@@ -8,13 +8,13 @@
 > truth; this plan gives direction and boundaries, not final wording.
 
 **Date:** 2026-08-21
-**Status:** Draft
+**Status:** Done
 **Owner:** SDK maintainers
-**Covers:** **REQ-160** (AQL containment admissibility relation), **REQ-161** (AQL semantic & portability lint), **REQ-162** (builder containment verification) — all *specified* (Phase 0 landed 2026-08-22; Impl. `planned`); canonical homes at [clinical-modeling.md](../specifications/clinical-modeling.md) beside REQ-109/113. Band **160–169 = AQL semantics** (allocation approved 2026-08-21; REQ.md numbering paragraph updated in Phase 0).
+**Covers:** **REQ-160** (AQL containment admissibility relation), **REQ-161** (AQL semantic & portability lint), **REQ-162** (builder containment verification) — all landed; canonical homes at [clinical-modeling.md](../../specifications/clinical-modeling.md) beside REQ-109/113. Band **160–169 = AQL semantics** (allocation approved 2026-08-21; REQ.md numbering paragraph updated in Phase 0).
 **Decision record:** **ADR-0017** — AQL semantic layer architecture (authored in Phase 0).
-**Probes:** **PROBE-097** (semantic lint corpus).
-**Implementation:** planned
-**Depends on:** landed [REQ-048](../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface) (`openehr/rm/rminfo` class graph — built with "AQL class-expression expansion and CONTAINS conformance" as a named consumer), landed [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) (lint layers + Issue model), landed [REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (`openehr/aql/parse`), [REQ-117](../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) containment algebra (`openehr/aql.Containment`).
+**Probes:** **PROBE-097** (semantic lint corpus) — Implemented (inline).
+**Implementation:** landed
+**Depends on:** landed [REQ-048](../../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface) (`openehr/rm/rminfo` class graph — built with "AQL class-expression expansion and CONTAINS conformance" as a named consumer), landed [REQ-109](../../specifications/clinical-modeling.md#req-109--aql-static-lint) (lint layers + Issue model), landed [REQ-113](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (`openehr/aql/parse`), [REQ-117](../../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) containment algebra (`openehr/aql.Containment`).
 **Defers:** see § Deferred follow-ups (typed result columns, template-derived FROM builder, engine-capability profiles, demographic overlay data, RM-path shape lint).
 
 ---
@@ -194,12 +194,12 @@ value-free classification (REQ-161), and the overlay edge table with citations (
 - **The negative space is normative too** — hold it while implementing: REQ-160's **Never** /
 **UnknownClass** verdicts and the pair-totality short-circuit (an UnknownClass operand makes the
 pair UnknownClass; a Never-containability operand makes the pair Never —
-[§ REQ-160](../specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation));
+[§ REQ-160](../../specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation));
 REQ-161's suppression rules (one finding per defect, and never an Error built on an unknown name
-— [§ REQ-161](../specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint));
+— [§ REQ-161](../../specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint));
 REQ-162's `Build()` **MUST NOT** change, down to byte-identical emission, and verification never
 runs implicitly
-([§ REQ-162](../specifications/clinical-modeling.md#req-162--builder-containment-verification)).
+([§ REQ-162](../../specifications/clinical-modeling.md#req-162--builder-containment-verification)).
 - `make spec-check` green on the spec-only commit.
 
 
@@ -223,10 +223,10 @@ entry); `docs/roadmap.md` updated; `make spec-check` + `make ci` green; plan arc
 | ----------------------------------------------------------------- | ------ |
 | Phase 0: ADR-0017 + REQ-160/161/162 + band + PROBE-097 registered | ✅ landed 2026-08-22 |
 | Phase 1: `openehr/aql/contain` + tests                            | ✅ landed 2026-08-24 |
-| Phase 2: lint checks + PROBE-097 + example                        |        |
-| Phase 3: builder verification + example                           |        |
-| Phase 4: traceability / CHANGELOG / roadmap / archive             |        |
-| `make spec-check` + `make ci` green at every phase boundary       |        |
+| Phase 2: lint checks + PROBE-097 + example                        | ✅ landed 2026-08-24 |
+| Phase 3: builder verification + example                           | ✅ landed 2026-08-24 |
+| Phase 4: traceability / CHANGELOG / roadmap / archive             | ✅ landed 2026-08-24 |
+| `make spec-check` + `make ci` green at every phase boundary       | ✅ (constituent commands green; `make ci` itself blocked on this host — Docker unavailable) |
 
 
 ---
@@ -257,14 +257,14 @@ entry); `docs/roadmap.md` updated; `make spec-check` + `make ci` green; plan arc
 2. **REQ-160 — containment admissibility relation** (clinical-modeling.md, band opener).
   Authors the verdict vocabulary, reachability semantics, the containable-operand rule, the
    overlay edge table, archetype/class conformance, and the extensibility contract. Canonical
-   wording: [REQ-160](../specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation).
+   wording: [REQ-160](../../specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation).
 3. **REQ-161 — semantic & portability lint.** Authors the issue-code catalogue — eight codes:
   `aql_impossible_containment` · `aql_contains_not_containable` ·
    `aql_archetype_class_mismatch` · `aql_unknown_rm_class` · `aql_containment_by_reference` ·
    `aql_version_no_predicate` · `aql_versioned_object_unreferenced` · `aql_fanout_row_grain` —
    each with its severity, firing rule, and value-free field classification, in the existing
    Layer-2 slot. Canonical catalogue:
-   [REQ-161](../specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint).
+   [REQ-161](../../specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint).
 4. **REQ-162 — builder containment verification.** Opt-in entry point on the write side;
   same verdicts/finding vocabulary as REQ-160; `Build()` contract explicitly unchanged.
 5. **Registry & plumbing:** REQ.md rows (Impl. `planned`), band paragraph rewrite ("160–169 =
@@ -419,14 +419,15 @@ listed there; run `/sdd-trace`; archive this plan via sdd-archive **in the imple
 | **Demographic overlay data**                       | AQL-C-010 dialect edges (`PERSON`→`EHR` by-reference…) as a shipped overlay; mechanism lands now, data waits for the dialect spec.                           |
 | **RM-path shape lint**                             | Template-free SELECT/WHERE path checking against `rminfo` attribute walks (`rmpath` precedent) — a Layer-2.5 between shape and template checks.              |
 | **Full semantic resolver / CDR lower-stage reuse** | One resolution pass producing a typed query model consumed by lint, builder, executor, and the consuming CDR's plan/lower stage.                             |
+| **Non-containable FROM root** | *Deferred — spec-sanctioned silence, not an oversight.* `aql_contains_not_containable` fires only on a `CONTAINS` operand; a non-containable FROM root (e.g. `FROM DV_TEXT t …`) raises no code today, in either spelling. Widening the code to the anchor position needs its own REQ/spec sentence, not a silent code change. |
 
 
 
 
 ## Mapping to specs
 
-- [clinical-modeling.md § REQ-160 / § REQ-161 / § REQ-162](../specifications/clinical-modeling.md) — canonical normative contracts (authored Phase 0)
-- [docs/adr/0017-aql-semantic-layer.md](../adr/0017-aql-semantic-layer.md) — architecture decision (authored Phase 0)
-- [REQ.md](../specifications/REQ.md) — registry rows + 160–169 band paragraph
-- [conformance.md § PROBE-097](../specifications/conformance.md) — probe catalogue row
-- [traceability.yaml](../specifications/traceability.yaml) — REQ→code/test map
+- [clinical-modeling.md § REQ-160 / § REQ-161 / § REQ-162](../../specifications/clinical-modeling.md) — canonical normative contracts (authored Phase 0)
+- [docs/adr/0017-aql-semantic-layer.md](../../adr/0017-aql-semantic-layer.md) — architecture decision (authored Phase 0)
+- [REQ.md](../../specifications/REQ.md) — registry rows + 160–169 band paragraph
+- [conformance.md § PROBE-097](../../specifications/conformance.md) — probe catalogue row
+- [traceability.yaml](../../specifications/traceability.yaml) — REQ→code/test map

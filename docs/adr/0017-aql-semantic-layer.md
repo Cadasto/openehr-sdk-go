@@ -5,7 +5,7 @@
 - **Superseded by:** —
 - **Strand:** —
 - **Introduces:** [REQ-160](../specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation) / [REQ-161](../specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint) / [REQ-162](../specifications/clinical-modeling.md#req-162--builder-containment-verification). **Amends:** [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) (Layer 2 gains the REQ-161 check groups; the out-of-scope list narrows to version-predicate *value* semantics — predicate presence is REQ-161's).
-- **Plan:** [2026-08-21-aql-semantic-layer.md](../plans/2026-08-21-aql-semantic-layer.md).
+- **Plan:** [2026-08-21-aql-semantic-layer.md](../plans/archive/2026-08-21-aql-semantic-layer.md).
 - **Related:** [ADR 0007](0007-aql-antlr-grammar-profile.md) (the permissive grammar profile this layer sits above); [REQ-048](../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface) (the `rminfo` class graph it consumes); [REQ-120](../specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation) (the canonical HRID parser it delegates to).
 
 ## Context

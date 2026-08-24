@@ -8,9 +8,7 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ### AQL semantic layer (2026-08-21)
 
-| Plan | Scope | Covers | Probe |
-|---|---|---|---|
-| [2026-08-21-aql-semantic-layer.md](2026-08-21-aql-semantic-layer.md) | A containment admissibility relation derived at runtime from the pinned BMM (`openehr/aql/contain`), semantic + portability lint checks on the read side, and opt-in builder verification on the write side — `Build()` and the parser unchanged | REQ-160 / REQ-161 / REQ-162 (specified 2026-08-22; REQ-160 Impl. `partial` — Phase 1 landed 2026-08-24; REQ-161/162 `planned`), [ADR-0017](../adr/0017-aql-semantic-layer.md) | PROBE-097 |
+This plan **landed 2026-08-24 and was archived** ([archive/2026-08-21-aql-semantic-layer.md](archive/2026-08-21-aql-semantic-layer.md)): REQ-160, REQ-161 and REQ-162 are all `landed`, and PROBE-097 is Implemented (inline). `openehr/aql/contain` derives a containment admissibility relation at runtime from the pinned BMM plus a cited overlay table ([ADR-0017](../adr/0017-aql-semantic-layer.md)); `openehr/aql/lint` gains the REQ-161 containment checks and three portability advisories; `(*Builder).VerifyContainment` gives the write side the same judgement, opt-in, held to read/write parity with the linter. `Build()` and the parser are unchanged.
 
 ### Client path safety, write-result contract, and missing leaves (2026-08-18)
 

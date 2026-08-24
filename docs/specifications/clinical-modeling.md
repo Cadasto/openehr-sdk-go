@@ -1485,9 +1485,9 @@ Row-semantics adjudication (REQ-161 carries the single advisory; the relation an
 
 `openehr/aql/contain/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`, and **MUST** limit its direct imports to `openehr/rm/rminfo`, `openehr/rm` (REQ-120's canonical `ParseArchetypeID` — § Archetype/class conformance), and the standard library — it sits below both `openehr/aql` and `openehr/aql/lint`. Enforced by an imports test.
 
-- **Lives in:** [`openehr/aql/contain/`](../../openehr/aql/contain/) (Phase 1 — landed; the REQ's own `Impl.` axis stays `partial` until Phase 2)
-- **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (arms with the Phase 2 lint corpus)
-- **Plan:** [`docs/plans/2026-08-21-aql-semantic-layer.md`](../plans/2026-08-21-aql-semantic-layer.md)
+- **Lives in:** [`openehr/aql/contain/`](../../openehr/aql/contain/)
+- **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (armed by the Phase 2 lint corpus and the Phase 3 builder-verification parity arm)
+- **Plan:** [`docs/plans/archive/2026-08-21-aql-semantic-layer.md`](../plans/archive/2026-08-21-aql-semantic-layer.md)
 
 ## REQ-161 — AQL semantic and portability lint
 
@@ -1507,6 +1507,8 @@ REQ-109's Layer 2 **MUST** gain two additive check groups: **semantic checks** b
 | Engine-defined row grain | `aql_fanout_row_grain` | Warning | **MUST** fire when an `AND` containment junction's class-expression **leaves** — the class expressions reached by flattening nested `AND` junctions, without descending into an `OR` junction — include two or more whose aliases each root at least one SELECT column; **MUST** stay silent on every other shape, `OR` junctions included (alternation selects rows, it does not multiply them) — an advisory held deliberately conservative. Near-miss pins: an `AND` junction with only one projected alias, and an `OR` junction with two projected aliases, **MUST NOT** fire. Detail states that row multiplicity for this shape is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9). |
 
 Operands whose verdict is **UnknownClass** or whose containability is **Never** **MUST** suppress the pair checks (`aql_impossible_containment`, `aql_containment_by_reference`) for every pair they participate in, and an archetype predicate **MUST NOT** raise `aql_archetype_class_mismatch` when its declared class or its HRID type segment is UnknownClass (the class expression already carries `aql_unknown_rm_class` — via the class-token arm or the type-segment arm of that code; REQ-160 § Archetype/class conformance yields no mismatch on an unknown name) — one finding per defect, and no Error built on an unknown name.
+
+`aql_contains_not_containable` is scoped to a `CONTAINS` operand, not to the FROM root. A **FROM root** whose REQ-160 containability verdict is Never — `FROM DV_TEXT t …` — **MUST** raise no code, in either the single-root or the root-junction spelling: the catalogue above authorises no code for the anchor position, and manufacturing one would breach § Flagging policy. An *unknown* root is unaffected by this boundary and **MUST** still raise `aql_unknown_rm_class` (unknown is not wrong). Widening a code to the anchor position is a deferred follow-up (see the plan's § Deferred follow-ups).
 
 The SDK adjudicates **no row semantics**: it **MUST NOT** deduplicate, reason about expected row counts, or refuse a row shape — the advisory above is the entire footprint.
 
@@ -1528,7 +1530,7 @@ Engine-capability findings (valid AQL a particular engine does not implement) ar
 
 - **Lives in:** [`openehr/aql/lint/`](../../openehr/aql/lint/) (extension)
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus); PROBE-028 re-baseline where applicable
-- **Plan:** [`docs/plans/2026-08-21-aql-semantic-layer.md`](../plans/2026-08-21-aql-semantic-layer.md)
+- **Plan:** [`docs/plans/archive/2026-08-21-aql-semantic-layer.md`](../plans/archive/2026-08-21-aql-semantic-layer.md)
 
 ## REQ-162 — Builder containment verification
 
@@ -1547,4 +1549,4 @@ The write side **MUST** offer the same semantic judgement as the read side, opt-
 
 - **Lives in:** [`openehr/aql/`](../../openehr/aql/) (extension)
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (parity arm)
-- **Plan:** [`docs/plans/2026-08-21-aql-semantic-layer.md`](../plans/2026-08-21-aql-semantic-layer.md)
+- **Plan:** [`docs/plans/archive/2026-08-21-aql-semantic-layer.md`](../plans/archive/2026-08-21-aql-semantic-layer.md)
