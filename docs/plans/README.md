@@ -6,6 +6,12 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### AQL semantic layer (2026-08-21)
+
+| Plan | Scope | Covers | Probe |
+|---|---|---|---|
+| [2026-08-21-aql-semantic-layer.md](2026-08-21-aql-semantic-layer.md) | A containment admissibility relation derived at runtime from the pinned BMM (`openehr/aql/contain`), semantic + portability lint checks on the read side, and opt-in builder verification on the write side — `Build()` and the parser unchanged | REQ-160 / REQ-161 / REQ-162 (specified 2026-08-22; Impl. `planned`), [ADR-0017](../adr/0017-aql-semantic-layer.md) | PROBE-097 |
+
 ### Client path safety, write-result contract, and missing leaves (2026-08-18)
 
 Four independent plans, specified first (REQ-150 / REQ-094 amendment / REQ-142 / REQ-143) — all four have now landed. The REQ-094 amendment was carried inside its plan and landed with the code (implementation-aligned), not ahead of it.

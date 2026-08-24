@@ -817,6 +817,12 @@ requirements:
     # value-free (Code / Severity / Span) and which may carry query text
     # (Detail / Path — a path spelling carries its own predicates). No code
     # added or removed, so PROBE-028's multiset is untouched.
+    #
+    # REQ-161 / ADR-0017 (2026-08-22) amend Layer 2: it gains the REQ-161
+    # semantic + portability check groups, and the out-of-scope list narrows to
+    # version-predicate *value* semantics (predicate presence is REQ-161's
+    # aql_version_no_predicate). Additive — the REQ-109 codes and PROBE-028's
+    # multiset are unchanged; the new codes are owned by the REQ-161 row.
     implementation: landed
     packages:
       - openehr/aql/parse
@@ -831,6 +837,7 @@ requirements:
       - docs/plans/archive/2026-06-15-aql-lint.md
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
       - docs/plans/archive/2026-08-18-aql-value-free-diagnostics.md
+      - docs/plans/2026-08-21-aql-semantic-layer.md
     tests:
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/ast_test.go
@@ -842,7 +849,7 @@ requirements:
       - openehr/validation/aql_test.go
       - internal/templatecompile/compile_test.go
       - testkit/probes/aql/probes_test.go
-    adrs: [docs/adr/0007-aql-antlr-grammar-profile.md]
+    adrs: [docs/adr/0007-aql-antlr-grammar-profile.md, docs/adr/0017-aql-semantic-layer.md]
 
   - id: REQ-103
     title: Primitive constraint introspection
@@ -2088,3 +2095,53 @@ requirements:
       service root and passes -- the System API sends OPTIONS /. Route gates
       the arity half, so openehr/client carries an AST tripwire holding every
       transport.Request literal to setting it.
+
+  - id: REQ-160
+    title: AQL containment admissibility relation
+    canonical: docs/specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation
+    status: draft
+    implementation: planned
+    packages: [openehr/aql/contain]
+    probes: [PROBE-097]
+    plans: [docs/plans/2026-08-21-aql-semantic-layer.md]
+    adrs: [docs/adr/0017-aql-semantic-layer.md]
+    notes: >-
+      Verdict relation (Admissible / Never / ByReference / UnknownClass)
+      derived at runtime from the pinned BMM via rminfo (REQ-048), plus the
+      cited overlay-edge table (EHR root, VERSION tier, FOLDER->COMPOSITION
+      by reference) and consumer-extensible overlays. Package to be created
+      by the plan's Phase 1; the planned-row warning on the missing path is
+      expected until then.
+
+  - id: REQ-161
+    title: AQL semantic and portability lint
+    canonical: docs/specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint
+    status: draft
+    implementation: planned
+    packages: [openehr/aql/lint]
+    probes: [PROBE-097]
+    plans: [docs/plans/2026-08-21-aql-semantic-layer.md]
+    adrs: [docs/adr/0017-aql-semantic-layer.md]
+    notes: >-
+      Additive REQ-109 Layer-2 extension: relation-backed semantic checks
+      (impossible containment, non-containable target, archetype/class
+      mismatch, unknown class, by-reference hop) plus spec-gap portability
+      checks (VERSION predicate default SPECPR-481, unreferenced
+      VERSIONED_OBJECT, conservative fan-out advisory). Existing codes,
+      severities and texts unchanged; PROBE-028 re-baselines only where a
+      corpus query genuinely carries a newly-checked defect.
+
+  - id: REQ-162
+    title: Builder containment verification
+    canonical: docs/specifications/clinical-modeling.md#req-162--builder-containment-verification
+    status: draft
+    implementation: planned
+    packages: [openehr/aql]
+    probes: [PROBE-097]
+    plans: [docs/plans/2026-08-21-aql-semantic-layer.md]
+    adrs: [docs/adr/0017-aql-semantic-layer.md]
+    notes: >-
+      Opt-in verification entry point over the builder's own containment
+      algebra, reporting REQ-161's containment codes; Build() validation
+      set, error texts and emission byte-identical to pre-REQ-162. Held to
+      read/write parity with lint by PROBE-097's arm (c).

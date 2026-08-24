@@ -561,6 +561,8 @@ The parse layer **MUST** validate against the **SDK-maintained grammar profile**
 
 SELECT-present-with-≥1-projection and FROM-present are guaranteed by a successful parse (the grammar requires both), so they raise no Layer-2 issue.
 
+Layer 2 additionally carries the semantic and portability check groups of [§ REQ-161](#req-161--aql-semantic-and-portability-lint) — additive codes whose severities and firing rules are specified once there.
+
 Two grammar-admitted, server-executable shapes are explicit **acceptances** of the alias-binding check; the resolution rules are specified normatively by [§ REQ-117 — Lint acceptance](#req-117--aql-expression-catalogue-completion). Codes, severities, and the collect-all contract are unchanged.
 
 ### Layer 3 — Path & template (only when a compiled OPT is supplied)
@@ -593,12 +595,12 @@ A `$param` archetype predicate (`[$name]`, `[parse.ClassExpr.ParamArchetype]`) i
 
 **`Issue` gains a `Span`**, populated from the token positions lint already visits and zero when the issue is not attributable. It **MUST** be the *same type* as the drop record's — `openehr/aql/parse` owns it, `openehr/aql/lint` re-exports it — not a structurally-identical twin, since [PROBE-096](conformance.md#probe-096--aql-value-free-structured-diagnostics) asserts spans across both packages and two types would make that a conversion exercise instead of a comparison. `lint` already imports `parse`, so this adds no dependency; the `validation → lint` arrow is unchanged.
 
-**Additive only.** No existing `Code`, `Severity`, `Detail` text, or `Result.OK()` semantic changes, and no lint code is added or removed — so [PROBE-028](conformance.md#probe-028--aql-lint-stability)'s issue-code multiset is untouched. The existing texts stay value-bearing and are **not** rewritten: the contract *names* them value-bearing, which is what lets a disclosure boundary drop them deliberately instead of scrubbing them hopefully. Redaction *policy* stays out of scope — what counts as a value is the consumer's decision.
+**Additive only.** No existing `Code`, `Severity`, `Detail` text, or `Result.OK()` semantic changes, and no lint code is added or removed *by this amendment* — so [PROBE-028](conformance.md#probe-028--aql-lint-stability)'s issue-code multiset is untouched here (the REQ-161 codes arrive additively, under [§ REQ-161 § Additivity](#req-161--aql-semantic-and-portability-lint)'s recorded re-baseline rule). The existing texts stay value-bearing and are **not** rewritten: the contract *names* them value-bearing, which is what lets a disclosure boundary drop them deliberately instead of scrubbing them hopefully. Redaction *policy* stays out of scope — what counts as a value is the consumer's decision.
 
 
 ### Out of scope (v1)
 
-- **Terminology** (`TERMINOLOGY()` / `MATCHES` value-set membership), function signatures, `ORDER BY` type checking, and version predicates beyond parse.
+- **Terminology** (`TERMINOLOGY()` / `MATCHES` value-set membership), function signatures, `ORDER BY` type checking, and version-predicate **value** semantics beyond parse — predicate *presence* on a `VERSION` operand is [§ REQ-161](#req-161--aql-semantic-and-portability-lint)'s `aql_version_no_predicate`.
 - **CDR-grade path resolution** — full AQL-path-to-canonical-path mapping (node-id-on-structural-attribute vs canonical placement) is PROBE-021 territory; Layer 3 is best-effort, hence `aql_path_not_in_template` is a Warning.
 - **Re-emission / pretty-printing** — not part of this REQ; canonical re-emission from the structured AST is provided by [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast) via [`(*Query).Emit`](../../openehr/aql/parse/query.go).
 
@@ -1395,3 +1397,153 @@ No other REQ-117 statement is affected, and nothing here licenses a new `ErrInco
 - Every guard MUST be mutation-detectable: removing it MUST fail a named test, not merely narrow coverage. String-literal closure is additionally fuzzed (`FuzzStringLiteralRoundTrip`), seeded with the byte classes that were wrong at least once.
 - Building-block independence (REQ-013) unchanged: `openehr/aql` still does not import the generated lexer, which is why the grammar confrontations live in `openehr/aql/parse`.
 - **Lives in:** [`openehr/aql/value.go`](../../openehr/aql/value.go) (literal spellings, function names, `ValidateValue`, `EqualValues`, `DerefValue`), [`openehr/aql/identifier.go`](../../openehr/aql/identifier.go) (`ValidateIdentifier`, `ValidateArchetypeID`), [`openehr/aql/predicate.go`](../../openehr/aql/predicate.go) (`ValidatePathPredicate`, `ValidateVersionPredicate`, `StripPredicateTrivia`, `RedactPredicateValues`, the bracket scan), [`openehr/aql/containment.go`](../../openehr/aql/containment.go) (the containment intake of both), [`openehr/aql/where.go`](../../openehr/aql/where.go) (`FormatValue`, `FormatWhere`, `DerefWhere`, URI operand guard), [`openehr/aql/builder.go`](../../openehr/aql/builder.go) (`Build` rendering WHERE through `FormatWhere`), [`openehr/aql/parse/deref.go`](../../openehr/aql/parse/deref.go) (`DerefSelectExpr`, `DerefLimitExpr`), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (unescaping, both delimiters, signed and scientific numeric extraction), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (SELECT-position and shape validation, Emit-side structural parity), [`openehr/aql/parse/emit_verify.go`](../../openehr/aql/parse/emit_verify.go) (the after-emission closure: the skeleton, its reduction and the two refusal arms), [`openehr/aql/lint/`](../../openehr/aql/lint/) (`resolve.go` / `path.go` normalising the now-verbatim predicate text before comparing it to a compiled OPT node id).
+
+## REQ-160 — AQL containment admissibility relation
+
+The SDK **MUST** ship a building-block relation that answers, for two AQL class expressions, whether a containment route under the pinned openEHR Reference Model connects them (§ Verdicts — route-existence, not a claim of RM truth) — so the lint (REQ-161), the builder verification (REQ-162), and future consumers judge `FROM … CONTAINS …` shapes from one shared RM-derived relation instead of each guessing. Architecture: [ADR 0017](../adr/0017-aql-semantic-layer.md).
+
+Motivation: almost any `X CONTAINS Y` parses, but only RM-nestable pairs can ever match data. Engines commonly accept the rest and return zero rows — EHRbase, for example, validates containment at storage-root granularity (observed behaviour; maintainer's knowledge base, `openehr-kb/notes/ecosystem/ehrbase-aql.md` §4.1.2) — so an empty result set cannot be told apart from an impossible query. Whether an engine must *reject* an RM-impossible containment is an open specification gap (AQL-C-009(d) in the maintainer's knowledge base); this relation is the SDK's documented position on it, not enforcement of existing spec text.
+
+### Verdicts
+
+The relation answers two questions — **operand containability** (may this class be a `CONTAINS` operand at all?) and **pair admissibility** (does a containment route connect this ancestor/descendant pair?) — each yielding exactly one verdict from the table below; **ByReference** arises only on the pair question.
+
+**Admissible is route-existence, not a claim of RM truth.** A verdict is derived from the pinned BMM's by-value graph plus the overlay edges; on the RM-faithful subgraph an Admissible verdict *is* genuine RM nesting, but where the default relation is deliberately loose (the family-agnostic `VERSION` hub, § Overlay edges) it **MAY** report Admissible for a pair that cannot actually nest. That looseness is a documented missed defect, never a false Error (§ REQ-161 § Flagging policy); consumers needing RM-exact verdicts use a stricter profile once one ships (§ Out of scope).
+
+| Verdict | Meaning |
+|---|---|
+| **Admissible** | Pair: a route (by-value or overlay) connects the pair using only non-reference edges. Operand: a legal `CONTAINS` operand. |
+| **Never** | Pair: no route connects the pair — a `CONTAINS` over it is always empty, and a `NOT CONTAINS` over it is trivially true. Operand: not a containment target at all. |
+| **ByReference** | The pair is resolvable only through a reference hop that some engines implement as containment; portable behaviour is not guaranteed. |
+| **UnknownClass** | The class is not one the relation knows (pinned BMM + overlays). Unknown is **not** wrong: future RM releases, demographic deployments, and dialects are legitimate sources of unknown names. |
+
+The pair question is total — it answers for **every** ordered operand pair: when either operand is **UnknownClass**, the pair verdict **MUST** be UnknownClass; otherwise, when either operand's containability is **Never**, the pair verdict **MUST** be Never. (REQ-161 reports such operands once, through the operand-level codes, and suppresses the pair codes.) Neither short-circuit can pre-empt an overlay edge: every class an overlay edge of the relation in use names is thereby a known, containable class of that relation (§ Containable operands, § Extensibility).
+
+### Reachability semantics
+
+- `CONTAINS` admissibility **MUST** be **descendant-at-any-depth reachability** over the RM's by-value composition graph, derived from the pinned BMM through [`openehr/rm/rminfo`](../../openehr/rm/rminfo/) (REQ-048) — never hand-written where the BMM can answer. `COMPOSITION CONTAINS ELEMENT` is Admissible even though levels are skipped: level-skipping is the QUERY specification's own worked-example behaviour and the engine consensus (survey: maintainer's knowledge base, `openehr-kb/notes/aql-language-reference.md` §6.1a; the depth question is itself part of open gap AQL-C-009), and a direct-child rule would flag valid queries.
+- The derivation walk **MUST** cross non-LOCATABLE by-value classes (e.g. `EVENT_CONTEXT` on the way to `COMPOSITION → ITEM_STRUCTURE`) while collecting only containable classes, and **MUST** treat reference-typed attributes (`OBJECT_REF` and its descendants) as terminating structural reachability — reference hops are overlay data, never derived.
+- **Abstract classes stand for their concrete kinds, on both operands:** a pair **MUST** be Admissible when *any* concrete-descendant combination is (`rminfo` `ConformsTo` / `ConcreteDescendants`). `ENTRY CONTAINS CLUSTER` is Admissible because a concrete entry admits it.
+- **ByReference closes over routes, not edges:** a *route* is any edge sequence connecting the pair in the closure, derived and overlay edges alike. The pair verdict **MUST** be Admissible when at least one route crosses no ByReference edge, ByReference when routes exist but every one crosses at least one ByReference edge, and Never when no route connects the pair. `FOLDER CONTAINS OBSERVATION` is therefore ByReference: every route runs through the `FOLDER → COMPOSITION` reference hop.
+- Class-name matching **MUST** be ASCII-case-insensitive against the BMM's canonical spelling (engines and the EHRbase SDK round-trip lower-case class spellings; a case-mismatch is not a semantic difference).
+- Verdicts are derived at runtime and **MAY** be memoized; the relation **MUST NOT** require code generation or network access.
+
+### Containable operands
+
+A class **MUST** be a legal `CONTAINS` operand exactly when it **conforms to** one of `LOCATABLE`, `VERSIONED_OBJECT`, or `VERSION` (conformance, not name equality — so every `VERSIONED_*` container the pin ships, `VERSIONED_FOLDER` and `VERSIONED_PARTY` included, and the concrete `ORIGINAL_VERSION` / `IMPORTED_VERSION` are containable), or is `EHR` (the non-LOCATABLE root), **or is named as an endpoint of an overlay edge of the relation in use** — naming a class in an edge makes it a known, containable class of that relation (§ Extensibility). Data values (`DV_*`) and other non-LOCATABLE, non-version-tier RM classes **MUST** yield containability verdict **Never** — values are read through paths, not bound by `CONTAINS`. Demographic classes are containable exactly when the pinned BMM declares them; their presence is a property of the pin, not of this contract.
+
+### Overlay edges (default relation)
+
+Facts the BMM cannot express **MUST** be carried as **overlay data with citations**, participating in the same reachability closure. Overlay edges **MUST** be conformance-aware on both endpoints, like any derived edge: an edge naming `VERSIONED_OBJECT` covers every class conforming to it.
+
+| Edge | Verdict contribution | Basis |
+|---|---|---|
+| `EHR` → `COMPOSITION`, `EHR_STATUS`, `FOLDER`, `EHR_ACCESS`, **and those four payload families' `VERSIONED_*` and `VERSION` tier** | Admissible | RM EHR IM: the EHR references its versioned objects — ehr_access, ehr_status, directory (folders) and compositions — so those four families are `EHR`'s **direct** overlay endpoints; the EHR IM versions no parties, so the demographic family is not a direct endpoint (a deployment that wants demographic containment adds a consumer edge, § Extensibility). Onward reachability through the shared, family-agnostic `VERSION` node may still resolve a hub-mediated cross-family route Admissible — deliberate, bounded looseness, never a false Error (§ Overlay edges, the family-agnostic note). `FROM EHR e CONTAINS …` is the specification's own canonical example shape and consensus engine behaviour (survey: maintainer's knowledge base, `openehr-kb/notes/aql-language-reference.md` §6.1a). |
+| For each **payload family** X in {`COMPOSITION`, `EHR_STATUS`, `EHR_ACCESS`, `FOLDER`, `PARTY`} — the payload classes of the concrete `VERSIONED_*` containers the pinned BMM ships — the pair of edges `VERSIONED_X` → `VERSION` and `VERSION` → `X` | Admissible | Version-tier mechanics are RM facts for every pin-shipped container (RM common IM version tier; the EHR IM's versioned objects; `VERSIONED_PARTY` is the demographic IM's, shipped by the pin), and the QUERY grammar admits the operands while CDR practice resolves them (pattern survey: maintainer's knowledge base, `openehr-kb/notes/aql-versioning-patterns.md`). `VERSION.data` is generic — in the pinned tables `ORIGINAL_VERSION.data` is literally typed `T`, and [REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface) leaves generic-parameter resolution out of scope — so the payload pairing is **cited overlay data reviewed on a BMM pin bump** ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md) drift triage), not derivable from `rminfo`. |
+| `FOLDER` → `COMPOSITION` | **ByReference** | `FOLDER.items: List<OBJECT_REF>`; engines that support it resolve the reference hop — engine-specific, verify before use. (`FOLDER → FOLDER` is by-value and needs no overlay.) |
+
+The `VERSION` node is **family-agnostic** in the default relation. Because `VERSION.data` is generic — one RM class for every payload — a bare `VERSION` or `VERSIONED_OBJECT` operand stands for any payload family (abstract expansion, § Reachability semantics), and the shared node carries no payload-family state along a route. The relation therefore **MAY** over-admit a rare cross-family version-tier pair rather than assert an impossibility it cannot cheaply prove: because the shared node offers a plain (non-reference) exit to *any* payload family, a route with no ByReference edge exists, and the route-closure rule (§ Reachability semantics) yields **Admissible** for both `VERSIONED_FOLDER CONTAINS COMPOSITION` (route `VERSIONED_FOLDER → VERSION → COMPOSITION`) and a hub-mediated `EHR … PARTY` pair. This looseness is deliberate and bounded: it is a *missed defect*, never a false Error ([§ REQ-161 § Flagging policy](#flagging-policy)), and it never contradicts the EHRbase-compatibility guard below. The over-admission lives in the default relation by design; what is deferred to its own requirement is a **family-precise** profile that would correctly refuse these pairs, and the shipped AQL-C-010 demographic edges — not the looseness itself (§ Out of scope, § Extensibility). The version-tier overlay set is pin-reviewed data and **MUST NOT** drift from the pin: a guard test **MUST** fail when the family enumeration and `ConcreteDescendants("VERSIONED_OBJECT")` diverge, so a pin that adds a versioned container fails the guard until its family edges are carried. The `VERSIONED_<CLASS>` naming convention is the *guard's* heuristic for pairing a container with its payload class — used in the test only, never in the relation.
+
+Under the default relation nothing contains `EHR` — a pair with `EHR` as the descendant **MUST** verdict Never — and no reference hop beyond the table above is admitted. The default relation expresses the openEHR RM and specifications only — never one vendor's storage model; **an RM-valid pair that a conformant engine (EHRbase among them) admits MUST NOT verdict Never.**
+
+### Archetype/class conformance
+
+For a class expression carrying a literal archetype predicate, the HRID's type segment (`openEHR-<pkg>-<TYPE>.<concept>.vN`) **MUST** conform to the declared class (ConformsTo, case-insensitive): `ENTRY o[openEHR-EHR-OBSERVATION.…]` conforms; `EVALUATION o[openEHR-EHR-OBSERVATION.…]` does not. HRID decomposition **MUST** delegate to `rm.ParseArchetypeID` — [REQ-120](rm-functions.md#req-120--rm-identifier-parsing-and-derivation)'s single canonical parser; the relation adds no duplicate lexical logic. HRID token shape is grammar-guaranteed on parsed input; an unparseable HRID reaching the relation directly **MUST** yield **UnknownClass**, never a false mismatch — and so **MUST** a declared class or type segment the relation does not know: a mismatch is only ever asserted between two known classes.
+
+### Extensibility
+
+An overlay edge — default and consumer alike — is a record of two class-name endpoints (`From`, `To`) and a by-reference marker: a plain edge contributes **Admissible** to routes through it, a marked edge contributes **ByReference** (§ Reachability semantics · ByReference closure). Consumers **MUST** be able to extend the relation with their own overlay edges without forking it (immutable-copy extension, matching the `Containment` algebra's style). A consumer edge **MUST** be honoured verbatim — its endpoints need not be BMM-known — which is what lets a dialect deployment (e.g. demographic containment, AQL-C-010) verify its own queries without false findings. Endpoint matching follows what the pin knows: a BMM-known endpoint **MUST** match by conformance (like any derived edge, § Overlay edges — `WithOverlay(VERSIONED_OBJECT → PERSON)` covers every `VERSIONED_*`), and an endpoint the pin does not know **MUST** match by exact name (there are no descendants to expand). An edge's endpoints thereby become known, containable classes of the extended relation (§ Containable operands), and a pair a consumer edge names **MUST** verdict per that edge: the UnknownClass / Never short-circuit (§ Verdicts) applies only to classes no edge of the relation names. Consumer edges **MUST NOT** alter the default relation.
+
+### Acceptance (representative rows — the full relation is derived)
+
+| Pair | Verdict |
+|---|---|
+| `EHR CONTAINS COMPOSITION` · `EHR CONTAINS OBSERVATION` | Admissible (overlay + closure) |
+| `COMPOSITION CONTAINS OBSERVATION` · `COMPOSITION CONTAINS ELEMENT` | Admissible |
+| `SECTION CONTAINS SECTION` · `CLUSTER CONTAINS CLUSTER` · `INSTRUCTION CONTAINS ACTIVITY` | Admissible |
+| `ENTRY CONTAINS CLUSTER` (abstract operand) · `EHR_STATUS CONTAINS ELEMENT` · `FOLDER CONTAINS FOLDER` | Admissible |
+| `EHR CONTAINS VERSION` · `VERSIONED_OBJECT CONTAINS VERSION` · `VERSION CONTAINS COMPOSITION` | Admissible (overlay) |
+| `VERSIONED_FOLDER CONTAINS VERSION` · `VERSION CONTAINS EHR_ACCESS` (version tier covers every pin-shipped container) | Admissible (overlay) |
+| `VERSION CONTAINS PARTY` | Admissible (the pin ships `VERSIONED_PARTY`; PARTY payload family) |
+| `FOLDER CONTAINS COMPOSITION` · `FOLDER CONTAINS OBSERVATION` (every route crosses the reference hop) | ByReference |
+| `VERSIONED_FOLDER CONTAINS COMPOSITION` · `EHR CONTAINS PERSON` (deliberate over-admission via the family-agnostic `VERSION` hub, which offers a plain route to any payload *family* — a missed defect, never a false Error; § Overlay edges) | Admissible |
+| `EHR CONTAINS VERSIONED_PARTY` (no route reaches the demographic *container*: the hub over-admits payloads, not `VERSIONED_*` containers, and no default edge leads to `VERSIONED_PARTY`) | Never |
+| `OBSERVATION CONTAINS COMPOSITION` · `OBSERVATION CONTAINS SECTION` · `OBSERVATION CONTAINS EVALUATION` · `ELEMENT CONTAINS CLUSTER` | Never |
+| any class `CONTAINS EHR` (default relation) | Never |
+| `DV_TEXT` as a `CONTAINS` operand (containability question) | Never |
+| `COMPOSITION CONTAINS DV_TEXT` (pair question: a Never-containability operand) | Never |
+| `FOO_BAR` as either operand — pair and containability questions alike | UnknownClass |
+
+Differences from any engine's observed admissibility are asserted as neutral, cited, executable documentation — including the EHRbase-compatibility guard above — not treated as anyone's defect.
+
+### Out of scope
+
+Row-semantics adjudication (REQ-161 carries the single advisory; the relation answers admissibility only); per-engine capability profiles (valid AQL an engine does not implement — deferred to its own requirement); a **family-precise profile** that would tighten the family-agnostic `VERSION` hub's over-admissions (§ Overlay edges) into RM-exact verdicts — deferred to its own requirement; and shipped **dialect containment edge data** (e.g. AQL-C-010 demographic containment) — the extension mechanism above is in scope, that edge data waits for its own requirement. The version tier of every pin-shipped `VERSIONED_*` container, `VERSIONED_PARTY` included, is **not** deferred: it is default overlay data (§ Overlay edges).
+
+### Building-block independence (REQ-013)
+
+`openehr/aql/contain/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`, and **MUST** limit its direct imports to `openehr/rm/rminfo`, `openehr/rm` (REQ-120's canonical `ParseArchetypeID` — § Archetype/class conformance), and the standard library — it sits below both `openehr/aql` and `openehr/aql/lint`. Enforced by an imports test.
+
+- **Lives in:** `openehr/aql/contain/` (planned)
+- **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus)
+- **Plan:** [`docs/plans/2026-08-21-aql-semantic-layer.md`](../plans/2026-08-21-aql-semantic-layer.md)
+
+## REQ-161 — AQL semantic and portability lint
+
+REQ-109's Layer 2 **MUST** gain two additive check groups: **semantic checks** backed by the REQ-160 relation (RM-impossible shapes a CDR will typically accept and answer with zero rows), and **portability checks** for behaviours the QUERY specification leaves open (each citing the open specification question or community source where one exists). The layer contract is preserved — AST walk, collect-all, no CDR, no OPT; the relation is derived in-process from the pinned BMM.
+
+### Checks
+
+| Check | Code | Severity | Rule |
+|---|---|---|---|
+| Impossible containment | `aql_impossible_containment` | Error | An adjacent FROM/CONTAINS pair of containable operands whose REQ-160 **pair verdict** is **Never** **MUST** raise this code — including junction operands (checked against the junction's enclosing parent) and `NOT CONTAINS` pairs (the exclusion is trivially true: a dead constraint is equally a defect). |
+| Non-containable target | `aql_contains_not_containable` | Error | A `CONTAINS` operand whose REQ-160 **containability verdict** is **Never** — a known class that is not a containment target, e.g. a `DV_*` type — **MUST** raise this code. |
+| Archetype/class mismatch | `aql_archetype_class_mismatch` | Error | A literal archetype predicate whose HRID type segment does not conform to the declared class (REQ-160 § Archetype/class conformance) **MUST** raise this code. `$param` archetype predicates are skipped — the CDR resolves the bound scope at execution (PROBE-021), the same skip REQ-109 Layer 3 applies. |
+| Unknown RM class | `aql_unknown_rm_class` | Warning | A class token whose REQ-160 verdict is **UnknownClass**, **or** a literal archetype predicate whose HRID type segment is not a class the relation knows (`ArchetypeMatches` → **UnknownClass**, REQ-160 § Archetype/class conformance), **MUST** raise this code, once per class-expression occurrence — Warning, because unknown is not wrong (future RM, demographic deployments, dialects). This is the code that fires when `aql_archetype_class_mismatch` is suppressed for an unknown type segment, so an unknown name is never silent. |
+| Containment by reference | `aql_containment_by_reference` | Warning | A pair whose REQ-160 pair verdict is **ByReference** **MUST** raise this code — Warning, because the hop is engine-specific: verify against the target CDR. |
+| `VERSION` without predicate | `aql_version_no_predicate` | Warning | A `VERSION` class expression carrying no version predicate **MUST** raise this code: the default is unspecified ([SPECPR-481](https://openehr.atlassian.net/browse/SPECPR-481)), so portable queries **SHOULD** state `[LATEST_VERSION]` / `[ALL_VERSIONS]` explicitly. |
+| Unreferenced `VERSIONED_OBJECT` | `aql_versioned_object_unreferenced` | Warning | An operand whose class conforms to `VERSIONED_OBJECT` (REQ-160 § Containable operands — conformance, not a name list) and whose alias roots no identified path outside FROM/CONTAINS **MUST** raise this code — the step is redundant unless container-level attributes are read ([Discourse #14186](https://discourse.openehr.org/t/aql-versionedobject-grammar/14186)). |
+| Engine-defined row grain | `aql_fanout_row_grain` | Warning | **MUST** fire when an `AND` containment junction's class-expression **leaves** — the class expressions reached by flattening nested `AND` junctions, without descending into an `OR` junction — include two or more whose aliases each root at least one SELECT column; **MUST** stay silent on every other shape, `OR` junctions included (alternation selects rows, it does not multiply them) — an advisory held deliberately conservative. Near-miss pins: an `AND` junction with only one projected alias, and an `OR` junction with two projected aliases, **MUST NOT** fire. Detail states that row multiplicity for this shape is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9). |
+
+Operands whose verdict is **UnknownClass** or whose containability is **Never** **MUST** suppress the pair checks (`aql_impossible_containment`, `aql_containment_by_reference`) for every pair they participate in, and an archetype predicate **MUST NOT** raise `aql_archetype_class_mismatch` when its declared class or its HRID type segment is UnknownClass (the class expression already carries `aql_unknown_rm_class` — via the class-token arm or the type-segment arm of that code; REQ-160 § Archetype/class conformance yields no mismatch on an unknown name) — one finding per defect, and no Error built on an unknown name.
+
+The SDK adjudicates **no row semantics**: it **MUST NOT** deduplicate, reason about expected row counts, or refuse a row shape — the advisory above is the entire footprint.
+
+### Flagging policy
+
+The semantic checks are **conservative**: a false **Error** is worse than a missed defect, so the layer flags only what the pinned BMM and overlays prove. Concretely — an **Error** code (`aql_impossible_containment`, `aql_contains_not_containable`, `aql_archetype_class_mismatch`) **MUST** fire only on a verdict provable from the relation; an unknown name is **not** an error — it **MUST** surface as the `aql_unknown_rm_class` **Warning**, never as silence and never as an Error; and where the relation is deliberately loose (the family-agnostic `VERSION` hub, REQ-160 § Overlay edges) the layer **MUST NOT** manufacture an Error the relation does not support. This policy is the canonical home for the "uncertain stays out of Error" rule that ADR-0017 and the plan cite.
+
+### Relation supply
+
+`lint.Options` **MUST** gain a nilable relation field; nil uses the REQ-160 default relation. A caller with dialect overlay edges (REQ-160 § Extensibility) lints without false findings. Because adding a field is breaking for positional struct literals ([idiom.md § Public-API stability](idiom.md#public-api-stability)), callers **SHOULD** construct `lint.Options` field-by-name; the addition is an additive minor bump, not a change to any existing field. Import direction: `lint → contain → {rminfo, openehr/rm}`; the `validation → lint` arrow and the REQ-109 forbidden-imports contract are unchanged, extended to `contain`.
+
+### Additivity
+
+No existing code, severity, `Detail` text, or `Result.OK()` semantic changes. The new codes reuse the REQ-109 issue model verbatim — `Code`/`Severity`/`Span` value-free, `Detail`/`Path` value-bearing ([§ REQ-109 § Value-free lint diagnostics](#req-109--aql-static-lint)) — with `Span` on the offending class expression or path. [PROBE-028](conformance.md#probe-028--aql-lint-stability)'s corpus **MAY** gain REQ-161 codes only where a corpus query genuinely carries a newly-checked defect — a deliberate, recorded re-baseline; a query carrying **no** REQ-161 defect **MUST** keep its existing issue-code multiset unchanged ([PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus)'s additivity guard). (A query the new checks legitimately flag — e.g. `OBSERVATION CONTAINS COMPOSITION` — is expected to gain its code; that is the feature, not an additivity breach.)
+
+### Out of scope
+
+Engine-capability findings (valid AQL a particular engine does not implement) are a deferred per-engine-profile concern; terminology, function signatures, and `ORDER BY` type checking remain out of scope as in REQ-109.
+
+- **Lives in:** [`openehr/aql/lint/`](../../openehr/aql/lint/) (extension)
+- **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus); PROBE-028 re-baseline where applicable
+- **Plan:** [`docs/plans/2026-08-21-aql-semantic-layer.md`](../plans/2026-08-21-aql-semantic-layer.md)
+
+## REQ-162 — Builder containment verification
+
+The write side **MUST** offer the same semantic judgement as the read side, opt-in: a verification entry point on the AQL builder that walks the builder's own FROM root and containment algebra (junctions and `NOT CONTAINS` included) — no emission, no re-parse — and reports the containment findings of the REQ-161 catalogue (`aql_impossible_containment`, `aql_contains_not_containable`, `aql_archetype_class_mismatch`, `aql_unknown_rm_class`, `aql_containment_by_reference`).
+
+### Contract
+
+- The entry point takes a nilable REQ-160 relation (nil = default) and returns findings carrying the REQ-161 **codes**; each code's severity and firing rule are defined **once**, in REQ-161 — this section adds none.
+- Findings **MUST** carry a value-free `Code` and a value-bearing `Detail` (may quote class names and HRIDs), mirroring the REQ-109 field classification, and **MUST NOT** carry a `Span`, `Path`, or severity field — a builder tree has no source text to point into, and severity is looked up per code in the REQ-161 catalogue.
+- **`Build()` is unchanged**: its validation set, error texts, and emitted text **MUST NOT** change — a query carrying a Never pair still builds and emits byte-identically to the pre-REQ-162 SDK. Verification **MUST NOT** run implicitly.
+- **Read/write parity:** for a query expressible through the builder, the verification's code multiset **MUST** equal the containment-check subset of `lint.LintString` over the emitted text — one rule engine, two adapters, no drift.
+
+### Building-block independence (REQ-013)
+
+`openehr/aql` gains an import of `openehr/aql/contain` (whose own import contract is [§ REQ-160 § Building-block independence](#req-160--aql-containment-admissibility-relation)); the package **MUST** remain importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`.
+
+- **Lives in:** [`openehr/aql/`](../../openehr/aql/) (extension)
+- **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (parity arm)
+- **Plan:** [`docs/plans/2026-08-21-aql-semantic-layer.md`](../plans/2026-08-21-aql-semantic-layer.md)
