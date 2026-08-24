@@ -241,6 +241,96 @@ func TestSuppressionRule(t *testing.T) {
 	}
 }
 
+// TestRootPositionIsSilentInEverySpelling pins the controller ruling on the
+// role axis: the operand role is assigned by POSITION IN THE QUERY, never by
+// shape in the containment tree.
+//
+// AQL spells a FROM root two ways — a single root (`FROM X x`) and a boolean
+// junction at the root (`FROM X x OR Y y`) — and the parse tree represents them
+// differently: the first lands on FromClause.Root, the second on
+// FromClause.Junction, whose operands are junction CHILDREN. Labelling those
+// children "contained" because of where they sit made the two spellings answer
+// differently for the same query position, which is the bug these rows exist to
+// keep fixed. Root positions are silent for aql_contains_not_containable in
+// every spelling; the code is authorised only for a CONTAINS operand (REQ-161
+// § Checks), and a false Error is worse than a missed defect (§ Flagging
+// policy). The engine-side rule is [semcheck.Role.Next].
+func TestRootPositionIsSilentInEverySpelling(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name  string
+		query string
+		want  []string
+	}{
+		{
+			"single root",
+			"SELECT t FROM DV_TEXT t",
+			nil,
+		},
+		{
+			"single root with a CONTAINS below it",
+			"SELECT t FROM DV_TEXT t CONTAINS ELEMENT e",
+			nil,
+		},
+		{
+			"root-junction operand is a root, not a contained operand",
+			"SELECT c FROM DV_TEXT t OR COMPOSITION c",
+			nil,
+		},
+		{
+			"root-junction operand in either arm order",
+			"SELECT c FROM COMPOSITION c OR DV_TEXT t",
+			nil,
+		},
+		{
+			// Mixed AND/OR at the root does NOT flatten, so this operand is a
+			// junction child of a junction child: the root role has to survive
+			// two levels of inheritance.
+			"nested root junction still holds roots",
+			"SELECT c1 FROM COMPOSITION c1 OR (DV_TEXT t AND COMPOSITION c2)",
+			nil,
+		},
+		{
+			// The scope of the silence, in ONE query: the root-junction operand
+			// DV_TEXT stays silent while DV_QUANTITY — a genuine CONTAINS
+			// operand under the other arm — still raises the Error. Before the
+			// role was assigned by position this query reported the code twice.
+			"a root operand and a contained operand in one query",
+			"SELECT c FROM DV_TEXT t OR COMPOSITION c CONTAINS DV_QUANTITY q",
+			[]string{codeNotContain},
+		},
+		{
+			// The counterpart: the same class as a CONTAINS operand IS an Error,
+			// so these rows pin a scoped silence rather than a blanket one.
+			"the same class under a CONTAINS is an Error",
+			"SELECT c FROM COMPOSITION c CONTAINS DV_TEXT t",
+			[]string{codeNotContain},
+		},
+		{
+			// An UNKNOWN root is covered in every spelling either way, because
+			// aql_unknown_rm_class fires on any class token in any position —
+			// so the silence above is narrowly the known-but-non-containable
+			// root, never an unreported unknown name.
+			"an unknown root-junction operand still warns",
+			"SELECT c1 FROM COMPOSITION c1 OR FOO_BAR f",
+			[]string{codeUnknownClass},
+		},
+		{
+			"an unknown single root still warns",
+			"SELECT f FROM FOO_BAR f",
+			[]string{codeUnknownClass},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := req161(lint.LintString(tc.query, nil)); !slices.Equal(got, tc.want) {
+				t.Errorf("%q semantic codes = %v, want %v", tc.query, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestUnknownClassFiresOncePerOccurrence pins the "once per class-expression
 // occurrence" wording (REQ-161 § Checks): two occurrences of the same unknown
 // class are two findings, because each is a separate class expression a reader

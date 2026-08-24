@@ -97,19 +97,67 @@ func SeverityOf(code string) (Severity, bool) {
 	return s, ok
 }
 
-// Role is where a class expression sits in the FROM/CONTAINS tree.
+// Role is the POSITION a class expression occupies in the query — is it a FROM
+// root, or an operand some CONTAINS introduced?
 //
 // It decides one thing only: whether [Operand.Findings] may raise
 // CodeNotContainable. REQ-161 § Checks scopes that code to a CONTAINS operand,
 // and a FROM root is the containment anchor rather than a containment target.
+//
+// Role is a property of the position, never of the node's SHAPE in whatever
+// tree an adapter happens to walk. Assign it with [Role.Next] rather than by
+// hand — see that method for why the distinction is load-bearing.
 type Role int
 
 const (
-	// RoleRoot is the FROM root — not a CONTAINS operand.
+	// RoleRoot is a FROM-root operand — the containment anchor, introduced by
+	// no CONTAINS keyword.
 	RoleRoot Role = iota
-	// RoleContained is a CONTAINS operand, junction operands included.
+	// RoleContained is an operand a CONTAINS / NOT CONTAINS keyword introduced,
+	// at any depth.
 	RoleContained
 )
+
+// Step is how an adapter reached an operand from the position above it.
+type Step int
+
+const (
+	// StepContains is a CONTAINS / NOT CONTAINS keyword.
+	StepContains Step = iota
+	// StepJunction is a boolean junction operand — an arm of an AND / OR, which
+	// is not a containment step at all.
+	StepJunction
+)
+
+// Next is the role of an operand reached from a position holding role r by step
+// s. It is the WHOLE role-assignment rule, and it lives here — not in either
+// adapter — because REQ-162 § Contract makes an identical code multiset a MUST
+// and a divergent assignment would break that parity silently:
+//
+//   - StepContains yields RoleContained, at any depth. A CONTAINS keyword
+//     introduces a containment target whatever introduced its ancestor.
+//   - StepJunction yields r UNCHANGED. A junction is boolean grouping, not a
+//     containment step, so its operands occupy the same position the junction
+//     itself occupies. `FROM A a OR B b` therefore holds two ROOT operands —
+//     neither is introduced by a CONTAINS — while `x CONTAINS (A a OR B b)`
+//     holds two contained ones. The inheritance composes, so a junction nested
+//     inside a junction keeps propagating the enclosing position.
+//
+// The rule an adapter must NOT use is tree shape: "this node is a junction's
+// child, therefore it is a containment child" makes the two spellings of a root
+// position — `FROM DV_TEXT t` and `FROM DV_TEXT t OR COMPOSITION c` — disagree,
+// and only one of them can be right. Root positions are silent for
+// CodeNotContainable in EVERY spelling: REQ-161 § Checks authorises the code
+// only for a CONTAINS operand, and REQ-161 § Flagging policy is explicit that a
+// false Error is worse than a missed defect. (An unknown root stays covered
+// either way — CodeUnknownRMClass fires on any class token, in any position —
+// so the silence is narrowly the known-but-non-containable root.)
+func (r Role) Next(s Step) Role {
+	if s == StepContains {
+		return RoleContained
+	}
+	return r
+}
 
 // Checker applies the REQ-161 containment rules over one REQ-160 relation.
 //
@@ -188,12 +236,15 @@ func (o Operand) Suppresses() bool { return o.verdict != contain.Admissible }
 //   - CodeNotContainable (Error) when the class is known but is not a
 //     containment target, and the operand is a CONTAINS operand.
 //
-// A FROM root whose class is not containable yields NO finding: REQ-161
-// § Checks scopes CodeNotContainable to a CONTAINS operand, and the catalogue
-// authorises no code for the anchor position. That is a documented missed
-// defect — the conservative direction — not an Error invented outside the
-// catalogue. It still suppresses the pair checks below it, so no Error is built
-// on it either.
+// A ROOT-role operand whose class is not containable yields NO finding, in
+// every spelling of the root position — the single `FROM DV_TEXT t` and each
+// operand of a root junction `FROM DV_TEXT t OR COMPOSITION c` alike, which is
+// what [Role.Next] exists to keep consistent. REQ-161 § Checks scopes
+// CodeNotContainable to a CONTAINS operand, and the catalogue authorises no code
+// for the anchor position. That is a documented missed defect — the conservative
+// direction (REQ-161 § Flagging policy) — not an Error invented outside the
+// catalogue. Such an operand still suppresses the pair checks around it, so no
+// Error is built on it either.
 func (o Operand) Findings() []contain.Finding {
 	if o.rmType == "" {
 		return nil

@@ -38,14 +38,23 @@ func semanticIssues(doc *parse.Document, rel *contain.Relation) []Issue {
 	// not itself a CONTAINS operand (REQ-161 § Checks).
 	root := c.operand(from.Root, semcheck.RoleRoot)
 	if from.Contains != nil {
-		c.walk(root, *from.Contains)
+		// Reached from the root by a CONTAINS keyword, so the subtree starts in
+		// the contained position ([semcheck.Role.Next]).
+		c.walk(root, semcheck.RoleRoot.Next(semcheck.StepContains), *from.Contains)
 	}
 	if from.Junction != nil {
-		// A junction AT the FROM root (`FROM A a OR B b`) leaves Root zero: its
-		// operands have no enclosing parent, so there is no pair to ask about.
-		// The zero Operand says exactly that, and suppresses every pair, so the
-		// walk needs no special case — only the operand checks fire.
-		c.walk(semcheck.Operand{}, *from.Junction)
+		// A junction AT the FROM root (`FROM A a OR B b`) leaves Root zero.
+		// Two consequences, both handled by what is passed in here rather than
+		// by a special case:
+		//
+		//   - its operands have no enclosing parent, so there is no pair to ask
+		//     about — the zero Operand says exactly that and suppresses every
+		//     pair;
+		//   - the junction OCCUPIES the root position, so its operands are
+		//     roots too. Passing RoleRoot (not RoleContained) is what makes
+		//     `FROM DV_TEXT t OR COMPOSITION c` answer the same as the single
+		//     root `FROM DV_TEXT t`: a root is a root in every spelling.
+		c.walk(semcheck.Operand{}, semcheck.RoleRoot, *from.Junction)
 	}
 	return c.issues
 }
@@ -59,24 +68,35 @@ type containCheck struct {
 // walk visits one containment node and returns the node's own decided operand
 // (the zero Operand for a junction node, which has no class of its own).
 //
+// TWO facts are threaded down, because a [parse.Containment] carries neither a
+// parent pointer nor its own position in the query, and both are unrecoverable
+// from the node after the fact:
+//
 // parent is the enclosing class operand every pair formed AT this node is asked
-// against. It is threaded down explicitly because a [parse.Containment] carries
-// NO parent pointer, and REQ-161 § Checks requires a junction operand to be
-// checked against the junction's ENCLOSING parent rather than against the
-// junction: `A CONTAINS (B OR C)` asks A→B and A→C, so the junction node passes
-// its own parent through to each operand untouched. Same-operator junctions
-// arrive pre-flattened (`A OR B OR C` is ONE node with three operands, REQ-117)
-// while mixed AND/OR nesting does not, so a junction operand may itself be a
-// junction — which the same pass-through handles at any depth.
-func (c *containCheck) walk(parent semcheck.Operand, n parse.Containment) semcheck.Operand {
+// against. REQ-161 § Checks requires a junction operand to be checked against
+// the junction's ENCLOSING parent rather than against the junction: `A CONTAINS
+// (B OR C)` asks A→B and A→C, so the junction node passes its own parent through
+// to each operand untouched.
+//
+// role is the POSITION this node occupies — see [semcheck.Role.Next], which owns
+// the assignment rule so the write-side adapter cannot pick a different answer
+// (REQ-162 § Contract). A junction's operands INHERIT the junction's role rather
+// than being labelled contained for being junction children, so a root junction
+// holds roots. Assigning by tree shape here is what made the two spellings of a
+// root position disagree.
+//
+// Both threadings compose the same way at depth: same-operator junctions arrive
+// pre-flattened (`A OR B OR C` is ONE node with three operands, REQ-117) while
+// mixed AND/OR nesting does not, so a junction operand may itself be a junction.
+func (c *containCheck) walk(parent semcheck.Operand, role semcheck.Role, n parse.Containment) semcheck.Operand {
 	if isJunction(n) {
 		for _, ch := range n.Children {
-			c.walk(parent, ch)
+			c.walk(parent, role.Next(semcheck.StepJunction), ch)
 		}
 		return semcheck.Operand{}
 	}
 
-	self := c.operand(n.Class, semcheck.RoleContained)
+	self := c.operand(n.Class, role)
 	c.pair(parent, self, n.Class)
 
 	// A class node's Children are the CONTAINS chain below it, in order — each
@@ -89,7 +109,7 @@ func (c *containCheck) walk(parent semcheck.Operand, n parse.Containment) semche
 	// it never becomes a predecessor.
 	prev := self
 	for _, ch := range n.Children {
-		if decided := c.walk(prev, ch); !isJunction(ch) {
+		if decided := c.walk(prev, role.Next(semcheck.StepContains), ch); !isJunction(ch) {
 			prev = decided
 		}
 	}

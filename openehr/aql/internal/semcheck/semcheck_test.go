@@ -150,6 +150,86 @@ func TestOperandDecision(t *testing.T) {
 	}
 }
 
+// TestRoleAssignment pins the role-assignment rule ([semcheck.Role.Next]) —
+// the contract that keeps the read-side and write-side adapters reporting the
+// same multiset (REQ-162 § Contract).
+//
+// The load-bearing row is StepJunction from RoleRoot: a junction is boolean
+// grouping, not a containment step, so its operands occupy the SAME position
+// the junction does. `FROM A a OR B b` holds ROOT operands, and an adapter that
+// labelled them contained for being junction children would make the two
+// spellings of a root position disagree.
+func TestRoleAssignment(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		from semcheck.Role
+		step semcheck.Step
+		want semcheck.Role
+	}{
+		{"CONTAINS from the FROM root", semcheck.RoleRoot, semcheck.StepContains, semcheck.RoleContained},
+		{"CONTAINS below a CONTAINS", semcheck.RoleContained, semcheck.StepContains, semcheck.RoleContained},
+		{"junction at the FROM root keeps roots", semcheck.RoleRoot, semcheck.StepJunction, semcheck.RoleRoot},
+		{"junction under a CONTAINS keeps contained", semcheck.RoleContained, semcheck.StepJunction, semcheck.RoleContained},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tc.from.Next(tc.step); got != tc.want {
+				t.Errorf("Role(%d).Next(%d) = %d, want %d", tc.from, tc.step, got, tc.want)
+			}
+		})
+	}
+
+	// A junction nested in a junction keeps propagating the enclosing position,
+	// so `FROM A a OR (B b AND C c)` holds roots all the way down.
+	deep := semcheck.RoleRoot.Next(semcheck.StepJunction).Next(semcheck.StepJunction)
+	if deep != semcheck.RoleRoot {
+		t.Errorf("nested root junctions gave role %d, want RoleRoot (%d)", deep, semcheck.RoleRoot)
+	}
+	// A CONTAINS anywhere along the way is one-way: nothing returns to root.
+	back := semcheck.RoleRoot.Next(semcheck.StepContains).Next(semcheck.StepJunction)
+	if back != semcheck.RoleContained {
+		t.Errorf("a junction under a CONTAINS gave role %d, want RoleContained (%d)", back, semcheck.RoleContained)
+	}
+}
+
+// TestRootRoleIsSilentForNotContainable is the controller ruling in engine
+// terms: a non-containable class in ANY root position raises nothing, while the
+// same class as a CONTAINS operand raises the Error. Root silence is a
+// documented missed defect (REQ-161 § Flagging policy — a false Error is worse),
+// and it must not depend on which root spelling the adapter walked.
+func TestRootRoleIsSilentForNotContainable(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	for _, rmType := range []string{"DV_TEXT", "DV_QUANTITY", "EVENT_CONTEXT"} {
+		t.Run(rmType, func(t *testing.T) {
+			t.Parallel()
+			// Every route an adapter can take to a root position must agree.
+			roots := []semcheck.Role{
+				semcheck.RoleRoot,
+				semcheck.RoleRoot.Next(semcheck.StepJunction),
+				semcheck.RoleRoot.Next(semcheck.StepJunction).Next(semcheck.StepJunction),
+			}
+			for i, role := range roots {
+				o := ck.Operand(rmType, role)
+				if got := codesOf(o.Findings()); len(got) != 0 {
+					t.Errorf("root route %d: %s reported %v, want nothing", i, rmType, got)
+				}
+				if !o.Suppresses() {
+					t.Errorf("root route %d: %s does not suppress; no pair may be built on it", i, rmType)
+				}
+			}
+			// The scope of that silence: as a CONTAINS operand the same class
+			// is an Error.
+			contained := ck.Operand(rmType, semcheck.RoleRoot.Next(semcheck.StepContains))
+			if got := codesOf(contained.Findings()); !slices.Equal(got, []string{semcheck.CodeNotContainable}) {
+				t.Errorf("%s as a CONTAINS operand = %v, want [%s]", rmType, got, semcheck.CodeNotContainable)
+			}
+		})
+	}
+}
+
 // TestPairDecision pins the per-pair half over operands that both survived the
 // operand checks: Never → Error code, ByReference → Warning code, Admissible →
 // silence (REQ-161 § Checks).
