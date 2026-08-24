@@ -439,6 +439,21 @@ func versionedObjectDetail(ce parse.ClassExpr) string {
 //     the same source [versionedObjectIssues] reads for "outside
 //     FROM/CONTAINS", here filtered to one clause rather than excluding one.
 //
+// A NEGATED AND junction (`NOT CONTAINS (A AND B)`) never fires either, even
+// though [parse.Containment.Negated] is not one of the spec's three named
+// clauses above. This asymmetry is deliberate, and the opposite of the rule
+// the containment-pair checks apply: REQ-161 § Checks has a NOT CONTAINS pair
+// checked IDENTICALLY to a plain one, because an RM-impossible pair is
+// impossible whether or not it is negated — POSSIBILITY does not care about
+// the sign. Row multiplicity does: a `NOT CONTAINS` collapses to a boolean
+// filter on the parent row, so the rows demonstrably do NOT multiply and the
+// negated operands' aliases are not meaningfully "projected sibling rows" at
+// all — this is a shape the spec's "every other shape" silence covers, not
+// one its three clauses omit by oversight. Whoever next touches this rule
+// should not "fix" this to match the pair checks' NOT-CONTAINS-is-identical
+// stance; the two checks answer different questions (possibility vs. row
+// count) and only one of them is sign-blind.
+//
 // This is a pure [parse.Document] walk: no [contain.Relation] is consulted —
 // whether two operands' aliases are both SELECT-projected is not an RM
 // question, and the containment SHAPE this check reads is a structural fact
@@ -463,9 +478,11 @@ func fanoutIssues(doc *parse.Document) []Issue {
 			}
 			return
 		}
-		if n.ChildJoin != parse.ContainsAnd {
-			// An OR (or any non-AND) junction never fires itself, but one of
-			// its operands may hide its own AND junction, at any depth.
+		if n.ChildJoin != parse.ContainsAnd || n.Negated {
+			// An OR (or any non-AND) junction never fires itself, and
+			// neither does a NEGATED and junction (see the doc comment
+			// above) — but one of its operands may hide its own AND
+			// junction, at any depth.
 			for _, ch := range n.Children {
 				walk(ch)
 			}
@@ -501,21 +518,35 @@ func fanoutIssues(doc *parse.Document) []Issue {
 	return issues
 }
 
-// andFrontier flattens n's nested-AND structure — n MUST be an AND junction
-// (checked by the caller). leaves are the class-expression operands reached
-// without crossing a non-AND junction (REQ-161's flattening rule, applied
-// regardless of how deep the AND-only nesting runs — same-operator junctions
-// arrive pre-flattened by the extractor already, REQ-117, but this recurses
-// regardless so a hand-built or future unflattened AST is handled
-// identically). boundary is every node the flatten explicitly did NOT
-// explore: a non-AND (OR) child, returned whole so the caller can look for
-// an AND junction nested inside it independently — it contributes nothing to
-// THIS junction's leaves, but it is not silently dropped either.
+// andFrontier flattens n's nested-AND structure — n MUST be a non-negated AND
+// junction (checked by the caller, [fanoutIssues]'s walk). leaves are the
+// class-expression operands reached without crossing a non-AND (or negated)
+// junction (REQ-161's flattening rule, applied regardless of how deep the
+// AND-only nesting runs — same-operator junctions arrive pre-flattened by the
+// extractor already, REQ-117, but this recurses regardless so a hand-built or
+// future unflattened AST is handled identically — see
+// [TestAndFrontierFlattensHandBuiltNestedAnd]). boundary is every node the
+// flatten explicitly did NOT explore: a non-AND (OR) child, or a NEGATED
+// child, returned whole so the caller can look for an AND junction nested
+// inside it independently — it contributes nothing to THIS junction's
+// leaves, but it is not silently dropped either.
+//
+// The Negated check is defensive, not reachable through today's only caller:
+// REQ-161's flattening rule composes through [n.Children], and [parse.Containment]'s
+// own doc comment records that NOT belongs to a CONTAINS keyword, never to a
+// junction operand — the parser sets Negated only on the node a CONTAINS/NOT
+// CONTAINS chain step targets, so a junction's direct Children (its boolean
+// operands) can never individually carry it. n ITSELF can, though — a whole
+// `NOT CONTAINS (A AND B)` junction is exactly such a target — which is why
+// the check has to live here too, mirroring [fanoutIssues]'s walk, rather
+// than only at the call site: a future caller of this function that skips
+// walk's own guard must not silently flatten a filter into row-multiplying
+// leaves.
 func andFrontier(n parse.Containment) (leaves, boundary []parse.Containment) {
 	if !isJunction(n) {
 		return []parse.Containment{n}, nil
 	}
-	if n.ChildJoin != parse.ContainsAnd {
+	if n.ChildJoin != parse.ContainsAnd || n.Negated {
 		return nil, []parse.Containment{n}
 	}
 	for _, ch := range n.Children {
@@ -531,11 +562,16 @@ func andFrontier(n parse.Containment) (leaves, boundary []parse.Containment) {
 // REQ-161's ">= 2" threshold, the exact boundary the near-miss pin (one
 // projected alias) must not cross.
 //
-// The Span lands on the FIRST (document-order) projected leaf: a fan-out
-// finding is a joint property of two or more operands together, so — unlike
-// every other REQ-161 code — there is no single offending class expression
-// to blame; the first one a reader would meet in the source is the most
-// useful anchor, and Path/Detail name every projected leaf, not just it.
+// The Span AND Path both land on the FIRST (document-order) projected leaf:
+// a fan-out finding is a joint property of two or more operands together, so
+// — unlike every other REQ-161 code — there is no single offending class
+// expression to blame, and the first one a reader would meet in the source
+// is the most useful anchor. [Issue.Path] is documented singular ("the AQL
+// path or class the issue concerns") and every other code's Path names
+// exactly the thing its Span covers — a comma-joined list here would be the
+// one code that disagrees with its own Span, and REQ-161 § Additivity says
+// the new codes reuse the issue model verbatim, not a widened one. The full
+// set of projected leaves still appears in Detail, where a list belongs.
 func fanoutFinding(leaves []parse.Containment, projectedAliases map[string]bool) *Issue {
 	var hits []parse.ClassExpr
 	for _, leaf := range leaves {
@@ -553,7 +589,7 @@ func fanoutFinding(leaves []parse.Containment, projectedAliases map[string]bool)
 	joined := strings.Join(tokens, ", ")
 	return &Issue{
 		Code: semcheck.CodeFanoutRowGrain,
-		Path: joined,
+		Path: classToken(hits[0]),
 		Detail: fmt.Sprintf("this AND containment step has %d SELECT-projected sibling operands (%s); row "+
 			"multiplicity for this shape is engine-defined (SPECQUERY-9) — verify the result shape against "+
 			"the target CDR", len(hits), joined),

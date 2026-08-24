@@ -826,6 +826,12 @@ func TestVersionNoPredicateFires(t *testing.T) {
 	if iss.Detail == "" {
 		t.Error("carries no Detail")
 	}
+	// Fix round 1, Minor 3: pin the governance citation itself, not merely
+	// that SOME text is present — Task 2's own fix rounds are the recorded
+	// precedent for what an unpinned Detail lets ship green.
+	if !strings.Contains(iss.Detail, "SPECPR-481") {
+		t.Errorf("Detail = %q, want it to cite SPECPR-481", iss.Detail)
+	}
 	if !r.OK() {
 		t.Error("a Warning-severity finding must not make Result.OK() false")
 	}
@@ -908,6 +914,10 @@ func TestVersionedObjectUnreferencedFires(t *testing.T) {
 			if iss.Detail == "" {
 				t.Error("carries no Detail")
 			}
+			// Fix round 1, Minor 3: pin the governance citation itself.
+			if !strings.Contains(iss.Detail, "14186") {
+				t.Errorf("Detail = %q, want it to cite Discourse #14186", iss.Detail)
+			}
 			if !r.OK() {
 				t.Error("a Warning-severity finding must not make Result.OK() false")
 			}
@@ -943,6 +953,30 @@ func TestVersionedObjectBareAliasProjectionCountsAsReferenced(t *testing.T) {
 	const q = "SELECT vo FROM EHR e CONTAINS VERSIONED_COMPOSITION vo"
 	if got := req161Portability(lint.LintString(q, nil)); len(got) != 0 {
 		t.Errorf("%q raised %v, want silence (the bare alias is itself a SELECT reference)", q, got)
+	}
+}
+
+// TestVersionedObjectReferencedInWhereOrOrderByStaysSilent closes fix round
+// 1's Important 3: the brief names SELECT, WHERE, AND ORDER BY for "outside
+// FROM/CONTAINS" (REQ-161 § Checks), but every prior test for this check used
+// SELECT only. versionedObjectIssues reads its "referenced" set from ALL of
+// [parse.Document.Paths], unfiltered by clause — unlike fanoutIssues, which
+// deliberately DOES filter to [parse.ClauseSelect] because its own rule is
+// SELECT-specific. These two rows are what would fail if that deliberate
+// difference were ever "simplified" into one shared clause-filtered helper.
+func TestVersionedObjectReferencedInWhereOrOrderByStaysSilent(t *testing.T) {
+	t.Parallel()
+	queries := map[string]string{
+		"referenced only in WHERE":    "SELECT 1 FROM VERSIONED_COMPOSITION vo WHERE vo/uid/value = 'x'",
+		"referenced only in ORDER BY": "SELECT 1 FROM VERSIONED_COMPOSITION vo ORDER BY vo/uid/value",
+	}
+	for name, q := range queries {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := req161Portability(lint.LintString(q, nil)); len(got) != 0 {
+				t.Errorf("%q raised %v, want silence (the alias is referenced, just not in SELECT)", q, got)
+			}
+		})
 	}
 }
 
@@ -983,65 +1017,88 @@ func TestVersionedObjectUnknownClassStaysSilent(t *testing.T) {
 // are found by flattening nested AND junctions without descending into an
 // OR; it fires only when two or more of those leaves are each rooted by at
 // least one SELECT column; every other shape — OR junctions included — stays
-// silent. The two rows marked "near miss" are the exact pins REQ-161 names by
-// name: an AND junction with only one projected alias, and an OR junction
-// with two projected aliases, neither of which may fire.
+// silent. The rows marked "near miss" are the exact pins REQ-161 names by
+// name (an AND junction with only one projected alias, an OR junction with
+// two projected aliases) plus one fix-round addition: a NEGATED AND junction
+// (`NOT CONTAINS (A AND B)`) with two projected aliases. REQ-161's three
+// named clauses do not mention negation at all, but a NOT CONTAINS collapses
+// to a boolean row filter — rows do not multiply, so this is a shape the
+// spec's "stay silent on every other shape" already covers, not a fourth
+// clause the text omits.
+//
+// Each row asserts the EXACT portability multiset (not merely whether
+// aql_fanout_row_grain is present): the "none is checked twice" reasoning in
+// [fanoutIssues] is only worth anything if a double-count would actually be
+// caught here.
+//
+// The "pre-flattened N-ary AND" row is named for what it actually exercises:
+// [parse]'s extractor splices a same-operator child's Children into its
+// parent (REQ-117), so `(OBSERVATION a AND (OBSERVATION b AND OBSERVATION
+// c2))` arrives as ONE three-child AND junction — behaviourally identical to
+// the three-projected-aliases row above it — never as a genuinely nested AND
+// node. [andFrontier]'s own recursive AND-in-AND branch is therefore
+// UNREACHABLE from any parsed query; it is pinned directly, on a hand-built
+// tree, by [TestAndFrontierFlattensHandBuiltNestedAnd] in the internal
+// `package lint` test file, not by this row.
 func TestFanoutRowGrainFires(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name  string
 		query string
-		fires bool
+		want  []string
 	}{
 		{
 			"AND junction, two projected aliases: fires",
 			"SELECT o1, o2 FROM COMPOSITION c CONTAINS (OBSERVATION o1 AND OBSERVATION o2)",
-			true,
+			[]string{codeFanoutRowGrain},
 		},
 		{
 			"near miss: AND junction, only one projected alias",
 			"SELECT o1 FROM COMPOSITION c CONTAINS (OBSERVATION o1 AND OBSERVATION o2)",
-			false,
+			nil,
 		},
 		{
 			"near miss: OR junction, two projected aliases",
 			"SELECT o1, o2 FROM COMPOSITION c CONTAINS (OBSERVATION o1 OR OBSERVATION o2)",
-			false,
+			nil,
+		},
+		{
+			"near miss: NEGATED AND junction, two projected aliases (fix round 1, Important 1)",
+			"SELECT o1, o2 FROM COMPOSITION c NOT CONTAINS (OBSERVATION o1 AND OBSERVATION o2)",
+			nil,
 		},
 		{
 			"AND junction, three projected aliases: fires (>= 2, not == 2)",
 			"SELECT a, b, c2 FROM COMPOSITION c CONTAINS (OBSERVATION a AND OBSERVATION b AND OBSERVATION c2)",
-			true,
+			[]string{codeFanoutRowGrain},
 		},
 		{
-			"nested AND flattens: two projected aliases across the nesting fire",
+			"pre-flattened N-ary AND (parens create no genuine nesting): two of three projected aliases fire",
 			"SELECT a, b FROM COMPOSITION c CONTAINS (OBSERVATION a AND (OBSERVATION b AND OBSERVATION c2))",
-			true,
+			[]string{codeFanoutRowGrain},
 		},
 		{
 			"OR subtree under an AND contributes no leaves: its own projected " +
 				"members do not count towards the outer AND, which then has only one leaf",
 			"SELECT a, ob, c2 FROM COMPOSITION c CONTAINS (OBSERVATION a AND (OBSERVATION ob OR OBSERVATION c2))",
-			false,
+			nil,
 		},
 		{
 			"no containment junction at all",
 			"SELECT o FROM COMPOSITION c CONTAINS OBSERVATION o",
-			false,
+			nil,
 		},
 		{
 			"AND junction with no projected aliases at all",
 			"SELECT c FROM COMPOSITION c CONTAINS (OBSERVATION o1 AND OBSERVATION o2)",
-			false,
+			nil,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := req161Portability(lint.LintString(tc.query, nil))
-			fired := slices.Contains(got, codeFanoutRowGrain)
-			if fired != tc.fires {
-				t.Errorf("%q: %s fired = %v, want %v (portability codes: %v)", tc.query, codeFanoutRowGrain, fired, tc.fires, got)
+			if got := req161Portability(lint.LintString(tc.query, nil)); !slices.Equal(got, tc.want) {
+				t.Errorf("%q: portability codes = %v, want %v", tc.query, got, tc.want)
 			}
 		})
 	}
@@ -1049,10 +1106,13 @@ func TestFanoutRowGrainFires(t *testing.T) {
 
 // TestFanoutRowGrainDetailsAndSeverity pins the shape of the finding itself:
 // Warning severity, a Detail citing SPECQUERY-9 without adjudicating row
-// semantics, and a Span landing on one of the two offending operands (a
+// semantics, and a Span/Path landing on one of the two offending operands (a
 // junction node itself carries no source position, so — unlike every other
 // REQ-161 code — there is no single "the" offending class expression; the
-// first projected leaf in document order is the anchor).
+// first projected leaf in document order is the anchor). Path and Span MUST
+// agree (fix round 1, Minor 1): [Issue.Path] is documented singular, and a
+// comma-joined list there would be the one REQ-161 code that disagreed with
+// its own Span.
 func TestFanoutRowGrainDetailsAndSeverity(t *testing.T) {
 	t.Parallel()
 	const q = "SELECT o1, o2 FROM COMPOSITION c CONTAINS (OBSERVATION o1 AND OBSERVATION o2)"
@@ -1071,8 +1131,14 @@ func TestFanoutRowGrainDetailsAndSeverity(t *testing.T) {
 	if want := classSpan(t, q, "OBSERVATION", 1); iss.Span != want {
 		t.Errorf("span = %+v, want %+v (the first projected leaf in document order)", iss.Span, want)
 	}
+	if iss.Path != "OBSERVATION o1" {
+		t.Errorf("path = %q, want %q (the same anchor leaf as Span, not a joined list)", iss.Path, "OBSERVATION o1")
+	}
 	if !strings.Contains(iss.Detail, "engine-defined") {
 		t.Errorf("Detail = %q, want it to state that row multiplicity is engine-defined", iss.Detail)
+	}
+	if !strings.Contains(iss.Detail, "SPECQUERY-9") {
+		t.Errorf("Detail = %q, want it to cite SPECQUERY-9", iss.Detail)
 	}
 	if !r.OK() {
 		t.Error("a Warning-severity finding must not make Result.OK() false")
