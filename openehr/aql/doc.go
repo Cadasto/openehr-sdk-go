@@ -14,6 +14,23 @@
 // bridges lint into the shared validation Issue model. Programs that only need
 // to construct AQL (no execution) can import openehr/aql alone.
 //
+// Three entry points, three different questions, in widening order — none of
+// them implies the next:
+//
+//   - [Builder.Build] answers the SHAPE question: is this representable,
+//     canonical AQL? It refuses a tree the grammar cannot carry, and nothing
+//     else — a query whose classes can never contain one another still builds
+//     and emits.
+//   - [Builder.VerifyContainment] is the opt-in RM-semantics gate (REQ-162):
+//     given a REQ-160 containment relation, it walks the builder's own FROM root
+//     and containment algebra and reports the REQ-161 containment findings.
+//     Opt-in means opt-in — Build never calls it.
+//   - lint.LintString covers the read side, for AQL that arrives as text rather
+//     than being built here: the same containment checks over a parsed document,
+//     plus the syntax, shape, param, template, and portability layers a
+//     builder tree cannot pose. Both sides drive one rule engine, so an
+//     equivalent query draws the same containment codes either way.
+//
 // The SDK grammar profile (ADR 0007) documents deltas from official QUERY
 // 1.1.0 — notably SDK-AQL-001 (CONTAINS vs CONTAINS_STR) and SDK-AQL-002
 // (SELECT *) — in resources/aql/grammar/DIVERGENCES.md. Parse success and
