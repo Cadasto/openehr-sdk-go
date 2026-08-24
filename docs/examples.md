@@ -293,7 +293,7 @@ canonical emission:
 
 ### lint-aql
 
-**Purpose:** Statically lint AQL before it reaches the CDR (REQ-109): parse against the SDK grammar profile (ADR 0007), then run the three lint layers — syntax, shape (alias binding, parameter binding), and template-aware archetype / path checks against a compiled OPT. Shown via `validation.ValidateAQL`; the building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. Lint-clean is **not** spec-conformance and not execute-success — the CDR remains the path authority (PROBE-021).
+**Purpose:** Statically lint AQL before it reaches the CDR (REQ-109): parse against the SDK grammar profile (ADR 0007), then run the lint layers — syntax, shape (alias binding, parameter binding), RM containment and portability semantics against the pinned BMM (REQ-160/161, runs unconditionally, no template needed), and template-aware archetype / path checks against a compiled OPT. Shown via `validation.ValidateAQL`; the building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. Lint-clean is **not** spec-conformance and not execute-success — the CDR remains the path authority (PROBE-021).
 
 ```bash
 go run ./cmd/examples/lint-aql
@@ -308,6 +308,11 @@ go run ./cmd/examples/lint-aql
 SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1] WHERE o/data/events/value/magnitude > $threshold
   [error] aql_unbound_param (-): $threshold is referenced but not bound in Query.Parameters
   [error] aql_archetype_not_in_template (openEHR-EHR-OBSERVATION.lab_result.v1): archetype openEHR-EHR-OBSERVATION.lab_result.v1 is not in template vital_signs
+
+== semantic finding (RM-impossible containment) ==
+SELECT o FROM OBSERVATION o CONTAINS COMPOSITION c
+  [warning] aql_from_archetype (-): FROM/CONTAINS names no archetype, $param, VERSION, or EHR scope
+  [error] aql_impossible_containment (COMPOSITION c): no containment route under the pinned RM connects OBSERVATION to COMPOSITION, so this CONTAINS can never match
 ```
 
 **What to copy into your app:** for CI / pre-flight checks call `lint.LintString(q, nil)` (Layers 1–2, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or `validation.ValidateAQL`) to add archetype / path checks. Dispatch on `Issue.Code`; treat only `Error`-severity issues as hard failures.

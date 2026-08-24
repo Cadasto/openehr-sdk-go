@@ -61,6 +61,13 @@ func main() {
 			"WHERE o/data/events/value/magnitude > $threshold",
 	)
 	report("broken query", broken, compiled)
+
+	// Semantic: grammatically and shape-valid, but RM-impossible — OBSERVATION
+	// never contains COMPOSITION (REQ-160/161). The Layer-2 semantic group
+	// (openehr/aql/lint's completed REQ-161 checks) runs unconditionally, so
+	// this finding surfaces with no template at all.
+	semantic := aql.NewQuery("SELECT o FROM OBSERVATION o CONTAINS COMPOSITION c")
+	report("semantic finding (RM-impossible containment)", semantic, compiled)
 }
 
 func report(label string, q aql.Query, c *templatecompile.Compiled) {
