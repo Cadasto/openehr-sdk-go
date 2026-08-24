@@ -2100,18 +2100,24 @@ requirements:
     title: AQL containment admissibility relation
     canonical: docs/specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation
     status: draft
-    implementation: planned
+    implementation: partial
     packages: [openehr/aql/contain]
-    probes: [PROBE-097]
+    tests:
+      - openehr/aql/contain/relation_test.go
+      - openehr/aql/contain/relation_internal_test.go
+      - openehr/aql/contain/overlay_test.go
+      - openehr/aql/contain/archetype_test.go
+      - openehr/aql/contain/imports_test.go
     plans: [docs/plans/2026-08-21-aql-semantic-layer.md]
     adrs: [docs/adr/0017-aql-semantic-layer.md]
     notes: >-
       Verdict relation (Admissible / Never / ByReference / UnknownClass)
       derived at runtime from the pinned BMM via rminfo (REQ-048), plus the
       cited overlay-edge table (EHR root, VERSION tier, FOLDER->COMPOSITION
-      by reference) and consumer-extensible overlays. Package to be created
-      by the plan's Phase 1; the planned-row warning on the missing path is
-      expected until then.
+      by reference) and consumer-extensible overlays. Phase 1 landed the
+      package and its guards; partial until the PROBE-097 corpus arms with
+      the Phase 2 lint checks — the probe row returns here then (spec-check
+      refuses a partial REQ citing a Draft probe).
 
   - id: REQ-161
     title: AQL semantic and portability lint
