@@ -28,6 +28,7 @@ package semcheck
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
 )
@@ -326,27 +327,41 @@ func (c Checker) Pair(ancestor, descendant Operand) []contain.Finding {
 	return nil
 }
 
-// Archetype decides a literal archetype predicate against the class it is
-// attached to (REQ-161 § Checks, REQ-160 § Archetype/class conformance):
-// rmType is the declared class's RM type name, archetypeID its literal HRID.
-// It is orthogonal to [Role] — a FROM root's archetype predicate is checked
-// exactly like a CONTAINS operand's — so, unlike [Checker.Operand], it takes
-// no role.
+// Archetype decides a literal-OR-parameter archetype predicate against the
+// class it is attached to (REQ-161 § Checks, REQ-160 § Archetype/class
+// conformance): rmType is the declared class's RM type name, archetypeID the
+// predicate text exactly as either adapter's carrier already holds it — a
+// literal HRID, or a `$param` placeholder. It is orthogonal to [Role] — a FROM
+// root's archetype predicate is checked exactly like a CONTAINS operand's —
+// so, unlike [Checker.Operand], it takes no role.
 //
-// A `$param` archetype predicate is the caller's business to skip before
-// calling Archetype: a `$param` carries no scope until execution binds it
-// (PROBE-021), and Archetype has no way to tell a literal HRID from a
-// placeholder string once it is handed only a string.
+// The `$param` skip lives HERE, not in either adapter, even though the read
+// side additionally holds a typed signal
+// ([parse.ClassExpr.ParamArchetype]) it could branch on instead: the write
+// side's carrier has no such flag — [aql.Containment] stores only the bare
+// archetypeID string — so a write-side caller passing that field straight
+// through (the exact usage this string-only signature exists for, REQ-162
+// § Contract) would otherwise feed "$arch" to [contain.Relation.ArchetypeMatches],
+// fail to parse it as an HRID, and manufacture an aql_unknown_rm_class the
+// read side never emits — a code-multiset divergence REQ-162 § Contract makes
+// a MUST-not. Detecting the sigil is Archetype's OWN business, by the SAME
+// test the builder already applies to the same field
+// (`strings.CutPrefix(c.archetypeID, "$")`, openehr/aql/containment.go's
+// validateTree) — not HRID decomposition, so it does not breach the
+// no-lexing rule. A `$param` carries no scope until execution binds it
+// (PROBE-021), so it is simply not this method's business, in either
+// direction: no mismatch, no unknown-class warning, nothing.
 //
-// The whole RM question belongs to [contain.Relation.ArchetypeMatches] — no
-// HRID lexing happens here, or anywhere in this package (REQ-160
+// The whole RM question otherwise belongs to [contain.Relation.ArchetypeMatches]
+// — no HRID lexing happens here, or anywhere in this package (REQ-160
 // § Archetype/class conformance mandates the single canonical
 // [rm.ParseArchetypeID], which ArchetypeMatches already delegates to). This
 // method only classifies ArchetypeMatches's verdict into a REQ-161 code and
 // enforces the suppression rule (REQ-161 § Checks — "one finding per defect,
 // and no Error built on an unknown name"):
 //
-//   - rmType itself already [contain.UnknownClass] under
+//   - archetypeID begins with `$` → no finding (see above).
+//   - Otherwise, rmType itself already [contain.UnknownClass] under
 //     [contain.Relation.Containable] — the SAME verdict [Checker.Operand]'s
 //     class-token arm classifies — yields NO finding here. That arm already
 //     reported [CodeUnknownRMClass] for this class expression; REQ-161 is
@@ -360,8 +375,11 @@ func (c Checker) Pair(ancestor, descendant Operand) []contain.Finding {
 //     does not know, while the declared class IS known — →
 //     [CodeUnknownRMClass] (Warning). This is the "second arm" of that code:
 //     the same code as the class-token arm, but firing for a different
-//     reason (the archetype's type segment, not the declared class), still
-//     exactly once per class expression.
+//     reason (the archetype side, not the declared class), still exactly
+//     once per class expression. Which of the two archetype-side causes
+//     applies is deliberately NOT distinguished in the Detail text below:
+//     ArchetypeMatches collapses both into one verdict, and telling them
+//     apart would mean re-deriving the HRID shape ourselves.
 //   - [contain.Admissible] → no finding.
 //
 // An empty rmType names nothing (mirrors [Checker.Operand]: a degenerate
@@ -370,6 +388,9 @@ func (c Checker) Pair(ancestor, descendant Operand) []contain.Finding {
 // caller input.
 func (c Checker) Archetype(rmType, archetypeID string) []contain.Finding {
 	if rmType == "" {
+		return nil
+	}
+	if strings.HasPrefix(archetypeID, "$") {
 		return nil
 	}
 	if c.relation().Containable(rmType) == contain.UnknownClass {
@@ -385,9 +406,11 @@ func (c Checker) Archetype(rmType, archetypeID string) []contain.Finding {
 	case contain.UnknownClass:
 		return []contain.Finding{{
 			Code: CodeUnknownRMClass,
-			Detail: fmt.Sprintf("archetype %s's type is not known to the containment relation,"+
-				" so its conformance to declared class %s is unchecked;"+
-				" a future RM release, a demographic deployment, or a dialect may define it", archetypeID, rmType),
+			Detail: fmt.Sprintf("archetype %s cannot be checked against declared class %s:"+
+				" its type segment is not a class the relation knows, or the archetype id is"+
+				" not a well-formed HRID; unknown is not wrong — a future RM release, a"+
+				" demographic deployment, or a dialect may still define the type,"+
+				" or the id may simply need correcting", archetypeID, rmType),
 		}}
 	case contain.Admissible, contain.ByReference:
 		return nil // ByReference is unreachable: ArchetypeMatches never returns it

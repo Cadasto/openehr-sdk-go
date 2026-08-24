@@ -338,6 +338,40 @@ func TestArchetypeDecision(t *testing.T) {
 	}
 }
 
+// TestArchetypeSkipsParamPredicates pins that the `$param` skip lives in the
+// ENGINE, not either adapter (fix-round Important 1): a write-side caller
+// holding only the bare archetypeID string — [aql.Containment] carries no
+// typed ParamArchetype flag the way [parse.ClassExpr] does — must still get
+// silence when it passes that string straight through, by the SAME
+// `$`-prefix test the builder itself already applies
+// (openehr/aql/containment.go's validateTree,
+// `strings.CutPrefix(c.archetypeID, "$")`). Without this gate inside
+// Archetype, a $param would fail rm.ParseArchetypeID and manufacture an
+// aql_unknown_rm_class the read side (which skips $param before ever calling
+// Archetype) never emits — exactly the REQ-162 § Contract multiset
+// divergence this row exists to catch.
+func TestArchetypeSkipsParamPredicates(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	cases := []struct {
+		name   string
+		rmType string
+		param  string
+	}{
+		{"known declared class", "ENTRY", "$arch"},
+		{"a class that would otherwise mismatch", "EVALUATION", "$arch"},
+		{"unknown declared class", "FOO_BAR", "$arch"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := codesOf(ck.Archetype(tc.rmType, tc.param)); len(got) != 0 {
+				t.Errorf("Archetype(%q, %q) = %v, want nothing ($param is skipped)", tc.rmType, tc.param, got)
+			}
+		})
+	}
+}
+
 // TestArchetypeSuppressedByUnknownDeclaredClass is the REQ-161 § Checks
 // suppression rule in engine terms: when the declared class is itself
 // UnknownClass, [Checker.Operand]'s class-token arm already raises
@@ -441,6 +475,24 @@ func TestOverlayRelationRetiresFindings(t *testing.T) {
 	d := ck.Operand("COMPOSITION", semcheck.RoleContained)
 	if got := codesOf(ck.Pair(a, d)); len(got) != 0 {
 		t.Errorf("Pair(FOO_BAR, COMPOSITION) over the overlay = %v, want nothing", got)
+	}
+
+	// Checker.Archetype's suppression gate is [contain.Relation.Containable],
+	// under which an overlay-only class is Admissible (asserted above via
+	// a.Suppresses()), NOT UnknownClass — so the gate must NOT fire here, and
+	// Archetype falls through to ArchetypeMatches, which reports UnknownClass
+	// on its own account (its declared-class lookup does not consult
+	// overlays at all). The total for an overlay-only declared class is
+	// therefore exactly ONE aql_unknown_rm_class — never zero (that would
+	// mean the archetype/class-conformance question silently went
+	// unanswered for a class the BMM cannot judge) and never the mismatch
+	// Error (a class the relation cannot resolve to a BMM entity can never
+	// be PROVEN to mismatch). A simplification of the gate to
+	// ArchetypeMatches's own resolve-based notion of "known" would flip this
+	// row to total silence while every other test stays green — this row
+	// exists to catch exactly that regression.
+	if got := codesOf(ck.Archetype("FOO_BAR", "openEHR-EHR-OBSERVATION.blood_pressure.v1")); !slices.Equal(got, []string{semcheck.CodeUnknownRMClass}) {
+		t.Errorf("Archetype(FOO_BAR, ...) over the overlay = %v, want exactly [%s]", got, semcheck.CodeUnknownRMClass)
 	}
 }
 
