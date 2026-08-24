@@ -16,10 +16,29 @@ import (
 // overlay edges passes nil. A relation from [contain.Relation.WithOverlay]
 // retires the findings that deployment's extra containment routes make false.
 //
-// FIVE codes can come back — the containment subset of the REQ-161 catalogue:
-// aql_impossible_containment, aql_contains_not_containable,
-// aql_archetype_class_mismatch, aql_unknown_rm_class, and
-// aql_containment_by_reference. REQ-161's three PORTABILITY advisories
+// FIVE codes can come back — the containment subset of the REQ-161 catalogue.
+// Three are static defects PROVABLE from the relation, and REQ-161 § Checks
+// classifies them as Errors:
+//
+//   - aql_impossible_containment — no containment route connects the pair.
+//   - aql_contains_not_containable — a CONTAINS names a class that is no
+//     containment target at all.
+//   - aql_archetype_class_mismatch — the archetype HRID's type segment does not
+//     conform to the class it is attached to.
+//
+// The other two are advisory, and REQ-161 § Checks classifies them as Warnings —
+// unknown is not wrong, and a reference hop is engine-specific:
+//
+//   - aql_unknown_rm_class — the relation does not know the class.
+//   - aql_containment_by_reference — the pair resolves only across a reference
+//     hop.
+//
+// REQ-161 § Checks is the normative home of both the severities and the firing
+// rules; the split is repeated here only because a [contain.Finding] carries no
+// severity field to look one up from. REQ-161 § Flagging policy governs when they
+// change, and this method adds none.
+//
+// REQ-161's three PORTABILITY advisories
 // (aql_version_no_predicate, aql_versioned_object_unreferenced,
 // aql_fanout_row_grain) are read-side only and never appear here: they are
 // advisories about how a CDR may READ a legal query, scoped by REQ-162

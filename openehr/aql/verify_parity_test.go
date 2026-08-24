@@ -149,11 +149,41 @@ var parityCases = []struct {
 		return aql.NewBuilder().Select(aql.Col("c")).From("COMPOSITION", "c").
 			Contains(aql.Class("OBSERVATION", "o").NotContains(aql.Class("DV_TEXT", "t")))
 	}},
-	{"flattened multi-entry chain", func() *aql.Builder {
+	// The next three rows pin the two DISTINCT flattening sites the chain-tail
+	// decision governs — see [containVerifier.chain]. They are separate rows on
+	// purpose: a class node's children flatten through Containment.emit's child
+	// loop, while consecutive Builder.Contains entries flatten through
+	// ast.build's entry loop, so one row cannot cover both. If a future change
+	// ever parenthesised sibling children, only the sibling-children rows would
+	// catch it.
+	{"flattened multi-entry chain (ast.build's entry loop)", func() *aql.Builder {
 		return aql.NewBuilder().Select(aql.Col("o")).From("EHR", "e").
 			Contains(aql.Class("FOLDER", "f").Contains(aql.Class("COMPOSITION", "c"))).
 			Contains(aql.Class("OBSERVATION", "o"))
 	}},
+	{
+		// One class node with THREE children (Containment.emit's child loop).
+		// The pairs are EHR→FOLDER, FOLDER→COMPOSITION, COMPOSITION→OBSERVATION
+		// and OBSERVATION→DV_TEXT: adjacency walks the flattened chain, so each
+		// child follows the PREVIOUS one, not the node they all hang off.
+		"class node with three sibling children", func() *aql.Builder {
+			return aql.NewBuilder().Select(aql.Col("o")).From("EHR", "e").
+				Contains(aql.Class("FOLDER", "f").
+					Contains(aql.Class("COMPOSITION", "c")).
+					Contains(aql.Class("OBSERVATION", "o")).
+					Contains(aql.Class("DV_TEXT", "t")))
+		},
+	},
+	{
+		// A junction whose enclosing parent is the flattened TAIL of the chain
+		// before it (COMPOSITION c), not the chain's head and not the FROM root.
+		"junction enclosed by a flattened chain tail", func() *aql.Builder {
+			return aql.NewBuilder().Select(aql.Col("o")).From("EHR", "e").
+				Contains(aql.Class("FOLDER", "f")).
+				Contains(aql.Class("COMPOSITION", "c")).
+				Contains(aql.ContainsOr(aql.Class("OBSERVATION", "o"), aql.Class("COMPOSITION", "c2")))
+		},
+	},
 	{"EHR/VERSION tier", func() *aql.Builder {
 		return aql.NewBuilder().Select(aql.Col("c")).From("EHR", "e").
 			Contains(aql.Class("VERSION", "v").Contains(aql.Class("COMPOSITION", "c")))

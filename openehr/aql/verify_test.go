@@ -1,7 +1,6 @@
 package aql_test
 
 import (
-	"errors"
 	"reflect"
 	"slices"
 	"strings"
@@ -389,9 +388,10 @@ func TestBuildUnchangedByImpossibleContainment(t *testing.T) {
 			if q.Q != tc.want {
 				t.Errorf("emitted\n  %q\nwant\n  %q", q.Q, tc.want)
 			}
-			if errors.Is(err, aql.ErrInvalidQuery) {
-				t.Error("an RM verdict must never surface as ErrInvalidQuery")
-			}
+			// (No ErrInvalidQuery assertion here: the err == nil check above
+			// already carries it. An `errors.Is(err, …)` after a t.Fatalf on
+			// err != nil is provably testing a nil error, so it asserts nothing.)
+			//
 			// The verification does see the defects — otherwise this test would
 			// pass for the wrong reason (a check that never runs).
 			if got := findingCodes(b.VerifyContainment(nil)); len(got) == 0 {
@@ -548,6 +548,18 @@ func TestVerifyContainmentPairsAreChainAdjacent(t *testing.T) {
 // builder no [aql.Builder.Build] would accept is verified without a panic and
 // without a manufactured finding. Verification is a diagnostic, so it must
 // survive every tree a caller can hand it — including the ones Build refuses.
+//
+// Silence is NOT a property of a degenerate tree, and this test must not be read
+// as claiming it is: a contained term is still checked on its own account, so
+// `Select(Col("t")).Contains(Class("DV_TEXT","t"))` with no FROM at all
+// correctly reports aql_contains_not_containable. Every fixture below is
+// deliberately RM-CLEAN, so the invariant actually pinned is narrower and
+// exact — no panic, and no finding MANUFACTURED out of a missing operand: a
+// missing FROM root, a class-less term, or an empty junction decides nothing and
+// suppresses the pairs around it rather than being reported against the empty
+// name. A fixture added here that carries a real RM defect belongs in
+// [TestVerifyContainmentRaisesEachCode] instead; adding one here would fail for
+// the wrong reason.
 func TestVerifyContainmentDegenerateBuilders(t *testing.T) {
 	t.Parallel()
 	cases := map[string]*aql.Builder{
@@ -567,7 +579,8 @@ func TestVerifyContainmentDegenerateBuilders(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			if got := findingCodes(b.VerifyContainment(nil)); len(got) != 0 {
-				t.Errorf("VerifyContainment codes = %v, want silence on a tree Build refuses", got)
+				t.Errorf("VerifyContainment codes = %v, want none: this tree carries no RM defect, "+
+					"so a finding here is one manufactured out of a missing operand", got)
 			}
 		})
 	}
