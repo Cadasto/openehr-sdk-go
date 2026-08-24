@@ -22,5 +22,6 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | [0014](0014-webtemplate-reference-implementation-lock.md) | WebTemplate export locked to EHRbase openEHR_SDK v2.3, structural parity | Accepted (2026-07-14) |
 | [0015](0015-flat-metadata-spelling.md) | Composition-level FLAT metadata: accept both spellings on input, emit `ctx/` only | Accepted (2026-08-03) |
 | [0016](0016-event-context-optionals-underscore-spelling.md) | EVENT_CONTEXT optionals ride the underscore grammar, not new `ctx/` short forms | Accepted (2026-08-05) |
+| [0017](0017-aql-semantic-layer.md) | AQL semantic layer: derived containment relation, overlays, opt-in enforcement | Accepted (2026-08-22) |
 
 See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.
