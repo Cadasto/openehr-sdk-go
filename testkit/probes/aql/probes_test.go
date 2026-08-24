@@ -175,12 +175,19 @@ func loadOPT(t *testing.T, name string) []byte {
 	return body
 }
 
-// PROBE-028 — AQL lint stability. Each cassette query, linted against the SDK
-// grammar profile (+ vital_signs.opt for the template-aware cases), yields a
-// stable issue-code multiset.
-func TestProbe028AQLLint(t *testing.T) {
+// probe028Cases is PROBE-028's own three-cassette corpus — the cassette
+// files under testkit/cassettes/aql/lint/, the vital_signs.opt template, and
+// their pre-REQ-161 WantCodes baseline. Shared between TestProbe028AQLLint
+// and PROBE-097 arm (b) (m-6, task-5-fix-round-1-brief.md) so a deliberate
+// PROBE-028 re-baseline is made ONCE: before this helper existed, arm (b)
+// hand-copied this table, so a re-baseline of one would need to be applied
+// twice, and a missed second edit would surface as a confusing
+// "additivity/…" failure in PROBE-097 rather than where the change actually
+// happened.
+func probe028Cases(t *testing.T) []aqlprobes.LintCase {
+	t.Helper()
 	opt := loadOPT(t, "vital_signs")
-	cases := []aqlprobes.LintCase{
+	return []aqlprobes.LintCase{
 		{
 			Name:      "valid",
 			OPT:       opt,
@@ -200,7 +207,13 @@ func TestProbe028AQLLint(t *testing.T) {
 			WantCodes: []string{"aql_syntax"},
 		},
 	}
-	r, err := aqlprobes.Probe028AQLLint(cases)
+}
+
+// PROBE-028 — AQL lint stability. Each cassette query, linted against the SDK
+// grammar profile (+ vital_signs.opt for the template-aware cases), yields a
+// stable issue-code multiset.
+func TestProbe028AQLLint(t *testing.T) {
+	r, err := aqlprobes.Probe028AQLLint(probe028Cases(t))
 	if err != nil {
 		t.Fatalf("Probe028: %v", err)
 	}
@@ -247,12 +260,15 @@ func TestProbe028DetectsCodeDrift(t *testing.T) {
 //
 // Arm (c), REQ-162 § Contract: for every corpus query expressible through the
 // builder, (*aql.Builder).VerifyContainment's code multiset equals
-// lint.LintString's containment-code subset over the emitted text. The three
-// portability codes have no builder-expressible counterpart at all (REQ-162
-// § Contract scopes parity to the five containment codes) and so are absent
-// from probe097ParityCases by scope, not by omission. A FROM-root archetype
-// predicate ALSO has no builder equivalent — openehr/aql/verify.go's own doc
-// comment records that the write-side FROM clause carries no archetype field
+// lint.LintString's containment-code subset over the emitted text.
+// VerifyContainment never emits the three portability codes at all — REQ-162
+// § Contract scopes parity to the five containment codes — so they have no
+// row in probe097ParityCases by scope, not by omission; a builder QUERY can
+// still trip one of the three (e.g. a bare VERSION operand raises
+// aql_version_no_predicate on the read side), it is only the write-side
+// finding that has no counterpart. A FROM-root archetype predicate is
+// excluded for a separate reason — openehr/aql/verify.go's own doc comment
+// records that the write-side FROM clause carries no archetype field at all
 // — which is why arm (a)'s archetype-mismatch rows below are spelled in
 // CONTAINS position throughout: that is the one spelling both arm (a) and
 // arm (c) can share, rather than two different queries pinning the same code.
@@ -344,7 +360,15 @@ func probe097SilentCases() []aqlprobes.SemanticSilentCase {
 			Name:  "near miss: conforming archetype",
 			Query: "SELECT o FROM COMPOSITION c CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2]",
 		},
-		{Name: "near miss: known containable class", Query: "SELECT c FROM COMPOSITION c CONTAINS CLUSTER cl"},
+		{
+			// Distinct shape from "near miss: containable target" above (m-11,
+			// task-5-fix-round-1-brief.md): both were otherwise "COMPOSITION
+			// CONTAINS <containable class>" and moved together under every
+			// mutation. This one adds a second, deeper hop (CLUSTER CONTAINS
+			// ELEMENT) so the two rows exercise a different pair.
+			Name:  "near miss: known containable class",
+			Query: "SELECT c FROM COMPOSITION c CONTAINS CLUSTER cl CONTAINS ELEMENT e2",
+		},
 		{Name: "near miss: no reference hop", Query: "SELECT f FROM FOLDER f CONTAINS FOLDER f2"},
 		{Name: "near miss: explicit version tier", Query: "SELECT v FROM VERSION v[LATEST_VERSION]"},
 		{
@@ -363,12 +387,47 @@ func probe097SilentCases() []aqlprobes.SemanticSilentCase {
 			Query: "SELECT o1, o2 FROM COMPOSITION c CONTAINS (OBSERVATION o1 OR OBSERVATION o2)",
 		},
 		{
-			// Mandatory negative case 1: an unknown operand suppresses BOTH
-			// adjacent pair checks, even though OBSERVATION CONTAINS COMPOSITION
-			// (the pair either side of FOO_BAR would form) is itself Never.
+			// Mandatory negative case 1: FOO_BAR, an unknown class, suppresses
+			// BOTH of its adjacent pair checks — OBSERVATION->FOO_BAR and
+			// FOO_BAR->COMPOSITION — leaving only its own aql_unknown_rm_class
+			// finding. (There is no transitive OBSERVATION->COMPOSITION pair to
+			// suppress: semcheck.Checker.Pair's own doc comment is explicit that
+			// the walk is adjacency-only and a transitive pair MUST NOT be
+			// synthesised, so that pair is never formed at all, suppressed or
+			// not — an earlier version of this comment claimed otherwise.)
+			//
+			// This row's arm is redundant-by-construction, not fragile: REQ-160
+			// makes the pair question total, so a pair with an unknown operand
+			// answers UnknownClass regardless of Operand.Suppresses, and
+			// Checker.Pair's own switch already returns nil for that verdict —
+			// neutering Suppresses entirely does not change this row's outcome
+			// (confirmed: only "fire/contains not containable" fails under that
+			// mutation, task-5-review-round-1.md M-1). The Suppresses mechanism
+			// itself IS pinned observably, just not by this flavour of operand —
+			// see "mandatory negative: unknown-class suppression (Never-arm
+			// observable pin)" below for the Never-verdict flavour that does
+			// arm, and semcheck_test.go's TestPairSuppressedByOperandVerdict for
+			// the engine-level pin of both flavours directly.
 			Name:  "mandatory negative: unknown-class suppression",
 			Query: "SELECT c FROM OBSERVATION o CONTAINS FOO_BAR f CONTAINS COMPOSITION c",
 			Want:  []string{"aql_unknown_rm_class"},
+		},
+		{
+			// M-1 fix (task-5-fix-round-1-brief.md): the sibling row above names
+			// "unknown-class suppression" but cannot fail on a mutation of the
+			// rule it names (Operand.Suppresses -> return false), because REQ-160
+			// totality already makes an unknown operand's pair answer
+			// UnknownClass with or without that check. This row pins the OTHER
+			// arm of the same Operand.Suppresses condition (verdict !=
+			// Admissible): a Never-verdict operand (DV_TEXT, not a containment
+			// target) suppressing the pair checks on BOTH sides of it. Confirmed:
+			// today's multiset is exactly [aql_contains_not_containable]; under
+			// the Suppresses->false mutation it gains aql_impossible_containment
+			// (from the no-longer-suppressed COMPOSITION->DV_TEXT and
+			// DV_TEXT->ELEMENT pairs), so this row genuinely arms.
+			Name:  "mandatory negative: unknown-class suppression (Never-arm observable pin)",
+			Query: "SELECT c FROM COMPOSITION c CONTAINS DV_TEXT t CONTAINS ELEMENT e",
+			Want:  []string{"aql_contains_not_containable"},
 		},
 		{
 			// Mandatory negative case 2, declared-class arm: an unknown declared
@@ -390,92 +449,91 @@ func probe097SilentCases() []aqlprobes.SemanticSilentCase {
 }
 
 // probe097AdditivityCases is PROBE-097 arm (b): PROBE-028's own corpus
-// (TestProbe028AQLLint above), unchanged, re-run under the completed
-// REQ-161 linter. WantCodes is the pre-REQ-161 baseline from that same
-// table; the controller ran all three through the completed linter and
-// found zero REQ-161 delta, so the baseline is asserted unchanged rather
-// than re-derived.
+// ([probe028Cases], shared with TestProbe028AQLLint per m-6 above),
+// unchanged, re-run under the completed REQ-161 linter. WantCodes is the
+// pre-REQ-161 baseline from that same table; the controller ran all three
+// through the completed linter and found zero REQ-161 delta, so the
+// baseline is asserted unchanged rather than re-derived.
 func probe097AdditivityCases(t *testing.T) []aqlprobes.LintCase {
 	t.Helper()
-	opt := loadOPT(t, "vital_signs")
-	return []aqlprobes.LintCase{
-		{
-			Name:      "bad_syntax.aql",
-			Query:     cassette(t, "bad_syntax.aql"),
-			WantCodes: []string{"aql_syntax"},
-		},
-		{
-			Name:      "missing_archetype.aql",
-			OPT:       opt,
-			Query:     cassette(t, "missing_archetype.aql"),
-			WantCodes: []string{"aql_archetype_not_in_template"},
-		},
-		{
-			Name:      "valid.aql",
-			OPT:       opt,
-			Query:     cassette(t, "valid.aql"),
-			WantCodes: nil, // clean
-		},
-	}
+	return probe028Cases(t)
 }
 
 // probe097ParityCases is PROBE-097 arm (c): the subset of probe097FireCases /
 // probe097SilentCases expressible through the builder, translated into the
 // equivalent containment tree. Every one of the five containment codes is
-// exercised, including both mandatory suppression negatives; the three
-// portability codes are out of REQ-162 § Contract's scope entirely (never
-// producible by VerifyContainment), so they have no row here.
+// exercised, including both mandatory-suppression-negative shapes — but this
+// does NOT independently pin either suppression rule on the write side (m-4,
+// task-5-fix-round-1-brief.md): one shared engine (openehr/aql/internal/
+// semcheck) backs both adapters, so a mutation to the suppression logic
+// moves both adapters together and these rows stay green regardless. What
+// they actually pin is read/write PARITY for these shapes — that
+// VerifyContainment reports aql_unknown_rm_class for them too, exactly as
+// LintString does. The three portability codes are out of REQ-162
+// § Contract's scope entirely (never producible by VerifyContainment), so
+// they have no row here.
 func probe097ParityCases() []aqlprobes.ParityCase {
 	return []aqlprobes.ParityCase{
-		{"impossible containment", func() *aql.Builder {
+		{Name: "impossible containment", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("o")).From("OBSERVATION", "o").
 				Contains(aql.Class("COMPOSITION", "c"))
 		}},
-		{"near miss: admissible pair", func() *aql.Builder {
+		{Name: "near miss: admissible pair", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("o")).From("COMPOSITION", "c").
 				Contains(aql.Class("OBSERVATION", "o"))
 		}},
-		{"contains not containable", func() *aql.Builder {
+		{Name: "contains not containable", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("c")).From("COMPOSITION", "c").
 				Contains(aql.Class("DV_TEXT", "t"))
 		}},
-		{"near miss: containable target", func() *aql.Builder {
+		{Name: "near miss: containable target", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("c")).From("COMPOSITION", "c").
 				Contains(aql.Class("ELEMENT", "e"))
 		}},
-		{"archetype class mismatch", func() *aql.Builder {
+		{Name: "archetype class mismatch", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("ev")).From("COMPOSITION", "c").
 				Contains(aql.Archetype("EVALUATION", "ev", "openEHR-EHR-OBSERVATION.body_temperature.v2"))
 		}},
-		{"near miss: conforming archetype", func() *aql.Builder {
+		{Name: "near miss: conforming archetype", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("o")).From("COMPOSITION", "c").
 				Contains(aql.Archetype("OBSERVATION", "o", "openEHR-EHR-OBSERVATION.body_temperature.v2"))
 		}},
-		{"unknown RM class", func() *aql.Builder {
+		{Name: "unknown RM class", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("c")).From("COMPOSITION", "c").
 				Contains(aql.Class("FOO_BAR", "f"))
 		}},
-		{"near miss: known containable class", func() *aql.Builder {
-			return aql.NewBuilder().Select(aql.Col("c")).From("COMPOSITION", "c").
-				Contains(aql.Class("CLUSTER", "cl"))
-		}},
-		{"containment by reference", func() *aql.Builder {
+		{
+			// Mirrors the deeper-chain shape given to the "near miss: known
+			// containable class" arm-(a) row (m-11) so the two stay aligned.
+			Name: "near miss: known containable class", Build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("c")).From("COMPOSITION", "c").
+					Contains(aql.Class("CLUSTER", "cl").Contains(aql.Class("ELEMENT", "e2")))
+			},
+		},
+		{Name: "containment by reference", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("c")).From("FOLDER", "f").
 				Contains(aql.Class("COMPOSITION", "c"))
 		}},
-		{"near miss: no reference hop", func() *aql.Builder {
+		{Name: "near miss: no reference hop", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("f")).From("FOLDER", "f").
 				Contains(aql.Class("FOLDER", "f2"))
 		}},
-		{"mandatory negative: unknown-class suppression", func() *aql.Builder {
+		{Name: "mandatory negative: unknown-class suppression", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("c")).From("OBSERVATION", "o").
 				Contains(aql.Class("FOO_BAR", "f").Contains(aql.Class("COMPOSITION", "c")))
 		}},
-		{"mandatory negative: archetype-mismatch suppression (unknown declared class)", func() *aql.Builder {
+		{
+			Name: "mandatory negative: unknown-class suppression (Never-arm observable pin)",
+			Build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("c")).From("COMPOSITION", "c").
+					Contains(aql.Class("DV_TEXT", "t").Contains(aql.Class("ELEMENT", "e")))
+			},
+		},
+		{Name: "mandatory negative: archetype-mismatch suppression (unknown declared class)", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("x")).From("COMPOSITION", "c").
 				Contains(aql.Archetype("FOO_BAR", "x", "openEHR-EHR-OBSERVATION.blood_pressure.v1"))
 		}},
-		{"mandatory negative: archetype-mismatch suppression (unknown HRID type segment)", func() *aql.Builder {
+		{Name: "mandatory negative: archetype-mismatch suppression (unknown HRID type segment)", Build: func() *aql.Builder {
 			return aql.NewBuilder().Select(aql.Col("ev")).From("COMPOSITION", "c").
 				Contains(aql.Archetype("EVALUATION", "ev", "openEHR-EHR-FOOTYPE.x.v1"))
 		}},
@@ -507,6 +565,14 @@ func TestProbe097SemanticLint(t *testing.T) {
 // a firing row wired to the wrong code must fail the probe, not pass it
 // silently.
 func TestProbe097DetectsFireCodeDrift(t *testing.T) {
+	// m-7 (task-5-fix-round-1-brief.md): Additivity and Parity below are
+	// minimal, one clean row each — NOT the full probe097AdditivityCases /
+	// probe097ParityCases corpora. Running the full corpora here let this
+	// control pass under an UNRELATED mutation (e.g. VerifyContainment ->
+	// nil breaks real parity rows too), so a fail here could mean "fire-code
+	// drift" or "something else entirely" and this control would not have
+	// noticed the difference. Asserting Detail names the drifted fire row
+	// (not just Status == "fail") closes that gap directly.
 	corpus := aqlprobes.SemanticCorpus{
 		Fire: []aqlprobes.SemanticFireCase{
 			{
@@ -518,9 +584,16 @@ func TestProbe097DetectsFireCodeDrift(t *testing.T) {
 				SpanNth:   1,
 			},
 		},
-		Silent:     []aqlprobes.SemanticSilentCase{{Name: "clean", Query: "SELECT c FROM COMPOSITION c"}},
-		Additivity: probe097AdditivityCases(t),
-		Parity:     probe097ParityCases(),
+		Silent: []aqlprobes.SemanticSilentCase{{Name: "clean", Query: "SELECT c FROM COMPOSITION c"}},
+		Additivity: []aqlprobes.LintCase{
+			{Name: "clean", Query: "SELECT c FROM COMPOSITION c", WantCodes: nil},
+		},
+		Parity: []aqlprobes.ParityCase{
+			{Name: "clean pair", Build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("o")).From("COMPOSITION", "c").
+					Contains(aql.Class("OBSERVATION", "o"))
+			}},
+		},
 	}
 	r, err := aqlprobes.Probe097SemanticLint(corpus)
 	if err != nil {
@@ -528,5 +601,9 @@ func TestProbe097DetectsFireCodeDrift(t *testing.T) {
 	}
 	if r.Status != "fail" {
 		t.Fatalf("expected fail on fire-code drift, got status=%q", r.Status)
+	}
+	if !strings.Contains(r.Detail, "fire/wrong code on purpose") {
+		t.Fatalf("expected failure detail to name the drifted fire row (%q), got %q",
+			"fire/wrong code on purpose", r.Detail)
 	}
 }

@@ -183,7 +183,7 @@ go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/cassettes/t
 
 ### aql-build
 
-**Purpose:** Build the same logical AQL query two ways — the struct-builder and the verb-functions — and prove both emit the same canonical string on the wire (REQ-055, PROBE-020). A third query demonstrates the REQ-117 containment algebra (`aql.Class` / `Contains` / `NotContains` / `ContainsOr`) and opt-in in-text paging (`LimitInline` / `OffsetInline`). Pure building block: no transport, no auth. The executor lives at `openehr/client/query`.
+**Purpose:** Build the same logical AQL query two ways — the struct-builder and the verb-functions — and prove both emit the same canonical string on the wire (REQ-055, PROBE-020). A third query demonstrates the REQ-117 containment algebra (`aql.Class` / `Contains` / `NotContains` / `ContainsOr`) and opt-in in-text paging (`LimitInline` / `OffsetInline`). A fourth pair shows the REQ-162 opt-in RM-semantics gate (`Builder.VerifyContainment`) — a question `Build` deliberately leaves unanswered — run over a clean containment tree and over one that is grammatically valid but RM-impossible. Pure building block: no transport, no auth. The executor lives at `openehr/client/query`.
 
 ```bash
 go run ./cmd/examples/aql-build
@@ -201,9 +201,21 @@ byte-identical : true
 containment algebra + in-text paging (REQ-117):
   SELECT c FROM EHR e CONTAINS COMPOSITION c CONTAINS ((OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] NOT CONTAINS CLUSTER cl) OR EVALUATION ev) WHERE e/ehr_id/value = $ehr_id ORDER BY c/context/start_time/value DESC LIMIT 20 OFFSET 40
   envelope paging unused — Fetch/Offset stay zero: 0 0
+
+containment verification (REQ-162) — opt-in; Build never runs it:
+  == containment algebra ==
+  SELECT c FROM EHR e CONTAINS COMPOSITION c CONTAINS ((OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] NOT CONTAINS CLUSTER cl) OR EVALUATION ev) WHERE e/ehr_id/value = $ehr_id ORDER BY c/context/start_time/value DESC LIMIT 20 OFFSET 40
+  result : no findings — every containment step is admissible under the pinned RM
+
+  == RM-impossible query ==
+  SELECT ev FROM OBSERVATION o CONTAINS EVALUATION ev[openEHR-EHR-OBSERVATION.body_temperature.v2]
+  aql_archetype_class_mismatch
+    archetype openEHR-EHR-OBSERVATION.body_temperature.v2 does not conform to declared class EVALUATION, so this class expression can never match
+  aql_impossible_containment
+    no containment route under the pinned RM connects OBSERVATION to EVALUATION, so this CONTAINS can never match
 ```
 
-**What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`. Keep paging on **one** channel — the envelope (`Limit`/`Offset`) by default, the in-text form only when the bound must survive stored-query registration; requesting both is a build-time error.
+**What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`. Keep paging on **one** channel — the envelope (`Limit`/`Offset`) by default, the in-text form only when the bound must survive stored-query registration; requesting both is a build-time error. `VerifyContainment` is opt-in and answers the RM question, not the shape one — dispatch on `contain.Finding.Code`; a nil relation uses the REQ-160 default, and a `contain.Default().WithOverlay(...)` copy accounts for a dialect that admits more.
 
 ### aql-parse-structured
 

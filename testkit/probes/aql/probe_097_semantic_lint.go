@@ -38,27 +38,34 @@ const (
 	codeFanoutRowGrain              = "aql_fanout_row_grain"
 )
 
+// semanticCodesAll is the full REQ-161 catalogue — arm (a)'s universe, and
+// what the arm (b) additivity guard checks stays absent from a
+// pre-REQ-161-clean query. A package-level var rather than a literal built
+// fresh per call: every caller only reads it (via [semanticCodes]).
+var semanticCodesAll = []string{
+	codeImpossibleContainment, codeContainsNotContainable, codeArchetypeClassMismatch,
+	codeUnknownRMClass, codeContainmentByReference,
+	codeVersionNoPredicate, codeVersionedObjectUnreferenced, codeFanoutRowGrain,
+}
+
 // semanticCodes is the full REQ-161 catalogue — arm (a)'s universe, and what
 // the arm (b) additivity guard checks stays absent from a pre-REQ-161-clean
 // query.
-func semanticCodes() []string {
-	return []string{
-		codeImpossibleContainment, codeContainsNotContainable, codeArchetypeClassMismatch,
-		codeUnknownRMClass, codeContainmentByReference,
-		codeVersionNoPredicate, codeVersionedObjectUnreferenced, codeFanoutRowGrain,
-	}
+func semanticCodes() []string { return semanticCodesAll }
+
+// containmentCodesAll is the REQ-162 § Contract five-code subset arm (c)
+// scopes parity to. A package-level var for the same reason as
+// [semanticCodesAll].
+var containmentCodesAll = []string{
+	codeImpossibleContainment, codeContainsNotContainable, codeArchetypeClassMismatch,
+	codeUnknownRMClass, codeContainmentByReference,
 }
 
 // containmentCodes is the REQ-162 § Contract five-code subset arm (c) scopes
 // parity to. The three portability advisories above are read-side only and
 // never appear from [aql.Builder.VerifyContainment] — REQ-162 § Contract is
 // explicit that parity is scoped to this subset, not the full catalogue.
-func containmentCodes() []string {
-	return []string{
-		codeImpossibleContainment, codeContainsNotContainable, codeArchetypeClassMismatch,
-		codeUnknownRMClass, codeContainmentByReference,
-	}
-}
+func containmentCodes() []string { return containmentCodesAll }
 
 // SemanticFireCase is one PROBE-097 arm-(a) firing row: Query MUST raise
 // exactly one REQ-161 code — Code, at Severity — spanned on the SpanNth
@@ -162,10 +169,38 @@ func Probe097SemanticLint(c SemanticCorpus) (Result, error) {
 			failures = append(failures, fmt.Sprintf("additivity/%s: %s", tc.Name, msg))
 		}
 	}
+	// The parity loop also feeds the non-vacuity guard below: it is not enough
+	// for every row to compare equal if both sides can be equal by being
+	// empty. TestReadWriteParityIsNotVacuous (openehr/aql/verify_parity_test.go)
+	// is the unit-level precedent for this exact guard; arm (c) had no
+	// analogue, so 5 of its 13 rows (the "near miss" ones) were free to be
+	// vacuous — green under a mutation that deleted the write-side check
+	// entirely, for the wrong reason (both sides empty, not both sides
+	// agreeing on a real finding).
+	writeUnion := map[string]bool{}
+	cleanRows := 0
 	for _, tc := range c.Parity {
-		if msg := runParity(tc); msg != "" {
+		msg, write, measured := runParity(tc)
+		if msg != "" {
 			failures = append(failures, fmt.Sprintf("parity/%s: %s", tc.Name, msg))
 		}
+		if !measured {
+			continue
+		}
+		if len(write) == 0 {
+			cleanRows++
+		}
+		for _, code := range write {
+			writeUnion[code] = true
+		}
+	}
+	for _, code := range containmentCodes() {
+		if !writeUnion[code] {
+			failures = append(failures, fmt.Sprintf("parity: no parity case raises %s; the corpus does not exercise it", code))
+		}
+	}
+	if cleanRows == 0 {
+		failures = append(failures, "parity: no parity case is clean; the corpus cannot show a false positive")
 	}
 
 	if len(failures) > 0 {
@@ -215,19 +250,35 @@ func runSemanticSilent(tc SemanticSilentCase) string {
 // compare [aql.Builder.VerifyContainment] against [lint.LintString]'s
 // [containmentCodes] subset, mirroring the comparison discipline of
 // openehr/aql/verify_parity_test.go's own TestReadWriteParity.
-func runParity(tc ParityCase) string {
+//
+// It fails closed rather than panicking (REQ-025) on a caller-supplied nil
+// Build field or a Build that returns a nil *aql.Builder: ParityCase is
+// exported API, and unlike [aql.Builder.VerifyContainment],
+// [aql.Builder.Build] has no nil-receiver guard of its own.
+//
+// measured reports whether write is a real observation (Build ran and
+// produced a query) rather than the zero value of a guard failure — the
+// caller's non-vacuity accounting must not count an unmeasured row as
+// "clean".
+func runParity(tc ParityCase) (msg string, write []string, measured bool) {
+	if tc.Build == nil {
+		return "ParityCase.Build is nil", nil, false
+	}
 	b := tc.Build()
+	if b == nil {
+		return "Build() returned a nil *aql.Builder", nil, false
+	}
 	q, err := b.Build()
 	if err != nil {
-		return fmt.Sprintf("Build() = %v — every parity case must be buildable", err)
+		return fmt.Sprintf("Build() = %v — every parity case must be buildable", err), nil, false
 	}
-	write := findingCodes(b.VerifyContainment(nil))
+	write = findingCodes(b.VerifyContainment(nil))
 	read := filterCodes(lint.LintString(q.Q, nil), containmentCodes())
 	if !slices.Equal(write, read) {
 		return fmt.Sprintf("code multisets diverge for %q:\n  write (VerifyContainment) = %v\n  read  (LintString)        = %v",
-			q.Q, write, read)
+			q.Q, write, read), write, true
 	}
-	return ""
+	return "", write, true
 }
 
 // filterCodes is the sorted multiset of r's issue codes restricted to set.
@@ -259,6 +310,20 @@ func findingCodes(fs []contain.Finding) []string {
 // semantic_test.go helper of the same purpose. Computed from the source text
 // rather than from the implementation under test, so a span that silently
 // widened to the whole clause fails.
+//
+// The occurrence search is boundary-checked (see [boundaryOK]), not a
+// token-aware parse: it skips a candidate match embedded inside a longer
+// class-token or archetype-HRID segment (e.g. "OBSERVATION" occurring inside
+// "openEHR-EHR-OBSERVATION.blood_pressure.v1" earlier in the query), so a
+// future corpus row naming a short class token cannot silently anchor on an
+// HRID fragment rather than the bare token it means to pin. SpanNth remains
+// the corpus author's own guard against two GENUINE class-token occurrences
+// of the same name; boundary checking only rules out a partial match.
+//
+// The final column is computed via a rune conversion (not a byte offset), so
+// a query carrying non-ASCII text ahead of the match would still land on the
+// right column — every corpus query today is ASCII, so that path is correct
+// but unexercised.
 func classSpan(query, rmType string, nth int) (lint.Span, error) {
 	if strings.Contains(query, "\n") {
 		return lint.Span{}, fmt.Errorf("classSpan assumes a single-line query, got %q", query)
@@ -266,18 +331,58 @@ func classSpan(query, rmType string, nth int) (lint.Span, error) {
 	if nth < 1 {
 		return lint.Span{}, fmt.Errorf("classSpan: nth is 1-based, got %d", nth)
 	}
-	idx, from := 0, 0
-	for range nth {
+	idx := -1
+	count, from := 0, 0
+	for {
 		i := strings.Index(query[from:], rmType)
 		if i < 0 {
-			return lint.Span{}, fmt.Errorf("query %q has fewer than %d occurrences of %q", query, nth, rmType)
+			break
 		}
-		idx = from + i
-		from = idx + len(rmType)
+		start := from + i
+		end := start + len(rmType)
+		from = start + 1 // advance by one byte, not len(rmType), so an overlapping candidate is still considered
+		if !boundaryOK(query, start, end) {
+			continue
+		}
+		count++
+		if count == nth {
+			idx = start
+			break
+		}
+	}
+	if idx < 0 {
+		return lint.Span{}, fmt.Errorf("query %q has fewer than %d boundary-matched occurrences of %q", query, nth, rmType)
 	}
 	col := len([]rune(query[:idx])) + 1
 	return lint.Span{
 		Start: parse.Position{Line: 1, Col: col},
 		End:   parse.Position{Line: 1, Col: col + len([]rune(rmType))},
 	}, nil
+}
+
+// boundaryOK reports whether the candidate occurrence s[start:end] is a
+// standalone token rather than a fragment embedded in a longer one: neither
+// the byte immediately before start nor the byte immediately at end may be
+// an [identifierByte] — a class-token or archetype-HRID constituent.
+func boundaryOK(s string, start, end int) bool {
+	if start > 0 && identifierByte(s[start-1]) {
+		return false
+	}
+	if end < len(s) && identifierByte(s[end]) {
+		return false
+	}
+	return true
+}
+
+// identifierByte reports whether b can appear inside an RM class token or an
+// archetype HRID segment: letters, digits, underscore, and the HRID
+// separators hyphen and period.
+func identifierByte(b byte) bool {
+	switch {
+	case b >= 'a' && b <= 'z', b >= 'A' && b <= 'Z', b >= '0' && b <= '9':
+		return true
+	case b == '_' || b == '-' || b == '.':
+		return true
+	}
+	return false
 }
