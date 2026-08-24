@@ -1,7 +1,7 @@
 // Package contain answers, for two AQL class expressions, whether a
 // containment route connects them under the pinned openEHR Reference Model —
-// the shared source of RM truth for the AQL semantic lint (REQ-161) and the
-// builder verification (REQ-162). REQ-160.
+// the shared RM-derived containment relation for the AQL semantic lint
+// (REQ-161) and the builder verification (REQ-162). REQ-160.
 //
 // The relation is derived at runtime from the BMM-backed class graph in
 // openehr/rm/rminfo (REQ-048): descendant-at-any-depth reachability over the

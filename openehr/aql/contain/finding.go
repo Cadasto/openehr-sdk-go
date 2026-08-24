@@ -1,7 +1,7 @@
 package contain
 
 // Finding is a containment finding surfaced by the builder verification
-// (REQ-162, Phase 3). Like the REQ-109 lint issue model it carries a value-free
+// (REQ-162 § Contract). Like the REQ-109 lint issue model it carries a value-free
 // Code and a value-bearing Detail; it deliberately has no Span, Path, or
 // severity field — a builder tree has no source text to point into, and
 // severity is looked up per code in the REQ-161 catalogue.

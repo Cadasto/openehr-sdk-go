@@ -16,16 +16,21 @@ func TestContainForbiddenImports(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ImportDir: %v", err)
 	}
-	const mod = "github.com/cadasto/openehr-sdk-go/"
+	if len(pkg.GoFiles) == 0 {
+		t.Fatal("ImportDir enumerated no non-test Go files; the guard is vacuous")
+	}
 	allowed := map[string]bool{
-		mod + "openehr/rm":        true,
-		mod + "openehr/rm/rminfo": true,
+		"github.com/cadasto/openehr-sdk-go/openehr/rm":        true,
+		"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo": true,
 	}
 	for _, imp := range pkg.Imports {
-		if !strings.HasPrefix(imp, mod) {
-			continue // standard library (or a foundation dep without the module prefix)
+		if allowed[imp] {
+			continue
 		}
-		if !allowed[imp] {
+		// A dot in the first path element marks a module path; the standard
+		// library never has one. This fails third-party imports too, closing
+		// the "and the standard library" half of the REQ-013 clause.
+		if first, _, _ := strings.Cut(imp, "/"); strings.Contains(first, ".") {
 			t.Errorf("openehr/aql/contain MUST NOT import %q (REQ-013; allowed: openehr/rm, openehr/rm/rminfo, stdlib)", imp)
 		}
 	}

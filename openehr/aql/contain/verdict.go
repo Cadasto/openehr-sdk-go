@@ -6,6 +6,9 @@ import "strconv"
 //
 // The zero value is [UnknownClass]: absent a definite answer the relation
 // reports "not a class I know" rather than a false Admissible or Never.
+//
+// The numeric values and their ordering are not part of the contract —
+// compare verdicts with == or switch, never order them.
 type Verdict int
 
 const (

@@ -43,6 +43,55 @@ func TestConsumerEdgeUnknownEndpointExactName(t *testing.T) {
 	}
 }
 
+// TestWithOverlaySiblingsDoNotAlias — two WithOverlay extensions of the same
+// parent must not see each other's edges (REQ-160 § Extensibility). A
+// regression to appending into the parent's backing array would let one
+// sibling's edge silently replace the other's while every single-extension
+// test still passes.
+func TestWithOverlaySiblingsDoNotAlias(t *testing.T) {
+	base := contain.Default()
+	ext1 := base.WithOverlay(contain.Edge{From: "PERSON", To: "NODE_ONE"})
+	ext2 := base.WithOverlay(contain.Edge{From: "PERSON", To: "NODE_TWO"})
+
+	if got := ext1.CanContain("PERSON", "NODE_ONE"); got != contain.Admissible {
+		t.Errorf("ext1.CanContain(PERSON, NODE_ONE) = %v, want Admissible (own edge lost)", got)
+	}
+	if got := ext1.CanContain("PERSON", "NODE_TWO"); got != contain.UnknownClass {
+		t.Errorf("ext1.CanContain(PERSON, NODE_TWO) = %v, want UnknownClass (sibling edge leaked)", got)
+	}
+	if got := ext2.CanContain("PERSON", "NODE_TWO"); got != contain.Admissible {
+		t.Errorf("ext2.CanContain(PERSON, NODE_TWO) = %v, want Admissible (own edge lost)", got)
+	}
+	if got := ext2.CanContain("PERSON", "NODE_ONE"); got != contain.UnknownClass {
+		t.Errorf("ext2.CanContain(PERSON, NODE_ONE) = %v, want UnknownClass (sibling edge leaked)", got)
+	}
+}
+
+// TestConsumerEdgeKnownEndpointConformance — the spec's own worked example
+// (REQ-160 § Extensibility): a consumer edge with a BMM-known endpoint matches
+// by conformance, like any derived edge, so WithOverlay(VERSIONED_OBJECT → …)
+// covers every VERSIONED_* container.
+func TestConsumerEdgeKnownEndpointConformance(t *testing.T) {
+	base := contain.Default()
+	ext := base.WithOverlay(contain.Edge{From: "VERSIONED_OBJECT", To: "MY_DIALECT_NODE"})
+
+	if got := ext.CanContain("VERSIONED_FOLDER", "MY_DIALECT_NODE"); got != contain.Admissible {
+		t.Errorf("ext.CanContain(VERSIONED_FOLDER, MY_DIALECT_NODE) = %v, want Admissible (VERSIONED_FOLDER conforms to the edge's VERSIONED_OBJECT endpoint)", got)
+	}
+	if got := base.CanContain("VERSIONED_FOLDER", "MY_DIALECT_NODE"); got != contain.UnknownClass {
+		t.Errorf("base.CanContain(VERSIONED_FOLDER, MY_DIALECT_NODE) = %v, want UnknownClass (default MUST be unaltered)", got)
+	}
+}
+
+// TestWithOverlayIgnoresEmptyEndpoint — an edge with an empty endpoint names
+// nothing and is ignored; "" never becomes a containable class.
+func TestWithOverlayIgnoresEmptyEndpoint(t *testing.T) {
+	ext := contain.Default().WithOverlay(contain.Edge{From: "", To: "COMPOSITION"})
+	if got := ext.Containable(""); got != contain.UnknownClass {
+		t.Errorf(`Containable("") = %v, want UnknownClass (empty endpoint must not register)`, got)
+	}
+}
+
 // TestConsumerByReferenceEdge — a ByReference consumer edge yields a ByReference
 // pair verdict when it is the only route.
 func TestConsumerByReferenceEdge(t *testing.T) {
