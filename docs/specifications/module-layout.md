@@ -40,6 +40,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `openehr/aql/` | AQL builders (struct-builder + verb-functions) and request / result models, independent of an executor. |
 | `openehr/aql/parse/` | AQL syntax parser against the SDK grammar profile (ADR 0007) → generated-type-free AST (REQ-109). The generated ANTLR parser lives under `openehr/aql/parse/gen/`; the pure-Go ANTLR runtime is its only third-party dependency. |
 | `openehr/aql/lint/` | Three-layer AQL static lint (syntax, shape, template-aware archetype/path checks) over `parse` (REQ-109). Bridged into the validation model by `validation.ValidateAQL`; never imports `openehr/validation`. |
+| `openehr/aql/contain/` | Containment admissibility relation (REQ-160): verdicts derived at runtime from the pinned BMM via `openehr/rm/rminfo` plus cited overlay edges. Sits below `openehr/aql` and `openehr/aql/lint`; imports only `openehr/rm`, `openehr/rm/rminfo`, and the standard library. |
 | `openehr/composition/` | Generic OPT-driven Composition builder (path-value assignment). Template-specific generated structs do **not** live here — they belong in the consuming project. |
 | `openehr/client/` | REST clients grouped per openEHR resource. |
 | `openehr/client/system/` | System API — capabilities, version, infrastructure discovery. |
@@ -134,7 +135,7 @@ No `cadasto/<X>` package **MAY** import another `cadasto/<Y>` package directly. 
 
 ## REQ-013 — Building-block independence
 
-Each of `openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/template`, `openehr/aql` (models only), and the AQL lint building blocks `openehr/aql/parse` + `openehr/aql/lint` **MUST** be importable and useful without constructing an authenticated client or instantiating `transport/` or `auth/`. (`aql/parse` pulls the pure-Go ANTLR runtime — its sole third-party dependency — but neither it nor `aql/lint` imports `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`; enforced by `TestAQLParseForbiddenImports` / `TestAQLLintForbiddenImports`.)
+Each of `openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/template`, `openehr/aql` (models only), and the AQL building blocks `openehr/aql/parse` + `openehr/aql/lint` + `openehr/aql/contain` **MUST** be importable and useful without constructing an authenticated client or instantiating `transport/` or `auth/`. (`aql/parse` pulls the pure-Go ANTLR runtime — its sole third-party dependency — but neither it nor `aql/lint` imports `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`; `aql/contain` imports only `openehr/rm`, `openehr/rm/rminfo`, and the standard library; enforced by `TestAQLParseForbiddenImports` / `TestAQLLintForbiddenImports` / `TestContainForbiddenImports`.)
 
 See [use-cases.md § Building-block use cases](use-cases.md#building-block-use-cases).
 

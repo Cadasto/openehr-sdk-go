@@ -222,7 +222,7 @@ entry); `docs/roadmap.md` updated; `make spec-check` + `make ci` green; plan arc
 | Step                                                              | Status |
 | ----------------------------------------------------------------- | ------ |
 | Phase 0: ADR-0017 + REQ-160/161/162 + band + PROBE-097 registered | ✅ landed 2026-08-22 |
-| Phase 1: `openehr/aql/contain` + tests                            |        |
+| Phase 1: `openehr/aql/contain` + tests                            | ✅ landed 2026-08-24 |
 | Phase 2: lint checks + PROBE-097 + example                        |        |
 | Phase 3: builder verification + example                           |        |
 | Phase 4: traceability / CHANGELOG / roadmap / archive             |        |
