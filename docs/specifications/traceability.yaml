@@ -1795,8 +1795,9 @@ requirements:
     canonical: docs/specifications/module-layout.md#req-013--building-block-independence
     status: draft
     implementation: landed
-    packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/aql]
+    packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain]
     tests:
+      - openehr/aql/contain/imports_test.go
       - openehr/aql/lint/imports_test.go
       - openehr/aql/parse/imports_test.go
       - openehr/composition/imports_test.go
