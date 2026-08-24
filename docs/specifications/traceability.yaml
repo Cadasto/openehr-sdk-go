@@ -2124,11 +2124,16 @@ requirements:
     title: AQL semantic and portability lint
     canonical: docs/specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint
     status: draft
-    implementation: planned
-    packages: [openehr/aql/lint]
-    probes: [PROBE-097]
+    implementation: partial
+    packages:
+      - openehr/aql/lint
+      - openehr/aql/internal/semcheck  # the shared verdict->code engine, also REQ-162's
     plans: [docs/plans/2026-08-21-aql-semantic-layer.md]
     adrs: [docs/adr/0017-aql-semantic-layer.md]
+    tests:
+      - openehr/aql/lint/semantic_test.go
+      - openehr/aql/internal/semcheck/semcheck_test.go
+      - openehr/aql/internal/semcheck/imports_test.go
     notes: >-
       Additive REQ-109 Layer-2 extension: relation-backed semantic checks
       (impossible containment, non-containable target, archetype/class
@@ -2136,7 +2141,13 @@ requirements:
       checks (VERSION predicate default SPECPR-481, unreferenced
       VERSIONED_OBJECT, conservative fan-out advisory). Existing codes,
       severities and texts unchanged; PROBE-028 re-baselines only where a
-      corpus query genuinely carries a newly-checked defect.
+      corpus query genuinely carries a newly-checked defect. Landed so far:
+      the four CONTAINMENT codes and lint.Options.Relation, with the
+      verdict->code classification and the suppression rule in
+      openehr/aql/internal/semcheck so REQ-162's write-side adapter reports
+      the same multiset. Partial until the archetype/class-mismatch arm, the
+      three portability checks, and the PROBE-097 corpus land — the probe row
+      returns then (spec-check refuses a partial REQ citing a Draft probe).
 
   - id: REQ-162
     title: Builder containment verification

@@ -110,7 +110,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-143 | Template list filters | [wire.md § REQ-143](wire.md#req-143--template-list-filters) | landed |
 | REQ-150 | Path-parameter segment validation | [transport.md § REQ-150](transport.md#req-150--path-parameter-segment-validation) | landed |
 | REQ-160 | AQL containment admissibility relation | [clinical-modeling.md § REQ-160](clinical-modeling.md#req-160--aql-containment-admissibility-relation) | partial |
-| REQ-161 | AQL semantic and portability lint | [clinical-modeling.md § REQ-161](clinical-modeling.md#req-161--aql-semantic-and-portability-lint) | planned |
+| REQ-161 | AQL semantic and portability lint | [clinical-modeling.md § REQ-161](clinical-modeling.md#req-161--aql-semantic-and-portability-lint) | partial |
 | REQ-162 | Builder containment verification | [clinical-modeling.md § REQ-162](clinical-modeling.md#req-162--builder-containment-verification) | planned |
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `deprecated` (normative text retained; implementation removed or not shipped — removal target in canonical spec). Detail in [`traceability.yaml`](traceability.yaml).

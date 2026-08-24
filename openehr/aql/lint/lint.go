@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -120,6 +121,15 @@ type Options struct {
 	// Query, when non-nil, enables parameter-binding checks
 	// (aql_unbound_param / aql_unused_param) against its Parameters map.
 	Query *aql.Query
+	// Relation is the REQ-160 containment relation the Layer-2 semantic
+	// checks judge FROM/CONTAINS shapes against (REQ-161 § Relation supply).
+	//
+	// Unlike Compiled and Query it does not GATE its checks: nil means the
+	// REQ-160 default relation ([contain.Default]), so the semantic group
+	// always runs. Supply a relation extended with dialect overlay edges
+	// ([contain.Relation.WithOverlay]) to lint a deployment whose containment
+	// facts go beyond the pinned RM without drawing false findings.
+	Relation *contain.Relation
 }
 
 // LintString parses q against the SDK grammar profile and lints the result.
@@ -187,6 +197,11 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	issues := []Issue{}
 
 	issues = append(issues, shapeIssues(doc, md)...)
+	// The Layer-2 semantic group (REQ-161) is unconditional: unlike Compiled
+	// and Query, the relation always has a usable default, so a nil
+	// Options.Relation selects the pinned RM rather than switching the group
+	// off.
+	issues = append(issues, semanticIssues(doc, opts.Relation)...)
 	if opts.Query != nil {
 		issues = append(issues, paramIssues(md, opts.Query)...)
 	}

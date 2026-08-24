@@ -5,6 +5,16 @@
 // neither transport/ nor auth/ nor any client, and it does not import
 // openehr/validation (the dependency arrow is validation → lint).
 //
+// Layer 2 additionally carries the SEMANTIC containment checks (REQ-161):
+// aql_unknown_rm_class, aql_contains_not_containable,
+// aql_impossible_containment and aql_containment_by_reference, judged against
+// the REQ-160 containment relation ([contain.Relation]) derived in-process from
+// the pinned BMM. They flag FROM/CONTAINS shapes that parse cleanly and that a
+// CDR will typically accept and answer with zero rows — `OBSERVATION CONTAINS
+// COMPOSITION` is the canonical one. The group is unconditional; supply
+// [Options.Relation] to lint against a relation carrying dialect overlay edges.
+// Layer 2 stays AST-only either way: no CDR, no OPT, and no row semantics.
+//
 // The CDR remains the execute-time semantic authority (PROBE-021): a
 // lint-clean query MAY still be rejected on execution. The SDK grammar
 // profile (ADR 0007) carries documented divergences from official QUERY
