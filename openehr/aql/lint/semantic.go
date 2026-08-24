@@ -9,7 +9,9 @@ import (
 // semanticIssues runs the Layer-2 semantic containment checks (REQ-161
 // § Checks): aql_unknown_rm_class and aql_contains_not_containable per class
 // expression, aql_impossible_containment and aql_containment_by_reference per
-// adjacent FROM/CONTAINS pair. rel may be nil (the REQ-160 default relation).
+// adjacent FROM/CONTAINS pair, and aql_archetype_class_mismatch (plus the
+// second arm of aql_unknown_rm_class) per literal archetype predicate. rel
+// may be nil (the REQ-160 default relation).
 //
 // This function is an ADAPTER, not a rule engine. Every verdict→code decision,
 // and the suppression rule between the operand codes and the pair codes, lives
@@ -116,11 +118,33 @@ func (c *containCheck) walk(parent semcheck.Operand, role semcheck.Role, n parse
 	return self
 }
 
-// operand decides one class expression and records its operand-level issues.
+// operand decides one class expression and records its operand-level issues:
+// the REQ-161 class-token check (aql_unknown_rm_class / aql_contains_not_containable,
+// via [semcheck.Checker.Operand]) and, when ce carries a literal archetype
+// predicate, the REQ-161 archetype/class-conformance check
+// (aql_archetype_class_mismatch, or the second arm of aql_unknown_rm_class,
+// via [semcheck.Checker.Archetype]).
+//
+// Both checks run from the SAME call, once per class expression — which is
+// what makes the "once per class-expression occurrence" rule (REQ-161
+// § Checks) hold structurally rather than by bookkeeping: a class node is
+// visited exactly once by [containCheck.walk], so operand is called exactly
+// once for it, and semcheck's own suppression (an already-unknown declared
+// class silences [semcheck.Checker.Archetype] before it runs) keeps a single
+// defect from producing two findings.
+//
+// A `$param` archetype predicate is skipped — the CDR resolves the bound
+// scope at execution (PROBE-021), the same skip [templateIssues] applies to
+// aql_path_not_in_template (resolve.go).
 func (c *containCheck) operand(ce parse.ClassExpr, role semcheck.Role) semcheck.Operand {
 	o := c.ck.Operand(ce.RMType, role)
 	for _, f := range o.Findings() {
 		c.issues = append(c.issues, semanticIssue(f, ce))
+	}
+	if ce.Archetype != "" && !ce.ParamArchetype {
+		for _, f := range c.ck.Archetype(ce.RMType, ce.Archetype) {
+			c.issues = append(c.issues, semanticIssue(f, ce))
+		}
 	}
 	return o
 }

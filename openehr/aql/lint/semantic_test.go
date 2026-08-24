@@ -29,11 +29,12 @@ const (
 	codeNotContain    = "aql_contains_not_containable"
 	codeUnknownClass  = "aql_unknown_rm_class"
 	codeByReference   = "aql_containment_by_reference"
+	codeMismatch      = "aql_archetype_class_mismatch"
 	nonSemanticSample = "aql_from_archetype" // a pre-existing code, for additivity checks
 )
 
 func semanticCodes() []string {
-	return []string{codeImpossible, codeNotContain, codeUnknownClass, codeByReference}
+	return []string{codeImpossible, codeNotContain, codeUnknownClass, codeByReference, codeMismatch}
 }
 
 // req161 filters a result down to the REQ-161 containment codes, in issue
@@ -172,6 +173,132 @@ func TestSemanticNearMissesStaySilent(t *testing.T) {
 				t.Errorf("%q raised %v, want no semantic finding", q, got)
 			}
 		})
+	}
+}
+
+// --- archetype/class conformance (REQ-161) -----------------------------------
+//
+// The class/HRID pairs below are the exact rows openehr/aql/contain's
+// TestArchetypeMatches already pins (REQ-160 § Archetype/class conformance),
+// not invented here — these tests assert the ADAPTER: extraction of the
+// literal predicate, the $param skip, the span/path/severity, and the
+// once-per-class-expression suppression.
+
+// TestArchetypeClassMismatchFires is task-brief test 2: a literal archetype
+// predicate whose HRID entity does not conform to the declared class raises
+// aql_archetype_class_mismatch, Error, with the Span on the offending class
+// expression — exactly like the other four REQ-161 codes.
+func TestArchetypeClassMismatchFires(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT ev FROM EVALUATION ev[openEHR-EHR-OBSERVATION.blood_pressure.v1]"
+	r := lint.LintString(q, nil)
+	if got := req161(r); !slices.Equal(got, []string{codeMismatch}) {
+		t.Fatalf("semantic codes = %v, want exactly [%s] (full result %v)", got, codeMismatch, codes(r))
+	}
+	iss := r.Issues[slices.IndexFunc(r.Issues, func(i lint.Issue) bool { return i.Code == codeMismatch })]
+	if iss.Severity != lint.Error {
+		t.Errorf("severity = %v, want Error", iss.Severity)
+	}
+	if want := classSpan(t, q, "EVALUATION", 1); iss.Span != want {
+		t.Errorf("span = %+v, want %+v (on the declared class, not the archetype text)", iss.Span, want)
+	}
+	if iss.Path != "EVALUATION ev" {
+		t.Errorf("path = %q, want %q", iss.Path, "EVALUATION ev")
+	}
+	if iss.Detail == "" {
+		t.Error("carries no Detail")
+	}
+	if r.OK() {
+		t.Error("an Error-severity mismatch must make the result not-OK")
+	}
+}
+
+// TestArchetypeConformsStaysSilent is task-brief test 1: a literal archetype
+// predicate whose HRID entity conforms to the declared class draws no
+// semantic finding, at either end of REQ-160's acceptance row (ENTRY is the
+// archetypeable ancestor, OBSERVATION is the entity itself).
+func TestArchetypeConformsStaysSilent(t *testing.T) {
+	t.Parallel()
+	queries := []string{
+		"SELECT o FROM ENTRY o[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
+		"SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
+	}
+	for _, q := range queries {
+		t.Run(q, func(t *testing.T) {
+			t.Parallel()
+			if got := req161(lint.LintString(q, nil)); len(got) != 0 {
+				t.Errorf("%q raised %v, want silence", q, got)
+			}
+		})
+	}
+}
+
+// TestArchetypeUnknownTypeSegmentWarnsNotMismatch is task-brief test 3: an
+// unknown HRID type segment on a KNOWN declared class raises
+// aql_unknown_rm_class (the second arm of that code) and never the mismatch
+// Error — an unknown name is never wrong (REQ-161 § Flagging policy).
+func TestArchetypeUnknownTypeSegmentWarnsNotMismatch(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT o FROM ENTRY o[openEHR-EHR-FOOTYPE.x.v1]"
+	got := req161(lint.LintString(q, nil))
+	if !slices.Equal(got, []string{codeUnknownClass}) {
+		t.Fatalf("semantic codes = %v, want exactly [%s]", got, codeUnknownClass)
+	}
+	if slices.Contains(got, codeMismatch) {
+		t.Errorf("%s fired alongside an unknown type segment; it must be absent", codeMismatch)
+	}
+}
+
+// TestArchetypeUnknownDeclaredClassReportsOnce is task-brief test 4: an
+// unknown declared class carrying a literal archetype predicate reports
+// aql_unknown_rm_class exactly ONCE for the class expression — the
+// class-token arm's finding, not a second one from the archetype arm — and
+// never the mismatch Error.
+func TestArchetypeUnknownDeclaredClassReportsOnce(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT f FROM FOO_BAR f[openEHR-EHR-OBSERVATION.blood_pressure.v1]"
+	r := lint.LintString(q, nil)
+	if got := count(r, codeUnknownClass); got != 1 {
+		t.Errorf("%s fired %d times, want exactly 1; full result %v", codeUnknownClass, got, codes(r))
+	}
+	if has(r, codeMismatch) {
+		t.Errorf("%s fired for an unknown declared class; it must not", codeMismatch)
+	}
+}
+
+// TestArchetypeUnparseableHRIDStaysBelowError is task-brief test 5: a literal
+// archetype predicate that lexes as an ARCHETYPE_HRID token (so it reaches
+// [parse.ClassExpr.Archetype] as a literal, not a $param) but fails
+// rm.ParseArchetypeID's stricter validation is treated as unknown, never as a
+// proven mismatch. A minor version carrying an embedded dot (".v1.2") is such
+// a case: VERSION_ID itself allows dots (resources/aql/grammar/active/AqlLexer.g4),
+// but that shifts where rm.ParseArchetypeID's first/last-dot split lands, so
+// its version segment no longer starts with "v" (REQ-120) and it reports
+// ErrMalformedID — exactly the "(HRID unparseable)" row of the decision
+// table, verified empirically against the parser rather than assumed.
+func TestArchetypeUnparseableHRIDStaysBelowError(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT o FROM ENTRY o[openEHR-EHR-OBSERVATION.blood_pressure.v1.2]"
+	r := lint.LintString(q, nil)
+	if got := req161(r); !slices.Equal(got, []string{codeUnknownClass}) {
+		t.Fatalf("semantic codes = %v, want exactly [%s] (an unparseable HRID is treated as unknown, never a proven Error)",
+			got, codeUnknownClass)
+	}
+	if !r.OK() {
+		t.Error("a Warning-severity finding must not make the result not-OK")
+	}
+}
+
+// TestArchetypeParamPredicateIsSkipped is task-brief test 6: a $param
+// archetype predicate is skipped entirely — the CDR resolves the bound scope
+// at execution (PROBE-021), the same skip openehr/aql/lint/resolve.go applies
+// to aql_path_not_in_template — even when the declared class would otherwise
+// be checked.
+func TestArchetypeParamPredicateIsSkipped(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT ev FROM EVALUATION ev[$arch]"
+	if got := req161(lint.LintString(q, nil)); len(got) != 0 {
+		t.Errorf("%q raised %v, want silence ($param is skipped)", q, got)
 	}
 }
 

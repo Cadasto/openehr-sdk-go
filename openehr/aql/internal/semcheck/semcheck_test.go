@@ -40,6 +40,7 @@ func TestSeverityOfIsTheOneCatalogue(t *testing.T) {
 		{semcheck.CodeNotContainable, semcheck.Error},
 		{semcheck.CodeUnknownRMClass, semcheck.Warning},
 		{semcheck.CodeContainmentByReference, semcheck.Warning},
+		{semcheck.CodeArchetypeClassMismatch, semcheck.Error},
 	}
 	for _, tc := range cases {
 		t.Run(tc.code, func(t *testing.T) {
@@ -67,6 +68,7 @@ func TestCodeSpellings(t *testing.T) {
 		semcheck.CodeNotContainable:         "aql_contains_not_containable",
 		semcheck.CodeUnknownRMClass:         "aql_unknown_rm_class",
 		semcheck.CodeContainmentByReference: "aql_containment_by_reference",
+		semcheck.CodeArchetypeClassMismatch: "aql_archetype_class_mismatch",
 	}
 	for got, want := range cases {
 		if got != want {
@@ -303,6 +305,86 @@ func TestPairSuppressedByOperandVerdict(t *testing.T) {
 	}
 }
 
+// TestArchetypeDecision pins REQ-161's archetype/class-conformance check
+// (Checker.Archetype): the class/HRID pairs are the exact rows
+// openehr/aql/contain's TestArchetypeMatches already pins (REQ-160 §
+// Archetype/class conformance), so this test asserts the CLASSIFICATION —
+// which code, at which severity — never re-derives the RM fact.
+func TestArchetypeDecision(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	cases := []struct {
+		name   string
+		rmType string
+		hrid   string
+		want   []string
+	}{
+		{"entity conforms to declared", "ENTRY", "openEHR-EHR-OBSERVATION.blood_pressure.v1", nil},
+		{"entity equals declared", "OBSERVATION", "openEHR-EHR-OBSERVATION.blood_pressure.v1", nil},
+		{"genuine mismatch", "EVALUATION", "openEHR-EHR-OBSERVATION.blood_pressure.v1", []string{semcheck.CodeArchetypeClassMismatch}},
+		{"unknown type segment", "ENTRY", "openEHR-EHR-FOOTYPE.x.v1", []string{semcheck.CodeUnknownRMClass}},
+		{"unparseable hrid", "ENTRY", "not-a-valid-archetype-id", []string{semcheck.CodeUnknownRMClass}},
+		{"unknown declared class suppresses", "FOO_BAR", "openEHR-EHR-OBSERVATION.x.v1", nil},
+		{"case-insensitive declared", "entry", "openEHR-EHR-OBSERVATION.x.v1", nil},
+		{"empty rmType names nothing", "", "openEHR-EHR-OBSERVATION.blood_pressure.v1", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := codesOf(ck.Archetype(tc.rmType, tc.hrid)); !slices.Equal(got, tc.want) {
+				t.Errorf("Archetype(%q, %q) = %v, want %v", tc.rmType, tc.hrid, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestArchetypeSuppressedByUnknownDeclaredClass is the REQ-161 § Checks
+// suppression rule in engine terms: when the declared class is itself
+// UnknownClass, [Checker.Operand]'s class-token arm already raises
+// aql_unknown_rm_class for the SAME class expression, so [Checker.Archetype]
+// MUST raise nothing — not the mismatch Error, and not a second
+// aql_unknown_rm_class. Combining the two calls' findings, as an adapter
+// would, must total exactly ONE finding.
+func TestArchetypeSuppressedByUnknownDeclaredClass(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	const rmType, hrid = "FOO_BAR", "openEHR-EHR-OBSERVATION.blood_pressure.v1"
+
+	// Premise: the relation really does not know FOO_BAR, and ArchetypeMatches
+	// on its own (ignoring the suppression) would still answer UnknownClass —
+	// otherwise this test would prove nothing.
+	if v := contain.Default().ArchetypeMatches(rmType, hrid); v != contain.UnknownClass {
+		t.Fatalf("premise broken: ArchetypeMatches(%s, %s) = %v, want UnknownClass", rmType, hrid, v)
+	}
+
+	tokenFindings := ck.Operand(rmType, semcheck.RoleContained).Findings()
+	archetypeFindings := ck.Archetype(rmType, hrid)
+	all := append(append([]contain.Finding{}, tokenFindings...), archetypeFindings...)
+	if got := codesOf(all); !slices.Equal(got, []string{semcheck.CodeUnknownRMClass}) {
+		t.Errorf("combined findings = %v, want exactly one %s (the class-token arm's)", got, semcheck.CodeUnknownRMClass)
+	}
+}
+
+// TestArchetypeUnknownSegmentDoesNotDuplicateTheClassToken is the OTHER half
+// of the suppression rule: when the declared class IS known (so the
+// class-token arm reports nothing), an unknown HRID type segment still gets
+// exactly one aql_unknown_rm_class — the "second arm" — never zero and never
+// two.
+func TestArchetypeUnknownSegmentDoesNotDuplicateTheClassToken(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	const rmType, hrid = "ENTRY", "openEHR-EHR-FOOTYPE.x.v1"
+
+	tokenFindings := ck.Operand(rmType, semcheck.RoleRoot).Findings()
+	if len(tokenFindings) != 0 {
+		t.Fatalf("premise broken: class-token arm reported %v for known class %s", codesOf(tokenFindings), rmType)
+	}
+	archetypeFindings := ck.Archetype(rmType, hrid)
+	if got := codesOf(archetypeFindings); !slices.Equal(got, []string{semcheck.CodeUnknownRMClass}) {
+		t.Errorf("Archetype(%s, %s) = %v, want exactly one %s", rmType, hrid, got, semcheck.CodeUnknownRMClass)
+	}
+}
+
 // TestZeroValuesAreUsable pins the fail-closed shapes (REQ-025: library code
 // does not panic on caller input). The zero Checker must behave as New(nil),
 // and the zero Operand — how an adapter spells "no enclosing parent" for a
@@ -376,6 +458,8 @@ func TestFindingsCarryDetail(t *testing.T) {
 		ck.Operand("DV_TEXT", semcheck.RoleContained).Findings(),
 		ck.Pair(obs, comp),
 		ck.Pair(ck.Operand("FOLDER", semcheck.RoleRoot), comp),
+		ck.Archetype("EVALUATION", "openEHR-EHR-OBSERVATION.blood_pressure.v1"),
+		ck.Archetype("ENTRY", "openEHR-EHR-FOOTYPE.x.v1"),
 	}
 	for _, fs := range groups {
 		if len(fs) == 0 {

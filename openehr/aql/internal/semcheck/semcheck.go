@@ -47,6 +47,10 @@ const (
 	// CodeContainmentByReference marks a pair whose REQ-160 pair verdict is
 	// ByReference — resolvable only across a reference hop.
 	CodeContainmentByReference = "aql_containment_by_reference"
+	// CodeArchetypeClassMismatch marks a literal archetype predicate whose
+	// HRID type segment does not conform to the class it is attached to
+	// (REQ-161 § Checks, REQ-160 § Archetype/class conformance).
+	CodeArchetypeClassMismatch = "aql_archetype_class_mismatch"
 )
 
 // Severity is the REQ-161 severity of an issue code.
@@ -84,6 +88,7 @@ var severities = map[string]Severity{
 	CodeNotContainable:         Error,
 	CodeUnknownRMClass:         Warning,
 	CodeContainmentByReference: Warning,
+	CodeArchetypeClassMismatch: Error,
 }
 
 // SeverityOf reports the REQ-161 severity of code, and whether code is in the
@@ -317,6 +322,75 @@ func (c Checker) Pair(ancestor, descendant Operand) []contain.Finding {
 		return nil // a route exists using no reference edge — nothing to report
 	case contain.UnknownClass:
 		return nil // unreachable: an unknown operand suppresses the pair above
+	}
+	return nil
+}
+
+// Archetype decides a literal archetype predicate against the class it is
+// attached to (REQ-161 § Checks, REQ-160 § Archetype/class conformance):
+// rmType is the declared class's RM type name, archetypeID its literal HRID.
+// It is orthogonal to [Role] — a FROM root's archetype predicate is checked
+// exactly like a CONTAINS operand's — so, unlike [Checker.Operand], it takes
+// no role.
+//
+// A `$param` archetype predicate is the caller's business to skip before
+// calling Archetype: a `$param` carries no scope until execution binds it
+// (PROBE-021), and Archetype has no way to tell a literal HRID from a
+// placeholder string once it is handed only a string.
+//
+// The whole RM question belongs to [contain.Relation.ArchetypeMatches] — no
+// HRID lexing happens here, or anywhere in this package (REQ-160
+// § Archetype/class conformance mandates the single canonical
+// [rm.ParseArchetypeID], which ArchetypeMatches already delegates to). This
+// method only classifies ArchetypeMatches's verdict into a REQ-161 code and
+// enforces the suppression rule (REQ-161 § Checks — "one finding per defect,
+// and no Error built on an unknown name"):
+//
+//   - rmType itself already [contain.UnknownClass] under
+//     [contain.Relation.Containable] — the SAME verdict [Checker.Operand]'s
+//     class-token arm classifies — yields NO finding here. That arm already
+//     reported [CodeUnknownRMClass] for this class expression; REQ-161 is
+//     explicit that an unknown name is reported once, not twice, so this
+//     method must not add a second finding for it.
+//   - Otherwise, [contain.Never] (a genuine mismatch between two known
+//     classes) → [CodeArchetypeClassMismatch] (Error): the query can never
+//     match.
+//   - Otherwise, [contain.UnknownClass] from ArchetypeMatches itself — the
+//     HRID is unparseable, or its type segment names a class the relation
+//     does not know, while the declared class IS known — →
+//     [CodeUnknownRMClass] (Warning). This is the "second arm" of that code:
+//     the same code as the class-token arm, but firing for a different
+//     reason (the archetype's type segment, not the declared class), still
+//     exactly once per class expression.
+//   - [contain.Admissible] → no finding.
+//
+// An empty rmType names nothing (mirrors [Checker.Operand]: a degenerate
+// caller with no declared class has nothing to check the archetype against)
+// and yields no finding — REQ-025: no panic, no finding manufactured on
+// caller input.
+func (c Checker) Archetype(rmType, archetypeID string) []contain.Finding {
+	if rmType == "" {
+		return nil
+	}
+	if c.relation().Containable(rmType) == contain.UnknownClass {
+		return nil
+	}
+	switch c.relation().ArchetypeMatches(rmType, archetypeID) {
+	case contain.Never:
+		return []contain.Finding{{
+			Code: CodeArchetypeClassMismatch,
+			Detail: fmt.Sprintf("archetype %s does not conform to declared class %s,"+
+				" so this class expression can never match", archetypeID, rmType),
+		}}
+	case contain.UnknownClass:
+		return []contain.Finding{{
+			Code: CodeUnknownRMClass,
+			Detail: fmt.Sprintf("archetype %s's type is not known to the containment relation,"+
+				" so its conformance to declared class %s is unchecked;"+
+				" a future RM release, a demographic deployment, or a dialect may define it", archetypeID, rmType),
+		}}
+	case contain.Admissible, contain.ByReference:
+		return nil // ByReference is unreachable: ArchetypeMatches never returns it
 	}
 	return nil
 }
