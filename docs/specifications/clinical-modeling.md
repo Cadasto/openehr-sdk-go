@@ -1400,7 +1400,7 @@ No other REQ-117 statement is affected, and nothing here licenses a new `ErrInco
 
 ## REQ-160 — AQL containment admissibility relation
 
-The SDK **MUST** ship a building-block relation that answers, for two AQL class expressions, whether one can ever structurally contain the other under the pinned openEHR Reference Model — so the lint (REQ-161), the builder verification (REQ-162), and future consumers judge `FROM … CONTAINS …` shapes from one shared source of RM truth instead of each guessing. Architecture: [ADR 0017](../adr/0017-aql-semantic-layer.md).
+The SDK **MUST** ship a building-block relation that answers, for two AQL class expressions, whether a containment route under the pinned openEHR Reference Model connects them (§ Verdicts — route-existence, not a claim of RM truth) — so the lint (REQ-161), the builder verification (REQ-162), and future consumers judge `FROM … CONTAINS …` shapes from one shared RM-derived relation instead of each guessing. Architecture: [ADR 0017](../adr/0017-aql-semantic-layer.md).
 
 Motivation: almost any `X CONTAINS Y` parses, but only RM-nestable pairs can ever match data. Engines commonly accept the rest and return zero rows — EHRbase, for example, validates containment at storage-root granularity (observed behaviour; maintainer's knowledge base, `openehr-kb/notes/ecosystem/ehrbase-aql.md` §4.1.2) — so an empty result set cannot be told apart from an impossible query. Whether an engine must *reject* an RM-impossible containment is an open specification gap (AQL-C-009(d) in the maintainer's knowledge base); this relation is the SDK's documented position on it, not enforcement of existing spec text.
 
