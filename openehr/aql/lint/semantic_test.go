@@ -1019,12 +1019,26 @@ func TestVersionedObjectUnknownClassStaysSilent(t *testing.T) {
 // least one SELECT column; every other shape — OR junctions included — stays
 // silent. The rows marked "near miss" are the exact pins REQ-161 names by
 // name (an AND junction with only one projected alias, an OR junction with
-// two projected aliases) plus one fix-round addition: a NEGATED AND junction
-// (`NOT CONTAINS (A AND B)`) with two projected aliases. REQ-161's three
-// named clauses do not mention negation at all, but a NOT CONTAINS collapses
-// to a boolean row filter — rows do not multiply, so this is a shape the
-// spec's "stay silent on every other shape" already covers, not a fourth
-// clause the text omits.
+// two projected aliases) plus two fix-round additions for negation, which
+// the spec's three named clauses do not mention at all: a NEGATED AND
+// junction directly (`NOT CONTAINS (A AND B)`, fix round 1, Important 1),
+// and a NEGATED AND reached only through an intervening, itself-un-negated
+// OR (`NOT CONTAINS (B OR (D AND E))`, fix round 2) — the parser sets
+// Negated on the OUTER OR (the CONTAINS-chain TARGET), never on the inner
+// AND (a mere junction OPERAND, which per [parse.Containment]'s own doc
+// comment can never individually carry the flag), so the exclusion has to be
+// INHERITED down through the OR rather than read off each node's own bit. A
+// NOT CONTAINS collapses to a boolean row filter over its WHOLE excluded
+// subtree — rows do not multiply anywhere inside it, at any depth — so both
+// are shapes the spec's "stay silent on every other shape" already covers,
+// not clauses the text omits.
+//
+// The row "non-negated AND under a non-negated OR still fires" is the
+// positive control fix round 2 asked for: the one thing broadening the
+// negation exclusion could plausibly over-correct into silence. An OR is a
+// leaf-collection boundary (REQ-161's own second clause), never a firing
+// boundary — only negation propagates down [fanoutIssues]'s walk, alternation
+// does not.
 //
 // Each row asserts the EXACT portability multiset (not merely whether
 // aql_fanout_row_grain is present): the "none is checked twice" reasoning in
@@ -1065,6 +1079,23 @@ func TestFanoutRowGrainFires(t *testing.T) {
 		{
 			"near miss: NEGATED AND junction, two projected aliases (fix round 1, Important 1)",
 			"SELECT o1, o2 FROM COMPOSITION c NOT CONTAINS (OBSERVATION o1 AND OBSERVATION o2)",
+			nil,
+		},
+		{
+			"positive control: non-negated AND nested under a non-negated OR still fires (fix round 2)",
+			"SELECT d, e FROM COMPOSITION c CONTAINS (OBSERVATION b OR (OBSERVATION d AND OBSERVATION e))",
+			[]string{codeFanoutRowGrain},
+		},
+		{
+			"near miss: negation inherited THROUGH an un-negated OR reaches the inner AND " +
+				"(fix round 2, the coordinator's own repro)",
+			"SELECT d, e FROM COMPOSITION c NOT CONTAINS (OBSERVATION b OR (OBSERVATION d AND OBSERVATION e))",
+			nil,
+		},
+		{
+			"near miss: a negated AND nested under a non-negated AND, reached via a leaf's " +
+				"own onward CONTAINS chain (fix round 2)",
+			"SELECT d, e FROM COMPOSITION c CONTAINS (OBSERVATION x AND (OBSERVATION y NOT CONTAINS (OBSERVATION d AND OBSERVATION e)))",
 			nil,
 		},
 		{
@@ -1162,6 +1193,28 @@ func TestFanoutRowGrainNeverFiresOnPairOnly(t *testing.T) {
 				t.Errorf("%q raised %s, want it absent (no junction present)", q, codeFanoutRowGrain)
 			}
 		})
+	}
+}
+
+// TestPairChecksStayFiredInsideANegatedSubtree is fix round 2's other
+// required behaviour: the fan-out advisory's newly-inherited negation flag
+// is local to [fanoutIssues]'s own `walk` closure and must be INVISIBLE to
+// [containCheck.walk]/[containCheck.pair] — REQ-161 § Checks requires a NOT
+// CONTAINS pair to be checked IDENTICALLY to a plain CONTAINS pair (an
+// RM-impossible pair is impossible whether or not it is negated), and that
+// must keep holding even after fix round 2 widened the ADVISORY's own
+// negation handling. The query is the coordinator's own repro: `x` and `y`
+// sit inside a `NOT CONTAINS` subtree, and OBSERVATION CONTAINS OBSERVATION
+// is Never under REQ-160's acceptance table ("entries never contain
+// entries"), so both MUST still raise aql_impossible_containment.
+func TestPairChecksStayFiredInsideANegatedSubtree(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT dd FROM COMPOSITION c CONTAINS " +
+		"((OBSERVATION a NOT CONTAINS (OBSERVATION x AND OBSERVATION y)) AND OBSERVATION dd)"
+	r := lint.LintString(q, nil)
+	if got := count(r, codeImpossible); got != 2 {
+		t.Fatalf("%s fired %d times, want 2 (x and y, both inside the negated subtree); full result %v",
+			codeImpossible, got, codes(r))
 	}
 }
 

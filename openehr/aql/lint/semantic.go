@@ -439,20 +439,49 @@ func versionedObjectDetail(ce parse.ClassExpr) string {
 //     the same source [versionedObjectIssues] reads for "outside
 //     FROM/CONTAINS", here filtered to one clause rather than excluding one.
 //
-// A NEGATED AND junction (`NOT CONTAINS (A AND B)`) never fires either, even
-// though [parse.Containment.Negated] is not one of the spec's three named
-// clauses above. This asymmetry is deliberate, and the opposite of the rule
-// the containment-pair checks apply: REQ-161 § Checks has a NOT CONTAINS pair
-// checked IDENTICALLY to a plain one, because an RM-impossible pair is
-// impossible whether or not it is negated — POSSIBILITY does not care about
-// the sign. Row multiplicity does: a `NOT CONTAINS` collapses to a boolean
-// filter on the parent row, so the rows demonstrably do NOT multiply and the
-// negated operands' aliases are not meaningfully "projected sibling rows" at
-// all — this is a shape the spec's "every other shape" silence covers, not
-// one its three clauses omit by oversight. Whoever next touches this rule
-// should not "fix" this to match the pair checks' NOT-CONTAINS-is-identical
-// stance; the two checks answer different questions (possibility vs. row
-// count) and only one of them is sign-blind.
+// A NEGATED subtree never fires an AND junction anywhere inside it, however
+// deep — this is fix round 2's correction, and it is INHERITED down the
+// walk, not read off each node's own [parse.Containment.Negated] bit in
+// isolation. `NOT CONTAINS (B OR (D AND E))` sets Negated only on the OUTER
+// OR node (the parser's Negated carrier is the CONTAINS-chain TARGET, which
+// here is the whole parenthesised junction); the inner `(D AND E)` is an
+// ordinary, un-negated junction OPERAND of that OR — [parse.Containment]'s
+// own doc comment records that NOT belongs to a CONTAINS keyword, never to a
+// junction operand, so no node BELOW the negated one can carry the flag
+// itself. Reading only `n.Negated` at each node (fix round 1's fix) caught
+// the negated node ITSELF firing, but let a plain, un-flagged AND several
+// junction-operand hops further down still fire — same defect class as
+// Important 1, one level deeper, because "is this pair impossible" and "does
+// a NOT CONTAINS filter reach this deep" are different questions.
+//
+// Once a `walk` call is under negation, it stays under negation all the way
+// down: the boolean threaded through `walk` is set the moment ANY visited
+// node's own Negated is true, and never cleared descending further, exactly
+// matching the semantics REQ-161's Important-1 rationale actually states —
+// "a NOT CONTAINS collapses to a boolean filter on the PARENT ROW" governs
+// the WHOLE excluded subtree, not merely its root spelling. Even though
+// [parse.Containment.Negated] is not one of the spec's three named clauses,
+// this is the opposite of the rule the containment-pair checks apply:
+// REQ-161 § Checks has a NOT CONTAINS pair checked IDENTICALLY to a plain
+// one, because an RM-impossible pair is impossible whether or not it is
+// negated — POSSIBILITY does not care about the sign, anywhere in the tree.
+// Row multiplicity does. Whoever next touches this rule should not "fix"
+// this to match the pair checks' NOT-CONTAINS-is-identical stance; the two
+// checks answer different questions, and only one of them is sign-blind.
+// [containCheck.walk]/[containCheck.pair] (the pair-check machinery) take no
+// such flag and MUST NOT: this inheritance is local to the advisory.
+//
+// TWO shapes this inheritance must NOT touch, both because REQ-161's own
+// clauses require them:
+//
+//   - a NON-negated AND nested under a NON-negated OR still fires — an OR is
+//     a leaf-collection BOUNDARY (nothing below it becomes a leaf of the
+//     enclosing junction), never a firing boundary; only negation, not
+//     alternation, suppresses a descendant AND;
+//   - the containment-pair codes (aql_impossible_containment and the rest)
+//     still fire inside a negated subtree, exactly as before — this
+//     function's own `negated` parameter is invisible to
+//     [containCheck.walk], which has and needs none of its own.
 //
 // This is a pure [parse.Document] walk: no [contain.Relation] is consulted —
 // whether two operands' aliases are both SELECT-projected is not an RM
@@ -470,21 +499,25 @@ func fanoutIssues(doc *parse.Document) []Issue {
 		}
 	}
 	var issues []Issue
-	var walk func(n parse.Containment)
-	walk = func(n parse.Containment) {
+	// negated is TRUE once any ancestor node (this one included) carried
+	// Negated=true; it is passed down, never reset, and never read back up.
+	var walk func(n parse.Containment, negated bool)
+	walk = func(n parse.Containment, negated bool) {
+		negated = negated || n.Negated
 		if !isJunction(n) {
 			for _, ch := range n.Children {
-				walk(ch)
+				walk(ch, negated)
 			}
 			return
 		}
-		if n.ChildJoin != parse.ContainsAnd || n.Negated {
+		if n.ChildJoin != parse.ContainsAnd || negated {
 			// An OR (or any non-AND) junction never fires itself, and
-			// neither does a NEGATED and junction (see the doc comment
-			// above) — but one of its operands may hide its own AND
-			// junction, at any depth.
+			// neither does an AND anywhere under an inherited negation (see
+			// the doc comment above) — but one of its operands may hide its
+			// own AND junction, at any depth, which still needs the SAME
+			// negated flag carried into it.
 			for _, ch := range n.Children {
-				walk(ch)
+				walk(ch, negated)
 			}
 			return
 		}
@@ -499,21 +532,23 @@ func fanoutIssues(doc *parse.Document) []Issue {
 		// THIS junction) and each excluded OR subtree (which may hide its own,
 		// independent, AND junction) — both are walked here, so no AND
 		// junction anywhere in the tree goes unchecked, and none is checked
-		// twice.
+		// twice. negated is false in both loops below (this branch is only
+		// reached when it was already false), so nothing is lost by not
+		// re-deriving it from n.
 		for _, leaf := range leaves {
 			for _, ch := range leaf.Children {
-				walk(ch)
+				walk(ch, negated)
 			}
 		}
 		for _, b := range boundary {
-			walk(b)
+			walk(b, negated)
 		}
 	}
 	if q.From.Contains != nil {
-		walk(*q.From.Contains)
+		walk(*q.From.Contains, false)
 	}
 	if q.From.Junction != nil {
-		walk(*q.From.Junction)
+		walk(*q.From.Junction, false)
 	}
 	return issues
 }
@@ -542,6 +577,16 @@ func fanoutIssues(doc *parse.Document) []Issue {
 // than only at the call site: a future caller of this function that skips
 // walk's own guard must not silently flatten a filter into row-multiplying
 // leaves.
+//
+// This is n's OWN bit only — it says nothing about an ANCESTOR further up
+// the tree that was negated (`NOT CONTAINS (B OR (D AND E))` sets Negated on
+// the OR, not on the un-negated inner `(D AND E)` this function would be
+// called on if [fanoutIssues]'s walk did not carry the inherited flag
+// itself; fix round 2). Inheriting a negated ancestor's exclusion down
+// through an intervening OR is [fanoutIssues]'s `walk` closure's job, via
+// its own threaded `negated bool` parameter — deliberately NOT this
+// function's, since andFrontier only ever sees the subtree at or below the
+// node walk has already decided is fireable.
 func andFrontier(n parse.Containment) (leaves, boundary []parse.Containment) {
 	if !isJunction(n) {
 		return []parse.Containment{n}, nil
