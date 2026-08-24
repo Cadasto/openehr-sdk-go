@@ -79,7 +79,12 @@ func (r *Relation) WithOverlay(edges ...Edge) *Relation {
 // endpoint of this relation; Never for a known non-containable class (a DV_*
 // among them); UnknownClass for a class the relation does not know.
 func (r *Relation) Containable(rmType string) Verdict {
-	c, isKnown := r.resolve(rmType)
+	return r.containable(r.resolve(rmType))
+}
+
+// containable is Containable over an already-resolved name and its known flag,
+// so the pair question resolves each operand once (see CanContain).
+func (r *Relation) containable(c string, isKnown bool) Verdict {
 	overlayEndpoint := r.namesOverlayEndpoint(c)
 	if !isKnown && !overlayEndpoint {
 		return UnknownClass
@@ -95,9 +100,9 @@ func (r *Relation) Containable(rmType string) Verdict {
 // UnknownClass if either operand is unknown; otherwise Never if either
 // operand's containability is Never; otherwise the route verdict.
 func (r *Relation) CanContain(ancestor, descendant string) Verdict {
-	a, _ := r.resolve(ancestor)
-	d, _ := r.resolve(descendant)
-	va, vd := r.Containable(a), r.Containable(d)
+	a, aKnown := r.resolve(ancestor)
+	d, dKnown := r.resolve(descendant)
+	va, vd := r.containable(a, aKnown), r.containable(d, dKnown)
 	if va == UnknownClass || vd == UnknownClass {
 		return UnknownClass
 	}
@@ -154,10 +159,12 @@ func build(lk rminfo.Lookup, overlays []Edge) *Relation {
 	if !hOK || !alOK {
 		// Without the optional rminfo capability interfaces the BMM half of
 		// the relation cannot be derived. No panics in library code: degrade
-		// to overlay-only — known stays empty, every BMM class answers
-		// UnknownClass (the fail-safe verdict, REQ-160 § Verdicts), and
-		// overlay edges still match by exact name. rminfo.Default implements
-		// both; this arm exists for a caller-substituted Lookup.
+		// to overlay-only — known stays empty, so a name only the BMM knows
+		// answers UnknownClass (the fail-safe verdict, REQ-160 § Verdicts),
+		// while an overlay endpoint keeps matching by exact folded name and
+		// stays containable (COMPOSITION, EHR and the rest of the default
+		// table among them). rminfo.Default implements both; this arm exists
+		// for a caller-substituted Lookup.
 		return r
 	}
 	r.h, r.al = h, al
@@ -234,9 +241,10 @@ func (r *Relation) isReference(class string) bool {
 // declares no properties there, so its arm is forward-looking pin insurance.
 // AQL CONTAINS navigates the archetype/content structure, not this metadata:
 // without the exclusion an ELEMENT would reach CLUSTER through
-// LOCATABLE.feeder_audit → FEEDER_AUDIT_DETAILS.other_details (an
-// ITEM_STRUCTURE), which the RM permits but AQL containment does not
-// (acceptance row ELEMENT CONTAINS CLUSTER = Never).
+// LOCATABLE.feeder_audit (a FEEDER_AUDIT) → originating_system_audit (a
+// FEEDER_AUDIT_DETAILS) → other_details (an ITEM_STRUCTURE), which the RM
+// permits but AQL containment does not (acceptance row ELEMENT CONTAINS
+// CLUSTER = Never).
 func (r *Relation) isInfrastructureAttr(rmType, attr string) bool {
 	decl, ok := r.h.DeclaredOn(rmType, attr)
 	return ok && (decl == "LOCATABLE" || decl == "PATHABLE")
@@ -361,13 +369,16 @@ func (r *Relation) conformsToAny(c string, supers ...string) bool {
 
 // --- helpers --------------------------------------------------------------
 
-// canon folds an ASCII class token to the BMM's canonical UPPER_SNAKE spelling
-// (REQ-160 § Reachability semantics — ASCII-case-insensitive matching). Only
+// canon folds an ASCII class token to its lookup key — the upper-cased form the
+// known map is keyed by (REQ-160 § Reachability semantics —
+// ASCII-case-insensitive matching). The key is not itself the pin's canonical
+// spelling: known maps the key to that spelling, and the two differ for the
+// mixed-case foundation classes the pin ships (Point_interval and kin). Only
 // a–z are folded; underscores and digits are left as-is, and a non-ASCII token
 // simply fails to match any known class.
 func canon(s string) string {
 	var b []byte
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if c >= 'a' && c <= 'z' {
 			if b == nil {
