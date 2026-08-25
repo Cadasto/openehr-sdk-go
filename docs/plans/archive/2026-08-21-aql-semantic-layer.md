@@ -419,7 +419,7 @@ listed there; run `/sdd-trace`; archive this plan via sdd-archive **in the imple
 | **Demographic overlay data**                       | AQL-C-010 dialect edges (`PERSON`→`EHR` by-reference…) as a shipped overlay; mechanism lands now, data waits for the dialect spec.                           |
 | **RM-path shape lint**                             | Template-free SELECT/WHERE path checking against `rminfo` attribute walks (`rmpath` precedent) — a Layer-2.5 between shape and template checks.              |
 | **Full semantic resolver / CDR lower-stage reuse** | One resolution pass producing a typed query model consumed by lint, builder, executor, and the consuming CDR's plan/lower stage.                             |
-| **Non-containable FROM root** | *Deferred — spec-sanctioned silence, not an oversight.* `aql_contains_not_containable` fires only on a `CONTAINS` operand; a non-containable FROM root (e.g. `FROM DV_TEXT t …`) raises no code today, in either spelling. Widening the code to the anchor position needs its own REQ/spec sentence, not a silent code change. |
+| **Non-containable FROM root** | *Deferred — spec-sanctioned silence, not an oversight.* `aql_contains_not_containable` fires only on a `CONTAINS` operand; a non-containable FROM root (e.g. `FROM DV_TEXT t …`) raises no *containability* code today, in either spelling — other role-orthogonal codes (`aql_archetype_class_mismatch`, `aql_unknown_rm_class`) are unaffected and still fire on the root as usual. Widening the containability code to the anchor position needs its own REQ/spec sentence, not a silent code change. |
 
 
 
