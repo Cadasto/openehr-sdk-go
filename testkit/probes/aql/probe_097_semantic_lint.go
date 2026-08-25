@@ -38,34 +38,84 @@ const (
 	codeFanoutRowGrain              = "aql_fanout_row_grain"
 )
 
-// semanticCodesAll is the full REQ-161 catalogue — arm (a)'s universe, and
-// what the arm (b) additivity guard checks stays absent from a
-// pre-REQ-161-clean query. A package-level var rather than a literal built
-// fresh per call: every caller only reads it (via [semanticCodes]).
+// semanticCodesAll is the full REQ-161 catalogue — arm (a)'s universe. Both
+// arm-(a) runners filter a [lint.Result] down to this set, and both arm-(a)
+// completeness guards enumerate it, so a code dropped from this list is a code
+// PROBE-097 stops demanding corpus rows for. A package-level var rather than a
+// literal built fresh per call: every caller only reads it (via
+// [semanticCodes]).
+//
+// Arm (b) does NOT consult it: runLintCase (probe_028_aql_lint.go) compares the
+// FULL issue-code multiset against the case's WantCodes, with no filter and no
+// catalogue — which is precisely what makes a gained REQ-161 code break the
+// additivity baseline there.
 var semanticCodesAll = []string{
 	codeImpossibleContainment, codeContainsNotContainable, codeArchetypeClassMismatch,
 	codeUnknownRMClass, codeContainmentByReference,
 	codeVersionNoPredicate, codeVersionedObjectUnreferenced, codeFanoutRowGrain,
 }
 
-// semanticCodes is the full REQ-161 catalogue — arm (a)'s universe, and what
-// the arm (b) additivity guard checks stays absent from a pre-REQ-161-clean
-// query.
+// semanticCodes returns [semanticCodesAll]; that var's doc carries the contract.
 func semanticCodes() []string { return semanticCodesAll }
 
-// containmentCodesAll is the REQ-162 § Contract five-code subset arm (c)
-// scopes parity to. A package-level var for the same reason as
+// containmentCodesAll is the REQ-162 § Contract five-code subset arm (c) scopes
+// parity to. The three portability advisories in [semanticCodesAll] are
+// read-side only and never appear from [aql.Builder.VerifyContainment] —
+// REQ-162 § Contract is explicit that parity is scoped to this subset, not the
+// full catalogue. A package-level var for the same reason as
 // [semanticCodesAll].
 var containmentCodesAll = []string{
 	codeImpossibleContainment, codeContainsNotContainable, codeArchetypeClassMismatch,
 	codeUnknownRMClass, codeContainmentByReference,
 }
 
-// containmentCodes is the REQ-162 § Contract five-code subset arm (c) scopes
-// parity to. The three portability advisories above are read-side only and
-// never appear from [aql.Builder.VerifyContainment] — REQ-162 § Contract is
-// explicit that parity is scoped to this subset, not the full catalogue.
+// containmentCodes returns [containmentCodesAll]; that var's doc carries the
+// contract.
 func containmentCodes() []string { return containmentCodesAll }
+
+// layer1Codes are the two Layer-1 outcomes [lint.LintString] returns INSTEAD of
+// linting: an empty query and a parse failure each short-circuit to a single
+// issue, and no REQ-161 check ever runs.
+var layer1Codes = []string{"aql_empty", "aql_syntax"}
+
+// layer1Code is the Layer-1 failure code carried by r, or "" when r came from a
+// query that actually parsed. Neither Layer-1 code is a semantic code, so
+// neither survives [filterCodes] — which is why a silence row MUST consult this
+// before comparing: otherwise a row whose query never parsed compares nil
+// against nil and passes without a single semantic check having run.
+func layer1Code(r lint.Result) string {
+	for _, i := range r.Issues {
+		if slices.Contains(layer1Codes, i.Code) {
+			return i.Code
+		}
+	}
+	return ""
+}
+
+// MandatoryNegative names one of the three negative cases the PROBE-097 wire
+// assertion requires BY NAME (conformance.md § PROBE-097, arm (a)). A
+// [SemanticSilentCase] tagged with one counts towards that requirement, and
+// [Probe097SemanticLint] fails a corpus in which any of the three is unclaimed.
+type MandatoryNegative string
+
+const (
+	// NegUnknownClassSuppression — an unknown operand suppresses the pair
+	// checks on both sides of it.
+	NegUnknownClassSuppression MandatoryNegative = "unknown-class suppression"
+	// NegArchetypeMismatchSuppression — a literal archetype predicate whose
+	// declared class or HRID type segment is unknown yields
+	// aql_unknown_rm_class only, never aql_archetype_class_mismatch.
+	NegArchetypeMismatchSuppression MandatoryNegative = "archetype-mismatch suppression"
+	// NegFanoutConservativeFiring — the aql_fanout_row_grain advisory's own
+	// conservative firing rule (it needs >= 2 projected leaves).
+	NegFanoutConservativeFiring MandatoryNegative = "fan-out conservative firing rule"
+)
+
+// mandatoryNegativesAll is the set arm (a)'s silence completeness guard
+// enumerates. A package-level var for the same reason as [semanticCodesAll].
+var mandatoryNegativesAll = []MandatoryNegative{
+	NegUnknownClassSuppression, NegArchetypeMismatchSuppression, NegFanoutConservativeFiring,
+}
 
 // SemanticFireCase is one PROBE-097 arm-(a) firing row: Query MUST raise
 // exactly one REQ-161 code — Code, at Severity — spanned on the SpanNth
@@ -90,13 +140,17 @@ type SemanticFireCase struct {
 	SpanNth int
 }
 
-// SemanticSilentCase is one PROBE-097 arm-(a) silence row: Query MUST raise
-// exactly the REQ-161 code multiset in Want. A plain near miss leaves Want
-// nil; a suppression negative (the unknown-class suppression, the
-// archetype-mismatch suppression, and the fan-out advisory's own conservative
-// near miss — all three named explicitly by the PROBE-097 wire assertion)
-// sets Want to the specific code the suppression rule still permits, e.g.
+// SemanticSilentCase is one PROBE-097 arm-(a) silence row: Query MUST reach
+// the REQ-161 checks at all, and MUST then raise exactly the REQ-161 code
+// multiset in Want.
+//
+// A plain near miss leaves Want nil. The two SUPPRESSION negatives — the
+// unknown-class suppression and the archetype-mismatch suppression — set Want
+// to the specific code the suppression rule still permits, e.g.
 // []string{"aql_unknown_rm_class"} for a pair the unknown operand suppresses.
+// The third mandatory negative, the fan-out advisory's own conservative near
+// miss, is not a suppression and leaves Want nil like a plain near miss:
+// nothing survives that near miss for the row to assert.
 type SemanticSilentCase struct {
 	// Name labels the case for diagnostic output.
 	Name string
@@ -105,6 +159,17 @@ type SemanticSilentCase struct {
 	// Want is the exact REQ-161 code multiset Query MUST raise (order
 	// irrelevant; nil means none).
 	Want []string
+	// ForCode, when set, declares which REQ-161 code's silence this row
+	// guards. Every code in [semanticCodes] MUST be claimed by at least one
+	// row — conformance.md § PROBE-097 arm (a) requires, per code, a firing
+	// row AND "at least one near-miss query [that] stays silent". A row that
+	// exists for some other reason leaves it empty.
+	ForCode string
+	// Mandatory, when set, declares this row as one of the three negatives
+	// the PROBE-097 wire assertion names explicitly. Each of
+	// [MandatoryNegative]'s three constants MUST be claimed by at least one
+	// row. A row that is not one of the three leaves it empty.
+	Mandatory MandatoryNegative
 }
 
 // ParityCase is one PROBE-097 arm-(c) row (REQ-162 § Contract): Build MUST
@@ -118,8 +183,10 @@ type ParityCase struct {
 	Build func() *aql.Builder
 }
 
-// SemanticCorpus is the whole PROBE-097 corpus, one field per wire-assertion
-// arm.
+// SemanticCorpus is the whole PROBE-097 corpus: four fields across three
+// wire-assertion arms — Fire and Silent are the two halves of arm (a), the
+// firing rows and the near misses that must stay silent. All four are
+// required.
 //
 // Additivity reuses [LintCase] (probe_028_aql_lint.go, same package): arm (b)
 // is PROBE-028's own corpus re-run under the completed REQ-161 linter, not a
@@ -165,9 +232,34 @@ func Probe097SemanticLint(c SemanticCorpus) (Result, error) {
 			failures = append(failures, fmt.Sprintf("fire: no fire case raises %s; the corpus does not exercise it", code))
 		}
 	}
+	silentCodes := map[string]bool{}
+	silentNegatives := map[MandatoryNegative]bool{}
 	for _, tc := range c.Silent {
 		if msg := runSemanticSilent(tc); msg != "" {
 			failures = append(failures, fmt.Sprintf("silent/%s: %s", tc.Name, msg))
+		}
+		if tc.ForCode != "" {
+			silentCodes[tc.ForCode] = true
+		}
+		if tc.Mandatory != "" {
+			silentNegatives[tc.Mandatory] = true
+		}
+	}
+	// The mirror of the fire completeness guard above, for the half of arm (a)
+	// that asserts SILENCE — the half that can go dark quietly, since a deleted
+	// near miss leaves every surviving row passing on its own. conformance.md
+	// § PROBE-097 arm (a) requires BOTH halves per code ("at least one corpus
+	// query yields it … and at least one near-miss query stays silent") and
+	// names three negatives explicitly, so both are enforced rather than
+	// assumed. len(c.Silent) == 0 above only catches an EMPTY arm.
+	for _, code := range semanticCodes() {
+		if !silentCodes[code] {
+			failures = append(failures, fmt.Sprintf("silent: no silence case guards %s; the corpus does not pin its near miss", code))
+		}
+	}
+	for _, neg := range mandatoryNegativesAll {
+		if !silentNegatives[neg] {
+			failures = append(failures, fmt.Sprintf("silent: no silence case pins the %s negative; the PROBE-097 wire assertion names it explicitly", neg))
 		}
 	}
 	for _, tc := range c.Additivity {
@@ -187,10 +279,12 @@ func Probe097SemanticLint(c SemanticCorpus) (Result, error) {
 	// for every row to compare equal if both sides can be equal by being
 	// empty. TestReadWriteParityIsNotVacuous (openehr/aql/verify_parity_test.go)
 	// is the unit-level precedent for this exact guard; arm (c) had no
-	// analogue, so 5 of its 13 rows (the "near miss" ones) were free to be
-	// vacuous — green under a mutation that deleted the write-side check
+	// analogue, so its clean rows — the "near miss" ones — were free to be
+	// vacuous: green under a mutation that deleted the write-side check
 	// entirely, for the wrong reason (both sides empty, not both sides
-	// agreeing on a real finding).
+	// agreeing on a real finding). No row tally is quoted here on purpose:
+	// Parity is caller-supplied, so any count would describe one particular
+	// corpus rather than the contract, and rot the day that corpus grew.
 	writeUnion := map[string]bool{}
 	cleanRows := 0
 	for _, tc := range c.Parity {
@@ -252,8 +346,21 @@ func runSemanticFire(tc SemanticFireCase) string {
 }
 
 // runSemanticSilent runs one arm-(a) silence row.
+//
+// Silence is proved, not assumed: a Layer-1 failure is rejected BEFORE the
+// comparison, because [filterCodes] drops aql_syntax / aql_empty (neither is a
+// semantic code) and a Want-nil row over an unparseable query would otherwise
+// compare nil against nil and pass vacuously. The firing arm needs no such
+// check — it demands a code, which a Layer-1 result cannot supply — and arm (b)
+// needs none either, since runLintCase asserts the full multiset, Layer-1 codes
+// included.
 func runSemanticSilent(tc SemanticSilentCase) string {
-	got := filterCodes(lint.LintString(tc.Query, nil), semanticCodes())
+	res := lint.LintString(tc.Query, nil)
+	if code := layer1Code(res); code != "" {
+		return fmt.Sprintf("query never reached the REQ-161 checks (%s): a silence row MUST assert silence on a query that actually linted, not on one Layer 1 rejected (query %q)",
+			code, tc.Query)
+	}
+	got := filterCodes(res, semanticCodes())
 	if !slices.Equal(got, sortedCopy(tc.Want)) {
 		return fmt.Sprintf("semantic codes = %v, want %v (query %q)", got, tc.Want, tc.Query)
 	}
