@@ -5,6 +5,14 @@
 // sugars — for resources that bind to no operational template (FOLDER,
 // EHR_STATUS, EHR_ACCESS, untemplated demographic PARTY).
 //
+// AQL query TEXT is validated here too, not only RM data:
+// [ValidateAQL] and [ValidateAQLWithTypeRelation] bridge the
+// openehr/aql/lint layers into this same [Issue] / [Result] model
+// (REQ-109), so a caller already using [ValidateComposition] gets one
+// uniform result shape for both kinds of artefact. Their own doc
+// comments carry which lint layers a nil template drops and how the
+// REQ-160 containment relation is supplied.
+//
 // Public entry:
 //
 //	r := validation.ValidateComposition(comp, compiled)
@@ -38,9 +46,8 @@
 // RM-mandatory attribute presence plus a small per-RM-type invariant
 // catalogue (CODE_PHRASE, DV_QUANTITY precision, DV_INTERVAL numeric
 // bounds, OBJECT_REF id/type/namespace). Template validity implies RM
-// validity,
-// so the two compose: callers with a template run [Validate], callers
-// without one run [ValidateRM], callers wanting both run both.
+// validity, so the two compose: callers with a template run [Validate],
+// callers without one run [ValidateRM], callers wanting both run both.
 //
 // Path strings in [Issue.Path] are built by appending OPT-side
 // attribute names and matched-child predicates to the parent OPT
@@ -63,8 +70,8 @@
 // # REQ-013 building-block independence
 //
 // The validator MUST be importable without `transport/`, `auth/`,
-// `openehr/client/*`, or `openehr/serialize/`. The forbidden
-// forbidden-import set is enforced by `TestValidationForbiddenImports`.
+// `openehr/client/*`, or `openehr/serialize/`. The forbidden-import
+// set is enforced by `TestValidationForbiddenImports`.
 //
 // # External callability (REQ-111)
 //
