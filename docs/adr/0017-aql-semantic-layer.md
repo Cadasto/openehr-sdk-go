@@ -70,10 +70,18 @@ contract unchanged.**
 
 - Statically-impossible containments become visible before a query reaches any CDR — closing
   the "empty result or impossible query?" ambiguity at the client — at the cost of one new
-  sub-package and an `openehr/aql → openehr/aql/contain → {rminfo, openehr/rm}` import edge
+  public sub-package and an `openehr/aql → openehr/aql/contain → {rminfo, openehr/rm}` import edge
   (REQ-013-safe; `contain`'s direct imports are `rminfo`, `openehr/rm` — REQ-120's canonical
   `ParseArchetypeID`, no duplicate lexical logic — and stdlib, and it sits below both `aql`
   and `lint` because `lint` already imports `aql`).
+- REQ-162's read/write parity (`(*aql.Builder).VerifyContainment` against `lint.LintString`) is
+  structural, not merely asserted: every verdict→code decision and the operand/pair suppression
+  rule between the containment codes live ONCE, in a second new sub-package,
+  `openehr/aql/internal/semcheck` — Go-internal, so it adds no public API — consumed verbatim by
+  both adapters. It sits below both `aql` and `lint` for the same reason `contain` does (`lint`
+  already imports `aql`, so `aql` cannot import `lint`), and its own import guard is a whitelist of
+  `contain` plus stdlib. One rule engine, two adapters, no drift, pinned by
+  `TestReadWriteParity` (`openehr/aql`) and PROBE-097's parity arm.
 - The relation's default verdicts can disagree with a given engine's admissibility in both
   directions; the differences are asserted as neutral, cited, executable documentation
   (PROBE-097 / the REQ-160 acceptance tests), including a compatibility guard for EHRbase.

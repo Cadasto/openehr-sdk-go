@@ -1545,7 +1545,7 @@ The write side **MUST** offer the same semantic judgement as the read side, opt-
 
 ### Building-block independence (REQ-013)
 
-`openehr/aql` gains an import of `openehr/aql/contain` (whose own import contract is [§ REQ-160 § Building-block independence](#req-160--aql-containment-admissibility-relation)); the package **MUST** remain importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`.
+`openehr/aql` gains an import of `openehr/aql/contain` (whose own import contract is [§ REQ-160 § Building-block independence](#req-160--aql-containment-admissibility-relation)) and, for the Read/write parity clause above, of `openehr/aql/internal/semcheck` — the shared verdict→code engine (one rule engine, two adapters, no drift) that also backs REQ-161's read-side linter. `semcheck` is Go-internal to `openehr/aql/`, so it adds no public API and needs no forbidden-import test of its own. `openehr/aql` **MUST** remain importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`.
 
 - **Lives in:** [`openehr/aql/`](../../openehr/aql/) (extension)
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (parity arm)
