@@ -27,7 +27,6 @@ package semcheck
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
@@ -101,20 +100,13 @@ const (
 	Warning
 )
 
-// String renders "error" / "warning"; out-of-range values render numerically.
-func (s Severity) String() string {
-	switch s {
-	case Error:
-		return "error"
-	case Warning:
-		return "warning"
-	}
-	return "severity(" + strconv.Itoa(int(s)) + ")"
-}
-
 // severities is the ONE code→severity table for the feature (REQ-161
-// § Checks). Both adapters read it through [SeverityOf]; neither keeps a table
-// of its own.
+// § Checks). The read-side adapter reads it through [SeverityOf] to fill its
+// own [lint.Issue].Severity field; the write side carries no severity field
+// at all ([contain.Finding]) and does not call [SeverityOf] itself — its own
+// doc comment (openehr/aql/verify.go) keeps a prose copy for a caller who
+// wants one without a lookup. Either way, no adapter keeps a SECOND
+// code→severity mapping of its own.
 var severities = map[string]Severity{
 	CodeImpossibleContainment:  Error,
 	CodeNotContainable:         Error,

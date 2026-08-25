@@ -206,10 +206,18 @@ func (c *containCheck) pair(ancestor, descendant semcheck.Operand, ce parse.Clas
 
 // isJunction reports whether n is a boolean junction node rather than a class
 // node. A junction is distinguished by an EMPTY class RM type plus operands —
-// the same discriminator the parse package's own containment validation uses;
 // there is no stored kind flag. A node with neither a class nor children is
 // degenerate (a dropped operand, REQ-119); it is treated as a class node, where
 // the empty RM type decides nothing and reports nothing.
+//
+// [parse.isContainmentJunction] tests the same two conditions PLUS
+// `!c.Class.Version`, a defensive third clause that only bounds a hand-built
+// tree — the extractor always sets RMType: "VERSION" alongside Version: true,
+// so no query [parse.Parse] can produce ever needs it (that function's own
+// doc comment). This function omits it: nothing downstream of it treats a
+// VERSION class expression differently from any other class node, so the
+// extra clause would only widen this function's own contract for a case it
+// cannot reach either.
 func isJunction(n parse.Containment) bool {
 	return n.Class.RMType == "" && len(n.Children) > 0
 }
