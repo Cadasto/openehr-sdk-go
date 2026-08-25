@@ -55,8 +55,8 @@ func TestFindingCarriesOnlyCodeAndDetail(t *testing.T) {
 	t.Parallel()
 	typ := reflect.TypeFor[contain.Finding]()
 	var got []string
-	for i := range typ.NumField() {
-		got = append(got, typ.Field(i).Name)
+	for f := range typ.Fields() {
+		got = append(got, f.Name)
 	}
 	if want := []string{"Code", "Detail"}; !slices.Equal(got, want) {
 		t.Errorf("contain.Finding fields = %v, want exactly %v (REQ-162 § Contract: no Span, Path, or severity)", got, want)

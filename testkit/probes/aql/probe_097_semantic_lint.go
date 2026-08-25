@@ -232,7 +232,7 @@ func runSemanticFire(tc SemanticFireCase) string {
 		return fmt.Sprintf("%s span = %+v, want %+v (on %s)", tc.Code, iss.Span, want, tc.SpanClass)
 	}
 	if iss.Detail == "" {
-		return fmt.Sprintf("%s carries no Detail", tc.Code)
+		return tc.Code + " carries no Detail"
 	}
 	return ""
 }
