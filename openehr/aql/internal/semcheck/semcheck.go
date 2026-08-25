@@ -225,17 +225,17 @@ func (r Role) Next(s Step) Role {
 // The zero Checker uses the REQ-160 default relation, as does New(nil)
 // (REQ-161 § Relation supply). A Checker is immutable and safe for concurrent
 // use.
-type Checker struct{ rel *contain.Relation }
+type Checker struct{ rel *contain.TypeRelation }
 
 // New returns a Checker over r. A nil r means the REQ-160 default relation, so
 // a caller with no dialect overlay edges passes nil and gets the pinned RM
 // (REQ-161 § Relation supply).
-func New(r *contain.Relation) Checker { return Checker{rel: r} }
+func New(r *contain.TypeRelation) Checker { return Checker{rel: r} }
 
 // relation resolves the nil relation once, here, so neither adapter repeats the
 // defaulting rule — and so the zero Checker is usable rather than a nil
 // dereference (REQ-025: no panic on caller input).
-func (c Checker) relation() *contain.Relation {
+func (c Checker) relation() *contain.TypeRelation {
 	if c.rel == nil {
 		return contain.Default()
 	}
@@ -282,7 +282,7 @@ func (c Checker) Operand(rmType string, role Role) Operand {
 // REQ-161 § Checks: an operand whose verdict is UnknownClass, or whose
 // containability is Never, is reported ONCE through its own operand-level code,
 // and no pair code is built on it — "one finding per defect, and no Error built
-// on an unknown name". [contain.Relation.CanContain] is total and would answer
+// on an unknown name". [contain.TypeRelation.CanContain] is total and would answer
 // such a pair UnknownClass or Never all by itself; mapping that answer into a
 // pair code is exactly the double-report the rule forbids, which is why
 // [Checker.Pair] consults this first.
@@ -416,7 +416,7 @@ func (c Checker) Pair(ancestor, descendant Operand) []contain.Finding {
 // side's carrier has no such flag — [aql.Containment] stores only the bare
 // archetypeID string — so a write-side caller passing that field straight
 // through (the exact usage this string-only signature exists for, REQ-162
-// § Contract) would otherwise feed "$arch" to [contain.Relation.ArchetypeMatches],
+// § Contract) would otherwise feed "$arch" to [contain.TypeRelation.ArchetypeMatches],
 // fail to parse it as an HRID, and manufacture an aql_unknown_rm_class the
 // read side never emits — a code-multiset divergence REQ-162 § Contract makes
 // a MUST-not. Detecting the sigil is Archetype's OWN business, by the SAME
@@ -427,7 +427,7 @@ func (c Checker) Pair(ancestor, descendant Operand) []contain.Finding {
 // (PROBE-021), so it is simply not this method's business, in either
 // direction: no mismatch, no unknown-class warning, nothing.
 //
-// The whole RM question otherwise belongs to [contain.Relation.ArchetypeMatches]
+// The whole RM question otherwise belongs to [contain.TypeRelation.ArchetypeMatches]
 // — no HRID lexing happens here, or anywhere in this package (REQ-160
 // § Archetype/class conformance mandates the single canonical
 // [rm.ParseArchetypeID], which ArchetypeMatches already delegates to). This
@@ -437,7 +437,7 @@ func (c Checker) Pair(ancestor, descendant Operand) []contain.Finding {
 //
 //   - archetypeID begins with `$` → no finding (see above).
 //   - Otherwise, rmType itself already [contain.UnknownClass] under
-//     [contain.Relation.Containable] — the SAME verdict [Checker.Operand]'s
+//     [contain.TypeRelation.Containable] — the SAME verdict [Checker.Operand]'s
 //     class-token arm classifies — yields NO finding here. That arm already
 //     reported [CodeUnknownRMClass] for this class expression; REQ-161 is
 //     explicit that an unknown name is reported once, not twice, so this
@@ -450,7 +450,7 @@ func (c Checker) Pair(ancestor, descendant Operand) []contain.Finding {
 //     HRID's type segment names a class the relation does not know; the
 //     HRID is unparseable; or — declared-class-side — rmType passed the
 //     suppression check above (it IS [contain.Admissible] under
-//     [contain.Relation.Containable]) yet ArchetypeMatches still cannot
+//     [contain.TypeRelation.Containable]) yet ArchetypeMatches still cannot
 //     resolve it in the pinned BMM. That third case is the overlay-only
 //     class: one the relation knows solely as an overlay-edge endpoint,
 //     which Containable admits but ArchetypeMatches's BMM-only resolution

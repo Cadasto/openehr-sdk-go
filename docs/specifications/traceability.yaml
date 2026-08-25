@@ -1849,12 +1849,13 @@ requirements:
     canonical: docs/specifications/idiom.md#errors-req-025
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr/contribution, openehr/aql/lint, internal]
+    packages: [transport, openehr/client/ehr/contribution, openehr/aql/lint, openehr/aql/contain, internal]
     tests:
       - openehr/client/ehr/contribution/version_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/aql/lint/extract_test.go
+      - openehr/aql/contain/nilrelation_test.go
       - transport/client_test.go
       - openehr/client/ehr/ehr_test.go
       - internal/option_guard_test.go
@@ -1865,8 +1866,12 @@ requirements:
       document, transport.Do guards a nil Client and Request for every
       Do-routed leaf while the admin probes guard their deliberate Do
       bypass themselves, and all 30 variadic-option loops skip a nil option
-      — held by an AST tripwire in internal/option_guard_test.go. The clause
-      carries a Must-prefix carve-out for the Go convention.
+      — held by an AST tripwire in internal/option_guard_test.go. The nil
+      RECEIVER is the same axis: a nil *contain.TypeRelation is the documented
+      spelling of "the default", so every method reads it that way rather than
+      dereferencing it, held by a reflection tripwire over the whole exported
+      method set. The clause carries a Must-prefix carve-out for the Go
+      convention.
 
   - id: REQ-026
     title: Goroutine-safe clients
@@ -2113,6 +2118,7 @@ requirements:
       - openehr/aql/contain/overlay_test.go
       - openehr/aql/contain/archetype_test.go
       - openehr/aql/contain/imports_test.go
+      - openehr/aql/contain/nilrelation_test.go  # § Nil and zero relations; also REQ-025
       - testkit/probes/aql/probes_test.go
     probes: [PROBE-097]
     plans: [docs/plans/archive/2026-08-21-aql-semantic-layer.md]
@@ -2133,6 +2139,7 @@ requirements:
     packages:
       - openehr/aql/lint
       - openehr/aql/internal/semcheck  # the shared verdict->code engine, also REQ-162's
+      - openehr/validation  # § Relation supply — the ValidateAQLWithTypeRelation seam
       - testkit/probes/aql
     probes: [PROBE-097]
     plans: [docs/plans/archive/2026-08-21-aql-semantic-layer.md]
@@ -2142,6 +2149,7 @@ requirements:
       - openehr/aql/lint/semantic_internal_test.go
       - openehr/aql/internal/semcheck/semcheck_test.go
       - openehr/aql/internal/semcheck/imports_test.go
+      - openehr/validation/aql_test.go
       - testkit/probes/aql/probes_test.go
     notes: >-
       Additive REQ-109 Layer-2 extension: relation-backed semantic checks

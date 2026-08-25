@@ -13,7 +13,7 @@ import (
 // It walks the builder's OWN tree: no emission, no re-parse, so it needs neither
 // a built [Query] nor the parser. r is the REQ-160 containment relation to judge
 // against; nil means the REQ-160 default relation, so a caller with no dialect
-// overlay edges passes nil. A relation from [contain.Relation.WithOverlay]
+// overlay edges passes nil. A relation from [contain.TypeRelation.WithOverlay]
 // retires the findings that deployment's extra containment routes make false.
 //
 // FIVE codes can come back — the containment subset of the REQ-161 catalogue.
@@ -73,7 +73,7 @@ import (
 // A nil *Builder reports nothing rather than panicking: there is no tree to
 // verify, which is a clean answer, and library code must not panic on caller
 // input (REQ-025).
-func (b *Builder) VerifyContainment(r *contain.Relation) []contain.Finding {
+func (b *Builder) VerifyContainment(r *contain.TypeRelation) []contain.Finding {
 	if b == nil {
 		return nil
 	}
@@ -88,7 +88,7 @@ func (b *Builder) VerifyContainment(r *contain.Relation) []contain.Finding {
 // class node's own chain, pre-order, depth-first) so the two walks cannot
 // disagree about tree SHAPE — but it re-runs none of their validation: they
 // answer the grammar question and this answers the RM one.
-func (a *ast) verifyContainment(r *contain.Relation) []contain.Finding {
+func (a *ast) verifyContainment(r *contain.TypeRelation) []contain.Finding {
 	v := containVerifier{ck: semcheck.New(r)}
 	// The FROM root is the ancestor of the first CONTAINS term. RoleRoot: the
 	// anchor of a containment tree is introduced by no CONTAINS keyword, so it

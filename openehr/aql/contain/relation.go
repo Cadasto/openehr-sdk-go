@@ -7,13 +7,31 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
-// Relation is a containment admissibility relation over the pinned RM plus a
-// set of overlay edges (REQ-160). Obtain the default relation with [Default];
-// extend it with [Relation.WithOverlay]. A Relation is immutable after
-// construction (the internal verdict memo is concurrency-safe) and safe for
-// concurrent use. The zero Relation is valid but knows no classes and answers
-// UnknownClass for everything.
-type Relation struct {
+// TypeRelation is the containment admissibility relation over RM TYPE NAMES
+// (REQ-160): the set of ordered pairs (ancestor, descendant) an AQL CONTAINS
+// can connect, and whether the route is by-value or by-reference. "Relation"
+// is the mathematical sense — a set of ordered pairs — and the RM type is what
+// it relates; it holds no archetype, template, or instance data, and answers
+// nothing about whether a query will return rows.
+//
+// Most of it is derived from the pinned BMM's by-value composition graph, but
+// three families of fact are carried as cited overlay data because the BMM
+// cannot express them: the version tier (VERSION.data is generic, so no
+// introspection pairs a VERSIONED_X with its payload X), the EHR's references
+// to its versioned objects, and reference hops an engine resolves such as
+// FOLDER.items. See § Overlay edges.
+//
+// Obtain the default relation with [Default]; extend it with
+// [TypeRelation.WithOverlay]. A TypeRelation is immutable after construction
+// (the internal verdict memo is concurrency-safe) and safe for concurrent use.
+//
+// A nil *TypeRelation is the default relation, on the receiver as well as at
+// every seam that takes one (REQ-160 § Nil and zero relations): each method
+// below answers what [Default] would answer rather than panicking, so a caller
+// can hold a nil relation meaning "the default" and still extend or query it.
+// The ZERO TypeRelation is a different thing — a real relation that knows no
+// classes and answers UnknownClass for every one.
+type TypeRelation struct {
 	h  rminfo.Hierarchy
 	lk rminfo.Lookup
 	al rminfo.AttributeLister
@@ -36,26 +54,43 @@ type Relation struct {
 	memo [2]sync.Map
 }
 
-var defaultRel = sync.OnceValue(func() *Relation {
+var defaultRel = sync.OnceValue(func() *TypeRelation {
 	return build(rminfo.Default, defaultOverlays())
 })
 
 // Default returns the default relation — the pinned RM's by-value graph plus
 // the REQ-160 overlay edges. It is built once and memoized; there is no
 // exported mutator, so the returned value cannot be altered.
-func Default() *Relation {
+func Default() *TypeRelation {
 	return defaultRel()
 }
 
+// orDefault reads a nil receiver as the default relation (REQ-160 § Nil and
+// zero relations). Every exported method funnels through it, so nil — the
+// documented spelling of "use the default" wherever a *TypeRelation is passed
+// — means the same thing when a method is called on one, instead of panicking
+// on caller-constructible input (REQ-025 § No panics). The unexported helpers
+// do not repeat the check: they are reachable only through an exported method
+// or through build, both of which hold a real relation by the time they call
+// one.
+func (r *TypeRelation) orDefault() *TypeRelation {
+	if r == nil {
+		return Default()
+	}
+	return r
+}
+
 // WithOverlay returns a copy of r extended with the given overlay edges
-// (REQ-160 § Extensibility). r is unchanged. Endpoints are canonicalised; a
-// BMM-known endpoint matches by conformance, an unknown one by exact name.
-// An edge with an empty endpoint names nothing and is ignored.
-func (r *Relation) WithOverlay(edges ...Edge) *Relation {
+// (REQ-160 § Extensibility). r is unchanged, and a nil r extends the default
+// relation. Endpoints are canonicalised; a BMM-known endpoint matches by
+// conformance, an unknown one by exact name. An edge with an empty endpoint
+// names nothing and is ignored. The result is never nil.
+func (r *TypeRelation) WithOverlay(edges ...Edge) *TypeRelation {
+	r = r.orDefault()
 	if len(edges) == 0 {
 		return r
 	}
-	cp := &Relation{
+	cp := &TypeRelation{
 		h:       r.h,
 		lk:      r.lk,
 		al:      r.al,
@@ -78,13 +113,14 @@ func (r *Relation) WithOverlay(edges ...Edge) *Relation {
 // LOCATABLE / VERSIONED_OBJECT / VERSION, for EHR, or for any overlay-edge
 // endpoint of this relation; Never for a known non-containable class (a DV_*
 // among them); UnknownClass for a class the relation does not know.
-func (r *Relation) Containable(rmType string) Verdict {
+func (r *TypeRelation) Containable(rmType string) Verdict {
+	r = r.orDefault()
 	return r.containable(r.resolve(rmType))
 }
 
 // containable is Containable over an already-resolved name and its known flag,
 // so the pair question resolves each operand once (see CanContain).
-func (r *Relation) containable(c string, isKnown bool) Verdict {
+func (r *TypeRelation) containable(c string, isKnown bool) Verdict {
 	overlayEndpoint := r.namesOverlayEndpoint(c)
 	if !isKnown && !overlayEndpoint {
 		return UnknownClass
@@ -99,7 +135,8 @@ func (r *Relation) containable(c string, isKnown bool) Verdict {
 // (REQ-160 § Verdicts, § Reachability semantics). The pair question is total:
 // UnknownClass if either operand is unknown; otherwise Never if either
 // operand's containability is Never; otherwise the route verdict.
-func (r *Relation) CanContain(ancestor, descendant string) Verdict {
+func (r *TypeRelation) CanContain(ancestor, descendant string) Verdict {
+	r = r.orDefault()
 	a, aKnown := r.resolve(ancestor)
 	d, dKnown := r.resolve(descendant)
 	va, vd := r.containable(a, aKnown), r.containable(d, dKnown)
@@ -122,7 +159,8 @@ func (r *Relation) CanContain(ancestor, descendant string) Verdict {
 // for them and UnknownClass is the conservative verdict (never a false
 // mismatch). HRID decomposition delegates to REQ-120's canonical
 // [rm.ParseArchetypeID].
-func (r *Relation) ArchetypeMatches(rmType, archetypeID string) Verdict {
+func (r *TypeRelation) ArchetypeMatches(rmType, archetypeID string) Verdict {
+	r = r.orDefault()
 	aid, err := rm.ParseArchetypeID(archetypeID)
 	if err != nil {
 		return UnknownClass
@@ -144,8 +182,8 @@ func (r *Relation) ArchetypeMatches(rmType, archetypeID string) Verdict {
 
 // --- construction ---------------------------------------------------------
 
-func build(lk rminfo.Lookup, overlays []Edge) *Relation {
-	r := &Relation{lk: lk}
+func build(lk rminfo.Lookup, overlays []Edge) *TypeRelation {
+	r := &TypeRelation{lk: lk}
 	r.overlays = make([]Edge, 0, len(overlays))
 	for _, e := range overlays { // canonicalised like WithOverlay, one rule for both paths
 		if e.From == "" || e.To == "" {
@@ -182,7 +220,7 @@ func build(lk rminfo.Lookup, overlays []Edge) *Relation {
 // name — a dialect or consumer-edge class — stays in its folded form, which is
 // how overlay endpoints are stored, so exact-name matching remains
 // case-insensitive too.
-func (r *Relation) resolve(name string) (string, bool) {
+func (r *TypeRelation) resolve(name string) (string, bool) {
 	c := canon(name)
 	if s, ok := r.known[c]; ok {
 		return s, true
@@ -196,7 +234,7 @@ func (r *Relation) resolve(name string) (string, bool) {
 // skipped; an attribute typed as an abstract class expands to that class's
 // concrete descendants. Only concrete classes are walked — inherited attributes
 // are already flattened onto them by rminfo.
-func (r *Relation) deriveByValue() map[string][]string {
+func (r *TypeRelation) deriveByValue() map[string][]string {
 	adj := make(map[string][]string, len(r.known))
 	for _, c := range r.known {
 		if abstract, _ := r.h.IsAbstract(c); abstract {
@@ -229,7 +267,7 @@ func (r *Relation) deriveByValue() map[string][]string {
 	return adj
 }
 
-func (r *Relation) isReference(class string) bool {
+func (r *TypeRelation) isReference(class string) bool {
 	conf, known := r.h.ConformsTo(class, "OBJECT_REF")
 	return known && conf
 }
@@ -245,7 +283,7 @@ func (r *Relation) isReference(class string) bool {
 // FEEDER_AUDIT_DETAILS) → other_details (an ITEM_STRUCTURE), which the RM
 // permits but AQL containment does not (acceptance row ELEMENT CONTAINS
 // CLUSTER = Never).
-func (r *Relation) isInfrastructureAttr(rmType, attr string) bool {
+func (r *TypeRelation) isInfrastructureAttr(rmType, attr string) bool {
 	decl, ok := r.h.DeclaredOn(rmType, attr)
 	return ok && (decl == "LOCATABLE" || decl == "PATHABLE")
 }
@@ -256,7 +294,7 @@ func (r *Relation) isInfrastructureAttr(rmType, attr string) bool {
 // closure (REQ-160 § Reachability semantics · ByReference): Admissible when a
 // route crosses no ByReference edge, ByReference when routes exist but all cross
 // a ByReference edge, Never when no route connects the pair.
-func (r *Relation) route(a, d string) Verdict {
+func (r *TypeRelation) route(a, d string) Verdict {
 	starts := r.expand(a)
 	targets := r.expand(d)
 	if r.anyReaches(starts, targets, false) {
@@ -270,7 +308,7 @@ func (r *Relation) route(a, d string) Verdict {
 
 // anyReaches reports whether any start node reaches any target node by at
 // least one edge.
-func (r *Relation) anyReaches(starts, targets []string, allowRef bool) bool {
+func (r *TypeRelation) anyReaches(starts, targets []string, allowRef bool) bool {
 	for _, s := range starts {
 		if intersects(r.reachableFrom(s, allowRef), targets) {
 			return true
@@ -283,7 +321,7 @@ func (r *Relation) anyReaches(starts, targets []string, allowRef bool) bool {
 // edge (depth >= 1). When allowRef is false, ByReference overlay edges are
 // excluded. The closure is memoized on first use per (start, mode); stored
 // sets are read-only and MUST NOT be mutated.
-func (r *Relation) reachableFrom(start string, allowRef bool) map[string]bool {
+func (r *TypeRelation) reachableFrom(start string, allowRef bool) map[string]bool {
 	idx := 0
 	if allowRef {
 		idx = 1
@@ -310,7 +348,7 @@ func (r *Relation) reachableFrom(start string, allowRef bool) map[string]bool {
 }
 
 // successors returns the by-value and overlay successors of a single node.
-func (r *Relation) successors(c string, allowRef bool) []string {
+func (r *TypeRelation) successors(c string, allowRef bool) []string {
 	out := make([]string, 0, len(r.byValue[c]))
 	out = append(out, r.byValue[c]...)
 	for _, e := range r.overlays {
@@ -326,7 +364,7 @@ func (r *Relation) successors(c string, allowRef bool) []string {
 
 // expand returns the concrete descendants of a BMM-known class, or the class
 // itself (exact) for a name the pin does not know — a dialect/consumer endpoint.
-func (r *Relation) expand(class string) []string {
+func (r *TypeRelation) expand(class string) []string {
 	if s, ok := r.known[canon(class)]; ok {
 		ds, _ := r.h.ConcreteDescendants(s)
 		return ds
@@ -338,7 +376,7 @@ func (r *Relation) expand(class string) []string {
 // by conformance when the endpoint is BMM-known, by exact name otherwise
 // (REQ-160 § Extensibility). Endpoints are stored canon-folded; node arrives
 // resolved (a canonical spelling, or the folded form of an unknown name).
-func (r *Relation) endpointMatches(node, endpoint string) bool {
+func (r *TypeRelation) endpointMatches(node, endpoint string) bool {
 	if s, ok := r.known[endpoint]; ok {
 		conf, _ := r.h.ConformsTo(node, s)
 		return conf
@@ -349,7 +387,7 @@ func (r *Relation) endpointMatches(node, endpoint string) bool {
 // namesOverlayEndpoint reports whether c is (or, for a known class, conforms to)
 // an endpoint of any overlay edge of this relation — which makes c a known,
 // containable class of the relation (REQ-160 § Containable operands).
-func (r *Relation) namesOverlayEndpoint(c string) bool {
+func (r *TypeRelation) namesOverlayEndpoint(c string) bool {
 	for _, e := range r.overlays {
 		if r.endpointMatches(c, e.From) || r.endpointMatches(c, e.To) {
 			return true
@@ -358,7 +396,7 @@ func (r *Relation) namesOverlayEndpoint(c string) bool {
 	return false
 }
 
-func (r *Relation) conformsToAny(c string, supers ...string) bool {
+func (r *TypeRelation) conformsToAny(c string, supers ...string) bool {
 	for _, s := range supers {
 		if conf, ok := r.h.ConformsTo(c, s); ok && conf {
 			return true

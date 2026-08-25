@@ -11,7 +11,7 @@
 // express — the EHR root's reference-based containment, the VERSION /
 // VERSIONED_* tier, FOLDER→COMPOSITION as a reference hop — are overlay data
 // (see [Default]); consumers extend the relation with their own overlay edges
-// via [Relation.WithOverlay] without forking it.
+// via [TypeRelation.WithOverlay] without forking it.
 //
 // A verdict is route-existence, not a claim of RM truth: on the RM-faithful
 // subgraph an [Admissible] verdict is genuine nesting, but where the default

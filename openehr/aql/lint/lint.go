@@ -131,7 +131,7 @@ type Options struct {
 	// Unlike Compiled and Query it does not GATE its checks: nil means the
 	// REQ-160 default relation ([contain.Default]), so the semantic group
 	// always runs. Supply a relation extended with dialect overlay edges
-	// ([contain.Relation.WithOverlay]) to lint a deployment whose containment
+	// ([contain.TypeRelation.WithOverlay]) to lint a deployment whose containment
 	// facts go beyond the pinned RM without drawing false findings.
 	//
 	// It governs the five containment-pair codes only. The three portability
@@ -140,7 +140,7 @@ type Options struct {
 	// the pinned RM (rminfo.Default) rather than a containment one, and the
 	// third reads the query's own SELECT / CONTAINS shape and consults no RM
 	// facts at all. An overlay therefore cannot retire those three.
-	Relation *contain.Relation
+	Relation *contain.TypeRelation
 }
 
 // LintString parses q against the SDK grammar profile and lints the result.

@@ -44,7 +44,7 @@ import (
 // notwithstanding; only aql_fanout_row_grain, which asks about junction
 // SHAPE, is gated on a successful [parse.Document.Query] the same way the
 // containment-pair checks are.
-func semanticIssues(doc *parse.Document, rel *contain.Relation) []Issue {
+func semanticIssues(doc *parse.Document, rel *contain.TypeRelation) []Issue {
 	ck := semcheck.New(rel)
 	var issues []Issue
 
@@ -295,7 +295,7 @@ func classToken(ce parse.ClassExpr) string {
 //
 // This is a pure walk of the flat [parse.Document.Classes]: the code is
 // scoped to a single class expression's own fields, needs no containment
-// nesting, and so needs no [contain.Relation] either.
+// nesting, and so needs no [contain.TypeRelation] either.
 func versionPredicateIssues(doc *parse.Document) []Issue {
 	var issues []Issue
 	for _, ce := range doc.Classes {
@@ -325,9 +325,9 @@ func versionPredicateIssues(doc *parse.Document) []Issue {
 // alias roots no identified path anywhere outside FROM/CONTAINS.
 //
 // The conformance question is asked directly of [rminfo.Default]
-// ([conformsToVersionedObject]), not through a [*contain.Relation]. That is
-// deliberate, not a shortcut: every [*contain.Relation] a caller can obtain —
-// [contain.Default] and every [contain.Relation.WithOverlay] copy of it —
+// ([conformsToVersionedObject]), not through a [*contain.TypeRelation]. That is
+// deliberate, not a shortcut: every [*contain.TypeRelation] a caller can obtain —
+// [contain.Default] and every [contain.TypeRelation.WithOverlay] copy of it —
 // carries the SAME [rminfo.Lookup] underneath (WithOverlay copies it
 // unchanged; the package's only other constructor, `build`, is unexported),
 // so there is no caller-suppliable relation this function could consult
@@ -404,14 +404,14 @@ func versionedObjectIssues(doc *parse.Document) []Issue {
 // VERSIONED_OBJECT under the pinned RM ([rminfo.Default]) — REQ-160
 // § Containable operands names the concept; this is the one place in the
 // lint package that asks it directly rather than through
-// [*contain.Relation], for the reason [versionedObjectIssues] explains.
+// [*contain.TypeRelation], for the reason [versionedObjectIssues] explains.
 // Unknown classes and known-but-non-conforming classes both answer false;
 // REQ-161 § Flagging policy forbids treating an unknown name as proof of
 // anything, so the caller must not, and does not need to, tell the two
 // apart.
 //
 // rmType is folded ASCII a-z → A-Z before the lookup: [rminfo.Hierarchy]'s
-// map is keyed by the BMM's exact spelling, unlike [*contain.Relation] (which
+// map is keyed by the BMM's exact spelling, unlike [*contain.TypeRelation] (which
 // folds internally), so this function folds locally to keep this check's
 // case-insensitivity consistent with every other REQ-161 code.
 // strings.ToUpper is deliberately not used — its Unicode fold can map some
@@ -517,7 +517,7 @@ func versionedObjectDetail(ce parse.ClassExpr) string {
 // never a firing one: a NON-negated AND nested under a NON-negated OR still
 // fires (REQ-161's own positive-control pin).
 //
-// This is a pure [parse.Document] walk: no [contain.Relation] is consulted —
+// This is a pure [parse.Document] walk: no [contain.TypeRelation] is consulted —
 // whether two operands' aliases are both SELECT-projected is not an RM
 // question, and the containment SHAPE this check reads is a structural fact
 // of the parsed query, not a containability verdict.

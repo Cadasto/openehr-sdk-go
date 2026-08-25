@@ -41,7 +41,7 @@ var containmentCodes = []string{
 // lintContainmentCodes is the sorted containment-code multiset lint reports for
 // q — every other lint code (syntax, shape, param, template, portability) is
 // outside the parity scope and dropped.
-func lintContainmentCodes(q string, rel *contain.Relation) []string {
+func lintContainmentCodes(q string, rel *contain.TypeRelation) []string {
 	var out []string
 	for _, i := range lint.LintString(q, &lint.Options{Relation: rel}).Issues {
 		if slices.Contains(containmentCodes, i.Code) {
@@ -231,7 +231,7 @@ func TestReadWriteParity(t *testing.T) {
 }
 
 // TestReadWriteParityUnderOverlay pins that parity survives the relation
-// parameter: both adapters take the SAME [*contain.Relation], so an overlay that
+// parameter: both adapters take the SAME [*contain.TypeRelation], so an overlay that
 // retires a finding must retire it on both sides. A read side that ignored the
 // relation, or a write side that resolved the default itself, would show up here
 // and nowhere else.

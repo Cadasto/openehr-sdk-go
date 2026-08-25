@@ -13,7 +13,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 ### Added
 
 - **Builder containment verification (REQ-162, PROBE-097).** `(*Builder).VerifyContainment` walks the builder's own containment algebra opt-in, reporting REQ-161's codes at read/write parity with the linter; `Build()` and its emitted text are unchanged.
-- **AQL semantic and portability lint (REQ-161, PROBE-097).** `lint` gains REQ-160-backed containment checks and spec-gap portability advisories; `lint.Options` grows a relation field, a compile-time break for positional struct literals.
+- **AQL semantic and portability lint (REQ-161, PROBE-097).** `lint` gains REQ-160-backed containment checks and spec-gap portability advisories, supplied a relation at every entry point including the validation seam; adding the field breaks positional struct literals.
 - **AQL containment admissibility relation (REQ-160, PROBE-097).** `aql/contain` answers whether a containment route connects two AQL class expressions, derived from the pinned BMM plus a cited overlay table and extensible per deployment.
 - **Contribution builder (REQ-130, PROBE-084).** `contribution.Builder` assembles a `Contribution_create` body from per-operation changes; write-side version bodies stop emitting the server-assigned `contribution` and an empty `uid`.
 - **Write-result contract (REQ-094).** Callers distinguish a successful write with no body from a committed write whose representation is empty or unusable, via `HasResource` and `NoRepresentationError`; `contribution.Commit` no longer treats an empty 2xx representation as success.

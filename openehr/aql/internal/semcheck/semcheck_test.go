@@ -576,7 +576,7 @@ func TestOverlayRelationRetiresFindings(t *testing.T) {
 		t.Errorf("Pair(FOO_BAR, COMPOSITION) over the overlay = %v, want nothing", got)
 	}
 
-	// Checker.Archetype's suppression gate is [contain.Relation.Containable],
+	// Checker.Archetype's suppression gate is [contain.TypeRelation.Containable],
 	// under which an overlay-only class is Admissible (asserted above via
 	// a.Suppresses()), NOT UnknownClass — so the gate must NOT fire here, and
 	// Archetype falls through to ArchetypeMatches, which reports UnknownClass
