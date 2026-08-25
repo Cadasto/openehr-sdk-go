@@ -2,6 +2,7 @@ package lint
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
@@ -549,6 +550,28 @@ func fanoutIssues(doc *parse.Document) []Issue {
 			}
 		}
 		for _, b := range boundary {
+			// Defensive, mirroring [andFrontier]'s own Negated check: the
+			// guard just above ("is n a fireable, non-negated AND junction")
+			// and andFrontier's OWN entry guard are two SEPARATE copies of
+			// conceptually the same condition — that duplication is why this
+			// check exists at all. If the two copies ever disagreed for n
+			// ITSELF (a future edit to one and not the other), andFrontier
+			// would hand n straight back as its own boundary unchanged, and
+			// calling walk on it again would repeat the identical decision
+			// forever — an unrecoverable stack overflow, not a wrong answer.
+			// Recursing directly into the boundary node's own children
+			// (never back into walk with a value equal to n) makes that
+			// impossible regardless of whether the two copies ever actually
+			// drift; it changes nothing for a genuine boundary element
+			// (an excluded OR or negated descendant), which is never equal
+			// to n because andFrontier only ever returns THOSE unchanged
+			// when recursing into n's children, not n itself.
+			if reflect.DeepEqual(b, n) {
+				for _, ch := range b.Children {
+					walk(ch, negated)
+				}
+				continue
+			}
 			walk(b, negated)
 		}
 	}
