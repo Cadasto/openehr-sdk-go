@@ -3,12 +3,20 @@ package lint
 // semantic_internal_test.go: white-box pins for the unexported REQ-161
 // fan-out helpers that no query [parse.Parse] can produce a tree for. See
 // semantic_test.go's TestFanoutRowGrainFires doc comment for the
-// parsed-query-side half of this story.
+// parsed-query-side half of this story. It also pins [containCheck.walk]'s
+// chain-tail return against the same class of hand-built, parser-unreachable
+// shape — see TestWalkTracksChainTailAcrossFlattenedSiblings below.
+//
+// Importing openehr/aql here (for the write-side half of that test) is not a
+// cycle: lint.go/path.go/resolve.go already import it in production code, and
+// aql imports nothing from lint.
 
 import (
 	"slices"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aql"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/internal/semcheck"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
@@ -92,5 +100,87 @@ func TestAndFrontierTreatsNegatedAndAsBoundary(t *testing.T) {
 	}
 	if !boundary[0].Negated || boundary[0].ChildJoin != parse.ContainsAnd {
 		t.Errorf("boundary[0] = %+v, want the original negated AND junction returned whole", boundary[0])
+	}
+}
+
+// TestWalkTracksChainTailAcrossFlattenedSiblings pins REQ-162's read/write
+// "no drift" structurally, for the one containment shape [lint.LintString]
+// can never itself reach: a class node whose Children hold TWO OR MORE
+// entries (the flattened spelling, [parse.Containment.Children]'s own doc)
+// where the FIRST of them carries its own further chain. The read-side
+// extractor never builds this shape (every class node it produces has at
+// most one child — semanticIssues' own doc comment), so it is exercised
+// here only by a hand-built tree, mirrored against the write side's
+// EQUIVALENT tree built through the ordinary, reachable
+// [aql.Containment.Contains] fluent API ("[r]epeated calls extend the chain
+// in call order", that method's own doc) — the write side reaches this
+// shape naturally; the read side does not.
+//
+// The tree: `COMPOSITION n CONTAINS OBSERVATION a CONTAINS FOLDER a1`,
+// with `COMPOSITION b` a SECOND child of `n` alongside `a` (so `a`, which
+// itself carries the one-element chain `a1`, is n's "first child with its
+// own chain", and `b` is the sibling that must be checked adjacent to
+// whichever operand is `a`'s TRUE chain tail).
+//
+// [containCheck.walk] previously returned the node's own operand instead
+// of its chain's tail (`return self` where `return prev` belongs), so `b`
+// was checked adjacent to `a` itself rather than to `a1`. That is
+// observable here because the two candidate predecessors disagree on the
+// verdict for `b` (COMPOSITION), per [contain.Default]'s acceptance table:
+// OBSERVATION→COMPOSITION is Never, so the bug manufactures a SECOND
+// aql_impossible_containment (the first already comes from the always-
+// correct a→a1 pair, OBSERVATION→FOLDER, also Never); the fix's
+// FOLDER→COMPOSITION is ByReference, raising aql_containment_by_reference
+// instead of the duplicate — a different multiset, not merely a duplicate
+// finding, so a mutation back to `return self` fails this test loudly.
+func TestWalkTracksChainTailAcrossFlattenedSiblings(t *testing.T) {
+	t.Parallel()
+
+	a1 := parse.Containment{Class: parse.ClassExpr{RMType: "FOLDER", Alias: "a1"}}
+	a := parse.Containment{
+		Class:    parse.ClassExpr{RMType: "OBSERVATION", Alias: "a"},
+		Children: []parse.Containment{a1},
+	}
+	b := parse.Containment{Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "b"}}
+	n := parse.Containment{
+		Class:    parse.ClassExpr{RMType: "COMPOSITION", Alias: "n"},
+		Children: []parse.Containment{a, b},
+	}
+
+	cc := containCheck{ck: semcheck.New(nil)}
+	cc.walk(semcheck.Operand{}, semcheck.RoleRoot, n)
+	var readCodes []string
+	for _, iss := range cc.issues {
+		readCodes = append(readCodes, iss.Code)
+	}
+	slices.Sort(readCodes)
+
+	// Same logical tree, the write side's own way: two stacked Contains
+	// calls under the FROM root give n's chain exactly [a, b], and a's own
+	// Contains call gives a its own one-element chain [a1] — no hand-built
+	// hack needed on this side.
+	wa := aql.Class("OBSERVATION", "a").Contains(aql.Class("FOLDER", "a1"))
+	wb := aql.Class("COMPOSITION", "b")
+	built := aql.NewBuilder().From("COMPOSITION", "n").Contains(wa).Contains(wb)
+	var writeCodes []string
+	for _, f := range built.VerifyContainment(nil) {
+		writeCodes = append(writeCodes, f.Code)
+	}
+	slices.Sort(writeCodes)
+
+	if !slices.Equal(readCodes, writeCodes) {
+		t.Fatalf("read codes = %v, write codes = %v, want equal (REQ-162 read/write parity)", readCodes, writeCodes)
+	}
+	// Non-vacuity, pinned to the exact expected shape rather than just
+	// cross-engine equality (which a shared latent bug could satisfy
+	// vacuously): ONE aql_impossible_containment from the always-correct
+	// a→a1 pair (OBSERVATION→FOLDER, Never), plus ONE
+	// aql_containment_by_reference from b's correct adjacency to a1
+	// (FOLDER→COMPOSITION, ByReference) — not a second
+	// aql_impossible_containment from b wrongly paired with a
+	// (OBSERVATION→COMPOSITION, also Never), which is what `return self`
+	// produces instead.
+	if want := []string{"aql_containment_by_reference", "aql_impossible_containment"}; !slices.Equal(readCodes, want) {
+		t.Fatalf("read codes = %v, want exactly %v", readCodes, want)
 	}
 }

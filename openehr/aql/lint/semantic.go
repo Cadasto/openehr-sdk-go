@@ -102,8 +102,11 @@ type containCheck struct {
 	issues []Issue
 }
 
-// walk visits one containment node and returns the node's own decided operand
-// (the zero Operand for a junction node, which has no class of its own).
+// walk visits one containment node and returns the operand its OWN downward
+// chain ends on (the zero Operand for a junction node, which has no class of
+// its own and can be nobody's ancestor) — see the Children comment below for
+// why the tail, not the node itself, is what a following sibling must be
+// checked against.
 //
 // TWO facts are threaded down, because a [parse.Containment] carries neither a
 // parent pointer nor its own position in the query, and both are unrecoverable
@@ -141,16 +144,21 @@ func (c *containCheck) walk(parent semcheck.Operand, role semcheck.Role, n parse
 	// ([parse.Containment.Children]), so adjacency advances along the chain
 	// rather than fanning out from this node. The read-side extractor nests a
 	// chain one level per CONTAINS (a class node gets a single child), so the
-	// loop normally runs once; walking the chain explicitly keeps the flattened
-	// spelling of the same tree correct too. A junction may only END a chain, so
-	// it never becomes a predecessor.
+	// loop normally runs once — but a class node CAN carry several children
+	// (the flattened spelling of the same tree, [parse.Containment.Children]'s
+	// own doc: the chain shape is not stable under re-parse), and when the
+	// first of those children carries its own further chain, prev must track
+	// THAT chain's tail, not the child itself, or the next sibling is checked
+	// against the wrong predecessor — openehr/aql/verify.go's containVerifier.chain
+	// faces the identical fan-in and resolves it the same way. A junction may
+	// only END a chain, so it never becomes a predecessor.
 	prev := self
 	for _, ch := range n.Children {
 		if decided := c.walk(prev, role.Next(semcheck.StepContains), ch); !isJunction(ch) {
 			prev = decided
 		}
 	}
-	return self
+	return prev
 }
 
 // operand decides one class expression and records its operand-level issues:
