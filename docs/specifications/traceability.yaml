@@ -837,7 +837,7 @@ requirements:
       - docs/plans/archive/2026-06-15-aql-lint.md
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
       - docs/plans/archive/2026-08-18-aql-value-free-diagnostics.md
-      - docs/plans/2026-08-21-aql-semantic-layer.md
+      - docs/plans/archive/2026-08-21-aql-semantic-layer.md
     tests:
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/ast_test.go
@@ -1795,9 +1795,11 @@ requirements:
     canonical: docs/specifications/module-layout.md#req-013--building-block-independence
     status: draft
     implementation: landed
-    packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain]
+    packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck]
     tests:
       - openehr/aql/contain/imports_test.go
+      - openehr/aql/imports_test.go
+      - openehr/aql/internal/semcheck/imports_test.go
       - openehr/aql/lint/imports_test.go
       - openehr/aql/parse/imports_test.go
       - openehr/composition/imports_test.go
@@ -2101,54 +2103,79 @@ requirements:
     title: AQL containment admissibility relation
     canonical: docs/specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation
     status: draft
-    implementation: partial
-    packages: [openehr/aql/contain]
+    implementation: landed
+    packages:
+      - openehr/aql/contain
+      - testkit/probes/aql
     tests:
       - openehr/aql/contain/relation_test.go
       - openehr/aql/contain/relation_internal_test.go
       - openehr/aql/contain/overlay_test.go
       - openehr/aql/contain/archetype_test.go
       - openehr/aql/contain/imports_test.go
-    plans: [docs/plans/2026-08-21-aql-semantic-layer.md]
+      - testkit/probes/aql/probes_test.go
+    probes: [PROBE-097]
+    plans: [docs/plans/archive/2026-08-21-aql-semantic-layer.md]
     adrs: [docs/adr/0017-aql-semantic-layer.md]
     notes: >-
       Verdict relation (Admissible / Never / ByReference / UnknownClass)
       derived at runtime from the pinned BMM via rminfo (REQ-048), plus the
       cited overlay-edge table (EHR root, VERSION tier, FOLDER->COMPOSITION
       by reference) and consumer-extensible overlays. Phase 1 landed the
-      package and its guards; partial until the PROBE-097 corpus arms with
-      the Phase 2 lint checks — the probe row returns here then (spec-check
-      refuses a partial REQ citing a Draft probe).
+      package and its guards; PROBE-097 now arms it against the Phase 2 lint
+      corpus and the Phase 3 builder-verification parity arm.
 
   - id: REQ-161
     title: AQL semantic and portability lint
     canonical: docs/specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint
     status: draft
-    implementation: planned
-    packages: [openehr/aql/lint]
+    implementation: landed
+    packages:
+      - openehr/aql/lint
+      - openehr/aql/internal/semcheck  # the shared verdict->code engine, also REQ-162's
+      - testkit/probes/aql
     probes: [PROBE-097]
-    plans: [docs/plans/2026-08-21-aql-semantic-layer.md]
+    plans: [docs/plans/archive/2026-08-21-aql-semantic-layer.md]
     adrs: [docs/adr/0017-aql-semantic-layer.md]
+    tests:
+      - openehr/aql/lint/semantic_test.go
+      - openehr/aql/lint/semantic_internal_test.go
+      - openehr/aql/internal/semcheck/semcheck_test.go
+      - openehr/aql/internal/semcheck/imports_test.go
+      - testkit/probes/aql/probes_test.go
     notes: >-
       Additive REQ-109 Layer-2 extension: relation-backed semantic checks
       (impossible containment, non-containable target, archetype/class
       mismatch, unknown class, by-reference hop) plus spec-gap portability
       checks (VERSION predicate default SPECPR-481, unreferenced
       VERSIONED_OBJECT, conservative fan-out advisory). Existing codes,
-      severities and texts unchanged; PROBE-028 re-baselines only where a
-      corpus query genuinely carries a newly-checked defect.
+      severities and texts unchanged; PROBE-028's three-cassette corpus
+      re-ran under the completed linter and gained none of the eight codes,
+      so no re-baseline was needed. The verdict->code classification and the
+      suppression rule live once in openehr/aql/internal/semcheck so
+      REQ-162's write-side adapter reports the same multiset; PROBE-097 arms
+      all eight codes, both suppression rules, and the fan-out near misses.
 
   - id: REQ-162
     title: Builder containment verification
     canonical: docs/specifications/clinical-modeling.md#req-162--builder-containment-verification
     status: draft
-    implementation: planned
-    packages: [openehr/aql]
+    implementation: landed
+    packages:
+      - openehr/aql
+      - openehr/aql/internal/semcheck  # the shared verdict->code engine, also REQ-161's
+      - testkit/probes/aql
     probes: [PROBE-097]
-    plans: [docs/plans/2026-08-21-aql-semantic-layer.md]
+    plans: [docs/plans/archive/2026-08-21-aql-semantic-layer.md]
     adrs: [docs/adr/0017-aql-semantic-layer.md]
+    tests:
+      - openehr/aql/verify_test.go
+      - openehr/aql/verify_parity_test.go
+      - openehr/aql/imports_test.go
+      - testkit/probes/aql/probes_test.go
     notes: >-
       Opt-in verification entry point over the builder's own containment
       algebra, reporting REQ-161's containment codes; Build() validation
       set, error texts and emission byte-identical to pre-REQ-162. Held to
-      read/write parity with lint by PROBE-097's arm (c).
+      read/write parity with lint by PROBE-097's arm (c), including its
+      non-vacuity guard over the containment-code corpus.

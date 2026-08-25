@@ -5,7 +5,7 @@
 - **Superseded by:** —
 - **Strand:** —
 - **Introduces:** [REQ-160](../specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation) / [REQ-161](../specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint) / [REQ-162](../specifications/clinical-modeling.md#req-162--builder-containment-verification). **Amends:** [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) (Layer 2 gains the REQ-161 check groups; the out-of-scope list narrows to version-predicate *value* semantics — predicate presence is REQ-161's).
-- **Plan:** [2026-08-21-aql-semantic-layer.md](../plans/2026-08-21-aql-semantic-layer.md).
+- **Plan:** [2026-08-21-aql-semantic-layer.md](../plans/archive/2026-08-21-aql-semantic-layer.md).
 - **Related:** [ADR 0007](0007-aql-antlr-grammar-profile.md) (the permissive grammar profile this layer sits above); [REQ-048](../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface) (the `rminfo` class graph it consumes); [REQ-120](../specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation) (the canonical HRID parser it delegates to).
 
 ## Context
@@ -70,10 +70,18 @@ contract unchanged.**
 
 - Statically-impossible containments become visible before a query reaches any CDR — closing
   the "empty result or impossible query?" ambiguity at the client — at the cost of one new
-  sub-package and an `openehr/aql → openehr/aql/contain → {rminfo, openehr/rm}` import edge
+  public sub-package and an `openehr/aql → openehr/aql/contain → {rminfo, openehr/rm}` import edge
   (REQ-013-safe; `contain`'s direct imports are `rminfo`, `openehr/rm` — REQ-120's canonical
   `ParseArchetypeID`, no duplicate lexical logic — and stdlib, and it sits below both `aql`
   and `lint` because `lint` already imports `aql`).
+- REQ-162's read/write parity (`(*aql.Builder).VerifyContainment` against `lint.LintString`) is
+  structural, not merely asserted: every verdict→code decision and the operand/pair suppression
+  rule between the containment codes live ONCE, in a second new sub-package,
+  `openehr/aql/internal/semcheck` — Go-internal, so it adds no public API — consumed verbatim by
+  both adapters. It sits below both `aql` and `lint` for the same reason `contain` does (`lint`
+  already imports `aql`, so `aql` cannot import `lint`), and its own import guard is a whitelist of
+  `contain` plus stdlib. One rule engine, two adapters, no drift, pinned by
+  `TestReadWriteParity` (`openehr/aql`) and PROBE-097's parity arm.
 - The relation's default verdicts can disagree with a given engine's admissibility in both
   directions; the differences are asserted as neutral, cited, executable documentation
   (PROBE-097 / the REQ-160 acceptance tests), including a compatibility guard for EHRbase.

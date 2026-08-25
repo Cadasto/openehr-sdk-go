@@ -22,7 +22,10 @@ type LintCase struct {
 	Name string
 
 	// OPT is the operational-template XML body to compile and lint against.
-	// Nil runs Layers 1–2 only (syntax, shape) with no template.
+	// Nil leaves Layer 3 off: the run is Layer 1 (syntax) plus every Layer-2
+	// group that needs no template — the shape checks and, since REQ-161, the
+	// semantic group, which [lint.Options.Relation] does not gate (a nil
+	// relation selects the pinned RM rather than switching the group off).
 	OPT []byte
 
 	// Query is the AQL string under test.
@@ -35,9 +38,14 @@ type LintCase struct {
 }
 
 // Probe028AQLLint runs each case through [lint.LintString] (Layer 1 syntax +
-// Layer 2 shape + Layer 3 template when an OPT is supplied) and asserts the
-// resulting issue codes match the case's WantCodes multiset. Sandbox-only: no
-// transport, no network (REQ-013 building block).
+// Layer 2 shape + the unconditional REQ-161 semantic group + Layer 3 template
+// when an OPT is supplied) and asserts the resulting issue codes match the
+// case's WantCodes multiset. Sandbox-only: no transport, no network (REQ-013
+// building block).
+//
+// The semantic group's presence is load-bearing beyond this probe: PROBE-097
+// arm (b) re-runs this same corpus through [runLintCase] as its additivity
+// guard, and that guard means nothing unless the REQ-161 checks actually ran.
 func Probe028AQLLint(cases []LintCase) (Result, error) {
 	r := Result{Probe: "PROBE-028"}
 	if len(cases) == 0 {

@@ -1,0 +1,645 @@
+package semcheck_test
+
+// semcheck_test.go: the REQ-161 rule engine itself — verdict→code
+// classification, the operand/pair split, and the suppression rule between
+// them. The two adapters (read-side lint, write-side builder verification) are
+// tested where they live; what is pinned HERE is the shared decision they both
+// consume, so a drift between them has to show up as a failure here first.
+//
+// The class pairs are taken from REQ-160's acceptance table (already pinned by
+// openehr/aql/contain's own tests) rather than invented: OBSERVATION CONTAINS
+// COMPOSITION is Never, FOLDER CONTAINS COMPOSITION is ByReference, COMPOSITION
+// CONTAINS ELEMENT is Admissible, DV_TEXT is a Never-containability operand,
+// FOO_BAR is UnknownClass.
+
+import (
+	"fmt"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/internal/semcheck"
+)
+
+func codesOf(fs []contain.Finding) []string {
+	out := make([]string, len(fs))
+	for i, f := range fs {
+		out[i] = f.Code
+	}
+	return out
+}
+
+// TestSeverityOfIsTheOneCatalogue pins the single code→severity table both
+// adapters read (REQ-161 § Checks). A severity that moves has to move here.
+func TestSeverityOfIsTheOneCatalogue(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		code string
+		want semcheck.Severity
+	}{
+		{semcheck.CodeImpossibleContainment, semcheck.Error},
+		{semcheck.CodeNotContainable, semcheck.Error},
+		{semcheck.CodeUnknownRMClass, semcheck.Warning},
+		{semcheck.CodeContainmentByReference, semcheck.Warning},
+		{semcheck.CodeArchetypeClassMismatch, semcheck.Error},
+		// REQ-161's three portability codes: Warning ONLY, and MUST stay
+		// Warning — none of the three may ever become an Error (REQ-161
+		// § Flagging policy), since the openEHR QUERY specification leaves
+		// the underlying behaviour open.
+		{semcheck.CodeVersionNoPredicate, semcheck.Warning},
+		{semcheck.CodeVersionedObjectUnreferenced, semcheck.Warning},
+		{semcheck.CodeFanoutRowGrain, semcheck.Warning},
+	}
+	for _, tc := range cases {
+		t.Run(tc.code, func(t *testing.T) {
+			t.Parallel()
+			got, ok := semcheck.SeverityOf(tc.code)
+			if !ok {
+				t.Fatalf("SeverityOf(%q): not in the catalogue", tc.code)
+			}
+			if got != tc.want {
+				t.Errorf("SeverityOf(%q) = %v, want %v", tc.code, got, tc.want)
+			}
+		})
+	}
+	if _, ok := semcheck.SeverityOf("aql_not_a_code"); ok {
+		t.Error(`SeverityOf("aql_not_a_code") reported a severity; an unlisted code MUST NOT resolve`)
+	}
+}
+
+// TestEnumZeroValuesAreConservative pins the POLARITY of this package's three
+// enums (REQ-161 § Flagging policy: a false Error is worse than a missed
+// defect). Each zero value must be the inert answer — what a caller gets from a
+// map miss, an uninitialised struct field, or a value decoded from a wider
+// vocabulary than this build knows:
+//
+//   - Severity zero is Warning. [SeverityOf] returns (zero, false) for a code
+//     outside the catalogue, so an Error zero value would make the API's own
+//     default the very thing its doc comment tells callers not to do.
+//   - Step zero is StepJunction, the INERT step: [Role.Next] leaves the role
+//     unchanged. A StepContains zero value would promote a root to
+//     RoleContained, which can raise a false aql_contains_not_containable on the
+//     anchor position REQ-161 § Checks explicitly exempts.
+//   - Role zero is RoleRoot, the silent position — already correct, pinned here
+//     so all three stay on the same polarity.
+//
+// The constants are ordered to make this true, so it is a property of the
+// declaration order rather than of any call site; every call site today passes a
+// constant explicitly, which is exactly why nothing would catch a reordering.
+func TestEnumZeroValuesAreConservative(t *testing.T) {
+	t.Parallel()
+
+	var severity semcheck.Severity
+	if severity != semcheck.Warning {
+		t.Errorf("zero Severity = %d, want Warning (%d): the inert value must be the default",
+			severity, semcheck.Warning)
+	}
+	if got, ok := semcheck.SeverityOf("aql_not_a_code"); ok || got != semcheck.Warning {
+		t.Errorf("SeverityOf(unlisted) = (%d, %v), want (Warning, false) — an unrecognised code"+
+			" must not default to Error", got, ok)
+	}
+
+	var step semcheck.Step
+	if step != semcheck.StepJunction {
+		t.Errorf("zero Step = %d, want StepJunction (%d): the inert step must be the default",
+			step, semcheck.StepJunction)
+	}
+	if got := semcheck.RoleRoot.Next(step); got != semcheck.RoleRoot {
+		t.Errorf("RoleRoot.Next(zero Step) = %d, want RoleRoot (%d): a zero step must not promote"+
+			" a root to a CONTAINS operand", got, semcheck.RoleRoot)
+	}
+
+	var role semcheck.Role
+	if role != semcheck.RoleRoot {
+		t.Errorf("zero Role = %d, want RoleRoot (%d): the silent position must be the default",
+			role, semcheck.RoleRoot)
+	}
+}
+
+// TestContainVerdictVocabularyIsPinned guards this package's FOUR
+// [contain.Verdict] dispatch sites — [semcheck.Operand.Findings],
+// [semcheck.Checker.Pair], [semcheck.Checker.Archetype], and the unexported
+// suppression test behind [semcheck.Operand.Suppresses] — against REQ-160
+// § Extensibility growing the vocabulary underneath them.
+//
+// Every one of those sites answers an unrecognised verdict with SILENCE, which
+// is the right conservative default (REQ-161 § Flagging policy) but a silent
+// one: a fifth verdict would make all four go quiet in lockstep, read/write
+// parity would still hold (both adapters share the engine), and PROBE-097's
+// per-code completeness guard would still pass, because it only checks the eight
+// codes that exist. Nothing else in the repo fails. This does — so the widening
+// arrives as a test failure to be answered deliberately, not as a diagnostic
+// that quietly stopped firing. (`exhaustive` is not enabled in .golangci.yml,
+// and enabling it repo-wide is a separate decision.)
+func TestContainVerdictVocabularyIsPinned(t *testing.T) {
+	t.Parallel()
+	// The declared order is the contract this test reads; contain's own
+	// verdict.go documents that the numeric values are not part of ITS contract,
+	// so the membership — not the ordering — is what matters here.
+	known := []contain.Verdict{contain.UnknownClass, contain.Never, contain.ByReference, contain.Admissible}
+	for i, v := range known {
+		if int(v) != i {
+			t.Fatalf("premise broken: %v = %d, want ordinal %d — this guard reads the ordinals", v, int(v), i)
+		}
+	}
+	// [contain.Verdict.String] names every member it knows and falls back to
+	// "Verdict(n)" for anything else, so an unnamed next ordinal is the proof
+	// that the vocabulary still has exactly len(known) members.
+	next := contain.Verdict(len(known))
+	if want := fmt.Sprintf("Verdict(%d)", len(known)); next.String() != want {
+		t.Errorf("contain.Verdict gained a member (%s = %s, want the unnamed %q): semcheck has FOUR "+
+			"switches over this type, each of which answers an unknown verdict with silence — decide "+
+			"deliberately what the new verdict means at every one of them before widening this list",
+			next, next.String(), want)
+	}
+}
+
+// TestCodeSpellings pins the wire-visible strings. They are consumer-facing
+// identifiers (REQ-161 § Checks) and a typo is a silent contract break.
+func TestCodeSpellings(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		semcheck.CodeImpossibleContainment:       "aql_impossible_containment",
+		semcheck.CodeNotContainable:              "aql_contains_not_containable",
+		semcheck.CodeUnknownRMClass:              "aql_unknown_rm_class",
+		semcheck.CodeContainmentByReference:      "aql_containment_by_reference",
+		semcheck.CodeArchetypeClassMismatch:      "aql_archetype_class_mismatch",
+		semcheck.CodeVersionNoPredicate:          "aql_version_no_predicate",
+		semcheck.CodeVersionedObjectUnreferenced: "aql_versioned_object_unreferenced",
+		semcheck.CodeFanoutRowGrain:              "aql_fanout_row_grain",
+	}
+	for got, want := range cases {
+		if got != want {
+			t.Errorf("code %q != %q", got, want)
+		}
+	}
+}
+
+// TestOperandDecision pins the per-operand half (REQ-161 § Checks): which code
+// an operand raises, and whether it suppresses the pair checks it takes part in.
+//
+// The RoleRoot rows are the load-bearing ones: aql_contains_not_containable is
+// scoped to a CONTAINS operand, so a non-containable FROM root raises nothing
+// while still suppressing — whereas an UNKNOWN class raises in either role,
+// because REQ-161 § Flagging policy forbids an unknown name being silent.
+func TestOperandDecision(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	cases := []struct {
+		name          string
+		rmType        string
+		role          semcheck.Role
+		wantCodes     []string
+		wantSuppress  bool
+		wantContainOK contain.Verdict
+	}{
+		{
+			name: "containable contained operand", rmType: "COMPOSITION", role: semcheck.RoleContained,
+			wantCodes: nil, wantSuppress: false, wantContainOK: contain.Admissible,
+		},
+		{
+			name: "containable root", rmType: "EHR", role: semcheck.RoleRoot,
+			wantCodes: nil, wantSuppress: false, wantContainOK: contain.Admissible,
+		},
+		{
+			name: "case-insensitive match", rmType: "composition", role: semcheck.RoleContained,
+			wantCodes: nil, wantSuppress: false, wantContainOK: contain.Admissible,
+		},
+		{
+			name: "data value as CONTAINS operand", rmType: "DV_TEXT", role: semcheck.RoleContained,
+			wantCodes: []string{semcheck.CodeNotContainable}, wantSuppress: true, wantContainOK: contain.Never,
+		},
+		{
+			name: "non-LOCATABLE as CONTAINS operand", rmType: "EVENT_CONTEXT", role: semcheck.RoleContained,
+			wantCodes: []string{semcheck.CodeNotContainable}, wantSuppress: true, wantContainOK: contain.Never,
+		},
+		{
+			name: "data value as FROM root raises nothing", rmType: "DV_TEXT", role: semcheck.RoleRoot,
+			wantCodes: nil, wantSuppress: true, wantContainOK: contain.Never,
+		},
+		{
+			name: "unknown class as CONTAINS operand", rmType: "FOO_BAR", role: semcheck.RoleContained,
+			wantCodes: []string{semcheck.CodeUnknownRMClass}, wantSuppress: true, wantContainOK: contain.UnknownClass,
+		},
+		{
+			name: "unknown class as FROM root still warns", rmType: "FOO_BAR", role: semcheck.RoleRoot,
+			wantCodes: []string{semcheck.CodeUnknownRMClass}, wantSuppress: true, wantContainOK: contain.UnknownClass,
+		},
+		{
+			name: "empty class names nothing", rmType: "", role: semcheck.RoleContained,
+			wantCodes: nil, wantSuppress: true, wantContainOK: contain.UnknownClass,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			o := ck.Operand(tc.rmType, tc.role)
+			if got := codesOf(o.Findings()); !slices.Equal(got, tc.wantCodes) {
+				t.Errorf("Operand(%q, %v) findings = %v, want %v", tc.rmType, tc.role, got, tc.wantCodes)
+			}
+			if got := o.Suppresses(); got != tc.wantSuppress {
+				t.Errorf("Operand(%q, %v).Suppresses() = %v, want %v", tc.rmType, tc.role, got, tc.wantSuppress)
+			}
+			if got := o.Verdict(); got != tc.wantContainOK {
+				t.Errorf("Operand(%q, %v).Verdict() = %v, want %v", tc.rmType, tc.role, got, tc.wantContainOK)
+			}
+			if got := o.RMType(); got != tc.rmType {
+				t.Errorf("Operand(%q, …).RMType() = %q", tc.rmType, got)
+			}
+		})
+	}
+}
+
+// TestRoleAssignment pins the role-assignment rule ([semcheck.Role.Next]) —
+// the contract that keeps the read-side and write-side adapters reporting the
+// same multiset (REQ-162 § Contract).
+//
+// The load-bearing row is StepJunction from RoleRoot: a junction is boolean
+// grouping, not a containment step, so its operands occupy the SAME position
+// the junction does. `FROM A a OR B b` holds ROOT operands, and an adapter that
+// labelled them contained for being junction children would make the two
+// spellings of a root position disagree.
+func TestRoleAssignment(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		from semcheck.Role
+		step semcheck.Step
+		want semcheck.Role
+	}{
+		{"CONTAINS from the FROM root", semcheck.RoleRoot, semcheck.StepContains, semcheck.RoleContained},
+		{"CONTAINS below a CONTAINS", semcheck.RoleContained, semcheck.StepContains, semcheck.RoleContained},
+		{"junction at the FROM root keeps roots", semcheck.RoleRoot, semcheck.StepJunction, semcheck.RoleRoot},
+		{"junction under a CONTAINS keeps contained", semcheck.RoleContained, semcheck.StepJunction, semcheck.RoleContained},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tc.from.Next(tc.step); got != tc.want {
+				t.Errorf("Role(%d).Next(%d) = %d, want %d", tc.from, tc.step, got, tc.want)
+			}
+		})
+	}
+
+	// A junction nested in a junction keeps propagating the enclosing position,
+	// so `FROM A a OR (B b AND C c)` holds roots all the way down.
+	deep := semcheck.RoleRoot.Next(semcheck.StepJunction).Next(semcheck.StepJunction)
+	if deep != semcheck.RoleRoot {
+		t.Errorf("nested root junctions gave role %d, want RoleRoot (%d)", deep, semcheck.RoleRoot)
+	}
+	// A CONTAINS anywhere along the way is one-way: nothing returns to root.
+	back := semcheck.RoleRoot.Next(semcheck.StepContains).Next(semcheck.StepJunction)
+	if back != semcheck.RoleContained {
+		t.Errorf("a junction under a CONTAINS gave role %d, want RoleContained (%d)", back, semcheck.RoleContained)
+	}
+}
+
+// TestRootRoleIsSilentForNotContainable is the controller ruling in engine
+// terms: a non-containable class in ANY root position raises nothing, while the
+// same class as a CONTAINS operand raises the Error. Root silence is a
+// documented missed defect (REQ-161 § Flagging policy — a false Error is worse),
+// and it must not depend on which root spelling the adapter walked.
+func TestRootRoleIsSilentForNotContainable(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	for _, rmType := range []string{"DV_TEXT", "DV_QUANTITY", "EVENT_CONTEXT"} {
+		t.Run(rmType, func(t *testing.T) {
+			t.Parallel()
+			// Every route an adapter can take to a root position must agree.
+			roots := []semcheck.Role{
+				semcheck.RoleRoot,
+				semcheck.RoleRoot.Next(semcheck.StepJunction),
+				semcheck.RoleRoot.Next(semcheck.StepJunction).Next(semcheck.StepJunction),
+			}
+			for i, role := range roots {
+				o := ck.Operand(rmType, role)
+				if got := codesOf(o.Findings()); len(got) != 0 {
+					t.Errorf("root route %d: %s reported %v, want nothing", i, rmType, got)
+				}
+				if !o.Suppresses() {
+					t.Errorf("root route %d: %s does not suppress; no pair may be built on it", i, rmType)
+				}
+			}
+			// The scope of that silence: as a CONTAINS operand the same class
+			// is an Error.
+			contained := ck.Operand(rmType, semcheck.RoleRoot.Next(semcheck.StepContains))
+			if got := codesOf(contained.Findings()); !slices.Equal(got, []string{semcheck.CodeNotContainable}) {
+				t.Errorf("%s as a CONTAINS operand = %v, want [%s]", rmType, got, semcheck.CodeNotContainable)
+			}
+		})
+	}
+}
+
+// TestPairDecision pins the per-pair half over operands that both survived the
+// operand checks: Never → Error code, ByReference → Warning code, Admissible →
+// silence (REQ-161 § Checks).
+func TestPairDecision(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	cases := []struct {
+		ancestor, descendant string
+		wantCodes            []string
+	}{
+		{"OBSERVATION", "COMPOSITION", []string{semcheck.CodeImpossibleContainment}},
+		{"OBSERVATION", "OBSERVATION", []string{semcheck.CodeImpossibleContainment}},
+		{"ELEMENT", "CLUSTER", []string{semcheck.CodeImpossibleContainment}},
+		{"COMPOSITION", "EHR", []string{semcheck.CodeImpossibleContainment}},
+		{"FOLDER", "COMPOSITION", []string{semcheck.CodeContainmentByReference}},
+		{"FOLDER", "OBSERVATION", []string{semcheck.CodeContainmentByReference}},
+		{"COMPOSITION", "ELEMENT", nil},
+		{"EHR", "COMPOSITION", nil},
+		{"SECTION", "SECTION", nil},
+		{"VERSION", "COMPOSITION", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.ancestor+"_contains_"+tc.descendant, func(t *testing.T) {
+			t.Parallel()
+			a := ck.Operand(tc.ancestor, semcheck.RoleRoot)
+			d := ck.Operand(tc.descendant, semcheck.RoleContained)
+			if got := codesOf(ck.Pair(a, d)); !slices.Equal(got, tc.wantCodes) {
+				t.Errorf("Pair(%s, %s) = %v, want %v", tc.ancestor, tc.descendant, got, tc.wantCodes)
+			}
+		})
+	}
+}
+
+// TestPairSuppressedByOperandVerdict is the suppression rule itself (REQ-161
+// § Checks): an operand already reported through its own code MUST NOT also
+// produce a pair code.
+//
+// Each row first asserts that the relation's own TOTAL pair question does
+// answer Never or UnknownClass for the pair — otherwise the row would pass on
+// an Admissible pair and prove nothing. That is the whole point: CanContain's
+// short-circuit is real, and semcheck deliberately declines to map it.
+func TestPairSuppressedByOperandVerdict(t *testing.T) {
+	t.Parallel()
+	rel := contain.Default()
+	ck := semcheck.New(rel)
+	cases := []struct {
+		name                 string
+		ancestor, descendant string
+		ancestorRole         semcheck.Role
+	}{
+		{"never-containability descendant", "COMPOSITION", "DV_TEXT", semcheck.RoleRoot},
+		{"never-containability ancestor", "DV_TEXT", "ELEMENT", semcheck.RoleRoot},
+		{"unknown descendant", "COMPOSITION", "FOO_BAR", semcheck.RoleRoot},
+		{"unknown ancestor", "FOO_BAR", "COMPOSITION", semcheck.RoleRoot},
+		{"unknown beats never", "FOO_BAR", "DV_TEXT", semcheck.RoleRoot},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if v := rel.CanContain(tc.ancestor, tc.descendant); v != contain.Never && v != contain.UnknownClass {
+				t.Fatalf("premise broken: CanContain(%s, %s) = %v, want Never or UnknownClass",
+					tc.ancestor, tc.descendant, v)
+			}
+			a := ck.Operand(tc.ancestor, tc.ancestorRole)
+			d := ck.Operand(tc.descendant, semcheck.RoleContained)
+			if got := codesOf(ck.Pair(a, d)); len(got) != 0 {
+				t.Errorf("Pair(%s, %s) = %v, want no pair finding (the operand code already reports it)",
+					tc.ancestor, tc.descendant, got)
+			}
+		})
+	}
+}
+
+// TestArchetypeDecision pins REQ-161's archetype/class-conformance check
+// (Checker.Archetype): the class/HRID pairs are the exact rows
+// openehr/aql/contain's TestArchetypeMatches already pins (REQ-160 §
+// Archetype/class conformance), so this test asserts the CLASSIFICATION —
+// which code, at which severity — never re-derives the RM fact.
+func TestArchetypeDecision(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	cases := []struct {
+		name   string
+		rmType string
+		hrid   string
+		want   []string
+	}{
+		{"entity conforms to declared", "ENTRY", "openEHR-EHR-OBSERVATION.blood_pressure.v1", nil},
+		{"entity equals declared", "OBSERVATION", "openEHR-EHR-OBSERVATION.blood_pressure.v1", nil},
+		{"genuine mismatch", "EVALUATION", "openEHR-EHR-OBSERVATION.blood_pressure.v1", []string{semcheck.CodeArchetypeClassMismatch}},
+		{"unknown type segment", "ENTRY", "openEHR-EHR-FOOTYPE.x.v1", []string{semcheck.CodeUnknownRMClass}},
+		{"unparseable hrid", "ENTRY", "not-a-valid-archetype-id", []string{semcheck.CodeUnknownRMClass}},
+		{"unknown declared class suppresses", "FOO_BAR", "openEHR-EHR-OBSERVATION.x.v1", nil},
+		{"case-insensitive declared", "entry", "openEHR-EHR-OBSERVATION.x.v1", nil},
+		{"empty rmType names nothing", "", "openEHR-EHR-OBSERVATION.blood_pressure.v1", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := codesOf(ck.Archetype(tc.rmType, tc.hrid)); !slices.Equal(got, tc.want) {
+				t.Errorf("Archetype(%q, %q) = %v, want %v", tc.rmType, tc.hrid, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestArchetypeSkipsParamPredicates pins that the `$param` skip lives in the
+// ENGINE, not either adapter (fix-round Important 1): a write-side caller
+// holding only the bare archetypeID string — [aql.Containment] carries no
+// typed ParamArchetype flag the way [parse.ClassExpr] does — must still get
+// silence when it passes that string straight through, by the SAME
+// `$`-prefix test the builder itself already applies
+// (openehr/aql/containment.go's validateTree,
+// `strings.CutPrefix(c.archetypeID, "$")`). Without this gate inside
+// Archetype, a $param would fail rm.ParseArchetypeID and manufacture an
+// aql_unknown_rm_class the read side (which skips $param before ever calling
+// Archetype) never emits — exactly the REQ-162 § Contract multiset
+// divergence this row exists to catch.
+func TestArchetypeSkipsParamPredicates(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	cases := []struct {
+		name   string
+		rmType string
+		param  string
+	}{
+		{"known declared class", "ENTRY", "$arch"},
+		{"a class that would otherwise mismatch", "EVALUATION", "$arch"},
+		{"unknown declared class", "FOO_BAR", "$arch"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := codesOf(ck.Archetype(tc.rmType, tc.param)); len(got) != 0 {
+				t.Errorf("Archetype(%q, %q) = %v, want nothing ($param is skipped)", tc.rmType, tc.param, got)
+			}
+		})
+	}
+}
+
+// TestArchetypeSuppressedByUnknownDeclaredClass is the REQ-161 § Checks
+// suppression rule in engine terms: when the declared class is itself
+// UnknownClass, [Checker.Operand]'s class-token arm already raises
+// aql_unknown_rm_class for the SAME class expression, so [Checker.Archetype]
+// MUST raise nothing — not the mismatch Error, and not a second
+// aql_unknown_rm_class. Combining the two calls' findings, as an adapter
+// would, must total exactly ONE finding.
+func TestArchetypeSuppressedByUnknownDeclaredClass(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	const rmType, hrid = "FOO_BAR", "openEHR-EHR-OBSERVATION.blood_pressure.v1"
+
+	// Premise: the relation really does not know FOO_BAR, and ArchetypeMatches
+	// on its own (ignoring the suppression) would still answer UnknownClass —
+	// otherwise this test would prove nothing.
+	if v := contain.Default().ArchetypeMatches(rmType, hrid); v != contain.UnknownClass {
+		t.Fatalf("premise broken: ArchetypeMatches(%s, %s) = %v, want UnknownClass", rmType, hrid, v)
+	}
+
+	tokenFindings := ck.Operand(rmType, semcheck.RoleContained).Findings()
+	archetypeFindings := ck.Archetype(rmType, hrid)
+	all := append(append([]contain.Finding{}, tokenFindings...), archetypeFindings...)
+	if got := codesOf(all); !slices.Equal(got, []string{semcheck.CodeUnknownRMClass}) {
+		t.Errorf("combined findings = %v, want exactly one %s (the class-token arm's)", got, semcheck.CodeUnknownRMClass)
+	}
+}
+
+// TestArchetypeUnknownSegmentDoesNotDuplicateTheClassToken is the OTHER half
+// of the suppression rule: when the declared class IS known (so the
+// class-token arm reports nothing), an unknown HRID type segment still gets
+// exactly one aql_unknown_rm_class — the "second arm" — never zero and never
+// two.
+func TestArchetypeUnknownSegmentDoesNotDuplicateTheClassToken(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	const rmType, hrid = "ENTRY", "openEHR-EHR-FOOTYPE.x.v1"
+
+	tokenFindings := ck.Operand(rmType, semcheck.RoleRoot).Findings()
+	if len(tokenFindings) != 0 {
+		t.Fatalf("premise broken: class-token arm reported %v for known class %s", codesOf(tokenFindings), rmType)
+	}
+	archetypeFindings := ck.Archetype(rmType, hrid)
+	if got := codesOf(archetypeFindings); !slices.Equal(got, []string{semcheck.CodeUnknownRMClass}) {
+		t.Errorf("Archetype(%s, %s) = %v, want exactly one %s", rmType, hrid, got, semcheck.CodeUnknownRMClass)
+	}
+}
+
+// TestZeroValuesAreUsable pins the fail-closed shapes (REQ-025: library code
+// does not panic on caller input). The zero Checker must behave as New(nil),
+// and the zero Operand — how an adapter spells "no enclosing parent" for a
+// junction at the FROM root — must suppress every pair.
+func TestZeroValuesAreUsable(t *testing.T) {
+	t.Parallel()
+
+	var zero semcheck.Checker
+	nilRel := semcheck.New(nil)
+	for _, rmType := range []string{"COMPOSITION", "DV_TEXT", "FOO_BAR", ""} {
+		a := zero.Operand(rmType, semcheck.RoleContained)
+		b := nilRel.Operand(rmType, semcheck.RoleContained)
+		if !slices.Equal(codesOf(a.Findings()), codesOf(b.Findings())) || a.Verdict() != b.Verdict() {
+			t.Errorf("zero Checker disagrees with New(nil) on %q: %v/%v vs %v/%v",
+				rmType, codesOf(a.Findings()), a.Verdict(), codesOf(b.Findings()), b.Verdict())
+		}
+	}
+
+	var noParent semcheck.Operand
+	if len(noParent.Findings()) != 0 {
+		t.Errorf("zero Operand reported %v; it names nothing", codesOf(noParent.Findings()))
+	}
+	if !noParent.Suppresses() {
+		t.Error("zero Operand does not suppress; an adapter uses it for 'no enclosing parent'")
+	}
+	// The descendant here would raise aql_impossible_containment against a real
+	// ancestor; with no parent there is no pair to ask about.
+	if got := zero.Pair(noParent, zero.Operand("COMPOSITION", semcheck.RoleContained)); len(got) != 0 {
+		t.Errorf("Pair(zero, COMPOSITION) = %v, want nothing", codesOf(got))
+	}
+}
+
+// TestOverlayRelationRetiresFindings is the dialect case (REQ-160
+// § Extensibility, REQ-161 § Relation supply): a consumer whose deployment
+// really does nest FOO_BAR over COMPOSITION passes a relation carrying that
+// edge and gets no finding — where the default relation reports the class
+// unknown.
+func TestOverlayRelationRetiresFindings(t *testing.T) {
+	t.Parallel()
+
+	def := semcheck.New(nil)
+	if got := codesOf(def.Operand("FOO_BAR", semcheck.RoleContained).Findings()); !slices.Equal(got, []string{semcheck.CodeUnknownRMClass}) {
+		t.Fatalf("premise broken: default relation reports %v for FOO_BAR, want aql_unknown_rm_class", got)
+	}
+
+	ck := semcheck.New(contain.Default().WithOverlay(contain.Edge{From: "FOO_BAR", To: "COMPOSITION"}))
+	a := ck.Operand("FOO_BAR", semcheck.RoleRoot)
+	if got := codesOf(a.Findings()); len(got) != 0 {
+		t.Errorf("overlay endpoint FOO_BAR still reports %v", got)
+	}
+	if a.Suppresses() {
+		t.Error("overlay endpoint FOO_BAR still suppresses; an overlay-named class is containable")
+	}
+	d := ck.Operand("COMPOSITION", semcheck.RoleContained)
+	if got := codesOf(ck.Pair(a, d)); len(got) != 0 {
+		t.Errorf("Pair(FOO_BAR, COMPOSITION) over the overlay = %v, want nothing", got)
+	}
+
+	// Checker.Archetype's suppression gate is [contain.Relation.Containable],
+	// under which an overlay-only class is Admissible (asserted above via
+	// a.Suppresses()), NOT UnknownClass — so the gate must NOT fire here, and
+	// Archetype falls through to ArchetypeMatches, which reports UnknownClass
+	// on its own account (its declared-class lookup does not consult
+	// overlays at all). The total for an overlay-only declared class is
+	// therefore exactly ONE aql_unknown_rm_class — never zero (that would
+	// mean the archetype/class-conformance question silently went
+	// unanswered for a class the BMM cannot judge) and never the mismatch
+	// Error (a class the relation cannot resolve to a BMM entity can never
+	// be PROVEN to mismatch). A simplification of the gate to
+	// ArchetypeMatches's own resolve-based notion of "known" would flip this
+	// row to total silence while every other test stays green — this row
+	// exists to catch exactly that regression.
+	overlayFindings := ck.Archetype("FOO_BAR", "openEHR-EHR-OBSERVATION.blood_pressure.v1")
+	if got := codesOf(overlayFindings); !slices.Equal(got, []string{semcheck.CodeUnknownRMClass}) {
+		t.Errorf("Archetype(FOO_BAR, ...) over the overlay = %v, want exactly [%s]", got, semcheck.CodeUnknownRMClass)
+	}
+	// Pin the Detail wording itself, not just the code: this is the overlay-only
+	// case fix-round Important 1 exists for — the declared class (FOO_BAR) IS
+	// known to Containable (via the overlay) and the HRID IS well-formed with a
+	// known type segment (OBSERVATION), so a Detail naming either "its type
+	// segment is not a class the relation knows" or "the archetype id is not a
+	// well-formed HRID" (the old, superseded wording) would be false for this
+	// case. The cause-neutral phrase below is true regardless of which of the
+	// three live causes applies, so it must survive here specifically.
+	const wantSubstring = "cannot be decided from the pinned RM"
+	if len(overlayFindings) != 1 || !strings.Contains(overlayFindings[0].Detail, wantSubstring) {
+		detail := ""
+		if len(overlayFindings) == 1 {
+			detail = overlayFindings[0].Detail
+		}
+		t.Errorf("Archetype(FOO_BAR, ...) Detail = %q, want it to contain %q", detail, wantSubstring)
+	}
+}
+
+// TestFindingsCarryDetail pins that every finding carries the value-bearing
+// Detail the REQ-109 issue model expects, naming the class(es) it concerns —
+// an empty Detail would leave a consumer with a bare code.
+func TestFindingsCarryDetail(t *testing.T) {
+	t.Parallel()
+	ck := semcheck.New(nil)
+	obs := ck.Operand("OBSERVATION", semcheck.RoleRoot)
+	comp := ck.Operand("COMPOSITION", semcheck.RoleContained)
+
+	groups := [][]contain.Finding{
+		ck.Operand("FOO_BAR", semcheck.RoleContained).Findings(),
+		ck.Operand("DV_TEXT", semcheck.RoleContained).Findings(),
+		ck.Pair(obs, comp),
+		ck.Pair(ck.Operand("FOLDER", semcheck.RoleRoot), comp),
+		ck.Archetype("EVALUATION", "openEHR-EHR-OBSERVATION.blood_pressure.v1"),
+		ck.Archetype("ENTRY", "openEHR-EHR-FOOTYPE.x.v1"),
+	}
+	for _, fs := range groups {
+		if len(fs) == 0 {
+			t.Fatal("a group produced no finding; the premise of this test is broken")
+		}
+		for _, f := range fs {
+			if f.Detail == "" {
+				t.Errorf("%s carries an empty Detail", f.Code)
+			}
+			if _, ok := semcheck.SeverityOf(f.Code); !ok {
+				t.Errorf("finding code %q is not in the severity catalogue", f.Code)
+			}
+		}
+	}
+}

@@ -32,7 +32,7 @@ The package taxonomy — every package with its scope notes — is **normative i
 
 The module resolves into three concentric layers, each usable without the one above it:
 
-1. **Building blocks (no I/O).** `openehr/rm` (+ `typereg`, `rminfo`), `openehr/bmm`, `openehr/aom`, `openehr/serialize`, `openehr/template`, `openehr/validation`, `openehr/instance`, `openehr/composition`, and `openehr/aql` (models). Pure data structures and algorithms — decode a canonical JSON Composition, validate it against an OPT, build one from a template, render an AQL string. They never reach for the network and never import `transport/` or `auth/` (REQ-013), so a CI validator or a synthetic-data faker can depend on exactly one of them.
+1. **Building blocks (no I/O).** `openehr/rm` (+ `typereg`, `rminfo`), `openehr/bmm`, `openehr/aom`, `openehr/serialize`, `openehr/template`, `openehr/validation`, `openehr/instance`, `openehr/composition`, and `openehr/aql` (query models, builders, and opt-in containment verification). Pure data structures and algorithms — decode a canonical JSON Composition, validate it against an OPT, build one from a template, render an AQL string, check a containment chain against the pinned RM. They never reach for the network and never import `transport/` or `auth/` (REQ-013), so a CI validator or a synthetic-data faker can depend on exactly one of them.
 2. **The HTTP path.** `auth/` produces a `TokenSource`; `transport/` wraps the caller's injected `*http.Client` and layers auth, retry, OpenTelemetry, and the ITS-REST envelope onto it; `openehr/client/*` are the thin, typed leaf clients (System, EHR + sub-resources, Query, Definition, Admin) that call through `transport/` and decode with the codecs. `smart/discovery` supplies the `ServiceCatalog` that tells the transport where the openEHR REST base URL lives.
 3. **Application & platform.** `smart/` adds SMART-on-openEHR launch context and ID-token validation on top of discovery; `cadasto/*` carries the platform extras (Extra API, Datamap, MPI, Care, admin health) behind the cut line described below.
 
@@ -123,7 +123,7 @@ Runnable wiring for both the building-block and REST paths is in [`quick-start.m
 The package tree has two named boundaries:
 
 - **The `cadasto/` cut line** (REQ-010, REQ-011) — preserves the option of extracting Cadasto-platform extras into a sibling Go module later (open question in STRAND-08). The cut is held now regardless of resolution, because reversing it after v1 ships is expensive.
-- **The building-block boundary** (REQ-013) — `openehr/rm`, `serialize`, `validation`, `template`, and `aql` (models only) must work *without* `transport/` or `auth/`. CI validators, FHIR-mapping prototypes, and AQL linters don't need HTTP; the SDK must not force the dependency.
+- **The building-block boundary** (REQ-013) — `openehr/rm`, `serialize`, `validation`, `template`, and `aql` (with its `parse`, `lint`, and `contain` blocks) must work *without* `transport/` or `auth/`. CI validators, FHIR-mapping prototypes, and AQL linters don't need HTTP; the SDK must not force the dependency.
 
 The first cut is about future-proofing module structure; the second is about present-day consumer ergonomics.
 

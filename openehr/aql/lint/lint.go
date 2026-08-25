@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -99,8 +100,10 @@ type Result struct {
 	// Issues is the full list of findings in a stable, deterministic
 	// order: by layer, then document order within a layer (aql_unused_param
 	// is sorted by parameter key, since unreferenced params have no
-	// document position). Never nil after a lint call (zero-length when
-	// clean).
+	// document position; and Layer 2 orders by CHECK GROUP first — shape,
+	// then the REQ-161 semantic group in its own fixed sequence — so a
+	// later-in-the-query semantic finding can precede an earlier shape one).
+	// Never nil after a lint call (zero-length when clean).
 	Issues []Issue
 }
 
@@ -111,8 +114,10 @@ func (r Result) OK() bool {
 }
 
 // Options tunes a lint pass. The zero value (or nil) runs the AST-shape
-// checks only: Layer 3 needs Compiled, and the Layer-2 parameter-binding
-// checks need Query.
+// checks AND the whole REQ-161 Layer-2 semantic group (which is ungated and
+// can raise Error-severity issues that flip [Result.OK] — see Relation);
+// Layer 3 needs Compiled, and the Layer-2 parameter-binding checks need
+// Query.
 type Options struct {
 	// Compiled, when non-nil, enables Layer 3 (archetype / path checks
 	// against a compiled OPT).
@@ -120,6 +125,22 @@ type Options struct {
 	// Query, when non-nil, enables parameter-binding checks
 	// (aql_unbound_param / aql_unused_param) against its Parameters map.
 	Query *aql.Query
+	// Relation is the REQ-160 containment relation the Layer-2 semantic
+	// checks judge FROM/CONTAINS shapes against (REQ-161 § Relation supply).
+	//
+	// Unlike Compiled and Query it does not GATE its checks: nil means the
+	// REQ-160 default relation ([contain.Default]), so the semantic group
+	// always runs. Supply a relation extended with dialect overlay edges
+	// ([contain.Relation.WithOverlay]) to lint a deployment whose containment
+	// facts go beyond the pinned RM without drawing false findings.
+	//
+	// It governs the five containment-pair codes only. The three portability
+	// codes — aql_version_no_predicate, aql_versioned_object_unreferenced and
+	// aql_fanout_row_grain — ignore it: the first two put a CLASS question to
+	// the pinned RM (rminfo.Default) rather than a containment one, and the
+	// third reads the query's own SELECT / CONTAINS shape and consults no RM
+	// facts at all. An overlay therefore cannot retire those three.
+	Relation *contain.Relation
 }
 
 // LintString parses q against the SDK grammar profile and lints the result.
@@ -187,6 +208,11 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	issues := []Issue{}
 
 	issues = append(issues, shapeIssues(doc, md)...)
+	// The Layer-2 semantic group (REQ-161) is unconditional: unlike Compiled
+	// and Query, the relation always has a usable default, so a nil
+	// Options.Relation selects the pinned RM rather than switching the group
+	// off.
+	issues = append(issues, semanticIssues(doc, opts.Relation)...)
 	if opts.Query != nil {
 		issues = append(issues, paramIssues(md, opts.Query)...)
 	}
