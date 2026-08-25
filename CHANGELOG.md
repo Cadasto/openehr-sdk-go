@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-08-25
+
+Twenty-second `v0.x` minor — AQL gains a semantic layer that tells an RM-impossible query apart from one that merely returns no rows, on the read and write sides alike, and the contribution builder and write-result contract land. **Breaking:** `lint.Options` gains a field, so positional struct literals no longer compile, and `contribution.Commit` stops reporting an empty 2xx representation as success.
+
 ### Added
 
 - **Builder containment verification (REQ-162, PROBE-097).** `(*Builder).VerifyContainment` walks the builder's own containment algebra opt-in, reporting REQ-161's codes at read/write parity with the linter; `Build()` and its emitted text are unchanged.
