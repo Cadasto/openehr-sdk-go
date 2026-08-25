@@ -2,7 +2,6 @@ package lint
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
@@ -153,7 +152,20 @@ func (c *containCheck) walk(parent semcheck.Operand, role semcheck.Role, n parse
 	// against the wrong predecessor — openehr/aql/verify.go's containVerifier.chain
 	// faces the identical fan-in and resolves it the same way. A junction may
 	// only END a chain, so it never becomes a predecessor.
+	// A class node carrying NO RM type decides nothing, so it is transparent:
+	// its chain — and its own caller's `prev` — see the enclosing parent rather
+	// than this node's zero [semcheck.Operand], which would suppress every pair
+	// built on it. This is the read-side twin of openehr/aql/verify.go's
+	// containVerifier.walk rule; without it the two adapters disagree on a
+	// hand-built tree, which is the parity break the shared engine exists to
+	// prevent. Only the CHILDLESS shape reaches here — [isJunction] already
+	// treats an RM-type-less node WITH children as a junction, which passes the
+	// parent through by the same logic — and no parsed document carries either,
+	// so this is answerable only to semantic_internal_test.go.
 	prev := self
+	if n.Class.RMType == "" {
+		prev = parent
+	}
 	for _, ch := range n.Children {
 		if decided := c.walk(prev, role.Next(semcheck.StepContains), ch); !isJunction(ch) {
 			prev = decided
@@ -333,6 +345,19 @@ func versionPredicateIssues(doc *parse.Document) []Issue {
 // path's root there IS the whole "outside FROM/CONTAINS" test — no separate
 // exclusion of FROM/CONTAINS itself is needed.
 //
+// That same fact is why an operand carrying its own class predicate
+// ([parse.ClassExpr.HasPredicate]) is SKIPPED outright, ahead of the alias
+// test (REQ-161 § Checks): "outside FROM/CONTAINS" is the right test for
+// whether the operand is REFERENCED, and the wrong one for whether the step
+// is REDUNDANT. `VERSIONED_COMPOSITION vo[uid/value=$vo]` reads a
+// container-level attribute — the very thing the redundancy sentence names —
+// in a standing predicate that is deliberately not an [parse.IdentifiedPath],
+// and it is what selects the container, so the step is doing work no path
+// anywhere will admit to. That is the canonical "all versions of one
+// composition" shape (`… CONTAINS VERSIONED_COMPOSITION vo[uid/value=$vo]
+// CONTAINS VERSION v[ALL_VERSIONS]`), and it reaches users through
+// [validation.ValidateAQL] as well as the linter.
+//
 // An anonymous operand (no alias at all — AQL's `classExprOperand` grammar
 // makes the alias optional) is INCLUDED, not skipped: with no alias, no path
 // anywhere can possibly reference it, so "roots no identified path" holds
@@ -352,6 +377,12 @@ func versionedObjectIssues(doc *parse.Document) []Issue {
 	var issues []Issue
 	for _, ce := range doc.Classes {
 		if ce.RMType == "" || !conformsToVersionedObject(ce.RMType) {
+			continue
+		}
+		// A standing class predicate IS a container-level attribute read; it
+		// simply is not an identified path, so doc.Paths can never see it.
+		// See the doc comment above.
+		if ce.HasPredicate {
 			continue
 		}
 		if ce.Alias != "" && referenced[ce.Alias] {
@@ -441,9 +472,8 @@ func versionedObjectDetail(ce parse.ClassExpr) string {
 // refuses on the strength of it (plan § The big picture).
 //
 // It fires once per AND containment junction whose AND-flattened
-// class-expression leaves ([andFrontier]) include two or more operands each
-// projected by at least one SELECT column. Per REQ-161 § Checks, verbatim,
-// three clauses:
+// class-expression leaves ([andFrontier]) include two or more SELECT-projected
+// operands. Per REQ-161 § Checks, verbatim, FOUR clauses:
 //
 //   - only an AND junction can fire it — an OR junction (or any junction
 //     that is not AND) never fires, however many of ITS operands are
@@ -454,51 +484,37 @@ func versionedObjectDetail(ce parse.ClassExpr) string {
 //   - "projected" means the leaf's alias roots at least one SELECT column,
 //     checked against [parse.Document.Paths] tagged [parse.ClauseSelect] —
 //     the same source [versionedObjectIssues] reads for "outside
-//     FROM/CONTAINS", here filtered to one clause rather than excluding one.
+//     FROM/CONTAINS", here filtered to one clause rather than excluding one —
+//     OR, when the projection carries a star in any form
+//     ([parse.Document.Star]: bare `SELECT *` and the mixed `SELECT *, col`),
+//     EVERY alias bound in FROM/CONTAINS, because the engine returns a column
+//     per alias and so every AND-junction sibling multiplies rows. A star
+//     projection roots no [parse.IdentifiedPath] at all, so reading Paths
+//     alone silently disabled this advisory on exactly the shape where the
+//     SPECQUERY-9 question is most live;
+//   - an AND junction under an INHERITED negation — a NOT CONTAINS anywhere
+//     above it, including through an intervening un-negated OR — MUST NOT
+//     fire: a NOT CONTAINS collapses to a boolean filter on the parent row
+//     and multiplies nothing anywhere inside its excluded subtree.
 //
-// A NEGATED subtree never fires an AND junction anywhere inside it, however
-// deep — this is fix round 2's correction, and it is INHERITED down the
-// walk, not read off each node's own [parse.Containment.Negated] bit in
-// isolation. `NOT CONTAINS (B OR (D AND E))` sets Negated only on the OUTER
-// OR node (the parser's Negated carrier is the CONTAINS-chain TARGET, which
-// here is the whole parenthesised junction); the inner `(D AND E)` is an
-// ordinary, un-negated junction OPERAND of that OR — [parse.Containment]'s
-// own doc comment records that NOT belongs to a CONTAINS keyword, never to a
-// junction operand, so no node BELOW the negated one can carry the flag
-// itself. Reading only `n.Negated` at each node (fix round 1's fix) caught
-// the negated node ITSELF firing, but let a plain, un-flagged AND several
-// junction-operand hops further down still fire — same defect class as
-// Important 1, one level deeper, because "is this pair impossible" and "does
-// a NOT CONTAINS filter reach this deep" are different questions.
+// The negation clause is INHERITED down this walk rather than read off each
+// node's own [parse.Containment.Negated] bit, because the parser's Negated
+// carrier is the CONTAINS-chain TARGET: `NOT CONTAINS (B OR (D AND E))` sets
+// the flag on the OUTER OR only, and no node below it carries it at all
+// ([parse.Containment]'s own doc comment — NOT belongs to a CONTAINS keyword,
+// never to a junction operand). Once a `walk` call is under negation it stays
+// under negation all the way down; the flag is never cleared descending
+// further, and it is never read back up.
 //
-// Once a `walk` call is under negation, it stays under negation all the way
-// down: the boolean threaded through `walk` is set the moment ANY visited
-// node's own Negated is true, and never cleared descending further, exactly
-// matching the semantics REQ-161's Important-1 rationale actually states —
-// "a NOT CONTAINS collapses to a boolean filter on the PARENT ROW" governs
-// the WHOLE excluded subtree, not merely its root spelling. Even though
-// [parse.Containment.Negated] is not one of the spec's three named clauses,
-// this is the opposite of the rule the containment-pair checks apply:
-// REQ-161 § Checks has a NOT CONTAINS pair checked IDENTICALLY to a plain
-// one, because an RM-impossible pair is impossible whether or not it is
-// negated — POSSIBILITY does not care about the sign, anywhere in the tree.
-// Row multiplicity does. Whoever next touches this rule should not "fix"
-// this to match the pair checks' NOT-CONTAINS-is-identical stance; the two
-// checks answer different questions, and only one of them is sign-blind.
-// [containCheck.walk]/[containCheck.pair] (the pair-check machinery) take no
-// such flag and MUST NOT: this inheritance is local to the advisory.
-//
-// TWO shapes this inheritance must NOT touch, both because REQ-161's own
-// clauses require them:
-//
-//   - a NON-negated AND nested under a NON-negated OR still fires — an OR is
-//     a leaf-collection BOUNDARY (nothing below it becomes a leaf of the
-//     enclosing junction), never a firing boundary; only negation, not
-//     alternation, suppresses a descendant AND;
-//   - the containment-pair codes (aql_impossible_containment and the rest)
-//     still fire inside a negated subtree, exactly as before — this
-//     function's own `negated` parameter is invisible to
-//     [containCheck.walk], which has and needs none of its own.
+// This is deliberately the OPPOSITE of the rule the containment-pair checks
+// apply, where REQ-161 § Checks has a NOT CONTAINS pair checked IDENTICALLY
+// to a plain one: POSSIBILITY does not care about the sign, row multiplicity
+// does. Whoever next touches this rule should not "fix" it to match — and
+// [containCheck.walk]/[containCheck.pair] take no such flag and MUST NOT, so
+// the containment-pair codes keep firing inside a negated subtree exactly as
+// before. Alternation, unlike negation, is a leaf-collection boundary and
+// never a firing one: a NON-negated AND nested under a NON-negated OR still
+// fires (REQ-161's own positive-control pin).
 //
 // This is a pure [parse.Document] walk: no [contain.Relation] is consulted —
 // whether two operands' aliases are both SELECT-projected is not an RM
@@ -510,6 +526,16 @@ func fanoutIssues(doc *parse.Document) []Issue {
 		return nil
 	}
 	projected := make(map[string]bool)
+	if doc.Star {
+		// A star projects a column per BOUND ALIAS, so every FROM/CONTAINS
+		// alias counts — see the third clause in the doc comment above. An
+		// anonymous operand still counts for nothing: [fanoutFinding] requires
+		// a non-empty alias, and a column with no alias to name it identifies
+		// no sibling to blame.
+		for _, ce := range doc.Classes {
+			projected[ce.Alias] = true
+		}
+	}
 	for _, p := range doc.Paths {
 		if p.Clause == parse.ClauseSelect {
 			projected[p.Alias] = true
@@ -538,19 +564,36 @@ func fanoutIssues(doc *parse.Document) []Issue {
 			}
 			return
 		}
-		leaves, boundary := andFrontier(n)
+		// n is a fireable, non-negated AND junction, so flattening it is
+		// exactly [andFrontier]'s own AND-junction loop over its children —
+		// inlined here rather than called as andFrontier(n). That is what
+		// keeps every andFrontier call STRICTLY DESCENDING: a returned
+		// boundary node is always a proper descendant of n, so it can never
+		// be n itself and re-walking one below always terminates. Calling
+		// andFrontier(n) instead would make that a matter of two separate
+		// copies of the "fireable AND junction" test (this branch's guard and
+		// andFrontier's own) continuing to agree — and if they ever drifted,
+		// andFrontier would hand n straight back as its own boundary and the
+		// walk below would repeat the identical decision forever. The
+		// structure removes the possibility; nothing needs to guard it.
+		var leaves, boundary []parse.Containment
+		for _, ch := range n.Children {
+			l, b := andFrontier(ch)
+			leaves = append(leaves, l...)
+			boundary = append(boundary, b...)
+		}
 		if found := fanoutFinding(leaves, projected); found != nil {
 			issues = append(issues, *found)
 		}
-		// andFrontier already consumed every nested-AND descendant in full —
-		// re-walking leaves or boundary as a plain child list would double-
-		// count the SAME junction. What it did NOT explore is each leaf's own
-		// onward CONTAINS chain (a deeper containment step, not a sibling of
-		// THIS junction) and each excluded OR subtree (which may hide its own,
-		// independent, AND junction) — both are walked here, so no AND
-		// junction anywhere in the tree goes unchecked, and none is checked
-		// twice. negated is false in both loops below (this branch is only
-		// reached when it was already false), so nothing is lost by not
+		// The flatten above already consumed every nested-AND descendant in
+		// full — re-walking leaves or boundary as a plain child list would
+		// double-count the SAME junction. What it did NOT explore is each
+		// leaf's own onward CONTAINS chain (a deeper containment step, not a
+		// sibling of THIS junction) and each excluded OR subtree (which may
+		// hide its own, independent, AND junction) — both are walked here, so
+		// no AND junction anywhere in the tree goes unchecked, and none is
+		// checked twice. negated is false in both loops below (this branch is
+		// only reached when it was already false), so nothing is lost by not
 		// re-deriving it from n.
 		for _, leaf := range leaves {
 			for _, ch := range leaf.Children {
@@ -558,28 +601,6 @@ func fanoutIssues(doc *parse.Document) []Issue {
 			}
 		}
 		for _, b := range boundary {
-			// Defensive, mirroring [andFrontier]'s own Negated check: the
-			// guard just above ("is n a fireable, non-negated AND junction")
-			// and andFrontier's OWN entry guard are two SEPARATE copies of
-			// conceptually the same condition — that duplication is why this
-			// check exists at all. If the two copies ever disagreed for n
-			// ITSELF (a future edit to one and not the other), andFrontier
-			// would hand n straight back as its own boundary unchanged, and
-			// calling walk on it again would repeat the identical decision
-			// forever — an unrecoverable stack overflow, not a wrong answer.
-			// Recursing directly into the boundary node's own children
-			// (never back into walk with a value equal to n) makes that
-			// impossible regardless of whether the two copies ever actually
-			// drift; it changes nothing for a genuine boundary element
-			// (an excluded OR or negated descendant), which is never equal
-			// to n because andFrontier only ever returns THOSE unchanged
-			// when recursing into n's children, not n itself.
-			if reflect.DeepEqual(b, n) {
-				for _, ch := range b.Children {
-					walk(ch, negated)
-				}
-				continue
-			}
 			walk(b, negated)
 		}
 	}
@@ -592,45 +613,48 @@ func fanoutIssues(doc *parse.Document) []Issue {
 	return issues
 }
 
-// andFrontier flattens n's nested-AND structure — n MUST be a non-negated AND
-// junction (checked by the caller, [fanoutIssues]'s walk). leaves are the
-// class-expression operands reached without crossing a non-AND (or negated)
-// junction (REQ-161's flattening rule, applied regardless of how deep the
-// AND-only nesting runs — same-operator junctions arrive pre-flattened by the
-// extractor already, REQ-117, but this recurses regardless so a hand-built or
-// future unflattened AST is handled identically — see
+// andFrontier flattens ONE OPERAND of a fireable AND junction. leaves are the
+// class-expression operands reached from n without crossing a non-AND (or
+// negated) junction (REQ-161's flattening rule, applied regardless of how deep
+// the AND-only nesting runs — same-operator junctions arrive pre-flattened by
+// the extractor already, REQ-117, but this recurses regardless so a hand-built
+// or future unflattened AST is handled identically — see
 // [TestAndFrontierFlattensHandBuiltNestedAnd]). boundary is every node the
-// flatten explicitly did NOT explore: a non-AND (OR) child, or a NEGATED
-// child, returned whole so the caller can look for an AND junction nested
-// inside it independently — it contributes nothing to THIS junction's
-// leaves, but it is not silently dropped either.
+// flatten explicitly did NOT explore: a non-AND (OR) node, or a NEGATED node,
+// returned whole so the caller can look for an AND junction nested inside it
+// independently — it contributes nothing to THIS junction's leaves, but it is
+// not silently dropped either.
 //
-// The Negated check is defensive, not reachable through today's only caller:
-// REQ-161's flattening rule composes through [n.Children], and [parse.Containment]'s
-// own doc comment records that NOT belongs to a CONTAINS keyword, never to a
-// junction operand — the parser sets Negated only on the node a CONTAINS/NOT
-// CONTAINS chain step targets, so a junction's direct Children (its boolean
-// operands) can never individually carry it. n ITSELF can, though — a whole
-// `NOT CONTAINS (A AND B)` junction is exactly such a target — which is why
-// the check has to live here too, mirroring [fanoutIssues]'s walk, rather
-// than only at the call site: a future caller of this function that skips
-// walk's own guard must not silently flatten a filter into row-multiplying
-// leaves.
+// [fanoutIssues]'s walk calls this per CHILD of the junction it has just
+// decided is fireable, never on that junction itself: see the inlined loop
+// there for why the strictly-descending call shape is load-bearing rather
+// than stylistic.
+//
+// The Negated test comes FIRST, ahead of the junction/class split, so a
+// negated node is a boundary WHATEVER its kind — the contract above says
+// "node", and counting a negated CLASS node as a firing leaf would contradict
+// it. It is defensive either way: REQ-161's flattening rule composes through
+// [n.Children], and [parse.Containment]'s own doc comment records that NOT
+// belongs to a CONTAINS keyword, never to a junction operand, so the parser
+// can never hand a junction's direct child the flag at all.
 //
 // This is n's OWN bit only — it says nothing about an ANCESTOR further up
 // the tree that was negated (`NOT CONTAINS (B OR (D AND E))` sets Negated on
 // the OR, not on the un-negated inner `(D AND E)` this function would be
 // called on if [fanoutIssues]'s walk did not carry the inherited flag
-// itself; fix round 2). Inheriting a negated ancestor's exclusion down
-// through an intervening OR is [fanoutIssues]'s `walk` closure's job, via
-// its own threaded `negated bool` parameter — deliberately NOT this
-// function's, since andFrontier only ever sees the subtree at or below the
-// node walk has already decided is fireable.
+// itself). Inheriting a negated ancestor's exclusion down through an
+// intervening OR is [fanoutIssues]'s `walk` closure's job, via its own
+// threaded `negated bool` parameter — deliberately NOT this function's, since
+// andFrontier only ever sees the subtree below a node walk has already decided
+// is fireable.
 func andFrontier(n parse.Containment) (leaves, boundary []parse.Containment) {
+	if n.Negated {
+		return nil, []parse.Containment{n}
+	}
 	if !isJunction(n) {
 		return []parse.Containment{n}, nil
 	}
-	if n.ChildJoin != parse.ContainsAnd || n.Negated {
+	if n.ChildJoin != parse.ContainsAnd {
 		return nil, []parse.Containment{n}
 	}
 	for _, ch := range n.Children {

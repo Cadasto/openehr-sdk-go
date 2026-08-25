@@ -988,6 +988,56 @@ func TestVersionedObjectReferencedInWhereOrOrderByStaysSilent(t *testing.T) {
 	}
 }
 
+// TestVersionedObjectPredicateScopedOperandStaysSilent pins REQ-161 § Checks'
+// predicate exclusion: an operand carrying its OWN class predicate is doing
+// container-level work and MUST NOT be called redundant, even though no
+// identified path names its alias.
+//
+// "Outside FROM/CONTAINS" is the right test for whether the operand is
+// REFERENCED and the wrong one for whether the step is REDUNDANT, and the two
+// were conflated: a class predicate is deliberately NOT a
+// [parse.IdentifiedPath] ([parse.ClassExpr.PredicateComparison]'s doc comment),
+// so `vo[uid/value=$vo]` — a container-level attribute read, the very thing the
+// Detail names as the exception — is invisible to [parse.Document.Paths] and
+// the code fired on the operand that was selecting the container.
+//
+// The firing row is the same query with the predicate REMOVED: without it the
+// step really does nothing, so the code must still fire. Pinning both halves
+// is what keeps the narrowing scoped to the predicate rather than retiring the
+// check for VERSIONED_COMPOSITION generally.
+func TestVersionedObjectPredicateScopedOperandStaysSilent(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name  string
+		query string
+		want  []string
+	}{
+		{
+			// The canonical "all versions of one composition" shape, which
+			// reaches users through validation.ValidateAQL as well as the
+			// linter.
+			"standing predicate on the container: silent",
+			"SELECT v/commit_audit/time_committed/value FROM EHR e[ehr_id/value=$ehr] " +
+				"CONTAINS VERSIONED_COMPOSITION vo[uid/value=$vo] CONTAINS VERSION v[ALL_VERSIONS]",
+			nil,
+		},
+		{
+			"the same query with no predicate on the container: fires",
+			"SELECT v/commit_audit/time_committed/value FROM EHR e[ehr_id/value=$ehr] " +
+				"CONTAINS VERSIONED_COMPOSITION vo CONTAINS VERSION v[ALL_VERSIONS]",
+			[]string{codeVersionedObjectUnreferenced},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := req161Portability(lint.LintString(tc.query, nil)); !slices.Equal(got, tc.want) {
+				t.Errorf("%q portability codes = %v, want %v", tc.query, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestVersionedObjectUsesConformanceNotNamePrefix is the task-brief's
 // load-bearing test for this check: the relation is asked a real conformance
 // question, never a `VERSIONED_` name-prefix guess. A class spelled to LOOK
@@ -1053,6 +1103,20 @@ func TestVersionedObjectUnknownClassStaysSilent(t *testing.T) {
 // [fanoutIssues] is only worth anything if a double-count would actually be
 // caught here.
 //
+// The `SELECT *` rows pin the projection clause's OTHER half: a star roots no
+// [parse.IdentifiedPath], so reading [parse.Document.Paths] alone left the
+// projected set EMPTY and silently disabled the advisory on the shape where
+// the row-grain question is most live — the engine returns a column per alias,
+// so every AND-junction sibling multiplies rows. The near-miss row beside them
+// pins that the star widens only WHAT COUNTS AS PROJECTED: an OR junction
+// stays silent under a star exactly as it does under named columns.
+//
+// The last three rows pin [fanoutIssues]'s three recursion arms — the FROM-root
+// junction entry, each leaf's onward CONTAINS chain, and the excluded-OR
+// boundary walk. All three were previously executed only by rows expecting nil,
+// so deleting any one of them satisfied every existing expectation; each row
+// below is a shape that FIRES through exactly one of them.
+//
 // The "pre-flattened N-ary AND" row is named for what it actually exercises:
 // [parse]'s extractor splices a same-operator child's Children into its
 // parent (REQ-117), so `(OBSERVATION a AND (OBSERVATION b AND OBSERVATION
@@ -1107,6 +1171,31 @@ func TestFanoutRowGrainFires(t *testing.T) {
 			nil,
 		},
 		{
+			// The star projects a column per BOUND ALIAS, so every
+			// AND-junction sibling multiplies rows — the shape where the
+			// SPECQUERY-9 question is most live, and the one a Paths-only
+			// reading of "projected" silently exempted (a star roots no
+			// parse.IdentifiedPath at all, so the map was simply empty).
+			"SELECT * projects every bound alias: AND junction fires",
+			"SELECT * FROM COMPOSITION c CONTAINS (OBSERVATION o1 AND OBSERVATION o2)",
+			[]string{codeFanoutRowGrain},
+		},
+		{
+			// parse.Document.Star is set for the MIXED form too, and the
+			// engine still returns a column per alias beside the named ones.
+			"mixed SELECT *, col projects every bound alias too",
+			"SELECT *, o1 FROM COMPOSITION c CONTAINS (OBSERVATION o1 AND OBSERVATION o2)",
+			[]string{codeFanoutRowGrain},
+		},
+		{
+			// The star widens WHAT COUNTS AS PROJECTED and nothing else: the
+			// junction-operator clause still governs, so a star over an OR
+			// junction stays silent exactly as two named columns would.
+			"near miss: SELECT * over an OR junction",
+			"SELECT * FROM COMPOSITION c CONTAINS (OBSERVATION o1 OR OBSERVATION o2)",
+			nil,
+		},
+		{
 			"AND junction, three projected aliases: fires (>= 2, not == 2)",
 			"SELECT a, b, c2 FROM COMPOSITION c CONTAINS (OBSERVATION a AND OBSERVATION b AND OBSERVATION c2)",
 			[]string{codeFanoutRowGrain},
@@ -1131,6 +1220,41 @@ func TestFanoutRowGrainFires(t *testing.T) {
 			"AND junction with no projected aliases at all",
 			"SELECT c FROM COMPOSITION c CONTAINS (OBSERVATION o1 AND OBSERVATION o2)",
 			nil,
+		},
+		// The three rows below pin [fanoutIssues]'s three RECURSION arms —
+		// each reachable from parsed AQL, each previously executed only by
+		// rows that expect nil, so deleting the arm satisfied every existing
+		// expectation and the suite stayed green. An arm that only ever runs
+		// under a "want nothing" assertion is not pinned by statement
+		// coverage; it needs a shape that FIRES through it.
+		{
+			// The FROM-root junction entry (`if q.From.Junction != nil`): the
+			// cartesian shape SPECQUERY-9 is actually about, with no CONTAINS
+			// anywhere — the root junction IS the whole containment tree, so
+			// the Contains entry point never sees it.
+			"FROM-root AND junction, two projected aliases: fires",
+			"SELECT c1, o1 FROM COMPOSITION c1 AND OBSERVATION o1",
+			[]string{codeFanoutRowGrain},
+		},
+		{
+			// Each leaf's own onward CONTAINS chain: andFrontier stops at the
+			// leaf and never looks below it, so an AND junction hanging off a
+			// leaf's CONTAINS is only reached by the leaves loop.
+			"AND junction below a leaf's own onward CONTAINS chain: fires",
+			"SELECT d, e FROM COMPOSITION c CONTAINS (OBSERVATION x AND (OBSERVATION y CONTAINS (CLUSTER d AND CLUSTER e)))",
+			[]string{codeFanoutRowGrain},
+		},
+		{
+			// The excluded-OR boundary walk: the outer AND's leaves are just
+			// [OBSERVATION a] (the OR contributes none, REQ-161's second
+			// clause), so the outer junction cannot fire — the single finding
+			// comes from the AND *inside* the excluded OR, reachable only by
+			// re-walking the boundary. Distinct from the "non-negated AND
+			// under a non-negated OR" row above, which enters through the
+			// non-AND branch of the walk instead.
+			"AND junction inside an AND's excluded OR subtree: fires exactly once",
+			"SELECT d, e FROM COMPOSITION c CONTAINS (OBSERVATION a AND (OBSERVATION b OR (OBSERVATION d AND OBSERVATION e)))",
+			[]string{codeFanoutRowGrain},
 		},
 	}
 	for _, tc := range cases {
