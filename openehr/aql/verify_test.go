@@ -222,6 +222,45 @@ func TestVerifyContainmentCleanQueriesAreSilent(t *testing.T) {
 	}
 }
 
+// TestVerifyContainmentJunctionNeverBecomesPredecessor pins
+// containVerifier.chain's junction guard (openehr/aql/verify.go): a junction
+// entry in a CONTAINS chain must never become the predecessor a FOLLOWING
+// entry in the SAME chain is checked adjacent to — a junction decides
+// nothing of its own ([contain.Finding]'s zero-Operand comment), so treating
+// it as a predecessor would ask every subsequent pair of the zero Operand,
+// which suppresses everything it takes part in and silently drops a real
+// defect.
+//
+// [Builder.Build] refuses a junction with a further term after it (the
+// grammar admits no such spelling), so this shape is reachable only by
+// calling VerifyContainment directly without Build — exactly the case that
+// method's own doc comment names ("verification judges whatever tree it is
+// handed, including one Build would refuse"). [Builder.Contains] appends to
+// the FROM clause's own top-level chain with no validation of its own (that
+// is [Builder.Build]'s job), so two ordinary top-level calls reach it.
+func TestVerifyContainmentJunctionNeverBecomesPredecessor(t *testing.T) {
+	t.Parallel()
+	b := aql.NewBuilder().Select(aql.Col("s")).From("OBSERVATION", "o").
+		Contains(aql.ContainsOr(aql.Class("ELEMENT", "e1"), aql.Class("CLUSTER", "cl1"))).
+		Contains(aql.Class("SECTION", "s"))
+
+	if _, err := b.Build(); err == nil {
+		t.Fatal("premise broken: Build() = nil, want an error — a junction may only END a chain")
+	}
+
+	// OBSERVATION→SECTION is a documented Never (semantic_test.go's file
+	// doc). If the junction wrongly became SECTION's predecessor, the pair
+	// would be asked of the zero Operand instead, which suppresses every
+	// pair it takes part in, and this code would go missing — the junction's
+	// OWN operands (checked against the true predecessor, OBSERVATION) stay
+	// silent regardless, since OBSERVATION→ELEMENT and OBSERVATION→CLUSTER
+	// are both Admissible, so they contribute no noise either way.
+	if got := findingCodes(b.VerifyContainment(nil)); !slices.Equal(got, []string{codeImpossible}) {
+		t.Errorf("VerifyContainment codes = %v, want exactly [%s] "+
+			"(SECTION must be checked adjacent to the OBSERVATION root, not the junction)", got, codeImpossible)
+	}
+}
+
 // TestVerifyContainmentNeverEmitsPortabilityCodes pins the five-not-eight scope
 // of REQ-162 § Contract (PROBE-097 § parity): the three REQ-161 portability
 // advisories are read-side only. The queries below are exactly the shapes that
