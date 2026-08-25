@@ -24,8 +24,13 @@ import (
 // Obtain the default relation with [Default]; extend it with
 // [TypeRelation.WithOverlay]. A TypeRelation is immutable after construction
 // (the internal verdict memo is concurrency-safe) and safe for concurrent use.
-// The zero TypeRelation is valid but knows no classes and answers UnknownClass
-// for everything.
+//
+// A nil *TypeRelation is the default relation, on the receiver as well as at
+// every seam that takes one (REQ-160 § Nil and zero relations): each method
+// below answers what [Default] would answer rather than panicking, so a caller
+// can hold a nil relation meaning "the default" and still extend or query it.
+// The ZERO TypeRelation is a different thing — a real relation that knows no
+// classes and answers UnknownClass for every one.
 type TypeRelation struct {
 	h  rminfo.Hierarchy
 	lk rminfo.Lookup
@@ -60,11 +65,28 @@ func Default() *TypeRelation {
 	return defaultRel()
 }
 
+// orDefault reads a nil receiver as the default relation (REQ-160 § Nil and
+// zero relations). Every exported method funnels through it, so nil — the
+// documented spelling of "use the default" wherever a *TypeRelation is passed
+// — means the same thing when a method is called on one, instead of panicking
+// on caller-constructible input (REQ-025 § No panics). The unexported helpers
+// do not repeat the check: they are reachable only through an exported method
+// or through build, both of which hold a real relation by the time they call
+// one.
+func (r *TypeRelation) orDefault() *TypeRelation {
+	if r == nil {
+		return Default()
+	}
+	return r
+}
+
 // WithOverlay returns a copy of r extended with the given overlay edges
-// (REQ-160 § Extensibility). r is unchanged. Endpoints are canonicalised; a
-// BMM-known endpoint matches by conformance, an unknown one by exact name.
-// An edge with an empty endpoint names nothing and is ignored.
+// (REQ-160 § Extensibility). r is unchanged, and a nil r extends the default
+// relation. Endpoints are canonicalised; a BMM-known endpoint matches by
+// conformance, an unknown one by exact name. An edge with an empty endpoint
+// names nothing and is ignored. The result is never nil.
 func (r *TypeRelation) WithOverlay(edges ...Edge) *TypeRelation {
+	r = r.orDefault()
 	if len(edges) == 0 {
 		return r
 	}
@@ -92,6 +114,7 @@ func (r *TypeRelation) WithOverlay(edges ...Edge) *TypeRelation {
 // endpoint of this relation; Never for a known non-containable class (a DV_*
 // among them); UnknownClass for a class the relation does not know.
 func (r *TypeRelation) Containable(rmType string) Verdict {
+	r = r.orDefault()
 	return r.containable(r.resolve(rmType))
 }
 
@@ -113,6 +136,7 @@ func (r *TypeRelation) containable(c string, isKnown bool) Verdict {
 // UnknownClass if either operand is unknown; otherwise Never if either
 // operand's containability is Never; otherwise the route verdict.
 func (r *TypeRelation) CanContain(ancestor, descendant string) Verdict {
+	r = r.orDefault()
 	a, aKnown := r.resolve(ancestor)
 	d, dKnown := r.resolve(descendant)
 	va, vd := r.containable(a, aKnown), r.containable(d, dKnown)
@@ -136,6 +160,7 @@ func (r *TypeRelation) CanContain(ancestor, descendant string) Verdict {
 // mismatch). HRID decomposition delegates to REQ-120's canonical
 // [rm.ParseArchetypeID].
 func (r *TypeRelation) ArchetypeMatches(rmType, archetypeID string) Verdict {
+	r = r.orDefault()
 	aid, err := rm.ParseArchetypeID(archetypeID)
 	if err != nil {
 		return UnknownClass
