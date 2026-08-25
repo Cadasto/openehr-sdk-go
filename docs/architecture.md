@@ -123,7 +123,7 @@ Runnable wiring for both the building-block and REST paths is in [`quick-start.m
 The package tree has two named boundaries:
 
 - **The `cadasto/` cut line** (REQ-010, REQ-011) — preserves the option of extracting Cadasto-platform extras into a sibling Go module later (open question in STRAND-08). The cut is held now regardless of resolution, because reversing it after v1 ships is expensive.
-- **The building-block boundary** (REQ-013) — `openehr/rm`, `serialize`, `validation`, `template`, and `aql` (models only) must work *without* `transport/` or `auth/`. CI validators, FHIR-mapping prototypes, and AQL linters don't need HTTP; the SDK must not force the dependency.
+- **The building-block boundary** (REQ-013) — `openehr/rm`, `serialize`, `validation`, `template`, and `aql` (with its `parse`, `lint`, and `contain` blocks) must work *without* `transport/` or `auth/`. CI validators, FHIR-mapping prototypes, and AQL linters don't need HTTP; the SDK must not force the dependency.
 
 The first cut is about future-proofing module structure; the second is about present-day consumer ergonomics.
 

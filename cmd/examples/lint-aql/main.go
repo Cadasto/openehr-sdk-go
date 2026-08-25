@@ -6,8 +6,10 @@
 // Note: templatecompile.Compile is internal; this example lives in the SDK
 // module and is the supported v1 call shape for the template-aware Layer 3
 // (same constraint as validate-composition — see ADR 0005). Layers 1–2
-// (syntax, shape, parameter binding) need no template and are usable by any
-// external consumer via openehr/aql/lint directly.
+// (syntax, shape, parameter binding, and the REQ-160/161 containment +
+// portability semantic group, which runs unconditionally against the pinned
+// RM) need no template and are usable by any external consumer via
+// openehr/aql/lint directly.
 //
 // Run:
 //
@@ -68,14 +70,40 @@ func main() {
 	// this finding surfaces with no template at all.
 	semantic := aql.NewQuery("SELECT o FROM OBSERVATION o CONTAINS COMPOSITION c")
 	report("semantic finding (RM-impossible containment)", semantic, compiled)
+
+	// Advisory-only: the hop is real under the pinned RM but crosses a
+	// by-reference edge (FOLDER holds OBJECT_REFs, not the COMPOSITIONs), so
+	// the group reports Warnings and Result.OK stays true. Most of the REQ-161
+	// codes are Warning-severity — an OK result is not an empty one.
+	advisory := aql.NewQuery("SELECT c FROM FOLDER f CONTAINS COMPOSITION c")
+	report("advisory only (OK, but not issue-free)", advisory, compiled)
 }
 
+// report prints what the result HOLDS, not merely what OK summarises.
+// [validation.Result.OK] is false only for Error-severity issues (REQ-109),
+// so an OK result may still carry Warning advisories — returning early on OK
+// would discard them.
 func report(label string, q aql.Query, c *templatecompile.Compiled) {
 	fmt.Printf("== %s ==\n%s\n", label, q.Q)
 	r := validation.ValidateAQL(q, c)
-	if r.OK {
+
+	var errs, warns int
+	for _, i := range r.Issues {
+		if i.Severity == validation.Error {
+			errs++
+		} else {
+			warns++
+		}
+	}
+	switch {
+	case len(r.Issues) == 0:
 		fmt.Print("result   : OK — no issues\n\n")
 		return
+	case r.OK:
+		fmt.Printf("result   : OK — no errors, %s\n", plural(warns, "advisory", "advisories"))
+	default:
+		fmt.Printf("result   : not OK — %s, %s\n",
+			plural(errs, "error", "errors"), plural(warns, "advisory", "advisories"))
 	}
 	for _, i := range r.Issues {
 		where := i.Path
@@ -85,4 +113,12 @@ func report(label string, q aql.Query, c *templatecompile.Compiled) {
 		fmt.Printf("  [%s] %s (%s): %s\n", i.Severity, i.Code, where, i.Detail)
 	}
 	fmt.Println()
+}
+
+// plural renders a count with the matching noun form.
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return fmt.Sprintf("%d %s", n, one)
+	}
+	return fmt.Sprintf("%d %s", n, many)
 }

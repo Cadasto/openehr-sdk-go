@@ -316,18 +316,32 @@ go run ./cmd/examples/lint-aql
 **Sample output:**
 
 ```text
+template : vital_signs (vital_signs.opt)
+
+== clean query ==
+SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude FROM EHR e CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] WHERE e/ehr_id/value = $ehr_id
+result   : OK — no issues
+
 == broken query ==
 SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1] WHERE o/data/events/value/magnitude > $threshold
+result   : not OK — 2 errors, 0 advisories
   [error] aql_unbound_param (-): $threshold is referenced but not bound in Query.Parameters
   [error] aql_archetype_not_in_template (openEHR-EHR-OBSERVATION.lab_result.v1): archetype openEHR-EHR-OBSERVATION.lab_result.v1 is not in template vital_signs
 
 == semantic finding (RM-impossible containment) ==
 SELECT o FROM OBSERVATION o CONTAINS COMPOSITION c
+result   : not OK — 1 error, 1 advisory
   [warning] aql_from_archetype (-): FROM/CONTAINS names no archetype, $param, VERSION, or EHR scope
   [error] aql_impossible_containment (COMPOSITION c): no containment route under the pinned RM connects OBSERVATION to COMPOSITION, so this CONTAINS can never match
+
+== advisory only (OK, but not issue-free) ==
+SELECT c FROM FOLDER f CONTAINS COMPOSITION c
+result   : OK — no errors, 2 advisories
+  [warning] aql_from_archetype (-): FROM/CONTAINS names no archetype, $param, VERSION, or EHR scope
+  [warning] aql_containment_by_reference (COMPOSITION c): FOLDER reaches COMPOSITION only across a reference hop; whether that counts as containment is engine-specific, so verify this step against the target CDR
 ```
 
-**What to copy into your app:** for CI / pre-flight checks call `lint.LintString(q, nil)` (Layers 1–2, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or `validation.ValidateAQL`) to add archetype / path checks. Dispatch on `Issue.Code`; treat only `Error`-severity issues as hard failures.
+**What to copy into your app:** for CI / pre-flight checks call `lint.LintString(q, nil)` (Layers 1–2, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or `validation.ValidateAQL`) to add archetype / path checks. Dispatch on `Issue.Code`; treat only `Error`-severity issues as hard failures — but read `Result.Issues`, not just `Result.OK`: OK means *no errors*, not *no issues*, and most of the REQ-161 portability codes are advisory (the last block above).
 
 ---
 

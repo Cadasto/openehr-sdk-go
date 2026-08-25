@@ -1795,9 +1795,11 @@ requirements:
     canonical: docs/specifications/module-layout.md#req-013--building-block-independence
     status: draft
     implementation: landed
-    packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain]
+    packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck]
     tests:
       - openehr/aql/contain/imports_test.go
+      - openehr/aql/imports_test.go
+      - openehr/aql/internal/semcheck/imports_test.go
       - openehr/aql/lint/imports_test.go
       - openehr/aql/parse/imports_test.go
       - openehr/composition/imports_test.go
@@ -2161,6 +2163,7 @@ requirements:
     implementation: landed
     packages:
       - openehr/aql
+      - openehr/aql/internal/semcheck  # the shared verdict->code engine, also REQ-161's
       - testkit/probes/aql
     probes: [PROBE-097]
     plans: [docs/plans/archive/2026-08-21-aql-semantic-layer.md]
