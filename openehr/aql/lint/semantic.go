@@ -184,7 +184,7 @@ func (c *containCheck) operand(ce parse.ClassExpr, role semcheck.Role) semcheck.
 	for _, f := range o.Findings() {
 		c.issues = append(c.issues, semanticIssue(f, ce))
 	}
-	if ce.Archetype != "" && !ce.ParamArchetype {
+	if ce.Archetype != "" {
 		for _, f := range c.ck.Archetype(ce.RMType, ce.Archetype) {
 			c.issues = append(c.issues, semanticIssue(f, ce))
 		}
