@@ -2133,6 +2133,7 @@ requirements:
     packages:
       - openehr/aql/lint
       - openehr/aql/internal/semcheck  # the shared verdict->code engine, also REQ-162's
+      - openehr/validation  # § Relation supply — the ValidateAQLWithTypeRelation seam
       - testkit/probes/aql
     probes: [PROBE-097]
     plans: [docs/plans/archive/2026-08-21-aql-semantic-layer.md]
@@ -2142,6 +2143,7 @@ requirements:
       - openehr/aql/lint/semantic_internal_test.go
       - openehr/aql/internal/semcheck/semcheck_test.go
       - openehr/aql/internal/semcheck/imports_test.go
+      - openehr/validation/aql_test.go
       - testkit/probes/aql/probes_test.go
     notes: >-
       Additive REQ-109 Layer-2 extension: relation-backed semantic checks

@@ -2,6 +2,7 @@ package validation
 
 import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -30,13 +31,38 @@ import (
 // aql_impossible_containment, aql_contains_not_containable,
 // aql_archetype_class_mismatch — that make [Result.OK] false.
 //
-// This seam carries no relation, so REQ-161 § Relation supply's overlay
-// escape hatch (contain.Relation.WithOverlay, reachable through
-// [lint.Options].Relation) is unreachable here. A deployment whose CDR admits
-// a containment route the pinned RM does not MUST call [lint.LintString]
-// directly to retire the resulting Error.
+// A deployment whose CDR admits a containment route the pinned RM does not —
+// demographic containment being the named case (REQ-160 § Extensibility) —
+// supplies its own relation through [ValidateAQLWithTypeRelation] rather than
+// accepting the false Error that would otherwise fall out of the default.
 func ValidateAQL(q aql.Query, c *templatecompile.Compiled) Result {
-	res := lint.LintString(q.Q, &lint.Options{Compiled: c, Query: &q})
+	return ValidateAQLWithTypeRelation(q, c, nil)
+}
+
+// ValidateAQLWithTypeRelation is [ValidateAQL] with the REQ-160 containment
+// relation supplied by the caller (REQ-161 § Relation supply).
+//
+// rel answers which ordered pairs of RM TYPE NAMES an AQL CONTAINS may
+// connect. A nil rel selects the REQ-160 default relation, so
+// ValidateAQLWithTypeRelation(q, c, nil) is exactly [ValidateAQL] — nil does
+// not switch the containment group off, and nothing switches it off.
+//
+// Supply a relation extended with
+// [contain.TypeRelation.WithOverlay] when the target CDR resolves a route the
+// pinned RM does not describe, so a query that is correct in production is not
+// reported as a static Error. The EHR Information Model versions no parties,
+// for instance, so `EHR CONTAINS VERSIONED_PARTY` is Never by default and a
+// deployment running demographics alongside the EHR names that edge itself:
+//
+//	rel := contain.Default().WithOverlay(contain.Edge{From: "EHR", To: "VERSIONED_PARTY"})
+//	res := validation.ValidateAQLWithTypeRelation(q, nil, rel)
+//
+// A relation widens or narrows only the five containment codes. The three
+// REQ-161 portability advisories consult no relation, and Layers 1–3 are
+// unaffected — an overlay cannot retire a syntax, shape, parameter, or
+// template finding.
+func ValidateAQLWithTypeRelation(q aql.Query, c *templatecompile.Compiled, rel *contain.TypeRelation) Result {
+	res := lint.LintString(q.Q, &lint.Options{Compiled: c, Query: &q, Relation: rel})
 
 	issues := make([]Issue, 0, len(res.Issues))
 	for _, li := range res.Issues {

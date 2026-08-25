@@ -581,6 +581,7 @@ A `$param` archetype predicate (`[$name]`, `[parse.ClassExpr.ParamArchetype]`) i
 - `openehr/aql/lint` owns its own `lint.Issue` / `lint.Result` / `lint.Severity` and **MUST NOT** import `openehr/validation` — the dependency arrow is `validation → lint`. `lint.Result.OK()` is true when no **Error**-severity issue is present (Warnings do not make a result not-OK).
 - `lint.LintString(q, *Options)` is the raw-AQL entry; `lint.Lint(doc, *Options)` lints an already-parsed `*parse.Document`. `Options{Compiled, Query, Relation}` is nilable, but the three fields do not gate alike: nil `Compiled` drops Layer 3 and nil `Query` drops the parameter-binding checks, whereas nil `Relation` *selects* the REQ-160 default rather than switching anything off, so the REQ-161 semantic group always runs (REQ-161 § Relation supply).
 - `validation.ValidateAQL(q aql.Query, c *templatecompile.Compiled) validation.Result` is the seam: it parses `q.Q`, runs the layers, and maps `lint.Issue` → `validation.Issue` (code and severity carried verbatim) so callers already using `ValidateComposition` get one uniform `Result`.
+- The seam **MUST** expose REQ-161 § Relation supply's escape hatch, as `validation.ValidateAQLWithTypeRelation(q, c, rel *contain.TypeRelation) validation.Result`; `ValidateAQL(q, c)` **MUST** be exactly `ValidateAQLWithTypeRelation(q, c, nil)`. Without it the uniform-`Result` seam is unusable by the deployments REQ-160 § Extensibility exists for — a dialect CDR could not retire a containment `Error` here at all, and would have to abandon `validation.Result` for `lint.LintString`. A supplied relation governs **only** the five containment codes: the three portability advisories consult none (REQ-161 § Checks), and Layers 1–3 are unreachable from it, so an overlay **MUST NOT** retire a syntax, shape, parameter-binding, or template finding.
 
 ### Value-free lint diagnostics
 
@@ -1518,7 +1519,11 @@ The semantic checks are **conservative**: a false **Error** is worse than a miss
 
 ### Relation supply
 
-`lint.Options` **MUST** gain a nilable relation field; nil uses the REQ-160 default relation. A caller with dialect overlay edges (REQ-160 § Extensibility) lints without false findings. Because adding a field is breaking for positional struct literals ([idiom.md § Public-API stability](idiom.md#public-api-stability)), callers **SHOULD** construct `lint.Options` field-by-name; the addition is an additive minor bump, not a change to any existing field. Import direction: `lint → contain → {rminfo, openehr/rm}`; the `validation → lint` arrow and the REQ-109 forbidden-imports contract are unchanged, extended to `contain`.
+`lint.Options` **MUST** gain a nilable relation field, typed `*contain.TypeRelation` — the relation is over RM **type names**, and the type says so; nil uses the REQ-160 default relation. A caller with dialect overlay edges (REQ-160 § Extensibility) lints without false findings. Because adding a field is breaking for positional struct literals ([idiom.md § Public-API stability](idiom.md#public-api-stability)), callers **SHOULD** construct `lint.Options` field-by-name; the addition is an additive minor bump, not a change to any existing field.
+
+Every entry point that runs the REQ-161 group **MUST** offer this supply, or the escape hatch reaches only the callers who bypass the seams: the read side through `lint.Options`, the write side through `(*aql.Builder).VerifyContainment` (REQ-162 § Contract), and the validation seam through `ValidateAQLWithTypeRelation` (§ Issue model and entry points). A relation is supplied, never gated — nil selects the default at every one of them.
+
+Import direction: `lint → {contain, aql/internal/semcheck, rm/rminfo}` — `rminfo` is consulted **directly**, and only for the `VERSIONED_OBJECT` conformance question, which is a class fact no caller-supplied relation may answer differently. `validation → {lint, contain}`, the second arrow added by the supply clause above. The REQ-109 forbidden-imports contract is unchanged: none of these are wire, auth, or client packages, and `validation` already reached `contain` transitively through `lint`.
 
 ### Additivity
 
