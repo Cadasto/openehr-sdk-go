@@ -345,9 +345,10 @@ func versionPredicateIssues(doc *parse.Document) []Issue {
 // path's root there IS the whole "outside FROM/CONTAINS" test — no separate
 // exclusion of FROM/CONTAINS itself is needed.
 //
-// That same fact is why an operand carrying its own class predicate
-// ([parse.ClassExpr.HasPredicate]) is SKIPPED outright, ahead of the alias
-// test (REQ-161 § Checks): "outside FROM/CONTAINS" is the right test for
+// That same fact is why an operand carrying any class-position predicate
+// ([parse.ClassExpr.HasPredicate] — a standing predicate or an archetype
+// predicate alike, the term REQ-161 § Checks uses) is SKIPPED outright,
+// ahead of the alias test: "outside FROM/CONTAINS" is the right test for
 // whether the operand is REFERENCED, and the wrong one for whether the step
 // is REDUNDANT. `VERSIONED_COMPOSITION vo[uid/value=$vo]` reads a
 // container-level attribute — the very thing the redundancy sentence names —
@@ -379,7 +380,7 @@ func versionedObjectIssues(doc *parse.Document) []Issue {
 		if ce.RMType == "" || !conformsToVersionedObject(ce.RMType) {
 			continue
 		}
-		// A standing class predicate IS a container-level attribute read; it
+		// A class-position predicate IS a container-level attribute read; it
 		// simply is not an identified path, so doc.Paths can never see it.
 		// See the doc comment above.
 		if ce.HasPredicate {
