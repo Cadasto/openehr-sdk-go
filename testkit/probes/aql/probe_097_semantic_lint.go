@@ -146,9 +146,23 @@ func Probe097SemanticLint(c SemanticCorpus) (Result, error) {
 	}
 
 	var failures []string
+	fireCodes := map[string]bool{}
 	for _, tc := range c.Fire {
 		if msg := runSemanticFire(tc); msg != "" {
 			failures = append(failures, fmt.Sprintf("fire/%s: %s", tc.Name, msg))
+		}
+		fireCodes[tc.Code] = true
+	}
+	// Completeness guard, mirroring the arm-(c) parity guard below: a Fire
+	// row deleted from the corpus (or never added for a new REQ-161 code)
+	// leaves this probe green as long as the surviving rows still pass on
+	// their own — len(c.Fire) == 0 above only catches an EMPTY corpus, not
+	// one missing a member of [semanticCodes]. SemanticFireCase's own doc
+	// calls "one row per REQ-161 code" the wire assertion's minimum, so this
+	// is that minimum, enforced.
+	for _, code := range semanticCodes() {
+		if !fireCodes[code] {
+			failures = append(failures, fmt.Sprintf("fire: no fire case raises %s; the corpus does not exercise it", code))
 		}
 	}
 	for _, tc := range c.Silent {
