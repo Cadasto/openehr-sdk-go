@@ -880,11 +880,19 @@ func TestVersionWithExplicitTierStaysSilent(t *testing.T) {
 // aql_impossible_containment Error and falsely fail this test's Result.OK()
 // assertion; the root position sidesteps that RM fact entirely, since it is
 // irrelevant to what this check is testing.
+//
+// The last two rows re-spell a canonical class lower-case and mixed-case:
+// [conformsToVersionedObject] folds the token ASCII a-z → A-Z before asking
+// [rminfo.Hierarchy.ConformsTo], which is keyed by the BMM's exact
+// upper-case spelling — the fold is load-bearing (removing it breaks no
+// OTHER test, since every other row here already spells the class
+// upper-case) but had zero coverage of its own.
 func TestVersionedObjectUnreferencedFires(t *testing.T) {
 	t.Parallel()
 	for _, class := range []string{
 		"VERSIONED_COMPOSITION", "VERSIONED_FOLDER", "VERSIONED_EHR_ACCESS",
 		"VERSIONED_EHR_STATUS", "VERSIONED_PARTY",
+		"versioned_composition", "Versioned_Ehr_Status",
 	} {
 		t.Run(class, func(t *testing.T) {
 			t.Parallel()
