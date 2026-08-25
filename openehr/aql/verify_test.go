@@ -456,9 +456,9 @@ func TestVerifyContainmentOnNilBuilder(t *testing.T) {
 // TestVerifyContainmentZeroRelation pins what a caller gets from
 // `&contain.TypeRelation{}` — the zero value of an EXPORTED type whose fields are
 // all unexported, so it compiles from any consumer package and cannot be
-// refused at the type level. It is not the default relation:
-// [contain.TypeRelation.Default] is the only supported way to obtain one, and this
-// test asserts the zero value degrades CONSERVATIVELY rather than usefully.
+// refused at the type level. It is not the default relation: [contain.Default]
+// is the only supported way to obtain one, and this test asserts the zero value
+// degrades CONSERVATIVELY rather than usefully.
 //
 // Every class token becomes aql_unknown_rm_class — a Warning, REQ-161 § Checks —
 // because a relation with no pinned BMM behind it knows no class at all. That

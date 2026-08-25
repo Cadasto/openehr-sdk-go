@@ -47,6 +47,12 @@ func ValidateAQL(q aql.Query, c *templatecompile.Compiled) Result {
 // ValidateAQLWithTypeRelation(q, c, nil) is exactly [ValidateAQL] — nil does
 // not switch the containment group off, and nothing switches it off.
 //
+// Note that nil and a zero relation are NOT the same thing: nil means the
+// default, whereas a non-nil &contain.TypeRelation{} knows no classes at all
+// and answers UnknownClass for every one, degrading the whole group to
+// Warnings and leaving [Result.OK] true. Reach for [contain.Default] and
+// extend it; do not construct a TypeRelation.
+//
 // Supply a relation extended with
 // [contain.TypeRelation.WithOverlay] when the target CDR resolves a route the
 // pinned RM does not describe, so a query that is correct in production is not
@@ -57,9 +63,10 @@ func ValidateAQL(q aql.Query, c *templatecompile.Compiled) Result {
 //	rel := contain.Default().WithOverlay(contain.Edge{From: "EHR", To: "VERSIONED_PARTY"})
 //	res := validation.ValidateAQLWithTypeRelation(q, nil, rel)
 //
-// A relation widens or narrows only the five containment codes. The three
-// REQ-161 portability advisories consult no relation, and Layers 1–3 are
-// unaffected — an overlay cannot retire a syntax, shape, parameter, or
+// A relation widens or narrows only the five containment codes — the scope is
+// by code, not by layer, since those codes are themselves Layer 2. The three
+// REQ-161 portability advisories consult no relation, and no other check reads
+// it, so an overlay cannot retire a syntax, shape, parameter-binding, or
 // template finding.
 func ValidateAQLWithTypeRelation(q aql.Query, c *templatecompile.Compiled, rel *contain.TypeRelation) Result {
 	res := lint.LintString(q.Q, &lint.Options{Compiled: c, Query: &q, Relation: rel})
