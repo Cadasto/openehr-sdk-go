@@ -310,7 +310,7 @@ func TestArchetypeParamPredicateIsSkipped(t *testing.T) {
 //
 // Each row asserts the exact semantic multiset, so a pair code leaking through
 // fails — which is the failure mode the rule exists to prevent, since
-// [contain.Relation.CanContain] is total and would answer such a pair Never or
+// [contain.TypeRelation.CanContain] is total and would answer such a pair Never or
 // UnknownClass on its own.
 //
 // The middle-operand rows carry a second job: `OBSERVATION CONTAINS <suppressed>

@@ -440,7 +440,7 @@ func TestVerifyContainmentOnNilBuilder(t *testing.T) {
 	// Both relation spellings: nil takes the default (see
 	// [TestVerifyContainmentNilRelationIsDefault]), and an explicit relation
 	// must not reach a dereference either.
-	for _, rel := range []*contain.Relation{nil, contain.Default(), contain.Default().WithOverlay(
+	for _, rel := range []*contain.TypeRelation{nil, contain.Default(), contain.Default().WithOverlay(
 		contain.Edge{From: "OBSERVATION", To: "COMPOSITION"},
 	)} {
 		if got := findingCodes(b.VerifyContainment(rel)); len(got) != 0 {
@@ -454,10 +454,10 @@ func TestVerifyContainmentOnNilBuilder(t *testing.T) {
 }
 
 // TestVerifyContainmentZeroRelation pins what a caller gets from
-// `&contain.Relation{}` — the zero value of an EXPORTED type whose fields are
+// `&contain.TypeRelation{}` — the zero value of an EXPORTED type whose fields are
 // all unexported, so it compiles from any consumer package and cannot be
 // refused at the type level. It is not the default relation:
-// [contain.Relation.Default] is the only supported way to obtain one, and this
+// [contain.TypeRelation.Default] is the only supported way to obtain one, and this
 // test asserts the zero value degrades CONSERVATIVELY rather than usefully.
 //
 // Every class token becomes aql_unknown_rm_class — a Warning, REQ-161 § Checks —
@@ -535,7 +535,7 @@ func TestVerifyContainmentZeroRelation(t *testing.T) {
 			if got := findingCodes(b.VerifyContainment(nil)); !slices.Equal(got, tc.wantDef) {
 				t.Fatalf("premise broken: the default relation reports %v, want %v", got, tc.wantDef)
 			}
-			got := findingCodes(b.VerifyContainment(&contain.Relation{}))
+			got := findingCodes(b.VerifyContainment(&contain.TypeRelation{}))
 			if want := slices.Repeat([]string{codeUnknownClass}, tc.classes); !slices.Equal(got, want) {
 				t.Errorf("zero relation codes = %v, want %v — every class token degrades to the "+
 					"aql_unknown_rm_class Warning, once per class expression", got, want)

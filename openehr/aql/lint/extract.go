@@ -10,7 +10,7 @@
 // aql_unknown_rm_class, aql_contains_not_containable,
 // aql_impossible_containment, aql_containment_by_reference, and
 // aql_archetype_class_mismatch — are judged against the REQ-160 containment
-// relation ([contain.Relation]) derived in-process from the pinned BMM. They
+// relation ([contain.TypeRelation]) derived in-process from the pinned BMM. They
 // flag FROM/CONTAINS shapes that parse cleanly and that a CDR will typically
 // accept and answer with zero rows — `OBSERVATION CONTAINS COMPOSITION` is
 // the canonical one. The remaining three — aql_version_no_predicate,
