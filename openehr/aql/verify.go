@@ -134,7 +134,10 @@ type containVerifier struct {
 // subtree. `Contains(B.Contains(D))` then `Contains(C)` emits
 // `… CONTAINS B CONTAINS D CONTAINS C`, and C's ancestor is D. (The read-side
 // extractor nests exactly one level per CONTAINS keyword, so its own walk never
-// meets the flattened spelling; the tree shapes differ, the pairs must not.)
+// meets the flattened spelling FROM A PARSED DOCUMENT — though its loop is
+// written to survive the shape [parse.Containment] permits, which is why the
+// same fan-in is resolved the same way on both sides. The tree shapes differ,
+// the pairs must not.)
 //
 // role is the position the ENCLOSING node occupies; each entry is reached from
 // it by a CONTAINS keyword, so the step is applied here once, through
@@ -146,6 +149,11 @@ type containVerifier struct {
 // tries). The guard keeps the tail on the last CLASS operand for the trees that
 // do — verification judges whatever tree it is handed, including one Build would
 // refuse.
+//
+// The class half of that same rule lives in [containVerifier.walk]: a class node
+// deciding no class hands its own parent back, so it too leaves prev on the last
+// operand that decided one. No guard is needed for it here — the value this loop
+// receives is already the right predecessor.
 func (v *containVerifier) chain(parent semcheck.Operand, role semcheck.Role, chain []Containment) semcheck.Operand {
 	prev := parent
 	for _, c := range chain {
@@ -183,6 +191,25 @@ func (v *containVerifier) chain(parent semcheck.Operand, role semcheck.Role, cha
 // NOT CONTAINS pair checked IDENTICALLY to a plain one: an RM-impossible pair is
 // impossible whichever sign it carries, and an impossible exclusion is a dead
 // constraint — equally a defect, not a licence to stay silent.
+//
+// A class node carrying NO RM type — `aql.Class("", "x")`, or the zero
+// [Containment] — is TRANSPARENT: it hands its own parent down to its chain
+// instead of itself, exactly as a junction hands its parent to each operand.
+// [Builder.Build] refuses such a node (a class node needs an RM type and an
+// alias), but verification judges whatever tree it is handed, and the decision
+// there is deliberate rather than incidental:
+//
+//   - It decides the zero [semcheck.Operand], whose verdict is UnknownClass, so
+//     it SUPPRESSES every pair it takes part in. Left in the ancestor position it
+//     would silently drop every later pair of the chain — while emitting no
+//     finding of its own, since an empty class name is nothing to report against
+//     ([semcheck.Checker.Operand]). One malformed node would erase the diagnosis
+//     of every real defect below it.
+//   - Transparency, not a finding. REQ-161's catalogue authorises no code for a
+//     malformed carrier — the class token is missing, not wrong — and REQ-161
+//     § Flagging policy holds that a false Error is worse than a missed defect,
+//     so inventing one here would be the more damaging error. The grammar defect
+//     is [Builder.Build]'s to report, and it does.
 func (v *containVerifier) walk(parent semcheck.Operand, role semcheck.Role, n Containment) semcheck.Operand {
 	if n.isJunction() {
 		for _, ch := range n.children {
@@ -194,7 +221,11 @@ func (v *containVerifier) walk(parent semcheck.Operand, role semcheck.Role, n Co
 	}
 	self := v.classNode(n.rmType, n.archetypeID, role)
 	v.findings = append(v.findings, v.ck.Pair(parent, self)...)
-	return v.chain(self, role, n.children)
+	ancestor := self
+	if n.rmType == "" {
+		ancestor = parent
+	}
+	return v.chain(ancestor, role, n.children)
 }
 
 // classNode decides one class expression and records its operand-level

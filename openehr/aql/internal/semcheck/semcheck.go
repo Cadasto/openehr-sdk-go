@@ -87,25 +87,38 @@ const (
 // Severity is the REQ-161 severity of an issue code.
 //
 // It mirrors the lint.Severity vocabulary rather than reusing it: openehr/aql/lint
-// imports this package, so the arrow cannot be reversed. The read-side adapter
-// maps this onto its own Severity; the write side (REQ-162 § Contract) carries
-// no severity field at all and reads the table only when it wants one.
+// imports this package, so the arrow cannot be reversed.
+//
+// Only ONE adapter consumes it. The read side maps it onto its own
+// lint.Severity to fill [lint.Issue].Severity; the write-side adapter never
+// touches it, because a [contain.Finding] carries no severity field at all
+// (REQ-162 § Contract). A CONSUMER of the write side that wants a severity for a
+// code it received is a different party from the adapter, and gets one from
+// REQ-161's catalogue — restated in prose on [aql.Builder.VerifyContainment] so
+// no lookup is needed — never from a second mapping of its own. See [severities].
 type Severity int
 
+// Warning is FIRST so the zero Severity is the INERT one. [SeverityOf] returns
+// (zero, false) for a code outside the catalogue, and REQ-161 § Flagging policy
+// holds that a false Error is worse than a missed defect — an Error zero value
+// would make this API's own default the very thing SeverityOf's doc comment
+// tells callers not to do. The numeric values are not part of any contract:
+// compare with ==, never by order (pinned by TestEnumZeroValuesAreConservative).
 const (
-	// Error means a static defect provable from the relation.
-	Error Severity = iota
 	// Warning is advisory: the query may still be exactly what the author
 	// meant, and the target CDR is the authority.
-	Warning
+	Warning Severity = iota
+	// Error means a static defect provable from the relation.
+	Error
 )
 
 // severities is the ONE code→severity table for the feature (REQ-161
 // § Checks). The read-side adapter reads it through [SeverityOf] to fill its
-// own [lint.Issue].Severity field; the write side carries no severity field
-// at all ([contain.Finding]) and does not call [SeverityOf] itself — its own
-// doc comment (openehr/aql/verify.go) keeps a prose copy for a caller who
-// wants one without a lookup. Either way, no adapter keeps a SECOND
+// own [lint.Issue].Severity field. The write-side adapter never calls
+// [SeverityOf]: it emits [contain.Finding]s, which carry no severity field, so
+// it has nothing to fill — its entry point's doc comment (openehr/aql/verify.go)
+// restates this table's five containment rows in prose for a consumer who wants
+// the severity without a lookup. Either way, no adapter keeps a SECOND
 // code→severity mapping of its own.
 var severities = map[string]Severity{
 	CodeImpossibleContainment:  Error,
@@ -142,6 +155,10 @@ func SeverityOf(code string) (Severity, bool) {
 // Role is a property of the position, never of the node's SHAPE in whatever
 // tree an adapter happens to walk. Assign it with [Role.Next] rather than by
 // hand — see that method for why the distinction is load-bearing.
+//
+// RoleRoot is FIRST so the zero Role is the SILENT position — the one that
+// raises no containability code at all. Same polarity as [Severity] and [Step];
+// pinned by TestEnumZeroValuesAreConservative.
 type Role int
 
 const (
@@ -154,14 +171,23 @@ const (
 )
 
 // Step is how an adapter reached an operand from the position above it.
+//
+// StepJunction is FIRST so the zero Step is the INERT one: [Role.Next] leaves
+// the role unchanged for it, so a zero-valued Step promotes nothing. The acting
+// step must not be the default — a zero Step that meant StepContains would turn
+// a FROM root into a RoleContained operand and could raise a false
+// aql_contains_not_containable on the anchor position REQ-161 § Checks
+// explicitly exempts, which REQ-161 § Flagging policy names as the worse of the
+// two errors. Same polarity as [Role] and [Severity]; pinned by
+// TestEnumZeroValuesAreConservative.
 type Step int
 
 const (
-	// StepContains is a CONTAINS / NOT CONTAINS keyword.
-	StepContains Step = iota
 	// StepJunction is a boolean junction operand — an arm of an AND / OR, which
 	// is not a containment step at all.
-	StepJunction
+	StepJunction Step = iota
+	// StepContains is a CONTAINS / NOT CONTAINS keyword.
+	StepContains
 )
 
 // Next is the role of an operand reached from a position holding role r by step
@@ -223,6 +249,15 @@ func (c Checker) relation() *contain.Relation {
 // no finding and suppresses every pair it takes part in, which is what lets an
 // adapter model "no enclosing parent" (a junction AT the FROM root has none)
 // without a special case.
+//
+// It is deliberately OPAQUE: no accessor for the class name, none for the raw
+// verdict, and the suppression test is unexported. This package's own invariant
+// is that "neither adapter classifies a verdict of its own" — handing an adapter
+// the raw [contain.Verdict] to branch on is exactly what the shared engine
+// exists to prevent, and exposing the class name and the suppression test would
+// hand it the pieces to re-derive the REQ-161 suppression rule for itself. All
+// three are re-exported in export_test.go for the external test package, which
+// is the only caller that ever needed them.
 type Operand struct {
 	rmType  string
 	role    Role
@@ -241,16 +276,7 @@ func (c Checker) Operand(rmType string, role Role) Operand {
 	return Operand{rmType: rmType, role: role, verdict: c.relation().Containable(rmType)}
 }
 
-// RMType is the class name this operand was decided from; "" for the zero
-// Operand.
-func (o Operand) RMType() string { return o.rmType }
-
-// Verdict is the REQ-160 containability verdict of the operand's class:
-// Admissible, Never, or UnknownClass. ByReference never appears here — it
-// arises only on the pair question.
-func (o Operand) Verdict() contain.Verdict { return o.verdict }
-
-// Suppresses reports whether this operand suppresses the pair checks for every
+// suppresses reports whether this operand suppresses the pair checks for every
 // pair it participates in.
 //
 // REQ-161 § Checks: an operand whose verdict is UnknownClass, or whose
@@ -260,7 +286,15 @@ func (o Operand) Verdict() contain.Verdict { return o.verdict }
 // such a pair UnknownClass or Never all by itself; mapping that answer into a
 // pair code is exactly the double-report the rule forbids, which is why
 // [Checker.Pair] consults this first.
-func (o Operand) Suppresses() bool { return o.verdict != contain.Admissible }
+//
+// This is the FOURTH [contain.Verdict] dispatch in the package, spelled as a
+// single inequality rather than a switch. It is fail-safe by construction under
+// REQ-160 § Extensibility: a verdict this build does not know is not Admissible,
+// so it SUPPRESSES — no pair code is built on an operand nobody could classify,
+// which is the conservative direction REQ-161 § Flagging policy asks for. The
+// widening still has to be noticed rather than absorbed, and
+// TestContainVerdictVocabularyIsPinned is what notices it.
+func (o Operand) suppresses() bool { return o.verdict != contain.Admissible }
 
 // Findings are this operand's own findings — at most one:
 //
@@ -305,8 +339,15 @@ func (o Operand) Findings() []contain.Finding {
 		return nil // a legal operand — nothing to report about it alone
 	case contain.ByReference:
 		return nil // unreachable: ByReference arises only on the pair question
+	default:
+		// A verdict this build does not know — REQ-160 § Extensibility reserves
+		// the right to widen the vocabulary. SILENCE is the decision: REQ-161's
+		// catalogue authorises no code for it, and § Flagging policy makes a
+		// false Error the worse of the two errors. The widening itself must not
+		// pass unnoticed, so TestContainVerdictVocabularyIsPinned fails when a
+		// fifth member appears — this arm is the safe landing, not the answer.
+		return nil
 	}
-	return nil
 }
 
 // Pair asks the REQ-160 pair question for ONE adjacent FROM/CONTAINS pair and
@@ -318,7 +359,7 @@ func (o Operand) Findings() []contain.Finding {
 //     engine-specific, so this is advisory rather than an Error.
 //   - Admissible → no finding.
 //
-// It returns nothing when either operand suppresses (see [Operand.Suppresses]),
+// It returns nothing when either operand suppresses (see Operand.suppresses),
 // which is where the REQ-161 suppression rule is enforced — structurally, in one
 // place, so neither adapter can re-derive it differently.
 //
@@ -329,7 +370,7 @@ func (o Operand) Findings() []contain.Finding {
 // impossible exclusion is trivially true, a dead constraint, and equally a
 // defect.
 func (c Checker) Pair(ancestor, descendant Operand) []contain.Finding {
-	if ancestor.Suppresses() || descendant.Suppresses() {
+	if ancestor.suppresses() || descendant.suppresses() {
 		return nil
 	}
 	// Both operands are containable, so CanContain's totality short-circuits
@@ -352,8 +393,13 @@ func (c Checker) Pair(ancestor, descendant Operand) []contain.Finding {
 		return nil // a route exists using no reference edge — nothing to report
 	case contain.UnknownClass:
 		return nil // unreachable: an unknown operand suppresses the pair above
+	default:
+		// A widened REQ-160 vocabulary (§ Extensibility): silence, for the same
+		// reason as [Operand.Findings]'s default — no catalogue code covers it,
+		// and REQ-161 § Flagging policy forbids inventing one. Guarded by
+		// TestContainVerdictVocabularyIsPinned.
+		return nil
 	}
-	return nil
 }
 
 // Archetype decides a literal-OR-parameter archetype predicate against the
@@ -451,6 +497,11 @@ func (c Checker) Archetype(rmType, archetypeID string) []contain.Finding {
 		}}
 	case contain.Admissible, contain.ByReference:
 		return nil // ByReference is unreachable: ArchetypeMatches never returns it
+	default:
+		// A widened REQ-160 vocabulary (§ Extensibility): silence, for the same
+		// reason as [Operand.Findings]'s default — no catalogue code covers it,
+		// and REQ-161 § Flagging policy forbids inventing one. Guarded by
+		// TestContainVerdictVocabularyIsPinned.
+		return nil
 	}
-	return nil
 }

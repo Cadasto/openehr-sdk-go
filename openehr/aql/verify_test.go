@@ -8,6 +8,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
 )
 
 // The five REQ-161 containment codes REQ-162 § Contract scopes the builder
@@ -261,26 +262,125 @@ func TestVerifyContainmentJunctionNeverBecomesPredecessor(t *testing.T) {
 	}
 }
 
+// TestVerifyContainmentEmptyClassNodeStaysTransparent is the CLASS half of the
+// same axis [TestVerifyContainmentJunctionNeverBecomesPredecessor] pins on the
+// junction half: a node that decides NO class must not become the operand a
+// following term — a sibling, or its own chain — is checked adjacent to.
+//
+// A class node with an empty rmType (`aql.Class("", "x")`, or the zero
+// [aql.Containment]) decides the zero-value [semcheck.Operand], whose verdict is
+// UnknownClass, so it suppresses every pair it takes part in. Left in the
+// ancestor position it would silently drop every LATER pair of the chain — and
+// the empty node emits no finding of its own either, so the defect would vanish
+// without a trace. containVerifier.walk therefore passes the ENCLOSING parent
+// through such a node, exactly as it does through a junction.
+//
+// Each row interposes the empty node between an OBSERVATION root and a
+// COMPOSITION term. OBSERVATION→COMPOSITION is a documented Never, pinned as the
+// control row: the code MUST survive the interposition. [Builder.Build] refuses
+// every fixture here (a class node needs an RM type and an alias,
+// openehr/aql/containment.go's validateTree), which is precisely the case
+// [Builder.VerifyContainment]'s doc comment claims to cover — "verification
+// judges whatever tree it is handed, including one Build would refuse".
+func TestVerifyContainmentEmptyClassNodeStaysTransparent(t *testing.T) {
+	t.Parallel()
+	control := aql.NewBuilder().Select(aql.Col("c")).From("OBSERVATION", "o").
+		Contains(aql.Class("COMPOSITION", "c"))
+	if got := findingCodes(control.VerifyContainment(nil)); !slices.Equal(got, []string{codeImpossible}) {
+		t.Fatalf("premise broken: the control query reports %v, want exactly [%s]", got, codeImpossible)
+	}
+
+	cases := map[string]*aql.Builder{
+		"empty node above the pair": aql.NewBuilder().Select(aql.Col("c")).From("OBSERVATION", "o").
+			Contains(aql.Class("", "x").Contains(aql.Class("COMPOSITION", "c"))),
+		"empty node as an earlier sibling": aql.NewBuilder().Select(aql.Col("c")).From("OBSERVATION", "o").
+			Contains(aql.Class("", "x")).
+			Contains(aql.Class("COMPOSITION", "c")),
+		"zero Containment above the pair": aql.NewBuilder().Select(aql.Col("c")).From("OBSERVATION", "o").
+			Contains(aql.Containment{}.Contains(aql.Class("COMPOSITION", "c"))),
+		"two empty nodes stacked": aql.NewBuilder().Select(aql.Col("c")).From("OBSERVATION", "o").
+			Contains(aql.Class("", "x").Contains(aql.Class("", "y").Contains(aql.Class("COMPOSITION", "c")))),
+	}
+	for name, b := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := b.Build(); err == nil {
+				t.Fatal("premise broken: Build() = nil, want an error — a class node needs an RM type and an alias")
+			}
+			if got := findingCodes(b.VerifyContainment(nil)); !slices.Equal(got, []string{codeImpossible}) {
+				t.Errorf("VerifyContainment codes = %v, want exactly [%s] — a node deciding no class must be "+
+					"transparent, not an ancestor that suppresses everything below it", got, codeImpossible)
+			}
+		})
+	}
+}
+
 // TestVerifyContainmentNeverEmitsPortabilityCodes pins the five-not-eight scope
 // of REQ-162 § Contract (PROBE-097 § parity): the three REQ-161 portability
 // advisories are read-side only. The queries below are exactly the shapes that
 // raise them on the read side — a bare VERSION, an unreferenced
 // VERSIONED_COMPOSITION, and an AND junction with two projected operands — so
 // this fails the moment the write side starts producing them.
+//
+// Each row therefore asserts the SCOPE BOUNDARY from BOTH ends: the read side
+// really does raise the row's code over the emitted text (the premise), and the
+// write side raises none of the three (the contract). Without the premise the
+// test would keep passing after a fixture stopped being a portability-triggering
+// shape at all, or after the read-side firing rule narrowed past it — an absence
+// asserted over queries that draw nothing anywhere proves nothing.
 func TestVerifyContainmentNeverEmitsPortabilityCodes(t *testing.T) {
 	t.Parallel()
-	builders := map[string]*aql.Builder{
-		"bare VERSION (no version predicate)": aql.NewBuilder().Select(aql.Col("v")).From("EHR", "e").
-			Contains(aql.Class("VERSION", "v")),
-		"unreferenced VERSIONED_COMPOSITION": aql.NewBuilder().Select(aql.Col("e")).From("EHR", "e").
-			Contains(aql.Class("VERSIONED_COMPOSITION", "vc")),
-		"AND junction with two projected operands": aql.NewBuilder().
-			Select(aql.Col("o"), aql.Col("ev")).From("COMPOSITION", "c").
-			Contains(aql.ContainsAnd(aql.Class("OBSERVATION", "o"), aql.Class("EVALUATION", "ev"))),
+	cases := []struct {
+		name     string
+		build    func() *aql.Builder
+		readCode string // the portability code lint MUST raise for the emitted text
+	}{
+		{
+			name: "bare VERSION (no version predicate)",
+			build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("v")).From("EHR", "e").
+					Contains(aql.Class("VERSION", "v"))
+			},
+			readCode: "aql_version_no_predicate",
+		},
+		{
+			name: "unreferenced VERSIONED_COMPOSITION",
+			build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("e")).From("EHR", "e").
+					Contains(aql.Class("VERSIONED_COMPOSITION", "vc"))
+			},
+			readCode: "aql_versioned_object_unreferenced",
+		},
+		{
+			name: "AND junction with two projected operands",
+			build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("o"), aql.Col("ev")).From("COMPOSITION", "c").
+					Contains(aql.ContainsAnd(aql.Class("OBSERVATION", "o"), aql.Class("EVALUATION", "ev")))
+			},
+			readCode: "aql_fanout_row_grain",
+		},
 	}
-	for name, b := range builders {
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			b := tc.build()
+			q, err := b.Build()
+			if err != nil {
+				t.Fatalf("premise broken: Build() = %v", err)
+			}
+			// Premise, from the read side: this fixture IS a
+			// portability-triggering shape.
+			var readCodes []string
+			for _, i := range lint.LintString(q.Q, &lint.Options{Relation: nil}).Issues {
+				if slices.Contains(portabilityCodes, i.Code) {
+					readCodes = append(readCodes, i.Code)
+				}
+			}
+			if !slices.Contains(readCodes, tc.readCode) {
+				t.Fatalf("premise broken: lint reports portability codes %v for %q, want it to include %s — "+
+					"this fixture no longer exercises the boundary it was chosen for", readCodes, q.Q, tc.readCode)
+			}
+			// The contract: the write side raises none of the three.
 			for _, f := range b.VerifyContainment(nil) {
 				if slices.Contains(portabilityCodes, f.Code) {
 					t.Errorf("write side emitted the read-side-only code %s (REQ-162 § Contract scopes it to lint)", f.Code)
@@ -318,6 +418,135 @@ func TestVerifyContainmentNilRelationIsDefault(t *testing.T) {
 	// …and nil is not a silent no-op: the first builder carries a real defect.
 	if got := findingCodes(builders[0].VerifyContainment(nil)); !slices.Equal(got, []string{codeImpossible}) {
 		t.Errorf("nil relation reported %v; nil selects the default relation, it does not disable the check", got)
+	}
+}
+
+// TestVerifyContainmentOnNilBuilder pins the nil-RECEIVER contract
+// [Builder.VerifyContainment]'s own doc comment states: a nil *Builder reports
+// nothing rather than panicking, because there is no tree to verify and library
+// code must not panic on caller input (REQ-025).
+//
+// This is a DELIBERATE asymmetry inside *Builder, and it is why the behaviour
+// needs its own pin rather than riding along with the degenerate-tree cases: the
+// builder's other methods, [Builder.Build] included, dereference the receiver,
+// so a nil *Builder panics there. Verification is a diagnostic a caller may reach
+// for on a value it did not construct itself, which is exactly where a nil
+// arrives, so this one entry point absorbs it. A future refactor that dropped
+// the guard would compile, pass every other test in this file, and panic only in
+// a consumer's error path.
+func TestVerifyContainmentOnNilBuilder(t *testing.T) {
+	t.Parallel()
+	var b *aql.Builder
+	// Both relation spellings: nil takes the default (see
+	// [TestVerifyContainmentNilRelationIsDefault]), and an explicit relation
+	// must not reach a dereference either.
+	for _, rel := range []*contain.Relation{nil, contain.Default(), contain.Default().WithOverlay(
+		contain.Edge{From: "OBSERVATION", To: "COMPOSITION"},
+	)} {
+		if got := findingCodes(b.VerifyContainment(rel)); len(got) != 0 {
+			t.Errorf("(*aql.Builder)(nil).VerifyContainment(%v) = %v, want no findings", rel, got)
+		}
+	}
+	// Repeatable, and no state is created on the way: a nil receiver has none.
+	if got := findingCodes(b.VerifyContainment(nil)); len(got) != 0 {
+		t.Errorf("second call reported %v, want no findings", got)
+	}
+}
+
+// TestVerifyContainmentZeroRelation pins what a caller gets from
+// `&contain.Relation{}` — the zero value of an EXPORTED type whose fields are
+// all unexported, so it compiles from any consumer package and cannot be
+// refused at the type level. It is not the default relation:
+// [contain.Relation.Default] is the only supported way to obtain one, and this
+// test asserts the zero value degrades CONSERVATIVELY rather than usefully.
+//
+// Every class token becomes aql_unknown_rm_class — a Warning, REQ-161 § Checks —
+// because a relation with no pinned BMM behind it knows no class at all. That
+// is the right direction (REQ-161 § Flagging policy: unknown is not wrong, and
+// never silence); the failure this pins against is the OTHER two: a panic on
+// the empty hierarchy, or an Error manufactured from "the relation cannot prove
+// a route", which would flag every well-formed query in a consumer that
+// value-initialised its Options.
+//
+// The read-side twin (lint.Options.Relation with the same zero value) is
+// deliberately NOT asserted here — openehr/aql/lint owns that surface.
+func TestVerifyContainmentZeroRelation(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		build   func() *aql.Builder
+		classes int      // class expressions in the tree — one Warning each
+		wantDef []string // what the DEFAULT relation reports, so no row goes vacuous
+	}{
+		{
+			name: "clean pair",
+			build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("o")).From("COMPOSITION", "c").
+					Contains(aql.Class("OBSERVATION", "o"))
+			},
+			classes: 2,
+			wantDef: nil,
+		},
+		{
+			// Under the default relation this is aql_impossible_containment (an
+			// Error). A relation that knows nothing must not prove it.
+			name: "a pair the default relation calls impossible",
+			build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("o")).From("OBSERVATION", "o").
+					Contains(aql.Class("COMPOSITION", "c"))
+			},
+			classes: 2,
+			wantDef: []string{codeImpossible},
+		},
+		{
+			// …and this is aql_archetype_class_mismatch (an Error) by default.
+			// Under the zero relation the archetype check is suppressed by the
+			// unknown declared class, so the node still contributes exactly ONE
+			// finding, not two.
+			name: "an archetype predicate the default relation calls mismatched",
+			build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("ev")).From("COMPOSITION", "c").
+					Contains(aql.Archetype("EVALUATION", "ev", "openEHR-EHR-OBSERVATION.body_temperature.v2"))
+			},
+			classes: 2,
+			wantDef: []string{codeArchetype},
+		},
+		{
+			name: "junction, NOT CONTAINS and a nested chain",
+			build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("c")).From("EHR", "e").
+					Contains(aql.Class("COMPOSITION", "c").NotContains(aql.Class("SECTION", "s"))).
+					Contains(aql.ContainsOr(aql.Class("OBSERVATION", "o"), aql.Class("EVALUATION", "ev")))
+			},
+			classes: 5,
+			wantDef: nil,
+		},
+	}
+	errorCodes := []string{codeImpossible, codeNotContainable, codeArchetype}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b := tc.build()
+			if _, err := b.Build(); err != nil {
+				t.Fatalf("premise broken: Build() = %v", err)
+			}
+			// Premise: the DEFAULT relation really does judge this tree the way
+			// the row claims, so a row cannot pass by exercising nothing.
+			if got := findingCodes(b.VerifyContainment(nil)); !slices.Equal(got, tc.wantDef) {
+				t.Fatalf("premise broken: the default relation reports %v, want %v", got, tc.wantDef)
+			}
+			got := findingCodes(b.VerifyContainment(&contain.Relation{}))
+			if want := slices.Repeat([]string{codeUnknownClass}, tc.classes); !slices.Equal(got, want) {
+				t.Errorf("zero relation codes = %v, want %v — every class token degrades to the "+
+					"aql_unknown_rm_class Warning, once per class expression", got, want)
+			}
+			for _, code := range got {
+				if slices.Contains(errorCodes, code) {
+					t.Errorf("zero relation manufactured the Error code %s; it can prove nothing "+
+						"(REQ-161 § Flagging policy)", code)
+				}
+			}
+		})
 	}
 }
 
@@ -599,10 +828,12 @@ func TestVerifyContainmentPairsAreChainAdjacent(t *testing.T) {
 // name. A fixture added here that carries a real RM defect belongs in
 // [TestVerifyContainmentRaisesEachCode] instead; adding one here would fail for
 // the wrong reason.
+//
+// The nil *Builder is a different axis (a nil RECEIVER, not a degenerate tree)
+// and is pinned by [TestVerifyContainmentOnNilBuilder].
 func TestVerifyContainmentDegenerateBuilders(t *testing.T) {
 	t.Parallel()
 	cases := map[string]*aql.Builder{
-		"nil builder":                 nil,
 		"zero builder":                aql.NewBuilder(),
 		"no FROM, only a containment": aql.NewBuilder().Select(aql.Col("o")).Contains(aql.Class("OBSERVATION", "o")),
 		"zero Containment term":       aql.NewBuilder().Select(aql.Col("c")).From("COMPOSITION", "c").Contains(aql.Containment{}),

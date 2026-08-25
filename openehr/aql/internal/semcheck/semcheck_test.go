@@ -13,6 +13,7 @@ package semcheck_test
 // FOO_BAR is UnknownClass.
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -64,6 +65,93 @@ func TestSeverityOfIsTheOneCatalogue(t *testing.T) {
 	}
 	if _, ok := semcheck.SeverityOf("aql_not_a_code"); ok {
 		t.Error(`SeverityOf("aql_not_a_code") reported a severity; an unlisted code MUST NOT resolve`)
+	}
+}
+
+// TestEnumZeroValuesAreConservative pins the POLARITY of this package's three
+// enums (REQ-161 § Flagging policy: a false Error is worse than a missed
+// defect). Each zero value must be the inert answer — what a caller gets from a
+// map miss, an uninitialised struct field, or a value decoded from a wider
+// vocabulary than this build knows:
+//
+//   - Severity zero is Warning. [SeverityOf] returns (zero, false) for a code
+//     outside the catalogue, so an Error zero value would make the API's own
+//     default the very thing its doc comment tells callers not to do.
+//   - Step zero is StepJunction, the INERT step: [Role.Next] leaves the role
+//     unchanged. A StepContains zero value would promote a root to
+//     RoleContained, which can raise a false aql_contains_not_containable on the
+//     anchor position REQ-161 § Checks explicitly exempts.
+//   - Role zero is RoleRoot, the silent position — already correct, pinned here
+//     so all three stay on the same polarity.
+//
+// The constants are ordered to make this true, so it is a property of the
+// declaration order rather than of any call site; every call site today passes a
+// constant explicitly, which is exactly why nothing would catch a reordering.
+func TestEnumZeroValuesAreConservative(t *testing.T) {
+	t.Parallel()
+
+	var severity semcheck.Severity
+	if severity != semcheck.Warning {
+		t.Errorf("zero Severity = %d, want Warning (%d): the inert value must be the default",
+			severity, semcheck.Warning)
+	}
+	if got, ok := semcheck.SeverityOf("aql_not_a_code"); ok || got != semcheck.Warning {
+		t.Errorf("SeverityOf(unlisted) = (%d, %v), want (Warning, false) — an unrecognised code"+
+			" must not default to Error", got, ok)
+	}
+
+	var step semcheck.Step
+	if step != semcheck.StepJunction {
+		t.Errorf("zero Step = %d, want StepJunction (%d): the inert step must be the default",
+			step, semcheck.StepJunction)
+	}
+	if got := semcheck.RoleRoot.Next(step); got != semcheck.RoleRoot {
+		t.Errorf("RoleRoot.Next(zero Step) = %d, want RoleRoot (%d): a zero step must not promote"+
+			" a root to a CONTAINS operand", got, semcheck.RoleRoot)
+	}
+
+	var role semcheck.Role
+	if role != semcheck.RoleRoot {
+		t.Errorf("zero Role = %d, want RoleRoot (%d): the silent position must be the default",
+			role, semcheck.RoleRoot)
+	}
+}
+
+// TestContainVerdictVocabularyIsPinned guards this package's FOUR
+// [contain.Verdict] dispatch sites — [semcheck.Operand.Findings],
+// [semcheck.Checker.Pair], [semcheck.Checker.Archetype], and the unexported
+// suppression test behind [semcheck.Operand.Suppresses] — against REQ-160
+// § Extensibility growing the vocabulary underneath them.
+//
+// Every one of those sites answers an unrecognised verdict with SILENCE, which
+// is the right conservative default (REQ-161 § Flagging policy) but a silent
+// one: a fifth verdict would make all four go quiet in lockstep, read/write
+// parity would still hold (both adapters share the engine), and PROBE-097's
+// per-code completeness guard would still pass, because it only checks the eight
+// codes that exist. Nothing else in the repo fails. This does — so the widening
+// arrives as a test failure to be answered deliberately, not as a diagnostic
+// that quietly stopped firing. (`exhaustive` is not enabled in .golangci.yml,
+// and enabling it repo-wide is a separate decision.)
+func TestContainVerdictVocabularyIsPinned(t *testing.T) {
+	t.Parallel()
+	// The declared order is the contract this test reads; contain's own
+	// verdict.go documents that the numeric values are not part of ITS contract,
+	// so the membership — not the ordering — is what matters here.
+	known := []contain.Verdict{contain.UnknownClass, contain.Never, contain.ByReference, contain.Admissible}
+	for i, v := range known {
+		if int(v) != i {
+			t.Fatalf("premise broken: %v = %d, want ordinal %d — this guard reads the ordinals", v, int(v), i)
+		}
+	}
+	// [contain.Verdict.String] names every member it knows and falls back to
+	// "Verdict(n)" for anything else, so an unnamed next ordinal is the proof
+	// that the vocabulary still has exactly len(known) members.
+	next := contain.Verdict(len(known))
+	if want := fmt.Sprintf("Verdict(%d)", len(known)); next.String() != want {
+		t.Errorf("contain.Verdict gained a member (%s = %s, want the unnamed %q): semcheck has FOUR "+
+			"switches over this type, each of which answers an unknown verdict with silence — decide "+
+			"deliberately what the new verdict means at every one of them before widening this list",
+			next, next.String(), want)
 	}
 }
 
