@@ -14,10 +14,10 @@ import "strconv"
 // deliberate: an accessor whose zero value meant "absent" could be misread as
 // a membership test with inverted sense.
 //
-// The set is closed and exhaustive-switchable. A consumer mapping reasons onto
-// policy has to fail closed on a member it does not recognise — adding one is
-// additive (a minor bump) but CHANGELOG-visible, which is what makes failing
-// closed possible. Compare reasons with == or a switch; apart from
+// The set is closed and exhaustive-switchable. A member may be added in a minor
+// release — idiom.md § Public-API stability — so a consumer switching on it
+// should handle one it does not recognise rather than assume the set it
+// compiled against. Compare reasons with == or a switch; apart from
 // AbsenceNone's zero the numeric values carry no contract and are never
 // ordered.
 //
