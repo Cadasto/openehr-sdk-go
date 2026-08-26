@@ -12,7 +12,9 @@ import (
 // CONTAINS terms, a negated term, or a boolean junction of sibling operands.
 //
 // Construct a leaf with [Class] (no archetype predicate), [Archetype], or —
-// for the grammar's other `classExprOperand` alternative — [Version], nest
+// for the grammar's other `classExprOperand` alternative — [Version]; give an
+// ordinary class a standing comparison in class position with
+// [Containment.Predicated]; nest
 // with [Containment.Contains] / [Containment.NotContains], and join siblings
 // with [ContainsAnd] / [ContainsOr]. Every combinator returns a NEW value —
 // a Containment is immutable once constructed, so one operand can be reused
@@ -65,6 +67,22 @@ type Containment struct {
 	// flag to say which it held, and that flag would be the RM-type spelling
 	// this carrier already has.
 	versionPred VersionPredicate
+
+	// standingPred is the `standardPredicate` alternative of an ordinary
+	// class expression's `pathPredicate` bracket (REQ-163), nil when the
+	// bracket is absent. Set by [Containment.Predicated].
+	//
+	// It sits beside archetypeID rather than sharing it for the reason
+	// [Containment.classToken] renders only one of them: the two ARE the same
+	// `[…]` position, but they are different alternatives of it, and a single
+	// string field carrying both would have to be told apart by scanning its
+	// text — the free-text bracket carrier REQ-119 spent a whole section
+	// keeping out of the write side.
+	//
+	// A pointer, so absence is the zero value rather than a second flag; the
+	// pointee is never mutated after construction, so the value copies every
+	// combinator returns share it safely.
+	standingPred *Comparison
 
 	// children are the nested CONTAINS terms of a class node, or the
 	// operands of a junction node (which carries no class of its own).
@@ -226,11 +244,13 @@ func (c Containment) chainEndsInJunction() bool {
 
 // classToken renders the class expression at this node (never the children).
 //
-// The archetype and the version predicate are two spellings of the ONE `[…]`
-// position, so exactly one bracket is ever written. Their order here decides
-// nothing for a tree [Builder.Build] accepts: validateTree refuses a node
-// carrying both (the landed archetype-on-VERSION rule), so the two are never
-// populated together on an emitted node.
+// The archetype predicate, the standing predicate and the version predicate are
+// three spellings of the ONE `[…]` position, so exactly one bracket is ever
+// written. Their order here decides nothing for a tree [Builder.Build] accepts:
+// validateTree refuses a node carrying more than one (the landed
+// archetype-on-VERSION rule, and REQ-163's standing-beside-archetype and
+// standing-on-VERSION rules), so no two are ever populated together on an
+// emitted node.
 func (c Containment) classToken() string {
 	out := c.rmType
 	if c.alias != "" {
@@ -239,6 +259,8 @@ func (c Containment) classToken() string {
 	switch {
 	case c.versionPred != nil:
 		out += "[" + c.versionPred.versionBracket() + "]"
+	case c.standingPred != nil:
+		out += "[" + c.standingPred.expr() + "]"
 	case c.archetypeID != "":
 		out += "[" + c.archetypeID + "]"
 	}
@@ -348,6 +370,17 @@ func (c Containment) validateTree(seen map[string]bool) error {
 		// the two halves of one `[…]` position, which is why they sit together.
 		if c.versionPred != nil {
 			if err := c.validateVersionPredicate(); err != nil {
+				return err
+			}
+		}
+		// …and the class alternative's OWN bracket, the standing predicate
+		// (REQ-163). It is the third spelling of the same `[…]` position, so it
+		// is checked here with the other two: against the VERSION alternative
+		// (which has its own bracket production), against the archetype form
+		// (which would be silently dropped beside it), and against its own
+		// grammar.
+		if c.standingPred != nil {
+			if err := c.validateStandingPredicate(); err != nil {
 				return err
 			}
 		}

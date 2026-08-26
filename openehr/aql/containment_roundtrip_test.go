@@ -185,6 +185,44 @@ func builderRoundTripCases() []struct {
 				aql.Class("COMPOSITION", "c"),
 			)).Build()
 		}},
+		// REQ-163 — the standing-predicate carrier. Same bar and same reason as
+		// the version bracket above: the read side re-emits a class bracket
+		// VERBATIM, so any spelling but the canonical one comes back different
+		// and the two sides disagree about the canonical form of a construct
+		// they both model.
+		{"standing_predicate_param", func() (aql.Query, error) {
+			return sel().Contains(aql.Class("VERSIONED_COMPOSITION", "vo").
+				Predicated("uid/value", aql.OpEq, aql.Param("vo"))).Build()
+		}},
+		{"standing_predicate_literal", func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").
+				Predicated("name/value", aql.OpEq, aql.String("Vital signs"))).Build()
+		}},
+		{"standing_predicate_int", func() (aql.Query, error) {
+			return sel().Contains(aql.Class("OBSERVATION", "o").
+				Predicated("data/events/data/items/value/magnitude", aql.OpGe, aql.Int(2))).Build()
+		}},
+		{"standing_predicate_nested_node_predicate", func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").
+				Predicated("content[openEHR-EHR-OBSERVATION.body_temperature.v2]/name/value",
+					aql.OpEq, aql.String("Temperature"))).Build()
+		}},
+		{"standing_predicate_quoted_value", func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").
+				Predicated("name/value", aql.OpEq, aql.String("a'] CONTAINS OBSERVATION o[b/c='d"))).Build()
+		}},
+		{"standing_predicate_chain", func() (aql.Query, error) {
+			return sel().Contains(aql.Class("VERSIONED_COMPOSITION", "vo").
+				Predicated("uid/value", aql.OpEq, aql.Param("vo")).
+				Contains(aql.Version("v", aql.AllVersions()).
+					Contains(aql.Class("COMPOSITION", "c")))).Build()
+		}},
+		{"standing_predicate_in_junction", func() (aql.Query, error) {
+			return sel().Contains(aql.ContainsOr(
+				aql.Class("COMPOSITION", "c").Predicated("name/value", aql.OpEq, aql.String("Vital signs")),
+				aql.Class("OBSERVATION", "o"),
+			)).Build()
+		}},
 		{"containment_with_where_and_order_by", func() (aql.Query, error) {
 			return aql.Select(aql.Col("o")).
 				FromEHR("e", aql.Param("ehr_id")).
