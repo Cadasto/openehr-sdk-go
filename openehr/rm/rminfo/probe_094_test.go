@@ -153,35 +153,81 @@ func packagePaths(schema *bmm.Schema) map[string]string {
 	return out
 }
 
-// exclusionReason accounts for a name the universe does not contain. The
-// reasons are exactly the universe rule's, so accounted=false means the name is
-// either a defect in the shipped table or a change to the generation target the
-// probe has not been told about.
+// exclusionKind is WHICH rule of the universe rule keeps a name out — the
+// typed half of the same account exclusionReason renders as prose. The two are
+// derived in one place because PROBE-098 (REQ-049) compares this kind against
+// the shipped AbsenceReason, and deriving the answer twice would let the two
+// probes disagree about the same name.
+//
+// The numeric values carry nothing: exclusionKindOf's switch order is what
+// fixes the precedence, and the declaration order below mirrors it so a reader
+// sees the same order in both places.
+type exclusionKind int
+
+const (
+	// inTheUniverse and the last two kinds are NOT exclusions — they are
+	// the three outcomes exclusionReason reports as unaccounted.
+	inTheUniverse exclusionKind = iota
+	// The four real exclusions, in REQ-049's fixed precedence order: what
+	// a name IS ranks ahead of why it was SKIPPED.
+	excludedAsPrimitive
+	excludedAsEnumeration
+	excludedByClassName
+	excludedByPackagePrefix
+	notDeclaredAtAll
+	unaccountedFor
+)
+
+// exclusionKindOf accounts for a name the universe does not contain, under
+// REQ-049's fixed precedence: primitive, then enumeration, then excluded class,
+// then excluded package.
+func (r *bmmReduction) exclusionKindOf(name string) exclusionKind {
+	switch {
+	case r.universe[name]:
+		return inTheUniverse
+	case r.primitive[name]:
+		return excludedAsPrimitive
+	case r.enumeration[name]:
+		return excludedAsEnumeration
+	case probeExcludedClasses[name]:
+		return excludedByClassName
+	case excludedPackage(r.packageOf[name]):
+		return excludedByPackagePrefix
+	case r.classOf[name] == nil:
+		return notDeclaredAtAll
+	default:
+		return unaccountedFor
+	}
+}
+
+// exclusionReason renders exclusionKindOf's answer as the prose a failure
+// message needs. The reasons are exactly the universe rule's, so
+// accounted=false means the name is either a defect in the shipped table or a
+// change to the generation target the probe has not been told about.
 //
 // The two returns are separate because "" is not a usable sentinel: a name that
 // IS in the universe and a name that cannot be accounted for are opposite
 // outcomes, and collapsing them once let the second pass as the first.
 func (r *bmmReduction) exclusionReason(name string) (reason string, accounted bool) {
-	switch {
-	case r.universe[name]:
+	switch r.exclusionKindOf(name) {
+	case inTheUniverse:
 		return "in the universe", false
-	case r.primitive[name]:
+	case excludedAsPrimitive:
 		return "a primitive_types entry (bmm-conformance.md § Primitive type mapping)", true
-	case r.enumeration[name]:
+	case excludedAsEnumeration:
 		return "an enumeration", true
-	case probeExcludedClasses[name]:
+	case excludedByClassName:
 		return "in the declared excluded-class set", true
-	case excludedPackage(r.packageOf[name]):
+	case excludedByPackagePrefix:
 		return "in an excluded package (" + r.packageOf[name] + ")", true
-	case r.classOf[name] == nil:
+	case notDeclaredAtAll:
 		// NOT an exclusion: a BMM ancestor the pinned schemas do not define
 		// is a REQ-047 divergence to raise upstream, not a licence to drop
 		// the edge. Saying so here is the difference between this arm
 		// catching that day and blessing it.
 		return "NOT DEFINED by the pinned schemas — a REQ-047 divergence, not an exclusion", false
-	default:
-		return "no declared exclusion matches", false
 	}
+	return "no declared exclusion matches", false
 }
 
 func excludedPackage(path string) bool {
