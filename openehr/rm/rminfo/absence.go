@@ -118,7 +118,11 @@ var _ AbsenceReporter = (*lookup)(nil)
 // because membership and absence are the same question and must not disagree.
 // A name in neither map reports [AbsenceUndeclared], so passing a nil absence
 // table is equivalent to [New]: every out-of-universe name is then undeclared,
-// which is a degraded but consistent answer rather than an error.
+// which is a degraded but consistent answer rather than an error. An entry
+// whose value is [AbsenceNone] is treated as ABSENT FROM THE TABLE for the
+// same consistency reason — the name reports AbsenceUndeclared, and no caller
+// input can make the surface report none for a name outside
+// [Lookup.KnownRMTypes].
 //
 // The returned Lookup RETAINS both maps rather than copying them, exactly as
 // [New] retains data. Callers MUST NOT mutate either afterwards — see [New]
@@ -131,7 +135,10 @@ func (l *lookup) AbsenceReason(rmType string) AbsenceReason {
 	if _, ok := l.data[rmType]; ok {
 		return AbsenceNone
 	}
-	if reason, ok := l.absence[rmType]; ok {
+	// A stored AbsenceNone is table silence, not an answer: reporting none
+	// for a name the class data omits would claim a membership
+	// KnownRMTypes does not list.
+	if reason, ok := l.absence[rmType]; ok && reason != AbsenceNone {
 		return reason
 	}
 	return AbsenceUndeclared

@@ -123,6 +123,26 @@ func TestUniverseWinsOverAnAbsenceEntry(t *testing.T) {
 	}
 }
 
+// TestStoredNoneIsTableSilence — REQ-049 § Surface shape. A synthetic absence
+// entry whose value is the *none* reason is treated as table silence: the name
+// is not in the class data, so reporting *none* for it would claim a
+// membership KnownRMTypes() does not list, and the two surfaces must not
+// disagree. The answer is *undeclared*, exactly as for a name in neither map.
+func TestStoredNoneIsTableSilence(t *testing.T) {
+	l := rminfo.NewWithAbsence(absenceUniverse(), map[string]rminfo.AbsenceReason{
+		"STORED_NONE": rminfo.AbsenceNone,
+	})
+	r := reporter(t, l)
+	if got := r.AbsenceReason("STORED_NONE"); got != rminfo.AbsenceUndeclared {
+		t.Errorf("AbsenceReason(STORED_NONE) = %v, want AbsenceUndeclared (a stored none is table silence)", got)
+	}
+	for _, name := range l.KnownRMTypes() {
+		if name == "STORED_NONE" {
+			t.Error("KnownRMTypes() lists STORED_NONE: an absence entry must not add a name to the universe")
+		}
+	}
+}
+
 // TestAbsenceReasonString — REQ-049. The string form names the kind only: it
 // never echoes the queried name, and a value outside the closed set formats
 // numerically rather than masquerading as a member.
