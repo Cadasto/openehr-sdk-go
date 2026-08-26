@@ -346,7 +346,7 @@ client scenarios to SDK coverage:
 
 #### PROBE-021 — AQL parse error mapping
 
-- **Title:** A syntactically invalid AQL string produced by a typed builder is impossible; a syntactically valid but semantically invalid one produces a typed `AQLError` on execution.
+- **Title:** A syntactically invalid AQL string produced by a typed builder is impossible; a syntactically valid but semantically invalid one produces a typed `AQLError` on execution, and a valid query the deployment does not implement produces one distinguishable as a capability gap rather than as bad AQL.
 - **Preconditions:** Reference deployment that validates AQL against templates.
 - **Wire assertion:** The typed builders cannot emit syntactically invalid AQL (structural guarantee). Execution of a query referencing a non-existent path returns the backend's AQL error envelope; the SDK maps it to `*query.AQLError`, which satisfies `errors.Is(err, aql.ErrPathResolution)`. A **501** response maps to `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)` and never `aql.ErrPathResolution` — the capability gap is read from the status alone, with an envelope or bare, never from message text (REQ-055).
 - **Modes:** Sandbox, Cassette, Live.
@@ -746,7 +746,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/demographic/probe_073_demographic_round_trip.go`](../../testkit/probes/demographic/probe_073_demographic_round_trip.go); the leaf is covered by the `openehr/client/demographic` unit tests. Demographic API maturity is Draft (upstream ITS-REST `x-status: DEVELOPMENT`).
 - **Satisfies:** REQ-040, REQ-050.
 
-#### PROBE-078 — `POST /query/aql` scopes via `openehr-ehr-id` header
+#### PROBE-078 — verb-aware EHR scoping on query execution
 
 - **Title:** An EHR-scoped ad-hoc AQL execution via `POST /query/aql` carries the scope on the `openehr-ehr-id` request header, per the verb-aware scoping rule in [wire.md § AQL executor](wire.md#aql-executor); every GET query operation — `GET /query/aql` and `GET /query/{qualified_query_name}[/{version}]` — continues to carry the `ehr_id` query parameter.
 - **Preconditions:** A stored or ad-hoc query executed with an EHR scope, against a backend that honours the ITS-REST OAS distinction between the two verbs (no `ehr_id` query parameter or body field on the POST operations).
