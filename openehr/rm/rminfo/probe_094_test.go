@@ -64,6 +64,37 @@ var probeExcludedPackagePrefixes = []string{
 	"org.openehr.base.base_types.builtins",
 }
 
+// probePrimitiveMappedNames restates the KEY SET of internal/bmmgen's
+// primitiveGoType — bmm-conformance.md § Primitive type mapping, the whole
+// table — written out here for the same reason probeExcludedClasses is: the
+// duplication confronts the generator's list from the other side.
+//
+// It is the second half of REQ-049's primitive rule, "declared as (or mapped
+// to) a § Primitive type mapping entry": the generator answers *primitive*
+// when the merged schema's `primitive_types` map declares the name OR this
+// mapping names it. A reduction reading only `primitive_types` would be
+// NARROWER than the rule it audits, and a future BMM bump that moved a mapped
+// name out of `primitive_types` would then make PROBE-098 read a
+// spec-faithful answer as a generation defect.
+//
+// How much weight the second half carries — measured against the pinned
+// schemas, not assumed: `Iso8601_timezone` is the only key below that
+// `primitive_types` does not declare, and the universe SHIPS it (a
+// class_definitions entry), so exclusionKindOf's in-the-universe arm answers
+// first and this map decides nothing on today's corpus. Restating it fixes the
+// RULE's shape, not any of the 74 rows the table currently holds.
+var probePrimitiveMappedNames = map[string]bool{
+	// Basic scalars.
+	"Boolean": true, "Integer": true, "Integer64": true,
+	"Real": true, "Double": true, "Character": true,
+	"String": true, "Octet": true, "Uri": true, "Any": true,
+
+	// ISO 8601 family, including the two abstract aliases.
+	"Iso8601_date": true, "Iso8601_time": true, "Iso8601_date_time": true,
+	"Iso8601_duration": true, "Iso8601_type": true, "Iso8601_timezone": true,
+	"Temporal": true,
+}
+
 // bmmReduction is the independently-derived model the probe compares against.
 type bmmReduction struct {
 	// universe is the class set the reduction expects to be shipped.
@@ -79,6 +110,11 @@ type bmmReduction struct {
 	// primitive / enumeration / packageOf carry the three facts the
 	// universe rule excludes on, so exclusionReason can account for every
 	// name the universe leaves out.
+	//
+	// primitive holds `primitive_types` DECLARATIONS only — arm (d) of
+	// PROBE-098 reads it with exactly that meaning. The other half of
+	// REQ-049's primitive rule, the § Primitive type mapping table, is
+	// probePrimitiveMappedNames, joined in at exclusionKindOf.
 	primitive   map[string]bool
 	enumeration map[string]bool
 	packageOf   map[string]string
@@ -181,11 +217,16 @@ const (
 // exclusionKindOf accounts for a name the universe does not contain, under
 // REQ-049's fixed precedence: primitive, then enumeration, then excluded class,
 // then excluded package.
+//
+// The primitive arm reads BOTH halves of REQ-049's primitive row — declared as
+// a `primitive_types` entry, or mapped to one by § Primitive type mapping —
+// because that is the rule the generator applies. Reading only the first half
+// would leave this reduction narrower than what it audits.
 func (r *bmmReduction) exclusionKindOf(name string) exclusionKind {
 	switch {
 	case r.universe[name]:
 		return inTheUniverse
-	case r.primitive[name]:
+	case r.primitive[name] || probePrimitiveMappedNames[name]:
 		return excludedAsPrimitive
 	case r.enumeration[name]:
 		return excludedAsEnumeration
@@ -213,7 +254,7 @@ func (r *bmmReduction) exclusionReason(name string) (reason string, accounted bo
 	case inTheUniverse:
 		return "in the universe", false
 	case excludedAsPrimitive:
-		return "a primitive_types entry (bmm-conformance.md § Primitive type mapping)", true
+		return "declared as, or mapped to, a primitive (bmm-conformance.md § Primitive type mapping)", true
 	case excludedAsEnumeration:
 		return "an enumeration", true
 	case excludedByClassName:
