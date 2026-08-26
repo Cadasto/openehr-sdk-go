@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-08-26
+
+Twenty-third `v0.x` minor — `rminfo` now answers why a name is *not* in its class universe, so a caller can tell a real openEHR class this SDK does not ship from a name openEHR never defines. Purely additive: no existing signature or answer changes.
+
 ### Added
 
 - **RM class-universe absence reasons (REQ-049, PROBE-098).** `rminfo` now reports why a name is *not* in the class universe, as a closed `AbsenceReason` on an optional `AbsenceReporter` backed by a generated table; existing answers are unchanged.
