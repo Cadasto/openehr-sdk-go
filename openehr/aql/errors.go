@@ -12,6 +12,15 @@ var ErrInvalidQuery = errors.New("aql: invalid query")
 // envelope to this sentinel (PROBE-021). Detect with errors.Is.
 var ErrPathResolution = errors.New("aql: path resolution failed")
 
+// ErrEngineCapability indicates a capability gap rather than a client error:
+// the query is valid; this deployment does not implement it. Callers branch on
+// it to retry elsewhere or degrade gracefully, never to correct the query —
+// bad AQL (syntax, semantically impossible containment, malformed path form)
+// arrives as HTTP 400 instead. The query executor maps HTTP 501 to this
+// sentinel from the status alone, with or without an openEHR error envelope
+// and never from message text (REQ-055, PROBE-021). Detect with errors.Is.
+var ErrEngineCapability = errors.New("aql: engine does not implement this AQL capability")
+
 // ErrSyntax indicates AQL that does not parse against the SDK grammar profile
 // (REQ-109; resources/aql/grammar/active, ADR 0007). Returned wrapped by
 // parse.Parse, surfaced by the lint layer as code "aql_syntax", and carried —

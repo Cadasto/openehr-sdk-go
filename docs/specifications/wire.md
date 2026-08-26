@@ -295,7 +295,10 @@ The reference golden lives at [`openehr/aql/testdata/wire/`](../../openehr/aql/t
 - Accepts a built `aql.Query` (or a raw AQL string for advanced use).
 - Sends it as an openEHR REST `POST /query/aql` (or `GET /query/aql/{queryId}` for stored queries).
 - Decodes the response: `meta`, `columns`, `rows`. Row values are typed via generics where the caller pre-declares column types; otherwise they decode to `any` and the call site casts.
-- Surfaces AQL-level errors (parse, path resolution) as typed errors distinct from generic `WireError`.
+- Surfaces AQL-level errors as typed errors distinct from a generic `WireError`. The taxonomy is fixed by the HTTP status and the openEHR error envelope alone — never by engine message text, which is deployment-specific and may carry PHI:
+  - **400** (bad AQL) and **408** (query timeout) **MUST** surface as `*query.AQLError`. One class covers bad AQL in every form: a syntax error, a semantically impossible containment, and a malformed path expression alike are `400`.
+  - An envelope denoting path resolution — never one carried by a `501`, see below — **MUST** additionally satisfy `errors.Is(err, aql.ErrPathResolution)`: a sub-kind of bad AQL, classified from the envelope's PHI-free code (PROBE-021).
+  - **501** **MUST** surface as `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)`: a capability gap, **not** a client error — the query is valid AQL and this deployment does not implement the feature, so the caller retries elsewhere or degrades rather than correcting the query. The status alone classifies it, with or without an envelope, and a `501` **MUST NOT** also be classified as path resolution.
 
 **AQL injection.** `ExecuteString` (raw AQL escape hatch) **MUST** be documented as unsafe for interpolating caller-supplied values into the query text — bind parameters via the typed `params` map (named placeholders the CDR binds server-side). String-built AQL from untrusted input is injectable.
 

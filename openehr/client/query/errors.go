@@ -13,7 +13,8 @@ var ErrInvalidConfig = errors.New("query: invalid configuration")
 
 // AQLError is an AQL-level failure distinct from generic transport
 // errors (parse error, timeout). Detect with errors.As. When the failure is a
-// path-resolution error it also satisfies errors.Is(err, [aql.ErrPathResolution]).
+// path-resolution error it also satisfies errors.Is(err, [aql.ErrPathResolution]);
+// when it is a capability gap, errors.Is(err, [aql.ErrEngineCapability]).
 type AQLError struct {
 	Message string
 	Code    string
@@ -21,13 +22,24 @@ type AQLError struct {
 	// pathResolution marks a backend error classified as an AQL path
 	// resolution failure (PROBE-021).
 	pathResolution bool
+	// capability marks a backend error classified as a capability gap: the
+	// query is valid AQL, this deployment does not implement it (REQ-055,
+	// PROBE-021). Set from HTTP 501 alone; never from message text.
+	capability bool
 }
 
 // Is reports whether the error matches target. A path-resolution AQLError
-// matches [aql.ErrPathResolution] so callers can branch without inspecting
-// CDR-specific codes.
+// matches [aql.ErrPathResolution] and a capability gap matches
+// [aql.ErrEngineCapability], so callers can branch without inspecting
+// CDR-specific codes. The two classes are disjoint (REQ-055).
 func (e *AQLError) Is(target error) bool {
-	return e.pathResolution && target == aql.ErrPathResolution
+	switch target {
+	case aql.ErrPathResolution:
+		return e.pathResolution
+	case aql.ErrEngineCapability:
+		return e.capability
+	}
+	return false
 }
 
 func (e *AQLError) Error() string {
@@ -51,16 +63,22 @@ func mapQueryError(err error) error {
 	if !ok {
 		return err
 	}
+	// REQ-055: 501 is a capability gap — the query is valid AQL, this
+	// deployment does not implement it. The status alone is the signal (with
+	// or without an envelope), and a capability gap is never also a path
+	// resolution failure, which is bad AQL and arrives as 400.
+	capability := we.StatusCode == 501
 	if we.OpenEHR != nil && (we.OpenEHR.Message != "" || we.OpenEHR.Code != "") {
 		return &AQLError{
 			Message:        we.OpenEHR.Message,
 			Code:           we.OpenEHR.Code,
 			Inner:          err,
-			pathResolution: isPathResolution(we.OpenEHR.Code, we.OpenEHR.Message),
+			pathResolution: !capability && isPathResolution(we.OpenEHR.Code, we.OpenEHR.Message),
+			capability:     capability,
 		}
 	}
-	if we.StatusCode == 400 || we.StatusCode == 408 {
-		return &AQLError{Message: we.Error(), Inner: err}
+	if capability || we.StatusCode == 400 || we.StatusCode == 408 {
+		return &AQLError{Message: we.Error(), Inner: err, capability: capability}
 	}
 	return err
 }

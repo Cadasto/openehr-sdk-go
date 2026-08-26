@@ -540,6 +540,70 @@ func TestExecutePathResolutionCodeOnly(t *testing.T) {
 	}
 }
 
+// TestExecuteEngineCapabilityError verifies the 501 arm of the PROBE-021
+// mapping (REQ-055): a capability gap — valid AQL this deployment does not
+// implement — surfaces as *AQLError satisfying
+// errors.Is(err, aql.ErrEngineCapability). The HTTP status alone classifies it,
+// with or without an openEHR error envelope, and a 501 is never also a
+// path-resolution failure — that is bad AQL, and bad AQL arrives as 400.
+// The 400/408 rows pin the pre-existing mapping unchanged.
+func TestExecuteEngineCapabilityError(t *testing.T) {
+	const pathEnvelope = `{"code":"AQL_PATH_RESOLUTION","message":"could not resolve path /foo"}`
+
+	cases := map[string]struct {
+		status         int
+		body           string
+		wantCapability bool
+		wantPathRes    bool
+		wantCode       string
+	}{
+		"501 with envelope":             {http.StatusNotImplemented, `{"code":"NOT_IMPLEMENTED","message":"AQL feature unsupported"}`, true, false, "NOT_IMPLEMENTED"},
+		"501 bare":                      {http.StatusNotImplemented, "", true, false, ""},
+		"501 with path-shaped envelope": {http.StatusNotImplemented, pathEnvelope, true, false, "AQL_PATH_RESOLUTION"},
+		"400 with path envelope":        {http.StatusBadRequest, pathEnvelope, false, true, "AQL_PATH_RESOLUTION"},
+		"400 bare":                      {http.StatusBadRequest, "", false, false, ""},
+		"408 bare":                      {http.StatusRequestTimeout, "", false, false, ""},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				if tc.body != "" {
+					w.Header().Set("Content-Type", "application/json")
+				}
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer srv.Close()
+
+			_, _, err := query.Execute(t.Context(), newClient(t, srv), aql.NewQuery("SELECT e FROM EHR e"))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			aqlErr, ok := errors.AsType[*query.AQLError](err)
+			if !ok {
+				t.Fatalf("expected *query.AQLError, got %T", err)
+			}
+			if aqlErr.Code != tc.wantCode {
+				t.Errorf("Code = %q, want %q", aqlErr.Code, tc.wantCode)
+			}
+			if got := errors.Is(err, aql.ErrEngineCapability); got != tc.wantCapability {
+				t.Errorf("errors.Is(err, aql.ErrEngineCapability) = %v, want %v", got, tc.wantCapability)
+			}
+			if got := errors.Is(err, aql.ErrPathResolution); got != tc.wantPathRes {
+				t.Errorf("errors.Is(err, aql.ErrPathResolution) = %v, want %v", got, tc.wantPathRes)
+			}
+			// The wire error stays reachable underneath the classification.
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok {
+				t.Fatalf("expected the wrapped *transport.WireError, got %T", errors.Unwrap(err))
+			}
+			if we.StatusCode != tc.status {
+				t.Errorf("WireError.StatusCode = %d, want %d", we.StatusCode, tc.status)
+			}
+		})
+	}
+}
+
 // TestExecuteBuiltQueryEnvelope verifies a query produced by the aql builder
 // reaches the wire body intact: the canonical AQL string, envelope paging
 // (Offset/Fetch), and bound parameters.

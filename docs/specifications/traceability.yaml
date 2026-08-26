@@ -635,6 +635,7 @@ requirements:
       - docs/plans/archive/2026-05-21-aql-builders.md
       - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
+      - docs/plans/2026-08-26-aql-small-corrections.md
     notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/aql/aql_test.go
