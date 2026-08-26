@@ -126,7 +126,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | Boundaries / layout | 010–014 | 015–019 |
 | Idiomatic surface | 020–026 | 027–029 |
 | Reference Model | 030–040 | — |
-| BMM conformance | 041–048 | 049 |
+| BMM conformance | 041–049 | — |
 | Wire format | 050–059 | — |
 | Authentication | 060–069 | — |
 | Service discovery | 070–073 | 074–079 |

@@ -210,7 +210,7 @@ The reason set is **closed and exhaustive-switchable**. Adding a member is addit
 
 #### Surface shape
 
-- The accessor **MUST NOT** be added to the `Lookup` or `Hierarchy` interfaces: it belongs on a new optional capability interface discovered by runtime type assertion, per [idiom.md § Public-API stability](idiom.md#public-api-stability) and the precedent attribute enumeration set. `Default` implements it; every existing interface, constructor signature, and answer is unchanged.
+- The accessor **MUST NOT** be added to the `Lookup` or `Hierarchy` interfaces: it belongs on a new optional capability interface discovered by runtime type assertion, per [idiom.md § Public-API stability](idiom.md#public-api-stability) and the precedent set by attribute enumeration. `Default` implements it; every existing interface, constructor signature, and answer is unchanged.
 - **Synthetic seam:** the question **MUST** be reachable with synthetic data — a constructor that admits an absence table beside the class data — so the behaviour is testable without the pinned RM. A `Lookup` built without an absence table **MUST** report *undeclared* for every out-of-universe name, and that fallback **MUST** be documented on the constructor. Where synthetic class data and a synthetic absence entry name the same class, the universe wins.
 - **Negative-space consistency:** a name reporting an absence reason **MUST** report not-known on every `Lookup` and `Hierarchy` question, and a name reporting *none* **MUST** be in `KnownRMTypes()` — the two surfaces answer the same membership question and **MUST NOT** disagree.
 

@@ -12,7 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **RM class-universe absence reasons (REQ-049, PROBE-098).** `rminfo` now reports why a name is *not* in the class universe — undeclared, excluded package or class, primitive, enumeration — on an optional `AbsenceReporter` backed by a generated table; every existing answer is unchanged.
+- **RM class-universe absence reasons (REQ-049, PROBE-098).** `rminfo` now reports why a name is *not* in the class universe, as a closed `AbsenceReason` on an optional `AbsenceReporter` backed by a generated table; existing answers are unchanged.
 
 ## [0.22.0] - 2026-08-25
 
