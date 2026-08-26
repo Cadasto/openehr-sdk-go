@@ -116,6 +116,12 @@ type Document struct {
 	SelectAliases []string
 	// Classes are the class expressions bound in the FROM / CONTAINS tree,
 	// flattened to document order.
+	//
+	// This is the flat lint view, so every [ClassExpr] read here has a nil
+	// [ClassExpr.PredicateComparison] — the standing predicate is carried as
+	// verbatim text ([ClassExpr.Predicate]) only. Read [Document.Query] for
+	// the parsed comparison; the godoc on [ClassExpr.PredicateComparison] is
+	// the canonical statement of this rule (REQ-113).
 	Classes []ClassExpr
 	// Paths are every alias-qualified identified path across the SELECT,
 	// WHERE, and ORDER BY clauses, in document order. A bare `true` /

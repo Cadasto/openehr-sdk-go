@@ -1214,6 +1214,7 @@ requirements:
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
       - docs/plans/archive/2026-08-18-aql-structured-node-predicates.md
       - docs/plans/archive/2026-08-18-aql-value-free-diagnostics.md
+      - docs/plans/2026-08-26-aql-small-corrections.md
 
   - id: REQ-116
     title: Template-level node naming and name-predicated paths
