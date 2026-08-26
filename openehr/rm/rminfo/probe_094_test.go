@@ -64,10 +64,14 @@ var probeExcludedPackagePrefixes = []string{
 	"org.openehr.base.base_types.builtins",
 }
 
-// probePrimitiveMappedNames restates the KEY SET of internal/bmmgen's
-// primitiveGoType — bmm-conformance.md § Primitive type mapping, the whole
-// table — written out here for the same reason probeExcludedClasses is: the
-// duplication confronts the generator's list from the other side.
+// probePrimitiveMappedNames restates, as a literal, the KEY SET of
+// internal/bmmgen's primitiveGoType — the 17 names the generator maps straight
+// onto a Go primitive. That is not the whole of bmm-conformance.md § Primitive
+// type mapping (29 rows): the table also lists the abstract and
+// structured/container primitives the generator handles by other means, and it
+// omits `Iso8601_timezone`, which the map carries. Written out here for the
+// same reason probeExcludedClasses is: the duplication confronts the
+// generator's list from the other side.
 //
 // It is the second half of REQ-049's primitive rule, "declared as (or mapped
 // to) a § Primitive type mapping entry": the generator answers *primitive*

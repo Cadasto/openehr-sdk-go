@@ -29,7 +29,7 @@
 // AQL class-expression expansion and CONTAINS conformance,
 // polymorphic slot fit, and BMM-faithful re-serialisation.
 //
-// Building-block weight: stdlib-only, single internal data table,
-// no init-time work beyond a map literal. Safe to import from any
-// SDK sub-package.
+// Building-block weight: stdlib-only, two internal data tables (the
+// class universe and the absence table), no init-time work beyond map
+// literals. Safe to import from any SDK sub-package.
 package rminfo
