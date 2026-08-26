@@ -15,10 +15,28 @@ var ErrInvalidConfig = errors.New("query: invalid configuration")
 // errors (parse error, timeout). Detect with errors.As. When the failure is a
 // path-resolution error it also satisfies errors.Is(err, [aql.ErrPathResolution]);
 // when it is a capability gap, errors.Is(err, [aql.ErrEngineCapability]).
+//
+// A nil *AQLError answers as the zero AQLError on every exported method rather
+// than panicking (REQ-025 § No panics). The documented detection pattern
+//
+//	var e *query.AQLError
+//	if errors.As(err, &e) { … }
+//
+// leaves that variable nil when the match fails, and passing it onward as an
+// error boxes a typed nil in a non-nil interface — so errors.Is would call Is
+// on a nil receiver. That is caller-constructible input reachable through the
+// documented API, not a programmer error. See orZero.
 type AQLError struct {
 	Message string
-	Code    string
-	Inner   error
+	// Code is the backend's own error code from the openEHR error envelope,
+	// carried through verbatim — it is NOT the SDK's classification, and the
+	// two can disagree: a 501 whose envelope happens to carry a path-shaped
+	// code is still a capability gap, never a path resolution failure. Dispatch
+	// with errors.Is against [aql.ErrPathResolution] / [aql.ErrEngineCapability]
+	// rather than on this string; the taxonomy is normative in
+	// docs/specifications/wire.md § AQL executor.
+	Code  string
+	Inner error
 	// pathResolution marks a backend error classified as an AQL path
 	// resolution failure (PROBE-021).
 	pathResolution bool
@@ -28,11 +46,26 @@ type AQLError struct {
 	capability bool
 }
 
+// orZero reads a nil receiver as the zero AQLError (REQ-025 § No panics).
+// Every exported method funnels through it, so the nil a failed errors.As
+// leaves behind answers instead of dereferencing: the zero value is classified
+// as neither error class, so Is reports no match, Error names the generic
+// failure, and there is nothing to unwrap. Only that nil path allocates —
+// a real AQLError is returned as-is.
+func (e *AQLError) orZero() *AQLError {
+	if e == nil {
+		return &AQLError{}
+	}
+	return e
+}
+
 // Is reports whether the error matches target. A path-resolution AQLError
 // matches [aql.ErrPathResolution] and a capability gap matches
 // [aql.ErrEngineCapability], so callers can branch without inspecting
-// CDR-specific codes. The two classes are disjoint (REQ-055).
+// CDR-specific codes. The two classes are disjoint (REQ-055). A nil receiver
+// matches nothing.
 func (e *AQLError) Is(target error) bool {
+	e = e.orZero()
 	switch target {
 	case aql.ErrPathResolution:
 		return e.pathResolution
@@ -42,7 +75,11 @@ func (e *AQLError) Is(target error) bool {
 	return false
 }
 
+// Error names the failure, preferring the envelope message when the deployment
+// surfaces raw error bodies and falling back to the PHI-free code. A nil
+// receiver yields the same stable, non-empty generic text as the zero value.
 func (e *AQLError) Error() string {
+	e = e.orZero()
 	if e.Message != "" {
 		return "query: " + e.Message
 	}
@@ -52,7 +89,9 @@ func (e *AQLError) Error() string {
 	return "query: execution failed"
 }
 
-func (e *AQLError) Unwrap() error { return e.Inner }
+// Unwrap exposes the wrapped wire error so errors.Is/As reach the underlying
+// [transport.WireError]. A nil receiver wraps nothing.
+func (e *AQLError) Unwrap() error { return e.orZero().Inner }
 
 // mapQueryError wraps transport wire errors that represent AQL failures.
 func mapQueryError(err error) error {
