@@ -609,6 +609,66 @@ func TestLintTopWithUnrepresentableCount(t *testing.T) {
 	}
 }
 
+// TestLintTopWithUnrepresentableCountAndEnvelopeFetch is the envelope-channel
+// half of TestLintTopWithUnrepresentableCount, and it is what makes REQ-118's
+// presence-keying MUST binding on ALL THREE TOP codes rather than on the two
+// in-text ones alone.
+//
+// The same split applies here: a `TOP` count outside Go `int` leaves
+// parse.Document.Top nil — nothing was decoded into a bound — while
+// Document.HasTop stays true, because the clause IS in the source. The row
+// limit on the other side of the pairing arrives from the caller's
+// aql.Query envelope, not from the AQL text, so it is unaffected by the count
+// failing to decode. Keying aql_top_with_fetch on the decoded bound would
+// silence it for exactly the query that must not lint clean: a deprecated
+// clause, an unusable count, AND a row limit the openEHR Query API's common
+// parameters say cannot be combined with AQL-top.
+// REQ-118 · REQ-109 · PROBE-028
+func TestLintTopWithUnrepresentableCountAndEnvelopeFetch(t *testing.T) {
+	const oor = "SELECT TOP 99999999999999999999 e/ehr_id/value FROM EHR e"
+	q := aql.NewQuery(oor)
+	q.Fetch = 20
+
+	// The premise is asserted on the very document that is linted below, so a
+	// reader can see the two flat-view facts the codes hang on rather than
+	// trusting that this query still behaves as the name claims.
+	doc := mustParse(t, oor)
+	if !doc.HasTop {
+		t.Fatal("Document.HasTop = false, want true (the clause is present in the source)")
+	}
+	if doc.Top != nil {
+		t.Fatalf("Document.Top = %+v, want nil (an unrepresentable count must not become a bound)", *doc.Top)
+	}
+
+	res := lint.Lint(doc, &lint.Options{Query: &q})
+	if got := count(res, "aql_top_with_fetch"); got != 1 {
+		t.Errorf("aql_top_with_fetch raised %d times for an out-of-range TOP beside an envelope row limit, want exactly 1: %v", got, codes(res))
+	}
+	// Collect-all: the deprecation is an independent finding and still fires.
+	if !has(res, "aql_deprecated_top") {
+		t.Errorf("aql_deprecated_top not raised for an out-of-range TOP: %v", codes(res))
+	}
+	// The row limit arrives ONLY by the envelope, so the in-text sibling must
+	// stay silent — the two channels are diagnosed separately.
+	if has(res, "aql_top_with_limit") {
+		t.Errorf("aql_top_with_limit raised for an envelope-only row limit: %v", codes(res))
+	}
+	if res.OK() {
+		t.Error("Result.OK() = true, want false (the TOP+fetch combination is an Error)")
+	}
+	// Value-free on both sides: neither the caller's Fetch nor the count that
+	// failed to decode may reach a Detail. An unrepresentable count has no
+	// canonical rendering, so aql_deprecated_top names the construct alone.
+	for _, iss := range res.Issues {
+		if strings.Contains(iss.Detail, strconv.Itoa(q.Fetch)) {
+			t.Errorf("%s Detail echoes the envelope's Fetch value: %q", iss.Code, iss.Detail)
+		}
+		if strings.Contains(iss.Detail, "99999999999999999999") {
+			t.Errorf("%s Detail echoes the undecoded TOP count: %q", iss.Code, iss.Detail)
+		}
+	}
+}
+
 // TestLintTopWithEnvelopeFetch pins the sibling of aql_top_with_limit for the
 // OTHER row-limit channel: the openEHR Query API's common parameters state
 // that `fetch` "cannot be combined with AQL-top". The builder already refuses

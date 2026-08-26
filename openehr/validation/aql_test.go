@@ -2,6 +2,8 @@ package validation_test
 
 import (
 	"errors"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -226,5 +228,85 @@ func TestValidateAQLWithTypeRelation_DoesNotReachPortabilityCodes(t *testing.T) 
 		if !containsCode(got.Issues, tc.want) {
 			t.Errorf("%s: want %s to survive a wide overlay; issues = %+v", tc.name, tc.want, got.Issues)
 		}
+	}
+}
+
+// The REQ-118 TOP codes are live at the validation seam, not only in the lint
+// building block: ValidateAQL passes the caller's aql.Query into
+// lint.LintString unconditionally, so the envelope's row limit is visible to
+// the pass on the path most consumers actually gate CI on. This is the
+// positive case — a `SELECT TOP n` beside an envelope Fetch is the pairing the
+// openEHR Query API's common parameters exclude ("`fetch` cannot be combined
+// with AQL-top"), so it bridges as an Error-severity Issue and flips
+// Result.OK.
+// REQ-118 · REQ-109 · PROBE-028
+func TestValidateAQL_TopWithEnvelopeFetch(t *testing.T) {
+	q := aql.NewQuery("SELECT TOP 5 e/ehr_id/value FROM EHR e")
+	q.Fetch = 20
+
+	r := validation.ValidateAQL(q, nil)
+	if r.OK {
+		t.Errorf("Result.OK = true, want false (TOP beside the envelope row limit is an Error); issues = %+v", r.Issues)
+	}
+	var found *validation.Issue
+	for i := range r.Issues {
+		if r.Issues[i].Code == "aql_top_with_fetch" {
+			found = &r.Issues[i]
+		}
+	}
+	if found == nil {
+		t.Fatalf("want aql_top_with_fetch; issues = %+v", r.Issues)
+	}
+	// The lint severity is carried across verbatim by bridgeSeverity, so the
+	// assertion is on validation's own enum — that mapping is the seam.
+	if found.Severity != validation.Error {
+		t.Errorf("aql_top_with_fetch severity = %v, want %v", found.Severity, validation.Error)
+	}
+	// The deprecation Warning is an independent finding and rides along.
+	if !containsCode(r.Issues, "aql_deprecated_top") {
+		t.Errorf("want aql_deprecated_top alongside the envelope pairing; issues = %+v", r.Issues)
+	}
+	// Value-free diagnostics: the code names the construct, never the
+	// caller's row count.
+	if strings.Contains(found.Detail, strconv.Itoa(q.Fetch)) {
+		t.Errorf("Detail echoes the envelope's Fetch value: %q", found.Detail)
+	}
+}
+
+// The negative control for the case above: the seam is keyed on the ENVELOPE's
+// row limit, not merely on a TOP being present. An unset Fetch leaves that
+// channel silent, and an Offset is not a row limit — the Query API's common
+// parameters exclude `fetch` from combining with AQL-top and say nothing of
+// `offset`, which the SDK deliberately leaves undiagnosed on the read side.
+// Only the aql_deprecated_top Warning survives, so the Result stays OK.
+// REQ-118 · REQ-109 · PROBE-028
+func TestValidateAQL_TopWithoutEnvelopeFetch(t *testing.T) {
+	const in = "SELECT TOP 5 e/ehr_id/value FROM EHR e"
+
+	zeroFetch := aql.NewQuery(in)
+	offsetOnly := aql.NewQuery(in)
+	offsetOnly.Offset = 10
+
+	for _, tc := range []struct {
+		name  string
+		query aql.Query
+	}{
+		{"zero Fetch", zeroFetch},
+		{"Offset only", offsetOnly},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validation.ValidateAQL(tc.query, nil)
+			if containsCode(r.Issues, "aql_top_with_fetch") {
+				t.Errorf("aql_top_with_fetch fired with no envelope row limit; issues = %+v", r.Issues)
+			}
+			// Premise: the query really does carry a TOP, so the silence
+			// above is the envelope's doing and not a missing clause.
+			if !containsCode(r.Issues, "aql_deprecated_top") {
+				t.Fatalf("premise broken: no aql_deprecated_top on a query carrying TOP; issues = %+v", r.Issues)
+			}
+			if !r.OK {
+				t.Errorf("Result.OK = false, want true (only the deprecation Warning remains); issues = %+v", r.Issues)
+			}
+		})
 	}
 }
