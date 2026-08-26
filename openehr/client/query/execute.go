@@ -78,6 +78,12 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName,
 	if name == "" {
 		return nil, nil, fmt.Errorf("query.RunStored: %w: empty qualified query name", ErrInvalidConfig)
 	}
+	// REQ-057: the stored path is "/query/" + name, so the name "aql"
+	// addresses the ad-hoc route /query/aql. Byte-exact — the collision is
+	// byte-level path routing, so "AQL" is an ordinary name.
+	if name == "aql" {
+		return nil, nil, fmt.Errorf(`query.RunStored: %w: "aql" is the ad-hoc route /query/aql, not a stored-query name`, ErrInvalidConfig)
+	}
 	cfg := executeConfig{}
 	for _, o := range opts {
 		if o != nil {

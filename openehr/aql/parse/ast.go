@@ -168,11 +168,20 @@ type ClassExpr struct {
 	// non-scalar / complex standing predicate, or a comparison whose literal
 	// the value vocabulary cannot represent (an out-of-range numeric) — the
 	// verbatim [Predicate] text stays authoritative in every nil case, so
-	// emission is lossless regardless. The comparison's Path is the relative
-	// object path as written, and its ParsedPath carries the same path's
-	// structured Segments with an empty Alias (a relative predicate path
-	// binds no FROM alias) — the WHERE-side symmetry for the class-predicate
-	// left-hand side.
+	// emission is lossless regardless.
+	//
+	// A fifth nil case turns on WHICH VIEW the [ClassExpr] was read from
+	// rather than on the predicate's shape: this field is always nil in the
+	// flat lint view ([Parse] → [Document.Classes]), and is populated only by
+	// the Tier-2 structured extraction ([ParseQuery] / [Document.Query]). The
+	// flat view omits it deliberately, so the lint gate does not pay for the
+	// structured parse; the verbatim [Predicate] text is authoritative there
+	// too, and is populated identically in both views.
+	//
+	// The comparison's Path is the relative object path as written, and its
+	// ParsedPath carries the same path's structured Segments with an empty
+	// Alias (a relative predicate path binds no FROM alias) — the WHERE-side
+	// symmetry for the class-predicate left-hand side.
 	PredicateComparison *aql.Comparison
 	// Pos is the source position of the class expression.
 	Pos Position
@@ -226,7 +235,9 @@ func (d *Document) extract() {
 // including the standing-predicate body and the param-archetype
 // placeholder name carried verbatim in Archetype. The structured
 // extractor additionally populates [ClassExpr.PredicateComparison],
-// which this flat lint view intentionally omits.
+// which this flat lint view intentionally omits — that field's own
+// godoc is the canonical statement of the rule for consumers (REQ-113:
+// the classification belongs on the type a consumer holds).
 func (e *extractor) EnterClassExpression(c *gen.ClassExpressionContext) {
 	ce := ClassExpr{Pos: posOf(c.GetStart())}
 	if ids := c.AllIDENTIFIER(); len(ids) > 0 {

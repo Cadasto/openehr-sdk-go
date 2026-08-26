@@ -36,6 +36,32 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return c
 }
 
+// newRawErrorBodiesClient is newClient plus transport.WithRawErrorBodies(true)
+// — the deployment opt-in that lets an openEHR error envelope's message text
+// reach the caller at all (it is suppressed by default because it may carry
+// PHI). A test that must prove a classifier does NOT read message text needs
+// the text to actually arrive first, or it would pass vacuously.
+func newRawErrorBodiesClient(t *testing.T, srv *httptest.Server) *transport.Client {
+	t.Helper()
+	cat, _ := discovery.NewStaticCatalog(discovery.StaticConfig{
+		Issuer: "https://test.example.com",
+		Services: map[string]discovery.ServiceEntry{
+			discovery.ServiceIDOpenEHRRest: {
+				BaseURL:     discovery.MustParseURL(srv.URL + "/openehr/v1"),
+				SpecVersion: discovery.SpecVersionPin,
+			},
+		},
+	})
+	c, err := transport.New(cat,
+		transport.WithHTTPClient(srv.Client()),
+		transport.WithRawErrorBodies(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
 func readCassette(t *testing.T, name string) []byte {
 	t.Helper()
 	_, src, _, _ := runtime.Caller(0)
@@ -324,6 +350,88 @@ func TestRunStoredPOSTExplicitZeroOffset(t *testing.T) {
 	}
 }
 
+// TestRunStoredRejectsReservedNameAQL pins REQ-057: the stored path is built
+// as "/query/" + name, so the name "aql" would address the ad-hoc route
+// /query/aql. The SDK refuses it before issuing any request, on both stored
+// entry points and both verbs, and after trimming surrounding whitespace.
+func TestRunStoredRejectsReservedNameAQL(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("server received %s %s; the reserved name must be refused before any request", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	cases := []struct {
+		label string
+		call  func() error
+	}{
+		{"RunStored_POST", func() error {
+			_, _, err := query.RunStored(t.Context(), c, "aql", nil)
+			return err
+		}},
+		{"RunStored_GET", func() error {
+			_, _, err := query.RunStored(t.Context(), c, "aql", nil, query.WithGET())
+			return err
+		}},
+		{"RunStored_trimmed", func() error {
+			_, _, err := query.RunStored(t.Context(), c, " aql ", nil)
+			return err
+		}},
+		{"RunStoredVersion_POST", func() error {
+			_, _, err := query.RunStoredVersion(t.Context(), c, "aql", "1.0.0", nil)
+			return err
+		}},
+		{"RunStoredVersion_GET", func() error {
+			_, _, err := query.RunStoredVersion(t.Context(), c, "aql", "1.0.0", nil, query.WithGET())
+			return err
+		}},
+		{"RunStoredVersion_trimmed", func() error {
+			_, _, err := query.RunStoredVersion(t.Context(), c, "\taql\n", "1.0.0", nil)
+			return err
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			err := tc.call()
+			if !errors.Is(err, query.ErrInvalidConfig) {
+				t.Fatalf("err = %v, want one wrapping ErrInvalidConfig", err)
+			}
+			// The diagnostic must name the collision, not leave the caller
+			// to decode a server-side "missing q" 400.
+			if !strings.Contains(err.Error(), "/query/aql") {
+				t.Errorf("err = %q, want it to name the ad-hoc route /query/aql", err)
+			}
+		})
+	}
+}
+
+// TestRunStoredReservedNameIsByteExact pins the other half of REQ-057's
+// carve-out: only the exact byte sequence "aql" collides, so every other
+// name — including case variants and names that merely contain it — still
+// reaches the wire verbatim.
+func TestRunStoredReservedNameIsByteExact(t *testing.T) {
+	for _, name := range []string{"AQL", "Aql", "aql.reports", "org.example.aql", "aqlx"} {
+		t.Run(name, func(t *testing.T) {
+			var gotPath string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.Path
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(readCassette(t, "result_set.json"))
+			}))
+			defer srv.Close()
+
+			_, _, err := query.RunStored(t.Context(), newClient(t, srv), name, nil)
+			if err != nil {
+				t.Fatalf("RunStored(%q) = %v, want it to pass through", name, err)
+			}
+			if want := "/openehr/v1/query/" + name; gotPath != want {
+				t.Errorf("path = %q, want %q (name passes through verbatim)", gotPath, want)
+			}
+		})
+	}
+}
+
 func TestExecuteGETExplicitZeroOffset(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -535,6 +643,228 @@ func TestExecutePathResolutionCodeOnly(t *testing.T) {
 			}
 			if got := errors.Is(err, aql.ErrPathResolution); got != tc.wantIs {
 				t.Errorf("errors.Is = %v, want %v", got, tc.wantIs)
+			}
+		})
+	}
+}
+
+// TestExecuteEngineCapabilityError verifies the 501 arm of the PROBE-021
+// mapping (REQ-055): a capability gap — valid AQL this deployment does not
+// implement — surfaces as *AQLError satisfying
+// errors.Is(err, aql.ErrEngineCapability). The HTTP status alone classifies it,
+// with or without an openEHR error envelope, and a 501 is never also a
+// path-resolution failure — that is bad AQL, and bad AQL arrives as 400.
+// The 400/408 rows pin the pre-existing mapping unchanged.
+func TestExecuteEngineCapabilityError(t *testing.T) {
+	const pathEnvelope = `{"code":"AQL_PATH_RESOLUTION","message":"could not resolve path /foo"}`
+
+	cases := map[string]struct {
+		status         int
+		body           string
+		wantCapability bool
+		wantPathRes    bool
+		wantCode       string
+	}{
+		"501 with envelope":             {http.StatusNotImplemented, `{"code":"NOT_IMPLEMENTED","message":"AQL feature unsupported"}`, true, false, "NOT_IMPLEMENTED"},
+		"501 bare":                      {http.StatusNotImplemented, "", true, false, ""},
+		"501 with path-shaped envelope": {http.StatusNotImplemented, pathEnvelope, true, false, "AQL_PATH_RESOLUTION"},
+		"400 with path envelope":        {http.StatusBadRequest, pathEnvelope, false, true, "AQL_PATH_RESOLUTION"},
+		"400 bare":                      {http.StatusBadRequest, "", false, false, ""},
+		"408 bare":                      {http.StatusRequestTimeout, "", false, false, ""},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				if tc.body != "" {
+					w.Header().Set("Content-Type", "application/json")
+				}
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer srv.Close()
+
+			_, _, err := query.Execute(t.Context(), newClient(t, srv), aql.NewQuery("SELECT e FROM EHR e"))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			aqlErr, ok := errors.AsType[*query.AQLError](err)
+			if !ok {
+				t.Fatalf("expected *query.AQLError, got %T", err)
+			}
+			if aqlErr.Code != tc.wantCode {
+				t.Errorf("Code = %q, want %q", aqlErr.Code, tc.wantCode)
+			}
+			if got := errors.Is(err, aql.ErrEngineCapability); got != tc.wantCapability {
+				t.Errorf("errors.Is(err, aql.ErrEngineCapability) = %v, want %v", got, tc.wantCapability)
+			}
+			if got := errors.Is(err, aql.ErrPathResolution); got != tc.wantPathRes {
+				t.Errorf("errors.Is(err, aql.ErrPathResolution) = %v, want %v", got, tc.wantPathRes)
+			}
+			// The wire error stays reachable underneath the classification.
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok {
+				t.Fatalf("expected the wrapped *transport.WireError, got %T", errors.Unwrap(err))
+			}
+			if we.StatusCode != tc.status {
+				t.Errorf("WireError.StatusCode = %d, want %d", we.StatusCode, tc.status)
+			}
+		})
+	}
+}
+
+// TestEngineCapabilityIsNeverInferredFromMessageText is the inverse of
+// TestExecuteEngineCapabilityError, and pins the "never from message text" half
+// of REQ-055 (wire.md § AQL executor): the HTTP 501 status ALONE classifies a
+// capability gap. A 400 or 408 is a client error however the envelope words
+// itself, so wording like "not implemented" / "unsupported" / "NOT_IMPLEMENTED"
+// MUST NOT make it satisfy errors.Is(err, aql.ErrEngineCapability) — while it
+// still maps to *query.AQLError exactly as before. The rule holds today because
+// the classifier is status-only; nothing pinned it, so a future "helpful" text
+// match would land silently.
+//
+// The client surfaces raw error bodies so the wording genuinely reaches the
+// mapper rather than being PHI-suppressed on the way in, and each row asserts
+// the trigger wording is present in the mapped error — a negative result on a
+// message the mapper never saw would prove nothing. The 501 row is the control:
+// same wording, and it MUST classify, so the table cannot pass by an
+// errors.Is that has stopped matching anything at all.
+func TestEngineCapabilityIsNeverInferredFromMessageText(t *testing.T) {
+	cases := map[string]struct {
+		status int
+		body   string
+		// trigger is the capability-flavoured wording that must be visible in
+		// the mapped error, lower-cased for the containment check.
+		trigger        string
+		wantCapability bool
+	}{
+		"400 code says NOT_IMPLEMENTED": {
+			http.StatusBadRequest,
+			`{"code":"NOT_IMPLEMENTED","message":"bad AQL"}`,
+			"not_implemented", false,
+		},
+		"400 message says not implemented": {
+			http.StatusBadRequest,
+			`{"code":"BAD_REQUEST","message":"this AQL function is not implemented"}`,
+			"not implemented", false,
+		},
+		"400 message says unsupported": {
+			http.StatusBadRequest,
+			`{"code":"VALIDATION_FAILED","message":"unsupported AQL feature"}`,
+			"unsupported", false,
+		},
+		"408 message says not implemented": {
+			http.StatusRequestTimeout,
+			`{"code":"TIMEOUT","message":"not implemented on this engine"}`,
+			"not implemented", false,
+		},
+		"501 with the same wording (control)": {
+			http.StatusNotImplemented,
+			`{"code":"NOT_IMPLEMENTED","message":"this AQL function is not implemented"}`,
+			"not implemented", true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer srv.Close()
+
+			_, _, err := query.Execute(t.Context(), newRawErrorBodiesClient(t, srv),
+				aql.NewQuery("SELECT e FROM EHR e"))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			aqlErr, ok := errors.AsType[*query.AQLError](err)
+			if !ok {
+				t.Fatalf("expected *query.AQLError, got %T: %v", err, err)
+			}
+			// The wording has to have reached the mapper, or the negative
+			// assertion below is vacuous.
+			seen := strings.ToLower(aqlErr.Message + " " + aqlErr.Code)
+			if !strings.Contains(seen, tc.trigger) {
+				t.Fatalf("premise gone: mapped error carries %q, want it to contain %q — the classifier never saw the wording", seen, tc.trigger)
+			}
+			if got := errors.Is(err, aql.ErrEngineCapability); got != tc.wantCapability {
+				t.Errorf("errors.Is(err, aql.ErrEngineCapability) = %v, want %v for HTTP %d — only the status classifies a capability gap, never the message text",
+					got, tc.wantCapability, tc.status)
+			}
+		})
+	}
+}
+
+// TestStoredQueryEngineCapabilityError extends the REQ-055 501 mapping to the
+// stored-query entry points. RunStored and RunStoredVersion reach mapQueryError
+// through the same doResultSet path as Execute, so the classification ought to
+// hold there — but only the ad-hoc route was covered, and a later divergence on
+// the stored path (its own decode step, an extra wrapper) would go unnoticed.
+//
+// Both entry points and both verbs are covered because each is a one-line call,
+// mirroring TestRunStoredRejectsReservedNameAQL. The envelope/bare split is not
+// repeated here: that is a property of mapQueryError itself and is already
+// pinned by TestExecuteEngineCapabilityError. What is new is that the stored
+// path reaches mapQueryError at all.
+func TestStoredQueryEngineCapabilityError(t *testing.T) {
+	const body = `{"code":"NOT_IMPLEMENTED","message":"stored query uses an AQL feature this engine lacks"}`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotImplemented)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	cases := []struct {
+		label string
+		call  func() error
+	}{
+		{"RunStored_POST", func() error {
+			_, _, err := query.RunStored(t.Context(), c, "org.openehr::compositions", nil)
+			return err
+		}},
+		{"RunStored_GET", func() error {
+			_, _, err := query.RunStored(t.Context(), c, "org.openehr::compositions", nil, query.WithGET())
+			return err
+		}},
+		{"RunStoredVersion_POST", func() error {
+			_, _, err := query.RunStoredVersion(t.Context(), c, "org.openehr::compositions", "1.0.0", nil)
+			return err
+		}},
+		{"RunStoredVersion_GET", func() error {
+			_, _, err := query.RunStoredVersion(t.Context(), c, "org.openehr::compositions", "1.0.0", nil, query.WithGET())
+			return err
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			err := tc.call()
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			aqlErr, ok := errors.AsType[*query.AQLError](err)
+			if !ok {
+				t.Fatalf("expected *query.AQLError, got %T: %v", err, err)
+			}
+			if !errors.Is(err, aql.ErrEngineCapability) {
+				t.Errorf("errors.Is(err, aql.ErrEngineCapability) = false, want true — a 501 is a capability gap on the stored path too")
+			}
+			if errors.Is(err, aql.ErrPathResolution) {
+				t.Error("errors.Is(err, aql.ErrPathResolution) = true, want false — the two classes are disjoint (REQ-055)")
+			}
+			// The PHI-free code is carried through; the message is suppressed
+			// by the default client.
+			if aqlErr.Code != "NOT_IMPLEMENTED" {
+				t.Errorf("Code = %q, want %q", aqlErr.Code, "NOT_IMPLEMENTED")
+			}
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok {
+				t.Fatalf("expected the wrapped *transport.WireError, got %T", errors.Unwrap(err))
+			}
+			if we.StatusCode != http.StatusNotImplemented {
+				t.Errorf("WireError.StatusCode = %d, want %d", we.StatusCode, http.StatusNotImplemented)
 			}
 		})
 	}

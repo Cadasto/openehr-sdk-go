@@ -6,6 +6,21 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### AQL alignment audit follow-ups (2026-08-26)
+
+Four plans from the 2026-08-26 AQL alignment audit (maintainer's knowledge base, ecosystem
+fit-gap report Part 2, findings AQL-FIT-01..10), one per audit group. Each plan authors its
+spec deltas in a Phase 0 (via `sdd-specify`) before implementation; the two new requirement ids
+continue the AQL semantics band (160–169). The plans are mutually independent; the corpus plan
+notes a soft sequencing preference (land it before further relation extensions).
+
+| Plan | Scope | Covers | Probe |
+|---|---|---|---|
+| [2026-08-26-aql-write-side-parity.md](2026-08-26-aql-write-side-parity.md) | Builder parity with the read side: a sealed `VERSION` predicate carrier, a standing class predicate, a typed projection (`DISTINCT` / `AS` / aggregates) + build-time structural verification — closes the last unvalidated write path REQ-119 left open | REQ-163 (proposed) | extends PROBE-088 / PROBE-097 arm (c) |
+| [2026-08-26-aql-path-shape-lint.md](2026-08-26-aql-path-shape-lint.md) | Path-shape lint anchored on the repeating-segment check (`rminfo` multi-cardinality, no OPT); paging-without-ORDER-BY, missing projection alias, provably-redundant containment step; the fan-out advisory's path axis + its recorded scope limit | REQ-164 (proposed); one REQ-161 scope sentence | PROBE-099 |
+| [archive/2026-08-26-aql-small-corrections.md](archive/2026-08-26-aql-small-corrections.md) | **Landed 2026-08-26 and archived**: `aql.ErrEngineCapability` maps HTTP 501 as a capability gap (valid AQL this deployment does not implement) rather than bad AQL, the reserved `aql` stored-name guard refuses the SDK's own routing collision client-side alongside the corrected wire.md § REQ-055 route and EHR-scoping prose, `aql_top_with_fetch` gives the linter the envelope arm of the `TOP` pairing `Build()` already refused, and the `PredicateComparison` flat-view caveat moved to the exported godoc | amends REQ-055 / 057 / 109 / 113 / 118 — no new id | extends PROBE-021 |
+| [2026-08-26-aql-conformance-corpus.md](2026-08-26-aql-conformance-corpus.md) | Vendor the EHRbase AQL conformance corpus (FROM-family CSV data, provenance-pinned) and hold the REQ-160 relation to it as a CI ratchet: no engine-accepted shape may verdict Never | REQ-160 evidence (no new id) | PROBE-100 |
+
 ### RM class-universe absence reasons (2026-08-26)
 
 This plan **landed 2026-08-26 and was archived** ([archive/2026-08-26-rminfo-absence-reason.md](archive/2026-08-26-rminfo-absence-reason.md)): [REQ-049](../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons) is `landed` and PROBE-098 is Implemented (inline). `rminfo` now answers why a name is *not* in the class universe — undeclared, excluded package, excluded class, primitive, enumeration — through a closed `AbsenceReason` enum on an optional `AbsenceReporter` that `Default` implements, backed by a generated table emitted beside `lookup_gen.go`. *Undeclared* and *none* are computed rather than stored, precedence is fixed so what a name IS outranks why it was skipped, and a declared-but-omitted name no rule accounts for fails generation. `Lookup`, `Hierarchy`, `AttributeLister` and `New` are unchanged; `NewWithAbsence` gives tests a synthetic seam.

@@ -116,14 +116,16 @@ func (r Result) OK() bool {
 // Options tunes a lint pass. The zero value (or nil) runs the AST-shape
 // checks AND the whole REQ-161 Layer-2 semantic group (which is ungated and
 // can raise Error-severity issues that flip [Result.OK] — see Relation);
-// Layer 3 needs Compiled, and the Layer-2 parameter-binding checks need
-// Query.
+// Layer 3 needs Compiled, and the Layer-2 checks that judge the query against
+// its request envelope need Query.
 type Options struct {
 	// Compiled, when non-nil, enables Layer 3 (archetype / path checks
 	// against a compiled OPT).
 	Compiled *templatecompile.Compiled
-	// Query, when non-nil, enables parameter-binding checks
-	// (aql_unbound_param / aql_unused_param) against its Parameters map.
+	// Query, when non-nil, is the request envelope the AQL will execute
+	// under. It enables the parameter-binding checks (aql_unbound_param /
+	// aql_unused_param) against its Parameters map, and lets the TOP group
+	// see the envelope's row limit (aql_top_with_fetch, REQ-118).
 	Query *aql.Query
 	// Relation is the REQ-160 containment relation the Layer-2 semantic
 	// checks judge FROM/CONTAINS shapes against (REQ-161 § Relation supply).
@@ -207,7 +209,10 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	md := Extract(doc)
 	issues := []Issue{}
 
-	issues = append(issues, shapeIssues(doc, md)...)
+	// opts.Query reaches the shape group too: the TOP check needs the request
+	// envelope to see the second row-limit channel (REQ-118). A nil Query
+	// leaves that channel invisible, exactly as it gates the parameter checks.
+	issues = append(issues, shapeIssues(doc, md, opts.Query)...)
 	// The Layer-2 semantic group (REQ-161) is unconditional: unlike Compiled
 	// and Query, the relation always has a usable default, so a nil
 	// Options.Relation selects the pinned RM rather than switching the group
@@ -222,11 +227,13 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	return Result{Issues: issues}
 }
 
-// shapeIssues runs the Layer-2 (AST-only) checks: alias binding,
+// shapeIssues runs the Layer-2 shape checks: alias binding,
 // identifiable scope, the SELECT * relaxation warning, and the TOP-clause
-// pair. SELECT/FROM presence is guaranteed by a successful parse (the
+// group. SELECT/FROM presence is guaranteed by a successful parse (the
 // grammar requires both), so no aql_select / aql_from issue can arise here.
-func shapeIssues(doc *parse.Document, md Metadata) []Issue {
+// q is the request envelope from [Options.Query] (nil when the caller supplied
+// none); only the TOP group reads it, and only for its row limit.
+func shapeIssues(doc *parse.Document, md Metadata, q *aql.Query) []Issue {
 	var issues []Issue
 
 	// aql_unknown_alias — every identified path's root alias MUST bind to a
@@ -277,18 +284,24 @@ func shapeIssues(doc *parse.Document, md Metadata) []Issue {
 		})
 	}
 
-	issues = append(issues, topIssues(doc)...)
+	issues = append(issues, topIssues(doc, q)...)
 	return issues
 }
 
-// topIssues reports the deprecated `SELECT TOP` modifier and the combination
-// openEHR QUERY Release-1.1.0 § 4.4.3 forbids outright (REQ-118).
+// topIssues reports the deprecated `SELECT TOP` modifier and the two row-bound
+// pairings the openEHR specifications forbid outright (REQ-118): `TOP` with the
+// in-text `LIMIT` clause (QUERY Release-1.1.0 § 4.4.3) and `TOP` with the
+// request envelope's row limit (the Query API common parameters).
 //
 // The SDK parses and emits `TOP` faithfully — a query it did not author may
 // legitimately carry one until the announced removal — so this is where the
 // spec's judgement on the construct is reported, rather than in the parser or
-// the emitter. The builder refuses to CONSTRUCT either shape.
-func topIssues(doc *parse.Document) []Issue {
+// the emitter. The builder refuses to CONSTRUCT any of these shapes.
+//
+// q is the request envelope from [Options.Query]. It is read for its row limit
+// only: nil (no envelope supplied) leaves that channel invisible to the pass,
+// and the in-text pairing is still judged.
+func topIssues(doc *parse.Document, q *aql.Query) []Issue {
 	// Keyed on PRESENCE, not on the decoded bound: an out-of-range count
 	// leaves [parse.Document.Top] nil (nothing is truncated into a bound), and
 	// keying on that would silence both findings for exactly the query that
@@ -311,6 +324,22 @@ func topIssues(doc *parse.Document) []Issue {
 		issues = append(issues, Issue{
 			Code:     "aql_top_with_limit",
 			Detail:   "SELECT TOP is used together with a LIMIT clause, which openEHR QUERY Release-1.1.0 §4.4.3 does not allow",
+			Severity: Error,
+		})
+	}
+	// The envelope's row limit is the same bound arriving by the other
+	// channel. Keyed on Fetch alone: the Query API common parameters exclude
+	// `fetch` from combining with AQL-top and say nothing of `offset`, so an
+	// offset-only envelope does not fire this. The parity with the write side
+	// is therefore partial by design: Build() ALSO refuses an envelope Offset
+	// beside a TOP, because it will not AUTHOR two row bounds — whereas this
+	// check reads a query the SDK did not author, so it reports only what the
+	// Query API actually forbids, the `fetch` arm.
+	if q != nil && q.Fetch > 0 {
+		issues = append(issues, Issue{
+			Code: "aql_top_with_fetch",
+			Detail: "SELECT TOP is used together with the request envelope's row limit, which the openEHR Query API " +
+				"common parameters do not allow: `fetch` cannot be combined with AQL-top",
 			Severity: Error,
 		})
 	}

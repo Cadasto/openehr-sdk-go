@@ -3,9 +3,9 @@
 //   - A struct-builder AQL builder and a verb-functions builder — both
 //     produce identical AQL on the wire.
 //   - AQL request and result models usable without an executor.
-//   - Shared sentinels: ErrInvalidQuery, ErrPathResolution (execute-time),
-//     ErrSyntax (parse-time), and ErrIncompleteAST (structured-AST residual
-//     after a clean parse).
+//   - Shared sentinels: ErrInvalidQuery, ErrPathResolution and
+//     ErrEngineCapability (both execute-time), ErrSyntax (parse-time), and
+//     ErrIncompleteAST (structured-AST residual after a clean parse).
 //
 // The executor lives at openehr/client/query and wraps this package.
 // Parsing and static lint of AQL strings live in the building-block subpackages
