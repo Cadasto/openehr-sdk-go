@@ -2222,3 +2222,28 @@ requirements:
       set, error texts and emission byte-identical to pre-REQ-162. Held to
       read/write parity with lint by PROBE-097's arm (c), including its
       non-vacuity guard over the containment-code corpus.
+
+  - id: REQ-163
+    title: AQL write-side expressivity parity
+    canonical: docs/specifications/clinical-modeling.md#req-163--aql-write-side-expressivity-parity
+    status: draft
+    implementation: planned
+    packages:
+      - openehr/aql
+    probes: [PROBE-088, PROBE-097]
+    plans: [docs/plans/2026-08-26-aql-write-side-parity.md]
+    notes: >-
+      Write-side carriers for the three class- and projection-position
+      vocabularies the read side already models: the sealed three-shape
+      version predicate (versionPredicate : LATEST_VERSION | ALL_VERSIONS |
+      standardPredicate), the one-comparison class standing predicate, and
+      the typed projection mirroring parse.SelectClause (DISTINCT, AS,
+      aggregate/function and literal items). Two API forks settled in the
+      prose rather than in code: Col keeps its signature and its leniency
+      while Build() gains the after-emission structural verification
+      REQ-119's own scope-change clause anticipated, and a standing
+      predicate on a VERSION-spelled node is refused with an error naming
+      the version-predicate constructor (one carrier per grammar position).
+      No new probe id: PROBE-088 gains golden fixtures and PROBE-097 arm (c)
+      gains the rows that were builder-inexpressible. Additive — PROBE-020's
+      golden stays byte-unchanged and no REQ-161/162 code or contract moves.
