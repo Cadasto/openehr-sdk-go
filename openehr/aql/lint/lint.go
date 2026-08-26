@@ -330,9 +330,11 @@ func topIssues(doc *parse.Document, q *aql.Query) []Issue {
 	// The envelope's row limit is the same bound arriving by the other
 	// channel. Keyed on Fetch alone: the Query API common parameters exclude
 	// `fetch` from combining with AQL-top and say nothing of `offset`, so an
-	// offset-only envelope does not fire this. The builder already refuses the
-	// pairing at Build(); this is the read side of the same rule, for a query
-	// the SDK did not author.
+	// offset-only envelope does not fire this. The parity with the write side
+	// is therefore partial by design: Build() ALSO refuses an envelope Offset
+	// beside a TOP, because it will not AUTHOR two row bounds — whereas this
+	// check reads a query the SDK did not author, so it reports only what the
+	// Query API actually forbids, the `fetch` arm.
 	if q != nil && q.Fetch > 0 {
 		issues = append(issues, Issue{
 			Code: "aql_top_with_fetch",

@@ -3,7 +3,7 @@
 **Date:** 2026-08-26
 **Status:** Draft
 **Owner:** SDK maintainers
-**Covers:** no new REQ id — four independent implementation-aligned amendments to landed requirements, each extending the section that already owns its surface (the precedent set by the archived structured-node-predicates and value-free-diagnostics plans): [REQ-055](../specifications/wire.md#req-055--wire-boundary) (§ AQL executor error taxonomy + two corrected sentences), [REQ-057](../specifications/wire.md#req-057) (reserved-name guard), [REQ-118](../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) (envelope-channel lint code), [REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (conformance fix — no prose change)
+**Covers:** no new REQ id — four independent implementation-aligned amendments to landed requirements, each extending the section that already owns its surface (the precedent set by the archived structured-node-predicates and value-free-diagnostics plans): [REQ-055](../specifications/wire.md#req-055--wire-boundary) (§ AQL executor error taxonomy + two corrected sentences), [REQ-057](../specifications/wire.md#req-057) (reserved-name guard), [REQ-118](../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) + [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) (envelope-channel lint code — the code's catalogue home is REQ-109's Layer-2 table, which REQ-118 cross-references), [REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (conformance fix — no prose change)
 **Probes:** no new probe id — [PROBE-021](../specifications/conformance.md#probe-021--aql-parse-error-mapping)'s wire assertion gains the 501 arm; PROBE-028's corpus is unaffected (its lint runs supply no `Options.Query`)
 **Implementation:** planned
 **Depends on:** nothing in the other three audit plans — every phase here is independent and separately committable
@@ -119,7 +119,7 @@ meets a modern caller's `fetch`.
 - Tests: positive (TOP + Fetch), negatives (TOP + nil Query; TOP + zero Fetch; Fetch + no TOP);
   `aql_top_with_limit` behaviour byte-stable.
 
-**Definition of done:** Build and Lint agree on all three row-bound pairings; `make ci` green.
+**Definition of done:** Build and Lint agree on the `TOP`+`LIMIT` and `TOP`+`fetch` pairings; the envelope-`Offset` arm `Build()` refuses stays undiagnosed by design — the OAS states no exclusion for `offset`; `make ci` green.
 
 ## Phase 4 — The `PredicateComparison` caveat moves to where callers read (AQL-FIT-10)
 
