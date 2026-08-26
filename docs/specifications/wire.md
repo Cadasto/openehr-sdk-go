@@ -293,7 +293,7 @@ The reference golden lives at [`openehr/aql/testdata/wire/`](../../openehr/aql/t
 `openehr/client/query` is the AQL executor. It:
 
 - Accepts a built `aql.Query` (or a raw AQL string for advanced use).
-- Sends it as an openEHR REST `POST /query/aql` (or `GET /query/aql/{queryId}` for stored queries).
+- Sends it as an openEHR REST `POST /query/aql` for ad-hoc execution; a stored query goes to `GET|POST /query/{qualified_query_name}`, or `GET|POST /query/{qualified_query_name}/{version}` when pinned to a version. The `aql` path segment belongs to the ad-hoc route alone — the vendored OAS declares exactly those three paths and no `/query/aql/{…}` route exists.
 - Decodes the response: `meta`, `columns`, `rows`. Row values are typed via generics where the caller pre-declares column types; otherwise they decode to `any` and the call site casts.
 - Surfaces AQL-level errors as typed errors distinct from a generic `WireError`. The taxonomy is fixed by the HTTP status and the openEHR error envelope; each arm below states which of the two carries its signal:
   - **400** (bad AQL) and **408** (query timeout) **MUST** surface as `*query.AQLError`. One class covers bad AQL in every form: a syntax error, a semantically impossible containment, and a malformed path expression alike are `400`.
@@ -302,7 +302,7 @@ The reference golden lives at [`openehr/aql/testdata/wire/`](../../openehr/aql/t
 
 **AQL injection.** `ExecuteString` (raw AQL escape hatch) **MUST** be documented as unsafe for interpolating caller-supplied values into the query text — bind parameters via the typed `params` map (named placeholders the CDR binds server-side). String-built AQL from untrusted input is injectable.
 
-**EHR scoping (verb-aware).** When execution is scoped to a single EHR, the SDK **MUST** apply the scope by the verb-appropriate mechanism the ITS-REST OAS declares: `GET /query/aql/{qualified_query_name}` carries the `ehr_id` **query parameter**; `POST /query/aql` carries the **`openehr-ehr-id` request header** — the POST operations declare no `ehr_id` query parameter and the request body carries no `ehr_id` field, so the header is the only channel. The SDK **MUST NOT** scope POST via the query parameter: a strict-spec server that honours only the header would otherwise run the query population-wide.
+**EHR scoping (verb-aware).** When execution is scoped to a single EHR, the SDK **MUST** apply the scope by the verb-appropriate mechanism the ITS-REST OAS declares. The rule is the **verb**, not the route: **every GET** query operation — ad-hoc (`/query/aql`), stored (`/query/{qualified_query_name}`), and stored-versioned (`/query/{qualified_query_name}/{version}`) — declares the `ehr_id` **query parameter**, and the SDK carries the scope there. **No POST** operation declares it, and neither request body schema (`AdhocQueryExecute` for ad-hoc, `Query` for stored) carries an `ehr_id` field, so the **`openehr-ehr-id` request header** is the only channel for both POST forms. The SDK **MUST NOT** scope POST via the query parameter: a strict-spec server that honours only the header would otherwise run the query population-wide.
 
 ### Stored AQL
 
@@ -314,6 +314,8 @@ The platform supports **stored AQL queries** — queries registered ahead of tim
 - **`openehr/client/query/`** — execute a stored query by ID (`GET /query/{qualified_query_name}`) in addition to the ad-hoc execution path.
 
 A stored query is identified by a qualified name (typically reverse-DNS, e.g. `org.example.queries.recent-observations`); the SDK passes it through verbatim. Stored queries are expected to be faster than ad-hoc AQL on the same backend (materialised read models, known output schemas), but the SDK does not pre-validate the qualified name — that's the backend's responsibility.
+
+**Reserved name `aql`.** That no-pre-validation stance is scoped to name *syntax*, which stays the backend's call. One collision is the SDK's own: it builds the stored path by concatenating `/query/` with the name, so the name `aql` addresses `/query/aql` — the ad-hoc route — and the caller learns of it only through the server's "missing `q`" `400`. A qualified name that is exactly `aql` after trimming surrounding whitespace **MUST** therefore fail client-side before any request is issued, with an error satisfying `errors.Is(err, ErrInvalidConfig)` whose message names the collision. The comparison is byte-exact, matching the byte-level path routing that causes it: `AQL` and `aql.reports` are ordinary names and pass through verbatim.
 
 **Store-response version recovery.** The Definition store operation (`PUT /definition/query/{qualified_query_name}[/{version}]`) returns the server-assigned `{name, version}` in a **`Location` response header** with an empty body — the canonical `200_StoredQuery_stored` OAS shape, and what a `text/plain` store returns. The SDK **MUST** recover the assigned identifier in order: (1) parse the `Location` header (canonical); (2) decode a JSON body if present (lenient — some deployments return one); (3) fall back to the caller's input `{name, version}` (graceful degradation). A malformed `Location` **MUST NOT** fail the call — it falls through to (2)/(3).
 

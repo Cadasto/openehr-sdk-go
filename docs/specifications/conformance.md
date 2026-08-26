@@ -748,7 +748,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 #### PROBE-078 — `POST /query/aql` scopes via `openehr-ehr-id` header
 
-- **Title:** An EHR-scoped ad-hoc AQL execution via `POST /query/aql` carries the scope on the `openehr-ehr-id` request header, per the verb-aware scoping rule in [wire.md § AQL executor](wire.md#aql-executor); `GET /query/aql/{qualified_query_name}` continues to carry the `ehr_id` query parameter.
+- **Title:** An EHR-scoped ad-hoc AQL execution via `POST /query/aql` carries the scope on the `openehr-ehr-id` request header, per the verb-aware scoping rule in [wire.md § AQL executor](wire.md#aql-executor); every GET query operation — `GET /query/aql` and `GET /query/{qualified_query_name}[/{version}]` — continues to carry the `ehr_id` query parameter.
 - **Preconditions:** A stored or ad-hoc query executed with an EHR scope, against a backend that honours the ITS-REST OAS distinction between the two verbs (no `ehr_id` query parameter or body field on the POST operations).
 - **Wire assertion:** Captured POST request carries `openehr-ehr-id: <ehr_id>` and no `ehr_id` query parameter or request-body field; the same scope on a GET request carries `ehr_id` as a query parameter and no header. A backend that only honours the header would run a query lacking it population-wide — the assertion catches an SDK regression that scopes POST via the query parameter instead.
 - **Modes:** Sandbox (planned); Cassette, Live not yet scoped.

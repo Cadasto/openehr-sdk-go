@@ -324,6 +324,88 @@ func TestRunStoredPOSTExplicitZeroOffset(t *testing.T) {
 	}
 }
 
+// TestRunStoredRejectsReservedNameAQL pins REQ-057: the stored path is built
+// as "/query/" + name, so the name "aql" would address the ad-hoc route
+// /query/aql. The SDK refuses it before issuing any request, on both stored
+// entry points and both verbs, and after trimming surrounding whitespace.
+func TestRunStoredRejectsReservedNameAQL(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("server received %s %s; the reserved name must be refused before any request", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	cases := []struct {
+		label string
+		call  func() error
+	}{
+		{"RunStored_POST", func() error {
+			_, _, err := query.RunStored(t.Context(), c, "aql", nil)
+			return err
+		}},
+		{"RunStored_GET", func() error {
+			_, _, err := query.RunStored(t.Context(), c, "aql", nil, query.WithGET())
+			return err
+		}},
+		{"RunStored_trimmed", func() error {
+			_, _, err := query.RunStored(t.Context(), c, " aql ", nil)
+			return err
+		}},
+		{"RunStoredVersion_POST", func() error {
+			_, _, err := query.RunStoredVersion(t.Context(), c, "aql", "1.0.0", nil)
+			return err
+		}},
+		{"RunStoredVersion_GET", func() error {
+			_, _, err := query.RunStoredVersion(t.Context(), c, "aql", "1.0.0", nil, query.WithGET())
+			return err
+		}},
+		{"RunStoredVersion_trimmed", func() error {
+			_, _, err := query.RunStoredVersion(t.Context(), c, "\taql\n", "1.0.0", nil)
+			return err
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			err := tc.call()
+			if !errors.Is(err, query.ErrInvalidConfig) {
+				t.Fatalf("err = %v, want one wrapping ErrInvalidConfig", err)
+			}
+			// The diagnostic must name the collision, not leave the caller
+			// to decode a server-side "missing q" 400.
+			if !strings.Contains(err.Error(), "/query/aql") {
+				t.Errorf("err = %q, want it to name the ad-hoc route /query/aql", err)
+			}
+		})
+	}
+}
+
+// TestRunStoredReservedNameIsByteExact pins the other half of REQ-057's
+// carve-out: only the exact byte sequence "aql" collides, so every other
+// name — including case variants and names that merely contain it — still
+// reaches the wire verbatim.
+func TestRunStoredReservedNameIsByteExact(t *testing.T) {
+	for _, name := range []string{"AQL", "Aql", "aql.reports", "org.example.aql", "aqlx"} {
+		t.Run(name, func(t *testing.T) {
+			var gotPath string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.Path
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(readCassette(t, "result_set.json"))
+			}))
+			defer srv.Close()
+
+			_, _, err := query.RunStored(t.Context(), newClient(t, srv), name, nil)
+			if err != nil {
+				t.Fatalf("RunStored(%q) = %v, want it to pass through", name, err)
+			}
+			if want := "/openehr/v1/query/" + name; gotPath != want {
+				t.Errorf("path = %q, want %q (name passes through verbatim)", gotPath, want)
+			}
+		})
+	}
+}
+
 func TestExecuteGETExplicitZeroOffset(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
