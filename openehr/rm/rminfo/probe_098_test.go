@@ -12,18 +12,16 @@ package rminfo_test
 // on a generator whose walk is itself wrong, which is what these arms exist to
 // catch.
 //
-// WHAT THE SHIPPED SURFACE CAN WITNESS. The generated table is unexported, so
-// the probe asks about names rather than enumerating keys. Every claim REQ-049
-// makes is reachable that way except one: a stored entry whose name is also a
-// SHIPPED universe member, which (*lookup).AbsenceReason masks by design —
-// membership is answered first, and absence_test.go's
-// TestUniverseWinsOverAnAbsenceEntry pins that masking as intended behaviour.
-// That one claim is held where the keys are visible instead:
-// internal/bmmgen's TestRMInfoAbsenceAccountsForThePinnedBMM asserts the
-// universe and the table partition the declared names, key by key, and
-// `make codegen-verify` holds the committed file to what the generator emits.
-// Saying so here is the difference between an arm that is honest about its
-// reach and one that reads as more than it proves.
+// HOW THE ARMS REACH THE TABLE. Most of them ask the shipped surface about
+// names, because that is what a consumer sees. That view alone cannot carry all
+// of REQ-049: (*lookup).AbsenceReason answers membership first, so a stored
+// entry for a universe member is invisible through it (absence_test.go's
+// TestUniverseWinsOverAnAbsenceEntry pins that masking as intended behaviour).
+// Arm (b) therefore reads the table's own entries, through export_test.go's
+// AbsenceTable, and holds the stored key set to a set identity against the
+// reduction. Nothing about the table's CONTENTS is delegated elsewhere. What is
+// left to another check is a different question — whether the committed file is
+// what the generator emits, which is `make codegen-verify`'s.
 
 import (
 	"maps"
@@ -105,11 +103,12 @@ var syntheticUndeclared = []string{
 // members must report *none* and every omission must report the reason the
 // reduction derives for it, under REQ-049's fixed precedence.
 //
-// Walking the DECLARED set rather than only the omissions is what makes the
-// second direction bite. A table entry for a name the reduction places in the
-// universe is caught here — the shipped answer would be that stored reason
-// where the reduction expects *none* — unless the shipped universe also
-// contains the name, the one masked case the file header accounts for.
+// Walking the DECLARED set rather than only the omissions is what makes this
+// arm answer for universe members too: a table entry for a name the reduction
+// places in the universe shows up here as a stored reason where *none* was
+// expected. The one case the shipped answers cannot show — the name is ALSO a
+// shipped member, so membership masks the entry — is where arm (b) reads the
+// table's keys instead.
 func TestProbe098AbsenceAccountsForTheNegativeSpace(t *testing.T) {
 	r := reducePinnedBMM(t)
 	rep := reporter(t, rminfo.Default)
@@ -129,12 +128,14 @@ func TestProbe098AbsenceAccountsForTheNegativeSpace(t *testing.T) {
 		census[want]++
 	}
 
-	// The census is what keeps the walk above from being one-directional.
-	// The stored table's keys are unreachable, so an expectation that
-	// quietly shrinks — a name dropped from the reduction, which would leave
-	// its table entry simply unasked-about — has to fail on the SHAPE of the
-	// walk instead. Pinned per reason rather than as one total, so a name
-	// moving between two rules cannot cancel out.
+	// The census pins the SHAPE of the walk. An expectation that quietly
+	// shrinks — a name dropped from the reduction, which leaves its table
+	// entry simply unasked-about — fails here on the counts even though every
+	// name the walk DID ask about agreed. Arm (b)'s set identity catches that
+	// same drift from the table's keys; this is the nearer tripwire, and it
+	// names which RULE moved, which a set difference does not. Pinned per
+	// reason rather than as one total, so a name moving between two rules
+	// cannot cancel out.
 	//
 	// Where the excluded-package count comes from, measured rather than
 	// assumed: all 30 sit under org.openehr.rm.ehr_extract. The other three
@@ -174,19 +175,24 @@ func TestProbe098AbsenceAccountsForTheNegativeSpace(t *testing.T) {
 	}
 }
 
-// TestProbe098NoOverlapWithTheUniverse — arm (b). Membership and absence answer
-// the same question, so the two must never disagree: every KnownRMTypes member
-// reports *none*, and every declared name reporting *none* is a KnownRMTypes
-// member (REQ-049 § Negative-space consistency).
+// TestProbe098NoOverlapWithTheUniverse — arm (b). The universe and the table do
+// not overlap, and nothing the surface COMPUTES is stored.
 //
-// That is the half of arm (b) the shipped answers can witness. Its other two
-// claims are about the stored table's KEYS — that it holds no universe member
-// and no *undeclared* entry — and the surface answers neither: a universe
-// member's entry is masked by the membership check, and a stored *undeclared* is
-// indistinguishable from the computed fallback. The first is held key by key by
-// internal/bmmgen's TestRMInfoAbsenceAccountsForThePinnedBMM (see the file
-// header); the second is pressed from the answering side in arm (c), which
-// sweeps the names a stray entry could plausibly have been keyed on.
+// Three assertions, in widening order. First, membership and absence never
+// disagree, in both directions: every KnownRMTypes member reports *none*, and
+// every declared name reporting *none* is a KnownRMTypes member (REQ-049
+// § Negative-space consistency).
+//
+// Then the table's own entries, read through export_test.go's AbsenceTable
+// because no sequence of AbsenceReason calls can see a masked one. The stored
+// key set must equal the reduction's declared-minus-universe set EXACTLY, which
+// is one assertion carrying three claims: no universe member is stored, no name
+// outside the pinned schemas is stored, and every stored entry is a
+// declared-but-omitted name — arm (a)'s second direction, now witnessed on the
+// keys rather than inferred from the answers.
+//
+// Last, no stored VALUE is *none* or *undeclared*: the accessor computes both,
+// and REQ-049 § Generated, accounted, computed stores neither.
 func TestProbe098NoOverlapWithTheUniverse(t *testing.T) {
 	r := reducePinnedBMM(t)
 	rep := reporter(t, rminfo.Default)
@@ -212,7 +218,44 @@ func TestProbe098NoOverlapWithTheUniverse(t *testing.T) {
 				"a name absent from the universe reported as a member of it", name)
 		}
 	}
-	t.Logf("%d universe members, all reporting none", len(shipped))
+
+	// The table's own entries. Set identity against the reduction — not a
+	// count, and not a spot check: a stored key the reduction does not derive
+	// and a derived name the table omits are opposite defects, so both
+	// directions are reported by name.
+	stored := rminfo.AbsenceTable()
+	storedNames := slices.Sorted(maps.Keys(stored))
+	var wantStored []string
+	for _, name := range declaredNames(r) {
+		if r.exclusionKindOf(name) != inTheUniverse {
+			wantStored = append(wantStored, name)
+		}
+	}
+	if !slices.Equal(storedNames, wantStored) {
+		for _, name := range storedNames {
+			if slices.Contains(wantStored, name) {
+				continue
+			}
+			reason, _ := r.exclusionReason(name)
+			t.Errorf("the table stores %q, which is not a declared-but-omitted name: "+
+				"the reduction says it is %s", name, reason)
+		}
+		for _, name := range wantStored {
+			if !slices.Contains(storedNames, name) {
+				reason, _ := r.exclusionReason(name)
+				t.Errorf("the reduction derives a reason for %q (%s) but the table stores no "+
+					"entry — the name would fall through to the computed *undeclared*", name, reason)
+			}
+		}
+	}
+	for _, name := range storedNames {
+		if reason := stored[name]; reason == rminfo.AbsenceNone || reason == rminfo.AbsenceUndeclared {
+			t.Errorf("the table stores %q as %v — the accessor COMPUTES both of those, and "+
+				"REQ-049 stores neither", name, reason)
+		}
+	}
+	t.Logf("%d universe members reporting none, %d stored entries checked against the reduction",
+		len(shipped), len(storedNames))
 }
 
 // TestProbe098UndeclaredIsComputedNotStored — arm (c). A name no pinned schema
