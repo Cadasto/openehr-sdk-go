@@ -6,6 +6,13 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### RM class-universe absence reasons (2026-08-26)
+
+| Plan | Scope | Covers | Probe |
+|---|---|---|---|
+| [2026-08-26-rminfo-absence-reason.md](2026-08-26-rminfo-absence-reason.md) | An exported, generated reason for why a name is absent from the `rminfo` class universe — closed enum, optional capability interface, synthetic seam — so the generator's exclusion taxonomy stops being test-file-only knowledge | [REQ-049](../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons) (**`planned`**) | PROBE-098 (Draft) |
+
+
 ### AQL semantic layer (2026-08-21)
 
 This plan **landed 2026-08-24 and was archived** ([archive/2026-08-21-aql-semantic-layer.md](archive/2026-08-21-aql-semantic-layer.md)): REQ-160, REQ-161 and REQ-162 are all `landed`, and PROBE-097 is Implemented (inline). `openehr/aql/contain` derives a containment admissibility relation at runtime from the pinned BMM plus a cited overlay table ([ADR-0017](../adr/0017-aql-semantic-layer.md)); `openehr/aql/lint` gains the REQ-161 containment checks and three portability advisories; `(*Builder).VerifyContainment` gives the write side the same judgement, opt-in, held to read/write parity with the linter. `Build()` and the parser are unchanged.

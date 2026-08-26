@@ -81,6 +81,26 @@ requirements:
     plans:
       - docs/plans/archive/2026-08-18-rminfo-class-hierarchy.md
 
+  - id: REQ-049
+    title: RM class-universe absence reasons
+    canonical: docs/specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons
+    status: draft
+    implementation: planned
+    # WHY THIS EXISTS, in one line: the universe answers "is this a class?"
+    # with one boolean, conflating "the pinned schemas do not declare this
+    # name" with "they declare it and the generator deliberately skips it" —
+    # facts the generator computes on every run (skip lists, primitive
+    # mapping, enumeration kind) and then discards; PROBE-094's accounting
+    # proves the taxonomy exists, but only inside a _test.go file. This REQ
+    # promotes it to the public surface as a closed, exhaustive-switchable
+    # reason enum on an optional capability interface.
+    probes: [PROBE-098]
+    packages:
+      - openehr/rm/rminfo
+      - internal/bmmgen
+    plans:
+      - docs/plans/2026-08-26-rminfo-absence-reason.md
+
   - id: REQ-040
     title: Type registry
     canonical: docs/specifications/rm-modeling.md#type-registry-req-040
