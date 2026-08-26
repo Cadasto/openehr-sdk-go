@@ -3,7 +3,7 @@
 **Date:** 2026-08-26
 **Status:** Draft
 **Owner:** SDK maintainers
-**Covers:** REQ-163 (proposed — first free id in the AQL semantics band 160–169; prose to be homed in [clinical-modeling.md](../specifications/clinical-modeling.md) beside REQ-160..162, authored in Phase 0 via `sdd-specify`). Amends nothing normative in landed REQs; extends the fixture sets of [PROBE-088](../specifications/conformance.md#probe-088--aql-builder-containment-and-paging-stability) and the arm-(c) corpus of [PROBE-097](../specifications/conformance.md#probe-097--aql-semantic-and-portability-lint-corpus).
+**Covers:** REQ-163 (proposed — first free id in the AQL semantics band 160–169; prose to be homed in [clinical-modeling.md](../specifications/clinical-modeling.md) beside REQ-160..162, authored in Phase 0 via `sdd-specify`). Amends one landed normative REQ, additively: the [REQ-055](../specifications/wire.md#req-055--wire-boundary) canonicalisation rule set gains the bracket and projection spellings the new carriers emit (Phase 0); no other landed REQ changes normatively. Extends the fixture sets of [PROBE-088](../specifications/conformance.md#probe-088--aql-builder-containment-and-paging-stability) and the arm-(c) corpus of [PROBE-097](../specifications/conformance.md#probe-097--aql-semantic-and-portability-lint-corpus).
 **Probes:** no new probe id — PROBE-088 (builder golden stability) and PROBE-097 arm (c) (read/write parity) both gain rows for the new constructs; PROBE-020's golden stays untouched.
 **Implementation:** planned
 **Depends on:** landed REQ-055 / 117 / 118 / 119 (builder + canonicalisation), REQ-113 (the read-side vocabulary being mirrored), REQ-160..162 (relation + verification)
