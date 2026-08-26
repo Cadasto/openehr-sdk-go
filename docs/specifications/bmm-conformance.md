@@ -200,7 +200,7 @@ For a name the universe **does** contain, the surface **MUST** report a distingu
 
 A name matching more than one rule **MUST** report per this fixed precedence: **primitive, then enumeration, then excluded class, then excluded package**. The order puts what a name *is* ahead of why it was *skipped* — the generator's named-class exclusion list deliberately restates several primitive-mapped names as belt-and-braces, and the reported reason must not depend on that redundancy.
 
-The reason set is **closed and exhaustive-switchable**. Adding a member is an additive change to the public surface: which bump it warrants and how it is announced are [idiom.md § Public-API stability](idiom.md#public-api-stability)'s and REQ-004's questions, not this taxonomy's, and what a caller does with a member it does not recognise is the caller's per § Out of scope below. The reason's string form **MUST** name the kind only.
+The reason set is **closed and exhaustive-switchable**. Adding a member is an additive change to the public surface: which bump it warrants is [idiom.md § Public-API stability](idiom.md#public-api-stability)'s and REQ-004's question, not this taxonomy's, and what a caller does with a member it does not recognise is the caller's per § Out of scope below. The reason's string form **MUST** name the kind only.
 
 #### Generated, accounted, computed
 

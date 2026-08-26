@@ -59,8 +59,8 @@ func shippedReasonFor(kind exclusionKind) (reason rminfo.AbsenceReason, isAnAnsw
 	}
 	// A kind added to exclusionKind without a mapping lands here. Reporting
 	// isAnAnswer=false makes that a named failure at the call site rather
-	// than a silent *none* — the fail-closed posture REQ-049 requires of
-	// anyone switching on this taxonomy.
+	// than a silent *none* — the fail-closed posture this probe adopts for
+	// its own taxonomy, which REQ-049's godoc advises of callers.
 	return rminfo.AbsenceNone, false
 }
 

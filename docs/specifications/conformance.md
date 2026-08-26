@@ -826,7 +826,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** As PROBE-094: the pinned primary RM schema and its includes under [`resources/bmm/`](../../resources/bmm) (REQ-041), reduced in-test through the `openehr/bmm` loader (REQ-045) — never through the generator's own reduction, which would make the comparison tautological — with the generator's exclusion lists restated as literals so a silent change to either side fails the probe.
 - **Wire assertion:** In-repo property, not backend-facing.
   (a) **Accounting, both directions** — every declared name the universe omits gets the reduction's reason from the shipped surface, and every stored table entry is a declared-but-omitted name carrying that same reason; an entry on one side only is a failure either way.
-  (b) **No overlap, nothing computed stored** — the stored table contains no universe member and no *undeclared* entry; every `KnownRMTypes()` member reports *none*.
+  (b) **No overlap, nothing computed stored** — the stored table contains no universe member and no *undeclared* or *none* entry; every `KnownRMTypes()` member reports *none*.
   (c) **Undeclared** — a name no pinned schema declares reports *undeclared*.
   (d) **Precedence** — at least one name matching two rules is pinned by name and MUST report per the REQ-049 order (a primitive-mapped name the named-class exclusion list restates as belt-and-braces reports *primitive*, not *excluded class*).
   (e) **Consistency with the negative space** — every out-of-universe name this probe exercises reports not-known on every `Lookup`/`Hierarchy` question (PROBE-094 arm (e) holds the converse for universe members).

@@ -29,7 +29,7 @@
 
 ## Global constraints (binding on every task)
 
-Normative source: [REQ-049](../../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons) and [PROBE-098](../../specifications/conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space). Constraints 1–6 are those clauses as handed to each task dispatch, not independent requirements — the spec governs on any divergence. Constraints 7–8 are plan-level process choices.
+Normative source: [REQ-049](../../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons) and [PROBE-098](../../specifications/conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space). Constraints 1–6 are those clauses as handed to each task dispatch, not independent requirements — the spec governs on any divergence. Constraints 7–8 are repo-wide conventions ([AGENTS.md](../../../AGENTS.md)), not clauses of this REQ.
 
 1. **Additive only.** `Lookup`, `Hierarchy`, `AttributeLister`, `New`, and every existing answer stay byte-unchanged ([idiom.md § Public-API stability](../../specifications/idiom.md#public-api-stability)). The accessor goes on a NEW optional interface — never on `Lookup` or `Hierarchy`.
 2. **Precedence, fixed:** primitive → enumeration → excluded class → excluded package. A name matching several rules reports the first.
