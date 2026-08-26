@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **RM class-universe absence reasons (REQ-049, PROBE-098).** `rminfo` now reports why a name is *not* in the class universe — undeclared, excluded package or class, primitive, enumeration — on an optional `AbsenceReporter` backed by a generated table; every existing answer is unchanged.
+
 ## [0.22.0] - 2026-08-25
 
 Twenty-second `v0.x` minor — AQL gains a semantic layer that tells an RM-impossible query apart from one that merely returns no rows, on the read and write sides alike, and the contribution builder and write-result contract land. **Breaking:** `lint.Options` gains a field, so positional struct literals no longer compile, and `contribution.Commit` stops reporting an empty 2xx representation as success.

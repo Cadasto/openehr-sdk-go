@@ -155,7 +155,7 @@ The RM and AOM 1.4 types are generated from the pinned BMM corpus — the one pi
 | Generated RM | [`openehr/rm/`](../openehr/rm/) | `*_gen.go`, `*_jsonmar_gen.go`, `*_jsonunmar_gen.go`, `typereg_gen.go` |
 | Generated AOM 1.4 | [`openehr/aom/aom14/`](../openehr/aom/aom14/) | One-way import of `rm` for base types |
 | Type registry | [`openehr/rm/typereg/`](../openehr/rm/typereg/) | Hand-written `Registry`; registrations in `typereg_gen.go` per [ADR 0002](adr/0002-bmm-codegen-decisions.md) |
-| RM structural lookup | [`openehr/rm/rminfo/`](../openehr/rm/rminfo/) | BMM-derived `lookup_gen.go`; [ADR 0005](adr/0005-compiled-template-foundation.md) |
+| RM structural lookup | [`openehr/rm/rminfo/`](../openehr/rm/rminfo/) | Two BMM-derived tables emitted by one run: `lookup_gen.go` (the class universe) and `absence_gen.go` (the declared names outside it, REQ-049); [ADR 0005](adr/0005-compiled-template-foundation.md) |
 
 ```mermaid
 flowchart LR

@@ -85,7 +85,7 @@ requirements:
     title: RM class-universe absence reasons
     canonical: docs/specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons
     status: draft
-    implementation: planned
+    implementation: landed
     # WHY THIS EXISTS, in one line: the universe answers "is this a class?"
     # with one boolean, conflating "the pinned schemas do not declare this
     # name" with "they declare it and the generator deliberately skips it" —
@@ -98,8 +98,12 @@ requirements:
     packages:
       - openehr/rm/rminfo
       - internal/bmmgen
+    tests:
+      - openehr/rm/rminfo/absence_test.go
+      - openehr/rm/rminfo/probe_098_test.go
+      - internal/bmmgen/render_rminfo_absence_test.go
     plans:
-      - docs/plans/2026-08-26-rminfo-absence-reason.md
+      - docs/plans/archive/2026-08-26-rminfo-absence-reason.md
 
   - id: REQ-040
     title: Type registry

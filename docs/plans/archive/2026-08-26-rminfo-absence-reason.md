@@ -1,11 +1,11 @@
 # Plan — RM class-universe absence reasons
 
 **Date:** 2026-08-26
-**Status:** Draft
+**Status:** Complete
 **Owner:** SDK maintainers
-**Covers:** [REQ-049](../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons)
-**Probes:** [PROBE-098](../specifications/conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space)
-**Implementation:** planned
+**Covers:** [REQ-049](../../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons)
+**Probes:** [PROBE-098](../../specifications/conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space)
+**Implementation:** landed
 **Depends on:** REQ-048 (landed) — the class universe, the `Hierarchy` surface, and PROBE-094's independent BMM reduction, all of which this plan reuses
 **Defers:** naming the *skipped package* for an excluded-package name; any AM/LANG/TERM universe; any policy mapping of reasons
 
@@ -16,20 +16,20 @@
 ## Definition of Ready
 
 - [x] **Covers:** lists every REQ this plan implements (REQ-049).
-- [x] Canonical normative prose exists ([bmm-conformance.md § REQ-049](../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons)) + registry row in [REQ.md](../specifications/REQ.md).
+- [x] Canonical normative prose exists ([bmm-conformance.md § REQ-049](../../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons)) + registry row in [REQ.md](../../specifications/REQ.md).
 - [x] No irreversible fork: the surface is additive and follows the `AttributeLister` optional-interface precedent — no new ADR needed.
 - [x] Tasks below name concrete files and the verification command per task.
 
 ## Definition of Done
 
 - Code and tests land with `// REQ-049` / `// PROBE-098` citations.
-- [`traceability.yaml`](../specifications/traceability.yaml) and the REQ.md **Impl.** column read `landed`; PROBE-098 **Status:** Implemented (inline).
+- [`traceability.yaml`](../../specifications/traceability.yaml) and the REQ.md **Impl.** column read `landed`; PROBE-098 **Status:** Implemented (inline).
 - `make spec-check` and `make ci` pass.
-- Plan archived under [`docs/plans/archive/`](archive/).
+- Plan archived under [`docs/plans/archive/`](./).
 
 ## Global constraints (binding on every task)
 
-1. **Additive only.** `Lookup`, `Hierarchy`, `AttributeLister`, `New`, and every existing answer stay byte-unchanged ([idiom.md § Public-API stability](../specifications/idiom.md#public-api-stability)). The accessor goes on a NEW optional interface — never on `Lookup` or `Hierarchy`.
+1. **Additive only.** `Lookup`, `Hierarchy`, `AttributeLister`, `New`, and every existing answer stay byte-unchanged ([idiom.md § Public-API stability](../../specifications/idiom.md#public-api-stability)). The accessor goes on a NEW optional interface — never on `Lookup` or `Hierarchy`.
 2. **Precedence, fixed:** primitive → enumeration → excluded class → excluded package. A name matching several rules reports the first.
 3. **`AbsenceNone` is the zero value.** *Undeclared* is computed, never stored; the stored table never contains a universe member or an `AbsenceNone`/`AbsenceUndeclared` entry.
 4. **Generation fails loudly:** a declared-but-omitted name no rule accounts for is a generation **error** naming the class, not a warning.
@@ -103,25 +103,25 @@ func NewWithAbsence(data map[string]ClassMeta, absence map[string]AbsenceReason)
 
 **Files:** `openehr/rm/rminfo/probe_098_test.go` (new), `openehr/rm/rminfo/probe_094_test.go` (refactor only: `exclusionReason` returns a typed kind alongside its prose so both probes share one derivation — no arm of PROBE-094 changes meaning).
 
-- Arms (a)–(e) exactly as the [conformance entry](../specifications/conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space) defines them, using the existing `bmmReduction` machinery and the restated literal lists (constraint 5).
+- Arms (a)–(e) exactly as the [conformance entry](../../specifications/conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space) defines them, using the existing `bmmReduction` machinery and the restated literal lists (constraint 5).
 - **Falsify before committing** and record the evidence in the task report: (i) add `COMPOSITION` to a copy of the table → arm (b) fails; (ii) remove `EXTRACT`'s entry → arm (a) fails; revert both.
 
 **Verify:** `go test ./openehr/rm/rminfo/`, host `golangci-lint run`.
 
 ### Task 4 — close-out
 
-- [conformance.md](../specifications/conformance.md): PROBE-098 **Status:** → Implemented (inline) with test-file links; coverage-matrix row updated to match.
-- [REQ.md](../specifications/REQ.md): REQ-049 **Impl.** `planned` → `landed`.
-- [traceability.yaml](../specifications/traceability.yaml): `implementation: landed`; add the `tests:` list (`absence_test.go`, `probe_098_test.go`, the generator render test file).
+- [conformance.md](../../specifications/conformance.md): PROBE-098 **Status:** → Implemented (inline) with test-file links; coverage-matrix row updated to match.
+- [REQ.md](../../specifications/REQ.md): REQ-049 **Impl.** `planned` → `landed`.
+- [traceability.yaml](../../specifications/traceability.yaml): `implementation: landed`; add the `tests:` list (`absence_test.go`, `probe_098_test.go`, the generator render test file).
 - `CHANGELOG.md`: one short entry under Unreleased (artefact-class style, matching neighbours).
 - `openehr/rm/rminfo/doc.go`: one sentence for the absence surface.
-- [docs/plans/README.md](README.md): flip this plan's entry to landed wording; plan **Status:** → complete; `git mv` the plan to [archive/](archive/) and add its row to [archive/README.md](archive/README.md).
+- [docs/plans/README.md](../README.md): flip this plan's entry to landed wording; plan **Status:** → complete; `git mv` the plan to [archive/](./) and add its row to [archive/README.md](README.md).
 - **No normative spec edits expected in this task.** If implementation diverged from REQ-049's prose, stop and report — do not edit the spec to match the code.
 
 **Verify:** `make spec-check`, `make probe-status` (inline probes report MISSING there by design), then the full `make ci`.
 
 ## Mapping to specs
 
-- [bmm-conformance.md § REQ-049](../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons) — normative contract
-- [conformance.md § PROBE-098](../specifications/conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space) — acceptance probe
-- [REQ.md](../specifications/REQ.md) registry row · [traceability.yaml](../specifications/traceability.yaml) entry
+- [bmm-conformance.md § REQ-049](../../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons) — normative contract
+- [conformance.md § PROBE-098](../../specifications/conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space) — acceptance probe
+- [REQ.md](../../specifications/REQ.md) registry row · [traceability.yaml](../../specifications/traceability.yaml) entry

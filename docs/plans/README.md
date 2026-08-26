@@ -8,9 +8,7 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ### RM class-universe absence reasons (2026-08-26)
 
-| Plan | Scope | Covers | Probe |
-|---|---|---|---|
-| [2026-08-26-rminfo-absence-reason.md](2026-08-26-rminfo-absence-reason.md) | An exported, generated reason for why a name is absent from the `rminfo` class universe — closed enum, optional capability interface, synthetic seam — so the generator's exclusion taxonomy stops being test-file-only knowledge | [REQ-049](../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons) (**`planned`**) | PROBE-098 (Draft) |
+This plan **landed 2026-08-26 and was archived** ([archive/2026-08-26-rminfo-absence-reason.md](archive/2026-08-26-rminfo-absence-reason.md)): [REQ-049](../specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons) is `landed` and PROBE-098 is Implemented (inline). `rminfo` now answers why a name is *not* in the class universe — undeclared, excluded package, excluded class, primitive, enumeration — through a closed `AbsenceReason` enum on an optional `AbsenceReporter` that `Default` implements, backed by a generated table emitted beside `lookup_gen.go`. *Undeclared* and *none* are computed rather than stored, precedence is fixed so what a name IS outranks why it was skipped, and a declared-but-omitted name no rule accounts for fails generation. `Lookup`, `Hierarchy`, `AttributeLister` and `New` are unchanged; `NewWithAbsence` gives tests a synthetic seam.
 
 
 ### AQL semantic layer (2026-08-21)
