@@ -87,6 +87,10 @@ var Default Lookup = &lookup{data: defaultData}
 // from it on first use. Callers MUST NOT mutate data afterwards: doing so races
 // with those indexes and leaves the derived answers permanently stale, with no
 // diagnostic. Like [Default], the result is otherwise safe for concurrent use.
+//
+// The result carries no absence table, so as an [AbsenceReporter] it reports
+// [AbsenceUndeclared] for every name outside data (REQ-049). To exercise the
+// other absence reasons on synthetic data, use [NewWithAbsence].
 func New(data map[string]ClassMeta) Lookup {
 	return &lookup{data: data}
 }
@@ -145,9 +149,15 @@ type AttrMeta struct {
 }
 
 // lookup is the concrete Lookup backed by a data map. It also implements the
-// optional [AttributeLister] and [Hierarchy] capability interfaces.
+// optional [AttributeLister], [Hierarchy] and [AbsenceReporter] capability
+// interfaces.
 type lookup struct {
-	data      map[string]ClassMeta
+	data map[string]ClassMeta
+	// absence records why each declared-but-omitted class is outside data —
+	// the universe's negative space (REQ-049, see absence.go). The GENERATED
+	// table never overlaps data; a synthetic one from [NewWithAbsence] may,
+	// and data wins. It may be nil: undeclared is computed, not stored.
+	absence   map[string]AbsenceReason
 	knownOnce sync.Once
 	known     []string
 	// childOnce/children memoise the inverted Parents edges the generated

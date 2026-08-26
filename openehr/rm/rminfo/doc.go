@@ -7,13 +7,15 @@
 //
 // The attribute questions are on the [Lookup] interface; the class-graph
 // questions are on the optional [Hierarchy] capability interface, which
-// [Default] implements and consumers reach by type assertion.
+// [Default] implements and consumers reach by type assertion. Why a name is
+// NOT in the class universe (REQ-049) is on the optional [AbsenceReporter],
+// reached the same way.
 //
 // The data is generated from the pinned BMM under resources/bmm/
 // via internal/bmmgen and lives in lookup_gen.go; the hand-written
-// surface is the [Lookup], [Hierarchy] and [AttributeLister]
-// interfaces, the [ClassMeta] and [AttrMeta] data types, and the
-// [Default] and [New] accessors.
+// surface is the [Lookup], [Hierarchy], [AttributeLister] and
+// [AbsenceReporter] interfaces, the [ClassMeta] and [AttrMeta] data
+// types, and the [Default], [New] and [NewWithAbsence] accessors.
 // No runtime BMM dependency — generated tables are pure Go strings.
 //
 // Consumed by [internal/templatecompile] (REQ-100 follow-up Phase 4)
