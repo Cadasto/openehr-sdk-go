@@ -74,6 +74,14 @@ type Plan struct {
 	// external classes — the renderer consults [PlannedClass.External]
 	// to decide whether a reference needs a package qualifier.
 	Classes map[string]*PlannedClass
+	// ClassPackages maps EVERY declared class name — including the ones
+	// the skip rules dropped, which never become a [PlannedClass] — to the
+	// dotted BMM package that lists it. It is the package walk's own
+	// result, kept rather than discarded so a renderer asking "which
+	// package was this name in?" cannot answer differently from the walk
+	// that decided the skips (REQ-049 needs it for the excluded-package
+	// reason; a second walk could disagree on a class two packages list).
+	ClassPackages map[string]string
 	// ConcreteClasses is the ordered list of concrete (non-abstract,
 	// non-enum, non-interface) classes that get registered in
 	// typereg. Sorted by BMMName for deterministic output.
@@ -180,6 +188,7 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 		root := schema.Packages[k]
 		walkPackage(root, root.Name, classToPkg)
 	}
+	p.ClassPackages = classToPkg
 
 	// Decide which classes survive the skip rules and bucket them by
 	// file. Classes whose package is in the skip list are dropped.
