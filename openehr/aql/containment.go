@@ -11,7 +11,8 @@ import (
 // or — since REQ-117 — a whole containment expression: a chain of nested
 // CONTAINS terms, a negated term, or a boolean junction of sibling operands.
 //
-// Construct a leaf with [Class] (no archetype predicate) or [Archetype], nest
+// Construct a leaf with [Class] (no archetype predicate), [Archetype], or —
+// for the grammar's other `classExprOperand` alternative — [Version], nest
 // with [Containment.Contains] / [Containment.NotContains], and join siblings
 // with [ContainsAnd] / [ContainsOr]. Every combinator returns a NEW value —
 // a Containment is immutable once constructed, so one operand can be reused
@@ -52,6 +53,18 @@ type Containment struct {
 	rmType      string
 	alias       string
 	archetypeID string
+
+	// versionPred is the `versionPredicate` bracket of a VERSION class
+	// expression (REQ-163), nil when the bracket is absent — which is the
+	// legal predicate-less form, not a defect.
+	//
+	// It sits BESIDE archetypeID rather than sharing it because the two are
+	// different grammar positions with different accept sets: `VERSION` has no
+	// archetype slot at all, and `versionPredicate` admits no node predicate
+	// (predicate.go § the two guards). One field carrying both would need a
+	// flag to say which it held, and that flag would be the RM-type spelling
+	// this carrier already has.
+	versionPred VersionPredicate
 
 	// children are the nested CONTAINS terms of a class node, or the
 	// operands of a junction node (which carries no class of its own).
@@ -212,12 +225,21 @@ func (c Containment) chainEndsInJunction() bool {
 }
 
 // classToken renders the class expression at this node (never the children).
+//
+// The archetype and the version predicate are two spellings of the ONE `[…]`
+// position, so exactly one bracket is ever written. Their order here decides
+// nothing for a tree [Builder.Build] accepts: validateTree refuses a node
+// carrying both (the landed archetype-on-VERSION rule), so the two are never
+// populated together on an emitted node.
 func (c Containment) classToken() string {
 	out := c.rmType
 	if c.alias != "" {
 		out += " " + c.alias
 	}
-	if c.archetypeID != "" {
+	switch {
+	case c.versionPred != nil:
+		out += "[" + c.versionPred.versionBracket() + "]"
+	case c.archetypeID != "":
 		out += "[" + c.archetypeID + "]"
 	}
 	return out
@@ -320,6 +342,14 @@ func (c Containment) validateTree(seen map[string]bool) error {
 		if strings.EqualFold(c.rmType, "VERSION") && c.archetypeID != "" {
 			return fmt.Errorf("%w: a VERSION class expression takes no archetype predicate (%q)",
 				ErrInvalidQuery, c.archetypeID)
+		}
+		// …and the OTHER bracket of that alternative, the version predicate,
+		// has no position on any class but VERSION (REQ-163). The two rules are
+		// the two halves of one `[…]` position, which is why they sit together.
+		if c.versionPred != nil {
+			if err := c.validateVersionPredicate(); err != nil {
+				return err
+			}
 		}
 		if err := ValidateIdentifier(c.alias); err != nil {
 			return fmt.Errorf("CONTAINS alias: %w", err)

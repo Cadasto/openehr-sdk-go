@@ -153,6 +153,38 @@ func builderRoundTripCases() []struct {
 			return sel().OrderBy("e/time_created/value", aql.Descending).
 				LimitInline(10).OffsetInline(20).Build()
 		}},
+		// REQ-163 — the version-predicate carrier. Identity, not mere
+		// re-parseability, is the bar: the read side re-emits a VERSION bracket
+		// VERBATIM, so any spelling but the canonical one would come back
+		// different and the two sides would disagree about the canonical form
+		// of a construct they both model.
+		{"version_latest_version", func() (aql.Query, error) {
+			return sel().Contains(aql.Version("v", aql.LatestVersion())).Build()
+		}},
+		{"version_all_versions", func() (aql.Query, error) {
+			return sel().Contains(aql.Version("v", aql.AllVersions())).Build()
+		}},
+		{"version_compare_param", func() (aql.Query, error) {
+			return sel().Contains(aql.Version("v",
+				aql.VersionCompare("commit_audit/time_committed/value", aql.OpGt, aql.Param("since")))).Build()
+		}},
+		{"version_compare_literal", func() (aql.Query, error) {
+			return sel().Contains(aql.Version("v",
+				aql.VersionCompare("commit_audit/change_type/value", aql.OpEq, aql.String("creation")))).Build()
+		}},
+		{"version_no_predicate", func() (aql.Query, error) {
+			return sel().Contains(aql.Version("v", nil)).Build()
+		}},
+		{"version_chain", func() (aql.Query, error) {
+			return sel().Contains(aql.Version("v", aql.LatestVersion()).
+				Contains(aql.Class("COMPOSITION", "c"))).Build()
+		}},
+		{"version_in_junction", func() (aql.Query, error) {
+			return sel().Contains(aql.ContainsOr(
+				aql.Version("v", aql.AllVersions()),
+				aql.Class("COMPOSITION", "c"),
+			)).Build()
+		}},
 		{"containment_with_where_and_order_by", func() (aql.Query, error) {
 			return aql.Select(aql.Col("o")).
 				FromEHR("e", aql.Param("ehr_id")).

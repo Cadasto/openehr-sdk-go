@@ -1,0 +1,1 @@
+SELECT c/uid/value FROM EHR e CONTAINS VERSION v[commit_audit/time_committed/value > $since] CONTAINS COMPOSITION c WHERE e/ehr_id/value = $ehr_id
