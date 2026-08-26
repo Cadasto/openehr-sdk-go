@@ -1,11 +1,11 @@
 # Plan — AQL small corrections: 501 sentinel, stored-query prose, TOP+fetch lint, godoc home
 
 **Date:** 2026-08-26
-**Status:** Draft
+**Status:** Complete
 **Owner:** SDK maintainers
-**Covers:** no new REQ id — four independent implementation-aligned amendments to landed requirements, each extending the section that already owns its surface (the precedent set by the archived structured-node-predicates and value-free-diagnostics plans): [REQ-055](../specifications/wire.md#req-055--wire-boundary) (§ AQL executor error taxonomy + two corrected sentences), [REQ-057](../specifications/wire.md#req-057) (reserved-name guard), [REQ-118](../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) + [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) (envelope-channel lint code — the code's catalogue home is REQ-109's Layer-2 table, which REQ-118 cross-references), [REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (conformance fix — no prose change)
-**Probes:** no new probe id — [PROBE-021](../specifications/conformance.md#probe-021--aql-parse-error-mapping)'s wire assertion gains the 501 arm; PROBE-028's corpus is unaffected (its lint runs supply no `Options.Query`)
-**Implementation:** planned
+**Covers:** no new REQ id — four independent implementation-aligned amendments to landed requirements, each extending the section that already owns its surface (the precedent set by the archived structured-node-predicates and value-free-diagnostics plans): [REQ-055](../../specifications/wire.md#req-055--wire-boundary) (§ AQL executor error taxonomy + two corrected sentences), [REQ-057](../../specifications/wire.md#req-057) (reserved-name guard), [REQ-118](../../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) + [REQ-109](../../specifications/clinical-modeling.md#req-109--aql-static-lint) (envelope-channel lint code — the code's catalogue home is REQ-109's Layer-2 table, which REQ-118 cross-references), [REQ-113](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (conformance fix — no prose change)
+**Probes:** no new probe id — [PROBE-021](../../specifications/conformance.md#probe-021--aql-parse-error-mapping)'s wire assertion gains the 501 arm; PROBE-028's corpus is unaffected (its lint runs supply no `Options.Query`)
+**Implementation:** landed
 **Depends on:** nothing in the other three audit plans — every phase here is independent and separately committable
 **Defers:** any message-text reading of engine errors (per-engine adapters / conformance tooling, per the maintainer's ruling below); pre-validating stored-query name *syntax* (REQ-057's deliberate choice, unchanged)
 
@@ -26,7 +26,7 @@ semantically impossible containment, malformed path syntax. Engine compatibility
 not at the cost of the wrong contract; message-text heuristics belong in a per-engine adapter,
 never in the SDK's error taxonomy.
 
-**Today:** `mapQueryError` ([`openehr/client/query/errors.go`](../../openehr/client/query/errors.go))
+**Today:** `mapQueryError` ([`openehr/client/query/errors.go`](../../../openehr/client/query/errors.go))
 wraps a `WireError` into `AQLError` on an openEHR error envelope or on status 400/408, and
 classifies one sub-kind (`aql.ErrPathResolution`, deliberately narrow). **501 falls through the
 switch entirely** and reaches the caller as a plain `transport.WireError` — the single most
@@ -35,7 +35,7 @@ with no typed handle.
 
 **Tasks:**
 
-- New sentinel in [`openehr/aql/errors.go`](../../openehr/aql/errors.go) beside
+- New sentinel in [`openehr/aql/errors.go`](../../../openehr/aql/errors.go) beside
   `ErrPathResolution`:
   `ErrEngineCapability = errors.New("aql: engine does not implement this AQL capability")`,
   godoc stating the ruling verbatim: *the query is valid; this deployment does not implement it.*
@@ -57,12 +57,12 @@ from bad AQL in the executor's public contract; `make ci` green.
 
 ## Phase 2 — Stored-query prose and the reserved name (AQL-FIT-07)
 
-**Today:** the **code is right** ([`execute.go`](../../openehr/client/query/execute.go) posts
+**Today:** the **code is right** ([`execute.go`](../../../openehr/client/query/execute.go) posts
 ad-hoc to `/query/aql`, builds `"/query/" + name [+ "/" + version]` for stored, routes
 `/query/{qualified_query_name}[/{version}]`), and the vendored OAS
-([`resources/its-rest/query-validation.openapi.yaml`](../../resources/its-rest/query-validation.openapi.yaml))
+([`resources/its-rest/query-validation.openapi.yaml`](../../../resources/its-rest/query-validation.openapi.yaml))
 declares exactly those three paths. The **normative prose is wrong twice** in
-[wire.md § REQ-055 § AQL executor](../specifications/wire.md#req-055--wire-boundary):
+[wire.md § REQ-055 § AQL executor](../../specifications/wire.md#req-055--wire-boundary):
 
 - line 296: *"(or `GET /query/aql/{queryId}` for stored queries)"* — there is no
   `/query/aql/{…}` route; the `aql` segment belongs to the ad-hoc route only. REQ-057, ten
@@ -112,7 +112,7 @@ meets a modern caller's `fetch`.
   code).
 - Fires from the TOP check group when `Options.Query != nil && Options.Query.Fetch > 0 &&
   Document.HasTop` — plumb `Options` to `topIssues`
-  ([`lint.go`](../../openehr/aql/lint/lint.go)); `Offset` alone does not fire (the OAS
+  ([`lint.go`](../../../openehr/aql/lint/lint.go)); `Offset` alone does not fire (the OAS
   exclusion names the row *limit*).
 - Spec amendment: the REQ-118 lint-codes prose gains the code; REQ-109's catalogue listing
   likewise.
@@ -127,7 +127,7 @@ meets a modern caller's `fetch`.
 left nil on the flat lint view (`parse.Parse` → `Document.Classes`) for the same source — a
 deliberate, reasonable performance choice. But the field's own godoc lists four nil cases and
 "read from `Document.Classes`" is not one of them; the caveat lives on the **unexported**
-`EnterClassExpression` method ([`ast.go`](../../openehr/aql/parse/ast.go)), where `go doc` will
+`EnterClassExpression` method ([`ast.go`](../../../openehr/aql/parse/ast.go)), where `go doc` will
 not surface it. REQ-113 legislates against exactly this one level up: *"the classification MUST
 be stated on the type a consumer holds rather than only in this spec."* This phase is
 **conformance to landed REQ-113**, so no spec prose changes.
@@ -153,28 +153,34 @@ behaviour change; verified by review and `make ci` (vet/lint clean).
 
 - Code and tests land with the owning `// REQ-` citations (055 / 057 / 118 / 113) and
   `// PROBE-021` where the probe grows.
-- [`traceability.yaml`](../specifications/traceability.yaml) untouched except where test lists
-  grow; no REQ.md registry changes (no new ids; Impl. columns already `landed`).
+- [`traceability.yaml`](../../specifications/traceability.yaml): five REQ entries — 055, 057, 109,
+  113 and 118 — each gained this plan in their `plans:` list; no test list grew (the phases added
+  no test file those entries did not already carry). No REQ.md registry changes (no new ids; Impl.
+  columns already `landed`).
 - **The index `make spec-check` cannot see:** no roadmap row needed (nothing new lands as a
   capability; these are corrections to landed rows) — recorded here so the omission is a
   decision, not a miss.
 - `make spec-check` and `make ci` pass after each phase.
-- Plan archived under [`docs/plans/archive/`](archive/).
+- Plan archived under [`docs/plans/archive/`](./).
 
 ## Implementation checklist
 
 | Step | Status |
 |---|---|
-| Phase 1 — `aql.ErrEngineCapability` + wire.md taxonomy + PROBE-021 arm | |
-| Phase 2 — wire.md sentence fixes + reserved-name guard + REQ-057 sentence | |
-| Phase 3 — `aql_top_with_fetch` + REQ-118/109 catalogue rows | |
-| Phase 4 — godoc relocation (REQ-113 conformance) | |
-| `make spec-check` / `make ci` per phase | |
+| Phase 1 — `aql.ErrEngineCapability` + wire.md taxonomy + PROBE-021 arm | ✅ landed 2026-08-26 |
+| Phase 2 — wire.md sentence fixes + reserved-name guard + REQ-057 sentence | ✅ landed 2026-08-26 |
+| Phase 3 — `aql_top_with_fetch` + REQ-118/109 catalogue rows | ✅ landed 2026-08-26 |
+| Phase 4 — godoc relocation (REQ-113 conformance) | ✅ landed 2026-08-26 |
+| `make spec-check` / `make ci` per phase | ✅ `make spec-check` OK at every phase; the `make ci` constituents ran green on the host (`fmt-check`, `vet`, `go test ./...`, `golangci-lint run ./...`, `build`) |
+
+[CHANGELOG.md](../../../CHANGELOG.md) is deliberately untouched: [AGENTS.md](../../../AGENTS.md) updates
+it only on request or when cutting a release, and these four corrections carry no release of their
+own.
 
 ## Mapping to specs
 
-- [wire.md § REQ-055](../specifications/wire.md#req-055--wire-boundary) — executor error taxonomy + the two corrected sentences
-- [wire.md § REQ-057](../specifications/wire.md#req-057) — reserved-name scope sentence
-- [clinical-modeling.md § REQ-118](../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) — the TOP lint family gaining the envelope arm
-- [clinical-modeling.md § REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) — the "stated on the type a consumer holds" clause Phase 4 conforms to
-- [conformance.md § PROBE-021](../specifications/conformance.md#probe-021--aql-parse-error-mapping) — error-mapping probe gaining the 501 arm
+- [wire.md § REQ-055](../../specifications/wire.md#req-055--wire-boundary) — executor error taxonomy + the two corrected sentences
+- [wire.md § REQ-057](../../specifications/wire.md#req-057) — reserved-name scope sentence
+- [clinical-modeling.md § REQ-118](../../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) — the TOP lint family gaining the envelope arm
+- [clinical-modeling.md § REQ-113](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) — the "stated on the type a consumer holds" clause Phase 4 conforms to
+- [conformance.md § PROBE-021](../../specifications/conformance.md#probe-021--aql-parse-error-mapping) — error-mapping probe gaining the 501 arm

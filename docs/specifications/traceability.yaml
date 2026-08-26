@@ -635,7 +635,7 @@ requirements:
       - docs/plans/archive/2026-05-21-aql-builders.md
       - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
-      - docs/plans/2026-08-26-aql-small-corrections.md
+      - docs/plans/archive/2026-08-26-aql-small-corrections.md
     notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/aql/aql_test.go
@@ -652,7 +652,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-15-rest-api-client.md
       - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
-      - docs/plans/2026-08-26-aql-small-corrections.md
+      - docs/plans/archive/2026-08-26-aql-small-corrections.md
     notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/client/query/query_test.go
@@ -864,7 +864,7 @@ requirements:
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
       - docs/plans/archive/2026-08-18-aql-value-free-diagnostics.md
       - docs/plans/archive/2026-08-21-aql-semantic-layer.md
-      - docs/plans/2026-08-26-aql-small-corrections.md
+      - docs/plans/archive/2026-08-26-aql-small-corrections.md
     tests:
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/ast_test.go
@@ -1214,7 +1214,7 @@ requirements:
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
       - docs/plans/archive/2026-08-18-aql-structured-node-predicates.md
       - docs/plans/archive/2026-08-18-aql-value-free-diagnostics.md
-      - docs/plans/2026-08-26-aql-small-corrections.md
+      - docs/plans/archive/2026-08-26-aql-small-corrections.md
 
   - id: REQ-116
     title: Template-level node naming and name-predicated paths
@@ -1445,7 +1445,7 @@ requirements:
       - testkit/probes/aql/probes_test.go
     plans:
       - docs/plans/archive/2026-08-05-aql-top-carrier-literal-source-text.md
-      - docs/plans/2026-08-26-aql-small-corrections.md
+      - docs/plans/archive/2026-08-26-aql-small-corrections.md
 
   - id: REQ-119
     title: Re-parseable canonical AQL emission
