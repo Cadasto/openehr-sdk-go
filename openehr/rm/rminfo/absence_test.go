@@ -150,13 +150,25 @@ func TestAbsenceReasonString(t *testing.T) {
 // TestDefaultImplementsAbsenceReporter — REQ-049 § Surface shape. Default
 // carries the capability; consumers reach it by exactly this assertion.
 //
-// The out-of-universe ANSWERS are deliberately not asserted here: Default's
-// absence table is still nil at this point on the branch, so every such name
-// reports undeclared. The generated table (REQ-042) lands in the next commit,
-// and PROBE-098 is what checks the answers against the pinned BMM.
+// The answers come from the GENERATED table (absence_gen.go), so what this
+// pins is the wiring — that Default was built WITH that table, one name per
+// reason, rather than with the nil table that reports undeclared for
+// everything. Whether the whole table agrees with the pinned BMM is
+// PROBE-098's question; whether it is what the generator emits is
+// `make codegen-verify`'s.
 func TestDefaultImplementsAbsenceReporter(t *testing.T) {
 	r := reporter(t, rminfo.Default)
-	if got := r.AbsenceReason("COMPOSITION"); got != rminfo.AbsenceNone {
-		t.Errorf("AbsenceReason(COMPOSITION) = %v, want AbsenceNone (a universe member)", got)
+	cases := map[string]rminfo.AbsenceReason{
+		"COMPOSITION":     rminfo.AbsenceNone,            // a universe member
+		"EXTRACT":         rminfo.AbsenceExcludedPackage, // org.openehr.rm.ehr_extract
+		"TUPLE":           rminfo.AbsenceExcludedClass,
+		"PROPORTION_KIND": rminfo.AbsenceEnumeration,
+		"Interval":        rminfo.AbsencePrimitive,  // a Go type is emitted for it either way
+		"NO_SUCH_CLASS":   rminfo.AbsenceUndeclared, // computed from the table's silence
+	}
+	for name, want := range cases {
+		if got := r.AbsenceReason(name); got != want {
+			t.Errorf("AbsenceReason(%s) = %v, want %v", name, got, want)
+		}
 	}
 }

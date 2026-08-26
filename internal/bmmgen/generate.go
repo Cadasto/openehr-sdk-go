@@ -340,29 +340,48 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 		}
 	}
 
-	// rminfo lookup data — emitted alongside the RM target (one
-	// sub-package down). RenderRMInfoFile returns nil for non-RM
-	// targets, so AOM 1.4 doesn't get one. Lives in its own
+	// rminfo data tables — emitted alongside the RM target (one
+	// sub-package down). Both renderers return nil for non-RM targets,
+	// so AOM 1.4 doesn't get them. The package lives in its own
 	// sub-package so it can be imported by the openehr/template
 	// compile step without dragging in the full rm package.
-	if rminfoBody, err := RenderRMInfoFile(plan); err != nil {
+	//
+	// lookup_gen.go carries the class universe (REQ-048); absence_gen.go
+	// carries the declared-but-omitted names behind it (REQ-049). One run
+	// emits both, so the two halves can never describe different BMMs.
+	lookupBody, err := RenderRMInfoFile(plan)
+	if err != nil {
 		return tr, err
-	} else if rminfoBody != nil {
-		rminfoPath := filepath.Join(opts.OutDir, "openehr", "rm", "rminfo", "lookup_gen.go")
-		tr.Files = append(tr.Files, rminfoPath)
-		result.Files = append(result.Files, rminfoPath)
+	}
+	absenceBody, err := RenderRMInfoAbsenceFile(plan)
+	if err != nil {
+		return tr, err
+	}
+	rminfoDir := filepath.Join(opts.OutDir, "openehr", "rm", "rminfo")
+	for _, gen := range []struct {
+		path string
+		body []byte
+	}{
+		{filepath.Join(rminfoDir, "lookup_gen.go"), lookupBody},
+		{filepath.Join(rminfoDir, "absence_gen.go"), absenceBody},
+	} {
+		if gen.body == nil {
+			continue
+		}
+		tr.Files = append(tr.Files, gen.path)
+		result.Files = append(result.Files, gen.path)
 		if opts.Verify {
-			drift, err := compareFile(rminfoPath, rminfoBody)
+			drift, err := compareFile(gen.path, gen.body)
 			if err != nil {
 				return tr, err
 			}
 			if drift != nil {
 				result.Drifts = append(result.Drifts, *drift)
 			}
-		} else {
-			if err := writeAtomic(rminfoPath, rminfoBody); err != nil {
-				return tr, err
-			}
+			continue
+		}
+		if err := writeAtomic(gen.path, gen.body); err != nil {
+			return tr, err
 		}
 	}
 

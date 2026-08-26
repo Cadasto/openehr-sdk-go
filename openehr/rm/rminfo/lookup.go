@@ -71,13 +71,18 @@ var (
 )
 
 // Default is the package-level Lookup populated by the generated
-// data tables (see lookup_gen.go). Tests and consumers should use
+// data tables (see lookup_gen.go for the class universe, absence_gen.go
+// for the names outside it). Tests and consumers should use
 // this value; New is provided for unit testing with synthetic data.
+//
+// As an [AbsenceReporter] it answers from the generated absence table, so an
+// out-of-universe name gets the reason it is out rather than a blanket
+// [AbsenceUndeclared] (REQ-049).
 //
 // Default is safe for concurrent use by multiple goroutines, including on
 // first use: the derived indexes it builds lazily are published under
 // [sync.Once].
-var Default Lookup = &lookup{data: defaultData}
+var Default Lookup = &lookup{data: defaultData, absence: absenceData}
 
 // New constructs a Lookup over a caller-supplied data set. Intended
 // for unit tests that need to substitute synthetic RM shapes.

@@ -11,11 +11,13 @@
 // NOT in the class universe (REQ-049) is on the optional [AbsenceReporter],
 // reached the same way.
 //
-// The data is generated from the pinned BMM under resources/bmm/
-// via internal/bmmgen and lives in lookup_gen.go; the hand-written
-// surface is the [Lookup], [Hierarchy], [AttributeLister] and
-// [AbsenceReporter] interfaces, the [ClassMeta] and [AttrMeta] data
-// types, and the [Default], [New] and [NewWithAbsence] accessors.
+// The data is generated from the pinned BMM under resources/bmm/ via
+// internal/bmmgen and lives in two tables one run emits together:
+// lookup_gen.go for the class universe, absence_gen.go for the declared
+// names outside it. The hand-written surface is the [Lookup], [Hierarchy],
+// [AttributeLister] and [AbsenceReporter] interfaces, the [ClassMeta] and
+// [AttrMeta] data types, and the [Default], [New] and [NewWithAbsence]
+// accessors.
 // No runtime BMM dependency — generated tables are pure Go strings.
 //
 // Consumed by [internal/templatecompile] (REQ-100 follow-up Phase 4)
