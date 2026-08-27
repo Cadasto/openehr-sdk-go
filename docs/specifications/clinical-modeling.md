@@ -1685,4 +1685,4 @@ These spellings are **additions** to the canonical write form whose home is [§ 
 
 - **Lives in:** [`openehr/aql/`](../../openehr/aql/) (extension)
 - **Probes:** [PROBE-088](conformance.md#probe-088--aql-builder-containment-and-paging-stability) (builder golden set, extended fixtures); [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) arm (c) (read/write parity corpus). No new probe id is allocated.
-- **Plan:** [`docs/plans/2026-08-26-aql-write-side-parity.md`](../plans/2026-08-26-aql-write-side-parity.md)
+- **Plan:** [`docs/plans/archive/2026-08-26-aql-write-side-parity.md`](../plans/archive/2026-08-26-aql-write-side-parity.md)

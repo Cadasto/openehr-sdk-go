@@ -1,11 +1,11 @@
 # Plan — AQL write-side parity: the builder can express what the parser can read
 
 **Date:** 2026-08-26
-**Status:** Draft
+**Status:** Complete
 **Owner:** SDK maintainers
-**Covers:** REQ-163 (proposed — first free id in the AQL semantics band 160–169; prose to be homed in [clinical-modeling.md](../specifications/clinical-modeling.md) beside REQ-160..162, authored in Phase 0 via `sdd-specify`). Amends nothing normative in landed REQs; extends the fixture sets of [PROBE-088](../specifications/conformance.md#probe-088--aql-builder-containment-and-paging-stability) and the arm-(c) corpus of [PROBE-097](../specifications/conformance.md#probe-097--aql-semantic-and-portability-lint-corpus).
-**Probes:** no new probe id — PROBE-088 (builder golden stability) and PROBE-097 arm (c) (read/write parity) both gain rows for the new constructs; PROBE-020's golden stays untouched.
-**Implementation:** planned
+**Covers:** [REQ-163](../../specifications/clinical-modeling.md#req-163--aql-write-side-expressivity-parity) — `landed`; 163 taken from the AQL semantics band 160–169, prose homed in [clinical-modeling.md](../../specifications/clinical-modeling.md) beside REQ-160..162 and authored in Phase 0 via `sdd-specify`. Amends nothing normative in landed REQs; extends the fixture sets of [PROBE-088](../../specifications/conformance.md#probe-088--aql-builder-containment-and-paging-stability) and the arm-(c) corpus of [PROBE-097](../../specifications/conformance.md#probe-097--aql-semantic-and-portability-lint-corpus).
+**Probes:** no new probe id — PROBE-088 (builder golden stability) gained fourteen goldens and three refusal rows, PROBE-097 arm (c) (read/write parity) four rows for the new constructs; PROBE-020's golden stayed untouched.
+**Implementation:** landed
 **Depends on:** landed REQ-055 / 117 / 118 / 119 (builder + canonicalisation), REQ-113 (the read-side vocabulary being mirrored), REQ-160..162 (relation + verification)
 **Defers:** a FROM-root standing predicate (REQ-055 rule 6 keeps the `WHERE e/ehr_id/value = $param` form deliberately); a FROM-root archetype predicate (separately unreachable, recorded in PROBE-097); a `TOP $n` parameter (the grammar admits none, REQ-118)
 
@@ -28,14 +28,14 @@ concrete failure today, verified by execution against v0.22.0:
 
 - `aql.Class("VERSION", "v")` is the **only** VERSION shape the builder can emit — exactly the
   shape the SDK's own `aql_version_no_predicate` warns on (SPECPR-481). All three routes to the
-  predicate are refused ([`containment.go`](../../openehr/aql/containment.go) rejects an
+  predicate are refused ([`containment.go`](../../../openehr/aql/containment.go) rejects an
   archetype predicate on VERSION; identifier validation rejects smuggling via alias or RM type).
 - REQ-161's own documented suppression shape —
   `… CONTAINS VERSIONED_COMPOSITION vo[uid/value=$vo] CONTAINS VERSION v[ALL_VERSIONS]`,
   the canonical *all versions of one composition* query — cannot be built: `Containment`
   carries only an archetype HRID (or `$param`) in its bracket.
 - `Col(path)` writes the projection **verbatim and unchecked**
-  ([`builder.go:215-218`](../../openehr/aql/builder.go)); SELECT is the one clause REQ-119's
+  ([`builder.go:215-218`](../../../openehr/aql/builder.go)); SELECT is the one clause REQ-119's
   write-path hardening did not reach. `DISTINCT`, `AS` and aggregates are expressible only by
   smuggling text through `Col`.
 
@@ -43,8 +43,8 @@ concrete failure today, verified by execution against v0.22.0:
 
 Implementation may start when:
 
-- **Phase 0 has landed REQ-163**: registry row in [REQ.md](../specifications/REQ.md), canonical
-  prose in [clinical-modeling.md](../specifications/clinical-modeling.md), a
+- **Phase 0 has landed REQ-163**: registry row in [REQ.md](../../specifications/REQ.md), canonical
+  prose in [clinical-modeling.md](../../specifications/clinical-modeling.md), a
   `traceability.yaml` entry (`status: specified`), and the numbering-policy band note
   (163 consumed from the AQL semantics band).
 - The two API forks below are settled in the REQ prose (not silently in code):
@@ -60,21 +60,26 @@ Implementation may start when:
      so a comparison on a VERSION node is legal AQL. Proposal: route it through the
      version-predicate carrier (`VersionCompare`, below) and refuse `Predicated` on a
      VERSION-spelled node with an error naming the right constructor — one carrier per grammar
-     position, mirroring the two-guard split [`predicate.go`](../../openehr/aql/predicate.go)
+     position, mirroring the two-guard split [`predicate.go`](../../../openehr/aql/predicate.go)
      already documents.
 
 ## Definition of Done
 
 - Code and tests land with `// REQ-163` citations (and `// PROBE-088` / `// PROBE-097` where
   fixtures grow).
-- [`traceability.yaml`](../specifications/traceability.yaml) and the REQ.md **Impl.** column
-  reflect the implementation.
-- **The two indexes `make spec-check` cannot see:** a [roadmap.md](../roadmap.md) row for
-  REQ-163, and the [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy) band
+- [`traceability.yaml`](../../specifications/traceability.yaml) and the REQ.md **Impl.** column
+  reflect the implementation. What landed: REQ-163's entry moved `planned` → `landed`, gained a
+  nine-file test list and `testkit/probes/aql` beside `openehr/aql` in `packages:`, and its notes
+  record the fourth standing-carrier refusal and the two called-out behaviour changes; REQ.md's
+  row moved `planned` → `landed`. No other REQ entry moved.
+- **The two indexes `make spec-check` cannot see:** a [roadmap.md](../../roadmap.md) row for
+  REQ-163, and the [REQ.md § Numbering policy](../../specifications/REQ.md#numbering-policy) band
   table updated (163 taken in the 160–169 AQL semantics band).
 - The canonical builder golden set under
-  [`openehr/aql/testdata/wire/`](../../openehr/aql/testdata/wire/) covers every new construct;
-  PROBE-020's existing golden is byte-unchanged (additivity).
+  [`openehr/aql/testdata/wire/`](../../../openehr/aql/testdata/wire/) covers every new construct;
+  PROBE-020's existing golden is byte-unchanged (additivity). Fourteen new files —
+  `version_*` ×3, `standing_*` ×3, `select_*` ×8 — all of them new names, so nothing was
+  re-baselined.
 - A builder-emitted `CONTAINS VERSION v[LATEST_VERSION]` query round-trips:
   `Build → parse.ParseQuery → Emit` is byte-identity, and `lint.LintString` raises **no**
   `aql_version_no_predicate` on it.
@@ -82,20 +87,27 @@ Implementation may start when:
   read/write parity now covers rows that were "builder-inexpressible" in the landed corpus.
 - `make spec-check` and `make ci` pass (run `golangci-lint` on the touched packages directly if
   the Docker image is unavailable).
-- Plan archived under [`docs/plans/archive/`](archive/).
+- Plan archived under [`docs/plans/archive/`](./).
+
+**One divergence worth recording.** The plan's Covers line promised the section would amend
+nothing normative, and it amended **itself**: Phase 2 built a fourth standing-carrier refusal —
+a second `Predicated` call on one node — that the Phase-0 prose had not enumerated, so Phase 4
+corrected § The standing-predicate carrier from three refusals to four and added the matching
+§ Acceptance row. The correction runs implementation → spec, which is the direction this repo
+prefers for a rule the code was always going to need; no landed REQ outside REQ-163 moved.
 
 ## Implementation checklist
 
 | Step | Status |
 |---|---|
-| Phase 0 — REQ-163 prose + registry + traceability (`sdd-specify`) | |
-| Indexes `spec-check` misses (`roadmap.md` row, REQ.md numbering band) | |
-| Phase 1 — version-predicate carrier | |
-| Phase 2 — standing-predicate carrier | |
-| Phase 3 — typed projection + `Distinct()` + structural verification | |
-| Phase 4 — probes, goldens, docs | |
-| `make spec-check` | |
-| `make ci` | |
+| Phase 0 — REQ-163 prose + registry + traceability (`sdd-specify`) | ✅ landed 2026-08-27 (`9193231`, `a50921a`) |
+| Indexes `spec-check` misses (`roadmap.md` row, REQ.md numbering band) | ✅ numbering band in Phase 0; `roadmap.md` row in Phase 4 |
+| Phase 1 — version-predicate carrier | ✅ landed 2026-08-27 (`5bd9f10`, `901feec`) |
+| Phase 2 — standing-predicate carrier | ✅ landed 2026-08-27 (`84c995c`, `5ea9183`) |
+| Phase 3 — typed projection + `Distinct()` + structural verification | ✅ landed 2026-08-27 (`8e35c03`, `d79d313`) |
+| Phase 4 — probes, goldens, docs | ✅ landed 2026-08-27 — PROBE-088 +14 goldens / +3 refusals, PROBE-097 arm (c) +4 rows, `doc.go`, conformance.md, the fourth-refusal spec correction, CHANGELOG + indexes |
+| `make spec-check` | ✅ OK at every phase |
+| `make ci` | ✅ green on the host at the end of Phase 4 (`fmt-check`, `mod-tidy-check`, `vet`, `go test ./... -count=1`, `golangci-lint run ./...` — 0 issues, `spec-check`, `flat-conformance-verify`, `build`) |
 
 ## Phases
 
@@ -125,10 +137,10 @@ holds). Registry row, traceability entry, numbering-band note.
 - New constructor `aql.Version(alias string, pred VersionPredicate) Containment` (fixed RM type
   `VERSION`; `Version("v", nil)` ≡ `Class("VERSION", "v")`, the predicate-less form staying
   legal). `Containment` gains an unexported version-predicate field beside `archetypeID`.
-- `validateTree` ([`containment.go`](../../openehr/aql/containment.go)): the field is refused on
+- `validateTree` ([`containment.go`](../../../openehr/aql/containment.go)): the field is refused on
   a non-VERSION node; the existing VERSION-archetype refusal stays; the rendered bracket text is
   belt-and-braces validated through the landed `aql.ValidateVersionPredicate`
-  ([`predicate.go`](../../openehr/aql/predicate.go)) — which finally gains its write-side caller.
+  ([`predicate.go`](../../../openehr/aql/predicate.go)) — which finally gains its write-side caller.
 - Emission: after the alias, `[` + canonical spelling + `]`.
 - Tests: all three predicate forms build, emit, re-parse to identity; the refusals
   (junction receiver, non-VERSION node, malformed comparison) each pinned; the built
@@ -194,7 +206,7 @@ holds). Registry row, traceability entry, numbering-band note.
 **Tasks:** extend PROBE-088's fixture set with the new constructs (its Preconditions already
 anticipate "golden fixtures … covering the new constructs"); extend PROBE-097 arm (c)'s corpus
 with the now-buildable rows and update its catalogue prose (the "builder-inexpressible" caveat
-narrows); update [`openehr/aql/doc.go`](../../openehr/aql/doc.go) examples; conformance.md
+narrows); update [`openehr/aql/doc.go`](../../../openehr/aql/doc.go) examples; conformance.md
 catalogue rows re-worded where they state the old unreachability; traceability + REQ.md Impl.
 column + roadmap row.
 
@@ -203,8 +215,8 @@ column + roadmap row.
 ## Mapping to specs
 
 - clinical-modeling.md § REQ-163 — normative contract (authored in Phase 0)
-- [clinical-modeling.md § REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) — the read-side vocabulary mirrored
-- [clinical-modeling.md § REQ-119](../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) — the write-path closure rule extended to SELECT
-- [clinical-modeling.md § REQ-161](../specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint) / [REQ-162](../specifications/clinical-modeling.md#req-162--builder-containment-verification) — the suppression shape and parity contract this makes reachable
-- [wire.md § REQ-055](../specifications/wire.md#req-055--wire-boundary) — canonicalisation rule set gaining the new spellings
-- [REQ.md](../specifications/REQ.md) — registry row + numbering band
+- [clinical-modeling.md § REQ-113](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) — the read-side vocabulary mirrored
+- [clinical-modeling.md § REQ-119](../../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) — the write-path closure rule extended to SELECT
+- [clinical-modeling.md § REQ-161](../../specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint) / [REQ-162](../../specifications/clinical-modeling.md#req-162--builder-containment-verification) — the suppression shape and parity contract this makes reachable
+- [wire.md § REQ-055](../../specifications/wire.md#req-055--wire-boundary) — canonicalisation rule set gaining the new spellings
+- [REQ.md](../../specifications/REQ.md) — registry row + numbering band
