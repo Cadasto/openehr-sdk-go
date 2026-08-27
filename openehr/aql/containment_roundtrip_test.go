@@ -223,6 +223,81 @@ func builderRoundTripCases() []struct {
 				aql.Class("OBSERVATION", "o"),
 			)).Build()
 		}},
+		// REQ-163 — the typed projection. Identity is the bar for the same
+		// reason as the two brackets above, sharpened: the extractor
+		// UPPER-CASES every projected function name while the emitter renders
+		// the name as carried, so a lower-case builder spelling comes back
+		// upper-cased and the round trip is not identity. These rows are also
+		// the REFERENCE decision procedure for the after-emission verification
+		// in projection_verify.go — the literal re-parse that scan states by
+		// hand, run over every construct it must accept.
+		{"projection_path_alias", func() (aql.Query, error) {
+			return aql.Select(aql.ColAs("e/ehr_id/value", "ehr")).From("EHR", "e").Build()
+		}},
+		{"projection_alias_via_as", func() (aql.Query, error) {
+			return aql.Select(aql.Col("e/ehr_id/value").As("ehr")).From("EHR", "e").Build()
+		}},
+		{"projection_star", func() (aql.Query, error) {
+			return aql.Select(aql.Star()).From("EHR", "e").Build()
+		}},
+		{"projection_star_mixed", func() (aql.Query, error) {
+			return aql.Select(aql.Star(), aql.Col("e/ehr_id/value")).From("EHR", "e").Build()
+		}},
+		{"projection_count_path", func() (aql.Query, error) {
+			return aql.Select(aql.Count("e/ehr_id/value")).From("EHR", "e").Build()
+		}},
+		{"projection_count_distinct", func() (aql.Query, error) {
+			return aql.Select(aql.CountDistinct("e/ehr_id/value")).From("EHR", "e").Build()
+		}},
+		{"projection_count_star_alias", func() (aql.Query, error) {
+			return aql.Select(aql.CountStar().As("n")).From("EHR", "e").Build()
+		}},
+		{"projection_lowercase_function_name", func() (aql.Query, error) {
+			return aql.Select(aql.Fn("max", aql.Col("e/time_created/value"))).From("EHR", "e").Build()
+		}},
+		{"projection_function_several_arguments", func() (aql.Query, error) {
+			return aql.Select(aql.Fn("CONCAT",
+				aql.Col("e/ehr_id/value"), aql.Lit(aql.String(", ")), aql.Lit(aql.Param("suffix")))).
+				From("EHR", "e").Build()
+		}},
+		{"projection_nested_function_call", func() (aql.Query, error) {
+			return aql.Select(aql.Fn("LENGTH", aql.Fn("CONCAT", aql.Col("e/ehr_id/value"), aql.Lit(aql.String("x"))))).
+				From("EHR", "e").Build()
+		}},
+		{"projection_distinct_star", func() (aql.Query, error) {
+			return aql.Select(aql.Star()).Distinct().From("EHR", "e").Build()
+		}},
+		{"projection_terminology_call", func() (aql.Query, error) {
+			return aql.Select(aql.Fn(aql.TerminologyFunc,
+				aql.Lit(aql.String("expand")), aql.Lit(aql.String("openehr")), aql.Lit(aql.String("x")))).
+				From("EHR", "e").Build()
+		}},
+		{"projection_literals", func() (aql.Query, error) {
+			return aql.Select(aql.Lit(aql.Int(1)), aql.Lit(aql.Real(1.5)), aql.Lit(aql.Bool(true)),
+				aql.Lit(aql.String("a, b")).As("label")).From("EHR", "e").Build()
+		}},
+		{"projection_distinct", func() (aql.Query, error) {
+			return sel().Distinct().Build()
+		}},
+		{"projection_distinct_with_top", func() (aql.Query, error) {
+			return sel().Distinct().Top(5).Build()
+		}},
+		{"projection_distinct_with_directed_top", func() (aql.Query, error) {
+			return sel().Distinct().TopDirected(5, aql.TopBackward).Build()
+		}},
+		{"projection_legacy_col_with_alias", func() (aql.Query, error) {
+			return aql.Select(aql.Col("COUNT(e/ehr_id/value) AS n")).From("EHR", "e").Build()
+		}},
+		{"projection_mixed_items", func() (aql.Query, error) {
+			return aql.Select(
+				aql.ColAs("c/uid/value", "uid"),
+				aql.CountStar().As("rows"),
+				aql.Lit(aql.Int(7)),
+				aql.Col("c/name/value"),
+			).Distinct().FromEHR("e", aql.Param("ehr_id")).
+				Contains(aql.Class("COMPOSITION", "c")).
+				OrderBy("c/name/value", aql.Ascending).Build()
+		}},
 		{"containment_with_where_and_order_by", func() (aql.Query, error) {
 			return aql.Select(aql.Col("o")).
 				FromEHR("e", aql.Param("ehr_id")).
