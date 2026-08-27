@@ -2299,3 +2299,41 @@ requirements:
       aql.SelectField losing useful ==-comparability — == still COMPILES and
       panics at run time whenever either operand carries a call-shaped field,
       map insertion likewise, the trap aql.Containment set in v0.18.0.
+
+  - id: REQ-164
+    title: AQL path-shape and paging lint
+    canonical: docs/specifications/clinical-modeling.md#req-164--aql-path-shape-and-paging-lint
+    status: draft
+    implementation: planned
+    packages:
+      - openehr/aql/lint
+      - testkit/probes/aql
+    probes: [PROBE-099]
+    plans: [docs/plans/2026-08-26-aql-path-shape-lint.md]
+    notes: >-
+      Third additive REQ-109 Layer-2 group: path shape. Five Warning codes
+      -- aql_path_repeating_unpredicated (an unpredicated multi-valued RM
+      segment, typed through rminfo's flattened AttributeRMType /
+      IsContainer), aql_paging_no_order_by (in-text LIMIT and the
+      Options.Query envelope's Fetch/Offset, no ORDER BY),
+      aql_select_no_alias (per unaliased SELECT item, star items exempt),
+      aql_fanout_path_grain (the PATH source of engine-defined row
+      multiplicity, SPECQUERY-9, once per alias -- sibling of REQ-161's
+      junction-source aql_fanout_row_grain, whose catalogue row gains only
+      the scope-boundary sentence) and aql_contains_redundant_step (an
+      unreferenced, predicate-less, non-root, non-leaf operand whose class
+      is unavoidable under the REQ-160 relation). The segment walk is
+      conservative in the Layer-3 style: an unknown class, an attribute the
+      pin does not declare, a BMM generic parameter (EVENT.data is typed T,
+      as VERSION.data is) or a $param archetype scope ends it silently, so
+      the walk's reach on the current pin is bounded and the spec says so.
+      Always on rather than Options-gated (no code flips Result.OK(); a
+      caller filters by Code) with the rejected style-gate alternative
+      recorded. No double-reporting: a VERSIONED_OBJECT-conforming operand
+      keeps REQ-161's aql_versioned_object_unreferenced. The redundant-step
+      check is specified but CUTTABLE -- it needs one new REQ-160 relation
+      query (working name Unavoidable); if implementation review declines
+      that API the check moves to REQ-164 § Out of scope with that
+      reasoning, the code string is not reused, and the requirement ships
+      four codes. PROBE-099 (Draft) carries the corpus: per-code positive,
+      per-rule negative near-miss, and the recorded PROBE-028 re-baseline.
