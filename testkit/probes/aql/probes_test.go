@@ -71,10 +71,12 @@ func probe088Goldens(t *testing.T) map[string]string {
 	return goldens
 }
 
-// PROBE-088 — builder containment algebra and in-text paging stability. The
-// REQ-117 constructs emit their committed goldens, both builder styles agree,
-// the PROBE-020 golden is unchanged, and combining the two paging channels is
-// a build-time error.
+// PROBE-088 — builder containment algebra, in-text paging, and (since REQ-163)
+// the version-predicate, standing-predicate and typed-projection carriers. Each
+// construct emits its committed golden, both builder styles agree, the
+// PROBE-020 golden is unchanged, and combining the two paging channels — or
+// emitting a SELECT that does not read back as the recorded projection — is a
+// build-time error.
 func TestProbe088BuilderContainmentAndPaging(t *testing.T) {
 	r, err := aqlprobes.Probe088BuilderContainmentAndPaging(probe088Goldens(t), goldenWire(t))
 	if err != nil {
@@ -267,12 +269,21 @@ func TestProbe028DetectsCodeDrift(t *testing.T) {
 // row in probe097ParityCases by scope, not by omission; a builder QUERY can
 // still trip one of the three (e.g. a bare VERSION operand raises
 // aql_version_no_predicate on the read side), it is only the write-side
-// finding that has no counterpart. A FROM-root archetype predicate is
-// excluded for a separate reason — openehr/aql/verify.go's own doc comment
-// records that the write-side FROM clause carries no archetype field at all
-// — which is why arm (a)'s archetype-mismatch rows below are spelled in
-// CONTAINS position throughout: that is the one spelling both arm (a) and
-// arm (c) can share, rather than two different queries pinning the same code.
+// finding that has no counterpart.
+//
+// What arm (c) can express WIDENED at REQ-163: the class-position version
+// predicate, the class-position standing comparison and the typed projection
+// are builder constructs now, so the REQ-163 rows at the end of
+// probe097ParityCases carry those brackets through the same parity comparison
+// — a bracket either side read differently would show up as a code the other
+// does not report. What stays out of reach is the FROM ROOT: openehr/aql's FROM
+// clause carries an RM type and an alias and nothing else, so a root archetype
+// predicate (openehr/aql/verify.go's own doc comment records this), a root
+// standing predicate (REQ-055 rule 6 keeps the WHERE spelling deliberately) and
+// a root version predicate are all unspellable, before REQ-163 and after it.
+// That is why arm (a)'s archetype-mismatch rows below are spelled in CONTAINS
+// position throughout: that is the one spelling both arm (a) and arm (c) can
+// share, rather than two different queries pinning the same code.
 
 // probe097FireCases is PROBE-097 arm (a)'s firing table: one row per REQ-161
 // code. Severities are REQ-161 § Checks, verbatim: impossible containment,
@@ -589,6 +600,76 @@ func probe097ParityCases() []aqlprobes.ParityCase {
 			return aql.NewBuilder().Select(aql.Col("ev")).From("COMPOSITION", "c").
 				Contains(aql.Archetype("EVALUATION", "ev", "openEHR-EHR-FOOTYPE.x.v1"))
 		}},
+
+		// --- REQ-163: the rows that were builder-inexpressible ----------------
+		//
+		// Each carries a construct no builder program could spell before REQ-163,
+		// through the same parity comparison as the rows above. The point is not
+		// a new code — these shapes are containment-clean or carry a code the
+		// corpus already covers — but that the new brackets and the new
+		// projection do not make the two sides disagree: the read side re-parses
+		// the emitted bracket text while the write side walks the recorded
+		// carrier, so a bracket either side reads differently would surface as a
+		// code the other does not report.
+		{
+			// REQ-161's motivating suppression shape, whose whole point is that
+			// it needs both class-position carriers at once. Containment-clean on
+			// both sides: EHR -> VERSIONED_COMPOSITION -> VERSION -> COMPOSITION
+			// is the admissible version-tier route REQ-160's overlay table names.
+			//
+			// The "near miss:" prefix is the corpus's clean-row convention and is
+			// load-bearing: TestProbe097GuardsCanFail's non-vacuity control
+			// deletes every row carrying it, and a clean row spelled otherwise
+			// would leave that control passing on a corpus it meant to empty.
+			// It is also accurate — this is arm (a)'s
+			// "near miss: VERSIONED_OBJECT operand referenced", now reachable
+			// from the builder.
+			Name: "near miss: VERSIONED_OBJECT referenced by a standing predicate (REQ-163)", Build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("c/uid/value")).
+					FromEHR("e", aql.Param("ehr_id")).
+					Contains(aql.Class("VERSIONED_COMPOSITION", "vo").
+						Predicated("uid/value", aql.OpEq, aql.Param("vo")).
+						Contains(aql.Version("v", aql.AllVersions()).
+							Contains(aql.Class("COMPOSITION", "c"))))
+			},
+		},
+		{
+			// The version-predicate carrier alone, in the shape that satisfies
+			// the aql_version_no_predicate advisory the builder could not
+			// previously satisfy at all. The advisory itself is a portability
+			// code and out of arm (c)'s scope; what this row checks is that the
+			// bracket leaves the CONTAINMENT verdicts alone on both sides.
+			// Clean, so it carries the "near miss:" prefix for the reason the
+			// row above records — and it is arm (a)'s
+			// "near miss: explicit version tier" in CONTAINS position.
+			Name: "near miss: explicit version tier in CONTAINS position (REQ-163)", Build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("c/uid/value")).
+					FromEHR("e", aql.Param("ehr_id")).
+					Contains(aql.Version("v", aql.LatestVersion()).
+						Contains(aql.Class("COMPOSITION", "c")))
+			},
+		},
+		{
+			// A standing predicate on a node whose PAIR is impossible: the
+			// bracket must not hide the finding from either side. Mirrors the
+			// "impossible containment" row above, with the new bracket added.
+			Name: "REQ-163: a standing predicate on an impossible pair", Build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.Col("o")).From("OBSERVATION", "o").
+					Contains(aql.Class("COMPOSITION", "c").
+						Predicated("name/value", aql.OpEq, aql.String("Vital signs")))
+			},
+		},
+		{
+			// The typed projection over an unknown class: SELECT is the clause
+			// REQ-163 rewrote, and the containment verdicts must be indifferent
+			// to it. DISTINCT and an aggregate together, so the clause-level flag
+			// rides along.
+			Name: "REQ-163: a typed projection over an unknown class", Build: func() *aql.Builder {
+				return aql.NewBuilder().Select(aql.CountStar().As("n")).Distinct().
+					From("COMPOSITION", "c").
+					Contains(aql.Class("FOO_BAR", "f"))
+			},
+		},
 	}
 }
 
