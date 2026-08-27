@@ -7,6 +7,26 @@
 //     ErrEngineCapability (both execute-time), ErrSyntax (parse-time), and
 //     ErrIncompleteAST (structured-AST residual after a clean parse).
 //
+// Since REQ-163 the builder spells the whole class- and projection-position
+// vocabulary the read side models, so a query with a version predicate, a
+// standing class predicate or a typed projection no longer needs a
+// hand-assembled string:
+//
+//	// … CONTAINS VERSION v[LATEST_VERSION]
+//	Contains(Version("v", LatestVersion()))
+//	// … CONTAINS VERSIONED_COMPOSITION vo[uid/value = $vo]
+//	Contains(Class("VERSIONED_COMPOSITION", "vo").Predicated("uid/value", OpEq, Param("vo")))
+//	// SELECT DISTINCT COUNT(*) AS n …
+//	Select(CountStar().As("n")).Distinct()
+//
+// The version bracket's three shapes are [LatestVersion], [AllVersions] and
+// [VersionCompare], carried onto the class by [Version]; the class bracket's one
+// comparison by [Containment.Predicated]; the projection by [ColAs], [Star],
+// [Count], [CountDistinct], [CountStar], [Fn], [Lit] and [SelectField.As],
+// beside the clause-level [Builder.Distinct]. [Col] is unchanged and stays the
+// legacy route — its text is spliced into the projection verbatim, which is
+// what the SELECT verification below bounds.
+//
 // The executor lives at openehr/client/query and wraps this package.
 // Parsing and static lint of AQL strings live in the building-block subpackages
 // openehr/aql/parse (syntax → generated-type-free AST) and openehr/aql/lint
