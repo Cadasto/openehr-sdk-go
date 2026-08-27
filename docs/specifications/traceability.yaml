@@ -2325,7 +2325,7 @@ requirements:
       is unavoidable under the REQ-160 relation). The segment walk is
       conservative in the Layer-3 style: an unknown class, an attribute the
       pin does not declare, a BMM generic parameter (EVENT.data is typed T,
-      as VERSION.data is) or a $param archetype scope ends it silently, so
+      as ORIGINAL_VERSION.data is) or a $param archetype scope ends it silently, so
       the walk's reach on the current pin is bounded and the spec says so.
       Always on rather than Options-gated (no code flips Result.OK(); a
       caller filters by Code) with the rejected style-gate alternative
