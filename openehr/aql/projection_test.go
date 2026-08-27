@@ -352,6 +352,55 @@ func TestProjectionRefusals(t *testing.T) {
 	}
 }
 
+// TestProjectionFuncNameFoldIsASCII pins the FOLD that canonicalises a projected
+// function name — [aql.Fn] upper-cases over ASCII letters only, never through
+// strings.ToUpper — the third site of the polarity the two class-bracket
+// siblings pin (TestVersionPredicateSpellingFoldIsASCII,
+// TestStandingPredicateSpellingFoldIsASCII).
+//
+// This is the site where the fold runs BEFORE the name validator and feeds it,
+// so a wider fold accepts MORE: the Unicode mapping folds some non-ASCII letters
+// INTO the ASCII alphabet (`ı` → `I`, `ſ` → `S`), which turns a spelling the
+// lexer cannot tokenise into a legal-looking one (REQ-163 § Canonical spellings,
+// a MUST NOT). `mın` is the worst arm — the fold does not merely respell it, it
+// MOVES the call into aql.IsAggregateFunc, so the aggregate shape rule would
+// then be applied to a call the caller never wrote. That is the
+// silent-substitution class REQ-119 and REQ-163 exist to close.
+//
+// The refusal names the offending spelling, and that is deliberate rather than a
+// gap in TestProjectionDiagnosticsAreValueFree below: a projected function name
+// has the developer-authored-identifier status REQ-055 rule 3 gives a path, not
+// the caller-data status of a value, so the redaction rule does not bind it.
+func TestProjectionFuncNameFoldIsASCII(t *testing.T) {
+	// Every ASCII casing IS the name, and emits the one canonical spelling. The
+	// accept rows are the positive control: a fold tightened into refusing valid
+	// AQL fails here (REQ-163 § Acceptance).
+	for _, name := range []string{"max", "MAX", "Max"} {
+		t.Run("accepts "+name, func(t *testing.T) {
+			q, err := projectionQuery(aql.Fn(name, aql.Col("c/uid/value")))
+			if err != nil {
+				t.Fatalf("Build refused the ASCII spelling %q: %v", name, err)
+			}
+			if !strings.Contains(q.String(), "MAX(c/uid/value)") {
+				t.Fatalf("built %q, want the canonical MAX(c/uid/value)", q.String())
+			}
+		})
+	}
+	// The Unicode fold-equal spellings. Each is refused today; each would BUILD
+	// under strings.ToUpper — `maıx` into a legal-looking identifier, `mın` and
+	// `ſum` into AGGREGATES the caller never named.
+	for _, name := range []string{"mın", "maıx", "ſum"} {
+		t.Run("refuses "+name, func(t *testing.T) {
+			q, err := projectionQuery(aql.Fn(name, aql.Col("c/uid/value")))
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("err = %v (query %q), want ErrInvalidQuery — the spelling is not one the AQL "+
+					"lexer can tokenise, and folding it into the ASCII alphabet would launder it into "+
+					"a name the caller never wrote", err, q.String())
+			}
+		})
+	}
+}
+
 // TestColSmugglingShapesArePinned is REQ-163 § Acceptance's per-shape ruling on
 // the smuggling shapes the audit found. Each carries a NAMED expected verdict —
 // not "either way", which would let the ruling pass whichever way it was
