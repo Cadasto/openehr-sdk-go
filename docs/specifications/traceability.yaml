@@ -2227,23 +2227,43 @@ requirements:
     title: AQL write-side expressivity parity
     canonical: docs/specifications/clinical-modeling.md#req-163--aql-write-side-expressivity-parity
     status: draft
-    implementation: planned
+    implementation: landed
     packages:
       - openehr/aql
+      - testkit/probes/aql
     probes: [PROBE-088, PROBE-097]
     plans: [docs/plans/2026-08-26-aql-write-side-parity.md]
+    tests:
+      - openehr/aql/version_test.go
+      - openehr/aql/version_internal_test.go
+      - openehr/aql/standing_test.go
+      - openehr/aql/standing_internal_test.go
+      - openehr/aql/projection_test.go
+      - openehr/aql/projection_internal_test.go
+      - openehr/aql/containment_roundtrip_test.go
+      - openehr/aql/parse/dispatch_tripwire_test.go
+      - testkit/probes/aql/probes_test.go
     notes: >-
       Write-side carriers for the three class- and projection-position
       vocabularies the read side already models: the sealed three-shape
       version predicate (versionPredicate : LATEST_VERSION | ALL_VERSIONS |
-      standardPredicate), the one-comparison class standing predicate, and
-      the typed projection mirroring parse.SelectClause (DISTINCT, AS,
-      aggregate/function and literal items). Two API forks settled in the
-      prose rather than in code: Col keeps its signature and its leniency
-      while Build() gains the after-emission structural verification
-      REQ-119's own scope-change clause anticipated, and a standing
-      predicate on a VERSION-spelled node is refused with an error naming
-      the version-predicate constructor (one carrier per grammar position).
-      No new probe id: PROBE-088 gains golden fixtures and PROBE-097 arm (c)
-      gains the rows that were builder-inexpressible. Additive — PROBE-020's
-      golden stays byte-unchanged and no REQ-161/162 code or contract moves.
+      standardPredicate) reached through the VERSION-fixed aql.Version, the
+      one-comparison class standing predicate
+      (Containment.Predicated, four refusals — junction receiver, archetype
+      pair, second standing predicate, VERSION routing), and the typed
+      projection mirroring parse.SelectClause (DISTINCT, AS,
+      aggregate/function and literal items, star). Two API forks settled in
+      the prose rather than in code: Col keeps its signature and its
+      leniency while Build() gains the after-emission structural
+      verification REQ-119's own scope-change clause anticipated, and a
+      standing predicate on a VERSION-spelled node is refused with an error
+      naming the version-predicate constructor (one carrier per grammar
+      position). No new probe id: PROBE-088 gained fourteen golden fixtures
+      and three refusal rows, PROBE-097 arm (c) four parity rows that were
+      builder-inexpressible; what stays unspellable is the FROM root's own
+      bracket in every spelling. Additive — PROBE-020's golden is
+      byte-unchanged and no REQ-161/162 code or contract moves. Two changes
+      to previously-accepted behaviour are called out in the CHANGELOG: a
+      Col that changes the recorded projection structure now fails Build()
+      (semver-minor on REQ-119's footing), and aql.SelectField is not
+      ==-comparable, as aql.Containment stopped being in v0.18.0.

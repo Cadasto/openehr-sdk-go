@@ -113,7 +113,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-160 | AQL containment admissibility relation | [clinical-modeling.md § REQ-160](clinical-modeling.md#req-160--aql-containment-admissibility-relation) | landed |
 | REQ-161 | AQL semantic and portability lint | [clinical-modeling.md § REQ-161](clinical-modeling.md#req-161--aql-semantic-and-portability-lint) | landed |
 | REQ-162 | Builder containment verification | [clinical-modeling.md § REQ-162](clinical-modeling.md#req-162--builder-containment-verification) | landed |
-| REQ-163 | AQL write-side expressivity parity | [clinical-modeling.md § REQ-163](clinical-modeling.md#req-163--aql-write-side-expressivity-parity) | planned |
+| REQ-163 | AQL write-side expressivity parity | [clinical-modeling.md § REQ-163](clinical-modeling.md#req-163--aql-write-side-expressivity-parity) | landed |
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `deprecated` (normative text retained; implementation removed or not shipped — removal target in canonical spec). Detail in [`traceability.yaml`](traceability.yaml).
 
