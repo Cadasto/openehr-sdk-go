@@ -42,15 +42,21 @@ import (
 // interface declarations disappears (renamed without updating this list) so
 // the derivation below cannot silently go blind.
 //
-// VersionPredicate (REQ-163) is registered here on the SAME footing as the
-// other four, not because it has a dispatch site to police today — production
-// code calls its interface methods and never type-switches on it — but because
-// this file exists on the premise that a mutation test cannot see a site that
-// does not exist yet. A vocabulary outside the sweep is a vocabulary whose
-// first dispatch site lands unwatched.
+// VersionPredicate and selectOperand (REQ-163) are registered here on the SAME
+// footing as the other four, not because either has a dispatch site to police
+// today — production code calls their interface methods and never type-switches
+// on them — but because this file exists on the premise that a mutation test
+// cannot see a site that does not exist yet. A vocabulary outside the sweep is a
+// vocabulary whose first dispatch site lands unwatched.
+//
+// selectOperand is the openehr/aql projection vocabulary (the write-side mirror
+// of [parse.SelectExpr]). It needs its OWN marker name rather than reusing
+// isSelectExpr, because the derivation below keys on type names alone and would
+// otherwise fold the two packages' shape sets into one — making
+// [parse.DerefSelectExpr] answerable for shapes that are not in its vocabulary.
 var sealedIfaces = map[string]bool{
 	"Value": true, "WhereExpr": true, "SelectExpr": true, "LimitExpr": true,
-	"VersionPredicate": true,
+	"VersionPredicate": true, "selectOperand": true,
 }
 
 // markerMethods are the sealed interfaces' method names; a type declaring one
@@ -59,6 +65,7 @@ var markerMethods = map[string]bool{
 	"token": true, "expr": true, "validate": true,
 	"isSelectExpr": true, "isLimitExpr": true,
 	"versionBracket": true, "versionValidate": true,
+	"selectToken": true,
 }
 
 func TestSealedVocabularyDispatchSitesNormalise(t *testing.T) {
@@ -247,7 +254,7 @@ func TestDerefSwitchesCoverEveryShape(t *testing.T) {
 	// to VersionPredicate and needs no such gate.
 	vocab := map[string]map[string]bool{
 		"Value": {}, "WhereExpr": {}, "SelectExpr": {}, "LimitExpr": {},
-		"VersionPredicate": {},
+		"VersionPredicate": {}, "selectOperand": {},
 	}
 	for _, f := range files {
 		for _, decl := range f.Decls {
@@ -276,11 +283,14 @@ func TestDerefSwitchesCoverEveryShape(t *testing.T) {
 				}
 			case "versionBracket":
 				vocab["VersionPredicate"][id.Name] = true
+			case "selectToken":
+				vocab["selectOperand"][id.Name] = true
 			}
 		}
 	}
 	for name, min := range map[string]int{
 		"Value": 8, "WhereExpr": 6, "SelectExpr": 4, "LimitExpr": 2, "VersionPredicate": 3,
+		"selectOperand": 5,
 	} {
 		if len(vocab[name]) < min {
 			t.Fatalf("derived only %d %s shapes (floor %d) — the marker derivation has gone blind",
@@ -291,14 +301,16 @@ func TestDerefSwitchesCoverEveryShape(t *testing.T) {
 	// The switches under coverage: function name → the vocabulary it must
 	// exhaust, and whether the pointer twin case is required too.
 	//
-	// VersionPredicate (REQ-163) has no row and no normaliser, deliberately:
-	// its three shapes are UNEXPORTED, so no caller outside openehr/aql can
-	// form a pointer twin and there is nothing to normalise — the failure mode
-	// this sweep exists for is unreachable rather than unhandled. It is still
-	// derived above, with its own floor, so the day a `derefVersionPredicate`
-	// is written, adding one row here holds it closed over shapes this sweep
-	// already knows. Registering the vocabulary without registering a
-	// normaliser is the honest state, not an omission.
+	// VersionPredicate and selectOperand (REQ-163) have no row and no
+	// normaliser, deliberately: their shapes are UNEXPORTED — selectOperand's
+	// interface is unexported too — so no caller outside openehr/aql can form a
+	// pointer twin and there is nothing to normalise; the failure mode this
+	// sweep exists for is unreachable rather than unhandled. Both are still
+	// derived above, with their own floors, so the day a
+	// `derefVersionPredicate` or `derefSelectOperand` is written, adding one row
+	// here holds it closed over shapes this sweep already knows. Registering a
+	// vocabulary without registering a normaliser is the honest state, not an
+	// omission.
 	targets := map[string]struct {
 		vocab    string
 		pointers bool

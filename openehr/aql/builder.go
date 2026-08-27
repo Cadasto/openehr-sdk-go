@@ -26,8 +26,25 @@ type Builder struct {
 func NewBuilder() *Builder { return &Builder{} }
 
 // Select sets the projection list (SELECT). Later calls replace earlier ones.
+// Construct the entries with [Col] or, preferred, the typed constructors
+// [ColAs], [Count], [CountDistinct], [CountStar], [Fn], [Lit] and [Star].
 func (b *Builder) Select(cols ...SelectField) *Builder {
 	b.ast.sel = slices.Clone(cols)
+	return b
+}
+
+// Distinct sets the clause-level `SELECT DISTINCT` flag (REQ-163), emitted
+// directly after `SELECT` and BEFORE the deprecated TOP clause — the grammar's
+// `selectClause : SELECT DISTINCT? top? selectExpr …`.
+//
+// The flag is a property of the CLAUSE, not of an item: the parser consumes the
+// keyword before the first projection, so it applies to the whole row. This is
+// the only route to it — a `Col` whose text merely begins with the keyword sets
+// a flag the builder never recorded, and [Builder.Build] refuses it (see [Col]).
+//
+// Calling it twice is the same as calling it once; there is no unset.
+func (b *Builder) Distinct() *Builder {
+	b.ast.distinct = true
 	return b
 }
 
@@ -211,12 +228,6 @@ func (b *Builder) Bind(name string, value any) *Builder {
 // [Bind] name is empty after stripping a leading `$` (REQ-055 rule 4).
 func (b *Builder) Build() (Query, error) { return b.ast.build() }
 
-// SelectField is one entry in the SELECT projection list. Construct with [Col].
-type SelectField struct{ path string }
-
-// Col is a projected path or alias, e.g. Col("o") or Col("o/data[at0001]").
-func Col(path string) SelectField { return SelectField{path: strings.TrimSpace(path)} }
-
 // Direction is an ORDER BY sort direction.
 type Direction int
 
@@ -252,7 +263,11 @@ type fromClause struct {
 // ast is the shared, unexported query tree emitted by both builder styles. It
 // is the single canonicalisation point (REQ-055).
 type ast struct {
-	sel       []SelectField
+	sel []SelectField
+	// distinct is the clause-level `SELECT DISTINCT` flag (REQ-163). It is a
+	// plain bool because the flag has no absent-vs-false distinction: no
+	// DISTINCT and `DISTINCT` off are the same clause.
+	distinct  bool
 	from      *fromClause
 	contains  []Containment
 	where     WhereExpr
@@ -279,10 +294,19 @@ func (a *ast) build() (Query, error) {
 	if len(a.sel) == 0 {
 		return Query{}, fmt.Errorf("%w: no SELECT fields", ErrInvalidQuery)
 	}
-	for _, c := range a.sel {
-		if c.path == "" {
-			return Query{}, fmt.Errorf("%w: empty SELECT field", ErrInvalidQuery)
-		}
+	// REQ-163: the SELECT clause is rendered HERE, ahead of the other clauses,
+	// and then read back and compared against the structure the builder
+	// recorded — the projection is the one clause the builder writes verbatim
+	// caller text into, so it is the one that needs verifying after emission
+	// (projection_verify.go). Rendering it first also keeps the per-item
+	// diagnostics ahead of the FROM / ORDER BY ones, whose coordinates are
+	// coarser.
+	selClause, recorded, err := a.selectClause()
+	if err != nil {
+		return Query{}, err
+	}
+	if err := verifySelectClause(selClause, recorded); err != nil {
+		return Query{}, err
 	}
 	if a.from == nil {
 		return Query{}, fmt.Errorf("%w: no FROM source", ErrInvalidQuery)
@@ -333,20 +357,10 @@ func (a *ast) build() (Query, error) {
 
 	var sb strings.Builder
 	sb.WriteString("SELECT ")
-	// REQ-118: the deprecated TOP row limit precedes the projection list
-	// (grammar: `SELECT DISTINCT? top? selectExpr …`). validatePaging has
-	// already refused a negative count, an unknown direction, and any
-	// combination with the other row-limit channels.
-	if a.top != nil {
-		sb.WriteString(FormatTop(a.top))
-		sb.WriteByte(' ')
-	}
-	for i, c := range a.sel {
-		if i > 0 {
-			sb.WriteString(", ")
-		}
-		sb.WriteString(c.path)
-	}
+	// The clause payload — `DISTINCT? top? selectExpr (, selectExpr)*` — was
+	// rendered and verified above, so what goes on the wire is byte-for-byte
+	// the text the verification read back (REQ-163).
+	sb.WriteString(selClause)
 
 	sb.WriteString(" FROM ")
 	sb.WriteString(a.from.rmType)

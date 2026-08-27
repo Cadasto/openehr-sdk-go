@@ -20,14 +20,16 @@
 // them implies the next:
 //
 //   - [Builder.Build] answers the SHAPE question: is this representable,
-//     canonical AQL? It refuses a tree the grammar cannot carry — plus two
-//     write-side rules of its own, both documented where they live: a
+//     canonical AQL? It refuses a tree the grammar cannot carry — plus three
+//     write-side rules of its own, each documented where it lives: a
 //     containment class node must carry an alias (an ergonomic choice, not a
-//     grammar rule — [Containment.validateTree]), and paging must not be set on
+//     grammar rule — [Containment.validateTree]); paging must not be set on
 //     both the in-text and request-envelope channels, which never reaches the
-//     emitted text at all (`validatePaging`, REQ-117). What Build does NOT ask
-//     is the RM question: a query whose classes can never contain one another
-//     still builds and emits.
+//     emitted text at all (`validatePaging`, REQ-117); and the SELECT clause it
+//     emitted must read back as the projection it recorded, which is what bounds
+//     [Col]'s verbatim splicing (`verifySelectClause`, REQ-163). What Build does
+//     NOT ask is the RM question: a query whose classes can never contain one
+//     another still builds and emits.
 //   - [Builder.VerifyContainment] is the opt-in RM-semantics gate (REQ-162): it
 //     walks the builder's own FROM root and containment algebra and reports the
 //     REQ-161 containment findings. It takes a nilable REQ-160 containment
