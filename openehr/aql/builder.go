@@ -223,9 +223,13 @@ func (b *Builder) Bind(name string, value any) *Builder {
 	return b
 }
 
-// Build emits the canonical [Query]. It returns an error wrapping
-// [ErrInvalidQuery] if the query has no projection or no source, or if a
-// [Bind] name is empty after stripping a leading `$` (REQ-055 rule 4).
+// Build emits the canonical [Query], or an error wrapping [ErrInvalidQuery].
+// Every write-side rule this package states is reported HERE, at one seam,
+// rather than by each setter — among them: no projection and no source; an
+// emitted SELECT clause that does not read back as the projection recorded here,
+// split into more items, spilled into another clause, or carrying a clause-level
+// flag the builder never set (REQ-163 § `Build()` verifies what it emitted); and
+// a [Bind] name that is empty after stripping a leading `$` (REQ-055 rule 4).
 func (b *Builder) Build() (Query, error) { return b.ast.build() }
 
 // Direction is an ORDER BY sort direction.
@@ -298,9 +302,13 @@ func (a *ast) build() (Query, error) {
 	// and then read back and compared against the structure the builder
 	// recorded — the projection is the one clause the builder writes verbatim
 	// caller text into, so it is the one that needs verifying after emission
-	// (projection_verify.go). Rendering it first also keeps the per-item
-	// diagnostics ahead of the FROM / ORDER BY ones, whose coordinates are
-	// coarser.
+	// (projection_verify.go). Rendering it first also fixes the diagnosis order:
+	// the per-item projection refusals, whose coordinates are the finest the
+	// builder has, land ahead of EVERY other refusal below — `no FROM source`
+	// included, and the containment, ORDER BY and paging ones with it. Only
+	// `no SELECT fields` outranks them. First defect wins, so on a query carrying
+	// two defects the projection one is what the caller sees; no verdict changes,
+	// since each of those pairings was a refusal before this clause moved.
 	selClause, recorded, err := a.selectClause()
 	if err != nil {
 		return Query{}, err

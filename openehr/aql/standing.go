@@ -107,12 +107,14 @@ func (c Containment) standingRefusal() error {
 	case c.archetypeID != "":
 		return fmt.Errorf("%w: a standing predicate beside the archetype predicate %q — the two are "+
 			"mutually exclusive spellings of ONE `[…]` position, so one would be silently dropped; "+
-			"keep one bracket and move the other condition to WHERE",
+			"keep one bracket and move the other condition to WHERE — or, under NOT CONTAINS, where "+
+			"this node's alias binds no result row, restructure the term",
 			ErrInvalidQuery, c.archetypeID)
 	case c.standingPred != nil:
 		return fmt.Errorf("%w: a second standing predicate on one class expression — `standardPredicate` "+
 			"is ONE `objectPath COMPARISON_OPERATOR pathPredicateOperand` and the bracket holds one "+
-			"predicate, so the first would be silently dropped; join the conditions in WHERE",
+			"predicate, so the first would be silently dropped; join the conditions in WHERE — or, "+
+			"under NOT CONTAINS, where this node's alias binds no result row, restructure the term",
 			ErrInvalidQuery)
 	}
 	return nil
