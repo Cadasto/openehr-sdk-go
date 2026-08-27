@@ -55,11 +55,6 @@ type SelectField struct {
 	// item's alias is part of the structure Build verifies.
 	alias    string
 	aliasSet bool
-	// invalid records a constructor misuse that has no valid item to return,
-	// surfaced by [Builder.Build] — the `invalid`-field route the containment
-	// algebra already uses, never absorbed into a shape that means something
-	// else.
-	invalid error
 }
 
 // selectOperand is the SEALED SELECT-operand vocabulary — the write-side twin
@@ -492,9 +487,6 @@ type renderedItem struct {
 // render renders one projection item: the operand text, plus the canonical
 // ` AS <alias>` when an alias was recorded.
 func (f SelectField) render(idx int) (renderedItem, error) {
-	if f.invalid != nil {
-		return renderedItem{}, f.invalid
-	}
 	if f.expr == nil {
 		return renderedItem{}, fmt.Errorf("%w: empty SELECT field", ErrInvalidQuery)
 	}
@@ -543,9 +535,6 @@ func (f SelectField) render(idx int) (renderedItem, error) {
 // argument, changing the call's ARITY with nothing downstream able to see it —
 // the silent-substitution mode one level below the item list.
 func (f SelectField) renderArgument(fn string, idx int) (string, error) {
-	if f.invalid != nil {
-		return "", f.invalid
-	}
 	if f.expr == nil {
 		return "", fmt.Errorf("%w: %s() argument %d is empty", ErrInvalidQuery, fn, idx)
 	}
