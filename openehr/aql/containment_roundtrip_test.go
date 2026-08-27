@@ -298,6 +298,30 @@ func builderRoundTripCases() []struct {
 				Contains(aql.Class("COMPOSITION", "c")).
 				OrderBy("c/name/value", aql.Ascending).Build()
 		}},
+		// REQ-163 — all THREE carriers in one query. Each is covered above on its
+		// own, and identity across the three together is a separate claim: the
+		// version bracket, the standing bracket and the typed projection are
+		// rendered by three different writers into one string, and the
+		// after-emission verification (projection_verify.go) scans the SELECT
+		// payload alone, so a bracket leaking into its input would show up HERE
+		// and nowhere else in this corpus. The emission ORDER the clause fixes —
+		// DISTINCT before the items, the version tier below the versioned object —
+		// is part of what identity pins.
+		{"all_three_req163_carriers", func() (aql.Query, error) {
+			return aql.Select(
+				aql.ColAs("c/uid/value", "uid"),
+				aql.CountStar().As("rows"),
+				aql.Lit(aql.Int(7)),
+			).Distinct().
+				FromEHR("e", aql.Param("ehr_id")).
+				Contains(aql.Class("VERSIONED_COMPOSITION", "vo").
+					Predicated("uid/value", aql.OpEq, aql.Param("vo")).
+					Contains(aql.Version("v", aql.AllVersions()).
+						Contains(aql.Class("COMPOSITION", "c")))).
+				Where(aql.Eq("c/name/value", aql.String("Vital signs"))).
+				OrderBy("c/uid/value", aql.Ascending).
+				Build()
+		}},
 		{"containment_with_where_and_order_by", func() (aql.Query, error) {
 			return aql.Select(aql.Col("o")).
 				FromEHR("e", aql.Param("ehr_id")).
