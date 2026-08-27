@@ -349,6 +349,16 @@ var probe088Refusals = []struct {
 		},
 	},
 	{
+		// REQ-163: the third mode of the same rule, and the one the wire
+		// assertion names last. A clause keyword at the top level ENDS the
+		// projection, so the parser reads a FROM the builder never wrote and
+		// the query it runs is not the query that was built.
+		name: "col_spills_into_another_clause",
+		build: func() (aql.Query, error) {
+			return probe088ProjectionQuery(aql.Col("c/uid/value FROM EHR e2"))
+		},
+	},
+	{
 		// REQ-163: one carrier per grammar position. A comparison on a VERSION
 		// node is legal AQL and reachable — through the VERSION bracket's own
 		// carrier, `Version(alias, VersionCompare(…))`. Routing a class-position

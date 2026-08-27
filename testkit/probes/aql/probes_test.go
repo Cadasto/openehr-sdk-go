@@ -132,6 +132,12 @@ func TestProbe020GoldenIsBytePinned(t *testing.T) {
 // committed golden MUST parse with no catalogue gap (no aql.ErrIncompleteAST)
 // and re-emit to the same bytes, so the builder's canonical form and the
 // parser's are provably the same form (REQ-117).
+//
+// Since REQ-163 the goldens include that REQ's three write-side carriers — the
+// VERSION predicate bracket, the class-position standing comparison and the
+// typed projection — so this is also where their byte-IDENTITY duty is met on the
+// committed files (REQ-163 § Read-side mirror duty); the corpus grows with
+// [aqlprobes.Probe088Constructs], so a new construct is picked up here for free.
 func TestProbe088GoldensRoundTripThroughParse(t *testing.T) {
 	for name, golden := range probe088Goldens(t) {
 		t.Run(name, func(t *testing.T) {
