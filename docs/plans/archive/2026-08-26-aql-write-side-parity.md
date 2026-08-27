@@ -95,6 +95,12 @@ a second `Predicated` call on one node — that the Phase-0 prose had not enumer
 corrected § The standing-predicate carrier from three refusals to four and added the matching
 § Acceptance row. The correction runs implementation → spec, which is the direction this repo
 prefers for a rule the code was always going to need; no landed REQ outside REQ-163 moved.
+A related fork in the draft's own text resolved the same way: Phase 0's prose had suggested the
+[REQ-055](../../specifications/wire.md#req-055--wire-boundary) canonicalisation rule set would
+gain the new spellings, and a main-branch correction to the draft recorded that reading — the
+execution instead homed every new canonical spelling in REQ-163 itself (the controller's
+pre-flight ruling: one home per fact, beside the construct), leaving REQ-055 untouched apart
+from one non-normative pointer sentence in wire.md.
 
 ## Implementation checklist
 

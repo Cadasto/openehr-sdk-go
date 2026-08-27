@@ -104,8 +104,8 @@ AQL-FIT-05, useful even if later phases slip.
 - PROBE-028 re-baseline (if any) recorded in the catalogue entry, per the additivity guard.
 - The four guidance rules and the two row-multiplication sources are each covered by exactly
   one code — no double-reporting with `aql_versioned_object_unreferenced` (an operand
-  conforming to `VERSIONED_OBJECT` keeps the REQ-161 code; the REQ-164 redundant-step check
-  MUST skip it).
+  conforming to `VERSIONED_OBJECT` keeps the REQ-161 code, and the REQ-164 redundant-step
+  check skips it).
 - `make spec-check` and `make ci` pass.
 - Plan archived under [`docs/plans/archive/`](archive/).
 
