@@ -143,3 +143,43 @@ func TestDefaultOverlayEndpointsPinKnown(t *testing.T) {
 		}
 	}
 }
+
+// TestUnavoidableDoesNotPoisonTheMemo is the INSIDE half of the guarantee
+// [TestUnavoidableLeavesTheVerdictMemoIntact] states from outside: the
+// vertex-exclusion walk MUST NOT share the verdict memo, because excluding a
+// vertex is a different graph. Only an internal test can see the difference
+// before it becomes a wrong verdict, and only on a FRESH relation — the shared
+// default has already been walked by every other test in the package.
+//
+// Two claims, one per direction:
+//
+//   - what IS memoized after the call is the whole-graph closure. If the
+//     exclusion walk stored its own, narrower closure under the same key, EHR
+//     would have lost COMPOSITION and everything below it;
+//   - what is NOT memoized is mode 0. Unavoidable reads routes at their widest
+//     on both halves of its question (its own doc comment), so it never asks
+//     the ByReference-excluded closure, and a change to that decision is
+//     visible here rather than only in a verdict somewhere downstream.
+func TestUnavoidableDoesNotPoisonTheMemo(t *testing.T) {
+	r := build(rminfo.Default, defaultOverlays())
+	if !r.Unavoidable("EHR", "COMPOSITION", "OBSERVATION") {
+		t.Fatal("premise gone: the relation no longer proves the REQ-164 witness, so this test proves nothing")
+	}
+
+	v, ok := r.memo[1].Load("EHR")
+	if !ok {
+		t.Fatal("premise gone: the route-existence half memoizes EHR's closure, and nothing did")
+	}
+	closure, _ := v.(map[string]bool)
+	// Each of these is reachable from EHR in the WHOLE graph and unreachable
+	// once COMPOSITION is excluded — exactly the nodes a poisoned memo drops.
+	for _, n := range []string{"COMPOSITION", "OBSERVATION", "SECTION"} {
+		if !closure[n] {
+			t.Errorf("memo[1][EHR] does not contain %q; the exclusion walk wrote its own closure into the shared memo", n)
+		}
+	}
+
+	if _, ok := r.memo[0].Load("EHR"); ok {
+		t.Error("memo[0][EHR] was written; Unavoidable reads routes at their widest and must never ask the ByReference-excluded closure")
+	}
+}

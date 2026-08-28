@@ -216,10 +216,13 @@ func TestVerdictString(t *testing.T) {
 	}
 }
 
-// TestConcurrentUse exercises Default, CanContain, Containable, and
-// WithOverlay from concurrent goroutines: the doc contract is "safe for
+// TestConcurrentUse exercises Default, CanContain, Containable, Unavoidable
+// and WithOverlay from concurrent goroutines: the doc contract is "safe for
 // concurrent use", and the verdict memo must keep it true under -race
-// (exercised on main CI).
+// (exercised on main CI). Unavoidable belongs here for the opposite reason to
+// the rest — it builds its exclusion closure OUTSIDE the memo, reading only the
+// relation's immutable derived graph, and this is where a lapse into writing
+// shared state would surface.
 func TestConcurrentUse(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 8 {
@@ -228,6 +231,8 @@ func TestConcurrentUse(t *testing.T) {
 			_ = r.CanContain("COMPOSITION", "ELEMENT")
 			_ = r.CanContain("FOLDER", "OBSERVATION")
 			_ = r.Containable("DV_TEXT")
+			_ = r.Unavoidable("EHR", "COMPOSITION", "OBSERVATION")
+			_ = r.Unavoidable("EHR", "SECTION", "OBSERVATION")
 			ext := r.WithOverlay(contain.Edge{From: "PERSON", To: "EHR"})
 			_ = ext.CanContain("PERSON", "EHR")
 		})
