@@ -17,25 +17,32 @@
 // aql_versioned_object_unreferenced, and aql_fanout_row_grain — are
 // portability advisories for behaviours the QUERY specification leaves open;
 // they consult no relation. The whole group is unconditional; supply
-// [Options.Relation] to lint the containment codes against a relation
-// carrying dialect overlay edges. Layer 2 stays AST-only either way: no CDR,
-// no OPT, and no row semantics.
+// [Options.Relation] to lint the containment codes — and REQ-164's
+// aql_contains_redundant_step below, the one other code that asks a
+// containment-route question — against a relation carrying dialect overlay
+// edges. Layer 2 stays AST-only either way: no CDR, no OPT, and no row
+// semantics.
 //
-// Layer 2 carries a third group, PATH SHAPE (REQ-164), whose landed members
-// are aql_path_repeating_unpredicated — an identified path, in SELECT, WHERE
-// or ORDER BY alike, steps through a multi-valued RM attribute with no
-// predicate on that segment, leaving which occurrence is meant to the engine —
+// Layer 2 carries a third group, PATH SHAPE (REQ-164), whose five members are
+// aql_path_repeating_unpredicated — an identified path, in SELECT, WHERE or
+// ORDER BY alike, steps through a multi-valued RM attribute with no predicate
+// on that segment, leaving which occurrence is meant to the engine —
 // aql_paging_no_order_by, a row-bounded query with no ORDER BY, whose page
 // boundary is therefore engine-defined (both channels: the in-text LIMIT
-// clause and a supplied [Options.Query]'s Fetch / Offset), and
+// clause and a supplied [Options.Query]'s Fetch / Offset),
 // aql_select_no_alias, a projection item carrying no AS alias, whose column
-// name is engine-defined, and aql_fanout_path_grain, two PROJECTED paths on one
+// name is engine-defined, aql_fanout_path_grain, two PROJECTED paths on one
 // alias descending into different unpredicated repeating scopes, whose row
 // multiplicity is engine-defined (the PATH source of that; the junction source
-// is REQ-161's aql_fanout_row_grain, and the two are disjoint). The first and
-// the last read one walk of each path's segments against the same pinned BMM,
-// which stops silently wherever the pin cannot type a step (see pathshape.go).
-// The group is ungated and every code in it is Warning.
+// is REQ-161's aql_fanout_row_grain, and the two are disjoint), and
+// aql_contains_redundant_step, an unreferenced, predicate-less, non-root,
+// non-leaf CONTAINS operand whose class every containment route between its
+// neighbours passes through, so removing the step provably changes nothing.
+// The first and the fourth read one walk of each path's segments against the
+// same pinned BMM, which stops silently wherever the pin cannot type a step
+// (see pathshape.go); the last is the group's one consumer of
+// [Options.Relation], since a route round the step is exactly what a dialect
+// overlay edge can state. The group is ungated and every code in it is Warning.
 //
 // The CDR remains the execute-time semantic authority (PROBE-021): a
 // lint-clean query MAY still be rejected on execution. The SDK grammar

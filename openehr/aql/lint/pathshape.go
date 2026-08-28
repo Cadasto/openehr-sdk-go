@@ -247,9 +247,12 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 // rel is the REQ-160 containment relation from [Options.Relation]; only
 // aql_contains_redundant_step reads it, and nil means the default relation
 // rather than a switched-off check (REQ-161 § Relation supply). The other four
-// codes consult NO relation: attribute typing and multiplicity are class facts
-// of the pinned RM, which no caller-supplied containment relation may answer
-// differently (REQ-164 § The conservative segment walk).
+// consult NO relation, in two pairs: the two codes the segment walk feeds
+// (aql_path_repeating_unpredicated, aql_fanout_path_grain) ask class facts of
+// the pinned RM — attribute typing and multiplicity — which no caller-supplied
+// containment relation may answer differently (REQ-164 § The conservative
+// segment walk); the two parse-only codes (aql_paging_no_order_by,
+// aql_select_no_alias) consult no RM fact at all.
 //
 // The group is ungated — every code in it is Warning, so none can flip
 // [Result.OK] (REQ-164 § Always on, never gated).

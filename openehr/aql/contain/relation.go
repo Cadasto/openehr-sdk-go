@@ -422,7 +422,8 @@ func (r *TypeRelation) reachableFrom(start string, allowRef bool) map[string]boo
 // of VERTICES removed: a node in blocked is neither reached nor traversed. It
 // is the one query [TypeRelation.Unavoidable] needs and the only reader of it.
 // Routes are read at their widest (ByReference edges included) — see that
-// method for why.
+// method for why, and TestUnavoidableCountsAByReferenceBypass for the witness
+// that narrowing this call to the non-reference closure changes an answer.
 //
 // It deliberately neither READS nor WRITES the relation's memo. The memo caches
 // the closure of the WHOLE graph per (start, mode); excluding a vertex is a

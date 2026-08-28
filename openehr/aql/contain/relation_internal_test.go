@@ -158,8 +158,9 @@ func TestDefaultOverlayEndpointsPinKnown(t *testing.T) {
 //     would have lost COMPOSITION and everything below it;
 //   - what is NOT memoized is mode 0. Unavoidable reads routes at their widest
 //     on both halves of its question (its own doc comment), so it never asks
-//     the ByReference-excluded closure, and a change to that decision is
-//     visible here rather than only in a verdict somewhere downstream.
+//     the ByReference-excluded closure. This is the ROUTE-EXISTENCE half's
+//     share of that decision; the EXCLUSION half's share is witnessed from
+//     outside the package by TestUnavoidableCountsAByReferenceBypass.
 func TestUnavoidableDoesNotPoisonTheMemo(t *testing.T) {
 	r := build(rminfo.Default, defaultOverlays())
 	if !r.Unavoidable("EHR", "COMPOSITION", "OBSERVATION") {

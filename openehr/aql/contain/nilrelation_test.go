@@ -105,17 +105,21 @@ func TestNilRelationExtendsTheDefault(t *testing.T) {
 }
 
 // TestEveryExportedMethodToleratesANilReceiver is the tripwire for the axis
-// rather than for the four methods that exist today: it reflects over the whole
+// rather than for the five methods that exist today: it reflects over the whole
 // exported method set of *TypeRelation and calls each on a nil receiver with
 // zero-value arguments. A method added later that dereferences the receiver
 // without going through orDefault fails here on the day it lands, which is the
 // only way a REQ-025 § No panics guarantee stays true as the surface grows.
+//
+// The floor tracks the surface deliberately: raise it whenever a method is
+// added, so the sweep keeps proving it looked at everything rather than
+// silently passing over a shrunken method set.
 func TestEveryExportedMethodToleratesANilReceiver(t *testing.T) {
 	var nilRel *contain.TypeRelation
 	rt := reflect.TypeOf(nilRel)
 
-	if n := rt.NumMethod(); n < 4 {
-		t.Fatalf("reflected %d exported methods on *TypeRelation; expected at least the 4 known ones — the sweep is not looking at what it thinks it is", n)
+	if n := rt.NumMethod(); n < 5 {
+		t.Fatalf("reflected %d exported methods on *TypeRelation; expected at least the 5 known ones — the sweep is not looking at what it thinks it is", n)
 	}
 
 	for m := range rt.Methods() {

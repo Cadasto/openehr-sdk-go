@@ -162,6 +162,31 @@ func TestUnavoidableOverlayEdgeRetiresAProof(t *testing.T) {
 	}
 }
 
+// TestUnavoidableCountsAByReferenceBypass is the witness for the one decision
+// the method's own doc states and the default relation's edge table cannot
+// exercise: routes are read at their WIDEST, ByReference edges included, on
+// the EXCLUSION half as well as on the route-existence half.
+//
+// A bypass crossing a reference hop is still a bypass on an engine that
+// resolves the hop (REQ-160 § Overlay edges), so a relation whose dialect files
+// observations under the EHR status BY REFERENCE must not be told its
+// COMPOSITION step is redundant. The route-existence half finds a route either
+// way here, so only the exclusion half's mode is under test: narrowing
+// reachableAvoiding to the non-reference closure makes this row — and only this
+// row — answer true again.
+func TestUnavoidableCountsAByReferenceBypass(t *testing.T) {
+	ref := contain.Default().WithOverlay(contain.Edge{From: "EHR_STATUS", To: "OBSERVATION", ByReference: true})
+	if !contain.Default().Unavoidable("EHR", "COMPOSITION", "OBSERVATION") {
+		t.Fatal("premise gone: the default no longer proves the witness, so the bypass proves nothing")
+	}
+	if got := ref.CanContain("EHR", "OBSERVATION"); got != contain.Admissible {
+		t.Fatalf("premise gone: EHR CONTAINS OBSERVATION = %v, want Admissible — the route-existence half must still find a route", got)
+	}
+	if ref.Unavoidable("EHR", "COMPOSITION", "OBSERVATION") {
+		t.Error("the relation still proves the step redundant, though its own ByReference edge routes round the COMPOSITION")
+	}
+}
+
 // TestUnavoidableHonoursAConsumerEdgeEndpoint — an endpoint the pin does not
 // know is a known, containable class of the extended relation (REQ-160
 // § Containable operands), so it can stand in any of the three positions. Here

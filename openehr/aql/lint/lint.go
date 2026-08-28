@@ -159,10 +159,13 @@ type Options struct {
 	// containment ROUTE goes round the step — precisely the kind of fact an
 	// overlay edge states, so the relation in use must answer it or a dialect
 	// deployment draws a false finding on a step its own edges make
-	// load-bearing (REQ-160 § Extensibility). The other four ask CLASS
-	// questions — attribute typing and multiplicity, which no caller-supplied
-	// containment relation may answer differently (REQ-164 § The conservative
-	// segment walk). No REQ-164 code is GATED by this field either way: nil
+	// load-bearing (REQ-160 § Extensibility). The other four ignore it, in two
+	// pairs: aql_path_repeating_unpredicated and aql_fanout_path_grain — the
+	// two codes the segment walk feeds — ask CLASS questions, attribute typing
+	// and multiplicity, which no caller-supplied containment relation may
+	// answer differently (REQ-164 § The conservative segment walk); while
+	// aql_paging_no_order_by and aql_select_no_alias are parse-only and consult
+	// no RM fact at all. No REQ-164 code is GATED by this field either way: nil
 	// selects the default here as it does everywhere.
 	Relation *contain.TypeRelation
 }
