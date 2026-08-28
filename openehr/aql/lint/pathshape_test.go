@@ -12,13 +12,17 @@ package lint_test
 // firing-only corpus cannot tell.
 //
 // These rows are the first code's share of PROBE-099 arm (a) — the per-code
-// positive plus per-rule negative near-miss corpus (the two parse-only codes
-// carry their share in pathshape_parseonly_test.go). The probe stays Draft
-// until the group's remaining codes land and its arm (b) additivity guard is
-// written; the facts that guard will need are already pinned here per code:
-// PROBE-028's valid.aql cassette predicates EVERY repeating segment, so it
-// gains no aql_path_repeating_unpredicated (see the cassette row in
-// TestPathRepeatingUnpredicatedSilentOnPredicatedSegments) — it does gain
+// positive plus per-rule negative near-miss corpus. The other four codes carry
+// their share in pathshape_parseonly_test.go (the two parse-only ones),
+// pathshape_fanout_test.go and pathshape_redundant_test.go.
+//
+// PROBE-099 is Implemented: its corpus lives in
+// testkit/probes/aql/probe_099_path_shape_lint.go and re-spells these shapes
+// rather than importing them, so a change cannot move the probe and the package
+// it checks together. The facts its arm (b) additivity guard rests on are pinned
+// here per code: PROBE-028's valid.aql cassette predicates EVERY repeating
+// segment, so it gains no aql_path_repeating_unpredicated (see the cassette row
+// in TestPathRepeatingUnpredicatedSilentOnPredicatedSegments) — it does gain
 // aql_select_no_alias, the recorded re-baseline pinned in
 // TestSelectNoAliasFiresOnTheCassetteProjections.
 
@@ -36,9 +40,13 @@ import (
 // The archetype predicates keep aql_from_archetype off these queries, so a
 // count assertion over the whole result stays about the code under test.
 //
-// The three REQ-164 code names are declared here, together, and shared with
-// pathshape_parseonly_test.go: the group's whole-result assertions name each
-// other's codes, so one spelling of each is what keeps them in step.
+// The three REQ-164 code names are declared here, together, and shared across
+// the group's other test files — pathshape_parseonly_test.go takes pagingCode
+// and aliasCode, pathshape_fanout_test.go takes repCode, and the two archetype
+// ids reach all four files. The group's whole-result assertions name each
+// other's codes, so one spelling of each is what keeps them in step. The
+// remaining two codes are declared beside their own rows (fanoutPathCode,
+// redundantCode), which no other file names.
 const (
 	obsArch    = "openEHR-EHR-OBSERVATION.blood_pressure.v1"
 	compArch   = "openEHR-EHR-COMPOSITION.encounter.v1"

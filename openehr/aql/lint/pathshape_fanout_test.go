@@ -13,9 +13,10 @@ package lint_test
 // emission records — an over-firing linter must not ship green, and a
 // firing-only corpus cannot tell.
 //
-// These rows are the fourth code's share of PROBE-099 arm (a); the other three
+// These rows are the fourth code's share of PROBE-099 arm (a); the other FOUR
 // codes' shares are in pathshape_test.go (which declares the code names shared
-// across the group's files) and pathshape_parseonly_test.go.
+// across the group's files), pathshape_parseonly_test.go and
+// pathshape_redundant_test.go.
 
 import (
 	"fmt"

@@ -12,9 +12,10 @@ package lint_test
 // emission records — an over-firing linter must not ship green, and a
 // firing-only corpus cannot tell.
 //
-// These rows are the two codes' share of PROBE-099 arm (a); the repeating-
-// segment code's share is in pathshape_test.go, which also declares the code
-// names both files use.
+// These rows are two of the five codes' share of PROBE-099 arm (a); the
+// repeating-segment code's share is in pathshape_test.go, and the remaining two
+// in pathshape_fanout_test.go and pathshape_redundant_test.go. pathshape_test.go
+// also declares the code names and archetype ids these files share.
 
 import (
 	"slices"

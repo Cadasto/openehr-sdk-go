@@ -626,8 +626,12 @@ func commonPrefixLen(a, b parse.IdentifiedPath) int {
 // consumer overlay edge states a containment route fact, and a route round the
 // via is exactly what retires a proof — so consulting the default instead would
 // raise a false finding on the dialect deployment REQ-160 § Extensibility
-// exists to serve. This is the one REQ-164 code a supplied relation governs;
-// the other four ask class questions no relation may answer differently.
+// exists to serve. This is the one REQ-164 code a supplied relation governs. Of
+// the other four, the TWO the segment walk feeds
+// (aql_path_repeating_unpredicated, aql_fanout_path_grain) ask class questions —
+// attribute typing and multiplicity — that no relation may answer differently;
+// the two parse-only ones (aql_paging_no_order_by, aql_select_no_alias) consult
+// no RM fact at all. [pathShapeIssues]'s own doc splits them the same way.
 //
 // It reads the STRUCTURED tree ([parse.Document.Query]) for the reason
 // [semanticIssues] does: the flat [parse.Document.Classes] is the FROM/CONTAINS
