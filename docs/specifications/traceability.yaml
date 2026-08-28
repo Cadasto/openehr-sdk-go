@@ -636,6 +636,7 @@ requirements:
       - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
       - docs/plans/archive/2026-08-26-aql-small-corrections.md
+      - docs/plans/archive/2026-08-26-aql-write-side-parity.md
     notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/aql/aql_test.go
@@ -1491,6 +1492,16 @@ requirements:
     # a vocabulary shape the skeleton cannot model (fail-closed). The guards' own accept
     # sets are unchanged, so aql.ValidatePathPredicate still accepts a contained
     # malformation; only the emitter's contract narrowed.
+    #
+    # AMENDED again by REQ-163: § Emission verified after emission's Build()
+    # exemption — stated on the ground that the builder's vocabulary carries no
+    # free-text bracket or clause carrier — is NARROWED, not overturned. The
+    # SELECT projection list was already such a carrier (aql.Col splices its
+    # argument verbatim), so Build() takes the scope change this section wrote
+    # down in advance and verifies the SELECT it emitted. Every other builder
+    # field keeps the exemption, and the reduction, the carried-encodings list
+    # and the value-free diagnostic rule stay homed here — REQ-163 cites them
+    # rather than restating them.
     implementation: landed
     packages:
       - openehr/aql
@@ -1884,11 +1895,12 @@ requirements:
     canonical: docs/specifications/idiom.md#errors-req-025
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr/contribution, openehr/aql/lint, openehr/aql/contain, openehr/client/query, internal]
+    packages: [transport, openehr/client/ehr/contribution, openehr/aql, openehr/aql/lint, openehr/aql/contain, openehr/client/query, internal]
     tests:
       - openehr/client/ehr/contribution/version_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
+      - openehr/aql/version_test.go
       - openehr/aql/lint/extract_test.go
       - openehr/aql/contain/nilrelation_test.go
       - openehr/client/query/nilaqlerror_test.go
@@ -1908,7 +1920,12 @@ requirements:
       documented errors.As detection pattern leaves behind when the match
       fails, so each answers as that value rather than dereferencing it —
       both held by reflection tripwires over the whole exported method set,
-      each fed arguments that actually reach the receiver. The clause carries a Must-prefix carve-out for the Go
+      each fed arguments that actually reach the receiver. A sealed exported
+      interface a caller can satisfy by EMBEDDING rather than implementing it
+      is the nil-adjacent arm of the same axis: an aql.VersionPredicate whose
+      embedded field is nil dereferences a nil interface at both dispatch
+      sites, so REQ-163's carrier refuses it at Build() as ErrInvalidQuery
+      and the emission path answers rather than panicking. The clause carries a Must-prefix carve-out for the Go
       convention.
 
   - id: REQ-026
@@ -2243,7 +2260,9 @@ requirements:
       - openehr/aql/standing_internal_test.go
       - openehr/aql/projection_test.go
       - openehr/aql/projection_internal_test.go
+      - openehr/aql/projection_confrontation_test.go
       - openehr/aql/containment_roundtrip_test.go
+      - openehr/aql/verify_parity_test.go
       - openehr/aql/parse/dispatch_tripwire_test.go
       - testkit/probes/aql/probes_test.go
     notes: >-
@@ -2261,12 +2280,22 @@ requirements:
       verification REQ-119's own scope-change clause anticipated, and a
       standing predicate on a VERSION-spelled node is refused with an error
       naming the version-predicate constructor (one carrier per grammar
-      position). No new probe id: PROBE-088 gained fourteen golden fixtures
-      and three refusal rows, PROBE-097 arm (c) four parity rows that were
-      builder-inexpressible; what stays unspellable is the FROM root's own
-      bracket in every spelling. Additive — PROBE-020's golden is
-      byte-unchanged and no REQ-161/162 code or contract moves. Two changes
-      to previously-accepted behaviour are called out in the CHANGELOG: a
-      Col that changes the recorded projection structure now fails Build()
-      (semver-minor on REQ-119's footing), and aql.SelectField is not
-      ==-comparable, as aql.Containment stopped being in v0.18.0.
+      position). Build()'s verification compares the clause-level flags
+      including the deprecated TOP's FORWARD/BACKWARD direction, and fails
+      closed on a lexical region a Col leaves open where the clause ends;
+      beside it four typed constructions the grammar does not admit at the
+      position they render are refused — a FuncCall-shaped Lit, an
+      aggregate-shaped Fn argument, a function-shaped comparison operand in
+      either bracket carrier, and a VersionPredicate shape outside the sealed
+      three, that last reachable by EMBEDDING the exported interface and so
+      refused rather than panicked (REQ-025). No new probe id: PROBE-088
+      gained fifteen golden fixtures and four refusal rows, PROBE-097 arm (c)
+      four parity rows that were builder-inexpressible; what stays
+      unspellable is the FROM root's own bracket in every spelling. Additive
+      — PROBE-020's golden is byte-unchanged and no REQ-161/162 code or
+      contract moves. The two changes to previously-accepted behaviour
+      § Additivity enumerates are called out in the CHANGELOG: the Build()
+      refusal class above (semver-minor on REQ-119's footing), and
+      aql.SelectField losing useful ==-comparability — == still COMPILES and
+      panics at run time whenever either operand carries a call-shaped field,
+      map insertion likewise, the trap aql.Containment set in v0.18.0.

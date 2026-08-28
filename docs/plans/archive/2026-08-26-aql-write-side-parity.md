@@ -4,7 +4,7 @@
 **Status:** Complete
 **Owner:** SDK maintainers
 **Covers:** [REQ-163](../../specifications/clinical-modeling.md#req-163--aql-write-side-expressivity-parity) — `landed`; 163 taken from the AQL semantics band 160–169, prose homed in [clinical-modeling.md](../../specifications/clinical-modeling.md) beside REQ-160..162 and authored in Phase 0 via `sdd-specify`. Amends nothing normative in landed REQs — but see § One divergence worth recording below, where REQ-163 amended its own section; extends the fixture sets of [PROBE-088](../../specifications/conformance.md#probe-088--aql-builder-containment-and-paging-stability) and the arm-(c) corpus of [PROBE-097](../../specifications/conformance.md#probe-097--aql-semantic-and-portability-lint-corpus).
-**Probes:** no new probe id — PROBE-088 (builder golden stability) gained fourteen goldens and four refusal rows, PROBE-097 arm (c) (read/write parity) four rows for the new constructs; PROBE-020's golden stayed untouched.
+**Probes:** no new probe id — PROBE-088 (builder golden stability) gained fifteen goldens and four refusal rows, PROBE-097 arm (c) (read/write parity) four rows for the new constructs; PROBE-020's golden stayed untouched.
 **Implementation:** landed
 **Depends on:** landed REQ-055 / 117 / 118 / 119 (builder + canonicalisation), REQ-113 (the read-side vocabulary being mirrored), REQ-160..162 (relation + verification)
 **Defers:** a FROM-root standing predicate (REQ-055 rule 6 keeps the `WHERE e/ehr_id/value = $param` form deliberately); a FROM-root archetype predicate (separately unreachable, recorded in PROBE-097); a `TOP $n` parameter (the grammar admits none, REQ-118)
@@ -111,7 +111,7 @@ from one non-normative pointer sentence in wire.md.
 | Phase 1 — version-predicate carrier | ✅ landed 2026-08-27 (`5bd9f10`, `901feec`) |
 | Phase 2 — standing-predicate carrier | ✅ landed 2026-08-27 (`84c995c`, `5ea9183`) |
 | Phase 3 — typed projection + `Distinct()` + structural verification | ✅ landed 2026-08-27 (`8e35c03`, `d79d313`) |
-| Phase 4 — probes, goldens, docs | ✅ landed 2026-08-27 — PROBE-088 +14 goldens / +3 refusals, PROBE-097 arm (c) +4 rows, `doc.go`, conformance.md, the fourth-refusal spec correction, CHANGELOG + indexes |
+| Phase 4 — probes, goldens, docs | ✅ landed 2026-08-27 — PROBE-088 +15 goldens / +4 refusals, PROBE-097 arm (c) +4 rows, `doc.go`, conformance.md, the fourth-refusal spec correction, CHANGELOG + indexes |
 | `make spec-check` | ✅ OK at every phase |
 | `make ci` | ✅ green on the host at the end of Phase 4 (`fmt-check`, `mod-tidy-check`, `vet`, `go test ./... -count=1`, `golangci-lint run ./...` — 0 issues, `spec-check`, `flat-conformance-verify`, `build`) |
 
@@ -224,5 +224,5 @@ column + roadmap row.
 - [clinical-modeling.md § REQ-113](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) — the read-side vocabulary mirrored
 - [clinical-modeling.md § REQ-119](../../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) — the write-path closure rule extended to SELECT
 - [clinical-modeling.md § REQ-161](../../specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint) / [REQ-162](../../specifications/clinical-modeling.md#req-162--builder-containment-verification) — the suppression shape and parity contract this makes reachable
-- [wire.md § REQ-055](../../specifications/wire.md#req-055--wire-boundary) — canonicalisation rule set gaining the new spellings
+- [wire.md § REQ-055](../../specifications/wire.md#req-055--wire-boundary) — one pointer sentence at the canonicalisation rule set; the spellings themselves are homed in REQ-163 § Canonical spellings, per the pre-flight ruling above
 - [REQ.md](../../specifications/REQ.md) — registry row + numbering band

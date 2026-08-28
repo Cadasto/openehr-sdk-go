@@ -12,9 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **AQL write-side expressivity parity (REQ-163, PROBE-088/097).** The builder now spells the class- and projection-position vocabularies its read side already modelled: the `VERSION` predicate bracket, one standing comparison in class position, and a typed projection.
-- **`Build()` verifies the `SELECT` it emitted (REQ-163).** A `Col` whose text splits the projection, spills into another clause, or smuggles an unrecorded clause-level flag now fails `Build()` where it previously emitted — semver-minor on REQ-119's footing.
-- **`aql.SelectField` is not `==`-comparable (REQ-163).** A field built by `Fn` carries its arguments as a slice, so `==` panics and it cannot be a map key — the change `aql.Containment` took in v0.18.0; compare built query strings.
+- **AQL write-side expressivity parity (REQ-163, PROBE-088/097).** The builder spells the `VERSION` predicate bracket, a class-position standing comparison and a typed projection its read side already modelled, and `Build()` verifies what it emitted, refusing a construction that changes the recorded query — semver-minor on REQ-119's footing. *Breaking:* `aql.SelectField` is no longer usefully `==`-comparable — `==` compiles but panics at run time on a call-shaped field, map insertion included; compare built query strings.
 
 ## [0.23.0] - 2026-08-26
 
