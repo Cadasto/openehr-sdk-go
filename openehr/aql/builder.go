@@ -13,6 +13,15 @@ import (
 // shares the same internal emitter, so both produce byte-identical AQL for the
 // same logical query (PROBE-020).
 //
+// Obtain one from [NewBuilder]. A nil *Builder is a PROGRAMMER ERROR and not an
+// input to validate (REQ-025): every setter here mutates the receiver and
+// returns it for chaining, so a nil one has nothing to record into and no error
+// channel to report through, and the setters — [Builder.Build] with them —
+// dereference it and panic rather than returning a builder that silently drops
+// what it was told. [Builder.VerifyContainment] is the one deliberate
+// exception, and says so: it is a diagnostic a caller may reach for on a value
+// it did not construct.
+//
 // Injection: caller-supplied data MUST flow through [Param] (or a literal
 // constructor), which the emitter binds or escapes. Path, alias, and archetype
 // arguments (to [Col], [Eq], [Archetype], [Builder.OrderBy], …) are openEHR

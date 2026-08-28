@@ -26,11 +26,12 @@ import (
 // that miscounted here would refuse valid AQL.
 func TestProjectionScanTracksLexerStates(t *testing.T) {
 	tests := []struct {
-		name   string
-		text   string
-		commas int
-		words  []string
-		flaw   bool
+		name     string
+		text     string
+		commas   int
+		words    []string
+		comments int
+		flaw     bool
 	}{
 		{name: "a bare path has no delimiters", text: "c/uid/value"},
 		{name: "top-level comma separates items", text: "c/a, c/b", commas: 1},
@@ -71,16 +72,35 @@ func TestProjectionScanTracksLexerStates(t *testing.T) {
 			words: []string{"AS"},
 		},
 		{
-			name:  "a comment at the top level swallows the rest of the query",
-			text:  "c/uid/value -- rest\n",
-			words: []string{"--"},
+			// A CLOSED run is closed by its own newline, so it hides the rest of
+			// its LINE and nothing beyond — the emitted FROM clause still
+			// reaches the parser. The lexer SKIPS a comment, so the run is
+			// TRIVIA: recorded for the derivation to strip, never an escape.
+			name:     "a closed comment at the top level is trivia the reader skips",
+			text:     "c/uid/value -- rest\n",
+			comments: 1,
+		},
+		{
+			// A `{` that opens a body no `/}` closes: a comma and a `)` are both
+			// ordinary body characters, so the run continues into the rest of
+			// the emitted query.
+			name: "an unterminated contained regex is a flaw",
+			text: "c/x MATCHES {/abc",
+			flaw: true,
 		},
 		{name: "an unterminated string literal is a flaw", text: "'abc", flaw: true},
 		{name: "an unclosed node predicate is a flaw", text: "c/x[at0001", flaw: true},
 		{name: "a stray closing bracket is a flaw", text: "c/x]", flaw: true},
 		{name: "an unclosed function call is a flaw", text: "COUNT(c/x", flaw: true},
 		{name: "a stray closing paren is a flaw", text: "c/x)", flaw: true},
-		{name: "an unterminated comment is a flaw", text: "c/x -- rest", flaw: true},
+		{
+			// The other side of the trivia row above: a run with NO terminator
+			// inside the text does carry on into the emitted query, so it is the
+			// escape — and it is reported as a flaw, not as a clause word.
+			name: "an unterminated comment is a flaw",
+			text: "c/x -- rest",
+			flaw: true,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -101,6 +121,9 @@ func TestProjectionScanTracksLexerStates(t *testing.T) {
 			if strings.Join(got, ",") != strings.Join(tc.words, ",") {
 				t.Errorf("clause words = %v, want %v", got, tc.words)
 			}
+			if len(sc.comments) != tc.comments {
+				t.Errorf("closed top-level comment runs = %d, want %d", len(sc.comments), tc.comments)
+			}
 		})
 	}
 }
@@ -111,8 +134,15 @@ func TestProjectionScanTracksLexerStates(t *testing.T) {
 // over-refusal direction REQ-163 § Acceptance requires rows for.
 func TestProjectionKeywordMatchIsWordBounded(t *testing.T) {
 	for _, text := range []string{
+		// The RIGHT boundary: the keyword's letters begin the segment and
+		// ordinary word characters follow them.
 		"c/from_date", "c/topic", "c/as_of", "c/orderly", "c/whereabouts", "c/limits",
 		"c/offsets", "c/distinctive", "c/selection", "c/contains_x", "c/x ASC",
+		// The LEFT boundary, which every row above leaves untested: the letters
+		// END the segment, so only the character BEFORE them can tell the
+		// keyword from an ordinary openEHR path.
+		"c/date_from", "c/sort_order", "c/valid_as", "c/row_limit", "c/byte_offset",
+		"c/step_forward", "c/look_backward", "c/is_distinct", "c/it_contains",
 	} {
 		t.Run(text, func(t *testing.T) {
 			if sc := scanProjection(text); len(sc.words) != 0 {
@@ -177,9 +207,34 @@ func TestDeriveSelectShapeReadsTheClauseBack(t *testing.T) {
 			want:   selectShape{distinct: true, top: true, items: 1, aliases: []string{""}},
 		},
 		{
+			// The direction belongs to the CLAUSE, and it is RECORDED there: a
+			// BACKWARD the builder never set asks for the rows at the other end
+			// of the result set, and the emitted query re-parses and re-emits
+			// byte-identically either way.
 			name:   "a directed TOP belongs to the clause",
 			clause: "TOP 5 BACKWARD c/a",
-			want:   selectShape{top: true, items: 1, aliases: []string{""}},
+			want:   selectShape{top: true, topDir: "BACKWARD", items: 1, aliases: []string{""}},
+		},
+		{
+			name:   "the other direction, and the fold is case-insensitive",
+			clause: "TOP 5 forward c/a",
+			want:   selectShape{top: true, topDir: "FORWARD", items: 1, aliases: []string{""}},
+		},
+		{
+			// A direction keyword INSIDE an item has no reading at all — the
+			// parser rejects `SELECT BACKWARD c/a` — so it is an escape.
+			name:    "a direction keyword inside an item",
+			clause:  "BACKWARD c/a",
+			want:    selectShape{items: 1, aliases: []string{""}},
+			escapes: 1,
+		},
+		{
+			// …and one AFTER the clause has already consumed its own is an
+			// escape too: `top` carries one direction, not two.
+			name:    "a second direction keyword after the TOP clause",
+			clause:  "TOP 5 BACKWARD FORWARD c/a",
+			want:    selectShape{top: true, topDir: "BACKWARD", items: 1, aliases: []string{""}},
+			escapes: 1,
 		},
 		{
 			// The keyword that ends the projection: the reader stops there, so
@@ -200,6 +255,7 @@ func TestDeriveSelectShapeReadsTheClauseBack(t *testing.T) {
 				t.Fatalf("escapes = %d, want %d (%+v)", len(got.escapes), tc.escapes, got.escapes)
 			}
 			if got.shape.distinct != tc.want.distinct || got.shape.top != tc.want.top ||
+				got.shape.topDir != tc.want.topDir ||
 				got.shape.star != tc.want.star || got.shape.items != tc.want.items {
 				t.Fatalf("shape = %+v, want %+v", got.shape, tc.want)
 			}
@@ -256,6 +312,15 @@ func TestVerifySelectClauseRefusesADisagreement(t *testing.T) {
 		}
 		return rec
 	}
+	directed := func(dir TopDir, sel ...SelectField) recordedProjection {
+		t.Helper()
+		a := &ast{sel: sel, top: &TopClause{N: 5, Dir: dir}}
+		_, rec, err := a.selectClause()
+		if err != nil {
+			t.Fatalf("selectClause: %v", err)
+		}
+		return rec
+	}
 	tests := map[string]struct {
 		clause string
 		rec    recordedProjection
@@ -300,6 +365,26 @@ func TestVerifySelectClauseRefusesADisagreement(t *testing.T) {
 			clause: "c/a['x",
 			rec:    recorded(false, false, Col("c/a")),
 			want:   "unterminated",
+		},
+		// The TOP DIRECTION is part of the compared structure beside the flags,
+		// and it is the sharpest of them: the emitted query re-parses and
+		// re-emits byte-identically either way, so a direction the builder never
+		// recorded returns the rows at the OTHER END of the result set with
+		// nothing downstream able to see it.
+		"a TOP direction the builder never recorded": {
+			clause: "TOP 5 BACKWARD c/a",
+			rec:    recorded(false, true, Col("c/a")),
+			want:   "directed BACKWARD",
+		},
+		"a TOP direction the builder recorded and the text lost": {
+			clause: "TOP 5 c/a",
+			rec:    directed(TopBackward, Col("c/a")),
+			want:   "with no direction",
+		},
+		"a TOP direction the text reversed": {
+			clause: "TOP 5 FORWARD c/a",
+			rec:    directed(TopBackward, Col("c/a")),
+			want:   "directed FORWARD",
 		},
 	}
 	for name, tc := range tests {
@@ -354,7 +439,8 @@ func TestMalformedTopDoesNotFoolTheVerification(t *testing.T) {
 
 // TestProjectionCoordinateNamesTheItem pins the diagnostic coordinate: a
 // refusal has to say WHICH item is at fault, because it may not quote any of
-// it (REQ-119 § the redaction rule) and a caller with a ten-item projection has
+// it (REQ-119 § Emission verified after emission) and a caller with a ten-item
+// projection has
 // nothing else to go on.
 func TestProjectionCoordinateNamesTheItem(t *testing.T) {
 	a := &ast{sel: []SelectField{Col("c/a"), Col("c/b, c/c"), Col("c/d")}}
@@ -368,5 +454,177 @@ func TestProjectionCoordinateNamesTheItem(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "SELECT item 1") {
 		t.Fatalf("refusal does not name the item at fault: %v", err)
+	}
+}
+
+// TestFuncColumnShapeArmsRefuseWhatTheConstructorsCannotBuild reaches the
+// [funcColumn.validateShape] arms that no public call can form.
+//
+// [Count], [CountDistinct] and [CountStar] each build ONE admitted shape by
+// construction, and [Fn] cannot set the star or DISTINCT flags at all, so five
+// arms of the shape rule are unreachable from openehr/aql_test — including the
+// one that catches a star beside arguments, which REQ-163 names as a defect
+// that must be refused rather than resolved by dropping the loser. Constructing
+// the shapes directly is the only way to hold them, and without these rows a
+// refactor could delete every one with the suite green.
+func TestFuncColumnShapeArmsRefuseWhatTheConstructorsCannotBuild(t *testing.T) {
+	tests := map[string]struct {
+		call funcColumn
+		want string
+	}{
+		// `functionCall` admits neither flag: only `aggregateFunctionCall` does.
+		"a star on an ordinary function call": {
+			call: funcColumn{name: "CONCAT", star: true},
+			want: "admits neither DISTINCT nor a star argument",
+		},
+		"a DISTINCT on an ordinary function call": {
+			call: funcColumn{name: "CONCAT", distinct: true, args: []SelectField{colPath("c/a")}},
+			want: "admits neither DISTINCT nor a star argument",
+		},
+		// `COUNT '(' (DISTINCT? identifiedPath | '*') ')'` — COUNT is the only
+		// aggregate with a star alternative.
+		"a star on an aggregate that has no star form": {
+			call: funcColumn{name: "MAX", star: true},
+			want: "only COUNT takes a star",
+		},
+		// The star IS the whole argument list, so anything beside it would be
+		// silently dropped by an emitter that rendered the star alone.
+		"COUNT(*) beside a DISTINCT": {
+			call: funcColumn{name: "COUNT", star: true, distinct: true},
+			want: "neither DISTINCT nor arguments beside the star",
+		},
+		"COUNT(*) beside an argument": {
+			call: funcColumn{name: "COUNT", star: true, args: []SelectField{colPath("c/a")}},
+			want: "neither DISTINCT nor arguments beside the star",
+		},
+		"a DISTINCT inside an aggregate that has no DISTINCT form": {
+			call: funcColumn{name: "MIN", distinct: true, args: []SelectField{colPath("c/a")}},
+			want: "only COUNT(DISTINCT path) is",
+		},
+		// `terminologyFunction` has its own production, with neither flag.
+		"a star on TERMINOLOGY": {
+			call: funcColumn{name: TerminologyFunc, star: true},
+			want: "admits neither DISTINCT nor a star argument",
+		},
+		"a DISTINCT on TERMINOLOGY": {
+			call: funcColumn{name: TerminologyFunc, distinct: true},
+			want: "admits neither DISTINCT nor a star argument",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := tc.call.selectToken()
+			if !errors.Is(err, ErrInvalidQuery) {
+				t.Fatalf("err = %v, want ErrInvalidQuery", err)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("err = %v, want it to name %q", err, tc.want)
+			}
+		})
+	}
+	// The controls: the shapes the same arms MUST let through, so a rule
+	// tightened into refusing valid AQL fails here too.
+	for name, call := range map[string]funcColumn{
+		"COUNT(*)":                  {name: "COUNT", star: true},
+		"COUNT(DISTINCT path)":      {name: "COUNT", distinct: true, args: []SelectField{colPath("c/a")}},
+		"MIN(path)":                 {name: "MIN", args: []SelectField{colPath("c/a")}},
+		"an ordinary function call": {name: "CONCAT", args: []SelectField{colPath("c/a"), colPath("c/b")}},
+	} {
+		t.Run("accepts "+name, func(t *testing.T) {
+			if _, err := call.selectToken(); err != nil {
+				t.Fatalf("the shape rule refused a shape the grammar admits: %v", err)
+			}
+		})
+	}
+}
+
+// TestAliasAlignmentFailsClosedOnALengthMismatch pins the arm that decides
+// whether the per-item alias comparison runs at all.
+//
+// The two halves are computed by different code from different inputs, so their
+// item counts can only disagree in ONE legitimate way: the reduced bare-star
+// form carries its projection in the flag and has no alias slots to align with
+// the one star item the builder recorded. Any OTHER disagreement means the two
+// agreed on the shape and then disagreed on the structure behind it — and
+// skipping the comparison there would let an emitted alias the builder never
+// recorded through, which is the substitution the comparison exists to catch.
+//
+// The mismatching state is handed to [compareSelectShape] directly, because
+// [deriveSelectShape] cannot produce it: this is the fail-closed arm for a
+// defect in projection_verify.go rather than in a query.
+func TestAliasAlignmentFailsClosedOnALengthMismatch(t *testing.T) {
+	rec := func(sel ...SelectField) recordedProjection {
+		t.Helper()
+		a := &ast{sel: sel}
+		_, r, err := a.selectClause()
+		if err != nil {
+			t.Fatalf("selectClause: %v", err)
+		}
+		return r
+	}
+	t.Run("the reduced bare-star form is the one legitimate mismatch", func(t *testing.T) {
+		// One recorded star item, zero derived alias slots — and accepted, or
+		// the sole-star query would refuse itself.
+		if err := verifySelectClause("*", rec(Star())); err != nil {
+			t.Fatalf("the bare-star reduction was refused: %v", err)
+		}
+	})
+	t.Run("any other length mismatch is refused", func(t *testing.T) {
+		got := derivedProjection{
+			exprs: []string{"c/a", "c/b"},
+			shape: selectShape{items: 2, aliases: []string{"", "", ""}},
+		}
+		err := compareSelectShape(got, rec(Col("c/a"), Col("c/b")))
+		if !errors.Is(err, ErrInvalidQuery) {
+			t.Fatalf("err = %v, want ErrInvalidQuery — three alias slots beside two recorded items is a "+
+				"structure the emitted text cannot be shown to match, so it must fail CLOSED", err)
+		}
+		if !strings.Contains(err.Error(), "alias slot(s)") {
+			t.Errorf("err = %v, want it to name the alignment it could not make", err)
+		}
+	})
+}
+
+// TestProjectionDivergenceCoordinateSurvivesACollapse pins the second arm of
+// [recordedProjection.divergenceAt]. A SPLIT names itself — the stray top-level
+// comma is inside the item that brought it — but a COLLAPSE has no stray comma
+// at all, so the offset fell through to -1 and the refusal named "the SELECT
+// clause", telling a caller with a ten-item projection only that something
+// changed.
+func TestProjectionDivergenceCoordinateSurvivesACollapse(t *testing.T) {
+	a := &ast{sel: []SelectField{Col("c/a"), Col("c/b"), Col("c/c")}}
+	_, rec, err := a.selectClause()
+	if err != nil {
+		t.Fatalf("selectClause: %v", err)
+	}
+	// The emitter wrote three items; the text reads back two, with no comma the
+	// emitter did not write.
+	err = verifySelectClause("c/a, c/b", rec)
+	if !errors.Is(err, ErrInvalidQuery) {
+		t.Fatalf("err = %v, want ErrInvalidQuery", err)
+	}
+	if !strings.Contains(err.Error(), "SELECT item 2") {
+		t.Fatalf("the collapse refusal does not name the item that vanished: %v", err)
+	}
+}
+
+// TestProjectionStructureDiagnosticSpellsTheStarFlag pins the other half of the
+// same diagnostic. The item count and the star flag are compared TOGETHER, so a
+// star-only disagreement printed the two halves identically — "1 item(s)" on
+// both sides — and said the structure changed without saying how.
+func TestProjectionStructureDiagnosticSpellsTheStarFlag(t *testing.T) {
+	// Two recorded items, two derived items — the counts AGREE and only the star
+	// flag differs, which is the shape that used to print identically.
+	a := &ast{sel: []SelectField{Col("c/a"), Col("c/b")}}
+	_, rec, err := a.selectClause()
+	if err != nil {
+		t.Fatalf("selectClause: %v", err)
+	}
+	err = verifySelectClause("*, c/a", rec)
+	if !errors.Is(err, ErrInvalidQuery) {
+		t.Fatalf("err = %v, want ErrInvalidQuery", err)
+	}
+	if !strings.Contains(err.Error(), "including a star") || !strings.Contains(err.Error(), "and no star") {
+		t.Fatalf("the two halves of the structure diagnostic do not distinguish the star flag: %v", err)
 	}
 }

@@ -48,15 +48,19 @@ package aql
 // would stop reading the projection the builder wrote.
 //
 // The literal re-parse stays the REFERENCE procedure, in the tests, where
-// importing parse is legal: every accepted query is built, emitted, parsed and
-// re-emitted to IDENTITY (containment_roundtrip_test.go), and each refusal
-// shape is confronted with the parser to prove the refusal right. If the scan
-// and the reference ever disagree, the scan is wrong.
+// importing parse is legal. Over the committed CORPUS — the REQ-163 projection
+// rows in containment_roundtrip_test.go and the accept rows in
+// projection_test.go — every accepted query is built, emitted, parsed and
+// re-emitted to IDENTITY, and each refusal shape is confronted with the parser
+// to prove the refusal right. Beyond the corpus the same property is confronted
+// over a GENERATED one, in projection_confrontation_test.go, which crosses the
+// constructors with an alphabet of quotes, brackets, comments, commas and clause
+// keywords. If the scan and the reference ever disagree, the scan is wrong.
 //
 // Diagnostics stay value-free: a refusal names the COORDINATE — the item index,
 // the clause, and where a keyword is at fault its spelling from the SDK's own
 // fixed vocabulary — and never reproduces the offending projection text
-// (REQ-119 § the redaction rule).
+// (REQ-119 § Emission verified after emission).
 
 import (
 	"fmt"
@@ -73,6 +77,21 @@ type selectShape struct {
 	// an escape, so the count never has to be re-derived from the text.
 	distinct bool
 	top      bool
+	// topDir is the TOP clause's DIRECTION keyword — "FORWARD", "BACKWARD", or
+	// "" for the undirected form — held as the rendered keyword rather than as
+	// a [TopDir], so an out-of-vocabulary direction reduces to the "" both
+	// [TopDir.String] and [FormatTop] emit for it and the comparison stays
+	// about the TEXT.
+	//
+	// It is part of the compared structure for the same reason the flags beside
+	// it are, and the consequence is sharper: `TOP 5 BACKWARD` returns the LAST
+	// five rows where the recorded `TOP 5` asks for the first. Nothing
+	// downstream can see the difference — the emitted query re-parses and
+	// re-emits byte-identically — so an unrecorded direction is the
+	// silent-substitution mode exactly (REQ-163 § `Col` stays lenient,
+	// and `Build()` verifies what it emitted, which makes the clause-level FLAGS
+	// part of the compared structure).
+	topDir string
 	// star is the projection's star flag, true both for the bare `SELECT *`
 	// form and for a star mixed with column items — exactly as
 	// [parse.SelectClause.Star] is.
@@ -80,8 +99,11 @@ type selectShape struct {
 	// items is the item count AFTER the reduction: zero for the bare star form,
 	// which carries its projection in the flag alone.
 	items int
-	// aliases is the per-item AS alias, "" where an item carries none. It is
-	// nil for the reduced bare-star form, which has no items.
+	// aliases is the per-item AS alias read off the emitted TEXT, "" where an
+	// item carries none. It is nil for the reduced bare-star form, which has no
+	// items. Only the DERIVED side fills it: the recorded side's aliases are
+	// read from [renderedItem.alias], which also carries whether the builder
+	// fixed them.
 	aliases []string
 }
 
@@ -90,7 +112,12 @@ type selectShape struct {
 type recordedProjection struct {
 	distinct bool
 	top      bool
-	items    []renderedItem
+	// topDir is the direction keyword the emitter will render for the recorded
+	// TOP clause, "" when there is none — [TopDir.String]'s own answer, so a
+	// direction outside the vocabulary compares equal to the nothing
+	// [FormatTop] emits for it and validatePaging keeps the refusal.
+	topDir string
+	items  []renderedItem
 	// separators are the byte offsets of the commas the EMITTER itself wrote
 	// between items, so a top-level comma at any other offset is one an item's
 	// own text brought with it.
@@ -107,15 +134,17 @@ type recordedProjection struct {
 // sole-star query refuse ITSELF, which is the failure
 // TestSoleStarItemReducesToTheBareForm exists to catch.
 func (r recordedProjection) shape() selectShape {
-	sh := selectShape{distinct: r.distinct, top: r.top}
+	sh := selectShape{distinct: r.distinct, top: r.top, topDir: r.topDir}
 	if len(r.items) == 1 && r.items[0].expr == "*" && r.items[0].alias == "" {
 		sh.star = true
 		return sh
 	}
 	sh.items = len(r.items)
-	sh.aliases = make([]string, len(r.items))
-	for i, it := range r.items {
-		sh.aliases[i] = it.alias
+	// aliases stays nil on this side. The alias comparison reads the recorded
+	// aliases from [recordedProjection.items] — which also carries whether the
+	// BUILDER fixed each one, the half a bare string cannot express — so a copy
+	// here would be a second, unread source of the same fact.
+	for _, it := range r.items {
 		if it.expr == "*" {
 			sh.star = true
 		}
@@ -131,6 +160,13 @@ func (r recordedProjection) shape() selectShape {
 // not a reconstruction of them.
 func (a *ast) selectClause() (string, recordedProjection, error) {
 	rec := recordedProjection{distinct: a.distinct, top: a.top != nil, separators: map[int]bool{}}
+	if a.top != nil {
+		// The rendered keyword, not the [TopDir] value: [FormatTop] emits ""
+		// for a direction outside the vocabulary, so recording the ENUM would
+		// make the verification refuse a clause whose only defect is one
+		// validatePaging already owns.
+		rec.topDir = a.top.Dir.String()
+	}
 	var sb strings.Builder
 	// Grammar order: `SELECT DISTINCT? top? selectExpr …`, so the flag precedes
 	// the deprecated TOP clause (REQ-163 § Canonical spellings).
@@ -177,7 +213,14 @@ func (a *ast) selectClause() (string, recordedProjection, error) {
 // spilled keyword explains a truncated projection, and only then is the item
 // count compared.
 func verifySelectClause(clause string, rec recordedProjection) error {
-	got := deriveSelectShape(clause)
+	return compareSelectShape(deriveSelectShape(clause), rec)
+}
+
+// compareSelectShape is the comparison itself, split from the derivation so a
+// test can hand it a derived side the derivation cannot produce — which is the
+// only way to reach the fail-closed arms that exist for a defect in THIS file
+// rather than in a query.
+func compareSelectShape(got derivedProjection, rec recordedProjection) error {
 	if got.flaw != "" {
 		return fmt.Errorf("%w: %s %s; the emitted query continues past it, so the projection would "+
 			"absorb the clauses after it and re-parse as a different query",
@@ -197,6 +240,14 @@ func verifySelectClause(clause string, rec recordedProjection) error {
 			"bound the caller never asked for; set it with (*aql.Builder).Top",
 			ErrInvalidQuery, carrying(got.shape.top), carrying(want.top))
 	}
+	if got.shape.topDir != want.topDir {
+		return fmt.Errorf("%w: the emitted SELECT clause reads back a TOP row limit %s, and the builder "+
+			"recorded it %s — `top : TOP INTEGER direction=(FORWARD|BACKWARD)?` consumes the direction "+
+			"into the CLAUSE, so the query would return the rows at the other END of the result set and "+
+			"the emitted text re-parses and re-emits byte-identically either way; set the direction with "+
+			"(*aql.Builder).TopDirected",
+			ErrInvalidQuery, describeTopDir(got.shape.topDir), describeTopDir(want.topDir))
+	}
 	if len(got.escapes) > 0 {
 		e := got.escapes[0]
 		return fmt.Errorf("%w: %s spills out of the projection — its text carries the clause-level token %s "+
@@ -208,7 +259,7 @@ func verifySelectClause(clause string, rec recordedProjection) error {
 		return fmt.Errorf("%w: %s changes the projection's structure — the emitted clause reads back as %s, "+
 			"and the builder recorded %s; text that re-shapes the item list is valid AQL asking a "+
 			"different question",
-			ErrInvalidQuery, rec.coordinate(rec.splitAt(got.commas)),
+			ErrInvalidQuery, rec.coordinate(rec.divergenceAt(got)),
 			describeItems(got.shape), describeItems(want))
 	}
 	// Aliases are compared only where the BUILDER fixed one: where the `AS`
@@ -216,7 +267,21 @@ func verifySelectClause(clause string, rec recordedProjection) error {
 	// recorded structure, which is what keeps `Col("COUNT(x) AS n")` tolerated
 	// (REQ-163 § rule 1).
 	if len(got.shape.aliases) != len(rec.items) {
-		return nil // the reduced bare-star form; no items to align
+		// The reduced bare-star form is the ONE legitimate length disagreement:
+		// it carries its projection in the flag, so there are no alias slots to
+		// align with the one star item the builder recorded.
+		if want.items == 0 && want.star {
+			return nil
+		}
+		// Every other length mismatch means the two halves agreed on the shape
+		// and then disagreed on the structure behind it — a defect in this file,
+		// not in the query. Fail CLOSED: skipping the alias comparison instead
+		// would let an emitted alias the builder never recorded through, which
+		// is the substitution the comparison exists to catch.
+		return fmt.Errorf("%w: the emitted SELECT clause reads back %d alias slot(s) beside %d recorded "+
+			"item(s) after the two agreed on the projection's shape, so the emitted text cannot be shown "+
+			"to ask the question the builder recorded",
+			ErrInvalidQuery, len(got.shape.aliases), len(rec.items))
 	}
 	for i, it := range rec.items {
 		if !it.aliasRecorded || got.shape.aliases[i] == it.alias {
@@ -232,7 +297,7 @@ func verifySelectClause(clause string, rec recordedProjection) error {
 // coordinate names the item a byte offset falls in, or the clause when it falls
 // in none (the DISTINCT / TOP prefix, or a separator the emitter wrote). It
 // reproduces no projection text — the coordinate is the whole diagnostic
-// (REQ-119 § the redaction rule).
+// (REQ-119 § Emission verified after emission).
 func (r recordedProjection) coordinate(pos int) string {
 	for i, it := range r.items {
 		if pos >= it.start && pos < it.end {
@@ -254,8 +319,37 @@ func (r recordedProjection) splitAt(commas []int) int {
 	return -1
 }
 
-// carrying and describeItems spell a shape difference in words. Both render
-// STRUCTURE only — a count, a flag — so neither can leak projection text.
+// divergenceAt returns the offset that best names WHERE the projection changed
+// shape, for [recordedProjection.coordinate] to turn into an item index.
+//
+// A SPLIT is the common cause and names itself: the first top-level comma the
+// emitter did not write is inside the item whose text brought it. But it is not
+// the only cause — an item can COLLAPSE into its neighbour, or acquire a star,
+// with no stray comma anywhere — and there [recordedProjection.splitAt] answers
+// -1, which falls through to "the SELECT clause" and tells a caller with a
+// ten-item projection nothing at all. So when there is no stray comma the second
+// arm walks the two halves in step and points at the first item whose emitted
+// operand or alias is not the one the builder recorded.
+func (r recordedProjection) divergenceAt(got derivedProjection) int {
+	if p := r.splitAt(got.commas); p >= 0 {
+		return p
+	}
+	for i, it := range r.items {
+		switch {
+		case i >= len(got.exprs), got.exprs[i] != it.expr:
+			return it.start
+		case i < len(got.shape.aliases) && got.shape.aliases[i] != it.alias:
+			return it.start
+		}
+	}
+	// Every recorded item reads back as itself and the shapes still differ, so
+	// the change is in the text BEYOND them — a coordinate no item owns.
+	return -1
+}
+
+// carrying, describeTopDir and describeItems spell a shape difference in words.
+// All three render STRUCTURE only — a count, a flag, a keyword from the SDK's
+// own fixed vocabulary — so none can leak projection text.
 func carrying(v bool) string {
 	if v {
 		return "with"
@@ -263,17 +357,37 @@ func carrying(v bool) string {
 	return "without"
 }
 
-func describeItems(sh selectShape) string {
-	if sh.items == 0 && sh.star {
-		return "the bare `SELECT *` form"
+func describeTopDir(dir string) string {
+	if dir == "" {
+		return "with no direction"
 	}
-	return fmt.Sprintf("%d item(s)", sh.items)
+	return "directed " + dir
+}
+
+// describeItems spells the STAR flag beside the count, because the two are
+// compared together: on a star-only disagreement — one side reading a star the
+// other did not — a count alone printed the two halves identically and the
+// diagnostic said the structure changed without saying how.
+func describeItems(sh selectShape) string {
+	switch {
+	case sh.items == 0 && sh.star:
+		return "the bare `SELECT *` form"
+	case sh.star:
+		return fmt.Sprintf("%d item(s) including a star", sh.items)
+	default:
+		return fmt.Sprintf("%d item(s) and no star", sh.items)
+	}
 }
 
 // derivedProjection is what ONE pass over the emitted clause text says a reader
 // of that text will carry.
 type derivedProjection struct {
 	shape selectShape
+	// exprs is each item's OPERAND text as the reader carries it — trimmed, and
+	// with the closed top-level comment runs stripped — so a diagnostic can find
+	// the first item that reads back as something other than what the builder
+	// recorded. It is empty for the reduced bare-star form.
+	exprs []string
 	// commas are the offsets of the top-level commas — the item separators the
 	// reader sees, whoever wrote them.
 	commas []int
@@ -317,10 +431,14 @@ func deriveSelectShape(clause string) derivedProjection {
 		}
 		i = skipProjectionSpace(clause, i)
 		// `top : TOP INTEGER direction=(FORWARD|BACKWARD)?` — the direction
-		// belongs to the clause too, so it is stepped over rather than left to
-		// look like the first item's text.
+		// belongs to the clause too, so it is RECORDED here and stepped over,
+		// rather than left to look like the first item's text. Recording it is
+		// what makes the comparison see it: a direction the builder never set
+		// re-parses and re-emits byte-identically, and asks for the rows at the
+		// other end of the result set.
 		for _, dir := range []string{"FORWARD", "BACKWARD"} {
 			if projectionKeywordIs(clause, i, dir) {
+				d.shape.topDir = dir
 				i = skipProjectionSpace(clause, i+len(dir))
 				break
 			}
@@ -356,22 +474,31 @@ func deriveSelectShape(clause string) derivedProjection {
 			if w.word == "AS" && !aliased {
 				aliased = true
 				exprEnd = w.pos
-				aliases[fi] = strings.TrimSpace(clause[w.pos+len("AS") : fr.end])
+				aliases[fi] = stripComments(clause, w.pos+len("AS"), fr.end, sc.comments)
 				continue
 			}
 			d.escapes = append(d.escapes, w)
 		}
-		exprs[fi] = strings.TrimSpace(clause[fr.start:exprEnd])
+		exprs[fi] = stripComments(clause, fr.start, exprEnd, sc.comments)
 	}
 
 	// The reduction: a SOLE unaliased star item and the bare `SELECT *` flag
 	// are one encoding, so the star form carries ZERO items — which is how the
 	// text re-parses, and the spelling REQ-163 § Canonical spellings calls
 	// canonical.
+	//
+	// It runs on the COMMENT-STRIPPED text, and that order is what keeps the
+	// comment leniency honest: `Col("-- x\n*")` records ONE non-star item and
+	// its emitted text reads back as the bare star form with zero, so stripping
+	// first is what lets the count/star arm below see the disagreement and
+	// refuse. Strip after the reduction and the item would still read as a
+	// commented path, agreeing with the record and shipping a `SELECT *` the
+	// caller never asked for.
 	if len(frags) == 1 && exprs[0] == "*" && aliases[0] == "" {
 		d.shape.star = true
 		return d
 	}
+	d.exprs = exprs
 	d.shape.items = len(frags)
 	d.shape.aliases = aliases
 	for _, e := range exprs {
@@ -382,6 +509,35 @@ func deriveSelectShape(clause string) derivedProjection {
 	return d
 }
 
+// stripComments returns clause[start:end] with the CLOSED top-level comment runs
+// inside it replaced by a single space, then trimmed — the text a reader of the
+// clause actually carries.
+//
+// A comment is SKIPPED by the lexer, so the tokens either side of one stay two
+// tokens: the replacement is a space and not nothing, or `c/a-- x\nFROM` would
+// close up into a single word and hide the keyword that ends the projection.
+//
+// Only closed runs reach here. An UNCLOSED one has no terminator inside the
+// clause, so it does comment out the rest of the emitted query, and
+// [scanProjection] reports it as a flaw before any of this runs.
+func stripComments(clause string, start, end int, comments []commentSpan) string {
+	pos := start
+	var sb strings.Builder
+	for _, c := range comments {
+		if c.start < pos || c.end > end {
+			continue
+		}
+		sb.WriteString(clause[pos:c.start])
+		sb.WriteByte(' ')
+		pos = c.end
+	}
+	if pos == start {
+		return strings.TrimSpace(clause[start:end])
+	}
+	sb.WriteString(clause[pos:end])
+	return strings.TrimSpace(sb.String())
+}
+
 // projectionWord is a clause-level keyword found in the clause text, carried
 // with the offset that found it and the SDK's OWN canonical spelling — never
 // the caller's bytes, so a diagnostic naming it reproduces no source.
@@ -389,6 +545,11 @@ type projectionWord struct {
 	pos  int
 	word string
 }
+
+// commentSpan bounds one CLOSED comment run at the top level of projection
+// text — `-- …` through the newline that ends it, the whole token the lexer
+// skips.
+type commentSpan struct{ start, end int }
 
 // projectionScan is what one pass over projection text tells the derivation.
 type projectionScan struct {
@@ -399,6 +560,11 @@ type projectionScan struct {
 	// words are the clause-level keywords at that same top level, in offset
 	// order.
 	words []projectionWord
+	// comments are the CLOSED comment runs at that same top level. They are
+	// TRIVIA, not escapes: the lexer skips a comment, and a closed one ends at
+	// its own newline, so the clauses the emitter wrote after it still reach the
+	// parser. The derivation strips them before comparing structure.
+	comments []commentSpan
 	// flaw names an opaque region left open or a delimiter left unbalanced
 	// ("" when none), with the offset that proved it. Either one makes the
 	// counts above a PREFIX count, so the derivation must refuse before it
@@ -497,14 +663,21 @@ func scanProjection(text string) projectionScan {
 				continue
 			}
 			if !closed {
+				// The run reaches the end of the text with no terminator, so it
+				// carries on into the emitted query and comments out the clauses
+				// after it — the FROM included. THAT is the escape.
 				sc.flaw, sc.flawPos = "leaves a comment unterminated", i
 				return sc
 			}
 			if brackets == 0 && parens == 0 {
-				// A comment at the top level of a projection comments out
-				// everything after it on the line — the emitted FROM clause
-				// included — so it is an escape, not content.
-				sc.words = append(sc.words, projectionWord{pos: i, word: "--"})
+				// A CLOSED run ends at its own newline, so it hides the rest of
+				// its LINE and nothing beyond: the emitted clauses after it still
+				// reach the parser, and the projection either side of it reads
+				// back as the projection the builder recorded. The lexer skips a
+				// comment, so this is WHITESPACE with a body — recorded for the
+				// derivation to strip, not refused (REQ-163 § rule 2 refuses
+				// nothing that does not change the structure).
+				sc.comments = append(sc.comments, commentSpan{start: i, end: i + n})
 			}
 			i += n
 		case ',':
@@ -534,20 +707,32 @@ func scanProjection(text string) projectionScan {
 
 // projectionClauseWords are the tokens whose appearance at the TOP level of the
 // SELECT clause text means the parser is no longer reading the projection the
-// builder recorded: the clause OPENERS that end it, the two clause-level FLAGS
-// it may carry before the first item, and `AS`, which ends one item's operand.
+// builder recorded: the clause OPENERS that end it, the clause-level FLAGS and
+// TOP OPERANDS it may carry before the first item, and `AS`, which ends one
+// item's operand.
 //
-// Longest first, because the match is by prefix and the boundary check comes
-// after — `ASC` must not read as `AS` (it does not: `C` is a word character),
-// and `ORDER` must not read as `OR` (which is not in this set at all, since a
-// junction keyword in a projection is a LOUD malformation the parser rejects
-// rather than a silent structure change).
+// FORWARD and BACKWARD are here for the same reason DISTINCT and TOP are, and
+// they earn their place twice over. Before the first item the prefix walk
+// consumes them into the clause, where the direction becomes part of the
+// compared structure — a `BACKWARD` the builder never recorded asks for the
+// rows at the other end of the result set, and the emitted query re-parses and
+// re-emits byte-identically, so nothing downstream can see it. INSIDE an item
+// there is no reading at all: `SELECT BACKWARD c/x` is text the parser rejects,
+// so the loud sibling is refused here rather than at the server.
+//
+// The list is written longest-first for reading, not for correctness: the
+// boundary check in [projectionKeywordIs] owns that, so `ASC` cannot read as
+// `AS` (`C` is a word character) whatever order the entries are in. `ORDER` and
+// `OR` never compete because `OR` is not in this set at all — a junction keyword
+// in a projection is a LOUD malformation the parser rejects rather than a silent
+// structure change.
 //
 // Source: resources/aql/grammar/active/AqlParser.g4 (`selectQuery`,
 // `selectClause`, `selectExpr`, `top`) and AqlLexer.g4 (§ Keywords). Held
 // against the grammar by the round-trip corpus rather than by a second list.
 var projectionClauseWords = []string{
-	"CONTAINS", "DISTINCT", "OFFSET", "SELECT", "ORDER", "LIMIT", "WHERE", "FROM", "TOP", "AS",
+	"BACKWARD", "CONTAINS", "DISTINCT", "FORWARD", "OFFSET", "SELECT",
+	"ORDER", "LIMIT", "WHERE", "FROM", "TOP", "AS",
 }
 
 // projectionWordAt returns the clause-level keyword beginning at i in the SDK's

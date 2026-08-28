@@ -26,6 +26,7 @@ package aql
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -61,20 +62,34 @@ type SelectField struct {
 // of [parse.SelectExpr], with one shape per `columnExpr` alternative plus the
 // star.
 //
-// Sealed by unexported methods on unexported types, as [VersionPredicate] is:
-// the constructors in this file are the only values that exist, so no caller
-// outside this package can form a shape (or a pointer twin of one) and the
-// vocabulary closes with the grammar rather than with policy.
+// Sealed by the INTERFACE's own visibility, which is the stronger of the two
+// sealing mechanisms and the one that applies here: selectOperand is unexported,
+// so no declaration outside this package can name it as an embedded field or as
+// a method's result, and the constructors in this file are therefore the only
+// values that exist. [VersionPredicate] is the sibling carrier and seals
+// differently — it is EXPORTED, so its closure rests on its methods being
+// unexported instead. Either way the vocabulary closes with the grammar rather
+// than with policy.
 type selectOperand interface {
 	// selectToken renders the operand's canonical text — WITHOUT the alias,
 	// which the item renderer appends — or reports why it cannot be rendered.
 	selectToken() (string, error)
 	// kind names the shape, so a positional rule can be written without a type
-	// switch over the vocabulary (REQ-119 § the dispatch rule).
+	// switch over the vocabulary (REQ-119 § The emission closure property).
 	kind() operandKind
 	// literalValue is the projected literal's value, and nil for every other
-	// shape — the one field a positional rule needs to read.
+	// shape.
 	literalValue() Value
+	// aggregateCall names the call and reports it AGGREGATE-shaped, and is
+	// ("", false) for every other shape.
+	//
+	// It and literalValue are the fields a POSITIONAL rule needs to read, and
+	// they are methods on the vocabulary rather than type assertions at the
+	// rule for the reason kind is: an assertion binds the rule to one carrier,
+	// and every shape here declares its methods on a value receiver, so a
+	// pointer twin satisfies the interface beside the value (REQ-119 § The
+	// emission closure property).
+	aggregateCall() (string, bool)
 }
 
 // operandKind names a [selectOperand] shape for the positional rules that must
@@ -111,6 +126,8 @@ func (rawColumn) kind() operandKind { return operandRaw }
 
 func (rawColumn) literalValue() Value { return nil }
 
+func (rawColumn) aggregateCall() (string, bool) { return "", false }
+
 // pathColumn is a typed projected `identifiedPath`. The text stays VERBATIM by
 // contract (REQ-055 rule 3) — it is an openEHR identifier, never caller data —
 // so the check here is the emptiness one every other path position has.
@@ -127,6 +144,8 @@ func (pathColumn) kind() operandKind { return operandPath }
 
 func (pathColumn) literalValue() Value { return nil }
 
+func (pathColumn) aggregateCall() (string, bool) { return "", false }
+
 // starColumn is the `*` projection item — `selectExpr`'s own SYM_ASTERISK
 // alternative (SDK-AQL-002), not a `columnExpr`. A SOLE unaliased one emits as
 // the bare `SELECT *`, which is how it re-parses.
@@ -138,6 +157,8 @@ func (starColumn) kind() operandKind { return operandStar }
 
 func (starColumn) literalValue() Value { return nil }
 
+func (starColumn) aggregateCall() (string, bool) { return "", false }
+
 // literalColumn is a projected primitive — `columnExpr`'s `primitive`
 // alternative — carrying the shared [Value] vocabulary so a projected literal
 // and a compared literal render through ONE renderer (REQ-119 § Canonical
@@ -145,6 +166,25 @@ func (starColumn) literalValue() Value { return nil }
 type literalColumn struct{ v Value }
 
 func (l literalColumn) selectToken() (string, error) {
+	// A CALL is not a primitive, and [Fn] is the route that carries one. The
+	// shape is read through [DerefValue] rather than a bare type switch, so a
+	// `*FuncCall` pointer twin is caught with the value shape (REQ-119
+	// § The emission closure property).
+	//
+	// Refusing rather than rerouting is the package's own idiom (see
+	// [versionRoutingRefusal]): [FormatValue] would render the call happily,
+	// but a literal never reaches [SelectField.renderArgument], so a comma
+	// inside an argument would come back as one more argument than the builder
+	// recorded — the arity substitution the argument scan exists to close, one
+	// route below it.
+	if inner, ok := DerefValue(l.v); ok {
+		if _, isCall := inner.(FuncCall); isCall {
+			return "", fmt.Errorf("%w: a projected literal carrying a function call; `columnExpr`'s "+
+				"`primitive` alternative is a primitive and the call has its own alternative — build it "+
+				"with aql.Fn, which holds the name and every argument to the call's own rules",
+				ErrInvalidQuery)
+		}
+	}
 	// [FormatValue] cannot refuse — it has no error to return — so the
 	// value-position guards must be applied HERE or the closure holds for
 	// WHERE and not for SELECT. Exactly what parse's own SELECT literal arm
@@ -159,6 +199,8 @@ func (literalColumn) kind() operandKind { return operandLiteral }
 
 func (l literalColumn) literalValue() Value { return l.v }
 
+func (literalColumn) aggregateCall() (string, bool) { return "", false }
+
 // funcColumn is a projected function or aggregate call — ONE type for
 // `aggregateFunctionCall` and `functionCall` both, mirroring
 // [parse.FunctionCall], so a shape rule written once binds both carriers.
@@ -172,6 +214,20 @@ type funcColumn struct {
 func (funcColumn) kind() operandKind { return operandFunc }
 
 func (funcColumn) literalValue() Value { return nil }
+
+// aggregateCall names the call in its canonical spelling and reports whether it
+// is AGGREGATE-shaped — the property `terminal` has no alternative for.
+//
+// Three tests, because the shape shows itself three ways and each is the
+// package's OWN classification rather than a second one: the STAR and the
+// DISTINCT flags belong to `aggregateFunctionCall` alone ([funcColumn.validateShape]
+// states that rule for the top-level position, where `functionCall` reaches
+// neither), and the NAME is read through [IsAggregateFunc], the same ASCII-folded
+// set the projected-name check admits and every value position refuses.
+func (f funcColumn) aggregateCall() (string, bool) {
+	name := asciiUpper(strings.TrimSpace(f.name))
+	return name, f.star || f.distinct || IsAggregateFunc(name)
+}
 
 // selectToken renders `NAME(args…)` in the canonical spelling: an ASCII
 // upper-cased name, `DISTINCT ` before the arguments when the aggregate
@@ -226,7 +282,8 @@ func (f funcColumn) selectToken() (string, error) {
 // is the builder-side statement of the rule [parse.Query.Emit] applies to a
 // projected [parse.FunctionCall]; openehr/aql cannot call that one (the import
 // runs the other way), so the two are held in agreement by test rather than by
-// sharing code — see TestProjectionShapeRefusalsAgreeWithEmit.
+// sharing code — see TestProjectionShapeRefusalsAgreeWithEmit in
+// projection_test.go, which walks the shapes both sides can reach.
 //
 // The constructors make most of this unreachable by construction — [Count],
 // [CountDistinct] and [CountStar] each build one admitted shape — so what it
@@ -287,7 +344,7 @@ func (f funcColumn) validateTerminology() error {
 	for i, a := range f.args {
 		// Both carriers normalise before the shape check: the operand (is it a
 		// literal at all?) and the [Value] inside it, since `*StringValue` is a
-		// string literal too (REQ-119 § the pointer-twin rule).
+		// string literal too (REQ-119 § The emission closure property).
 		lit, ok := DerefValue(a.literalValue())
 		if !ok {
 			return fmt.Errorf("%w: %s() argument %d is not a string literal; the grammar admits no other",
@@ -306,7 +363,8 @@ func (f funcColumn) validateTerminology() error {
 func isTerminologyName(name string) bool { return asciiKeyword(name, TerminologyFunc) }
 
 // String names an [operandKind] in a diagnostic. The vocabulary is the SDK's
-// own, so naming it reproduces no caller text (REQ-119 § the redaction rule).
+// own, so naming it reproduces no caller text (REQ-119 § Emission verified
+// after emission).
 func (k operandKind) String() string {
 	switch k {
 	case operandRaw:
@@ -408,9 +466,17 @@ func CountStar() SelectField {
 //
 // An argument carrying an `AS` alias is refused: `selectExpr` aliases the whole
 // projected item, and `functionCall`'s arguments are `terminal`s with no alias
-// slot at all.
+// slot at all. So is an AGGREGATE-shaped argument: `COUNT` / `MIN` / `MAX` /
+// `SUM` / `AVG` reach `columnExpr` and no `terminal`, so `CONCAT(COUNT(*))` is
+// text the parser rejects. A nested ordinary call — `Fn("CONCAT",
+// Fn("LENGTH", Col("c/x")))` — is a `terminal` and stays admitted.
+//
+// The variadic slice is COPIED at intake, as [Builder.Select] copies its own:
+// a `...SelectField` call site hands the callee the caller's own backing array
+// when the arguments were spread from a slice, so retaining it would let a
+// later write to that slice change what an already-recorded projection emits.
 func Fn(name string, args ...SelectField) SelectField {
-	return SelectField{expr: funcColumn{name: name, args: args}}
+	return SelectField{expr: funcColumn{name: name, args: slices.Clone(args)}}
 }
 
 // Lit is a projected literal — `Lit(Int(1))` emits `1`, `Lit(String("x"))`
@@ -422,6 +488,14 @@ func Fn(name string, args ...SelectField) SelectField {
 // `Fn("CONCAT", Lit(String("a")), Lit(Param("p")))` is admitted — a function
 // argument is a `terminal`, which does carry one. The check is positional,
 // which is why it is not on [Lit] itself.
+//
+// A FUNCTION CALL is not a literal in any position: `Lit(Func("CONCAT", …))`
+// is refused at [Builder.Build] wherever it sits, because `primitive` and the
+// call alternatives are different branches of `columnExpr` and only [Fn] holds
+// a call to the rules of its own branch — the name, the argument shapes, and
+// the per-argument escape scan that keeps a spliced comma from adding an
+// argument the builder never recorded. Build the call with [Fn], nesting it
+// where a nested call is what you mean.
 func Lit(v Value) SelectField { return SelectField{expr: literalColumn{v: v}} }
 
 // As returns the field carrying an `AS` alias — `Count("c/uid/value").As("n")`
@@ -486,9 +560,15 @@ type renderedItem struct {
 
 // render renders one projection item: the operand text, plus the canonical
 // ` AS <alias>` when an alias was recorded.
+//
+// Every refusal it returns carries the ITEM INDEX, including the ones the
+// operand raises for itself — a shape error, a name the grammar cannot lex, an
+// argument that escapes its slot. The coordinate is the whole diagnostic here
+// (REQ-119 § Emission verified after emission): the text may not be quoted, so
+// a caller with a ten-item projection has nothing else to locate the defect by.
 func (f SelectField) render(idx int) (renderedItem, error) {
 	if f.expr == nil {
-		return renderedItem{}, fmt.Errorf("%w: empty SELECT field", ErrInvalidQuery)
+		return renderedItem{}, fmt.Errorf("%w: SELECT item %d carries no operand", ErrInvalidQuery, idx)
 	}
 	// A bare parameter is refused at the TOP of a projection and nowhere
 	// deeper: `columnExpr` has no PARAMETER alternative while a function
@@ -502,7 +582,12 @@ func (f SelectField) render(idx int) (renderedItem, error) {
 	}
 	tok, err := f.expr.selectToken()
 	if err != nil {
-		return renderedItem{}, err
+		// The operand's own diagnostics name the rule they applied — the shape,
+		// the name, the argument slot — and none of them knows WHERE in the
+		// projection it sat. The index is added once, here, so `%w` keeps
+		// [ErrInvalidQuery] reachable as a sentinel and the message stays
+		// value-free.
+		return renderedItem{}, fmt.Errorf("SELECT item %d: %w", idx, err)
 	}
 	item := renderedItem{expr: tok, text: tok}
 	if f.aliasSet {
@@ -528,10 +613,18 @@ func (f SelectField) render(idx int) (renderedItem, error) {
 }
 
 // renderArgument renders one argument of a projected call. `functionCall`'s
-// arguments are `terminal`s: no alias slot, and no star.
+// arguments are `terminal`s: no alias slot, no star, and no AGGREGATE.
 //
-// The argument text is held to the SAME escape scan the projection items are
-// (projection_verify.go): a comma inside an argument re-parses as one more
+//	functionCall : terminologyFunction | name '(' (terminal (',' terminal)*)? ')'
+//	terminal     : primitive | PARAMETER | identifiedPath | functionCall
+//
+// `terminal` reaches an ordinary `functionCall` and NOT
+// `aggregateFunctionCall`, which only `columnExpr` does — so a nested plain
+// call is legal (`CONCAT(LENGTH(c/x))`) while an aggregate in the same slot is
+// text the parser rejects (`CONCAT(COUNT(*))`, `CONCAT(MIN(c/x))`).
+//
+// The argument text is then held to the SAME escape scan the projection items
+// are (projection_verify.go): a comma inside an argument re-parses as one more
 // argument, changing the call's ARITY with nothing downstream able to see it —
 // the silent-substitution mode one level below the item list.
 func (f SelectField) renderArgument(fn string, idx int) (string, error) {
@@ -546,6 +639,16 @@ func (f SelectField) renderArgument(fn string, idx int) (string, error) {
 	if f.operandKind() == operandStar {
 		return "", fmt.Errorf("%w: %s() argument %d is a star; the only star inside a call is COUNT(*), "+
 			"which is the whole argument list", ErrInvalidQuery, fn, idx)
+	}
+	// `terminal` has no `aggregateFunctionCall` alternative, so an aggregate in
+	// an argument slot emits text the parser rejects outright. Refused here
+	// rather than left to the server, whose syntax message would point into
+	// bytes the SDK wrote for the caller.
+	if name, isAggregate := f.expr.aggregateCall(); isAggregate {
+		return "", fmt.Errorf("%w: %s() argument %d is the aggregate-shaped call %s() — `terminal` reaches "+
+			"an ordinary `functionCall` and not `aggregateFunctionCall`, which only `columnExpr` does, so "+
+			"the emitted text has no reading; project the aggregate as its own SELECT item",
+			ErrInvalidQuery, fn, idx, name)
 	}
 	tok, err := f.expr.selectToken()
 	if err != nil {
