@@ -101,7 +101,9 @@ AQL-FIT-05, useful even if later phases slip.
   REQ-164, and the [REQ.md § Numbering policy](../../specifications/REQ.md#numbering-policy) band
   table (164 taken).
 - PROBE-099 Implemented (inline): every REQ-164 code fires on a corpus query built to carry
-  exactly that defect, with severity and span; every code has a negative near-miss (predicated
+  exactly that defect, with severity and span (as landed, `aql_paging_no_order_by` carries the
+  spec-mandated zero Span (neither of its channels has a source position; REQ-109's
+  zero-when-unattributable rule)); every code has a negative near-miss (predicated
   segment; ORDER BY present; aliased projection; an *avoidable* intermediate staying silent);
   the audit's two verified-silent queries from AQL-FIT-04 are corpus rows and now warn.
 - PROBE-028's re-baseline recorded in the catalogue entry, per the additivity guard: `valid.aql`
