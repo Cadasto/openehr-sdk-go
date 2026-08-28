@@ -255,3 +255,175 @@ func TestBuiltVersionPredicateSuppressesAdvisory(t *testing.T) {
 		}
 	})
 }
+
+// embeddedVersionPredicate satisfies [aql.VersionPredicate] by EMBEDDING it,
+// which the interface's unexported methods do not prevent — they prevent
+// IMPLEMENTING it. The embedded field is nil, so both marker methods dereference
+// a nil interface when called. It is the caller-constructible shape REQ-025
+// § No panics forbids the library from panicking on.
+//
+// Sealing was documented as making this value impossible; it does not, so the
+// closed set is held by [aql.DerefValue]'s counterpart on this vocabulary
+// instead — the catalogue gate every dispatch site runs first.
+type embeddedVersionPredicate struct{ aql.VersionPredicate }
+
+// TestEmbeddedVersionPredicateIsRefusedNotPanicked is the REQ-025 pin for the
+// version carrier: an out-of-catalogue predicate MUST reach the caller as an
+// error wrapping [aql.ErrInvalidQuery], never as a nil dereference inside
+// Build.
+//
+// Both caller-constructible spellings are covered — a named wrapper type and
+// the anonymous struct a caller writes inline — because they are the same defect
+// arriving by two syntaxes, and a guard keyed on the type name would catch only
+// one.
+//
+// Delete the catalogue gate in [aql.Version]'s validation path and this test
+// fails by PANIC, which is the mutation signal it exists to give.
+func TestEmbeddedVersionPredicateIsRefusedNotPanicked(t *testing.T) {
+	for name, pred := range map[string]aql.VersionPredicate{
+		"named wrapper type":      embeddedVersionPredicate{},
+		"inline anonymous struct": struct{ aql.VersionPredicate }{},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// The panic is what this test is about, so it is caught and
+			// reported as a failure rather than crashing the run: a bare
+			// t.Fatalf on the error would leave the diagnosis to the stack
+			// trace of a different test binary line.
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("Build panicked on a caller-constructible predicate (REQ-025): %v", r)
+				}
+			}()
+			q, err := aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e").
+				Contains(aql.Version("v", pred)).Build()
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("err = %v (query %q), want ErrInvalidQuery", err, q.String())
+			}
+			// The refusal points at the route back, as every other REQ-163
+			// refusal does; a bare "invalid predicate" leaves the caller with
+			// no way to spell the query they meant.
+			if !strings.Contains(err.Error(), "aql.LatestVersion") {
+				t.Errorf("refusal does not name the constructors that carry the shape: %v", err)
+			}
+		})
+	}
+}
+
+// TestEmbeddedVersionPredicateDoesNotPanicOnEmission covers the SECOND dispatch
+// site on the same interface. [Containment.classToken] renders the bracket, and
+// it is reached from a different function than the validation above, so guarding
+// only one moves the panic rather than removing it.
+//
+// It is asked through the public surface the only way it can be: the emission
+// path runs after validation, so this pins the pair — with the gate in place the
+// caller gets an error, and with EITHER gate removed the caller gets a panic.
+func TestEmbeddedVersionPredicateDoesNotPanicOnEmission(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("the emission path panicked on a caller-constructible predicate (REQ-025): %v", r)
+		}
+	}()
+	// A junction operand, so the emission walk reaches the node through
+	// emitOperands rather than the top-level chain — a second route to
+	// classToken, and the one a reordering of the two guards would expose.
+	_, err := aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e").
+		Contains(aql.ContainsOr(
+			aql.Version("v", embeddedVersionPredicate{}),
+			aql.Class("COMPOSITION", "c"),
+		)).Build()
+	if !errors.Is(err, aql.ErrInvalidQuery) {
+		t.Fatalf("err = %v, want ErrInvalidQuery", err)
+	}
+}
+
+// TestVersionCompareOperandVocabulary pins the VERSION bracket's operand accept
+// set against the grammar production it actually reaches:
+//
+//	standardPredicate    : objectPath COMPARISON_OPERATOR pathPredicateOperand
+//	pathPredicateOperand : primitive | objectPath | PARAMETER | ID_CODE | AT_CODE
+//
+// There is no function-call alternative, so `Func(…)` — and [aql.Terminology],
+// which is the same shape with a fixed name — emits text the SDK's own parser
+// rejects. The bracket is NARROWER than the WHERE value position the shared
+// [aql.Comparison] otherwise serves, which is why the guard is a check at this
+// position rather than a second operand vocabulary (REQ-163 § The
+// standing-predicate carrier makes the shared comparison a MUST).
+//
+// Both directions are pinned. The ACCEPT rows are not decoration: REQ-119's own
+// record is that a corpus of refusal rows alone let three OVER-refusals ship
+// green, and `Path` in particular is the `objectPath` alternative — legal, and
+// the row a guard written as "refuse anything but a literal or a parameter"
+// would break. Delete the operand call from [aql.VersionCompare]'s carrier and
+// the refusal rows fail; widen it past FuncCall and the accept rows do.
+func TestVersionCompareOperandVocabulary(t *testing.T) {
+	build := func(v aql.Value) (aql.Query, error) {
+		return aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e").
+			Contains(aql.Version("v", aql.VersionCompare("commit_audit/time_committed/value", aql.OpEq, v))).
+			Build()
+	}
+	t.Run("refuses", func(t *testing.T) {
+		for name, v := range map[string]aql.Value{
+			"a plain function call": aql.Func("LENGTH", aql.Path("x")),
+			// TERMINOLOGY is the same aql.FuncCall shape with a fixed name, so
+			// one guard covers both — the read/write asymmetry REQ-163 § The
+			// typed projection names as the reason for one shared shape.
+			"a TERMINOLOGY call": aql.Terminology("expand", "openehr", "x"),
+		} {
+			t.Run(name, func(t *testing.T) {
+				q, err := build(v)
+				if !errors.Is(err, aql.ErrInvalidQuery) {
+					t.Fatalf("err = %v (query %q), want ErrInvalidQuery", err, q.String())
+				}
+				if !strings.Contains(err.Error(), "pathPredicateOperand") {
+					t.Errorf("refusal does not name the grammar production it enforces: %v", err)
+				}
+			})
+		}
+	})
+	t.Run("accepts", func(t *testing.T) {
+		for name, tc := range map[string]struct {
+			val  aql.Value
+			want string
+		}{
+			"PARAMETER":            {aql.Param("since"), "$since"},
+			"a string primitive":   {aql.String("creation"), "'creation'"},
+			"an integer primitive": {aql.Int(2), "2"},
+			// `objectPath` IS an alternative of the production, so a path
+			// operand is legal AQL and refusing it would be an over-refusal.
+			"objectPath": {aql.Path("commit_audit/committer/name"), "commit_audit/committer/name"},
+		} {
+			t.Run(name, func(t *testing.T) {
+				q, err := build(tc.val)
+				if err != nil {
+					t.Fatalf("Build refused an operand the production admits: %v", err)
+				}
+				want := "SELECT x FROM EHR e CONTAINS VERSION v[commit_audit/time_committed/value = " +
+					tc.want + "]"
+				if q.String() != want {
+					t.Fatalf("operand emission mismatch:\n got: %q\nwant: %q", q.String(), want)
+				}
+			})
+		}
+	})
+}
+
+// TestVersionComparePathIsTrimmed pins the canonical spelling against edge
+// whitespace in the caller's path. Every sibling constructor trims ([aql.Col],
+// [aql.ColAs], [aql.Builder.From], [aql.Builder.OrderBy]); storing the padding
+// verbatim would emit `v[  uid/value   = $v]`, which contradicts REQ-163
+// § Canonical spellings' "no padding inside the brackets" and is not what the
+// read side emits back — so the identity round trip would fail on an otherwise
+// correct query.
+func TestVersionComparePathIsTrimmed(t *testing.T) {
+	q, err := aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e").
+		Contains(aql.Version("v", aql.VersionCompare("  commit_audit/time_committed/value\t",
+			aql.OpGt, aql.Param("since")))).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	const want = "SELECT x FROM EHR e CONTAINS VERSION v[commit_audit/time_committed/value > $since]"
+	if q.String() != want {
+		t.Fatalf("padded path reached the bracket:\n got: %q\nwant: %q", q.String(), want)
+	}
+}

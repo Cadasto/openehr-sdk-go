@@ -158,8 +158,16 @@ func (c Containment) NotContains(child Containment) Containment {
 // is recorded and surfaced by [Builder.Build].
 func (c Containment) withChild(child Containment) Containment {
 	if c.isJunction() {
-		c.invalid = fmt.Errorf("%w: CONTAINS below a containment junction — the grammar admits no "+
-			"`(A OR B) CONTAINS C` form; write the nesting inside the junction's operands", ErrInvalidQuery)
+		// The FIRST defect wins, as at [Containment.Predicated] and in
+		// [Containment.validateTree], which reports the first structural defect
+		// it reaches. Writing unconditionally would make the surviving
+		// diagnosis depend on combinator ORDER: a node already carrying a
+		// recorded misuse would come back reporting this one instead, i.e. the
+		// second-order symptom in place of the cause.
+		if c.invalid == nil {
+			c.invalid = fmt.Errorf("%w: CONTAINS below a containment junction — the grammar admits no "+
+				"`(A OR B) CONTAINS C` form; write the nesting inside the junction's operands", ErrInvalidQuery)
+		}
 		return c
 	}
 	c.children = append(slices.Clone(c.children), child)
@@ -251,14 +259,26 @@ func (c Containment) chainEndsInJunction() bool {
 // archetype-on-VERSION rule, and REQ-163's standing-beside-archetype and
 // standing-on-VERSION rules), so no two are ever populated together on an
 // emitted node.
+//
+// It is TOTAL over every value the fields can hold, including a
+// [VersionPredicate] outside the sealed catalogue — an embedded one, whose
+// methods are nil ([derefVersionPredicate]). validateTree refuses that value
+// before emission, so this arm is a backstop and not a live path; it is written
+// because a renderer that panics on its way to producing text is a worse
+// failure than the refusal it was supposed to have received, and the two guards
+// sit in different functions that a later reordering could separate.
 func (c Containment) classToken() string {
 	out := c.rmType
 	if c.alias != "" {
 		out += " " + c.alias
 	}
-	switch {
+	switch pred, known := derefVersionPredicate(c.versionPred); {
+	case c.versionPred != nil && known:
+		out += "[" + pred.versionBracket() + "]"
 	case c.versionPred != nil:
-		out += "[" + c.versionPred.versionBracket() + "]"
+		// Out of catalogue: no bracket rather than a panic. Nothing downstream
+		// re-reads this, so the emission is not a silent substitution the wire
+		// could carry — validateTree has already refused the node.
 	case c.standingPred != nil:
 		out += "[" + c.standingPred.expr() + "]"
 	case c.archetypeID != "":

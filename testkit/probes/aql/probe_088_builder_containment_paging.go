@@ -169,6 +169,23 @@ var probe088Constructs = []struct {
 		},
 	},
 	{
+		// The `objectPath` alternative of `pathPredicateOperand`, which the two
+		// rows above do not reach: they cover `primitive` and `PARAMETER`.
+		// Comparing two paths on one class expression is ordinary AQL — here,
+		// encounters whose context began and ended at the same instant — and it
+		// is the row that keeps the operand guard from being written as "a
+		// literal or a parameter", which would refuse legal text.
+		//
+		// The production's remaining alternatives, ID_CODE and AT_CODE, have no
+		// [aql.Value] shape to build them from, so they are not expressible from
+		// the write side and no golden can pin them.
+		name: "standing_predicate_path_operand",
+		build: func() (aql.Query, error) {
+			return probe088StandingQuery(aql.Class("COMPOSITION", "c").
+				Predicated("context/end_time/value", aql.OpEq, aql.Path("context/start_time/value")))
+		},
+	},
+	{
 		// REQ-161's own documented suppression shape — all versions of ONE
 		// versioned composition — which no builder program could express before
 		// REQ-163 and which the linter's aql_versioned_object_unreferenced

@@ -1,11 +1,12 @@
 package aql_test
 
 // containment_roundtrip_test.go is the equivalence pin between the two
-// canonicalisers of REQ-117: the builder's (openehr/aql, this package's
+// canonicalisers of REQ-117 and, since the rows below gained REQ-163's three
+// write-side carriers, of those too: the builder's (openehr/aql, this package's
 // subject) and the parser's (openehr/aql/parse). openehr/aql cannot import
-// openehr/aql/parse — the dependency runs the other way — so the paren and
-// precedence rules are stated twice; this test proves the two statements
-// agree by construction:
+// openehr/aql/parse — the dependency runs the other way — so the paren,
+// precedence and canonical-bracket rules are stated twice; this test proves the
+// two statements agree by construction:
 //
 //	build → parse.Parse → QueryErr() == nil → Emit() == build
 //
@@ -13,7 +14,12 @@ package aql_test
 // byte mismatch, an out-of-catalogue shape as a non-nil QueryErr
 // (aql.ErrIncompleteAST), and an ungrammatical emission as a syntax error.
 // The external test package (aql_test) is what makes the parse import legal.
-// REQ-117 · PROBE-088
+//
+// For REQ-163 the bar is stated as IDENTITY rather than re-parseability, and
+// this file is where that MUST is discharged: the read side re-emits a class or
+// VERSION bracket verbatim and upper-cases a projected function name, so any
+// builder spelling but the canonical one comes back different.
+// REQ-117 · REQ-163 · PROBE-088
 
 import (
 	"errors"
@@ -201,6 +207,14 @@ func builderRoundTripCases() []struct {
 		{"standing_predicate_int", func() (aql.Query, error) {
 			return sel().Contains(aql.Class("OBSERVATION", "o").
 				Predicated("data/events/data/items/value/magnitude", aql.OpGe, aql.Int(2))).Build()
+		}},
+		{"standing_predicate_path_operand", func() (aql.Query, error) {
+			// `pathPredicateOperand`'s `objectPath` alternative: the operand is
+			// another relative path rather than a literal or a parameter. It is
+			// the row that would fail an operand guard narrowed past the
+			// production (REQ-163 § Acceptance's ACCEPT direction).
+			return sel().Contains(aql.Class("COMPOSITION", "c").
+				Predicated("context/end_time/value", aql.OpEq, aql.Path("context/start_time/value"))).Build()
 		}},
 		{"standing_predicate_nested_node_predicate", func() (aql.Query, error) {
 			return sel().Contains(aql.Class("COMPOSITION", "c").

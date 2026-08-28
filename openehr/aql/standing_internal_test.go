@@ -64,6 +64,22 @@ func TestPredicatedRecordsTheDefectOnTheNode(t *testing.T) {
 			if name != "node already predicated" && got.standingPred != nil {
 				t.Errorf("the refused predicate was stored on the node anyway")
 			}
+			// …and on the one receiver that legitimately still carries a
+			// bracket, WHICH comparison survived is the whole point of the
+			// refusal. The rule is that a second predicate would silently drop
+			// the FIRST, so a Predicated that refused and then overwrote anyway
+			// would leave exactly the state the diagnostic says it prevented —
+			// invisible to a nil check.
+			if name == "node already predicated" {
+				kept := got.standingPred
+				switch {
+				case kept == nil:
+					t.Fatal("the refusal dropped the first predicate as well as the second")
+				case kept.Path != "name/value", kept.Op != OpEq, !EqualValues(kept.Val, String("a")):
+					t.Errorf("the second predicate overwrote the first: kept %q %q %q",
+						kept.Path, string(kept.Op), FormatValue(kept.Val))
+				}
+			}
 		})
 	}
 }
@@ -83,6 +99,42 @@ func TestPredicatedKeepsTheFirstDefect(t *testing.T) {
 	}
 	if !strings.Contains(c.invalid.Error(), "CONTAINS below a containment junction") {
 		t.Errorf("the later refusal overwrote the first defect: %v", c.invalid)
+	}
+}
+
+// TestWithChildKeepsTheFirstDefect is [TestPredicatedKeepsTheFirstDefect]'s
+// mirror across the OTHER combinator, and it is the direction the pair was
+// missing: [Containment.Predicated] guards its write to `invalid`, so a defect
+// recorded there must survive a later [Containment.Contains] on the same node.
+//
+// Without the guard the surviving diagnosis depends on combinator ORDER — the
+// caller is handed the CONTAINS-on-a-junction message for a chain whose actual
+// mistake was the standing predicate two calls earlier, i.e. the second-order
+// symptom in place of the cause. Both messages are ErrInvalidQuery, so no
+// errors.Is assertion can see the difference; only the text can.
+//
+// Delete the `if c.invalid == nil` guard in [Containment.withChild] and this
+// test fails by name.
+func TestWithChildKeepsTheFirstDefect(t *testing.T) {
+	// The standing predicate on a junction is the FIRST defect; the CONTAINS on
+	// the same junction is the second.
+	c := ContainsOr(Class("OBSERVATION", "o"), Class("EVALUATION", "ev")).
+		Predicated("uid/value", OpEq, Param("uid")).
+		Contains(Class("COMPOSITION", "c"))
+	if c.invalid == nil {
+		t.Fatal("no defect recorded")
+	}
+	if !strings.Contains(c.invalid.Error(), "standing predicate on a containment junction") {
+		t.Errorf("the later refusal overwrote the first defect: %v", c.invalid)
+	}
+	// …and it survives all the way to the caller, which is the seam that
+	// matters: `invalid` is an internal field, the Build error is the surface.
+	_, err := NewBuilder().Select(Col("x")).From("EHR", "e").Contains(c).Build()
+	if !errors.Is(err, ErrInvalidQuery) {
+		t.Fatalf("Build err = %v, want ErrInvalidQuery", err)
+	}
+	if !strings.Contains(err.Error(), "standing predicate on a containment junction") {
+		t.Errorf("Build reported the second-order defect: %v", err)
 	}
 }
 

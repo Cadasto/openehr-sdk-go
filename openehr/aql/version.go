@@ -21,11 +21,22 @@ package aql
 //
 // The vocabulary is a SEALED SUM rather than a string field because the
 // production is a fixed three-way choice that does not recurse into its own
-// position: a fourth shape would be a grammar change, not an extension. Sealing
-// is by unexported marker methods on unexported types, so the three
-// constructors below are the only values that exist.
+// position: a fourth shape would be a grammar change, not an extension.
+//
+// What the unexported marker methods actually buy is narrower than "the three
+// constructors below are the only values that exist", and the difference is a
+// REQ-025 one. Unexported methods block a foreign type from IMPLEMENTING the
+// interface; they do not block EMBEDDING it. `type w struct{ aql.VersionPredicate }`
+// satisfies VersionPredicate with a nil method set, and calling either method on
+// it dereferences that nil. So the closed set is held by a CATALOGUE GATE,
+// [derefVersionPredicate], which every dispatch site runs first and which refuses
+// anything outside the three shapes — the same answer [derefValue] gives for the
+// same shape on [Value].
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // VersionPredicate is the bracket a `VERSION` class expression carries — the
 // grammar's `versionPredicate : LATEST_VERSION | ALL_VERSIONS |
@@ -33,10 +44,15 @@ import "fmt"
 //
 // The interface is SEALED and has exactly three shapes, one per grammar
 // alternative: construct them with [LatestVersion], [AllVersions] and
-// [VersionCompare], and pass the result to [Version]. There is no fourth shape
-// and no way to add one from outside this package — `versionPredicate` does not
-// recurse into its own position, so the choice is closed by the grammar rather
-// than by policy.
+// [VersionCompare], and pass the result to [Version]. `versionPredicate` does
+// not recurse into its own position, so the choice is closed by the grammar
+// rather than by policy.
+//
+// Sealing is by unexported methods, which stops a foreign type IMPLEMENTING the
+// interface but not EMBEDDING it: a `struct{ aql.VersionPredicate }` satisfies
+// this interface with nil methods. Such a value is caller input, so it is
+// REFUSED at [Builder.Build] with an error wrapping [ErrInvalidQuery] rather
+// than panicking (REQ-025) — see [derefVersionPredicate].
 //
 // A nil VersionPredicate denotes the PREDICATE-LESS form (`VERSION v`), which
 // stays legal — see [Version].
@@ -79,7 +95,17 @@ type versionComparison struct{ cmp Comparison }
 // not a copy of it, which is the whole point of reusing the shape.
 func (v versionComparison) versionBracket() string { return v.cmp.expr() }
 
-func (v versionComparison) versionValidate() error { return v.cmp.validate() }
+// versionValidate runs the shared [Comparison.validate] and then the bracket's
+// OWN narrowing: `versionPredicate`'s standardPredicate arm reaches the same
+// `pathPredicateOperand` the class bracket does, which admits no function call
+// even though the WHERE value position the shared [Comparison] otherwise serves
+// does ([validatePredicateOperand]).
+func (v versionComparison) versionValidate() error {
+	if err := v.cmp.validate(); err != nil {
+		return err
+	}
+	return validatePredicateOperand(v.cmp.Val)
+}
 
 // LatestVersion is the `[LATEST_VERSION]` version predicate: the most recent
 // version of each versioned object.
@@ -109,10 +135,17 @@ func AllVersions() VersionPredicate { return allVersions{} }
 // path and op are held to the same rules a WHERE comparison is ([Comparison]),
 // and the whole rendered bracket is additionally held to
 // [ValidateVersionPredicate] at [Builder.Build] time. A malformed comparison —
-// an unknown operator, an empty path, a nil value — is refused there rather
-// than emitted.
+// an unknown operator, an empty path, a nil value, an operand outside
+// `pathPredicateOperand` — is refused there rather than emitted.
+//
+// Edge whitespace is TRIMMED off path, as at every other path-taking
+// constructor ([Col], [ColAs], [Builder.From], [Builder.OrderBy]): the canonical
+// bracket carries no padding (REQ-163 § Canonical spellings), and storing the
+// padding verbatim would emit `v[  uid/value   = $v]` — text that re-parses to
+// the same query but is not the spelling the read side emits back, so the
+// identity round trip would fail on a query that is otherwise correct.
 func VersionCompare(path string, op Operator, v Value) VersionPredicate {
-	return versionComparison{cmp: Comparison{Path: path, Op: op, Val: v}}
+	return versionComparison{cmp: Comparison{Path: strings.TrimSpace(path), Op: op, Val: v}}
 }
 
 // Version is a `VERSION` containment operand — `VERSION <alias>[<predicate>]`,
@@ -140,18 +173,28 @@ func Version(alias string, pred VersionPredicate) Containment {
 }
 
 // validateVersionPredicate holds a VERSION bracket to its own grammar position
-// (REQ-163 § The version-predicate carrier). Three checks, each already in
-// force somewhere and applied here rather than re-invented:
+// (REQ-163 § The version-predicate carrier). Four checks. Two are borrowed —
+// they were already in force elsewhere and are applied here rather than
+// re-invented — and two are this carrier's own machinery:
 //
 //   - the RM-type SPELLING, because `versionPredicate` is reachable from
-//     classExprOperand's VERSION alternative alone;
-//   - the CARRIER's own shape, through the same [Comparison.validate] the
-//     WHERE clause runs;
+//     classExprOperand's VERSION alternative alone. The rule is REQ-163's; the
+//     FOLD is new machinery, not borrowed: the landed archetype-on-VERSION
+//     refusal beside it uses the wider [strings.EqualFold], and the polarity
+//     here is the opposite one, so [asciiKeyword] is chosen for this guard
+//     rather than inherited from that one (see the comment on the check);
+//   - the CATALOGUE, through [derefVersionPredicate] — also this carrier's own:
+//     [VersionPredicate] is exported and sealed by unexported methods, which
+//     blocks implementing it and not embedding it, so an out-of-catalogue value
+//     reaches here and must be refused rather than dereferenced (REQ-025);
+//   - the CARRIER's own shape, through the same [Comparison.validate] the WHERE
+//     clause runs, plus the shared [validatePredicateOperand] — borrowed, both
+//     of them;
 //   - the RENDERED bracket text, through [ValidateVersionPredicate] — the very
 //     guard `(*parse.Query).Emit` applies at this position, so Build/Emit
 //     parity holds from the day the carrier lands rather than being reconciled
 //     later (REQ-119 § Single-token identifier positions, applied to the one
-//     position that had a guard and no caller).
+//     position that had a guard and no caller). Borrowed.
 //
 // It runs only when the field is populated; an absent predicate is the legal
 // predicate-less form, not a defect.
@@ -170,11 +213,53 @@ func (c Containment) validateVersionPredicate() error {
 			"reachable only from classExprOperand's VERSION alternative, so this emits text the "+
 			"parser rejects — build the node with aql.Version", ErrInvalidQuery, c.rmType)
 	}
-	if err := c.versionPred.versionValidate(); err != nil {
+	pred, ok := derefVersionPredicate(c.versionPred)
+	if !ok {
+		return errOutOfCatalogueVersionPredicate()
+	}
+	if err := pred.versionValidate(); err != nil {
 		return fmt.Errorf("CONTAINS version predicate: %w", err)
 	}
-	if err := ValidateVersionPredicate(c.versionPred.versionBracket()); err != nil {
+	if err := ValidateVersionPredicate(pred.versionBracket()); err != nil {
 		return fmt.Errorf("CONTAINS version predicate: %w", err)
 	}
 	return nil
+}
+
+// derefVersionPredicate normalises a [VersionPredicate] to the shape it denotes,
+// reporting false for anything outside the sealed three-shape catalogue.
+//
+// It is [derefValue]'s answer to the same problem on [Value], and it exists for
+// the same REQ-025 reason: an exported interface sealed by unexported methods
+// cannot be IMPLEMENTED from outside the package, but it can be EMBEDDED —
+// `struct{ aql.VersionPredicate }` satisfies VersionPredicate with a nil method
+// set, and both marker methods then dereference that nil. That is caller input,
+// so the library must fail closed with an error, not panic.
+//
+// It has no POINTER twins, unlike [derefValue]: the three shapes are unexported,
+// so no caller outside this package can name one to take its address, and the
+// package's own constructors return values. The dispatch tripwire's
+// case-coverage sweep (parse/dispatch_tripwire_test.go) registers this switch
+// against the derived VersionPredicate vocabulary, so a fourth shape landing
+// without a case here fails the build rather than falling silently to the
+// refusal below.
+func derefVersionPredicate(p VersionPredicate) (VersionPredicate, bool) {
+	switch x := p.(type) {
+	case latestVersion, allVersions, versionComparison:
+		return x, true
+	}
+	return nil, false // an untyped nil, or a shape outside the catalogue
+}
+
+// errOutOfCatalogueVersionPredicate is the refusal every dispatch site shares.
+//
+// It is value-free and names no type: the offending value is caller-supplied, so
+// its Go type name is caller text and has no place in a diagnostic a consuming
+// CDR logs (REQ-119 § the redaction rule). What it does name is the route back —
+// the three constructors that DO produce a carriable shape.
+func errOutOfCatalogueVersionPredicate() error {
+	return fmt.Errorf("%w: a version predicate outside the sealed `versionPredicate` vocabulary — the "+
+		"interface is satisfied by embedding it as well as by the three constructors, and an embedded "+
+		"one carries no bracket; build the predicate with aql.LatestVersion, aql.AllVersions or "+
+		"aql.VersionCompare", ErrInvalidQuery)
 }

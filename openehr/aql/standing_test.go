@@ -132,6 +132,12 @@ func TestStandingPredicateMatchesGolden(t *testing.T) {
 			Predicated("uid/value", aql.OpEq, aql.Param("uid")),
 		"standing_predicate_literal": aql.Class("COMPOSITION", "c").
 			Predicated("name/value", aql.OpEq, aql.String("Vital signs")),
+		// The third `pathPredicateOperand` alternative a [aql.Value] can spell:
+		// `objectPath`. ID_CODE and AT_CODE have no value shape, so the
+		// promised "one golden per standing-predicate operand kind" is complete
+		// at the kinds the write side can express (conformance.md, PROBE-088).
+		"standing_predicate_path_operand": aql.Class("COMPOSITION", "c").
+			Predicated("context/end_time/value", aql.OpEq, aql.Path("context/start_time/value")),
 		"standing_versioned_object": versionedObjectTerm(),
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -393,4 +399,100 @@ func TestBuiltStandingPredicateSuppressesUnreferenced(t *testing.T) {
 				code, n)
 		}
 	})
+}
+
+// TestStandingPredicateOperandVocabulary pins the class bracket's operand accept
+// set against the production it renders:
+//
+//	standardPredicate    : objectPath COMPARISON_OPERATOR pathPredicateOperand
+//	pathPredicateOperand : primitive | objectPath | PARAMETER | ID_CODE | AT_CODE
+//
+// No function-call alternative, so `Func(…)` and [aql.Terminology] emit text the
+// SDK's own parser rejects. It is the SAME guard the VERSION bracket runs
+// (version_test.go) — one function, because the two carriers share one
+// [aql.Comparison] and a rule written twice can drift.
+//
+// The ACCEPT rows carry their own weight (REQ-163 § Acceptance): `Path` is the
+// `objectPath` alternative and is legal, so a guard written as "refuse anything
+// that is not a literal or a parameter" would fail here rather than on the
+// refusal rows.
+func TestStandingPredicateOperandVocabulary(t *testing.T) {
+	build := func(v aql.Value) (aql.Query, error) {
+		return aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e").
+			Contains(aql.Class("COMPOSITION", "c").Predicated("name/value", aql.OpEq, v)).
+			Build()
+	}
+	t.Run("refuses", func(t *testing.T) {
+		for name, v := range map[string]aql.Value{
+			"a plain function call": aql.Func("LENGTH", aql.Path("x")),
+			"a TERMINOLOGY call":    aql.Terminology("expand", "openehr", "x"),
+		} {
+			t.Run(name, func(t *testing.T) {
+				q, err := build(v)
+				if !errors.Is(err, aql.ErrInvalidQuery) {
+					t.Fatalf("err = %v (query %q), want ErrInvalidQuery", err, q.String())
+				}
+				if !strings.Contains(err.Error(), "pathPredicateOperand") {
+					t.Errorf("refusal does not name the grammar production it enforces: %v", err)
+				}
+			})
+		}
+	})
+	t.Run("accepts", func(t *testing.T) {
+		for name, tc := range map[string]struct {
+			val  aql.Value
+			want string
+		}{
+			"PARAMETER":            {aql.Param("name"), "$name"},
+			"a string primitive":   {aql.String("Vital signs"), "'Vital signs'"},
+			"an integer primitive": {aql.Int(2), "2"},
+			"objectPath":           {aql.Path("other/name/value"), "other/name/value"},
+		} {
+			t.Run(name, func(t *testing.T) {
+				q, err := build(tc.val)
+				if err != nil {
+					t.Fatalf("Build refused an operand the production admits: %v", err)
+				}
+				want := "SELECT x FROM EHR e CONTAINS COMPOSITION c[name/value = " + tc.want + "]"
+				if q.String() != want {
+					t.Fatalf("operand emission mismatch:\n got: %q\nwant: %q", q.String(), want)
+				}
+				// The accept rows are only worth anything if the accepted text
+				// is text the parser reads back the same way, so each is
+				// re-parsed and re-emitted here as well as in the round-trip
+				// corpus — an over-narrow guard fails above, an over-wide one
+				// fails here.
+				doc, perr := parse.Parse(q.String())
+				if perr != nil {
+					t.Fatalf("Parse(%q): %v", q.String(), perr)
+				}
+				emitted, eerr := doc.Query().Emit()
+				if eerr != nil {
+					t.Fatalf("Emit(%q): %v", q.String(), eerr)
+				}
+				if emitted != q.String() {
+					t.Fatalf("accepted operand does not round-trip to identity:\n builder: %s\n   parse: %s",
+						q.String(), emitted)
+				}
+			})
+		}
+	})
+}
+
+// TestPredicatedPathIsTrimmed pins the canonical spelling against edge
+// whitespace in the caller's path. Every sibling constructor trims ([aql.Col],
+// [aql.ColAs], [aql.Builder.From], [aql.Builder.OrderBy]); storing the padding
+// verbatim emitted `c[  uid/value   = $v]`, contradicting REQ-163 § Canonical
+// spellings' "no padding inside the brackets".
+func TestPredicatedPathIsTrimmed(t *testing.T) {
+	q, err := aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e").
+		Contains(aql.Class("COMPOSITION", "c").Predicated("  uid/value  ", aql.OpEq, aql.Param("v"))).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	const want = "SELECT x FROM EHR e CONTAINS COMPOSITION c[uid/value = $v]"
+	if q.String() != want {
+		t.Fatalf("padded path reached the bracket:\n got: %q\nwant: %q", q.String(), want)
+	}
 }

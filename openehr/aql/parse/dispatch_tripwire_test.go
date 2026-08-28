@@ -301,25 +301,34 @@ func TestDerefSwitchesCoverEveryShape(t *testing.T) {
 	// The switches under coverage: function name → the vocabulary it must
 	// exhaust, and whether the pointer twin case is required too.
 	//
-	// VersionPredicate and selectOperand (REQ-163) have no row and no
-	// normaliser, deliberately: their shapes are UNEXPORTED — selectOperand's
-	// interface is unexported too — so no caller outside openehr/aql can form a
-	// pointer twin and there is nothing to normalise; the failure mode this
-	// sweep exists for is unreachable rather than unhandled. Both are still
-	// derived above, with their own floors, so the day a
-	// `derefVersionPredicate` or `derefSelectOperand` is written, adding one row
-	// here holds it closed over shapes this sweep already knows. Registering a
-	// vocabulary without registering a normaliser is the honest state, not an
-	// omission.
+	// `pointers: false` on the REQ-163 rows is the whole of what their
+	// unexported shapes buy: a caller outside openehr/aql cannot NAME
+	// latestVersion or pathItem, so it cannot form a pointer twin either, and
+	// there is no second carrier for a case to be missing on.
+	//
+	// It buys nothing about the VALUE case, and an earlier draft of this comment
+	// got that wrong — it read the unexported shapes as making an
+	// out-of-catalogue value "unreachable rather than unhandled", and so as a
+	// reason not to write a normaliser at all. Sealing by unexported methods
+	// blocks a foreign type IMPLEMENTING the interface; it does not block
+	// EMBEDDING one. `struct{ aql.VersionPredicate }` satisfies the exported
+	// interface with a nil method set, so an out-of-catalogue value is
+	// caller-constructible and used to panic inside `Build` — which is why
+	// `derefVersionPredicate` now exists and is registered here (REQ-025).
+	//
+	// selectOperand keeps no row because ITS interface is unexported too, so
+	// there is nothing outside the package to embed; if that ever changes it
+	// needs the same treatment.
 	targets := map[string]struct {
 		vocab    string
 		pointers bool
 	}{
-		"derefValue":      {"Value", true},
-		"derefWhere":      {"WhereExpr", true},
-		"DerefSelectExpr": {"SelectExpr", true},
-		"DerefLimitExpr":  {"LimitExpr", true},
-		"sameShape":       {"Value", false},
+		"derefValue":            {"Value", true},
+		"derefWhere":            {"WhereExpr", true},
+		"DerefSelectExpr":       {"SelectExpr", true},
+		"DerefLimitExpr":        {"LimitExpr", true},
+		"sameShape":             {"Value", false},
+		"derefVersionPredicate": {"VersionPredicate", false},
 	}
 	seen := map[string]bool{}
 	for _, f := range files {
