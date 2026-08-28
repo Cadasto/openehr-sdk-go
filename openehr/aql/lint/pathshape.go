@@ -17,12 +17,17 @@ package lint
 // It also carries the group's two PARSE-ONLY checks, which need no walk and no
 // RM fact at all: aql_paging_no_order_by (clause presence plus the request
 // envelope) and aql_select_no_alias (the projection list).
+//
+// And it carries the group's one RELATION check, aql_contains_redundant_step,
+// which reads neither the walk nor the projection but the FROM/CONTAINS tree,
+// and asks the REQ-160 relation whether a step provably does nothing.
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
@@ -225,30 +230,37 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 	return sh
 }
 
-// pathShapeIssues runs the REQ-164 path-shape group. The four landed codes are
+// pathShapeIssues runs the REQ-164 path-shape group. The five codes are
 // emitted in the order REQ-164 § Path-shape checks catalogues them —
 // aql_path_repeating_unpredicated, then aql_paging_no_order_by, then
-// aql_select_no_alias, then aql_fanout_path_grain — because they answer
-// questions of different scopes (a path, the whole query, a projection item, a
-// PAIR of projected paths) that share no document order to sort by. That fixed
-// sequence is what [Result.Issues] promises for a check group, exactly as the
-// REQ-161 group has one.
+// aql_select_no_alias, then aql_fanout_path_grain, then
+// aql_contains_redundant_step — because they answer questions of different
+// scopes (a path, the whole query, a projection item, a PAIR of projected
+// paths, a containment step) that share no document order to sort by. That
+// fixed sequence is what [Result.Issues] promises for a check group, exactly as
+// the REQ-161 group has one.
 //
 // q is the request envelope from [Options.Query]; only the paging check reads
 // it, and a nil q simply leaves that check's envelope arm unable to fire, the
 // same way it leaves the parameter-binding checks unable to.
 //
+// rel is the REQ-160 containment relation from [Options.Relation]; only
+// aql_contains_redundant_step reads it, and nil means the default relation
+// rather than a switched-off check (REQ-161 § Relation supply). The other four
+// codes consult NO relation: attribute typing and multiplicity are class facts
+// of the pinned RM, which no caller-supplied containment relation may answer
+// differently (REQ-164 § The conservative segment walk).
+//
 // The group is ungated — every code in it is Warning, so none can flip
-// [Result.OK], and [Options.Relation] governs none of them: attribute typing
-// is a class fact of the pinned RM, which no caller-supplied containment
-// relation may answer differently (REQ-164 § Always on, never gated).
-func pathShapeIssues(doc *parse.Document, md Metadata, q *aql.Query) []Issue {
+// [Result.OK] (REQ-164 § Always on, never gated).
+func pathShapeIssues(doc *parse.Document, md Metadata, q *aql.Query, rel *contain.TypeRelation) []Issue {
 	walked := walkPaths(md)
 	var issues []Issue
 	issues = append(issues, repeatingSegmentIssues(walked)...)
 	issues = append(issues, pagingIssues(doc, q)...)
 	issues = append(issues, selectAliasIssues(doc)...)
 	issues = append(issues, fanoutPathGrainIssues(walked)...)
+	issues = append(issues, redundantStepIssues(doc, md, rel)...)
 	return issues
 }
 
@@ -581,6 +593,166 @@ func commonPrefixLen(a, b parse.IdentifiedPath) int {
 		}
 	}
 	return n
+}
+
+// redundantStepIssues raises aql_contains_redundant_step: a CONTAINS operand
+// whose removal provably changes nothing (REQ-164 § Path-shape checks). ALL
+// five conditions must hold, and each is a separate arm below:
+//
+//   - it is NOT the FROM root — a root anchors the tree, it is not a step;
+//   - it is NOT a leaf — an unreferenced leaf is an existence filter, and does
+//     work;
+//   - it carries NO class-position predicate of any kind
+//     ([parse.ClassExpr.HasPredicate]: archetype, standing or version alike);
+//   - its alias roots NO identified path outside FROM/CONTAINS;
+//   - and its class is UNAVOIDABLE under the REQ-160 relation
+//     ([contain.TypeRelation.Unavoidable]) — every containment route from its
+//     PARENT operand's class to its CHILD operand's class passes through it.
+//
+// The last is the substance of the rule, not caution about it. The guidance
+// sentence this check comes from ("containment is minimal") would flag every
+// unreferenced operand and be wrong on two of the three shapes: an unreferenced
+// leaf filters, and an unreferenced intermediate NARROWS whenever it is
+// AVOIDABLE — dropping `SECTION s` from `… CONTAINS SECTION s CONTAINS
+// OBSERVATION o` admits observations that sit outside any section. Only the
+// unavoidable intermediate — `EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION
+// o`, where every EHR→OBSERVATION route passes a COMPOSITION — does nothing.
+//
+// rel is [Options.Relation], nil meaning the default (REQ-161 § Relation
+// supply). It is the relation IN USE that is asked, not [contain.Default]: a
+// consumer overlay edge states a containment route fact, and a route round the
+// via is exactly what retires a proof — so consulting the default instead would
+// raise a false finding on the dialect deployment REQ-160 § Extensibility
+// exists to serve. This is the one REQ-164 code a supplied relation governs;
+// the other four ask class questions no relation may answer differently.
+//
+// It reads the STRUCTURED tree ([parse.Document.Query]) for the reason
+// [semanticIssues] does: the flat [parse.Document.Classes] is the FROM/CONTAINS
+// tree collapsed to document order and cannot say which operands are adjacent,
+// which sit under a junction, or what is negated — and all three decide this
+// code. A nil Query (structured extraction did not succeed) leaves the check
+// silent, the conservative direction, exactly as it leaves the REQ-161
+// containment-pair checks silent.
+//
+// A VERSIONED_OBJECT-conforming operand is SKIPPED whole: REQ-161's
+// aql_versioned_object_unreferenced owns that shape, and this code is the
+// general case yielding to the specific (REQ-164 § No double-reporting). The
+// conformance question is asked of [conformsToVersionedObject] — the pinned
+// BMM, not rel — for the reason [versionedObjectIssues] gives: no relation a
+// caller can obtain answers an IS-A question differently.
+//
+// An ANONYMOUS operand (no alias at all) is INCLUDED, not skipped, exactly as
+// it is for aql_versioned_object_unreferenced: with no alias no path can
+// reference it, so "roots no identified path" holds unconditionally.
+func redundantStepIssues(doc *parse.Document, md Metadata, rel *contain.TypeRelation) []Issue {
+	q := doc.Query()
+	if q == nil {
+		return nil
+	}
+	from := q.From
+	// A junction AT the FROM root (`FROM A a OR B b`) leaves Root and Contains
+	// zero, and every one of its operands is inside a junction — silent by the
+	// rule below rather than by this early return, which is only what makes the
+	// chain walk start from a real class.
+	if from.Contains == nil || from.Root.RMType == "" {
+		return nil
+	}
+	chain, _ := containsChain([]parse.ClassExpr{from.Root}, *from.Contains)
+	if len(chain) < 3 {
+		return nil // a root and a leaf, with no step between them
+	}
+	referenced := make(map[string]bool, len(md.Paths))
+	for _, p := range md.Paths {
+		referenced[p.Alias] = true
+	}
+
+	var issues []Issue
+	// The loop bounds ARE two of the five conditions, and they are the two that
+	// cannot be got wrong later: index 0 is the FROM root, and the last index is
+	// where the chain ends — a genuine leaf, or the operand whose successor a
+	// stop removed ([containsChain]), which is silent either way and for the
+	// same reason: neither has a child operand to be redundant between.
+	for i := 1; i < len(chain)-1; i++ {
+		ce := chain[i]
+		if ce.HasPredicate {
+			continue // an archetype, standing or version predicate selects; it is not inert
+		}
+		if conformsToVersionedObject(ce.RMType) {
+			continue // REQ-161's code owns this operand
+		}
+		if ce.Alias != "" && referenced[ce.Alias] {
+			continue // a projected / filtered / ordered alias is doing work
+		}
+		parent, child := chain[i-1], chain[i+1]
+		if !rel.Unavoidable(parent.RMType, ce.RMType, child.RMType) {
+			continue
+		}
+		issues = append(issues, Issue{
+			Code: "aql_contains_redundant_step",
+			Path: classToken(ce),
+			Detail: fmt.Sprintf(
+				"%s carries no predicate and roots no identified path, and every containment "+
+					"route from %s to %s passes through %s; the step narrows nothing, so removing "+
+					"it leaves the result unchanged",
+				classToken(ce), parent.RMType, child.RMType, ce.RMType,
+			),
+			Severity: Warning,
+			// The class expression's Pos starts at its RM type token, so the span
+			// covers the class name itself — the same anchor every REQ-161
+			// class-expression code uses (see [semanticIssue]).
+			Span: spanOfText(ce.Pos, ce.RMType),
+		})
+	}
+	return issues
+}
+
+// containsChain appends the CONTAINS chain below n to chain, in containment
+// order — the linear ancestor→descendant sequence
+// aql_contains_redundant_step's parent/child questions are asked along.
+//
+// A [parse.Containment] carries no parent pointer, so the order has to be
+// rebuilt. On a CLASS node the Children are the flattened chain below it, each
+// following the PREVIOUS one with a CONTAINS keyword
+// ([parse.Containment.Children]) — so `n` with children `[c1[c1a], c2]` reads
+// `n CONTAINS c1 CONTAINS c1a CONTAINS c2`, which the depth-first append
+// produces exactly. The read-side extractor nests a parsed chain one level per
+// CONTAINS (a single child each), so the recursion normally goes straight down;
+// the flattened spelling is the same tree and is handled identically, which is
+// the rule [containCheck.walk] threads through its `prev` for the REQ-161 pair
+// checks.
+//
+// The chain STOPS, contributing nothing further, at the first node that is:
+//
+//   - a JUNCTION ([isJunction]) — every operand inside a containment junction
+//     is silent (removing one changes the junction's arity, which the relation
+//     alone cannot prove inert, REQ-164 § Path-shape checks), and so is the
+//     operand ABOVE it, whose single child class the pair question needs and
+//     which a junction does not supply;
+//   - NEGATED — every operand under a negation is silent for the twin reason:
+//     removing one changes the excluded set. The flag sits on the CONTAINS
+//     chain's target ([parse.Containment]), so stopping AT the flagged node
+//     covers the negated operand and everything below it in one test;
+//   - a class node with an EMPTY RM type — the degenerate dropped operand
+//     (REQ-119). It decides nothing, and neither can a pair built on it.
+//
+// Truncating rather than skipping is what keeps the surviving prefix honest:
+// the last surviving element is never checked (the loop stops one short of it),
+// so an operand whose real child was dropped at a stop is never judged against
+// the wrong one. The second return says whether the chain ran to its end, which
+// is how a stop DEEP inside one child truncates the whole chain rather than
+// letting a following sibling be appended as if it followed the stopped node.
+func containsChain(chain []parse.ClassExpr, n parse.Containment) ([]parse.ClassExpr, bool) {
+	if n.Negated || isJunction(n) || n.Class.RMType == "" {
+		return chain, false
+	}
+	chain = append(chain, n.Class)
+	for _, ch := range n.Children {
+		var whole bool
+		if chain, whole = containsChain(chain, ch); !whole {
+			return chain, false
+		}
+	}
+	return chain, true
 }
 
 // segmentSpan is the span the idx-th segment's ATTRIBUTE NAME occupies in the

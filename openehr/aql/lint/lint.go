@@ -154,10 +154,16 @@ type Options struct {
 	// third reads the query's own SELECT / CONTAINS shape and consults no RM
 	// facts at all. An overlay therefore cannot retire those three.
 	//
-	// It governs no REQ-164 path-shape code either, for the first of those
-	// reasons: attribute typing and multiplicity are class facts of the pinned
-	// RM, and an overlay edge states a containment ROUTE fact, never an
-	// attribute one (REQ-164 § The conservative segment walk).
+	// Of the five REQ-164 path-shape codes it governs exactly ONE:
+	// aql_contains_redundant_step, whose whole question is whether a
+	// containment ROUTE goes round the step — precisely the kind of fact an
+	// overlay edge states, so the relation in use must answer it or a dialect
+	// deployment draws a false finding on a step its own edges make
+	// load-bearing (REQ-160 § Extensibility). The other four ask CLASS
+	// questions — attribute typing and multiplicity, which no caller-supplied
+	// containment relation may answer differently (REQ-164 § The conservative
+	// segment walk). No REQ-164 code is GATED by this field either way: nil
+	// selects the default here as it does everywhere.
 	Relation *contain.TypeRelation
 }
 
@@ -236,13 +242,16 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	issues = append(issues, semanticIssues(doc, opts.Relation)...)
 	// The Layer-2 path-shape group (REQ-164) is ungated too, and for a
 	// stronger reason: it has no input to gate on. Every fact it reads is in
-	// the query text or the pinned BMM, and every code it raises is Warning,
-	// so it can never turn a passing result into a failing one (REQ-164
-	// § Always on, never gated). opts.Query reaches it for the same reason it
-	// reaches the shape group: aql_paging_no_order_by has a second row-bound
-	// channel in the request envelope, which a nil Query leaves invisible —
-	// that is the ENVELOPE ARM being unable to fire, not the group being gated.
-	issues = append(issues, pathShapeIssues(doc, md, opts.Query)...)
+	// the query text, the pinned BMM, or a relation that defaults when absent,
+	// and every code it raises is Warning, so it can never turn a passing
+	// result into a failing one (REQ-164 § Always on, never gated). opts.Query
+	// reaches it for the same reason it reaches the shape group:
+	// aql_paging_no_order_by has a second row-bound channel in the request
+	// envelope, which a nil Query leaves invisible — that is the ENVELOPE ARM
+	// being unable to fire, not the group being gated. opts.Relation reaches it
+	// for aql_contains_redundant_step alone, and nil there selects the default
+	// relation exactly as it does for the semantic group above.
+	issues = append(issues, pathShapeIssues(doc, md, opts.Query, opts.Relation)...)
 	if opts.Query != nil {
 		issues = append(issues, paramIssues(md, opts.Query)...)
 	}

@@ -2307,6 +2307,7 @@ requirements:
     implementation: planned
     packages:
       - openehr/aql/lint
+      - openehr/aql/contain
       - testkit/probes/aql
     probes: [PROBE-099]
     plans: [docs/plans/2026-08-26-aql-path-shape-lint.md]
@@ -2332,8 +2333,12 @@ requirements:
       recorded. No double-reporting: a VERSIONED_OBJECT-conforming operand
       keeps REQ-161's aql_versioned_object_unreferenced. The redundant-step
       check is specified but CUTTABLE -- it needs one new REQ-160 relation
-      query (working name Unavoidable); if implementation review declines
+      query, which landed in openehr/aql/contain as
+      TypeRelation.Unavoidable (reachability with one vertex excluded,
+      outside the verdict memo); if implementation review declines
       that API the check moves to REQ-164 § Out of scope with that
       reasoning, the code string is not reused, and the requirement ships
-      four codes. PROBE-099 (Draft) carries the corpus: per-code positive,
+      four codes. That query is also why aql_contains_redundant_step is
+      the one REQ-164 code Options.Relation governs -- a route fact is
+      exactly what an overlay edge states -- while it gates none. PROBE-099 (Draft) carries the corpus: per-code positive,
       per-rule negative near-miss, and the recorded PROBE-028 re-baseline.

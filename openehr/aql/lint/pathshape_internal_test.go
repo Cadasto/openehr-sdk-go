@@ -10,8 +10,16 @@ package lint
 // The walk's own verdict is what a later REQ-164 check reads
 // (aql_fanout_path_grain asks the divergence question of this same walk), so
 // the shape of that verdict is pinned here too.
+//
+// It also carries the pins for [containsChain], aql_contains_redundant_step's
+// linearisation of the FROM/CONTAINS tree, for the same reason and one more:
+// its flattened-sibling and deep-stop branches answer tree shapes no query
+// [parse.Parse] can produce, so only a hand-built tree reaches them (the
+// precedent is semantic_internal_test.go's
+// TestAndFrontierFlattensHandBuiltNestedAnd).
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
@@ -204,5 +212,122 @@ func TestWalkStopNames(t *testing.T) {
 		if got := tc.stop.String(); got != tc.want {
 			t.Errorf("walkStop(%d).String() = %q, want %q", int(tc.stop), got, tc.want)
 		}
+	}
+}
+
+// --- aql_contains_redundant_step: the chain linearisation --------------------
+
+// chainNames renders a linearised chain for a failure message.
+func chainNames(chain []parse.ClassExpr) []string {
+	out := make([]string, len(chain))
+	for i, ce := range chain {
+		out[i] = ce.RMType
+	}
+	return out
+}
+
+// TestContainsChainOrdersFlattenedSiblings exercises containsChain's own
+// depth-first branch on a hand-built tree, for the same reason
+// TestAndFrontierFlattensHandBuiltNestedAnd exists: the read-side extractor
+// nests a parsed CONTAINS chain one level per keyword (a class node gets a
+// single child), so no query [parse.Parse] can produce hands this function a
+// class node with SEVERAL children. The flattened spelling is the same tree
+// ([parse.Containment.Children] — the chain shape is not stable under
+// re-parse), and it must linearise to the same order, or a following sibling
+// would be judged against the wrong parent.
+//
+// `EHR e CONTAINS COMPOSITION c CONTAINS SECTION s CONTAINS OBSERVATION o
+// CONTAINS CLUSTER cl`, spelled with SECTION and CLUSTER as siblings of one
+// class node.
+func TestContainsChainOrdersFlattenedSiblings(t *testing.T) {
+	tree := parse.Containment{
+		Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"},
+		Children: []parse.Containment{
+			{
+				Class:    parse.ClassExpr{RMType: "SECTION", Alias: "s"},
+				Children: []parse.Containment{{Class: parse.ClassExpr{RMType: "OBSERVATION", Alias: "o"}}},
+			},
+			{Class: parse.ClassExpr{RMType: "CLUSTER", Alias: "cl"}},
+		},
+	}
+	got, whole := containsChain([]parse.ClassExpr{{RMType: "EHR", Alias: "e"}}, tree)
+	want := []string{"EHR", "COMPOSITION", "SECTION", "OBSERVATION", "CLUSTER"}
+	if !slices.Equal(chainNames(got), want) {
+		t.Errorf("chain = %v, want %v — a sibling follows the PREVIOUS child's chain tail, not the node itself",
+			chainNames(got), want)
+	}
+	if !whole {
+		t.Error("chain reported truncated although nothing stopped it")
+	}
+}
+
+// TestContainsChainTruncatesAtADeepStop pins the consequence of a stop found
+// INSIDE one child: everything after it is dropped, the following sibling
+// included. Appending that sibling regardless would put it beside a node it
+// does not follow, and the redundant-step check would then ask the relation
+// about a parent/child pair the query never spelled — a wrong finding, not a
+// missed one, which is the direction REQ-164 forbids.
+func TestContainsChainTruncatesAtADeepStop(t *testing.T) {
+	junction := parse.Containment{Children: []parse.Containment{
+		{Class: parse.ClassExpr{RMType: "OBSERVATION", Alias: "o"}},
+		{Class: parse.ClassExpr{RMType: "EVALUATION", Alias: "ev"}},
+	}}
+	tree := parse.Containment{
+		Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"},
+		Children: []parse.Containment{
+			{
+				Class:    parse.ClassExpr{RMType: "SECTION", Alias: "s"},
+				Children: []parse.Containment{junction},
+			},
+			{Class: parse.ClassExpr{RMType: "CLUSTER", Alias: "cl"}},
+		},
+	}
+	got, whole := containsChain([]parse.ClassExpr{{RMType: "EHR", Alias: "e"}}, tree)
+	want := []string{"EHR", "COMPOSITION", "SECTION"}
+	if !slices.Equal(chainNames(got), want) {
+		t.Errorf("chain = %v, want %v — a stop inside a child truncates the whole chain", chainNames(got), want)
+	}
+	if whole {
+		t.Error("chain reported whole although a junction stopped it")
+	}
+}
+
+// TestContainsChainStopsByName pins each of the three chain stops separately.
+// From outside the package they all look alike — silence — so a guard swapped
+// for another would pass the external suite unnoticed (the same reasoning the
+// walk's own stops are pinned by name for, REQ-164 § Acceptance).
+func TestContainsChainStopsByName(t *testing.T) {
+	seed := []parse.ClassExpr{{RMType: "EHR", Alias: "e"}}
+	for _, tc := range []struct {
+		name string
+		node parse.Containment
+	}{
+		{
+			"junction",
+			parse.Containment{Children: []parse.Containment{
+				{Class: parse.ClassExpr{RMType: "OBSERVATION", Alias: "o"}},
+				{Class: parse.ClassExpr{RMType: "EVALUATION", Alias: "ev"}},
+			}},
+		},
+		{
+			"negated",
+			parse.Containment{Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"}, Negated: true},
+		},
+		{
+			// A node with neither a class nor children — the dropped operand of
+			// REQ-119. It decides nothing, and no pair built on it could either.
+			"empty RM type",
+			parse.Containment{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, whole := containsChain(seed, tc.node)
+			if !slices.Equal(chainNames(got), []string{"EHR"}) {
+				t.Errorf("chain = %v, want just the seed — a %s node contributes nothing", chainNames(got), tc.name)
+			}
+			if whole {
+				t.Errorf("chain reported whole although a %s node stopped it", tc.name)
+			}
+		})
 	}
 }

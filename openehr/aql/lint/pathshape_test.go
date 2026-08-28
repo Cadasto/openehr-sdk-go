@@ -277,9 +277,13 @@ func TestPathRepeatingUnpredicatedValueFreeFields(t *testing.T) {
 // TestPathShapeGroupIsUngated pins REQ-164 § Always on, never gated: the group
 // runs whenever Layer 2 runs, with no option to enable it. The three Options
 // spellings a caller can reach must all yield the same finding — including a
-// supplied Relation, which governs NO code in this group: attribute typing is
-// a class fact of the pinned RM, and an overlay edge states a containment
-// ROUTE fact, never an attribute one (REQ-164 § The conservative segment walk).
+// supplied Relation, which governs no ATTRIBUTE question: typing and
+// multiplicity are class facts of the pinned RM, and an overlay edge states a
+// containment ROUTE fact, never an attribute one (REQ-164 § The conservative
+// segment walk). The group's one route-question code,
+// aql_contains_redundant_step, does read the supplied relation — that is
+// pathshape_redundant_test.go's TestRedundantStepReadsTheSuppliedRelation, and
+// it is a different claim from gating: nil selects the default there too.
 func TestPathShapeGroupIsUngated(t *testing.T) {
 	t.Parallel()
 	nilOpts := spannedSegments(t, auditQuery)
