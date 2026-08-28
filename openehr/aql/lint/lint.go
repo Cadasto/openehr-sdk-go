@@ -52,14 +52,24 @@ func spanOfText(start parse.Position, text string) Span {
 	if start == (parse.Position{}) {
 		return Span{}
 	}
-	end := start
+	return Span{Start: start, End: advance(start, text)}
+}
+
+// advance is the position reached by reading text from p. Columns count RUNES,
+// matching how the parser reports a position, so a multi-byte character does
+// not shift every column after it.
+//
+// It is shared with [segmentSpan], which starts a span PART-WAY along a
+// construct rather than at its beginning ([parse.PathSegment] carries no
+// position of its own).
+func advance(p parse.Position, text string) parse.Position {
 	if n := strings.Count(text, "\n"); n > 0 {
-		end.Line += n
-		end.Col = 1 + len([]rune(text[strings.LastIndex(text, "\n")+1:]))
+		p.Line += n
+		p.Col = 1 + len([]rune(text[strings.LastIndex(text, "\n")+1:]))
 	} else {
-		end.Col += len([]rune(text))
+		p.Col += len([]rune(text))
 	}
-	return Span{Start: start, End: end}
+	return p
 }
 
 // Issue is one finding from a lint pass. Lint is collect-all (every issue,
@@ -101,8 +111,9 @@ type Result struct {
 	// order: by layer, then document order within a layer (aql_unused_param
 	// is sorted by parameter key, since unreferenced params have no
 	// document position; and Layer 2 orders by CHECK GROUP first — shape,
-	// then the REQ-161 semantic group in its own fixed sequence — so a
-	// later-in-the-query semantic finding can precede an earlier shape one).
+	// then the REQ-161 semantic group in its own fixed sequence, then the
+	// REQ-164 path-shape group — so a later-in-the-query semantic finding
+	// can precede an earlier shape one).
 	// Never nil after a lint call (zero-length when clean).
 	Issues []Issue
 }
@@ -142,6 +153,11 @@ type Options struct {
 	// the pinned RM (rminfo.Default) rather than a containment one, and the
 	// third reads the query's own SELECT / CONTAINS shape and consults no RM
 	// facts at all. An overlay therefore cannot retire those three.
+	//
+	// It governs no REQ-164 path-shape code either, for the first of those
+	// reasons: attribute typing and multiplicity are class facts of the pinned
+	// RM, and an overlay edge states a containment ROUTE fact, never an
+	// attribute one (REQ-164 § The conservative segment walk).
 	Relation *contain.TypeRelation
 }
 
@@ -218,6 +234,12 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	// Options.Relation selects the pinned RM rather than switching the group
 	// off.
 	issues = append(issues, semanticIssues(doc, opts.Relation)...)
+	// The Layer-2 path-shape group (REQ-164) is ungated too, and for a
+	// stronger reason: it has no input to gate on. Every fact it reads is in
+	// the query text or the pinned BMM, and every code it raises is Warning,
+	// so it can never turn a passing result into a failing one (REQ-164
+	// § Always on, never gated).
+	issues = append(issues, pathShapeIssues(md)...)
 	if opts.Query != nil {
 		issues = append(issues, paramIssues(md, opts.Query)...)
 	}

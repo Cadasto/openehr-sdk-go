@@ -21,6 +21,14 @@
 // carrying dialect overlay edges. Layer 2 stays AST-only either way: no CDR,
 // no OPT, and no row semantics.
 //
+// Layer 2 carries a third group, PATH SHAPE (REQ-164), whose landed member is
+// aql_path_repeating_unpredicated: an identified path — in SELECT, WHERE or
+// ORDER BY alike — steps through a multi-valued RM attribute with no predicate
+// on that segment, leaving which occurrence is meant to the engine. It types
+// each segment against the same pinned BMM, and stops silently wherever the
+// pin cannot type a step (see pathshape.go). The group is ungated and every
+// code in it is Warning.
+//
 // The CDR remains the execute-time semantic authority (PROBE-021): a
 // lint-clean query MAY still be rejected on execution. The SDK grammar
 // profile (ADR 0007) carries documented divergences from official QUERY
