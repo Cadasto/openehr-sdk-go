@@ -6,11 +6,13 @@ package lint
 // [versionedObjectIssues]'s VERSIONED_OBJECT conformance question).
 //
 // It carries the segment WALKER — the shared machinery that types an
-// identified path's segments from the class its alias binds — and the one
-// check that reads it today, aql_path_repeating_unpredicated. The walk's
-// per-path verdict ([pathShape]) records which segments are multi-valued,
-// which carry a predicate, and where the walk stopped, because REQ-164's
-// aql_fanout_path_grain asks the divergence question of the same walk.
+// identified path's segments from the class its alias binds — and the two
+// checks that read it: aql_path_repeating_unpredicated, over every clause's
+// paths, and aql_fanout_path_grain, over the projected ones. The walk runs ONCE
+// per path ([walkPaths]) and both checks read the same verdicts, which is what
+// REQ-164 § The conservative segment walk means by their sharing one walk. That
+// per-path verdict ([pathShape]) records which segments are multi-valued, which
+// carry a predicate, and where the walk stopped.
 //
 // It also carries the group's two PARSE-ONLY checks, which need no walk and no
 // RM fact at all: aql_paging_no_order_by (clause presence plus the request
@@ -119,6 +121,26 @@ func (s pathShape) offending() []segmentShape {
 	return out
 }
 
+// offendingFrom returns the FIRST unpredicated multi-valued segment at or after
+// segment index from — what aql_fanout_path_grain asks of each path once the
+// divergence index is known.
+//
+// It reads [pathShape.Typed] through [pathShape.offending], so a segment the
+// walk never typed can never answer yes: everything at or beyond a silent stop
+// is simply absent, which is the bound REQ-164 § The conservative segment walk
+// puts on this check's reach. Segments typed BEFORE a stop do participate,
+// which is the same paragraph's explicit ruling — a path that stops at
+// `EVENT.data`'s generic `T` still carries its typed `HISTORY.events` into the
+// divergence test.
+func (s pathShape) offendingFrom(from int) (segmentShape, bool) {
+	for _, seg := range s.offending() {
+		if seg.Index >= from {
+			return seg, true
+		}
+	}
+	return segmentShape{}, false
+}
+
 // segmentWalker types identified paths against the pinned BMM. Construct it
 // with [newSegmentWalker]; one walker serves a whole lint pass.
 type segmentWalker struct {
@@ -203,13 +225,14 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 	return sh
 }
 
-// pathShapeIssues runs the REQ-164 path-shape group. The three landed codes
-// are emitted in the order REQ-164 § Path-shape checks catalogues them —
+// pathShapeIssues runs the REQ-164 path-shape group. The four landed codes are
+// emitted in the order REQ-164 § Path-shape checks catalogues them —
 // aql_path_repeating_unpredicated, then aql_paging_no_order_by, then
-// aql_select_no_alias — because they answer questions of different scopes (a
-// path, the whole query, a projection item) that share no document order to
-// sort by. That fixed sequence is what [Result.Issues] promises for a check
-// group, exactly as the REQ-161 group has one.
+// aql_select_no_alias, then aql_fanout_path_grain — because they answer
+// questions of different scopes (a path, the whole query, a projection item, a
+// PAIR of projected paths) that share no document order to sort by. That fixed
+// sequence is what [Result.Issues] promises for a check group, exactly as the
+// REQ-161 group has one.
 //
 // q is the request envelope from [Options.Query]; only the paging check reads
 // it, and a nil q simply leaves that check's envelope arm unable to fire, the
@@ -220,11 +243,46 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 // is a class fact of the pinned RM, which no caller-supplied containment
 // relation may answer differently (REQ-164 § Always on, never gated).
 func pathShapeIssues(doc *parse.Document, md Metadata, q *aql.Query) []Issue {
+	walked := walkPaths(md)
 	var issues []Issue
-	issues = append(issues, repeatingSegmentIssues(md)...)
+	issues = append(issues, repeatingSegmentIssues(walked)...)
 	issues = append(issues, pagingIssues(doc, q)...)
 	issues = append(issues, selectAliasIssues(doc)...)
+	issues = append(issues, fanoutPathGrainIssues(walked)...)
 	return issues
+}
+
+// walkedPath is one identified path beside the walk's verdict on it. The two
+// travel together — rather than as a path list and a parallel shape list — so
+// that no check can pair a path with another path's verdict, and so that adding
+// a third reader of the walk needs no new index discipline.
+type walkedPath struct {
+	// Path is the identified path as the document recorded it.
+	Path parse.IdentifiedPath
+	// Shape is the conservative walk's verdict on Path.
+	Shape pathShape
+}
+
+// walkPaths is the group's ONE segment walk: it types every identified path the
+// document records — SELECT, WHERE and ORDER BY alike — and returns them in
+// document order.
+//
+// Both RM-fact checks in the group read this result rather than walking again.
+// REQ-164 § The conservative segment walk says the repeating-segment check and
+// aql_fanout_path_grain's divergence test "share one walk", and sharing the
+// RESULT is what makes that true by construction: the two checks cannot drift
+// into answering two walks that merely look alike, and a path is typed once
+// however many checks ask about it.
+func walkPaths(md Metadata) []walkedPath {
+	if len(md.Paths) == 0 {
+		return nil
+	}
+	w := newSegmentWalker(rminfo.Default, md.Aliases)
+	walked := make([]walkedPath, len(md.Paths))
+	for i, p := range md.Paths {
+		walked[i] = walkedPath{Path: p, Shape: w.walk(p)}
+	}
+	return walked
 }
 
 // repeatingSegmentIssues raises aql_path_repeating_unpredicated over every
@@ -234,17 +292,13 @@ func pathShapeIssues(doc *parse.Document, md Metadata, q *aql.Query) []Issue {
 // unconstrained repeating segment carries the same which-occurrence ambiguity
 // a projected path does (REQ-164 § Path-shape checks).
 //
-// It reads the extracted [Metadata] alone and no other part of the document,
-// which is the whole of its input: the query's paths, and the class each alias
-// binds.
-func repeatingSegmentIssues(md Metadata) []Issue {
-	if len(md.Paths) == 0 {
-		return nil
-	}
-	w := newSegmentWalker(rminfo.Default, md.Aliases)
+// Its whole input is [walkPaths]'s output — the query's paths, already typed
+// against the class each alias binds — and no other part of the document.
+func repeatingSegmentIssues(walked []walkedPath) []Issue {
 	var issues []Issue
-	for _, p := range md.Paths {
-		for _, seg := range w.walk(p).offending() {
+	for _, wp := range walked {
+		p := wp.Path
+		for _, seg := range wp.Shape.offending() {
 			issues = append(issues, Issue{
 				Code: "aql_path_repeating_unpredicated",
 				Path: displayPath(p),
@@ -401,6 +455,127 @@ func selectItemSite(item parse.SelectItem) (string, Span) {
 		return "", Span{}
 	}
 	return displayPath(pe.IdentifiedPath), spanOfText(pe.Pos, pe.Raw)
+}
+
+// fanoutPathGrainIssues raises aql_fanout_path_grain: two PROJECTED identified
+// paths rooted on the SAME alias that diverge after their longest common
+// prefix, EACH passing at least one unpredicated multi-valued segment at or
+// after the divergence. That is the Cartesian-product shape — the two branches
+// repeat independently, and how many rows the engine returns for it is
+// undefined (SPECQUERY-9), which is the fact Detail states exactly as its
+// sibling aql_fanout_row_grain does (REQ-164 § Path-shape checks).
+//
+// PROJECTION ONLY, unlike its group-mate the repeating-segment check, which is
+// required to read every clause. The two are asking different questions: an
+// unconstrained repeating segment is ambiguous wherever it stands, whereas a
+// row PRODUCT needs two columns to multiply — a WHERE filter or an ORDER BY key
+// over a second repeating scope returns no column and multiplies nothing. A
+// path nested inside a projection expression (a function call's argument) is
+// NOT exempted: the parser records it in the SELECT clause, and the rows it
+// contributes are fanned out before any function over them is applied.
+//
+// ONCE PER ALIAS, not once per pair: a wide projection yields one advisory
+// rather than a quadratic report. The pair loop is therefore ordered by the
+// LATER path (outer) and then by the earlier one (inner), which is what makes
+// "the first offending pair in document order" mean what a reader sees — the
+// finding is reported AT its later path, so the pair whose later path comes
+// first in the query is the one that fixes the Span. Ordering the search by the
+// earlier path instead could report a pair at the end of a projection while an
+// offending pair sat wholly before it.
+//
+// The DIVERGENCE index is the length of the two paths' longest common prefix by
+// segment NAME ([commonPrefixLen]) — never by predicate text. Two spellings of
+// a predicate on one attribute are a content question, and § The conservative
+// segment walk keeps this group's reading of a predicate to PRESENCE: a check
+// that had to tell `[at0001]` from `[at0002]` to place a divergence would be
+// judging content. Reading names alone also errs silent, which is the direction
+// REQ-164 requires where a fact is not provable.
+//
+// Each MUST NOT of the catalogue row falls out of that, with no arm of its own:
+//
+//   - multi-valued segments all in the COMMON PREFIX — one repeating scope, no
+//     product — leaves neither path an offending segment at or after the
+//     divergence, so no pair forms;
+//   - a path PREDICATED on every multi-valued segment at or after the
+//     divergence has no offending segment there either, so a pair needing BOTH
+//     halves never forms;
+//   - paths on DIFFERENT aliases never pair, because the inner loop matches the
+//     alias — that is the junction question, aql_fanout_row_grain (REQ-161),
+//     and the two codes are disjoint by construction: this one needs two paths
+//     under one alias, that one two projected aliases under one AND junction;
+//   - a bare `SELECT *` roots no identified path at all, so there is nothing to
+//     pair. (The star's own row-grain question belongs to the junction code,
+//     whose rule reads a star as projecting every alias.)
+//
+// An aliasless path needs no guard either: the walk roots at the class the
+// alias binds, so a path that names none has an unstarted walk and no typed
+// segment to offend with.
+func fanoutPathGrainIssues(walked []walkedPath) []Issue {
+	var issues []Issue
+	// One finding per alias, and the first pair found for it wins — the loops
+	// below reach pairs in exactly the order the rule names.
+	reported := make(map[string]bool)
+	for j, lp := range walked {
+		later := lp.Path
+		if later.Clause != parse.ClauseSelect || reported[later.Alias] {
+			continue
+		}
+		for i := range j {
+			earlier := walked[i].Path
+			if earlier.Clause != parse.ClauseSelect || earlier.Alias != later.Alias {
+				continue
+			}
+			at := commonPrefixLen(earlier, later)
+			// Both halves, or no pair: one branch repeating under another's
+			// fixed occurrence is a single scope, not a product.
+			first, ok := walked[i].Shape.offendingFrom(at)
+			if !ok {
+				continue
+			}
+			second, ok := lp.Shape.offendingFrom(at)
+			if !ok {
+				continue
+			}
+			reported[later.Alias] = true
+			issues = append(issues, Issue{
+				Code: "aql_fanout_path_grain",
+				// The path the Span covers, so a reader correlating the two
+				// reads one location twice rather than two.
+				Path: displayPath(later),
+				Detail: fmt.Sprintf(
+					"projected paths %q and %q are rooted on alias %q and descend into "+
+						"different unpredicated repeating scopes after their common prefix "+
+						"(%s.%s and %s.%s); row multiplicity for this shape is engine-defined "+
+						"(SPECQUERY-9) — verify the result shape against the target CDR",
+					displayPath(earlier), displayPath(later), later.Alias,
+					first.Parent, first.Name, second.Parent, second.Name,
+				),
+				Severity: Warning,
+				// The LATER path of the pair, whole: the defect is the pairing,
+				// so no single segment of it is the offence, and the later path
+				// is where a reader meets the pair.
+				Span: spanOfText(later.Pos, later.Raw),
+			})
+			break
+		}
+	}
+	return issues
+}
+
+// commonPrefixLen is how many leading segments a and b spell the same way — the
+// index at which the two paths diverge, and len of the shorter when one is a
+// prefix of the other (a path with nothing beyond the shared part cannot be
+// half of a product).
+//
+// NAMES only; see [fanoutPathGrainIssues] for why a predicate is not read here.
+func commonPrefixLen(a, b parse.IdentifiedPath) int {
+	n := min(len(a.Segments), len(b.Segments))
+	for i := range n {
+		if a.Segments[i].Name != b.Segments[i].Name {
+			return i
+		}
+	}
+	return n
 }
 
 // segmentSpan is the span the idx-th segment's ATTRIBUTE NAME occupies in the

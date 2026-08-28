@@ -29,9 +29,13 @@
 // boundary is therefore engine-defined (both channels: the in-text LIMIT
 // clause and a supplied [Options.Query]'s Fetch / Offset), and
 // aql_select_no_alias, a projection item carrying no AS alias, whose column
-// name is engine-defined. The first types each segment against the same pinned
-// BMM, and stops silently wherever the pin cannot type a step (see
-// pathshape.go). The group is ungated and every code in it is Warning.
+// name is engine-defined, and aql_fanout_path_grain, two PROJECTED paths on one
+// alias descending into different unpredicated repeating scopes, whose row
+// multiplicity is engine-defined (the PATH source of that; the junction source
+// is REQ-161's aql_fanout_row_grain, and the two are disjoint). The first and
+// the last read one walk of each path's segments against the same pinned BMM,
+// which stops silently wherever the pin cannot type a step (see pathshape.go).
+// The group is ungated and every code in it is Warning.
 //
 // The CDR remains the execute-time semantic authority (PROBE-021): a
 // lint-clean query MAY still be rejected on execution. The SDK grammar
