@@ -335,7 +335,7 @@ func runSemanticFire(tc SemanticFireCase) string {
 	if iss.Severity != tc.Severity {
 		return fmt.Sprintf("%s severity = %v, want %v", tc.Code, iss.Severity, tc.Severity)
 	}
-	want, err := classSpan(tc.Query, tc.SpanClass, tc.SpanNth)
+	want, err := tokenSpan(tc.Query, tc.SpanClass, tc.SpanNth)
 	if err != nil {
 		return err.Error()
 	}
@@ -429,11 +429,17 @@ func findingCodes(fs []contain.Finding) []string {
 	return out
 }
 
-// classSpan is the span the nth (1-based) occurrence of an RM class token
-// occupies in a single-line query — mirrors openehr/aql/lint's own
-// semantic_test.go helper of the same purpose. Computed from the source text
-// rather than from the implementation under test, so a span that silently
-// widened to the whole clause fails.
+// tokenSpan is the span the nth (1-based) occurrence of a source token occupies
+// in a single-line query — mirrors openehr/aql/lint's own semantic_test.go
+// helper of the same purpose. Computed from the source text rather than from the
+// implementation under test, so a span that silently widened to the whole clause
+// fails.
+//
+// PROBE-097 only ever asks it about an RM class token; PROBE-099
+// (probe_099_path_shape_lint.go, same package) asks it about a path segment
+// name, a whole identified path and a projection item as well. Nothing in the
+// scan is class-specific — it is a boundary-checked substring search — so the
+// two share one implementation rather than two that look alike.
 //
 // The occurrence search is boundary-checked (see [boundaryOK]), not a
 // token-aware parse: it skips a candidate match embedded inside a longer
@@ -448,23 +454,23 @@ func findingCodes(fs []contain.Finding) []string {
 // a query carrying non-ASCII text ahead of the match would still land on the
 // right column — every corpus query today is ASCII, so that path is correct
 // but unexercised.
-func classSpan(query, rmType string, nth int) (lint.Span, error) {
+func tokenSpan(query, text string, nth int) (lint.Span, error) {
 	if strings.Contains(query, "\n") {
-		return lint.Span{}, fmt.Errorf("classSpan assumes a single-line query, got %q", query)
+		return lint.Span{}, fmt.Errorf("tokenSpan assumes a single-line query, got %q", query)
 	}
 	if nth < 1 {
-		return lint.Span{}, fmt.Errorf("classSpan: nth is 1-based, got %d", nth)
+		return lint.Span{}, fmt.Errorf("tokenSpan: nth is 1-based, got %d", nth)
 	}
 	idx := -1
 	count, from := 0, 0
 	for {
-		i := strings.Index(query[from:], rmType)
+		i := strings.Index(query[from:], text)
 		if i < 0 {
 			break
 		}
 		start := from + i
-		end := start + len(rmType)
-		from = start + 1 // advance by one byte, not len(rmType), so an overlapping candidate is still considered
+		end := start + len(text)
+		from = start + 1 // advance by one byte, not len(text), so an overlapping candidate is still considered
 		if !boundaryOK(query, start, end) {
 			continue
 		}
@@ -475,12 +481,12 @@ func classSpan(query, rmType string, nth int) (lint.Span, error) {
 		}
 	}
 	if idx < 0 {
-		return lint.Span{}, fmt.Errorf("query %q has fewer than %d boundary-matched occurrences of %q", query, nth, rmType)
+		return lint.Span{}, fmt.Errorf("query %q has fewer than %d boundary-matched occurrences of %q", query, nth, text)
 	}
 	col := len([]rune(query[:idx])) + 1
 	return lint.Span{
 		Start: parse.Position{Line: 1, Col: col},
-		End:   parse.Position{Line: 1, Col: col + len([]rune(rmType))},
+		End:   parse.Position{Line: 1, Col: col + len([]rune(text))},
 	}, nil
 }
 
