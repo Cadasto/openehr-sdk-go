@@ -522,6 +522,11 @@ func fanoutPathGrainIssues(walked []walkedPath) []Issue {
 		}
 		for i := range j {
 			earlier := walked[i].Path
+			// The clause half of this test is UNREACHABLE by construction and
+			// kept as defence in depth, so no test witnesses it: the parser
+			// fills [parse.Document.Paths] in source order, so nothing before a
+			// SELECT path can be a WHERE or ORDER BY one. The alias half is the
+			// live guard — it is what makes two aliases never pair.
 			if earlier.Clause != parse.ClauseSelect || earlier.Alias != later.Alias {
 				continue
 			}

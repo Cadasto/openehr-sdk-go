@@ -158,6 +158,43 @@ func TestFanoutPathGrainFiresOncePerAlias(t *testing.T) {
 	}
 }
 
+// TestFanoutPathGrainStopsAfterOnePairUnderOneLaterPath is the once-per-alias
+// budget's SECOND guard, and it needs a shape of its own: the `reported` map is
+// consulted when a later path is CHOSEN, so within a single later path nothing
+// but the loop break keeps a second pair from being emitted for the same alias.
+//
+// This projection reaches that state. Its first two paths pair INERTLY with each
+// other — their only repeating segment, `events`, sits in their common prefix —
+// while BOTH of them offend against the third. So the third path forms two
+// offending pairs, and only the break stops the second from being reported.
+//
+// Mutation check recorded in the task report: removing the break makes exactly
+// this test fail, with two aql_fanout_path_grain findings for alias `o`.
+func TestFanoutPathGrainStopsAfterOnePairUnderOneLaterPath(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT o/data/events/time AS a, o/data/events/name/value AS b, " +
+		"o/links/meaning/value AS c" + obsFrom
+	res := lint.LintString(q, nil)
+	// The whole result, in order: each of the three paths carries its own
+	// unpredicated repeating segment, and the pair adds ONE advisory — not one
+	// per offending pair.
+	want := []string{repCode, repCode, repCode, fanoutPathCode}
+	if !slices.Equal(codes(res), want) {
+		t.Fatalf("codes = %v, want %v — one advisory per alias, not per pair", codes(res), want)
+	}
+	iss := fanoutPathIssues(res)[0]
+	if got := spanText(t, q, iss.Span); got != "o/links/meaning/value" {
+		t.Errorf("span covers %q, want the later path the pair was found under", got)
+	}
+	if !strings.Contains(iss.Detail, "o/data/events/time") {
+		t.Errorf("Detail %q does not name the earlier path of the first pair", iss.Detail)
+	}
+	if strings.Contains(iss.Detail, "o/data/events/name/value") {
+		t.Errorf("Detail %q names the second offending pair's earlier path; the search "+
+			"stops at the first pair under a later path", iss.Detail)
+	}
+}
+
 // TestFanoutPathGrainReportsTheFirstOFFENDINGPair pins that "first pair" means
 // the first pair that OFFENDS, not the first pair of paths. The leading column
 // here is wholly single-valued, so every pair it forms is inert and the finding
