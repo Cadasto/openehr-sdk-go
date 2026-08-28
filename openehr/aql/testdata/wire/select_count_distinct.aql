@@ -1,0 +1,1 @@
+SELECT COUNT(DISTINCT c/uid/value) FROM EHR e CONTAINS COMPOSITION c WHERE e/ehr_id/value = $ehr_id

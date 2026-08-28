@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **AQL write-side expressivity parity (REQ-163, PROBE-088/097).** The builder spells the `VERSION` predicate bracket, a class-position standing comparison and a typed projection its read side already modelled, and `Build()` verifies what it emitted, refusing a construction that changes the recorded query — semver-minor on REQ-119's footing. *Breaking:* `aql.SelectField` is no longer usefully `==`-comparable — `==` compiles but panics at run time on a call-shaped field, map insertion included; compare built query strings.
+
 ## [0.23.0] - 2026-08-26
 
 Twenty-third `v0.x` minor — `rminfo` now answers why a name is *not* in its class universe, so a caller can tell a real openEHR class this SDK does not ship from a name openEHR never defines. Purely additive: no existing signature or answer changes.

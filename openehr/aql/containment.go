@@ -11,7 +11,10 @@ import (
 // or — since REQ-117 — a whole containment expression: a chain of nested
 // CONTAINS terms, a negated term, or a boolean junction of sibling operands.
 //
-// Construct a leaf with [Class] (no archetype predicate) or [Archetype], nest
+// Construct a leaf with [Class] (no archetype predicate), [Archetype], or —
+// for the grammar's other `classExprOperand` alternative — [Version]; give an
+// ordinary class a standing comparison in class position with
+// [Containment.Predicated]; nest
 // with [Containment.Contains] / [Containment.NotContains], and join siblings
 // with [ContainsAnd] / [ContainsOr]. Every combinator returns a NEW value —
 // a Containment is immutable once constructed, so one operand can be reused
@@ -52,6 +55,34 @@ type Containment struct {
 	rmType      string
 	alias       string
 	archetypeID string
+
+	// versionPred is the `versionPredicate` bracket of a VERSION class
+	// expression (REQ-163), nil when the bracket is absent — which is the
+	// legal predicate-less form, not a defect.
+	//
+	// It sits BESIDE archetypeID rather than sharing it because the two are
+	// different grammar positions with different accept sets: `VERSION` has no
+	// archetype slot at all, and `versionPredicate` admits no node predicate
+	// (predicate.go § the two guards). One field carrying both would need a
+	// flag to say which it held, and that flag would be the RM-type spelling
+	// this carrier already has.
+	versionPred VersionPredicate
+
+	// standingPred is the `standardPredicate` alternative of an ordinary
+	// class expression's `pathPredicate` bracket (REQ-163), nil when the
+	// bracket is absent. Set by [Containment.Predicated].
+	//
+	// It sits beside archetypeID rather than sharing it for the reason
+	// [Containment.classToken] renders only one of them: the two ARE the same
+	// `[…]` position, but they are different alternatives of it, and a single
+	// string field carrying both would have to be told apart by scanning its
+	// text — the free-text bracket carrier REQ-119 spent a whole section
+	// keeping out of the write side.
+	//
+	// A pointer, so absence is the zero value rather than a second flag; the
+	// pointee is never mutated after construction, so the value copies every
+	// combinator returns share it safely.
+	standingPred *Comparison
 
 	// children are the nested CONTAINS terms of a class node, or the
 	// operands of a junction node (which carries no class of its own).
@@ -127,8 +158,16 @@ func (c Containment) NotContains(child Containment) Containment {
 // is recorded and surfaced by [Builder.Build].
 func (c Containment) withChild(child Containment) Containment {
 	if c.isJunction() {
-		c.invalid = fmt.Errorf("%w: CONTAINS below a containment junction — the grammar admits no "+
-			"`(A OR B) CONTAINS C` form; write the nesting inside the junction's operands", ErrInvalidQuery)
+		// The FIRST defect wins, as at [Containment.Predicated] and in
+		// [Containment.validateTree], which reports the first structural defect
+		// it reaches. Writing unconditionally would make the surviving
+		// diagnosis depend on combinator ORDER: a node already carrying a
+		// recorded misuse would come back reporting this one instead, i.e. the
+		// second-order symptom in place of the cause.
+		if c.invalid == nil {
+			c.invalid = fmt.Errorf("%w: CONTAINS below a containment junction — the grammar admits no "+
+				"`(A OR B) CONTAINS C` form; write the nesting inside the junction's operands", ErrInvalidQuery)
+		}
 		return c
 	}
 	c.children = append(slices.Clone(c.children), child)
@@ -212,12 +251,37 @@ func (c Containment) chainEndsInJunction() bool {
 }
 
 // classToken renders the class expression at this node (never the children).
+//
+// The archetype predicate, the standing predicate and the version predicate are
+// three spellings of the ONE `[…]` position, so exactly one bracket is ever
+// written. Their order here decides nothing for a tree [Builder.Build] accepts:
+// validateTree refuses a node carrying more than one (the landed
+// archetype-on-VERSION rule, and REQ-163's standing-beside-archetype and
+// standing-on-VERSION rules), so no two are ever populated together on an
+// emitted node.
+//
+// It is TOTAL over every value the fields can hold, including a
+// [VersionPredicate] outside the sealed catalogue — an embedded one, whose
+// methods are nil ([derefVersionPredicate]). validateTree refuses that value
+// before emission, so this arm is a backstop and not a live path; it is written
+// because a renderer that panics on its way to producing text is a worse
+// failure than the refusal it was supposed to have received, and the two guards
+// sit in different functions that a later reordering could separate.
 func (c Containment) classToken() string {
 	out := c.rmType
 	if c.alias != "" {
 		out += " " + c.alias
 	}
-	if c.archetypeID != "" {
+	switch pred, known := derefVersionPredicate(c.versionPred); {
+	case c.versionPred != nil && known:
+		out += "[" + pred.versionBracket() + "]"
+	case c.versionPred != nil:
+		// Out of catalogue: no bracket rather than a panic. Nothing downstream
+		// re-reads this, so the emission is not a silent substitution the wire
+		// could carry — validateTree has already refused the node.
+	case c.standingPred != nil:
+		out += "[" + c.standingPred.expr() + "]"
+	case c.archetypeID != "":
 		out += "[" + c.archetypeID + "]"
 	}
 	return out
@@ -320,6 +384,25 @@ func (c Containment) validateTree(seen map[string]bool) error {
 		if strings.EqualFold(c.rmType, "VERSION") && c.archetypeID != "" {
 			return fmt.Errorf("%w: a VERSION class expression takes no archetype predicate (%q)",
 				ErrInvalidQuery, c.archetypeID)
+		}
+		// …and the OTHER bracket of that alternative, the version predicate,
+		// has no position on any class but VERSION (REQ-163). The two rules are
+		// the two halves of one `[…]` position, which is why they sit together.
+		if c.versionPred != nil {
+			if err := c.validateVersionPredicate(); err != nil {
+				return err
+			}
+		}
+		// …and the class alternative's OWN bracket, the standing predicate
+		// (REQ-163). It is the third spelling of the same `[…]` position, so it
+		// is checked here with the other two: against the VERSION alternative
+		// (which has its own bracket production), against the archetype form
+		// (which would be silently dropped beside it), and against its own
+		// grammar.
+		if c.standingPred != nil {
+			if err := c.validateStandingPredicate(); err != nil {
+				return err
+			}
 		}
 		if err := ValidateIdentifier(c.alias); err != nil {
 			return fmt.Errorf("CONTAINS alias: %w", err)

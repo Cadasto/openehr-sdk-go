@@ -188,6 +188,32 @@ var parityCases = []struct {
 		return aql.NewBuilder().Select(aql.Col("c")).From("EHR", "e").
 			Contains(aql.Class("VERSION", "v").Contains(aql.Class("COMPOSITION", "c")))
 	}},
+	{
+		// REQ-163's motivating shape, and the REQ-162 § Contract row the
+		// standing-predicate carrier owes: the class-position predicate is not
+		// an archetype predicate, so BOTH adapters must stay silent about it —
+		// a write side that fed the bracket text to the archetype check would
+		// raise a code the read side never raises. The portability advisory the
+		// shape suppresses is read-side only and outside the parity subset;
+		// standing_test.go is where that suppression is asserted.
+		"standing predicate on a versioned object", func() *aql.Builder {
+			return aql.NewBuilder().Select(aql.Col("c/uid/value")).From("EHR", "e").
+				Contains(aql.Class("VERSIONED_COMPOSITION", "vo").
+					Predicated("uid/value", aql.OpEq, aql.Param("vo")).
+					Contains(aql.Version("v", aql.AllVersions()).
+						Contains(aql.Class("COMPOSITION", "c"))))
+		},
+	},
+	{
+		// The same carrier on a pair that IS defective, so the row cannot pass
+		// by both sides being silent about everything: the predicate must not
+		// suppress the containment finding either.
+		"standing predicate on an impossible pair", func() *aql.Builder {
+			return aql.NewBuilder().Select(aql.Col("c")).From("OBSERVATION", "o").
+				Contains(aql.Class("COMPOSITION", "c").
+					Predicated("name/value", aql.OpEq, aql.String("Vital signs")))
+		},
+	},
 	{"every defect at once", func() *aql.Builder {
 		return aql.NewBuilder().
 			Select(aql.Col("o"), aql.Col("c")).
