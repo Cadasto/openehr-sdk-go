@@ -12,12 +12,15 @@ package lint_test
 // firing-only corpus cannot tell.
 //
 // These rows are the first code's share of PROBE-099 arm (a) — the per-code
-// positive plus per-rule negative near-miss corpus. The probe stays Draft until
-// the group's remaining codes land and its arm (b) additivity guard is written;
-// the one fact that guard will need is already true here, and pinned: PROBE-028's
-// valid.aql cassette predicates EVERY repeating segment, so its issue-code
-// multiset is unchanged by this requirement (see the cassette row in
-// TestPathRepeatingUnpredicatedSilentOnPredicatedSegments).
+// positive plus per-rule negative near-miss corpus (the two parse-only codes
+// carry their share in pathshape_parseonly_test.go). The probe stays Draft
+// until the group's remaining codes land and its arm (b) additivity guard is
+// written; the facts that guard will need are already pinned here per code:
+// PROBE-028's valid.aql cassette predicates EVERY repeating segment, so it
+// gains no aql_path_repeating_unpredicated (see the cassette row in
+// TestPathRepeatingUnpredicatedSilentOnPredicatedSegments) — it does gain
+// aql_select_no_alias, the recorded re-baseline pinned in
+// TestSelectNoAliasFiresOnTheCassetteProjections.
 
 import (
 	"fmt"
@@ -32,10 +35,16 @@ import (
 
 // The archetype predicates keep aql_from_archetype off these queries, so a
 // count assertion over the whole result stays about the code under test.
+//
+// The three REQ-164 code names are declared here, together, and shared with
+// pathshape_parseonly_test.go: the group's whole-result assertions name each
+// other's codes, so one spelling of each is what keeps them in step.
 const (
-	obsArch  = "openEHR-EHR-OBSERVATION.blood_pressure.v1"
-	compArch = "openEHR-EHR-COMPOSITION.encounter.v1"
-	repCode  = "aql_path_repeating_unpredicated"
+	obsArch    = "openEHR-EHR-OBSERVATION.blood_pressure.v1"
+	compArch   = "openEHR-EHR-COMPOSITION.encounter.v1"
+	repCode    = "aql_path_repeating_unpredicated"
+	pagingCode = "aql_paging_no_order_by"
+	aliasCode  = "aql_select_no_alias"
 )
 
 // auditQuery is the AQL-FIT-04 audit's verified-silent projection: an
@@ -109,10 +118,12 @@ func TestPathRepeatingUnpredicatedFiresOnTheAuditQuery(t *testing.T) {
 	if want := "o/data/events/data/items/value/magnitude"; got[0].Path != want {
 		t.Errorf("Issue.Path = %q, want the offending path %q", got[0].Path, want)
 	}
-	// The whole result, not just this code: the audit query carries no other
-	// defect, so a second finding would mean this group over-reaches.
-	if len(res.Issues) != 1 {
-		t.Errorf("codes = %v, want only %s", codes(res), repCode)
+	// The whole result, not just this code: the audit query carries exactly
+	// two REQ-164 defects — this one and an unaliased projection — so a third
+	// finding would mean this group over-reaches. Named in full and in order,
+	// not counted, so a code SWAP fails here too.
+	if want := []string{repCode, aliasCode}; !slices.Equal(codes(res), want) {
+		t.Errorf("codes = %v, want %v", codes(res), want)
 	}
 }
 
@@ -324,7 +335,9 @@ func TestPathShapeFindingsKeepResultOK(t *testing.T) {
 // (aql_path_not_in_template), not this check's.
 //
 // The first row is PROBE-028's valid.aql cassette verbatim, which is why that
-// probe's baseline is unchanged by this requirement (REQ-164 § Additivity).
+// probe's baseline gains no repeating-segment code (REQ-164 § Additivity; the
+// unaliased-projection code it does gain is pinned in
+// TestSelectNoAliasFiresOnTheCassetteProjections).
 func TestPathRepeatingUnpredicatedSilentOnPredicatedSegments(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ name, path string }{

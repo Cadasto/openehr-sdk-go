@@ -238,8 +238,11 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	// stronger reason: it has no input to gate on. Every fact it reads is in
 	// the query text or the pinned BMM, and every code it raises is Warning,
 	// so it can never turn a passing result into a failing one (REQ-164
-	// § Always on, never gated).
-	issues = append(issues, pathShapeIssues(md)...)
+	// § Always on, never gated). opts.Query reaches it for the same reason it
+	// reaches the shape group: aql_paging_no_order_by has a second row-bound
+	// channel in the request envelope, which a nil Query leaves invisible —
+	// that is the ENVELOPE ARM being unable to fire, not the group being gated.
+	issues = append(issues, pathShapeIssues(doc, md, opts.Query)...)
 	if opts.Query != nil {
 		issues = append(issues, paramIssues(md, opts.Query)...)
 	}

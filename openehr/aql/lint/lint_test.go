@@ -350,14 +350,19 @@ func TestLintPathUnderParamArchetypeClean(t *testing.T) {
 	}
 }
 
+// REQ-164 re-baseline: the bare-alias projection carries no AS alias, so this
+// query now raises aql_select_no_alias — the deliberate, recorded re-baseline
+// REQ-164 § Additivity defines. What the case exists to pin is unchanged and
+// is asserted in full: an archetype the template DOES carry raises no Layer-3
+// code, and the result stays OK.
 func TestLintArchetypeInTemplateClean(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 	r := lint.LintString(
 		"SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
 		&lint.Options{Compiled: c},
 	)
-	if !r.OK() || len(r.Issues) != 0 {
-		t.Fatalf("expected clean, got %v", codes(r))
+	if !r.OK() || !slices.Equal(codes(r), []string{"aql_select_no_alias"}) {
+		t.Fatalf("codes = %v (OK=%v), want only the unaliased-projection warning", codes(r), r.OK())
 	}
 }
 
@@ -765,12 +770,20 @@ func TestLintTopWithLimitUnchangedByEnvelope(t *testing.T) {
 		t.Errorf("codes drifted when an offset-only envelope was supplied: %v, want %v", codes(withOffset), codes(base))
 	}
 
-	// Both channels at once: the landed codes keep their order and the new
-	// one follows them.
+	// Both channels at once: the landed codes keep their order and the new one
+	// follows them WITHIN THE SHAPE GROUP's TOP run — not at the end of the
+	// result, since the REQ-164 path-shape group is emitted after the whole
+	// shape group. Spelled out in full rather than appended to base: where a
+	// code lands is part of the contract, and an appended want would have
+	// re-baselined itself silently when that group landed.
 	bothChannels := aql.NewQuery(in)
 	bothChannels.Fetch = 20
 	withFetch := lint.Lint(mustParse(t, in), &lint.Options{Query: &bothChannels})
-	if want := append(codes(base), "aql_top_with_fetch"); !slices.Equal(codes(withFetch), want) {
+	want := []string{
+		"aql_deprecated_top", "aql_top_with_limit", "aql_top_with_fetch",
+		"aql_paging_no_order_by", "aql_select_no_alias",
+	}
+	if !slices.Equal(codes(withFetch), want) {
 		t.Errorf("codes = %v, want %v", codes(withFetch), want)
 	}
 

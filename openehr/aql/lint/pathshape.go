@@ -11,11 +11,16 @@ package lint
 // per-path verdict ([pathShape]) records which segments are multi-valued,
 // which carry a predicate, and where the walk stopped, because REQ-164's
 // aql_fanout_path_grain asks the divergence question of the same walk.
+//
+// It also carries the group's two PARSE-ONLY checks, which need no walk and no
+// RM fact at all: aql_paging_no_order_by (clause presence plus the request
+// envelope) and aql_select_no_alias (the projection list).
 
 import (
 	"fmt"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
@@ -198,8 +203,32 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 	return sh
 }
 
-// pathShapeIssues runs the REQ-164 path-shape group over every identified path
-// the document records — SELECT, WHERE and ORDER BY alike
+// pathShapeIssues runs the REQ-164 path-shape group. The three landed codes
+// are emitted in the order REQ-164 § Path-shape checks catalogues them —
+// aql_path_repeating_unpredicated, then aql_paging_no_order_by, then
+// aql_select_no_alias — because they answer questions of different scopes (a
+// path, the whole query, a projection item) that share no document order to
+// sort by. That fixed sequence is what [Result.Issues] promises for a check
+// group, exactly as the REQ-161 group has one.
+//
+// q is the request envelope from [Options.Query]; only the paging check reads
+// it, and a nil q simply leaves that check's envelope arm unable to fire, the
+// same way it leaves the parameter-binding checks unable to.
+//
+// The group is ungated — every code in it is Warning, so none can flip
+// [Result.OK], and [Options.Relation] governs none of them: attribute typing
+// is a class fact of the pinned RM, which no caller-supplied containment
+// relation may answer differently (REQ-164 § Always on, never gated).
+func pathShapeIssues(doc *parse.Document, md Metadata, q *aql.Query) []Issue {
+	var issues []Issue
+	issues = append(issues, repeatingSegmentIssues(md)...)
+	issues = append(issues, pagingIssues(doc, q)...)
+	issues = append(issues, selectAliasIssues(doc)...)
+	return issues
+}
+
+// repeatingSegmentIssues raises aql_path_repeating_unpredicated over every
+// identified path the document records — SELECT, WHERE and ORDER BY alike
 // ([Metadata.Paths], which is [parse.Document.Paths]). The clause scope is a
 // MUST, not an optimisation skipped: a WHERE filter or an ORDER BY key over an
 // unconstrained repeating segment carries the same which-occurrence ambiguity
@@ -208,12 +237,7 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 // It reads the extracted [Metadata] alone and no other part of the document,
 // which is the whole of its input: the query's paths, and the class each alias
 // binds.
-//
-// The group is ungated — every code in it is Warning, so none can flip
-// [Result.OK], and [Options.Relation] governs none of them: attribute typing
-// is a class fact of the pinned RM, which no caller-supplied containment
-// relation may answer differently (REQ-164 § Always on, never gated).
-func pathShapeIssues(md Metadata) []Issue {
+func repeatingSegmentIssues(md Metadata) []Issue {
 	if len(md.Paths) == 0 {
 		return nil
 	}
@@ -235,6 +259,148 @@ func pathShapeIssues(md Metadata) []Issue {
 		}
 	}
 	return issues
+}
+
+// pagingIssues raises aql_paging_no_order_by: a row-bounded query with no
+// `ORDER BY` leaves its page boundary to the engine, so successive pages MAY
+// repeat or drop rows (REQ-164 § Path-shape checks).
+//
+// AT MOST ONE issue per query, whichever channels carried the bound, because
+// the defect is the missing total order and there is only ever one of those.
+// Detail names the channel(s), which is the only thing that distinguishes the
+// two arms for a reader.
+//
+// The two channels:
+//
+//   - IN-TEXT, keyed on [parse.Document.HasLimit]. The SDK grammar profile's
+//     limitClause admits no OFFSET without a LIMIT, so keying on LIMIT alone
+//     misses no in-text spelling.
+//   - ENVELOPE, keyed on a supplied q's Fetch OR Offset. Reading Offset too is
+//     deliberately unlike [topIssues]'s fetch-only scope: that code reports an
+//     exclusion the Query API *states*, whereas an offset into an unordered
+//     result produces an unstable page boundary on its own.
+//
+// A query whose ONLY row bound is a deprecated `TOP` raises nothing here, and
+// needs no guard to: HasLimit is false and, with no envelope bound, no channel
+// fires. aql_deprecated_top already carries the ORDER BY remedy for that
+// clause, and one defect gets one finding (REQ-164 § No double-reporting).
+//
+// No Span: neither channel has a position to point at. [parse.Document]
+// records the LIMIT clause's presence but not its place, and the envelope is
+// not in the query text at all — so REQ-109 § Value-free lint diagnostics'
+// zero Span (the issue is not attributable to a position) is the honest
+// answer rather than an invented one.
+func pagingIssues(doc *parse.Document, q *aql.Query) []Issue {
+	// The total order is the remedy, so its presence is the whole silence
+	// rule — an ORDER BY makes the page boundary well-defined however many
+	// channels bounded the rows.
+	if doc.HasOrderBy {
+		return nil
+	}
+	var channels []string
+	if doc.HasLimit {
+		channels = append(channels, "a LIMIT clause")
+	}
+	// Non-zero, not positive: an envelope carrying a negative bound is still an
+	// envelope that asks for a page, and the transport — not this advisory —
+	// owns whether that value is usable.
+	if q != nil && (q.Fetch != 0 || q.Offset != 0) {
+		channels = append(channels, "the request envelope")
+	}
+	if len(channels) == 0 {
+		return nil
+	}
+	return []Issue{{
+		Code: "aql_paging_no_order_by",
+		Detail: fmt.Sprintf(
+			"the query is row-bounded by %s but carries no ORDER BY; without a total "+
+				"order the page boundary is engine-defined, so successive pages may "+
+				"repeat or drop rows",
+			strings.Join(channels, " and "),
+		),
+		Severity: Warning,
+	}}
+}
+
+// selectAliasIssues raises aql_select_no_alias once per projection item that
+// carries no `AS` alias: a stored-query contract and every column-addressed
+// result reader depend on stable column names, and an unaliased column's name
+// is engine-defined (REQ-164 § Path-shape checks).
+//
+// It reads the STRUCTURED projection ([parse.Document.Query]) because the flat
+// lint view cannot answer the question: [parse.Document.SelectAliases] lists
+// the aliases that WERE written, with nothing to say which items wrote them,
+// and [Metadata.Paths] would count a path nested inside an aliased function
+// call as an item of its own. A non-nil [parse.Document.QueryErr] is not fatal
+// here, exactly as it is not for the REQ-161 junction checks: the structured
+// AST is best-effort by contract (REQ-119) and a dropped shape simply goes
+// unchecked, which is the conservative direction.
+//
+// TWO exemptions, and only two:
+//
+//   - a `*` item, which has nothing to alias — that shape is REQ-109's
+//     aql_select_star, and REQ-164 § No double-reporting gives it to that code.
+//     A BARE `SELECT *` never reaches the loop at all, since it leaves Items
+//     empty by construction; the mixed `SELECT *, col` form carries the star as
+//     an item, and it is skipped here.
+//   - an item that wrote an alias.
+//
+// A BARE ALIAS item (`SELECT o`) is NOT exempt: it names no column either, and
+// the engine picks that column's name as freely as it picks a path's.
+func selectAliasIssues(doc *parse.Document) []Issue {
+	q := doc.Query()
+	if q == nil {
+		return nil
+	}
+	var issues []Issue
+	for i, item := range q.Select.Items {
+		if _, star := item.Expr.(parse.StarExpr); star {
+			continue
+		}
+		if item.Alias != "" {
+			continue
+		}
+		path, span := selectItemSite(item)
+		issues = append(issues, Issue{
+			Code: "aql_select_no_alias",
+			Path: path,
+			// The ORDINAL, not the item's text: it locates the item for a reader
+			// counting projections even where the item shape carries no position
+			// to span, and it counts every item including a mixed star, so it is
+			// the ordinal the reader counts commas to.
+			Detail: fmt.Sprintf(
+				"SELECT item %d carries no AS alias; the result column's name is then "+
+					"engine-defined, and a stored-query contract depends on a stable one",
+				i+1,
+			),
+			Severity: Warning,
+			Span:     span,
+		})
+	}
+	return issues
+}
+
+// selectItemSite is where a projected item is, for a diagnostic: its path
+// spelling and the span its source text occupies.
+//
+// Only a bare path item has either. [parse.IdentifiedPath] carries a position
+// and its verbatim source ([parse.IdentifiedPath.Raw], byte-exact since
+// REQ-119), whereas a function call and a literal projection carry neither —
+// [parse.SelectItem] has no position of its own, and REQ-113 models a
+// projection's structure, not its layout.
+//
+// Those items therefore report NEITHER rather than a derived guess: spanning a
+// function call's first argument would point at a path INSIDE the item instead
+// of at the item, and naming that argument in [Issue.Path] would report a path
+// the item does not project. REQ-109 § Value-free lint diagnostics has an
+// unattributable issue report no position rather than a wrong one, and Detail's
+// ordinal locates it either way.
+func selectItemSite(item parse.SelectItem) (string, Span) {
+	pe, ok := item.Expr.(parse.PathExpr)
+	if !ok {
+		return "", Span{}
+	}
+	return displayPath(pe.IdentifiedPath), spanOfText(pe.Pos, pe.Raw)
 }
 
 // segmentSpan is the span the idx-th segment's ATTRIBUTE NAME occupies in the

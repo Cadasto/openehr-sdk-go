@@ -186,13 +186,21 @@ func loadOPT(t *testing.T, name string) []byte {
 
 // probe028Cases is PROBE-028's own three-cassette corpus — the cassette
 // files under testkit/cassettes/aql/lint/, the vital_signs.opt template, and
-// their pre-REQ-161 WantCodes baseline. Shared between TestProbe028AQLLint
+// their WantCodes baseline. Shared between TestProbe028AQLLint
 // and PROBE-097 arm (b) so a deliberate PROBE-028 re-baseline (conformance.md
 // § PROBE-097 arm (b)) is made ONCE: before this helper existed, arm (b)
 // hand-copied this table, so a re-baseline of one would need to be applied
 // twice, and a missed second edit would surface as a confusing
 // "additivity/…" failure in PROBE-097 rather than where the change actually
 // happened.
+//
+// The baseline was pre-REQ-161 and gained nothing from that requirement. It
+// took its one re-baseline from REQ-164 § Additivity: `valid.aql` and
+// `missing_archetype.aql` each project a column with no `AS` alias — a defect
+// those queries genuinely carry — so each gained aql_select_no_alias and
+// nothing else. Neither carries an unpredicated repeating segment (valid.aql
+// predicates every one) or a row bound, and `bad_syntax.aql` gains nothing at
+// all: it fails at Layer 1, so Layer 2 never runs.
 func probe028Cases(t *testing.T) []aqlprobes.LintCase {
 	t.Helper()
 	opt := loadOPT(t, "vital_signs")
@@ -201,13 +209,13 @@ func probe028Cases(t *testing.T) []aqlprobes.LintCase {
 			Name:      "valid",
 			OPT:       opt,
 			Query:     cassette(t, "valid.aql"),
-			WantCodes: nil, // clean
+			WantCodes: []string{"aql_select_no_alias"},
 		},
 		{
 			Name:      "missing_archetype",
 			OPT:       opt,
 			Query:     cassette(t, "missing_archetype.aql"),
-			WantCodes: []string{"aql_archetype_not_in_template"},
+			WantCodes: []string{"aql_archetype_not_in_template", "aql_select_no_alias"},
 		},
 		{
 			Name:      "bad_syntax",
@@ -265,7 +273,9 @@ func TestProbe028DetectsCodeDrift(t *testing.T) {
 // TestProbe028AQLLint above already wires) re-run under the completed
 // REQ-161 linter gains no REQ-161 code — the controller's own precomputed
 // prediction, recorded in docs/specifications/conformance.md's PROBE-097 row
-// as "no re-baseline required".
+// as "no re-baseline required". That claim still holds over the corpus as it
+// stands: probe028Cases has since taken a REQ-164 re-baseline (an unaliased
+// projection on two cassettes), and no REQ-161 code is among what it gained.
 //
 // Arm (c), REQ-162 § Contract: for every corpus query expressible through the
 // builder, (*aql.Builder).VerifyContainment's code multiset equals

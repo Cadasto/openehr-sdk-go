@@ -21,13 +21,17 @@
 // carrying dialect overlay edges. Layer 2 stays AST-only either way: no CDR,
 // no OPT, and no row semantics.
 //
-// Layer 2 carries a third group, PATH SHAPE (REQ-164), whose landed member is
-// aql_path_repeating_unpredicated: an identified path — in SELECT, WHERE or
-// ORDER BY alike — steps through a multi-valued RM attribute with no predicate
-// on that segment, leaving which occurrence is meant to the engine. It types
-// each segment against the same pinned BMM, and stops silently wherever the
-// pin cannot type a step (see pathshape.go). The group is ungated and every
-// code in it is Warning.
+// Layer 2 carries a third group, PATH SHAPE (REQ-164), whose landed members
+// are aql_path_repeating_unpredicated — an identified path, in SELECT, WHERE
+// or ORDER BY alike, steps through a multi-valued RM attribute with no
+// predicate on that segment, leaving which occurrence is meant to the engine —
+// aql_paging_no_order_by, a row-bounded query with no ORDER BY, whose page
+// boundary is therefore engine-defined (both channels: the in-text LIMIT
+// clause and a supplied [Options.Query]'s Fetch / Offset), and
+// aql_select_no_alias, a projection item carrying no AS alias, whose column
+// name is engine-defined. The first types each segment against the same pinned
+// BMM, and stops silently wherever the pin cannot type a step (see
+// pathshape.go). The group is ungated and every code in it is Warning.
 //
 // The CDR remains the execute-time semantic authority (PROBE-021): a
 // lint-clean query MAY still be rejected on execution. The SDK grammar

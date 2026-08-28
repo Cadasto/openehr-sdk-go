@@ -268,9 +268,12 @@ func Probe097SemanticLint(c SemanticCorpus) (Result, error) {
 		// REQ-161 code appearing on one of these three cassettes — which carry
 		// no REQ-161 defect — already breaks that equality (REQ-161
 		// § Additivity's whole point). The task-brief ruling that a gained
-		// code is a blocker, never a re-baseline, is a reporting instruction
-		// for whoever reads this failure, not a runtime branch: WantCodes
-		// below is the pre-REQ-161 baseline, and this loop never moves it.
+		// REQ-161 code is a blocker, never a re-baseline, is a reporting
+		// instruction for whoever reads this failure, not a runtime branch:
+		// WantCodes is the caller's baseline, and this loop never moves it.
+		// (A LATER requirement may re-baseline that table deliberately — see
+		// probe028Cases, which REQ-164 § Additivity moved — which is a change
+		// to what the caller passes in, not to what this guard does.)
 		if msg := runLintCase(tc); msg != "" {
 			failures = append(failures, fmt.Sprintf("additivity/%s: %s", tc.Name, msg))
 		}
