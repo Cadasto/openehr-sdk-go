@@ -1481,7 +1481,7 @@ An overlay edge — default and consumer alike — is a record of two class-name
 | `COMPOSITION CONTAINS DV_TEXT` (pair question: a Never-containability operand) | Never |
 | `FOO_BAR` as either operand — pair and containability questions alike | UnknownClass |
 
-Differences from any engine's observed admissibility are asserted as neutral, cited, executable documentation — including the EHRbase-compatibility guard above — not treated as anyone's defect.
+Differences from any engine's observed admissibility are asserted as neutral, cited, executable documentation — including the EHRbase-compatibility guard above — not treated as anyone's defect. That guard's evidence base is mechanical rather than merely cited: [PROBE-100](conformance.md#probe-100--upstream-aql-admissibility-corpus-ratchet) is its gate, run against the upstream FROM/CONTAINS corpus vendored under [conformance.md § Vendored fixtures](conformance.md#vendored-fixtures-testkitcassettes).
 
 ### Out of scope
 
