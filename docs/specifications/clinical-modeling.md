@@ -1492,7 +1492,7 @@ Row-semantics adjudication (REQ-161 carries the single advisory; the relation an
 `openehr/aql/contain/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`, and **MUST** limit its direct imports to `openehr/rm/rminfo`, `openehr/rm` (REQ-120's canonical `ParseArchetypeID` — § Archetype/class conformance), and the standard library — it sits below both `openehr/aql` and `openehr/aql/lint`. Enforced by an imports test.
 
 - **Lives in:** [`openehr/aql/contain/`](../../openehr/aql/contain/)
-- **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (armed by the Phase 2 lint corpus and the Phase 3 builder-verification parity arm)
+- **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (armed by the Phase 2 lint corpus and the Phase 3 builder-verification parity arm); [PROBE-100](conformance.md#probe-100--upstream-aql-admissibility-corpus-ratchet) (the compatibility guard's evidence gate — the vendored upstream FROM/CONTAINS corpus, § Acceptance)
 - **Plan:** [`docs/plans/archive/2026-08-21-aql-semantic-layer.md`](../plans/archive/2026-08-21-aql-semantic-layer.md)
 
 ## REQ-161 — AQL semantic and portability lint
