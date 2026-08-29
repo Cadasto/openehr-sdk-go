@@ -155,8 +155,9 @@ type ClassExpr struct {
 	HasPredicate bool
 	// Predicate is the raw text inside the class predicate brackets when
 	// HasPredicate is true and the predicate is NOT a literal archetype HRID
-	// (which lives on [Archetype]) or a `$param` archetype (signalled by
-	// [ParamArchetype]). Carries standing predicates such as
+	// (which lives on [ClassExpr.Archetype]) or a `$param` archetype
+	// (signalled by [ClassExpr.ParamArchetype]). Carries standing predicates
+	// such as
 	// `ehr_id/value=$x` so the emitter can round-trip them — brackets
 	// stripped, content verbatim from the source.
 	Predicate string
@@ -164,19 +165,19 @@ type ClassExpr struct {
 	// `{path, operator, value}` comparison (e.g. `ehr_id/value = $x`),
 	// reusing the shared [aql.Comparison] / [aql.Value] vocabulary
 	// (REQ-113). Non-nil only when the predicate is a simple comparison;
-	// nil for an archetype HRID (see [Archetype]), a version predicate, a
-	// non-scalar / complex standing predicate, or a comparison whose literal
-	// the value vocabulary cannot represent (an out-of-range numeric) — the
-	// verbatim [Predicate] text stays authoritative in every nil case, so
-	// emission is lossless regardless.
+	// nil for an archetype HRID (see [ClassExpr.Archetype]), a version
+	// predicate, a non-scalar / complex standing predicate, or a comparison
+	// whose literal the value vocabulary cannot represent (an out-of-range
+	// numeric) — the verbatim [ClassExpr.Predicate] text stays authoritative
+	// in every nil case, so emission is lossless regardless.
 	//
 	// A fifth nil case turns on WHICH VIEW the [ClassExpr] was read from
 	// rather than on the predicate's shape: this field is always nil in the
 	// flat lint view ([Parse] → [Document.Classes]), and is populated only by
 	// the Tier-2 structured extraction ([ParseQuery] / [Document.Query]). The
 	// flat view omits it deliberately, so the lint gate does not pay for the
-	// structured parse; the verbatim [Predicate] text is authoritative there
-	// too, and is populated identically in both views.
+	// structured parse; the verbatim [ClassExpr.Predicate] text is
+	// authoritative there too, and is populated identically in both views.
 	//
 	// The comparison's Path is the relative object path as written, and its
 	// ParsedPath carries the same path's structured Segments with an empty

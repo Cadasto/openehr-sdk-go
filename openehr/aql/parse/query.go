@@ -30,10 +30,10 @@ import (
 // flattened lint view) remain available for callers that don't need the
 // structured shape.
 //
-// Field zero values follow AQL semantics: an empty [Select] indicates no
-// projection (a malformed query the parser would have rejected); nil
-// [Where] means no WHERE clause; nil [Limit] / [Offset] mean the clause
-// was absent in the source.
+// Field zero values follow AQL semantics: an empty [Query.Select] indicates
+// no projection (a malformed query the parser would have rejected); nil
+// [Query.Where] means no WHERE clause; nil [Query.Limit] / [Query.Offset]
+// mean the clause was absent in the source.
 type Query struct {
 	// Select is the SELECT projection list (`Items`) plus its flags.
 	Select SelectClause
@@ -59,7 +59,7 @@ type Query struct {
 	Limit LimitExpr
 
 	// Offset is the row offset when present; nil when no OFFSET
-	// clause appeared in the source. Same concrete shapes as [Limit].
+	// clause appeared in the source. Same concrete shapes as [Query.Limit].
 	Offset LimitExpr
 
 	// incomplete records the catalogue-gap error from the extractor
