@@ -6,10 +6,10 @@
 // Note: templatecompile.Compile is internal; this example lives in the SDK
 // module and is the supported v1 call shape for the template-aware Layer 3
 // (same constraint as validate-composition — see ADR 0005). Layers 1–2
-// (syntax, shape, parameter binding, and the REQ-160/161 containment +
+// (syntax, shape, parameter binding, the REQ-160/161 containment +
 // portability semantic group, which runs unconditionally against the pinned
-// RM) need no template and are usable by any external consumer via
-// openehr/aql/lint directly.
+// RM, and the REQ-164 path-shape advisories) need no template and are usable
+// by any external consumer via openehr/aql/lint directly.
 //
 // Run:
 //
@@ -48,9 +48,11 @@ func main() {
 	}
 	fmt.Printf("template : %s (%s)\n\n", opt.TemplateID(), filepath.Base(optPath))
 
-	// Clean: archetype is in the template; path resolves; parameter is bound.
+	// Clean: archetype is in the template; path resolves; parameter is bound;
+	// and every repeating path step carries a predicate while the SELECT item
+	// carries an alias, so the REQ-164 path-shape checks stay quiet too.
 	clean := aql.NewQuery(
-		"SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude " +
+		"SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude AS magnitude " +
 			"FROM EHR e CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] " +
 			"WHERE e/ehr_id/value = $ehr_id",
 	)

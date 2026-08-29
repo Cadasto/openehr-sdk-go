@@ -305,7 +305,7 @@ canonical emission:
 
 ### lint-aql
 
-**Purpose:** Statically lint AQL before it reaches the CDR (REQ-109): parse against the SDK grammar profile (ADR 0007), then run the lint layers — syntax, shape (alias binding, parameter binding), RM containment and portability semantics against the pinned BMM (REQ-160/161, runs unconditionally, no template needed), and template-aware archetype / path checks against a compiled OPT. Shown via `validation.ValidateAQL`; the building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. Lint-clean is **not** spec-conformance and not execute-success — the CDR remains the path authority (PROBE-021).
+**Purpose:** Statically lint AQL before it reaches the CDR (REQ-109): parse against the SDK grammar profile (ADR 0007), then run the lint layers — syntax, shape (alias binding, parameter binding), RM containment and portability semantics against the pinned BMM (REQ-160/161, runs unconditionally, no template needed), path-shape and paging advisories over the query text plus the pinned BMM (REQ-164, likewise always on), and template-aware archetype / path checks against a compiled OPT. Shown via `validation.ValidateAQL`; the building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. Lint-clean is **not** spec-conformance and not execute-success — the CDR remains the path authority (PROBE-021).
 
 ```bash
 go run ./cmd/examples/lint-aql
@@ -319,29 +319,33 @@ go run ./cmd/examples/lint-aql
 template : vital_signs (vital_signs.opt)
 
 == clean query ==
-SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude FROM EHR e CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] WHERE e/ehr_id/value = $ehr_id
+SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude AS magnitude FROM EHR e CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] WHERE e/ehr_id/value = $ehr_id
 result   : OK — no issues
 
 == broken query ==
 SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1] WHERE o/data/events/value/magnitude > $threshold
-result   : not OK — 2 errors, 0 advisories
+result   : not OK — 2 errors, 2 advisories
+  [warning] aql_path_repeating_unpredicated (o/data/events/value/magnitude): segment "events" steps through the multi-valued HISTORY.events with no predicate; which occurrence is meant is engine-defined
+  [warning] aql_select_no_alias (o): SELECT item 1 carries no AS alias; the result column's name is then engine-defined, and a stored-query contract depends on a stable one
   [error] aql_unbound_param (-): $threshold is referenced but not bound in Query.Parameters
   [error] aql_archetype_not_in_template (openEHR-EHR-OBSERVATION.lab_result.v1): archetype openEHR-EHR-OBSERVATION.lab_result.v1 is not in template vital_signs
 
 == semantic finding (RM-impossible containment) ==
 SELECT o FROM OBSERVATION o CONTAINS COMPOSITION c
-result   : not OK — 1 error, 1 advisory
+result   : not OK — 1 error, 2 advisories
   [warning] aql_from_archetype (-): FROM/CONTAINS names no archetype, $param, VERSION, or EHR scope
   [error] aql_impossible_containment (COMPOSITION c): no containment route under the pinned RM connects OBSERVATION to COMPOSITION, so this CONTAINS can never match
+  [warning] aql_select_no_alias (o): SELECT item 1 carries no AS alias; the result column's name is then engine-defined, and a stored-query contract depends on a stable one
 
 == advisory only (OK, but not issue-free) ==
 SELECT c FROM FOLDER f CONTAINS COMPOSITION c
-result   : OK — no errors, 2 advisories
+result   : OK — no errors, 3 advisories
   [warning] aql_from_archetype (-): FROM/CONTAINS names no archetype, $param, VERSION, or EHR scope
   [warning] aql_containment_by_reference (COMPOSITION c): FOLDER reaches COMPOSITION only across a reference hop; whether that counts as containment is engine-specific, so verify this step against the target CDR
+  [warning] aql_select_no_alias (c): SELECT item 1 carries no AS alias; the result column's name is then engine-defined, and a stored-query contract depends on a stable one
 ```
 
-**What to copy into your app:** for CI / pre-flight checks call `lint.LintString(q, nil)` (Layers 1–2, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or `validation.ValidateAQL`) to add archetype / path checks. Dispatch on `Issue.Code`; treat only `Error`-severity issues as hard failures — but read `Result.Issues`, not just `Result.OK`: OK means *no errors*, not *no issues*, and most of the REQ-161 portability codes are advisory (the last block above).
+**What to copy into your app:** for CI / pre-flight checks call `lint.LintString(q, nil)` (Layers 1–2, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or `validation.ValidateAQL`) to add archetype / path checks. Dispatch on `Issue.Code`; treat only `Error`-severity issues as hard failures — but read `Result.Issues`, not just `Result.OK`: OK means *no errors*, not *no issues*, and most of the REQ-161 portability and all of the REQ-164 path-shape codes are advisory (the last block above).
 
 ---
 
