@@ -1998,12 +1998,19 @@ func TestProbe100ReaderRefusesAnUnlearnedCorpus(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
+			// Every fixture corpus carries the two ingest files the reader
+			// demands; their absence has its own test below.
 			for name, body := range tc.files {
 				path := filepath.Join(root, name)
 				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 					t.Fatal(err)
 				}
 				if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, name := range []string{"AQL_SOURCE.txt", "EXCLUDED.txt"} {
+				if err := os.WriteFile(filepath.Join(root, name), []byte("# fixture\n"), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -2018,9 +2025,33 @@ func TestProbe100ReaderRefusesAnUnlearnedCorpus(t *testing.T) {
 	}
 }
 
-// probe100CorpusCopy copies the shipping corpus's family directories into a
-// throwaway root a test may edit. The reader demands the whole table's worth of
-// files, so a test about ONE row still needs a complete corpus around it.
+// TestProbe100ReaderRequiresTheIngestFiles is the able-to-fail control for the
+// root-file presence arm: a corpus whose provenance pin or exclusion record
+// went missing — a partial vendoring, or a copy that took only the family
+// directories — is a read error naming the missing file, not a readable corpus.
+func TestProbe100ReaderRequiresTheIngestFiles(t *testing.T) {
+	for _, missing := range []string{"AQL_SOURCE.txt", "EXCLUDED.txt"} {
+		t.Run(missing, func(t *testing.T) {
+			root := probe100CorpusCopy(t)
+			if err := os.Remove(filepath.Join(root, missing)); err != nil {
+				t.Fatal(err)
+			}
+			_, err := aqlprobes.ReadConformanceCorpus(root)
+			if err == nil {
+				t.Fatal("err = nil, want a refusal for the missing ingest file")
+			}
+			if !strings.Contains(err.Error(), missing) {
+				t.Fatalf("err = %v, want it to name %s", err, missing)
+			}
+		})
+	}
+}
+
+// probe100CorpusCopy copies the shipping corpus — family directories and the
+// ingest's root files — into a throwaway root a test may edit. The reader
+// demands the whole table's worth of files plus the provenance pin and
+// exclusion record, so a test about ONE row still needs a complete corpus
+// around it.
 func probe100CorpusCopy(t *testing.T) string {
 	t.Helper()
 	root, src := t.TempDir(), fixtures.AQLConformanceRoot()
@@ -2030,6 +2061,13 @@ func probe100CorpusCopy(t *testing.T) string {
 	}
 	for _, fam := range families {
 		if !fam.IsDir() {
+			body, err := os.ReadFile(filepath.Join(src, fam.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, fam.Name()), body, 0o644); err != nil {
+				t.Fatal(err)
+			}
 			continue
 		}
 		if err := os.MkdirAll(filepath.Join(root, fam.Name()), 0o755); err != nil {
