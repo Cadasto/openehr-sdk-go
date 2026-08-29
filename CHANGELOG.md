@@ -12,7 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **AQL containment evidence under CI (REQ-160, PROBE-100).** The vendored EHRbase FROM-combination corpus now runs as a ratchet: every shape a conformant engine accepts must parse and draw no Error-severity containment code, with no behaviour change.
+- **AQL containment evidence under CI (REQ-160, PROBE-100).** The vendored EHRbase FROM-combination corpus runs under `go test` as PROBE-100's admissibility ratchet over the REQ-160 relation — purely additive, no SDK behaviour change.
 - **AQL path-shape and paging lint (REQ-164, PROBE-099).** A third additive `lint` Layer-2 group — five Warning codes for unpredicated repeating segments, unordered row bounds, unaliased projections, path fan-out and provably inert containment steps.
 - **AQL write-side expressivity parity (REQ-163, PROBE-088/097).** The builder spells the `VERSION` predicate bracket, a class-position standing comparison and a typed projection its read side already modelled, and `Build()` verifies what it emitted, refusing a construction that changes the recorded query — semver-minor on REQ-119's footing. *Breaking:* `aql.SelectField` is no longer usefully `==`-comparable — `==` compiles but panics at run time on a call-shaped field, map insertion included; compare built query strings.
 
