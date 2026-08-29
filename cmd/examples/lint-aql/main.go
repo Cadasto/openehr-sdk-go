@@ -7,9 +7,9 @@
 // module and is the supported v1 call shape for the template-aware Layer 3
 // (same constraint as validate-composition — see ADR 0005). Layers 1–2
 // (syntax, shape, parameter binding, the REQ-160/161 containment +
-// portability semantic group, which runs unconditionally against the pinned
-// RM, and the REQ-164 path-shape advisories) need no template and are usable
-// by any external consumer via openehr/aql/lint directly.
+// portability semantic group and the REQ-164 path-shape advisories, which
+// both run unconditionally against the pinned RM) need no template and are
+// usable by any external consumer via openehr/aql/lint directly.
 //
 // Run:
 //
