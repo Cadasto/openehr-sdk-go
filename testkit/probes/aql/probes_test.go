@@ -2,6 +2,7 @@ package aqlprobes_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1598,6 +1599,361 @@ func TestProbe099RequiresEveryCorpusArm(t *testing.T) {
 			}
 			if r.Probe != "PROBE-099" {
 				t.Errorf("Probe id = %q, want PROBE-099", r.Probe)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// PROBE-100 — REQ-160 upstream admissibility corpus ratchet.
+// ---------------------------------------------------------------------------
+
+// probe100Corpus reads the shipping corpus — the vendored CSVs under
+// testkit/cassettes/aql/conformance/, reconstructed into queries by the
+// reconstruction table in probe_100_conformance_corpus.go. The root comes from
+// the fixtures package so the path is resolved from the cassettes root rather
+// than from the working directory.
+func probe100Corpus(t *testing.T) aqlprobes.ConformanceCorpus {
+	t.Helper()
+	c, err := aqlprobes.ReadConformanceCorpus(fixtures.AQLConformanceRoot())
+	if err != nil {
+		t.Fatalf("ReadConformanceCorpus: %v", err)
+	}
+	return c
+}
+
+// TestProbe100ConformanceCorpus runs the ratchet over the whole vendored
+// corpus and logs the per-family tally, so a CI run records what the ratchet
+// actually covered rather than only that it passed.
+func TestProbe100ConformanceCorpus(t *testing.T) {
+	corpus := probe100Corpus(t)
+	for _, f := range corpus.FamilyCounts() {
+		t.Logf("family %s: %d asserted, %d excluded", f.Family, f.Asserted, f.Excluded)
+	}
+	t.Logf("corpus total: %d asserted, %d excluded", len(corpus.Rows), len(corpus.Excluded))
+	for _, e := range corpus.Excluded {
+		t.Logf("excluded %s: %s — %s", e.Where(), e.Reason, e.Why)
+	}
+
+	r, err := aqlprobes.Probe100ConformanceCorpus(corpus)
+	if err != nil {
+		t.Fatalf("Probe100: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("Probe100 status=%q detail=%q", r.Status, r.Detail)
+	}
+	if r.Probe != "PROBE-100" {
+		t.Errorf("Probe id = %q, want PROBE-100", r.Probe)
+	}
+}
+
+// TestProbe100CoversTheChainingSuite pins by name the one CSV REQ-160's
+// compatibility guard was hand-picked from. The probe carries the same guard;
+// this asserts it at the corpus the probe is actually given, so a corpus that
+// stopped carrying those chains fails here with the file named rather than as
+// one line inside an aggregated probe Detail.
+func TestProbe100CoversTheChainingSuite(t *testing.T) {
+	const family, file = "CONTAINS_A_D", "from_contains_plus_contain_chaining.csv"
+	for _, f := range probe100Corpus(t).FileCounts() {
+		if f.Family != family || f.File != file {
+			continue
+		}
+		if f.Asserted == 0 {
+			t.Fatalf("%s/%s: asserted = 0, want > 0 — it carries the containment chains "+
+				"REQ-160's compatibility guard was drawn from (%d row(s) excluded)", family, file, f.Excluded)
+		}
+		return
+	}
+	t.Fatalf("%s/%s is not in the corpus tally at all", family, file)
+}
+
+// TestProbe100DetectsInadmissibleRows is the probe's able-to-fail control for
+// both halves of the wire assertion: a row that does not parse, and a row the
+// REQ-161 containment checks refuse at Error severity. Each failure must name
+// the row's corpus coordinate, since that is all a CI log carries.
+func TestProbe100DetectsInadmissibleRows(t *testing.T) {
+	cases := []struct {
+		name string
+		row  aqlprobes.ConformanceRow
+	}{
+		{
+			name: "unparseable",
+			row: aqlprobes.ConformanceRow{
+				Family: "AND_OR", File: "from_simple_and_or.csv", Line: 2,
+				Suite: "AQL_TESTS/FROM/AND_OR/simple_and_or.robot",
+				Query: "SELECT o FROM",
+			},
+		},
+		{
+			// An OBSERVATION cannot contain a COMPOSITION under the REQ-160
+			// relation, so this is the shape a corpus row would have to take
+			// for the ratchet to bite.
+			name: "impossible_containment",
+			row: aqlprobes.ConformanceRow{
+				Family: "CONTAINS_A_D", File: "from_contains_plus_contain_chaining.csv", Line: 3,
+				Suite: "AQL_TESTS/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
+				Query: "SELECT o FROM OBSERVATION o CONTAINS COMPOSITION c",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			corpus := probe100Corpus(t)
+			corpus.Rows = append(corpus.Rows, tc.row)
+			r, err := aqlprobes.Probe100ConformanceCorpus(corpus)
+			if err != nil {
+				t.Fatalf("Probe100: %v", err)
+			}
+			if r.Status != "fail" {
+				t.Fatalf("status = %q, want fail — the ratchet did not bite", r.Status)
+			}
+			if !strings.Contains(r.Detail, tc.row.Where()) {
+				t.Fatalf("detail does not name the row coordinate %s: %s", tc.row.Where(), r.Detail)
+			}
+		})
+	}
+}
+
+// TestProbe100DetectsCorpusShrinkage is the able-to-fail control for the two
+// coverage guards — the per-family empty tripwire and the named chaining suite.
+// Both go dark quietly: every surviving row still passes on its own, so only a
+// guard that counts what is missing can tell.
+func TestProbe100DetectsCorpusShrinkage(t *testing.T) {
+	cases := []struct {
+		name string
+		// drop reports whether a row is removed from the shipping corpus.
+		drop func(aqlprobes.ConformanceRow) bool
+		want string
+	}{
+		{
+			name: "family_emptied",
+			drop: func(r aqlprobes.ConformanceRow) bool { return r.Family == "EHR_STATUS" },
+			want: "family EHR_STATUS: no asserted row",
+		},
+		{
+			name: "chaining_suite_lost",
+			drop: func(r aqlprobes.ConformanceRow) bool {
+				return r.File == "from_contains_plus_contain_chaining.csv"
+			},
+			want: "CONTAINS_A_D/from_contains_plus_contain_chaining.csv contributes no asserted row",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			corpus := probe100Corpus(t)
+			corpus.Rows = slices.DeleteFunc(corpus.Rows, tc.drop)
+			r, err := aqlprobes.Probe100ConformanceCorpus(corpus)
+			if err != nil {
+				t.Fatalf("Probe100: %v", err)
+			}
+			if r.Status != "fail" {
+				t.Fatalf("status = %q, want fail — the shrunken corpus still reported pass", r.Status)
+			}
+			if !strings.Contains(r.Detail, tc.want) {
+				t.Fatalf("detail = %q, want it to contain %q", r.Detail, tc.want)
+			}
+		})
+	}
+}
+
+// TestProbe100RequiresANonEmptyCorpus is the able-to-fail control for the
+// whole-corpus tripwire: an empty corpus is a CALLER error — reported as an
+// error with no Result status, never as a vacuous pass.
+func TestProbe100RequiresANonEmptyCorpus(t *testing.T) {
+	r, err := aqlprobes.Probe100ConformanceCorpus(aqlprobes.ConformanceCorpus{})
+	if err == nil {
+		t.Fatalf("err = nil, want the empty-corpus error (status=%q detail=%q)", r.Status, r.Detail)
+	}
+	if !strings.Contains(err.Error(), "reconstructed no rows") {
+		t.Fatalf("err = %v, want the empty-corpus error", err)
+	}
+	if r.Status != "" {
+		t.Fatalf("status = %q, want %q — an empty corpus is not a probe verdict", r.Status, "")
+	}
+	if r.Probe != "PROBE-100" {
+		t.Errorf("Probe id = %q, want PROBE-100", r.Probe)
+	}
+}
+
+// TestProbe100ReaderRefusesAnUnlearnedCorpus is the refresh arm of the ratchet:
+// a corpus the reader has not learned MUST fail, not be partially read. Each
+// case writes a throwaway corpus root holding exactly the named files.
+func TestProbe100ReaderRefusesAnUnlearnedCorpus(t *testing.T) {
+	const goodHeader = "${statement},${expected_file},${nr_of_results}\n"
+	const goodRow = "\"SELECT o FROM EHR CONTAINS OBSERVATION o\",expected.json,1\n"
+	cases := []struct {
+		name  string
+		files map[string]string
+		want  string
+	}{
+		{
+			name:  "unlearned_family",
+			files: map[string]string{"NEW_FAMILY/from_something.csv": goodHeader + goodRow},
+			want:  "not in the reconstruction table",
+		},
+		{
+			name:  "unlearned_file",
+			files: map[string]string{"AND_OR/from_something_new.csv": goodHeader + goodRow},
+			want:  "not in the reconstruction table",
+		},
+		{
+			name:  "unlearned_root_file",
+			files: map[string]string{"NOTES.txt": "vendored by hand\n"},
+			want:  "neither a family directory nor",
+		},
+		{
+			name: "header_drift",
+			files: map[string]string{
+				"AND_OR/from_simple_and_or.csv": "${statement},${expected_file}\n" +
+					"\"SELECT o FROM EHR CONTAINS OBSERVATION o\",expected.json\n",
+			},
+			want: "the reconstruction table expects",
+		},
+		{
+			name:  "vendored_file_lost",
+			files: map[string]string{"AND_OR/from_simple_and_or.csv": goodHeader + goodRow},
+			want:  "the corpus does not carry it",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			for name, body := range tc.files {
+				path := filepath.Join(root, name)
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			c, err := aqlprobes.ReadConformanceCorpus(root)
+			if err == nil {
+				t.Fatalf("err = nil, want a refusal; read %d row(s)", len(c.Rows))
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("err = %v, want it to contain %q", err, tc.want)
+			}
+		})
+	}
+}
+
+// probe100CorpusCopy copies the shipping corpus's family directories into a
+// throwaway root a test may edit. The reader demands the whole table's worth of
+// files, so a test about ONE row still needs a complete corpus around it.
+func probe100CorpusCopy(t *testing.T) string {
+	t.Helper()
+	root, src := t.TempDir(), fixtures.AQLConformanceRoot()
+	families, err := os.ReadDir(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fam := range families {
+		if !fam.IsDir() {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Join(root, fam.Name()), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		files, err := os.ReadDir(filepath.Join(src, fam.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range files {
+			body, err := os.ReadFile(filepath.Join(src, fam.Name(), f.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, fam.Name(), f.Name()), body, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	return root
+}
+
+// appendCorpusRow appends record as the final line of the named CSV under root
+// and returns the 1-based line it lands on.
+func appendCorpusRow(t *testing.T, root, name, record string) int {
+	t.Helper()
+	path := filepath.Join(root, name)
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.TrimRight(string(body), "\n")
+	if err := os.WriteFile(path, []byte(text+"\n"+record+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return strings.Count(text, "\n") + 2
+}
+
+// TestProbe100ReaderExcludesUnreconstructableRows covers the reader's exclusion
+// rules, which no row of the corpus meets at its current pin. They are the
+// refresh contract: a row that stops reconstructing into a complete query is
+// recorded against a named reason and counted, never dropped on the quiet — so
+// the asserted plus excluded tallies always add up to the rows on disk.
+func TestProbe100ReaderExcludesUnreconstructableRows(t *testing.T) {
+	const file = "AND_OR/from_simple_and_or.csv"
+	cases := []struct {
+		name   string
+		record string
+		want   string
+	}{
+		{
+			name:   "blank_variable_cell",
+			record: ",expected_from_simple_and_or_6.json,1",
+			want:   "empty-variable-value",
+		},
+		{
+			// A row that names a further Robot variable of its own: the
+			// reconstruction still holds a placeholder, so it is not a query.
+			name:   "row_names_another_robot_variable",
+			record: `"SELECT o FROM EHR CONTAINS OBSERVATION o[${archetype}]",expected_from_simple_and_or_6.json,1`,
+			want:   "unresolved-template-variable",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			baseline := probe100Corpus(t)
+			root := probe100CorpusCopy(t)
+			line := appendCorpusRow(t, root, file, tc.record)
+
+			c, err := aqlprobes.ReadConformanceCorpus(root)
+			if err != nil {
+				t.Fatalf("ReadConformanceCorpus: %v", err)
+			}
+			if len(c.Rows) != len(baseline.Rows) {
+				t.Errorf("asserted rows = %d, want %d — the excluded row must not reach the ratchet",
+					len(c.Rows), len(baseline.Rows))
+			}
+			if len(c.Excluded) != 1 {
+				t.Fatalf("excluded rows = %d, want 1: %+v", len(c.Excluded), c.Excluded)
+			}
+			got := c.Excluded[0]
+			if got.Reason != tc.want {
+				t.Errorf("reason = %q, want %q", got.Reason, tc.want)
+			}
+			if got.Why == "" {
+				t.Errorf("Why = %q, want the rule's prose — an excluded row must explain itself", got.Why)
+			}
+			if want := fmt.Sprintf("%s:%d", file, line); got.Where() != want {
+				t.Errorf("Where() = %q, want %q", got.Where(), want)
+			}
+			// The tally must show the exclusion where it happened, not only in
+			// the corpus-wide total.
+			for _, f := range c.FileCounts() {
+				if f.Family+"/"+f.File == file && f.Excluded != 1 {
+					t.Errorf("%s: excluded = %d, want 1", file, f.Excluded)
+				}
+			}
+			r, err := aqlprobes.Probe100ConformanceCorpus(c)
+			if err != nil {
+				t.Fatalf("Probe100: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Fatalf("Probe100 status=%q detail=%q — an excluded row must not fail the ratchet",
+					r.Status, r.Detail)
 			}
 		})
 	}
