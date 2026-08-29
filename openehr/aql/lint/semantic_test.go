@@ -689,8 +689,18 @@ func TestOptionsFieldsAreIndependent(t *testing.T) {
 // semantic defect keeps its exact pre-existing issue-code multiset. The
 // expectations below are the pre-REQ-161 outputs, written out in full rather
 // than diffed, so a new code leaking into a clean query fails here.
+//
+// Every row but one also carries `aql_select_no_alias` (REQ-164), added here
+// as the deliberate, recorded re-baseline REQ-164 § Additivity defines: none
+// of these projections writes an `AS` alias, so each genuinely carries that
+// defect. `SELECT *` is the exception — a star item has nothing to alias — and
+// the `LIMIT 10` row gains `aql_paging_no_order_by` on top, for the row bound
+// it carries with no total order. The rows are still written out in full, so a
+// REQ-161 code leaking into one still fails here, which is what this test is
+// for.
 func TestSemanticGroupIsAdditive(t *testing.T) {
 	t.Parallel()
+	const noAlias = "aql_select_no_alias"
 	cases := []struct {
 		query string
 		want  []string
@@ -699,29 +709,32 @@ func TestSemanticGroupIsAdditive(t *testing.T) {
 			// PROBE-028's `valid.aql` corpus query.
 			"SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude " +
 				"FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
-			nil,
+			[]string{noAlias},
 		},
 		{
 			// PROBE-028's `missing_archetype.aql` corpus query (Layers 1–2 only).
 			"SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1]",
-			nil,
+			[]string{noAlias},
 		},
-		{"SELECT c FROM COMPOSITION c", []string{nonSemanticSample}},
+		{"SELECT c FROM COMPOSITION c", []string{nonSemanticSample, noAlias}},
 		{"SELECT * FROM EHR e", []string{"aql_select_star"}},
 		{
 			"SELECT TOP 5 c FROM COMPOSITION c LIMIT 10",
-			[]string{nonSemanticSample, "aql_deprecated_top", "aql_top_with_limit"},
+			[]string{
+				nonSemanticSample, "aql_deprecated_top", "aql_top_with_limit",
+				"aql_paging_no_order_by", noAlias,
+			},
 		},
 		{
 			"SELECT o FROM EHR e CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
-			nil,
+			[]string{noAlias},
 		},
 		{
 			"SELECT zz/data[at0001]/magnitude FROM COMPOSITION c",
-			[]string{"aql_unknown_alias", nonSemanticSample},
+			[]string{"aql_unknown_alias", nonSemanticSample, noAlias},
 		},
-		{"SELECT c FROM COMPOSITION c[$arch]", nil},
-		{"SELECT v FROM VERSION v[all_versions]", nil},
+		{"SELECT c FROM COMPOSITION c[$arch]", []string{noAlias}},
+		{"SELECT v FROM VERSION v[all_versions]", []string{noAlias}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.query, func(t *testing.T) {

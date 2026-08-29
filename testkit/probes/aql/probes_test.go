@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -186,13 +187,21 @@ func loadOPT(t *testing.T, name string) []byte {
 
 // probe028Cases is PROBE-028's own three-cassette corpus — the cassette
 // files under testkit/cassettes/aql/lint/, the vital_signs.opt template, and
-// their pre-REQ-161 WantCodes baseline. Shared between TestProbe028AQLLint
+// their WantCodes baseline. Shared between TestProbe028AQLLint
 // and PROBE-097 arm (b) so a deliberate PROBE-028 re-baseline (conformance.md
 // § PROBE-097 arm (b)) is made ONCE: before this helper existed, arm (b)
 // hand-copied this table, so a re-baseline of one would need to be applied
 // twice, and a missed second edit would surface as a confusing
 // "additivity/…" failure in PROBE-097 rather than where the change actually
 // happened.
+//
+// The baseline was pre-REQ-161 and gained nothing from that requirement. It
+// took its one re-baseline from REQ-164 § Additivity: `valid.aql` and
+// `missing_archetype.aql` each project a column with no `AS` alias — a defect
+// those queries genuinely carry — so each gained aql_select_no_alias and
+// nothing else. Neither carries an unpredicated repeating segment (valid.aql
+// predicates every one) or a row bound, and `bad_syntax.aql` gains nothing at
+// all: it fails at Layer 1, so Layer 2 never runs.
 func probe028Cases(t *testing.T) []aqlprobes.LintCase {
 	t.Helper()
 	opt := loadOPT(t, "vital_signs")
@@ -201,13 +210,13 @@ func probe028Cases(t *testing.T) []aqlprobes.LintCase {
 			Name:      "valid",
 			OPT:       opt,
 			Query:     cassette(t, "valid.aql"),
-			WantCodes: nil, // clean
+			WantCodes: []string{"aql_select_no_alias"},
 		},
 		{
 			Name:      "missing_archetype",
 			OPT:       opt,
 			Query:     cassette(t, "missing_archetype.aql"),
-			WantCodes: []string{"aql_archetype_not_in_template"},
+			WantCodes: []string{"aql_archetype_not_in_template", "aql_select_no_alias"},
 		},
 		{
 			Name:      "bad_syntax",
@@ -265,7 +274,9 @@ func TestProbe028DetectsCodeDrift(t *testing.T) {
 // TestProbe028AQLLint above already wires) re-run under the completed
 // REQ-161 linter gains no REQ-161 code — the controller's own precomputed
 // prediction, recorded in docs/specifications/conformance.md's PROBE-097 row
-// as "no re-baseline required".
+// as "no re-baseline required". That claim still holds over the corpus as it
+// stands: probe028Cases has since taken a REQ-164 re-baseline (an unaliased
+// projection on two cassettes), and no REQ-161 code is among what it gained.
 //
 // Arm (c), REQ-162 § Contract: for every corpus query expressible through the
 // builder, (*aql.Builder).VerifyContainment's code multiset equals
@@ -369,7 +380,7 @@ func probe097FireCases() []aqlprobes.SemanticFireCase {
 			// occurs three times in this query, and the middle one is a fragment
 			// of the archetype HRID. Only a boundary-checked search skips it, so
 			// SpanNth 2 means the CONTAINS operand here and the HRID fragment if
-			// classSpan's boundaryOK call is ever removed — the exact case that
+			// tokenSpan's boundaryOK call is ever removed — the exact case that
 			// helper exists for, which no other corpus row reaches. The finding
 			// itself is ordinary: OBSERVATION cannot contain OBSERVATION, and the
 			// conforming archetype on the root raises nothing.
@@ -878,7 +889,7 @@ func TestProbe097GuardsCanFail(t *testing.T) {
 			want: "aql_impossible_containment span =",
 		},
 		{
-			// Arm (a), fire half: classSpan's own error path — an occurrence the
+			// Arm (a), fire half: tokenSpan's own error path — an occurrence the
 			// query does not have is reported, never silently treated as absent.
 			name: "a fire row names an occurrence the query does not have",
 			mutate: func(t *testing.T, c *aqlprobes.SemanticCorpus) {
@@ -981,6 +992,612 @@ func TestProbe097RequiresEveryCorpusArm(t *testing.T) {
 			}
 			if r.Probe != "PROBE-097" {
 				t.Errorf("Probe id = %q, want PROBE-097", r.Probe)
+			}
+		})
+	}
+}
+
+// --- PROBE-099 — REQ-164 path-shape lint corpus -----------------------------
+//
+// PROBE-097's structure minus its read/write-parity arm: every REQ-164 code is
+// read-side only, so there is no builder analogue to compare against.
+//
+// Arm (a): each of the five REQ-164 codes fires on a corpus query built to carry
+// exactly that defect, with Warning severity and a span on the offending
+// construct — and stays silent on a near miss. The three firing rows the wire
+// assertion names are claimed by name (the AQL-FIT-04 audit's two
+// verified-silent queries, which MUST now warn, and the WHERE-only clause-scope
+// witness), as are the fifteen negatives it names.
+//
+// Arm (b): the PROBE-028 corpus ([probe028Cases], the same three cassettes
+// TestProbe028AQLLint wires) re-run under the completed REQ-164 linter. Two of
+// the three gained aql_select_no_alias — a defect those queries genuinely carry
+// — which is the deliberate, recorded re-baseline REQ-161 § Additivity defines,
+// recorded in conformance.md's PROBE-099 entry.
+//
+// The queries below are the shapes openehr/aql/lint's own pathshape_*_test.go
+// files pin at unit level. They are re-spelled here rather than imported: a
+// probe that shared its corpus with the package under test would pass through a
+// change that moved both together.
+
+const (
+	// The archetype predicates keep aql_from_archetype off these queries, so a
+	// whole-multiset assertion stays about the codes under test.
+	probe099ObsArch  = "openEHR-EHR-OBSERVATION.blood_pressure.v1"
+	probe099CompArch = "openEHR-EHR-COMPOSITION.encounter.v1"
+
+	codePathRepeatingUnpredicated = "aql_path_repeating_unpredicated"
+	codePagingNoOrderBy           = "aql_paging_no_order_by"
+	codeSelectNoAlias             = "aql_select_no_alias"
+	codeFanoutPathGrain           = "aql_fanout_path_grain"
+	codeContainsRedundantStep     = "aql_contains_redundant_step"
+)
+
+// probe099VersionTierRow is the one shipping fire row whose result is NOT
+// REQ-164-only: a bare VERSION operand carries REQ-161's
+// aql_version_no_predicate beside this group's finding. The guard control for
+// the group-only accounting addresses it by name.
+const probe099VersionTierRow = "redundant version-tier step, with the REQ-161 advisory riding along"
+
+// probe099FireCases is PROBE-099 arm (a)'s firing table: at least one row per
+// REQ-164 code, plus the three rows the wire assertion names explicitly.
+// Severities are REQ-164 § Path-shape checks, verbatim: all five codes are
+// Warnings, which is what keeps Result.OK() true on a group-only result.
+func probe099FireCases() []aqlprobes.PathShapeFireCase {
+	return []aqlprobes.PathShapeFireCase{
+		{
+			// The audit projection. ONE repeating-segment finding, on `events`:
+			// OBSERVATION.data types to HISTORY (single-valued), HISTORY.events
+			// to EVENT as a container, and EVENT.data is the BMM generic
+			// parameter `T`, where the walk stops. The unaliased column is a
+			// second, genuine REQ-164 defect of the same query.
+			Name:      "the audit's unpredicated repeating-segment projection",
+			Query:     "SELECT o/data/events/data/items/value/magnitude FROM EHR e CONTAINS OBSERVATION o[" + probe099ObsArch + "]",
+			Code:      codePathRepeatingUnpredicated,
+			Want:      []string{codePathRepeatingUnpredicated, codeSelectNoAlias},
+			Severity:  lint.Warning,
+			SpanText:  "events",
+			SpanNth:   1,
+			Mandatory: aqlprobes.FireAuditRepeatingSegment,
+		},
+		{
+			Name:      "the audit's LIMIT 50 OFFSET 100 query with no ORDER BY",
+			Query:     "SELECT o/name/value AS name FROM OBSERVATION o[" + probe099ObsArch + "] LIMIT 50 OFFSET 100",
+			Code:      codePagingNoOrderBy,
+			Want:      []string{codePagingNoOrderBy},
+			Severity:  lint.Warning,
+			SpanText:  "", // neither paging channel has a position in the query text
+			Mandatory: aqlprobes.FireAuditRowBound,
+		},
+		{
+			// The clause-scope witness: the offending path appears ONLY in
+			// WHERE. An implementation narrowed to the projection fails here —
+			// this query's SELECT path is entirely single-valued.
+			Name: "a repeating segment reached only through WHERE",
+			Query: "SELECT o/name/value AS n FROM OBSERVATION o[" + probe099ObsArch + "] " +
+				"WHERE o/data/events/time/value > '2020-01-01'",
+			Code:      codePathRepeatingUnpredicated,
+			Want:      []string{codePathRepeatingUnpredicated},
+			Severity:  lint.Warning,
+			SpanText:  "events",
+			SpanNth:   1,
+			Mandatory: aqlprobes.FireClauseScopeWhereOnly,
+		},
+		{
+			// The envelope arm: the AQL text carries no row bound at all, and
+			// the bound arrives on Options.Query — the same channel the
+			// parameter-binding checks read.
+			Name:     "a row bound carried by the request envelope alone",
+			Query:    "SELECT o/name/value AS name FROM OBSERVATION o[" + probe099ObsArch + "]",
+			Fetch:    20,
+			Code:     codePagingNoOrderBy,
+			Want:     []string{codePagingNoOrderBy},
+			Severity: lint.Warning,
+			SpanText: "",
+		},
+		{
+			Name:     "an unaliased projection item",
+			Query:    "SELECT o/name/value FROM OBSERVATION o[" + probe099ObsArch + "]",
+			Code:     codeSelectNoAlias,
+			Want:     []string{codeSelectNoAlias},
+			Severity: lint.Warning,
+			SpanText: "o/name/value",
+			SpanNth:  1,
+		},
+		{
+			// REQ-164 § The conservative segment walk's named firing witness:
+			// the two paths diverge AT the alias, with an unpredicated container
+			// on each branch (HISTORY.events and LOCATABLE.links). The two
+			// repeating-segment findings are the fan-out's PREMISE, not a
+			// bystander — which is why Want names the whole multiset.
+			Name: "two projected paths descending into different repeating scopes",
+			Query: "SELECT o/data/events/time AS t, o/links/meaning/value AS m " +
+				"FROM OBSERVATION o[" + probe099ObsArch + "]",
+			Code: codeFanoutPathGrain,
+			Want: []string{
+				codePathRepeatingUnpredicated, codePathRepeatingUnpredicated, codeFanoutPathGrain,
+			},
+			Severity: lint.Warning,
+			SpanText: "o/links/meaning/value", // the LATER path of the pair
+			SpanNth:  1,
+		},
+		{
+			// REQ-164's own redundant-step example: `c` is unreferenced and
+			// predicate-less, and every EHR -> OBSERVATION containment route
+			// passes a COMPOSITION.
+			Name:     "an unavoidable unreferenced intermediate",
+			Query:    "SELECT o/name/value AS n FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o",
+			Code:     codeContainsRedundantStep,
+			Want:     []string{codeContainsRedundantStep},
+			Severity: lint.Warning,
+			SpanText: "COMPOSITION",
+			SpanNth:  1,
+		},
+		{
+			// The version tier is the only route from a container to its
+			// payload, so the unstated-tier step is inert. It records a
+			// deliberate coexistence: a bare VERSION operand also carries
+			// REQ-161's aql_version_no_predicate, which REQ-164 § No
+			// double-reporting leaves standing — the two report DIFFERENT
+			// defects. That bystander is what makes this the one shipping row
+			// whose result is not REQ-164-only.
+			Name: probe099VersionTierRow,
+			Query: "SELECT c/name/value AS n FROM VERSIONED_COMPOSITION vo[uid/value='x'] " +
+				"CONTAINS VERSION v CONTAINS COMPOSITION c",
+			Code:     codeContainsRedundantStep,
+			Want:     []string{codeContainsRedundantStep},
+			Severity: lint.Warning,
+			// Boundary-matched, so the `VERSION` inside VERSIONED_COMPOSITION
+			// earlier in the query is not an occurrence.
+			SpanText: "VERSION",
+			SpanNth:  1,
+		},
+	}
+}
+
+// probe099SilentCases is PROBE-099 arm (a)'s near-miss table — at least one row
+// per REQ-164 code, and the fifteen negatives the wire assertion names.
+//
+// ForCode / Negative are not decoration: they are what the probe's completeness
+// guards count, so the near-miss half of arm (a) cannot shrink below "one
+// silence row per REQ-164 code, and all fifteen named negatives" while still
+// reporting pass. Keeps is what makes a YIELDING near miss non-vacuous — three
+// of these are not "nothing fires" but "another code owns this shape".
+func probe099SilentCases() []aqlprobes.PathShapeSilentCase {
+	return []aqlprobes.PathShapeSilentCase{
+		{
+			// Presence suffices, content is never judged: whether at0006 is the
+			// RIGHT node id is Layer 3's question.
+			Name:     "near miss: a predicated repeating segment",
+			Query:    "SELECT o/data/events[at0006]/time AS t FROM OBSERVATION o[" + probe099ObsArch + "]",
+			ForCode:  codePathRepeatingUnpredicated,
+			Negative: aqlprobes.NegPredicatedSegment,
+		},
+		{
+			// The total order is the remedy, so its presence silences the
+			// finding however many channels bounded the rows — here both.
+			Name: "near miss: ORDER BY beside a bound on both channels",
+			Query: "SELECT o/name/value AS name FROM OBSERVATION o[" + probe099ObsArch + "] " +
+				"ORDER BY o/name/value LIMIT 50 OFFSET 100",
+			Fetch:    20,
+			ForCode:  codePagingNoOrderBy,
+			Negative: aqlprobes.NegOrderByPresent,
+		},
+		{
+			// With no envelope supplied the envelope arm cannot fire, exactly as
+			// it leaves the parameter-binding checks unable to. The positive
+			// control is the fire row above spelling the SAME query with a
+			// bound.
+			Name:     "near miss: no request envelope, and no in-text bound",
+			Query:    "SELECT o/name/value AS name FROM OBSERVATION o[" + probe099ObsArch + "]",
+			ForCode:  codePagingNoOrderBy,
+			Negative: aqlprobes.NegNilEnvelope,
+		},
+		{
+			// One defect gets one finding: aql_deprecated_top already carries
+			// the ORDER BY remedy for that clause.
+			Name:     "near miss: a TOP-only row bound",
+			Query:    "SELECT TOP 5 o/name/value AS name FROM OBSERVATION o[" + probe099ObsArch + "]",
+			Keeps:    []string{"aql_deprecated_top"},
+			ForCode:  codePagingNoOrderBy,
+			Negative: aqlprobes.NegTopOnlyBound,
+		},
+		{
+			Name: "near miss: every projection item aliased",
+			Query: "SELECT o/name/value AS name, o/uid/value AS uid " +
+				"FROM OBSERVATION o[" + probe099ObsArch + "]",
+			ForCode:  codeSelectNoAlias,
+			Negative: aqlprobes.NegAliasedProjection,
+		},
+		{
+			// The star has nothing to alias; REQ-164 § No double-reporting gives
+			// that shape to REQ-109's aql_select_star. The MIXED spelling is
+			// used so the star is a projection item the check actually sees and
+			// skips, rather than one a bare SELECT * never records.
+			Name:     "near miss: a `*` item beside an aliased column",
+			Query:    "SELECT *, o/name/value AS name FROM OBSERVATION o[" + probe099ObsArch + "]",
+			Keeps:    []string{"aql_select_star"},
+			ForCode:  codeSelectNoAlias,
+			Negative: aqlprobes.NegStarItem,
+		},
+		{
+			// One repeating scope, no product: the two paths' only container
+			// sits in their common prefix. Each path still carries its own
+			// repeating-segment finding, which is why Want is not nil — the
+			// silence being asserted is the fan-out advisory's.
+			Name: "near miss: repeating segments all in the common prefix",
+			Query: "SELECT o/data/events/time AS a, o/data/events/name/value AS b " +
+				"FROM OBSERVATION o[" + probe099ObsArch + "]",
+			Want: []string{
+				codePathRepeatingUnpredicated, codePathRepeatingUnpredicated,
+			},
+			ForCode:  codeFanoutPathGrain,
+			Negative: aqlprobes.NegSharedRepeatingPrefix,
+		},
+		{
+			// Two aliases never pair: that is the junction question,
+			// aql_fanout_row_grain (REQ-161). Each alias's path carries its own
+			// repeating-segment findings — `c/content` and its inherited
+			// `links`, and `o`'s `events`.
+			Name: "near miss: projected paths rooted on different aliases",
+			Query: "SELECT c/content/links/meaning/value AS a, o/data/events/time AS b " +
+				"FROM EHR e CONTAINS COMPOSITION c[" + probe099CompArch + "] " +
+				"CONTAINS OBSERVATION o[" + probe099ObsArch + "]",
+			Want: []string{
+				codePathRepeatingUnpredicated, codePathRepeatingUnpredicated,
+				codePathRepeatingUnpredicated,
+			},
+			ForCode:  codeFanoutPathGrain,
+			Negative: aqlprobes.NegDifferentAliases,
+		},
+		{
+			// The substance of the whole redundant-step rule: dropping SECTION
+			// admits observations that sit directly in a composition's content,
+			// so the step narrows the result and is not redundant. A check
+			// written to the guidance sentence as stated would flag this.
+			Name:     "near miss: an avoidable unreferenced intermediate",
+			Query:    "SELECT o/name/value AS n FROM EHR e CONTAINS SECTION s CONTAINS OBSERVATION o",
+			ForCode:  codeContainsRedundantStep,
+			Negative: aqlprobes.NegAvoidableIntermediate,
+		},
+		{
+			Name:     "near miss: an unreferenced leaf",
+			Query:    "SELECT e/ehr_id/value AS id FROM EHR e CONTAINS COMPOSITION c",
+			ForCode:  codeContainsRedundantStep,
+			Negative: aqlprobes.NegUnreferencedLeaf,
+		},
+		{
+			// REQ-164 § No double-reporting: the general case yields to the
+			// specific. The overlay is what makes the skip observable — on the
+			// default relation no VERSIONED_* class is ever unavoidable, so a
+			// row without it would pass with the guard deleted.
+			Name: "near miss: a VERSIONED_OBJECT-conforming operand keeps REQ-161's code",
+			Query: "SELECT c/name/value AS n FROM SITE s CONTAINS VERSIONED_COMPOSITION vo " +
+				"CONTAINS COMPOSITION c[" + probe099CompArch + "]",
+			Relation: contain.Default().WithOverlay(contain.Edge{
+				From: "SITE", To: "VERSIONED_COMPOSITION",
+			}),
+			Keeps:    []string{"aql_versioned_object_unreferenced"},
+			ForCode:  codeContainsRedundantStep,
+			Negative: aqlprobes.NegVersionedObjectOperand,
+		},
+		{
+			// The walk cannot start, so the path goes unjudged rather than
+			// judged against a guess. The class has its own code, which this
+			// group adds nothing to.
+			Name:     "near miss: the walk stops on a class the pin does not know",
+			Query:    "SELECT x/data/events/time AS t FROM NOT_AN_RM_CLASS x",
+			Keeps:    []string{"aql_unknown_rm_class"},
+			ForCode:  codePathRepeatingUnpredicated,
+			Negative: aqlprobes.NegWalkStopUnknownClass,
+		},
+		{
+			// `items` is a container on SECTION and on ITEM_TREE; on OBSERVATION
+			// it is not an attribute at all, so the walk stops at the first
+			// segment.
+			Name:     "near miss: the walk stops on an attribute the pin does not declare",
+			Query:    "SELECT o/items/value AS v FROM OBSERVATION o[" + probe099ObsArch + "]",
+			ForCode:  codePathRepeatingUnpredicated,
+			Negative: aqlprobes.NegWalkStopUndeclaredAttribute,
+		},
+		{
+			// EVENT.data is literally typed `T` on the pinned tables, and
+			// REQ-048 leaves generic-parameter resolution out of scope. The
+			// `items` below that stop IS a container on every class that
+			// declares it, so a walk that guessed what `T` stands for would
+			// report it — with `events` predicated here, the stop is the only
+			// thing keeping this query silent.
+			Name: "near miss: the walk stops at the generic parameter above a container",
+			Query: "SELECT o/data/events[at0006]/data/items/value/magnitude AS m " +
+				"FROM OBSERVATION o[" + probe099ObsArch + "]",
+			ForCode:  codePathRepeatingUnpredicated,
+			Negative: aqlprobes.NegWalkStopGenericParameter,
+		},
+		{
+			// A `$param` archetype scope, whose extent the CDR resolves at
+			// execution — the skip Layer 3 and the REQ-161 checks already apply
+			// for the same reason. The same path under a LITERAL archetype is
+			// the fire row above.
+			Name:     "near miss: a $param archetype scope",
+			Query:    "SELECT o/data/events/time AS t FROM OBSERVATION o[$arch]",
+			ForCode:  codePathRepeatingUnpredicated,
+			Negative: aqlprobes.NegWalkStopParamArchetype,
+		},
+	}
+}
+
+// probe099AdditivityCases is PROBE-099 arm (b): PROBE-028's own corpus
+// ([probe028Cases], shared with TestProbe028AQLLint as noted there), re-run
+// under the completed REQ-164 linter.
+//
+// Unlike PROBE-097 arm (b), this one DID re-baseline: valid.aql and
+// missing_archetype.aql each project a column with no AS alias — a defect those
+// queries genuinely carry — so each gained aql_select_no_alias and nothing else,
+// while bad_syntax.aql gained nothing at all (it fails at Layer 1, so Layer 2
+// never runs). That re-baseline is recorded in conformance.md's PROBE-099 entry,
+// as REQ-164 § Additivity requires; probe028Cases carries it in the table
+// itself.
+func probe099AdditivityCases(t *testing.T) []aqlprobes.LintCase {
+	t.Helper()
+	return probe028Cases(t)
+}
+
+// probe099Corpus assembles the full PROBE-099 corpus. Shared between
+// TestProbe099PathShapeLint and the guard controls below, which each mutate one
+// arm of it — a control built from a hand-written stand-in would prove the guard
+// fires on a toy corpus, not that it fires on the corpus that ships.
+func probe099Corpus(t *testing.T) aqlprobes.PathShapeCorpus {
+	t.Helper()
+	return aqlprobes.PathShapeCorpus{
+		Fire:       probe099FireCases(),
+		Silent:     probe099SilentCases(),
+		Additivity: probe099AdditivityCases(t),
+	}
+}
+
+// TestProbe099PathShapeLint runs PROBE-099's full corpus — both wire-assertion
+// arms — and asserts a clean pass.
+func TestProbe099PathShapeLint(t *testing.T) {
+	r, err := aqlprobes.Probe099PathShapeLint(probe099Corpus(t))
+	if err != nil {
+		t.Fatalf("Probe099: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("Probe099 status=%q detail=%q", r.Status, r.Detail)
+	}
+	if r.Probe != "PROBE-099" {
+		t.Errorf("Probe id = %q, want PROBE-099", r.Probe)
+	}
+}
+
+// pathShapeFireRow addresses the named fire row so a control can mutate it in
+// place, failing the test rather than no-opping when the row is gone.
+func pathShapeFireRow(t *testing.T, rows []aqlprobes.PathShapeFireCase, name string) *aqlprobes.PathShapeFireCase {
+	t.Helper()
+	i := slices.IndexFunc(rows, func(c aqlprobes.PathShapeFireCase) bool { return c.Name == name })
+	if i < 0 {
+		t.Fatalf("no fire row named %q; this control has rotted", name)
+	}
+	return &rows[i]
+}
+
+const probe099AuditFireRow = "the audit's unpredicated repeating-segment projection"
+
+// TestProbe099GuardsCanFail is the able-to-fail control suite. Each case mutates
+// the SHIPPING corpus in exactly the way one guard exists to catch — a toy
+// stand-in would only prove the guard fires on a toy corpus — and asserts that
+// guard's OWN message, since a control asserting nothing but Status == "fail"
+// passes on any failure, including one it caused for an unrelated reason.
+func TestProbe099GuardsCanFail(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*testing.T, *aqlprobes.PathShapeCorpus)
+		want   string // substring of Detail the guard under control must produce
+	}{
+		{
+			// Arm (a), fire half: the per-code coverage guard.
+			name: "a fire row is deleted",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				c.Fire = deleteRows(t, c.Fire, "fan-out fire row", func(f aqlprobes.PathShapeFireCase) bool {
+					return f.Code == codeFanoutPathGrain
+				})
+			},
+			want: "fire: no fire case raises aql_fanout_path_grain",
+		},
+		{
+			// Arm (a), fire half: the named-row guard, which no per-code count
+			// would notice the loss of (the paging code keeps its envelope row).
+			name: "a fire row the wire assertion names is deleted",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				c.Fire = deleteRows(t, c.Fire, "audit row-bound fire row", func(f aqlprobes.PathShapeFireCase) bool {
+					return f.Mandatory == aqlprobes.FireAuditRowBound
+				})
+			},
+			want: `fire: no fire case claims the "audit: the LIMIT-without-ORDER BY query" row`,
+		},
+		{
+			// Arm (a), fire half: the group-only accounting behind REQ-164
+			// § Acceptance's OK() claim. Keeping only the version-tier row —
+			// whose result carries REQ-161's advisory too — leaves no row able
+			// to make that claim.
+			name: "no fire row yields a group-only result",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				c.Fire = deleteRows(t, c.Fire, "group-only fire rows", func(f aqlprobes.PathShapeFireCase) bool {
+					return f.Name != probe099VersionTierRow
+				})
+			},
+			want: "fire: no fire case yields a group-only result",
+		},
+		{
+			// Arm (a), fire half: the corpus-row check, which no linter
+			// behaviour can trip — a row whose Want omits its own Code asserts
+			// nothing about the code it exists for while still satisfying the
+			// coverage guard.
+			name: "a fire row's Want omits its own Code",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				pathShapeFireRow(t, c.Fire, probe099AuditFireRow).Want = []string{codeSelectNoAlias}
+			},
+			want: "corpus row error: Want",
+		},
+		{
+			// Arm (a), fire half: the severity comparison.
+			name: "a fire row carries the wrong severity",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				pathShapeFireRow(t, c.Fire, probe099AuditFireRow).Severity = lint.Error
+			},
+			want: "aql_path_repeating_unpredicated severity =",
+		},
+		{
+			// Arm (a), fire half: the span comparison, on a code whose span
+			// covers a path SEGMENT rather than a class token.
+			name: "a fire row names an occurrence the query does not have",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				pathShapeFireRow(t, c.Fire, probe099AuditFireRow).SpanNth = 2
+			},
+			want: `fewer than 2 boundary-matched occurrences of "events"`,
+		},
+		{
+			// Arm (a), fire half: the zero-Span assertion is POSITIVE — a
+			// paging row that named a span would have to find one.
+			name: "a paging fire row expects a span",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				row := pathShapeFireRow(t, c.Fire, "the audit's LIMIT 50 OFFSET 100 query with no ORDER BY")
+				row.SpanText, row.SpanNth = "LIMIT", 1
+			},
+			want: "aql_paging_no_order_by span =",
+		},
+		{
+			// …and its converse: a row that expected NO span on a code that
+			// carries one.
+			name: "a spanned fire row expects the zero Span",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				pathShapeFireRow(t, c.Fire, probe099AuditFireRow).SpanText = ""
+			},
+			want: "want the zero Span",
+		},
+		{
+			// Arm (a), silence half: the per-code coverage guard's mirror.
+			name: "the silence row for a code is deleted",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				c.Silent = deleteRows(t, c.Silent, "fan-out silence rows", func(s aqlprobes.PathShapeSilentCase) bool {
+					return s.ForCode == codeFanoutPathGrain
+				})
+			},
+			want: "silent: no silence case guards aql_fanout_path_grain",
+		},
+		{
+			// Arm (a), silence half: the named-negative guard. The
+			// repeating-segment code keeps four other silence rows, so no
+			// per-code count would notice this one going.
+			name: "a named negative is deleted",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				c.Silent = deleteRows(t, c.Silent, "generic-parameter stop row", func(s aqlprobes.PathShapeSilentCase) bool {
+					return s.Negative == aqlprobes.NegWalkStopGenericParameter
+				})
+			},
+			want: `silent: no silence case pins the "walk stop: generic-parameter type" negative`,
+		},
+		{
+			// Arm (a), silence half: the vacuous-silence hole — a row whose
+			// query fails Layer 1 never reaches a REQ-164 check, so its
+			// nil-vs-nil comparison would assert nothing.
+			name: "a silence row asserts silence on a query that never parsed",
+			mutate: func(_ *testing.T, c *aqlprobes.PathShapeCorpus) {
+				c.Silent = append(c.Silent, aqlprobes.PathShapeSilentCase{
+					Name:  "never parsed",
+					Query: "SELECT o/name/value AS n FROM OBSERVATION o CONTAINS", // dangling CONTAINS
+				})
+			},
+			want: "silent/never parsed: query never reached the REQ-164 checks (aql_syntax)",
+		},
+		{
+			// Arm (a), silence half: the comparison itself.
+			name: "a silence row wants a code its query does not raise",
+			mutate: func(_ *testing.T, c *aqlprobes.PathShapeCorpus) {
+				c.Silent = append(c.Silent, aqlprobes.PathShapeSilentCase{
+					Name:  "wrong want",
+					Query: "SELECT o/name/value AS n FROM OBSERVATION o[" + probe099ObsArch + "]",
+					Want:  []string{codeSelectNoAlias},
+				})
+			},
+			want: "silent/wrong want: path-shape codes = []",
+		},
+		{
+			// Arm (a), silence half: the Keeps assertion, which is what stops a
+			// YIELDING near miss passing on a query that had simply stopped
+			// being linted.
+			name: "a yielding silence row loses the code it yields to",
+			mutate: func(_ *testing.T, c *aqlprobes.PathShapeCorpus) {
+				c.Silent = append(c.Silent, aqlprobes.PathShapeSilentCase{
+					Name:  "keeps nothing",
+					Query: "SELECT o/name/value AS n FROM OBSERVATION o[" + probe099ObsArch + "]",
+					Keeps: []string{"aql_deprecated_top"},
+				})
+			},
+			want: "silent/keeps nothing: the shape yields to aql_deprecated_top",
+		},
+		{
+			// Arm (b): the additivity baseline. A cassette re-baselined by
+			// accident rather than by decision fails here.
+			name: "an additivity baseline drifts",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				i := slices.IndexFunc(c.Additivity, func(lc aqlprobes.LintCase) bool { return lc.Name == "valid" })
+				if i < 0 {
+					t.Fatal("no additivity row named \"valid\"; this control has rotted")
+				}
+				c.Additivity[i].WantCodes = nil
+			},
+			want: "additivity/valid: codes mismatch",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			corpus := probe099Corpus(t)
+			tt.mutate(t, &corpus)
+			r, err := aqlprobes.Probe099PathShapeLint(corpus)
+			if err != nil {
+				t.Fatalf("Probe099: %v", err)
+			}
+			if r.Status != "fail" {
+				t.Fatalf("expected fail, got status=%q detail=%q", r.Status, r.Detail)
+			}
+			if !strings.Contains(r.Detail, tt.want) {
+				t.Fatalf("failure detail does not name the guard under control:\n  want substring: %s\n  got: %s",
+					tt.want, r.Detail)
+			}
+		})
+	}
+}
+
+// TestProbe099RequiresEveryCorpusArm is the able-to-fail control for the
+// corpus-shape guard: an arm omitted entirely is a CALLER error — reported as an
+// error with no Result status, never as a green run over the arms that remain.
+func TestProbe099RequiresEveryCorpusArm(t *testing.T) {
+	arms := []struct {
+		name string
+		drop func(*aqlprobes.PathShapeCorpus)
+	}{
+		{"Fire", func(c *aqlprobes.PathShapeCorpus) { c.Fire = nil }},
+		{"Silent", func(c *aqlprobes.PathShapeCorpus) { c.Silent = nil }},
+		{"Additivity", func(c *aqlprobes.PathShapeCorpus) { c.Additivity = nil }},
+	}
+	for _, arm := range arms {
+		t.Run(arm.name, func(t *testing.T) {
+			corpus := probe099Corpus(t)
+			arm.drop(&corpus)
+			r, err := aqlprobes.Probe099PathShapeLint(corpus)
+			if err == nil {
+				t.Fatalf("err = nil, want the corpus-shape error (status=%q detail=%q)", r.Status, r.Detail)
+			}
+			if !strings.Contains(err.Error(), "all three corpus fields") {
+				t.Fatalf("err = %v, want the corpus-shape error", err)
+			}
+			if r.Status != "" {
+				t.Fatalf("status = %q, want %q — a corpus-shape error is not a probe verdict", r.Status, "")
+			}
+			if r.Probe != "PROBE-099" {
+				t.Errorf("Probe id = %q, want PROBE-099", r.Probe)
 			}
 		})
 	}

@@ -52,14 +52,24 @@ func spanOfText(start parse.Position, text string) Span {
 	if start == (parse.Position{}) {
 		return Span{}
 	}
-	end := start
+	return Span{Start: start, End: advance(start, text)}
+}
+
+// advance is the position reached by reading text from p. Columns count RUNES,
+// matching how the parser reports a position, so a multi-byte character does
+// not shift every column after it.
+//
+// It is shared with [segmentSpan], which starts a span PART-WAY along a
+// construct rather than at its beginning ([parse.PathSegment] carries no
+// position of its own).
+func advance(p parse.Position, text string) parse.Position {
 	if n := strings.Count(text, "\n"); n > 0 {
-		end.Line += n
-		end.Col = 1 + len([]rune(text[strings.LastIndex(text, "\n")+1:]))
+		p.Line += n
+		p.Col = 1 + len([]rune(text[strings.LastIndex(text, "\n")+1:]))
 	} else {
-		end.Col += len([]rune(text))
+		p.Col += len([]rune(text))
 	}
-	return Span{Start: start, End: end}
+	return p
 }
 
 // Issue is one finding from a lint pass. Lint is collect-all (every issue,
@@ -101,8 +111,9 @@ type Result struct {
 	// order: by layer, then document order within a layer (aql_unused_param
 	// is sorted by parameter key, since unreferenced params have no
 	// document position; and Layer 2 orders by CHECK GROUP first — shape,
-	// then the REQ-161 semantic group in its own fixed sequence — so a
-	// later-in-the-query semantic finding can precede an earlier shape one).
+	// then the REQ-161 semantic group in its own fixed sequence, then the
+	// REQ-164 path-shape group — so a later-in-the-query semantic finding
+	// can precede an earlier shape one).
 	// Never nil after a lint call (zero-length when clean).
 	Issues []Issue
 }
@@ -142,6 +153,20 @@ type Options struct {
 	// the pinned RM (rminfo.Default) rather than a containment one, and the
 	// third reads the query's own SELECT / CONTAINS shape and consults no RM
 	// facts at all. An overlay therefore cannot retire those three.
+	//
+	// Of the five REQ-164 path-shape codes it governs exactly ONE:
+	// aql_contains_redundant_step, whose whole question is whether a
+	// containment ROUTE goes round the step — precisely the kind of fact an
+	// overlay edge states, so the relation in use must answer it or a dialect
+	// deployment draws a false finding on a step its own edges make
+	// load-bearing (REQ-160 § Extensibility). The other four ignore it, in two
+	// pairs: aql_path_repeating_unpredicated and aql_fanout_path_grain — the
+	// two codes the segment walk feeds — ask CLASS questions, attribute typing
+	// and multiplicity, which no caller-supplied containment relation may
+	// answer differently (REQ-164 § The conservative segment walk); while
+	// aql_paging_no_order_by and aql_select_no_alias are parse-only and consult
+	// no RM fact at all. No REQ-164 code is GATED by this field either way: nil
+	// selects the default here as it does everywhere.
 	Relation *contain.TypeRelation
 }
 
@@ -218,6 +243,18 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	// Options.Relation selects the pinned RM rather than switching the group
 	// off.
 	issues = append(issues, semanticIssues(doc, opts.Relation)...)
+	// The Layer-2 path-shape group (REQ-164) is ungated too, and for a
+	// stronger reason: it has no input to gate on. Every fact it reads is in
+	// the query text, the pinned BMM, or a relation that defaults when absent,
+	// and every code it raises is Warning, so it can never turn a passing
+	// result into a failing one (REQ-164 § Always on, never gated). opts.Query
+	// reaches it for the same reason it reaches the shape group:
+	// aql_paging_no_order_by has a second row-bound channel in the request
+	// envelope, which a nil Query leaves invisible — that is the ENVELOPE ARM
+	// being unable to fire, not the group being gated. opts.Relation reaches it
+	// for aql_contains_redundant_step alone, and nil there selects the default
+	// relation exactly as it does for the semantic group above.
+	issues = append(issues, pathShapeIssues(doc, md, opts.Query, opts.Relation)...)
 	if opts.Query != nil {
 		issues = append(issues, paramIssues(md, opts.Query)...)
 	}

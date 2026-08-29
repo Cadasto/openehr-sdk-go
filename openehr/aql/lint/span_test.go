@@ -193,6 +193,12 @@ func itoa(n int) string {
 // surface: adding Span changed no existing Code, Severity, Detail shape, or
 // OK() outcome. The expectations below are the PRE-change behaviour, written
 // down — a drift in any of them is the regression this arm exists to catch.
+//
+// Three rows gained REQ-164 codes when the path-shape group landed — the
+// deliberate, recorded re-baseline REQ-164 § Additivity defines, and each is
+// a defect the row's query genuinely carries (an unaliased projection; a
+// LIMIT with no ORDER BY). Every gained code is a Warning, so no row's `ok`
+// moved, which is itself the property this arm cares about most.
 func TestAdditivityOverTheCorpus(t *testing.T) {
 	t.Parallel()
 	expect := []struct {
@@ -205,8 +211,9 @@ func TestAdditivityOverTheCorpus(t *testing.T) {
 			name:  "unbound alias",
 			query: "SELECT zz/data[at0001, 'Systolic']/magnitude FROM COMPOSITION c",
 			codes: map[string]lint.Severity{
-				"aql_unknown_alias":  lint.Error,
-				"aql_from_archetype": lint.Warning,
+				"aql_unknown_alias":   lint.Error,
+				"aql_from_archetype":  lint.Warning,
+				"aql_select_no_alias": lint.Warning, // REQ-164 re-baseline
 			},
 			ok: false,
 		},
@@ -223,13 +230,19 @@ func TestAdditivityOverTheCorpus(t *testing.T) {
 				"aql_deprecated_top": lint.Warning,
 				"aql_top_with_limit": lint.Error,
 				"aql_from_archetype": lint.Warning,
+				// REQ-164 re-baseline: the LIMIT carries no ORDER BY, and the
+				// projection carries no AS alias.
+				"aql_paging_no_order_by": lint.Warning,
+				"aql_select_no_alias":    lint.Warning,
 			},
 			ok: false,
 		},
 		{
+			// Clean in the sense this arm tests — no Error, so OK() is true.
+			// REQ-164 re-baseline: the projection carries no AS alias.
 			name:  "clean",
 			query: "SELECT c/uid/value FROM EHR e CONTAINS COMPOSITION c",
-			codes: map[string]lint.Severity{},
+			codes: map[string]lint.Severity{"aql_select_no_alias": lint.Warning},
 			ok:    true,
 		},
 	}

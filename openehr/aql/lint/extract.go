@@ -17,9 +17,26 @@
 // aql_versioned_object_unreferenced, and aql_fanout_row_grain — are
 // portability advisories for behaviours the QUERY specification leaves open;
 // they consult no relation. The whole group is unconditional; supply
-// [Options.Relation] to lint the containment codes against a relation
-// carrying dialect overlay edges. Layer 2 stays AST-only either way: no CDR,
-// no OPT, and no row semantics.
+// [Options.Relation] to lint the containment codes — and REQ-164's
+// aql_contains_redundant_step below, the one other code that asks a
+// containment-route question — against a relation carrying dialect overlay
+// edges. Layer 2 stays AST-only either way: no CDR, no OPT, and no row
+// semantics.
+//
+// Layer 2 carries a third group, PATH SHAPE (REQ-164):
+// aql_path_repeating_unpredicated, aql_paging_no_order_by,
+// aql_select_no_alias, aql_fanout_path_grain and
+// aql_contains_redundant_step. Between them they flag query shapes whose
+// outcome the engine rather than the query decides — which occurrence, which
+// page boundary, which column name, how many rows — plus the one containment
+// step that provably decides nothing. What each code fires on is REQ-164
+// § Path-shape checks and stays there; pathshape.go's per-check godoc carries
+// the implementation reading of it. The group is ungated and every code in it
+// is Warning: two are fed by a single walk of each path's segments against the
+// same pinned BMM, which stops silently wherever the pin cannot type a step;
+// two consult no RM fact at all; and aql_contains_redundant_step is the
+// group's one consumer of [Options.Relation], since a route round the step is
+// exactly what a dialect overlay edge can state.
 //
 // The CDR remains the execute-time semantic authority (PROBE-021): a
 // lint-clean query MAY still be rejected on execution. The SDK grammar

@@ -180,6 +180,77 @@ func (r *TypeRelation) ArchetypeMatches(rmType, archetypeID string) Verdict {
 	return Never
 }
 
+// Unavoidable reports whether EVERY containment route from ancestor to
+// descendant passes through via — the relation's reachability recomputed with
+// one intermediate class excluded. REQ-164 § The redundant-step ruling names
+// this query; REQ-160 § Reachability semantics owns the route vocabulary it is
+// asked in, and adds no verdict of its own for it (the answer is a proof or
+// the absence of one, not a fourth verdict).
+//
+// True is a PROOF that `ancestor a CONTAINS via v CONTAINS descendant d`
+// selects exactly what `ancestor a CONTAINS descendant d` selects, so the via
+// step narrows nothing — the RM fact lint's aql_contains_redundant_step rests
+// on (REQ-164 § Path-shape checks).
+// Unavoidable("EHR", "COMPOSITION", "OBSERVATION") is true: every route from an
+// EHR down to an OBSERVATION passes a COMPOSITION.
+// Unavoidable("EHR", "SECTION", "OBSERVATION") is false: an observation sitting
+// directly in a composition's content is reached without any section, so
+// dropping the section step widens the result.
+//
+// Every failure to prove answers FALSE, which is the silent direction for the
+// consumer (REQ-164 § Path-shape checks — where a fact is not provable the
+// check stays silent rather than guessing). Four of them:
+//
+//   - a class this relation does not know, in any of the three positions;
+//   - a class it knows but does not admit as a CONTAINS operand
+//     (§ Containable operands) — a DV_* among them;
+//   - a via standing for the ancestor's or the descendant's own kinds:
+//     excluding it would remove an ENDPOINT of the very question, which is not
+//     the question "is there a way round it";
+//   - a pair no route connects at all. Nothing is proved by a step that changes
+//     an empty result into an empty result, and an impossible containment is
+//     REQ-161's aql_impossible_containment to report, never a redundant step.
+//
+// Routes are read at their WIDEST — ByReference edges included — on both halves
+// of the question. A bypass crossing a reference hop is still a bypass on an
+// engine that resolves the hop (REQ-160 § Overlay edges), so counting it keeps
+// this method from proving a step redundant that such an engine can see is not.
+//
+// Abstract classes stand for their concrete kinds throughout, exactly as they
+// do for [TypeRelation.CanContain]: excluding via excludes every concrete class
+// conforming to it.
+//
+// A nil receiver answers as [Default] does (REQ-160 § Nil and zero relations).
+func (r *TypeRelation) Unavoidable(ancestor, via, descendant string) bool {
+	r = r.orDefault()
+	a, aKnown := r.resolve(ancestor)
+	v, vKnown := r.resolve(via)
+	d, dKnown := r.resolve(descendant)
+	if r.containable(a, aKnown) != Admissible ||
+		r.containable(v, vKnown) != Admissible ||
+		r.containable(d, dKnown) != Admissible {
+		return false
+	}
+
+	starts, targets := r.expand(a), r.expand(d)
+	blocked := make(map[string]bool)
+	for _, c := range r.expand(v) {
+		blocked[c] = true
+	}
+	if intersects(blocked, starts) || intersects(blocked, targets) {
+		return false
+	}
+	if !r.anyReaches(starts, targets, true) {
+		return false
+	}
+	for _, s := range starts {
+		if intersects(r.reachableAvoiding(s, blocked), targets) {
+			return false // a route round via
+		}
+	}
+	return true
+}
+
 // --- construction ---------------------------------------------------------
 
 func build(lk rminfo.Lookup, overlays []Edge) *TypeRelation {
@@ -345,6 +416,40 @@ func (r *TypeRelation) reachableFrom(start string, allowRef bool) map[string]boo
 	}
 	v, _ := r.memo[idx].LoadOrStore(start, reached)
 	return v.(map[string]bool)
+}
+
+// reachableAvoiding is [TypeRelation.reachableFrom] over the graph with a set
+// of VERTICES removed: a node in blocked is neither reached nor traversed. It
+// is the one query [TypeRelation.Unavoidable] needs and the only reader of it.
+// Routes are read at their widest (ByReference edges included) — see that
+// method for why, and TestUnavoidableCountsAByReferenceBypass for the witness
+// that narrowing this call to the non-reference closure changes an answer.
+//
+// It deliberately neither READS nor WRITES the relation's memo. The memo caches
+// the closure of the WHOLE graph per (start, mode); excluding a vertex is a
+// different graph, so reading from it would answer the wrong question and
+// writing to it would corrupt every later verdict. REQ-160 § Reachability
+// semantics has verdicts MAY be memoized, never must, so a fresh walk per call
+// is within contract — and this walk runs per lint operand, not per query row.
+func (r *TypeRelation) reachableAvoiding(start string, blocked map[string]bool) map[string]bool {
+	reached := make(map[string]bool)
+	seen := map[string]bool{start: true}
+	queue := []string{start}
+	for len(queue) > 0 {
+		c := queue[0]
+		queue = queue[1:]
+		for _, nb := range r.successors(c, true) {
+			if blocked[nb] {
+				continue
+			}
+			reached[nb] = true // nb is at depth >= 1, exactly as in reachableFrom
+			if !seen[nb] {
+				seen[nb] = true
+				queue = append(queue, nb)
+			}
+		}
+	}
+	return reached
 }
 
 // successors returns the by-value and overlay successors of a single node.
