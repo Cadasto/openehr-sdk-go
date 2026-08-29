@@ -20,6 +20,11 @@ cassettes/
     MANIFEST.txt                      #   commit pin + per-file sha256
     templates/{name}.opt
     compositions/{name}.json          #   upstream-authored FLAT bodies
+  aql/lint/{name}.aql                 # hand-written AQL lint inputs
+  aql/conformance/                    # pinned upstream AQL FROM corpus (PROBE-100)
+    AQL_SOURCE.txt                    #   commit pin (authoritative — byte copies)
+    EXCLUDED.txt                      #   generated: what upstream is not carried
+    {FAMILY}/{name}.csv               #   per consuming Robot suite family
 ```
 
 **Pinned subtree.** Everything under `flat-conformance/` is machine-synced from
@@ -33,6 +38,12 @@ this directory is curated by hand and is not covered by that manifest; the
 EHRbase Robot integration-test subset records the upstream commit it was
 ingested from in [`ROBOT_SOURCE.txt`](ROBOT_SOURCE.txt) (a provenance pin, not
 a per-file `sha256` lock).
+
+`aql/conformance/` is a second pinned subtree — also do not hand-edit it. Its
+CSVs are byte copies of the upstream files, so its pin
+([`AQL_SOURCE.txt`](aql/conformance/AQL_SOURCE.txt)) determines their content
+outright; refresh with [`scripts/ingest-robot-aql.sh`](../../scripts/ingest-robot-aql.sh),
+which also regenerates `EXCLUDED.txt`.
 
 Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`, `WebTemplateOpt`, `WebTemplateReference`).
 
@@ -121,6 +132,8 @@ The Corona pair is the largest cassette in the repo — the size is the cost of 
 **RM JSON** (`rm/`, flat names): 8 `ehr_status_valid_*` in PROBE-030/033 (excludes ECIS alternate wire); 12 `ehr_status_invalid_*` on disk for client/validation work but excluded from probe discovery (`ehr_status_invalid_*` prefix); 14 `folder_*` including `folder_update_*`.
 
 **Submissions** ([`submissions/`](submissions/README.md)): 47 CONTRIBUTION create payloads from `contributions/` (bulk `create_multiple_compositions` omitted) — use `contribution.Submission`, not `rm.Contribution` decode.
+
+**AQL conformance corpus** ([`aql/conformance/`](aql/conformance/)): 12 FROM-family combination CSVs from `aql/fields_and_results/from/combinations/`, copied byte-exact and filed under the Robot suite family that consumes each one (`AND_OR`, `CONTAINS_A_D`, `EHR_STATUS`, `PREDICATE_A_D`, `USABLE_RM_TYPES_A_D`) — a row is a FROM/CONTAINS shape, and the family names the suite holding the query template it goes into (PROBE-100). Vendored by its own ingest, [`scripts/ingest-robot-aql.sh`](../../scripts/ingest-robot-aql.sh), on its own cadence, so it carries its own pin: [`AQL_SOURCE.txt`](aql/conformance/AQL_SOURCE.txt), authoritative for the bytes rather than best-effort like `ROBOT_SOURCE.txt` above. [`EXCLUDED.txt`](aql/conformance/EXCLUDED.txt) is generated beside it and names all 1124 upstream files the corpus does not carry, each with a reason tag (`execution-semantics`, `non-from-family`, `unconsumed-by-suite`). Both files are generated — do not hand-edit.
 
 ### SDK (`rm/`)
 

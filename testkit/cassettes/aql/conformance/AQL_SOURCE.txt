@@ -1,0 +1,13 @@
+# EHRbase Robot AQL FROM-combination corpus — source provenance pin
+# Written by scripts/ingest-robot-aql.sh. This pin IS authoritative for
+# the vendored CSVs: they are copied unmodified from the commit below, so
+# that commit fully determines their bytes. (Contrast ROBOT_SOURCE.txt one
+# level up, whose cassettes are hand-curated and renamed, making its pin a
+# record of the tree the ingest read rather than of the files it produced.)
+source_repo: ehrbase/integration-tests
+source_path: tests/robot/_resources/test_data_sets/aql/fields_and_results/from/combinations
+commit: 206ee8c5389e0c0d75cb2366b1dfb0987644a383
+commit_date: 2026-01-28T18:33:37+02:00
+recorded_utc: 2026-08-29
+source_tree: https://github.com/ehrbase/integration-tests/tree/206ee8c5389e0c0d75cb2366b1dfb0987644a383/tests/robot/_resources/test_data_sets/aql/fields_and_results/from/combinations
+license: Apache-2.0 (see testkit/cassettes/THIRD_PARTY_LICENSES.md)

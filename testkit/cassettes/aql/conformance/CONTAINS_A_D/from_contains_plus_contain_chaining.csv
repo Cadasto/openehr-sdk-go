@@ -1,0 +1,12 @@
+${from},${expected_file},${nr_of_results}
+COMPOSITION CONTAINS OBSERVATION o,expected_contains_contain_chaining_compo_obs.json,5
+SECTION CONTAINS OBSERVATION o,expected_contains_contain_chaining_section_obs.json,5
+SECTION [openEHR-EHR-SECTION.adhoc.v1] CONTAINS OBSERVATION o,expected_contains_contain_chaining_section_x_obs.json,2
+SECTION [openEHR-EHR-SECTION.conformance_section.v0] CONTAINS OBSERVATION o,expected_contains_contain_chaining_section_xy_obs.json,3
+SECTION [openEHR-EHR-SECTION.conformance_section.v0] CONTAINS OBSERVATION o CONTAINS CLUSTER,expected_contains_contain_chaining_section_xy_obs_cluster.json,3
+OBSERVATION o CONTAINS CLUSTER,expected_contains_contain_chaining_obs_cluster.json,3
+OBSERVATION o CONTAINS INTERVAL_EVENT,expected_contains_contain_chaining_obs_int_event.json,2
+OBSERVATION o CONTAINS INTERVAL_EVENT CONTAINS CLUSTER,expected_contains_contain_chaining_obs_int_event_cluster.json,1
+EVENT o CONTAINS CLUSTER,expected_contains_contain_chaining_event_cluster.json,3
+COMPOSITION CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v2] CONTAINS ELEMENT[at0004],expected_contains_contain_chaining_obs_element.json,1
+COMPOSITION CONTAINS CLUSTER o[openEHR-EHR-CLUSTER.conformance_cluster.v0] CONTAINS ELEMENT[at0003],expected_contains_contain_chaining_cluster_element.json,3

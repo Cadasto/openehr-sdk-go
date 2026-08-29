@@ -13,6 +13,8 @@
 //	flat-conformance/             # pinned upstream FLAT corpus (MANIFEST.txt)
 //	  templates/{name}.opt
 //	  compositions/{name}.json
+//	aql/conformance/              # pinned upstream AQL FROM corpus (AQL_SOURCE.txt)
+//	  {family}/{name}.csv
 //
 // Vendor provenance is indexed in testkit/cassettes/README.md (not in paths).
 package fixtures
@@ -104,6 +106,15 @@ func FlatConformanceOpt() string {
 // FlatConformanceFlat returns testkit/cassettes/flat-conformance/compositions/{name}.json.
 func FlatConformanceFlat(name string) string {
 	return filepath.Join(FlatConformanceRoot(), "compositions", name+".json")
+}
+
+// AQLConformanceRoot is testkit/cassettes/aql/conformance — the pinned
+// upstream EHRbase Robot AQL FROM-family combination corpus (see AQL_SOURCE.txt
+// and EXCLUDED.txt there, and scripts/ingest-robot-aql.sh). Vendored
+// Apache-2.0; provenance in THIRD_PARTY_LICENSES.md. The family directories
+// under it hold the CSVs PROBE-100 reconstructs into queries.
+func AQLConformanceRoot() string {
+	return filepath.Join(CassettesRoot(), "aql", "conformance")
 }
 
 // ListFlatConformance returns the FLAT conformance fixture names (no

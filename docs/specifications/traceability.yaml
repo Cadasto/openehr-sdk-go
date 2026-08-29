@@ -2175,9 +2175,12 @@ requirements:
       - openehr/aql/contain/imports_test.go
       - openehr/aql/contain/nilrelation_test.go  # § Nil and zero relations; also REQ-025
       - openehr/aql/contain/unavoidable_test.go  # TypeRelation.Unavoidable, the REQ-164 widening
+      - testkit/probes/aql/probe_100_conformance_corpus.go  # the PROBE-100 corpus reader and its reconstruction table
       - testkit/probes/aql/probes_test.go
-    probes: [PROBE-097]
-    plans: [docs/plans/archive/2026-08-21-aql-semantic-layer.md]
+    probes: [PROBE-097, PROBE-100]
+    plans:
+      - docs/plans/archive/2026-08-21-aql-semantic-layer.md
+      - docs/plans/archive/2026-08-26-aql-conformance-corpus.md
     adrs: [docs/adr/0017-aql-semantic-layer.md]
     notes: >-
       Verdict relation (Admissible / Never / ByReference / UnknownClass)
@@ -2191,7 +2194,14 @@ requirements:
       the same overlaid graph and deliberately outside the verdict memo, whose
       key is a pair. The relation's own contract is unchanged: no verdict, no
       overlay rule and no nil/zero behaviour moved, and the new method answers
-      as the default on a nil receiver like the other four.
+      as the default on a nil receiver like the other four. PROBE-100 puts the
+      relation's own evidence base under CI: the compatibility guard the
+      Acceptance section cites is generalised from hand-picked rows to the
+      vendored upstream FROM/CONTAINS corpus (67 rows, 12 CSVs, five families,
+      pinned by testkit/cassettes/aql/conformance/AQL_SOURCE.txt), each row
+      reconstructed with its consuming Robot suite's own query template and
+      held to parse plus no Error-severity containment code. No relation
+      behaviour changed to meet it -- all 67 rows already held.
 
   - id: REQ-161
     title: AQL semantic and portability lint

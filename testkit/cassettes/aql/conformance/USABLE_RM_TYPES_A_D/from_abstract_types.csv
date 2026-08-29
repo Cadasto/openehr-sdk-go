@@ -1,0 +1,5 @@
+${type},${expected_file},${nr_of_results}
+ENTRY,expected_from_entry.json,5
+CARE_ENTRY,expected_from_care_entry.json,4
+ITEM_STRUCTURE,expected_from_item_structure.json,14
+DATA_STRUCTURE,expected_from_data_structure.json,15
