@@ -65,18 +65,21 @@ func ExecuteString(ctx context.Context, c *transport.Client, aqlText string, par
 // RunStored executes a stored query at the latest version via POST
 // /query/{qualified_query_name} (REQ-057).
 func RunStored(ctx context.Context, c *transport.Client, qualifiedName string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
-	return runStoredAtVersion(ctx, c, qualifiedName, "", params, opts...)
+	return runStoredAtVersion(ctx, c, "query.RunStored", qualifiedName, "", params, opts...)
 }
 
 // RunStoredVersion executes a stored query at an explicit version.
 func RunStoredVersion(ctx context.Context, c *transport.Client, qualifiedName, version string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
-	return runStoredAtVersion(ctx, c, qualifiedName, version, params, opts...)
+	return runStoredAtVersion(ctx, c, "query.RunStoredVersion", qualifiedName, version, params, opts...)
 }
 
-func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName, version string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
+// runStoredAtVersion is the shared implementation behind [RunStored] and
+// [RunStoredVersion]; op is the caller's name, so every diagnostic names
+// the operation the caller actually invoked.
+func runStoredAtVersion(ctx context.Context, c *transport.Client, op, qualifiedName, version string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
 	name := strings.TrimSpace(qualifiedName)
 	if name == "" {
-		return nil, nil, fmt.Errorf("query.RunStored: %w: empty qualified query name", ErrInvalidConfig)
+		return nil, nil, fmt.Errorf("%s: %w: empty qualified query name", op, ErrInvalidConfig)
 	}
 	// REQ-057: the stored path is "/query/" + name, so the name "aql"
 	// addresses the ad-hoc route /query/aql. Byte-exact — the collision is
@@ -85,7 +88,7 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName,
 	// enforced on the store side (openehr/client/definition), where the
 	// SDK would otherwise help create the forbidden artifact.
 	if name == "aql" {
-		return nil, nil, fmt.Errorf(`query.RunStored: %w: "aql" is the ad-hoc route /query/aql, not a stored-query name`, ErrInvalidConfig)
+		return nil, nil, fmt.Errorf(`%s: %w: "aql" is the ad-hoc route /query/aql, not a stored-query name`, op, ErrInvalidConfig)
 	}
 	cfg := executeConfig{}
 	for _, o := range opts {
@@ -107,14 +110,14 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName,
 	if cfg.useGET {
 		qv, err := storedQueryValues(params, cfg)
 		if err != nil {
-			return nil, nil, fmt.Errorf("query.RunStored: %w", err)
+			return nil, nil, fmt.Errorf("%s: %w", op, err)
 		}
 		req.Method = http.MethodGet
 		req.Query = qv
 	} else {
 		raw, err := json.Marshal(storedBody(params, cfg))
 		if err != nil {
-			return nil, nil, fmt.Errorf("query.RunStored: encode body: %w", err)
+			return nil, nil, fmt.Errorf("%s: encode body: %w", op, err)
 		}
 		req.Method = http.MethodPost
 		req.Body = raw

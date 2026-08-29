@@ -432,6 +432,56 @@ func TestRunStoredReservedNameIsByteExact(t *testing.T) {
 	}
 }
 
+// TestRunStoredVersionPathConstruction positively pins the stored-version
+// route (REQ-057): the version is appended as its own path segment on both
+// verbs, `/query/{qualified_query_name}/{version}`.
+func TestRunStoredVersionPathConstruction(t *testing.T) {
+	for _, tc := range []struct {
+		label      string
+		opt        []query.ExecuteOption
+		wantMethod string
+	}{
+		{"POST", nil, http.MethodPost},
+		{"GET", []query.ExecuteOption{query.WithGET()}, http.MethodGet},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			var captured *http.Request
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				captured = r.Clone(r.Context())
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(readCassette(t, "result_set.json"))
+			}))
+			defer srv.Close()
+
+			_, _, err := query.RunStoredVersion(t.Context(), newClient(t, srv),
+				"org.openehr::vitals", "1.2.3", nil, tc.opt...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if captured.Method != tc.wantMethod {
+				t.Errorf("method = %q, want %q", captured.Method, tc.wantMethod)
+			}
+			if want := "/openehr/v1/query/org.openehr::vitals/1.2.3"; captured.URL.Path != want {
+				t.Errorf("path = %q, want %q", captured.URL.Path, want)
+			}
+		})
+	}
+}
+
+// TestRunStoredDiagnosticsNameTheOperation pins that the shared stored-path
+// implementation reports the operation the caller actually invoked, not its
+// sibling — the prefix is the caller's first breadcrumb.
+func TestRunStoredDiagnosticsNameTheOperation(t *testing.T) {
+	_, _, err := query.RunStoredVersion(t.Context(), nil, "   ", "1.0.0", nil)
+	if err == nil || !strings.Contains(err.Error(), "query.RunStoredVersion:") {
+		t.Errorf("RunStoredVersion err = %v, want a query.RunStoredVersion: prefix", err)
+	}
+	_, _, err = query.RunStored(t.Context(), nil, "   ", nil)
+	if err == nil || !strings.Contains(err.Error(), "query.RunStored:") {
+		t.Errorf("RunStored err = %v, want a query.RunStored: prefix", err)
+	}
+}
+
 func TestExecuteGETExplicitZeroOffset(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
