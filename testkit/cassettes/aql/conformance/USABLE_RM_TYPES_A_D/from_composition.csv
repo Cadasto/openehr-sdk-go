@@ -1,0 +1,11 @@
+${type},${expected_file}
+COMPOSITION,expected_from_composition.json
+EVENT_CONTEXT,expected_from_event_context.json
+SECTION,expected_from_section.json
+ADMIN_ENTRY,expected_from_admin_entry.json
+OBSERVATION,expected_from_observation.json
+INSTRUCTION,expected_from_instruction.json
+ACTION,expected_from_action.json
+EVALUATION,expected_from_evaluation.json
+INSTRUCTION_DETAILS,expected_from_instruction_details.json
+ACTIVITY,expected_from_activity.json

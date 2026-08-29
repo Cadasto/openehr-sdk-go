@@ -40,7 +40,7 @@ limitations under the License.
 
 **Source:** https://github.com/ehrbase/integration-tests (split out of the former `ehrbase/ehrbase` monorepo)  
 **Path within source:** `tests/robot/_resources/test_data_sets/` (sibling clone under `/src/ehrbase/integration-tests`)  
-**Pinned commit:** recorded in [`ROBOT_SOURCE.txt`](ROBOT_SOURCE.txt) — the upstream commit the curated cassettes were ingested from (provenance pin, not a per-file `sha256` lock).
+**Pinned commit:** recorded in [`ROBOT_SOURCE.txt`](ROBOT_SOURCE.txt) — the upstream commit the curated cassettes were ingested from (provenance pin, not a per-file `sha256` lock). The AQL conformance corpus from the same repository is vendored separately and carries its own pin, [`aql/conformance/AQL_SOURCE.txt`](aql/conformance/AQL_SOURCE.txt).
 
 ```
 Copyright vitasystems GmbH and Hannover Medical School (ehrbase project).
@@ -52,9 +52,9 @@ You may obtain a copy of the License at
     http://www.apache.org/licenses/LICENSE-2.0
 ```
 
-**Vendored:** Minimal-entry and `Test_dv_*` template triplets under `templates/` + `compositions/`; `persistent_minimal.en.v1`; flat `rm/ehr_status_*` and `rm/folder_*` JSON; `submissions/*.json` CONTRIBUTION create wire from `contributions/`.
+**Vendored:** Minimal-entry and `Test_dv_*` template triplets under `templates/` + `compositions/`; `persistent_minimal.en.v1`; flat `rm/ehr_status_*` and `rm/folder_*` JSON; `submissions/*.json` CONTRIBUTION create wire from `contributions/`; the FROM-family AQL combination CSVs under `aql/conformance/`.
 
-**Modifications:** Flat `rm/` and `submissions/` filenames; composition JSON stems match operational `template_id`; no clinical content edits. Re-ingest via `scripts/ingest-robot-cassettes.sh`, which stamps the source commit into [`ROBOT_SOURCE.txt`](ROBOT_SOURCE.txt).
+**Modifications:** Flat `rm/` and `submissions/` filenames; composition JSON stems match operational `template_id`; no clinical content edits. Re-ingest via `scripts/ingest-robot-cassettes.sh`, which stamps the source commit into [`ROBOT_SOURCE.txt`](ROBOT_SOURCE.txt). The `aql/conformance/` CSVs are unmodified upstream bytes, only regrouped into a directory per consuming Robot suite family; re-ingest via `scripts/ingest-robot-aql.sh`, which stamps [`aql/conformance/AQL_SOURCE.txt`](aql/conformance/AQL_SOURCE.txt).
 
 ## CODE24 (Cadasto)
 

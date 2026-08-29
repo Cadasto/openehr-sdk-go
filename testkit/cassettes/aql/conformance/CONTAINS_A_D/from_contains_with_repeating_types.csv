@@ -1,0 +1,6 @@
+${from},${expected_file},${nr_of_results}
+SECTION o,expected_contains_repeating_types_section.json,2
+SECTION contains SECTION o,expected_contains_repeating_types_section_section.json,1
+CLUSTER o,expected_contains_repeating_types_cluster.json,3
+CLUSTER contains CLUSTER o,expected_contains_repeating_types_cluster_cluster.json,2
+CLUSTER[openEHR-EHR-CLUSTER.cluster_with_cluster.v0] contains CLUSTER o[at0005],expected_contains_repeating_types_cluster_cluster_x.json,1

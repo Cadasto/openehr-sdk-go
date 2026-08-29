@@ -1,0 +1,7 @@
+${type},${expected_file},${nr_of_results}
+FEEDER_AUDIT,expected_from_feeder_audit.json,5
+HISTORY,expected_from_history.json,1
+POINT_EVENT,expected_from_point_event.json,1
+INTERVAL_EVENT,expected_from_interval_event.json,2
+ITEM_TREE,expected_from_item_tree.json,14
+CLUSTER,expected_from_cluster.json,3
