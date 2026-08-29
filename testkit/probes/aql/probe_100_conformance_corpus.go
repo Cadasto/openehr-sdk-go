@@ -47,13 +47,38 @@ import (
 // reconstruction deterministic and the failure output stable.
 const conformanceEHRID = "11111111-1111-1111-1111-111111111111"
 
-// conformanceChainingSuite is the CONTAINS chaining CSV whose rows are the
-// reason this probe exists: REQ-160's compatibility guard was hand-picked from
-// exactly this suite's chains, and generalising it to the corpus must not
-// quietly drop it. [Probe100ConformanceCorpus] fails a corpus in which this
-// file contributes no asserted row, so the file cannot go missing while the
-// probe still reports pass.
-const conformanceChainingSuite = "CONTAINS_A_D/from_contains_plus_contain_chaining.csv"
+// conformancePinnedSuites are the CSVs pinned BY NAME: [Probe100ConformanceCorpus]
+// fails a corpus in which any of them contributes no asserted row, each with the
+// reason its pin exists, so none can go missing while the probe still reports
+// pass. The per-family tripwire fires only when a whole directory empties, and
+// an excluded row fails nothing — these three have failure modes exactly that
+// quiet. The chaining suite is the reason the probe exists: REQ-160's
+// compatibility guard was hand-picked from its chains, and generalising the
+// guard to the corpus must not quietly drop it. The two EHR_STATUS suites are
+// the only ones whose templates carry the `${ehr_id}` Robot variable, so they
+// alone depend on the [conformanceEHRID] substitution: a regression there sends
+// their rows to the exclusion list — no family tripwire notices, because
+// EHR_STATUS/contains.csv still contributes — and only a pin that names them
+// turns that into a failure with the file on it.
+var conformancePinnedSuites = []struct {
+	// Suite is the family-qualified CSV path, as [ConformanceFileCount] keys it.
+	Suite string
+	// Why finishes the failure sentence "<suite> contributes no asserted row; …".
+	Why string
+}{
+	{
+		Suite: "CONTAINS_A_D/from_contains_plus_contain_chaining.csv",
+		Why:   "it carries the containment chains REQ-160's compatibility guard was drawn from",
+	},
+	{
+		Suite: "EHR_STATUS/from_single_ehr.csv",
+		Why:   "its template is one of the two carrying the ${ehr_id} substitution, whose regression excludes rows rather than failing a family",
+	},
+	{
+		Suite: "EHR_STATUS/via_part.csv",
+		Why:   "its template is one of the two carrying the ${ehr_id} substitution, whose regression excludes rows rather than failing a family",
+	},
+}
 
 // conformanceRootFiles are the two non-CSV files the ingest writes at the
 // corpus root — the provenance pin and the generated exclusion list. Anything
@@ -78,7 +103,7 @@ type conformanceSuite struct {
 	// corpus does not carry and this probe does not assert.
 	Vars []string
 	// Template is the consuming suite's query template, verbatim, including
-	// its casing: upstream writes `contains` in lower case in two of them and
+	// its casing: upstream writes `contains` in lower case in one of them and
 	// the AQL grammar is case-insensitive, so it is kept as written.
 	Template string
 	// Suite is the upstream .robot file Template was transcribed from,
@@ -501,13 +526,13 @@ func Probe100ConformanceCorpus(c ConformanceCorpus) (Result, error) {
 				f.Family, f.Excluded))
 		}
 	}
-	// REQ-160's compatibility guard was hand-picked from this one suite's
-	// chains; generalising it to the corpus must not lose it.
-	if !slices.ContainsFunc(c.FileCounts(), func(f ConformanceFileCount) bool {
-		return f.Family+"/"+f.File == conformanceChainingSuite && f.Asserted > 0
-	}) {
-		failures = append(failures, conformanceChainingSuite+
-			" contributes no asserted row; it carries the containment chains REQ-160's compatibility guard was drawn from")
+	// The named pins: suites whose loss no family tripwire would notice.
+	for _, pin := range conformancePinnedSuites {
+		if !slices.ContainsFunc(c.FileCounts(), func(f ConformanceFileCount) bool {
+			return f.Family+"/"+f.File == pin.Suite && f.Asserted > 0
+		}) {
+			failures = append(failures, pin.Suite+" contributes no asserted row; "+pin.Why)
+		}
 	}
 
 	if len(failures) > 0 {

@@ -1635,6 +1635,19 @@ func TestProbe100ConformanceCorpus(t *testing.T) {
 		t.Logf("excluded %s: %s — %s", e.Where(), e.Reason, e.Why)
 	}
 
+	// The shipping tally is pinned, not only logged. The probe's per-family
+	// tripwire fires only at zero, so an intra-family shrink — 29 rows down
+	// to 1 in USABLE_RM_TYPES_A_D, say — would stay green while the snapshot
+	// PROBE-100's Status records silently drifted. These are that snapshot's
+	// numbers; a corpus refresh re-baselines the pin and the Status prose
+	// together, deliberately (the ratchet's refresh arm).
+	if len(corpus.Rows) != 67 {
+		t.Errorf("corpus reconstructs %d asserted rows, want the 67 the PROBE-100 pin records", len(corpus.Rows))
+	}
+	if len(corpus.Excluded) != 0 {
+		t.Errorf("corpus excludes %d row(s), want 0 at this pin — the exclusion log above names each", len(corpus.Excluded))
+	}
+
 	r, err := aqlprobes.Probe100ConformanceCorpus(corpus)
 	if err != nil {
 		t.Fatalf("Probe100: %v", err)
@@ -1647,24 +1660,48 @@ func TestProbe100ConformanceCorpus(t *testing.T) {
 	}
 }
 
-// TestProbe100CoversTheChainingSuite pins by name the one CSV REQ-160's
-// compatibility guard was hand-picked from. The probe carries the same guard;
-// this asserts it at the corpus the probe is actually given, so a corpus that
-// stopped carrying those chains fails here with the file named rather than as
-// one line inside an aggregated probe Detail.
-func TestProbe100CoversTheChainingSuite(t *testing.T) {
-	const family, file = "CONTAINS_A_D", "from_contains_plus_contain_chaining.csv"
-	for _, f := range probe100Corpus(t).FileCounts() {
-		if f.Family != family || f.File != file {
-			continue
-		}
-		if f.Asserted == 0 {
-			t.Fatalf("%s/%s: asserted = 0, want > 0 — it carries the containment chains "+
-				"REQ-160's compatibility guard was drawn from (%d row(s) excluded)", family, file, f.Excluded)
-		}
-		return
+// TestProbe100CoversThePinnedSuites pins by name the CSVs whose loss the
+// family tripwire would not notice. The probe carries the same guards; this
+// asserts them at the corpus the probe is actually given, so a suite that
+// stopped contributing fails here with the file named rather than as one line
+// inside an aggregated probe Detail. The chaining suite is the one REQ-160's
+// compatibility guard was hand-picked from; the two EHR_STATUS suites are the
+// only templates carrying the ${ehr_id} substitution, whose regression sends
+// their rows to the exclusion list — which fails no family, since
+// EHR_STATUS/contains.csv still contributes.
+func TestProbe100CoversThePinnedSuites(t *testing.T) {
+	cases := []struct {
+		family, file, why string
+	}{
+		{
+			family: "CONTAINS_A_D", file: "from_contains_plus_contain_chaining.csv",
+			why: "it carries the containment chains REQ-160's compatibility guard was drawn from",
+		},
+		{
+			family: "EHR_STATUS", file: "from_single_ehr.csv",
+			why: "its template depends on the ${ehr_id} substitution; a regression excludes rows, failing no family",
+		},
+		{
+			family: "EHR_STATUS", file: "via_part.csv",
+			why: "its template depends on the ${ehr_id} substitution; a regression excludes rows, failing no family",
+		},
 	}
-	t.Fatalf("%s/%s is not in the corpus tally at all", family, file)
+	counts := probe100Corpus(t).FileCounts()
+	for _, tc := range cases {
+		t.Run(tc.family+"/"+tc.file, func(t *testing.T) {
+			for _, f := range counts {
+				if f.Family != tc.family || f.File != tc.file {
+					continue
+				}
+				if f.Asserted == 0 {
+					t.Fatalf("%s/%s: asserted = 0, want > 0 — %s (%d row(s) excluded)",
+						tc.family, tc.file, tc.why, f.Excluded)
+				}
+				return
+			}
+			t.Fatalf("%s/%s is not in the corpus tally at all", tc.family, tc.file)
+		})
+	}
 }
 
 // TestProbe100DetectsInadmissibleRows is the probe's able-to-fail control for
@@ -1714,6 +1751,133 @@ func TestProbe100DetectsInadmissibleRows(t *testing.T) {
 	}
 }
 
+// probe100ContainmentCodes is the REQ-162 § Contract five-code containment
+// scope PROBE-100's wire assertion is written against, spelled out here because
+// the probe's own containmentCodes() is unexported and this file is the
+// external test package. It is the set the premise guard below sweeps for an
+// Error: a code outside it — a REQ-161 portability advisory, a REQ-164
+// path-shape finding — is not what PROBE-100 asserts on either way.
+var probe100ContainmentCodes = []string{
+	"aql_impossible_containment",
+	"aql_contains_not_containable",
+	"aql_archetype_class_mismatch",
+	"aql_unknown_rm_class",
+	"aql_containment_by_reference",
+}
+
+// TestProbe100PermitsWarningSeverityContainmentCodes is the mirror image of
+// TestProbe100DetectsInadmissibleRows, and the control for the arm of the
+// PROBE-100 wire assertion that says a Warning is NOT a refusal: "Warnings are
+// permitted: aql_unknown_rm_class, aql_containment_by_reference and the
+// portability advisories are observations about a pair, never admissibility
+// refusals."
+//
+// Nothing else holds that arm. Whether any row of the shipping corpus warns at
+// all is a property of the vendored data, not of this repository, so a
+// Probe100ConformanceCorpus that regressed to failing on ANY containment code
+// regardless of severity could leave the whole corpus run green and no named
+// test would fail. Each case here appends one crafted row that provably draws
+// its named Warning and no Error-severity containment code, so the severity
+// gate has something it MUST let through.
+//
+// REQ-160 · REQ-161
+func TestProbe100PermitsWarningSeverityContainmentCodes(t *testing.T) {
+	cases := []struct {
+		name string
+		// code is the Warning the crafted row must raise — one of the two the
+		// wire assertion names by code.
+		code string
+		row  aqlprobes.ConformanceRow
+	}{
+		{
+			// A CONTAINS naming a class the pinned RM does not know. The
+			// coordinate is the line a refresh of this CSV would add the row on:
+			// its template is `SELECT t FROM COMPOSITION CONTAINS ${type} t`, so
+			// a `${type}` cell naming an unmodelled class reconstructs exactly
+			// this query. The engine answering such a row is precisely the case
+			// REQ-160 must not verdict Never on.
+			name: "unknown_rm_class",
+			code: "aql_unknown_rm_class",
+			row: aqlprobes.ConformanceRow{
+				Family: "USABLE_RM_TYPES_A_D", File: "from_item_structure_and_element_in_composition.csv", Line: 6,
+				Suite: "AQL_TESTS/FROM/USABLE_RM_TYPES_A_D/from_item_structure_and_element_in_composition.robot",
+				Query: "SELECT t FROM COMPOSITION CONTAINS FOO_BAR t",
+			},
+		},
+		{
+			// FOLDER->COMPOSITION is containment by reference, not by value: a
+			// real containment relation an engine answers, which REQ-161 grades
+			// Warning because the pair costs a dereference rather than because
+			// it is inadmissible. The chaining CSV's template is
+			// `SELECT o FROM ${from}`, so a `${from}` cell reading
+			// "FOLDER CONTAINS COMPOSITION o" reconstructs this query.
+			name: "containment_by_reference",
+			code: "aql_containment_by_reference",
+			row: aqlprobes.ConformanceRow{
+				Family: "CONTAINS_A_D", File: "from_contains_plus_contain_chaining.csv", Line: 12,
+				Suite: "AQL_TESTS/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
+				Query: "SELECT o FROM FOLDER CONTAINS COMPOSITION o",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// PREMISE, asserted on the very query the probe is handed below and
+			// through the same lint call runConformanceRow makes
+			// (lint.LintString with nil options). Without it this control is
+			// vacuous: a crafted query that quietly stopped raising anything
+			// would sail through a probe that had regressed to failing on any
+			// containment code, and the test would pass for the wrong reason.
+			// Same register as TestLintTopWithUnrepresentableCountAndEnvelopeFetch
+			// in openehr/aql/lint/lint_test.go.
+			res := lint.LintString(tc.row.Query, nil)
+			raised := make([]string, 0, len(res.Issues))
+			for _, iss := range res.Issues {
+				raised = append(raised, fmt.Sprintf("%s/%v", iss.Code, iss.Severity))
+			}
+			// The named Warning is present AT Warning severity. Its presence
+			// also proves the query parsed: lint.LintString short-circuits a
+			// parse failure to aql_syntax and runs no REQ-161 check at all.
+			found := false
+			for _, iss := range res.Issues {
+				if iss.Code != tc.code {
+					continue
+				}
+				found = true
+				if iss.Severity != lint.Warning {
+					t.Fatalf("%s severity = %v, want %v — this control needs a row the wire assertion permits, not one it refuses",
+						tc.code, iss.Severity, lint.Warning)
+				}
+			}
+			if !found {
+				t.Fatalf("lint raises %v on %q, want it to include %s at Warning severity — the premise of this control",
+					raised, tc.row.Query, tc.code)
+			}
+			// And no Error-severity containment code, which is the half of the
+			// wire assertion the probe actually refuses on.
+			for _, iss := range res.Issues {
+				if iss.Severity == lint.Error && slices.Contains(probe100ContainmentCodes, iss.Code) {
+					t.Fatalf("lint raises Error-severity containment code %s on %q (all issues: %v); "+
+						"this control needs a row the ratchet MUST admit, not one it must refuse",
+						iss.Code, tc.row.Query, raised)
+				}
+			}
+
+			corpus := probe100Corpus(t)
+			corpus.Rows = append(corpus.Rows, tc.row)
+			r, err := aqlprobes.Probe100ConformanceCorpus(corpus)
+			if err != nil {
+				t.Fatalf("Probe100: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Fatalf("status = %q (detail %q), want pass — %s is a Warning, and the wire assertion permits it: "+
+					"an observation about a pair, never an admissibility refusal",
+					r.Status, r.Detail, tc.code)
+			}
+		})
+	}
+}
+
 // TestProbe100DetectsCorpusShrinkage is the able-to-fail control for the two
 // coverage guards — the per-family empty tripwire and the named chaining suite.
 // Both go dark quietly: every surviving row still passes on its own, so only a
@@ -1736,6 +1900,22 @@ func TestProbe100DetectsCorpusShrinkage(t *testing.T) {
 				return r.File == "from_contains_plus_contain_chaining.csv"
 			},
 			want: "CONTAINS_A_D/from_contains_plus_contain_chaining.csv contributes no asserted row",
+		},
+		// The two ${ehr_id} suites: dropping either leaves the EHR_STATUS
+		// family alive through contains.csv, so only the named pin bites.
+		{
+			name: "ehr_id_suite_from_single_ehr_lost",
+			drop: func(r aqlprobes.ConformanceRow) bool {
+				return r.Family == "EHR_STATUS" && r.File == "from_single_ehr.csv"
+			},
+			want: "EHR_STATUS/from_single_ehr.csv contributes no asserted row",
+		},
+		{
+			name: "ehr_id_suite_via_part_lost",
+			drop: func(r aqlprobes.ConformanceRow) bool {
+				return r.Family == "EHR_STATUS" && r.File == "via_part.csv"
+			},
+			want: "EHR_STATUS/via_part.csv contributes no asserted row",
 		},
 	}
 	for _, tc := range cases {
