@@ -171,7 +171,7 @@ Deferred Tier-3 gaps — dedicated ITEM_TAG endpoints, `VERSIONED_*` read famili
 | Validation probes | **Landed** | `testkit/probes/validation/` | PROBE-025/026 |
 | Instance synthesis probe | **Landed** | `testkit/probes/instance/` | PROBE-027 |
 | Composition builder probe | **Landed** | `testkit/probes/composition/` | PROBE-023 — full marshal → unmarshal → re-marshal round-trip |
-| AQL probes | **Landed** | `testkit/probes/aql/` | PROBE-020 (struct vs verb byte-identical), PROBE-021, PROBE-088 |
+| AQL probes | **Landed** | `testkit/probes/aql/` | PROBE-020 (struct vs verb byte-identical), PROBE-028, PROBE-088, PROBE-097, PROBE-099, PROBE-100 |
 | Definition probes | **Landed** | `testkit/probes/definition/` | PROBE-067, PROBE-093 |
 | Discovery probes | **Landed** | `testkit/probes/discovery/` | PROBE-040/041 |
 | Transport probes | **Landed** | `testkit/probes/transport/` | PROBE-091 |
@@ -193,7 +193,7 @@ Deferred Tier-3 gaps — dedicated ITEM_TAG endpoints, `VERSIONED_*` read famili
 | Release / semver strategy | **Landed** | Tag-driven [`release.yml`](../.github/workflows/release.yml); policy in [releases.md](releases.md) |
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | Codegen and BMM-corpus diff tooling |
 | Developer onboarding | **Landed** | [quick-start.md](quick-start.md) — install, two integration paths, REST wiring |
-| Worked examples | **Landed** | [`cmd/examples/`](../cmd/examples/) — 16 runnable programs, catalogued in [examples.md](examples.md) (the single list) |
+| Worked examples | **Landed** | [`cmd/examples/`](../cmd/examples/) — 17 runnable programs, catalogued in [examples.md](examples.md) (the single list) |
 | Documentation website | **Planned** | No site generator in the tree yet; docs are read from `docs/` and on GitHub |
 
 ---
