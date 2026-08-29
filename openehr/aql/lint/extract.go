@@ -23,26 +23,20 @@
 // edges. Layer 2 stays AST-only either way: no CDR, no OPT, and no row
 // semantics.
 //
-// Layer 2 carries a third group, PATH SHAPE (REQ-164), whose five members are
-// aql_path_repeating_unpredicated — an identified path, in SELECT, WHERE or
-// ORDER BY alike, steps through a multi-valued RM attribute with no predicate
-// on that segment, leaving which occurrence is meant to the engine —
-// aql_paging_no_order_by, a row-bounded query with no ORDER BY, whose page
-// boundary is therefore engine-defined (both channels: the in-text LIMIT
-// clause and a supplied [Options.Query]'s Fetch / Offset),
-// aql_select_no_alias, a projection item carrying no AS alias, whose column
-// name is engine-defined, aql_fanout_path_grain, two PROJECTED paths on one
-// alias descending into different unpredicated repeating scopes, whose row
-// multiplicity is engine-defined (the PATH source of that; the junction source
-// is REQ-161's aql_fanout_row_grain, and the two are disjoint), and
-// aql_contains_redundant_step, an unreferenced, predicate-less, non-root,
-// non-leaf CONTAINS operand whose class every containment route between its
-// neighbours passes through, so removing the step provably changes nothing.
-// The first and the fourth read one walk of each path's segments against the
-// same pinned BMM, which stops silently wherever the pin cannot type a step
-// (see pathshape.go); the last is the group's one consumer of
-// [Options.Relation], since a route round the step is exactly what a dialect
-// overlay edge can state. The group is ungated and every code in it is Warning.
+// Layer 2 carries a third group, PATH SHAPE (REQ-164):
+// aql_path_repeating_unpredicated, aql_paging_no_order_by,
+// aql_select_no_alias, aql_fanout_path_grain and
+// aql_contains_redundant_step. Between them they flag query shapes whose
+// outcome the engine rather than the query decides — which occurrence, which
+// page boundary, which column name, how many rows — plus the one containment
+// step that provably decides nothing. What each code fires on is REQ-164
+// § Path-shape checks and stays there; pathshape.go's per-check godoc carries
+// the implementation reading of it. The group is ungated and every code in it
+// is Warning: two are fed by a single walk of each path's segments against the
+// same pinned BMM, which stops silently wherever the pin cannot type a step;
+// two consult no RM fact at all; and aql_contains_redundant_step is the
+// group's one consumer of [Options.Relation], since a route round the step is
+// exactly what a dialect overlay edge can state.
 //
 // The CDR remains the execute-time semantic authority (PROBE-021): a
 // lint-clean query MAY still be rejected on execution. The SDK grammar
