@@ -83,6 +83,9 @@ func PutStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, aql
 	if name == "" {
 		return nil, nil, fmt.Errorf("definition.PutStoredQuery: %w: empty qualified query name", transport.ErrInvalidConfig)
 	}
+	if reservedQueryName(name) {
+		return nil, nil, fmt.Errorf(`definition.PutStoredQuery: %w: the query-name part is the reserved name "aql" (case-insensitive, per the upstream Qualified_query_name contract)`, transport.ErrInvalidConfig)
+	}
 	return putStoredQuery(ctx, c,
 		"/definition/query/"+name,
 		"/definition/query/{qualified_query_name}",
@@ -101,10 +104,32 @@ func PutStoredQueryVersion(ctx context.Context, c *transport.Client, qualifiedNa
 	if name == "" || ver == "" {
 		return nil, nil, fmt.Errorf("definition.PutStoredQueryVersion: %w: name and version are required", transport.ErrInvalidConfig)
 	}
+	if reservedQueryName(name) {
+		return nil, nil, fmt.Errorf(`definition.PutStoredQueryVersion: %w: the query-name part is the reserved name "aql" (case-insensitive, per the upstream Qualified_query_name contract)`, transport.ErrInvalidConfig)
+	}
 	return putStoredQuery(ctx, c,
 		"/definition/query/"+name+"/"+ver,
 		"/definition/query/{qualified_query_name}/{version}",
 		"definition.PutStoredQueryVersion", name, ver, aqlText, opts...)
+}
+
+// reservedQueryName reports whether the query-name part of a qualified
+// name — everything after the final "::" per the upstream
+// `[{namespace}::]{query-name}` grammar — is the reserved name "aql".
+// The upstream contract reserves it case-insensitively
+// (`resources/its-rest/query-validation.openapi.yaml`, the
+// Qualified_query_name description: "The query-name value must not be
+// `aql` (case-insensitive), as that is a reserved name") because such a
+// query's execution path IS the ad-hoc route /query/aql. Only the store
+// operations enforce it; reads and deletes pass a reserved name through so
+// a deployment holding one anyway stays reachable for remediation
+// (REQ-057).
+func reservedQueryName(qualifiedName string) bool {
+	queryName := qualifiedName
+	if i := strings.LastIndex(qualifiedName, "::"); i >= 0 {
+		queryName = qualifiedName[i+2:]
+	}
+	return strings.EqualFold(queryName, "aql")
 }
 
 // putStoredQuery is the shared PUT implementation for the versioned and

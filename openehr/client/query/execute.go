@@ -80,7 +80,10 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName,
 	}
 	// REQ-057: the stored path is "/query/" + name, so the name "aql"
 	// addresses the ad-hoc route /query/aql. Byte-exact — the collision is
-	// byte-level path routing, so "AQL" is an ordinary name.
+	// byte-level path routing, so "AQL" passes through and the server
+	// rules on it. The upstream case-insensitive reserved-name rule is
+	// enforced on the store side (openehr/client/definition), where the
+	// SDK would otherwise help create the forbidden artifact.
 	if name == "aql" {
 		return nil, nil, fmt.Errorf(`query.RunStored: %w: "aql" is the ad-hoc route /query/aql, not a stored-query name`, ErrInvalidConfig)
 	}
