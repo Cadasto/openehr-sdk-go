@@ -275,11 +275,20 @@ headers — `ETag`, `Location` and the rest remain available beside the error.
 the SDK **MUST NOT** return a `*transport.DecodeError` for a non-2xx response. The two
 classifications are disjoint: recovering one **MUST NOT** recover the other.
 
-**An empty 2xx body keeps its existing contract.** A read that expected a representation and
-received an empty 2xx body **MUST** keep today's `transport.ErrInvalidShape` behaviour. This arm
-is deliberately **not** unified under `*transport.DecodeError`: there is no representation to
-decode and no bytes to hand back, so the failure is an absent body rather than an unusable one,
-and callers already keying on `errors.Is(err, transport.ErrInvalidShape)` keep working unchanged.
+**An empty 2xx body keeps its existing per-surface contract.** This requirement re-types no
+empty-body arm. Each arm **MUST** keep the contract its own surface already had, and no arm is
+unified under `*transport.DecodeError`: an empty body has no representation to decode and no
+bytes to hand back, so where it is a failure at all it is an *absent* body rather than an unusable
+one. The arms take three shapes, named below.
+
+**The refusal arms.** A read that expected a representation and received an empty 2xx body
+**MUST** keep today's `transport.ErrInvalidShape` behaviour, so callers already keying on
+`errors.Is(err, transport.ErrInvalidShape)` keep working unchanged. This is the shared
+`transport.Decode` arm and the hand-rolled reads that mirror it — `system.Capabilities`,
+`composition.Get`, and the Demographic party and version reads. Where such a leaf carves out
+`204 No Content` as a typed success ahead of the refusal — `composition.ErrDeletedAtTime`, the
+Demographic reads' nil-for-no-matching-version — that carve-out is the leaf's own contract and
+stands unchanged; the refusal covers every remaining empty-body 2xx.
 
 **Keyed exclusion — the Definition list leaves.** For the Definition **list** operations, an empty
 2xx body is a *successful empty catalog*, not a failed representation decode. It **MUST NOT**
@@ -287,6 +296,16 @@ produce `transport.ErrInvalidShape` and **MUST NOT** produce a `*transport.Decod
 slice value that success returns is the Definition list contract's business, not this
 requirement's; this § only points there and holds either way. Only a **non-empty** list body that
 fails to decode — for example a JSON object where an array is expected — is REQ-151's.
+
+**Keyed exclusion — the synthesized-metadata arms.** Four Definition leaves answer an empty 2xx
+body with a metadata value they synthesize themselves and a nil error: `GetStoredQuery` (the
+requested name and version), the two stored-query PUT leaves `PutStoredQuery` and
+`PutStoredQueryVersion` (name, version and the submitted AQL text), and `UploadTemplate` (the
+template id recovered from the `Location` header). Each is deliberate deployment tolerance that
+predates this requirement — a deployment may legally answer these calls `200` or `204` with no
+body — and each **MUST NOT** be re-typed by it: no `transport.ErrInvalidShape`, and no
+`*transport.DecodeError`. As with the list leaves, only a **non-empty** body that fails to decode
+is REQ-151's on those routes.
 
 **Scope.** This requirement binds every 2xx **response-body decode** performed on the
 `transport.Client` stack that is not owned by the REQ-094 write-result contract. Scope follows

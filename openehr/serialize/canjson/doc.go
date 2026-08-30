@@ -37,8 +37,9 @@
 //   - ISO 8601 dates/times/durations are passed through as JSON
 //     strings; the codec does not parse them to time.Time (REQ-046).
 //   - Numeric magnitudes use IEEE 754 double-precision JSON numbers
-//     (no silent float32 coercion). Overflow on decode is reported as
-//     [ErrInvalidShape] rather than silently rounded.
+//     (no silent float32 coercion). Overflow on decode surfaces as the
+//     underlying codec's own error rather than being silently rounded;
+//     no canjson sentinel wraps it (see Error classification below).
 //
 // # Error classification
 //

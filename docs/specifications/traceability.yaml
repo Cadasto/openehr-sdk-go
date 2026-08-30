@@ -145,8 +145,9 @@ requirements:
       directions; that is observed as out of scope, not aligned. Open gap:
       canjson.ErrInvalidShape has no decode-side producer (Unmarshal and
       Decoder.Decode pass the codec's error through unchanged), so when a
-      producer lands, sweep the four sites that promise it — decode.go:11-17,
-      decode.go:63, doc.go:41 and doc.go:51.
+      producer lands, sweep the four sites that now document its absence — the
+      ErrInvalidShape var comment and the Unmarshal godoc in decode.go, and the
+      wire-profile and error-classification bullets in doc.go.
 
   - id: REQ-056
     title: Canonical XML

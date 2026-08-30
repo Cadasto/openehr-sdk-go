@@ -143,14 +143,22 @@ type DecodeError struct {
 	// Route is the route template (e.g. "/ehr/{ehr_id}"), not the
 	// expanded URL.
 	Route string
-	// Body is the raw response body, exactly as the server sent it,
-	// populated unconditionally — no option gates it, and
-	// WithRawErrorBodies (which governs non-2xx bodies) does not apply
-	// (ADR 0018). Body inherits whatever ceiling the caller's
-	// [WithMaxResponseBody] configuration imposes on this client — the
-	// 64 MiB default, an explicit positive limit, or no ceiling at all
-	// where the caller disabled the cap with a negative value; it adds
-	// no ceiling of its own.
+	// Body is the raw response body as delivered by the injected
+	// [http.Client] — after any transparent content decoding that client
+	// performs, so a gzipped response yields the decompressed bytes
+	// rather than the wire form. It is populated unconditionally: no
+	// option gates it, and WithRawErrorBodies (which governs non-2xx
+	// bodies) does not apply (ADR 0018). Body inherits whatever ceiling
+	// the caller's [WithMaxResponseBody] configuration imposes on this
+	// client — the 64 MiB default, an explicit positive limit, or no
+	// ceiling at all where the caller disabled the cap with a negative
+	// value; it adds no ceiling of its own.
+	//
+	// The slice is the response buffer itself, not a copy. A custom
+	// UnmarshalJSON that mutates the bytes handed to it violates the
+	// encoding/json unmarshaler contract, and corrupts these diagnostics
+	// as a consequence; the SDK does not defensively copy to insure
+	// against that.
 	//
 	// May contain PHI: it is the caller's own requested representation,
 	// so for a clinical resource it is patient data. Error never

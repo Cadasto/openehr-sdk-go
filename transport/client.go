@@ -573,6 +573,10 @@ func sanitisedURL(u *url.URL) string {
 // targeting Prefer=minimal endpoints typically use Do directly so the
 // empty-body shape does not trip the decoder.
 //
+// The two 2xx failures are distinct (REQ-151): an empty body fails with
+// [ErrInvalidShape], while a non-empty body that does not decode returns
+// a [DecodeError] carrying the raw bytes the server delivered.
+//
 // Generic over T per REQ-024.
 func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata, error) {
 	resp, err := c.Do(ctx, req)

@@ -175,7 +175,7 @@ Deferred Tier-3 gaps — dedicated ITEM_TAG endpoints, `VERSIONED_*` read famili
 | AQL probes | **Landed** | `testkit/probes/aql/` | PROBE-020 (struct vs verb byte-identical), PROBE-028, PROBE-088, PROBE-097, PROBE-099, PROBE-100 |
 | Definition probes | **Landed** | `testkit/probes/definition/` | PROBE-067, PROBE-093 |
 | Discovery probes | **Landed** | `testkit/probes/discovery/` | PROBE-040/041 |
-| Transport probes | **Landed** | `testkit/probes/transport/` | PROBE-091 |
+| Transport probes | **Landed** | `testkit/probes/transport/` | PROBE-091, PROBE-101 |
 | Auth / REST probes | **Partial** | `testkit/probes/auth/` | PROBE-001…009 all implemented (Sandbox) plus launch-mode coverage; the PROBE-060+ REST-binding probes are mostly Draft |
 | Sandbox transport | **Planned** | `sandbox/` | Reserved name, `doc.go` only — the suite hand-writes an `httptest` server per test. Phase 2 of the [runnability plan](plans/2026-08-18-probe-runnability.md) |
 | Testkit helpers + probe runner | **Partial** | `testkit/` | Probe packages landed but there is **no runner**: the `Result` type is duplicated across 12 packages and each probe is reached only from its own bespoke test. REQ-082 specified the modes, result contract, and per-mode rules; phases 1–2 of the [runnability plan](plans/2026-08-18-probe-runnability.md) build them. Recording format open ([STRAND-11](specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml)) |

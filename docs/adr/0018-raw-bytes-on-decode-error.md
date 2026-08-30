@@ -4,9 +4,9 @@
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** none — direct decision (this plan's Phase 0); no prior open research strand.
-- **Introduces:** [REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) (the typed 2xx decode failure and its `Body` field). **Amends:** [REQ-052](../specifications/wire.md#req-052) (the canonical-JSON encoder gains an encode-only refusal sentinel, so an encode refusal and a decode refusal stop sharing one value); [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (cross-reference only — the write-result contract keeps every arm it owns, including the `ehr.Create` empty-body keyed exception).
+- **Introduces:** [REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) (the typed 2xx decode failure and its `Body` field). **Amends:** —
 - **Plan:** [2026-08-30-read-path-decode-taxonomy.md](../plans/archive/2026-08-30-read-path-decode-taxonomy.md).
-- **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (the "no strict-mode knob in v1" posture this decision follows); [REQ-093](../specifications/transport.md#req-093--openehr-error-envelope-mapping) (the PHI-safe error-surface discipline, the `WithRawErrorBodies` opt-in this decision deliberately does *not* extend, and the `WithMaxResponseBody` cap it relies on).
+- **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (the "no strict-mode knob in v1" posture this decision follows); [REQ-093](../specifications/transport.md#req-093--openehr-error-envelope-mapping) (the PHI-safe error-surface discipline, the `WithRawErrorBodies` opt-in this decision deliberately does *not* extend, and the `WithMaxResponseBody` cap it relies on); [REQ-052](../specifications/wire.md#req-052) (the encode-only refusal sentinel — a rider delivered by the same plan, whose decision of record is the plan and § REQ-052 itself, not this ADR); [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (cross-reference only — the write-result contract keeps every arm it owns, including the `ehr.Create` empty-body keyed exception).
 
 ## Context
 
@@ -47,14 +47,11 @@ is no opt-in knob, and `WithRawErrorBodies` does not gate it.**
   error can rely on the bytes being there without inspecting client configuration.
 - **The 2xx body is the caller's own requested representation.** This is the whole reason the
   case differs from REQ-093's, and it is stated in Consequences below rather than restated here.
-- **The surface stays value-free.** `DecodeError.Error()` carries the HTTP method, the route
-  template and the classification only — never the body, never the wrapped decoder's text
-  (codec errors embed offending values in `parse %q`-style messages). Log lines, REQ-098
-  observations and REQ-090 span statuses are therefore unchanged by this decision; the bytes are
-  reachable only by a caller who deliberately reads the field or unwraps.
-- **The field, not the string, carries the PHI warning.** `Body` is documented as PHI-bearing by
-  design — exactly the treatment `ehr.NoRepresentationError.Cause` already receives, where the
-  cause may carry payload-derived text and `Error()` never interpolates it.
+- **Always-on is affordable because the string surface is not.** The error-string discipline —
+  a value-free `Error()`, the PHI warning carried by the field rather than the message — is
+  REQ-151's, stated there and not decided here. This decision relies on it: because nothing the
+  SDK emits by default (log lines, REQ-098 observations, REQ-090 span statuses) interpolates the
+  bytes, attaching them unconditionally costs no exposure a caller did not choose.
 - **Bounded by an existing control, to the extent the caller left it in place.**
   `transport.WithMaxResponseBody` (default `DefaultMaxResponseBody`, 64 MiB — REQ-093) caps how
   many bytes `Client.Do` reads, and the error can never carry more than the transport was already
