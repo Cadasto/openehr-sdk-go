@@ -194,6 +194,23 @@ var (
 
 Consumers detect classes with `errors.Is(err, transport.ErrPreconditionFailed)`. Discovery, parse, and auth errors **MUST** have their own sentinel or typed error so they are distinguishable from wire errors.
 
+To extract a typed error's fields — not just match a sentinel — prefer the Go 1.26 `errors.AsType[E]` form over the older `errors.As(err, &target)` out-parameter. The module floor is `1.26.0` (REQ-002), so it is always available:
+
+```go
+// SHOULD — Go 1.26 generic extraction
+if we, ok := errors.AsType[*transport.WireError](err); ok {
+    use(we.StatusCode, we.OpenEHR)
+}
+
+// Still valid, but the pre-1.26 shape
+var we *transport.WireError
+if errors.As(err, &we) {
+    use(we.StatusCode, we.OpenEHR)
+}
+```
+
+Sentinel matching with `errors.Is` is unchanged. The `modernize` suite's `errorsastype` fixer performs this rewrite.
+
 ### No panics
 
 Library code **MUST NOT** panic on:

@@ -335,8 +335,8 @@ func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
 		t.Context(), newClient(t, srv), ehrIDFixture, readComposition(t),
 		composition.WithPrefer(transport.PreferRepresentation),
 	)
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -367,8 +367,8 @@ func TestUpdateRepresentationEmptyBodyErrors(t *testing.T) {
 		t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), readComposition(t),
 		composition.WithPrefer(transport.PreferRepresentation),
 	)
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, transport.ErrInvalidShape) {

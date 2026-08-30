@@ -34,8 +34,8 @@ func TestWriteResultRepresentationEmptyBody(t *testing.T) {
 
 	out, meta, err := openehrclient.WriteResult(t.Context(), newClient(t, srv), writeReq(transport.PreferRepresentation), "composition", okComposition)
 
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -66,8 +66,8 @@ func TestWriteResultRepresentationNullBody(t *testing.T) {
 
 	out, meta, err := openehrclient.WriteResult(t.Context(), newClient(t, srv), writeReq(transport.PreferRepresentation), "composition", okComposition)
 
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("null body: err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -94,8 +94,8 @@ func TestWriteResultRepresentationWhitespaceBody(t *testing.T) {
 
 	out, meta, err := openehrclient.WriteResult(t.Context(), newClient(t, srv), writeReq(transport.PreferRepresentation), "composition", okComposition)
 
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("whitespace body: err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -123,8 +123,8 @@ func TestWriteResultRepresentationDecodeFailure(t *testing.T) {
 	_, meta, err := openehrclient.WriteResult(t.Context(), newClient(t, srv), writeReq(transport.PreferRepresentation), "composition",
 		func([]byte) (*rm.Composition, error) { return nil, decodeErr })
 
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, decodeErr) {

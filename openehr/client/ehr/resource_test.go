@@ -94,9 +94,9 @@ func TestNoRepresentationErrorStrings(t *testing.T) {
 func TestNoRepresentationErrorAs(t *testing.T) {
 	meta := &openehrclient.VersionMetadata{VersionUID: "uid::system::1"}
 	err := &openehrclient.NoRepresentationError{Meta: meta, Cause: transport.ErrInvalidShape}
-	var got *openehrclient.NoRepresentationError
-	if !errors.As(err, &got) {
-		t.Fatal("errors.As")
+	got, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
+		t.Fatal("errors.AsType")
 	}
 	if got.Meta.VersionUID != meta.VersionUID {
 		t.Fatalf("uid = %q", got.Meta.VersionUID)

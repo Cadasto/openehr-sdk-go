@@ -12,12 +12,14 @@ import (
 var ErrInvalidConfig = errors.New("query: invalid configuration")
 
 // AQLError is an AQL-level failure distinct from generic transport
-// errors (parse error, timeout). Detect with errors.As. When the failure is a
-// path-resolution error it also satisfies errors.Is(err, [aql.ErrPathResolution]);
+// errors (parse error, timeout). Detect with errors.AsType. When the failure is
+// a path-resolution error it also satisfies errors.Is(err, [aql.ErrPathResolution]);
 // when it is a capability gap, errors.Is(err, [aql.ErrEngineCapability]).
 //
+//	if e, ok := errors.AsType[*query.AQLError](err); ok { … }
+//
 // A nil *AQLError answers as the zero AQLError on every exported method rather
-// than panicking (REQ-025 § No panics). The documented detection pattern
+// than panicking (REQ-025 § No panics). The older errors.As out-parameter form
 //
 //	var e *query.AQLError
 //	if errors.As(err, &e) { … }
