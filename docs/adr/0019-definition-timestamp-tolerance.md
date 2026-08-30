@@ -67,6 +67,11 @@ The accepted set, in the order a decoder tries it:
 | `2006-01-02T15:04` | zone-less, minute precision, ISO 8601 extended | The same, from a server that records catalog metadata to the minute. |
 | `2006-01-02 15:04:05` | zone-less, **space** separator | **Deployment interop.** Not ISO 8601 extended (no `T`), not REST-legal, and not a form the pin exemplifies. It is in the set for one reason: deployments emit it and it broke a real catalog read (`609a104`). |
 
+Four shapes, five entries in the implementation's layout list: it names both
+`time.RFC3339` and `time.RFC3339Nano` because the table above does, though the latter's
+optional fractional field already subsumes the former, so the `RFC3339` entry is never
+reached. The counts below are of shapes.
+
 The set is **closed** — a non-empty value matching no member is an error, not a
 best-effort guess — and it is a **one-way door**: removing a layout later breaks every
 consumer whose server emits it, so each entry is an addition made deliberately and kept.
@@ -84,8 +89,11 @@ is a property of the standard library the set is built on, not a rule the SDK in
 `saved` is pinned `required` with `format: date-time`, and REQ-095 says the OpenAPI wins
 when it and in-repo prose disagree. Accepting a zone-less or space-separated `saved` is
 therefore not a reading of the pin; it is a departure from it, and it is granted here as a
-**named compatibility exception** on deployment evidence — the same bar ADR 0004 set: a
-real observed failure, not pre-emption. The exception is written into
+**named compatibility exception**. The evidence bar is ADR 0004's — a real observed
+failure, not pre-emption — but the observation is `created_timestamp`'s (`609a104`);
+`saved` was never seen failing on its own and is carried into the exception by the shared
+decode path both descriptors use, for the reason the last alternative below records. The
+exception is written into
 [§ REQ-095](../specifications/wire.md#req-095) itself, so the authoritative-source rule
 carries its own single exception and no ADR overrides a requirement from outside it. For
 `created_timestamp` no exception is needed: the pin declares an unformatted string, so
@@ -128,8 +136,9 @@ stated rather than hidden.
   — one space-separated `created_timestamp` costing the consumer the entire template list —
   is closed for every layout in the set.
 - **The layout set is load-bearing and one-way.** Every accepted layout lives in one place
-  with the reason it is there, so adding a fifth is a reviewed edit rather than a scattered
-  fallback chain, and removing any of the four is a breaking change to be treated as one.
+  with the reason it is there, so adding a fifth shape is a reviewed edit rather than a
+  scattered fallback chain, and removing any of the four is a breaking change to be treated
+  as one.
 - **Zone-less values re-marshal with a `Z` the wire never carried.** Decoding
   `2019-04-01 10:12:33` yields a UTC time, and encoding that time emits
   `2019-04-01T10:12:33Z`. Round-tripping a descriptor therefore does not reproduce the bytes
@@ -161,7 +170,7 @@ stated rather than hidden.
 - **A general-purpose permissive time parser (try many layouts, or a date-guessing library).**
   Rejected: an open set has no reviewable boundary, invites ambiguity between day-first and
   month-first spellings, and would silently absorb the next malformed input instead of
-  reporting it. A closed set of four is auditable.
+  reporting it. A closed set of four shapes is auditable.
 - **Decode zone-less values in the client host's local zone (`time.Local`).** Rejected: it
   reads the overview's "local timezone" as the *client's*, which it is not, and makes the
   same response decode to different instants on a developer laptop and a UTC container.

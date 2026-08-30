@@ -290,9 +290,11 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 // ListStoredQueries lists stored queries matching qualifiedName as a
 // prefix pattern. An empty pattern lists all queries on the deployment.
 //
-// An empty catalog comes back as a non-nil zero-length slice with a nil
-// error, never a nil slice, so re-serialising the result yields [] rather
-// than JSON null (REQ-144).
+// An empty 2xx response body comes back as a non-nil zero-length slice with
+// a nil error, so re-serialising the result yields [] rather than JSON null;
+// a JSON [] body decodes non-nil through encoding/json by construction. A
+// 2xx body that is literally JSON null still decodes to a nil slice and is
+// returned unchanged — § REQ-144 binds the empty-body arm only.
 //
 // Wire: GET /definition/query/{qualified_query_name}.
 func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern string) ([]StoredQueryMetadata, *transport.Metadata, error) {
