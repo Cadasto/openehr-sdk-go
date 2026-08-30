@@ -1,12 +1,14 @@
 package definition_test
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -370,4 +372,251 @@ func TestPutStoredQueryReservedNameScope(t *testing.T) {
 			t.Errorf("path = %q, want %q", gotPath, want)
 		}
 	})
+}
+
+// TestListStoredQueries pins the happy path: the documented descriptor
+// fields decode, and `saved` in the pin's own example shape — zoned,
+// fractional-second RFC 3339 — lands on the exact instant it names
+// (REQ-144).
+func TestListStoredQueries(t *testing.T) {
+	c := jsonServerClient(t, `[{
+		"name":"org.openehr::vitals",
+		"type":"AQL",
+		"version":"1.0.0",
+		"saved":"2017-07-16T19:20:30.450+01:00",
+		"q":"SELECT c FROM EHR e CONTAINS COMPOSITION c"
+	}]`)
+
+	list, _, err := definition.ListStoredQueries(t.Context(), c, "")
+	if err != nil {
+		t.Fatalf("ListStoredQueries = %v, want nil error", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("len(list) = %d, want 1", len(list))
+	}
+	got := list[0]
+	if got.Name != "org.openehr::vitals" {
+		t.Errorf("Name = %q, want org.openehr::vitals", got.Name)
+	}
+	if got.Type != "AQL" {
+		t.Errorf("Type = %q, want AQL", got.Type)
+	}
+	if got.Version != "1.0.0" {
+		t.Errorf("Version = %q, want 1.0.0", got.Version)
+	}
+	if got.Q != "SELECT c FROM EHR e CONTAINS COMPOSITION c" {
+		t.Errorf("Q = %q, want the stored AQL text", got.Q)
+	}
+	want := time.Date(2017, 7, 16, 19, 20, 30, 450_000_000, time.FixedZone("+01:00", 60*60))
+	if !got.Saved.Equal(want) {
+		t.Errorf("Saved = %s, want %s", got.Saved.Format(time.RFC3339Nano), want.Format(time.RFC3339Nano))
+	}
+	if _, leaked := got.Extras["saved"]; leaked {
+		t.Error("saved leaked into Extras instead of Saved")
+	}
+}
+
+// TestListStoredQueriesEmpty is the stored-query twin of
+// TestListTemplatesEmpty: an empty 2xx body yields a non-nil zero-length
+// slice and a nil error, so a caller who re-serialises the result publishes
+// an empty JSON array rather than null. Restoring the bare `return nil`
+// fails this test.
+func TestListStoredQueriesEmpty(t *testing.T) {
+	// REQ-144
+	for _, status := range []int{http.StatusOK, http.StatusNoContent} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(status)
+			}))
+			defer srv.Close()
+			list, _, err := definition.ListStoredQueries(t.Context(), newClient(t, srv), "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if list == nil {
+				t.Errorf("list = nil on %d, want a non-nil empty slice (a nil slice marshals as JSON null)", status)
+			}
+			if len(list) != 0 {
+				t.Errorf("expected empty list on %d, got %d items", status, len(list))
+			}
+		})
+	}
+}
+
+// TestListStoredQueriesEmptyJSONArray is the stored-query twin of
+// TestListTemplatesEmptyJSONArray: a JSON `[]` body decodes non-nil through
+// encoding/json by construction, without reaching the empty-body guard
+// (REQ-144).
+func TestListStoredQueriesEmptyJSONArray(t *testing.T) {
+	// REQ-144
+	c := jsonServerClient(t, `[]`)
+
+	list, _, err := definition.ListStoredQueries(t.Context(), c, "")
+	if err != nil {
+		t.Fatalf("ListStoredQueries = %v, want nil error", err)
+	}
+	if list == nil {
+		t.Error("list = nil on a JSON [] body, want a non-nil empty slice (a nil slice marshals as JSON null)")
+	}
+	if len(list) != 0 {
+		t.Errorf("len(list) = %d, want 0", len(list))
+	}
+}
+
+// TestListStoredQueriesZoneLessSaved pins the `saved` arm of the tolerance
+// — the keyed REQ-095 exception, since `saved` is pinned `format:
+// date-time`: a zone-less value decodes as UTC rather than failing the
+// whole list (REQ-144).
+func TestListStoredQueriesZoneLessSaved(t *testing.T) {
+	c := jsonServerClient(t, `[{"name":"org.openehr::vitals","saved":"2022-03-30T07:18:13.591"}]`)
+
+	list, _, err := definition.ListStoredQueries(t.Context(), c, "")
+	if err != nil {
+		t.Fatalf("ListStoredQueries = %v, want nil error", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("len(list) = %d, want 1", len(list))
+	}
+	want := time.Date(2022, 3, 30, 7, 18, 13, 591_000_000, time.UTC)
+	if !list[0].Saved.Equal(want) {
+		t.Errorf("Saved = %s, want %s", list[0].Saved.Format(time.RFC3339Nano), want.Format(time.RFC3339Nano))
+	}
+	// Equal compares instants, so on a UTC host it cannot tell a UTC decode
+	// from a time.Local one. The location check is what actually pins the
+	// "never the client host's zone" rule (REQ-144).
+	if loc := list[0].Saved.Location(); loc != time.UTC {
+		t.Errorf("Saved.Location() = %v, want UTC (a time.Local decode would read one response as different instants on different machines)", loc)
+	}
+}
+
+// TestListStoredQueriesSavedLayouts gives `saved` its own layout-set pin,
+// rather than inheriting the template side's: the two descriptors share a
+// decode path today, and this is the test that would notice if they stopped
+// doing so. Each case names its exact instant (REQ-144).
+func TestListStoredQueriesSavedLayouts(t *testing.T) {
+	cases := []struct {
+		name string
+		wire string
+		want time.Time
+	}{
+		{"minute precision", "2026-06-22T14:50", time.Date(2026, 6, 22, 14, 50, 0, 0, time.UTC)},
+		{"space separated", "2019-04-01 10:12:33", time.Date(2019, 4, 1, 10, 12, 33, 0, time.UTC)},
+		{"comma fraction", "2022-03-30T07:18:13,591", time.Date(2022, 3, 30, 7, 18, 13, 591_000_000, time.UTC)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := jsonServerClient(t, `[{"name":"org.openehr::vitals","saved":"`+tc.wire+`"}]`)
+
+			list, _, err := definition.ListStoredQueries(t.Context(), c, "")
+			if err != nil {
+				t.Fatalf("ListStoredQueries(%q) = %v, want nil error", tc.wire, err)
+			}
+			if len(list) != 1 {
+				t.Fatalf("len(list) = %d, want 1", len(list))
+			}
+			if !list[0].Saved.Equal(tc.want) {
+				t.Errorf("Saved = %s, want %s", list[0].Saved.Format(time.RFC3339Nano), tc.want.Format(time.RFC3339Nano))
+			}
+		})
+	}
+}
+
+// TestStoredQuerySavedAbsentNullEmpty is the twin of
+// TestTemplateTimestampAbsentNullEmpty: an absent key, a JSON null, and an
+// empty string each yield the zero time.Time with no error, and none of the
+// three leaks the key into Extras (REQ-144).
+//
+// The empty-string case is the load-bearing one of the three: it is the
+// only arm here that the stdlib would refuse if the json.RawMessage shadow
+// over `saved` were removed. encoding/json's own time.Time decoder returns
+// a parse error on "", while it accepts an absent key and a JSON null as
+// no-ops — so this case is the shadow's guard, and the other two would pass
+// without it.
+func TestStoredQuerySavedAbsentNullEmpty(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"key absent", `{"name":"org.openehr::vitals"}`},
+		{"json null", `{"name":"org.openehr::vitals","saved":null}`},
+		{"empty string", `{"name":"org.openehr::vitals","saved":""}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var meta definition.StoredQueryMetadata
+			if err := json.Unmarshal([]byte(tc.body), &meta); err != nil {
+				t.Fatalf("Unmarshal(%s) = %v, want nil error", tc.body, err)
+			}
+			if !meta.Saved.IsZero() {
+				t.Errorf("Saved = %s, want the zero time", meta.Saved.Format(time.RFC3339Nano))
+			}
+			if meta.Name != "org.openehr::vitals" {
+				t.Errorf("Name = %q, want org.openehr::vitals (the rest of the item still decodes)", meta.Name)
+			}
+			if _, leaked := meta.Extras["saved"]; leaked {
+				t.Error("saved leaked into Extras")
+			}
+		})
+	}
+}
+
+// TestZoneLessSavedRemarshalsAsUTC is the `saved` twin of
+// TestZoneLessTimestampRemarshalsAsUTC: encode stays single-valued RFC
+// 3339, so a zone-less wire value re-marshals with a `Z` the wire never
+// carried (REQ-144).
+func TestZoneLessSavedRemarshalsAsUTC(t *testing.T) {
+	var meta definition.StoredQueryMetadata
+	if err := json.Unmarshal([]byte(`{"name":"org.openehr::vitals","saved":"2019-04-01 10:12:33"}`), &meta); err != nil {
+		t.Fatalf("Unmarshal = %v, want nil error", err)
+	}
+	out, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatalf("Marshal = %v, want nil error", err)
+	}
+	const want = `"saved":"2019-04-01T10:12:33Z"`
+	if !strings.Contains(string(out), want) {
+		t.Errorf("re-marshalled to %s, want it to carry %s", out, want)
+	}
+}
+
+// TestListStoredQueriesUnparseableSavedFails gives the `saved` arm its own
+// refusal pin: a non-empty value matching no accepted layout fails the
+// list call, never a silent zero. The failure is the typed
+// *transport.DecodeError (REQ-151) whose top-level string stays
+// value-free; the field is named by the wrapped cause. Removing the
+// failure guard fails this test (REQ-144).
+//
+// The near misses are the load-bearing cases, as on the template side: they
+// pin that the set is closed rather than merely that nonsense is rejected.
+// A space separator at minute precision matches nothing (the space layout
+// carries seconds), and a date with no time at all matches nothing.
+func TestListStoredQueriesUnparseableSavedFails(t *testing.T) {
+	cases := []struct {
+		name string
+		wire string
+	}{
+		{"obvious garbage", "not-a-time"},
+		{"space separator at minute precision", "2026-06-22 14:50"},
+		{"date only", "2026-06-22"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := jsonServerClient(t, `[{"name":"org.openehr::vitals","saved":"`+tc.wire+`"}]`)
+
+			list, _, err := definition.ListStoredQueries(t.Context(), c, "")
+			if err == nil {
+				t.Fatalf("ListStoredQueries(%q) = nil error with list %+v, want a decode failure", tc.wire, list)
+			}
+			de, ok := errors.AsType[*transport.DecodeError](err)
+			if !ok {
+				t.Fatalf("err = %v, want a *transport.DecodeError in the chain (REQ-151)", err)
+			}
+			if de.Inner == nil || !strings.Contains(de.Inner.Error(), "saved") {
+				t.Errorf("wrapped cause = %v, want it to name saved", de.Inner)
+			}
+			if list != nil {
+				t.Errorf("list = %+v, want nil on decode failure", list)
+			}
+		})
+	}
 }

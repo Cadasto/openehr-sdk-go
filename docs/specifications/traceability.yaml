@@ -450,10 +450,18 @@ requirements:
     implementation: partial
     packages: [testkit/cassettes/its_rest, transport, openehr/client, openehr/client/definition, openehr/client/query, openehr/client/admin, openehr/client/demographic, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus]
     probes: [PROBE-072]
+    adrs: [docs/adr/0019-definition-timestamp-tolerance.md]
     plans:
       - docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
+      - docs/plans/archive/2026-08-30-definition-metadata-decoding.md
     notes: >
+      Amended 2026-08-30 (ADR 0019): the section now carries one KEYED exception
+      to the OpenAPI-authoritative rule -- the REQ-144 Definition metadata
+      timestamp decode tolerance, which accepts StoredQueryMetadata.saved values
+      the pin's `format: date-time` excludes; further exceptions must be named
+      in the section, so no ADR overrides REQ-095 from outside.
+
       Path-parameter encoding: the transport is the single canonical path
       encoder (Request.Path is a decoded url.URL.Path); leaf clients interpolate
       the raw id and MUST NOT pre-escape with url.PathEscape (which double-encodes
@@ -2152,6 +2160,46 @@ requirements:
       an SDK floor, the pin declares no minimum. Repository.ListTemplates grew
       the same variadic signature. ADL 2 deferred: FormatADL14 is the only
       registered TemplateFormat.
+
+  - id: REQ-144
+    title: Definition metadata decoding
+    canonical: docs/specifications/wire.md#req-144--definition-metadata-decoding
+    status: draft
+    implementation: landed
+    packages: [openehr/client/definition]
+    adrs: [docs/adr/0019-definition-timestamp-tolerance.md]
+    plans: [docs/plans/archive/2026-08-30-definition-metadata-decoding.md]
+    tests:
+      - openehr/client/definition/template_test.go
+      - openehr/client/definition/stored_query_test.go
+    notes: >-
+      Decode of the two Definition catalog timestamps
+      (TemplateMetadata.created_timestamp, StoredQueryMetadata.saved) accepts a
+      CLOSED layout set: RFC3339/RFC3339Nano, 2006-01-02T15:04:05,
+      2006-01-02T15:04, and the space-separated 2006-01-02 15:04:05 (deployment
+      interop -- not ISO 8601 extended, not REST-legal, accepted because
+      deployments emit it). Fractional seconds ride the seconds-bearing
+      layouts via stdlib time.Parse absorption; the minute-precision layout
+      takes neither. The pin is ASYMMETRIC about the two fields, which is why
+      the leniency is a departure for one and a correction for the other:
+      created_timestamp is required but a bare `type: string` with no format
+      (resources/its-rest/definition-validation.openapi.yaml:509, :521-522), so
+      RFC3339-only decode over-constrained a field the pin never constrained;
+      saved is required with `format: date-time` (:3872, :3882-3884), so its
+      tolerance genuinely exceeds the pin and is the keyed REQ-095 exception
+      ADR 0019 grants on deployment evidence (609a104, a space-separated
+      created_timestamp aborting a whole ListTemplates decode). Zone-less values
+      decode as UTC and therefore re-marshal with a Z the wire never carried;
+      the pinned REST overview assumes the deployment's LOCAL zone
+      (overview-validation.openapi.yaml:675), which an SDK cannot know for a
+      remote server -- recorded as ADR 0019 departure (c), not a time.Parse side
+      effect. Absent/null/empty yields the zero time with no error (departure
+      (b)); a non-empty unparseable value fails the containing item and the list
+      call naming the field, never a silent zero. Encode is unchanged (RFC 3339)
+      -- asymmetric tolerance, ADR 0004's precedent. Also fixes the empty-BODY
+      arm: ListTemplates/ListStoredQueries return a non-nil zero-length slice
+      (a nil slice boxed in a non-nil interface marshals as JSON null -- the
+      read-side twin of the REQ-094 typed-nil trap).
 
   - id: REQ-150
     title: Path-parameter segment validation
