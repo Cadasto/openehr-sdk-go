@@ -73,7 +73,7 @@ consumer whose server emits it, so each entry is an addition made deliberately a
 
 Fractional seconds ride the set rather than doubling it. Go's `time.Parse` absorbs a
 fractional-second field immediately following a seconds element even when the layout omits
-it, so the three seconds-bearing layouts accept fractions without separate entries. The
+it, so the seconds-bearing layouts accept fractions without separate entries. The
 minute-precision layout carries no seconds element and so accepts neither seconds nor
 fractions — an input carrying them simply matches a seconds-bearing layout instead. This
 is a property of the standard library the set is built on, not a rule the SDK invents.

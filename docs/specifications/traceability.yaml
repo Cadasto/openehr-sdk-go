@@ -2159,7 +2159,7 @@ requirements:
       CLOSED layout set: RFC3339/RFC3339Nano, 2006-01-02T15:04:05,
       2006-01-02T15:04, and the space-separated 2006-01-02 15:04:05 (deployment
       interop -- not ISO 8601 extended, not REST-legal, accepted because
-      deployments emit it). Fractional seconds ride the three seconds-bearing
+      deployments emit it). Fractional seconds ride the seconds-bearing
       layouts via stdlib time.Parse absorption; the minute-precision layout
       takes neither. The pin is ASYMMETRIC about the two fields, which is why
       the leniency is a departure for one and a correction for the other:
