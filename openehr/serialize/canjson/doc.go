@@ -58,8 +58,9 @@
 //     reachable through unwrapping.
 //   - [ErrInvalidShape] — decode only. Never appears on an encode
 //     path. It is reserved for decode-side shape errors: today no
-//     decode path produces it, because [Unmarshal] and [Decoder.Decode]
-//     pass the underlying codec's error through unchanged.
+//     decode path produces it — a decode failure surfaces in one of
+//     the three shapes described below instead, none of which wraps
+//     this sentinel.
 //
 // Both are distinct from the transport-level transport.ErrInvalidShape,
 // which classifies a response body rather than a codec operation.

@@ -295,7 +295,7 @@ func TestUnmarshalOverflowIsATypedError(t *testing.T) {
 // significant digits than float64 holds is rounded silently, where the
 // clause requires a typed error "rather than silently rounding". This
 // test documents today's behaviour, not the target; the producer that
-// closes the gap (docs/plans/2026-08-30-read-path-decode-taxonomy.md)
+// closes the gap (docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md)
 // must invert it.
 func TestUnmarshalMantissaPrecisionLossIsSilent(t *testing.T) {
 	const in = `{"_type":"DV_QUANTITY","magnitude":0.1234567890123456789,"units":"kg"}`

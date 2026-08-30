@@ -1,10 +1,12 @@
 package transport_test
 
 // nilwireerror_test.go — REQ-025 § No panics, on the nil-receiver axis of this
-// package's exported pointer types. Two sit on it: *WireError, the typed error
-// a failed errors.As / errors.AsType leaves behind in a consumer's variable,
-// and *Client, which a consumer holds and passes into every leaf call. The
-// remaining exported identifiers are off-axis: Option is a func type and
+// package's exported pointer types. Three carry nil receivers: *WireError, the
+// typed error a failed errors.As / errors.AsType leaves behind in a consumer's
+// variable, and *Client, which a consumer holds and passes into every leaf
+// call, are pinned here; *DecodeError (REQ-151) is the third, pinned in its own
+// decode_error_test.go and not repeated here. The remaining exported
+// identifiers are off-axis: Option is a func type and
 // Observer an interface (neither has a nil receiver of its own); Request,
 // Response, Metadata, Observation, OpenEHRErrorDetail, CodedTextItem and
 // RetryPolicy are plain structs with no exported methods; CallerAttribution
