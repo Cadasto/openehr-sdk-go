@@ -2187,8 +2187,9 @@ requirements:
       The contract: a 2xx body that will not decode as the requested
       representation returns *transport.DecodeError, recoverable with
       errors.AsType through a leaf's fmt.Errorf wrap, carrying the raw bytes
-      in Body (always populated -- ADR 0018 -- bounded by the REQ-093
-      WithMaxResponseBody cap), wrapping the decoder's error, with a
+      in Body (always populated -- ADR 0018 -- inheriting whatever ceiling
+      the caller's WithMaxResponseBody sets, including none where REQ-093's
+      negative escape hatch disabled the cap), wrapping the decoder's error, with a
       value-free Error() carrying method, route and classification only.
       The (*T, *Metadata, error) triple still populates metadata. A non-2xx
       stays *transport.WireError; an empty representation-expecting 2xx body

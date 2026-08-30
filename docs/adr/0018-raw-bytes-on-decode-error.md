@@ -55,11 +55,15 @@ is no opt-in knob, and `WithRawErrorBodies` does not gate it.**
 - **The field, not the string, carries the PHI warning.** `Body` is documented as PHI-bearing by
   design — exactly the treatment `ehr.NoRepresentationError.Cause` already receives, where the
   cause may carry payload-derived text and `Error()` never interpolates it.
-- **Bounded by an existing control.** `transport.WithMaxResponseBody` (default
-  `DefaultMaxResponseBody`, 64 MiB — REQ-093) already caps how many bytes `Client.Do` reads. The
-  error cannot carry more than the transport was already willing to read, so this decision adds
-  no new unbounded-retention surface; a consumer that wants a smaller ceiling tightens the
-  existing option rather than reaching for a new one.
+- **Bounded by an existing control, to the extent the caller left it in place.**
+  `transport.WithMaxResponseBody` (default `DefaultMaxResponseBody`, 64 MiB — REQ-093) caps how
+  many bytes `Client.Do` reads, and the error can never carry more than the transport was already
+  willing to read. On the default, or on any explicit positive limit, `Body` therefore introduces
+  no ceiling the caller has not already chosen, and a consumer who wants a smaller one tightens
+  that existing option rather than reaching for a new knob. REQ-093 also documents a **negative**
+  value as an escape hatch that disables the cap outright for trusted backends; for such a client
+  there is no ceiling to inherit, and the retention consequence of that combination is stated in
+  Consequences rather than glossed over here.
 
 ## Consequences
 
@@ -72,9 +76,19 @@ is no opt-in knob, and `WithRawErrorBodies` does not gate it.**
   Gating that content behind an explicit opt-in is a real privacy decision; gating a caller's own
   requested representation behind one is not — it withholds from the caller only what the caller
   asked for, and only when something went wrong.
-- **The bytes have already crossed the wire.** They are in the process either way, bounded by
-  `WithMaxResponseBody`, and are freed when the error is. The decision is about whether the
-  caller may *see* them, not about whether the SDK holds them.
+- **The bytes have already crossed the wire — but they now live longer.** They are read into the
+  process either way, so the decision is about whether the caller may *see* them, not about
+  whether the SDK reads them. It does change how long they survive: previously the transport read
+  the body, failed to decode it, and discarded it; now the error holds it until the caller drops
+  the error. Under the default cap or any explicit positive limit that retained buffer is bounded
+  by the ceiling the caller chose. Under REQ-093's documented escape hatch — a **negative**
+  `WithMaxResponseBody`, which disables the cap for trusted backends — it is not: such a client
+  now retains an **unbounded, PHI-bearing buffer per 2xx decode failure**, where before those
+  bytes were read and thrown away. This ADR accepts that cost rather than denying it. Disabling
+  the cap is already an explicit statement that the caller trusts the backend's response sizes,
+  the exposure is proportional to a failure that should be rare, and the remedy is the option
+  that is already there — set a positive ceiling — not a second knob on the error. A consumer
+  that both disables the cap and retains errors long-term should set one.
 - **Retention becomes the caller's responsibility.** A `*transport.DecodeError` kept alive keeps
   its `Body` alive. Callers that log or persist errors wholesale, rather than logging `Error()`,
   now have a PHI surface they did not have before. REQ-151 documents the field so that this is a

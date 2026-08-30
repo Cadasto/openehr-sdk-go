@@ -251,8 +251,11 @@ representation, the SDK **MUST** return a `*transport.DecodeError`. That error *
   REQ-025 preferred matcher; `errors.As` reaches it identically — through any `fmt.Errorf`
   operation-name wrapping a leaf package adds, so a leaf's wrap is presentation, never a barrier;
 - carry the raw response bytes in a `Body` field, populated unconditionally (no opt-in gates it;
-  [ADR 0018](../adr/0018-raw-bytes-on-decode-error.md) is the decision of record) and bounded by
-  the `WithMaxResponseBody` cap REQ-093 already imposes on every read;
+  [ADR 0018](../adr/0018-raw-bytes-on-decode-error.md) is the decision of record), bounded by
+  whatever ceiling `WithMaxResponseBody` imposes on that client — the 64 MiB default, an explicit
+  positive limit, or **no ceiling at all** where the caller has taken REQ-093's documented escape
+  hatch and disabled the cap with a negative value. `Body` inherits the caller's configured
+  ceiling; it does not add one of its own;
 - wrap the decoder's error and expose it through `Unwrap`, so `errors.Is` and `errors.AsType`
   still reach the codec's own typed diagnostics (path, type, offset) unchanged;
 - carry the request's HTTP method and route template, so the failure is attributable without
