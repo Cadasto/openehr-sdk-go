@@ -142,11 +142,12 @@ const (
 // transport's configured auth path — anonymous calls are possible by
 // constructing a separate transport.Client with auth.AnonymousTokenSource.
 func Capabilities(ctx context.Context, c *transport.Client) (*ServiceCapabilities, *transport.Metadata, error) {
-	resp, err := c.Do(ctx, &transport.Request{
+	req := &transport.Request{
 		Method: http.MethodOptions,
 		Path:   "/",
 		Route:  "/",
-	})
+	}
+	resp, err := c.Do(ctx, req)
 	if err != nil {
 		if resp != nil {
 			return nil, resp.Metadata, err
@@ -158,7 +159,9 @@ func Capabilities(ctx context.Context, c *transport.Client) (*ServiceCapabilitie
 	}
 	var sc ServiceCapabilities
 	if err := json.Unmarshal(resp.Body, &sc); err != nil {
-		return nil, resp.Metadata, fmt.Errorf("system.Capabilities: decode: %w", err)
+		return nil, resp.Metadata, fmt.Errorf("system.Capabilities: %w", &transport.DecodeError{
+			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+		})
 	}
 	return &sc, resp.Metadata, nil
 }
