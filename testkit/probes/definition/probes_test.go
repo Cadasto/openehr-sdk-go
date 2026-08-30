@@ -143,11 +143,12 @@ func TestProbe093TemplateListFilters(t *testing.T) {
 }
 
 // TestProbe093EmptyCatalogPasses pins that an empty catalog is a pass, not
-// a decode failure: ListTemplates yields a non-nil zero-length slice for a
-// 204 (REQ-144), and REQ-143 licenses no assertion that a filtered
-// deployment holds templates. The probe's own assertions are shape-agnostic
-// — it discards the returned slice entirely and asserts only on the error
-// and the captured queries — so they hold either way.
+// a decode failure: REQ-143 licenses no assertion that a filtered
+// deployment holds templates. This test says nothing about the shape of the
+// returned slice — the probe discards it entirely and asserts only on the
+// error and the captured queries. The non-nil zero-length slice REQ-144
+// requires on an empty 2xx body is pinned by TestListTemplatesEmpty and
+// TestListStoredQueriesEmpty in openehr/client/definition.
 func TestProbe093EmptyCatalogPasses(t *testing.T) {
 	var captured []url.Values
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

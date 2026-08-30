@@ -9,9 +9,10 @@ import (
 // definitionTimestampLayouts is the CLOSED set of layouts accepted for the
 // two Definition catalog timestamps — TemplateMetadata.created_timestamp
 // and StoredQueryMetadata.saved (REQ-144, ADR 0019). Deployments emit more
-// than the RFC 3339 that encoding/json accepts, and one unreadable
-// timestamp otherwise costs the caller the whole list rather than one
-// entry.
+// than the RFC 3339 that encoding/json accepts, and an unreadable
+// timestamp fails the containing item and with it the whole list. The set
+// widens what is readable; it does not isolate a bad entry, so a value
+// outside the set still costs the caller the list.
 //
 // The set is closed on purpose: decode never reaches this tolerance
 // through a format-guessing parser, because an open set has no reviewable

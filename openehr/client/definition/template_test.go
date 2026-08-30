@@ -237,6 +237,27 @@ func TestListTemplatesEmpty(t *testing.T) {
 	}
 }
 
+// TestListTemplatesEmptyJSONArray pins the other half of the § REQ-144
+// empty-catalog claim: a JSON `[]` body decodes non-nil through
+// encoding/json by construction, without reaching the empty-body guard. A
+// later short-circuit on the literal body — `if body == "[]" { return nil }`
+// — would turn that into a nil slice, and this test is what would catch it.
+func TestListTemplatesEmptyJSONArray(t *testing.T) {
+	// REQ-144
+	c := jsonServerClient(t, `[]`)
+
+	list, _, err := definition.ListTemplates(t.Context(), c, definition.FormatADL14)
+	if err != nil {
+		t.Fatalf("ListTemplates = %v, want nil error", err)
+	}
+	if list == nil {
+		t.Error("list = nil on a JSON [] body, want a non-nil empty slice (a nil slice marshals as JSON null)")
+	}
+	if len(list) != 0 {
+		t.Errorf("len(list) = %d, want 0", len(list))
+	}
+}
+
 func TestDeleteTemplate(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -548,6 +569,46 @@ func TestListTemplatesZoneLessTimestamp(t *testing.T) {
 	want := time.Date(2022, 3, 30, 7, 18, 13, 591_000_000, time.UTC)
 	if !list[0].CreatedOn.Equal(want) {
 		t.Errorf("CreatedOn = %s, want %s", list[0].CreatedOn.Format(time.RFC3339Nano), want.Format(time.RFC3339Nano))
+	}
+	// Equal compares instants, so on a UTC host it cannot tell a UTC decode
+	// from a time.Local one. The location check is what actually pins the
+	// "never the client host's zone" rule (REQ-144).
+	if loc := list[0].CreatedOn.Location(); loc != time.UTC {
+		t.Errorf("CreatedOn.Location() = %v, want UTC (a time.Local decode would read one response as different instants on different machines)", loc)
+	}
+}
+
+// TestListTemplatesFractionalSecondLayouts pins the fractional-second
+// latitude across both seconds-bearing layout families and both decimal
+// signs: time.Parse absorbs a fraction following a seconds element even
+// though no layout in the set spells one, and accepts the ISO 8601 comma as
+// readily as the point. The dot-on-`T` spelling is already pinned by
+// TestListTemplatesZoneLessTimestamp (REQ-144).
+func TestListTemplatesFractionalSecondLayouts(t *testing.T) {
+	cases := []struct {
+		name string
+		wire string
+		want time.Time
+	}{
+		{"comma fraction, ISO extended", "2022-03-30T07:18:13,591", time.Date(2022, 3, 30, 7, 18, 13, 591_000_000, time.UTC)},
+		{"comma fraction, space separated", "2026-06-22 14:50:55,25", time.Date(2026, 6, 22, 14, 50, 55, 250_000_000, time.UTC)},
+		{"point fraction, space separated", "2026-06-22 14:50:55.25", time.Date(2026, 6, 22, 14, 50, 55, 250_000_000, time.UTC)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := jsonServerClient(t, `[{"template_id":"t.v1","created_timestamp":"`+tc.wire+`"}]`)
+
+			list, _, err := definition.ListTemplates(t.Context(), c, definition.FormatADL14)
+			if err != nil {
+				t.Fatalf("ListTemplates(%q) = %v, want nil error", tc.wire, err)
+			}
+			if len(list) != 1 {
+				t.Fatalf("len(list) = %d, want 1", len(list))
+			}
+			if !list[0].CreatedOn.Equal(tc.want) {
+				t.Errorf("CreatedOn = %s, want %s", list[0].CreatedOn.Format(time.RFC3339Nano), tc.want.Format(time.RFC3339Nano))
+			}
+		})
 	}
 }
 
