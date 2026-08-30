@@ -10,16 +10,23 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-08-30
+
+Twenty-fourth `v0.x` minor — a 2xx body that will not decode is a typed error carrying the raw bytes, Definition catalogs tolerate timestamp layouts and re-emit unknown keys, and AQL gains write-side parity, path-shape lint and a 501 capability sentinel. **Breaking:** `aql.SelectField` is no longer usefully `==`-comparable.
+
 ### Added
 
 - **Typed 2xx decode failure (REQ-151, PROBE-101).** A 2xx body that will not decode now fails with `transport.DecodeError` carrying the raw bytes; the non-2xx and empty-body arms are unchanged, and the message no longer echoes the codec's text — unwrap or read `Body`.
 - **Canonical-JSON encode sentinel (REQ-052).** A value the canonical-JSON encoder refuses now carries `canjson.ErrInvalidValue`, `errors.Is`-distinguishable from the decode-side shape sentinel and from the transport one — the encode side had none of its own.
 - **Catalog descriptor decode and re-encode.** Definition catalog timestamps decode against a closed tolerant layout set and an empty 2xx list body yields a non-nil empty slice (REQ-144); the Definition and System descriptors re-emit unknown keys, documented fields winning a collision.
-- **Nil-receiver tolerance on the error axis (REQ-025).** Typed-nil error values left behind by a failed `errors.As` answer instead of panicking across the transport, auth, discovery, AQL-parse and type-registry error types, and the SDK sites that dereferenced such a match are guarded.
-- **Reserved stored-query name refused client-side (REQ-057).** Store operations return `transport.ErrInvalidConfig` for any case variant of the query-name `aql`, namespaced or not, before the wire; stored-path diagnostics name the operation the caller invoked.
+- **Nil-receiver tolerance on the error axis (REQ-025).** Typed-nil error values left behind by a failed `errors.As` answer instead of panicking across the transport, query, auth, discovery, AQL-parse and type-registry error types, and the SDK sites that dereferenced such a match are guarded.
+- **Reserved stored-query name refused client-side (REQ-057).** Store and execute refuse the query-name `aql` before the wire — store any case variant (`transport.ErrInvalidConfig`), execute the exact name (`query.ErrInvalidConfig`); stored-path diagnostics name the invoked operation.
+- **AQL 501 capability sentinel (REQ-055, PROBE-021).** HTTP 501 from query execution is `aql.ErrEngineCapability` — a capability gap, classified from the status alone, never from message text, and never also path resolution.
 - **AQL containment evidence under CI (REQ-160, PROBE-100).** The vendored EHRbase FROM-combination corpus runs under `go test` as PROBE-100's admissibility ratchet over the REQ-160 relation — purely additive, no SDK behaviour change.
 - **AQL path-shape and paging lint (REQ-164, PROBE-099).** A third additive `lint` Layer-2 group — five Warning codes for unpredicated repeating segments, unordered row bounds, unaliased projections, path fan-out and provably inert containment steps.
+- **AQL `TOP` plus envelope `fetch` lint (REQ-109, REQ-118).** Lint raises Error `aql_top_with_fetch` when a `TOP` query also carries the request envelope's row limit — the read-side twin of the existing `Build()` refusal.
 - **AQL write-side expressivity parity (REQ-163, PROBE-088/097).** The builder spells the `VERSION` predicate bracket, a class-position standing comparison and a typed projection its read side already modelled, and `Build()` verifies what it emitted, refusing a construction that changes the recorded query — semver-minor on REQ-119's footing. *Breaking:* `aql.SelectField` is no longer usefully `==`-comparable — `==` compiles but panics at run time on a call-shaped field, map insertion included; compare built query strings.
+- **Dependency pins.** OpenTelemetry 1.45 → 1.46 (`otel` / `otel/trace`); the `go.mod` floor stays `1.26.0`.
 
 ## [0.23.0] - 2026-08-26
 
