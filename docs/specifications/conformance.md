@@ -826,6 +826,16 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Status:** Implemented (Sandbox) — [`testkit/probes/definition/probe_093_template_list_filters.go`](../../testkit/probes/definition/probe_093_template_list_filters.go); harness in [`probes_test.go`](../../testkit/probes/definition/probes_test.go). Plan: [`docs/plans/archive/2026-08-18-template-list-filters.md`](../plans/archive/2026-08-18-template-list-filters.md).
 - **Satisfies:** REQ-143.
 
+#### PROBE-101 — 2xx decode failure is surfaced, not swallowed
+
+- **Title:** A 200 whose body cannot be decoded as the requested representation fails the call rather than returning a silently zero-valued result — on the shared transport decode and on a hand-rolled Definition list decode alike — while a non-2xx on the same route keeps failing as it always did.
+- **Preconditions:** A sandbox server that can serve, on demand, a 200 whose JSON body does not match the requested type, a 404, and a list route answering a JSON object where an array is expected.
+- **Wire assertion:** Three arms, kept at observable-behaviour level. (a) A read served a 200 with an undecodable body fails with a non-nil error, and the returned resource is never a zero value paired with a nil error — a silent zero-valued success is the exact defect this probe exists to catch. (b) The same read served a 404 fails with a non-nil error. (c) A Definition list leaf served a JSON object where an array is expected fails with a non-nil error. Error-type identity (`*transport.DecodeError` versus `*transport.WireError`), raw-`Body` recovery, and the value-free `Error()` string are pinned by `transport/` and `openehr/client/definition/` unit tests, not by this probe (REQ-080: no error-type assertions in probes).
+- **Effect:** read-only — every arm issues a read and asserts on how the call fails.
+- **Modes:** Sandbox.
+- **Status:** Draft — the catalog entry lands ahead of the probe (ordering is normative); flips to Implemented when `testkit/probes/transport/probe_101_decode_failure_surfaced.go` and its harness case land. Plan: [`docs/plans/2026-08-30-read-path-decode-taxonomy.md`](../plans/2026-08-30-read-path-decode-taxonomy.md).
+- **Satisfies:** REQ-151.
+
 ### RM model introspection
 
 #### PROBE-094 — RM meta-model introspection equals the pinned BMM

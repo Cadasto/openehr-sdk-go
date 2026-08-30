@@ -123,7 +123,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/serialize/canjson, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/2026-08-30-read-path-decode-taxonomy.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
@@ -134,6 +134,13 @@ requirements:
       - openehr/internal/jsonpoly/jsonpoly_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
+    notes: >-
+      Amended 2026-08-30 (read-path decode taxonomy, spec ahead of code): the
+      REQ-052 encode-side refusal sentinel clause requires canjson.Marshal /
+      MarshalIndent to wrap the encode-only canjson.ErrInvalidValue, kept
+      errors.Is-distinguishable from the decode-side canjson.ErrInvalidShape
+      and from transport.ErrInvalidShape. canxml reuses one sentinel across
+      both directions; that is observed as out of scope, not aligned.
 
   - id: REQ-056
     title: Canonical XML
@@ -398,7 +405,7 @@ requirements:
     implementation: landed
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/demographic]
     probes: [PROBE-061, PROBE-071]
-    plans: [docs/plans/archive/2026-08-18-write-result-contract.md]
+    plans: [docs/plans/archive/2026-08-18-write-result-contract.md, docs/plans/2026-08-30-read-path-decode-taxonomy.md]
     tests:
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/directory/directory_test.go
@@ -424,6 +431,10 @@ requirements:
       never populated from the body (deferred in that plan). Deferred:
       PROBE-065 minimal->GET identifier round-trip (tracked in the
       probe-runnability plan, docs/plans/2026-08-18-probe-runnability.md).
+      Amended 2026-08-30 (cross-reference only): ehr.Create's decode-failure
+      arm is typed by REQ-151 as *transport.DecodeError, while its keyed
+      exception for the empty 2xx body stands unchanged as bare
+      transport.ErrInvalidShape; no arm this contract owns is re-typed.
 
   - id: REQ-095
     title: OpenAPI authoritative source
@@ -2159,6 +2170,35 @@ requirements:
       service root and passes -- the System API sends OPTIONS /. Route gates
       the arity half, so openehr/client carries an AST tripwire holding every
       transport.Request literal to setting it.
+
+  - id: REQ-151
+    title: Typed 2xx decode failure
+    canonical: docs/specifications/transport.md#req-151--typed-2xx-decode-failure
+    status: draft
+    implementation: planned
+    packages: [transport, openehr/client/definition, openehr/client/system, openehr/client/demographic, openehr/client/ehr/composition]
+    adrs: [docs/adr/0018-raw-bytes-on-decode-error.md]
+    plans: [docs/plans/2026-08-30-read-path-decode-taxonomy.md]
+    notes: >-
+      Spec and decision only at this point: transport.DecodeError does not
+      exist yet, so implementation stays planned and no probes are cited --
+      PROBE-101's catalogue entry is deliberately Status: Draft until the
+      probe lands, and a landed/partial REQ may not cite a Draft probe.
+      The contract: a 2xx body that will not decode as the requested
+      representation returns *transport.DecodeError, recoverable with
+      errors.AsType through a leaf's fmt.Errorf wrap, carrying the raw bytes
+      in Body (always populated -- ADR 0018 -- bounded by the REQ-093
+      WithMaxResponseBody cap), wrapping the decoder's error, with a
+      value-free Error() carrying method, route and classification only.
+      The (*T, *Metadata, error) triple still populates metadata. A non-2xx
+      stays *transport.WireError; an empty representation-expecting 2xx body
+      stays transport.ErrInvalidShape, deliberately not unified. Keyed
+      exclusions keep their owning contracts: the ehr.WriteResult funnel and
+      contribution.Commit (REQ-094 NoRepresentationError), the
+      Prefer=identifier arm (ehr.ResolveIdentifierBody), and the Definition
+      list leaves, where an empty 2xx body is a successful empty catalog.
+      Scope follows the decode, not the verb, so the Definition upload/PUT
+      leaves are in.
 
   - id: REQ-160
     title: AQL containment admissibility relation
