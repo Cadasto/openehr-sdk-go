@@ -74,7 +74,10 @@ func Probe101DecodeFailureSurfaced(ctx context.Context, c *transport.Client, cap
 	if err == nil {
 		r.Status = "fail"
 		r.Detail = "a read served a 200 whose body does not decode as the requested representation returned a nil error"
-		if ehr == nil || ehr.EHRID.Value == "" {
+		switch {
+		case ehr == nil:
+			r.Detail += "; it handed back no resource either — a silent success with nothing decoded is exactly what REQ-151 forbids"
+		case ehr.EHRID.Value == "":
 			r.Detail += "; the resource it handed back is a zero value — a silently zero-valued success is exactly what REQ-151 forbids"
 		}
 		return r, nil

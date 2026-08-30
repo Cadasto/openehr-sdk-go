@@ -142,7 +142,11 @@ requirements:
       from the decode-side canjson.ErrInvalidShape and from
       transport.ErrInvalidShape. Landed the same day in marshal.go and pinned
       by marshal_sentinel_test.go. canxml reuses one sentinel across both
-      directions; that is observed as out of scope, not aligned.
+      directions; that is observed as out of scope, not aligned. Open gap:
+      canjson.ErrInvalidShape has no decode-side producer (Unmarshal and
+      Decoder.Decode pass the codec's error through unchanged), so when a
+      producer lands, sweep the four sites that promise it — decode.go:11-17,
+      decode.go:63, doc.go:41 and doc.go:51.
 
   - id: REQ-056
     title: Canonical XML

@@ -281,14 +281,16 @@ func TestListStoredQueriesEmptyBodyIsEmptyCatalog(t *testing.T) { // REQ-151
 	defer srv.Close()
 
 	list, meta, err := definition.ListStoredQueries(t.Context(), newClient(t, srv), "")
-	if err != nil {
-		t.Fatalf("ListStoredQueries on an empty 204 body: unexpected error %v; an empty list body is success", err)
-	}
+	// Classify before the nil check: on a regression these two say which
+	// contract the leaf reached for, which a bare "unexpected error" would not.
 	if _, ok := errors.AsType[*transport.DecodeError](err); ok {
 		t.Error("an empty list body produced a *transport.DecodeError; REQ-151's keyed exclusion forbids it")
 	}
 	if errors.Is(err, transport.ErrInvalidShape) {
 		t.Error("an empty list body produced transport.ErrInvalidShape; REQ-151's keyed exclusion forbids it")
+	}
+	if err != nil {
+		t.Fatalf("ListStoredQueries on an empty 204 body: unexpected error %v; an empty list body is success", err)
 	}
 	if len(list) != 0 {
 		t.Errorf("len(list) = %d, want 0 on an empty body", len(list))

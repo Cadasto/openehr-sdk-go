@@ -189,7 +189,7 @@ func TestProbe101DecodeFailureSurfaced(t *testing.T) { // PROBE-101, REQ-151
 	}
 }
 
-// The three planted backends below each break exactly one arm — a probe that
+// The four planted backends below each break exactly one arm — a probe that
 // cannot fail proves nothing.
 func TestProbe101FlagsADecodableBody(t *testing.T) { // PROBE-101, REQ-151
 	arms := probe101Conformant()

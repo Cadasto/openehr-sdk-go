@@ -12,7 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **Typed 2xx decode failure (REQ-151, PROBE-101).** A 2xx body that will not decode now fails with `transport.DecodeError`, carrying the raw bytes the server delivered instead of dropping them; the non-2xx and empty-body arms are unchanged.
+- **Typed 2xx decode failure (REQ-151, PROBE-101).** A 2xx body that will not decode now fails with `transport.DecodeError` carrying the raw bytes; the non-2xx and empty-body arms are unchanged, and the message no longer echoes the codec's text — unwrap or read `Body`.
 - **Canonical-JSON encode sentinel (REQ-052).** A value the canonical-JSON encoder refuses now carries `canjson.ErrInvalidValue`, `errors.Is`-distinguishable from the decode-side shape sentinel and from the transport one — the encode side had none of its own.
 - **AQL containment evidence under CI (REQ-160, PROBE-100).** The vendored EHRbase FROM-combination corpus runs under `go test` as PROBE-100's admissibility ratchet over the REQ-160 relation — purely additive, no SDK behaviour change.
 - **AQL path-shape and paging lint (REQ-164, PROBE-099).** A third additive `lint` Layer-2 group — five Warning codes for unpredicated repeating segments, unordered row bounds, unaliased projections, path fan-out and provably inert containment steps.

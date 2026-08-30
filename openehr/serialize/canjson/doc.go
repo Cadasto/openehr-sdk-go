@@ -48,7 +48,10 @@
 //   - [ErrInvalidValue] — encode only. Every [Marshal] / [MarshalIndent]
 //     failure wraps it, over the encoder's own error, which stays
 //     reachable through unwrapping.
-//   - [ErrInvalidShape] — decode only. Never appears on an encode path.
+//   - [ErrInvalidShape] — decode only. Never appears on an encode
+//     path. It is reserved for decode-side shape errors: today no
+//     decode path produces it, because [Unmarshal] and [Decoder.Decode]
+//     pass the underlying codec's error through unchanged.
 //
 // Both are distinct from the transport-level transport.ErrInvalidShape,
 // which classifies a response body rather than a codec operation.

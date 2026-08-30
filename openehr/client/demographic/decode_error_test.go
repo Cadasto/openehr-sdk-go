@@ -172,11 +172,10 @@ func TestGetVersionDataArmCarriesFullBody(t *testing.T) { // REQ-151
 	if !ok {
 		t.Fatalf("errors.AsType[*transport.DecodeError] did not match %T (%v)", err, err)
 	}
+	// The full envelope, not the `data` sub-slice the second decode ran on:
+	// REQ-151 wants the bytes the server delivered.
 	if got := string(de.Body); got != string(full) {
 		t.Fatalf("DecodeError.Body = %q, want the full response %q", got, full)
-	}
-	if got := string(de.Body); got == unregisteredParty {
-		t.Fatal("DecodeError.Body carries only the `data` sub-slice; REQ-151 wants the bytes the server delivered")
 	}
 	// The registry's own sentinel is still reachable underneath, so callers
 	// already keying on it are unaffected by the conversion.
