@@ -28,6 +28,13 @@ set -euo pipefail
 EXPECTED_COMMIT=206ee8c5389e0c0d75cb2366b1dfb0987644a383
 
 ROBOT="${ROBOT_ROOT:-/src/ehrbase/integration-tests/tests/robot/_resources/test_data_sets}"
+# Canonicalise: prefix-stripping below compares against
+# `git rev-parse --show-toplevel`, which prints a physical path, so a
+# ROBOT_ROOT given with a trailing slash or through a symlink would silently
+# fail to strip and record wrong provenance paths.
+if [[ -d "$ROBOT" ]]; then
+  ROBOT="$(cd "$ROBOT" && pwd -P)"
+fi
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$REPO/testkit/cassettes/aql/conformance"
 
@@ -80,11 +87,6 @@ done < <(find "$AQL" -type f -print0)
 # CSV -> the Robot suite family that consumes it, under upstream
 # tests/robot/AQL_TESTS/FROM/<FAMILY>/. The family is the vendored directory name
 # so a reader can find the suite that supplies the query template for each row.
-#
-# from/combinations/from_simple_and_or_ent.csv is deliberately absent: at this pin
-# it has zero references anywhere under the upstream tests/ tree, so no suite
-# supplies a query template for its rows and nothing can be reconstructed from
-# them. EXCLUDED.txt records it with the unconsumed-by-suite tag.
 CORPUS=(
   "AND_OR from_simple_and_or.csv"
   "CONTAINS_A_D from_contains_plus_contain_chaining.csv"
@@ -102,6 +104,60 @@ CORPUS=(
 
 FAMILIES=(AND_OR CONTAINS_A_D EHR_STATUS PREDICATE_A_D USABLE_RM_TYPES_A_D)
 
+# from/combinations CSVs that are input data yet deliberately NOT vendored,
+# tagged with the reason their rows cannot be reconstructed. Keyed by the
+# path relative to the corpus root — the same spelling EXCLUDED.txt records —
+# and never by basename: a nested CSV that merely shares an excluded basename
+# (say from/combinations/sub/from_simple_and_or_ent.csv) is a different file,
+# and must reach the refusal below rather than inherit an exclusion written for
+# its namesake. At this pin: from/combinations/from_simple_and_or_ent.csv has
+# zero references anywhere under the upstream tests/ tree, so no suite supplies
+# a query template for its rows. A new upstream CSV in from/combinations that is
+# neither in CORPUS nor here makes the ingest refuse (below) instead of
+# mis-filing it in EXCLUDED.txt — classifying it is the re-pin author's
+# decision, not the fallthrough's.
+declare -A KNOWN_UNCONSUMED=(
+  ["from/combinations/from_simple_and_or_ent.csv"]=unconsumed-by-suite
+)
+
+# --- validate -----------------------------------------------------------------
+#
+# Every refusal runs before the first byte under $DEST moves. Clearing the
+# family directories first and only then discovering an unclassifiable upstream
+# CSV would empty the vendored corpus and abort — leaving the destination in a
+# state the pin does not describe, which is the opposite of the fail-closed
+# promise the guards above make. So this pass only reads.
+
+declare -A VENDORED=()
+for entry in "${CORPUS[@]}"; do
+  csv=${entry#* }
+  if [[ ! -f "$SRC/$csv" ]]; then
+    echo "missing upstream CSV at the pin: $SRC/$csv" >&2
+    exit 1
+  fi
+  VENDORED["from/combinations/$csv"]=1
+done
+
+# Input-CSV completeness: every from/combinations CSV at the pin must be either
+# vendored or a named exclusion. Anything else is new input data the corpus
+# does not know — refuse loudly rather than let the classifier below file it
+# under a wrong tag. The walk is recursive because the classifier's
+# `from/combinations/*.csv` case glob is too (a bash case `*` crosses `/`), so a
+# CSV in a new subdirectory must reach this refusal rather than fall through to
+# the classifier's unbound KNOWN_UNCONSUMED key and die as a bare `set -u` abort.
+while IFS= read -r -d '' f; do
+  rel=${f#"$AQL/"}
+  if [[ -n "${VENDORED[$rel]:-}" || -n "${KNOWN_UNCONSUMED[$rel]:-}" ]]; then
+    continue
+  fi
+  echo "new upstream input CSV at the pin: $rel" >&2
+  echo "it is neither vendored (CORPUS) nor a named exclusion (KNOWN_UNCONSUMED) —" >&2
+  echo "vendor it and teach the reader its template, or record why it cannot be reconstructed" >&2
+  exit 1
+done < <(find "$SRC" -type f -name '*.csv' -print0)
+
+# --- copy ---------------------------------------------------------------------
+
 # Clear the family directories first: a re-pin that drops a CSV upstream must not
 # leave the old copy behind pretending to still be vendored.
 for fam in "${FAMILIES[@]}"; do
@@ -109,17 +165,11 @@ for fam in "${FAMILIES[@]}"; do
   rm -f "${DEST:?}/$fam"/*.csv
 done
 
-declare -A VENDORED=()
 for entry in "${CORPUS[@]}"; do
   fam=${entry%% *}
   csv=${entry#* }
-  if [[ ! -f "$SRC/$csv" ]]; then
-    echo "missing upstream CSV at the pin: $SRC/$csv" >&2
-    exit 1
-  fi
   # Byte-exact copy — CSV content is never rewritten.
   cp "$SRC/$csv" "$DEST/$fam/$csv"
-  VENDORED["from/combinations/$csv"]=1
 done
 
 # --- provenance pin -----------------------------------------------------------
@@ -191,8 +241,12 @@ excl_file="$DEST/EXCLUDED.txt"
       continue
     fi
     case "$rel" in
-    from/combinations/from_simple_and_or_ent.csv)
-      tag=unconsumed-by-suite
+    from/combinations/*.csv)
+      # Always classified: the input-CSV completeness check above already
+      # refused anything not in KNOWN_UNCONSUMED (set -u faults if not). Both
+      # sides key on the corpus-relative path, so this glob crossing `/` is
+      # correct rather than a hole — a nested CSV needs its own entry.
+      tag=${KNOWN_UNCONSUMED[$rel]}
       ;;
     *.csv)
       case "$rel" in

@@ -34,7 +34,8 @@ package serializeprobes
 // family deleted from the codec fails here whether or not its package test
 // survives.
 //
-// Modes: In-repo (Sandbox) only — no backend, no cassette/live mode.
+// Modes: In-repo (round-trip property against vendored fixtures; no backend)
+// — no cassette or live mode.
 
 import (
 	"encoding/json"

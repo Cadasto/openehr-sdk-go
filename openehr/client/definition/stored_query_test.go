@@ -269,3 +269,105 @@ func TestPutStoredQueryVersionConflict(t *testing.T) {
 		t.Errorf("409 should map to ErrVersionConflict, got %v", err)
 	}
 }
+
+// TestPutStoredQueryReservedName pins the store side of REQ-057's reserved
+// name: the upstream contract (query-validation.openapi.yaml, the
+// Qualified_query_name description) reserves the query-name `aql`
+// case-insensitively, so both store operations refuse it — for any case
+// variant, with or without a namespace — before any request is issued.
+func TestPutStoredQueryReservedName(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("server received %s %s; the reserved name must be refused before any request", r.Method, r.URL.Path)
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	for _, name := range []string{"aql", "AQL", "Aql", " aql ", "ehr::aql", "org.openehr::AQL"} {
+		t.Run(name, func(t *testing.T) {
+			for _, tc := range []struct {
+				label string
+				call  func() error
+			}{
+				{"PutStoredQuery", func() error {
+					_, _, err := definition.PutStoredQuery(t.Context(), c, name, "SELECT 1")
+					return err
+				}},
+				{"PutStoredQueryVersion", func() error {
+					_, _, err := definition.PutStoredQueryVersion(t.Context(), c, name, "1.0.0", "SELECT 1")
+					return err
+				}},
+			} {
+				t.Run(tc.label, func(t *testing.T) {
+					err := tc.call()
+					if !errors.Is(err, transport.ErrInvalidConfig) {
+						t.Fatalf("err = %v, want one wrapping ErrInvalidConfig", err)
+					}
+					// The diagnostic names the reserved-name rule rather
+					// than echoing the input.
+					if !strings.Contains(err.Error(), "reserved") {
+						t.Errorf("err = %q, want it to name the reserved-name rule", err)
+					}
+				})
+			}
+		})
+	}
+}
+
+// TestPutStoredQueryReservedNameScope pins the rule's edges. The reservation
+// covers only the query-name part of `[{namespace}::]{query-name}`: a name
+// that merely contains "aql", and a namespace that IS "aql", are ordinary
+// names and reach the wire verbatim. The read, list and delete operations
+// pass a reserved name through too — a deployment that stored one anyway
+// must stay reachable for retrieval and cleanup — so each of the three
+// asserts the reserved name reached the request path unaltered (REQ-057).
+func TestPutStoredQueryReservedNameScope(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	for _, name := range []string{"aql.reports", "aqlx", "org.example.aql", "aql::reports", "myaql"} {
+		t.Run("store_"+name, func(t *testing.T) {
+			_, _, err := definition.PutStoredQuery(t.Context(), c, name, "SELECT 1")
+			if err != nil {
+				t.Fatalf("PutStoredQuery(%q) = %v, want it to pass through", name, err)
+			}
+			if want := "/openehr/v1/definition/query/" + name; gotPath != want {
+				t.Errorf("path = %q, want %q", gotPath, want)
+			}
+		})
+	}
+
+	t.Run("get_reserved_name_passes_through", func(t *testing.T) {
+		_, _, err := definition.GetStoredQuery(t.Context(), c, "aql", "1.0.0")
+		if err != nil {
+			t.Fatalf("GetStoredQuery(\"aql\") = %v, want pass-through (read side is for remediation)", err)
+		}
+		if want := "/openehr/v1/definition/query/aql/1.0.0"; gotPath != want {
+			t.Errorf("path = %q, want %q", gotPath, want)
+		}
+	})
+
+	t.Run("list_reserved_name_passes_through", func(t *testing.T) {
+		_, _, err := definition.ListStoredQueries(t.Context(), c, "ehr::aql")
+		if err != nil {
+			t.Fatalf("ListStoredQueries(\"ehr::aql\") = %v, want pass-through (list side is for remediation)", err)
+		}
+		if want := "/openehr/v1/definition/query/ehr::aql"; gotPath != want {
+			t.Errorf("path = %q, want %q", gotPath, want)
+		}
+	})
+
+	t.Run("delete_reserved_name_passes_through", func(t *testing.T) {
+		_, err := definition.DeleteStoredQuery(t.Context(), c, "aql", "1.0.0")
+		if err != nil {
+			t.Fatalf("DeleteStoredQuery(\"aql\") = %v, want pass-through (delete side is for remediation)", err)
+		}
+		if want := "/openehr/v1/definition/query/aql/1.0.0"; gotPath != want {
+			t.Errorf("path = %q, want %q", gotPath, want)
+		}
+	})
+}

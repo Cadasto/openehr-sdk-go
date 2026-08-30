@@ -1135,6 +1135,63 @@ func probe099FireCases() []aqlprobes.PathShapeFireCase {
 			SpanNth:  1,
 		},
 		{
+			// The same unavoidable intermediate, judged over a SUPPLIED
+			// relation (the one REQ-164 code a relation governs). The overlay
+			// edge is deliberately inert — EHR -> VERSIONED_PARTY adds no route
+			// among the query's classes — so the finding is the one the default
+			// relation already gives, and what the row adds is the corpus-level
+			// restatement of REQ-164 § Always on, never gated: supplying a
+			// relation governs this check, it does not mute it. The axis is
+			// pinned spelling-by-spelling at unit level, by
+			// TestRedundantStepReadsTheSuppliedRelation in
+			// openehr/aql/lint/pathshape_redundant_test.go (nil, zero, explicit
+			// default and unrelated-overlay, over this same witness query);
+			// carrying it here keeps it stated where the probe reports.
+			// Follow-up, not yet built: a discriminating twin rooted on an
+			// overlay-introduced class — the default relation finds no route,
+			// so only the supplied relation can fire it.
+			Name: "an unavoidable unreferenced intermediate, under a supplied relation",
+			Query: "SELECT o/name/value AS n FROM EHR e CONTAINS COMPOSITION c " +
+				"CONTAINS OBSERVATION o",
+			Relation: contain.Default().WithOverlay(contain.Edge{From: "EHR", To: "VERSIONED_PARTY"}),
+			Code:     codeContainsRedundantStep,
+			Want:     []string{codeContainsRedundantStep},
+			Severity: lint.Warning,
+			SpanText: "COMPOSITION",
+			SpanNth:  1,
+		},
+		{
+			// A repeating path reached only as a function-call ARGUMENT joins
+			// the fan-out: the grain question is about which repeating scopes
+			// the row iterates, and an aggregate over a path iterates its
+			// scope like any projection of it. Both paths carry their own
+			// repeating-segment finding (the fan-out's premise), and the
+			// aggregate column is aliased, so no alias finding rides along.
+			Name: "a repeating path inside a function-call argument joins the fan-out",
+			Query: "SELECT MAX(o/data/events/time) AS latest, o/links/meaning/value AS m " +
+				"FROM OBSERVATION o[" + probe099ObsArch + "]",
+			Code: codeFanoutPathGrain,
+			Want: []string{
+				codePathRepeatingUnpredicated, codePathRepeatingUnpredicated, codeFanoutPathGrain,
+			},
+			Severity: lint.Warning,
+			SpanText: "o/links/meaning/value", // the LATER path of the pair
+			SpanNth:  1,
+		},
+		{
+			// The counter-assertion for the paging code: BOTH channels bound
+			// the rows — LIMIT in the text and Fetch on the envelope — and the
+			// finding is still raised ONCE. Want is an exact multiset, so a
+			// per-channel double report fails this row.
+			Name:     "both row-bound channels raise one paging finding",
+			Query:    "SELECT o/name/value AS name FROM OBSERVATION o[" + probe099ObsArch + "] LIMIT 10",
+			Fetch:    20,
+			Code:     codePagingNoOrderBy,
+			Want:     []string{codePagingNoOrderBy},
+			Severity: lint.Warning,
+			SpanText: "",
+		},
+		{
 			// The version tier is the only route from a container to its
 			// payload, so the unstated-tier step is inert. It records a
 			// deliberate coexistence: a bare VERSION operand also carries
@@ -1998,12 +2055,19 @@ func TestProbe100ReaderRefusesAnUnlearnedCorpus(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
+			// Every fixture corpus carries the two ingest files the reader
+			// demands; their absence has its own test below.
 			for name, body := range tc.files {
 				path := filepath.Join(root, name)
 				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 					t.Fatal(err)
 				}
 				if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, name := range []string{"AQL_SOURCE.txt", "EXCLUDED.txt"} {
+				if err := os.WriteFile(filepath.Join(root, name), []byte("# fixture\n"), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -2018,9 +2082,33 @@ func TestProbe100ReaderRefusesAnUnlearnedCorpus(t *testing.T) {
 	}
 }
 
-// probe100CorpusCopy copies the shipping corpus's family directories into a
-// throwaway root a test may edit. The reader demands the whole table's worth of
-// files, so a test about ONE row still needs a complete corpus around it.
+// TestProbe100ReaderRequiresTheIngestFiles is the able-to-fail control for the
+// root-file presence arm: a corpus whose provenance pin or exclusion record
+// went missing — a partial vendoring, or a copy that took only the family
+// directories — is a read error naming the missing file, not a readable corpus.
+func TestProbe100ReaderRequiresTheIngestFiles(t *testing.T) {
+	for _, missing := range []string{"AQL_SOURCE.txt", "EXCLUDED.txt"} {
+		t.Run(missing, func(t *testing.T) {
+			root := probe100CorpusCopy(t)
+			if err := os.Remove(filepath.Join(root, missing)); err != nil {
+				t.Fatal(err)
+			}
+			_, err := aqlprobes.ReadConformanceCorpus(root)
+			if err == nil {
+				t.Fatal("err = nil, want a refusal for the missing ingest file")
+			}
+			if !strings.Contains(err.Error(), missing) {
+				t.Fatalf("err = %v, want it to name %s", err, missing)
+			}
+		})
+	}
+}
+
+// probe100CorpusCopy copies the shipping corpus — family directories and the
+// ingest's root files — into a throwaway root a test may edit. The reader
+// demands the whole table's worth of files plus the provenance pin and
+// exclusion record, so a test about ONE row still needs a complete corpus
+// around it.
 func probe100CorpusCopy(t *testing.T) string {
 	t.Helper()
 	root, src := t.TempDir(), fixtures.AQLConformanceRoot()
@@ -2030,6 +2118,13 @@ func probe100CorpusCopy(t *testing.T) string {
 	}
 	for _, fam := range families {
 		if !fam.IsDir() {
+			body, err := os.ReadFile(filepath.Join(src, fam.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, fam.Name()), body, 0o644); err != nil {
+				t.Fatal(err)
+			}
 			continue
 		}
 		if err := os.MkdirAll(filepath.Join(root, fam.Name()), 0o755); err != nil {

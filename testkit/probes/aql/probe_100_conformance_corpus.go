@@ -373,8 +373,9 @@ func (c ConformanceCorpus) FamilyCounts() []ConformanceFamilyCount {
 //
 // It is strict by design: an unlearned file at the root or in a family
 // directory, a family directory the table does not name, a header that does not
-// match field for field, or a table entry with no file on disk is an error, not
-// a skipped row.
+// match field for field, a table entry with no file on disk, or a missing
+// ingest file (AQL_SOURCE.txt, EXCLUDED.txt) is an error, not a skipped row —
+// a corpus without its provenance pin or exclusion record is not a corpus.
 func ReadConformanceCorpus(root string) (ConformanceCorpus, error) {
 	var c ConformanceCorpus
 	entries, err := os.ReadDir(root)
@@ -382,9 +383,11 @@ func ReadConformanceCorpus(root string) (ConformanceCorpus, error) {
 		return c, fmt.Errorf("PROBE-100: read corpus root: %w", err)
 	}
 	seen := map[string]bool{}
+	rootSeen := map[string]bool{}
 	for _, e := range entries {
 		if !e.IsDir() {
 			if slices.Contains(conformanceRootFiles, e.Name()) {
+				rootSeen[e.Name()] = true
 				continue
 			}
 			return c, fmt.Errorf("PROBE-100: %q at the corpus root is neither a family directory nor "+
@@ -392,6 +395,12 @@ func ReadConformanceCorpus(root string) (ConformanceCorpus, error) {
 		}
 		if err := readConformanceFamily(root, e.Name(), &c, seen); err != nil {
 			return c, err
+		}
+	}
+	for _, name := range conformanceRootFiles {
+		if !rootSeen[name] {
+			return c, fmt.Errorf("PROBE-100: the corpus root is missing %s — the ingest writes it beside "+
+				"the family directories; a corpus without its provenance pin and exclusion record is not readable", name)
 		}
 	}
 	for _, s := range conformanceSuites {

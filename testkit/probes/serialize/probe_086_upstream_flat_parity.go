@@ -18,8 +18,9 @@ package serializeprobes
 // substantial part of the corpus that is not yet modelled, are documented in
 // that package — SKIPPED.md carries the counted inventory.
 //
-// Modes: In-repo (Sandbox) only. Cassette / Live are out of scope for v1, so
-// REQ-082 runnability is a documented partial.
+// Modes: In-repo (parity property against vendored fixtures; no backend).
+// Cassette / Live are out of scope for v1, so REQ-082 runnability is a
+// documented partial.
 
 import (
 	"errors"

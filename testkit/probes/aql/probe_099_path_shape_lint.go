@@ -166,6 +166,12 @@ type PathShapeFireCase struct {
 	// on [lint.Options.Query] — the second channel aql_paging_no_order_by
 	// reads. Both zero means no envelope is supplied at all.
 	Fetch, Offset int
+	// Relation, when non-nil, is the REQ-160 relation the run supplies on
+	// [lint.Options.Relation], as on [PathShapeSilentCase]. The redundant-step
+	// check is the one REQ-164 code a supplied relation governs; a fire row
+	// carrying one pins that the group answers over the SUPPLIED relation —
+	// supplying is not muting (REQ-161 § Relation supply).
+	Relation *contain.TypeRelation
 	// Code is the REQ-164 issue code this row exists for.
 	Code string
 	// Want is the exact REQ-164 code multiset Query MUST raise (order
@@ -379,7 +385,7 @@ func runPathShapeFire(tc PathShapeFireCase) (msg string, groupOnly bool) {
 	if !slices.Contains(tc.Want, tc.Code) {
 		return fmt.Sprintf("corpus row error: Want %v does not contain the row's own Code %s", tc.Want, tc.Code), false
 	}
-	res := lint.LintString(tc.Query, pathShapeOptions(tc.Fetch, tc.Offset, nil))
+	res := lint.LintString(tc.Query, pathShapeOptions(tc.Fetch, tc.Offset, tc.Relation))
 	got := filterCodes(res, pathShapeCodes())
 	if !slices.Equal(got, sortedCopy(tc.Want)) {
 		return fmt.Sprintf("path-shape codes = %v, want %v (query %q)", got, sortedCopy(tc.Want), tc.Query), false

@@ -276,9 +276,13 @@ func canonicalPathKey(path string, ip *IdentifiedPath) string {
 		}
 		b.WriteString(seg.Name)
 		if nested, ok := derefSegmentPredicate(seg.Parsed); ok {
-			b.WriteString("[" + nested.key() + "]")
+			b.WriteByte('[')
+			b.WriteString(nested.key())
+			b.WriteByte(']')
 		} else if seg.Predicate != "" {
-			b.WriteString("[" + seg.Predicate + "]")
+			b.WriteByte('[')
+			b.WriteString(seg.Predicate)
+			b.WriteByte(']')
 		}
 	}
 	return b.String()
