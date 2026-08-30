@@ -395,9 +395,11 @@ The set is closed: decode **MUST NOT** accept a **non-empty** value outside it (
 
 **Encode is unchanged.** Both fields **MUST** continue to be emitted as RFC 3339 through the existing marshal paths. The tolerance is decode-only.
 
+**Unknown response keys.** Both descriptors carry an `Extras` map, and decode **MUST** route every response key outside the documented field set into it rather than dropping it; encode **MUST** re-emit those keys with their values unchanged, up to the insignificant whitespace `encoding/json` compacts inside a preserved value. An `Extras` key whose name collides with a documented field name **MUST** be ignored on encode — the documented field is authoritative — and **MUST** be ignored even where that field's own JSON contract emits no key for it, since otherwise a caller-set collision would survive into output the descriptor's own decode rejects. Decode cannot create such a collision: a documented name is routed to its field and never into `Extras`, so the case is caller-constructed. Round-trip identity of the key set is **not** promised in either direction — documented fields are emitted per their own JSON contract, one that omits a field when empty or zero emits no key for it at all, and key order is not part of the contract.
+
 **Empty list bodies.** `ListTemplates` and `ListStoredQueries` **MUST** return a **non-nil** zero-length slice and a nil error when a 2xx response body is empty. This is the empty-*body* arm: a JSON `[]` already decodes to a non-nil empty slice through `encoding/json`. A nil slice boxed in a non-nil interface marshals as JSON `null` rather than `[]`, so a caller who re-serialises the result would publish `null` for "no templates" — the read-side twin of the typed-nil trap [REQ-094](transport.md#req-094--prefer-response-shape-negotiation) documents on the write path.
 
-**Out of scope.** RM `DV_DATE_TIME` wire formats (REQ-052 / REQ-123) are untouched, and this § grants no SDK-wide zone-less tolerance for `time.Time`: the rules above reach exactly these two Definition-area catalog fields.
+**Out of scope.** RM `DV_DATE_TIME` wire formats (REQ-052 / REQ-123) are untouched, and this § grants no SDK-wide zone-less tolerance for `time.Time`: the timestamp rules above reach exactly these two Definition-area catalog fields.
 
 ## Write-side authoring
 
