@@ -77,7 +77,16 @@ type TemplateMetadata struct {
 	// Description is an optional free-text description.
 	Description string `json:"description,omitempty"`
 	// Extras preserves deployment-specific fields not in the standard
-	// metadata shape.
+	// metadata shape. [TemplateMetadata.MarshalJSON] re-emits them
+	// (REQ-144).
+	//
+	// Extras keys are matched against the documented field names
+	// case-sensitively, while encoding/json decodes those field names
+	// case-insensitively. A wire key differing from a documented field
+	// only by case ("Template_ID") therefore populates the documented
+	// field and is also preserved here verbatim, so encode emits both
+	// keys when the documented field emits one at all — `template_id` is
+	// omitempty, so an empty TemplateID emits only the preserved key.
 	Extras map[string]json.RawMessage `json:"-"`
 }
 
@@ -128,9 +137,18 @@ func (m *TemplateMetadata) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON re-emits documented fields plus Extras (insertion order
-// for known fields; map iteration order is non-deterministic on the
-// Extras side, but the result decodes back to the same key set).
+// MarshalJSON re-emits documented fields plus Extras.
+//
+// An Extras key that collides with a documented field name is ignored on
+// encode; the documented field is authoritative. Unknown keys are
+// preserved and re-emitted, and documented fields are emitted per their
+// own contract (each is omitted when empty, and `created_timestamp` when
+// zero), so the emitted key set is not guaranteed to be identical to the
+// wire body a value was decoded from. Neither is its spelling:
+// encoding/json compacts insignificant whitespace and escapes `<`, `>`
+// and `&` as `\u003c`, `\u003e` and `\u0026` inside a preserved value —
+// the escaped spelling decodes to the identical value — and key order is
+// not part of the contract (REQ-144).
 func (m TemplateMetadata) MarshalJSON() ([]byte, error) {
 	type alias TemplateMetadata
 	known, err := json.Marshal(alias(m))
@@ -140,14 +158,19 @@ func (m TemplateMetadata) MarshalJSON() ([]byte, error) {
 	if len(m.Extras) == 0 {
 		return known, nil
 	}
-	var merged map[string]json.RawMessage
+	// Start from Extras with every documented field name deleted, then
+	// overlay the typed emission. Deleting rather than merely letting the
+	// overlay win is what makes the rule hold for an omitted field: a zero
+	// CreatedOn emits no `created_timestamp` key, so a caller-set
+	// Extras["created_timestamp"] would otherwise survive and produce
+	// output this package's own UnmarshalJSON rejects.
+	merged := maps.Clone(m.Extras)
+	for k := range knownTemplateMetadataFields {
+		delete(merged, k)
+	}
 	if err := json.Unmarshal(known, &merged); err != nil {
 		return nil, err
 	}
-	if merged == nil {
-		merged = map[string]json.RawMessage{}
-	}
-	maps.Copy(merged, m.Extras)
 	return json.Marshal(merged)
 }
 

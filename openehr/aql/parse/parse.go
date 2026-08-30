@@ -47,10 +47,19 @@ type SyntaxError struct {
 	Msg string
 }
 
+// Error names the position and the message. A nil receiver answers with
+// the zero SyntaxError's text rather than reading Pos (REQ-025
+// nil-receiver axis): a failed errors.As / errors.AsType leaves a typed
+// nil that a caller boxes into a non-nil error interface and prints.
 func (e *SyntaxError) Error() string {
+	if e == nil {
+		return (&SyntaxError{}).Error()
+	}
 	return fmt.Sprintf("aql: syntax error at %d:%d: %s", e.Pos.Line, e.Pos.Col, e.Msg)
 }
 
+// Unwrap exposes [aql.ErrSyntax]. It reads no field, so a nil receiver
+// classifies as a syntax error exactly as a real one does.
 func (e *SyntaxError) Unwrap() error { return aql.ErrSyntax }
 
 // Document is a parsed, syntactically valid AQL query. Clause presence,

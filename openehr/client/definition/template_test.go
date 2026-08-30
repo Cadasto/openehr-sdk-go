@@ -66,6 +66,51 @@ func readCassette(t *testing.T, name string) []byte {
 	return b
 }
 
+// encodedJSON returns raw as encoding/json re-emits it — the fair
+// comparison for a preserved Extras value. Extras holds the wire bytes
+// exactly as decoded, but re-encoding runs them through encoding/json,
+// which compacts insignificant whitespace and escapes `<`, `>` and `&`:
+// a wire value spelled `["a", "b"]` comes back as `["a","b"]`, and one
+// spelled `"?a=1&b=2"` as `"?a=1\u0026b=2"`, with nothing lost.
+// Comparing raw bytes would fail on the spelling alone.
+//
+// It normalises through json.Marshal, not json.Compact, because Compact
+// does only the whitespace half of that: a want carrying `&` would not
+// match the encoded form.
+func encodedJSON(t *testing.T, raw json.RawMessage) string {
+	t.Helper()
+	out, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("Marshal(%s) = %v, want nil error", raw, err)
+	}
+	return string(out)
+}
+
+// assertEmittedKeys checks that the encoded object carries each named key
+// with the given JSON value. It reads the raw object rather than a decoded
+// descriptor because that is the only way to see two keys differing only
+// by case: decoding folds them onto one documented field.
+func assertEmittedKeys(t *testing.T, out []byte, want map[string]string) {
+	t.Helper()
+	if len(want) == 0 {
+		return
+	}
+	var emitted map[string]json.RawMessage
+	if err := json.Unmarshal(out, &emitted); err != nil {
+		t.Fatalf("Unmarshal(%s) into a raw object = %v, want nil error", out, err)
+	}
+	for k, w := range want {
+		raw, ok := emitted[k]
+		if !ok {
+			t.Errorf("encode dropped key %q: %s", k, out)
+			continue
+		}
+		if w := encodedJSON(t, json.RawMessage(w)); string(raw) != w {
+			t.Errorf("encoded[%q] = %s, want %s", k, raw, w)
+		}
+	}
+}
+
 func TestUploadTemplate(t *testing.T) {
 	var captured *http.Request
 	var capturedBody []byte
@@ -352,33 +397,155 @@ func TestExampleCompositionRejectsInvalidParams(t *testing.T) {
 	}
 }
 
+// TestTemplateMetadataRoundTrip is the template twin of
+// TestStoredQueryMetadataExtrasRoundTrip. Each row's invariant is the
+// same: the documented fields a value carries before encode come back
+// unchanged after a Marshal/Unmarshal round trip, and only the unknown
+// keys ride along in Extras. The two collision rows add the caller-
+// constructed case — an Extras key naming a documented field is ignored
+// on encode — for an emitted key (`template_id`) and for an omitted one
+// (`description` is omitempty and `created_timestamp` omitzero, so
+// nothing is emitted for the overlay to win with). The last row pins the
+// other edge of the rule: collision is decided by exact comparison, so a
+// key differing from a documented name only by case is not one (REQ-144).
 func TestTemplateMetadataRoundTrip(t *testing.T) {
-	body := readCassette(t, "template_metadata.json")
-	var meta definition.TemplateMetadata
-	if err := json.Unmarshal(body, &meta); err != nil {
-		t.Fatal(err)
-	}
-	out, err := json.Marshal(meta)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var roundTripped definition.TemplateMetadata
-	if err := json.Unmarshal(out, &roundTripped); err != nil {
-		t.Fatal(err)
-	}
-	if roundTripped.TemplateID != meta.TemplateID {
-		t.Errorf("TemplateID drifted: %q vs %q", roundTripped.TemplateID, meta.TemplateID)
-	}
-	if len(roundTripped.Extras) != len(meta.Extras) {
-		t.Errorf("Extras count drifted: %d vs %d", len(roundTripped.Extras), len(meta.Extras))
-	}
-	// created_timestamp (the spec field) must decode into CreatedOn, not
-	// silently land in Extras.
-	if meta.CreatedOn.IsZero() {
-		t.Errorf("CreatedOn not populated from created_timestamp: %+v", meta)
-	}
-	if _, leaked := meta.Extras["created_timestamp"]; leaked {
-		t.Error("created_timestamp leaked into Extras instead of CreatedOn")
+	for _, tc := range []struct {
+		label string
+		body  []byte
+		// inject is applied to the decoded value before re-encoding;
+		// UnmarshalJSON never routes a documented field name into Extras, so
+		// a collision can only come from a caller.
+		inject map[string]json.RawMessage
+		// wantTimestampDecoded asserts the premise that `created_timestamp`
+		// reaches CreatedOn rather than leaking into Extras.
+		wantTimestampDecoded bool
+		// caseVariant, when set, is a wire key differing from a documented
+		// field name only by case. It must populate the documented field
+		// (encoding/json matches field names case-insensitively) AND be kept
+		// in Extras (the known-field set is matched exactly).
+		caseVariant string
+		// wantEmitted names keys the encoded object itself must carry, read
+		// from the raw JSON — the only way to see two keys that differ only
+		// by case, since decoding folds them onto one field.
+		wantEmitted map[string]string
+	}{
+		{
+			label:                "cassette",
+			body:                 readCassette(t, "template_metadata.json"),
+			wantTimestampDecoded: true,
+		},
+		{
+			label: "colliding extra on an emitted field is ignored",
+			// The `uri` value carries an `&`, which encoding/json escapes as
+			// \u0026 on re-emission — the preserved value comes back
+			// re-spelled, not altered, which is what encodedJSON normalises
+			// for.
+			body: []byte(`{"template_id":"t.v1","uri":"/definition/template/adl1.4/t.v1?a=1&b=2"}`),
+			inject: map[string]json.RawMessage{
+				"template_id": json.RawMessage(`"caller-supplied id"`),
+			},
+		},
+		{
+			label: "colliding extra on an omitted field is ignored",
+			// Only template_id is populated here, so description (omitempty)
+			// and created_timestamp (omitzero) emit no key at all — the case
+			// a last-wins merge cannot survive.
+			body: []byte(`{"template_id":"t.v1","uri":"/definition/template/adl1.4/t.v1"}`),
+			inject: map[string]json.RawMessage{
+				"description":       json.RawMessage(`"caller-supplied description"`),
+				"created_timestamp": json.RawMessage(`"16/07/2017"`),
+			},
+		},
+		{
+			label: "case-variant key rides beside the documented field",
+			// "Template_ID" differs from the documented `template_id` only by
+			// case, so it is not a collision: it populates TemplateID on decode
+			// and is preserved in Extras, and encode emits both keys.
+			// TemplateID is non-empty, so its omitempty key is emitted too.
+			body:        []byte(`{"Template_ID":"t.v1","concept":"Body Weight"}`),
+			caseVariant: "Template_ID",
+			wantEmitted: map[string]string{"template_id": `"t.v1"`, "Template_ID": `"t.v1"`},
+		},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			var meta definition.TemplateMetadata
+			if err := json.Unmarshal(tc.body, &meta); err != nil {
+				t.Fatalf("Unmarshal(wire) = %v, want nil error", err)
+			}
+			// Snapshot the decoded value before injection: it is the want for
+			// every documented field and for the Extras key set. want.Extras
+			// is cleared so nothing reads it through the alias the copy keeps
+			// on the map injection is about to mutate.
+			wantExtras := maps.Clone(meta.Extras)
+			want := meta
+			want.Extras = nil
+			if tc.wantTimestampDecoded {
+				// created_timestamp (the spec field) must decode into
+				// CreatedOn, not silently land in Extras.
+				if meta.CreatedOn.IsZero() {
+					t.Errorf("CreatedOn not populated from created_timestamp: %+v", meta)
+				}
+				if _, leaked := meta.Extras["created_timestamp"]; leaked {
+					t.Error("created_timestamp leaked into Extras instead of CreatedOn")
+				}
+			}
+			if tc.caseVariant != "" {
+				if meta.TemplateID != "t.v1" {
+					t.Errorf("TemplateID = %q after decoding a body whose only template-id key is %q, want t.v1 — encoding/json matches field names case-insensitively",
+						meta.TemplateID, tc.caseVariant)
+				}
+				if raw := meta.Extras[tc.caseVariant]; string(raw) != `"t.v1"` {
+					t.Errorf(`Extras[%q] = %s, want "t.v1" preserved verbatim — the known-field set is matched exactly, so a case variant is not a documented name`,
+						tc.caseVariant, raw)
+				}
+			}
+			for k, v := range tc.inject {
+				if meta.Extras == nil {
+					meta.Extras = map[string]json.RawMessage{}
+				}
+				meta.Extras[k] = v
+			}
+			out, err := json.Marshal(meta)
+			if err != nil {
+				t.Fatalf("Marshal = %v, want nil error", err)
+			}
+			assertEmittedKeys(t, out, tc.wantEmitted)
+			var got definition.TemplateMetadata
+			if err := json.Unmarshal(out, &got); err != nil {
+				t.Fatalf("Unmarshal(re-encoded %s) = %v, want nil error — MarshalJSON emitted what this package cannot decode", out, err)
+			}
+			if got.TemplateID != want.TemplateID {
+				t.Errorf("TemplateID = %q, want %q (the documented field is authoritative)", got.TemplateID, want.TemplateID)
+			}
+			if got.Concept != want.Concept {
+				t.Errorf("Concept = %q, want %q", got.Concept, want.Concept)
+			}
+			if got.ArchetypeID != want.ArchetypeID {
+				t.Errorf("ArchetypeID = %q, want %q", got.ArchetypeID, want.ArchetypeID)
+			}
+			if got.Version != want.Version {
+				t.Errorf("Version = %q, want %q", got.Version, want.Version)
+			}
+			if got.Description != want.Description {
+				t.Errorf("Description = %q, want %q (the documented field is authoritative)", got.Description, want.Description)
+			}
+			if !got.CreatedOn.Equal(want.CreatedOn) {
+				t.Errorf("CreatedOn = %s, want %s", got.CreatedOn.Format(time.RFC3339Nano), want.CreatedOn.Format(time.RFC3339Nano))
+			}
+			if len(got.Extras) != len(wantExtras) {
+				t.Errorf("Extras = %v, want exactly the %d unknown key(s) %v", got.Extras, len(wantExtras), wantExtras)
+			}
+			for k, wantRaw := range wantExtras {
+				raw, ok := got.Extras[k]
+				if !ok {
+					t.Errorf("Extras[%q] dropped on re-encode: %s", k, out)
+					continue
+				}
+				if want := encodedJSON(t, wantRaw); string(raw) != want {
+					t.Errorf("Extras[%q] = %s, want %s", k, raw, want)
+				}
+			}
+		})
 	}
 }
 

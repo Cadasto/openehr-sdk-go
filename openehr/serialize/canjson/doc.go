@@ -37,9 +37,16 @@
 //   - ISO 8601 dates/times/durations are passed through as JSON
 //     strings; the codec does not parse them to time.Time (REQ-046).
 //   - Numeric magnitudes use IEEE 754 double-precision JSON numbers
-//     (no silent float32 coercion). Overflow on decode surfaces as the
-//     underlying codec's own error rather than being silently rounded;
-//     no canjson sentinel wraps it (see Error classification below).
+//     (no silent float32 coercion). REQ-052 requires a typed error on
+//     decode "rather than silently rounding" when a wire value exceeds
+//     JSON's number precision. Half of that is met: an out-of-range
+//     magnitude (e.g. 1e400) already fails with a typed error — a
+//     *json.UnmarshalTypeError, reachable with errors.As through the
+//     generated UnmarshalJSON wrapper. The open half is mantissa
+//     precision loss, which is still silent: a magnitude of
+//     0.1234567890123456789 decodes to 0.12345678901234568 with a nil
+//     error. Closing it is tracked by
+//     docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md.
 //
 // # Error classification
 //
@@ -51,11 +58,34 @@
 //     reachable through unwrapping.
 //   - [ErrInvalidShape] — decode only. Never appears on an encode
 //     path. It is reserved for decode-side shape errors: today no
-//     decode path produces it, because [Unmarshal] and [Decoder.Decode]
-//     pass the underlying codec's error through unchanged.
+//     decode path produces it — a decode failure surfaces in one of
+//     the three shapes described below instead, none of which wraps
+//     this sentinel.
 //
 // Both are distinct from the transport-level transport.ErrInvalidShape,
 // which classifies a response body rather than a codec operation.
+// Do not confuse [ErrInvalidShape] with canxml.ErrInvalidShape either:
+// same name, same subtree, a different value — and unlike this one it
+// does have producers, for `xmi:type` discriminator failures.
+//
+// What a decode failure looks like depends on where it happens:
+//
+//   - Malformed JSON reaches the caller unchanged from encoding/json,
+//     because encoding/json validates the whole input before it
+//     dispatches to any UnmarshalJSON method. [Unmarshal] returns
+//     *json.SyntaxError for it; [Decoder.Decode] classifies a
+//     truncated stream differently, as io.ErrUnexpectedEOF, and an
+//     empty one as io.EOF.
+//   - A shape error inside a generated RM type is wrapped by that
+//     type's generated UnmarshalJSON with a `canjson: <RM_TYPE>:`
+//     prefix, so the encoding/json error stays reachable with
+//     errors.As but is not returned verbatim.
+//   - A failure at a polymorphic slot arrives as [DecodeError]
+//     carrying the path — whether its cause is a typereg sentinel
+//     (missing, unknown or mismatched `_type`) or a plain
+//     encoding/json error at that slot.
+//
+// None of the three wraps [ErrInvalidShape].
 //
 // # Strict vs relaxed decode
 //
@@ -73,9 +103,10 @@
 // # Polymorphic dispatch
 //
 // The codec consults [typereg.Default] for every `_type` lookup.
-// External consumers MUST NOT register types into the default
-// registry — it is populated once by the rm package's init() and
-// expected to stay append-only (REQ-040).
+// External consumers do not register types into the default registry:
+// it is populated once by the rm package's init() and stays
+// append-only. The rule is normative in
+// docs/specifications/rm-modeling.md § Type registry (REQ-040).
 //
 // Abstract generic RM classes whose concrete descendants must
 // dispatch on the wire (e.g. EVENT → POINT_EVENT / INTERVAL_EVENT)

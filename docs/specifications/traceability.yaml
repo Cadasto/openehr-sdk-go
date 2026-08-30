@@ -121,7 +121,7 @@ requirements:
     title: Canonical JSON
     canonical: docs/specifications/wire.md#req-052
     status: draft
-    implementation: landed
+    implementation: partial
     packages: [openehr/serialize/canjson, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
     plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
@@ -132,22 +132,40 @@ requirements:
       - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canjson/polymorphic_decode_test.go
       - openehr/serialize/canjson/polymorphic_encode_test.go
+      - openehr/serialize/canjson/decode_test.go
       - openehr/internal/jsonpoly/jsonpoly_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
     notes: >-
-      Amended 2026-08-30 (read-path decode taxonomy): the REQ-052 encode-side
-      refusal sentinel clause requires canjson.Marshal / MarshalIndent to wrap
-      the encode-only canjson.ErrInvalidValue, kept errors.Is-distinguishable
-      from the decode-side canjson.ErrInvalidShape and from
-      transport.ErrInvalidShape. Landed the same day in marshal.go and pinned
-      by marshal_sentinel_test.go. canxml reuses one sentinel across both
-      directions; that is observed as out of scope, not aligned. Open gap:
-      canjson.ErrInvalidShape has no decode-side producer (Unmarshal and
-      Decoder.Decode pass the codec's error through unchanged), so when a
-      producer lands, sweep the four sites that now document its absence — the
-      ErrInvalidShape var comment and the Unmarshal godoc in decode.go, and the
-      wire-profile and error-classification bullets in doc.go.
+      partial (2026-08-30): the encode-side refusal sentinel clause
+      requires canjson.Marshal / MarshalIndent to wrap the encode-only
+      canjson.ErrInvalidValue, kept errors.Is-distinguishable from the
+      decode-side canjson.ErrInvalidShape and from transport.ErrInvalidShape
+      (landed in marshal.go, pinned by marshal_sentinel_test.go; canxml
+      reuses one sentinel across both directions — observed as out of
+      scope, not aligned). Every other clause is landed except one arm
+      of § Floating-point precision. Its MUST — report a wire value
+      exceeding JSON's number precision as a typed error "rather than
+      silently rounding" — is MET for OUT-OF-RANGE values: 1e400 fails
+      with a typed *json.UnmarshalTypeError, reachable by errors.As
+      through the generated UnmarshalJSON wrapper
+      (TestUnmarshalOverflowIsATypedError). It is OPEN for MANTISSA
+      precision loss, which is still silent: 0.1234567890123456789
+      decodes to 0.12345678901234568 with a nil error, pinned as
+      today's behaviour by TestUnmarshalMantissaPrecisionLossIsSilent —
+      the producer that closes the gap must invert that test. Tracked by
+      docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md
+      (Defers list). A SEPARATE and lesser gap, not this MUST:
+      canjson.ErrInvalidShape has no decode-side producer, so an
+      errors.Is against it never matches; the § asks for a typed error,
+      which the sentinel alone would not discharge.
+      TestUnmarshalDoesNotWrapErrInvalidShape and its Decoder.Decode
+      twin pin that absence. Decode failures reach the caller three ways
+      — malformed JSON unchanged from encoding/json, an in-type shape
+      error behind a `canjson: <RM_TYPE>:` prefix, a polymorphic-slot
+      failure as typereg.DecodeError — and none of them wraps the
+      sentinel, which is a distinct value from both
+      canxml.ErrInvalidShape and transport.ErrInvalidShape.
 
   - id: REQ-056
     title: Canonical XML
@@ -333,6 +351,18 @@ requirements:
       - testkit/probes/demographic/probes_test.go
       - openehr/client/demographic/party_test.go
       - openehr/client/demographic/versioned_test.go
+      - openehr/client/system/system_test.go
+    notes: >-
+      Convention alignment, no § of its own: system.ServiceCapabilities carries
+      an Extras map for unknown response keys and now follows the § REQ-144
+      catalog-descriptor rule by construction -- preserved on decode, re-emitted
+      on encode, and a key colliding with a documented field name ignored, the
+      documented field authoritative (TestCapabilitiesRoundTripsExtras). REQ-144
+      reaches only the two Definition descriptors, and no other § specifies
+      ServiceCapabilities' unknown-key behaviour, so the godoc on that Extras
+      field is deliberately left WITHOUT a REQ citation rather than borrowing
+      one that does not cover it; homing the convention normatively for the
+      System leaf would need its own requirement.
 
   - id: REQ-054
     title: Optimistic concurrency
@@ -680,7 +710,12 @@ requirements:
       - docs/plans/archive/2026-05-15-rest-api-client.md
       - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
       - docs/plans/archive/2026-08-26-aql-small-corrections.md
-    notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
+    notes: >-
+      POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param);
+      PutStoredQuery recovers {name,version} from Location header. Verified by
+      query/execute.go, definition/stored_query.go; PROBE-078/079 deferred.
+      The Extras (unknown-key) behaviour of StoredQueryMetadata is NOT recorded
+      here: § REQ-144 owns both catalog descriptors' decode/encode contract.
     tests:
       - openehr/client/query/query_test.go
       - openehr/client/definition/stored_query_test.go
@@ -1921,7 +1956,7 @@ requirements:
     canonical: docs/specifications/idiom.md#errors-req-025
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr/contribution, openehr/aql, openehr/aql/lint, openehr/aql/contain, openehr/client/query, internal]
+    packages: [transport, auth, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, internal]
     tests:
       - openehr/client/ehr/contribution/version_test.go
       - openehr/client/ehr/contribution/submission_test.go
@@ -1929,9 +1964,17 @@ requirements:
       - openehr/aql/version_test.go
       - openehr/aql/lint/extract_test.go
       - openehr/aql/contain/nilrelation_test.go
+      - openehr/aql/parse/nilsyntaxerror_test.go
       - openehr/client/query/nilaqlerror_test.go
+      - openehr/client/query/nilwiredereference_internal_test.go
       - transport/client_test.go
+      - transport/nilwireerror_test.go
+      - transport/nilwiredereference_internal_test.go
+      - auth/nilautherror_test.go
+      - smart/discovery/nildiscoveryerror_test.go
+      - openehr/rm/typereg/nildecodeerror_test.go
       - openehr/client/ehr/ehr_test.go
+      - openehr/client/ehr/resource_test.go
       - internal/option_guard_test.go
     notes: >-
       The no-panic clause is enforced across the caller-constructible axis, not
@@ -1947,7 +1990,24 @@ requirements:
       out-parameter or an errors.AsType binding — so each answers as that
       value rather than dereferencing it —
       both held by reflection tripwires over the whole exported method set,
-      each fed arguments that actually reach the receiver. A sealed exported
+      each fed arguments that actually reach the receiver. A typed-nil
+      *transport.WireError — the value a failed errors.As / errors.AsType
+      leaves behind — answers Error and Unwrap rather than panicking
+      (transport/nilwireerror_test.go), and answers with the text its own zero
+      value produces, as *query.AQLError does; *ehr.NoRepresentationError sits
+      on the same axis but deliberately answers a nil receiver with a text
+      DIFFERENT from its zero value's, pinned at
+      openehr/client/ehr/resource_test.go:66-76. The 2026-08-30 sweep closed
+      the remaining proven-panicking receivers on the axis:
+      discovery.DiscoveryError, auth.ExchangeError and auth.OAuth2Error (the
+      latter returned nil by ParseOAuth2Error for a non-RFC-6749 body, so it
+      reaches consumers with no errors.As involved), parse.SyntaxError, and
+      typereg.DecodeError — re-exported as canjson.DecodeError and
+      canxml.DecodeError, the documented errors.As out-parameter of both
+      codecs. The four consumer sites that dereferenced a MATCHED-but-nil
+      *transport.WireError are guarded too (errors.As / errors.AsType report
+      ok for a boxed typed nil), and transport.Client's Catalog and HTTPClient
+      accessors join Do on the nil-receiver rule. A sealed exported
       interface a caller can satisfy by EMBEDDING rather than implementing it
       is the nil-adjacent arm of the same axis: an aql.VersionPredicate whose
       embedded field is nil dereferences a nil interface at both dispatch
@@ -2199,7 +2259,19 @@ requirements:
       -- asymmetric tolerance, ADR 0004's precedent. Also fixes the empty-BODY
       arm: ListTemplates/ListStoredQueries return a non-nil zero-length slice
       (a nil slice boxed in a non-nil interface marshals as JSON null -- the
-      read-side twin of the REQ-094 typed-nil trap).
+      read-side twin of the REQ-094 typed-nil trap). The unknown-key (Extras)
+      contract is this §'s too, for BOTH descriptors, including the
+      documented-field-wins collision rule: StoredQueryMetadata reached
+      TemplateMetadata's re-emit parity here. Pinned per descriptor by
+      the collision rows of TestStoredQueryMetadataExtrasRoundTrip and
+      TestTemplateMetadataRoundTrip -- one row per mechanism, since deleting
+      the known-key deletion and restoring Extras-last precedence fail
+      different rows. Preserved values survive up to the insignificant
+      whitespace encoding/json compacts and the <, > and & it escapes as
+      \u003c, \u003e and \u0026 inside a json.RawMessage -- the escaped spelling
+      decodes to the identical value -- so those tests normalise the want
+      through json.Marshal (the encode path itself) rather than comparing raw
+      bytes.
 
   - id: REQ-150
     title: Path-parameter segment validation

@@ -620,3 +620,167 @@ func TestListStoredQueriesUnparseableSavedFails(t *testing.T) {
 		})
 	}
 }
+
+// TestStoredQueryMetadataExtrasRoundTrip pins the stored-query
+// descriptor's encode contract (REQ-144): deployment-specific fields
+// preserved in Extras on decode are re-emitted on encode, and an Extras
+// key colliding with a documented field name is ignored — the documented
+// field is authoritative. Deleting MarshalJSON drops the Extras keys
+// silently, because Extras is `json:"-"`.
+//
+// Every row asserts the full documented field set, so losing `q` or
+// `saved` on the merged (non-empty Extras) path fails here instead of
+// passing unseen. The two collision rows cover both mechanisms: an
+// emitted documented key (`name`) and an omitted one (`saved`, which
+// carries omitzero — nothing is emitted for the overlay to win with, so
+// only deleting the known key from the Extras clone ignores it). The
+// last row pins the other edge of the same rule: collision is decided by
+// exact comparison, so a key differing from a documented name only by
+// case is not one.
+func TestStoredQueryMetadataExtrasRoundTrip(t *testing.T) {
+	const (
+		nameJSON     = `"org.openehr::vitals"`
+		withSaved    = `"name":"org.openehr::vitals","type":"AQL","version":"1.0.0","saved":"2017-07-16T19:20:30.450+01:00","q":"SELECT 1"`
+		withoutSaved = `"name":"org.openehr::vitals","type":"AQL","version":"1.0.0","q":"SELECT 1"`
+		uriJSON      = `"https://example.example/q"`
+	)
+	// Saved is compared with .Equal, never byte-wise: the decode re-
+	// canonicalises `…30.450+01:00` as `…30.45+01:00`, so the re-emitted
+	// spelling differs from the wire spelling while naming the same instant.
+	saved := time.Date(2017, 7, 16, 19, 20, 30, 450_000_000, time.FixedZone("+01:00", 60*60))
+
+	for _, tc := range []struct {
+		label string
+		body  string
+		// inject is applied to the decoded value before re-encoding. A
+		// collision is always caller-constructed: UnmarshalJSON never routes
+		// a documented field name into Extras.
+		inject map[string]json.RawMessage
+		// wantExtras is the exact JSON expected under each surviving Extras
+		// key after the round trip; any other key is a failure.
+		wantExtras map[string]string
+		wantSaved  time.Time
+		// caseVariant, when set, is a wire key differing from a documented
+		// field name only by case. It must populate the documented field
+		// (encoding/json matches field names case-insensitively) AND be kept
+		// in Extras (the known-field set is matched exactly).
+		caseVariant string
+		// wantEmitted names keys the encoded object itself must carry, read
+		// from the raw JSON — the only way to see two keys that differ only
+		// by case, since decoding folds them onto one field.
+		wantEmitted map[string]string
+	}{
+		{
+			label:     "no extras",
+			body:      `{` + withSaved + `}`,
+			wantSaved: saved,
+		},
+		{
+			label:      "one unknown extra",
+			body:       `{` + withSaved + `,"uri":` + uriJSON + `}`,
+			wantExtras: map[string]string{"uri": uriJSON},
+			wantSaved:  saved,
+		},
+		{
+			label: "colliding extra on an emitted field is ignored",
+			body:  `{` + withSaved + `,"uri":` + uriJSON + `}`,
+			inject: map[string]json.RawMessage{
+				"name": json.RawMessage(`"caller-supplied name"`),
+			},
+			wantExtras: map[string]string{"uri": uriJSON},
+			wantSaved:  saved,
+		},
+		{
+			label: "colliding extra on an omitted field is ignored",
+			// No `saved` on the wire, so Saved is zero and omitzero emits no
+			// key. A last-wins merge would publish the caller's bogus value,
+			// which this package's own UnmarshalJSON then rejects — the
+			// re-decode below is the assertion that catches it.
+			body: `{` + withoutSaved + `,"uri":` + uriJSON + `}`,
+			inject: map[string]json.RawMessage{
+				"saved": json.RawMessage(`"16/07/2017"`),
+			},
+			wantExtras: map[string]string{"uri": uriJSON},
+			wantSaved:  time.Time{},
+		},
+		{
+			label: "case-variant key rides beside the documented field",
+			// "Name" differs from the documented `name` only by case, so it is
+			// not a collision: it populates Name on decode and is preserved in
+			// Extras, and encode emits both keys. `name` carries no omitempty,
+			// so the documented key is emitted whatever its value.
+			body:        `{"Name":` + nameJSON + `,"type":"AQL","version":"1.0.0","saved":"2017-07-16T19:20:30.450+01:00","q":"SELECT 1"}`,
+			caseVariant: "Name",
+			wantExtras:  map[string]string{"Name": nameJSON},
+			wantEmitted: map[string]string{"name": nameJSON, "Name": nameJSON},
+			wantSaved:   saved,
+		},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			var meta definition.StoredQueryMetadata
+			if err := json.Unmarshal([]byte(tc.body), &meta); err != nil {
+				t.Fatalf("Unmarshal(wire) = %v, want nil error", err)
+			}
+			// Every surviving Extras key comes from the wire body, never from
+			// inject, so each must already be there after the first decode.
+			for k := range tc.wantExtras {
+				if _, ok := meta.Extras[k]; !ok {
+					t.Fatalf("premise gone: Extras = %v, want %q to land there on decode", meta.Extras, k)
+				}
+			}
+			if tc.caseVariant != "" {
+				if meta.Name != "org.openehr::vitals" {
+					t.Errorf("Name = %q after decoding a body whose only name key is %q, want it populated — encoding/json matches field names case-insensitively",
+						meta.Name, tc.caseVariant)
+				}
+				if raw := meta.Extras[tc.caseVariant]; string(raw) != nameJSON {
+					t.Errorf("Extras[%q] = %s, want %s preserved verbatim — the known-field set is matched exactly, so a case variant is not a documented name",
+						tc.caseVariant, raw, nameJSON)
+				}
+			}
+			for k, v := range tc.inject {
+				if meta.Extras == nil {
+					meta.Extras = map[string]json.RawMessage{}
+				}
+				meta.Extras[k] = v
+			}
+			out, err := json.Marshal(meta)
+			if err != nil {
+				t.Fatalf("Marshal = %v, want nil error", err)
+			}
+			assertEmittedKeys(t, out, tc.wantEmitted)
+			var got definition.StoredQueryMetadata
+			if err := json.Unmarshal(out, &got); err != nil {
+				t.Fatalf("Unmarshal(re-encoded %s) = %v, want nil error — MarshalJSON emitted what this package cannot decode", out, err)
+			}
+			if got.Name != "org.openehr::vitals" {
+				t.Errorf("Name = %q, want org.openehr::vitals (the documented field is authoritative)", got.Name)
+			}
+			if got.Type != "AQL" {
+				t.Errorf("Type = %q, want AQL", got.Type)
+			}
+			if got.Version != "1.0.0" {
+				t.Errorf("Version = %q, want 1.0.0", got.Version)
+			}
+			if got.Q != "SELECT 1" {
+				t.Errorf("Q = %q, want SELECT 1", got.Q)
+			}
+			if !got.Saved.Equal(tc.wantSaved) {
+				t.Errorf("Saved = %s, want %s", got.Saved.Format(time.RFC3339Nano), tc.wantSaved.Format(time.RFC3339Nano))
+			}
+			if len(got.Extras) != len(tc.wantExtras) {
+				t.Errorf("Extras = %v, want exactly the %d unknown key(s) %v", got.Extras, len(tc.wantExtras), tc.wantExtras)
+			}
+			for k, want := range tc.wantExtras {
+				raw, ok := got.Extras[k]
+				if !ok {
+					t.Errorf("Extras[%q] dropped on re-encode: %s", k, out)
+					continue
+				}
+				if want := encodedJSON(t, json.RawMessage(want)); string(raw) != want {
+					t.Errorf("Extras[%q] = %s, want %s", k, raw, want)
+				}
+			}
+		})
+	}
+}

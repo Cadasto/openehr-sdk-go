@@ -6,13 +6,20 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/internal/poly"
 )
 
-// ErrInvalidShape is the canxml-local sentinel for XML-level shape
-// errors (malformed XML, element-name mismatch on a non-polymorphic
-// field, numeric overflow, `xmi:type` rejection). Polymorphic-
-// discrimination errors come from the typereg package — callers
-// MUST `errors.Is` against [typereg.ErrMissingType] /
-// [typereg.ErrUnknownType] / [typereg.ErrTypeMismatch] rather than
-// against this sentinel.
+// ErrInvalidShape is the canxml-local sentinel reserved for XML-level
+// shape errors (malformed XML, element-name mismatch on a
+// non-polymorphic field, numeric overflow, `xmi:type` rejection).
+// Only part of that range is produced today: decode returns it for an
+// `xmi:type` discriminator on the wire (via [XSITypeOf]), and encode
+// returns it for a nil value or a value that does not implement
+// xml.Marshaler. Generic XML syntax errors come back unchanged from
+// encoding/xml, so an errors.Is against this sentinel does not match
+// a malformed document.
+//
+// Polymorphic-discrimination errors come from the typereg package
+// instead: match those with errors.Is against [typereg.ErrMissingType]
+// / [typereg.ErrUnknownType] / [typereg.ErrTypeMismatch], not against
+// this sentinel.
 var ErrInvalidShape = errors.New("canxml: invalid XML shape")
 
 // ErrNamespace is the canxml-local sentinel reserved for foreign-

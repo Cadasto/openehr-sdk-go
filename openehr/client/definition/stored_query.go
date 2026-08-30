@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,12 +16,21 @@ import (
 // StoredQueryMetadata is the Definition API stored-query descriptor
 // (REQ-057).
 type StoredQueryMetadata struct {
-	Name    string                     `json:"name"`
-	Type    string                     `json:"type"`
-	Version string                     `json:"version"`
-	Saved   time.Time                  `json:"saved,omitzero"`
-	Q       string                     `json:"q"`
-	Extras  map[string]json.RawMessage `json:"-"`
+	Name    string    `json:"name"`
+	Type    string    `json:"type"`
+	Version string    `json:"version"`
+	Saved   time.Time `json:"saved,omitzero"`
+	Q       string    `json:"q"`
+	// Extras preserves deployment-specific fields not in the standard
+	// stored-query descriptor shape.
+	// [StoredQueryMetadata.MarshalJSON] re-emits them (REQ-144).
+	//
+	// Extras keys are matched against the documented field names
+	// case-sensitively, while encoding/json decodes those field names
+	// case-insensitively. A wire key differing from a documented field
+	// only by case ("Name") therefore populates the documented field and
+	// is also preserved here verbatim, so encode emits both keys.
+	Extras map[string]json.RawMessage `json:"-"`
 }
 
 var knownStoredQueryFields = map[string]struct{}{
@@ -63,6 +73,43 @@ func (m *StoredQueryMetadata) UnmarshalJSON(data []byte) error {
 		m.Extras[k] = v
 	}
 	return nil
+}
+
+// MarshalJSON re-emits documented fields plus Extras.
+//
+// An Extras key that collides with a documented field name is ignored on
+// encode; the documented field is authoritative. Unknown keys are
+// preserved and re-emitted, and documented fields are emitted per their
+// own contract (only `saved` is omitted, when it is zero), so the emitted
+// key set is not guaranteed to be identical to the wire body a value was
+// decoded from. Neither is its spelling: encoding/json compacts
+// insignificant whitespace and escapes `<`, `>` and `&` as `\u003c`,
+// `\u003e` and `\u0026` inside a preserved value — the escaped spelling
+// decodes to the identical value — and key order is not part of the
+// contract (REQ-144).
+func (m StoredQueryMetadata) MarshalJSON() ([]byte, error) {
+	type alias StoredQueryMetadata
+	known, err := json.Marshal(alias(m))
+	if err != nil {
+		return nil, err
+	}
+	if len(m.Extras) == 0 {
+		return known, nil
+	}
+	// Start from Extras with every documented field name deleted, then
+	// overlay the typed emission. Deleting rather than merely letting the
+	// overlay win is what makes the rule hold for an omitted field: a zero
+	// Saved emits no `saved` key, so a caller-set Extras["saved"] would
+	// otherwise survive and produce output this package's own
+	// UnmarshalJSON rejects.
+	merged := maps.Clone(m.Extras)
+	for k := range knownStoredQueryFields {
+		delete(merged, k)
+	}
+	if err := json.Unmarshal(known, &merged); err != nil {
+		return nil, err
+	}
+	return json.Marshal(merged)
 }
 
 // storeConfig holds resolved options for storing a query.
