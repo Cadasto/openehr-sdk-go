@@ -2176,7 +2176,9 @@ requirements:
       - openehr/aql/contain/imports_test.go
       - openehr/aql/contain/nilrelation_test.go  # § Nil and zero relations; also REQ-025
       - openehr/aql/contain/unavoidable_test.go  # TypeRelation.Unavoidable, the REQ-164 widening
+      - testkit/probes/aql/probe_097_semantic_lint.go  # the PROBE-097 armature over the semantic-lint corpus
       - testkit/probes/aql/probe_100_conformance_corpus.go  # the PROBE-100 corpus reader and its reconstruction table
+      - testkit/probes/aql/probe_100_internal_test.go  # the reconstruction table's own Vars-are-leading-Header contract
       - testkit/probes/aql/probes_test.go
     probes: [PROBE-097, PROBE-100]
     plans:
@@ -2223,6 +2225,7 @@ requirements:
       - openehr/aql/internal/semcheck/semcheck_test.go
       - openehr/aql/internal/semcheck/imports_test.go
       - openehr/validation/aql_test.go
+      - testkit/probes/aql/probe_097_semantic_lint.go  # the PROBE-097 armature over the semantic-lint corpus
       - testkit/probes/aql/probes_test.go
     notes: >-
       Additive REQ-109 Layer-2 extension: relation-backed semantic checks
@@ -2253,6 +2256,7 @@ requirements:
       - openehr/aql/verify_test.go
       - openehr/aql/verify_parity_test.go
       - openehr/aql/imports_test.go
+      - testkit/probes/aql/probe_097_semantic_lint.go  # PROBE-097 arm (c), the read/write parity guard
       - testkit/probes/aql/probes_test.go
     notes: >-
       Opt-in verification entry point over the builder's own containment
@@ -2282,6 +2286,7 @@ requirements:
       - openehr/aql/containment_roundtrip_test.go
       - openehr/aql/verify_parity_test.go
       - openehr/aql/parse/dispatch_tripwire_test.go
+      - testkit/probes/aql/probe_097_semantic_lint.go  # PROBE-097 arm (c), widened to REQ-163's now-buildable rows
       - testkit/probes/aql/probes_test.go
     notes: >-
       Write-side carriers for the three class- and projection-position

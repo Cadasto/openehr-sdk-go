@@ -53,7 +53,8 @@ composition: archetype_node_id=openEHR-EHR-COMPOSITION.encounter.v1
   name="body_weight"
   language=nl (terminology=ISO_639-1)
   territory=NL
-  ...
+  category=event
+  content items=1
 OK: canonical-JSON Composition decoded from body_weight.json
 ```
 
@@ -364,9 +365,9 @@ go run ./cmd/examples/compile-build-validate path/to/template.opt
 
 ```text
 template : vital_signs (vital_signs.opt)
-composition: 7550 bytes canonical JSON, round-tripped
+composition: 3162 bytes canonical JSON, round-tripped
 validation : OK — round-tripped composition conforms to the OPT
-ehr_status : ValidateEHRStatus callable (OK=false against a COMPOSITION OPT)
+ehr_status : ValidateEHRStatus callable — 6 issue(s), root type mismatch as expected
 ```
 
 **What to copy into your app:** `templatecompile.Compile(opt)` once per template, then reuse the `*Compiled` across many `composition.NewBuilder` / `validation.Validate*` calls. The compiled template is the single artifact the builder and validator share.
@@ -466,7 +467,7 @@ FLAT (application/openehr.wt.flat+json):
   test_dv_quantity_open_constraint.v0/test123/any_event:0/my_dv_quantity|unit = mmHg
   ...
 
-STRUCTURED (application/openehr.wt.structured+json): 412 bytes
+STRUCTURED (application/openehr.wt.structured+json): 1325 bytes
 
 OK: FLAT -> COMPOSITION -> FLAT round-trips for Test_dv_quantity_open_constraint.v0
 OK: WithTemplate decode validates against the OPT
@@ -605,6 +606,10 @@ When writing your own tests, prefer importing fixtures from `testkit` rather tha
 ## Maintaining this catalog
 
 Agents and contributors: when you add or materially change an example under `cmd/examples/`, update this file, [`cmd/examples/doc.go`](../cmd/examples/doc.go), and [`quick-start.md`](quick-start.md) (if onboarding changes) in the **same PR**. Checklist: [ai-workflow.md § Examples](ai-workflow.md#examples).
+
+The **Sample output:** blocks named in the allowlist of [`cmd/examples/transcripts_test.go`](../cmd/examples/transcripts_test.go) are verified mechanically against real program runs — that allowlist is the sole authority on which ones, and its exclusion census accounts for every other example. A deliberate output change therefore means regenerating the block verbatim from `go run ./cmd/examples/<name>`, not editing it by hand.
+
+An example that **gains** a verbatim sample-output block must be added to that allowlist in the same PR; a new block is otherwise unguarded, which is the one blind spot the test has.
 
 ---
 
