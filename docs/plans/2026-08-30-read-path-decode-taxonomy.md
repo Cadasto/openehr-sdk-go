@@ -49,7 +49,7 @@ When a 2xx response body cannot be decoded as the requested type, the SDK today 
 - [ ] Write **ADR 0018 — Raw response bytes on the typed 2xx decode error** (`docs/adr/0018-raw-bytes-on-decode-error.md`, heading form `# ADR 0018 — …`, metadata bullets per ADR 0017's richer form: Status / Introduces REQ-151 / Amends REQ-052, REQ-094 / Plan link / Related ADR 0004, REQ-093). Decision: the `Body` field on `transport.DecodeError` is **always populated** on a 2xx decode failure — no opt-in knob. The ADR must answer, in Consequences, why 2xx decode-failure bytes differ from the non-2xx bodies REQ-093 gates behind `WithRawErrorBodies`: a 2xx body is the very representation the caller requested and would have received fully decoded had it parsed — the caller is already entitled to those bytes; a non-2xx error body is diagnostic content the caller never asked for and routinely carries server-side clinical narrative. Supporting points: the bytes have already crossed the wire into the process; `WithMaxResponseBody` (default 64 MiB, transport.md § REQ-093) bounds them; `Error()` stays value-free so log surfaces are unchanged; the *field* is documented as potentially PHI-bearing, exactly how `NoRepresentationError.Cause` is treated. Alternatives considered: reuse `WithRawErrorBodies` (default still loses the payload — the defect survives), a new opt-in `WithRawDecodeBodies` (same problem unless default-on, in which case it is a no-op knob; ADR 0004's consequence line — no second strict-mode knob in v1 — is the precedent against it).
 - [ ] Update `docs/adr/README.md` table with the 0018 row (Accepted, 2026-08-30).
 - [ ] Write **`transport.md` § REQ-151** as `## REQ-151 — Typed 2xx decode failure`, inserted after the REQ-150 block (~line 239), before `## Coverage`. The bullets below are the `sdd-specify` seed — the § authored in Phase 0 is the only normative home, and its RFC-2119 wording is written there, not copied from here:
-  - After a 2xx, when the body cannot be decoded as the requested representation, the returned error is a `*transport.DecodeError` reachable via `errors.As`, carrying the raw response bytes in `Body`, wrapping the decoder's error (`Unwrap`), with a value-free `Error()` in the REQ-093 discipline (method + route template + classification; never the body, never interpolated cause text).
+  - After a 2xx, when the body cannot be decoded as the requested representation, the returned error is a `*transport.DecodeError` recoverable via `errors.AsType` (the REQ-025 preferred matcher; `errors.As` reaches it identically), carrying the raw response bytes in `Body`, wrapping the decoder's error (`Unwrap`), with a value-free `Error()` in the REQ-093 discipline (method + route template + classification; never the body, never interpolated cause text).
   - The existing `(*T, *Metadata, error)` triple still populates `*Metadata` on this path.
   - A non-2xx stays `*transport.WireError` and is never a `DecodeError`.
   - An **empty** 2xx body on a read that expected a representation keeps today's `transport.ErrInvalidShape` contract — deliberately not unified under the new type (state this explicitly). Keyed exclusion: the Definition **list** leaves, where an empty 2xx body is success — a non-nil empty slice under REQ-144 ([Definition metadata decoding plan](2026-08-30-definition-metadata-decoding.md)) — never `ErrInvalidShape` and never a `DecodeError`; only a non-empty list body that fails to decode (e.g. an object where an array is expected) is REQ-151's.
@@ -70,9 +70,9 @@ When a 2xx response body cannot be decoded as the requested type, the SDK today 
 **Tasks:**
 
 - [ ] Failing tests first in `transport/client_test.go` (external `_test` package, stdlib `testing` only):
-  - `TestDecodeTypedErrorCarriesBody` — httptest 200 with body `[1, 2, 3]` (a top-level JSON array cannot decode into any struct type, so the failure is guaranteed; an object with unknown keys such as `{"unexpected":"shape"}` decodes cleanly — unknown fields are ignored and no required-field validation runs) decoded as an RM type; assert `errors.As` yields `*transport.DecodeError`, `Body` equals the served bytes, `Unwrap` reaches the decoder error, metadata on the triple is non-nil.
+  - `TestDecodeTypedErrorCarriesBody` — httptest 200 with body `[1, 2, 3]` (a top-level JSON array cannot decode into any struct type, so the failure is guaranteed; an object with unknown keys such as `{"unexpected":"shape"}` decodes cleanly — unknown fields are ignored and no required-field validation runs) decoded as an RM type; assert `errors.AsType[*transport.DecodeError]` (REQ-025's preferred matcher since PR #135) recovers the typed error, `Body` equals the served bytes, `Unwrap` reaches the decoder error, metadata on the triple is non-nil.
   - `TestDecodeErrorStringIsValueFree` — `Error()` contains the method and route but no substring of the body **and no substring of the wrapped decoder error's text** (the decoder's `parse %q`-style messages embed payload values — the leak this guard exists to block). Removing the value-free guard must fail this named test.
-  - `TestDecodeNon2xxStaysWireError` — 404: `errors.As` for `*transport.WireError` true, for `*transport.DecodeError` false.
+  - `TestDecodeNon2xxStaysWireError` — 404: `errors.AsType[*transport.WireError]` matches, `errors.AsType[*transport.DecodeError]` does not.
   - `TestDecodeEmptyBodyStaysInvalidShape` — 200 empty body: `errors.Is(err, transport.ErrInvalidShape)` true, not a `DecodeError`.
 - [ ] Implement in `transport/errors.go`, next to `WireError`:
 
@@ -111,7 +111,7 @@ if err := json.Unmarshal(resp.Body, &out); err != nil {
 }
 ```
 
-(`errors.As` traverses the `fmt.Errorf` wrap, so acceptance is unchanged; reuse each leaf's existing method/route values rather than new constants.)
+(`errors.AsType` traverses the `fmt.Errorf` wrap, so acceptance is unchanged; reuse each leaf's existing method/route values rather than new constants.)
 
 **Tasks:**
 
@@ -127,7 +127,7 @@ The read-path decodes outside `transport.Decode` and outside the Definition clie
 
 **Tasks:**
 
-- [ ] Failing test then conversion, one leaf at a time, same wrapper-plus-typed-inner shape as Phase 2. The demographic and composition leaves decode via `typereg.DecodeAs` / `canjson.Unmarshal` — the typed error's `Inner` wraps whatever those return (including `canjson.DecodeError`), preserving today's `errors.As` reach into path/type diagnostics.
+- [ ] Failing test then conversion, one leaf at a time, same wrapper-plus-typed-inner shape as Phase 2. The demographic and composition leaves decode via `typereg.DecodeAs` / `canjson.Unmarshal` — the typed error's `Inner` wraps whatever those return (including `canjson.DecodeError`), preserving today's `errors.AsType` reach into path/type diagnostics.
 - [ ] `go test ./openehr/client/... -count=1`.
 
 **Definition of done:** every in-scope read-path 2xx decode failure surfaces as `*transport.DecodeError`; **each** excluded arm is covered by a named test asserting it is **not** the new type — `contribution.Commit` decode failure stays `*ehr.NoRepresentationError`; a `WriteResult` callback decode failure (e.g. `composition.Update`) stays `*ehr.NoRepresentationError`; `ResolveIdentifierBody` decode failure keeps its `transport.ErrInvalidShape` wrap.
@@ -146,7 +146,7 @@ The read-path decodes outside `transport.Decode` and outside the Definition clie
 
 **Tasks:**
 
-- [ ] Failing test in `openehr/serialize/canjson`: `canjson.Marshal(make(chan int))` satisfies `errors.Is(err, canjson.ErrInvalidValue)` and does **not** satisfy `errors.Is` for `canjson.ErrInvalidShape` nor `transport.ErrInvalidShape`; the underlying `*json.UnsupportedTypeError` stays reachable via `errors.As`. A sibling case asserts `canjson.MarshalIndent(make(chan int), "", "  ")` carries the same sentinel.
+- [ ] Failing test in `openehr/serialize/canjson`: `canjson.Marshal(make(chan int))` satisfies `errors.Is(err, canjson.ErrInvalidValue)` and does **not** satisfy `errors.Is` for `canjson.ErrInvalidShape` nor `transport.ErrInvalidShape`; the underlying `*json.UnsupportedTypeError` stays reachable via `errors.AsType`. A sibling case asserts `canjson.MarshalIndent(make(chan int), "", "  ")` carries the same sentinel.
 - [ ] Implement in `openehr/serialize/canjson/marshal.go`:
 
 ```go
