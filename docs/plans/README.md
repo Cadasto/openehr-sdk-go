@@ -6,6 +6,20 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### Read-path decode taxonomy and Definition metadata decoding (2026-08-30)
+
+Two independent Draft plans, each authoring its spec deltas in a Phase 0 (via `sdd-specify`)
+before implementation. [2026-08-30-read-path-decode-taxonomy.md](2026-08-30-read-path-decode-taxonomy.md)
+reserves **REQ-151** (transport band): a `transport.DecodeError` carrying the raw response bytes
+when a 2xx body fails to decode, settled by ADR 0018, probed by PROBE-101, with a `canjson`
+encode-sentinel rider on REQ-052 — it closes both read-path deferrals from the archived
+[write-result plan](archive/2026-08-18-write-result-contract.md).
+[2026-08-30-definition-metadata-decoding.md](2026-08-30-definition-metadata-decoding.md)
+reserves **REQ-144** (wire-extensions band): tolerant Definition metadata timestamp decode
+(settled by ADR 0019) and non-nil empty list slices. Both ids are reserved in
+[REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy); registry rows and
+traceability entries follow in each plan's Phase 0.
+
 ### AQL alignment audit follow-ups (2026-08-26)
 
 Four plans from the 2026-08-26 AQL alignment audit (maintainer's knowledge base, ecosystem
