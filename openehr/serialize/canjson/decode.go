@@ -100,11 +100,15 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 }
 
 // Decode reads the next JSON value from the stream and stores it in
-// v. Errors follow the same classification as [Unmarshal], with one
-// stream-level difference: a truncated value is reported as
-// io.ErrUnexpectedEOF here, where [Unmarshal] reports a
-// *json.SyntaxError ("unexpected end of JSON input"). Other syntax
-// errors are the same *json.SyntaxError in both.
+// v. Errors follow the same classification as [Unmarshal], except
+// where reading a stream rather than a whole input changes the
+// answer: a truncated value is reported as io.ErrUnexpectedEOF here,
+// where [Unmarshal] reports a *json.SyntaxError ("unexpected end of
+// JSON input"); an empty or whitespace-only stream is io.EOF; and
+// content after the first value is simply the next value in the
+// stream, not a syntax error — `{"a":1}x` fails in [Unmarshal] and
+// succeeds here. Other syntax errors are the same *json.SyntaxError
+// in both.
 func (d *Decoder) Decode(v any) error {
 	return d.dec.Decode(v)
 }

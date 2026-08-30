@@ -63,7 +63,8 @@
 //     because encoding/json validates the whole input before it
 //     dispatches to any UnmarshalJSON method. [Unmarshal] returns
 //     *json.SyntaxError for it; [Decoder.Decode] classifies a
-//     truncated stream differently, as io.ErrUnexpectedEOF.
+//     truncated stream differently, as io.ErrUnexpectedEOF, and an
+//     empty one as io.EOF.
 //   - A shape error inside a generated RM type is wrapped by that
 //     type's generated UnmarshalJSON with a `canjson: <RM_TYPE>:`
 //     prefix, so the encoding/json error stays reachable with
@@ -98,9 +99,10 @@
 // # Polymorphic dispatch
 //
 // The codec consults [typereg.Default] for every `_type` lookup.
-// External consumers MUST NOT register types into the default
-// registry — it is populated once by the rm package's init() and
-// expected to stay append-only (REQ-040).
+// External consumers do not register types into the default registry:
+// it is populated once by the rm package's init() and stays
+// append-only. The rule is normative in
+// docs/specifications/rm-modeling.md § Type registry (REQ-040).
 //
 // Abstract generic RM classes whose concrete descendants must
 // dispatch on the wire (e.g. EVENT → POINT_EVENT / INTERVAL_EVENT)

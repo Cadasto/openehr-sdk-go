@@ -3,6 +3,7 @@ package canjson_test
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -140,23 +141,30 @@ func TestDecodeErrorCarriesPath(t *testing.T) {
 // numeric magnitude out of float64 range. All three fail today — none
 // of them through the sentinel.
 //
-// The two want fields pin WHICH arm of the documented classification
+// The want fields pin WHICH arm of the documented classification
 // produced each failure, so a future producer cannot quietly change
 // the arm. They differ for the syntax row on purpose: Unmarshal sees
 // the whole input and reports *json.SyntaxError, while Decoder.Decode
-// runs out of stream and reports io.ErrUnexpectedEOF.
+// runs out of stream and reports io.ErrUnexpectedEOF. The other
+// stream-level divergences Decode's godoc names — an empty stream and
+// content after the first value — are pinned by
+// TestDecoderDecodeStreamDivergesFromUnmarshal.
 var shapeErrorInputs = []struct {
 	name string
 	in   string
 	// wantUnmarshalErr / wantDecodeErr are substrings of the error text.
 	wantUnmarshalErr string
 	wantDecodeErr    string
+	// wantDecodeSentinel, when set, is the sentinel Decode's error must
+	// match under errors.Is — the one Decode's godoc names.
+	wantDecodeSentinel error
 }{
 	{
-		name:             "syntax error: object truncated after the opening brace",
-		in:               `{`,
-		wantUnmarshalErr: "unexpected end of JSON input",
-		wantDecodeErr:    "unexpected EOF",
+		name:               "syntax error: object truncated after the opening brace",
+		in:                 `{`,
+		wantUnmarshalErr:   "unexpected end of JSON input",
+		wantDecodeErr:      "unexpected EOF",
+		wantDecodeSentinel: io.ErrUnexpectedEOF,
 	},
 	{
 		name:             "type mismatch: magnitude is not a number",
@@ -197,9 +205,9 @@ func TestUnmarshalDoesNotWrapErrInvalidShape(t *testing.T) {
 
 // TestDecoderDecodeDoesNotWrapErrInvalidShape is the streaming twin of
 // the test above — the only coverage of Decoder.Decode in the package.
-// It also pins the one documented difference between the two entry
-// points: a truncated value is io.ErrUnexpectedEOF here, not the
-// *json.SyntaxError Unmarshal reports.
+// It also pins the sentinel Decode's godoc names for a truncated
+// value, io.ErrUnexpectedEOF, where Unmarshal reports a
+// *json.SyntaxError.
 func TestDecoderDecodeDoesNotWrapErrInvalidShape(t *testing.T) {
 	for _, tt := range shapeErrorInputs {
 		t.Run(tt.name, func(t *testing.T) {
@@ -211,11 +219,57 @@ func TestDecoderDecodeDoesNotWrapErrInvalidShape(t *testing.T) {
 			if !strings.Contains(err.Error(), tt.wantDecodeErr) {
 				t.Errorf("Decode(%s) err = %v; want the text to contain %q", tt.in, err, tt.wantDecodeErr)
 			}
+			if tt.wantDecodeSentinel != nil && !errors.Is(err, tt.wantDecodeSentinel) {
+				t.Errorf("Decode(%s) err = %v; want errors.Is(_, %v)", tt.in, err, tt.wantDecodeSentinel)
+			}
 			if errors.Is(err, canjson.ErrInvalidShape) {
 				t.Errorf("Decode(%s) err = %v wraps ErrInvalidShape; no decode path produces the sentinel yet (REQ-052 producer deferred)", tt.in, err)
 			}
 		})
 	}
+}
+
+// TestDecoderDecodeStreamDivergesFromUnmarshal pins the two divergences
+// Decode's godoc names beyond the truncated-value one: reading a stream
+// rather than a whole input changes the answer for an empty input and
+// for content after the first value. Both are measured behaviour of
+// encoding/json's Decoder, not a canjson policy — this test is the
+// tripwire if a future codec swap changes either.
+func TestDecoderDecodeStreamDivergesFromUnmarshal(t *testing.T) {
+	t.Run("empty stream is io.EOF, not a syntax error", func(t *testing.T) {
+		var q rm.DVQuantity
+		err := canjson.NewDecoder(strings.NewReader("")).Decode(&q)
+		if !errors.Is(err, io.EOF) {
+			t.Errorf("Decode(\"\") err = %v; want errors.Is(_, io.EOF)", err)
+		}
+		var uq rm.DVQuantity
+		if uerr := canjson.Unmarshal([]byte(""), &uq); !errors.As(uerr, new(*json.SyntaxError)) {
+			t.Errorf("Unmarshal(\"\") err = %v; want *json.SyntaxError (the divergence this test pins)", uerr)
+		}
+	})
+
+	t.Run("content after the first value is the next value, not an error", func(t *testing.T) {
+		const in = `{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg"}{"_type":"DV_QUANTITY","magnitude":1.5,"units":"kg"}`
+		dec := canjson.NewDecoder(strings.NewReader(in))
+		var first rm.DVQuantity
+		if err := dec.Decode(&first); err != nil {
+			t.Fatalf("Decode(first value) = %v; want nil", err)
+		}
+		if first.Magnitude != 80.5 {
+			t.Errorf("first.Magnitude = %v; want 80.5", first.Magnitude)
+		}
+		var second rm.DVQuantity
+		if err := dec.Decode(&second); err != nil {
+			t.Fatalf("Decode(second value) = %v; want nil — trailing content is the next stream value", err)
+		}
+		if second.Magnitude != 1.5 {
+			t.Errorf("second.Magnitude = %v; want 1.5", second.Magnitude)
+		}
+		var uq rm.DVQuantity
+		if uerr := canjson.Unmarshal([]byte(in), &uq); !errors.As(uerr, new(*json.SyntaxError)) {
+			t.Errorf("Unmarshal(two values) err = %v; want *json.SyntaxError (the divergence this test pins)", uerr)
+		}
+	})
 }
 
 // TestUnmarshalOverflowIsATypedError pins the half of REQ-052's
