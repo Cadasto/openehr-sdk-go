@@ -25,11 +25,14 @@ const sampleMarker = "**Sample output:**"
 // neither the bare form nor a known label.
 const markerPrefix = "**Sample output"
 
-// labelledMarkers are the exact spellings docs/examples.md uses when a block is
-// deliberately not a full verbatim transcript. Transcribed from the file, not
-// guessed: the label sits inside the bold run for the two "(abridged)" forms
-// and outside it for contribution-build, so no prefix or contains test would
-// classify all four. A section carrying one of these is not expected on the
+// labelledMarkers are the three exact spellings docs/examples.md uses when a
+// block is deliberately not a full verbatim transcript. Four sections carry
+// them: template-explore and webtemplate-export share the plain "(abridged)"
+// spelling, flat-roundtrip adds ", keys sorted", and contribution-build is
+// spelled differently again. Transcribed from the file, not guessed — the
+// label sits inside the bold run for the two "(abridged)" spellings and
+// outside it for contribution-build, so no single prefix or contains test
+// classifies all three. A section carrying one of these is not expected on the
 // allowlist — its block is elided by design, and comparing it would fail.
 var labelledMarkers = []string{
 	"**Sample output (abridged):**",
@@ -124,7 +127,8 @@ func TestDocsExamplesTranscripts(t *testing.T) {
 			if want == got {
 				return
 			}
-			t.Errorf("docs/examples.md § %s no longer matches `go run ./cmd/examples/%s`.\n%s"+
+			t.Errorf("docs/examples.md § %s no longer matches the program's output "+
+				"(reproduce with `go run ./cmd/examples/%s`).\n%s"+
 				"Regenerate the block from a real run, or exclude the example in the allowlist if "+
 				"its output became nondeterministic.",
 				tc.section, tc.program, diffTranscript(want, got))
@@ -456,7 +460,7 @@ func diffTranscript(want, got string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "  first difference at line %d — the doc block has %d line(s), the program printed %d\n",
 		at+1, len(wantLines), len(gotLines))
-	b.WriteString("  --- docs/examples.md\n  +++ go run output\n")
+	b.WriteString("  --- docs/examples.md\n  +++ program output\n")
 	for i := max(at-2, 0); i < min(at+3, longest); i++ {
 		w, wOK := lineAt(wantLines, i)
 		g, gOK := lineAt(gotLines, i)
