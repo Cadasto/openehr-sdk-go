@@ -922,8 +922,12 @@ func TestListTemplatesUnparseableTimestampFails(t *testing.T) {
 			if err == nil {
 				t.Fatalf("ListTemplates(%q) = nil error with list %+v, want a decode failure", tc.wire, list)
 			}
-			if !strings.Contains(err.Error(), "created_timestamp") {
-				t.Errorf("err = %q, want it to name created_timestamp", err)
+			de, ok := errors.AsType[*transport.DecodeError](err)
+			if !ok {
+				t.Fatalf("err = %v, want a *transport.DecodeError in the chain (REQ-151)", err)
+			}
+			if de.Inner == nil || !strings.Contains(de.Inner.Error(), "created_timestamp") {
+				t.Errorf("wrapped cause = %v, want it to name created_timestamp", de.Inner)
 			}
 			if list != nil {
 				t.Errorf("list = %+v, want nil on decode failure", list)

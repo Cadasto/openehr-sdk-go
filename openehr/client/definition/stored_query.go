@@ -243,7 +243,9 @@ func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, n
 	}
 	var out StoredQueryMetadata
 	if err := json.Unmarshal(resp.Body, &out); err != nil {
-		return nil, resp.Metadata, fmt.Errorf("%s: decode: %w", op, err)
+		return nil, resp.Metadata, fmt.Errorf("%s: %w", op, &transport.DecodeError{
+			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+		})
 	}
 	return &out, resp.Metadata, nil
 }
@@ -329,7 +331,9 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 	}
 	var out StoredQueryMetadata
 	if err := json.Unmarshal(resp.Body, &out); err != nil {
-		return nil, resp.Metadata, fmt.Errorf("definition.GetStoredQuery: decode: %w", err)
+		return nil, resp.Metadata, fmt.Errorf("definition.GetStoredQuery: %w", &transport.DecodeError{
+			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+		})
 	}
 	return &out, resp.Metadata, nil
 }
@@ -372,7 +376,9 @@ func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern str
 	}
 	var out []StoredQueryMetadata
 	if err := json.Unmarshal(resp.Body, &out); err != nil {
-		return nil, resp.Metadata, fmt.Errorf("definition.ListStoredQueries: decode: %w", err)
+		return nil, resp.Metadata, fmt.Errorf("definition.ListStoredQueries: %w", &transport.DecodeError{
+			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+		})
 	}
 	return out, resp.Metadata, nil
 }

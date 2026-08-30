@@ -253,7 +253,9 @@ func UploadTemplate(ctx context.Context, c *transport.Client, format TemplateFor
 	}
 	var out TemplateMetadata
 	if err := json.Unmarshal(resp.Body, &out); err != nil {
-		return nil, resp.Metadata, fmt.Errorf("definition.UploadTemplate: decode metadata: %w", err)
+		return nil, resp.Metadata, fmt.Errorf("definition.UploadTemplate: %w", &transport.DecodeError{
+			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+		})
 	}
 	return &out, resp.Metadata, nil
 }
@@ -337,7 +339,9 @@ func ListTemplates(ctx context.Context, c *transport.Client, format TemplateForm
 	}
 	var out []TemplateMetadata
 	if err := json.Unmarshal(resp.Body, &out); err != nil {
-		return nil, resp.Metadata, fmt.Errorf("definition.ListTemplates: decode: %w", err)
+		return nil, resp.Metadata, fmt.Errorf("definition.ListTemplates: %w", &transport.DecodeError{
+			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+		})
 	}
 	return out, resp.Metadata, nil
 }

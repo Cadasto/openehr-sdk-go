@@ -123,11 +123,12 @@ requirements:
     status: draft
     implementation: partial
     packages: [openehr/serialize/canjson, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
       - openehr/serialize/canjson/encode_test.go
+      - openehr/serialize/canjson/marshal_sentinel_test.go
       - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canjson/polymorphic_decode_test.go
       - openehr/serialize/canjson/polymorphic_encode_test.go
@@ -136,27 +137,35 @@ requirements:
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
     notes: >-
-      partial (2026-08-30): every clause is landed except one arm of §
-      Floating-point precision. Its MUST -- report a wire value exceeding
-      JSON's number precision as a typed error "rather than silently rounding"
-      -- is MET for OUT-OF-RANGE values: 1e400 fails with a typed
-      *json.UnmarshalTypeError, reachable by errors.As through the generated
-      UnmarshalJSON wrapper (TestUnmarshalOverflowIsATypedError). It is OPEN
-      for MANTISSA precision loss, which is still silent:
-      0.1234567890123456789 decodes to 0.12345678901234568 with a nil error,
-      pinned as today's behaviour by TestUnmarshalMantissaPrecisionLossIsSilent
-      -- the producer that closes the gap must invert that test. Tracked by
-      docs/plans/2026-08-30-read-path-decode-taxonomy.md (Defers list). A
-      SEPARATE and lesser gap, not this MUST: canjson.ErrInvalidShape has no
-      decode-side producer, so an errors.Is against it never matches; the §
-      asks for a typed error, which the sentinel alone would not discharge.
-      TestUnmarshalDoesNotWrapErrInvalidShape and its Decoder.Decode twin pin
-      that absence. Decode failures reach the caller three ways -- malformed
-      JSON unchanged from encoding/json, an in-type shape error behind a
-      `canjson: <RM_TYPE>:` prefix, a polymorphic-slot failure as
-      typereg.DecodeError -- and none of them wraps the sentinel, which is a
-      distinct value from both canxml.ErrInvalidShape and
-      transport.ErrInvalidShape.
+      partial (2026-08-30): the encode-side refusal sentinel clause
+      requires canjson.Marshal / MarshalIndent to wrap the encode-only
+      canjson.ErrInvalidValue, kept errors.Is-distinguishable from the
+      decode-side canjson.ErrInvalidShape and from transport.ErrInvalidShape
+      (landed in marshal.go, pinned by marshal_sentinel_test.go; canxml
+      reuses one sentinel across both directions — observed as out of
+      scope, not aligned). Every other clause is landed except one arm
+      of § Floating-point precision. Its MUST — report a wire value
+      exceeding JSON's number precision as a typed error "rather than
+      silently rounding" — is MET for OUT-OF-RANGE values: 1e400 fails
+      with a typed *json.UnmarshalTypeError, reachable by errors.As
+      through the generated UnmarshalJSON wrapper
+      (TestUnmarshalOverflowIsATypedError). It is OPEN for MANTISSA
+      precision loss, which is still silent: 0.1234567890123456789
+      decodes to 0.12345678901234568 with a nil error, pinned as
+      today's behaviour by TestUnmarshalMantissaPrecisionLossIsSilent —
+      the producer that closes the gap must invert that test. Tracked by
+      docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md
+      (Defers list). A SEPARATE and lesser gap, not this MUST:
+      canjson.ErrInvalidShape has no decode-side producer, so an
+      errors.Is against it never matches; the § asks for a typed error,
+      which the sentinel alone would not discharge.
+      TestUnmarshalDoesNotWrapErrInvalidShape and its Decoder.Decode
+      twin pin that absence. Decode failures reach the caller three ways
+      — malformed JSON unchanged from encoding/json, an in-type shape
+      error behind a `canjson: <RM_TYPE>:` prefix, a polymorphic-slot
+      failure as typereg.DecodeError — and none of them wraps the
+      sentinel, which is a distinct value from both
+      canxml.ErrInvalidShape and transport.ErrInvalidShape.
 
   - id: REQ-056
     title: Canonical XML
@@ -433,7 +442,7 @@ requirements:
     implementation: landed
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/demographic]
     probes: [PROBE-061, PROBE-071]
-    plans: [docs/plans/archive/2026-08-18-write-result-contract.md]
+    plans: [docs/plans/archive/2026-08-18-write-result-contract.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
     tests:
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/directory/directory_test.go
@@ -459,6 +468,10 @@ requirements:
       never populated from the body (deferred in that plan). Deferred:
       PROBE-065 minimal->GET identifier round-trip (tracked in the
       probe-runnability plan, docs/plans/2026-08-18-probe-runnability.md).
+      Amended 2026-08-30 (cross-reference only): ehr.Create's decode-failure
+      arm is typed by REQ-151 as *transport.DecodeError, while its keyed
+      exception for the empty 2xx body stands unchanged as bare
+      transport.ErrInvalidShape; no arm this contract owns is re-typed.
 
   - id: REQ-095
     title: OpenAPI authoritative source
@@ -2284,6 +2297,54 @@ requirements:
       service root and passes -- the System API sends OPTIONS /. Route gates
       the arity half, so openehr/client carries an AST tripwire holding every
       transport.Request literal to setting it.
+
+  - id: REQ-151
+    title: Typed 2xx decode failure
+    canonical: docs/specifications/transport.md#req-151--typed-2xx-decode-failure
+    status: draft
+    implementation: landed
+    packages: [transport, openehr/client/definition, openehr/client/system, openehr/client/demographic, openehr/client/ehr/composition, testkit/probes/transport]
+    probes: [PROBE-101]
+    adrs: [docs/adr/0018-raw-bytes-on-decode-error.md]
+    plans: [docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
+    tests:
+      - transport/decode_error_test.go
+      - openehr/client/definition/decode_error_test.go
+      - openehr/client/system/decode_error_test.go
+      - openehr/client/demographic/decode_error_test.go
+      - openehr/client/ehr/composition/decode_error_test.go
+      - openehr/client/ehr/decode_error_test.go  # § Keyed exclusions, the Prefer=identifier arm
+      - openehr/client/ehr/contribution/decode_error_test.go  # § Keyed exclusions, the write-result funnel
+      - testkit/probes/transport/probes_test.go
+    notes: >-
+      transport.DecodeError carries the request's method and route template,
+      the raw response bytes and the decoder's error. transport.Decode returns
+      it for any 2xx body that will not decode, and the hand-rolled leaf
+      decodes construct the same type -- five in definition, three in
+      demographic, plus system.Capabilities and composition.Get -- so which
+      implementation route a leaf took stays invisible to the caller.
+      errors.AsType reaches it through each leaf's fmt.Errorf operation-name
+      wrap; Body is populated unconditionally (ADR 0018), inheriting whatever
+      ceiling the caller's WithMaxResponseBody sets, including none where
+      REQ-093's negative escape hatch disabled the cap; Unwrap keeps the
+      codec's own diagnostics reachable; Error() names the method, the route
+      and the classification only -- never the body and never the wrapped
+      decoder's text, which embeds offending values in `parse %q` form -- and
+      answers on a nil receiver (REQ-025). The (*T, *Metadata, error) triple
+      still populates metadata beside the error. Both disjointness arms are
+      pinned negatively: a non-2xx stays *transport.WireError, and an empty
+      representation-expecting 2xx body stays transport.ErrInvalidShape,
+      deliberately not unified. The keyed exclusions keep their owning
+      contracts and are pinned where they live: the ehr.WriteResult funnel and
+      contribution.Commit (REQ-094 NoRepresentationError), the
+      Prefer=identifier arm (ehr.ResolveIdentifierBody), the Definition
+      list leaves, where an empty 2xx body is a successful empty catalog,
+      and the four synthesized-metadata arms -- GetStoredQuery, PutStoredQuery,
+      PutStoredQueryVersion and UploadTemplate -- where an empty 2xx body is a
+      success the leaf answers from what it already knows (pre-existing
+      deployment tolerance, 0352ce8). Scope follows the decode, not the verb,
+      so the Definition upload/PUT leaves are in for their non-empty bodies.
+      PROBE-101 holds the wire-level half in Sandbox mode.
 
   - id: REQ-160
     title: AQL containment admissibility relation

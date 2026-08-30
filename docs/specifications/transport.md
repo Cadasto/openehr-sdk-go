@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages. Covers REQ-090 through REQ-094, the REQ-096..098 extension range, and REQ-150 (path-parameter segment validation).
+Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages. Covers REQ-090 through REQ-094, the REQ-096..098 extension range, REQ-150 (path-parameter segment validation), and REQ-151 (typed 2xx decode failure).
 
 openEHR resource semantics (Compositions, AQL, canonical codecs) live in [wire.md](wire.md). Service catalog resolution lives in [service-discovery.md](service-discovery.md).
 
@@ -124,7 +124,7 @@ A wire failure **MUST** remain a `*transport.WireError`. The SDK **MUST NOT** re
 
 The same empty-body and decode-failure rules **MUST** apply to `contribution.Commit` when `Prefer: return=representation` was sent. An empty representation body **MUST NOT** be a silent success.
 
-This contract binds the versioned-write `WriteResult` family and `contribution.Commit`. **Keyed exception:** EHR creation (`ehr.Create`, a non-versioned write that decodes through the shared read-path `transport.Decode`) **MUST** keep the bare `transport.ErrInvalidShape` contract on an empty 2xx body until its committed-but-unusable arm is typed in a spec-first change (deferred; recorded in the archived write-result plan's Defers).
+This contract binds the versioned-write `WriteResult` family and `contribution.Commit`. **Keyed exception:** EHR creation (`ehr.Create`, a non-versioned write that decodes through the shared `transport.Decode`) **MUST** keep the bare `transport.ErrInvalidShape` contract on an empty 2xx body until its committed-but-unusable arm is typed in a spec-first change (deferred; recorded in the archived write-result plan's Defers). That exception is scoped to the **empty**-body arm and stands unchanged: `ehr.Create`'s *decode-failure* arm — a 2xx body that is present but does not decode — is typed by [§ REQ-151](#req-151--typed-2xx-decode-failure) as a `*transport.DecodeError`, which is the shared primitive whose absence deferred the exception in the first place.
 
 - **Lives in:** [`transport/`](../../transport), [`openehr/client/ehr/`](../../openehr/client/ehr) (composition / directory / ehrstatus / contribution), [`openehr/client/demographic/`](../../openehr/client/demographic)
 
@@ -238,6 +238,111 @@ Out of scope: a breaking `PathSegment` named type on every leaf; validating the 
 
 ---
 
+## REQ-151 — Typed 2xx decode failure
+
+A 2xx response whose body cannot be decoded as the requested representation is a distinct failure
+from a wire failure and from an absent body. The SDK **MUST** surface it as such, and **MUST NOT**
+discard the bytes the server delivered.
+
+**The typed error.** After a 2xx, when the response body cannot be decoded as the requested
+representation, the SDK **MUST** return a `*transport.DecodeError`. That error **MUST**:
+
+- be recoverable from the returned error with `errors.AsType[*transport.DecodeError]` — the
+  REQ-025 preferred matcher; `errors.As` reaches it identically — through any `fmt.Errorf`
+  operation-name wrapping a leaf package adds, so a leaf's wrap is presentation, never a barrier;
+- carry the raw response bytes in a `Body` field, populated unconditionally (no opt-in gates it;
+  [ADR 0018](../adr/0018-raw-bytes-on-decode-error.md) is the decision of record), bounded by
+  whatever ceiling `WithMaxResponseBody` imposes on that client — the 64 MiB default, an explicit
+  positive limit, or **no ceiling at all** where the caller has taken REQ-093's documented escape
+  hatch and disabled the cap with a negative value. `Body` inherits the caller's configured
+  ceiling; it does not add one of its own;
+- wrap the decoder's error and expose it through `Unwrap`, so `errors.Is` and `errors.AsType`
+  still reach the codec's own typed diagnostics (path, type, offset) unchanged;
+- carry the request's HTTP method and route template, so the failure is attributable without
+  re-deriving it from the call site.
+
+**`Error()` stays value-free.** `DecodeError.Error()` **MUST** carry the HTTP method, the route
+template and the classification only, in the REQ-093 discipline. It **MUST NOT** interpolate the
+body, and **MUST NOT** interpolate the wrapped decoder's text — codec errors embed offending
+values in `parse %q`-style messages, so echoing the cause would leak through the string surface
+what the field deliberately gates. Callers that need the diagnostics unwrap or read `Body`.
+
+**Metadata still arrives.** The `(*T, *Metadata, error)` triple the leaf packages return **MUST**
+still populate `*Metadata` on this path. A decode failure does not cost the caller the response
+headers — `ETag`, `Location` and the rest remain available beside the error.
+
+**A non-2xx is never this error.** A wire failure **MUST** remain a `*transport.WireError`, and
+the SDK **MUST NOT** return a `*transport.DecodeError` for a non-2xx response. The two
+classifications are disjoint: recovering one **MUST NOT** recover the other.
+
+**An empty 2xx body keeps its existing per-surface contract.** This requirement re-types no
+empty-body arm. Each arm **MUST** keep the contract its own surface already had, and no arm is
+unified under `*transport.DecodeError`: an empty body has no representation to decode and no
+bytes to hand back, so where it is a failure at all it is an *absent* body rather than an unusable
+one. The arms take three shapes, named below.
+
+**The refusal arms.** A read that expected a representation and received an empty 2xx body
+**MUST** keep today's `transport.ErrInvalidShape` behaviour, so callers already keying on
+`errors.Is(err, transport.ErrInvalidShape)` keep working unchanged. This is the shared
+`transport.Decode` arm and the hand-rolled reads that mirror it — `system.Capabilities`,
+`composition.Get`, and the Demographic party and version reads. Where such a leaf carves out
+`204 No Content` as a typed success ahead of the refusal — `composition.ErrDeletedAtTime`, the
+Demographic reads' nil-for-no-matching-version — that carve-out is the leaf's own contract and
+stands unchanged; the refusal covers every remaining empty-body 2xx.
+
+**Keyed exclusion — the Definition list leaves.** For the Definition **list** operations, an empty
+2xx body is a *successful empty catalog*, not a failed representation decode. It **MUST NOT**
+produce `transport.ErrInvalidShape` and **MUST NOT** produce a `*transport.DecodeError`. What
+slice value that success returns is the Definition list contract's business, not this
+requirement's; this § only points there and holds either way. Only a **non-empty** list body that
+fails to decode — for example a JSON object where an array is expected — is REQ-151's.
+
+**Keyed exclusion — the synthesized-metadata arms.** Four Definition leaves answer an empty 2xx
+body with a metadata value they synthesize themselves and a nil error: `GetStoredQuery`,
+`PutStoredQuery` and `PutStoredQueryVersion` — three stored-query surfaces owned by
+[wire.md § REQ-057](wire.md#req-057) — and `UploadTemplate`, owned by its template leaf contract.
+What each synthesized value carries is the owning contract's business, not this requirement's; as
+with the list leaves, this § only points there. Each is deliberate deployment tolerance that
+predates this requirement — a deployment may legally answer these calls `200` or `204` with no
+body — and each **MUST NOT** be re-typed by it: no `transport.ErrInvalidShape`, and no
+`*transport.DecodeError`. As with the list leaves, only a **non-empty** body that fails to decode
+is REQ-151's on those routes.
+
+**Scope.** This requirement binds every 2xx **response-body decode** performed on the
+`transport.Client` stack that is not owned by the REQ-094 write-result contract. Scope follows
+the *decode*, not the request's verb: the Definition upload and PUT leaves are in scope, because
+their requests are writes but their 2xx metadata responses are decoded exactly as any read
+response is. Every call site reaching `transport.Decode` inherits the contract by construction;
+hand-rolled response decodes on the same stack **MUST** satisfy it identically, so which
+implementation route a leaf took stays invisible to the caller.
+
+**Keyed exclusions, by owning contract.** Three surfaces keep their own error taxonomy and
+**MUST NOT** be re-typed by this requirement:
+
+- the write-result funnel — the `ehr.WriteResult` callbacks and `contribution.Commit` — whose
+  committed-but-unusable arm is `*ehr.NoRepresentationError`
+  ([§ REQ-094](#req-094--prefer-response-shape-negotiation));
+- the `Prefer: return=identifier` arm (`ehr.ResolveIdentifierBody`), likewise REQ-094's
+  negotiation surface, which keeps its `transport.ErrInvalidShape` wrap;
+- the empty-body arms named above, including REQ-094's keyed exception for `ehr.Create`.
+
+Everything a keyed exclusion covers stays covered by the requirement that owns it; nothing here
+loosens those contracts.
+
+**`Body` is PHI-bearing by design.** The field carries the response as the injected
+`http.Client` delivered it, which for a
+clinical resource means patient data. It **MUST** be documented as such on the exported type, in
+the treatment `ehr.NoRepresentationError.Cause` already receives: the value-free `Error()` string
+is the boundary-safe surface, and reading `Body` is a deliberate act by a caller who has decided
+the diagnostics are worth the exposure. Why those bytes are attached unconditionally, rather than
+gated the way REQ-093 gates non-2xx error bodies, is settled in
+[ADR 0018](../adr/0018-raw-bytes-on-decode-error.md), which is the authority for that asymmetry.
+
+- **Lives in:** [`transport/`](../../transport)
+- **Probes:** PROBE-101 (Implemented — Sandbox)
+
+---
+
 ## Coverage
 
 | REQ | Package |
@@ -250,3 +355,4 @@ Out of scope: a breaking `PathSegment` named type on every leaf; validating the 
 | REQ-096 | `transport/` |
 | REQ-098 | `transport/` |
 | REQ-150 | `transport/`, `openehr/client/*` |
+| REQ-151 | `transport/`, `openehr/client/*` |

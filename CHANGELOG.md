@@ -12,6 +12,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
+- **Typed 2xx decode failure (REQ-151, PROBE-101).** A 2xx body that will not decode now fails with `transport.DecodeError` carrying the raw bytes; the non-2xx and empty-body arms are unchanged, and the message no longer echoes the codec's text — unwrap or read `Body`.
+- **Canonical-JSON encode sentinel (REQ-052).** A value the canonical-JSON encoder refuses now carries `canjson.ErrInvalidValue`, `errors.Is`-distinguishable from the decode-side shape sentinel and from the transport one — the encode side had none of its own.
 - **Catalog descriptor decode and re-encode.** Definition catalog timestamps decode against a closed tolerant layout set and an empty 2xx list body yields a non-nil empty slice (REQ-144); the Definition and System descriptors re-emit unknown keys, documented fields winning a collision.
 - **Nil-receiver tolerance on the error axis (REQ-025).** Typed-nil error values left behind by a failed `errors.As` answer instead of panicking across the transport, auth, discovery, AQL-parse and type-registry error types, and the SDK sites that dereferenced such a match are guarded.
 - **Reserved stored-query name refused client-side (REQ-057).** Store operations return `transport.ErrInvalidConfig` for any case variant of the query-name `aql`, namespaced or not, before the wire; stored-path diagnostics name the operation the caller invoked.

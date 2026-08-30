@@ -10,19 +10,19 @@ import (
 
 // ErrInvalidShape is the canjson-local sentinel reserved for JSON-level
 // shape errors (malformed JSON, type mismatch on a non-polymorphic field,
-// numeric overflow). Polymorphic-discrimination errors come from the
-// typereg package instead: match those with errors.Is against
-// [typereg.ErrMissingType] / [typereg.ErrUnknownType] /
+// numeric overflow). It is decode-only: encode failures wrap
+// [ErrInvalidValue] instead. No decode path returns it today, so an
+// errors.Is against it never matches. Polymorphic-discrimination errors
+// come from the typereg package instead: match those with errors.Is
+// against [typereg.ErrMissingType] / [typereg.ErrUnknownType] /
 // [typereg.ErrTypeMismatch], not against this sentinel.
 //
-// No decode path returns it today, so an errors.Is against it never
-// matches. A decode failure surfaces in one of three other shapes:
-// malformed JSON reaches the caller unchanged from encoding/json, a
-// shape error inside a generated RM type carries a
-// `canjson: <RM_TYPE>:` prefix, and a failure at a polymorphic slot
-// arrives as [DecodeError]. Wrapping decode failures with this
-// sentinel is a spec-first REQ-052 follow-up, tracked by
-// docs/plans/2026-08-30-read-path-decode-taxonomy.md.
+// A decode failure surfaces in one of three other shapes: malformed JSON
+// reaches the caller unchanged from encoding/json, a shape error inside
+// a generated RM type carries a `canjson: <RM_TYPE>:` prefix, and a
+// failure at a polymorphic slot arrives as [DecodeError]. Wrapping
+// decode failures with this sentinel is a spec-first REQ-052 follow-up,
+// tracked by docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md.
 var ErrInvalidShape = errors.New("canjson: invalid JSON shape")
 
 // DecodeError is the unified error returned by the decoder at

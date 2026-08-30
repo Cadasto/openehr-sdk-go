@@ -46,18 +46,28 @@
 //     precision loss, which is still silent: a magnitude of
 //     0.1234567890123456789 decodes to 0.12345678901234568 with a nil
 //     error. Closing it is tracked by
-//     docs/plans/2026-08-30-read-path-decode-taxonomy.md.
+//     docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md.
 //
 // # Error classification
 //
-// [ErrInvalidShape] is decode-only and is reserved for JSON-level
-// shape errors (malformed JSON, type mismatch on a non-polymorphic
-// field, numeric overflow). No decode path returns it today, so an
-// errors.Is against it never matches. Wrapping decode failures with
-// the sentinel is a spec-first REQ-052 follow-up, tracked by
-// docs/plans/2026-08-30-read-path-decode-taxonomy.md.
+// The package keeps its two sentinels one-directional (REQ-052), so a
+// caller can classify a failure with errors.Is alone:
 //
-// What a decode failure does look like depends on where it happens:
+//   - [ErrInvalidValue] — encode only. Every [Marshal] / [MarshalIndent]
+//     failure wraps it, over the encoder's own error, which stays
+//     reachable through unwrapping.
+//   - [ErrInvalidShape] — decode only. Never appears on an encode
+//     path. It is reserved for decode-side shape errors: today no
+//     decode path produces it, because [Unmarshal] and [Decoder.Decode]
+//     pass the underlying codec's error through unchanged.
+//
+// Both are distinct from the transport-level transport.ErrInvalidShape,
+// which classifies a response body rather than a codec operation.
+// Do not confuse [ErrInvalidShape] with canxml.ErrInvalidShape either:
+// same name, same subtree, a different value — and unlike this one it
+// does have producers, for `xmi:type` discriminator failures.
+//
+// What a decode failure looks like depends on where it happens:
 //
 //   - Malformed JSON reaches the caller unchanged from encoding/json,
 //     because encoding/json validates the whole input before it
@@ -75,13 +85,6 @@
 //     encoding/json error at that slot.
 //
 // None of the three wraps [ErrInvalidShape].
-//
-// Do not confuse this sentinel with canxml.ErrInvalidShape: same
-// name, same subtree, a different value — and unlike this one it does
-// have producers, for `xmi:type` discriminator failures. The
-// transport-level transport.ErrInvalidShape is a third distinct
-// value; it is named here in plain text rather than as a doc link
-// because canjson must not depend on transport (REQ-013).
 //
 // # Strict vs relaxed decode
 //
