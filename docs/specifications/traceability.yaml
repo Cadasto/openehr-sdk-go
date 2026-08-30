@@ -2265,10 +2265,14 @@ requirements:
       deliberately not unified. The keyed exclusions keep their owning
       contracts and are pinned where they live: the ehr.WriteResult funnel and
       contribution.Commit (REQ-094 NoRepresentationError), the
-      Prefer=identifier arm (ehr.ResolveIdentifierBody), and the Definition
-      list leaves, where an empty 2xx body is a successful empty catalog.
-      Scope follows the decode, not the verb, so the Definition upload/PUT
-      leaves are in. PROBE-101 holds the wire-level half in Sandbox mode.
+      Prefer=identifier arm (ehr.ResolveIdentifierBody), the Definition
+      list leaves, where an empty 2xx body is a successful empty catalog,
+      and the four synthesized-metadata arms -- GetStoredQuery, PutStoredQuery,
+      PutStoredQueryVersion and UploadTemplate -- where an empty 2xx body is a
+      success the leaf answers from what it already knows (pre-existing
+      deployment tolerance, 0352ce8). Scope follows the decode, not the verb,
+      so the Definition upload/PUT leaves are in for their non-empty bodies.
+      PROBE-101 holds the wire-level half in Sandbox mode.
 
   - id: REQ-160
     title: AQL containment admissibility relation

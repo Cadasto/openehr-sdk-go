@@ -298,10 +298,11 @@ requirement's; this § only points there and holds either way. Only a **non-empt
 fails to decode — for example a JSON object where an array is expected — is REQ-151's.
 
 **Keyed exclusion — the synthesized-metadata arms.** Four Definition leaves answer an empty 2xx
-body with a metadata value they synthesize themselves and a nil error: `GetStoredQuery` (the
-requested name and version), the two stored-query PUT leaves `PutStoredQuery` and
-`PutStoredQueryVersion` (name, version and the submitted AQL text), and `UploadTemplate` (the
-template id recovered from the `Location` header). Each is deliberate deployment tolerance that
+body with a metadata value they synthesize themselves and a nil error: `GetStoredQuery`,
+`PutStoredQuery` and `PutStoredQueryVersion` — three stored-query surfaces owned by
+[wire.md § REQ-057](wire.md#req-057) — and `UploadTemplate`, owned by its template leaf contract.
+What each synthesized value carries is the owning contract's business, not this requirement's; as
+with the list leaves, this § only points there. Each is deliberate deployment tolerance that
 predates this requirement — a deployment may legally answer these calls `200` or `204` with no
 body — and each **MUST NOT** be re-typed by it: no `transport.ErrInvalidShape`, and no
 `*transport.DecodeError`. As with the list leaves, only a **non-empty** body that fails to decode
@@ -328,7 +329,8 @@ implementation route a leaf took stays invisible to the caller.
 Everything a keyed exclusion covers stays covered by the requirement that owns it; nothing here
 loosens those contracts.
 
-**`Body` is PHI-bearing by design.** The field carries the response verbatim, which for a
+**`Body` is PHI-bearing by design.** The field carries the response as the injected
+`http.Client` delivered it, which for a
 clinical resource means patient data. It **MUST** be documented as such on the exported type, in
 the treatment `ehr.NoRepresentationError.Cause` already receives: the value-free `Error()` string
 is the boundary-safe surface, and reading `Body` is a deliberate act by a caller who has decided
