@@ -494,9 +494,13 @@ func TestListStoredQueriesUnparseableSavedFails(t *testing.T) {
 // passing unseen. The two collision rows cover both mechanisms: an
 // emitted documented key (`name`) and an omitted one (`saved`, which
 // carries omitzero — nothing is emitted for the overlay to win with, so
-// only deleting the known key from the Extras clone ignores it).
+// only deleting the known key from the Extras clone ignores it). The
+// last row pins the other edge of the same rule: collision is decided by
+// exact comparison, so a key differing from a documented name only by
+// case is not one.
 func TestStoredQueryMetadataExtrasRoundTrip(t *testing.T) {
 	const (
+		nameJSON     = `"org.openehr::vitals"`
 		withSaved    = `"name":"org.openehr::vitals","type":"AQL","version":"1.0.0","saved":"2017-07-16T19:20:30.450+01:00","q":"SELECT 1"`
 		withoutSaved = `"name":"org.openehr::vitals","type":"AQL","version":"1.0.0","q":"SELECT 1"`
 		uriJSON      = `"https://example.example/q"`
@@ -517,6 +521,15 @@ func TestStoredQueryMetadataExtrasRoundTrip(t *testing.T) {
 		// key after the round trip; any other key is a failure.
 		wantExtras map[string]string
 		wantSaved  time.Time
+		// caseVariant, when set, is a wire key differing from a documented
+		// field name only by case. It must populate the documented field
+		// (encoding/json matches field names case-insensitively) AND be kept
+		// in Extras (the known-field set is matched exactly).
+		caseVariant string
+		// wantEmitted names keys the encoded object itself must carry, read
+		// from the raw JSON — the only way to see two keys that differ only
+		// by case, since decoding folds them onto one field.
+		wantEmitted map[string]string
 	}{
 		{
 			label:     "no extras",
@@ -551,15 +564,39 @@ func TestStoredQueryMetadataExtrasRoundTrip(t *testing.T) {
 			wantExtras: map[string]string{"uri": uriJSON},
 			wantSaved:  time.Time{},
 		},
+		{
+			label: "case-variant key rides beside the documented field",
+			// "Name" differs from the documented `name` only by case, so it is
+			// not a collision: it populates Name on decode and is preserved in
+			// Extras, and encode emits both keys. `name` carries no omitempty,
+			// so the documented key is emitted whatever its value.
+			body:        `{"Name":` + nameJSON + `,"type":"AQL","version":"1.0.0","saved":"2017-07-16T19:20:30.450+01:00","q":"SELECT 1"}`,
+			caseVariant: "Name",
+			wantExtras:  map[string]string{"Name": nameJSON},
+			wantEmitted: map[string]string{"name": nameJSON, "Name": nameJSON},
+			wantSaved:   saved,
+		},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			var meta definition.StoredQueryMetadata
 			if err := json.Unmarshal([]byte(tc.body), &meta); err != nil {
 				t.Fatalf("Unmarshal(wire) = %v, want nil error", err)
 			}
-			if len(tc.wantExtras) > 0 {
-				if _, ok := meta.Extras["uri"]; !ok {
-					t.Fatalf("premise gone: Extras = %v, want uri to land there on decode", meta.Extras)
+			// Every surviving Extras key comes from the wire body, never from
+			// inject, so each must already be there after the first decode.
+			for k := range tc.wantExtras {
+				if _, ok := meta.Extras[k]; !ok {
+					t.Fatalf("premise gone: Extras = %v, want %q to land there on decode", meta.Extras, k)
+				}
+			}
+			if tc.caseVariant != "" {
+				if meta.Name != "org.openehr::vitals" {
+					t.Errorf("Name = %q after decoding a body whose only name key is %q, want it populated — encoding/json matches field names case-insensitively",
+						meta.Name, tc.caseVariant)
+				}
+				if raw := meta.Extras[tc.caseVariant]; string(raw) != nameJSON {
+					t.Errorf("Extras[%q] = %s, want %s preserved verbatim — the known-field set is matched exactly, so a case variant is not a documented name",
+						tc.caseVariant, raw, nameJSON)
 				}
 			}
 			for k, v := range tc.inject {
@@ -572,6 +609,7 @@ func TestStoredQueryMetadataExtrasRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Marshal = %v, want nil error", err)
 			}
+			assertEmittedKeys(t, out, tc.wantEmitted)
 			var got definition.StoredQueryMetadata
 			if err := json.Unmarshal(out, &got); err != nil {
 				t.Fatalf("Unmarshal(re-encoded %s) = %v, want nil error — MarshalJSON emitted what this package cannot decode", out, err)

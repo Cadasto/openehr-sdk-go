@@ -66,6 +66,31 @@ func compactJSON(t *testing.T, raw json.RawMessage) string {
 	return buf.String()
 }
 
+// assertEmittedKeys checks that the encoded object carries each named key
+// with the given JSON value. It reads the raw object rather than a decoded
+// ServiceCapabilities because that is the only way to see two keys
+// differing only by case: decoding folds them onto one documented field.
+func assertEmittedKeys(t *testing.T, out []byte, want map[string]string) {
+	t.Helper()
+	if len(want) == 0 {
+		return
+	}
+	var emitted map[string]json.RawMessage
+	if err := json.Unmarshal(out, &emitted); err != nil {
+		t.Fatalf("Unmarshal(%s) into a raw object = %v, want nil error", out, err)
+	}
+	for k, w := range want {
+		raw, ok := emitted[k]
+		if !ok {
+			t.Errorf("encode dropped key %q: %s", k, out)
+			continue
+		}
+		if w := compactJSON(t, json.RawMessage(w)); string(raw) != w {
+			t.Errorf("encoded[%q] = %s, want %s", k, raw, w)
+		}
+	}
+}
+
 func readCassette(t *testing.T, dir, name string) []byte {
 	t.Helper()
 	_, src, _, ok := runtime.Caller(0)
@@ -164,13 +189,24 @@ func TestCapabilitiesPreservesExtras(t *testing.T) {
 // mechanisms — a documented field that emits a key (the overlay wins it
 // back) and one that emits none because it is empty and every documented
 // field here carries omitempty (only deleting the known key from the
-// Extras clone can ignore that one).
+// Extras clone can ignore that one). The last row pins the other edge of
+// the rule: collision is decided by exact comparison, so a key differing
+// from a documented name only by case is not one.
 func TestCapabilitiesRoundTripsExtras(t *testing.T) {
 	for _, tc := range []struct {
 		label string
 		body  []byte
 		// inject is applied to the decoded value before re-encoding.
 		inject map[string]json.RawMessage
+		// caseVariant, when set, is a wire key differing from a documented
+		// field name only by case. It must populate the documented field
+		// (encoding/json matches field names case-insensitively) AND be kept
+		// in Extras (the known-field set is matched exactly).
+		caseVariant string
+		// wantEmitted names keys the encoded object itself must carry, read
+		// from the raw JSON — the only way to see two keys that differ only
+		// by case, since decoding folds them onto one field.
+		wantEmitted map[string]string
 	}{
 		{
 			label: "cassette",
@@ -194,6 +230,16 @@ func TestCapabilitiesRoundTripsExtras(t *testing.T) {
 				"endpoints": json.RawMessage(`["/caller/supplied"]`),
 			},
 		},
+		{
+			label: "case-variant key rides beside the documented field",
+			// "Solution" differs from the documented `solution` only by case,
+			// so it is not a collision: it populates Solution on decode and is
+			// preserved in Extras, and encode emits both keys. Solution is
+			// non-empty, so its omitempty key is emitted too.
+			body:        []byte(`{"Solution":"Cadasto","support_email":"support@cadasto.example"}`),
+			caseVariant: "Solution",
+			wantEmitted: map[string]string{"solution": `"Cadasto"`, "Solution": `"Cadasto"`},
+		},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			var sc system.ServiceCapabilities
@@ -207,6 +253,16 @@ func TestCapabilitiesRoundTripsExtras(t *testing.T) {
 			wantExtras := maps.Clone(sc.Extras)
 			want := sc
 			want.Extras = nil
+			if tc.caseVariant != "" {
+				if sc.Solution != "Cadasto" {
+					t.Errorf("Solution = %q after decoding a body whose only solution key is %q, want Cadasto — encoding/json matches field names case-insensitively",
+						sc.Solution, tc.caseVariant)
+				}
+				if raw := sc.Extras[tc.caseVariant]; string(raw) != `"Cadasto"` {
+					t.Errorf(`Extras[%q] = %s, want "Cadasto" preserved verbatim — the known-field set is matched exactly, so a case variant is not a documented name`,
+						tc.caseVariant, raw)
+				}
+			}
 			for k, v := range tc.inject {
 				if sc.Extras == nil {
 					sc.Extras = map[string]json.RawMessage{}
@@ -217,6 +273,7 @@ func TestCapabilitiesRoundTripsExtras(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Marshal = %v, want nil error", err)
 			}
+			assertEmittedKeys(t, out, tc.wantEmitted)
 			var got system.ServiceCapabilities
 			if err := json.Unmarshal(out, &got); err != nil {
 				t.Fatalf("Unmarshal(re-encoded %s) = %v, want nil error", out, err)
