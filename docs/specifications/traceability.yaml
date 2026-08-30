@@ -2175,31 +2175,45 @@ requirements:
     title: Typed 2xx decode failure
     canonical: docs/specifications/transport.md#req-151--typed-2xx-decode-failure
     status: draft
-    implementation: planned
-    packages: [transport, openehr/client/definition, openehr/client/system, openehr/client/demographic, openehr/client/ehr/composition]
+    implementation: landed
+    packages: [transport, openehr/client/definition, openehr/client/system, openehr/client/demographic, openehr/client/ehr/composition, testkit/probes/transport]
+    probes: [PROBE-101]
     adrs: [docs/adr/0018-raw-bytes-on-decode-error.md]
     plans: [docs/plans/2026-08-30-read-path-decode-taxonomy.md]
+    tests:
+      - transport/decode_error_test.go
+      - openehr/client/definition/decode_error_test.go
+      - openehr/client/system/decode_error_test.go
+      - openehr/client/demographic/decode_error_test.go
+      - openehr/client/ehr/composition/decode_error_test.go
+      - openehr/client/ehr/decode_error_test.go  # § Keyed exclusions, the Prefer=identifier arm
+      - openehr/client/ehr/contribution/decode_error_test.go  # § Keyed exclusions, the write-result funnel
+      - testkit/probes/transport/probes_test.go
     notes: >-
-      Spec and decision only at this point: transport.DecodeError does not
-      exist yet, so implementation stays planned and no probes are cited --
-      PROBE-101's catalogue entry is deliberately Status: Draft until the
-      probe lands, and a landed/partial REQ may not cite a Draft probe.
-      The contract: a 2xx body that will not decode as the requested
-      representation returns *transport.DecodeError, recoverable with
-      errors.AsType through a leaf's fmt.Errorf wrap, carrying the raw bytes
-      in Body (always populated -- ADR 0018 -- inheriting whatever ceiling
-      the caller's WithMaxResponseBody sets, including none where REQ-093's
-      negative escape hatch disabled the cap), wrapping the decoder's error, with a
-      value-free Error() carrying method, route and classification only.
-      The (*T, *Metadata, error) triple still populates metadata. A non-2xx
-      stays *transport.WireError; an empty representation-expecting 2xx body
-      stays transport.ErrInvalidShape, deliberately not unified. Keyed
-      exclusions keep their owning contracts: the ehr.WriteResult funnel and
+      transport.DecodeError carries the request's method and route template,
+      the raw response bytes and the decoder's error. transport.Decode returns
+      it for any 2xx body that will not decode, and the hand-rolled leaf
+      decodes construct the same type -- five in definition, three in
+      demographic, plus system.Capabilities and composition.Get -- so which
+      implementation route a leaf took stays invisible to the caller.
+      errors.AsType reaches it through each leaf's fmt.Errorf operation-name
+      wrap; Body is populated unconditionally (ADR 0018), inheriting whatever
+      ceiling the caller's WithMaxResponseBody sets, including none where
+      REQ-093's negative escape hatch disabled the cap; Unwrap keeps the
+      codec's own diagnostics reachable; Error() names the method, the route
+      and the classification only -- never the body and never the wrapped
+      decoder's text, which embeds offending values in `parse %q` form -- and
+      answers on a nil receiver (REQ-025). The (*T, *Metadata, error) triple
+      still populates metadata beside the error. Both disjointness arms are
+      pinned negatively: a non-2xx stays *transport.WireError, and an empty
+      representation-expecting 2xx body stays transport.ErrInvalidShape,
+      deliberately not unified. The keyed exclusions keep their owning
+      contracts and are pinned where they live: the ehr.WriteResult funnel and
       contribution.Commit (REQ-094 NoRepresentationError), the
       Prefer=identifier arm (ehr.ResolveIdentifierBody), and the Definition
       list leaves, where an empty 2xx body is a successful empty catalog.
       Scope follows the decode, not the verb, so the Definition upload/PUT
-      leaves are in.
+      leaves are in. PROBE-101 holds the wire-level half in Sandbox mode.
 
   - id: REQ-160
     title: AQL containment admissibility relation

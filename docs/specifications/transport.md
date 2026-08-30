@@ -318,7 +318,7 @@ gated the way REQ-093 gates non-2xx error bodies, is settled in
 [ADR 0018](../adr/0018-raw-bytes-on-decode-error.md), which is the authority for that asymmetry.
 
 - **Lives in:** [`transport/`](../../transport)
-- **Probes:** PROBE-101 (Draft — Sandbox)
+- **Probes:** PROBE-101 (Implemented — Sandbox)
 
 ---
 

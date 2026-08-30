@@ -110,7 +110,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-142 | Contribution read | [wire.md § REQ-142](wire.md#req-142--contribution-read) | landed |
 | REQ-143 | Template list filters | [wire.md § REQ-143](wire.md#req-143--template-list-filters) | landed |
 | REQ-150 | Path-parameter segment validation | [transport.md § REQ-150](transport.md#req-150--path-parameter-segment-validation) | landed |
-| REQ-151 | Typed 2xx decode failure | [transport.md § REQ-151](transport.md#req-151--typed-2xx-decode-failure) | planned |
+| REQ-151 | Typed 2xx decode failure | [transport.md § REQ-151](transport.md#req-151--typed-2xx-decode-failure) | landed |
 | REQ-160 | AQL containment admissibility relation | [clinical-modeling.md § REQ-160](clinical-modeling.md#req-160--aql-containment-admissibility-relation) | landed |
 | REQ-161 | AQL semantic and portability lint | [clinical-modeling.md § REQ-161](clinical-modeling.md#req-161--aql-semantic-and-portability-lint) | landed |
 | REQ-162 | Builder containment verification | [clinical-modeling.md § REQ-162](clinical-modeling.md#req-162--builder-containment-verification) | landed |
