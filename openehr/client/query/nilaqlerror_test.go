@@ -52,8 +52,9 @@ func TestNilAQLErrorAnswersInsteadOfPanicking(t *testing.T) {
 }
 
 // TestFailedErrorsAsLeavesAnAQLErrorThatStillAnswers walks the exact route the
-// defect was reachable by, so the guard is pinned against the documented API
-// rather than against a hand-built nil. In the errors.As out-parameter form
+// defect was reachable by, so the guard is pinned against a documented call
+// shape rather than against a hand-built nil. In the errors.As out-parameter
+// form
 //
 //	var e *query.AQLError
 //	if errors.As(err, &e) { … }
@@ -62,10 +63,11 @@ func TestNilAQLErrorAnswersInsteadOfPanicking(t *testing.T) {
 // a typed nil in a non-nil error interface, so errors.Is finds a non-nil error,
 // sees the Is method, and calls it on the nil receiver.
 //
-// This test MUST keep errors.As. The hazard is the out-parameter a failed match
-// leaves behind, which errors.AsType cannot reproduce — it returns the zero
-// value beside an ok, so nothing persists in the caller's scope. Converting
-// this call would delete the guard and leave the test green.
+// This test stays on errors.As deliberately: it pins the out-parameter shape,
+// which the godoc now demotes and which a modernization sweep would convert.
+// errors.AsType is NOT nil-proof — `e, ok :=` at function scope binds the same
+// nil on a failed match and boxes identically — so converting this call would
+// not remove the hazard, only stop pinning the shape that documents it.
 func TestFailedErrorsAsLeavesAnAQLErrorThatStillAnswers(t *testing.T) {
 	notAnAQLError := errors.New("query: some other failure")
 

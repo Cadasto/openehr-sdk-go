@@ -194,7 +194,7 @@ var (
 
 Consumers detect classes with `errors.Is(err, transport.ErrPreconditionFailed)`. Discovery, parse, and auth errors **MUST** have their own sentinel or typed error so they are distinguishable from wire errors.
 
-To extract a typed error's fields — not just match a sentinel — prefer the Go 1.26 `errors.AsType[E]` form over the older `errors.As(err, &target)` out-parameter. The module floor is `1.26.0` (REQ-002), so it is always available:
+To extract a typed error's fields — not just match a sentinel — code **SHOULD** use the Go 1.26 `errors.AsType[E]` form. The older `errors.As(err, &target)` out-parameter **MAY** remain where that shape is itself the subject, as in the nil-receiver guard in `openehr/client/query`. The module floor is `1.26.0` (REQ-002), so the generic form is always available:
 
 ```go
 // SHOULD — Go 1.26 generic extraction
@@ -202,14 +202,14 @@ if we, ok := errors.AsType[*transport.WireError](err); ok {
     use(we.StatusCode, we.OpenEHR)
 }
 
-// Still valid, but the pre-1.26 shape
+// MAY — the pre-1.26 out-parameter shape
 var we *transport.WireError
 if errors.As(err, &we) {
     use(we.StatusCode, we.OpenEHR)
 }
 ```
 
-Sentinel matching with `errors.Is` is unchanged. The `modernize` suite's `errorsastype` fixer performs this rewrite.
+Sentinel matching with `errors.Is` is unchanged. Neither form is nil-proof: a failed match leaves a nil typed pointer that a caller can box into a non-nil `error`, which is why the no-panic rule below covers the nil receiver.
 
 ### No panics
 
