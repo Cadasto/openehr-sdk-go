@@ -1,7 +1,7 @@
 // Package transportprobes hosts the openEHR conformance probes for
 // cross-cutting transport behaviour — properties the `transport/` layer
 // enforces on behalf of every `openehr/client` leaf, rather than
-// properties of one openEHR resource (PROBE-091 today).
+// properties of one openEHR resource (PROBE-091 and PROBE-101 today).
 //
 // Probes are plain functions returning (Result, error) and run against
 // any compliant transport.Client backend — sandbox, cassette, or live

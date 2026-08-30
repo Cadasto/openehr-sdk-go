@@ -309,7 +309,9 @@ func getParty(ctx context.Context, c *transport.Client, req *transport.Request) 
 	}
 	party, err := typereg.DecodeAs[rm.Party](resp.Body)
 	if err != nil {
-		return nil, meta, fmt.Errorf("demographic: decode PARTY body: %w", err)
+		return nil, meta, fmt.Errorf("demographic: PARTY body: %w", &transport.DecodeError{
+			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+		})
 	}
 	return party, meta, nil
 }

@@ -573,6 +573,10 @@ func sanitisedURL(u *url.URL) string {
 // targeting Prefer=minimal endpoints typically use Do directly so the
 // empty-body shape does not trip the decoder.
 //
+// The two 2xx failures are distinct (REQ-151): an empty body fails with
+// [ErrInvalidShape], while a non-empty body that does not decode returns
+// a [DecodeError] carrying the raw bytes the server delivered.
+//
 // Generic over T per REQ-024.
 func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata, error) {
 	resp, err := c.Do(ctx, req)
@@ -587,7 +591,15 @@ func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata,
 	}
 	out := new(T)
 	if err := canjson.Unmarshal(resp.Body, out); err != nil {
-		return nil, resp.Metadata, fmt.Errorf("transport: decode %s %s: %w", req.effectiveMethod(), req.effectiveRoute(), err)
+		// REQ-151: a 2xx body that does not decode is a typed failure that
+		// keeps the bytes the server delivered, not a wrapped decoder error
+		// that drops them.
+		return nil, resp.Metadata, &DecodeError{
+			Method: req.effectiveMethod(),
+			Route:  req.effectiveRoute(),
+			Body:   resp.Body,
+			Inner:  err,
+		}
 	}
 	return out, resp.Metadata, nil
 }

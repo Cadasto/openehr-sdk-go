@@ -37,8 +37,25 @@
 //   - ISO 8601 dates/times/durations are passed through as JSON
 //     strings; the codec does not parse them to time.Time (REQ-046).
 //   - Numeric magnitudes use IEEE 754 double-precision JSON numbers
-//     (no silent float32 coercion). Overflow on decode is reported as
-//     [ErrInvalidShape] rather than silently rounded.
+//     (no silent float32 coercion). Overflow on decode surfaces as the
+//     underlying codec's own error rather than being silently rounded;
+//     no canjson sentinel wraps it (see Error classification below).
+//
+// # Error classification
+//
+// The package keeps its two sentinels one-directional (REQ-052), so a
+// caller can classify a failure with errors.Is alone:
+//
+//   - [ErrInvalidValue] — encode only. Every [Marshal] / [MarshalIndent]
+//     failure wraps it, over the encoder's own error, which stays
+//     reachable through unwrapping.
+//   - [ErrInvalidShape] — decode only. Never appears on an encode
+//     path. It is reserved for decode-side shape errors: today no
+//     decode path produces it, because [Unmarshal] and [Decoder.Decode]
+//     pass the underlying codec's error through unchanged.
+//
+// Both are distinct from the transport-level transport.ErrInvalidShape,
+// which classifies a response body rather than a codec operation.
 //
 // # Strict vs relaxed decode
 //

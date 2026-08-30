@@ -130,3 +130,69 @@ func (e *WireError) Error() string {
 
 // Unwrap exposes the sentinel for errors.Is.
 func (e *WireError) Unwrap() error { return e.Sentinel }
+
+// DecodeError reports a 2xx response whose body could not be decoded as the
+// requested representation (REQ-151) — a failure distinct both from a wire
+// failure ([WireError]) and from an absent body ([ErrInvalidShape], which the
+// empty-2xx arm keeps). Extract it with
+// errors.AsType[*transport.DecodeError](err); a leaf package's operation-name
+// wrap is presentation, not a barrier.
+type DecodeError struct {
+	// Method is the HTTP method of the request.
+	Method string
+	// Route is the route template (e.g. "/ehr/{ehr_id}"), not the
+	// expanded URL.
+	Route string
+	// Body is the raw response body as delivered by the injected
+	// [http.Client] — after any transparent content decoding that client
+	// performs, so a gzipped response yields the decompressed bytes
+	// rather than the wire form. It is populated unconditionally: no
+	// option gates it, and WithRawErrorBodies (which governs non-2xx
+	// bodies) does not apply (ADR 0018). Body inherits whatever ceiling
+	// the caller's [WithMaxResponseBody] configuration imposes on this
+	// client — the 64 MiB default, an explicit positive limit, or no
+	// ceiling at all where the caller disabled the cap with a negative
+	// value; it adds no ceiling of its own.
+	//
+	// The slice is the response buffer itself, not a copy. A custom
+	// UnmarshalJSON that mutates the bytes handed to it violates the
+	// encoding/json unmarshaler contract, and corrupts these diagnostics
+	// as a consequence; the SDK does not defensively copy to insure
+	// against that.
+	//
+	// May contain PHI: it is the caller's own requested representation,
+	// so for a clinical resource it is patient data. Error never
+	// includes it, and neither do observers or spans; reading Body is a
+	// deliberate act, and an error value retained by the caller retains
+	// these bytes with it.
+	Body []byte
+	// Inner is the decoder's own error, reachable via Unwrap.
+	Inner error
+}
+
+// Error names the method, the route and the classification only — the REQ-093
+// value-free discipline (REQ-151). It never interpolates Body, and never the
+// wrapped decoder's text: codec messages embed the offending value in
+// `parse %q` form, so echoing the cause would leak through the string surface
+// what Body deliberately gates. Callers that need the diagnostics unwrap or
+// read Body.
+//
+// Error answers on a nil receiver instead of panicking: a failed errors.As
+// leaves the caller holding a typed nil, which boxes into a non-nil error
+// (REQ-025 § No panics, nil-receiver axis).
+func (e *DecodeError) Error() string {
+	if e == nil {
+		return "transport: decode: response body does not match the requested type"
+	}
+	return fmt.Sprintf("transport: decode %s %s: response body does not match the requested type", e.Method, e.Route)
+}
+
+// Unwrap exposes the decoder's error, so errors.Is and errors.AsType still
+// reach the codec's own typed diagnostics (path, type, offset) unchanged. It
+// answers nil on a nil receiver (REQ-025 nil-receiver axis).
+func (e *DecodeError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Inner
+}

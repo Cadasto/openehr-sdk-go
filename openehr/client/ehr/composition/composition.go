@@ -70,7 +70,9 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 	out := new(rm.Composition)
 	if err := canjson.Unmarshal(resp.Body, out); err != nil {
 		return nil, openehrclient.NewVersionMetadata(resp.Metadata),
-			fmt.Errorf("composition.Get: decode: %w", err)
+			fmt.Errorf("composition.Get: %w", &transport.DecodeError{
+				Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+			})
 	}
 	return out, openehrclient.NewVersionMetadata(resp.Metadata), nil
 }

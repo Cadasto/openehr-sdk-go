@@ -581,8 +581,10 @@ func TestZoneLessSavedRemarshalsAsUTC(t *testing.T) {
 
 // TestListStoredQueriesUnparseableSavedFails gives the `saved` arm its own
 // refusal pin: a non-empty value matching no accepted layout fails the
-// list call naming the field, never a silent zero. Removing the failure
-// guard fails this test (REQ-144).
+// list call, never a silent zero. The failure is the typed
+// *transport.DecodeError (REQ-151) whose top-level string stays
+// value-free; the field is named by the wrapped cause. Removing the
+// failure guard fails this test (REQ-144).
 //
 // The near misses are the load-bearing cases, as on the template side: they
 // pin that the set is closed rather than merely that nonsense is rejected.
@@ -605,8 +607,12 @@ func TestListStoredQueriesUnparseableSavedFails(t *testing.T) {
 			if err == nil {
 				t.Fatalf("ListStoredQueries(%q) = nil error with list %+v, want a decode failure", tc.wire, list)
 			}
-			if !strings.Contains(err.Error(), "saved") {
-				t.Errorf("err = %q, want it to name saved", err)
+			de, ok := errors.AsType[*transport.DecodeError](err)
+			if !ok {
+				t.Fatalf("err = %v, want a *transport.DecodeError in the chain (REQ-151)", err)
+			}
+			if de.Inner == nil || !strings.Contains(de.Inner.Error(), "saved") {
+				t.Errorf("wrapped cause = %v, want it to name saved", de.Inner)
 			}
 			if list != nil {
 				t.Errorf("list = %+v, want nil on decode failure", list)
