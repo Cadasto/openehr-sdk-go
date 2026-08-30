@@ -66,6 +66,20 @@ func readCassette(t *testing.T, name string) []byte {
 	return b
 }
 
+// compactJSON is the fair comparison for a preserved Extras value. Extras
+// holds the wire bytes exactly as decoded, but re-encoding runs them
+// through encoding/json, which compacts insignificant whitespace — so a
+// wire value spelled `["a", "b"]` comes back as `["a","b"]` with nothing
+// lost. Comparing raw bytes would fail on the spacing alone.
+func compactJSON(t *testing.T, raw json.RawMessage) string {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, raw); err != nil {
+		t.Fatalf("Compact(%s) = %v, want nil error", raw, err)
+	}
+	return buf.String()
+}
+
 func TestUploadTemplate(t *testing.T) {
 	var captured *http.Request
 	var capturedBody []byte
@@ -439,8 +453,8 @@ func TestTemplateMetadataRoundTrip(t *testing.T) {
 					t.Errorf("Extras[%q] dropped on re-encode: %s", k, out)
 					continue
 				}
-				if string(raw) != string(wantRaw) {
-					t.Errorf("Extras[%q] = %s, want %s", k, raw, wantRaw)
+				if want := compactJSON(t, wantRaw); string(raw) != want {
+					t.Errorf("Extras[%q] = %s, want %s", k, raw, want)
 				}
 			}
 		})

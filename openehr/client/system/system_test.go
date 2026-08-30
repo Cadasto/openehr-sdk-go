@@ -1,6 +1,7 @@
 package system_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"maps"
@@ -50,6 +51,21 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 
 // readCassette returns the bytes of a vendored cassette at
 // testkit/cassettes/its_rest/<dir>/<name>.
+// compactJSON is the fair comparison for a preserved Extras value. Extras
+// holds the wire bytes exactly as decoded, but re-encoding runs them
+// through encoding/json, which compacts insignificant whitespace — so the
+// cassette's `["application/json", "application/xml"]` comes back without
+// the space and nothing is lost. Comparing raw bytes would fail on the
+// spacing alone.
+func compactJSON(t *testing.T, raw json.RawMessage) string {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, raw); err != nil {
+		t.Fatalf("Compact(%s) = %v, want nil error", raw, err)
+	}
+	return buf.String()
+}
+
 func readCassette(t *testing.T, dir, name string) []byte {
 	t.Helper()
 	_, src, _, ok := runtime.Caller(0)
@@ -137,30 +153,107 @@ func TestCapabilitiesPreservesExtras(t *testing.T) {
 	}
 }
 
+// TestCapabilitiesRoundTripsExtras pins the capabilities encode contract:
+// the documented fields a value carries before encode come back unchanged
+// after a Marshal/Unmarshal round trip, only the unknown keys ride along
+// in Extras, and an Extras key colliding with a documented field name is
+// ignored — the documented field is authoritative.
+//
+// The collision is always caller-constructed: UnmarshalJSON never routes a
+// documented field name into Extras. The two collision rows cover both
+// mechanisms — a documented field that emits a key (the overlay wins it
+// back) and one that emits none because it is empty and every documented
+// field here carries omitempty (only deleting the known key from the
+// Extras clone can ignore that one).
 func TestCapabilitiesRoundTripsExtras(t *testing.T) {
-	body := readCassette(t, "system", "capabilities.json")
-	var sc system.ServiceCapabilities
-	if err := json.Unmarshal(body, &sc); err != nil {
-		t.Fatal(err)
-	}
-	out, err := json.Marshal(sc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var roundTripped system.ServiceCapabilities
-	if err := json.Unmarshal(out, &roundTripped); err != nil {
-		t.Fatal(err)
-	}
-	if roundTripped.Solution != sc.Solution {
-		t.Errorf("Solution drifted: %q vs %q", roundTripped.Solution, sc.Solution)
-	}
-	if len(roundTripped.Extras) != len(sc.Extras) {
-		t.Errorf("Extras count drifted: %d vs %d", len(roundTripped.Extras), len(sc.Extras))
-	}
-	for k := range sc.Extras {
-		if _, ok := roundTripped.Extras[k]; !ok {
-			t.Errorf("Extras key %q lost in round-trip", k)
-		}
+	for _, tc := range []struct {
+		label string
+		body  []byte
+		// inject is applied to the decoded value before re-encoding.
+		inject map[string]json.RawMessage
+	}{
+		{
+			label: "cassette",
+			body:  readCassette(t, "system", "capabilities.json"),
+		},
+		{
+			label: "colliding extra on an emitted field is ignored",
+			body:  []byte(`{"solution":"Cadasto","support_email":"support@cadasto.example"}`),
+			inject: map[string]json.RawMessage{
+				"solution": json.RawMessage(`"caller-supplied solution"`),
+			},
+		},
+		{
+			label: "colliding extra on an omitted field is ignored",
+			// No solution and no endpoints on the wire, so both stay empty and
+			// omitempty emits no key for either — the case a last-wins merge
+			// cannot survive.
+			body: []byte(`{"vendor":"Cadasto","support_email":"support@cadasto.example"}`),
+			inject: map[string]json.RawMessage{
+				"solution":  json.RawMessage(`"caller-supplied solution"`),
+				"endpoints": json.RawMessage(`["/caller/supplied"]`),
+			},
+		},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			var sc system.ServiceCapabilities
+			if err := json.Unmarshal(tc.body, &sc); err != nil {
+				t.Fatalf("Unmarshal(wire) = %v, want nil error", err)
+			}
+			// Snapshot the decoded value before injection: it is the want for
+			// every documented field and for the Extras key set. want.Extras
+			// is cleared so nothing reads it through the alias the copy keeps
+			// on the map injection is about to mutate.
+			wantExtras := maps.Clone(sc.Extras)
+			want := sc
+			want.Extras = nil
+			for k, v := range tc.inject {
+				if sc.Extras == nil {
+					sc.Extras = map[string]json.RawMessage{}
+				}
+				sc.Extras[k] = v
+			}
+			out, err := json.Marshal(sc)
+			if err != nil {
+				t.Fatalf("Marshal = %v, want nil error", err)
+			}
+			var got system.ServiceCapabilities
+			if err := json.Unmarshal(out, &got); err != nil {
+				t.Fatalf("Unmarshal(re-encoded %s) = %v, want nil error", out, err)
+			}
+			if got.Solution != want.Solution {
+				t.Errorf("Solution = %q, want %q (the documented field is authoritative)", got.Solution, want.Solution)
+			}
+			if got.SolutionVersion != want.SolutionVersion {
+				t.Errorf("SolutionVersion = %q, want %q", got.SolutionVersion, want.SolutionVersion)
+			}
+			if got.Vendor != want.Vendor {
+				t.Errorf("Vendor = %q, want %q", got.Vendor, want.Vendor)
+			}
+			if got.RESTAPISpecsVersion != want.RESTAPISpecsVersion {
+				t.Errorf("RESTAPISpecsVersion = %q, want %q", got.RESTAPISpecsVersion, want.RESTAPISpecsVersion)
+			}
+			if got.ConformanceProfile != want.ConformanceProfile {
+				t.Errorf("ConformanceProfile = %q, want %q", got.ConformanceProfile, want.ConformanceProfile)
+			}
+			if !slices.Equal(got.Endpoints, want.Endpoints) {
+				t.Errorf("Endpoints = %v, want %v (the documented field is authoritative)", got.Endpoints, want.Endpoints)
+			}
+			if len(got.Extras) != len(wantExtras) {
+				t.Errorf("Extras = %v, want exactly the %d unknown key(s) %v",
+					slices.Sorted(maps.Keys(got.Extras)), len(wantExtras), slices.Sorted(maps.Keys(wantExtras)))
+			}
+			for k, wantRaw := range wantExtras {
+				raw, ok := got.Extras[k]
+				if !ok {
+					t.Errorf("Extras[%q] dropped on re-encode: %s", k, out)
+					continue
+				}
+				if want := compactJSON(t, wantRaw); string(raw) != want {
+					t.Errorf("Extras[%q] = %s, want %s", k, raw, want)
+				}
+			}
+		})
 	}
 }
 

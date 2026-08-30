@@ -43,12 +43,21 @@ type ServiceCapabilities struct {
 	Endpoints []string `json:"endpoints,omitempty"`
 	// Extras preserves deployment-specific fields not in the
 	// documented capabilities shape.
+	// [ServiceCapabilities.MarshalJSON] re-emits them.
+	//
+	// Extras keys are matched against the documented field names
+	// case-sensitively, while encoding/json decodes those field names
+	// case-insensitively. A wire key differing from a documented field
+	// only by case ("Solution") therefore populates the documented field
+	// and is also preserved here verbatim, so encode emits both keys.
 	Extras map[string]json.RawMessage `json:"-"`
 }
 
 // knownCapabilityFields is the JSON-tag set decoded into typed
 // ServiceCapabilities fields. UnmarshalJSON routes every other key
-// to Extras.
+// to Extras, and MarshalJSON deletes these keys from the Extras clone
+// it merges, so a colliding caller-set entry cannot displace the
+// documented field.
 var knownCapabilityFields = map[string]struct{}{
 	"solution":              {},
 	"solution_version":      {},
@@ -84,13 +93,18 @@ func (s *ServiceCapabilities) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON re-emits the documented fields plus Extras. Unknown keys
-// are preserved and re-emitted verbatim; documented fields are emitted
-// per their own contract (each is omitted when empty), so the emitted
-// key set is not guaranteed to be identical to the wire body a value was
-// decoded from. Key order is not part of the contract (a non-empty
-// Extras path marshals a map, and encoding/json sorts a map's keys —
-// documented fields are not emitted first there).
+// MarshalJSON re-emits the documented fields plus Extras.
+//
+// An Extras key that collides with a documented field name is ignored on
+// encode; the documented field is authoritative. Unknown keys are
+// preserved and re-emitted, and documented fields are emitted per their
+// own contract (each is omitted when empty), so the emitted key set is
+// not guaranteed to be identical to the wire body a value was decoded
+// from. Neither is its spelling: encoding/json compacts insignificant
+// whitespace inside a preserved value. Key order is not part of the
+// contract either (a non-empty Extras path marshals a map, and
+// encoding/json sorts a map's keys — documented fields are not emitted
+// first there).
 func (s ServiceCapabilities) MarshalJSON() ([]byte, error) {
 	type alias ServiceCapabilities
 	known, err := json.Marshal(alias(s))
@@ -100,16 +114,20 @@ func (s ServiceCapabilities) MarshalJSON() ([]byte, error) {
 	if len(s.Extras) == 0 {
 		return known, nil
 	}
-	// Re-decode known into a generic map so we can merge Extras and
-	// re-encode with stable JSON-object semantics.
-	var merged map[string]json.RawMessage
+	// Start from Extras with every documented field name deleted, then
+	// overlay the typed emission — re-decoding known into a generic map so
+	// the merge and the re-encode keep JSON-object semantics. Deleting
+	// rather than merely letting the overlay win is what makes the rule
+	// hold for an omitted field: every documented field here carries
+	// omitempty, so an empty one emits no key for the overlay to win with
+	// and a caller-set Extras entry would otherwise survive in its place.
+	merged := maps.Clone(s.Extras)
+	for k := range knownCapabilityFields {
+		delete(merged, k)
+	}
 	if err := json.Unmarshal(known, &merged); err != nil {
 		return nil, err
 	}
-	if merged == nil {
-		merged = map[string]json.RawMessage{}
-	}
-	maps.Copy(merged, s.Extras)
 	return json.Marshal(merged)
 }
 

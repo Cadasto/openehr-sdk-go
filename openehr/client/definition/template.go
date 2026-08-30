@@ -140,11 +140,12 @@ func (m *TemplateMetadata) UnmarshalJSON(data []byte) error {
 //
 // An Extras key that collides with a documented field name is ignored on
 // encode; the documented field is authoritative. Unknown keys are
-// preserved and re-emitted verbatim, and documented fields are emitted
-// per their own contract (each is omitted when empty, and
-// `created_timestamp` when zero), so the emitted key set is not
-// guaranteed to be identical to the wire body a value was decoded from.
-// Key order is not part of the contract (REQ-144).
+// preserved and re-emitted, and documented fields are emitted per their
+// own contract (each is omitted when empty, and `created_timestamp` when
+// zero), so the emitted key set is not guaranteed to be identical to the
+// wire body a value was decoded from. Neither is its spelling:
+// encoding/json compacts insignificant whitespace inside a preserved
+// value, and key order is not part of the contract (REQ-144).
 func (m TemplateMetadata) MarshalJSON() ([]byte, error) {
 	type alias TemplateMetadata
 	known, err := json.Marshal(alias(m))

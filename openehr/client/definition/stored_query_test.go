@@ -600,7 +600,7 @@ func TestStoredQueryMetadataExtrasRoundTrip(t *testing.T) {
 					t.Errorf("Extras[%q] dropped on re-encode: %s", k, out)
 					continue
 				}
-				if string(raw) != want {
+				if want := compactJSON(t, json.RawMessage(want)); string(raw) != want {
 					t.Errorf("Extras[%q] = %s, want %s", k, raw, want)
 				}
 			}

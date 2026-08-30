@@ -79,11 +79,12 @@ func (m *StoredQueryMetadata) UnmarshalJSON(data []byte) error {
 //
 // An Extras key that collides with a documented field name is ignored on
 // encode; the documented field is authoritative. Unknown keys are
-// preserved and re-emitted verbatim, and documented fields are emitted
-// per their own contract (only `saved` is omitted, when it is zero), so
-// the emitted key set is not guaranteed to be identical to the wire body
-// a value was decoded from. Key order is not part of the contract
-// (REQ-144).
+// preserved and re-emitted, and documented fields are emitted per their
+// own contract (only `saved` is omitted, when it is zero), so the emitted
+// key set is not guaranteed to be identical to the wire body a value was
+// decoded from. Neither is its spelling: encoding/json compacts
+// insignificant whitespace inside a preserved value, and key order is not
+// part of the contract (REQ-144).
 func (m StoredQueryMetadata) MarshalJSON() ([]byte, error) {
 	type alias StoredQueryMetadata
 	known, err := json.Marshal(alias(m))
