@@ -8,17 +8,28 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ### Read-path decode taxonomy and Definition metadata decoding (2026-08-30)
 
-Two independent Draft plans, each authoring its spec deltas in a Phase 0 (via `sdd-specify`)
+Two independent plans, each authoring its spec deltas in a Phase 0 (via `sdd-specify`)
 before implementation. [2026-08-30-read-path-decode-taxonomy.md](2026-08-30-read-path-decode-taxonomy.md)
 reserves **REQ-151** (transport band): a `transport.DecodeError` carrying the raw response bytes
 when a 2xx body fails to decode, settled by ADR 0018, probed by PROBE-101, with a `canjson`
 encode-sentinel rider on REQ-052 — it closes both read-path deferrals from the archived
-[write-result plan](archive/2026-08-18-write-result-contract.md).
-[2026-08-30-definition-metadata-decoding.md](2026-08-30-definition-metadata-decoding.md)
-reserves **REQ-144** (wire-extensions band): tolerant Definition metadata timestamp decode
-(settled by ADR 0019) and non-nil empty list slices. Both ids are reserved in
-[REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy); registry rows and
-traceability entries follow in each plan's Phase 0.
+[write-result plan](archive/2026-08-18-write-result-contract.md). Its id is reserved in
+[REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy); the registry row and
+traceability entry follow in its Phase 0.
+
+The Definition metadata decoding plan **landed 2026-08-30 and was archived**
+([archive/2026-08-30-definition-metadata-decoding.md](archive/2026-08-30-definition-metadata-decoding.md)):
+[REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding) is `landed`, and
+PROBE-093 keeps its catalog entry unchanged. The two Definition catalog timestamps
+(`TemplateMetadata.created_timestamp`, `StoredQueryMetadata.saved`) now decode against a closed
+five-layout set ([ADR 0019](../adr/0019-definition-timestamp-tolerance.md)) instead of RFC 3339
+only, so a single zone-less or space-separated value no longer fails a whole catalog: absent,
+`null` or empty yields the zero time, an unparseable value fails naming the field, and encode
+stays RFC 3339. Zone-less values decode as UTC and therefore re-marshal with a `Z` the wire never
+carried — the recorded round-trip asymmetry. `ListTemplates` and `ListStoredQueries` also return a
+non-nil zero-length slice for an empty 2xx body, the read-side twin of REQ-094's typed-nil trap.
+The `saved` half of the tolerance is the one keyed exception § REQ-095 now names, granted on
+deployment evidence rather than pre-emption.
 
 ### AQL alignment audit follow-ups (2026-08-26)
 

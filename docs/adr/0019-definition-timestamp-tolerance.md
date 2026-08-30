@@ -5,7 +5,7 @@
 - **Superseded by:** —
 - **Strand:** none — direct decision (this plan's Phase 0); no prior open research strand.
 - **Introduces:** [REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding) (Definition metadata decoding). **Amends:** [REQ-095](../specifications/wire.md#req-095) (OpenAPI authoritative source) — one keyed compatibility exception, carried by § REQ-095 itself rather than asserted from here.
-- **Plan:** [2026-08-30-definition-metadata-decoding.md](../plans/2026-08-30-definition-metadata-decoding.md) Phase 0.
+- **Plan:** [2026-08-30-definition-metadata-decoding.md](../plans/archive/2026-08-30-definition-metadata-decoding.md) Phase 0.
 - **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (strict-encode / permissive-decode for BMM numerics — the asymmetry precedent and its evidence bar); [ADR 0015](0015-flat-metadata-spelling.md) (accept both spellings on input, emit exactly one).
 
 ## Context

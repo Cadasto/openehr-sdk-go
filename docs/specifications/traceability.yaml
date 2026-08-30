@@ -435,7 +435,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
-      - docs/plans/2026-08-30-definition-metadata-decoding.md
+      - docs/plans/archive/2026-08-30-definition-metadata-decoding.md
     notes: >
       Amended 2026-08-30 (ADR 0019): the section now carries one KEYED exception
       to the OpenAPI-authoritative rule -- the REQ-144 Definition metadata
@@ -2146,10 +2146,13 @@ requirements:
     title: Definition metadata decoding
     canonical: docs/specifications/wire.md#req-144--definition-metadata-decoding
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [openehr/client/definition]
     adrs: [docs/adr/0019-definition-timestamp-tolerance.md]
-    plans: [docs/plans/2026-08-30-definition-metadata-decoding.md]
+    plans: [docs/plans/archive/2026-08-30-definition-metadata-decoding.md]
+    tests:
+      - openehr/client/definition/template_test.go
+      - openehr/client/definition/stored_query_test.go
     notes: >-
       Decode of the two Definition catalog timestamps
       (TemplateMetadata.created_timestamp, StoredQueryMetadata.saved) accepts a
@@ -2177,8 +2180,7 @@ requirements:
       -- asymmetric tolerance, ADR 0004's precedent. Also fixes the empty-BODY
       arm: ListTemplates/ListStoredQueries return a non-nil zero-length slice
       (a nil slice boxed in a non-nil interface marshals as JSON null -- the
-      read-side twin of the REQ-094 typed-nil trap). implementation: planned --
-      flipped to landed with the code; tests land with it.
+      read-side twin of the REQ-094 typed-nil trap).
 
   - id: REQ-150
     title: Path-parameter segment validation
