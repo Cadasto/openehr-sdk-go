@@ -40,6 +40,19 @@
 //     (no silent float32 coercion). Overflow on decode is reported as
 //     [ErrInvalidShape] rather than silently rounded.
 //
+// # Error classification
+//
+// The package keeps its two sentinels one-directional (REQ-052), so a
+// caller can classify a failure with errors.Is alone:
+//
+//   - [ErrInvalidValue] — encode only. Every [Marshal] / [MarshalIndent]
+//     failure wraps it, over the encoder's own error, which stays
+//     reachable through unwrapping.
+//   - [ErrInvalidShape] — decode only. Never appears on an encode path.
+//
+// Both are distinct from the transport-level transport.ErrInvalidShape,
+// which classifies a response body rather than a codec operation.
+//
 // # Strict vs relaxed decode
 //
 // The decoder defaults to STRICT polymorphism: at any field whose
