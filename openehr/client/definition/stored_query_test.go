@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -370,4 +371,85 @@ func TestPutStoredQueryReservedNameScope(t *testing.T) {
 			t.Errorf("path = %q, want %q", gotPath, want)
 		}
 	})
+}
+
+// TestListStoredQueries pins the happy path: the documented descriptor
+// fields decode, and `saved` in the pin's own example shape — zoned,
+// fractional-second RFC 3339 — lands on the exact instant it names
+// (REQ-144).
+func TestListStoredQueries(t *testing.T) {
+	c := jsonServerClient(t, `[{
+		"name":"org.openehr::vitals",
+		"type":"AQL",
+		"version":"1.0.0",
+		"saved":"2017-07-16T19:20:30.450+01:00",
+		"q":"SELECT c FROM EHR e CONTAINS COMPOSITION c"
+	}]`)
+
+	list, _, err := definition.ListStoredQueries(t.Context(), c, "")
+	if err != nil {
+		t.Fatalf("ListStoredQueries = %v, want nil error", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("len(list) = %d, want 1", len(list))
+	}
+	got := list[0]
+	if got.Name != "org.openehr::vitals" {
+		t.Errorf("Name = %q, want org.openehr::vitals", got.Name)
+	}
+	if got.Type != "AQL" {
+		t.Errorf("Type = %q, want AQL", got.Type)
+	}
+	if got.Version != "1.0.0" {
+		t.Errorf("Version = %q, want 1.0.0", got.Version)
+	}
+	if got.Q != "SELECT c FROM EHR e CONTAINS COMPOSITION c" {
+		t.Errorf("Q = %q, want the stored AQL text", got.Q)
+	}
+	want := time.Date(2017, 7, 16, 19, 20, 30, 450_000_000, time.FixedZone("+01:00", 60*60))
+	if !got.Saved.Equal(want) {
+		t.Errorf("Saved = %s, want %s", got.Saved.Format(time.RFC3339Nano), want.Format(time.RFC3339Nano))
+	}
+	if _, leaked := got.Extras["saved"]; leaked {
+		t.Error("saved leaked into Extras instead of Saved")
+	}
+}
+
+// TestListStoredQueriesZoneLessSaved pins the `saved` arm of the tolerance
+// — the keyed REQ-095 exception, since `saved` is pinned `format:
+// date-time`: a zone-less value decodes as UTC rather than failing the
+// whole list (REQ-144).
+func TestListStoredQueriesZoneLessSaved(t *testing.T) {
+	c := jsonServerClient(t, `[{"name":"org.openehr::vitals","saved":"2022-03-30T07:18:13.591"}]`)
+
+	list, _, err := definition.ListStoredQueries(t.Context(), c, "")
+	if err != nil {
+		t.Fatalf("ListStoredQueries = %v, want nil error", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("len(list) = %d, want 1", len(list))
+	}
+	want := time.Date(2022, 3, 30, 7, 18, 13, 591_000_000, time.UTC)
+	if !list[0].Saved.Equal(want) {
+		t.Errorf("Saved = %s, want %s", list[0].Saved.Format(time.RFC3339Nano), want.Format(time.RFC3339Nano))
+	}
+}
+
+// TestListStoredQueriesUnparseableSavedFails gives the `saved` arm its own
+// refusal pin: a non-empty value matching no accepted layout fails the
+// list call naming the field, never a silent zero. Removing the failure
+// guard fails this test (REQ-144).
+func TestListStoredQueriesUnparseableSavedFails(t *testing.T) {
+	c := jsonServerClient(t, `[{"name":"org.openehr::vitals","saved":"not-a-time"}]`)
+
+	list, _, err := definition.ListStoredQueries(t.Context(), c, "")
+	if err == nil {
+		t.Fatalf("ListStoredQueries = nil error with list %+v, want a decode failure", list)
+	}
+	if !strings.Contains(err.Error(), "saved") {
+		t.Errorf("err = %q, want it to name saved", err)
+	}
+	if list != nil {
+		t.Errorf("list = %+v, want nil on decode failure", list)
+	}
 }

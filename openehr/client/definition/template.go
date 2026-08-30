@@ -91,13 +91,26 @@ var knownTemplateMetadataFields = map[string]struct{}{
 }
 
 // UnmarshalJSON decodes both documented fields and Extras in one pass.
+//
+// created_timestamp is shadowed as a json.RawMessage over the alias so the
+// strict RFC 3339-only time.Time decoder never sees it; it is parsed
+// afterwards across the accepted layout set (REQ-144).
 func (m *TemplateMetadata) UnmarshalJSON(data []byte) error {
 	type alias TemplateMetadata
 	var a alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	aux := struct {
+		*alias
+		CreatedOn json.RawMessage `json:"created_timestamp"`
+	}{alias: &a}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	createdOn, err := parseDefinitionTimestamp("created_timestamp", aux.CreatedOn)
+	if err != nil {
 		return err
 	}
 	*m = TemplateMetadata(a)
+	m.CreatedOn = createdOn
 
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {

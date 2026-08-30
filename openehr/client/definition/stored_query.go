@@ -28,13 +28,26 @@ var knownStoredQueryFields = map[string]struct{}{
 }
 
 // UnmarshalJSON decodes documented fields and preserves Extras.
+//
+// saved is shadowed as a json.RawMessage over the alias so the strict
+// RFC 3339-only time.Time decoder never sees it; it is parsed afterwards
+// across the accepted layout set (REQ-144).
 func (m *StoredQueryMetadata) UnmarshalJSON(data []byte) error {
 	type alias StoredQueryMetadata
 	var a alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	aux := struct {
+		*alias
+		Saved json.RawMessage `json:"saved"`
+	}{alias: &a}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	saved, err := parseDefinitionTimestamp("saved", aux.Saved)
+	if err != nil {
 		return err
 	}
 	*m = StoredQueryMetadata(a)
+	m.Saved = saved
 
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
