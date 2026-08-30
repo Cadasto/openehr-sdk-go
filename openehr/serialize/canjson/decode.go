@@ -11,12 +11,18 @@ import (
 // ErrInvalidShape is the canjson-local sentinel reserved for JSON-level
 // shape errors (malformed JSON, type mismatch on a non-polymorphic field,
 // numeric overflow). Polymorphic-discrimination errors come from the
-// typereg package — callers MUST `errors.Is` against
+// typereg package instead: match those with errors.Is against
 // [typereg.ErrMissingType] / [typereg.ErrUnknownType] /
-// [typereg.ErrTypeMismatch] rather than against this sentinel.
+// [typereg.ErrTypeMismatch], not against this sentinel.
 //
-// No decode path produces it today: [Unmarshal] and [Decoder.Decode]
-// pass the codec's error through unchanged (REQ-052 producer deferred).
+// No decode path returns it today, so an errors.Is against it never
+// matches. A decode failure surfaces in one of three other shapes:
+// malformed JSON reaches the caller unchanged from encoding/json, a
+// shape error inside a generated RM type carries a
+// `canjson: <RM_TYPE>:` prefix, and a failure at a polymorphic slot
+// arrives as [DecodeError]. Wrapping decode failures with this
+// sentinel is a spec-first REQ-052 follow-up, tracked by
+// docs/plans/2026-08-30-read-path-decode-taxonomy.md.
 var ErrInvalidShape = errors.New("canjson: invalid JSON shape")
 
 // DecodeError is the unified error returned by the decoder at
@@ -63,9 +69,12 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 //
 // Returns [poly.DecodeError] wrapping a typereg sentinel
 // ([typereg.ErrMissingType] / ErrUnknownType / ErrTypeMismatch) at
-// polymorphic failures (via generated UnmarshalJSON). JSON shape
-// errors currently come from encoding/json unchanged — they do not
-// wrap [ErrInvalidShape] (REQ-052 producer deferred).
+// polymorphic failures (via generated UnmarshalJSON). Malformed JSON
+// comes back unchanged from encoding/json as *json.SyntaxError; a
+// shape error inside a generated RM type keeps a
+// `canjson: <RM_TYPE>:` prefix from that type's UnmarshalJSON. None
+// of these wraps [ErrInvalidShape] (REQ-052 producer deferred — see
+// the sentinel's own documentation).
 func Unmarshal(data []byte, v any) error {
 	return json.Unmarshal(data, v)
 }
@@ -91,7 +100,11 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 }
 
 // Decode reads the next JSON value from the stream and stores it in
-// v. Errors follow the same classification as [Unmarshal].
+// v. Errors follow the same classification as [Unmarshal], with one
+// stream-level difference: a truncated value is reported as
+// io.ErrUnexpectedEOF here, where [Unmarshal] reports a
+// *json.SyntaxError ("unexpected end of JSON input"). Other syntax
+// errors are the same *json.SyntaxError in both.
 func (d *Decoder) Decode(v any) error {
 	return d.dec.Decode(v)
 }

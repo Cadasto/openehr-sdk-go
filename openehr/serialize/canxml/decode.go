@@ -91,8 +91,11 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 //
 // Returns [DecodeError] wrapping a typereg sentinel
 // ([typereg.ErrMissingType] / ErrUnknownType / ErrTypeMismatch) at
-// polymorphic failures, and [ErrInvalidShape] (wrapped) for XML
-// shape errors such as `xmi:type` or malformed content.
+// polymorphic failures, and [ErrInvalidShape] (wrapped) for an
+// `xmi:type` discriminator failure. Generic XML syntax errors are not
+// classified: they come back unchanged from encoding/xml, so an
+// errors.Is against [ErrInvalidShape] does not match a truncated or
+// otherwise malformed document.
 func Unmarshal(data []byte, v any) error {
 	return xml.NewDecoder(bytes.NewReader(data)).Decode(v)
 }

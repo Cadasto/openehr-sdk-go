@@ -37,26 +37,50 @@
 //   - ISO 8601 dates/times/durations are passed through as JSON
 //     strings; the codec does not parse them to time.Time (REQ-046).
 //   - Numeric magnitudes use IEEE 754 double-precision JSON numbers
-//     (no silent float32 coercion). Overflow on decode is specified
-//     by REQ-052 as a typed error; that producer is not yet landed —
-//     [Unmarshal] and [Decoder.Decode] pass the codec's error through
-//     unchanged, so [ErrInvalidShape] is reserved, not currently
-//     returned.
+//     (no silent float32 coercion). REQ-052 requires a typed error on
+//     decode "rather than silently rounding" when a wire value exceeds
+//     JSON's number precision. Half of that is met: an out-of-range
+//     magnitude (e.g. 1e400) already fails with a typed error — a
+//     *json.UnmarshalTypeError, reachable with errors.As through the
+//     generated UnmarshalJSON wrapper. The open half is mantissa
+//     precision loss, which is still silent: a magnitude of
+//     0.1234567890123456789 decodes to 0.12345678901234568 with a nil
+//     error. Closing it is tracked by
+//     docs/plans/2026-08-30-read-path-decode-taxonomy.md.
 //
 // # Error classification
 //
 // [ErrInvalidShape] is decode-only and is reserved for JSON-level
 // shape errors (malformed JSON, type mismatch on a non-polymorphic
-// field, numeric overflow). Today no decode path produces it:
-// [Unmarshal] and [Decoder.Decode] pass the underlying codec's error
-// through unchanged. Polymorphic-discrimination failures wrap
-// typereg sentinels in [DecodeError] via generated UnmarshalJSON.
-// Wrapping decode failures with this sentinel is a spec-first
-// REQ-052 follow-up; until it lands, callers MUST NOT classify
-// decode errors with errors.Is(_, ErrInvalidShape).
+// field, numeric overflow). No decode path returns it today, so an
+// errors.Is against it never matches. Wrapping decode failures with
+// the sentinel is a spec-first REQ-052 follow-up, tracked by
+// docs/plans/2026-08-30-read-path-decode-taxonomy.md.
 //
-// Both this sentinel and the transport-level transport.ErrInvalidShape
-// are distinct values.
+// What a decode failure does look like depends on where it happens:
+//
+//   - Malformed JSON reaches the caller unchanged from encoding/json,
+//     because encoding/json validates the whole input before it
+//     dispatches to any UnmarshalJSON method. [Unmarshal] returns
+//     *json.SyntaxError for it; [Decoder.Decode] classifies a
+//     truncated stream differently, as io.ErrUnexpectedEOF.
+//   - A shape error inside a generated RM type is wrapped by that
+//     type's generated UnmarshalJSON with a `canjson: <RM_TYPE>:`
+//     prefix, so the encoding/json error stays reachable with
+//     errors.As but is not returned verbatim.
+//   - A failure at a polymorphic slot arrives as [DecodeError]
+//     carrying the path — whether its cause is a typereg sentinel
+//     (missing, unknown or mismatched `_type`) or a plain
+//     encoding/json error at that slot.
+//
+// None of the three wraps [ErrInvalidShape].
+//
+// Do not confuse this sentinel with canxml.ErrInvalidShape: same
+// name, same subtree, a different value — and unlike this one it does
+// have producers, for `xmi:type` discriminator failures. The
+// transport-level transport.ErrInvalidShape is a third distinct
+// value; it is named here in plain text rather than as a doc link
+// because canjson must not depend on transport (REQ-013).
 //
 // # Strict vs relaxed decode
 //
