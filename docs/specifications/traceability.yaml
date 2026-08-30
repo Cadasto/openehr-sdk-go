@@ -128,6 +128,7 @@ requirements:
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
       - openehr/serialize/canjson/encode_test.go
+      - openehr/serialize/canjson/marshal_sentinel_test.go
       - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canjson/polymorphic_decode_test.go
       - openehr/serialize/canjson/polymorphic_encode_test.go
@@ -135,12 +136,13 @@ requirements:
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
     notes: >-
-      Amended 2026-08-30 (read-path decode taxonomy, spec ahead of code): the
-      REQ-052 encode-side refusal sentinel clause requires canjson.Marshal /
-      MarshalIndent to wrap the encode-only canjson.ErrInvalidValue, kept
-      errors.Is-distinguishable from the decode-side canjson.ErrInvalidShape
-      and from transport.ErrInvalidShape. canxml reuses one sentinel across
-      both directions; that is observed as out of scope, not aligned.
+      Amended 2026-08-30 (read-path decode taxonomy): the REQ-052 encode-side
+      refusal sentinel clause requires canjson.Marshal / MarshalIndent to wrap
+      the encode-only canjson.ErrInvalidValue, kept errors.Is-distinguishable
+      from the decode-side canjson.ErrInvalidShape and from
+      transport.ErrInvalidShape. Landed the same day in marshal.go and pinned
+      by marshal_sentinel_test.go. canxml reuses one sentinel across both
+      directions; that is observed as out of scope, not aligned.
 
   - id: REQ-056
     title: Canonical XML
