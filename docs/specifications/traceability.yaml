@@ -123,7 +123,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/serialize/canjson, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/2026-08-30-read-path-decode-taxonomy.md]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
@@ -407,7 +407,7 @@ requirements:
     implementation: landed
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/demographic]
     probes: [PROBE-061, PROBE-071]
-    plans: [docs/plans/archive/2026-08-18-write-result-contract.md, docs/plans/2026-08-30-read-path-decode-taxonomy.md]
+    plans: [docs/plans/archive/2026-08-18-write-result-contract.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
     tests:
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/directory/directory_test.go
@@ -2181,7 +2181,7 @@ requirements:
     packages: [transport, openehr/client/definition, openehr/client/system, openehr/client/demographic, openehr/client/ehr/composition, testkit/probes/transport]
     probes: [PROBE-101]
     adrs: [docs/adr/0018-raw-bytes-on-decode-error.md]
-    plans: [docs/plans/2026-08-30-read-path-decode-taxonomy.md]
+    plans: [docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
     tests:
       - transport/decode_error_test.go
       - openehr/client/definition/decode_error_test.go

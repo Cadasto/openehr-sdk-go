@@ -8,17 +8,33 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ### Read-path decode taxonomy and Definition metadata decoding (2026-08-30)
 
-Two independent Draft plans, each authoring its spec deltas in a Phase 0 (via `sdd-specify`)
-before implementation. [2026-08-30-read-path-decode-taxonomy.md](2026-08-30-read-path-decode-taxonomy.md)
-reserves **REQ-151** (transport band): a `transport.DecodeError` carrying the raw response bytes
-when a 2xx body fails to decode, settled by ADR 0018, probed by PROBE-101, with a `canjson`
-encode-sentinel rider on REQ-052 — it closes both read-path deferrals from the archived
-[write-result plan](archive/2026-08-18-write-result-contract.md).
-[2026-08-30-definition-metadata-decoding.md](2026-08-30-definition-metadata-decoding.md)
-reserves **REQ-144** (wire-extensions band): tolerant Definition metadata timestamp decode
-(settled by ADR 0019) and non-nil empty list slices. Both ids are reserved in
-[REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy); registry rows and
-traceability entries follow in each plan's Phase 0.
+Two independent plans, each authoring its spec deltas in a Phase 0 (via `sdd-specify`) before
+implementation. The decode-taxonomy plan has landed; the Definition-metadata plan is still Draft
+and unstarted.
+
+The read-path decode taxonomy plan **landed 2026-08-30 and was archived**
+([archive/2026-08-30-read-path-decode-taxonomy.md](archive/2026-08-30-read-path-decode-taxonomy.md)):
+[REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) is `landed` and
+PROBE-101 is Implemented (Sandbox). A 2xx body that will not decode as the requested
+representation now fails with `*transport.DecodeError`, carrying the raw bytes the server already
+delivered — with the request's method, its route template and the codec's own error beside them —
+instead of dropping them; `Error()` stays value-free and the bytes are attached by default
+([ADR 0018](../adr/0018-raw-bytes-on-decode-error.md)). `transport.Decode` and every hand-rolled
+leaf decode return the same type, so which implementation route a leaf took is invisible to the
+caller. The disjoint arms are pinned negatively: a non-2xx stays `*transport.WireError`, an empty
+representation body stays `transport.ErrInvalidShape`, and the REQ-094 write-result funnel and
+`Prefer=identifier` arm keep their own contracts. The rider closed the second read-path deferral
+from the archived [write-result plan](archive/2026-08-18-write-result-contract.md): a
+`canjson.ErrInvalidValue` encode sentinel under REQ-052, `errors.Is`-distinct from the decode-side
+shape sentinel and from the transport one. **Deferred:** lifting REQ-094's empty-body keyed
+exception for `ehr.Create`, the `auth` / `smart` JSON decodes, and aligning `canxml`'s single
+both-directions sentinel.
+
+Still active: [2026-08-30-definition-metadata-decoding.md](2026-08-30-definition-metadata-decoding.md)
+(Draft, unstarted) reserves **REQ-144** (wire-extensions band): tolerant Definition metadata
+timestamp decode (settled by ADR 0019) and non-nil empty list slices. That id stays reserved in
+[REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy); its registry row and
+traceability entry follow in its Phase 0.
 
 ### AQL alignment audit follow-ups (2026-08-26)
 

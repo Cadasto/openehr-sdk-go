@@ -5,7 +5,7 @@
 - **Superseded by:** —
 - **Strand:** none — direct decision (this plan's Phase 0); no prior open research strand.
 - **Introduces:** [REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) (the typed 2xx decode failure and its `Body` field). **Amends:** [REQ-052](../specifications/wire.md#req-052) (the canonical-JSON encoder gains an encode-only refusal sentinel, so an encode refusal and a decode refusal stop sharing one value); [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (cross-reference only — the write-result contract keeps every arm it owns, including the `ehr.Create` empty-body keyed exception).
-- **Plan:** [2026-08-30-read-path-decode-taxonomy.md](../plans/2026-08-30-read-path-decode-taxonomy.md).
+- **Plan:** [2026-08-30-read-path-decode-taxonomy.md](../plans/archive/2026-08-30-read-path-decode-taxonomy.md).
 - **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (the "no strict-mode knob in v1" posture this decision follows); [REQ-093](../specifications/transport.md#req-093--openehr-error-envelope-mapping) (the PHI-safe error-surface discipline, the `WithRawErrorBodies` opt-in this decision deliberately does *not* extend, and the `WithMaxResponseBody` cap it relies on).
 
 ## Context
