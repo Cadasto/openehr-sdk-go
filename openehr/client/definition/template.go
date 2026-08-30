@@ -90,14 +90,27 @@ var knownTemplateMetadataFields = map[string]struct{}{
 	"description":       {},
 }
 
-// UnmarshalJSON decodes both documented fields and Extras in one pass.
+// UnmarshalJSON decodes both the documented fields and Extras.
+//
+// created_timestamp is shadowed as a json.RawMessage over the alias so the
+// strict RFC 3339-only time.Time decoder never sees it; it is parsed
+// afterwards across the accepted layout set (REQ-144).
 func (m *TemplateMetadata) UnmarshalJSON(data []byte) error {
 	type alias TemplateMetadata
 	var a alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	aux := struct {
+		*alias
+		CreatedOn json.RawMessage `json:"created_timestamp"`
+	}{alias: &a}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	createdOn, err := parseDefinitionTimestamp("created_timestamp", aux.CreatedOn)
+	if err != nil {
 		return err
 	}
 	*m = TemplateMetadata(a)
+	m.CreatedOn = createdOn
 
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -264,6 +277,12 @@ func GetTemplate(ctx context.Context, c *transport.Client, templateID string, fo
 // the request this function has always issued. Filtering is applied by the
 // server; the SDK only emits the parameters.
 //
+// An empty 2xx response body comes back as a non-nil zero-length slice with
+// a nil error, so re-serialising the result yields [] rather than JSON null;
+// a JSON [] body decodes non-nil through encoding/json by construction. A
+// 2xx body that is literally JSON null still decodes to a nil slice and is
+// returned unchanged — § REQ-144 binds the empty-body arm only.
+//
 // Wire: GET /definition/template/{format}.
 func ListTemplates(ctx context.Context, c *transport.Client, format TemplateFormat, opts ...ListOption) ([]TemplateMetadata, *transport.Metadata, error) {
 	if !format.IsValid() {
@@ -288,7 +307,10 @@ func ListTemplates(ctx context.Context, c *transport.Client, format TemplateForm
 		return nil, nil, err
 	}
 	if len(resp.Body) == 0 {
-		return nil, resp.Metadata, nil
+		// An empty 2xx body is an empty catalog, not an absent one: return a
+		// non-nil zero-length slice so a caller re-serialising the result
+		// publishes [] rather than JSON null (REQ-144).
+		return []TemplateMetadata{}, resp.Metadata, nil
 	}
 	var out []TemplateMetadata
 	if err := json.Unmarshal(resp.Body, &out); err != nil {

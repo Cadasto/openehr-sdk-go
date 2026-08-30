@@ -28,13 +28,26 @@ var knownStoredQueryFields = map[string]struct{}{
 }
 
 // UnmarshalJSON decodes documented fields and preserves Extras.
+//
+// saved is shadowed as a json.RawMessage over the alias so the strict
+// RFC 3339-only time.Time decoder never sees it; it is parsed afterwards
+// across the accepted layout set (REQ-144).
 func (m *StoredQueryMetadata) UnmarshalJSON(data []byte) error {
 	type alias StoredQueryMetadata
 	var a alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	aux := struct {
+		*alias
+		Saved json.RawMessage `json:"saved"`
+	}{alias: &a}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	saved, err := parseDefinitionTimestamp("saved", aux.Saved)
+	if err != nil {
 		return err
 	}
 	*m = StoredQueryMetadata(a)
+	m.Saved = saved
 
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -277,6 +290,12 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 // ListStoredQueries lists stored queries matching qualifiedName as a
 // prefix pattern. An empty pattern lists all queries on the deployment.
 //
+// An empty 2xx response body comes back as a non-nil zero-length slice with
+// a nil error, so re-serialising the result yields [] rather than JSON null;
+// a JSON [] body decodes non-nil through encoding/json by construction. A
+// 2xx body that is literally JSON null still decodes to a nil slice and is
+// returned unchanged — § REQ-144 binds the empty-body arm only.
+//
 // Wire: GET /definition/query/{qualified_query_name}.
 func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern string) ([]StoredQueryMetadata, *transport.Metadata, error) {
 	path := "/definition/query"
@@ -299,7 +318,10 @@ func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern str
 		return nil, nil, err
 	}
 	if len(resp.Body) == 0 {
-		return nil, resp.Metadata, nil
+		// An empty 2xx body is an empty catalog, not an absent one: return a
+		// non-nil zero-length slice so a caller re-serialising the result
+		// publishes [] rather than JSON null (REQ-144).
+		return []StoredQueryMetadata{}, resp.Metadata, nil
 	}
 	var out []StoredQueryMetadata
 	if err := json.Unmarshal(resp.Body, &out); err != nil {

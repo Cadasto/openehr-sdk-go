@@ -13,8 +13,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -38,6 +40,19 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 		t.Fatal(err)
 	}
 	return c
+}
+
+// jsonServerClient starts a test server that answers every request with
+// body as JSON, and returns a client bound to it. Used by the decode
+// tests, which care about the response body and nothing else (REQ-144).
+func jsonServerClient(t *testing.T, body string) *transport.Client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	return newClient(t, srv)
 }
 
 func readCassette(t *testing.T, name string) []byte {
@@ -195,17 +210,51 @@ func TestListTemplates(t *testing.T) {
 	}
 }
 
+// TestListTemplatesEmpty pins the empty-BODY arm of REQ-144: an empty 2xx
+// body yields a non-nil zero-length slice and a nil error. The nil check is
+// the load-bearing one — a nil slice boxed in a non-nil interface marshals
+// as JSON null, so a caller who re-serialises the result would publish null
+// for "no templates". Restoring the bare `return nil` fails this test.
 func TestListTemplatesEmpty(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer srv.Close()
-	list, _, err := definition.ListTemplates(t.Context(), newClient(t, srv), definition.FormatADL14)
+	// REQ-144
+	for _, status := range []int{http.StatusOK, http.StatusNoContent} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(status)
+			}))
+			defer srv.Close()
+			list, _, err := definition.ListTemplates(t.Context(), newClient(t, srv), definition.FormatADL14)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if list == nil {
+				t.Errorf("list = nil on %d, want a non-nil empty slice (a nil slice marshals as JSON null)", status)
+			}
+			if len(list) != 0 {
+				t.Errorf("expected empty list on %d, got %d items", status, len(list))
+			}
+		})
+	}
+}
+
+// TestListTemplatesEmptyJSONArray pins the other half of the § REQ-144
+// empty-catalog claim: a JSON `[]` body decodes non-nil through
+// encoding/json by construction, without reaching the empty-body guard. A
+// later short-circuit on the literal body — `if body == "[]" { return nil }`
+// — would turn that into a nil slice, and this test is what would catch it.
+func TestListTemplatesEmptyJSONArray(t *testing.T) {
+	// REQ-144
+	c := jsonServerClient(t, `[]`)
+
+	list, _, err := definition.ListTemplates(t.Context(), c, definition.FormatADL14)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("ListTemplates = %v, want nil error", err)
+	}
+	if list == nil {
+		t.Error("list = nil on a JSON [] body, want a non-nil empty slice (a nil slice marshals as JSON null)")
 	}
 	if len(list) != 0 {
-		t.Errorf("expected empty list on 204, got %d items", len(list))
+		t.Errorf("len(list) = %d, want 0", len(list))
 	}
 }
 
@@ -499,5 +548,239 @@ func TestRepositoryListTemplatesCarriesOptions(t *testing.T) {
 	}
 	if got := captured.URL.Query().Get("template_id"); got != "vital*" {
 		t.Errorf("template_id = %q, want %q", got, "vital*")
+	}
+}
+
+// TestListTemplatesZoneLessTimestamp pins the zone-less arm of the
+// accepted layout set: a `created_timestamp` carrying no zone indicator
+// decodes as UTC — never as the client host's local zone, which would read
+// one response as different instants on different machines — and the
+// fractional second is absorbed by the seconds-bearing layout (REQ-144).
+func TestListTemplatesZoneLessTimestamp(t *testing.T) {
+	c := jsonServerClient(t, `[{"template_id":"t.v1","created_timestamp":"2022-03-30T07:18:13.591"}]`)
+
+	list, _, err := definition.ListTemplates(t.Context(), c, definition.FormatADL14)
+	if err != nil {
+		t.Fatalf("ListTemplates = %v, want nil error", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("len(list) = %d, want 1", len(list))
+	}
+	want := time.Date(2022, 3, 30, 7, 18, 13, 591_000_000, time.UTC)
+	if !list[0].CreatedOn.Equal(want) {
+		t.Errorf("CreatedOn = %s, want %s", list[0].CreatedOn.Format(time.RFC3339Nano), want.Format(time.RFC3339Nano))
+	}
+	// Equal compares instants, so on a UTC host it cannot tell a UTC decode
+	// from a time.Local one. The location check is what actually pins the
+	// "never the client host's zone" rule (REQ-144).
+	if loc := list[0].CreatedOn.Location(); loc != time.UTC {
+		t.Errorf("CreatedOn.Location() = %v, want UTC (a time.Local decode would read one response as different instants on different machines)", loc)
+	}
+}
+
+// TestListTemplatesFractionalSecondLayouts pins the fractional-second
+// latitude across both seconds-bearing layout families and both decimal
+// signs: time.Parse absorbs a fraction following a seconds element even
+// though no layout in the set spells one, and accepts the ISO 8601 comma as
+// readily as the point. The dot-on-`T` spelling is already pinned by
+// TestListTemplatesZoneLessTimestamp (REQ-144).
+func TestListTemplatesFractionalSecondLayouts(t *testing.T) {
+	cases := []struct {
+		name string
+		wire string
+		want time.Time
+	}{
+		{"comma fraction, ISO extended", "2022-03-30T07:18:13,591", time.Date(2022, 3, 30, 7, 18, 13, 591_000_000, time.UTC)},
+		{"comma fraction, space separated", "2026-06-22 14:50:55,25", time.Date(2026, 6, 22, 14, 50, 55, 250_000_000, time.UTC)},
+		{"point fraction, space separated", "2026-06-22 14:50:55.25", time.Date(2026, 6, 22, 14, 50, 55, 250_000_000, time.UTC)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := jsonServerClient(t, `[{"template_id":"t.v1","created_timestamp":"`+tc.wire+`"}]`)
+
+			list, _, err := definition.ListTemplates(t.Context(), c, definition.FormatADL14)
+			if err != nil {
+				t.Fatalf("ListTemplates(%q) = %v, want nil error", tc.wire, err)
+			}
+			if len(list) != 1 {
+				t.Fatalf("len(list) = %d, want 1", len(list))
+			}
+			if !list[0].CreatedOn.Equal(tc.want) {
+				t.Errorf("CreatedOn = %s, want %s", list[0].CreatedOn.Format(time.RFC3339Nano), tc.want.Format(time.RFC3339Nano))
+			}
+		})
+	}
+}
+
+// TestListTemplatesMixedZoneCatalog pins that tolerance is per item: a
+// catalog holding one zoned and one zone-less timestamp returns both
+// entries, each at its own exact instant (REQ-144).
+func TestListTemplatesMixedZoneCatalog(t *testing.T) {
+	c := jsonServerClient(t, `[
+		{"template_id":"zoned.v1","created_timestamp":"2026-05-17T12:00:00Z"},
+		{"template_id":"zoneless.v1","created_timestamp":"2022-03-30T07:18:13.591"}
+	]`)
+
+	list, _, err := definition.ListTemplates(t.Context(), c, definition.FormatADL14)
+	if err != nil {
+		t.Fatalf("ListTemplates = %v, want nil error", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("len(list) = %d, want 2", len(list))
+	}
+	want := []struct {
+		id string
+		at time.Time
+	}{
+		{"zoned.v1", time.Date(2026, 5, 17, 12, 0, 0, 0, time.UTC)},
+		{"zoneless.v1", time.Date(2022, 3, 30, 7, 18, 13, 591_000_000, time.UTC)},
+	}
+	for i, w := range want {
+		if list[i].TemplateID != w.id {
+			t.Errorf("list[%d].TemplateID = %q, want %q", i, list[i].TemplateID, w.id)
+		}
+		if !list[i].CreatedOn.Equal(w.at) {
+			t.Errorf("list[%d].CreatedOn = %s, want %s", i, list[i].CreatedOn.Format(time.RFC3339Nano), w.at.Format(time.RFC3339Nano))
+		}
+	}
+}
+
+// TestListTemplatesSpaceSeparatedTimestamp pins the deployment-interop
+// layout: `2006-01-02 15:04:05` is neither ISO 8601 extended nor a
+// pin-example form, and is accepted solely because deployments emit it
+// (REQ-144).
+func TestListTemplatesSpaceSeparatedTimestamp(t *testing.T) {
+	c := jsonServerClient(t, `[{"template_id":"t.v1","created_timestamp":"2026-06-22 14:50:55"}]`)
+
+	list, _, err := definition.ListTemplates(t.Context(), c, definition.FormatADL14)
+	if err != nil {
+		t.Fatalf("ListTemplates = %v, want nil error", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("len(list) = %d, want 1", len(list))
+	}
+	want := time.Date(2026, 6, 22, 14, 50, 55, 0, time.UTC)
+	if !list[0].CreatedOn.Equal(want) {
+		t.Errorf("CreatedOn = %s, want %s", list[0].CreatedOn.Format(time.RFC3339Nano), want.Format(time.RFC3339Nano))
+	}
+}
+
+// TestListTemplatesMinutePrecisionTimestamp pins the minute-precision
+// layout and its boundary: `2006-01-02T15:04` carries no seconds element,
+// so a value that does carry seconds is matched by a seconds-bearing
+// layout instead — both spellings decode, neither is guessed at (REQ-144).
+func TestListTemplatesMinutePrecisionTimestamp(t *testing.T) {
+	cases := []struct {
+		name string
+		wire string
+		want time.Time
+	}{
+		{"minute precision", "2026-06-22T14:50", time.Date(2026, 6, 22, 14, 50, 0, 0, time.UTC)},
+		{"seconds match a seconds-bearing layout", "2026-06-22T14:50:55", time.Date(2026, 6, 22, 14, 50, 55, 0, time.UTC)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := jsonServerClient(t, `[{"template_id":"t.v1","created_timestamp":"`+tc.wire+`"}]`)
+
+			list, _, err := definition.ListTemplates(t.Context(), c, definition.FormatADL14)
+			if err != nil {
+				t.Fatalf("ListTemplates(%q) = %v, want nil error", tc.wire, err)
+			}
+			if len(list) != 1 {
+				t.Fatalf("len(list) = %d, want 1", len(list))
+			}
+			if !list[0].CreatedOn.Equal(tc.want) {
+				t.Errorf("CreatedOn = %s, want %s", list[0].CreatedOn.Format(time.RFC3339Nano), tc.want.Format(time.RFC3339Nano))
+			}
+		})
+	}
+}
+
+// TestTemplateTimestampAbsentNullEmpty pins the absent/empty arm: an
+// absent key, a JSON null, and an empty string each yield the zero
+// time.Time with no error — the caller distinguishes the case with
+// IsZero — and none of the three leaks the key into Extras (REQ-144).
+func TestTemplateTimestampAbsentNullEmpty(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"key absent", `{"template_id":"t.v1"}`},
+		{"json null", `{"template_id":"t.v1","created_timestamp":null}`},
+		{"empty string", `{"template_id":"t.v1","created_timestamp":""}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var meta definition.TemplateMetadata
+			if err := json.Unmarshal([]byte(tc.body), &meta); err != nil {
+				t.Fatalf("Unmarshal(%s) = %v, want nil error", tc.body, err)
+			}
+			if !meta.CreatedOn.IsZero() {
+				t.Errorf("CreatedOn = %s, want the zero time", meta.CreatedOn.Format(time.RFC3339Nano))
+			}
+			if meta.TemplateID != "t.v1" {
+				t.Errorf("TemplateID = %q, want t.v1 (the rest of the item still decodes)", meta.TemplateID)
+			}
+			if _, leaked := meta.Extras["created_timestamp"]; leaked {
+				t.Error("created_timestamp leaked into Extras")
+			}
+		})
+	}
+}
+
+// TestListTemplatesUnparseableTimestampFails pins the refusal: a non-empty
+// value matching no accepted layout fails the containing item's decode and
+// therefore the list call, naming the field. Never a silent zero — that
+// would present an instant the server never sent as though it had.
+// Removing the failure guard fails this test (REQ-144).
+func TestListTemplatesUnparseableTimestampFails(t *testing.T) {
+	// Each value is refused for its own reason: obvious garbage, a
+	// space-separated value at minute precision (the space layout carries
+	// seconds), and a date with no time at all. The near misses are the
+	// load-bearing ones — they pin that the layout set is closed, not just
+	// that nonsense is rejected.
+	cases := []struct {
+		name string
+		wire string
+	}{
+		{"obvious garbage", "not-a-time"},
+		{"space separator at minute precision", "2026-06-22 14:50"},
+		{"date only", "2026-06-22"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := jsonServerClient(t, `[{"template_id":"t.v1","created_timestamp":"`+tc.wire+`"}]`)
+
+			list, _, err := definition.ListTemplates(t.Context(), c, definition.FormatADL14)
+			if err == nil {
+				t.Fatalf("ListTemplates(%q) = nil error with list %+v, want a decode failure", tc.wire, list)
+			}
+			if !strings.Contains(err.Error(), "created_timestamp") {
+				t.Errorf("err = %q, want it to name created_timestamp", err)
+			}
+			if list != nil {
+				t.Errorf("list = %+v, want nil on decode failure", list)
+			}
+		})
+	}
+}
+
+// TestZoneLessTimestampRemarshalsAsUTC pins the stated round-trip
+// asymmetry: encode stays single-valued RFC 3339, so a zone-less wire
+// value re-marshals with a `Z` the wire never carried. The emitted form is
+// a correct rendering of the decoded instant, not a transcription of the
+// server's spelling (REQ-144).
+func TestZoneLessTimestampRemarshalsAsUTC(t *testing.T) {
+	var meta definition.TemplateMetadata
+	if err := json.Unmarshal([]byte(`{"template_id":"t.v1","created_timestamp":"2022-03-30T07:18:13.591"}`), &meta); err != nil {
+		t.Fatalf("Unmarshal = %v, want nil error", err)
+	}
+	out, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatalf("Marshal = %v, want nil error", err)
+	}
+	const want = `"created_timestamp":"2022-03-30T07:18:13.591Z"`
+	if !strings.Contains(string(out), want) {
+		t.Errorf("re-marshalled to %s, want it to carry %s", out, want)
 	}
 }

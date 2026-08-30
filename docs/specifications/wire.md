@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers), REQ-095 (OpenAPI authoritative source), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-142 (contribution read), and REQ-143 (template list filters). The wire-extension band 140–149 continues the exhausted 050–059 band; the SDK authoring & client-tooling band 130–139 opens here with REQ-130. Transport hygiene (REQ-090–094, REQ-150) lives in [transport.md](transport.md).
+The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers), REQ-095 (OpenAPI authoritative source), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-142 (contribution read), REQ-143 (template list filters), and REQ-144 (Definition metadata decoding). The wire-extension band 140–149 continues the exhausted 050–059 band; the SDK authoring & client-tooling band 130–139 opens here with REQ-130. Transport hygiene (REQ-090–094, REQ-150) lives in [transport.md](transport.md).
 
 The premise: correctness is wire-level (REQ-080). The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
 
@@ -30,6 +30,8 @@ For per-endpoint detail (paths, parameters, request/response schemas, status cod
 Pinned source: `https://github.com/openEHR/specifications-ITS-REST/tree/master/computable/OAS`. The SDK's plans and test cassettes record the upstream commit they were validated against; bumping it is an explicit, reviewable change.
 
 When the OpenAPI files and any in-repo prose disagree, the OpenAPI wins; the prose is updated, not the wire behaviour.
+
+**Keyed exceptions.** One departure is granted and named here: decode of `StoredQueryMetadata.saved` **MAY** accept values the pin's `format: date-time` declaration excludes, exactly as the Definition metadata timestamp tolerance of [REQ-144](#req-144--definition-metadata-decoding) specifies. It is decided by [ADR 0019](../adr/0019-definition-timestamp-tolerance.md) on deployment evidence observed on `created_timestamp`, extended to `saved` by the shared decode path both descriptors use. Any further exception **MUST** be added to this list with the requirement and decision that key it — a departure the authoritative-source rule does not name is a defect, not an exception.
 
 **Path-parameter encoding.** A request path **MUST** conform to the OAS path template — each path parameter is percent-encoded **exactly once** on the wire. The transport is the **single canonical path encoder**: [`transport.Request.Path`](../../transport/request.go) is a **decoded** path (`url.URL.Path` semantics) that `url.URL.String()` encodes once on the way out. Leaf clients (`openehr/client/*`) **MUST** interpolate the **raw**, decoded id into `Request.Path` and **MUST NOT** pre-escape it with `url.PathEscape` — a pre-escaped parameter is encoded twice (a template id `Referral Request.v1` → `%20` → `%2520`), which a strict server unescapes to a literal `%20` and answers `404`. Segment legality is a separate question from encoding: a path parameter containing `/` — or any other content [REQ-150](transport.md#req-150--path-parameter-segment-validation) forbids — is governed by that requirement, the transport's segment validator — which also forbids honouring `url.URL.RawPath` (the encoded hint), so there is no encoding-level escape hatch for a separator-bearing value; the MUST NOT lives there, not here. Decoding a server-supplied value (e.g. the `Location` header via `url.PathUnescape`) is unaffected — the rule is about **forming** the request path, not reading a response.
 
@@ -366,6 +368,39 @@ The leaf's repository interface **MUST** include the same read — no break for 
 
 Unset options **MUST** omit the corresponding query key. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` and **MUST NOT** issue a request. The existing `format` argument selects the list path; v1 supports `FormatADL14` — the only registered `TemplateFormat` value. The decoded result **MUST** remain the same template-metadata slice the unfiltered list already returns. Adding a trailing variadic option list **MUST** stay source-compatible with existing callers. The `Repository` interface **MUST** grow the same variadic options — no break for callers, a compile-time break for interface implementers (precedent: `UploadTemplate`); the CHANGELOG `### Added` entry **MUST** name the interface growth.
 
+### REQ-144 — Definition metadata decoding
+
+The Definition leaf's two catalog descriptors each carry a timestamp: `TemplateMetadata.created_timestamp` (the template list) and `StoredQueryMetadata.saved` (the stored-query list). Both decode into a Go `time.Time`, for which `encoding/json` accepts only RFC 3339 as `time.Parse` reads it. Deployments emit more than that, and one unreadable timestamp costs the consumer the whole list rather than one entry. The decode rules below are decided by [ADR 0019](../adr/0019-definition-timestamp-tolerance.md); the tolerance is asymmetric — liberal on decode, single-valued on encode — as [ADR 0004](../adr/0004-numeric-wire-tolerance.md) established for BMM numerics.
+
+**Accepted layouts.** Decode of `created_timestamp` and `saved` **MUST** accept a value spelled in any member of this **closed** set:
+
+| Layout | Shape |
+|---|---|
+| `time.RFC3339` / `time.RFC3339Nano` | Zoned, ISO 8601 extended — the form `encoding/json` already accepted, and the pin's own `saved` example |
+| `2006-01-02T15:04:05` | Zone-less, ISO 8601 extended |
+| `2006-01-02T15:04` | Zone-less, minute precision, ISO 8601 extended |
+| `2006-01-02 15:04:05` | Zone-less, **space**-separated — **deployment interop**: not ISO 8601 extended (no `T`) and not a REST-legal or pin-example form, accepted solely because deployments emit it |
+
+The set is closed: decode **MUST NOT** accept a **non-empty** value outside it (the absent, `null` and empty-string arm is governed by *Absent and empty values* below), and **MUST NOT** reach the same tolerance through a general-purpose or format-guessing parser — an open set has no reviewable boundary and would absorb the next malformed input instead of reporting it. Adding or removing a layout is an amendment to this §; removal is a **breaking change** for every consumer whose server emits the removed form.
+
+**Fractional seconds.** Decode **MUST** tolerate a fractional-second component on every layout in the set that carries a seconds element. No separate layout entries are required: Go's `time.Parse` absorbs a fractional-second field immediately following a seconds element even when the layout omits it, and accepts either decimal sign — a `.` or the ISO 8601 `,` — so `2022-03-30T07:18:13,591` decodes exactly as `2022-03-30T07:18:13.591` does. That latitude belongs to the seconds-bearing layouts and adds no member to the set. The minute-precision layout `2006-01-02T15:04` carries no seconds element and therefore accepts neither seconds nor fractions — an input carrying them matches one of the seconds-bearing layouts instead.
+
+**Stdlib latitude.** Two further properties of the standard library the set is built on are recorded here rather than left to be discovered, and neither adds a rule the SDK invents. *Offset component ranges are not validated:* `time.Parse` normalises an out-of-range zone offset instead of refusing it — `+24:00`, `+00:60` and `-24:00` each parse, landing on the adjacent day or hour — so the closed set constrains layout **shapes**, not component ranges, and the SDK adds no hand-rolled range validation (the same posture as fractional absorption above). *The zero instant is indistinguishable from absence:* a wire value of `0001-01-01T00:00:00Z` decodes to Go's zero `time.Time`, which is exactly what an absent key, a `null`, and an empty string yield below, and both fields carry `omitzero`, so it re-marshals as absent. A consumer needing to tell "the server sent the zero instant" from "the server sent nothing" cannot do so from these fields.
+
+**Pin ground truth.** The two fields are not pinned alike, and the difference decides how far tolerance is a reading of the pin and where it becomes a departure. `created_timestamp` is `required` but declared a bare `type: string` with **no `format`** ([`definition-validation.openapi.yaml:509`, `:521-522`](../../resources/its-rest/definition-validation.openapi.yaml)), so an RFC 3339-only decoder over-constrains a field the pin never constrained and tolerance closes that gap. `saved` is `required` with `type: string` + `format: date-time` (`:3872`, `:3882-3884`), so its tolerance genuinely exceeds the pin and is the keyed [REQ-095](#req-095) exception ADR 0019 grants.
+
+**Zone handling.** A value carrying no zone indicator **MUST** decode as **UTC**. The SDK **MUST NOT** infer any other zone — in particular **MUST NOT** use the client host's local zone, which would decode one response to different instants on different machines. The pinned REST overview states that "Timezone SHOULD be only supplied when needed, otherwise the local timezone is assumed" ([`overview-validation.openapi.yaml:675`](../../resources/its-rest/overview-validation.openapi.yaml)); the zone assumed there is the *deployment's*, which the SDK can neither know nor discover for a remote server, so UTC is the deterministic choice and the departure is recorded in ADR 0019. The consequence is a stated round-trip asymmetry: a zone-less wire value re-marshals with a `Z` suffix the wire never carried. The emitted form is a correct RFC 3339 rendering of the decoded instant, not a transcription of the server's spelling; a consumer needing the original spelling does not get it from these fields.
+
+**Absent and empty values.** A JSON `null`, an absent key, or an empty string **MUST** yield the zero `time.Time` and **MUST NOT** produce an error, even though the pin marks both fields `required` — a descriptor whose timestamp the server did not populate is still usable, and the caller distinguishes the case with `IsZero`.
+
+**Unreadable values.** A **non-empty** value matching no accepted layout **MUST** fail the containing item's decode, and therefore the list call, with an error naming the field. Decode **MUST NOT** substitute the zero time for an unreadable value — a silent zero would present an instant the server never sent as though it had. Catalog timestamps are design-time metadata, not clinical content, so the offending value **MAY** appear in the error; the value-free discipline [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) sets for `WireError` boundary diagnostics is unaffected — these are decode-side parse failures, not error-envelope surfaces.
+
+**Encode is unchanged.** Both fields **MUST** continue to be emitted as RFC 3339 through the existing marshal paths. The tolerance is decode-only.
+
+**Empty list bodies.** `ListTemplates` and `ListStoredQueries` **MUST** return a **non-nil** zero-length slice and a nil error when a 2xx response body is empty. This is the empty-*body* arm: a JSON `[]` already decodes to a non-nil empty slice through `encoding/json`. A nil slice boxed in a non-nil interface marshals as JSON `null` rather than `[]`, so a caller who re-serialises the result would publish `null` for "no templates" — the read-side twin of the typed-nil trap [REQ-094](transport.md#req-094--prefer-response-shape-negotiation) documents on the write path.
+
+**Out of scope.** RM `DV_DATE_TIME` wire formats (REQ-052 / REQ-123) are untouched, and this § grants no SDK-wide zone-less tolerance for `time.Time`: the rules above reach exactly these two Definition-area catalog fields.
+
 ## Write-side authoring
 
 ### REQ-130 — Contribution builder
@@ -433,5 +468,6 @@ Out of v1 scope:
 | Contribution builder | REQ-130 | `openehr/client/ehr/contribution/` |
 | Contribution read | REQ-142 | `openehr/client/ehr/contribution/` |
 | Template list filters | REQ-143 | `openehr/client/definition/` |
+| Definition metadata decoding | REQ-144 | `openehr/client/definition/` |
 | Shared RM / OPT fixtures | REQ-052, REQ-056 | `testkit/cassettes/{templates,compositions,rm}/` — resolve via `testkit/fixtures/`; index in [`testkit/cassettes/README.md`](../../testkit/cassettes/README.md). Bodies, not REQ-082 Cassette-mode recordings ([conformance.md § Vendored fixtures](conformance.md#vendored-fixtures-testkitcassettes)) |
 | Transport (OTel, retry, TLS, errors, Prefer) | REQ-090–094 | [transport.md](transport.md) → `transport/`, `smart/discovery/` |
