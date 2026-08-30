@@ -157,9 +157,8 @@ type ClassExpr struct {
 	// HasPredicate is true and the predicate is NOT a literal archetype HRID
 	// (which lives on [ClassExpr.Archetype]) or a `$param` archetype
 	// (signalled by [ClassExpr.ParamArchetype]). Carries standing predicates
-	// such as
-	// `ehr_id/value=$x` so the emitter can round-trip them — brackets
-	// stripped, content verbatim from the source.
+	// such as `ehr_id/value=$x` so the emitter can round-trip them —
+	// brackets stripped, content verbatim from the source.
 	Predicate string
 	// PredicateComparison is the standing class predicate parsed as a
 	// `{path, operator, value}` comparison (e.g. `ehr_id/value = $x`),

@@ -138,18 +138,21 @@ done
 # Input-CSV completeness: every from/combinations CSV at the pin must be either
 # vendored or a named exclusion. Anything else is new input data the corpus
 # does not know — refuse loudly rather than let the classifier below file it
-# under a wrong tag.
-for f in "$SRC"/*.csv; do
-  [[ -e "$f" ]] || continue
-  csv=$(basename "$f")
-  if [[ -n "${VENDORED[from/combinations/$csv]:-}" || -n "${KNOWN_UNCONSUMED[$csv]:-}" ]]; then
+# under a wrong tag. The walk is recursive because the classifier's
+# `from/combinations/*.csv` case glob is too (a bash case `*` crosses `/`), so a
+# CSV in a new subdirectory must reach this refusal rather than fall through to
+# the classifier's unbound KNOWN_UNCONSUMED key and die as a bare `set -u` abort.
+while IFS= read -r -d '' f; do
+  rel=${f#"$AQL/"}
+  csv=${rel##*/}
+  if [[ -n "${VENDORED[$rel]:-}" || -n "${KNOWN_UNCONSUMED[$csv]:-}" ]]; then
     continue
   fi
-  echo "new upstream input CSV at the pin: from/combinations/$csv" >&2
+  echo "new upstream input CSV at the pin: $rel" >&2
   echo "it is neither vendored (CORPUS) nor a named exclusion (KNOWN_UNCONSUMED) —" >&2
   echo "vendor it and teach the reader its template, or record why it cannot be reconstructed" >&2
   exit 1
-done
+done < <(find "$SRC" -type f -name '*.csv' -print0)
 
 # --- provenance pin -----------------------------------------------------------
 

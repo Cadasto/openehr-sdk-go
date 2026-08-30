@@ -2285,6 +2285,7 @@ requirements:
       - openehr/aql/containment_roundtrip_test.go
       - openehr/aql/verify_parity_test.go
       - openehr/aql/parse/dispatch_tripwire_test.go
+      - testkit/probes/aql/probe_097_semantic_lint.go  # PROBE-097 arm (c), widened to REQ-163's now-buildable rows
       - testkit/probes/aql/probes_test.go
     notes: >-
       Write-side carriers for the three class- and projection-position

@@ -1147,6 +1147,9 @@ func probe099FireCases() []aqlprobes.PathShapeFireCase {
 			// openehr/aql/lint/pathshape_redundant_test.go (nil, zero, explicit
 			// default and unrelated-overlay, over this same witness query);
 			// carrying it here keeps it stated where the probe reports.
+			// Follow-up, not yet built: a discriminating twin rooted on an
+			// overlay-introduced class — the default relation finds no route,
+			// so only the supplied relation can fire it.
 			Name: "an unavoidable unreferenced intermediate, under a supplied relation",
 			Query: "SELECT o/name/value AS n FROM EHR e CONTAINS COMPOSITION c " +
 				"CONTAINS OBSERVATION o",
