@@ -174,7 +174,9 @@ func getVersion(ctx context.Context, c *transport.Client, req *transport.Request
 	}
 	var env rm.OriginalVersion[json.RawMessage]
 	if err := json.Unmarshal(resp.Body, &env); err != nil {
-		return nil, meta, fmt.Errorf("demographic: decode ORIGINAL_VERSION envelope: %w", err)
+		return nil, meta, fmt.Errorf("demographic: ORIGINAL_VERSION envelope: %w", &transport.DecodeError{
+			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+		})
 	}
 	pv := &PartyVersion{
 		UID:                 env.UID,
@@ -186,7 +188,13 @@ func getVersion(ctx context.Context, c *transport.Client, req *transport.Request
 	if env.Data != nil && len(*env.Data) > 0 {
 		party, err := typereg.DecodeAs[rm.Party](*env.Data)
 		if err != nil {
-			return nil, meta, fmt.Errorf("demographic: decode VERSION data: %w", err)
+			// Body carries the full response, not the `data` sub-slice this
+			// decode was reading: REQ-151 hands back the bytes the server
+			// delivered, so the caller's recovery is the same whichever of
+			// getVersion's two decodes tripped.
+			return nil, meta, fmt.Errorf("demographic: VERSION data: %w", &transport.DecodeError{
+				Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+			})
 		}
 		pv.Party = party
 	}
