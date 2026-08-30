@@ -482,34 +482,128 @@ func TestListStoredQueriesUnparseableSavedFails(t *testing.T) {
 	}
 }
 
-// TestStoredQueryMetadataExtrasRoundTrip pins that deployment-specific
-// fields preserved in Extras on decode are re-emitted on encode
-// (REQ-057). Restoring a missing MarshalJSON (Extras is json:"-")
-// drops them silently.
+// TestStoredQueryMetadataExtrasRoundTrip pins the stored-query
+// descriptor's encode contract (REQ-144): deployment-specific fields
+// preserved in Extras on decode are re-emitted on encode, and an Extras
+// key colliding with a documented field name is ignored — the documented
+// field is authoritative. Deleting MarshalJSON drops the Extras keys
+// silently, because Extras is `json:"-"`.
+//
+// Every row asserts the full documented field set, so losing `q` or
+// `saved` on the merged (non-empty Extras) path fails here instead of
+// passing unseen. The two collision rows cover both mechanisms: an
+// emitted documented key (`name`) and an omitted one (`saved`, which
+// carries omitzero — nothing is emitted for the overlay to win with, so
+// only deleting the known key from the Extras clone ignores it).
 func TestStoredQueryMetadataExtrasRoundTrip(t *testing.T) {
-	body := []byte(`{"name":"org.openehr::vitals","type":"AQL","version":"1.0.0","saved":"2017-07-16T19:20:30.450+01:00","q":"SELECT 1","uri":"https://example.example/q"}`)
-	var meta definition.StoredQueryMetadata
-	if err := json.Unmarshal(body, &meta); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := meta.Extras["uri"]; !ok {
-		t.Fatal("premise gone: uri did not land in Extras on decode")
-	}
-	out, err := json.Marshal(meta)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var roundTripped definition.StoredQueryMetadata
-	if err := json.Unmarshal(out, &roundTripped); err != nil {
-		t.Fatal(err)
-	}
-	if roundTripped.Name != "org.openehr::vitals" {
-		t.Errorf("Name = %q, want org.openehr::vitals (documented fields still encode)", roundTripped.Name)
-	}
-	gotURI, ok := roundTripped.Extras["uri"]
-	if !ok {
-		t.Errorf("uri dropped on re-encode: %s", out)
-	} else if string(gotURI) != `"https://example.example/q"` {
-		t.Errorf("Extras[uri] = %s, want the original JSON string", gotURI)
+	const (
+		withSaved    = `"name":"org.openehr::vitals","type":"AQL","version":"1.0.0","saved":"2017-07-16T19:20:30.450+01:00","q":"SELECT 1"`
+		withoutSaved = `"name":"org.openehr::vitals","type":"AQL","version":"1.0.0","q":"SELECT 1"`
+		uriJSON      = `"https://example.example/q"`
+	)
+	// Saved is compared with .Equal, never byte-wise: the decode re-
+	// canonicalises `…30.450+01:00` as `…30.45+01:00`, so the re-emitted
+	// spelling differs from the wire spelling while naming the same instant.
+	saved := time.Date(2017, 7, 16, 19, 20, 30, 450_000_000, time.FixedZone("+01:00", 60*60))
+
+	for _, tc := range []struct {
+		label string
+		body  string
+		// inject is applied to the decoded value before re-encoding. A
+		// collision is always caller-constructed: UnmarshalJSON never routes
+		// a documented field name into Extras.
+		inject map[string]json.RawMessage
+		// wantExtras is the exact JSON expected under each surviving Extras
+		// key after the round trip; any other key is a failure.
+		wantExtras map[string]string
+		wantSaved  time.Time
+	}{
+		{
+			label:     "no extras",
+			body:      `{` + withSaved + `}`,
+			wantSaved: saved,
+		},
+		{
+			label:      "one unknown extra",
+			body:       `{` + withSaved + `,"uri":` + uriJSON + `}`,
+			wantExtras: map[string]string{"uri": uriJSON},
+			wantSaved:  saved,
+		},
+		{
+			label: "colliding extra on an emitted field is ignored",
+			body:  `{` + withSaved + `,"uri":` + uriJSON + `}`,
+			inject: map[string]json.RawMessage{
+				"name": json.RawMessage(`"caller-supplied name"`),
+			},
+			wantExtras: map[string]string{"uri": uriJSON},
+			wantSaved:  saved,
+		},
+		{
+			label: "colliding extra on an omitted field is ignored",
+			// No `saved` on the wire, so Saved is zero and omitzero emits no
+			// key. A last-wins merge would publish the caller's bogus value,
+			// which this package's own UnmarshalJSON then rejects — the
+			// re-decode below is the assertion that catches it.
+			body: `{` + withoutSaved + `,"uri":` + uriJSON + `}`,
+			inject: map[string]json.RawMessage{
+				"saved": json.RawMessage(`"16/07/2017"`),
+			},
+			wantExtras: map[string]string{"uri": uriJSON},
+			wantSaved:  time.Time{},
+		},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			var meta definition.StoredQueryMetadata
+			if err := json.Unmarshal([]byte(tc.body), &meta); err != nil {
+				t.Fatalf("Unmarshal(wire) = %v, want nil error", err)
+			}
+			if len(tc.wantExtras) > 0 {
+				if _, ok := meta.Extras["uri"]; !ok {
+					t.Fatalf("premise gone: Extras = %v, want uri to land there on decode", meta.Extras)
+				}
+			}
+			for k, v := range tc.inject {
+				if meta.Extras == nil {
+					meta.Extras = map[string]json.RawMessage{}
+				}
+				meta.Extras[k] = v
+			}
+			out, err := json.Marshal(meta)
+			if err != nil {
+				t.Fatalf("Marshal = %v, want nil error", err)
+			}
+			var got definition.StoredQueryMetadata
+			if err := json.Unmarshal(out, &got); err != nil {
+				t.Fatalf("Unmarshal(re-encoded %s) = %v, want nil error — MarshalJSON emitted what this package cannot decode", out, err)
+			}
+			if got.Name != "org.openehr::vitals" {
+				t.Errorf("Name = %q, want org.openehr::vitals (the documented field is authoritative)", got.Name)
+			}
+			if got.Type != "AQL" {
+				t.Errorf("Type = %q, want AQL", got.Type)
+			}
+			if got.Version != "1.0.0" {
+				t.Errorf("Version = %q, want 1.0.0", got.Version)
+			}
+			if got.Q != "SELECT 1" {
+				t.Errorf("Q = %q, want SELECT 1", got.Q)
+			}
+			if !got.Saved.Equal(tc.wantSaved) {
+				t.Errorf("Saved = %s, want %s", got.Saved.Format(time.RFC3339Nano), tc.wantSaved.Format(time.RFC3339Nano))
+			}
+			if len(got.Extras) != len(tc.wantExtras) {
+				t.Errorf("Extras = %v, want exactly the %d unknown key(s) %v", got.Extras, len(tc.wantExtras), tc.wantExtras)
+			}
+			for k, want := range tc.wantExtras {
+				raw, ok := got.Extras[k]
+				if !ok {
+					t.Errorf("Extras[%q] dropped on re-encode: %s", k, out)
+					continue
+				}
+				if string(raw) != want {
+					t.Errorf("Extras[%q] = %s, want %s", k, raw, want)
+				}
+			}
+		})
 	}
 }

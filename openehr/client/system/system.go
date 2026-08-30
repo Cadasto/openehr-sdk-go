@@ -84,10 +84,13 @@ func (s *ServiceCapabilities) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON emits the documented fields first, then the Extras keys
-// in insertion order. Round-trips through Unmarshal+Marshal preserve
-// key sets (not necessarily key order — go map iteration order on the
-// extras side is randomised).
+// MarshalJSON re-emits the documented fields plus Extras. Unknown keys
+// are preserved and re-emitted verbatim; documented fields are emitted
+// per their own contract (each is omitted when empty), so the emitted
+// key set is not guaranteed to be identical to the wire body a value was
+// decoded from. Key order is not part of the contract (a non-empty
+// Extras path marshals a map, and encoding/json sorts a map's keys —
+// documented fields are not emitted first there).
 func (s ServiceCapabilities) MarshalJSON() ([]byte, error) {
 	type alias ServiceCapabilities
 	known, err := json.Marshal(alias(s))

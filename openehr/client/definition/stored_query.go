@@ -16,12 +16,21 @@ import (
 // StoredQueryMetadata is the Definition API stored-query descriptor
 // (REQ-057).
 type StoredQueryMetadata struct {
-	Name    string                     `json:"name"`
-	Type    string                     `json:"type"`
-	Version string                     `json:"version"`
-	Saved   time.Time                  `json:"saved,omitzero"`
-	Q       string                     `json:"q"`
-	Extras  map[string]json.RawMessage `json:"-"`
+	Name    string    `json:"name"`
+	Type    string    `json:"type"`
+	Version string    `json:"version"`
+	Saved   time.Time `json:"saved,omitzero"`
+	Q       string    `json:"q"`
+	// Extras preserves deployment-specific fields not in the standard
+	// stored-query descriptor shape.
+	// [StoredQueryMetadata.MarshalJSON] re-emits them (REQ-144).
+	//
+	// Extras keys are matched against the documented field names
+	// case-sensitively, while encoding/json decodes those field names
+	// case-insensitively. A wire key differing from a documented field
+	// only by case ("Name") therefore populates the documented field and
+	// is also preserved here verbatim, so encode emits both keys.
+	Extras map[string]json.RawMessage `json:"-"`
 }
 
 var knownStoredQueryFields = map[string]struct{}{
@@ -32,7 +41,7 @@ var knownStoredQueryFields = map[string]struct{}{
 //
 // saved is shadowed as a json.RawMessage over the alias so the strict
 // RFC 3339-only time.Time decoder never sees it; it is parsed afterwards
-// across the accepted layout set (REQ-144). MarshalJSON re-emits Extras.
+// across the accepted layout set (REQ-144).
 func (m *StoredQueryMetadata) UnmarshalJSON(data []byte) error {
 	type alias StoredQueryMetadata
 	var a alias
@@ -66,9 +75,15 @@ func (m *StoredQueryMetadata) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON re-emits documented fields plus Extras. The result
-// decodes back to the same key set; key order is not part of the
-// contract (a non-empty Extras path marshals a map).
+// MarshalJSON re-emits documented fields plus Extras.
+//
+// An Extras key that collides with a documented field name is ignored on
+// encode; the documented field is authoritative. Unknown keys are
+// preserved and re-emitted verbatim, and documented fields are emitted
+// per their own contract (only `saved` is omitted, when it is zero), so
+// the emitted key set is not guaranteed to be identical to the wire body
+// a value was decoded from. Key order is not part of the contract
+// (REQ-144).
 func (m StoredQueryMetadata) MarshalJSON() ([]byte, error) {
 	type alias StoredQueryMetadata
 	known, err := json.Marshal(alias(m))
@@ -78,14 +93,19 @@ func (m StoredQueryMetadata) MarshalJSON() ([]byte, error) {
 	if len(m.Extras) == 0 {
 		return known, nil
 	}
-	var merged map[string]json.RawMessage
+	// Start from Extras with every documented field name deleted, then
+	// overlay the typed emission. Deleting rather than merely letting the
+	// overlay win is what makes the rule hold for an omitted field: a zero
+	// Saved emits no `saved` key, so a caller-set Extras["saved"] would
+	// otherwise survive and produce output this package's own
+	// UnmarshalJSON rejects.
+	merged := maps.Clone(m.Extras)
+	for k := range knownStoredQueryFields {
+		delete(merged, k)
+	}
 	if err := json.Unmarshal(known, &merged); err != nil {
 		return nil, err
 	}
-	if merged == nil {
-		merged = map[string]json.RawMessage{}
-	}
-	maps.Copy(merged, m.Extras)
 	return json.Marshal(merged)
 }
 

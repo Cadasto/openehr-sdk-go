@@ -331,33 +331,119 @@ func TestExampleCompositionRejectsInvalidParams(t *testing.T) {
 	}
 }
 
+// TestTemplateMetadataRoundTrip is the template twin of
+// TestStoredQueryMetadataExtrasRoundTrip. Each row's invariant is the
+// same: the documented fields a value carries before encode come back
+// unchanged after a Marshal/Unmarshal round trip, and only the unknown
+// keys ride along in Extras. The two collision rows add the caller-
+// constructed case — an Extras key naming a documented field is ignored
+// on encode — for an emitted key (`template_id`) and for an omitted one
+// (`description` is omitempty and `created_timestamp` omitzero, so
+// nothing is emitted for the overlay to win with) (REQ-144).
 func TestTemplateMetadataRoundTrip(t *testing.T) {
-	body := readCassette(t, "template_metadata.json")
-	var meta definition.TemplateMetadata
-	if err := json.Unmarshal(body, &meta); err != nil {
-		t.Fatal(err)
-	}
-	out, err := json.Marshal(meta)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var roundTripped definition.TemplateMetadata
-	if err := json.Unmarshal(out, &roundTripped); err != nil {
-		t.Fatal(err)
-	}
-	if roundTripped.TemplateID != meta.TemplateID {
-		t.Errorf("TemplateID drifted: %q vs %q", roundTripped.TemplateID, meta.TemplateID)
-	}
-	if len(roundTripped.Extras) != len(meta.Extras) {
-		t.Errorf("Extras count drifted: %d vs %d", len(roundTripped.Extras), len(meta.Extras))
-	}
-	// created_timestamp (the spec field) must decode into CreatedOn, not
-	// silently land in Extras.
-	if meta.CreatedOn.IsZero() {
-		t.Errorf("CreatedOn not populated from created_timestamp: %+v", meta)
-	}
-	if _, leaked := meta.Extras["created_timestamp"]; leaked {
-		t.Error("created_timestamp leaked into Extras instead of CreatedOn")
+	for _, tc := range []struct {
+		label string
+		body  []byte
+		// inject is applied to the decoded value before re-encoding;
+		// UnmarshalJSON never routes a documented field name into Extras, so
+		// a collision can only come from a caller.
+		inject map[string]json.RawMessage
+		// wantTimestampDecoded asserts the premise that `created_timestamp`
+		// reaches CreatedOn rather than leaking into Extras.
+		wantTimestampDecoded bool
+	}{
+		{
+			label:                "cassette",
+			body:                 readCassette(t, "template_metadata.json"),
+			wantTimestampDecoded: true,
+		},
+		{
+			label: "colliding extra on an emitted field is ignored",
+			body:  []byte(`{"template_id":"t.v1","uri":"/definition/template/adl1.4/t.v1"}`),
+			inject: map[string]json.RawMessage{
+				"template_id": json.RawMessage(`"caller-supplied id"`),
+			},
+		},
+		{
+			label: "colliding extra on an omitted field is ignored",
+			// Only template_id is populated here, so description (omitempty)
+			// and created_timestamp (omitzero) emit no key at all — the case
+			// a last-wins merge cannot survive.
+			body: []byte(`{"template_id":"t.v1","uri":"/definition/template/adl1.4/t.v1"}`),
+			inject: map[string]json.RawMessage{
+				"description":       json.RawMessage(`"caller-supplied description"`),
+				"created_timestamp": json.RawMessage(`"16/07/2017"`),
+			},
+		},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			var meta definition.TemplateMetadata
+			if err := json.Unmarshal(tc.body, &meta); err != nil {
+				t.Fatalf("Unmarshal(wire) = %v, want nil error", err)
+			}
+			// Snapshot the decoded value before injection: it is the want for
+			// every documented field and for the Extras key set. want.Extras
+			// is cleared so nothing reads it through the alias the copy keeps
+			// on the map injection is about to mutate.
+			wantExtras := maps.Clone(meta.Extras)
+			want := meta
+			want.Extras = nil
+			if tc.wantTimestampDecoded {
+				// created_timestamp (the spec field) must decode into
+				// CreatedOn, not silently land in Extras.
+				if meta.CreatedOn.IsZero() {
+					t.Errorf("CreatedOn not populated from created_timestamp: %+v", meta)
+				}
+				if _, leaked := meta.Extras["created_timestamp"]; leaked {
+					t.Error("created_timestamp leaked into Extras instead of CreatedOn")
+				}
+			}
+			for k, v := range tc.inject {
+				if meta.Extras == nil {
+					meta.Extras = map[string]json.RawMessage{}
+				}
+				meta.Extras[k] = v
+			}
+			out, err := json.Marshal(meta)
+			if err != nil {
+				t.Fatalf("Marshal = %v, want nil error", err)
+			}
+			var got definition.TemplateMetadata
+			if err := json.Unmarshal(out, &got); err != nil {
+				t.Fatalf("Unmarshal(re-encoded %s) = %v, want nil error — MarshalJSON emitted what this package cannot decode", out, err)
+			}
+			if got.TemplateID != want.TemplateID {
+				t.Errorf("TemplateID = %q, want %q (the documented field is authoritative)", got.TemplateID, want.TemplateID)
+			}
+			if got.Concept != want.Concept {
+				t.Errorf("Concept = %q, want %q", got.Concept, want.Concept)
+			}
+			if got.ArchetypeID != want.ArchetypeID {
+				t.Errorf("ArchetypeID = %q, want %q", got.ArchetypeID, want.ArchetypeID)
+			}
+			if got.Version != want.Version {
+				t.Errorf("Version = %q, want %q", got.Version, want.Version)
+			}
+			if got.Description != want.Description {
+				t.Errorf("Description = %q, want %q (the documented field is authoritative)", got.Description, want.Description)
+			}
+			if !got.CreatedOn.Equal(want.CreatedOn) {
+				t.Errorf("CreatedOn = %s, want %s", got.CreatedOn.Format(time.RFC3339Nano), want.CreatedOn.Format(time.RFC3339Nano))
+			}
+			if len(got.Extras) != len(wantExtras) {
+				t.Errorf("Extras = %v, want exactly the %d unknown key(s) %v", got.Extras, len(wantExtras), wantExtras)
+			}
+			for k, wantRaw := range wantExtras {
+				raw, ok := got.Extras[k]
+				if !ok {
+					t.Errorf("Extras[%q] dropped on re-encode: %s", k, out)
+					continue
+				}
+				if string(raw) != string(wantRaw) {
+					t.Errorf("Extras[%q] = %s, want %s", k, raw, wantRaw)
+				}
+			}
+		})
 	}
 }
 
