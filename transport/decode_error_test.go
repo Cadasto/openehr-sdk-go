@@ -71,8 +71,9 @@ func newDecodeCatalog(t *testing.T, srv *httptest.Server) *discovery.ServiceCata
 }
 
 // newDecodeClient serves body with status and the given headers on every
-// request, and returns a client aimed at it.
-func newDecodeClient(t *testing.T, status int, body string, header http.Header) *transport.Client {
+// request, and returns a client aimed at it. Extra options are appended after
+// the fake's own, so a caller can set a response-size cap.
+func newDecodeClient(t *testing.T, status int, body string, header http.Header, opts ...transport.Option) *transport.Client {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		for k, vs := range header {
@@ -85,7 +86,7 @@ func newDecodeClient(t *testing.T, status int, body string, header http.Header) 
 	}))
 	t.Cleanup(srv.Close)
 
-	c, err := transport.New(newDecodeCatalog(t, srv), transport.WithHTTPClient(srv.Client()))
+	c, err := transport.New(newDecodeCatalog(t, srv), append([]transport.Option{transport.WithHTTPClient(srv.Client())}, opts...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,6 +144,92 @@ func TestDecodeTypedErrorCarriesBody(t *testing.T) { // REQ-151
 	if meta.ETag != "v1" {
 		t.Errorf("Metadata.ETag = %q, want %q — the response headers must remain available beside the error", meta.ETag, "v1")
 	}
+
+	// The other direction of § A non-2xx is never this error: the two
+	// classifications are disjoint both ways, so a 2xx decode failure must not
+	// be recoverable as a wire failure either.
+	if we, ok := errors.AsType[*transport.WireError](err); ok {
+		t.Errorf("errors.AsType[*transport.WireError] matched a 2xx decode failure (%v); REQ-151 requires the two classifications stay disjoint", we)
+	}
+}
+
+// undecodableBody returns exactly n bytes of JSON that cannot decode into
+// decodeFake — a top-level array holding one long integer literal. Sized to the
+// byte so a test can serve exactly a response cap, one byte past it, or far
+// beyond it. n must be at least 3.
+func undecodableBody(n int) string {
+	return "[" + strings.Repeat("1", n-2) + "]"
+}
+
+// TestDecodeErrorBodyInheritsTheResponseCap pins REQ-151's "Body inherits the
+// caller's configured ceiling; it does not add one of its own" against both
+// shapes WithMaxResponseBody takes (REQ-093): an explicit positive limit, and
+// the negative escape hatch that disables the cap outright.
+func TestDecodeErrorBodyInheritsTheResponseCap(t *testing.T) { // REQ-151
+	const (
+		limit     = 128
+		oversized = 4096 // comfortably past limit, to make "no ceiling" visible
+	)
+
+	// At the ceiling the caller set: every byte the transport was willing to
+	// read reaches Body, and Body withholds none of them.
+	t.Run("at the limit", func(t *testing.T) {
+		body := undecodableBody(limit)
+		c := newDecodeClient(t, http.StatusOK, body, nil, transport.WithMaxResponseBody(limit))
+
+		_, _, err := transport.Decode[decodeFake](t.Context(), c, &transport.Request{
+			Method: "GET",
+			Path:   "/ehr/abc",
+			Route:  "/ehr/{ehr_id}",
+		})
+		de, ok := errors.AsType[*transport.DecodeError](err)
+		if !ok {
+			t.Fatalf("errors.AsType[*transport.DecodeError] did not match %T (%v)", err, err)
+		}
+		if len(de.Body) != limit {
+			t.Errorf("len(DecodeError.Body) = %d, want %d — Body carries every byte read under the caller's ceiling", len(de.Body), limit)
+		}
+	})
+
+	// One byte past it: the ceiling is enforced by the read, not by the error.
+	// The response never reaches the decoder, so there is no DecodeError at all
+	// — which is the sense in which Body adds no ceiling of its own.
+	t.Run("over the limit", func(t *testing.T) {
+		c := newDecodeClient(t, http.StatusOK, undecodableBody(limit+1), nil, transport.WithMaxResponseBody(limit))
+
+		_, _, err := transport.Decode[decodeFake](t.Context(), c, &transport.Request{
+			Method: "GET",
+			Path:   "/ehr/abc",
+			Route:  "/ehr/{ehr_id}",
+		})
+		if err == nil {
+			t.Fatal("Decode of a response past the configured cap succeeded; the premise of this subtest is gone")
+		}
+		if de, ok := errors.AsType[*transport.DecodeError](err); ok {
+			t.Errorf("errors.AsType[*transport.DecodeError] matched a response the cap refused (%v); the bytes were never decoded, so this is not a decode failure", de)
+		}
+	})
+
+	// REQ-093's documented escape hatch: a negative cap disables the read limit
+	// outright, so there is no ceiling for Body to inherit and it carries the
+	// whole oversized payload.
+	t.Run("cap disabled", func(t *testing.T) {
+		body := undecodableBody(oversized)
+		c := newDecodeClient(t, http.StatusOK, body, nil, transport.WithMaxResponseBody(-1))
+
+		_, _, err := transport.Decode[decodeFake](t.Context(), c, &transport.Request{
+			Method: "GET",
+			Path:   "/ehr/abc",
+			Route:  "/ehr/{ehr_id}",
+		})
+		de, ok := errors.AsType[*transport.DecodeError](err)
+		if !ok {
+			t.Fatalf("errors.AsType[*transport.DecodeError] did not match %T (%v)", err, err)
+		}
+		if len(de.Body) != oversized {
+			t.Errorf("len(DecodeError.Body) = %d, want the full %d-byte payload — with the cap disabled Body imposes no ceiling of its own", len(de.Body), oversized)
+		}
+	})
 }
 
 // TestDecodeErrorStringIsValueFree is the guard behind REQ-151 § Error() stays

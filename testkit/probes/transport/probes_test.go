@@ -13,13 +13,19 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
+// restBasePath is the path prefix every request in this package carries,
+// because newClient points the catalog's openEHR REST entry at it. Tests that
+// assert captured request paths build their expectations from this constant so
+// the two cannot drift apart.
+const restBasePath = "/openehr/v1"
+
 func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	t.Helper()
 	cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{
 		Issuer: "https://test.example.com",
 		Services: map[string]discovery.ServiceEntry{
 			discovery.ServiceIDOpenEHRRest: {
-				BaseURL:     discovery.MustParseURL(srv.URL + "/openehr/v1"),
+				BaseURL:     discovery.MustParseURL(srv.URL + restBasePath),
 				SpecVersion: discovery.SpecVersionPin,
 			},
 		},
@@ -185,7 +191,21 @@ func TestProbe101DecodeFailureSurfaced(t *testing.T) { // PROBE-101, REQ-151
 	// One request per arm: every leg must fail on the response it was served,
 	// never on a pre-flight refusal that never reached the wire.
 	if len(captured) != 3 {
-		t.Errorf("captured %d requests %v, want 3 (one per arm)", len(captured), captured)
+		t.Fatalf("captured %d requests %v, want 3 (one per arm)", len(captured), captured)
+	}
+	// And each on its own route, in the catalog's order. The count alone
+	// cannot say that: the fake's default arm answers every other path with an
+	// undecodable `{}`, so a leg routed at the wrong resource would still fail
+	// its decode and still tally three requests.
+	want := []string{
+		restBasePath + "/ehr/" + string(probe101UndecodableEHR),
+		restBasePath + "/ehr/" + string(probe101MissingEHR),
+		restBasePath + "/definition/template/adl1.4",
+	}
+	for i, w := range want {
+		if captured[i] != w {
+			t.Errorf("request %d went to %q, want %q — the arm must be served by the route it names", i+1, captured[i], w)
+		}
 	}
 }
 
