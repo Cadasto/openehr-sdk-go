@@ -25,6 +25,8 @@ import (
 // one of the seconds-bearing layouts instead.
 var definitionTimestampLayouts = []string{
 	time.RFC3339Nano,
+	// RFC3339Nano's fractional field is optional, so it already subsumes
+	// RFC3339; the entry is kept because § REQ-144 names both.
 	time.RFC3339,
 	"2006-01-02T15:04:05",
 	"2006-01-02T15:04",

@@ -146,7 +146,8 @@ func TestProbe093TemplateListFilters(t *testing.T) {
 // a decode failure: ListTemplates yields a non-nil zero-length slice for a
 // 204 (REQ-144), and REQ-143 licenses no assertion that a filtered
 // deployment holds templates. The probe's own assertions are shape-agnostic
-// — they read len, never nil-ness — so they hold either way.
+// — it discards the returned slice entirely and asserts only on the error
+// and the captured queries — so they hold either way.
 func TestProbe093EmptyCatalogPasses(t *testing.T) {
 	var captured []url.Values
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

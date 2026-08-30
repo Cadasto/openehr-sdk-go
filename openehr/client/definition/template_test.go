@@ -673,17 +673,34 @@ func TestTemplateTimestampAbsentNullEmpty(t *testing.T) {
 // would present an instant the server never sent as though it had.
 // Removing the failure guard fails this test (REQ-144).
 func TestListTemplatesUnparseableTimestampFails(t *testing.T) {
-	c := jsonServerClient(t, `[{"template_id":"t.v1","created_timestamp":"not-a-time"}]`)
+	// Each value is refused for its own reason: obvious garbage, a
+	// space-separated value at minute precision (the space layout carries
+	// seconds), and a date with no time at all. The near misses are the
+	// load-bearing ones — they pin that the layout set is closed, not just
+	// that nonsense is rejected.
+	cases := []struct {
+		name string
+		wire string
+	}{
+		{"obvious garbage", "not-a-time"},
+		{"space separator at minute precision", "2026-06-22 14:50"},
+		{"date only", "2026-06-22"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := jsonServerClient(t, `[{"template_id":"t.v1","created_timestamp":"`+tc.wire+`"}]`)
 
-	list, _, err := definition.ListTemplates(t.Context(), c, definition.FormatADL14)
-	if err == nil {
-		t.Fatalf("ListTemplates = nil error with list %+v, want a decode failure", list)
-	}
-	if !strings.Contains(err.Error(), "created_timestamp") {
-		t.Errorf("err = %q, want it to name created_timestamp", err)
-	}
-	if list != nil {
-		t.Errorf("list = %+v, want nil on decode failure", list)
+			list, _, err := definition.ListTemplates(t.Context(), c, definition.FormatADL14)
+			if err == nil {
+				t.Fatalf("ListTemplates(%q) = nil error with list %+v, want a decode failure", tc.wire, list)
+			}
+			if !strings.Contains(err.Error(), "created_timestamp") {
+				t.Errorf("err = %q, want it to name created_timestamp", err)
+			}
+			if list != nil {
+				t.Errorf("list = %+v, want nil on decode failure", list)
+			}
+		})
 	}
 }
 
