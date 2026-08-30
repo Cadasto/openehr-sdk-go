@@ -277,6 +277,10 @@ func GetTemplate(ctx context.Context, c *transport.Client, templateID string, fo
 // the request this function has always issued. Filtering is applied by the
 // server; the SDK only emits the parameters.
 //
+// An empty catalog comes back as a non-nil zero-length slice with a nil
+// error, never a nil slice, so re-serialising the result yields [] rather
+// than JSON null (REQ-144).
+//
 // Wire: GET /definition/template/{format}.
 func ListTemplates(ctx context.Context, c *transport.Client, format TemplateFormat, opts ...ListOption) ([]TemplateMetadata, *transport.Metadata, error) {
 	if !format.IsValid() {
@@ -301,7 +305,10 @@ func ListTemplates(ctx context.Context, c *transport.Client, format TemplateForm
 		return nil, nil, err
 	}
 	if len(resp.Body) == 0 {
-		return nil, resp.Metadata, nil
+		// An empty 2xx body is an empty catalog, not an absent one: return a
+		// non-nil zero-length slice so a caller re-serialising the result
+		// publishes [] rather than JSON null (REQ-144).
+		return []TemplateMetadata{}, resp.Metadata, nil
 	}
 	var out []TemplateMetadata
 	if err := json.Unmarshal(resp.Body, &out); err != nil {

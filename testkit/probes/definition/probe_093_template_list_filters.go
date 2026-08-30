@@ -33,8 +33,9 @@ import (
 //
 // The backend answers each list call with a template-metadata body; the
 // probe asserts only that the call returns no error. An empty catalog is a
-// pass — ListTemplates yields a nil slice for an empty body or 204, and
-// REQ-143 licenses no assertion that a filtered deployment holds templates.
+// pass — ListTemplates yields a non-nil zero-length slice for an empty body
+// or 204 (REQ-144), and REQ-143 licenses no assertion that a filtered
+// deployment holds templates.
 func Probe093TemplateListFilters(ctx context.Context, c *transport.Client, captured *[]url.Values) (Result, error) {
 	r := Result{Probe: "PROBE-093"}
 	if c == nil {
@@ -67,10 +68,11 @@ func Probe093TemplateListFilters(ctx context.Context, c *transport.Client, captu
 
 	// Leg 2 — every option set: each reaches the wire under its pin name.
 	before = len(*captured)
-	// A nil slice is not a failure: ListTemplates returns (nil, meta, nil)
-	// for an empty body / 204, which is a legitimately empty catalog. A
-	// decode that genuinely failed comes back as a non-nil error, so err is
-	// the only decode assertion REQ-143 licenses here.
+	// An empty list is not a failure: ListTemplates returns an empty slice
+	// and a nil error for an empty body / 204 (REQ-144), which is a
+	// legitimately empty catalog. A decode that genuinely failed comes back
+	// as a non-nil error, so err is the only decode assertion REQ-143
+	// licenses here.
 	if _, _, err := definition.ListTemplates(ctx, c, definition.FormatADL14,
 		definition.WithTemplateID("vital*"),
 		definition.WithConcept("*signs*"),

@@ -415,6 +415,33 @@ func TestListStoredQueries(t *testing.T) {
 	}
 }
 
+// TestListStoredQueriesEmpty is the stored-query twin of
+// TestListTemplatesEmpty: an empty 2xx body yields a non-nil zero-length
+// slice and a nil error, so a caller who re-serialises the result publishes
+// an empty JSON array rather than null. Restoring the bare `return nil`
+// fails this test.
+func TestListStoredQueriesEmpty(t *testing.T) {
+	// REQ-144
+	for _, status := range []int{http.StatusOK, http.StatusNoContent} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(status)
+			}))
+			defer srv.Close()
+			list, _, err := definition.ListStoredQueries(t.Context(), newClient(t, srv), "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if list == nil {
+				t.Errorf("list = nil on %d, want a non-nil empty slice (a nil slice marshals as JSON null)", status)
+			}
+			if len(list) != 0 {
+				t.Errorf("expected empty list on %d, got %d items", status, len(list))
+			}
+		})
+	}
+}
+
 // TestListStoredQueriesZoneLessSaved pins the `saved` arm of the tolerance
 // — the keyed REQ-095 exception, since `saved` is pinned `format:
 // date-time`: a zone-less value decodes as UTC rather than failing the

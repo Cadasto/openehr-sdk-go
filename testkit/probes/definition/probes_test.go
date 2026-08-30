@@ -143,8 +143,10 @@ func TestProbe093TemplateListFilters(t *testing.T) {
 }
 
 // TestProbe093EmptyCatalogPasses pins that an empty catalog is a pass, not
-// a decode failure: ListTemplates yields a nil slice for a 204, and REQ-143
-// licenses no assertion that a filtered deployment holds templates.
+// a decode failure: ListTemplates yields a non-nil zero-length slice for a
+// 204 (REQ-144), and REQ-143 licenses no assertion that a filtered
+// deployment holds templates. The probe's own assertions are shape-agnostic
+// — they read len, never nil-ness — so they hold either way.
 func TestProbe093EmptyCatalogPasses(t *testing.T) {
 	var captured []url.Values
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

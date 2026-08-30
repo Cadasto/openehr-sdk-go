@@ -210,17 +210,30 @@ func TestListTemplates(t *testing.T) {
 	}
 }
 
+// TestListTemplatesEmpty pins the empty-BODY arm of REQ-144: an empty 2xx
+// body yields a non-nil zero-length slice and a nil error. The nil check is
+// the load-bearing one — a nil slice boxed in a non-nil interface marshals
+// as JSON null, so a caller who re-serialises the result would publish null
+// for "no templates". Restoring the bare `return nil` fails this test.
 func TestListTemplatesEmpty(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer srv.Close()
-	list, _, err := definition.ListTemplates(t.Context(), newClient(t, srv), definition.FormatADL14)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(list) != 0 {
-		t.Errorf("expected empty list on 204, got %d items", len(list))
+	// REQ-144
+	for _, status := range []int{http.StatusOK, http.StatusNoContent} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(status)
+			}))
+			defer srv.Close()
+			list, _, err := definition.ListTemplates(t.Context(), newClient(t, srv), definition.FormatADL14)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if list == nil {
+				t.Errorf("list = nil on %d, want a non-nil empty slice (a nil slice marshals as JSON null)", status)
+			}
+			if len(list) != 0 {
+				t.Errorf("expected empty list on %d, got %d items", status, len(list))
+			}
+		})
 	}
 }
 
