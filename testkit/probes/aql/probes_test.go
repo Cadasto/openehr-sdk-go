@@ -1135,6 +1135,60 @@ func probe099FireCases() []aqlprobes.PathShapeFireCase {
 			SpanNth:  1,
 		},
 		{
+			// The same unavoidable intermediate, judged over a SUPPLIED
+			// relation (the one REQ-164 code a relation governs). The overlay
+			// edge is deliberately inert — EHR -> VERSIONED_PARTY adds no route
+			// among the query's classes — so the finding is the one the default
+			// relation already gives, and what the row adds is the corpus-level
+			// restatement of REQ-164 § Always on, never gated: supplying a
+			// relation governs this check, it does not mute it. The axis is
+			// pinned spelling-by-spelling at unit level, by
+			// TestRedundantStepReadsTheSuppliedRelation in
+			// openehr/aql/lint/pathshape_redundant_test.go (nil, zero, explicit
+			// default and unrelated-overlay, over this same witness query);
+			// carrying it here keeps it stated where the probe reports.
+			Name: "an unavoidable unreferenced intermediate, under a supplied relation",
+			Query: "SELECT o/name/value AS n FROM EHR e CONTAINS COMPOSITION c " +
+				"CONTAINS OBSERVATION o",
+			Relation: contain.Default().WithOverlay(contain.Edge{From: "EHR", To: "VERSIONED_PARTY"}),
+			Code:     codeContainsRedundantStep,
+			Want:     []string{codeContainsRedundantStep},
+			Severity: lint.Warning,
+			SpanText: "COMPOSITION",
+			SpanNth:  1,
+		},
+		{
+			// A repeating path reached only as a function-call ARGUMENT joins
+			// the fan-out: the grain question is about which repeating scopes
+			// the row iterates, and an aggregate over a path iterates its
+			// scope like any projection of it. Both paths carry their own
+			// repeating-segment finding (the fan-out's premise), and the
+			// aggregate column is aliased, so no alias finding rides along.
+			Name: "a repeating path inside a function-call argument joins the fan-out",
+			Query: "SELECT MAX(o/data/events/time) AS latest, o/links/meaning/value AS m " +
+				"FROM OBSERVATION o[" + probe099ObsArch + "]",
+			Code: codeFanoutPathGrain,
+			Want: []string{
+				codePathRepeatingUnpredicated, codePathRepeatingUnpredicated, codeFanoutPathGrain,
+			},
+			Severity: lint.Warning,
+			SpanText: "o/links/meaning/value", // the LATER path of the pair
+			SpanNth:  1,
+		},
+		{
+			// The counter-assertion for the paging code: BOTH channels bound
+			// the rows — LIMIT in the text and Fetch on the envelope — and the
+			// finding is still raised ONCE. Want is an exact multiset, so a
+			// per-channel double report fails this row.
+			Name:     "both row-bound channels raise one paging finding",
+			Query:    "SELECT o/name/value AS name FROM OBSERVATION o[" + probe099ObsArch + "] LIMIT 10",
+			Fetch:    20,
+			Code:     codePagingNoOrderBy,
+			Want:     []string{codePagingNoOrderBy},
+			Severity: lint.Warning,
+			SpanText: "",
+		},
+		{
 			// The version tier is the only route from a container to its
 			// payload, so the unstated-tier step is inert. It records a
 			// deliberate coexistence: a bare VERSION operand also carries
