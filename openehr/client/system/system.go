@@ -49,7 +49,9 @@ type ServiceCapabilities struct {
 	// case-sensitively, while encoding/json decodes those field names
 	// case-insensitively. A wire key differing from a documented field
 	// only by case ("Solution") therefore populates the documented field
-	// and is also preserved here verbatim, so encode emits both keys.
+	// and is also preserved here verbatim, so encode emits both keys when
+	// the documented field emits one at all — `solution` is omitempty, so
+	// an empty Solution emits only the preserved key.
 	Extras map[string]json.RawMessage `json:"-"`
 }
 
@@ -101,10 +103,11 @@ func (s *ServiceCapabilities) UnmarshalJSON(data []byte) error {
 // own contract (each is omitted when empty), so the emitted key set is
 // not guaranteed to be identical to the wire body a value was decoded
 // from. Neither is its spelling: encoding/json compacts insignificant
-// whitespace inside a preserved value. Key order is not part of the
-// contract either (a non-empty Extras path marshals a map, and
-// encoding/json sorts a map's keys — documented fields are not emitted
-// first there).
+// whitespace and escapes `<`, `>` and `&` as `\u003c`, `\u003e` and
+// `\u0026` inside a preserved value — the escaped spelling decodes to
+// the identical value. Key order is not part of the contract either (a
+// non-empty Extras path marshals a map, and encoding/json sorts a map's
+// keys — documented fields are not emitted first there).
 func (s ServiceCapabilities) MarshalJSON() ([]byte, error) {
 	type alias ServiceCapabilities
 	known, err := json.Marshal(alias(s))

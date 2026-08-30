@@ -66,18 +66,24 @@ func readCassette(t *testing.T, name string) []byte {
 	return b
 }
 
-// compactJSON is the fair comparison for a preserved Extras value. Extras
-// holds the wire bytes exactly as decoded, but re-encoding runs them
-// through encoding/json, which compacts insignificant whitespace — so a
-// wire value spelled `["a", "b"]` comes back as `["a","b"]` with nothing
-// lost. Comparing raw bytes would fail on the spacing alone.
-func compactJSON(t *testing.T, raw json.RawMessage) string {
+// encodedJSON returns raw as encoding/json re-emits it — the fair
+// comparison for a preserved Extras value. Extras holds the wire bytes
+// exactly as decoded, but re-encoding runs them through encoding/json,
+// which compacts insignificant whitespace and escapes `<`, `>` and `&`:
+// a wire value spelled `["a", "b"]` comes back as `["a","b"]`, and one
+// spelled `"?a=1&b=2"` as `"?a=1\u0026b=2"`, with nothing lost.
+// Comparing raw bytes would fail on the spelling alone.
+//
+// It normalises through json.Marshal, not json.Compact, because Compact
+// does only the whitespace half of that: a want carrying `&` would not
+// match the encoded form.
+func encodedJSON(t *testing.T, raw json.RawMessage) string {
 	t.Helper()
-	var buf bytes.Buffer
-	if err := json.Compact(&buf, raw); err != nil {
-		t.Fatalf("Compact(%s) = %v, want nil error", raw, err)
+	out, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("Marshal(%s) = %v, want nil error", raw, err)
 	}
-	return buf.String()
+	return string(out)
 }
 
 // assertEmittedKeys checks that the encoded object carries each named key
@@ -99,7 +105,7 @@ func assertEmittedKeys(t *testing.T, out []byte, want map[string]string) {
 			t.Errorf("encode dropped key %q: %s", k, out)
 			continue
 		}
-		if w := compactJSON(t, json.RawMessage(w)); string(raw) != w {
+		if w := encodedJSON(t, json.RawMessage(w)); string(raw) != w {
 			t.Errorf("encoded[%q] = %s, want %s", k, raw, w)
 		}
 	}
@@ -430,7 +436,11 @@ func TestTemplateMetadataRoundTrip(t *testing.T) {
 		},
 		{
 			label: "colliding extra on an emitted field is ignored",
-			body:  []byte(`{"template_id":"t.v1","uri":"/definition/template/adl1.4/t.v1"}`),
+			// The `uri` value carries an `&`, which encoding/json escapes as
+			// \u0026 on re-emission — the preserved value comes back
+			// re-spelled, not altered, which is what encodedJSON normalises
+			// for.
+			body: []byte(`{"template_id":"t.v1","uri":"/definition/template/adl1.4/t.v1?a=1&b=2"}`),
 			inject: map[string]json.RawMessage{
 				"template_id": json.RawMessage(`"caller-supplied id"`),
 			},
@@ -531,7 +541,7 @@ func TestTemplateMetadataRoundTrip(t *testing.T) {
 					t.Errorf("Extras[%q] dropped on re-encode: %s", k, out)
 					continue
 				}
-				if want := compactJSON(t, wantRaw); string(raw) != want {
+				if want := encodedJSON(t, wantRaw); string(raw) != want {
 					t.Errorf("Extras[%q] = %s, want %s", k, raw, want)
 				}
 			}

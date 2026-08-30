@@ -83,8 +83,10 @@ func (m *StoredQueryMetadata) UnmarshalJSON(data []byte) error {
 // own contract (only `saved` is omitted, when it is zero), so the emitted
 // key set is not guaranteed to be identical to the wire body a value was
 // decoded from. Neither is its spelling: encoding/json compacts
-// insignificant whitespace inside a preserved value, and key order is not
-// part of the contract (REQ-144).
+// insignificant whitespace and escapes `<`, `>` and `&` as `\u003c`,
+// `\u003e` and `\u0026` inside a preserved value — the escaped spelling
+// decodes to the identical value — and key order is not part of the
+// contract (REQ-144).
 func (m StoredQueryMetadata) MarshalJSON() ([]byte, error) {
 	type alias StoredQueryMetadata
 	known, err := json.Marshal(alias(m))

@@ -85,7 +85,8 @@ type TemplateMetadata struct {
 	// case-insensitively. A wire key differing from a documented field
 	// only by case ("Template_ID") therefore populates the documented
 	// field and is also preserved here verbatim, so encode emits both
-	// keys.
+	// keys when the documented field emits one at all — `template_id` is
+	// omitempty, so an empty TemplateID emits only the preserved key.
 	Extras map[string]json.RawMessage `json:"-"`
 }
 
@@ -144,8 +145,10 @@ func (m *TemplateMetadata) UnmarshalJSON(data []byte) error {
 // own contract (each is omitted when empty, and `created_timestamp` when
 // zero), so the emitted key set is not guaranteed to be identical to the
 // wire body a value was decoded from. Neither is its spelling:
-// encoding/json compacts insignificant whitespace inside a preserved
-// value, and key order is not part of the contract (REQ-144).
+// encoding/json compacts insignificant whitespace and escapes `<`, `>`
+// and `&` as `\u003c`, `\u003e` and `\u0026` inside a preserved value —
+// the escaped spelling decodes to the identical value — and key order is
+// not part of the contract (REQ-144).
 func (m TemplateMetadata) MarshalJSON() ([]byte, error) {
 	type alias TemplateMetadata
 	known, err := json.Marshal(alias(m))

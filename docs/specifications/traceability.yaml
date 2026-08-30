@@ -2253,9 +2253,12 @@ requirements:
       the collision rows of TestStoredQueryMetadataExtrasRoundTrip and
       TestTemplateMetadataRoundTrip -- one row per mechanism, since deleting
       the known-key deletion and restoring Extras-last precedence fail
-      different rows. Preserved values survive up to encoding/json's
-      whitespace compaction inside a json.RawMessage, so those tests compare
-      compacted forms rather than raw bytes.
+      different rows. Preserved values survive up to the insignificant
+      whitespace encoding/json compacts and the <, > and & it escapes as
+      \u003c, \u003e and \u0026 inside a json.RawMessage -- the escaped spelling
+      decodes to the identical value -- so those tests normalise the want
+      through json.Marshal (the encode path itself) rather than comparing raw
+      bytes.
 
   - id: REQ-150
     title: Path-parameter segment validation

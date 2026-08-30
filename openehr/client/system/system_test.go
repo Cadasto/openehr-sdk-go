@@ -1,7 +1,6 @@
 package system_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"maps"
@@ -51,19 +50,39 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 
 // readCassette returns the bytes of a vendored cassette at
 // testkit/cassettes/its_rest/<dir>/<name>.
-// compactJSON is the fair comparison for a preserved Extras value. Extras
-// holds the wire bytes exactly as decoded, but re-encoding runs them
-// through encoding/json, which compacts insignificant whitespace — so the
-// cassette's `["application/json", "application/xml"]` comes back without
-// the space and nothing is lost. Comparing raw bytes would fail on the
-// spacing alone.
-func compactJSON(t *testing.T, raw json.RawMessage) string {
+func readCassette(t *testing.T, dir, name string) []byte {
 	t.Helper()
-	var buf bytes.Buffer
-	if err := json.Compact(&buf, raw); err != nil {
-		t.Fatalf("Compact(%s) = %v, want nil error", raw, err)
+	_, src, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
 	}
-	return buf.String()
+	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "cassettes", "its_rest", dir, name)
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read cassette %q: %v", path, err)
+	}
+	return b
+}
+
+// encodedJSON returns raw as encoding/json re-emits it — the fair
+// comparison for a preserved Extras value. Extras holds the wire bytes
+// exactly as decoded, but re-encoding runs them through encoding/json,
+// which compacts insignificant whitespace and escapes `<`, `>` and `&`:
+// the cassette's `["application/json", "application/xml"]` comes back
+// without the space, and a value spelled `"?a=1&b=2"` as
+// `"?a=1\u0026b=2"`, with nothing lost. Comparing raw bytes would fail
+// on the spelling alone.
+//
+// It normalises through json.Marshal, not json.Compact, because Compact
+// does only the whitespace half of that: a want carrying `&` would not
+// match the encoded form.
+func encodedJSON(t *testing.T, raw json.RawMessage) string {
+	t.Helper()
+	out, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("Marshal(%s) = %v, want nil error", raw, err)
+	}
+	return string(out)
 }
 
 // assertEmittedKeys checks that the encoded object carries each named key
@@ -85,24 +104,10 @@ func assertEmittedKeys(t *testing.T, out []byte, want map[string]string) {
 			t.Errorf("encode dropped key %q: %s", k, out)
 			continue
 		}
-		if w := compactJSON(t, json.RawMessage(w)); string(raw) != w {
+		if w := encodedJSON(t, json.RawMessage(w)); string(raw) != w {
 			t.Errorf("encoded[%q] = %s, want %s", k, raw, w)
 		}
 	}
-}
-
-func readCassette(t *testing.T, dir, name string) []byte {
-	t.Helper()
-	_, src, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "cassettes", "its_rest", dir, name)
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
-	}
-	return b
 }
 
 func TestCapabilitiesDecodesCassette(t *testing.T) {
@@ -214,7 +219,11 @@ func TestCapabilitiesRoundTripsExtras(t *testing.T) {
 		},
 		{
 			label: "colliding extra on an emitted field is ignored",
-			body:  []byte(`{"solution":"Cadasto","support_email":"support@cadasto.example"}`),
+			// The `documentation_url` value carries an `&`, which encoding/json
+			// escapes as \u0026 on re-emission — the preserved value comes
+			// back re-spelled, not altered, which is what encodedJSON
+			// normalises for.
+			body: []byte(`{"solution":"Cadasto","support_email":"support@cadasto.example","documentation_url":"https://docs.cadasto.example/openehr?a=1&b=2"}`),
 			inject: map[string]json.RawMessage{
 				"solution": json.RawMessage(`"caller-supplied solution"`),
 			},
@@ -306,7 +315,7 @@ func TestCapabilitiesRoundTripsExtras(t *testing.T) {
 					t.Errorf("Extras[%q] dropped on re-encode: %s", k, out)
 					continue
 				}
-				if want := compactJSON(t, wantRaw); string(raw) != want {
+				if want := encodedJSON(t, wantRaw); string(raw) != want {
 					t.Errorf("Extras[%q] = %s, want %s", k, raw, want)
 				}
 			}
