@@ -105,33 +105,36 @@ CORPUS=(
 FAMILIES=(AND_OR CONTAINS_A_D EHR_STATUS PREDICATE_A_D USABLE_RM_TYPES_A_D)
 
 # from/combinations CSVs that are input data yet deliberately NOT vendored,
-# tagged with the reason their rows cannot be reconstructed. At this pin:
-# from_simple_and_or_ent.csv has zero references anywhere under the upstream
-# tests/ tree, so no suite supplies a query template for its rows. A new
-# upstream CSV in from/combinations that is neither in CORPUS nor here makes
-# the ingest refuse (below) instead of mis-filing it in EXCLUDED.txt —
-# classifying it is the re-pin author's decision, not the fallthrough's.
+# tagged with the reason their rows cannot be reconstructed. Keyed by the
+# path relative to the corpus root — the same spelling EXCLUDED.txt records —
+# and never by basename: a nested CSV that merely shares an excluded basename
+# (say from/combinations/sub/from_simple_and_or_ent.csv) is a different file,
+# and must reach the refusal below rather than inherit an exclusion written for
+# its namesake. At this pin: from/combinations/from_simple_and_or_ent.csv has
+# zero references anywhere under the upstream tests/ tree, so no suite supplies
+# a query template for its rows. A new upstream CSV in from/combinations that is
+# neither in CORPUS nor here makes the ingest refuse (below) instead of
+# mis-filing it in EXCLUDED.txt — classifying it is the re-pin author's
+# decision, not the fallthrough's.
 declare -A KNOWN_UNCONSUMED=(
-  ["from_simple_and_or_ent.csv"]=unconsumed-by-suite
+  ["from/combinations/from_simple_and_or_ent.csv"]=unconsumed-by-suite
 )
 
-# Clear the family directories first: a re-pin that drops a CSV upstream must not
-# leave the old copy behind pretending to still be vendored.
-for fam in "${FAMILIES[@]}"; do
-  mkdir -p "$DEST/$fam"
-  rm -f "${DEST:?}/$fam"/*.csv
-done
+# --- validate -----------------------------------------------------------------
+#
+# Every refusal runs before the first byte under $DEST moves. Clearing the
+# family directories first and only then discovering an unclassifiable upstream
+# CSV would empty the vendored corpus and abort — leaving the destination in a
+# state the pin does not describe, which is the opposite of the fail-closed
+# promise the guards above make. So this pass only reads.
 
 declare -A VENDORED=()
 for entry in "${CORPUS[@]}"; do
-  fam=${entry%% *}
   csv=${entry#* }
   if [[ ! -f "$SRC/$csv" ]]; then
     echo "missing upstream CSV at the pin: $SRC/$csv" >&2
     exit 1
   fi
-  # Byte-exact copy — CSV content is never rewritten.
-  cp "$SRC/$csv" "$DEST/$fam/$csv"
   VENDORED["from/combinations/$csv"]=1
 done
 
@@ -144,8 +147,7 @@ done
 # the classifier's unbound KNOWN_UNCONSUMED key and die as a bare `set -u` abort.
 while IFS= read -r -d '' f; do
   rel=${f#"$AQL/"}
-  csv=${rel##*/}
-  if [[ -n "${VENDORED[$rel]:-}" || -n "${KNOWN_UNCONSUMED[$csv]:-}" ]]; then
+  if [[ -n "${VENDORED[$rel]:-}" || -n "${KNOWN_UNCONSUMED[$rel]:-}" ]]; then
     continue
   fi
   echo "new upstream input CSV at the pin: $rel" >&2
@@ -153,6 +155,22 @@ while IFS= read -r -d '' f; do
   echo "vendor it and teach the reader its template, or record why it cannot be reconstructed" >&2
   exit 1
 done < <(find "$SRC" -type f -name '*.csv' -print0)
+
+# --- copy ---------------------------------------------------------------------
+
+# Clear the family directories first: a re-pin that drops a CSV upstream must not
+# leave the old copy behind pretending to still be vendored.
+for fam in "${FAMILIES[@]}"; do
+  mkdir -p "$DEST/$fam"
+  rm -f "${DEST:?}/$fam"/*.csv
+done
+
+for entry in "${CORPUS[@]}"; do
+  fam=${entry%% *}
+  csv=${entry#* }
+  # Byte-exact copy — CSV content is never rewritten.
+  cp "$SRC/$csv" "$DEST/$fam/$csv"
+done
 
 # --- provenance pin -----------------------------------------------------------
 
@@ -225,8 +243,10 @@ excl_file="$DEST/EXCLUDED.txt"
     case "$rel" in
     from/combinations/*.csv)
       # Always classified: the input-CSV completeness check above already
-      # refused anything not in KNOWN_UNCONSUMED (set -u faults if not).
-      tag=${KNOWN_UNCONSUMED[${rel##*/}]}
+      # refused anything not in KNOWN_UNCONSUMED (set -u faults if not). Both
+      # sides key on the corpus-relative path, so this glob crossing `/` is
+      # correct rather than a hole — a nested CSV needs its own entry.
+      tag=${KNOWN_UNCONSUMED[$rel]}
       ;;
     *.csv)
       case "$rel" in
