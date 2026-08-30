@@ -111,10 +111,12 @@ type WireError struct {
 // WireError after opting in via WithRawErrorBodies.
 //
 // A nil receiver answers with the zero WireError's Error text rather
-// than panicking (REQ-025 nil-receiver axis).
+// than panicking (REQ-025 nil-receiver axis). It delegates to the zero
+// value rather than repeating its text, so nil and zero cannot drift
+// apart.
 func (e *WireError) Error() string {
 	if e == nil {
-		return "transport: wire error"
+		return (&WireError{}).Error()
 	}
 	var b strings.Builder
 	if e.Sentinel != nil {
@@ -135,8 +137,8 @@ func (e *WireError) Error() string {
 }
 
 // Unwrap exposes the sentinel for errors.Is. A nil receiver unwraps to
-// nil (REQ-025 nil-receiver axis): a failed errors.As leaves a typed
-// nil that must answer rather than panic.
+// nil (REQ-025 nil-receiver axis): a failed errors.As / errors.AsType
+// leaves a typed nil that must answer rather than panic.
 func (e *WireError) Unwrap() error {
 	if e == nil {
 		return nil

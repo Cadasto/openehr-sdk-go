@@ -99,22 +99,44 @@ type DecodeError struct {
 	Inner error
 }
 
+// Error names the failed node and the wrapped cause. A nil receiver
+// answers with the zero DecodeError's text rather than dereferencing
+// (REQ-025 nil-receiver axis). This type is the documented errors.As /
+// errors.AsType out-parameter for both codecs — it is re-exported as
+// canjson.DecodeError and canxml.DecodeError — so a failed match leaves
+// a typed nil in consumer hands on the most-travelled decode route in
+// the SDK.
 func (e *DecodeError) Error() string {
+	if e == nil {
+		return (&DecodeError{}).Error()
+	}
+	// Every producer sets Inner; only a caller-built zero value leaves it
+	// nil, and %v would render that as a bare "<nil>".
+	cause := "unspecified error"
+	if e.Inner != nil {
+		cause = e.Inner.Error()
+	}
 	switch {
 	case e.Path != "" && e.Type != "":
-		return fmt.Sprintf("decode %s (_type=%q): %v", e.Path, e.Type, e.Inner)
+		return fmt.Sprintf("decode %s (_type=%q): %s", e.Path, e.Type, cause)
 	case e.Path != "":
-		return fmt.Sprintf("decode %s: %v", e.Path, e.Inner)
+		return fmt.Sprintf("decode %s: %s", e.Path, cause)
 	case e.Type != "":
-		return fmt.Sprintf("decode _type=%q: %v", e.Type, e.Inner)
+		return fmt.Sprintf("decode _type=%q: %s", e.Type, cause)
 	default:
-		return fmt.Sprintf("decode: %v", e.Inner)
+		return "decode: " + cause
 	}
 }
 
 // Unwrap returns the wrapped error so errors.Is / errors.As reach the
-// underlying sentinel.
-func (e *DecodeError) Unwrap() error { return e.Inner }
+// underlying sentinel. A nil receiver unwraps to nil (REQ-025
+// nil-receiver axis).
+func (e *DecodeError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Inner
+}
 
 // Registry maps each openEHR _type discriminator string (e.g.
 // "DV_QUANTITY") to a constructor returning a fresh zero-value

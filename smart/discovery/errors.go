@@ -58,10 +58,23 @@ type DiscoveryError struct {
 	Inner error
 }
 
-// Error implements error.
+// Error implements error. A nil receiver answers with the zero
+// DiscoveryError's text rather than dereferencing (REQ-025 nil-receiver
+// axis): a failed errors.As / errors.AsType leaves a typed nil behind,
+// and a caller that passes it onward boxes it into a non-nil error
+// interface that fmt and the errors package then call methods on.
 func (e *DiscoveryError) Error() string {
+	if e == nil {
+		return (&DiscoveryError{}).Error()
+	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "discovery: %s", e.Reason)
+	// Every SDK producer sets Reason; only a caller-built zero value leaves
+	// it empty, and that must not render as a dangling "discovery: ".
+	reason := e.Reason
+	if reason == "" {
+		reason = "unspecified"
+	}
+	fmt.Fprintf(&b, "discovery: %s", reason)
 	if e.Issuer != "" {
 		fmt.Fprintf(&b, " issuer=%s", e.Issuer)
 	}
@@ -81,5 +94,11 @@ func (e *DiscoveryError) Error() string {
 	return b.String()
 }
 
-// Unwrap exposes the inner cause to errors.Is / errors.As.
-func (e *DiscoveryError) Unwrap() error { return e.Inner }
+// Unwrap exposes the inner cause to errors.Is / errors.As. A nil
+// receiver unwraps to nil (REQ-025 nil-receiver axis).
+func (e *DiscoveryError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Inner
+}

@@ -197,7 +197,10 @@ func Health(ctx context.Context, c *transport.Client) (*HealthStatus, error) {
 	})
 	h := &HealthStatus{CheckedAt: time.Now()}
 	if err != nil {
-		if we, ok := errors.AsType[*transport.WireError](err); ok {
+		// A boxed typed-nil *WireError matches with ok=true and a nil
+		// pointer, so the nil check is load-bearing (REQ-025 nil-receiver
+		// axis); such an error carries no status and takes the branch below.
+		if we, ok := errors.AsType[*transport.WireError](err); ok && we != nil {
 			h.Status = healthDown
 			h.HTTPStatusCode = we.StatusCode
 			return h, nil

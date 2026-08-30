@@ -100,8 +100,11 @@ func mapQueryError(err error) error {
 	if err == nil {
 		return nil
 	}
+	// A boxed typed-nil *transport.WireError matches with ok=true and a nil
+	// pointer, so the nil check is load-bearing (REQ-025 nil-receiver axis):
+	// there is no status to map, so the error passes through untouched.
 	we, ok := errors.AsType[*transport.WireError](err)
-	if !ok {
+	if !ok || we == nil {
 		return err
 	}
 	// REQ-055: 501 is a capability gap — the query is valid AQL, this

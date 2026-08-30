@@ -40,13 +40,26 @@ type OAuth2Error struct {
 	URI         string // optional URI describing the error
 }
 
-// Error implements error.
+// Error implements error. A nil receiver answers with the zero
+// OAuth2Error's text rather than dereferencing (REQ-025 nil-receiver
+// axis): a failed errors.As / errors.AsType leaves a typed nil that a
+// caller boxes into a non-nil error interface and prints.
 func (e *OAuth2Error) Error() string {
+	if e == nil {
+		return (&OAuth2Error{}).Error()
+	}
+	// Every producer parses a Code out of the RFC 6749 §5.2 envelope; only a
+	// caller-built zero value leaves it empty, and that must not render as a
+	// dangling "oauth2: ".
+	code := e.Code
+	if code == "" {
+		code = "unspecified"
+	}
 	switch {
 	case e.Description != "":
-		return fmt.Sprintf("oauth2: %s: %s", e.Code, e.Description)
+		return fmt.Sprintf("oauth2: %s: %s", code, e.Description)
 	default:
-		return "oauth2: " + e.Code
+		return "oauth2: " + code
 	}
 }
 
@@ -68,9 +81,22 @@ type ExchangeError struct {
 	Inner error
 }
 
-// Error implements error.
+// Error implements error. A nil receiver answers with the zero
+// ExchangeError's text rather than dereferencing (REQ-025 nil-receiver
+// axis): a failed errors.As / errors.AsType leaves a typed nil behind.
 func (e *ExchangeError) Error() string {
-	parts := []byte(e.Sentinel.Error())
+	if e == nil {
+		return (&ExchangeError{}).Error()
+	}
+	// Every producer sets Sentinel; a caller-built zero value does not, and
+	// calling Error on that nil interface would panic just as the nil
+	// receiver did. The fallback text deliberately matches no sentinel: this
+	// value classifies as none of them, so it must not read as one.
+	lead := "auth: unspecified exchange failure"
+	if e.Sentinel != nil {
+		lead = e.Sentinel.Error()
+	}
+	parts := []byte(lead)
 	if e.StatusCode != 0 {
 		parts = fmt.Appendf(parts, " status=%d", e.StatusCode)
 	}
@@ -83,8 +109,12 @@ func (e *ExchangeError) Error() string {
 }
 
 // Unwrap walks the wrapped errors. errors.Is(err, auth.ErrTokenExchangeFailed)
-// and errors.AsType[*auth.OAuth2Error](err) both work.
+// and errors.AsType[*auth.OAuth2Error](err) both work. A nil receiver
+// unwraps to nothing (REQ-025 nil-receiver axis).
 func (e *ExchangeError) Unwrap() []error {
+	if e == nil {
+		return nil
+	}
 	out := make([]error, 0, 3)
 	if e.Sentinel != nil {
 		out = append(out, e.Sentinel)

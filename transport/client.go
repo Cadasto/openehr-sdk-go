@@ -89,15 +89,29 @@ func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 // Catalog returns the ServiceCatalog the Client was constructed with.
 // Useful for leaf clients that want to project entries before issuing
 // a request (e.g. to extract the SpecVersion for observability).
-func (c *Client) Catalog() *discovery.ServiceCatalog { return c.catalog }
+// A nil Client returns nil (REQ-025 nil-receiver axis, parity with Do).
+func (c *Client) Catalog() *discovery.ServiceCatalog {
+	// REQ-025: a nil Client is caller-constructible — see Do.
+	if c == nil {
+		return nil
+	}
+	return c.catalog
+}
 
 // HTTPClient returns the injected *http.Client (REQ-021). Exposed so
 // SDK packages that need to issue requests outside the catalog-routed
 // Do pipeline — e.g. cadasto/admin/ deployment-level health probes
 // (REQ-083) — can reuse the configured HTTP transport without
 // re-injection or wrapping. Returns nil only when New rejected the
-// configuration (which is impossible for a constructed Client).
-func (c *Client) HTTPClient() *http.Client { return c.cfg.httpClient }
+// configuration (which is impossible for a constructed Client) or when
+// the Client itself is nil (REQ-025 nil-receiver axis, parity with Do).
+func (c *Client) HTTPClient() *http.Client {
+	// REQ-025: a nil Client is caller-constructible — see Do.
+	if c == nil {
+		return nil
+	}
+	return c.cfg.httpClient
+}
 
 // Do executes req and returns the captured Response. Status codes in
 // 2xx surface as a non-nil Response with err=nil; non-2xx surface as
@@ -483,9 +497,11 @@ func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 
 // isWire401 reports whether err is a *WireError whose StatusCode is 401.
 // Used by the opt-in 401→reauth guard in Do (REQ-063).
+// A boxed typed-nil *WireError matches with ok=true and a nil pointer,
+// so the nil check is load-bearing (REQ-025 nil-receiver axis).
 func isWire401(err error) bool {
 	we, ok := errors.AsType[*WireError](err)
-	return ok && we.StatusCode == 401
+	return ok && we != nil && we.StatusCode == 401
 }
 
 // shouldRetry consults the configured RetryPolicy. Network errors are
@@ -500,8 +516,11 @@ func (c *Client) shouldRetry(req *Request, resp *Response, err error, attempt in
 	}
 	if err != nil {
 		// A *WireError carries a status — defer to the status-based
-		// retriable check so RetriableStatus is the single gate.
-		if we, ok := errors.AsType[*WireError](err); ok {
+		// retriable check so RetriableStatus is the single gate. A boxed
+		// typed-nil matches with ok=true and a nil pointer, so the nil
+		// check is load-bearing (REQ-025 nil-receiver axis); such an error
+		// carries no status and falls through to the generic branch below.
+		if we, ok := errors.AsType[*WireError](err); ok && we != nil {
 			return c.cfg.retry.retriable(req.effectiveMethod(), we.StatusCode)
 		}
 		// Token-source errors that are deterministically terminal (the config
