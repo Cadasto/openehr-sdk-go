@@ -52,15 +52,22 @@ func TestNilAQLErrorAnswersInsteadOfPanicking(t *testing.T) {
 }
 
 // TestFailedErrorsAsLeavesAnAQLErrorThatStillAnswers walks the exact route the
-// defect was reachable by, so the guard is pinned against the documented API
-// rather than against a hand-built nil. The godoc detection pattern is
+// defect was reachable by, so the guard is pinned against a documented call
+// shape rather than against a hand-built nil. In the errors.As out-parameter
+// form
 //
 //	var e *query.AQLError
 //	if errors.As(err, &e) { … }
 //
-// and after a FAILED errors.As that variable is still nil. A caller that passes
-// it onward boxes a typed nil in a non-nil error interface, so errors.Is finds
-// a non-nil error, sees the Is method, and calls it on the nil receiver.
+// a FAILED match leaves that variable nil. A caller that passes it onward boxes
+// a typed nil in a non-nil error interface, so errors.Is finds a non-nil error,
+// sees the Is method, and calls it on the nil receiver.
+//
+// This test stays on errors.As deliberately: it pins the out-parameter shape,
+// which the godoc now demotes and which a modernization sweep would convert.
+// errors.AsType is NOT nil-proof — `e, ok :=` at function scope binds the same
+// nil on a failed match and boxes identically — so converting this call would
+// not remove the hazard, only stop pinning the shape that documents it.
 func TestFailedErrorsAsLeavesAnAQLErrorThatStillAnswers(t *testing.T) {
 	notAnAQLError := errors.New("query: some other failure")
 

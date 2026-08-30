@@ -1916,9 +1916,10 @@ requirements:
       bypass themselves, and all 30 variadic-option loops skip a nil option
       — held by an AST tripwire in internal/option_guard_test.go. The nil
       RECEIVER is the same axis: a nil *contain.TypeRelation is the documented
-      spelling of "the default", and a nil *query.AQLError is what the
-      documented errors.As detection pattern leaves behind when the match
-      fails, so each answers as that value rather than dereferencing it —
+      spelling of "the default", and a nil *query.AQLError is what a failed
+      typed-error match leaves behind in either detection form — the errors.As
+      out-parameter or an errors.AsType binding — so each answers as that
+      value rather than dereferencing it —
       both held by reflection tripwires over the whole exported method set,
       each fed arguments that actually reach the receiver. A sealed exported
       interface a caller can satisfy by EMBEDDING rather than implementing it

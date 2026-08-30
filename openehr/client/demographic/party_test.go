@@ -494,8 +494,8 @@ func TestCreatePreferRepresentationEmptyBody(t *testing.T) {
 	out, meta, err := demographic.Create(t.Context(), newClient(t, srv),
 		&rm.Person{Name: rm.DVText{Value: "Jane Doe"}},
 		demographic.WithPrefer(transport.PreferRepresentation))
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("representation empty body: err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, transport.ErrInvalidShape) {

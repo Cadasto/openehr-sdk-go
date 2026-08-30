@@ -32,8 +32,8 @@ func TestCommitRepresentationEmptyBody(t *testing.T) {
 	out, meta, err := contribution.Commit(t.Context(), newClient(t, srv), ehrIDFixture, representationBatch(),
 		contribution.WithPrefer(transport.PreferRepresentation))
 
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -65,8 +65,8 @@ func TestCommitRepresentationNullBody(t *testing.T) {
 	out, meta, err := contribution.Commit(t.Context(), newClient(t, srv), ehrIDFixture, representationBatch(),
 		contribution.WithPrefer(transport.PreferRepresentation))
 
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("null body: err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -93,8 +93,8 @@ func TestCommitRepresentationWhitespaceBody(t *testing.T) {
 	out, meta, err := contribution.Commit(t.Context(), newClient(t, srv), ehrIDFixture, representationBatch(),
 		contribution.WithPrefer(transport.PreferRepresentation))
 
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("whitespace body: err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -121,8 +121,8 @@ func TestCommitRepresentationUndecodable(t *testing.T) {
 	out, meta, err := contribution.Commit(t.Context(), newClient(t, srv), ehrIDFixture, representationBatch(),
 		contribution.WithPrefer(transport.PreferRepresentation))
 
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
 	if _, ok := errors.AsType[*json.SyntaxError](err); !ok {

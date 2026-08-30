@@ -217,8 +217,8 @@ func TestPutRepresentationEmptyBodyErrors(t *testing.T) {
 		t.Context(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
 		ehrstatus.WithPrefer(transport.PreferRepresentation),
 	)
-	var nre *openehrclient.NoRepresentationError
-	if !errors.As(err, &nre) {
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
 		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, transport.ErrInvalidShape) {
