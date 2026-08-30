@@ -408,10 +408,15 @@ func TestRunStoredRejectsReservedNameAQL(t *testing.T) {
 
 // TestRunStoredReservedNameIsByteExact pins the other half of REQ-057's
 // carve-out: only the exact byte sequence "aql" collides, so every other
-// name — including case variants and names that merely contain it — still
-// reaches the wire verbatim.
+// name — including case variants, namespaced forms, and names that merely
+// contain it — still reaches the wire verbatim.
+//
+// The namespaced rows are the discriminator between the two sides of
+// REQ-057: the store side refuses "ehr::aql" case-insensitively, while the
+// execution path must not raise a client-side error for it. Unifying
+// the store's reservedQueryName onto this path would fail here.
 func TestRunStoredReservedNameIsByteExact(t *testing.T) {
-	for _, name := range []string{"AQL", "Aql", "aql.reports", "org.example.aql", "aqlx"} {
+	for _, name := range []string{"AQL", "Aql", "aql.reports", "org.example.aql", "aqlx", "ehr::aql", "ehr::AQL"} {
 		t.Run(name, func(t *testing.T) {
 			var gotPath string
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -479,6 +484,36 @@ func TestRunStoredDiagnosticsNameTheOperation(t *testing.T) {
 	_, _, err = query.RunStored(t.Context(), nil, "   ", nil)
 	if err == nil || !strings.Contains(err.Error(), "query.RunStored:") {
 		t.Errorf("RunStored err = %v, want a query.RunStored: prefix", err)
+	}
+}
+
+// TestRunStoredDiagnosticsNameTheOperationOnParamErrors extends the op-name
+// pin past the empty-name arm: a failure raised further inside
+// runStoredAtVersion — the GET query-parameter encoder — must still carry
+// the caller's own operation name, not its sibling's (REQ-057). No server
+// is involved: both arms return before a request is built.
+func TestRunStoredDiagnosticsNameTheOperationOnParamErrors(t *testing.T) {
+	for _, tc := range []struct {
+		label  string
+		params map[string]any
+		want   string
+	}{
+		{"reserved_query_key", map[string]any{"fetch": 5}, "collides with reserved GET query key"},
+		{"unencodable_value", map[string]any{"since": make(chan int)}, "query parameter \"since\""},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			_, _, err := query.RunStoredVersion(t.Context(), nil,
+				"org.openehr::vitals", "1.2.3", tc.params, query.WithGET())
+			if !errors.Is(err, query.ErrInvalidConfig) {
+				t.Fatalf("err = %v, want one wrapping ErrInvalidConfig", err)
+			}
+			if !strings.Contains(err.Error(), "query.RunStoredVersion:") {
+				t.Errorf("err = %q, want a query.RunStoredVersion: prefix", err)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("err = %q, want it to name %s", err, tc.want)
+			}
+		})
 	}
 }
 

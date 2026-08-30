@@ -316,9 +316,10 @@ func TestPutStoredQueryReservedName(t *testing.T) {
 // TestPutStoredQueryReservedNameScope pins the rule's edges. The reservation
 // covers only the query-name part of `[{namespace}::]{query-name}`: a name
 // that merely contains "aql", and a namespace that IS "aql", are ordinary
-// names and reach the wire verbatim. The read and delete operations pass a
-// reserved name through too — a deployment that stored one anyway must stay
-// reachable for retrieval and cleanup.
+// names and reach the wire verbatim. The read, list and delete operations
+// pass a reserved name through too — a deployment that stored one anyway
+// must stay reachable for retrieval and cleanup — so each of the three
+// asserts the reserved name reached the request path unaltered (REQ-057).
 func TestPutStoredQueryReservedNameScope(t *testing.T) {
 	var gotPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -350,10 +351,23 @@ func TestPutStoredQueryReservedNameScope(t *testing.T) {
 		}
 	})
 
+	t.Run("list_reserved_name_passes_through", func(t *testing.T) {
+		_, _, err := definition.ListStoredQueries(t.Context(), c, "ehr::aql")
+		if err != nil {
+			t.Fatalf("ListStoredQueries(\"ehr::aql\") = %v, want pass-through (list side is for remediation)", err)
+		}
+		if want := "/openehr/v1/definition/query/ehr::aql"; gotPath != want {
+			t.Errorf("path = %q, want %q", gotPath, want)
+		}
+	})
+
 	t.Run("delete_reserved_name_passes_through", func(t *testing.T) {
 		_, err := definition.DeleteStoredQuery(t.Context(), c, "aql", "1.0.0")
 		if err != nil {
 			t.Fatalf("DeleteStoredQuery(\"aql\") = %v, want pass-through (delete side is for remediation)", err)
+		}
+		if want := "/openehr/v1/definition/query/aql/1.0.0"; gotPath != want {
+			t.Errorf("path = %q, want %q", gotPath, want)
 		}
 	})
 }

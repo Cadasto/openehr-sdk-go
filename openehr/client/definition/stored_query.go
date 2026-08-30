@@ -116,14 +116,13 @@ func PutStoredQueryVersion(ctx context.Context, c *transport.Client, qualifiedNa
 // reservedQueryName reports whether the query-name part of a qualified
 // name — everything after the final "::" per the upstream
 // `[{namespace}::]{query-name}` grammar — is the reserved name "aql".
-// The upstream contract reserves it case-insensitively
-// (`resources/its-rest/query-validation.openapi.yaml`, the
-// Qualified_query_name description: "The query-name value must not be
-// `aql` (case-insensitive), as that is a reserved name") because such a
-// query's execution path IS the ad-hoc route /query/aql. Only the store
-// operations enforce it; reads and deletes pass a reserved name through so
-// a deployment holding one anyway stays reachable for remediation
-// (REQ-057).
+// The reservation's ground is the upstream contract, which reserves it
+// case-insensitively (`resources/its-rest/query-validation.openapi.yaml`,
+// the Qualified_query_name description: "The query-name value must not be
+// `aql` (case-insensitive), as that is a reserved name"). Only the store
+// operations enforce it; reads, lists and deletes pass a reserved name
+// through so a deployment holding one anyway stays reachable for
+// remediation (REQ-057).
 func reservedQueryName(qualifiedName string) bool {
 	queryName := qualifiedName
 	if i := strings.LastIndex(qualifiedName, "::"); i >= 0 {
