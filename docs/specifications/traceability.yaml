@@ -131,9 +131,17 @@ requirements:
       - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canjson/polymorphic_decode_test.go
       - openehr/serialize/canjson/polymorphic_encode_test.go
+      - openehr/serialize/canjson/decode_test.go
       - openehr/internal/jsonpoly/jsonpoly_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
+    notes: >-
+      Open gap recorded 2026-08-30: canjson.ErrInvalidShape has no decode-side
+      producer (Unmarshal and Decoder.Decode pass the codec's error through
+      unchanged). Package comments and Unmarshal's godoc say so; TestUnmarshalDoesNotWrapErrInvalidShape
+      pins the pass-through. Wrapping decode with the sentinel (including
+      overflow as a typed error per this §) is a spec-first follow-up, not
+      silently landed here. Distinct from transport.ErrInvalidShape.
 
   - id: REQ-056
     title: Canonical XML
@@ -661,7 +669,13 @@ requirements:
       - docs/plans/archive/2026-05-15-rest-api-client.md
       - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
       - docs/plans/archive/2026-08-26-aql-small-corrections.md
-    notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
+    notes: >-
+      POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param);
+      PutStoredQuery recovers {name,version} from Location header. Verified by
+      query/execute.go, definition/stored_query.go; PROBE-078/079 deferred.
+      StoredQueryMetadata re-emits Extras on encode (MarshalJSON), matching
+      TemplateMetadata, so a deployment-specific key is not dropped on
+      re-marshal — pinned by TestStoredQueryMetadataExtrasRoundTrip.
     tests:
       - openehr/client/query/query_test.go
       - openehr/client/definition/stored_query_test.go
@@ -1912,6 +1926,7 @@ requirements:
       - openehr/aql/contain/nilrelation_test.go
       - openehr/client/query/nilaqlerror_test.go
       - transport/client_test.go
+      - transport/nilwireerror_test.go
       - openehr/client/ehr/ehr_test.go
       - internal/option_guard_test.go
     notes: >-
@@ -1928,7 +1943,11 @@ requirements:
       out-parameter or an errors.AsType binding — so each answers as that
       value rather than dereferencing it —
       both held by reflection tripwires over the whole exported method set,
-      each fed arguments that actually reach the receiver. A sealed exported
+      each fed arguments that actually reach the receiver. A typed-nil
+      *transport.WireError — the value a failed errors.As / errors.AsType
+      leaves behind — answers Error and Unwrap rather than panicking
+      (transport/nilwireerror_test.go), matching *query.AQLError and
+      *ehr.NoRepresentationError. A sealed exported
       interface a caller can satisfy by EMBEDDING rather than implementing it
       is the nil-adjacent arm of the same axis: an aql.VersionPredicate whose
       embedded field is nil dereferences a nil interface at both dispatch

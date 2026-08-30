@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -31,7 +32,7 @@ var knownStoredQueryFields = map[string]struct{}{
 //
 // saved is shadowed as a json.RawMessage over the alias so the strict
 // RFC 3339-only time.Time decoder never sees it; it is parsed afterwards
-// across the accepted layout set (REQ-144).
+// across the accepted layout set (REQ-144). MarshalJSON re-emits Extras.
 func (m *StoredQueryMetadata) UnmarshalJSON(data []byte) error {
 	type alias StoredQueryMetadata
 	var a alias
@@ -63,6 +64,29 @@ func (m *StoredQueryMetadata) UnmarshalJSON(data []byte) error {
 		m.Extras[k] = v
 	}
 	return nil
+}
+
+// MarshalJSON re-emits documented fields plus Extras. The result
+// decodes back to the same key set; key order is not part of the
+// contract (a non-empty Extras path marshals a map).
+func (m StoredQueryMetadata) MarshalJSON() ([]byte, error) {
+	type alias StoredQueryMetadata
+	known, err := json.Marshal(alias(m))
+	if err != nil {
+		return nil, err
+	}
+	if len(m.Extras) == 0 {
+		return known, nil
+	}
+	var merged map[string]json.RawMessage
+	if err := json.Unmarshal(known, &merged); err != nil {
+		return nil, err
+	}
+	if merged == nil {
+		merged = map[string]json.RawMessage{}
+	}
+	maps.Copy(merged, m.Extras)
+	return json.Marshal(merged)
 }
 
 // storeConfig holds resolved options for storing a query.

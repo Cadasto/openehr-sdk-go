@@ -8,12 +8,15 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/internal/poly"
 )
 
-// ErrInvalidShape is the canjson-local sentinel for JSON-level shape
-// errors (malformed JSON, type mismatch on a non-polymorphic field,
+// ErrInvalidShape is the canjson-local sentinel reserved for JSON-level
+// shape errors (malformed JSON, type mismatch on a non-polymorphic field,
 // numeric overflow). Polymorphic-discrimination errors come from the
 // typereg package — callers MUST `errors.Is` against
 // [typereg.ErrMissingType] / [typereg.ErrUnknownType] /
 // [typereg.ErrTypeMismatch] rather than against this sentinel.
+//
+// No decode path produces it today: [Unmarshal] and [Decoder.Decode]
+// pass the codec's error through unchanged (REQ-052 producer deferred).
 var ErrInvalidShape = errors.New("canjson: invalid JSON shape")
 
 // DecodeError is the unified error returned by the decoder at
@@ -60,8 +63,9 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 //
 // Returns [poly.DecodeError] wrapping a typereg sentinel
 // ([typereg.ErrMissingType] / ErrUnknownType / ErrTypeMismatch) at
-// polymorphic failures, and [ErrInvalidShape] (wrapped) for JSON
-// shape errors.
+// polymorphic failures (via generated UnmarshalJSON). JSON shape
+// errors currently come from encoding/json unchanged — they do not
+// wrap [ErrInvalidShape] (REQ-052 producer deferred).
 func Unmarshal(data []byte, v any) error {
 	return json.Unmarshal(data, v)
 }

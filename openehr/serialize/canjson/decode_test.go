@@ -132,3 +132,18 @@ func TestDecodeErrorCarriesPath(t *testing.T) {
 		t.Errorf("DecodeError.Path = %q; want path to mention content", de.Path)
 	}
 }
+
+// TestUnmarshalDoesNotWrapErrInvalidShape pins the deferred REQ-052
+// producer: Unmarshal is a pass-through, so a JSON shape error is not
+// canjson.ErrInvalidShape. Wrapping decode with that sentinel without
+// updating this test is the follow-up that closes the gap.
+func TestUnmarshalDoesNotWrapErrInvalidShape(t *testing.T) {
+	var q rm.DVQuantity
+	err := canjson.Unmarshal([]byte("{"), &q)
+	if err == nil {
+		t.Fatal("Unmarshal(\"{}\"-truncated) = nil, want a JSON shape error")
+	}
+	if errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v wraps ErrInvalidShape; Unmarshal still passes the codec error through (REQ-052 producer deferred)", err)
+	}
+}

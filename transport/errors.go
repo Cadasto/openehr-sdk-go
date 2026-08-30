@@ -109,7 +109,13 @@ type WireError struct {
 // Callers that need the message (e.g. for user-facing error reporting in
 // a controlled environment) should use errors.As to extract the full
 // WireError after opting in via WithRawErrorBodies.
+//
+// A nil receiver answers with the zero WireError's Error text rather
+// than panicking (REQ-025 nil-receiver axis).
 func (e *WireError) Error() string {
+	if e == nil {
+		return "transport: wire error"
+	}
 	var b strings.Builder
 	if e.Sentinel != nil {
 		b.WriteString(e.Sentinel.Error())
@@ -128,5 +134,12 @@ func (e *WireError) Error() string {
 	return b.String()
 }
 
-// Unwrap exposes the sentinel for errors.Is.
-func (e *WireError) Unwrap() error { return e.Sentinel }
+// Unwrap exposes the sentinel for errors.Is. A nil receiver unwraps to
+// nil (REQ-025 nil-receiver axis): a failed errors.As leaves a typed
+// nil that must answer rather than panic.
+func (e *WireError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Sentinel
+}

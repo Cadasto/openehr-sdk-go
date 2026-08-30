@@ -1,6 +1,7 @@
 package definition_test
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -478,5 +479,37 @@ func TestListStoredQueriesUnparseableSavedFails(t *testing.T) {
 	}
 	if list != nil {
 		t.Errorf("list = %+v, want nil on decode failure", list)
+	}
+}
+
+// TestStoredQueryMetadataExtrasRoundTrip pins that deployment-specific
+// fields preserved in Extras on decode are re-emitted on encode
+// (REQ-057). Restoring a missing MarshalJSON (Extras is json:"-")
+// drops them silently.
+func TestStoredQueryMetadataExtrasRoundTrip(t *testing.T) {
+	body := []byte(`{"name":"org.openehr::vitals","type":"AQL","version":"1.0.0","saved":"2017-07-16T19:20:30.450+01:00","q":"SELECT 1","uri":"https://example.example/q"}`)
+	var meta definition.StoredQueryMetadata
+	if err := json.Unmarshal(body, &meta); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := meta.Extras["uri"]; !ok {
+		t.Fatal("premise gone: uri did not land in Extras on decode")
+	}
+	out, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roundTripped definition.StoredQueryMetadata
+	if err := json.Unmarshal(out, &roundTripped); err != nil {
+		t.Fatal(err)
+	}
+	if roundTripped.Name != "org.openehr::vitals" {
+		t.Errorf("Name = %q, want org.openehr::vitals (documented fields still encode)", roundTripped.Name)
+	}
+	gotURI, ok := roundTripped.Extras["uri"]
+	if !ok {
+		t.Errorf("uri dropped on re-encode: %s", out)
+	} else if string(gotURI) != `"https://example.example/q"` {
+		t.Errorf("Extras[uri] = %s, want the original JSON string", gotURI)
 	}
 }
