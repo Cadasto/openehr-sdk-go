@@ -139,7 +139,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | Clinical modeling | 100–119 | — (see note) |
 | RM behavioural functions | 120–123 | 124–129 |
 | SDK authoring & client tooling | 130 | 131–139 |
-| Wire format — extensions | 140, 142–143 | 141, 145–149 (144 reserved) |
+| Wire format — extensions | 140, 142–143 | 145–149 (144 reserved; 141 retired — see note) |
 | Transport — extensions | 150 | 152–159 (151 reserved) |
 | AQL semantics | 160–164 | 165–169 |
 

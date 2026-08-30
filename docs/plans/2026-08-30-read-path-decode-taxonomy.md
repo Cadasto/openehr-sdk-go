@@ -6,18 +6,19 @@
 **Covers:** REQ-151 (new — typed 2xx decode failure), REQ-052 (amend — encode-side sentinel), REQ-094 (amend — cross-reference only), ADR 0018 (new — raw bytes on the typed decode error)
 **Probes:** PROBE-101 (new, Sandbox)
 **Implementation:** planned
-**Depends on:** nothing. Independent of the [Definition metadata decoding plan](2026-08-30-definition-metadata-decoding.md); the two touch the same Definition list functions textually, so whichever lands second rebases, but they share no types or contract.
+**Depends on:** nothing. Independent of the [Definition metadata decoding plan](2026-08-30-definition-metadata-decoding.md); the two touch the same Definition list functions textually, so whichever lands second rebases, but they share no types or contract, and the § REQ-151 empty-list-body exclusion is self-contained (an empty list body is success, whoever defines its slice shape), so neither plan orders the other.
 **Defers:** lifting REQ-094's keyed exception for `ehr.Create`'s **empty-body** 2xx arm (stays bare `transport.ErrInvalidShape`; typing it means routing EHR creation through the write-result contract — a separate REQ-094 amendment); changing `Prefer` defaults; typing the `Prefer=identifier` decode arm (`openehr/client/ehr/identifier.go` — REQ-094 negotiation surface, already typed as `ErrInvalidShape`); the auth/SMART JSON decodes (`auth/*`, `smart/*` — separate `net/http` stacks, not the `transport.Client` read path); aligning `canxml`'s single-sentinel-both-directions shape with the new `canjson` encode sentinel; the optional PROBE-038 `CONTRIBUTION.versions` missing-`_type` row (regression pin on already-landed REQ-052 behaviour, unrelated to this taxonomy).
 
 ## Goal
 
-When a 2xx response body cannot be decoded as the requested type, the SDK today returns a wrapped error and drops the bytes — the payload the server already delivered is unrecoverable (`transport/client.go:589-591`; `Metadata` is headers-only). The archived [write-result plan](archive/2026-08-18-write-result-contract.md) deferred typing `ehr.Create`'s committed-but-unusable arm *because* it decodes through this shared path — this plan ships the missing primitive: a `transport.DecodeError` that carries the raw body, used by `transport.Decode` and by every hand-rolled read-path 2xx decode. As a rider it closes the second deferral from the same plan: a typed sentinel for `canjson` marshal failures.
+When a 2xx response body cannot be decoded as the requested type, the SDK today returns a wrapped error and drops the bytes — the payload the server already delivered is unrecoverable (`transport/client.go:589-591`; `Metadata` is headers-only). The archived [write-result plan](archive/2026-08-18-write-result-contract.md) deferred typing `ehr.Create`'s committed-but-unusable arm *because* it decodes through this shared path — this plan ships the missing primitive: a `transport.DecodeError` that carries the raw body, used by `transport.Decode` and by every hand-rolled 2xx response-body decode outside the write-result funnel ("read path" in this plan means the response-decode path — it includes the Definition upload/PUT leaves, whose requests are writes but whose 2xx metadata responses are decoded the same way). As a rider it closes the second deferral from the same plan: a typed sentinel for `canjson` marshal failures.
 
 ## Definition of Ready
 
 - **Covers:** REQ-151, REQ-052, REQ-094, ADR 0018 — all listed above with canonical links planned below.
 - Canonical normative prose for REQ-151 is written in Phase 0 (`transport.md`), the REQ-052 clause likewise; both land ahead of the code in this plan's own commits. Until Phase 0 lands, the spec links in Mapping to specs are forward references — nothing (code comments, traceability, other docs) cites REQ-151 before its § exists. REQ-151 is **reserved** in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy) as of this plan's merge.
 - The irreversible fork (raw bytes attached to the error **by default**) is settled by ADR 0018, Accepted in Phase 0 before any code. Rationale: once consumers rely on the populated field, gating it later is a break; that is the same one-way door REQ-093 walked through in the opposite direction.
+- The seed's refuse paths are likewise citations of the future §, not contracts this plan carries on its own: a non-2xx stays `*transport.WireError`; an empty representation-expecting 2xx body stays `transport.ErrInvalidShape`; the keyed exclusions keep their owning contracts (REQ-094). None is citable from code or traceability until the Phase 0 § exists.
 - Phases name their verification: `make spec-check`, `make ci` (or the documented no-Docker fallback: `fmt-check`, `vet`, `spec-check`, `build`, `go test ./... -count=1`).
 
 ## Definition of Done
@@ -46,14 +47,14 @@ When a 2xx response body cannot be decoded as the requested type, the SDK today 
 
 **Tasks:**
 
-- [ ] Write **ADR 0018 — Raw response bytes on the typed 2xx decode error** (`docs/adr/0018-raw-bytes-on-decode-error.md`, heading form `# ADR 0018 — …`, metadata bullets per ADR 0017's richer form: Status / Introduces REQ-151 / Amends REQ-052, REQ-094 / Plan link / Related ADR 0004, REQ-093). Decision: the `Body` field on `transport.DecodeError` is **always populated** on a 2xx decode failure — no opt-in knob. The ADR must answer, in Consequences, why 2xx decode-failure bytes differ from the non-2xx bodies REQ-093 gates behind `WithRawErrorBodies`: a 2xx body is the very representation the caller requested and would have received fully decoded had it parsed — the caller is already entitled to those bytes; a non-2xx error body is diagnostic content the caller never asked for and routinely carries server-side clinical narrative. Supporting points: the bytes have already crossed the wire into the process; `WithMaxResponseBody` (default 64 MiB, transport.md § REQ-093) bounds them; `Error()` stays value-free so log surfaces are unchanged; the *field* is documented as potentially PHI-bearing, exactly how `NoRepresentationError.Cause` is treated. Alternatives considered: reuse `WithRawErrorBodies` (default still loses the payload — the defect survives), a new opt-in `WithRawDecodeBodies` (same problem unless default-on, in which case it is a no-op knob; ADR 0004's consequence line — no second strict-mode knob in v1 — is the precedent against it).
+- [ ] Write **ADR 0018 — Raw response bytes on the typed 2xx decode error** (`docs/adr/0018-raw-bytes-on-decode-error.md`, heading form `# ADR 0018 — …`, metadata bullets per ADR 0017's richer form: Status / `Strand: none — direct decision (this plan's Phase 0); no prior open research strand` (the ADR 0011/0012 spelling) / Introduces REQ-151 / Amends REQ-052, REQ-094 / Plan link / Related ADR 0004, REQ-093). Decision: the `Body` field on `transport.DecodeError` is **always populated** on a 2xx decode failure — no opt-in knob. The ADR must answer, in Consequences, why 2xx decode-failure bytes differ from the non-2xx bodies REQ-093 gates behind `WithRawErrorBodies`: a 2xx body is the very representation the caller requested and would have received fully decoded had it parsed — the caller is already entitled to those bytes; a non-2xx error body is diagnostic content the caller never asked for and routinely carries server-side clinical narrative. Supporting points: the bytes have already crossed the wire into the process; `WithMaxResponseBody` (default 64 MiB, transport.md § REQ-093) bounds them; `Error()` stays value-free so log surfaces are unchanged; the *field* is documented as potentially PHI-bearing, exactly how `NoRepresentationError.Cause` is treated. Alternatives considered: reuse `WithRawErrorBodies` (default still loses the payload — the defect survives), a new opt-in `WithRawDecodeBodies` (same problem unless default-on, in which case it is a no-op knob; ADR 0004's consequence line — no second strict-mode knob in v1 — is the precedent against it).
 - [ ] Update `docs/adr/README.md` table with the 0018 row (Accepted, 2026-08-30).
 - [ ] Write **`transport.md` § REQ-151** as `## REQ-151 — Typed 2xx decode failure`, inserted after the REQ-150 block (~line 239), before `## Coverage`. The bullets below are the `sdd-specify` seed — the § authored in Phase 0 is the only normative home, and its RFC-2119 wording is written there, not copied from here:
   - After a 2xx, when the body cannot be decoded as the requested representation, the returned error is a `*transport.DecodeError` recoverable via `errors.AsType` (the REQ-025 preferred matcher; `errors.As` reaches it identically), carrying the raw response bytes in `Body`, wrapping the decoder's error (`Unwrap`), with a value-free `Error()` in the REQ-093 discipline (method + route template + classification; never the body, never interpolated cause text).
   - The existing `(*T, *Metadata, error)` triple still populates `*Metadata` on this path.
   - A non-2xx stays `*transport.WireError` and is never a `DecodeError`.
-  - An **empty** 2xx body on a read that expected a representation keeps today's `transport.ErrInvalidShape` contract — deliberately not unified under the new type (state this explicitly). Keyed exclusion: the Definition **list** leaves, where an empty 2xx body is success — a non-nil empty slice under REQ-144 ([Definition metadata decoding plan](2026-08-30-definition-metadata-decoding.md)) — never `ErrInvalidShape` and never a `DecodeError`; only a non-empty list body that fails to decode (e.g. an object where an array is expected) is REQ-151's.
-  - Scope: `transport.Decode` and every hand-rolled read-path 2xx decode on the `transport.Client` stack — the ten `transport.Decode` call sites inherit it; the hand-rolled sites are enumerated in Phases 2–3. Keyed exclusions, named in the §: the write-result funnel (`ehr.WriteResult` callbacks and `contribution.Commit`, owned by REQ-094 / `NoRepresentationError`) and the `Prefer=identifier` arm (`ehr.ResolveIdentifierBody`, REQ-094).
+  - An **empty** 2xx body on a read that expected a representation keeps today's `transport.ErrInvalidShape` contract — deliberately not unified under the new type (state this explicitly). Keyed exclusion, self-contained: the Definition **list** leaves, where an empty 2xx body is a successful empty catalog, not a failed representation decode — never `ErrInvalidShape`, never a `DecodeError`. The slice shape of that success is the Definition list contract's business (REQ-144 once its [plan](2026-08-30-definition-metadata-decoding.md) lands; today's landed behaviour is already success), so this § only points there and holds with or without it. Only a non-empty list body that fails to decode (e.g. an object where an array is expected) is REQ-151's.
+  - Scope, stated precisely (the § does not use the ambiguous term "read path"): every 2xx **response-body decode** on the `transport.Client` stack that is not owned by the REQ-094 write-result contract — regardless of the request's verb, so the Definition upload/PUT leaves are in scope: their requests are writes, but their 2xx metadata responses are decoded like any read. The ten `transport.Decode` call sites inherit it; the hand-rolled sites are enumerated in Phases 2–3. Keyed exclusions, named in the §: the write-result funnel (`ehr.WriteResult` callbacks and `contribution.Commit`, owned by REQ-094 / `NoRepresentationError`) and the `Prefer=identifier` arm (`ehr.ResolveIdentifierBody`, REQ-094).
   - The `Body` field is PHI-bearing by design; ADR 0018 is the authority.
   - Footer: `- **Lives in:** [`transport/`](../../transport)` + `- **Probes:** PROBE-101 (Implemented — Sandbox)`.
 - [ ] Amend `transport.md` line 5 Covers sentence and add the `| REQ-151 | transport/ … |` Coverage row.
@@ -74,6 +75,7 @@ When a 2xx response body cannot be decoded as the requested type, the SDK today 
   - `TestDecodeErrorStringIsValueFree` — `Error()` contains the method and route but no substring of the body **and no substring of the wrapped decoder error's text** (the decoder's `parse %q`-style messages embed payload values — the leak this guard exists to block). Removing the value-free guard must fail this named test.
   - `TestDecodeNon2xxStaysWireError` — 404: `errors.AsType[*transport.WireError]` matches, `errors.AsType[*transport.DecodeError]` does not.
   - `TestDecodeEmptyBodyStaysInvalidShape` — 200 empty body: `errors.Is(err, transport.ErrInvalidShape)` true, not a `DecodeError`.
+  - `TestDecodeErrorNilReceiver` — a typed-nil `*transport.DecodeError` answers `Error()` and `Unwrap()` without panicking (REQ-025 nil-receiver axis; the `NoRepresentationError` and `nilaqlerror_test.go` precedent). Removing either nil guard must fail this named test.
 - [ ] Implement in `transport/errors.go`, next to `WireError`:
 
 ```go
@@ -88,11 +90,22 @@ type DecodeError struct {
 	Inner  error  // the decoder's error
 }
 
+// Error answers on a nil receiver instead of panicking: a typed-nil
+// *DecodeError is caller-constructible input (REQ-025 § No panics,
+// nil-receiver axis — the NoRepresentationError / nilaqlerror_test.go shape).
 func (e *DecodeError) Error() string {
+	if e == nil {
+		return "transport: decode: response body does not match the requested type"
+	}
 	return fmt.Sprintf("transport: decode %s %s: response body does not match the requested type", e.Method, e.Route)
 }
 
-func (e *DecodeError) Unwrap() error { return e.Inner }
+func (e *DecodeError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Inner
+}
 ```
 
 - [ ] Replace the decode arm in `transport/client.go` (`Decode`, ~line 589): return `nil, resp.Metadata, &DecodeError{Method: req.effectiveMethod(), Route: req.effectiveRoute(), Body: resp.Body, Inner: err}`. The empty-body arm above it is untouched.
@@ -115,22 +128,23 @@ if err := json.Unmarshal(resp.Body, &out); err != nil {
 
 **Tasks:**
 
-- [ ] Failing tests first, per leaf: a 200 whose JSON is an object where an array is expected (`ListTemplates`, `ListStoredQueries` — the object-body arm is PROBE-101's fourth assertion) and a 200 with a non-conforming metadata body (`UploadTemplate`, `StoreQuery`, `GetStoredQuery`); assert the typed error and body recovery. `ListStoredQueries` currently has zero tests — add a happy-path list decode test alongside.
-- [ ] Convert the five sites: `template.go:219` (UploadTemplate), `template.go:294` (ListTemplates), `stored_query.go:161` (StoreQuery), `stored_query.go:247` (GetStoredQuery), `stored_query.go:281` (ListStoredQueries). Empty-body arms in all five are untouched (list arms are the other plan's business; metadata arms keep their Location/synthesis behaviour).
+- [ ] Failing tests first, per leaf: a 200 whose JSON is an object where an array is expected (`ListTemplates`, `ListStoredQueries` — the object-body arm is PROBE-101's third assertion) and a 200 with a non-conforming metadata body (`UploadTemplate`; `PutStoredQuery` and `PutStoredQueryVersion`, which share the decode site; `GetStoredQuery`); assert the typed error and body recovery. `ListStoredQueries` currently has zero tests — add a happy-path list decode test alongside.
+- [ ] Convert the five sites: `template.go:219` (UploadTemplate), `template.go:294` (ListTemplates), `stored_query.go:161` (inside the unexported `putStoredQuery` helper, the one decode serving both `PutStoredQuery` and `PutStoredQueryVersion`), `stored_query.go:247` (GetStoredQuery), `stored_query.go:281` (ListStoredQueries). Empty-body arms in all of them are untouched (list arms are the other plan's business; metadata arms keep their Location/synthesis behaviour).
 - [ ] `go test ./openehr/client/definition/... -count=1`.
 
 **Definition of done:** all five leaves return the typed error on decode failure with the body recoverable; existing behaviour tests unchanged.
 
-### Phase 3 — Remaining read-path leaves
+### Phase 3 — Remaining response-decode leaves
 
-The read-path decodes outside `transport.Decode` and outside the Definition client, from the 2026-08-30 census: `system.Capabilities` (`openehr/client/system/system.go:160`), `demographic` `getVersion` (`versioned.go:176`) and `getParty` (`party.go:310`), `composition.get` (`openehr/client/ehr/composition/composition.go:71`). Explicitly **not** converted (keyed exclusions in the §): the `WriteResult` callback decodes (`party.go:320`, `composition.go:332`, `directory.go:303`, `ehrstatus.go:183` — funnel to `NoRepresentationError`), `contribution.Commit` (`contribution.go:108`, same), `ResolveIdentifierBody` (`identifier.go:45`, REQ-094 `Prefer=identifier` arm).
+The in-scope decodes outside `transport.Decode` and outside the Definition client, from the 2026-08-30 census: `system.Capabilities` (`openehr/client/system/system.go:160`), `demographic` `getVersion` — which has **two** decode arms, the `rm.OriginalVersion[json.RawMessage]` envelope (`versioned.go:176`) and the polymorphic version data (`typereg.DecodeAs[rm.Party]` on `env.Data`, `versioned.go:187`) — and `getParty` (`party.go:310`), `composition.get` (`openehr/client/ehr/composition/composition.go:71`). Explicitly **not** converted (keyed exclusions in the §): the `WriteResult` callback decodes (`party.go:320`, `composition.go:332`, `directory.go:303`, `ehrstatus.go:183` — funnel to `NoRepresentationError`), `contribution.Commit` (`contribution.go:108`, same), `ResolveIdentifierBody` (`identifier.go:45`, REQ-094 `Prefer=identifier` arm).
 
 **Tasks:**
 
 - [ ] Failing test then conversion, one leaf at a time, same wrapper-plus-typed-inner shape as Phase 2. The demographic and composition leaves decode via `typereg.DecodeAs` / `canjson.Unmarshal` — the typed error's `Inner` wraps whatever those return (including `canjson.DecodeError`), preserving today's `errors.AsType` reach into path/type diagnostics.
+- [ ] `getVersion` gets one failing test **per arm**: an undecodable `ORIGINAL_VERSION` envelope, and a well-formed envelope whose `data` fails the polymorphic `rm.Party` decode. Both arms return the typed error with `Body` carrying the **full response bytes** (the payload the server delivered — not the `data` sub-slice), so the consumer's recovery story is the same either way.
 - [ ] `go test ./openehr/client/... -count=1`.
 
-**Definition of done:** every in-scope read-path 2xx decode failure surfaces as `*transport.DecodeError`; **each** excluded arm is covered by a named test asserting it is **not** the new type — `contribution.Commit` decode failure stays `*ehr.NoRepresentationError`; a `WriteResult` callback decode failure (e.g. `composition.Update`) stays `*ehr.NoRepresentationError`; `ResolveIdentifierBody` decode failure keeps its `transport.ErrInvalidShape` wrap.
+**Definition of done:** every in-scope 2xx response-decode failure surfaces as `*transport.DecodeError`; **each** excluded arm is covered by a named test asserting it is **not** the new type — `contribution.Commit` decode failure stays `*ehr.NoRepresentationError`; a `WriteResult` callback decode failure (e.g. `composition.Update`) stays `*ehr.NoRepresentationError`; `ResolveIdentifierBody` decode failure keeps its `transport.ErrInvalidShape` wrap.
 
 ### Phase 4 — PROBE-101
 
