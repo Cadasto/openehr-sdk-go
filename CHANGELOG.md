@@ -12,8 +12,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **Definition stored-query extras round-trip (REQ-057).** `StoredQueryMetadata` re-emits deployment extras on encode, matching `TemplateMetadata`, so an unknown catalog key is not dropped on re-marshal.
-- **Definition metadata decoding (REQ-144).** The two catalog timestamps decode against a closed tolerant layout set rather than RFC 3339 only, so one zone-less value no longer fails a whole list; an empty 2xx body yields a non-nil empty slice.
+- **Definition metadata decoding (REQ-144).** The two catalog timestamps decode against a closed tolerant layout set, an empty 2xx list body yields a non-nil empty slice, and the Definition and System descriptors re-emit unknown keys with documented fields winning a name collision.
+- **Nil-receiver tolerance on the error axis (REQ-025).** Typed-nil error values left behind by a failed `errors.As` answer instead of panicking across the transport, auth, discovery, AQL-parse and type-registry error types, and the SDK sites that dereferenced such a match are guarded.
 - **Reserved stored-query name refused client-side (REQ-057).** Store operations return `transport.ErrInvalidConfig` for any case variant of the query-name `aql`, namespaced or not, before the wire; stored-path diagnostics name the operation the caller invoked.
 - **AQL containment evidence under CI (REQ-160, PROBE-100).** The vendored EHRbase FROM-combination corpus runs under `go test` as PROBE-100's admissibility ratchet over the REQ-160 relation — purely additive, no SDK behaviour change.
 - **AQL path-shape and paging lint (REQ-164, PROBE-099).** A third additive `lint` Layer-2 group — five Warning codes for unpredicated repeating segments, unordered row bounds, unaliased projections, path fan-out and provably inert containment steps.
