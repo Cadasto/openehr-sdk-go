@@ -461,6 +461,29 @@ git commit -m "test(canjson): pin DV_MULTIMEDIA inline base64 round-trip; record
 
 ---
 
+### Task 5: Report `Real` mantissa precision loss on decode (Item E — folded from the memory backlog)
+
+**Files:**
+- Modify: `openehr/rm/real.go` (`Real.UnmarshalJSON`)
+- Test: `openehr/rm/real_test.go`
+- Modify: `openehr/serialize/canjson/doc.go` (drop the "open half … still silent" note), `docs/specifications/wire.md` (§ REQ-052 Floating-point precision)
+
+**Interfaces:**
+- Produces: `Real.UnmarshalJSON` returns a typed error when the decimal literal carries more significant digits than `float64` can represent, instead of silently rounding.
+
+**Context:** wire.md § REQ-052 requires a wire value exceeding JSON number precision to be a typed decode error "rather than silently rounding." `canjson/doc.go` records this half as **still open** — overflow (`1e400`) is already typed by the generated wrapper; only mantissa precision loss stays silent. Both `Real.UnmarshalJSON` branches (string `strconv.ParseFloat(s,64)` at `real.go:24`; number `json.Unmarshal(b,&f)` at `real.go:31`) round silently.
+
+- [ ] **Step 1: Failing test.** `Real` decode of `0.12345678901234567890` (20 significant digits) returns an error; `0.5`, `80.5`, and a 17-digit value decode cleanly; `"0.5"` (quoted) too.
+- [ ] **Step 2:** Run → today it rounds, `err == nil` → FAIL.
+- [ ] **Step 3: Implement.** Add `significantDigits(s string) int` (strip sign / exponent / decimal point / leading zeros; ignore trailing zeros). In both branches, if `significantDigits(...) > 17` return a value-free typed error (REQ-093 — names no magnitude): `fmt.Errorf("rm.Real: %w: value carries more precision than float64 can represent", <sentinel>)`.
+- [ ] **Step 4:** Run → PASS. Confirm `DV_QUANTITY` / `DV_PROPORTION` magnitudes (which use `Real`) inherit the check.
+- [ ] **Step 5: Spec.** wire.md § REQ-052 clause is now **met**, not deferred; drop the "open half … still silent" note in `canjson/doc.go`.
+- [ ] **Step 6: Commit** `fix(rm): Real reports mantissa precision loss on decode (REQ-052)`.
+
+**Decision (named):** the trigger is **>17 significant decimal digits** (float64's shortest-round-trip guarantee) — simple and non-over-reporting: it does **not** reject `0.1` (inexact but round-trips). A `big.Float` exactness check would wrongly reject `0.1` and is not the criterion. Second choice: which sentinel to wrap — a fresh `rm`/`canjson` precision sentinel, or **reuse `canjson.ErrInvalidShape` once Plan B (`2026-09-02-decode-error-surface-typing.md`) gives it a producer**. Coordinate with Plan B so the sentinel lands once.
+
+---
+
 ## Verification (whole bundle)
 
 - [ ] `make codegen-verify` — generated tree matches the generator (Task 1 is the only regen).
@@ -477,6 +500,6 @@ git commit -m "test(canjson): pin DV_MULTIMEDIA inline base64 round-trip; record
 
 ## Self-review notes
 
-- **Coverage:** A→Task 1, B→Task 2, C→Task 3, D→Task 4. All four items mapped.
+- **Coverage:** A→Task 1, B→Task 2, C→Task 3, D→Task 4, E (REQ-052 mantissa precision, folded from the backlog)→Task 5. All items mapped.
 - **Type consistency:** `Character` is the string type throughout; tests compare `string(tm.Match)`. Task 3's `switch m.Match` compares against string literals — valid because `Character` is a string kind.
 - **Decision recorded (Task 1):** representation is `type Character string` (zero value `""` is illegal-and-detectable, per proposal point 5); an incomplete `match` errors on encode (wrapped as `canjson.ErrInvalidValue`) rather than emitting legal-looking JSON. A maintainer preferring "emit and let the floor catch it" should flip Step 3's `MarshalJSON` and lean on Task 3 — but that reintroduces a silent-zero encode, which is the defect being closed, so erroring is the recommended path.
