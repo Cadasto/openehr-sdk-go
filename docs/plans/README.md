@@ -39,8 +39,8 @@ representation body stays `transport.ErrInvalidShape`, and the REQ-094 write-res
 from the archived [write-result plan](archive/2026-08-18-write-result-contract.md): a
 `canjson.ErrInvalidValue` encode sentinel under REQ-052, `errors.Is`-distinct from the decode-side
 shape sentinel and from the transport one. **Deferred:** lifting REQ-094's empty-body keyed
-exception for `ehr.Create`, the `auth` / `smart` JSON decodes, and aligning `canxml`'s single
-both-directions sentinel.
+exception for `ehr.Create` (closed — see the `ehr.Create` empty-2xx typing row above), the
+`auth` / `smart` JSON decodes, and aligning `canxml`'s single both-directions sentinel.
 
 The Definition metadata decoding plan **landed 2026-08-30 and was archived**
 ([archive/2026-08-30-definition-metadata-decoding.md](archive/2026-08-30-definition-metadata-decoding.md)):
