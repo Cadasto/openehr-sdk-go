@@ -186,10 +186,22 @@ func (e *shapeError) Error() string {
 	return "canjson: " + e.rmType + ": " + e.cause.Error()
 }
 
-// Unwrap returns both the cause and [ErrInvalidShape], so errors.As
-// reaches the encoding/json error and errors.Is matches the sentinel.
-func (e *shapeError) Unwrap() []error {
-	return []error{e.cause, ErrInvalidShape}
+// Unwrap returns the cause alone, so a single errors.Unwrap step lands
+// on the encoding/json error the generated method actually failed with,
+// and errors.As reaches it as before. The [ErrInvalidShape]
+// classification rides on Is below rather than on a second unwrap
+// branch: a multi-error Unwrap would make errors.Unwrap answer nil for
+// every generated decode failure, which is not what the "the cause
+// stays reachable through unwrapping" clause promises (REQ-052).
+func (e *shapeError) Unwrap() error {
+	return e.cause
+}
+
+// Is reports the sentinel this type carries. It matches [ErrInvalidShape]
+// only — the classification [WrapShapeError] attaches — and leaves every
+// other target to the ordinary unwrap walk down e.cause.
+func (e *shapeError) Is(target error) bool {
+	return target == ErrInvalidShape
 }
 
 // Registry maps each openEHR _type discriminator string (e.g.

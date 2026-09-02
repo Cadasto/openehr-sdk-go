@@ -16,11 +16,13 @@ import (
 //
 // Every failure raised inside a generated RM type's [UnmarshalJSON] —
 // the `canjson: <RM_TYPE>:` family — wraps it, over the encoding/json
-// error, which stays reachable with errors.As. Two decode failures stay
-// outside it on purpose: malformed JSON, which encoding/json reports
-// before any UnmarshalJSON method runs, and a polymorphic-slot failure,
-// which arrives as [DecodeError] — including when it travels out
-// through an enclosing type's `canjson: <RM_TYPE>:` prefix. Match those
+// error, which stays reachable with errors.As — a single errors.Unwrap
+// step lands on it. Two decode failures stay outside the sentinel on
+// purpose: malformed JSON, which encoding/json reports before any
+// UnmarshalJSON method runs, and a [DecodeError], raised either at a
+// polymorphic slot or by a whole-value `_type` naming a different class
+// than the target — including when it travels out through an enclosing
+// type's `canjson: <RM_TYPE>:` prefix. Match those
 // with errors.As for [DecodeError], or errors.Is against
 // [typereg.ErrMissingType] / [typereg.ErrUnknownType] /
 // [typereg.ErrTypeMismatch].

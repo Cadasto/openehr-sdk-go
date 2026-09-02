@@ -134,6 +134,20 @@ func TestErrorStringsValueFreeWhenRouteUnset(t *testing.T) { // REQ-093
 		assertValueFree(t, err.Error())
 	})
 
+	// A DecodeError a caller builds directly — no Client involved — must
+	// render the same placeholder rather than an empty slot mid-sentence.
+	// WireError.Error() already guards this; the two are the same axis.
+	t.Run("caller-constructed errors with an empty Route", func(t *testing.T) {
+		de := &transport.DecodeError{Method: "GET"}
+		if !strings.Contains(de.Error(), unroutedPlaceholder) {
+			t.Errorf("DecodeError{Method: \"GET\"}.Error() = %q, want the %q placeholder in the empty route slot", de.Error(), unroutedPlaceholder)
+		}
+		we := &transport.WireError{Method: "GET", StatusCode: http.StatusNotFound}
+		if !strings.Contains(we.Error(), unroutedPlaceholder) {
+			t.Errorf("WireError{Method: \"GET\"}.Error() = %q, want the %q placeholder in the empty route slot", we.Error(), unroutedPlaceholder)
+		}
+	})
+
 	// Regression guard: a routed request must keep printing the template
 	// exactly as before — the fix targets the unset-Route case only.
 	t.Run("routed request keeps the template", func(t *testing.T) {

@@ -114,9 +114,9 @@ func (r *Request) effectiveRoute() string {
 
 // unroutedRoute is the stable, value-free placeholder substituted for the
 // route template in diagnostic strings when the caller left Request.Route
-// unset. Its exact text is part of the REQ-093 contract, not an
-// implementation detail free to change: a caller may already match against
-// it, so keep it stable.
+// unset. Its exact text is normative — transport.md § REQ-093, the
+// "Unrouted requests render a placeholder" clause — not an implementation
+// detail free to change: a caller may already match against it.
 const unroutedRoute = "(unrouted)"
 
 // routeOrPlaceholder returns Route, or unroutedRoute when Route is unset.

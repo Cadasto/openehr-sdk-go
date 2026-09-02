@@ -11,6 +11,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -213,7 +214,11 @@ var shapeErrorInputs = []struct {
 // assertShapeSentinelDistinct pins the Global-Constraint half of
 // REQ-052 on a decode failure: whatever else it carries, it MUST NOT
 // match the encode-only canjson.ErrInvalidValue nor the transport-level
-// transport.ErrInvalidShape — three distinct sentinel values.
+// transport.ErrInvalidShape — three distinct sentinel values. The
+// same-named canxml.ErrInvalidShape is checked beside them: it is a
+// fourth, unrelated value (the XML codec's own, used in both
+// directions), and only a test keeps two same-named sentinels from
+// being quietly conflated.
 func assertShapeSentinelDistinct(t *testing.T, err error) {
 	t.Helper()
 	if errors.Is(err, canjson.ErrInvalidValue) {
@@ -221,6 +226,9 @@ func assertShapeSentinelDistinct(t *testing.T, err error) {
 	}
 	if errors.Is(err, transport.ErrInvalidShape) {
 		t.Errorf("decode failure must not match transport.ErrInvalidShape; got %v", err)
+	}
+	if errors.Is(err, canxml.ErrInvalidShape) {
+		t.Errorf("a JSON decode failure must not match the XML codec's canxml.ErrInvalidShape; got %v", err)
 	}
 }
 
@@ -309,6 +317,37 @@ func TestUnmarshalNestedDecodeErrorIsNotShapeTagged(t *testing.T) {
 	}
 	if errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; a nested polymorphic failure must not be re-classified as a JSON shape error", err)
+	}
+	assertShapeSentinelDistinct(t, err)
+}
+
+// TestUnmarshalWholeValueTypeMismatchIsNotShapeTagged draws the
+// sentinel's other exclusion boundary (REQ-052). A generated
+// UnmarshalJSON refuses a `_type` that names a different class than the
+// target with a *DecodeError on "/_type" — the same exclusion the
+// polymorphic-slot case gets, raised on the whole value rather than at
+// a slot. It must not acquire ErrInvalidShape either: the bytes are a
+// perfectly well-shaped DV_TEXT, they are simply not the requested
+// class.
+func TestUnmarshalWholeValueTypeMismatchIsNotShapeTagged(t *testing.T) {
+	const in = `{"_type":"DV_TEXT","value":"hello"}`
+	var q rm.DVQuantity
+	err := canjson.Unmarshal([]byte(in), &q)
+	if err == nil {
+		t.Fatal("Unmarshal(DV_TEXT into rm.DVQuantity) = nil; want a _type mismatch error")
+	}
+	de, ok := errors.AsType[*canjson.DecodeError](err)
+	if !ok {
+		t.Fatalf("err = %v (%T); want errors.As to reach *canjson.DecodeError", err, err)
+	}
+	if de.Path != "/_type" {
+		t.Errorf("DecodeError.Path = %q; want %q — this test covers the whole-value arm, not a slot", de.Path, "/_type")
+	}
+	if !errors.Is(err, typereg.ErrTypeMismatch) {
+		t.Errorf("err = %v; want errors.Is(_, typereg.ErrTypeMismatch)", err)
+	}
+	if errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; a whole-value _type mismatch is a DecodeError, not a JSON shape error", err)
 	}
 	assertShapeSentinelDistinct(t, err)
 }

@@ -209,7 +209,12 @@ func (e *DecodeError) Error() string {
 	if e == nil {
 		return "transport: decode: response body does not match the requested type"
 	}
-	return fmt.Sprintf("transport: decode %s %s: response body does not match the requested type", e.Method, e.Route)
+	// The unroutedRoute fallback matches WireError.Error(): Decode always
+	// sets Route (to the template, or to the placeholder when the caller
+	// left Request.Route unset), so this is for a DecodeError a caller
+	// constructs directly — an empty Route would otherwise render an empty
+	// slot in the middle of the sentence.
+	return fmt.Sprintf("transport: decode %s %s: response body does not match the requested type", e.Method, cmp.Or(e.Route, unroutedRoute))
 }
 
 // Unwrap exposes the decoder's error, so errors.Is and errors.AsType still

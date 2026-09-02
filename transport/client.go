@@ -305,6 +305,14 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 
 	httpResp, err := c.cfg.httpClient.Do(httpReq)
 	if err != nil {
+		// REQ-093 residual: this arm's own text is value-free, but a
+		// network failure from net/http arrives as *url.Error, whose
+		// Error() prints the resolved URL it was dialling — so the
+		// wrapped cause still carries whatever identifier the caller put
+		// in Path. Sanitising it means rewriting the wrapped error, which
+		// costs the caller the typed *url.Error; that trade is a
+		// follow-up, not this change. The other two doOnce diagnostics
+		// wrap body-read errors, which carry no request URL of their own.
 		return nil, fmt.Errorf("transport: %s %s: %w", req.effectiveMethod(), req.routeOrPlaceholder(), err)
 	}
 	defer func() { _ = httpResp.Body.Close() }()

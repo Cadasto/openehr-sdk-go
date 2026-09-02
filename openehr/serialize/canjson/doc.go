@@ -81,10 +81,11 @@
 //     prefix, so the encoding/json error stays reachable with
 //     errors.As but is not returned verbatim. This is the one that
 //     wraps [ErrInvalidShape].
-//   - A failure at a polymorphic slot arrives as [DecodeError]
-//     carrying the path — whether its cause is a typereg sentinel
-//     (missing, unknown or mismatched `_type`) or a plain
-//     encoding/json error at that slot. It keeps that classification
+//   - A `_type` failure arrives as [DecodeError] carrying the path —
+//     at a polymorphic slot, or on `/_type` where the whole value's
+//     `_type` names a different class than the target — whether its
+//     cause is a typereg sentinel (missing, unknown or mismatched
+//     `_type`) or a plain encoding/json error. It keeps that classification
 //     even when it travels out through an enclosing type's
 //     `canjson: <RM_TYPE>:` prefix, so a nested polymorphic failure
 //     never turns into a shape error.

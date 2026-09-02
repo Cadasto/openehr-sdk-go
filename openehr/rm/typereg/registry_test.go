@@ -220,6 +220,15 @@ func TestWrapShapeErrorKeepsTextAndAddsSentinel(t *testing.T) {
 	if !errors.Is(err, cause) {
 		t.Errorf("err = %v; the classification must not cost the cause", err)
 	}
+	// Single-step unwrapping must land on the cause, not on nil: a
+	// multi-error Unwrap would satisfy errors.Is/As but break every
+	// caller that walks the chain one hop at a time. The comparison is
+	// identity on purpose — errors.Is would also pass if Unwrap returned
+	// some other wrapper around the cause, which is the failure this
+	// assertion exists to catch.
+	if got := errors.Unwrap(err); got != cause { //nolint:errorlint // identity by design — see above
+		t.Errorf("errors.Unwrap(err) = %v; want the cause %v — one unwrap step must reach it", got, cause)
+	}
 }
 
 // TestWrapShapeErrorLeavesDecodeErrorUnclassified pins the boundary: a
