@@ -17,6 +17,7 @@
 // decode-failure arm stays a [*transport.DecodeError] per REQ-151.
 //
 // Implements REQ-023, REQ-050, REQ-054, REQ-059 (ItemTags in
-// itemtags/), and the REQ-094 write-result contract per
-// docs/specifications/wire.md and docs/specifications/transport.md.
+// itemtags/), the REQ-094 write-result contract, and REQ-151's
+// decode-failure arm for [Create], per docs/specifications/wire.md and
+// docs/specifications/transport.md.
 package ehr

@@ -6,7 +6,7 @@
 - **Strand:** none — direct decision (this plan's Phase 0); no prior open research strand.
 - **Introduces:** [REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) (the typed 2xx decode failure and its `Body` field). **Amends:** —
 - **Plan:** [2026-08-30-read-path-decode-taxonomy.md](../plans/archive/2026-08-30-read-path-decode-taxonomy.md).
-- **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (the "no strict-mode knob in v1" posture this decision follows); [REQ-093](../specifications/transport.md#req-093--openehr-error-envelope-mapping) (the PHI-safe error-surface discipline, the `WithRawErrorBodies` opt-in this decision deliberately does *not* extend, and the `WithMaxResponseBody` cap it relies on); [REQ-052](../specifications/wire.md#req-052) (the encode-only refusal sentinel — a rider delivered by the same plan, whose decision of record is the plan and § REQ-052 itself, not this ADR); [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (cross-reference only — the write-result contract keeps every arm it owns, including the `ehr.Create` empty-body keyed exception — closed 2026-09-02 by [docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md](../plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md)).
+- **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (the "no strict-mode knob in v1" posture this decision follows); [REQ-093](../specifications/transport.md#req-093--openehr-error-envelope-mapping) (the PHI-safe error-surface discipline, the `WithRawErrorBodies` opt-in this decision deliberately does *not* extend, and the `WithMaxResponseBody` cap it relies on); [REQ-052](../specifications/wire.md#req-052) (the encode-only refusal sentinel — a rider delivered by the same plan, whose decision of record is the plan and § REQ-052 itself, not this ADR); [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (cross-reference only — REQ-094 owns `ehr.Create`'s empty/null-body arm, a typed `NoRepresentationError` since 2026-09-02 ([plan](../plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md)), while this ADR's primitive types only the decode-failure arm; at the time of this ADR that empty-body arm was still REQ-094's keyed exception).
 
 ## Context
 
@@ -99,9 +99,10 @@ is no opt-in knob, and `WithRawErrorBodies` does not gate it.**
   direction the evidence supports.
 - **`transport.DecodeError` becomes the taxonomy's shared primitive.** With it in place,
   REQ-094's deferred `ehr.Create` decode-failure arm is typed by REQ-151 without routing EHR
-  creation through the write-result contract; the empty-body keyed exception in REQ-094 was, at
-  the time of this ADR, untouched and a separate, still-deferred amendment — closed 2026-09-02 by
-  [docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md](../plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md).
+  creation through the write-result contract. `ehr.Create`'s empty/null-body arm stays REQ-094's
+  own, and since 2026-09-02 it is a typed `NoRepresentationError`
+  ([plan](../plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md)); at the time of this ADR it
+  was still the keyed exception — a separate amendment this ADR deliberately did not make.
 
 ## Alternatives considered
 

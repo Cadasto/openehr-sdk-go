@@ -2307,7 +2307,9 @@ requirements:
     packages: [transport, openehr/client/definition, openehr/client/system, openehr/client/demographic, openehr/client/ehr, openehr/client/ehr/composition, testkit/probes/transport]
     probes: [PROBE-101]
     adrs: [docs/adr/0018-raw-bytes-on-decode-error.md]
-    plans: [docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
+    plans:
+      - docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md
+      - docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md  # ehr.Create's hand-rolled DecodeError arm
     tests:
       - transport/decode_error_test.go
       - openehr/client/definition/decode_error_test.go
