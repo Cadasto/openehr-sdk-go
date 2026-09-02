@@ -9,6 +9,7 @@
 **Probes:** none new (unit-covered).
 **Implementation:** landed
 **Depends on:** landed `*transport.DecodeError` (REQ-151), `transport.Request.effectiveRoute()`.
+**Follow-up closed (2026-09-02, same PR):** Task 2 left one residual — `doOnce`'s network-failure arm wraps net/http's `*url.Error`, whose own text prints the resolved URL. The review wave on this PR closed it: `transport.sanitiseURLError` substitutes the route slot (template or `(unrouted)`) into a shallow copy of the `*url.Error`, so the typed error, its `Op` and its cause survive; pinned by `TestNetworkFailureSanitisesWrappedURL`, and the telemetry carve-out by `TestUnroutedObservationKeepsTheResolvedPath`. REQ-093's placeholder clause in [transport.md](../../specifications/transport.md#req-093--openehr-error-envelope-mapping) now states the obligation.
 **Defers:** the `StoredQueryMetadata` / `TemplateMetadata` Extras re-encode item once considered for this plan — **verified already fixed** (`stored_query.go:78-90` has `MarshalJSON` with delete-then-overlay collision handling, PR #140); nothing to do.
 
 **Goal:** Close two error-surface loose ends from the REQ-151/#140 review rounds: give the decode-only sentinel `canjson.ErrInvalidShape` a producer (or retire it), and stop `transport`'s error strings from printing a real request path — with identifiers like a live `ehr_id` — when a route template is unset.

@@ -12,8 +12,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **Canonical-JSON decode shape sentinel (REQ-052).** Every generated RM/AOM `UnmarshalJSON` now classifies a JSON-shape failure with `canjson.ErrInvalidShape`, so `errors.Is` finally matches; the message and the unwrapped cause are unchanged. [plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md).
-- **Value-free diagnostics for unrouted requests (REQ-093).** A request with no route template renders the placeholder `(unrouted)` rather than its resolved path or URL — `WireError.Error()` now shows `(GET (unrouted))`. [plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md).
+- **Canonical-JSON decode shape sentinel (REQ-052).** Every generated RM/AOM `UnmarshalJSON` now classifies a JSON-shape failure with `canjson.ErrInvalidShape` so `errors.Is` matches, with message and unwrapped cause unchanged ([plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md)).
+- **Value-free diagnostics for unrouted requests (REQ-093).** Transport error strings render the placeholder `(unrouted)` instead of a resolved path or URL when a request carries no route template, including the URL a wrapped `*url.Error` reports ([plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md)).
 
 ## [0.24.0] - 2026-08-30
 

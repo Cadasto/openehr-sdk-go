@@ -155,12 +155,17 @@ requirements:
       typereg.WrapShapeError, called from the one funnel the generator
       emits (internal/bmmgen/render_jsonunmar.go), which is also why the
       sentinel value lives in openehr/rm/typereg: generated code under
-      openehr/rm cannot import openehr/serialize. A nested DecodeError
-      passing through that funnel deliberately keeps only its own
-      classification. TestUnmarshalWrapsErrInvalidShape, its
-      Decoder.Decode twin, TestUnmarshalNestedDecodeErrorIsNotShapeTagged,
-      TestUnmarshalWholeValueTypeMismatchIsNotShapeTagged and the typereg
-      WrapShapeError tests pin all of it, distinctness from
+      openehr/rm cannot import openehr/serialize. The exclusion is the
+      polymorphic dispatch failure alone: that funnel never adds the
+      sentinel to a DecodeError travelling out through it, and a
+      DecodeError never strips one raised beneath it — a shape failure
+      inside the concrete type selected at a slot is both, the path from
+      the DecodeError and the kind from the sentinel.
+      TestUnmarshalWrapsErrInvalidShape, its Decoder.Decode twin,
+      TestUnmarshalNestedDecodeErrorIsNotShapeTagged,
+      TestUnmarshalWholeValueTypeMismatchIsNotShapeTagged,
+      TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications and
+      the typereg WrapShapeError tests pin all of it, distinctness from
       canxml.ErrInvalidShape and transport.ErrInvalidShape included
       (assertShapeSentinelDistinct asserts both).
       What keeps the REQ partial is one arm of § Floating-point
@@ -446,10 +451,14 @@ requirements:
       ErrUnprocessable (422) came from the ITS-REST conformance
       remediation; the "(unrouted)" placeholder clause came from the
       decode-error-surface plan, pinned by
-      TestErrorStringsValueFreeWhenRouteUnset. Residual, not covered:
-      doOnce's network-failure arm (transport/client.go) wraps
-      *url.Error, whose own text prints the resolved URL — sanitising it
-      costs the caller the typed error, so it is a follow-up.
+      TestErrorStringsValueFreeWhenRouteUnset. The placeholder now also
+      replaces the resolved URL a wrapped net/http *url.Error prints
+      from doOnce's network-failure arm — sanitiseURLError copies the
+      error rather than rewriting it, so the typed *url.Error, its Op
+      and its cause all survive; pinned by
+      TestNetworkFailureSanitisesWrappedURL. The telemetry carve-out
+      (Observation.Route keeps its Path fallback) is pinned by
+      TestUnroutedObservationKeepsTheResolvedPath.
     tests:
       - transport/client_test.go
       - transport/errors_test.go
