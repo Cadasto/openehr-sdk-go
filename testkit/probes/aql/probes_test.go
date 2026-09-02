@@ -1646,9 +1646,10 @@ func TestProbe099GuardsCanFail(t *testing.T) {
 			// EHR_STATUS -> OBSERVATION bypass route, so the redundant step the
 			// overlay excused stands again and the row stops being silent —
 			// which is exactly what a regression that quietly fell back to the
-			// default relation would do to it. Deleting the row is covered by
-			// the per-code and named-negative guards above; this covers
-			// NEUTRALISING it, which those cannot see.
+			// default relation would do to it. This control pins NEUTRALISING
+			// the row (Relation = nil). Deleting it is not a Probe099
+			// completeness guard: ForCode is already satisfied by sibling
+			// silence rows, and the row has no named PathShapeNegative.
 			name: "the discriminating silence row loses its supplied relation",
 			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
 				pathShapeSilentRow(t, c.Silent, probe099DiscriminatingRelationRow).Relation = nil

@@ -1,10 +1,10 @@
 package definition_test
 
 // version_trim_test.go — REQ-057 § Path-parameter normalisation, Definition
-// side. DeleteStoredQuery trims `name` and `version` once each and reuses the
-// trimmed values for both the empty-check and the wire path, so a version with
-// surrounding whitespace reaches the server trimmed and one that is empty after
-// trimming is refused before any request is issued.
+// side. DeleteStoredQuery and GetStoredQuery trim `name` and `version` once
+// each and reuse the trimmed values for both the empty-check and the wire
+// path, so a version with surrounding whitespace reaches the server trimmed
+// and one that is empty after trimming is refused before any request.
 
 import (
 	"errors"
@@ -60,6 +60,39 @@ func TestDeleteStoredQueryRefusesEmptyVersion(t *testing.T) {
 			}
 			if !errors.Is(err, transport.ErrInvalidConfig) {
 				t.Errorf("DeleteStoredQuery(version=%q) err = %v, want errors.Is(err, transport.ErrInvalidConfig)", tt.version, err)
+			}
+			if hits != 0 {
+				t.Errorf("server hits = %d, want 0 — the refusal MUST precede any request", hits)
+			}
+		})
+	}
+}
+
+// TestGetStoredQueryRefusesEmptyVersion is the Get half of the same
+// Definition-side refusal (REQ-057 § Path-parameter normalisation).
+func TestGetStoredQueryRefusesEmptyVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+	}{
+		{"whitespace only", "   "},
+		{"empty", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hits := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				hits++
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer srv.Close()
+
+			_, _, err := definition.GetStoredQuery(t.Context(), newClient(t, srv), "org.example.q", tt.version)
+			if err == nil {
+				t.Fatalf("GetStoredQuery(version=%q) err = nil, want a refusal", tt.version)
+			}
+			if !errors.Is(err, transport.ErrInvalidConfig) {
+				t.Errorf("GetStoredQuery(version=%q) err = %v, want errors.Is(err, transport.ErrInvalidConfig)", tt.version, err)
 			}
 			if hits != 0 {
 				t.Errorf("server hits = %d, want 0 — the refusal MUST precede any request", hits)
