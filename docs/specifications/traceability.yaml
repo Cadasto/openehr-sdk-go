@@ -47,8 +47,19 @@ requirements:
     implementation: landed
     packages: [openehr/rm]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
+    plans:
+      - docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md
     tests:
       - openehr/serialize/canjson/edgecases_test.go
+      - openehr/rm/character_test.go
+    notes: >-
+      landed (2026-09-03): Character, the RM's one primitive whose
+      canonical spelling (a one-character string) disagrees with a
+      numeric Go rune, is now a hand-written named type
+      (openehr/rm/character.go) carrying its own MarshalJSON /
+      UnmarshalJSON, exactly like Integer / Real, and the BMM primitive
+      map points at it. TERM_MAPPING.match is the only Character in the
+      RM.
 
   - id: REQ-048
     title: RM meta-model introspection
@@ -123,7 +134,7 @@ requirements:
     status: draft
     implementation: partial
     packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
@@ -137,6 +148,10 @@ requirements:
       - openehr/internal/jsonpoly/jsonpoly_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
+      - openehr/rm/character_test.go
+      - openehr/rm/real_test.go
+      - openehr/serialize/canjson/mappings_presence_test.go
+      - openehr/serialize/canjson/multimedia_bytes_test.go
     notes: >-
       partial (2026-09-02): the encode-side refusal sentinel clause
       requires canjson.Marshal / MarshalIndent to wrap the encode-only
@@ -168,20 +183,37 @@ requirements:
       the typereg WrapShapeError tests pin all of it, distinctness from
       canxml.ErrInvalidShape and transport.ErrInvalidShape included
       (assertShapeSentinelDistinct asserts both).
-      What keeps the REQ partial is one arm of § Floating-point
-      precision. Its MUST — report a wire value exceeding JSON's number
-      precision as a typed error "rather than silently rounding" — is
-      MET for OUT-OF-RANGE values: 1e400 fails with a typed
+      § Floating-point precision is now MET on both its arms (2026-09-03,
+      docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md): the
+      OUT-OF-RANGE arm as before (1e400 fails with a typed
       *json.UnmarshalTypeError, reachable by errors.As through the
-      generated UnmarshalJSON wrapper
-      (TestUnmarshalOverflowIsATypedError). It is OPEN for MANTISSA
-      precision loss, which is still silent: 0.1234567890123456789
-      decodes to 0.12345678901234568 with a nil error, pinned as
-      today's behaviour by TestUnmarshalMantissaPrecisionLossIsSilent —
-      the producer that closes the gap must invert that test. Tracked by
-      docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md
-      (Defers list); the sentinel alone does not discharge it, since the
-      § asks for an error where today there is none.
+      generated UnmarshalJSON wrapper — TestUnmarshalOverflowIsATypedError),
+      and the MANTISSA arm, previously open, is now closed —
+      rm.significantDigits (openehr/rm/real.go) counts a decimal
+      literal's significant digits (mantissa only: sign, decimal point
+      and exponent excluded, leading/trailing zeros ignored) and
+      Real.UnmarshalJSON fails wrapping canjson.ErrInvalidShape past 17
+      of them (float64's shortest-round-trip guarantee) instead of
+      rounding — 0.1234567890123456789 (19 significant digits) now
+      fails where it used to decode silently to 0.12345678901234568,
+      while a merely inexact-but-round-tripping value such as 0.1
+      still decodes cleanly. The retired
+      TestUnmarshalMantissaPrecisionLossIsSilent (which pinned the old
+      silent behaviour) is replaced by
+      TestUnmarshalMantissaPrecisionLossIsATypedError and a
+      DV_PROPORTION inheritance twin; TestSignificantDigits and
+      TestRealUnmarshalJSON{CleanCases,PrecisionLoss} in
+      openehr/rm/real_test.go pin the trigger directly. No
+      *typereg.DecodeError names a "/magnitude" path in the resulting
+      chain — only polymorphic slots and whole-value _type mismatches
+      attach one today — so classification rests on errors.Is alone.
+      REQ-052 stays partial regardless: § Floating-point precision's
+      other clause — "Field order SHOULD follow the openEHR
+      canonical-JSON specification when one is published" — remains
+      open pending that external publication; the SDK's own
+      deterministic field-order profile is what MUST govern until then,
+      and that MUST is met, but the SHOULD itself has no canonical spec
+      to defer to yet.
 
   - id: REQ-056
     title: Canonical XML
@@ -1235,6 +1267,15 @@ requirements:
       - openehr/validation/rmfloor_bytes_test.go
     plans:
       - docs/plans/archive/2026-06-29-rm-floor-validation.md
+      - docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md
+    notes: >-
+      landed (2026-09-03): the floor gained two TERM_MAPPING /
+      DV_TEXT.mappings invariants — match outside {'>','=','<','?'} and
+      a present-but-empty mappings (Mappings_valid) — raised from
+      ValidateRM and its typed sugars. ValidateComposition
+      (template-driven) has never routed through the RM floor and is
+      not a producer of these issues; the plan's own Interfaces line
+      first said otherwise and was corrected in its Status header.
 
   - id: REQ-113
     title: Execution-oriented parsed AQL AST

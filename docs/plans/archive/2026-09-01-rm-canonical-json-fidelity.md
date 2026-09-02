@@ -3,11 +3,11 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Date:** 2026-09-01
-**Status:** Draft
+**Status:** Done (2026-09-03) — all five tasks landed: `TERM_MAPPING.match` is a canonical single-character `Character` primitive, `DV_TEXT.mappings`'s decode collapse is documented and pinned, the RM floor enforces `match`'s value set and `Mappings_valid`, `DV_MULTIMEDIA`'s inline-byte round-trip is pinned, and `Real` now reports mantissa precision loss on decode. **Correction:** Task 3's Interfaces line named `ValidateRM` / `ValidateComposition` as the issue producers; `ValidateComposition` (template-driven) has never routed through the RM floor, so it is `ValidateRM` and its typed sugars alone — corrected below. **Correction:** Task 5's controller decision expected a `*typereg.DecodeError` naming a `/magnitude` path in the DV_QUANTITY inheritance chain; verified against the generated `DVQuantity.UnmarshalJSON` and a minimal `encoding/json` probe that no per-field path wrapping exists for a scalar `Real` field (only polymorphic slots and whole-value `_type` mismatches attach one) — the landed test asserts `errors.Is(err, canjson.ErrInvalidShape)` only, recorded in the Task 5 report rather than asserted falsely.
 **Owner:** SDK maintainers
-**Covers:** [REQ-046](../specifications/bmm-conformance.md#req-046--primitive-type-mapping) (primitive type mapping), [REQ-052](../specifications/wire.md#req-052) (canonical JSON round-trip), [REQ-112](../specifications/clinical-modeling.md#req-112--composition-validation) (template-less RM floor). No new REQ id — every delta amends a shipped REQ in place (implementation-aligned; the normative table edit rides in the same PR).
+**Covers:** [REQ-046](../../specifications/bmm-conformance.md#req-046--primitive-type-mapping) (primitive type mapping), [REQ-052](../../specifications/wire.md#req-052) (canonical JSON round-trip), [REQ-112](../../specifications/clinical-modeling.md#req-112--composition-validation) (template-less RM floor). No new REQ id — every delta amends a shipped REQ in place (implementation-aligned; the normative table edit rides in the same PR).
 **Probes:** PROBE-030 (canonical-JSON round-trip corpus, extended); PROBE-081 pattern reused for presence (no new probe minted).
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** landed named-primitive precedent (`openehr/rm/integer.go`, `openehr/rm/real.go`); the template-less RM floor `openehr/validation/rmfloor.go` + `rmfloor_bytes.go` (REQ-112); the generator `internal/bmmgen`. All shipped; no new prerequisites.
 **Defers:** a general per-node decode-time presence map for `mappings` at arbitrary depth (Phase 2 delivers the boundary case + the documented model limitation, not a whole-tree presence API); any change to `omitempty` on `mappings` or `data`; terminology validation of `TERM_MAPPING.target`; the consuming CDR project's own skip-on-decode-failure policy (theirs to re-examine).
 
@@ -18,9 +18,9 @@
 **Tech Stack:** Go (`encoding/json` custom marshalers), `internal/bmmgen` code generator, `openehr/serialize/canjson`, `openehr/validation`.
 
 **Spec:** canonical homes updated by this plan —
-[bmm-conformance.md § Primitive type mapping](../specifications/bmm-conformance.md#primitive-type-mapping) (REQ-046),
-[wire.md § REQ-052](../specifications/wire.md#req-052) (canonical JSON),
-[clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--composition-validation) (RM floor).
+[bmm-conformance.md § Primitive type mapping](../../specifications/bmm-conformance.md#primitive-type-mapping) (REQ-046),
+[wire.md § REQ-052](../../specifications/wire.md#req-052) (canonical JSON),
+[clinical-modeling.md § REQ-112](../../specifications/clinical-modeling.md#req-112--composition-validation) (RM floor).
 
 ## Global Constraints
 
@@ -41,23 +41,23 @@
 ## Definition of Done
 
 - Code and tests land with `// REQ-046` / `// REQ-052` / `// REQ-112` citations.
-- [`traceability.yaml`](../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the change (REQ-052 gains these clauses; it **remains `partial`** — its FLAT/STRUCTURED and other open clauses are untouched).
-- The two indexes `spec-check` cannot see are updated: a [`roadmap.md`](../roadmap.md) row for what landed; no numbering band moved (no new id).
+- [`traceability.yaml`](../../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the change (REQ-052 gains these clauses; it **remains `partial`** — its FLAT/STRUCTURED and other open clauses are untouched).
+- The two indexes `spec-check` cannot see are updated: a [`roadmap.md`](../../roadmap.md) row for what landed; no numbering band moved (no new id).
 - Canonical spec prose updated in the **same PR** (the `Character` row in the primitive table; the REQ-052 `match` round-trip clause; the REQ-112 invariant clause).
 - `make codegen-verify`, `make spec-check`, and `make ci` pass.
-- Plan archived under [`docs/plans/archive/`](archive/) in the implementing PR (`sdd-archive`).
+- Plan archived under `docs/plans/archive/` in the implementing PR (`sdd-archive`).
 
 ## Implementation checklist
 
 | Step | Status |
 |---|---|
-| Spec / registry updated (`bmm-conformance.md` table, `wire.md` REQ-052 clause, `clinical-modeling.md` REQ-112 clause, `traceability.yaml`, REQ.md row) | |
-| Indexes `spec-check` misses (`roadmap.md` row) | |
-| Code (Phases 1–4) | |
-| Tests with `// REQ-` comments | |
-| `make codegen-verify` | |
-| `make spec-check` | |
-| `make ci` | |
+| Spec / registry updated (`bmm-conformance.md` table, `wire.md` REQ-052 clause, `clinical-modeling.md` REQ-112 clause, `traceability.yaml`, REQ.md row) | Done |
+| Indexes `spec-check` misses (`roadmap.md` row) | Done |
+| Code (Phases 1–4, plus Task 5's `Real` precision check) | Done |
+| Tests with `// REQ-` comments | Done |
+| `make codegen-verify` | Passed |
+| `make spec-check` | Passed |
+| `make ci` | Passed (`go build`, `go vet`, `golangci-lint run`, `go test ./... -count=1`) |
 
 ---
 
@@ -89,7 +89,7 @@
 **Interfaces:**
 - Produces: `type Character string` with `func (Character) MarshalJSON() ([]byte, error)` and `func (*Character) UnmarshalJSON([]byte) error`. After regen, `rm.TermMapping.Match` has type `Character` (was `rune`).
 
-- [ ] **Step 1: Write the failing test** (`openehr/rm/character_test.go`)
+- [x] **Step 1: Write the failing test** (`openehr/rm/character_test.go`)
 
 ```go
 package rm_test
@@ -137,12 +137,14 @@ func contains(b []byte, sub string) bool { return len(b) >= len(sub) && (string(
 func indexOf(s, sub string) int { for i := 0; i+len(sub) <= len(s); i++ { if s[i:i+len(sub)] == sub { return i } }; return -1 }
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 Run: `go test ./openehr/rm/ -run TestTermMappingMatch -v`
 Expected: FAIL — today `tm.Match` is a `rune`, so the decode errors with *"cannot unmarshal string into Go struct field … of type int32"*.
 
-- [ ] **Step 3: Write `openehr/rm/character.go`**
+- [x] **Step 3: Write `openehr/rm/character.go`**
+
+Landed shape tightened the number arm beyond the sample below during the review-round fixes (`c19bfba`): a JSON `null` is a no-op leaving the receiver unchanged (the `encoding/json` Unmarshaler convention), and a legacy numeric code point of `0` or one failing `utf8.ValidRune` is refused rather than silently mapped to `U+0000` / `U+FFFD`.
 
 ```go
 package rm
@@ -199,24 +201,24 @@ func (c Character) MarshalJSON() ([]byte, error) {
 }
 ```
 
-- [ ] **Step 4: Point the generator at it** — `internal/bmmgen/primitives.go:20`
+- [x] **Step 4: Point the generator at it** — `internal/bmmgen/primitives.go:20`
 
 ```go
 	"Character": "Character", // was "rune": canonical JSON is a single-char string — REQ-046
 ```
 
-- [ ] **Step 5: Regenerate and verify no unintended drift**
+- [x] **Step 5: Regenerate and verify no unintended drift**
 
 Run: `make codegen && make codegen-verify`
 Expected: the only functional change is `TERM_MAPPING`'s field, now `Match Character \`json:"match"\`` in `data_types_text_gen.go` and both marshaller aux structs. `codegen-verify` passes (generated tree matches the generator).
 
-- [ ] **Step 6: Run the Task-1 tests — expect PASS**
+- [x] **Step 6: Run the Task-1 tests — expect PASS**
 
 Run: `go test ./openehr/rm/ -run TestTermMappingMatch -v`
 Expected: PASS. The generated `TermMapping` marshaller aux struct now carries `Character`, so `encoding/json` calls its custom methods (the same mechanism that already works for `Integer` fields, e.g. `DVQuantity` — no generator change needed).
 Note: the generated `TermMapping` unmarshaller already wraps a child field error as `typereg.DecodeError{Path: "/match", Inner: err}`, so the attribute is named by the wrapper (REQ-052 point 3) — the custom error only has to be descriptive.
 
-- [ ] **Step 7: Update the normative spec (same PR)**
+- [x] **Step 7: Update the normative spec (same PR)**
 
 In `docs/specifications/bmm-conformance.md`, change the primitive-mapping table row from `| \`Character\` | \`rune\` | |` to:
 
@@ -228,7 +230,9 @@ Add one sentence under REQ-046 recording *why* this row is not a bare builtin: `
 
 In `docs/specifications/wire.md` § REQ-052, add a bullet: `TERM_MAPPING.match` **MUST** encode as a one-character JSON string and **MUST** decode from one; a string that is empty or longer than one character **MUST** be a decode error; a bare number **MAY** decode (back-compat) but **MUST NOT** be the encoded form.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
+
+Landed at `d4b9e0f`, with review-round fixes at `c19bfba` and `9b77b93`.
 
 ```bash
 git add openehr/rm/character.go openehr/rm/character_test.go internal/bmmgen/primitives.go \
@@ -253,7 +257,7 @@ git commit -m "fix(rm): TERM_MAPPING.match is a canonical single-character strin
 
 **Scope note (honest):** `[]TermMapping` with `omitempty` cannot carry the `[]` / `null` / absent distinction after decode, and the proposal explicitly does **not** want `omitempty` changed. The general fix (a decode-time presence map for every `mappings` at any depth) is larger than this bundle and is **deferred** (see Defers). Task 2 delivers (a) a test that *documents* the collapse so it cannot regress silently, and (b) the byte-level presence signal at the RM-floor boundary the consumer actually crosses, mirroring the REQ-112 precedent.
 
-- [ ] **Step 1: Write the documentation test** (`openehr/serialize/canjson/mappings_presence_test.go`)
+- [x] **Step 1: Write the documentation test** (`openehr/serialize/canjson/mappings_presence_test.go`)
 
 ```go
 package canjson_test
@@ -289,20 +293,22 @@ func TestDVTextMappingsCollapse(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it — expect PASS** (it pins today's behaviour)
+- [x] **Step 2: Run it — expect PASS** (it pins today's behaviour)
 
 Run: `go test ./openehr/serialize/canjson/ -run TestDVTextMappingsCollapse -v`
 Expected: PASS. If it ever fails, the codec changed and the wire.md note must be revisited.
 
-- [ ] **Step 3: Record the limitation in the spec** — `docs/specifications/wire.md` § REQ-052
+- [x] **Step 3: Record the limitation in the spec** — `docs/specifications/wire.md` § REQ-052
 
 Add a note: the canonical decoder cannot distinguish `"mappings": []`, `"mappings": null`, and an absent `mappings` (all yield an empty list; `omitempty` re-drops the key). A caller needing the distinction reads JSON-key presence at the decode boundary, the shape REQ-112 uses for `EHR_STATUS.subject` (`ValidateRMEHRStatusBytes`). `omitempty` is intentionally unchanged: emitting `[]` would be RM-invalid (`Mappings_valid`), emitting `null` a spelling nothing needs.
 
-- [ ] **Step 4: (Optional, if a consumer boundary needs it now) presence helper**
+- [x] **Step 4: (Optional, if a consumer boundary needs it now) presence helper**
 
 If the consuming floor decodes composition bytes and must flag a present-but-empty `mappings`, add a byte-level read mirroring `openehr/validation/rmfloor_bytes.go:44` (`ValidateRMEHRStatusBytes`) — a targeted key-presence check, not a whole-tree map. Otherwise leave this as the recorded follow-up in Defers.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
+
+Landed at `96b0cdd`.
 
 ```bash
 git add openehr/serialize/canjson/mappings_presence_test.go docs/specifications/wire.md
@@ -320,9 +326,9 @@ git commit -m "docs(wire): record DV_TEXT.mappings decode collapse; pin it in ca
 
 **Interfaces:**
 - Consumes: `rm.TermMapping.Match` (a `Character` after Task 1) and `rm.DVText.Mappings`. Reuses the existing `rmFloorWalker.emit(Issue)` and `Issue`/`Result` types (`openehr/validation/issue.go`).
-- Produces: two new Error-severity issues from `ValidateRM` / `ValidateComposition` when a term mapping is malformed.
+- Produces: two new Error-severity issues from `ValidateRM` and its typed sugars when a term mapping is malformed. **Correction:** `ValidateComposition` (template-driven) has never routed through the RM floor, so it is not a producer here — see the header Status line.
 
-- [ ] **Step 1: Write the failing tests** (`openehr/validation/rmfloor_test.go`)
+- [x] **Step 1: Write the failing tests** (`openehr/validation/rmfloor_test.go`)
 
 ```go
 // REQ-112: the RM floor enforces the TERM_MAPPING.match value set and Mappings_valid.
@@ -348,12 +354,12 @@ func TestRMFloorMappingsNotEmptyIfPresent(t *testing.T) {
 
 (Adjust `res.OK()` to the real `Result` accessor — confirm against `openehr/validation/issue.go`.)
 
-- [ ] **Step 2: Run — expect FAIL** (`no such issue emitted`)
+- [x] **Step 2: Run — expect FAIL** (`no such issue emitted`)
 
 Run: `go test ./openehr/validation/ -run 'TestRMFloor(TermMappingMatchValueSet|MappingsNotEmpty)' -v`
 Expected: FAIL.
 
-- [ ] **Step 3: Add the invariants in `openehr/validation/rmfloor.go`**
+- [x] **Step 3: Add the invariants in `openehr/validation/rmfloor.go`**
 
 Where the walker visits a `*rm.DVText` (add the hook next to the existing per-type invariant checks, e.g. the EHR_STATUS.subject one), emit:
 
@@ -379,14 +385,16 @@ func checkTermMappings(w *rmFloorWalker, path string, ms []rm.TermMapping) {
 
 Fill the `Issue` fields from the real struct in `issue.go` (severity/code/message/path). Keep the message value-free (REQ-093) — name the attribute and the allowed set, never echo the bad value.
 
-- [ ] **Step 4: Run — expect PASS**
+- [x] **Step 4: Run — expect PASS**
 
 Run: `go test ./openehr/validation/ -run 'TestRMFloor(TermMappingMatchValueSet|MappingsNotEmpty)' -v`
 Expected: PASS.
 
-- [ ] **Step 5: Update the REQ-112 clause** in `docs/specifications/clinical-modeling.md` — the floor **MUST** report a `TERM_MAPPING.match` outside `{'>','=','<','?'}` and a present-but-empty `DV_TEXT.mappings` (`Mappings_valid`) as invariant violations.
+- [x] **Step 5: Update the REQ-112 clause** in `docs/specifications/clinical-modeling.md` — the floor **MUST** report a `TERM_MAPPING.match` outside `{'>','=','<','?'}` and a present-but-empty `DV_TEXT.mappings` (`Mappings_valid`) as invariant violations.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
+
+Landed at `de24dc1`, with positive-path/empty-match test coverage added at `5e5c715`.
 
 ```bash
 git add openehr/validation/rmfloor.go openehr/validation/rmfloor_test.go docs/specifications/clinical-modeling.md
@@ -407,7 +415,7 @@ git commit -m "feat(validation): RM floor enforces TERM_MAPPING.match value set 
 
 **Finding that scopes this task:** the FLAT conformance fixture spells inline data as base64 (`…|data": "Z2hnZ2pnamdnag=="`), which is exactly what Go's `[]byte` emits — so **base64 is the correct canonical spelling and no representation change is needed.** What is missing is a *pin*: the canonical composition corpus carries only `uri`/`media_type`/`size`, never inline `data`, so the base64 round-trip is currently unexercised. `data`/`integrity_check` also carry the same `omitempty` presence-collapse as `mappings` (Task 2), recorded here, not fixed (base64 is right; `size` already carries the byte count, so a present-but-empty `data` is low-value).
 
-- [ ] **Step 1: Write the round-trip pin** (`openehr/serialize/canjson/multimedia_bytes_test.go`)
+- [x] **Step 1: Write the round-trip pin** (`openehr/serialize/canjson/multimedia_bytes_test.go`)
 
 ```go
 package canjson_test
@@ -445,14 +453,16 @@ func TestDVMultimediaBytesRoundTrip(t *testing.T) {
 
 (Reuse or add a small `bytesContains` helper, or assert via `strings.Contains(string(out), …)`.)
 
-- [ ] **Step 2: Run — expect PASS** (proves base64 is lossless today)
+- [x] **Step 2: Run — expect PASS** (proves base64 is lossless today)
 
 Run: `go test ./openehr/serialize/canjson/ -run TestDVMultimediaBytesRoundTrip -v`
 Expected: PASS. If it fails, the `[]byte` handling changed and REQ-052 must be revisited.
 
-- [ ] **Step 3: Record the deviation** — one line in `docs/specifications/wire.md` § REQ-052 (or canjson `doc.go`): `DV_MULTIMEDIA.data` / `integrity_check` (`[]byte`) encode as base64 (correct canonical spelling) but carry the same `[]`/`null`/absent collapse as `mappings`; not fixed — `size` carries the unencoded byte count, so present-but-empty inline data is not a distinction the SDK needs to preserve.
+- [x] **Step 3: Record the deviation** — one line in `docs/specifications/wire.md` § REQ-052 (or canjson `doc.go`): `DV_MULTIMEDIA.data` / `integrity_check` (`[]byte`) encode as base64 (correct canonical spelling) but carry the same `[]`/`null`/absent collapse as `mappings`; not fixed — `size` carries the unencoded byte count, so present-but-empty inline data is not a distinction the SDK needs to preserve.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
+
+Landed at `ea2872e`.
 
 ```bash
 git add openehr/serialize/canjson/multimedia_bytes_test.go docs/specifications/wire.md
@@ -473,30 +483,32 @@ git commit -m "test(canjson): pin DV_MULTIMEDIA inline base64 round-trip; record
 
 **Context:** wire.md § REQ-052 requires a wire value exceeding JSON number precision to be a typed decode error "rather than silently rounding." `canjson/doc.go` records this half as **still open** — overflow (`1e400`) is already typed by the generated wrapper; only mantissa precision loss stays silent. Both `Real.UnmarshalJSON` branches (string `strconv.ParseFloat(s,64)` at `real.go:24`; number `json.Unmarshal(b,&f)` at `real.go:31`) round silently.
 
-- [ ] **Step 1: Failing test.** `Real` decode of `0.12345678901234567890` (20 significant digits) returns an error; `0.5`, `80.5`, and a 17-digit value decode cleanly; `"0.5"` (quoted) too.
-- [ ] **Step 2:** Run → today it rounds, `err == nil` → FAIL.
-- [ ] **Step 3: Implement.** Add `significantDigits(s string) int` (strip sign / exponent / decimal point / leading zeros; ignore trailing zeros). In both branches, if `significantDigits(...) > 17` return a value-free typed error (REQ-093 — names no magnitude): `fmt.Errorf("rm.Real: %w: value carries more precision than float64 can represent", <sentinel>)`.
-- [ ] **Step 4:** Run → PASS. Confirm `DV_QUANTITY` / `DV_PROPORTION` magnitudes (which use `Real`) inherit the check.
-- [ ] **Step 5: Spec.** wire.md § REQ-052 clause is now **met**, not deferred; drop the "open half … still silent" note in `canjson/doc.go`.
-- [ ] **Step 6: Commit** `fix(rm): Real reports mantissa precision loss on decode (REQ-052)`.
+- [x] **Step 1: Failing test.** `Real` decode of `0.12345678901234567890` (20 significant digits) returns an error; `0.5`, `80.5`, and a 17-digit value decode cleanly; `"0.5"` (quoted) too.
+- [x] **Step 2:** Run → today it rounds, `err == nil` → FAIL.
+- [x] **Step 3: Implement.** Add `significantDigits(s string) int` (strip sign / exponent / decimal point / leading zeros; ignore trailing zeros). In both branches, if `significantDigits(...) > 17` return a value-free typed error (REQ-093 — names no magnitude): `fmt.Errorf("rm.Real: %w: value carries more precision than float64 can represent", <sentinel>)`.
+- [x] **Step 4:** Run → PASS. Confirm `DV_QUANTITY` / `DV_PROPORTION` magnitudes (which use `Real`) inherit the check.
+- [x] **Step 5: Spec.** wire.md § REQ-052 clause is now **met**, not deferred; drop the "open half … still silent" note in `canjson/doc.go`.
+- [x] **Step 6: Commit** `fix(rm): Real reports mantissa precision loss on decode (REQ-052)`.
 
-**Decision (named):** the trigger is **>17 significant decimal digits** (float64's shortest-round-trip guarantee) — simple and non-over-reporting: it does **not** reject `0.1` (inexact but round-trips). A `big.Float` exactness check would wrongly reject `0.1` and is not the criterion. Second choice: which sentinel to wrap — a fresh `rm`/`canjson` precision sentinel, or **reuse `canjson.ErrInvalidShape`**. Settled: Plan B ([`archive/2026-09-02-decode-error-surface-typing.md`](archive/2026-09-02-decode-error-surface-typing.md)) landed option A, so the sentinel already has a producer — reuse it rather than minting a second.
+Landed at `1d09718`.
+
+**Decision (named):** the trigger is **>17 significant decimal digits** (float64's shortest-round-trip guarantee) — simple and non-over-reporting: it does **not** reject `0.1` (inexact but round-trips). A `big.Float` exactness check would wrongly reject `0.1` and is not the criterion. Second choice: which sentinel to wrap — a fresh `rm`/`canjson` precision sentinel, or **reuse `canjson.ErrInvalidShape`**. Settled: Plan B ([`2026-09-02-decode-error-surface-typing.md`](2026-09-02-decode-error-surface-typing.md)) landed option A, so the sentinel already has a producer — reuse it rather than minting a second.
 
 ---
 
 ## Verification (whole bundle)
 
-- [ ] `make codegen-verify` — generated tree matches the generator (Task 1 is the only regen).
-- [ ] `make spec-check` — traceability intact; the REQ rows and citations resolve.
-- [ ] `make ci` — gofmt/vet/golangci-lint/tests green across `openehr/rm/…`, `openehr/serialize/canjson/…`, `openehr/validation/…`, `internal/bmmgen/…`.
-- [ ] Negative space exercised (DoD): empty / multi-char `match` refused on decode **and** encode; malformed `match` and empty-present `mappings` caught by the floor; base64 round-trip lossless.
+- [x] `make codegen-verify` — generated tree matches the generator (Task 1 is the only regen).
+- [x] `make spec-check` — traceability intact; the REQ rows and citations resolve.
+- [x] `make ci` — gofmt/vet/golangci-lint/tests green across `openehr/rm/…`, `openehr/serialize/canjson/…`, `openehr/validation/…`, `internal/bmmgen/…`.
+- [x] Negative space exercised (DoD): empty / multi-char `match` refused on decode **and** encode; malformed `match` and empty-present `mappings` caught by the floor; base64 round-trip lossless.
 
 ## Mapping to specs
 
-- [bmm-conformance.md § Primitive type mapping](../specifications/bmm-conformance.md#primitive-type-mapping) — REQ-046, the `Character` row (Task 1).
-- [wire.md § REQ-052](../specifications/wire.md#req-052) — canonical `match` round-trip (Task 1), `mappings` collapse note (Task 2), `DV_MULTIMEDIA` base64 (Task 4).
-- [clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--composition-validation) — RM-floor invariants (Task 3).
-- [REQ.md](../specifications/REQ.md) — registry rows for REQ-046 / REQ-052 / REQ-112 (REQ-052 stays `partial`).
+- [bmm-conformance.md § Primitive type mapping](../../specifications/bmm-conformance.md#primitive-type-mapping) — REQ-046, the `Character` row (Task 1).
+- [wire.md § REQ-052](../../specifications/wire.md#req-052) — canonical `match` round-trip (Task 1), `mappings` collapse note (Task 2), `DV_MULTIMEDIA` base64 (Task 4).
+- [clinical-modeling.md § REQ-112](../../specifications/clinical-modeling.md#req-112--composition-validation) — RM-floor invariants (Task 3).
+- [REQ.md](../../specifications/REQ.md) — registry rows for REQ-046 / REQ-052 / REQ-112 (REQ-052 stays `partial`).
 
 ## Self-review notes
 

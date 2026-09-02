@@ -18,6 +18,9 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 - **Discriminating PROBE-099 relation row (REQ-164).** A new near-miss row makes containment-relation threading mutation-detectable at probe level, where the prior supplied-relation row stayed inert.
 - **Canonical-JSON decode shape sentinel (REQ-052).** Every generated RM/AOM `UnmarshalJSON` now classifies a JSON-shape failure with `canjson.ErrInvalidShape` so `errors.Is` matches, with message and unwrapped cause unchanged ([plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md)).
 - **Value-free diagnostics for unrouted requests (REQ-093).** Transport error strings render the placeholder `(unrouted)` instead of a resolved path or URL when a request carries no route template, including the URL a wrapped `*url.Error` reports ([plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md)).
+- **`TERM_MAPPING.match` is a canonical single-character string (REQ-046, REQ-052).** A new `Character` named primitive decodes and encodes the RM's one-character JSON string, replacing the numeric spelling that could not represent it. [plan](docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md).
+- **RM-floor `TERM_MAPPING` invariants (REQ-112).** `ValidateRM` and its typed sugars now report a `match` outside `{'>','=','<','?'}` and a present-but-empty `DV_TEXT.mappings` as invariant violations. [plan](docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md).
+- **Canonical-JSON precision and presence pins (REQ-052).** `Real.UnmarshalJSON` now refuses a literal past 17 significant digits instead of rounding silently; `DV_TEXT.mappings` and `DV_MULTIMEDIA`'s base64 `[]`/`null`/absent decode collapse are documented and pinned. [plan](docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md).
 
 ## [0.24.0] - 2026-08-30
 
