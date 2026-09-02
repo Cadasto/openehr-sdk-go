@@ -1,6 +1,7 @@
 package ehr
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -139,8 +140,47 @@ func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm
 		req.Route = "/ehr"
 	}
 
-	out, meta, err := transport.Decode[rm.EHR](ctx, c, req)
-	return out, NewVersionMetadata(meta), err
+	resp, err := c.Do(ctx, req)
+	if err != nil {
+		if resp != nil {
+			return nil, NewVersionMetadata(resp.Metadata), err
+		}
+		return nil, nil, err
+	}
+	meta := NewVersionMetadata(resp.Metadata)
+
+	// REQ-094: an empty or JSON-null 2xx body commits the EHR but carries
+	// no usable representation. Classified against the raw bytes before
+	// decode is attempted -- the same rule WriteResult applies to the
+	// versioned-write family -- because a JSON null literal unmarshals
+	// into a struct target as a nil-error no-op (transport.Decode does
+	// not special-case it), which would otherwise let a null body
+	// masquerade as a populated, all-zero-value *rm.EHR. Only this
+	// empty/null arm is retyped: the decode-failure arm below keeps
+	// REQ-151's *transport.DecodeError typing unchanged (the keyed
+	// exception this closes was scoped to the empty-body arm only).
+	if body := bytes.TrimSpace(resp.Body); len(body) == 0 || bytes.Equal(body, []byte("null")) {
+		return nil, meta, &NoRepresentationError{
+			Meta:  meta,
+			Cause: fmt.Errorf("ehr.Create: %w: 2xx with no representation body", transport.ErrInvalidShape),
+		}
+	}
+
+	out := new(rm.EHR)
+	if err := canjson.Unmarshal(resp.Body, out); err != nil {
+		// REQ-151, unchanged: a present-but-undecodable 2xx body is a
+		// *transport.DecodeError, not a NoRepresentationError. Method and
+		// Route are read directly off req rather than via the unexported
+		// effective*() helpers transport.Decode uses internally -- both
+		// are always explicitly set above, so the values are identical.
+		return nil, meta, &transport.DecodeError{
+			Method: req.Method,
+			Route:  req.Route,
+			Body:   resp.Body,
+			Inner:  err,
+		}
+	}
+	return out, meta, nil
 }
 
 // Repository mirrors the package-level EHR functions as a method set

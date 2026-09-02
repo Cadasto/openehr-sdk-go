@@ -124,7 +124,7 @@ A wire failure **MUST** remain a `*transport.WireError`. The SDK **MUST NOT** re
 
 The same empty-body and decode-failure rules **MUST** apply to `contribution.Commit` when `Prefer: return=representation` was sent. An empty representation body **MUST NOT** be a silent success.
 
-This contract binds the versioned-write `WriteResult` family and `contribution.Commit`. **Keyed exception:** EHR creation (`ehr.Create`, a non-versioned write that decodes through the shared `transport.Decode`) **MUST** keep the bare `transport.ErrInvalidShape` contract on an empty 2xx body until its committed-but-unusable arm is typed in a spec-first change (deferred; recorded in the archived write-result plan's Defers). That exception is scoped to the **empty**-body arm and stands unchanged: `ehr.Create`'s *decode-failure* arm — a 2xx body that is present but does not decode — is typed by [§ REQ-151](#req-151--typed-2xx-decode-failure) as a `*transport.DecodeError`, which is the shared primitive whose absence deferred the exception in the first place.
+This contract binds the versioned-write `WriteResult` family, `contribution.Commit`, and EHR creation's empty/null-body arm. **Keyed exception closed:** `ehr.Create` (a non-versioned write) no longer keeps the bare `transport.ErrInvalidShape` contract on an empty 2xx body — its empty/null-body arm is a typed `NoRepresentationError`, matching the versioned-write family. `ehr.Create`'s *decode-failure* arm — a 2xx body that is present but does not decode — stays typed by [§ REQ-151](#req-151--typed-2xx-decode-failure) as a `*transport.DecodeError`, unaffected by this closure.
 
 - **Lives in:** [`transport/`](../../transport), [`openehr/client/ehr/`](../../openehr/client/ehr) (composition / directory / ehrstatus / contribution), [`openehr/client/demographic/`](../../openehr/client/demographic)
 
@@ -319,12 +319,13 @@ implementation route a leaf took stays invisible to the caller.
 **Keyed exclusions, by owning contract.** Three surfaces keep their own error taxonomy and
 **MUST NOT** be re-typed by this requirement:
 
-- the write-result funnel — the `ehr.WriteResult` callbacks and `contribution.Commit` — whose
-  committed-but-unusable arm is `*ehr.NoRepresentationError`
-  ([§ REQ-094](#req-094--prefer-response-shape-negotiation));
+- the write-result funnel — the `ehr.WriteResult` callbacks, `contribution.Commit`, and
+  `ehr.Create`'s empty/null-body arm — whose committed-but-unusable classification is
+  `*ehr.NoRepresentationError` ([§ REQ-094](#req-094--prefer-response-shape-negotiation));
 - the `Prefer: return=identifier` arm (`ehr.ResolveIdentifierBody`), likewise REQ-094's
   negotiation surface, which keeps its `transport.ErrInvalidShape` wrap;
-- the empty-body arms named above, including REQ-094's keyed exception for `ehr.Create`.
+- the empty-body arms named above (the refusal arms, the Definition list leaves, and the
+  synthesized-metadata arms).
 
 Everything a keyed exclusion covers stays covered by the requirement that owns it; nothing here
 loosens those contracts.

@@ -234,6 +234,91 @@ func TestCreateClientSupplied(t *testing.T) {
 	}
 }
 
+// TestCreateEmpty2xxBody characterises the four response-body shapes
+// Create's 2xx arm can receive (REQ-094). An empty or JSON-null body
+// commits but carries no representation and MUST surface as
+// *NoRepresentationError, carrying the commit metadata; a present but
+// undecodable body keeps REQ-151's *transport.DecodeError typing
+// unchanged; a valid body decodes normally. ehr.Get/ehr.Exists are
+// proven unchanged separately (TestGet/TestExists*).
+func TestCreateEmpty2xxBody(t *testing.T) {
+	t.Run("empty_body", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Location", "/ehr/"+ehrIDFixture)
+			w.WriteHeader(http.StatusCreated)
+		}))
+		defer srv.Close()
+		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+		if !ok {
+			t.Fatalf("empty body: err = %v, want *NoRepresentationError", err)
+		}
+		if !errors.Is(err, transport.ErrInvalidShape) {
+			t.Errorf("empty body: err must wrap transport.ErrInvalidShape, got %v", err)
+		}
+		if out != nil {
+			t.Errorf("empty body: out = %+v, want nil", out)
+		}
+		if meta == nil || nre.Meta == nil {
+			t.Fatal("empty body: commit metadata must survive the failed representation")
+		}
+	})
+
+	t.Run("null_body", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Location", "/ehr/"+ehrIDFixture)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte("null"))
+		}))
+		defer srv.Close()
+		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+		if !ok {
+			t.Fatalf("null body: err = %v, want *NoRepresentationError", err)
+		}
+		if !errors.Is(err, transport.ErrInvalidShape) {
+			t.Errorf("null body: err must wrap transport.ErrInvalidShape, got %v", err)
+		}
+		if out != nil {
+			t.Errorf("null body: out = %+v, want nil", out)
+		}
+		if meta == nil || nre.Meta == nil {
+			t.Fatal("null body: commit metadata must survive the failed representation")
+		}
+	})
+
+	t.Run("garbage_body", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`}{ not json`))
+		}))
+		defer srv.Close()
+		_, _, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		if _, ok := errors.AsType[*transport.DecodeError](err); !ok {
+			t.Fatalf("garbage body: err = %v, want *transport.DecodeError (REQ-151, unchanged)", err)
+		}
+		if _, ok := errors.AsType[*openehrclient.NoRepresentationError](err); ok {
+			t.Error("garbage body: decode-failure arm must not be reclassified as NoRepresentationError")
+		}
+	})
+
+	t.Run("valid_body", func(t *testing.T) {
+		body := readCassette(t, "ehr", "ehr.json")
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write(body)
+		}))
+		defer srv.Close()
+		out, _, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		if err != nil {
+			t.Fatalf("valid body: unexpected err = %v", err)
+		}
+		if out == nil || out.EHRID.Value != ehrIDFixture {
+			t.Errorf("valid body: out = %+v, want EHRID.Value = %q", out, ehrIDFixture)
+		}
+	})
+}
+
 func TestRefConstruction(t *testing.T) {
 	if r := openehrclient.LatestOf("voID"); r.PathSegment() != "voID" {
 		t.Errorf("LatestOf PathSegment = %q", r.PathSegment())
