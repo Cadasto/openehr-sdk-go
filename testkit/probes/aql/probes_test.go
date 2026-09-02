@@ -1146,10 +1146,11 @@ func probe099FireCases() []aqlprobes.PathShapeFireCase {
 			// TestRedundantStepReadsTheSuppliedRelation in
 			// openehr/aql/lint/pathshape_redundant_test.go (nil, zero, explicit
 			// default and unrelated-overlay, over this same witness query);
-			// carrying it here keeps it stated where the probe reports.
-			// Follow-up, not yet built: a discriminating twin rooted on an
-			// overlay-introduced class — the default relation finds no route,
-			// so only the supplied relation can fire it.
+			// carrying it here keeps it stated where the probe reports. Its
+			// discriminating twin — a supplied relation that SILENCES this
+			// same witness rather than restating an unaffected finding — is
+			// the Silent arm's "a redundant step silenced by a discriminating
+			// supplied relation" row, below.
 			Name: "an unavoidable unreferenced intermediate, under a supplied relation",
 			Query: "SELECT o/name/value AS n FROM EHR e CONTAINS COMPOSITION c " +
 				"CONTAINS OBSERVATION o",
@@ -1338,6 +1339,31 @@ func probe099SilentCases() []aqlprobes.PathShapeSilentCase {
 			Keeps:    []string{"aql_versioned_object_unreferenced"},
 			ForCode:  codeContainsRedundantStep,
 			Negative: aqlprobes.NegVersionedObjectOperand,
+		},
+		{
+			// The discriminating twin of the Fire arm's inert supplied-relation
+			// row above ("an unavoidable unreferenced intermediate, under a
+			// supplied relation") — EHR -> VERSIONED_PARTY there adds no route
+			// to OBSERVATION, so that row's finding stands whether or not
+			// Relation is actually threaded through the check at all. This
+			// overlay DOES change the verdict: EHR_STATUS -> OBSERVATION,
+			// layered on the default relation's own EHR -> EHR_STATUS edge,
+			// opens a bypass route around COMPOSITION for the very query the
+			// default-relation fire row above flags as redundant — so code
+			// that reaches this check with the relation unthreaded (silently
+			// falling back to the default) would still raise the finding
+			// here, which is what makes THIS row mutation-detectable where
+			// the inert one is not. Mirrors
+			// TestRedundantStepReadsTheSuppliedRelation
+			// (openehr/aql/lint/pathshape_redundant_test.go): same witness
+			// query, same overlay.
+			Name: "near miss: a redundant step silenced by a discriminating supplied relation",
+			Query: "SELECT o/name/value AS n FROM EHR e CONTAINS COMPOSITION c " +
+				"CONTAINS OBSERVATION o",
+			Relation: contain.Default().WithOverlay(contain.Edge{
+				From: "EHR_STATUS", To: "OBSERVATION",
+			}),
+			ForCode: codeContainsRedundantStep,
 		},
 		{
 			// The walk cannot start, so the path goes unjudged rather than
