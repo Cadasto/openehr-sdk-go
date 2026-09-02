@@ -122,8 +122,8 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: partial
-    packages: [openehr/serialize/canjson, openehr/rm/typereg, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
+    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
@@ -147,8 +147,9 @@ requirements:
       scope, not aligned). The decode-side shape sentinel clause is
       landed too: decode failures still reach the caller three ways —
       malformed JSON unchanged from encoding/json, an in-type shape
-      error behind a `canjson: <RM_TYPE>:` prefix, a polymorphic-slot
-      failure as typereg.DecodeError — and the middle one now wraps
+      error behind a `canjson: <RM_TYPE>:` prefix, a typereg.DecodeError
+      (raised at a polymorphic slot or by a whole-value _type mismatch
+      on /_type) — and the middle one now wraps
       canjson.ErrInvalidShape, with the message and the errors.As-reachable
       encoding/json cause both unchanged. The producer is
       typereg.WrapShapeError, called from the one funnel the generator
@@ -157,9 +158,11 @@ requirements:
       openehr/rm cannot import openehr/serialize. A nested DecodeError
       passing through that funnel deliberately keeps only its own
       classification. TestUnmarshalWrapsErrInvalidShape, its
-      Decoder.Decode twin, TestUnmarshalNestedDecodeErrorIsNotShapeTagged
-      and the typereg WrapShapeError tests pin all of it, distinctness
-      from canxml.ErrInvalidShape and transport.ErrInvalidShape included.
+      Decoder.Decode twin, TestUnmarshalNestedDecodeErrorIsNotShapeTagged,
+      TestUnmarshalWholeValueTypeMismatchIsNotShapeTagged and the typereg
+      WrapShapeError tests pin all of it, distinctness from
+      canxml.ErrInvalidShape and transport.ErrInvalidShape included
+      (assertShapeSentinelDistinct asserts both).
       What keeps the REQ partial is one arm of § Floating-point
       precision. Its MUST — report a wire value exceeding JSON's number
       precision as a typed error "rather than silently rounding" — is
@@ -438,17 +441,15 @@ requirements:
     implementation: landed
     packages: [transport, openehr/client/query]
     probes: [PROBE-010, PROBE-011]
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md]
     notes: >-
-      ErrUnprocessable (422) sentinel added by the ITS-REST conformance
-      remediation. An unset Route template no longer falls back to Path in
-      the human-readable error strings — WireError.Error, DecodeError.Error,
-      and doOnce's "transport: %s %s: …" diagnostics — since Path may carry
-      a caller-supplied identifier; a stable "(unrouted)" placeholder takes
-      its place instead. effectiveRoute's Path fallback is unchanged for the
-      telemetry surfaces (span naming, the http.route attribute,
-      Observation.Route), which may legitimately carry the resolved path.
-      Pinned by TestErrorStringsValueFreeWhenRouteUnset.
+      ErrUnprocessable (422) came from the ITS-REST conformance
+      remediation; the "(unrouted)" placeholder clause came from the
+      decode-error-surface plan, pinned by
+      TestErrorStringsValueFreeWhenRouteUnset. Residual, not covered:
+      doOnce's network-failure arm (transport/client.go) wraps
+      *url.Error, whose own text prints the resolved URL — sanitising it
+      costs the caller the typed error, so it is a follow-up.
     tests:
       - transport/client_test.go
       - transport/errors_test.go
