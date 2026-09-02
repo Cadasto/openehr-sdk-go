@@ -11,8 +11,8 @@ import (
 
 // wireEscapes maps a match character to the substring encoding/json's default
 // HTML-escaping emits for it inside a string literal — `<`, `>` and `&` come
-// out as the literal six-byte sequences `<`, `>`, `&`. This is
-// the same carve-out docs/specifications/wire.md § REQ-052's TERM_MAPPING.match
+// out as the literal six-byte escape sequences `\u003c`, `\u003e`, `\u0026`.
+// This is the same carve-out docs/specifications/wire.md § REQ-052's TERM_MAPPING.match
 // bullet now records explicitly (mirroring § Unknown response keys): the
 // escaped form decodes to the identical single character, so the normative
 // obligation is on the decoded value, not the literal bytes. Every other

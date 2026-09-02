@@ -39,14 +39,16 @@
 //   - Numeric magnitudes use IEEE 754 double-precision JSON numbers
 //     (no silent float32 coercion). REQ-052 requires a typed error on
 //     decode "rather than silently rounding" when a wire value exceeds
-//     JSON's number precision. Half of that is met: an out-of-range
-//     magnitude (e.g. 1e400) already fails with a typed error — a
+//     JSON's number precision. Both halves are met: an out-of-range
+//     magnitude (e.g. 1e400) fails with a typed error — a
 //     *json.UnmarshalTypeError, reachable with errors.As through the
-//     generated UnmarshalJSON wrapper. The open half is mantissa
-//     precision loss, which is still silent: a magnitude of
-//     0.1234567890123456789 decodes to 0.12345678901234568 with a nil
-//     error. Closing it is tracked by
-//     docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md.
+//     generated UnmarshalJSON wrapper — and a magnitude carrying more
+//     than 17 significant decimal digits (float64's shortest-round-trip
+//     guarantee), such as 0.1234567890123456789, fails decode wrapping
+//     [ErrInvalidShape] instead of rounding to the nearest float64. A
+//     merely inexact-but-round-tripping value such as 0.1 is not
+//     rejected. Closed by
+//     docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md.
 //
 // # Error classification
 //

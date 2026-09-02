@@ -537,21 +537,42 @@ func TestUnmarshalOverflowIsATypedError(t *testing.T) {
 	}
 }
 
-// TestUnmarshalMantissaPrecisionLossIsSilent pins the half of REQ-052's
-// floating-point clause that is still OPEN: a magnitude carrying more
-// significant digits than float64 holds is rounded silently, where the
-// clause requires a typed error "rather than silently rounding". This
-// test documents today's behaviour, not the target; the producer that
-// closes the gap (docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md)
-// must invert it.
-func TestUnmarshalMantissaPrecisionLossIsSilent(t *testing.T) {
+// TestUnmarshalMantissaPrecisionLossIsATypedError pins the half of
+// REQ-052's floating-point clause that used to be open: a magnitude
+// carrying more significant digits than float64 holds (here 19) now
+// fails rather than rounding silently, wrapping canjson.ErrInvalidShape
+// so a caller can classify it with errors.Is alone — closed by
+// docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md, which
+// replaces the retired TestUnmarshalMantissaPrecisionLossIsSilent this
+// pinned before the gap closed. rm.Real's own significant-digit trigger
+// is unit-tested directly in openehr/rm/real_test.go; this only proves
+// DV_QUANTITY.magnitude inherits it through the ordinary struct-field
+// decode path — no per-field path wrapping exists for a scalar Real
+// field today (only polymorphic slots and whole-value `_type` mismatches
+// attach a *typereg.DecodeError), so this test does not assert one.
+func TestUnmarshalMantissaPrecisionLossIsATypedError(t *testing.T) {
 	const in = `{"_type":"DV_QUANTITY","magnitude":0.1234567890123456789,"units":"kg"}`
 	var q rm.DVQuantity
-	if err := canjson.Unmarshal([]byte(in), &q); err != nil {
-		t.Fatalf("Unmarshal(%s) = %v; today precision loss is silent, so want nil", in, err)
+	err := canjson.Unmarshal([]byte(in), &q)
+	if err == nil {
+		t.Fatalf("Unmarshal(%s) = nil; want a precision error (gap closed)", in)
 	}
-	const want = 0.12345678901234568 // the float64 nearest the wire value
-	if q.Magnitude != want {
-		t.Errorf("Magnitude = %.17g; want %.17g (the rounded value, gap not yet closed)", q.Magnitude, want)
+	if !errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; want errors.Is(err, canjson.ErrInvalidShape)", err)
+	}
+}
+
+// TestUnmarshalMantissaPrecisionLossInheritedByDVProportion is the same
+// assertion over DV_PROPORTION.numerator, proving the check is inherited
+// by every Real-typed field, not special-cased to DV_QUANTITY.
+func TestUnmarshalMantissaPrecisionLossInheritedByDVProportion(t *testing.T) {
+	const in = `{"_type":"DV_PROPORTION","numerator":0.1234567890123456789,"denominator":1,"type":0}`
+	var p rm.DVProportion
+	err := canjson.Unmarshal([]byte(in), &p)
+	if err == nil {
+		t.Fatalf("Unmarshal(%s) = nil; want a precision error", in)
+	}
+	if !errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; want errors.Is(err, canjson.ErrInvalidShape)", err)
 	}
 }
