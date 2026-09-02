@@ -389,7 +389,8 @@ func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern str
 // Wire: DELETE /definition/query/{qualified_query_name}/{version}.
 func DeleteStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, version string) (*transport.Metadata, error) {
 	name := strings.TrimSpace(qualifiedName)
-	if name == "" || strings.TrimSpace(version) == "" {
+	version = strings.TrimSpace(version)
+	if name == "" || version == "" {
 		return nil, fmt.Errorf("definition.DeleteStoredQuery: %w: name and version are required", transport.ErrInvalidConfig)
 	}
 	req := &transport.Request{
