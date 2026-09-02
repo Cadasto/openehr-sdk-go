@@ -2040,8 +2040,14 @@ requirements:
       elsewhere). typereg.DecodeError.Error() also stopped calling
       Inner.Error() directly -- Inner is any caller/codec-supplied error, not
       only this SDK's own already-guarded types -- and now renders the cause
-      through a recover-guarded helper. parse.SyntaxError.Error() separately
-      stopped printing a fabricated "at 0:0:" for a zero Position.
+      with %v, which leans on fmt's own recovery of a panicking Error() method
+      and prints "<nil>" for a boxed typed-nil receiver, rather than on a
+      hand-rolled recover. A zero Position is the separate position-honesty
+      rule on the same types, not the nil-receiver one:
+      parse.SyntaxError.Error() stopped printing a fabricated "at 0:0:" for
+      one, and parse's syntaxErrorPosition and lint's syntaxDetail report such
+      a position as ABSENT (ok=false / no "L:C:" prefix) so no consumer
+      diagnostic invents a 0:0 coordinate.
 
   - id: REQ-026
     title: Goroutine-safe clients

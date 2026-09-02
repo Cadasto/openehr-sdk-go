@@ -15,6 +15,7 @@ package parse
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -43,5 +44,24 @@ func TestSyntaxErrorPositionToleratesABoxedNilSyntaxError(t *testing.T) {
 	}
 	if want := (Position{Line: 4, Col: 9}); pos != want {
 		t.Errorf("syntaxErrorPosition(positioned SyntaxError) = %+v, want %+v", pos, want)
+	}
+}
+
+// TestSyntaxErrorPositionTreatsAZeroPositionAsAbsent is the position-honesty
+// half of the same helper. A non-nil *SyntaxError whose Pos is the zero value
+// carries NO position — [SyntaxError.Error] and lint's syntaxDetail both omit a
+// fabricated "0:0" rather than print one — so reporting ok=true here would let
+// verifyEmitted format "syntax error at 0:0" and invent a coordinate the
+// diagnostic never had.
+func TestSyntaxErrorPositionTreatsAZeroPositionAsAbsent(t *testing.T) {
+	unpositioned := &SyntaxError{Msg: "unexpected token"}
+
+	if _, ok := syntaxErrorPosition(unpositioned); ok {
+		t.Error("syntaxErrorPosition(zero-Pos SyntaxError) ok = true, want false — the zero Position is the \"no position\" value")
+	}
+
+	// The honesty rule it mirrors, pinned here so the two cannot drift apart.
+	if got := unpositioned.Error(); strings.Contains(got, "0:0") {
+		t.Errorf("SyntaxError.Error() = %q, want no fabricated 0:0 coordinate", got)
 	}
 }
