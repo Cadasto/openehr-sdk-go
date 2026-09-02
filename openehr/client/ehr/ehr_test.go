@@ -87,6 +87,24 @@ func TestGet(t *testing.T) {
 	}
 }
 
+// TestGetEmpty2xxBodyStaysErrInvalidShape is the negative pin for "reads are
+// untouched" (REQ-094's Create closure MUST NOT reach transport.Decode's
+// shared read arm): an empty 2xx body on a read stays the bare
+// transport.ErrInvalidShape it always was, never *NoRepresentationError.
+func TestGetEmpty2xxBodyStaysErrInvalidShape(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	_, _, err := openehrclient.Get(t.Context(), newClient(t, srv), ehrIDFixture)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("err = %v, want transport.ErrInvalidShape", err)
+	}
+	if _, ok := errors.AsType[*openehrclient.NoRepresentationError](err); ok {
+		t.Error("ehr.Get must not reclassify an empty body as NoRepresentationError")
+	}
+}
+
 func TestGetRejectsEmptyID(t *testing.T) {
 	_, _, err := openehrclient.Get(t.Context(), nil, "")
 	if !errors.Is(err, transport.ErrInvalidConfig) {
@@ -287,15 +305,60 @@ func TestCreateEmpty2xxBody(t *testing.T) {
 		}
 	})
 
+	// REQ-094: a whitespace-only body classifies as empty (ErrInvalidShape),
+	// not as a decode failure -- the TrimSpace guard is load-bearing on its
+	// own, independent of the JSON null arm (write_test.go pins the same
+	// case for WriteResult).
+	t.Run("whitespace_body", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Location", "/ehr/"+ehrIDFixture)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(" \n\t"))
+		}))
+		defer srv.Close()
+		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+		if !ok {
+			t.Fatalf("whitespace body: err = %v, want *NoRepresentationError", err)
+		}
+		if !errors.Is(err, transport.ErrInvalidShape) {
+			t.Errorf("whitespace body: err must wrap transport.ErrInvalidShape, got %v", err)
+		}
+		if out != nil {
+			t.Errorf("whitespace body: out = %+v, want nil", out)
+		}
+		if meta == nil || nre.Meta == nil {
+			t.Fatal("whitespace body: commit metadata must survive the failed representation")
+		}
+	})
+
 	t.Run("garbage_body", func(t *testing.T) {
+		const garbage = `}{ not json`
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`}{ not json`))
+			_, _ = w.Write([]byte(garbage))
 		}))
 		defer srv.Close()
 		_, _, err := openehrclient.Create(t.Context(), newClient(t, srv))
-		if _, ok := errors.AsType[*transport.DecodeError](err); !ok {
+		de, ok := errors.AsType[*transport.DecodeError](err)
+		if !ok {
 			t.Fatalf("garbage body: err = %v, want *transport.DecodeError (REQ-151, unchanged)", err)
+		}
+		// Pins the transport.Decode bypass: Create builds *transport.DecodeError
+		// by hand (it no longer calls transport.Decode -- see the null-body
+		// note above), so its payload must match what transport.Decode itself
+		// would have produced, not merely the type.
+		if string(de.Body) != garbage {
+			t.Errorf("garbage body: de.Body = %q, want %q", de.Body, garbage)
+		}
+		if de.Method != http.MethodPost {
+			t.Errorf("garbage body: de.Method = %q, want %q", de.Method, http.MethodPost)
+		}
+		if de.Route != "/ehr" {
+			t.Errorf("garbage body: de.Route = %q, want %q", de.Route, "/ehr")
+		}
+		if de.Unwrap() == nil {
+			t.Error("garbage body: de.Unwrap() = nil, want the canjson decode cause")
 		}
 		if _, ok := errors.AsType[*openehrclient.NoRepresentationError](err); ok {
 			t.Error("garbage body: decode-failure arm must not be reclassified as NoRepresentationError")

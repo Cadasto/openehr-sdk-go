@@ -1,7 +1,6 @@
 package ehr
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -151,15 +150,14 @@ func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm
 
 	// REQ-094: an empty or JSON-null 2xx body commits the EHR but carries
 	// no usable representation. Classified against the raw bytes before
-	// decode is attempted -- the same rule WriteResult applies to the
-	// versioned-write family -- because a JSON null literal unmarshals
-	// into a struct target as a nil-error no-op (transport.Decode does
-	// not special-case it), which would otherwise let a null body
-	// masquerade as a populated, all-zero-value *rm.EHR. Only this
-	// empty/null arm is retyped: the decode-failure arm below keeps
-	// REQ-151's *transport.DecodeError typing unchanged (the keyed
-	// exception this closes was scoped to the empty-body arm only).
-	if body := bytes.TrimSpace(resp.Body); len(body) == 0 || bytes.Equal(body, []byte("null")) {
+	// decode is attempted, via the same isNoRepresentationBody helper
+	// WriteResult uses (transport.Decode does not special-case a null
+	// body, which would otherwise let one masquerade as a populated,
+	// all-zero-value *rm.EHR). Only this empty/null arm is retyped: the
+	// decode-failure arm below keeps REQ-151's *transport.DecodeError
+	// typing unchanged (the keyed exception this closes was scoped to
+	// the empty-body arm only).
+	if isNoRepresentationBody(resp.Body) {
 		return nil, meta, &NoRepresentationError{
 			Meta:  meta,
 			Cause: fmt.Errorf("ehr.Create: %w: 2xx with no representation body", transport.ErrInvalidShape),
@@ -173,12 +171,16 @@ func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm
 		// Route are read directly off req rather than via the unexported
 		// effective*() helpers transport.Decode uses internally -- both
 		// are always explicitly set above, so the values are identical.
-		return nil, meta, &transport.DecodeError{
+		// The operation-name wrap matches every other hand-rolled leaf
+		// decode (composition.Get, system.Capabilities, the definition
+		// and demographic leaves); errors.AsType still reaches the inner
+		// *transport.DecodeError through it.
+		return nil, meta, fmt.Errorf("ehr.Create: %w", &transport.DecodeError{
 			Method: req.Method,
 			Route:  req.Route,
 			Body:   resp.Body,
 			Inner:  err,
-		}
+		})
 	}
 	return out, meta, nil
 }

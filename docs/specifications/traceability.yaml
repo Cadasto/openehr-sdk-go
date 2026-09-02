@@ -2304,7 +2304,7 @@ requirements:
     canonical: docs/specifications/transport.md#req-151--typed-2xx-decode-failure
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/definition, openehr/client/system, openehr/client/demographic, openehr/client/ehr/composition, testkit/probes/transport]
+    packages: [transport, openehr/client/definition, openehr/client/system, openehr/client/demographic, openehr/client/ehr, openehr/client/ehr/composition, testkit/probes/transport]
     probes: [PROBE-101]
     adrs: [docs/adr/0018-raw-bytes-on-decode-error.md]
     plans: [docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
@@ -2315,6 +2315,7 @@ requirements:
       - openehr/client/demographic/decode_error_test.go
       - openehr/client/ehr/composition/decode_error_test.go
       - openehr/client/ehr/decode_error_test.go  # § Keyed exclusions, the Prefer=identifier arm
+      - openehr/client/ehr/ehr_test.go  # TestCreateEmpty2xxBody/garbage_body -- ehr.Create's hand-rolled *transport.DecodeError
       - openehr/client/ehr/contribution/decode_error_test.go  # § Keyed exclusions, the write-result funnel
       - testkit/probes/transport/probes_test.go
     notes: >-
@@ -2322,8 +2323,8 @@ requirements:
       the raw response bytes and the decoder's error. transport.Decode returns
       it for any 2xx body that will not decode, and the hand-rolled leaf
       decodes construct the same type -- five in definition, three in
-      demographic, plus system.Capabilities and composition.Get -- so which
-      implementation route a leaf took stays invisible to the caller.
+      demographic, plus system.Capabilities, composition.Get and ehr.Create --
+      so which implementation route a leaf took stays invisible to the caller.
       errors.AsType reaches it through each leaf's fmt.Errorf operation-name
       wrap; Body is populated unconditionally (ADR 0018), inheriting whatever
       ceiling the caller's WithMaxResponseBody sets, including none where
