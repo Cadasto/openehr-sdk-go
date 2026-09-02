@@ -719,8 +719,14 @@ requirements:
       The Extras (unknown-key) behaviour of StoredQueryMetadata is NOT recorded
       here: § REQ-144 owns both catalog descriptors' decode/encode contract.
       The 2026-09-02 leftovers plan closed a version-trim asymmetry with name:
-      runStoredAtVersion and DeleteStoredQuery now trim version once and reuse
-      it for both the empty-check and the path, matching name's own trim.
+      runStoredAtVersion and DeleteStoredQuery each trim version once and reuse
+      the trimmed value for both the empty-check and the path, matching name's
+      own trim. On top of the trim, RunStoredVersion refuses an EXPLICIT version
+      that is empty after trimming with query.ErrInvalidConfig, and
+      DeleteStoredQuery with transport.ErrInvalidConfig -- both before any
+      request is issued. RunStored alone addresses the latest version, by
+      omitting the /{version} segment; a caller passing "" to RunStoredVersion
+      no longer falls back to it (a public behaviour change).
     tests:
       - openehr/client/query/query_test.go
       - openehr/client/query/version_trim_test.go

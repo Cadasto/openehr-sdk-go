@@ -13,9 +13,9 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 ### Added
 
 - **`ehr.Create` empty-2xx typing (REQ-094).** An empty, whitespace-only, or JSON-`null` 2xx body from `ehr.Create` now returns `*NoRepresentationError` with the commit metadata, matching the versioned-write family ([plan](docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md)).
-- **Stored-query `version` path trim (REQ-057).** `RunStoredVersion` and `DeleteStoredQuery` now trim `version` before it reaches the wire path, matching the existing `name` trim and closing a whitespace asymmetry.
-- **Nil-safe AQL/decode error inspection (REQ-025).** `SyntaxError` and `DecodeError` cause-inspection sites now guard against a typed-nil match from `errors.AsType`, matching the existing `WireError` guard idiom.
-- **Discriminating PROBE-099 relation row (REQ-164).** A new Silent-arm row makes containment-relation threading mutation-detectable at probe level, closing a gap where the prior supplied-relation row stayed inert.
+- **Stored-query `version` path hygiene (REQ-057).** The `version` path parameter is trimmed before reaching the wire and an explicit empty version is refused before any request — **breaking:** `RunStoredVersion` with an empty version no longer falls back to the latest.
+- **Nil-safe AQL/decode error inspection (REQ-025).** The AQL-parse and type-registry error inspection sites now guard against a typed-nil `errors.AsType` match, and report no position where none is known.
+- **Discriminating PROBE-099 relation row (REQ-164).** A new near-miss row makes containment-relation threading mutation-detectable at probe level, where the prior supplied-relation row stayed inert.
 
 ## [0.24.0] - 2026-08-30
 
