@@ -36,10 +36,13 @@ type CCodedTextJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (c *CCodedText) UnmarshalJSON(data []byte) error {
 	var aux CCodedTextJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: C_CODED_TEXT: %w", err)
+		return typereg.WrapShapeError("C_CODED_TEXT", err)
 	}
 	if aux.Class != "" && aux.Class != "C_CODED_TEXT" {
 		return &typereg.DecodeError{
@@ -77,10 +80,13 @@ type COrdinalJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (c *COrdinal) UnmarshalJSON(data []byte) error {
 	var aux COrdinalJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: C_ORDINAL: %w", err)
+		return typereg.WrapShapeError("C_ORDINAL", err)
 	}
 	if aux.Class != "" && aux.Class != "C_ORDINAL" {
 		return &typereg.DecodeError{
@@ -118,10 +124,13 @@ type CQuantityJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (c *CQuantity) UnmarshalJSON(data []byte) error {
 	var aux CQuantityJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: C_QUANTITY: %w", err)
+		return typereg.WrapShapeError("C_QUANTITY", err)
 	}
 	if aux.Class != "" && aux.Class != "C_QUANTITY" {
 		return &typereg.DecodeError{
@@ -151,10 +160,13 @@ type CQuantityItemJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (c *CQuantityItem) UnmarshalJSON(data []byte) error {
 	var aux CQuantityItemJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: C_QUANTITY_ITEM: %w", err)
+		return typereg.WrapShapeError("C_QUANTITY_ITEM", err)
 	}
 	if aux.Class != "" && aux.Class != "C_QUANTITY_ITEM" {
 		return &typereg.DecodeError{
@@ -180,10 +192,13 @@ type OrdinalJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (o *Ordinal) UnmarshalJSON(data []byte) error {
 	var aux OrdinalJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ORDINAL: %w", err)
+		return typereg.WrapShapeError("ORDINAL", err)
 	}
 	if aux.Class != "" && aux.Class != "ORDINAL" {
 		return &typereg.DecodeError{

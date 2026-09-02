@@ -33,10 +33,13 @@ type PointIntervalJSONUnmarshaller[T any] struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (p *PointInterval[T]) UnmarshalJSON(data []byte) error {
 	var aux PointIntervalJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: Point_interval: %w", err)
+		return typereg.WrapShapeError("Point_interval", err)
 	}
 	if aux.Class != "" && aux.Class != "Point_interval" {
 		return &typereg.DecodeError{
@@ -74,10 +77,13 @@ type ProperIntervalJSONUnmarshaller[T any] struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (p *ProperInterval[T]) UnmarshalJSON(data []byte) error {
 	var aux ProperIntervalJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: Proper_interval: %w", err)
+		return typereg.WrapShapeError("Proper_interval", err)
 	}
 	if aux.Class != "" && aux.Class != "Proper_interval" {
 		return &typereg.DecodeError{

@@ -38,10 +38,13 @@ type FolderJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (f *Folder) UnmarshalJSON(data []byte) error {
 	var aux FolderJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: FOLDER: %w", err)
+		return typereg.WrapShapeError("FOLDER", err)
 	}
 	if aux.Class != "" && aux.Class != "FOLDER" {
 		return &typereg.DecodeError{
@@ -123,10 +126,13 @@ type VersionedFolderJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (v *VersionedFolder) UnmarshalJSON(data []byte) error {
 	var aux VersionedFolderJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: VERSIONED_FOLDER: %w", err)
+		return typereg.WrapShapeError("VERSIONED_FOLDER", err)
 	}
 	if aux.Class != "" && aux.Class != "VERSIONED_FOLDER" {
 		return &typereg.DecodeError{

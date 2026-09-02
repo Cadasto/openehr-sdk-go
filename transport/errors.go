@@ -86,8 +86,10 @@ type WireError struct {
 	// StatusCode is the HTTP status code received.
 	StatusCode int
 	// Method, URL, and Route are the captured request identifiers.
-	// Route is the path template (e.g. "/ehr/{ehr_id}") when known;
-	// URL is the resolved URL with parameters substituted.
+	// Route is the path template (e.g. "/ehr/{ehr_id}") when known, or the
+	// stable "(unrouted)" placeholder when the request carried no Route
+	// (REQ-093: never the expanded Path, which may hold a caller-supplied
+	// identifier). URL is the resolved URL with parameters substituted.
 	Method, URL, Route string
 	// OpenEHR is the parsed openEHR error envelope (REQ-093). Nil when
 	// the body could not be parsed as such. OpenEHR.Message may contain
@@ -125,7 +127,13 @@ func (e *WireError) Error() string {
 		b.WriteString("transport: wire error")
 	}
 	if e.Method != "" || e.Route != "" {
-		fmt.Fprintf(&b, " (%s %s)", e.Method, cmp.Or(e.Route, e.URL))
+		// REQ-093: never fall back to e.URL here — it is the resolved URL
+		// with parameters substituted, so it can carry a caller-supplied
+		// identifier. mapWireError always sets Route (to the template, or to
+		// the unroutedRoute placeholder when the caller left Route unset),
+		// so this branch is defensive for a WireError a caller constructs
+		// directly with Route left zero.
+		fmt.Fprintf(&b, " (%s %s)", e.Method, cmp.Or(e.Route, unroutedRoute))
 	}
 	if e.StatusCode != 0 {
 		fmt.Fprintf(&b, " status=%d", e.StatusCode)
@@ -156,7 +164,9 @@ type DecodeError struct {
 	// Method is the HTTP method of the request.
 	Method string
 	// Route is the route template (e.g. "/ehr/{ehr_id}"), not the
-	// expanded URL.
+	// expanded URL — or the stable "(unrouted)" placeholder when the
+	// request carried no Route (REQ-093: never the expanded Path, which
+	// may hold a caller-supplied identifier).
 	Route string
 	// Body is the raw response body as delivered by the injected
 	// [http.Client] — after any transparent content decoding that client
@@ -199,7 +209,12 @@ func (e *DecodeError) Error() string {
 	if e == nil {
 		return "transport: decode: response body does not match the requested type"
 	}
-	return fmt.Sprintf("transport: decode %s %s: response body does not match the requested type", e.Method, e.Route)
+	// The unroutedRoute fallback matches WireError.Error(): Decode always
+	// sets Route (to the template, or to the placeholder when the caller
+	// left Request.Route unset), so this is for a DecodeError a caller
+	// constructs directly — an empty Route would otherwise render an empty
+	// slot in the middle of the sentence.
+	return fmt.Sprintf("transport: decode %s %s: response body does not match the requested type", e.Method, cmp.Or(e.Route, unroutedRoute))
 }
 
 // Unwrap exposes the decoder's error, so errors.Is and errors.AsType still

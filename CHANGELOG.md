@@ -16,6 +16,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 - **Stored-query `version` path hygiene (REQ-057).** The `version` path parameter is trimmed before reaching the wire and an explicit empty version is refused before any request — **breaking:** `RunStoredVersion` with an empty version no longer falls back to the latest.
 - **Nil-safe AQL/decode error inspection (REQ-025).** The AQL-parse and type-registry error inspection sites now guard against a typed-nil `errors.AsType` match, and report no position where none is known.
 - **Discriminating PROBE-099 relation row (REQ-164).** A new near-miss row makes containment-relation threading mutation-detectable at probe level, where the prior supplied-relation row stayed inert.
+- **Canonical-JSON decode shape sentinel (REQ-052).** Every generated RM/AOM `UnmarshalJSON` now classifies a JSON-shape failure with `canjson.ErrInvalidShape` so `errors.Is` matches, with message and unwrapped cause unchanged ([plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md)).
+- **Value-free diagnostics for unrouted requests (REQ-093).** Transport error strings render the placeholder `(unrouted)` instead of a resolved path or URL when a request carries no route template, including the URL a wrapped `*url.Error` reports ([plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md)).
 
 ## [0.24.0] - 2026-08-30
 

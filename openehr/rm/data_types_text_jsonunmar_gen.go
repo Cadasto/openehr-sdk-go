@@ -28,10 +28,13 @@ type CodePhraseJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (c *CodePhrase) UnmarshalJSON(data []byte) error {
 	var aux CodePhraseJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: CODE_PHRASE: %w", err)
+		return typereg.WrapShapeError("CODE_PHRASE", err)
 	}
 	if aux.Class != "" && aux.Class != "CODE_PHRASE" {
 		return &typereg.DecodeError{
@@ -73,10 +76,13 @@ type DVCodedTextJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVCodedText) UnmarshalJSON(data []byte) error {
 	var aux DVCodedTextJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_CODED_TEXT: %w", err)
+		return typereg.WrapShapeError("DV_CODED_TEXT", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_CODED_TEXT" {
 		return &typereg.DecodeError{
@@ -119,10 +125,13 @@ type DVParagraphJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVParagraph) UnmarshalJSON(data []byte) error {
 	var aux DVParagraphJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_PARAGRAPH: %w", err)
+		return typereg.WrapShapeError("DV_PARAGRAPH", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_PARAGRAPH" {
 		return &typereg.DecodeError{
@@ -181,10 +190,13 @@ type DVTextJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVText) UnmarshalJSON(data []byte) error {
 	var aux DVTextJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_TEXT: %w", err)
+		return typereg.WrapShapeError("DV_TEXT", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_TEXT" {
 		return &typereg.DecodeError{
@@ -238,10 +250,13 @@ type TermMappingJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (t *TermMapping) UnmarshalJSON(data []byte) error {
 	var aux TermMappingJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: TERM_MAPPING: %w", err)
+		return typereg.WrapShapeError("TERM_MAPPING", err)
 	}
 	if aux.Class != "" && aux.Class != "TERM_MAPPING" {
 		return &typereg.DecodeError{

@@ -28,10 +28,13 @@ type AssertionJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (a *Assertion) UnmarshalJSON(data []byte) error {
 	var aux AssertionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ASSERTION: %w", err)
+		return typereg.WrapShapeError("ASSERTION", err)
 	}
 	if aux.Class != "" && aux.Class != "ASSERTION" {
 		return &typereg.DecodeError{
@@ -65,10 +68,13 @@ type AssertionVariableJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (a *AssertionVariable) UnmarshalJSON(data []byte) error {
 	var aux AssertionVariableJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ASSERTION_VARIABLE: %w", err)
+		return typereg.WrapShapeError("ASSERTION_VARIABLE", err)
 	}
 	if aux.Class != "" && aux.Class != "ASSERTION_VARIABLE" {
 		return &typereg.DecodeError{
@@ -98,10 +104,13 @@ type ExprBinaryOperatorJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (e *ExprBinaryOperator) UnmarshalJSON(data []byte) error {
 	var aux ExprBinaryOperatorJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: EXPR_BINARY_OPERATOR: %w", err)
+		return typereg.WrapShapeError("EXPR_BINARY_OPERATOR", err)
 	}
 	if aux.Class != "" && aux.Class != "EXPR_BINARY_OPERATOR" {
 		return &typereg.DecodeError{
@@ -144,10 +153,13 @@ type ExprLeafJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (e *ExprLeaf) UnmarshalJSON(data []byte) error {
 	var aux ExprLeafJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: EXPR_LEAF: %w", err)
+		return typereg.WrapShapeError("EXPR_LEAF", err)
 	}
 	if aux.Class != "" && aux.Class != "EXPR_LEAF" {
 		return &typereg.DecodeError{
@@ -177,10 +189,13 @@ type ExprUnaryOperatorJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (e *ExprUnaryOperator) UnmarshalJSON(data []byte) error {
 	var aux ExprUnaryOperatorJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: EXPR_UNARY_OPERATOR: %w", err)
+		return typereg.WrapShapeError("EXPR_UNARY_OPERATOR", err)
 	}
 	if aux.Class != "" && aux.Class != "EXPR_UNARY_OPERATOR" {
 		return &typereg.DecodeError{

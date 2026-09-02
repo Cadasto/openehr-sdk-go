@@ -305,7 +305,15 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 
 	httpResp, err := c.cfg.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("transport: %s %s: %w", req.effectiveMethod(), req.effectiveRoute(), err)
+		// A network failure arrives from net/http as *url.Error, whose own
+		// Error() prints the resolved URL it was dialling — so this arm's
+		// value-free prefix is not enough on its own (REQ-093).
+		// sanitiseURLError substitutes the same route slot into that URL
+		// field while keeping the error's type and cause intact. The other
+		// two doOnce diagnostics wrap body-read errors, which carry no
+		// request URL of their own.
+		route := req.routeOrPlaceholder()
+		return nil, fmt.Errorf("transport: %s %s: %w", req.effectiveMethod(), route, sanitiseURLError(err, route))
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
@@ -319,10 +327,10 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 	}
 	respBody, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, fmt.Errorf("transport: %s %s: read body: %w", req.effectiveMethod(), req.effectiveRoute(), err)
+		return nil, fmt.Errorf("transport: %s %s: read body: %w", req.effectiveMethod(), req.routeOrPlaceholder(), err)
 	}
 	if limit > 0 && int64(len(respBody)) > limit {
-		return nil, fmt.Errorf("transport: %s %s: read body: response exceeds limit of %d bytes", req.effectiveMethod(), req.effectiveRoute(), limit)
+		return nil, fmt.Errorf("transport: %s %s: read body: response exceeds limit of %d bytes", req.effectiveMethod(), req.routeOrPlaceholder(), limit)
 	}
 	resp := &Response{
 		StatusCode: httpResp.StatusCode,
@@ -440,7 +448,7 @@ func (c *Client) mapWireError(req *Request, target *url.URL, resp *Response) err
 		StatusCode: resp.StatusCode,
 		Method:     req.effectiveMethod(),
 		URL:        sanitisedURL(target),
-		Route:      req.effectiveRoute(),
+		Route:      req.routeOrPlaceholder(),
 		Sentinel:   statusToSentinel(resp.StatusCode),
 	}
 	if detail, ok := decodeOpenEHRError(resp.Body); ok {
@@ -584,6 +592,38 @@ func sanitisedURL(u *url.URL) string {
 	return out.String()
 }
 
+// sanitiseURLError replaces the resolved URL a wrapped net/http
+// *url.Error prints with route — the caller's route template, or the
+// "(unrouted)" placeholder — so a network failure's diagnostic stays
+// value-free (REQ-093). The resolved URL carries the expanded request
+// path, which may hold a caller-supplied identifier such as a live
+// ehr_id.
+//
+// What it guarantees the caller: the substitution is a shallow copy, so
+// the error is still a *url.Error under errors.AsType, with Op and Err
+// unchanged — Timeout(), Temporary(), Unwrap() and errors.Is against the
+// underlying cause all answer exactly as they did. Only the URL field's
+// text differs.
+//
+// *http.Client.Do documents that it always returns a *url.Error at the
+// top of the chain, so only a top-level match is substituted; anything
+// else is returned unchanged rather than rewritten mid-chain, where a
+// *url.Error could belong to a cause the transport did not build.
+func sanitiseURLError(err error, route string) error {
+	ue, ok := errors.AsType[*url.Error](err)
+	if !ok || ue == nil {
+		return err
+	}
+	// Identity, not chain membership: substitute only when the match IS
+	// the error net/http handed back, never one found deeper in the chain.
+	if error(ue) != err { //nolint:errorlint // identity by design — see above
+		return err
+	}
+	out := *ue
+	out.URL = route
+	return &out
+}
+
 // Decode is a typed wrapper around Do — executes req, decodes the
 // response body as canonical JSON into a fresh *T, and returns the
 // typed result plus the parsed Metadata.
@@ -615,7 +655,7 @@ func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata,
 		// that drops them.
 		return nil, resp.Metadata, &DecodeError{
 			Method: req.effectiveMethod(),
-			Route:  req.effectiveRoute(),
+			Route:  req.routeOrPlaceholder(),
 			Body:   resp.Body,
 			Inner:  err,
 		}

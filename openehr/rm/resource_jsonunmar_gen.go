@@ -23,10 +23,13 @@ type ResourceAnnotationsJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (r *ResourceAnnotations) UnmarshalJSON(data []byte) error {
 	var aux ResourceAnnotationsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: RESOURCE_ANNOTATIONS: %w", err)
+		return typereg.WrapShapeError("RESOURCE_ANNOTATIONS", err)
 	}
 	if aux.Class != "" && aux.Class != "RESOURCE_ANNOTATIONS" {
 		return &typereg.DecodeError{

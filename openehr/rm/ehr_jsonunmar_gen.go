@@ -37,10 +37,13 @@ type EHRJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (e *EHR) UnmarshalJSON(data []byte) error {
 	var aux EHRJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: EHR: %w", err)
+		return typereg.WrapShapeError("EHR", err)
 	}
 	if aux.Class != "" && aux.Class != "EHR" {
 		return &typereg.DecodeError{
@@ -212,10 +215,13 @@ type EHRAccessJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (e *EHRAccess) UnmarshalJSON(data []byte) error {
 	var aux EHRAccessJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: EHR_ACCESS: %w", err)
+		return typereg.WrapShapeError("EHR_ACCESS", err)
 	}
 	if aux.Class != "" && aux.Class != "EHR_ACCESS" {
 		return &typereg.DecodeError{
@@ -288,10 +294,13 @@ type EHRStatusJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (e *EHRStatus) UnmarshalJSON(data []byte) error {
 	var aux EHRStatusJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: EHR_STATUS: %w", err)
+		return typereg.WrapShapeError("EHR_STATUS", err)
 	}
 	if aux.Class != "" && aux.Class != "EHR_STATUS" {
 		return &typereg.DecodeError{
@@ -353,10 +362,13 @@ type VersionedCompositionJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (v *VersionedComposition) UnmarshalJSON(data []byte) error {
 	var aux VersionedCompositionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: VERSIONED_COMPOSITION: %w", err)
+		return typereg.WrapShapeError("VERSIONED_COMPOSITION", err)
 	}
 	if aux.Class != "" && aux.Class != "VERSIONED_COMPOSITION" {
 		return &typereg.DecodeError{
@@ -399,10 +411,13 @@ type VersionedEHRAccessJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (v *VersionedEHRAccess) UnmarshalJSON(data []byte) error {
 	var aux VersionedEHRAccessJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: VERSIONED_EHR_ACCESS: %w", err)
+		return typereg.WrapShapeError("VERSIONED_EHR_ACCESS", err)
 	}
 	if aux.Class != "" && aux.Class != "VERSIONED_EHR_ACCESS" {
 		return &typereg.DecodeError{
@@ -445,10 +460,13 @@ type VersionedEHRStatusJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (v *VersionedEHRStatus) UnmarshalJSON(data []byte) error {
 	var aux VersionedEHRStatusJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: VERSIONED_EHR_STATUS: %w", err)
+		return typereg.WrapShapeError("VERSIONED_EHR_STATUS", err)
 	}
 	if aux.Class != "" && aux.Class != "VERSIONED_EHR_STATUS" {
 		return &typereg.DecodeError{

@@ -32,10 +32,13 @@ type ArchetypeOntologyJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (a *ArchetypeOntology) UnmarshalJSON(data []byte) error {
 	var aux ArchetypeOntologyJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ARCHETYPE_ONTOLOGY: %w", err)
+		return typereg.WrapShapeError("ARCHETYPE_ONTOLOGY", err)
 	}
 	if aux.Class != "" && aux.Class != "ARCHETYPE_ONTOLOGY" {
 		return &typereg.DecodeError{
@@ -65,10 +68,13 @@ type ArchetypeTermJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (a *ArchetypeTerm) UnmarshalJSON(data []byte) error {
 	var aux ArchetypeTermJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ARCHETYPE_TERM: %w", err)
+		return typereg.WrapShapeError("ARCHETYPE_TERM", err)
 	}
 	if aux.Class != "" && aux.Class != "ARCHETYPE_TERM" {
 		return &typereg.DecodeError{

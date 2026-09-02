@@ -48,10 +48,13 @@ type ArchetypeJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (a *Archetype) UnmarshalJSON(data []byte) error {
 	var aux ArchetypeJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ARCHETYPE: %w", err)
+		return typereg.WrapShapeError("ARCHETYPE", err)
 	}
 	if aux.Class != "" && aux.Class != "ARCHETYPE" {
 		return &typereg.DecodeError{

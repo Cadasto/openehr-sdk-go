@@ -21,10 +21,13 @@ type MeasurementServiceJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (m *MeasurementService) UnmarshalJSON(data []byte) error {
 	var aux MeasurementServiceJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: MEASUREMENT_SERVICE: %w", err)
+		return typereg.WrapShapeError("MEASUREMENT_SERVICE", err)
 	}
 	if aux.Class != "" && aux.Class != "MEASUREMENT_SERVICE" {
 		return &typereg.DecodeError{

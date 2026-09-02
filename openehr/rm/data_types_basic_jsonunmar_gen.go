@@ -23,10 +23,13 @@ type DVBooleanJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVBoolean) UnmarshalJSON(data []byte) error {
 	var aux DVBooleanJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_BOOLEAN: %w", err)
+		return typereg.WrapShapeError("DV_BOOLEAN", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_BOOLEAN" {
 		return &typereg.DecodeError{
@@ -55,10 +58,13 @@ type DVIdentifierJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVIdentifier) UnmarshalJSON(data []byte) error {
 	var aux DVIdentifierJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_IDENTIFIER: %w", err)
+		return typereg.WrapShapeError("DV_IDENTIFIER", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_IDENTIFIER" {
 		return &typereg.DecodeError{
@@ -86,10 +92,13 @@ type DVStateJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVState) UnmarshalJSON(data []byte) error {
 	var aux DVStateJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_STATE: %w", err)
+		return typereg.WrapShapeError("DV_STATE", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_STATE" {
 		return &typereg.DecodeError{

@@ -65,7 +65,7 @@
 
 - **Coverage:** version-trim → Group 1; nil-safety → Group 2; PROBE-099 twin → Group 3. All three recorded leftovers mapped.
 - **Independence:** the groups share no files; ship any subset.
-- **Note:** Group 2 is the same REQ-025 nil-safety axis as `transport`'s `WireError`/`DecodeError` guards — if the [decode-error-surface plan](../2026-09-02-decode-error-surface-typing.md) runs alongside, keep the guard idiom identical.
+- **Note:** Group 2 is the same REQ-025 nil-safety axis as `transport`'s `WireError`/`DecodeError` guards — the [decode-error-surface plan](2026-09-02-decode-error-surface-typing.md) has landed, so match the guard idiom it left behind.
 
 ## Mapping to specs
 

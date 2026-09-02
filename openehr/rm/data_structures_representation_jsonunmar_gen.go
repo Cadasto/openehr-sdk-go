@@ -35,10 +35,13 @@ type ClusterJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (c *Cluster) UnmarshalJSON(data []byte) error {
 	var aux ClusterJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: CLUSTER: %w", err)
+		return typereg.WrapShapeError("CLUSTER", err)
 	}
 	if aux.Class != "" && aux.Class != "CLUSTER" {
 		return &typereg.DecodeError{
@@ -114,10 +117,13 @@ type ElementJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (e *Element) UnmarshalJSON(data []byte) error {
 	var aux ElementJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ELEMENT: %w", err)
+		return typereg.WrapShapeError("ELEMENT", err)
 	}
 	if aux.Class != "" && aux.Class != "ELEMENT" {
 		return &typereg.DecodeError{

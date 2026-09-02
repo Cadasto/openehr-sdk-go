@@ -42,10 +42,13 @@ type DVDateJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVDate) UnmarshalJSON(data []byte) error {
 	var aux DVDateJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_DATE: %w", err)
+		return typereg.WrapShapeError("DV_DATE", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_DATE" {
 		return &typereg.DecodeError{
@@ -92,10 +95,13 @@ type DVDateTimeJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVDateTime) UnmarshalJSON(data []byte) error {
 	var aux DVDateTimeJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_DATE_TIME: %w", err)
+		return typereg.WrapShapeError("DV_DATE_TIME", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_DATE_TIME" {
 		return &typereg.DecodeError{
@@ -146,10 +152,13 @@ type DVDurationJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVDuration) UnmarshalJSON(data []byte) error {
 	var aux DVDurationJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_DURATION: %w", err)
+		return typereg.WrapShapeError("DV_DURATION", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_DURATION" {
 		return &typereg.DecodeError{
@@ -197,10 +206,13 @@ type DVTimeJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVTime) UnmarshalJSON(data []byte) error {
 	var aux DVTimeJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_TIME: %w", err)
+		return typereg.WrapShapeError("DV_TIME", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_TIME" {
 		return &typereg.DecodeError{

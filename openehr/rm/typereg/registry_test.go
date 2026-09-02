@@ -83,6 +83,10 @@ func TestDecodeMissingTypeIsErrMissingType(t *testing.T) {
 	if !errors.Is(err, ErrMissingType) {
 		t.Errorf("err = %v; want errors.Is(_, ErrMissingType)", err)
 	}
+	// REQ-052: a dispatch failure stays outside the shape sentinel.
+	if errors.Is(err, ErrInvalidShape) {
+		t.Errorf("err = %v; a missing `_type` is a dispatch failure, not a JSON shape error", err)
+	}
 }
 
 func TestDecodeUnknownTypeIsErrUnknownType(t *testing.T) {
@@ -199,5 +203,65 @@ func TestJSONNestingDepth_boundary(t *testing.T) {
 	}
 	if got := jsonNestingDepth(nested(maxDecodeDepth + 1)); got <= maxDecodeDepth {
 		t.Errorf("depth cap+1: got %d, want > %d (must be rejected)", got, maxDecodeDepth)
+	}
+}
+
+// TestWrapShapeErrorKeepsTextAndAddsSentinel pins the two halves of the
+// REQ-052 wrap that the canjson end-to-end tests can only see through a
+// substring: the message is EXACTLY the historical
+// `canjson: <RM_TYPE>: <cause>` text, and the cause stays reachable
+// beside the added ErrInvalidShape classification.
+func TestWrapShapeErrorKeepsTextAndAddsSentinel(t *testing.T) {
+	cause := errors.New("json: cannot unmarshal string into Go value of type float64")
+	err := WrapShapeError("DV_QUANTITY", cause)
+
+	if want := "canjson: DV_QUANTITY: " + cause.Error(); err.Error() != want {
+		t.Errorf("Error() = %q; want %q — the wrap must not change the text", err.Error(), want)
+	}
+	if !errors.Is(err, ErrInvalidShape) {
+		t.Errorf("err = %v; want errors.Is(_, ErrInvalidShape)", err)
+	}
+	if !errors.Is(err, cause) {
+		t.Errorf("err = %v; the classification must not cost the cause", err)
+	}
+	// Single-step unwrapping must land on the cause, not on nil: a
+	// multi-error Unwrap would satisfy errors.Is/As but break every
+	// caller that walks the chain one hop at a time. The comparison is
+	// identity on purpose — errors.Is would also pass if Unwrap returned
+	// some other wrapper around the cause, which is the failure this
+	// assertion exists to catch.
+	if got := errors.Unwrap(err); got != cause { //nolint:errorlint // identity by design — see above
+		t.Errorf("errors.Unwrap(err) = %v; want the cause %v — one unwrap step must reach it", got, cause)
+	}
+}
+
+// TestWrapShapeErrorLeavesDecodeErrorUnclassified pins the boundary: a
+// nested polymorphic failure travelling out through an enclosing type's
+// UnmarshalJSON keeps its DecodeError classification and does NOT become
+// a shape error — ErrInvalidShape means "JSON-level shape", not "any
+// decode failure" (REQ-052).
+func TestWrapShapeErrorLeavesDecodeErrorUnclassified(t *testing.T) {
+	inner := &DecodeError{Path: "/lower", Inner: ErrUnknownType}
+	err := WrapShapeError("DV_QUANTITY", inner)
+
+	if want := "canjson: DV_QUANTITY: " + inner.Error(); err.Error() != want {
+		t.Errorf("Error() = %q; want %q", err.Error(), want)
+	}
+	if errors.Is(err, ErrInvalidShape) {
+		t.Errorf("err = %v; a nested DecodeError must not be re-classified as a shape error", err)
+	}
+	if !errors.Is(err, ErrUnknownType) {
+		t.Errorf("err = %v; want the polymorphic classification to survive the wrap", err)
+	}
+	if _, ok := errors.AsType[*DecodeError](err); !ok {
+		t.Errorf("err = %v; want errors.As to still reach *DecodeError", err)
+	}
+}
+
+// TestWrapShapeErrorNilIsNil guards the success path: a nil cause must
+// not be turned into an error by the wrap.
+func TestWrapShapeErrorNilIsNil(t *testing.T) {
+	if err := WrapShapeError("DV_QUANTITY", nil); err != nil {
+		t.Errorf("WrapShapeError(_, nil) = %v; want nil", err)
 	}
 }

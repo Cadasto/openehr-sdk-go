@@ -40,9 +40,19 @@ type Request struct {
 	// id exploits. Use [ValidatePathSegment] to preflight one interpolated
 	// parameter.
 	Path string
-	// Route is the path template used for OTel span naming and error
-	// attribution (e.g. "/ehr/{ehr_id}/composition"). When empty the
-	// transport falls back to Path for those.
+	// Route is the path template the transport names the request by
+	// (e.g. "/ehr/{ehr_id}/composition"). When it is empty the two
+	// surfaces that need a name answer differently, and deliberately so:
+	//
+	//   - Telemetry falls back to Path — OTel span naming, the http.route
+	//     attribute (REQ-090) and Observation.Route (REQ-098) may
+	//     legitimately carry the resolved path.
+	//   - Diagnostic strings do not. They render the stable placeholder
+	//     "(unrouted)" instead, because Path may hold a caller-supplied
+	//     identifier and REQ-093 requires error strings stay value-free.
+	//
+	// The split is effectiveRoute (telemetry) versus routeOrPlaceholder
+	// (diagnostics); see those two methods for the precise contract.
 	//
 	// Optional for a raw transport.Do caller, but REQUIRED of any request
 	// that interpolates a parameter into Path: the REQ-150 arity check
@@ -101,12 +111,36 @@ type Request struct {
 }
 
 // effectiveRoute returns Route, falling back to Path. Used for OTel
-// span naming and error attribution.
+// span naming and the REQ-098 Observation.Route — telemetry surfaces, which
+// may legitimately carry the resolved path. Human-readable error strings use
+// routeOrPlaceholder instead (REQ-093): see that doc comment for why the two
+// must not share a fallback.
 func (r *Request) effectiveRoute() string {
 	if r.Route != "" {
 		return r.Route
 	}
 	return r.Path
+}
+
+// unroutedRoute is the stable, value-free placeholder substituted for the
+// route template in diagnostic strings when the caller left Request.Route
+// unset. Its exact text is normative — transport.md § REQ-093, the
+// "Unrouted requests render a placeholder" clause — not an implementation
+// detail free to change: a caller may already match against it.
+const unroutedRoute = "(unrouted)"
+
+// routeOrPlaceholder returns Route, or unroutedRoute when Route is unset.
+// Unlike effectiveRoute, it never falls back to Path: Path may carry a
+// caller-supplied identifier (an EHR id, a composition uid, …), and REQ-093
+// requires transport error strings — doOnce's "transport: %s %s: …"
+// diagnostics, and the Route captured on WireError and DecodeError — stay
+// value-free. Every human-readable error surface in this package uses this
+// method instead of effectiveRoute.
+func (r *Request) routeOrPlaceholder() string {
+	if r.Route != "" {
+		return r.Route
+	}
+	return unroutedRoute
 }
 
 func (r *Request) effectiveServiceID() string {

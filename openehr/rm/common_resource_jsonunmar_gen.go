@@ -34,10 +34,13 @@ type ResourceDescriptionJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (r *ResourceDescription) UnmarshalJSON(data []byte) error {
 	var aux ResourceDescriptionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: RESOURCE_DESCRIPTION: %w", err)
+		return typereg.WrapShapeError("RESOURCE_DESCRIPTION", err)
 	}
 	if aux.Class != "" && aux.Class != "RESOURCE_DESCRIPTION" {
 		return &typereg.DecodeError{
@@ -86,10 +89,13 @@ type ResourceDescriptionItemJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (r *ResourceDescriptionItem) UnmarshalJSON(data []byte) error {
 	var aux ResourceDescriptionItemJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: RESOURCE_DESCRIPTION_ITEM: %w", err)
+		return typereg.WrapShapeError("RESOURCE_DESCRIPTION_ITEM", err)
 	}
 	if aux.Class != "" && aux.Class != "RESOURCE_DESCRIPTION_ITEM" {
 		return &typereg.DecodeError{
@@ -125,10 +131,13 @@ type TranslationDetailsJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (t *TranslationDetails) UnmarshalJSON(data []byte) error {
 	var aux TranslationDetailsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: TRANSLATION_DETAILS: %w", err)
+		return typereg.WrapShapeError("TRANSLATION_DETAILS", err)
 	}
 	if aux.Class != "" && aux.Class != "TRANSLATION_DETAILS" {
 		return &typereg.DecodeError{

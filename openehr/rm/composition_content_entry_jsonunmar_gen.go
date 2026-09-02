@@ -52,10 +52,13 @@ type ActionJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (a *Action) UnmarshalJSON(data []byte) error {
 	var aux ActionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ACTION: %w", err)
+		return typereg.WrapShapeError("ACTION", err)
 	}
 	if aux.Class != "" && aux.Class != "ACTION" {
 		return &typereg.DecodeError{
@@ -192,10 +195,13 @@ type ActivityJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (a *Activity) UnmarshalJSON(data []byte) error {
 	var aux ActivityJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ACTIVITY: %w", err)
+		return typereg.WrapShapeError("ACTIVITY", err)
 	}
 	if aux.Class != "" && aux.Class != "ACTIVITY" {
 		return &typereg.DecodeError{
@@ -273,10 +279,13 @@ type AdminEntryJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (a *AdminEntry) UnmarshalJSON(data []byte) error {
 	var aux AdminEntryJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ADMIN_ENTRY: %w", err)
+		return typereg.WrapShapeError("ADMIN_ENTRY", err)
 	}
 	if aux.Class != "" && aux.Class != "ADMIN_ENTRY" {
 		return &typereg.DecodeError{
@@ -387,10 +396,13 @@ type EvaluationJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (e *Evaluation) UnmarshalJSON(data []byte) error {
 	var aux EvaluationJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: EVALUATION: %w", err)
+		return typereg.WrapShapeError("EVALUATION", err)
 	}
 	if aux.Class != "" && aux.Class != "EVALUATION" {
 		return &typereg.DecodeError{
@@ -530,10 +542,13 @@ type InstructionJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (i *Instruction) UnmarshalJSON(data []byte) error {
 	var aux InstructionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: INSTRUCTION: %w", err)
+		return typereg.WrapShapeError("INSTRUCTION", err)
 	}
 	if aux.Class != "" && aux.Class != "INSTRUCTION" {
 		return &typereg.DecodeError{
@@ -660,10 +675,13 @@ type InstructionDetailsJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (i *InstructionDetails) UnmarshalJSON(data []byte) error {
 	var aux InstructionDetailsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: INSTRUCTION_DETAILS: %w", err)
+		return typereg.WrapShapeError("INSTRUCTION_DETAILS", err)
 	}
 	if aux.Class != "" && aux.Class != "INSTRUCTION_DETAILS" {
 		return &typereg.DecodeError{
@@ -699,10 +717,13 @@ type IsmTransitionJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (i *IsmTransition) UnmarshalJSON(data []byte) error {
 	var aux IsmTransitionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ISM_TRANSITION: %w", err)
+		return typereg.WrapShapeError("ISM_TRANSITION", err)
 	}
 	if aux.Class != "" && aux.Class != "ISM_TRANSITION" {
 		return &typereg.DecodeError{
@@ -774,10 +795,13 @@ type ObservationJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (o *Observation) UnmarshalJSON(data []byte) error {
 	var aux ObservationJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: OBSERVATION: %w", err)
+		return typereg.WrapShapeError("OBSERVATION", err)
 	}
 	if aux.Class != "" && aux.Class != "OBSERVATION" {
 		return &typereg.DecodeError{
