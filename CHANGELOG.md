@@ -12,6 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
+- **`ehr.Create` empty-2xx typing (REQ-094).** An empty, whitespace-only, or JSON-`null` 2xx body from `ehr.Create` now returns `*NoRepresentationError` with the commit metadata, matching the versioned-write family ([plan](docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md)).
 - **Canonical-JSON decode shape sentinel (REQ-052).** Every generated RM/AOM `UnmarshalJSON` now classifies a JSON-shape failure with `canjson.ErrInvalidShape` so `errors.Is` matches, with message and unwrapped cause unchanged ([plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md)).
 - **Value-free diagnostics for unrouted requests (REQ-093).** Transport error strings render the placeholder `(unrouted)` instead of a resolved path or URL when a request carries no route template, including the URL a wrapped `*url.Error` reports ([plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md)).
 

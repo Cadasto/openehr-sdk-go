@@ -8,15 +8,16 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ### Deferred-work backlog (2026-09-01 / 02)
 
-Five plans from a consumer→SDK gap survey plus the review-round follow-ups that were living only in session notes. All amend shipped REQs in place (normative deltas ride in the implementing PR) **except** the RM-function stubs, which propose new ids. **The four still-draft plans are not approved for implementation yet** — they exist so the work is ready; the fifth, the decode-error-surface plan, landed 2026-09-02 and is archived. Landing it also settled the group's named cross-plan seam: it wired `canjson.ErrInvalidShape` (option A) rather than retiring it, so the fidelity plan's `Real`-precision task reuses that sentinel instead of minting its own.
+Five plans from a consumer→SDK gap survey plus the review-round follow-ups that were living only in session notes. All amend shipped REQs in place (normative deltas ride in the implementing PR) **except** the RM-function stubs, which propose new ids. The `ehr.Create` empty-2xx typing plan and the decode-error-surface plan have since **landed and were archived** (below); the remaining three are **not approved for implementation yet** — they exist so the work is ready. Landing the decode-error-surface plan also settled the group's named cross-plan seam: it wired `canjson.ErrInvalidShape` (option A) rather than retiring it, so the fidelity plan's `Real`-precision task reuses that sentinel instead of minting its own.
 
 | Plan | Scope | Covers | Notes |
 |---|---|---|---|
 | [2026-09-01-rm-canonical-json-fidelity.md](2026-09-01-rm-canonical-json-fidelity.md) | `TERM_MAPPING.match` as a canonical single-character string (a `Character` named primitive), `DV_TEXT.mappings` decode-presence, the RM-floor value-set + `Mappings_valid` invariants, a `DV_MULTIMEDIA` base64 round-trip pin, and the `Real` mantissa-precision-loss decode error | REQ-046 / 052 / 112 (no new id) | Reported by the consuming CDR project |
-| [2026-09-01-ehr-create-empty-2xx-typing.md](2026-09-01-ehr-create-empty-2xx-typing.md) | Type `ehr.Create`'s empty-2xx arm as `*NoRepresentationError`, matching the versioned-write family, without disturbing the shared read decode or the REQ-151 decode-failure arm | REQ-094 (no new id) | Closes the last write-result deferral |
 | [2026-09-01-rm-function-deferred-stubs.md](2026-09-01-rm-function-deferred-stubs.md) | Realise the two `rm-functions` panic-stub clusters — `DV_AMOUNT` arithmetic, and reference accessors + inverse navigation | proposed REQ-124 / 125 | **Parked** behind a YAGNI/DoR gate — no consumer need yet; `parent`/`path_of_item` needs an ADR |
 | [archive/2026-09-02-decode-error-surface-typing.md](archive/2026-09-02-decode-error-surface-typing.md) | **Landed 2026-09-02 and archived**: the decode-only `canjson.ErrInvalidShape` gained a producer — every generated RM/AOM `UnmarshalJSON` now classifies its JSON-shape failures with it, text and cause unchanged — and `transport`'s error strings stop falling back to `Request.Path`, rendering the stable `(unrouted)` placeholder when the caller set no route template | REQ-052 (stays `partial`) / REQ-093 (no new id) | The Extras re-encode candidate was verified already fixed and dropped |
 | [2026-09-02-aql-req151-error-leftovers.md](2026-09-02-aql-req151-error-leftovers.md) | Trim the stored-query `version` path parameter, nil-safe the `parse.SyntaxError` / `typereg.DecodeError` inspection sites, and add the discriminating PROBE-099 relation-threading row | REQ-055 / 057 / 025 (no new id) | PROBE-099 corpus extension |
+
+The `ehr.Create` empty-2xx typing plan **landed 2026-09-02 and was archived** ([archive/2026-09-01-ehr-create-empty-2xx-typing.md](archive/2026-09-01-ehr-create-empty-2xx-typing.md)): REQ-094 stays `landed` (implementation-aligned amendment). `ehr.Create`'s empty/null-body 2xx arm now returns a typed `*ehr.NoRepresentationError`, matching the versioned-write family, instead of the bare `transport.ErrInvalidShape` that was REQ-094's one keyed exception; the decode-failure arm stays `*transport.DecodeError` per REQ-151, and `ehr.Get`/`ehr.Exists`/`ehr.GetBySubject` are untouched.
 
 ### Read-path decode taxonomy and Definition metadata decoding (2026-08-30)
 
@@ -38,8 +39,8 @@ representation body stays `transport.ErrInvalidShape`, and the REQ-094 write-res
 from the archived [write-result plan](archive/2026-08-18-write-result-contract.md): a
 `canjson.ErrInvalidValue` encode sentinel under REQ-052, `errors.Is`-distinct from the decode-side
 shape sentinel and from the transport one. **Deferred:** lifting REQ-094's empty-body keyed
-exception for `ehr.Create`, the `auth` / `smart` JSON decodes, and aligning `canxml`'s single
-both-directions sentinel.
+exception for `ehr.Create` (closed — see the `ehr.Create` empty-2xx typing row above), the
+`auth` / `smart` JSON decodes, and aligning `canxml`'s single both-directions sentinel.
 
 The Definition metadata decoding plan **landed 2026-08-30 and was archived**
 ([archive/2026-08-30-definition-metadata-decoding.md](archive/2026-08-30-definition-metadata-decoding.md)):

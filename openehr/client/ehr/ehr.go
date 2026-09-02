@@ -108,6 +108,22 @@ func WithInitialStatus(s *rm.EHRStatus) CreateOption {
 // EHR_STATUS. Returns the decoded *rm.EHR (Prefer=representation by
 // default — callers almost always need the new ehr_id back even when
 // they supplied one).
+//
+// Two 2xx responses are failures, not successes, and each has its own
+// type:
+//
+//   - An empty, whitespace-only, or JSON-null body committed the EHR but
+//     carries no usable representation: a [*NoRepresentationError]
+//     (REQ-094). [errors.Is](err, [transport.ErrInvalidShape]) still
+//     holds through its Unwrap, so callers keyed on that sentinel are
+//     unaffected.
+//   - A body that is present but does not decode: a
+//     [*transport.DecodeError] carrying the raw response bytes
+//     (REQ-151).
+//
+// The returned *VersionMetadata is populated on both — it is what proves
+// the EHR was committed. A non-2xx response stays a
+// [*transport.WireError].
 func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm.EHR, *VersionMetadata, error) {
 	cfg := createConfig{}
 	for _, o := range opts {
@@ -139,8 +155,50 @@ func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm
 		req.Route = "/ehr"
 	}
 
-	out, meta, err := transport.Decode[rm.EHR](ctx, c, req)
-	return out, NewVersionMetadata(meta), err
+	resp, err := c.Do(ctx, req)
+	if err != nil {
+		if resp != nil {
+			return nil, NewVersionMetadata(resp.Metadata), err
+		}
+		return nil, nil, err
+	}
+	meta := NewVersionMetadata(resp.Metadata)
+
+	// REQ-094: an empty, whitespace-only, or JSON-null 2xx body commits
+	// the EHR but carries no usable representation. Classified against
+	// the raw bytes before decode is attempted, via the same
+	// isNoRepresentationBody helper WriteResult uses (transport.Decode
+	// does not special-case a null body, which would otherwise let one
+	// masquerade as a populated, all-zero-value *rm.EHR). The two 2xx
+	// failure arms split exactly here: this one is REQ-094's
+	// *NoRepresentationError; the present-but-undecodable body below is
+	// REQ-151's *transport.DecodeError.
+	if isNoRepresentationBody(resp.Body) {
+		return nil, meta, &NoRepresentationError{
+			Meta:  meta,
+			Cause: fmt.Errorf("ehr.Create: %w: 2xx with no representation body", transport.ErrInvalidShape),
+		}
+	}
+
+	out := new(rm.EHR)
+	if err := canjson.Unmarshal(resp.Body, out); err != nil {
+		// REQ-151, unchanged: a present-but-undecodable 2xx body is a
+		// *transport.DecodeError, not a NoRepresentationError. Method and
+		// Route are read directly off req rather than via the unexported
+		// effective*() helpers transport.Decode uses internally -- both
+		// are always explicitly set above, so the values are identical.
+		// The operation-name wrap matches every other hand-rolled leaf
+		// decode (composition.Get, system.Capabilities, the definition
+		// and demographic leaves); errors.AsType still reaches the inner
+		// *transport.DecodeError through it.
+		return nil, meta, fmt.Errorf("ehr.Create: %w", &transport.DecodeError{
+			Method: req.Method,
+			Route:  req.Route,
+			Body:   resp.Body,
+			Inner:  err,
+		})
+	}
+	return out, meta, nil
 }
 
 // Repository mirrors the package-level EHR functions as a method set
