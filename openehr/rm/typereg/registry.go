@@ -163,16 +163,19 @@ func (e *DecodeError) Unwrap() error {
 // The message is exactly `canjson: <rmType>: <err>`, and err stays
 // reachable through errors.As, so the classification costs no
 // diagnostic. What it adds is [ErrInvalidShape] under errors.Is —
-// except when err already carries a [DecodeError], which is a nested
-// polymorphic failure travelling out through this type's method: an
-// envelope never acquires the sentinel here, because ErrInvalidShape
-// means "JSON-level shape", not "any decode failure" (REQ-052).
+// except when err already carries a [DecodeError]: this arm does not
+// add the sentinel to it, and whatever classification that DecodeError
+// already carries — its dispatch sentinel, or a shape classification
+// raised beneath it — is kept as is (REQ-052).
 //
-// The bypass is one-directional. It withholds a classification the
-// enclosing funnel would otherwise add; it does not remove one already
-// raised beneath the [DecodeError]. A shape failure inside the concrete
-// type selected at a slot therefore keeps ErrInvalidShape while the
-// DecodeError keeps the path — both true of the same error.
+// The bypass is one-directional: it withholds a classification the
+// enclosing funnel would otherwise add, never removes one raised
+// further down. So a shape failure inside the concrete type selected
+// at a polymorphic slot keeps ErrInvalidShape while the DecodeError
+// keeps the path — both true of the same error — whereas a dispatch
+// failure (missing, unknown or mismatched `_type`) stays outside the
+// sentinel, because ErrInvalidShape means "JSON-level shape", not "any
+// decode failure".
 //
 // A nil err returns nil, so a caller cannot manufacture an error out
 // of a success.

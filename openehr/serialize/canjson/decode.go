@@ -16,9 +16,9 @@ import (
 //
 // Every shape error raised inside a generated RM type's
 // [UnmarshalJSON] — the `canjson: <RM_TYPE>:` family — wraps it, over
-// the encoding/json error, which stays reachable with errors.As: a
-// single errors.Unwrap step lands on it. A decode failure reaches the
-// caller one of three ways (REQ-052):
+// the encoding/json error, which stays reachable with errors.As; for a
+// whole-value shape failure a single errors.Unwrap step lands on it. A
+// decode failure reaches the caller one of three ways (REQ-052):
 //
 //   - Malformed JSON, which encoding/json reports before any
 //     UnmarshalJSON method runs. No sentinel: [Unmarshal] returns
