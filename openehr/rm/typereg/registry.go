@@ -114,7 +114,7 @@ func (e *DecodeError) Error() string {
 	// nil, and %v would render that as a bare "<nil>".
 	cause := "unspecified error"
 	if e.Inner != nil {
-		cause = e.Inner.Error()
+		cause = causeString(e.Inner)
 	}
 	switch {
 	case e.Path != "" && e.Type != "":
@@ -136,6 +136,21 @@ func (e *DecodeError) Unwrap() error {
 		return nil
 	}
 	return e.Inner
+}
+
+// causeString renders err's message defensively (REQ-025 nil-receiver axis).
+// Inner is any error a codec or caller can supply — including a boxed
+// typed-nil pointer whose own Error() dereferences unguarded, the shape a
+// failed errors.As / errors.AsType leaves behind — so a direct err.Error()
+// call is not safe here the way it is for this package's own guarded types.
+// The recover is the backstop for every Inner this SDK does not control.
+func causeString(err error) (s string) {
+	defer func() {
+		if r := recover(); r != nil {
+			s = fmt.Sprintf("error formatting panicked: %v", r)
+		}
+	}()
+	return err.Error()
 }
 
 // Registry maps each openEHR _type discriminator string (e.g.

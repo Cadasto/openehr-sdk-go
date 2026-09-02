@@ -50,10 +50,17 @@ type SyntaxError struct {
 // Error names the position and the message. A nil receiver answers with
 // the zero SyntaxError's text rather than reading Pos (REQ-025
 // nil-receiver axis): a failed errors.As / errors.AsType leaves a typed
-// nil that a caller boxes into a non-nil error interface and prints.
+// nil that a caller boxes into a non-nil error interface and prints. A zero
+// Pos (the nil receiver's own shape, and any caller-built SyntaxError that
+// never set one) omits the position segment rather than claiming a
+// fabricated "at 0:0:" — no real construction site ever reports that
+// position (the ANTLR listener's Line/Col start at 1).
 func (e *SyntaxError) Error() string {
 	if e == nil {
 		return (&SyntaxError{}).Error()
+	}
+	if e.Pos == (Position{}) {
+		return "aql: syntax error: " + e.Msg
 	}
 	return fmt.Sprintf("aql: syntax error at %d:%d: %s", e.Pos.Line, e.Pos.Col, e.Msg)
 }
