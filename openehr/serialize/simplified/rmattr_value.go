@@ -459,19 +459,16 @@ const matchCodes = "=<>?"
 // decodeRMAttrTermMapping decodes one `_mapping:N` instance on a DV_TEXT or
 // DV_CODED_TEXT leaf.
 //
-// `match` lands in the intermediate canonical-JSON tree as its code point
-// (`"match": 61`), a plain Go int32 this package builds directly — not the
-// generated TERM_MAPPING's own JSON contract, which since rm.Character
-// (REQ-046 / REQ-052) always encodes a one-character string. The number
-// still decodes correctly through rm.Character.UnmarshalJSON's
-// backward-compatibility branch once this tree is fed to canjson, so no
-// canonical `_type` value is ever affected by the difference; encode spells
-// `match` back as the one-character string the wire carries. `/target` is
-// decoded by the CODE_PHRASE leaf builder — `|code` required, `|terminology`
-// optional exactly as at an ENTRY `language` leaf, which is what keeps the two
-// spellings of a CODE_PHRASE from diverging — and `/purpose` by the
-// DV_CODED_TEXT one, which requires `|code`+`|value` and takes `|terminology`
-// when present.
+// `match` lands in the intermediate canonical-JSON tree as the one-character
+// string [rmattrTails.matchCode] returns (`"match": "="`) — the same canonical
+// spelling the generated TERM_MAPPING's own JSON contract uses since
+// rm.Character (REQ-046 / REQ-052), so this package's own FLAT decoder never
+// depends on rm.Character.UnmarshalJSON's backward-compatibility numeric
+// branch to round-trip a mapping. `/target` is decoded by the CODE_PHRASE leaf
+// builder — `|code` required, `|terminology` optional exactly as at an ENTRY
+// `language` leaf, which is what keeps the two spellings of a CODE_PHRASE from
+// diverging — and `/purpose` by the DV_CODED_TEXT one, which requires
+// `|code`+`|value` and takes `|terminology` when present.
 func decodeRMAttrTermMapping(g rmattrGroup, _ string) (any, error) {
 	ts, err := splitRMAttrTails(g, nil)
 	if err != nil {
@@ -591,24 +588,26 @@ func decodeRMAttrLeafValue(g rmattrGroup, rmType string) (any, error) {
 }
 
 // matchCode reads `|match` as the single character TERM_MAPPING admits, returning
-// its code point. Anything else — absent, empty, longer than one rune, or a
-// character outside the set — is a typed error rather than a truncated or zero
-// rune, which would be a mapping whose relation to its target is a fabrication.
-func (ts rmattrTails) matchCode(g rmattrGroup) (int32, error) {
+// it as the one-character canonical string (never the legacy code point — the
+// FLAT decoder's own tree carries the same spelling encode produces). Anything
+// else — absent, empty, longer than one rune, or a character outside the set —
+// is a typed error rather than a truncated or empty string, which would be a
+// mapping whose relation to its target is a fabrication.
+func (ts rmattrTails) matchCode(g rmattrGroup) (string, error) {
 	key := ts.key(g, ownTail("match"))
 	v, present := ts.own["match"]
 	if !present {
-		return 0, fmt.Errorf("%w: %s is missing the required |match (RM-mandatory on TERM_MAPPING)",
+		return "", fmt.Errorf("%w: %s is missing the required |match (RM-mandatory on TERM_MAPPING)",
 			ErrUnsupportedDatatype, g.prefix())
 	}
 	s, ok := v.(string)
 	if !ok {
-		return 0, fmt.Errorf("%w: %q must be a string, got %T", ErrUnsupportedDatatype, key, v)
+		return "", fmt.Errorf("%w: %q must be a string, got %T", ErrUnsupportedDatatype, key, v)
 	}
 	runes := []rune(s)
 	if len(runes) != 1 || !strings.ContainsRune(matchCodes, runes[0]) {
-		return 0, fmt.Errorf("%w: %q is %q, but TERM_MAPPING.match is one of %s (REQ-140)",
+		return "", fmt.Errorf("%w: %q is %q, but TERM_MAPPING.match is one of %s (REQ-140)",
 			ErrUnsupportedDatatype, key, s, matchCodes)
 	}
-	return runes[0], nil
+	return string(runes[0]), nil
 }
