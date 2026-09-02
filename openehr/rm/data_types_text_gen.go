@@ -82,7 +82,7 @@ type TermMapping struct {
 	// * `'?'`: the kind of mapping is unknown.
 	//
 	// The first three values are taken from the ISO standards 2788 ( Guide to Establishment and development of monolingual thesauri) and 5964 (Guide to Establishment and development of multilingual thesauri).
-	Match rune `json:"match"`
+	Match Character `json:"match"`
 	// Purpose Purpose of the mapping e.g. 'automated data mining', 'billing', 'interoperability'.
 	Purpose *DVCodedText `json:"purpose,omitempty"`
 	// Target The target term of the mapping.
@@ -104,7 +104,7 @@ func (t *TermMapping) Equivalent() bool {
 // IsValidMatchCode True if match valid.
 //
 // Post: Result := c = ‘>’ or c = ‘=’ or c = ‘<’ or c = ‘?’
-func (t *TermMapping) IsValidMatchCode(c rune) bool {
+func (t *TermMapping) IsValidMatchCode(c Character) bool {
 	panic("not implemented: TERM_MAPPING.is_valid_match_code — implement in a non-generated file")
 }
 

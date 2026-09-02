@@ -459,14 +459,19 @@ const matchCodes = "=<>?"
 // decodeRMAttrTermMapping decodes one `_mapping:N` instance on a DV_TEXT or
 // DV_CODED_TEXT leaf.
 //
-// `match` is a single character and lands in the canonical form as its code
-// point, because that is what the generated TERM_MAPPING marshals a Go rune to
-// (`"match": 61`); encode spells it back as the one-character string the wire
-// carries. `/target` is decoded by the CODE_PHRASE leaf builder — `|code`
-// required, `|terminology` optional exactly as at an ENTRY `language` leaf, which
-// is what keeps the two spellings of a CODE_PHRASE from diverging — and
-// `/purpose` by the DV_CODED_TEXT one, which requires `|code`+`|value` and takes
-// `|terminology` when present.
+// `match` lands in the intermediate canonical-JSON tree as its code point
+// (`"match": 61`), a plain Go int32 this package builds directly — not the
+// generated TERM_MAPPING's own JSON contract, which since rm.Character
+// (REQ-046 / REQ-052) always encodes a one-character string. The number
+// still decodes correctly through rm.Character.UnmarshalJSON's
+// backward-compatibility branch once this tree is fed to canjson, so no
+// canonical `_type` value is ever affected by the difference; encode spells
+// `match` back as the one-character string the wire carries. `/target` is
+// decoded by the CODE_PHRASE leaf builder — `|code` required, `|terminology`
+// optional exactly as at an ENTRY `language` leaf, which is what keeps the two
+// spellings of a CODE_PHRASE from diverging — and `/purpose` by the
+// DV_CODED_TEXT one, which requires `|code`+`|value` and takes `|terminology`
+// when present.
 func decodeRMAttrTermMapping(g rmattrGroup, _ string) (any, error) {
 	ts, err := splitRMAttrTails(g, nil)
 	if err != nil {

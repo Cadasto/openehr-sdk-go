@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -437,7 +438,10 @@ func emptyMandatorySuffix(sub map[string]any, path, anchor string) (string, bool
 func mappingsRMAttr(out map[string]any, base string, mappings []rm.TermMapping) error {
 	for i, tm := range mappings {
 		prefix := base + "/_mapping:" + strconv.Itoa(i)
-		if !strings.ContainsRune(matchCodes, tm.Match) {
+		matchStr := string(tm.Match)
+		// strings.Contains(s, "") is always true, so the length check comes first —
+		// otherwise a zero-value (empty) Character would slip through as "valid".
+		if utf8.RuneCountInString(matchStr) != 1 || !strings.Contains(matchCodes, matchStr) {
 			return fmt.Errorf("%w: %q cannot carry TERM_MAPPING.match %q; it is one of %s (REQ-140)",
 				ErrUnsupportedDatatype, prefix+"|match", tm.Match, matchCodes)
 		}

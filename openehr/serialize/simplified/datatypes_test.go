@@ -290,7 +290,7 @@ func TestDecoratedCodedTextAtTextLeaf(t *testing.T) {
 		DVText: rm.DVText{
 			Value: "Radial styloid tenosynovitis",
 			Mappings: []rm.TermMapping{{
-				Match:  '=',
+				Match:  "=",
 				Target: rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
 			}},
 		},
@@ -902,7 +902,7 @@ func TestMappingBesideOtherFreeText(t *testing.T) {
 	v := rm.DVText{
 		Value: "free text",
 		Mappings: []rm.TermMapping{{
-			Match:  '=',
+			Match:  "=",
 			Target: rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
 		}},
 	}

@@ -264,8 +264,8 @@ func TestRMAttrMappingRoundTrip(t *testing.T) {
 	if len(dv.Mappings) != 2 {
 		t.Fatalf("mappings = %d, want 2", len(dv.Mappings))
 	}
-	if dv.Mappings[0].Match != '=' {
-		t.Errorf("mappings[0].match = %q, want '='", dv.Mappings[0].Match)
+	if dv.Mappings[0].Match != "=" {
+		t.Errorf("mappings[0].match = %q, want \"=\"", dv.Mappings[0].Match)
 	}
 	if got := dv.Mappings[0].Target.CodeString; got != "21794005" {
 		t.Errorf("mappings[0].target.code_string = %q", got)
@@ -377,9 +377,9 @@ func TestRMAttrMappingMatchValidated(t *testing.T) {
 	if !ok {
 		t.Fatalf("dv_text leaf decoded as %T", elementText(t, comp))
 	}
-	text.Mappings[0].Match = '~'
+	text.Mappings[0].Match = "~"
 	if _, err := MarshalFlat(comp, wt); !errors.Is(err, ErrUnsupportedDatatype) {
-		t.Errorf("MarshalFlat with match '~' err = %v, want ErrUnsupportedDatatype", err)
+		t.Errorf("MarshalFlat with match %q err = %v, want ErrUnsupportedDatatype", "~", err)
 	}
 }
 
@@ -836,7 +836,7 @@ func TestIntervalUnboundedEndEncodes(t *testing.T) {
 func TestRMAttrMappingCodelessTargetRefusedOnEncode(t *testing.T) {
 	out := map[string]any{}
 	err := mappingsRMAttr(out, "x", []rm.TermMapping{{
-		Match:  '=',
+		Match:  "=",
 		Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
 	}})
 	if !errors.Is(err, ErrUnsupportedDatatype) {
