@@ -78,7 +78,7 @@ func RunStoredVersion(ctx context.Context, c *transport.Client, qualifiedName, v
 // the operation the caller actually invoked.
 func runStoredAtVersion(ctx context.Context, c *transport.Client, op, qualifiedName, version string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
 	name := strings.TrimSpace(qualifiedName)
-	version = strings.TrimSpace(version)
+	version = strings.TrimSpace(version) // REQ-057: trimmed once, reused below
 	if name == "" {
 		return nil, nil, fmt.Errorf("%s: %w: empty qualified query name", op, ErrInvalidConfig)
 	}
