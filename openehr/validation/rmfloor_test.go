@@ -327,18 +327,59 @@ func TestValidateRMDemographic_NilGuard(t *testing.T) {
 
 // TestRMFloorTermMappingMatchValueSet covers the TERM_MAPPING.match value
 // set: a match outside {'>', '=', '<', '?'} surfaces `term_mapping_match`
-// at the offending mapping's path (REQ-112).
+// at the offending mapping's path (REQ-112). Table-driven over three
+// out-of-set shapes: an arbitrary letter, the empty string (rm.Character's
+// zero value — the most likely bad input in practice, e.g. an
+// unpopulated field), and a two-character near-miss.
 func TestRMFloorTermMappingMatchValueSet(t *testing.T) {
-	txt := &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{
-		Match:  rm.Character("x"), // not in {> = < ?}
-		Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "1"},
-	}}}
-	r := validation.ValidateRM(txt)
-	if r.OK {
-		t.Fatalf("expected an invariant issue for match=%q", "x")
+	cases := []struct {
+		name  string
+		match rm.Character
+	}{
+		{name: "letter", match: rm.Character("x")},
+		{name: "empty", match: rm.Character("")},
+		{name: "two_chars", match: rm.Character("==")},
 	}
-	if !containsIssue(r.Issues, "/mappings[0]/match", "term_mapping_match") {
-		t.Errorf("expected term_mapping_match at /mappings[0]/match, got %+v", r.Issues)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			txt := &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{
+				Match:  tc.match, // not in {> = < ?}
+				Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "1"},
+			}}}
+			r := validation.ValidateRM(txt)
+			if r.OK {
+				t.Fatalf("expected an invariant issue for match=%q", tc.match)
+			}
+			if !containsIssue(r.Issues, "/mappings[0]/match", "term_mapping_match") {
+				t.Errorf("expected term_mapping_match at /mappings[0]/match, got %+v", r.Issues)
+			}
+		})
+	}
+}
+
+// TestValidateRM_TermMappingValid is the positive-path regression guard
+// for the value-set check, pairing TestRMFloorTermMappingMatchValueSet per
+// this file's established convention (e.g. TestValidateRM_CodePhraseValid
+// pairs TestValidateRM_CodePhraseEmptyCodeString): a DV_TEXT carrying one
+// TermMapping per accepted match code (`>`, `=`, `<`, `?`), each with a
+// fully-populated Target CODE_PHRASE, exercises every non-default arm of
+// checkTermMappings's switch and must report clean — no issues at all
+// (REQ-112).
+func TestValidateRM_TermMappingValid(t *testing.T) {
+	var mappings []rm.TermMapping
+	for _, match := range []rm.Character{">", "=", "<", "?"} {
+		mappings = append(mappings, rm.TermMapping{
+			Match:  match,
+			Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "73211009"},
+		})
+	}
+	txt := &rm.DVText{Value: "x", Mappings: mappings}
+	r := validation.ValidateRM(txt)
+	if !r.OK {
+		t.Errorf("ValidateRM(DV_TEXT with valid term mappings) want OK; got %+v", r.Issues)
+	}
+	if len(r.Issues) != 0 {
+		t.Errorf("ValidateRM(DV_TEXT with valid term mappings) want no issues at all; got %+v", r.Issues)
 	}
 }
 
@@ -398,11 +439,12 @@ func TestRMFloorMappingsEmptyLiteralIsInvalid(t *testing.T) {
 // carries `mappings` via its embedded DV_TEXT, and the term_mapping_match
 // invariant MUST apply there too (REQ-112).
 func TestRMFloorDVCodedTextBadMatch(t *testing.T) {
+	badMatch := rm.Character("q") // not in {> = < ?}
 	txt := &rm.DVCodedText{
 		DVText: rm.DVText{
 			Value: "x",
 			Mappings: []rm.TermMapping{{
-				Match:  rm.Character("q"), // not in {> = < ?}
+				Match:  badMatch,
 				Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "1"},
 			}},
 		},
@@ -410,7 +452,7 @@ func TestRMFloorDVCodedTextBadMatch(t *testing.T) {
 	}
 	r := validation.ValidateRM(txt)
 	if r.OK {
-		t.Fatalf("expected a term_mapping_match issue for DV_CODED_TEXT with match=%q", "q")
+		t.Fatalf("expected a term_mapping_match issue for DV_CODED_TEXT with match=%q", badMatch)
 	}
 	if !containsIssue(r.Issues, "/mappings[0]/match", "term_mapping_match") {
 		t.Errorf("expected term_mapping_match at /mappings[0]/match, got %+v", r.Issues)
