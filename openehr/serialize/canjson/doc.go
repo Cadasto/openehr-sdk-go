@@ -39,15 +39,22 @@
 //   - Numeric magnitudes use IEEE 754 double-precision JSON numbers
 //     (no silent float32 coercion). REQ-052 requires a typed error on
 //     decode "rather than silently rounding" when a wire value exceeds
-//     JSON's number precision. Both halves are met: an out-of-range
-//     magnitude (e.g. 1e400) fails with a typed error — a
-//     *json.UnmarshalTypeError, reachable with errors.As through the
-//     generated UnmarshalJSON wrapper — and a magnitude carrying more
-//     than 17 significant decimal digits (float64's shortest-round-trip
-//     guarantee), such as 0.1234567890123456789, fails decode wrapping
-//     [ErrInvalidShape] instead of rounding to the nearest float64. A
-//     merely inexact-but-round-tripping value such as 0.1 is not
-//     rejected. Closed by
+//     JSON's number precision; the SDK defines that condition as a
+//     literal carrying more than 17 significant decimal digits — past
+//     that point a literal certainly cannot round-trip through float64
+//     (its shortest-round-trip maximum). Within that definition both
+//     arms are met: an out-of-range magnitude (e.g. 1e400) fails with a
+//     typed error — a *json.UnmarshalTypeError, reachable with
+//     errors.As through the generated UnmarshalJSON wrapper — and a
+//     magnitude past 17 significant decimal digits, such as
+//     0.1234567890123456789, fails decode wrapping [ErrInvalidShape]
+//     instead of rounding to the nearest float64. This is a lower
+//     bound, not a full round-trip guarantee: a shorter literal can
+//     still be binary-inexact and decode unreported by design — an
+//     integer past 2^53 (e.g. 9007199254740993, 16 digits, decodes to
+//     9007199254740992) or any decimal fraction that is not a power of
+//     two (0.1 included) — because a general exactness check would also
+//     reject 0.1, which the plan rejected as over-reporting. Closed by
 //     docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md.
 //
 // # Error classification

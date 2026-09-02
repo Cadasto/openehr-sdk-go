@@ -183,37 +183,48 @@ requirements:
       the typereg WrapShapeError tests pin all of it, distinctness from
       canxml.ErrInvalidShape and transport.ErrInvalidShape included
       (assertShapeSentinelDistinct asserts both).
-      § Floating-point precision is now MET on both its arms (2026-09-03,
+      § Floating-point precision defines "exceeds JSON's number
+      precision" as a decimal literal carrying more than 17 significant
+      decimal digits (float64's shortest-round-trip maximum) — a lower
+      bound, not an equivalence: a shorter literal can still be
+      binary-inexact and is accepted unreported by design (e.g.
+      9007199254740993, 16 digits, decodes to 9007199254740992; any
+      decimal fraction that is not a power of two, 0.1 included, is
+      binary-inexact regardless of digit count). A general exactness
+      check (big.Float) would catch those too but would also reject 0.1,
+      which the plan rejected as over-reporting. Within that definition,
+      both arms are now MET (2026-09-03,
       docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md): the
       OUT-OF-RANGE arm as before (1e400 fails with a typed
       *json.UnmarshalTypeError, reachable by errors.As through the
       generated UnmarshalJSON wrapper — TestUnmarshalOverflowIsATypedError),
-      and the MANTISSA arm, previously open, is now closed —
-      rm.significantDigits (openehr/rm/real.go) counts a decimal
-      literal's significant digits (mantissa only: sign, decimal point
-      and exponent excluded, leading/trailing zeros ignored) and
-      Real.UnmarshalJSON fails wrapping canjson.ErrInvalidShape past 17
-      of them (float64's shortest-round-trip guarantee) instead of
-      rounding — 0.1234567890123456789 (19 significant digits) now
-      fails where it used to decode silently to 0.12345678901234568,
-      while a merely inexact-but-round-tripping value such as 0.1
-      still decodes cleanly. The retired
-      TestUnmarshalMantissaPrecisionLossIsSilent (which pinned the old
-      silent behaviour) is replaced by
+      and the MANTISSA arm, previously open, is now closed for literals
+      past 17 significant digits — rm.significantDigits
+      (openehr/rm/real.go) counts a decimal literal's significant digits
+      (mantissa only: sign, decimal point and exponent excluded,
+      leading/trailing zeros ignored) and Real.UnmarshalJSON fails
+      wrapping canjson.ErrInvalidShape past 17 of them instead of
+      rounding — 0.1234567890123456789 (19 significant digits) now fails
+      where it used to decode silently to 0.12345678901234568. The
+      retired TestUnmarshalMantissaPrecisionLossIsSilent (which pinned
+      the old silent behaviour) is replaced by
       TestUnmarshalMantissaPrecisionLossIsATypedError and a
       DV_PROPORTION inheritance twin; TestSignificantDigits and
-      TestRealUnmarshalJSON{CleanCases,PrecisionLoss} in
-      openehr/rm/real_test.go pin the trigger directly. No
-      *typereg.DecodeError names a "/magnitude" path in the resulting
-      chain — only polymorphic slots and whole-value _type mismatches
-      attach one today — so classification rests on errors.Is alone.
-      REQ-052 stays partial regardless: § Floating-point precision's
-      other clause — "Field order SHOULD follow the openEHR
-      canonical-JSON specification when one is published" — remains
-      open pending that external publication; the SDK's own
-      deterministic field-order profile is what MUST govern until then,
-      and that MUST is met, but the SHOULD itself has no canonical spec
-      to defer to yet.
+      TestRealUnmarshalJSON{CleanCases,PrecisionLoss,NullIsNoOp} in
+      openehr/rm/real_test.go pin the trigger directly, including the
+      17-digit boundary case that decodes cleanly without in fact
+      round-tripping. No *typereg.DecodeError names a "/magnitude" path
+      in the resulting chain — only polymorphic slots and whole-value
+      _type mismatches attach one today — so classification rests on
+      errors.Is alone.
+      REQ-052 stays partial regardless: § REQ-052's own Canonical-JSON
+      properties bullet list (not § Floating-point precision, which
+      contains no field-order clause) states "Field order SHOULD follow
+      the openEHR canonical-JSON specification when one is published" —
+      that SHOULD remains open pending that external publication; the
+      SDK's own deterministic field-order profile is what MUST govern
+      until then, and that MUST is met, but the SHOULD itself has no
+      canonical spec to defer to yet.
 
   - id: REQ-056
     title: Canonical XML

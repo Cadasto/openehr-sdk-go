@@ -21,6 +21,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 - **`TERM_MAPPING.match` is a canonical single-character string (REQ-046, REQ-052).** A new `Character` named primitive decodes and encodes the RM's one-character JSON string, replacing the numeric spelling that could not represent it. [plan](docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md).
 - **RM-floor `TERM_MAPPING` invariants (REQ-112).** `ValidateRM` and its typed sugars now report a `match` outside `{'>','=','<','?'}` and a present-but-empty `DV_TEXT.mappings` as invariant violations. [plan](docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md).
 - **Canonical-JSON precision and presence pins (REQ-052).** `Real.UnmarshalJSON` now refuses a literal past 17 significant digits instead of rounding silently; `DV_TEXT.mappings` and `DV_MULTIMEDIA`'s base64 `[]`/`null`/absent decode collapse are documented and pinned. [plan](docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md).
+- **Breaking: `TermMapping.Match` type change (REQ-046, REQ-052).** `Match` is `rm.Character`, not `rune` (write `Match: rm.Character("=")`); an unset `Match` now fails encode, and a magnitude past 17 significant digits now fails decode. [plan](docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md).
 
 ## [0.24.0] - 2026-08-30
 

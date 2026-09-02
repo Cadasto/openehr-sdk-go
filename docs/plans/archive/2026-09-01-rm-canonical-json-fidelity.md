@@ -5,7 +5,7 @@
 **Date:** 2026-09-01
 **Status:** Done (2026-09-03) — all five tasks landed: `TERM_MAPPING.match` is a canonical single-character `Character` primitive, `DV_TEXT.mappings`'s decode collapse is documented and pinned, the RM floor enforces `match`'s value set and `Mappings_valid`, `DV_MULTIMEDIA`'s inline-byte round-trip is pinned, and `Real` now reports mantissa precision loss on decode. **Correction:** Task 3's Interfaces line named `ValidateRM` / `ValidateComposition` as the issue producers; `ValidateComposition` (template-driven) has never routed through the RM floor, so it is `ValidateRM` and its typed sugars alone — corrected below. **Correction:** Task 5's controller decision expected a `*typereg.DecodeError` naming a `/magnitude` path in the DV_QUANTITY inheritance chain; verified against the generated `DVQuantity.UnmarshalJSON` and a minimal `encoding/json` probe that no per-field path wrapping exists for a scalar `Real` field (only polymorphic slots and whole-value `_type` mismatches attach one) — the landed test asserts `errors.Is(err, canjson.ErrInvalidShape)` only, recorded in the Task 5 report rather than asserted falsely.
 **Owner:** SDK maintainers
-**Covers:** [REQ-046](../../specifications/bmm-conformance.md#req-046--primitive-type-mapping) (primitive type mapping), [REQ-052](../../specifications/wire.md#req-052) (canonical JSON round-trip), [REQ-112](../../specifications/clinical-modeling.md#req-112--composition-validation) (template-less RM floor). No new REQ id — every delta amends a shipped REQ in place (implementation-aligned; the normative table edit rides in the same PR).
+**Covers:** [REQ-046](../../specifications/bmm-conformance.md#req-046--primitive-type-mapping) (primitive type mapping), [REQ-052](../../specifications/wire.md#req-052) (canonical JSON round-trip), [REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (template-less RM floor). No new REQ id — every delta amends a shipped REQ in place (implementation-aligned; the normative table edit rides in the same PR).
 **Probes:** PROBE-030 (canonical-JSON round-trip corpus, extended); PROBE-081 pattern reused for presence (no new probe minted).
 **Implementation:** landed
 **Depends on:** landed named-primitive precedent (`openehr/rm/integer.go`, `openehr/rm/real.go`); the template-less RM floor `openehr/validation/rmfloor.go` + `rmfloor_bytes.go` (REQ-112); the generator `internal/bmmgen`. All shipped; no new prerequisites.
@@ -20,7 +20,7 @@
 **Spec:** canonical homes updated by this plan —
 [bmm-conformance.md § Primitive type mapping](../../specifications/bmm-conformance.md#primitive-type-mapping) (REQ-046),
 [wire.md § REQ-052](../../specifications/wire.md#req-052) (canonical JSON),
-[clinical-modeling.md § REQ-112](../../specifications/clinical-modeling.md#req-112--composition-validation) (RM floor).
+[clinical-modeling.md § REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (RM floor).
 
 ## Global Constraints
 
@@ -507,7 +507,7 @@ Landed at `1d09718`.
 
 - [bmm-conformance.md § Primitive type mapping](../../specifications/bmm-conformance.md#primitive-type-mapping) — REQ-046, the `Character` row (Task 1).
 - [wire.md § REQ-052](../../specifications/wire.md#req-052) — canonical `match` round-trip (Task 1), `mappings` collapse note (Task 2), `DV_MULTIMEDIA` base64 (Task 4).
-- [clinical-modeling.md § REQ-112](../../specifications/clinical-modeling.md#req-112--composition-validation) — RM-floor invariants (Task 3).
+- [clinical-modeling.md § REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) — RM-floor invariants (Task 3).
 - [REQ.md](../../specifications/REQ.md) — registry rows for REQ-046 / REQ-052 / REQ-112 (REQ-052 stays `partial`).
 
 ## Self-review notes
