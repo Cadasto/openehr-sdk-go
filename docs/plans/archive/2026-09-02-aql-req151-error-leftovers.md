@@ -3,13 +3,13 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax. The three task groups are independent — pick any subset.
 
 **Date:** 2026-09-02
-**Status:** Draft
+**Status:** Done (2026-09-02) — all three groups landed: REQ-057 stored-query `version` trim, REQ-025 nil-safe `SyntaxError`/`DecodeError` guards, and the PROBE-099 discriminating row. **Correction:** the PROBE-099 coverage extension is [REQ-164](../specifications/clinical-modeling.md#req-164--aql-path-shape-and-paging-lint) (path-shape lint), not REQ-160 as first written below — confirmed against `docs/specifications/conformance.md`'s PROBE-099 entry and `testkit/probes/aql/probes_test.go`'s own REQ-164 heading.
 **Owner:** SDK maintainers
-**Covers:** [REQ-055/057](../specifications/wire.md#req-057) (stored-query client path hygiene), [REQ-025](../specifications/idiom.md#errors-req-025) (nil-safe error inspection on the AQL/decode surface), and a coverage extension for [PROBE-099](../specifications/conformance.md) under REQ-160. No new id — amendments + tests.
+**Covers:** [REQ-055/057](../specifications/wire.md#req-057) (stored-query client path hygiene), [REQ-025](../specifications/idiom.md#errors-req-025) (nil-safe error inspection on the AQL/decode surface), and a coverage extension for [PROBE-099](../specifications/conformance.md) under [REQ-164](../specifications/clinical-modeling.md#req-164--aql-path-shape-and-paging-lint). No new id — amendments + tests.
 **Probes:** PROBE-099 (extended with a discriminating row).
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** landed `*transport.DecodeError` / `typereg.DecodeError` (REQ-151), `parse.SyntaxError`, the stored-query client.
-**Defers:** nothing — this drains the residual AQL + REQ-151 error follow-ups recorded from the #137/#140/#151 review rounds.
+**Defers:** nothing — this drained the residual AQL + REQ-151 error follow-ups recorded from the #137/#140/#151 review rounds.
 
 **Goal:** Clear the small, verified AQL-side and decode-error leftovers that never got filed: trim the stored-query `version` path parameter consistently, make the `parse.SyntaxError` / `typereg.DecodeError` inspection sites nil-safe (an `AsType` match can carry a typed-nil pointer), and add the discriminating PROBE-099 row that makes containment-relation threading mutation-detectable at probe level.
 
@@ -35,10 +35,10 @@
 
 **State:** `qualifiedName` is trimmed (`stored_query.go:391` `name := strings.TrimSpace(qualifiedName)`), but `version` is used **raw** in the path: `runStoredAtVersion` does `path += "/" + version` with no trim (`execute.go:102`), and `DeleteStoredQuery` trims `version` only for the empty-check yet builds `Path` from the raw value (`:390` region). A `version` with surrounding whitespace passes the guard and reaches the wire un-trimmed — an asymmetry with `name`.
 
-- [ ] **Step 1: Failing test.** `RunStoredVersion(…, " v1 ", …)` and `DeleteStoredQuery(…, " v1 ")` build a path containing `/v1`, not `/%20v1%20` or `/ v1 ` (capture the `Request.Path` via a stub transport).
-- [ ] **Step 2:** Run → FAIL (raw value reaches the path).
-- [ ] **Step 3:** Trim `version` once at the top of `runStoredAtVersion` and `DeleteStoredQuery` (mirroring `name`); reuse the trimmed value for both the empty-check and the path.
-- [ ] **Step 4:** Run → PASS. `make ci`. Commit `fix(client): trim stored-query version path parameter (REQ-057)`.
+- [x] **Step 1: Failing test.** `RunStoredVersion(…, " v1 ", …)` and `DeleteStoredQuery(…, " v1 ")` build a path containing `/v1`, not `/%20v1%20` or `/ v1 ` (capture the `Request.Path` via a stub transport).
+- [x] **Step 2:** Run → FAIL (raw value reaches the path).
+- [x] **Step 3:** Trim `version` once at the top of `runStoredAtVersion` and `DeleteStoredQuery` (mirroring `name`); reuse the trimmed value for both the empty-check and the path.
+- [x] **Step 4:** Run → PASS. `make ci`. Commit `fix(client): trim stored-query version path parameter (REQ-057)` — `9078c3f`.
 
 ### Group 2: Nil-safe `SyntaxError` / `DecodeError` inspection — REQ-025
 
@@ -46,20 +46,20 @@
 
 **State:** these sites do `if se, ok := errors.AsType[*parse.SyntaxError](err); ok { … se.Pos … }`. `errors.AsType` can report `ok == true` with a **typed-nil** pointer (recorded in the REQ-025 work — `AsType` is not nil-proof), so `se.Pos` panics if a typed-nil `*parse.SyntaxError` reaches the chain. Same shape for the `typereg.DecodeError` `Inner.Error()` call (loses `%v` panic recovery) and the `parse` dangling `"at 0:0:"` on nil/zero text.
 
-- [ ] **Step 1: Failing test.** Feed each site an error chain carrying a typed-nil `*parse.SyntaxError` (`var se *parse.SyntaxError; err := fmt.Errorf("x: %w", se)`); assert no panic and a sensible fallback (`err.Error()` / a value-free message).
-- [ ] **Step 2:** Run → PANIC/FAIL today.
-- [ ] **Step 3:** Add `&& se != nil` to each `ok`-guarded branch (or switch to `errors.As` with an explicit nil check); guard the `typereg` `Inner.Error()` behind a nil check; suppress the dangling `"at 0:0:"` when position is zero/unknown.
-- [ ] **Step 4:** Run → PASS. `make ci`. Commit `fix(aql): nil-safe SyntaxError/DecodeError inspection (REQ-025)`.
+- [x] **Step 1: Failing test.** Feed each site an error chain carrying a typed-nil `*parse.SyntaxError` (`var se *parse.SyntaxError; err := fmt.Errorf("x: %w", se)`); assert no panic and a sensible fallback (`err.Error()` / a value-free message).
+- [x] **Step 2:** Run → PANIC/FAIL today.
+- [x] **Step 3:** Add `&& se != nil` to each `ok`-guarded branch (or switch to `errors.As` with an explicit nil check); guard the `typereg` `Inner.Error()` behind a nil check; suppress the dangling `"at 0:0:"` when position is zero/unknown.
+- [x] **Step 4:** Run → PASS. `make ci`. Commit `fix(aql): nil-safe SyntaxError/DecodeError inspection (REQ-025)` — `d093d22`.
 
-### Group 3: Discriminating PROBE-099 row — REQ-160
+### Group 3: Discriminating PROBE-099 row — REQ-164
 
 **Files:** `testkit/probes/aql/probes_test.go` (the PROBE-099 fire corpus; the non-discriminating supplied-relation row is annotated there today).
 
 **State:** the existing supplied-relation fire row uses a **deliberately inert** overlay (`EHR→VERSIONED_PARTY`), so ignoring the threaded relation would still pass — the row does not detect relation-threading regressions at probe level (the unit test `TestRedundantStepReadsTheSuppliedRelation` does, which is why this was only ever a nice-to-have). This adds the probe twin that *is* mutation-detectable.
 
-- [ ] **Step 1:** Add a fire row supplying a **discriminating** overlay — one that silences a finding that otherwise stands (mirror the unit test's `EHR_STATUS→OBSERVATION` overlay) — so a stubbed-out relation threading fails the probe.
-- [ ] **Step 2:** Run the probe suite → the new row passes with threading, and (verify locally by temporarily ignoring `tc.Relation`) fails without it.
-- [ ] **Step 3:** `make ci`. Commit `test(probes): discriminating supplied-relation PROBE-099 row (REQ-160)`.
+- [x] **Step 1:** Add a **discriminating** overlay row — one that silences a finding that otherwise stands (mirror the unit test's `EHR_STATUS→OBSERVATION` overlay) — so a stubbed-out relation threading fails the probe. Landed in the Silent arm (not the Fire arm this step originally named): the overlay SILENCES the witness's finding rather than restating it, so `Want` is the near-miss `nil`.
+- [x] **Step 2:** Run the probe suite → the new row passes with threading, and (verified locally by temporarily dropping the row's `Relation` field) fails without it — `TestProbe099PathShapeLint` failed naming the row and the unexpectedly-firing `aql_contains_redundant_step`; reverted before commit.
+- [x] **Step 3:** `make ci`. Commit `test(probes): discriminating supplied-relation PROBE-099 row (REQ-164)` — `274f03c`.
 
 ## Self-review
 
@@ -71,4 +71,4 @@
 
 - [wire.md § REQ-057](../specifications/wire.md#req-057) — stored-query routes (Group 1).
 - [idiom.md § Errors (REQ-025)](../specifications/idiom.md#errors-req-025) — nil-safe inspection (Group 2).
-- [conformance.md § PROBE-099](../specifications/conformance.md) under REQ-160 — probe corpus (Group 3).
+- [conformance.md § PROBE-099](../specifications/conformance.md) under REQ-164 — probe corpus (Group 3).
