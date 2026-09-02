@@ -13,6 +13,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 ### Added
 
 - **`ehr.Create` empty-2xx typing (REQ-094).** An empty, whitespace-only, or JSON-`null` 2xx body from `ehr.Create` now returns `*NoRepresentationError` with the commit metadata, matching the versioned-write family ([plan](docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md)).
+- **AQL + REQ-151 error leftovers (REQ-057/025/164).** Stored-query `version` path trim matching `name`'s, nil-safe `SyntaxError`/`DecodeError` inspection matching the `WireError` guard idiom, and a discriminating PROBE-099 relation row that is actually mutation-detectable; see [plan](docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md).
 
 ## [0.24.0] - 2026-08-30
 

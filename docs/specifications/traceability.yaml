@@ -711,15 +711,21 @@ requirements:
       - docs/plans/archive/2026-05-15-rest-api-client.md
       - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
       - docs/plans/archive/2026-08-26-aql-small-corrections.md
+      - docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md
     notes: >-
       POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param);
       PutStoredQuery recovers {name,version} from Location header. Verified by
       query/execute.go, definition/stored_query.go; PROBE-078/079 deferred.
       The Extras (unknown-key) behaviour of StoredQueryMetadata is NOT recorded
       here: § REQ-144 owns both catalog descriptors' decode/encode contract.
+      The 2026-09-02 leftovers plan closed a version-trim asymmetry with name:
+      runStoredAtVersion and DeleteStoredQuery now trim version once and reuse
+      it for both the empty-check and the path, matching name's own trim.
     tests:
       - openehr/client/query/query_test.go
+      - openehr/client/query/version_trim_test.go
       - openehr/client/definition/stored_query_test.go
+      - openehr/client/definition/version_trim_test.go
 
   - id: REQ-061
     title: SMART-on-openEHR PKCE
@@ -1958,14 +1964,17 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, auth, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, internal]
+    plans: [docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md]
     tests:
       - openehr/client/ehr/contribution/version_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/aql/version_test.go
       - openehr/aql/lint/extract_test.go
+      - openehr/aql/lint/nilsyntaxerror_internal_test.go
       - openehr/aql/contain/nilrelation_test.go
       - openehr/aql/parse/nilsyntaxerror_test.go
+      - openehr/aql/parse/emit_verify_nilsyntaxerror_internal_test.go
       - openehr/client/query/nilaqlerror_test.go
       - openehr/client/query/nilwiredereference_internal_test.go
       - transport/client_test.go
@@ -2014,7 +2023,19 @@ requirements:
       embedded field is nil dereferences a nil interface at both dispatch
       sites, so REQ-163's carrier refuses it at Build() as ErrInvalidQuery
       and the emission path answers rather than panicking. The clause carries a Must-prefix carve-out for the Go
-      convention.
+      convention. The 2026-09-02 sweep closed the consumer-side gap the
+      2026-08-30 sweep's parse.SyntaxError / typereg.DecodeError guards left
+      open: an ok=true, typed-nil errors.AsType[*parse.SyntaxError] match was
+      read without a nil check at openehr/aql/lint.syntaxSpan/syntaxDetail
+      and at the emit_verify.go re-parse-failure site (openehr/aql/parse),
+      the latter extracted into the independently-testable
+      syntaxErrorPosition since ParseQuery itself never returns a typed-nil
+      *SyntaxError (the guard is defense in depth, matching the idiom
+      elsewhere). typereg.DecodeError.Error() also stopped calling
+      Inner.Error() directly -- Inner is any caller/codec-supplied error, not
+      only this SDK's own already-guarded types -- and now renders the cause
+      through a recover-guarded helper. parse.SyntaxError.Error() separately
+      stopped printing a fabricated "at 0:0:" for a zero Position.
 
   - id: REQ-026
     title: Goroutine-safe clients
@@ -2531,7 +2552,9 @@ requirements:
       - testkit/probes/aql/probe_099_path_shape_lint.go
       - testkit/probes/aql/probes_test.go  # the PROBE-099 corpus, its able-to-fail guard controls, and the PROBE-028 baseline table
     probes: [PROBE-099]
-    plans: [docs/plans/archive/2026-08-26-aql-path-shape-lint.md]
+    plans:
+      - docs/plans/archive/2026-08-26-aql-path-shape-lint.md
+      - docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md
     notes: >-
       Third additive REQ-109 Layer-2 group: path shape. Five Warning codes
       shipped -- aql_path_repeating_unpredicated (an unpredicated
@@ -2569,4 +2592,12 @@ requirements:
       carries the corpus: per-code positive, per-rule negative near-miss,
       and the PROBE-028 re-baseline, which is RECORDED in the PROBE-099
       catalogue entry in conformance.md -- valid.aql and missing_archetype.aql
-      each gained exactly aql_select_no_alias, bad_syntax.aql nothing.
+      each gained exactly aql_select_no_alias, bad_syntax.aql nothing. The
+      2026-09-02 leftovers plan added a discriminating supplied-relation
+      Silent-arm row: the shipped Fire-arm supplied-relation row's overlay
+      (EHR -> VERSIONED_PARTY) is deliberately inert, so it cannot detect a
+      regression that stops threading Options.Relation through the
+      redundant-step check; the new row's overlay (EHR_STATUS -> OBSERVATION,
+      mirroring TestRedundantStepReadsTheSuppliedRelation) SILENCES the same
+      witness query's finding instead, which the default relation alone
+      would still raise -- mutation-detectability verified locally.
