@@ -321,6 +321,52 @@ func TestUnmarshalNestedDecodeErrorIsNotShapeTagged(t *testing.T) {
 	assertShapeSentinelDistinct(t, err)
 }
 
+// TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications pins
+// the near boundary of REQ-052's shape sentinel, the mirror of the test
+// above. When the concrete type selected at a polymorphic slot fails on
+// *shape* — here a DV_QUANTITY whose `units` is a number where the wire
+// contract wants a string — the failure raised beneath the slot is a
+// JSON-level shape failure, and the enclosing *DecodeError MUST NOT
+// strip that classification on the way out. So both hold at once: the
+// DecodeError names the slot on its Path, and errors.Is reaches
+// canjson.ErrInvalidShape. Only the polymorphic *dispatch* failure
+// (missing / unknown / mismatched `_type`) stays outside the sentinel.
+func TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications(t *testing.T) {
+	// `units` must be a string; a quoted *magnitude* would be tolerated
+	// instead (ADR 0004 numeric wire tolerance), so it cannot drive this
+	// case. normal_range is a DVInterval[DVQuantity], whose /lower goes
+	// through typereg.DecodeAs — a real polymorphic slot.
+	const in = `{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg",` +
+		`"normal_range":{"lower":{"_type":"DV_QUANTITY","magnitude":80,"units":5}}}`
+	var q rm.DVQuantity
+	err := canjson.Unmarshal([]byte(in), &q)
+	if err == nil {
+		t.Fatal("Unmarshal(slot-nested wrong-typed units) = nil; want a decode error")
+	}
+	if !strings.Contains(err.Error(), "canjson: DV_QUANTITY:") {
+		t.Fatalf("err = %v; want the text to show it passed through DV_QUANTITY's funnel — otherwise this test no longer covers the nesting case", err)
+	}
+	de, ok := errors.AsType[*canjson.DecodeError](err)
+	if !ok {
+		t.Fatalf("err = %v (%T); want errors.As to reach *canjson.DecodeError", err, err)
+	}
+	if de.Path != "/lower" {
+		t.Errorf("DecodeError.Path = %q, want %q — the slot it failed at, so a consumer keeps the path alongside the kind", de.Path, "/lower")
+	}
+	if !errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; a shape failure raised beneath a polymorphic slot stays a shape failure — a DecodeError must not strip the classification", err)
+	}
+	if !errors.As(err, new(*json.UnmarshalTypeError)) {
+		t.Errorf("err = %v; want the encoding/json cause to stay reachable with errors.As", err)
+	}
+	for _, sentinel := range []error{typereg.ErrUnknownType, typereg.ErrMissingType, typereg.ErrTypeMismatch} {
+		if errors.Is(err, sentinel) {
+			t.Errorf("err = %v; must not match %v — the `_type` dispatched fine, the shape did not", err, sentinel)
+		}
+	}
+	assertShapeSentinelDistinct(t, err)
+}
+
 // TestUnmarshalWholeValueTypeMismatchIsNotShapeTagged draws the
 // sentinel's other exclusion boundary (REQ-052). A generated
 // UnmarshalJSON refuses a `_type` that names a different class than the
@@ -364,6 +410,12 @@ func TestDecoderDecodeStreamDivergesFromUnmarshal(t *testing.T) {
 		err := canjson.NewDecoder(strings.NewReader("")).Decode(&q)
 		if !errors.Is(err, io.EOF) {
 			t.Errorf("Decode(\"\") err = %v; want errors.Is(_, io.EOF)", err)
+		}
+		// io.EOF is named by REQ-052 as a malformed-input failure that
+		// MUST NOT acquire the shape sentinel: nothing reached a
+		// generated UnmarshalJSON.
+		if errors.Is(err, canjson.ErrInvalidShape) {
+			t.Errorf("Decode(\"\") err = %v; an empty stream is io.EOF, not a JSON shape failure", err)
 		}
 		var uq rm.DVQuantity
 		if uerr := canjson.Unmarshal([]byte(""), &uq); !errors.As(uerr, new(*json.SyntaxError)) {

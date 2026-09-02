@@ -14,18 +14,28 @@ import (
 // range. It is decode-only: encode failures wrap [ErrInvalidValue]
 // instead (REQ-052).
 //
-// Every failure raised inside a generated RM type's [UnmarshalJSON] —
-// the `canjson: <RM_TYPE>:` family — wraps it, over the encoding/json
-// error, which stays reachable with errors.As — a single errors.Unwrap
-// step lands on it. Two decode failures stay outside the sentinel on
-// purpose: malformed JSON, which encoding/json reports before any
-// UnmarshalJSON method runs, and a [DecodeError], raised either at a
-// polymorphic slot or by a whole-value `_type` naming a different class
-// than the target — including when it travels out through an enclosing
-// type's `canjson: <RM_TYPE>:` prefix. Match those
-// with errors.As for [DecodeError], or errors.Is against
-// [typereg.ErrMissingType] / [typereg.ErrUnknownType] /
-// [typereg.ErrTypeMismatch].
+// Every shape error raised inside a generated RM type's
+// [UnmarshalJSON] — the `canjson: <RM_TYPE>:` family — wraps it, over
+// the encoding/json error, which stays reachable with errors.As: a
+// single errors.Unwrap step lands on it. A decode failure reaches the
+// caller one of three ways (REQ-052):
+//
+//   - Malformed JSON, which encoding/json reports before any
+//     UnmarshalJSON method runs. No sentinel: [Unmarshal] returns
+//     *json.SyntaxError, [Decoder.Decode] io.ErrUnexpectedEOF or
+//     io.EOF.
+//   - A polymorphic dispatch failure — a missing, unknown or
+//     mismatched `_type`, at a slot or on `/_type` for the whole value
+//     — which arrives as a [DecodeError] carrying the path. No
+//     sentinel either, even when it travels out through an enclosing
+//     type's `canjson: <RM_TYPE>:` prefix. Match it with errors.As for
+//     [DecodeError], or errors.Is against [typereg.ErrMissingType] /
+//     [typereg.ErrUnknownType] / [typereg.ErrTypeMismatch].
+//   - A shape failure — valid JSON in the wrong shape. This one wraps
+//     the sentinel. When it happens inside the concrete type selected
+//     at a polymorphic slot it is ALSO a [DecodeError] naming that
+//     slot, so both classifications hold: the path from the
+//     [DecodeError], the kind from the sentinel.
 //
 // The value lives in [typereg] so generated code under openehr/rm can
 // attach it without forming an `openehr/rm → openehr/serialize` import
@@ -76,12 +86,14 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 //
 // Returns [poly.DecodeError] wrapping a typereg sentinel
 // ([typereg.ErrMissingType] / ErrUnknownType / ErrTypeMismatch) at
-// polymorphic failures (via generated UnmarshalJSON). Malformed JSON
-// comes back unchanged from encoding/json as *json.SyntaxError; a
-// shape error inside a generated RM type keeps a
+// polymorphic dispatch failures (via generated UnmarshalJSON).
+// Malformed JSON comes back unchanged from encoding/json as
+// *json.SyntaxError; a shape error inside a generated RM type keeps a
 // `canjson: <RM_TYPE>:` prefix from that type's UnmarshalJSON and
-// wraps [ErrInvalidShape]. The other two do not: see the sentinel's
-// own documentation for where the line falls.
+// wraps [ErrInvalidShape]. Neither malformed JSON nor a dispatch
+// failure carries the sentinel; a shape failure beneath a polymorphic
+// slot carries both it and a [DecodeError]. See the sentinel's own
+// documentation for where the lines fall.
 func Unmarshal(data []byte, v any) error {
 	return json.Unmarshal(data, v)
 }

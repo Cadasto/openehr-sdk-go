@@ -59,8 +59,8 @@
 //   - [ErrInvalidShape] — decode only. Never appears on an encode
 //     path. Every shape error raised inside a generated RM type's
 //     [UnmarshalJSON] wraps it, over the encoding/json error, which
-//     stays reachable through unwrapping. The other two decode
-//     failures described below do not wrap it.
+//     stays reachable through unwrapping. Of the three decode outcomes
+//     described below, only the shape one carries it.
 //
 // Both are distinct from the transport-level transport.ErrInvalidShape,
 // which classifies a response body rather than a codec operation.
@@ -75,20 +75,23 @@
 //     dispatches to any UnmarshalJSON method. [Unmarshal] returns
 //     *json.SyntaxError for it; [Decoder.Decode] classifies a
 //     truncated stream differently, as io.ErrUnexpectedEOF, and an
-//     empty one as io.EOF.
+//     empty one as io.EOF. No sentinel.
+//   - A polymorphic dispatch failure — a missing, unknown or
+//     mismatched `_type` — arrives as [DecodeError] carrying the path,
+//     either at a slot or on `/_type` where the whole value's `_type`
+//     names a different class than the target. No sentinel: an
+//     enclosing type's `canjson: <RM_TYPE>:` funnel does not add one
+//     to a [DecodeError] travelling out through it, so a nested
+//     dispatch failure never turns into a shape error.
 //   - A shape error inside a generated RM type is wrapped by that
 //     type's generated UnmarshalJSON with a `canjson: <RM_TYPE>:`
 //     prefix, so the encoding/json error stays reachable with
 //     errors.As but is not returned verbatim. This is the one that
-//     wraps [ErrInvalidShape].
-//   - A `_type` failure arrives as [DecodeError] carrying the path —
-//     at a polymorphic slot, or on `/_type` where the whole value's
-//     `_type` names a different class than the target — whether its
-//     cause is a typereg sentinel (missing, unknown or mismatched
-//     `_type`) or a plain encoding/json error. It keeps that classification
-//     even when it travels out through an enclosing type's
-//     `canjson: <RM_TYPE>:` prefix, so a nested polymorphic failure
-//     never turns into a shape error.
+//     wraps [ErrInvalidShape] — and when the failing type is the one
+//     selected at a polymorphic slot, the error is ALSO a
+//     [DecodeError] naming that slot: a [DecodeError] does not strip a
+//     shape classification raised beneath it, so a consumer reads the
+//     path off one and the kind off the other.
 //
 // # Strict vs relaxed decode
 //

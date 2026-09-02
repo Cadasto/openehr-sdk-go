@@ -101,6 +101,15 @@ var (
 // failed node; Type is the observed discriminator (may be empty when
 // the discriminator was missing); Inner unwraps to one of the
 // typereg sentinels (or a codec-defined shape error).
+//
+// The envelope is classification-neutral in both directions: it never
+// adds [ErrInvalidShape] to what it wraps, and — because Unwrap exposes
+// Inner — it never strips one raised beneath it. So a dispatch failure
+// (missing / unknown / mismatched `_type`) stays outside the shape
+// sentinel, while a shape failure inside the concrete type selected at
+// a slot answers true to both errors.AsType[*DecodeError] and
+// errors.Is(_, ErrInvalidShape): the path from this type, the kind from
+// the sentinel (REQ-052).
 type DecodeError struct {
 	Path  string
 	Type  string
@@ -155,9 +164,15 @@ func (e *DecodeError) Unwrap() error {
 // reachable through errors.As, so the classification costs no
 // diagnostic. What it adds is [ErrInvalidShape] under errors.Is —
 // except when err already carries a [DecodeError], which is a nested
-// polymorphic failure travelling out through this type's method: that
-// keeps its own classification, because ErrInvalidShape means
-// "JSON-level shape", not "any decode failure" (REQ-052).
+// polymorphic failure travelling out through this type's method: an
+// envelope never acquires the sentinel here, because ErrInvalidShape
+// means "JSON-level shape", not "any decode failure" (REQ-052).
+//
+// The bypass is one-directional. It withholds a classification the
+// enclosing funnel would otherwise add; it does not remove one already
+// raised beneath the [DecodeError]. A shape failure inside the concrete
+// type selected at a slot therefore keeps ErrInvalidShape while the
+// DecodeError keeps the path — both true of the same error.
 //
 // A nil err returns nil, so a caller cannot manufacture an error out
 // of a success.
