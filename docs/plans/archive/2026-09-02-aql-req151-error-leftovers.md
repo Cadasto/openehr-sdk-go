@@ -3,9 +3,9 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax. The three task groups are independent — pick any subset.
 
 **Date:** 2026-09-02
-**Status:** Done (2026-09-02) — all three groups landed: REQ-057 stored-query `version` trim, REQ-025 nil-safe `SyntaxError`/`DecodeError` guards, and the PROBE-099 discriminating row. **Correction:** the PROBE-099 coverage extension is [REQ-164](../specifications/clinical-modeling.md#req-164--aql-path-shape-and-paging-lint) (path-shape lint), not REQ-160 as first written below — confirmed against `docs/specifications/conformance.md`'s PROBE-099 entry and `testkit/probes/aql/probes_test.go`'s own REQ-164 heading.
+**Status:** Done (2026-09-02) — all three groups landed: REQ-057 stored-query `version` trim, REQ-025 nil-safe `SyntaxError`/`DecodeError` guards, and the PROBE-099 discriminating row. **Correction:** the PROBE-099 coverage extension is [REQ-164](../../specifications/clinical-modeling.md#req-164--aql-path-shape-and-paging-lint) (path-shape lint), not REQ-160 as first written below — confirmed against `docs/specifications/conformance.md`'s PROBE-099 entry and `testkit/probes/aql/probes_test.go`'s own REQ-164 heading.
 **Owner:** SDK maintainers
-**Covers:** [REQ-055/057](../specifications/wire.md#req-057) (stored-query client path hygiene), [REQ-025](../specifications/idiom.md#errors-req-025) (nil-safe error inspection on the AQL/decode surface), and a coverage extension for [PROBE-099](../specifications/conformance.md) under [REQ-164](../specifications/clinical-modeling.md#req-164--aql-path-shape-and-paging-lint). No new id — amendments + tests.
+**Covers:** [REQ-057](../../specifications/wire.md#req-057) (stored-query client path hygiene), [REQ-025](../../specifications/idiom.md#errors-req-025) (nil-safe error inspection on the AQL/decode surface), and a coverage extension for [PROBE-099](../../specifications/conformance.md) under [REQ-164](../../specifications/clinical-modeling.md#req-164--aql-path-shape-and-paging-lint). No new id — amendments + tests.
 **Probes:** PROBE-099 (extended with a discriminating row).
 **Implementation:** landed
 **Depends on:** landed `*transport.DecodeError` / `typereg.DecodeError` (REQ-151), `parse.SyntaxError`, the stored-query client.
@@ -29,7 +29,7 @@
 
 ## Phases
 
-### Group 1: Trim the stored-query `version` path parameter — REQ-055/057
+### Group 1: Trim the stored-query `version` path parameter — REQ-057
 
 **Files:** `openehr/client/query/execute.go` (`runStoredAtVersion`, `:101-102`), `openehr/client/definition/stored_query.go` (`DeleteStoredQuery`, `:390`); tests in the sibling `_test.go`.
 
@@ -69,6 +69,6 @@
 
 ## Mapping to specs
 
-- [wire.md § REQ-057](../specifications/wire.md#req-057) — stored-query routes (Group 1).
-- [idiom.md § Errors (REQ-025)](../specifications/idiom.md#errors-req-025) — nil-safe inspection (Group 2).
-- [conformance.md § PROBE-099](../specifications/conformance.md) under REQ-164 — probe corpus (Group 3).
+- [wire.md § REQ-057](../../specifications/wire.md#req-057) — stored-query routes (Group 1).
+- [idiom.md § Errors (REQ-025)](../../specifications/idiom.md#errors-req-025) — nil-safe inspection (Group 2).
+- [conformance.md § PROBE-099](../../specifications/conformance.md) under REQ-164 — probe corpus (Group 3).
