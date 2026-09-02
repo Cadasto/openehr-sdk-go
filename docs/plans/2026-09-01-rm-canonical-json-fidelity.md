@@ -480,7 +480,7 @@ git commit -m "test(canjson): pin DV_MULTIMEDIA inline base64 round-trip; record
 - [ ] **Step 5: Spec.** wire.md § REQ-052 clause is now **met**, not deferred; drop the "open half … still silent" note in `canjson/doc.go`.
 - [ ] **Step 6: Commit** `fix(rm): Real reports mantissa precision loss on decode (REQ-052)`.
 
-**Decision (named):** the trigger is **>17 significant decimal digits** (float64's shortest-round-trip guarantee) — simple and non-over-reporting: it does **not** reject `0.1` (inexact but round-trips). A `big.Float` exactness check would wrongly reject `0.1` and is not the criterion. Second choice: which sentinel to wrap — a fresh `rm`/`canjson` precision sentinel, or **reuse `canjson.ErrInvalidShape` once Plan B (`2026-09-02-decode-error-surface-typing.md`) gives it a producer**. Coordinate with Plan B so the sentinel lands once.
+**Decision (named):** the trigger is **>17 significant decimal digits** (float64's shortest-round-trip guarantee) — simple and non-over-reporting: it does **not** reject `0.1` (inexact but round-trips). A `big.Float` exactness check would wrongly reject `0.1` and is not the criterion. Second choice: which sentinel to wrap — a fresh `rm`/`canjson` precision sentinel, or **reuse `canjson.ErrInvalidShape`**. Settled: Plan B ([`archive/2026-09-02-decode-error-surface-typing.md`](archive/2026-09-02-decode-error-surface-typing.md)) landed option A, so the sentinel already has a producer — reuse it rather than minting a second.
 
 ---
 

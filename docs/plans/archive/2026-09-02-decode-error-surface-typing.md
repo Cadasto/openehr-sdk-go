@@ -3,11 +3,11 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
 
 **Date:** 2026-09-02
-**Status:** Draft
+**Status:** Done (2026-09-02) — both tasks executed; [REQ-093](../../specifications/transport.md#req-093--openehr-error-envelope-mapping) stays `landed` (it gained the `(unrouted)` placeholder clause), and [REQ-052](../../specifications/wire.md#req-052) stays **`partial`**: the decode-side shape sentinel now has a producer, but the § Floating-point precision mantissa arm — the one this plan never claimed — is still open.
 **Owner:** SDK maintainers
-**Covers:** [REQ-052](../specifications/wire.md#req-052) (the decode-side `canjson.ErrInvalidShape` producer) and [REQ-093](../specifications/transport.md#req-093) (value-free diagnostics — the `effectiveRoute()` path-identifier leak). No new id.
+**Covers:** [REQ-052](../../specifications/wire.md#req-052) (the decode-side `canjson.ErrInvalidShape` producer) and [REQ-093](../../specifications/transport.md#req-093--openehr-error-envelope-mapping) (value-free diagnostics — the `effectiveRoute()` path-identifier leak). No new id.
 **Probes:** none new (unit-covered).
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** landed `*transport.DecodeError` (REQ-151), `transport.Request.effectiveRoute()`.
 **Defers:** the `StoredQueryMetadata` / `TemplateMetadata` Extras re-encode item once considered for this plan — **verified already fixed** (`stored_query.go:78-90` has `MarshalJSON` with delete-then-overlay collision handling, PR #140); nothing to do.
 
@@ -68,5 +68,5 @@
 
 ## Mapping to specs
 
-- [wire.md § REQ-052](../specifications/wire.md#req-052) — the decode-side sentinel (Task 1).
-- [transport.md § REQ-093](../specifications/transport.md#req-093) — value-free diagnostics (Task 2).
+- [wire.md § REQ-052](../../specifications/wire.md#req-052) — the decode-side sentinel (Task 1); the § gained the "Decode-side shape sentinel" clause with this plan.
+- [transport.md § REQ-093](../../specifications/transport.md#req-093--openehr-error-envelope-mapping) — value-free diagnostics (Task 2); the § gained the "Unrouted requests render a placeholder" clause with this plan.
