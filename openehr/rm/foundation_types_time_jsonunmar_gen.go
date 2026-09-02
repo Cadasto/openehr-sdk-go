@@ -21,10 +21,13 @@ type ISO8601TimezoneJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (i *ISO8601Timezone) UnmarshalJSON(data []byte) error {
 	var aux ISO8601TimezoneJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: Iso8601_timezone: %w", err)
+		return typereg.WrapShapeError("Iso8601_timezone", err)
 	}
 	if aux.Class != "" && aux.Class != "Iso8601_timezone" {
 		return &typereg.DecodeError{
@@ -44,10 +47,13 @@ type TimeDefinitionsJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (t *TimeDefinitions) UnmarshalJSON(data []byte) error {
 	var aux TimeDefinitionsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: Time_Definitions: %w", err)
+		return typereg.WrapShapeError("Time_Definitions", err)
 	}
 	if aux.Class != "" && aux.Class != "Time_Definitions" {
 		return &typereg.DecodeError{

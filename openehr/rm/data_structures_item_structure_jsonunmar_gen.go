@@ -36,10 +36,13 @@ type ItemListJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (i *ItemList) UnmarshalJSON(data []byte) error {
 	var aux ItemListJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ITEM_LIST: %w", err)
+		return typereg.WrapShapeError("ITEM_LIST", err)
 	}
 	if aux.Class != "" && aux.Class != "ITEM_LIST" {
 		return &typereg.DecodeError{
@@ -100,10 +103,13 @@ type ItemSingleJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (i *ItemSingle) UnmarshalJSON(data []byte) error {
 	var aux ItemSingleJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ITEM_SINGLE: %w", err)
+		return typereg.WrapShapeError("ITEM_SINGLE", err)
 	}
 	if aux.Class != "" && aux.Class != "ITEM_SINGLE" {
 		return &typereg.DecodeError{
@@ -165,10 +171,13 @@ type ItemTableJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (i *ItemTable) UnmarshalJSON(data []byte) error {
 	var aux ItemTableJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ITEM_TABLE: %w", err)
+		return typereg.WrapShapeError("ITEM_TABLE", err)
 	}
 	if aux.Class != "" && aux.Class != "ITEM_TABLE" {
 		return &typereg.DecodeError{
@@ -229,10 +238,13 @@ type ItemTreeJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (i *ItemTree) UnmarshalJSON(data []byte) error {
 	var aux ItemTreeJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ITEM_TREE: %w", err)
+		return typereg.WrapShapeError("ITEM_TREE", err)
 	}
 	if aux.Class != "" && aux.Class != "ITEM_TREE" {
 		return &typereg.DecodeError{

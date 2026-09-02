@@ -23,10 +23,13 @@ type DVEHRURIJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVEHRURI) UnmarshalJSON(data []byte) error {
 	var aux DVEHRURIJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_EHR_URI: %w", err)
+		return typereg.WrapShapeError("DV_EHR_URI", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_EHR_URI" {
 		return &typereg.DecodeError{
@@ -49,10 +52,13 @@ type DVURIJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (d *DVURI) UnmarshalJSON(data []byte) error {
 	var aux DVURIJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: DV_URI: %w", err)
+		return typereg.WrapShapeError("DV_URI", err)
 	}
 	if aux.Class != "" && aux.Class != "DV_URI" {
 		return &typereg.DecodeError{

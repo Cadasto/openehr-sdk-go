@@ -21,10 +21,13 @@ type BasicDefinitionsJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (b *BasicDefinitions) UnmarshalJSON(data []byte) error {
 	var aux BasicDefinitionsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: BASIC_DEFINITIONS: %w", err)
+		return typereg.WrapShapeError("BASIC_DEFINITIONS", err)
 	}
 	if aux.Class != "" && aux.Class != "BASIC_DEFINITIONS" {
 		return &typereg.DecodeError{
@@ -44,10 +47,13 @@ type OpenehrDefinitionsJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (o *OpenehrDefinitions) UnmarshalJSON(data []byte) error {
 	var aux OpenehrDefinitionsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: OPENEHR_DEFINITIONS: %w", err)
+		return typereg.WrapShapeError("OPENEHR_DEFINITIONS", err)
 	}
 	if aux.Class != "" && aux.Class != "OPENEHR_DEFINITIONS" {
 		return &typereg.DecodeError{

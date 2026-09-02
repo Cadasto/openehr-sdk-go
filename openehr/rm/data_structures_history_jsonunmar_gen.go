@@ -42,10 +42,13 @@ type HistoryJSONUnmarshaller[T ItemStructure] struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (h *History[T]) UnmarshalJSON(data []byte) error {
 	var aux HistoryJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: HISTORY: %w", err)
+		return typereg.WrapShapeError("HISTORY", err)
 	}
 	if aux.Class != "" && aux.Class != "HISTORY" {
 		return &typereg.DecodeError{
@@ -137,10 +140,13 @@ type IntervalEventJSONUnmarshaller[T ItemStructure] struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (i *IntervalEvent[T]) UnmarshalJSON(data []byte) error {
 	var aux IntervalEventJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: INTERVAL_EVENT: %w", err)
+		return typereg.WrapShapeError("INTERVAL_EVENT", err)
 	}
 	if aux.Class != "" && aux.Class != "INTERVAL_EVENT" {
 		return &typereg.DecodeError{
@@ -221,10 +227,13 @@ type PointEventJSONUnmarshaller[T ItemStructure] struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (p *PointEvent[T]) UnmarshalJSON(data []byte) error {
 	var aux PointEventJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: POINT_EVENT: %w", err)
+		return typereg.WrapShapeError("POINT_EVENT", err)
 	}
 	if aux.Class != "" && aux.Class != "POINT_EVENT" {
 		return &typereg.DecodeError{

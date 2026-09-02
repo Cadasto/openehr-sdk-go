@@ -80,6 +80,14 @@ var (
 	// exhaustion and quadratic re-parsing from a crafted deeply-nested
 	// polymorphic document (e.g. nested CLUSTER/SECTION trees).
 	ErrMaxDepthExceeded = errors.New("typereg: nesting depth exceeds limit")
+	// ErrInvalidShape classifies a JSON-level shape failure raised
+	// inside a generated UnmarshalJSON method — valid JSON that is the
+	// wrong shape for the target type (REQ-052). It is attached by
+	// [WrapShapeError]. Its message names canjson because canjson is
+	// where callers meet it: it is re-exported as canjson.ErrInvalidShape
+	// and lives here only so generated code in openehr/rm can attach it
+	// without forming an `openehr/rm → openehr/serialize` import cycle.
+	ErrInvalidShape = errors.New("canjson: invalid JSON shape")
 )
 
 // DecodeError is the unified envelope returned by the canjson and
@@ -136,6 +144,52 @@ func (e *DecodeError) Unwrap() error {
 		return nil
 	}
 	return e.Inner
+}
+
+// WrapShapeError builds the error a generated UnmarshalJSON method
+// returns when the whole value fails to decode into its wire struct.
+// rmType is the openEHR class name (e.g. "DV_QUANTITY"); err is the
+// encoding/json failure underneath.
+//
+// The message is exactly `canjson: <rmType>: <err>`, and err stays
+// reachable through errors.As, so the classification costs no
+// diagnostic. What it adds is [ErrInvalidShape] under errors.Is —
+// except when err already carries a [DecodeError], which is a nested
+// polymorphic failure travelling out through this type's method: that
+// keeps its own classification, because ErrInvalidShape means
+// "JSON-level shape", not "any decode failure" (REQ-052).
+//
+// A nil err returns nil, so a caller cannot manufacture an error out
+// of a success.
+func WrapShapeError(rmType string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, ok := errors.AsType[*DecodeError](err); ok {
+		return fmt.Errorf("canjson: %s: %w", rmType, err)
+	}
+	return &shapeError{rmType: rmType, cause: err}
+}
+
+// shapeError is the [ErrInvalidShape]-carrying error [WrapShapeError]
+// returns. It is unexported: consumers classify with errors.Is against
+// the sentinel and reach the cause with errors.As, so the concrete type
+// is not part of the public surface.
+type shapeError struct {
+	rmType string
+	cause  error
+}
+
+// Error reproduces the `canjson: <RM_TYPE>: <cause>` text the generated
+// methods have always returned.
+func (e *shapeError) Error() string {
+	return "canjson: " + e.rmType + ": " + e.cause.Error()
+}
+
+// Unwrap returns both the cause and [ErrInvalidShape], so errors.As
+// reaches the encoding/json error and errors.Is matches the sentinel.
+func (e *shapeError) Unwrap() []error {
+	return []error{e.cause, ErrInvalidShape}
 }
 
 // Registry maps each openEHR _type discriminator string (e.g.

@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
 // TestUnmarshalLeafConcreteType — a non-polymorphic leaf type
@@ -136,14 +138,16 @@ func TestDecodeErrorCarriesPath(t *testing.T) {
 }
 
 // shapeErrorInputs are the three JSON-level shape-error classes
-// canjson.ErrInvalidShape is reserved for (REQ-052, wire.md): a
-// syntax error, a type mismatch on a non-polymorphic field, and a
-// numeric magnitude out of float64 range. All three fail today — none
-// of them through the sentinel.
+// REQ-052 (wire.md) discusses under canjson.ErrInvalidShape: a syntax
+// error, a type mismatch on a non-polymorphic field, and a numeric
+// magnitude out of float64 range. Only the last two are raised inside
+// a generated UnmarshalJSON and so carry the sentinel; encoding/json
+// rejects the syntax error before any UnmarshalJSON method runs, so
+// that one reaches the caller unclassified.
 //
 // The want fields pin WHICH arm of the documented classification
-// produced each failure, so a future producer cannot quietly change
-// the arm. They differ for the syntax row on purpose: Unmarshal sees
+// produced each failure, so a later change cannot quietly move the
+// arm. They differ for the syntax row on purpose: Unmarshal sees
 // the whole input and reports *json.SyntaxError, while Decoder.Decode
 // runs out of stream and reports io.ErrUnexpectedEOF. The other
 // stream-level divergences Decode's godoc names — an empty stream and
@@ -158,6 +162,17 @@ var shapeErrorInputs = []struct {
 	// wantDecodeSentinel, when set, is the sentinel Decode's error must
 	// match under errors.Is — the one Decode's godoc names.
 	wantDecodeSentinel error
+	// wantShapeSentinel is whether the failure carries
+	// canjson.ErrInvalidShape: true for the in-type failures, false for
+	// the syntax error encoding/json reports on its own.
+	wantShapeSentinel bool
+	// assertCause, when set, checks that the typed cause the sentinel is
+	// forbidden to displace is still reachable — the "classification
+	// costs no diagnostic" half of the clause. The two in-type rows fail
+	// on different causes because rm.Real accepts quoted decimals
+	// (ADR 0004): a quoted non-number fails in strconv, an out-of-range
+	// JSON number fails in encoding/json.
+	assertCause func(t *testing.T, err error)
 }{
 	{
 		name:               "syntax error: object truncated after the opening brace",
@@ -165,27 +180,58 @@ var shapeErrorInputs = []struct {
 		wantUnmarshalErr:   "unexpected end of JSON input",
 		wantDecodeErr:      "unexpected EOF",
 		wantDecodeSentinel: io.ErrUnexpectedEOF,
+		wantShapeSentinel:  false,
 	},
 	{
-		name:             "type mismatch: magnitude is not a number",
-		in:               `{"_type":"DV_QUANTITY","magnitude":"not-a-number","units":"kg"}`,
-		wantUnmarshalErr: "canjson: DV_QUANTITY:",
-		wantDecodeErr:    "canjson: DV_QUANTITY:",
+		name:              "type mismatch: magnitude is not a number",
+		in:                `{"_type":"DV_QUANTITY","magnitude":"not-a-number","units":"kg"}`,
+		wantUnmarshalErr:  "canjson: DV_QUANTITY:",
+		wantDecodeErr:     "canjson: DV_QUANTITY:",
+		wantShapeSentinel: true,
+		assertCause: func(t *testing.T, err error) {
+			t.Helper()
+			if _, ok := errors.AsType[*strconv.NumError](err); !ok {
+				t.Errorf("err = %v; want errors.As to still reach *strconv.NumError under the sentinel", err)
+			}
+		},
 	},
 	{
-		name:             "numeric overflow: magnitude out of float64 range",
-		in:               `{"_type":"DV_QUANTITY","magnitude":1e400,"units":"kg"}`,
-		wantUnmarshalErr: "canjson: DV_QUANTITY:",
-		wantDecodeErr:    "canjson: DV_QUANTITY:",
+		name:              "numeric overflow: magnitude out of float64 range",
+		in:                `{"_type":"DV_QUANTITY","magnitude":1e400,"units":"kg"}`,
+		wantUnmarshalErr:  "canjson: DV_QUANTITY:",
+		wantDecodeErr:     "canjson: DV_QUANTITY:",
+		wantShapeSentinel: true,
+		assertCause: func(t *testing.T, err error) {
+			t.Helper()
+			if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
+				t.Errorf("err = %v; want errors.As to still reach *json.UnmarshalTypeError under the sentinel", err)
+			}
+		},
 	},
 }
 
-// TestUnmarshalDoesNotWrapErrInvalidShape pins the deferred REQ-052
-// producer: no decode path returns canjson.ErrInvalidShape, so an
-// errors.Is against it never matches, whichever shape error the input
-// carries. Landing the sentinel means updating this test — that is the
-// follow-up which closes the gap.
-func TestUnmarshalDoesNotWrapErrInvalidShape(t *testing.T) {
+// assertShapeSentinelDistinct pins the Global-Constraint half of
+// REQ-052 on a decode failure: whatever else it carries, it MUST NOT
+// match the encode-only canjson.ErrInvalidValue nor the transport-level
+// transport.ErrInvalidShape — three distinct sentinel values.
+func assertShapeSentinelDistinct(t *testing.T, err error) {
+	t.Helper()
+	if errors.Is(err, canjson.ErrInvalidValue) {
+		t.Errorf("decode failure must not match the encode-only canjson.ErrInvalidValue; got %v", err)
+	}
+	if errors.Is(err, transport.ErrInvalidShape) {
+		t.Errorf("decode failure must not match transport.ErrInvalidShape; got %v", err)
+	}
+}
+
+// TestUnmarshalWrapsErrInvalidShape pins REQ-052's decode-side shape
+// sentinel: a shape failure raised inside a generated UnmarshalJSON —
+// the `canjson: <RM_TYPE>:` family — matches errors.Is against
+// canjson.ErrInvalidShape, while malformed JSON, which never reaches a
+// generated UnmarshalJSON, does not. The classification costs nothing:
+// the error text is unchanged and the encoding/json cause stays
+// reachable with errors.As.
+func TestUnmarshalWrapsErrInvalidShape(t *testing.T) {
 	for _, tt := range shapeErrorInputs {
 		t.Run(tt.name, func(t *testing.T) {
 			var q rm.DVQuantity
@@ -196,19 +242,23 @@ func TestUnmarshalDoesNotWrapErrInvalidShape(t *testing.T) {
 			if !strings.Contains(err.Error(), tt.wantUnmarshalErr) {
 				t.Errorf("Unmarshal(%s) err = %v; want the text to contain %q", tt.in, err, tt.wantUnmarshalErr)
 			}
-			if errors.Is(err, canjson.ErrInvalidShape) {
-				t.Errorf("Unmarshal(%s) err = %v wraps ErrInvalidShape; no decode path produces the sentinel yet (REQ-052 producer deferred)", tt.in, err)
+			if got := errors.Is(err, canjson.ErrInvalidShape); got != tt.wantShapeSentinel {
+				t.Errorf("Unmarshal(%s) err = %v: errors.Is(_, canjson.ErrInvalidShape) = %t; want %t", tt.in, err, got, tt.wantShapeSentinel)
 			}
+			if tt.assertCause != nil {
+				tt.assertCause(t, err)
+			}
+			assertShapeSentinelDistinct(t, err)
 		})
 	}
 }
 
-// TestDecoderDecodeDoesNotWrapErrInvalidShape is the streaming twin of
+// TestDecoderDecodeWrapsErrInvalidShape is the streaming twin of
 // the test above — the only coverage of Decoder.Decode in the package.
 // It also pins the sentinel Decode's godoc names for a truncated
 // value, io.ErrUnexpectedEOF, where Unmarshal reports a
 // *json.SyntaxError.
-func TestDecoderDecodeDoesNotWrapErrInvalidShape(t *testing.T) {
+func TestDecoderDecodeWrapsErrInvalidShape(t *testing.T) {
 	for _, tt := range shapeErrorInputs {
 		t.Run(tt.name, func(t *testing.T) {
 			var q rm.DVQuantity
@@ -222,11 +272,45 @@ func TestDecoderDecodeDoesNotWrapErrInvalidShape(t *testing.T) {
 			if tt.wantDecodeSentinel != nil && !errors.Is(err, tt.wantDecodeSentinel) {
 				t.Errorf("Decode(%s) err = %v; want errors.Is(_, %v)", tt.in, err, tt.wantDecodeSentinel)
 			}
-			if errors.Is(err, canjson.ErrInvalidShape) {
-				t.Errorf("Decode(%s) err = %v wraps ErrInvalidShape; no decode path produces the sentinel yet (REQ-052 producer deferred)", tt.in, err)
+			if got := errors.Is(err, canjson.ErrInvalidShape); got != tt.wantShapeSentinel {
+				t.Errorf("Decode(%s) err = %v: errors.Is(_, canjson.ErrInvalidShape) = %t; want %t", tt.in, err, got, tt.wantShapeSentinel)
 			}
+			if tt.assertCause != nil {
+				tt.assertCause(t, err)
+			}
+			assertShapeSentinelDistinct(t, err)
 		})
 	}
+}
+
+// TestUnmarshalNestedDecodeErrorIsNotShapeTagged draws the sentinel's
+// far boundary (REQ-052). A polymorphic failure inside a nested value
+// travels out through the enclosing type's `canjson: <RM_TYPE>:`
+// funnel — here DV_QUANTITY's, because normal_range is a plain field
+// of the wire struct — and MUST keep its *DecodeError classification
+// without picking up ErrInvalidShape on the way. The sentinel means
+// "JSON-level shape", not "any decode failure".
+func TestUnmarshalNestedDecodeErrorIsNotShapeTagged(t *testing.T) {
+	const in = `{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg",` +
+		`"normal_range":{"lower":{"_type":"NEVER_REGISTERED_TYPE"}}}`
+	var q rm.DVQuantity
+	err := canjson.Unmarshal([]byte(in), &q)
+	if err == nil {
+		t.Fatal("Unmarshal(nested unknown _type) = nil; want a polymorphic decode error")
+	}
+	if !strings.Contains(err.Error(), "canjson: DV_QUANTITY:") {
+		t.Fatalf("err = %v; want the text to show it passed through DV_QUANTITY's funnel — otherwise this test no longer covers the nesting case", err)
+	}
+	if _, ok := errors.AsType[*canjson.DecodeError](err); !ok {
+		t.Errorf("err = %v (%T); want errors.As to reach *canjson.DecodeError", err, err)
+	}
+	if !errors.Is(err, typereg.ErrUnknownType) {
+		t.Errorf("err = %v; want errors.Is(_, typereg.ErrUnknownType)", err)
+	}
+	if errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; a nested polymorphic failure must not be re-classified as a JSON shape error", err)
+	}
+	assertShapeSentinelDistinct(t, err)
 }
 
 // TestDecoderDecodeStreamDivergesFromUnmarshal pins the two divergences

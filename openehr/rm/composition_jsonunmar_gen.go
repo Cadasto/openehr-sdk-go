@@ -50,10 +50,13 @@ type CompositionJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (c *Composition) UnmarshalJSON(data []byte) error {
 	var aux CompositionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: COMPOSITION: %w", err)
+		return typereg.WrapShapeError("COMPOSITION", err)
 	}
 	if aux.Class != "" && aux.Class != "COMPOSITION" {
 		return &typereg.DecodeError{
@@ -136,10 +139,13 @@ type EventContextJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (e *EventContext) UnmarshalJSON(data []byte) error {
 	var aux EventContextJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: EVENT_CONTEXT: %w", err)
+		return typereg.WrapShapeError("EVENT_CONTEXT", err)
 	}
 	if aux.Class != "" && aux.Class != "EVENT_CONTEXT" {
 		return &typereg.DecodeError{

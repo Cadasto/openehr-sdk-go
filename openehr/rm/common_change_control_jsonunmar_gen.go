@@ -26,10 +26,13 @@ type ContributionJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (c *Contribution) UnmarshalJSON(data []byte) error {
 	var aux ContributionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: CONTRIBUTION: %w", err)
+		return typereg.WrapShapeError("CONTRIBUTION", err)
 	}
 	if aux.Class != "" && aux.Class != "CONTRIBUTION" {
 		return &typereg.DecodeError{
@@ -94,10 +97,13 @@ type ImportedVersionJSONUnmarshaller[T any] struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (i *ImportedVersion[T]) UnmarshalJSON(data []byte) error {
 	var aux ImportedVersionJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: IMPORTED_VERSION: %w", err)
+		return typereg.WrapShapeError("IMPORTED_VERSION", err)
 	}
 	if aux.Class != "" && aux.Class != "IMPORTED_VERSION" {
 		return &typereg.DecodeError{
@@ -167,10 +173,13 @@ type OriginalVersionJSONUnmarshaller[T any] struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (o *OriginalVersion[T]) UnmarshalJSON(data []byte) error {
 	var aux OriginalVersionJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ORIGINAL_VERSION: %w", err)
+		return typereg.WrapShapeError("ORIGINAL_VERSION", err)
 	}
 	if aux.Class != "" && aux.Class != "ORIGINAL_VERSION" {
 		return &typereg.DecodeError{
@@ -234,10 +243,13 @@ type VersionedObjectJSONUnmarshaller[T any] struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (v *VersionedObject[T]) UnmarshalJSON(data []byte) error {
 	var aux VersionedObjectJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: VERSIONED_OBJECT: %w", err)
+		return typereg.WrapShapeError("VERSIONED_OBJECT", err)
 	}
 	if aux.Class != "" && aux.Class != "VERSIONED_OBJECT" {
 		return &typereg.DecodeError{

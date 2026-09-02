@@ -2,28 +2,33 @@ package canjson
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/internal/poly"
 )
 
-// ErrInvalidShape is the canjson-local sentinel reserved for JSON-level
-// shape errors (malformed JSON, type mismatch on a non-polymorphic field,
-// numeric overflow). It is decode-only: encode failures wrap
-// [ErrInvalidValue] instead. No decode path returns it today, so an
-// errors.Is against it never matches. Polymorphic-discrimination errors
-// come from the typereg package instead: match those with errors.Is
-// against [typereg.ErrMissingType] / [typereg.ErrUnknownType] /
-// [typereg.ErrTypeMismatch], not against this sentinel.
+// ErrInvalidShape is the canjson sentinel for JSON-level shape errors —
+// valid JSON in the wrong shape for the target RM type, such as a type
+// mismatch on a non-polymorphic field or a magnitude out of float64
+// range. It is decode-only: encode failures wrap [ErrInvalidValue]
+// instead (REQ-052).
 //
-// A decode failure surfaces in one of three other shapes: malformed JSON
-// reaches the caller unchanged from encoding/json, a shape error inside
-// a generated RM type carries a `canjson: <RM_TYPE>:` prefix, and a
-// failure at a polymorphic slot arrives as [DecodeError]. Wrapping
-// decode failures with this sentinel is a spec-first REQ-052 follow-up,
-// tracked by docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md.
-var ErrInvalidShape = errors.New("canjson: invalid JSON shape")
+// Every failure raised inside a generated RM type's [UnmarshalJSON] —
+// the `canjson: <RM_TYPE>:` family — wraps it, over the encoding/json
+// error, which stays reachable with errors.As. Two decode failures stay
+// outside it on purpose: malformed JSON, which encoding/json reports
+// before any UnmarshalJSON method runs, and a polymorphic-slot failure,
+// which arrives as [DecodeError] — including when it travels out
+// through an enclosing type's `canjson: <RM_TYPE>:` prefix. Match those
+// with errors.As for [DecodeError], or errors.Is against
+// [typereg.ErrMissingType] / [typereg.ErrUnknownType] /
+// [typereg.ErrTypeMismatch].
+//
+// The value lives in [typereg] so generated code under openehr/rm can
+// attach it without forming an `openehr/rm → openehr/serialize` import
+// cycle; this is the caller-facing name for it.
+var ErrInvalidShape = typereg.ErrInvalidShape
 
 // DecodeError is the unified error returned by the decoder at
 // polymorphic dispatch sites. Re-exported from the internal poly
@@ -72,9 +77,9 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 // polymorphic failures (via generated UnmarshalJSON). Malformed JSON
 // comes back unchanged from encoding/json as *json.SyntaxError; a
 // shape error inside a generated RM type keeps a
-// `canjson: <RM_TYPE>:` prefix from that type's UnmarshalJSON. None
-// of these wraps [ErrInvalidShape] (REQ-052 producer deferred — see
-// the sentinel's own documentation).
+// `canjson: <RM_TYPE>:` prefix from that type's UnmarshalJSON and
+// wraps [ErrInvalidShape]. The other two do not: see the sentinel's
+// own documentation for where the line falls.
 func Unmarshal(data []byte, v any) error {
 	return json.Unmarshal(data, v)
 }

@@ -57,16 +57,16 @@
 //     failure wraps it, over the encoder's own error, which stays
 //     reachable through unwrapping.
 //   - [ErrInvalidShape] — decode only. Never appears on an encode
-//     path. It is reserved for decode-side shape errors: today no
-//     decode path produces it — a decode failure surfaces in one of
-//     the three shapes described below instead, none of which wraps
-//     this sentinel.
+//     path. Every shape error raised inside a generated RM type's
+//     [UnmarshalJSON] wraps it, over the encoding/json error, which
+//     stays reachable through unwrapping. The other two decode
+//     failures described below do not wrap it.
 //
 // Both are distinct from the transport-level transport.ErrInvalidShape,
 // which classifies a response body rather than a codec operation.
 // Do not confuse [ErrInvalidShape] with canxml.ErrInvalidShape either:
-// same name, same subtree, a different value — and unlike this one it
-// does have producers, for `xmi:type` discriminator failures.
+// same name, same subtree, a different value — and canxml's is raised
+// in both directions, where this one is decode-only.
 //
 // What a decode failure looks like depends on where it happens:
 //
@@ -79,13 +79,15 @@
 //   - A shape error inside a generated RM type is wrapped by that
 //     type's generated UnmarshalJSON with a `canjson: <RM_TYPE>:`
 //     prefix, so the encoding/json error stays reachable with
-//     errors.As but is not returned verbatim.
+//     errors.As but is not returned verbatim. This is the one that
+//     wraps [ErrInvalidShape].
 //   - A failure at a polymorphic slot arrives as [DecodeError]
 //     carrying the path — whether its cause is a typereg sentinel
 //     (missing, unknown or mismatched `_type`) or a plain
-//     encoding/json error at that slot.
-//
-// None of the three wraps [ErrInvalidShape].
+//     encoding/json error at that slot. It keeps that classification
+//     even when it travels out through an enclosing type's
+//     `canjson: <RM_TYPE>:` prefix, so a nested polymorphic failure
+//     never turns into a shape error.
 //
 // # Strict vs relaxed decode
 //

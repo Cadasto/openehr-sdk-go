@@ -35,10 +35,13 @@ type GenericEntryJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (g *GenericEntry) UnmarshalJSON(data []byte) error {
 	var aux GenericEntryJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: GENERIC_ENTRY: %w", err)
+		return typereg.WrapShapeError("GENERIC_ENTRY", err)
 	}
 	if aux.Class != "" && aux.Class != "GENERIC_ENTRY" {
 		return &typereg.DecodeError{

@@ -122,7 +122,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: partial
-    packages: [openehr/serialize/canjson, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
+    packages: [openehr/serialize/canjson, openehr/rm/typereg, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
     plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
@@ -133,39 +133,47 @@ requirements:
       - openehr/serialize/canjson/polymorphic_decode_test.go
       - openehr/serialize/canjson/polymorphic_encode_test.go
       - openehr/serialize/canjson/decode_test.go
+      - openehr/rm/typereg/registry_test.go
       - openehr/internal/jsonpoly/jsonpoly_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
     notes: >-
-      partial (2026-08-30): the encode-side refusal sentinel clause
+      partial (2026-09-02): the encode-side refusal sentinel clause
       requires canjson.Marshal / MarshalIndent to wrap the encode-only
       canjson.ErrInvalidValue, kept errors.Is-distinguishable from the
       decode-side canjson.ErrInvalidShape and from transport.ErrInvalidShape
       (landed in marshal.go, pinned by marshal_sentinel_test.go; canxml
       reuses one sentinel across both directions — observed as out of
-      scope, not aligned). Every other clause is landed except one arm
-      of § Floating-point precision. Its MUST — report a wire value
-      exceeding JSON's number precision as a typed error "rather than
-      silently rounding" — is MET for OUT-OF-RANGE values: 1e400 fails
-      with a typed *json.UnmarshalTypeError, reachable by errors.As
-      through the generated UnmarshalJSON wrapper
+      scope, not aligned). The decode-side shape sentinel clause is
+      landed too: decode failures still reach the caller three ways —
+      malformed JSON unchanged from encoding/json, an in-type shape
+      error behind a `canjson: <RM_TYPE>:` prefix, a polymorphic-slot
+      failure as typereg.DecodeError — and the middle one now wraps
+      canjson.ErrInvalidShape, with the message and the errors.As-reachable
+      encoding/json cause both unchanged. The producer is
+      typereg.WrapShapeError, called from the one funnel the generator
+      emits (internal/bmmgen/render_jsonunmar.go), which is also why the
+      sentinel value lives in openehr/rm/typereg: generated code under
+      openehr/rm cannot import openehr/serialize. A nested DecodeError
+      passing through that funnel deliberately keeps only its own
+      classification. TestUnmarshalWrapsErrInvalidShape, its
+      Decoder.Decode twin, TestUnmarshalNestedDecodeErrorIsNotShapeTagged
+      and the typereg WrapShapeError tests pin all of it, distinctness
+      from canxml.ErrInvalidShape and transport.ErrInvalidShape included.
+      What keeps the REQ partial is one arm of § Floating-point
+      precision. Its MUST — report a wire value exceeding JSON's number
+      precision as a typed error "rather than silently rounding" — is
+      MET for OUT-OF-RANGE values: 1e400 fails with a typed
+      *json.UnmarshalTypeError, reachable by errors.As through the
+      generated UnmarshalJSON wrapper
       (TestUnmarshalOverflowIsATypedError). It is OPEN for MANTISSA
       precision loss, which is still silent: 0.1234567890123456789
       decodes to 0.12345678901234568 with a nil error, pinned as
       today's behaviour by TestUnmarshalMantissaPrecisionLossIsSilent —
       the producer that closes the gap must invert that test. Tracked by
       docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md
-      (Defers list). A SEPARATE and lesser gap, not this MUST:
-      canjson.ErrInvalidShape has no decode-side producer, so an
-      errors.Is against it never matches; the § asks for a typed error,
-      which the sentinel alone would not discharge.
-      TestUnmarshalDoesNotWrapErrInvalidShape and its Decoder.Decode
-      twin pin that absence. Decode failures reach the caller three ways
-      — malformed JSON unchanged from encoding/json, an in-type shape
-      error behind a `canjson: <RM_TYPE>:` prefix, a polymorphic-slot
-      failure as typereg.DecodeError — and none of them wraps the
-      sentinel, which is a distinct value from both
-      canxml.ErrInvalidShape and transport.ErrInvalidShape.
+      (Defers list); the sentinel alone does not discharge it, since the
+      § asks for an error where today there is none.
 
   - id: REQ-056
     title: Canonical XML

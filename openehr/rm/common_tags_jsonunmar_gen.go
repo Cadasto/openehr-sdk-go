@@ -30,10 +30,13 @@ type ItemTagJSONUnmarshaller struct {
 // concrete type is selected by `_type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
+// A whole-value shape failure goes through typereg.WrapShapeError,
+// which keeps the `canjson: <RM_TYPE>:` text and adds
+// typereg.ErrInvalidShape (REQ-052).
 func (i *ItemTag) UnmarshalJSON(data []byte) error {
 	var aux ItemTagJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("canjson: ITEM_TAG: %w", err)
+		return typereg.WrapShapeError("ITEM_TAG", err)
 	}
 	if aux.Class != "" && aux.Class != "ITEM_TAG" {
 		return &typereg.DecodeError{

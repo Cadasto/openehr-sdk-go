@@ -78,10 +78,10 @@ func TestMarshalSuccessIsUnaffectedBySentinel(t *testing.T) {
 
 // TestDecodeFailureDoesNotCarryErrInvalidValue guards the other half
 // of the distinctness rule: the encode-only sentinel MUST NOT appear
-// on any decode path (REQ-052). The positive decode classification is
-// not asserted here — canjson.Unmarshal is a pass-through that does
-// not itself attach canjson.ErrInvalidShape, which is a decode-side
-// question outside this clause.
+// on any decode path (REQ-052). The input here is malformed JSON,
+// which encoding/json rejects before any generated UnmarshalJSON runs,
+// so it carries no decode sentinel either; where canjson.ErrInvalidShape
+// does and does not attach is pinned in decode_test.go.
 func TestDecodeFailureDoesNotCarryErrInvalidValue(t *testing.T) {
 	var into map[string]any
 	err := canjson.Unmarshal([]byte(`{"a":`), &into)
