@@ -1311,4 +1311,35 @@ func TestSanitiseURLErrorGuards(t *testing.T) { // REQ-093
 			t.Errorf("copy = {Op:%q URL:%q}, want {Op:%q URL:%q} with the cause still reachable", ue.Op, ue.URL, in.Op, route)
 		}
 	})
+
+	// (*url.Error).Timeout and .Temporary type-assert on the Err field
+	// directly rather than walking the chain, so they are the one part
+	// of the copy that errors.Is cannot vouch for: wrapping Err would
+	// leave every chain assertion above passing while both answers
+	// silently flipped to false. Callers branch on these to decide
+	// whether to retry, so pin them.
+	t.Run("Timeout and Temporary survive the copy", func(t *testing.T) {
+		in := &url.Error{Op: "Get", URL: "https://cdr.example/ehr/live-id", Err: timeoutCause{}}
+
+		ue, ok := errors.AsType[*url.Error](sanitiseURLError(in, route))
+		if !ok {
+			t.Fatalf("sanitiseURLError returned a non-*url.Error for a timeout cause")
+		}
+		if !ue.Timeout() {
+			t.Error("copy.Timeout() = false, want true — url.Error asserts on Err directly, so wrapping the cause would break it")
+		}
+		if !ue.Temporary() {
+			t.Error("copy.Temporary() = false, want true — url.Error asserts on Err directly, so wrapping the cause would break it")
+		}
+	})
 }
+
+// timeoutCause is a cause that reports itself as a timeout, the shape
+// net/http hands back on a deadline. It exists so the sanitiser's copy
+// can be checked for the two answers (*url.Error) derives by asserting
+// on its Err field rather than by unwrapping (REQ-093).
+type timeoutCause struct{}
+
+func (timeoutCause) Error() string   { return "simulated timeout" }
+func (timeoutCause) Timeout() bool   { return true }
+func (timeoutCause) Temporary() bool { return true }

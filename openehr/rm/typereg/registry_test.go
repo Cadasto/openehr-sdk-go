@@ -83,6 +83,10 @@ func TestDecodeMissingTypeIsErrMissingType(t *testing.T) {
 	if !errors.Is(err, ErrMissingType) {
 		t.Errorf("err = %v; want errors.Is(_, ErrMissingType)", err)
 	}
+	// REQ-052: a dispatch failure stays outside the shape sentinel.
+	if errors.Is(err, ErrInvalidShape) {
+		t.Errorf("err = %v; a missing `_type` is a dispatch failure, not a JSON shape error", err)
+	}
 }
 
 func TestDecodeUnknownTypeIsErrUnknownType(t *testing.T) {

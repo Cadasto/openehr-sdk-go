@@ -107,6 +107,12 @@ func TestUnmarshalMissingTypeStrictDefault(t *testing.T) {
 	if !errors.Is(err, typereg.ErrMissingType) {
 		t.Errorf("err = %v; want errors.Is(_, typereg.ErrMissingType)", err)
 	}
+	// REQ-052: a polymorphic dispatch failure stays outside the shape
+	// sentinel — the same exclusion the unknown-`_type` and
+	// whole-value-mismatch arms assert.
+	if errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; a missing `_type` is a dispatch failure, not a JSON shape error", err)
+	}
 }
 
 // TestDecodeErrorCarriesPath — the DecodeError envelope MUST carry
@@ -365,6 +371,72 @@ func TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications(t *testing.T)
 		}
 	}
 	assertShapeSentinelDistinct(t, err)
+}
+
+// TestUnmarshalNarrowSlotMissingTypeFallbackKeepsBothClassifications
+// covers the one route into a slot-nested shape failure the test above
+// does not: the missing-`_type` fallback on a *narrow* slot. `ELEMENT.name`
+// is declared `DV_TEXT` and admits `DV_CODED_TEXT`, so the generator
+// lifts it to DVTextLike and, when the wire omits `_type`, retries the
+// bytes against the declared parent (the missing-`_type` tolerance in
+// wire.md § REQ-052). That retry is a plain json.Unmarshal into DVText,
+// so the reviewer's question was whether it can hand back a raw
+// encoding/json error with no classification at all.
+//
+// It cannot: the retry goes through DVText's own generated
+// UnmarshalJSON, whose funnel is typereg.WrapShapeError, so the failure
+// arrives already carrying ErrInvalidShape and the generated code stores
+// it as *DecodeError{Path: "/name"}. Both classifications hold, exactly
+// as for the `_type`-present slot. ErrMissingType is *not* in the chain:
+// the fallback consumed that condition and the dispatch error was
+// discarded — what remains is the shape failure the retry produced.
+func TestUnmarshalNarrowSlotMissingTypeFallbackKeepsBothClassifications(t *testing.T) {
+	// `name` carries no `_type`, so dispatch falls back to DV_TEXT; its
+	// `value` must be a string, and 5 is not one.
+	const in = `{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"value":5}}`
+	var e rm.Element
+	err := canjson.Unmarshal([]byte(in), &e)
+	if err == nil {
+		t.Fatal("Unmarshal(narrow slot, no _type, wrong-typed value) = nil; want a decode error")
+	}
+	de, ok := errors.AsType[*canjson.DecodeError](err)
+	if !ok {
+		t.Fatalf("err = %v (%T); want errors.As to reach *canjson.DecodeError", err, err)
+	}
+	if de.Path != "/name" {
+		t.Errorf("DecodeError.Path = %q, want %q — the narrow slot the fallback failed at", de.Path, "/name")
+	}
+	if !errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; the fallback decodes through DV_TEXT's own funnel, so its shape failure must keep the sentinel", err)
+	}
+	if !errors.As(err, new(*json.UnmarshalTypeError)) {
+		t.Errorf("err = %v; want the encoding/json cause to stay reachable with errors.As", err)
+	}
+	if errors.Is(err, typereg.ErrMissingType) {
+		t.Errorf("err = %v; the fallback consumed the missing-`_type` condition — what is reported is the retry's shape failure", err)
+	}
+	assertShapeSentinelDistinct(t, err)
+}
+
+// TestUnmarshalNarrowSlotMissingTypeDefaultsToParent is the positive
+// twin of the test above: the same narrow slot with `_type` omitted and
+// a well-shaped body decodes as the declared parent type. This is the
+// missing-`_type` tolerance wire.md § REQ-052 grants permissive
+// producers, and it is what makes the failing case above a *shape*
+// failure rather than a dispatch one.
+func TestUnmarshalNarrowSlotMissingTypeDefaultsToParent(t *testing.T) {
+	const in = `{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"value":"Systolic"}}`
+	var e rm.Element
+	if err := canjson.Unmarshal([]byte(in), &e); err != nil {
+		t.Fatalf("Unmarshal(narrow slot, no _type, well-shaped body) = %v; want the declared parent to be assumed", err)
+	}
+	name, ok := e.Name.(*rm.DVText)
+	if !ok {
+		t.Fatalf("Element.Name is %T; want *rm.DVText — the declared parent of the DVTextLike slot", e.Name)
+	}
+	if name.Value != "Systolic" {
+		t.Errorf("Element.Name.Value = %q, want %q", name.Value, "Systolic")
+	}
 }
 
 // TestUnmarshalWholeValueTypeMismatchIsNotShapeTagged draws the
