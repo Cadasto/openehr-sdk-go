@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -55,6 +57,64 @@ func readCassette(t *testing.T, dir, name string) []byte {
 }
 
 const ehrIDFixture = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
+
+// createCommitMetadataServer stands up a 201 responder that carries the
+// commit metadata every Create response is expected to carry -- Location
+// and ETag -- plus the given body. body == "" writes no body at all.
+func createCommitMetadataServer(t *testing.T, body string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/"+ehrIDFixture)
+		w.Header().Set("ETag", `"`+ehrIDFixture+`"`)
+		w.WriteHeader(http.StatusCreated)
+		if body != "" {
+			_, _ = w.Write([]byte(body))
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// wantCreateNoRepresentation asserts Create's no-representation arm
+// (REQ-094): the error is a *NoRepresentationError that still wraps
+// transport.ErrInvalidShape, no resource comes back, and the commit
+// metadata survives at both exits -- the separately returned
+// *VersionMetadata and the copy the error carries -- with the exact
+// header values the server sent. The metadata is what proves the EHR was
+// committed, so pinning its values, not merely its presence, is the point.
+func wantCreateNoRepresentation(t *testing.T, out *rm.EHR, meta *openehrclient.VersionMetadata, err error) {
+	t.Helper()
+	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+	if !ok {
+		t.Fatalf("err = %v, want *NoRepresentationError", err)
+	}
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Errorf("err = %v, must still wrap transport.ErrInvalidShape", err)
+	}
+	if out != nil {
+		t.Errorf("out = %+v, want nil", out)
+	}
+	if nre.Meta == nil {
+		t.Fatal("nre.Meta = nil, want the commit metadata on the error")
+	}
+	wantCommitMetadata(t, "returned meta", meta)
+	wantCommitMetadata(t, "nre.Meta", nre.Meta)
+}
+
+// wantCommitMetadata pins the exact Location and ETag the
+// createCommitMetadataServer fixture sends.
+func wantCommitMetadata(t *testing.T, label string, meta *openehrclient.VersionMetadata) {
+	t.Helper()
+	if meta == nil {
+		t.Fatalf("%s = nil, want the commit metadata", label)
+	}
+	if want := "/ehr/" + ehrIDFixture; meta.Location != want {
+		t.Errorf("%s.Location = %q, want %q", label, meta.Location, want)
+	}
+	if meta.ETag != ehrIDFixture {
+		t.Errorf("%s.ETag = %q, want %q", label, meta.ETag, ehrIDFixture)
+	}
+}
 
 func TestGet(t *testing.T) {
 	var captured *http.Request
@@ -261,48 +321,15 @@ func TestCreateClientSupplied(t *testing.T) {
 // proven unchanged separately (TestGet/TestExists*).
 func TestCreateEmpty2xxBody(t *testing.T) {
 	t.Run("empty_body", func(t *testing.T) {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Location", "/ehr/"+ehrIDFixture)
-			w.WriteHeader(http.StatusCreated)
-		}))
-		defer srv.Close()
+		srv := createCommitMetadataServer(t, "")
 		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
-		nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
-		if !ok {
-			t.Fatalf("empty body: err = %v, want *NoRepresentationError", err)
-		}
-		if !errors.Is(err, transport.ErrInvalidShape) {
-			t.Errorf("empty body: err must wrap transport.ErrInvalidShape, got %v", err)
-		}
-		if out != nil {
-			t.Errorf("empty body: out = %+v, want nil", out)
-		}
-		if meta == nil || nre.Meta == nil {
-			t.Fatal("empty body: commit metadata must survive the failed representation")
-		}
+		wantCreateNoRepresentation(t, out, meta, err)
 	})
 
 	t.Run("null_body", func(t *testing.T) {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Location", "/ehr/"+ehrIDFixture)
-			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte("null"))
-		}))
-		defer srv.Close()
+		srv := createCommitMetadataServer(t, "null")
 		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
-		nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
-		if !ok {
-			t.Fatalf("null body: err = %v, want *NoRepresentationError", err)
-		}
-		if !errors.Is(err, transport.ErrInvalidShape) {
-			t.Errorf("null body: err must wrap transport.ErrInvalidShape, got %v", err)
-		}
-		if out != nil {
-			t.Errorf("null body: out = %+v, want nil", out)
-		}
-		if meta == nil || nre.Meta == nil {
-			t.Fatal("null body: commit metadata must survive the failed representation")
-		}
+		wantCreateNoRepresentation(t, out, meta, err)
 	})
 
 	// REQ-094: a whitespace-only body classifies as empty (ErrInvalidShape),
@@ -310,39 +337,27 @@ func TestCreateEmpty2xxBody(t *testing.T) {
 	// own, independent of the JSON null arm (write_test.go pins the same
 	// case for WriteResult).
 	t.Run("whitespace_body", func(t *testing.T) {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Location", "/ehr/"+ehrIDFixture)
-			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(" \n\t"))
-		}))
-		defer srv.Close()
+		srv := createCommitMetadataServer(t, " \n\t")
 		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
-		nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
-		if !ok {
-			t.Fatalf("whitespace body: err = %v, want *NoRepresentationError", err)
-		}
-		if !errors.Is(err, transport.ErrInvalidShape) {
-			t.Errorf("whitespace body: err must wrap transport.ErrInvalidShape, got %v", err)
-		}
-		if out != nil {
-			t.Errorf("whitespace body: out = %+v, want nil", out)
-		}
-		if meta == nil || nre.Meta == nil {
-			t.Fatal("whitespace body: commit metadata must survive the failed representation")
-		}
+		wantCreateNoRepresentation(t, out, meta, err)
 	})
 
 	t.Run("garbage_body", func(t *testing.T) {
 		const garbage = `}{ not json`
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(garbage))
-		}))
-		defer srv.Close()
-		_, _, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		srv := createCommitMetadataServer(t, garbage)
+		_, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
 		de, ok := errors.AsType[*transport.DecodeError](err)
 		if !ok {
 			t.Fatalf("garbage body: err = %v, want *transport.DecodeError (REQ-151, unchanged)", err)
+		}
+		// REQ-151: a decode failure does not cost the caller the response
+		// headers -- the triple still populates the commit metadata.
+		wantCommitMetadata(t, "garbage body: returned meta", meta)
+		// The leaf's operation-name wrap is presentation, not a barrier
+		// (REQ-151): it must be on the string, with errors.AsType still
+		// reaching through it as asserted above.
+		if !strings.HasPrefix(err.Error(), "ehr.Create: ") {
+			t.Errorf("garbage body: err.Error() = %q, want the %q operation-name prefix", err.Error(), "ehr.Create: ")
 		}
 		// Pins the transport.Decode bypass: Create builds *transport.DecodeError
 		// by hand (it no longer calls transport.Decode -- see the null-body
@@ -365,6 +380,30 @@ func TestCreateEmpty2xxBody(t *testing.T) {
 		}
 	})
 
+	// REQ-151: the hand-rolled *transport.DecodeError must attribute the
+	// failure to the route actually taken -- the client-supplied-id arm is
+	// PUT /ehr/{ehr_id}, not the POST /ehr the sibling case exercises.
+	t.Run("garbage_body_with_ehr_id", func(t *testing.T) {
+		const garbage = `}{ not json`
+		srv := createCommitMetadataServer(t, garbage)
+		_, _, err := openehrclient.Create(t.Context(), newClient(t, srv),
+			openehrclient.WithEHRID(ehrIDFixture),
+		)
+		de, ok := errors.AsType[*transport.DecodeError](err)
+		if !ok {
+			t.Fatalf("garbage body (client-supplied id): err = %v, want *transport.DecodeError", err)
+		}
+		if de.Method != http.MethodPut {
+			t.Errorf("de.Method = %q, want %q", de.Method, http.MethodPut)
+		}
+		if de.Route != "/ehr/{ehr_id}" {
+			t.Errorf("de.Route = %q, want %q", de.Route, "/ehr/{ehr_id}")
+		}
+		if string(de.Body) != garbage {
+			t.Errorf("de.Body = %q, want %q", de.Body, garbage)
+		}
+	})
+
 	t.Run("valid_body", func(t *testing.T) {
 		body := readCassette(t, "ehr", "ehr.json")
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -380,6 +419,42 @@ func TestCreateEmpty2xxBody(t *testing.T) {
 			t.Errorf("valid body: out = %+v, want EHRID.Value = %q", out, ehrIDFixture)
 		}
 	})
+}
+
+// REQ-094: a non-2xx is never a no-representation failure. The 409's
+// empty body is exactly the shape the 2xx arm classifies as
+// "committed, no usable representation", so this pins the two
+// classifications disjoint -- a wire failure stays a
+// *transport.WireError, and is neither reclassified as
+// *NoRepresentationError (REQ-094) nor as *transport.DecodeError
+// (REQ-151). Mirrors TestWriteResultWireErrorNotNoRepresentation.
+func TestCreateWireErrorNotNoRepresentation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/"+ehrIDFixture)
+		w.WriteHeader(http.StatusConflict)
+	}))
+	defer srv.Close()
+
+	out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+
+	if _, ok := errors.AsType[*transport.WireError](err); !ok {
+		t.Fatalf("409 err = %v, want *transport.WireError", err)
+	}
+	if _, ok := errors.AsType[*openehrclient.NoRepresentationError](err); ok {
+		t.Error("a wire failure must not be a NoRepresentationError")
+	}
+	if _, ok := errors.AsType[*transport.DecodeError](err); ok {
+		t.Error("a wire failure must not be a DecodeError")
+	}
+	if out != nil {
+		t.Errorf("out = %+v, want nil", out)
+	}
+	// Today's contract: Create returns the response metadata whenever the
+	// wire error carried a response (ehr.go's resp != nil arm), so the
+	// caller keeps the headers alongside the failure.
+	if meta == nil || meta.Location != "/ehr/"+ehrIDFixture {
+		t.Errorf("meta = %+v, want the 409's Location captured", meta)
+	}
 }
 
 func TestRefConstruction(t *testing.T) {
