@@ -312,8 +312,8 @@ func TestCreateClientSupplied(t *testing.T) {
 	}
 }
 
-// TestCreateEmpty2xxBody characterises the four response-body shapes
-// Create's 2xx arm can receive (REQ-094). An empty or JSON-null body
+// TestCreateEmpty2xxBody characterises each response-body shape below
+// that Create's 2xx arm can receive (REQ-094). An empty or JSON-null body
 // commits but carries no representation and MUST surface as
 // *NoRepresentationError, carrying the commit metadata; a present but
 // undecodable body keeps REQ-151's *transport.DecodeError typing
@@ -345,10 +345,15 @@ func TestCreateEmpty2xxBody(t *testing.T) {
 	t.Run("garbage_body", func(t *testing.T) {
 		const garbage = `}{ not json`
 		srv := createCommitMetadataServer(t, garbage)
-		_, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
 		de, ok := errors.AsType[*transport.DecodeError](err)
 		if !ok {
 			t.Fatalf("garbage body: err = %v, want *transport.DecodeError (REQ-151, unchanged)", err)
+		}
+		// A decode failure yields no resource: the half-built *rm.EHR the
+		// decoder was filling must never reach the caller beside the error.
+		if out != nil {
+			t.Errorf("garbage body: out = %+v, want nil", out)
 		}
 		// REQ-151: a decode failure does not cost the caller the response
 		// headers -- the triple still populates the commit metadata.
@@ -386,13 +391,19 @@ func TestCreateEmpty2xxBody(t *testing.T) {
 	t.Run("garbage_body_with_ehr_id", func(t *testing.T) {
 		const garbage = `}{ not json`
 		srv := createCommitMetadataServer(t, garbage)
-		_, _, err := openehrclient.Create(t.Context(), newClient(t, srv),
+		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv),
 			openehrclient.WithEHRID(ehrIDFixture),
 		)
 		de, ok := errors.AsType[*transport.DecodeError](err)
 		if !ok {
 			t.Fatalf("garbage body (client-supplied id): err = %v, want *transport.DecodeError", err)
 		}
+		if out != nil {
+			t.Errorf("garbage body (client-supplied id): out = %+v, want nil", out)
+		}
+		// REQ-151: the PUT arm keeps the commit metadata on a decode failure
+		// too -- pinned here so it does not ride on the POST arm's assertion.
+		wantCommitMetadata(t, "garbage body (client-supplied id): returned meta", meta)
 		if de.Method != http.MethodPut {
 			t.Errorf("de.Method = %q, want %q", de.Method, http.MethodPut)
 		}

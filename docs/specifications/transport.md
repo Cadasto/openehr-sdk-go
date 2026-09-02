@@ -125,7 +125,7 @@ A wire failure **MUST** remain a `*transport.WireError`. The SDK **MUST NOT** re
 
 The same empty-body and decode-failure rules **MUST** apply to `contribution.Commit` when `Prefer: return=representation` was sent. An empty representation body **MUST NOT** be a silent success.
 
-This contract binds the versioned-write `WriteResult` family, `contribution.Commit`, and EHR creation. `ehr.Create` (a non-versioned write) **MUST** return a typed `NoRepresentationError`, carrying the commit metadata as above, when a 2xx body is empty, whitespace-only, or the JSON `null` literal. A 2xx body that is present but does not decode is `ehr.Create`'s *decode-failure* arm, typed by [§ REQ-151](#req-151--typed-2xx-decode-failure) as a `*transport.DecodeError`. Until 2026-09-02 the empty/null-body arm was a keyed exception returning the bare `transport.ErrInvalidShape`; it was closed by the archived [`ehr.Create` empty-2xx typing plan](../plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md).
+This contract binds the versioned-write `WriteResult` family, `contribution.Commit`, and EHR creation's empty/null-body arm. `ehr.Create` (a non-versioned write) **MUST** return a typed `NoRepresentationError`, carrying the commit metadata as above, when a 2xx body is empty, whitespace-only, or the JSON `null` literal. A 2xx body that is present but does not decode is `ehr.Create`'s *decode-failure* arm, typed by [§ REQ-151](#req-151--typed-2xx-decode-failure) as a `*transport.DecodeError`.
 
 - **Lives in:** [`transport/`](../../transport), [`openehr/client/ehr/`](../../openehr/client/ehr) (composition / directory / ehrstatus / contribution), [`openehr/client/demographic/`](../../openehr/client/demographic)
 
