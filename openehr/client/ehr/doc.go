@@ -12,11 +12,12 @@
 // demographic) and contribution Commit, a 2xx representation with an
 // empty, JSON-null, or undecodable body is a [*NoRepresentationError]
 // carrying the commit metadata, never a silent success; a non-2xx stays
-// a wire error. EHR creation ([Create], which decodes through
-// transport.Decode) retains the bare transport.ErrInvalidShape contract
-// on an empty body — typing it is deferred.
+// a wire error. EHR creation ([Create]) follows the same rule for its
+// empty/null-body arm — a [*NoRepresentationError] — while its
+// decode-failure arm stays a [*transport.DecodeError] per REQ-151.
 //
 // Implements REQ-023, REQ-050, REQ-054, REQ-059 (ItemTags in
-// itemtags/), and the REQ-094 write-result contract per
-// docs/specifications/wire.md and docs/specifications/transport.md.
+// itemtags/), the REQ-094 write-result contract, and REQ-151's
+// decode-failure arm for [Create], per docs/specifications/wire.md and
+// docs/specifications/transport.md.
 package ehr
