@@ -69,3 +69,14 @@ func TestSyntaxDetailToleratesABoxedNilSyntaxError(t *testing.T) {
 		t.Errorf("syntaxDetail(positioned SyntaxError) = %q, want %q", got, want)
 	}
 }
+
+// TestSyntaxDetailOmitsPositionWhenZero pins the same no-fabricated-"0:0:"
+// rule [parse.SyntaxError.Error] applies: a non-nil *SyntaxError whose Pos is
+// the zero value has no real position to report, so syntaxDetail must not
+// invent one (REQ-025 nil-receiver axis).
+func TestSyntaxDetailOmitsPositionWhenZero(t *testing.T) {
+	zeroPos := &parse.SyntaxError{Msg: "unexpected token"}
+	if got, want := syntaxDetail(zeroPos), "unexpected token"; got != want {
+		t.Errorf("syntaxDetail(zero-Pos SyntaxError) = %q, want %q (no dangling %q)", got, want, "0:0:")
+	}
+}

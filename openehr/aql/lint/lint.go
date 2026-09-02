@@ -211,9 +211,14 @@ func syntaxSpan(err error) Span {
 
 // syntaxDetail formats a parse failure for lint consumers. REQ-109 requires
 // line/column in Detail for aql_syntax; [parse.SyntaxError] carries position.
+// A zero Pos omits the "L:C:" prefix rather than claiming a fabricated
+// "0:0:", mirroring [parse.SyntaxError.Error] (REQ-025 nil-receiver axis).
 func syntaxDetail(err error) string {
 	// See syntaxSpan: ok alone does not prove se is non-nil.
 	if se, ok := errors.AsType[*parse.SyntaxError](err); ok && se != nil {
+		if se.Pos == (parse.Position{}) {
+			return se.Msg
+		}
 		return fmt.Sprintf("%d:%d: %s", se.Pos.Line, se.Pos.Col, se.Msg)
 	}
 	return err.Error()
