@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -321,5 +322,97 @@ func TestValidateRMDemographic_NilGuard(t *testing.T) {
 	r := validation.ValidateRMDemographic(nil)
 	if r.OK || !containsCode(r.Issues, "nil_party") {
 		t.Errorf("ValidateRMDemographic(nil) want nil_party, got %+v", r.Issues)
+	}
+}
+
+// TestRMFloorTermMappingMatchValueSet covers the TERM_MAPPING.match value
+// set: a match outside {'>', '=', '<', '?'} surfaces `term_mapping_match`
+// at the offending mapping's path (REQ-112).
+func TestRMFloorTermMappingMatchValueSet(t *testing.T) {
+	txt := &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{
+		Match:  rm.Character("x"), // not in {> = < ?}
+		Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "1"},
+	}}}
+	r := validation.ValidateRM(txt)
+	if r.OK {
+		t.Fatalf("expected an invariant issue for match=%q", "x")
+	}
+	if !containsIssue(r.Issues, "/mappings[0]/match", "term_mapping_match") {
+		t.Errorf("expected term_mapping_match at /mappings[0]/match, got %+v", r.Issues)
+	}
+}
+
+// TestRMFloorMappingsNotEmptyIfPresent covers Mappings_valid: a
+// present-but-empty DV_TEXT.mappings (a Go-value-literal empty slice,
+// mirroring a decoded literal `"mappings":[]` on the wire) surfaces
+// `mappings_valid` at /mappings (REQ-112).
+func TestRMFloorMappingsNotEmptyIfPresent(t *testing.T) {
+	txt := &rm.DVText{Value: "x", Mappings: []rm.TermMapping{}} // present, empty -> invalid
+	r := validation.ValidateRM(txt)
+	if r.OK {
+		t.Fatalf("expected a Mappings_valid issue for a present-but-empty mappings")
+	}
+	if !containsIssue(r.Issues, "/mappings", "mappings_valid") {
+		t.Errorf("expected mappings_valid at /mappings, got %+v", r.Issues)
+	}
+}
+
+// TestRMFloorMappingsAbsentIsValid is the no-false-positive guard: a
+// DV_TEXT decoded from JSON with no `mappings` key at all decodes to a
+// nil slice (verified on this branch — absent and JSON `null` both
+// collapse to nil; only a literal `[]` decodes non-nil-empty), which the
+// floor must not flag (REQ-112).
+func TestRMFloorMappingsAbsentIsValid(t *testing.T) {
+	var txt rm.DVText
+	if err := canjson.Unmarshal([]byte(`{"_type":"DV_TEXT","value":"x"}`), &txt); err != nil {
+		t.Fatalf("canjson.Unmarshal: %v", err)
+	}
+	r := validation.ValidateRM(&txt)
+	if !r.OK {
+		t.Errorf("ValidateRM(DV_TEXT, mappings absent) want OK; got %+v", r.Issues)
+	}
+	if containsCode(r.Issues, "mappings_valid") {
+		t.Errorf("absent mappings must not be flagged mappings_valid; got %+v", r.Issues)
+	}
+}
+
+// TestRMFloorMappingsEmptyLiteralIsInvalid is the decode-path twin of
+// TestRMFloorMappingsNotEmptyIfPresent: a DV_TEXT decoded from a literal
+// `"mappings":[]` on the wire decodes to a non-nil empty slice and the
+// floor MUST flag it (REQ-112).
+func TestRMFloorMappingsEmptyLiteralIsInvalid(t *testing.T) {
+	var txt rm.DVText
+	if err := canjson.Unmarshal([]byte(`{"_type":"DV_TEXT","value":"x","mappings":[]}`), &txt); err != nil {
+		t.Fatalf("canjson.Unmarshal: %v", err)
+	}
+	r := validation.ValidateRM(&txt)
+	if r.OK {
+		t.Fatalf("expected a mappings_valid issue for a decoded literal empty mappings array")
+	}
+	if !containsIssue(r.Issues, "/mappings", "mappings_valid") {
+		t.Errorf("expected mappings_valid at /mappings, got %+v", r.Issues)
+	}
+}
+
+// TestRMFloorDVCodedTextBadMatch covers the inheritance path: DV_CODED_TEXT
+// carries `mappings` via its embedded DV_TEXT, and the term_mapping_match
+// invariant MUST apply there too (REQ-112).
+func TestRMFloorDVCodedTextBadMatch(t *testing.T) {
+	txt := &rm.DVCodedText{
+		DVText: rm.DVText{
+			Value: "x",
+			Mappings: []rm.TermMapping{{
+				Match:  rm.Character("q"), // not in {> = < ?}
+				Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "1"},
+			}},
+		},
+		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "2"},
+	}
+	r := validation.ValidateRM(txt)
+	if r.OK {
+		t.Fatalf("expected a term_mapping_match issue for DV_CODED_TEXT with match=%q", "q")
+	}
+	if !containsIssue(r.Issues, "/mappings[0]/match", "term_mapping_match") {
+		t.Errorf("expected term_mapping_match at /mappings[0]/match, got %+v", r.Issues)
 	}
 }

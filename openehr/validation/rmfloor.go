@@ -266,6 +266,10 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkDVInterval(value, path)
 	case rmType == "OBJECT_REF", rmType == "PARTY_REF", rmType == "ACCESS_GROUP_REF", rmType == "LOCATABLE_REF":
 		w.checkObjectRef(value, path)
+	case rmType == "DV_TEXT", rmType == "DV_CODED_TEXT":
+		// DV_CODED_TEXT inherits `mappings` from DV_TEXT via embedding —
+		// one evaluator, dispatched for both runtime types.
+		w.checkTermMappings(value, path)
 	}
 }
 
@@ -360,5 +364,48 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 			Code:   "rm_invariant",
 			Detail: "OBJECT_REF.namespace must be non-empty",
 		})
+	}
+}
+
+// checkTermMappings enforces two REQ-112 invariants on the `mappings`
+// attribute DV_TEXT carries (and DV_CODED_TEXT inherits via its embedded
+// DV_TEXT):
+//
+//   - Mappings_valid: a *present* mappings MUST be non-empty. Presence is
+//     read from Go slice nilness, which mirrors the wire distinction
+//     canjson decode preserves: an absent `mappings` key and an explicit
+//     JSON `null` both decode to a nil slice (verified on this branch),
+//     so they are indistinguishable from "not supplied" and both valid;
+//     only a decoded literal `"mappings":[]` produces the non-nil empty
+//     slice this check flags.
+//   - TERM_MAPPING.match value set: each mapping's match MUST be one of
+//     '>', '=', '<', '?' (openEHR RM Data Types).
+//
+// Diagnostics name the attribute and the allowed set only — never the
+// offending value (REQ-093's value-free boundary-diagnostic discipline).
+func (w *rmFloorWalker) checkTermMappings(value any, path string) {
+	ms, ok := asMappings(value)
+	if !ok {
+		return
+	}
+	mappingsPath := joinPath(path, "/mappings")
+	if ms != nil && len(ms) == 0 {
+		w.emit(Issue{
+			Path:   mappingsPath,
+			Code:   "mappings_valid",
+			Detail: "DV_TEXT.mappings present but empty",
+		})
+		return
+	}
+	for i, m := range ms {
+		switch m.Match {
+		case ">", "=", "<", "?":
+		default:
+			w.emit(Issue{
+				Path:   fmt.Sprintf("%s[%d]/match", mappingsPath, i),
+				Code:   "term_mapping_match",
+				Detail: "TERM_MAPPING.match must be one of {'>', '=', '<', '?'}",
+			})
+		}
 	}
 }

@@ -1212,19 +1212,23 @@ requirements:
     # no compiled OPT. Enforces RM-mandatory attribute presence + a small
     # per-RM-type invariant catalogue (CODE_PHRASE, DV_QUANTITY,
     # DV_INTERVAL bounds for numeric-comparable bounds, OBJECT_REF
-    # type/namespace). Driver is a second walker alongside REQ-102/110;
-    # closed-RM-set helpers (rmTypeInfo / rmread) are shared across REQ-102/110/112.
+    # type/namespace, DV_TEXT/DV_CODED_TEXT mappings/Mappings_valid +
+    # TERM_MAPPING.match value set). Driver is a second walker alongside
+    # REQ-102/110; closed-RM-set helpers (rmTypeInfo / rmread) are shared
+    # across REQ-102/110/112.
     implementation: landed
     packages:
       - openehr/validation
       - openehr/rm/rminfo  # AttributeNames added to Lookup
     # PROBE-077 (RM-floor invariant matrix) is deferred to a follow-up
     # cycle; the unit-test cassette matrix in rmfloor_test.go covers the
-    # first-cycle catalogue (required-set absence + the four named
-    # leaf invariants). PROBE-081 (REQ-112) covers value-typed
-    # mandatory presence — EHR_STATUS.subject — decided from JSON-key
-    # presence by ValidateRMEHRStatusBytes (rmfloor_bytes.go), carried
-    # inline by rmfloor_bytes_test.go.
+    # first-cycle catalogue (required-set absence + the named leaf
+    # invariants, including the DV_TEXT/DV_CODED_TEXT term-mapping pair
+    # and its canjson decode-path absent/null-vs-literal-[] distinction).
+    # PROBE-081 (REQ-112) covers value-typed mandatory presence —
+    # EHR_STATUS.subject — decided from JSON-key presence by
+    # ValidateRMEHRStatusBytes (rmfloor_bytes.go), carried inline by
+    # rmfloor_bytes_test.go.
     probes: [PROBE-081]
     tests:
       - openehr/validation/rmfloor_test.go

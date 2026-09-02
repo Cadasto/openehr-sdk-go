@@ -41,6 +41,30 @@ func asDVQuantity(value any) (rm.DVQuantity, bool) {
 	return rm.DVQuantity{}, false
 }
 
+// asMappings recovers the DV_TEXT.mappings slice (by value or by
+// pointer) from any concrete carrying it — DV_TEXT itself, and
+// DV_CODED_TEXT, which inherits the attribute via its embedded DV_TEXT.
+// Returns ok=false when value is neither.
+func asMappings(value any) ([]rm.TermMapping, bool) {
+	switch v := value.(type) {
+	case *rm.DVText:
+		if v == nil {
+			return nil, false
+		}
+		return v.Mappings, true
+	case rm.DVText:
+		return v.Mappings, true
+	case *rm.DVCodedText:
+		if v == nil {
+			return nil, false
+		}
+		return v.Mappings, true
+	case rm.DVCodedText:
+		return v.Mappings, true
+	}
+	return nil, false
+}
+
 // dvIntervalNumericBounds returns the lower/upper magnitudes of a DV_INTERVAL
 // when both bounds are numerically comparable — same-unit DV_QUANTITY, or
 // DV_COUNT — and neither side is unbounded. It handles the monomorphised
