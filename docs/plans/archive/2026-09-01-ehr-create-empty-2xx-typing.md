@@ -5,23 +5,25 @@
 **Date:** 2026-09-01
 **Status:** Done (2026-09-02) — Task 1 executed; REQ-094's `ehr.Create` keyed exception closed.
 **Owner:** SDK maintainers
-**Covers:** [REQ-094](../specifications/transport.md#req-094) (write-result contract / `NoRepresentationError`) — extends it to `ehr.Create`'s empty-body arm. No new id.
+**Covers:** [REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation) (write-result contract / `NoRepresentationError`) — extends it to `ehr.Create`'s empty-body arm. Also amends [REQ-151](../../specifications/transport.md#req-151--typed-2xx-decode-failure) — its keyed-exclusion bullets now name `ehr.Create`'s empty/null-body arm under the write-result funnel, and its traceability entry gains `openehr/client/ehr` plus `ehr_test.go` for the hand-rolled `*transport.DecodeError` arm. Cross-reference only; no new id.
 **Probes:** none new (unit-covered like the rest of the write-result family).
 **Implementation:** landed
-**Depends on:** [REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) (`*transport.DecodeError`, landed — the primitive whose absence deferred this); `NoRepresentationError` ([`openehr/client/ehr/write.go:151`](../../openehr/client/ehr/write.go#L151), landed); `WriteResult[T]` ([`write.go:99`](../../openehr/client/ehr/write.go#L99), landed).
-**Defers:** nothing — this closes the one deferred slice recorded in [the archived write-result plan's Defers](archive/2026-08-18-write-result-contract.md).
+**Depends on:** [REQ-151](../../specifications/transport.md#req-151--typed-2xx-decode-failure) (`*transport.DecodeError`, landed — the primitive whose absence deferred this); `NoRepresentationError` ([`openehr/client/ehr/write.go:151`](../../../openehr/client/ehr/write.go#L151), landed); `WriteResult[T]` ([`write.go:99`](../../../openehr/client/ehr/write.go#L99), landed).
+**Defers:** nothing — this closes the one deferred slice recorded in [the archived write-result plan's Defers](2026-08-18-write-result-contract.md).
 
 **Goal:** When `ehr.Create` receives a 2xx with an **empty or JSON-null** body, return a typed `*NoRepresentationError` ("committed, but no usable representation") instead of the bare `transport.ErrInvalidShape` — bringing it in line with every versioned write — **without** changing the shared read contract or the decode-failure arm.
 
-**Architecture:** `ehr.Create` decodes through the shared `transport.Decode[rm.EHR]` (line 141), which the read paths (`ehr.Get`, `ehr.Exists`) also use — so its empty-body error cannot be retyped inside `transport.Decode` without changing reads. The surgical fix retypes **only at the `ehr.Create` layer**: after `transport.Decode`, translate the *empty-body* `ErrInvalidShape` into `*NoRepresentationError`, while leaving the decode-failure arm as the `*transport.DecodeError` REQ-151 already produces. Reads are untouched.
+**Architecture (as landed):** `ehr.Create` calls `c.Do` itself and classifies the **raw response body** before any decode is attempted: empty, whitespace-only, or the JSON `null` literal → `*NoRepresentationError` (REQ-094), through the same `isNoRepresentationBody` helper `WriteResult` uses. A body that gets past that check and then fails `canjson.Unmarshal` is built into the same `*transport.DecodeError` `transport.Decode` would have returned (`Method` / `Route` read off `req`), so REQ-151's typing for that arm is unchanged. `ehr.Create` therefore no longer calls `transport.Decode` at all — the shared read contract is not reachable from this function. `ehr.Get` / `ehr.GetBySubject` still decode through `transport.Decode` and are untouched; `ehr.Exists` never decoded a body (it reads the status off `c.Do`).
+
+> **Superseded on 2026-09-02:** the plan proposed a narrower fix — keep `Create`'s `transport.Decode` call and retype the empty-body `ErrInvalidShape` *after* it returned. That shape cannot see a JSON-`null` body: `transport.Decode` accepts one with a **nil** error, because a `null` literal unmarshals into a struct target as a no-op, so the null case never reaches the post-decode branch. The landed code classifies the raw bytes instead. The original proposal is kept verbatim below (Task 1, Step 2) as delivery history — read it as history, not as the current design.
 
 **Tech Stack:** Go error wrapping (`errors.Is` / `errors.AsType`), `openehr/client/ehr`, `transport`.
 
-**Spec:** [transport.md § REQ-094 / REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) — the keyed exception clause that names this deferral.
+**Spec:** [transport.md § REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation) — the clause that carried the keyed exception this plan closed (§ REQ-094 now binds `ehr.Create`'s empty/null-body arm outright); [§ REQ-151](../../specifications/transport.md#req-151--typed-2xx-decode-failure) — the decode-failure arm, unchanged.
 
 ## Global Constraints
 
-- **Reads keep the shared contract.** `ehr.Get` / `ehr.Exists` (and every other `transport.Decode` caller) **MUST** be behaviourally unchanged: an empty read body stays bare `transport.ErrInvalidShape`.
+- **Reads keep the shared contract.** `ehr.Get` / `ehr.GetBySubject` (and every other `transport.Decode` caller) **MUST** be behaviourally unchanged: an empty read body stays bare `transport.ErrInvalidShape`. `ehr.Exists` decodes no body at all — it reads the status off `c.Do` — and is likewise unchanged.
 - **Decode-failure arm unchanged.** A present-but-undecodable 2xx body stays a `*transport.DecodeError` (REQ-151).
 - **Value-free diagnostics** (REQ-093): the error names the classification, never the body.
 
@@ -43,14 +45,14 @@
 | Spec: rewrite the transport.md keyed-exception clause (REQ-094/151) | ✅ closed, not narrowed (`8f2b88e`) |
 | Code: retype the empty-body arm in `ehr.Create` | ✅ `8f2b88e` — also classifies the JSON-null body, which `transport.Decode` does not error on (a null literal is a nil-error no-op against a struct target); Create no longer routes through `transport.Decode` (reads untouched) |
 | Test: empty-body → `NoRepresentationError`; decode-failure → `DecodeError`; reads unchanged | ✅ `TestCreateEmpty2xxBody` (`ehr_test.go`), `TestGet`/`TestExists*` re-run unchanged |
-| `make spec-check` / `make ci` | ✅ `make spec-check` OK at both commits; `make ci` not run — task's verification scope was `go build ./...`, `go test ./openehr/client/... ./transport/... -count=1`, `golangci-lint run ./openehr/client/ehr/...`, `make spec-check`, all green |
+| `make spec-check` / `make ci` | ✅ `make spec-check` OK at every commit. **`make ci` green on 2026-09-02** (exit 0) at the review-fix head: the whole gate — `fmt-check`, `mod-tidy-check`, `vet`, `test` (with `codegen-verify` and `aqlgen-verify`), `lint`, `spec-check`, `flat-conformance-verify`, `build` — on host Go 1.26.6, golangci-lint 2.13.0 and Docker for the ANTLR codegen image |
 
 ## Phases
 
 ### Task 1: Retype `ehr.Create`'s empty-body arm
 
 **Files:**
-- Modify: `openehr/client/ehr/ehr.go:141` (the `transport.Decode` return in `Create`)
+- Modify: `openehr/client/ehr/ehr.go:141` (the `transport.Decode` return in `Create`) — **superseded 2026-09-02:** as landed, that `transport.Decode` call is gone; `Create` calls `c.Do` and classifies the raw body (see Step 2's note and the Architecture note above)
 - Modify: `openehr/client/ehr/doc.go:13-17` (drop the "typing is deferred" note)
 - Test: `openehr/client/ehr/ehr_test.go` (or the existing create test file)
 - Modify: `docs/specifications/transport.md` (keyed-exception clause)
@@ -117,5 +119,5 @@ Two ways to do this, both sound:
 
 ## Mapping to specs
 
-- [transport.md § REQ-094](../specifications/transport.md#req-094) — write-result contract / `NoRepresentationError` (the clause this closes).
-- [transport.md § REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) — decode-failure arm (unchanged).
+- [transport.md § REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation) — write-result contract / `NoRepresentationError` (the clause this closes).
+- [transport.md § REQ-151](../../specifications/transport.md#req-151--typed-2xx-decode-failure) — decode-failure arm (unchanged).
