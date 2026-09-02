@@ -12,6 +12,7 @@ package typereg_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -80,5 +81,37 @@ func TestFailedErrorsAsTypeLeavesADecodeErrorThatStillAnswers(t *testing.T) {
 	}
 	if errors.Is(boxed, typereg.ErrUnknownType) {
 		t.Error("errors.Is(boxed typed-nil DecodeError, typereg.ErrUnknownType) = true, want false")
+	}
+}
+
+// unguardedNilError has no nil-receiver guard of its own — deliberately, to
+// prove the DecodeError cause-rendering fix (REQ-025 nil-receiver axis)
+// defends the GENERAL case (any Inner error, not merely this SDK's own
+// already-guarded types such as *parse.SyntaxError).
+type unguardedNilError struct{ msg string }
+
+func (e *unguardedNilError) Error() string { return e.msg }
+
+// TestDecodeErrorToleratesAnUnguardedNilInner pins the cause-rendering guard:
+// a non-nil *DecodeError whose Inner is a boxed typed-nil error (a bare
+// e.Inner.Error() call dereferences it and panics) MUST still answer Error()
+// rather than take the caller down with it.
+func TestDecodeErrorToleratesAnUnguardedNilInner(t *testing.T) {
+	var inner *unguardedNilError
+	e := &typereg.DecodeError{Path: "/composition/content", Type: "OBSERVATION", Inner: inner}
+
+	got := e.Error() // panics here today = the finding
+	if got == "" {
+		t.Fatal(`Error() with a boxed typed-nil Inner = "", want a non-empty string`)
+	}
+	if !strings.Contains(got, "/composition/content") || !strings.Contains(got, "OBSERVATION") {
+		t.Errorf("Error() = %q, want it to still name Path and Type despite the unreadable Inner", got)
+	}
+
+	// A withCause Inner still renders its own message, so the guard did not
+	// swallow the signal.
+	withCause := &typereg.DecodeError{Path: "/composition/content", Type: "OBSERVATION", Inner: errors.New("boom")}
+	if got, want := withCause.Error(), "decode /composition/content (_type=\"OBSERVATION\"): boom"; got != want {
+		t.Errorf("Error() with a withCause Inner = %q, want %q", got, want)
 	}
 }

@@ -69,7 +69,21 @@ func RunStored(ctx context.Context, c *transport.Client, qualifiedName string, p
 }
 
 // RunStoredVersion executes a stored query at an explicit version.
+//
+// The version is trimmed of surrounding whitespace before it reaches the
+// path. A version that is empty after trimming is refused before any
+// request is issued, with an error satisfying errors.Is(err,
+// [ErrInvalidConfig]): the versioned and unversioned routes execute
+// different query logic, so falling back to the latest version would run
+// something the caller did not ask for. Use [RunStored] for the latest
+// version — it omits the /{version} segment by design (REQ-057).
 func RunStoredVersion(ctx context.Context, c *transport.Client, qualifiedName, version string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
+	// REQ-057: the refusal belongs to the EXPLICIT-version entry point.
+	// RunStored passes an empty version internally to mean "latest", which
+	// is intentional, so runStoredAtVersion cannot tell the two apart.
+	if strings.TrimSpace(version) == "" {
+		return nil, nil, fmt.Errorf("query.RunStoredVersion: %w: empty version — use RunStored for the latest version", ErrInvalidConfig)
+	}
 	return runStoredAtVersion(ctx, c, "query.RunStoredVersion", qualifiedName, version, params, opts...)
 }
 
@@ -78,6 +92,7 @@ func RunStoredVersion(ctx context.Context, c *transport.Client, qualifiedName, v
 // the operation the caller actually invoked.
 func runStoredAtVersion(ctx context.Context, c *transport.Client, op, qualifiedName, version string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
 	name := strings.TrimSpace(qualifiedName)
+	version = strings.TrimSpace(version) // REQ-057: trimmed once, reused below
 	if name == "" {
 		return nil, nil, fmt.Errorf("%s: %w: empty qualified query name", op, ErrInvalidConfig)
 	}

@@ -71,10 +71,10 @@ func (q *Query) verifyEmitted(out string) error {
 		// position carries — into every error string and log line downstream.
 		// The position is reported instead, and both sentinels stay reachable
 		// without the message riding along.
-		if se, ok := errors.AsType[*SyntaxError](err); ok {
+		if pos, ok := syntaxErrorPosition(err); ok {
 			return fmt.Errorf("%w: emitted AQL does not re-parse (syntax error at %d:%d); "+
 				"the AST carries text no write-side guard covers: %w",
-				aql.ErrInvalidQuery, se.Pos.Line, se.Pos.Col, aql.ErrSyntax)
+				aql.ErrInvalidQuery, pos.Line, pos.Col, aql.ErrSyntax)
 		}
 		if errors.Is(err, aql.ErrIncompleteAST) {
 			return fmt.Errorf("%w: emitted AQL re-parses into an INCOMPLETE AST — the SDK "+
@@ -97,6 +97,28 @@ func (q *Query) verifyEmitted(out string) error {
 			"carries a field emission drops)", aql.ErrInvalidQuery, at)
 	}
 	return nil
+}
+
+// syntaxErrorPosition extracts the position from a [ParseQuery] re-parse
+// failure. A failed errors.AsType can leave a typed-nil *SyntaxError in a
+// caller's hands (REQ-025 nil-receiver axis) — ok alone is not proof there is
+// a position to read — so a typed-nil match reports false exactly as a
+// non-match does, and verifyEmitted falls through to its generic refusal.
+//
+// A zero Pos on a non-nil *SyntaxError reports false for a different reason:
+// the zero Position is the "no position" value, so there is nothing to read
+// there either. That is the position-honesty rule [SyntaxError.Error] and
+// lint's syntaxDetail already keep — neither prints a fabricated 0:0 — and
+// without it verifyEmitted would format "syntax error at 0:0" and invent a
+// coordinate the diagnostic never carried — an unattributable position is
+// reported as absent, not approximated (REQ-109 § Value-free lint
+// diagnostics).
+func syntaxErrorPosition(err error) (Position, bool) {
+	se, ok := errors.AsType[*SyntaxError](err)
+	if !ok || se == nil || se.Pos == (Position{}) {
+		return Position{}, false
+	}
+	return se.Pos, true
 }
 
 // diffSlots reports whether two skeletons agree, and on a difference the

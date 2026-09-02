@@ -199,8 +199,11 @@ func LintString(q string, opts *Options) Result {
 // it stopped, not how much text was at fault — an invented end would claim more
 // than the diagnostic knows.
 func syntaxSpan(err error) Span {
+	// A failed errors.AsType can leave ok=true with a typed-nil *SyntaxError —
+	// the value a caller's own failed match boxes and passes onward (REQ-025
+	// nil-receiver axis) — so ok alone is not proof there is a Pos to read.
 	se, ok := errors.AsType[*parse.SyntaxError](err)
-	if !ok {
+	if !ok || se == nil {
 		return Span{}
 	}
 	return Span{Start: se.Pos, End: se.Pos}
@@ -208,8 +211,21 @@ func syntaxSpan(err error) Span {
 
 // syntaxDetail formats a parse failure for lint consumers. REQ-109 requires
 // line/column in Detail for aql_syntax; [parse.SyntaxError] carries position.
+//
+// A zero Pos omits the "L:C:" prefix rather than claiming a fabricated "0:0:".
+// That is the position-honesty rule, not the nil-receiver one — the zero
+// Position is a NON-nil *parse.SyntaxError's "no position" value, and an
+// unattributable diagnostic reports no position rather than an invented one
+// (REQ-109 § Value-free lint diagnostics). It mirrors what
+// [parse.SyntaxError.Error] and parse's own syntaxErrorPosition do with the
+// same value.
 func syntaxDetail(err error) string {
-	if se, ok := errors.AsType[*parse.SyntaxError](err); ok {
+	// The se != nil arm is the separate REQ-025 nil-receiver guard: see
+	// syntaxSpan — ok alone does not prove se is non-nil.
+	if se, ok := errors.AsType[*parse.SyntaxError](err); ok && se != nil {
+		if se.Pos == (parse.Position{}) {
+			return se.Msg
+		}
 		return fmt.Sprintf("%d:%d: %s", se.Pos.Line, se.Pos.Col, se.Msg)
 	}
 	return err.Error()
