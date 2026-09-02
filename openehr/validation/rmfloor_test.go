@@ -11,11 +11,11 @@ package validation_test
 //     panicking, mirroring REQ-110's nil_* contract.
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -405,8 +405,8 @@ func TestRMFloorMappingsNotEmptyIfPresent(t *testing.T) {
 // floor must not flag (REQ-112).
 func TestRMFloorMappingsAbsentIsValid(t *testing.T) {
 	var txt rm.DVText
-	if err := canjson.Unmarshal([]byte(`{"_type":"DV_TEXT","value":"x"}`), &txt); err != nil {
-		t.Fatalf("canjson.Unmarshal: %v", err)
+	if err := json.Unmarshal([]byte(`{"_type":"DV_TEXT","value":"x"}`), &txt); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
 	}
 	r := validation.ValidateRM(&txt)
 	if !r.OK {
@@ -423,8 +423,8 @@ func TestRMFloorMappingsAbsentIsValid(t *testing.T) {
 // floor MUST flag it (REQ-112).
 func TestRMFloorMappingsEmptyLiteralIsInvalid(t *testing.T) {
 	var txt rm.DVText
-	if err := canjson.Unmarshal([]byte(`{"_type":"DV_TEXT","value":"x","mappings":[]}`), &txt); err != nil {
-		t.Fatalf("canjson.Unmarshal: %v", err)
+	if err := json.Unmarshal([]byte(`{"_type":"DV_TEXT","value":"x","mappings":[]}`), &txt); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
 	}
 	r := validation.ValidateRM(&txt)
 	if r.OK {

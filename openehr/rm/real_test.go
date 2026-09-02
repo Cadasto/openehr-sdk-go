@@ -43,32 +43,60 @@ func TestSignificantDigits(t *testing.T) {
 	}
 }
 
-// TestRealUnmarshalJSONCleanCases asserts that literals within float64's
-// 17-significant-digit shortest-round-trip guarantee decode cleanly, in
+// TestRealUnmarshalJSONCleanCases asserts that a literal at or under the
+// 17-significant-digit trigger decodes cleanly to the expected value, in
 // both bare-number and quoted-string form (REQ-052 — the SDK does not
-// over-report on merely-inexact-but-round-tripping values like 0.1).
+// over-report on a shorter literal that is merely binary-inexact, such
+// as 0.1, or on a literal at the trigger's own boundary that does not in
+// fact round-trip — see maxSignificantDigits).
 func TestRealUnmarshalJSONCleanCases(t *testing.T) {
-	clean := []string{
-		"0.1",
-		"0.5",
-		"80.5",
-		"12345678901234567", // exactly 17 significant digits
-		"1.00000000000000000000",
+	tests := []struct {
+		lit  string
+		want float64
+	}{
+		{"0.1", 0.1},
+		{"0.5", 0.5},
+		{"80.5", 80.5},
+		// The boundary case the >17 rule admits: exactly 17 significant
+		// digits, so it decodes without error, but it does NOT round-trip
+		// (float64 stores it as ...67568, one past the last digit) — the
+		// rule's documented lower-bound trade-off, not a round-trip claim.
+		{"12345678901234567", 1.2345678901234568e16},
+		{"1.00000000000000000000", 1},
 	}
-	for _, lit := range clean {
-		t.Run(lit, func(t *testing.T) {
+	for _, tc := range tests {
+		t.Run(tc.lit, func(t *testing.T) {
 			var r Real
-			if err := r.UnmarshalJSON([]byte(lit)); err != nil {
-				t.Errorf("UnmarshalJSON(%s) = %v, want nil", lit, err)
+			if err := r.UnmarshalJSON([]byte(tc.lit)); err != nil {
+				t.Errorf("UnmarshalJSON(%s) = %v, want nil", tc.lit, err)
+			}
+			if float64(r) != tc.want {
+				t.Errorf("UnmarshalJSON(%s): r = %v, want %v", tc.lit, float64(r), tc.want)
 			}
 		})
-		t.Run(lit+" quoted", func(t *testing.T) {
+		t.Run(tc.lit+" quoted", func(t *testing.T) {
 			var r Real
-			quoted := strconv.Quote(lit)
+			quoted := strconv.Quote(tc.lit)
 			if err := r.UnmarshalJSON([]byte(quoted)); err != nil {
 				t.Errorf("UnmarshalJSON(%s) = %v, want nil", quoted, err)
 			}
+			if float64(r) != tc.want {
+				t.Errorf("UnmarshalJSON(%s): r = %v, want %v", quoted, float64(r), tc.want)
+			}
 		})
+	}
+}
+
+// TestRealUnmarshalJSONNullIsNoOp asserts that a JSON null leaves the
+// receiver unchanged, matching rm.Character's convention and the
+// encoding/json Unmarshaler idiom for "not present".
+func TestRealUnmarshalJSONNullIsNoOp(t *testing.T) {
+	r := Real(80.5)
+	if err := r.UnmarshalJSON([]byte("null")); err != nil {
+		t.Fatalf("UnmarshalJSON(null) = %v, want nil", err)
+	}
+	if r != 80.5 {
+		t.Errorf("UnmarshalJSON(null) overwrote the receiver: r = %v, want 80.5 unchanged", r)
 	}
 }
 
