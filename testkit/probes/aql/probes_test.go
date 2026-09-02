@@ -1214,6 +1214,12 @@ func probe099FireCases() []aqlprobes.PathShapeFireCase {
 	}
 }
 
+// probe099DiscriminatingRelationRow is the one shipping silence row whose
+// silence DEPENDS on the supplied relation reaching the check — named here so
+// the row and its can-fail control ([TestProbe099GuardsCanFail]) cannot drift
+// apart.
+const probe099DiscriminatingRelationRow = "near miss: a redundant step silenced by a discriminating supplied relation"
+
 // probe099SilentCases is PROBE-099 arm (a)'s near-miss table — at least one row
 // per REQ-164 code, and the fifteen negatives the wire assertion names.
 //
@@ -1357,7 +1363,7 @@ func probe099SilentCases() []aqlprobes.PathShapeSilentCase {
 			// TestRedundantStepReadsTheSuppliedRelation
 			// (openehr/aql/lint/pathshape_redundant_test.go): same witness
 			// query, same overlay.
-			Name: "near miss: a redundant step silenced by a discriminating supplied relation",
+			Name: probe099DiscriminatingRelationRow,
 			Query: "SELECT o/name/value AS n FROM EHR e CONTAINS COMPOSITION c " +
 				"CONTAINS OBSERVATION o",
 			Relation: contain.Default().WithOverlay(contain.Edge{
@@ -1466,6 +1472,17 @@ func pathShapeFireRow(t *testing.T, rows []aqlprobes.PathShapeFireCase, name str
 }
 
 const probe099AuditFireRow = "the audit's unpredicated repeating-segment projection"
+
+// pathShapeSilentRow addresses the named silence row so a control can mutate it
+// in place, failing the test rather than no-opping when the row is gone.
+func pathShapeSilentRow(t *testing.T, rows []aqlprobes.PathShapeSilentCase, name string) *aqlprobes.PathShapeSilentCase {
+	t.Helper()
+	i := slices.IndexFunc(rows, func(c aqlprobes.PathShapeSilentCase) bool { return c.Name == name })
+	if i < 0 {
+		t.Fatalf("no silence row named %q; this control has rotted", name)
+	}
+	return &rows[i]
+}
 
 // TestProbe099GuardsCanFail is the able-to-fail control suite. Each case mutates
 // the SHIPPING corpus in exactly the way one guard exists to catch — a toy
@@ -1619,6 +1636,24 @@ func TestProbe099GuardsCanFail(t *testing.T) {
 				})
 			},
 			want: "silent/keeps nothing: the shape yields to aql_deprecated_top",
+		},
+		{
+			// Arm (a), silence half: the DISCRIMINATING supplied-relation row's
+			// own can-fail pin. Every other silence control here is about a
+			// guard; this one is about the row, which is the only near miss
+			// whose silence depends on the relation being threaded through to
+			// the check at all. Stubbing Relation back to nil drops the
+			// EHR_STATUS -> OBSERVATION bypass route, so the redundant step the
+			// overlay excused stands again and the row stops being silent —
+			// which is exactly what a regression that quietly fell back to the
+			// default relation would do to it. Deleting the row is covered by
+			// the per-code and named-negative guards above; this covers
+			// NEUTRALISING it, which those cannot see.
+			name: "the discriminating silence row loses its supplied relation",
+			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
+				pathShapeSilentRow(t, c.Silent, probe099DiscriminatingRelationRow).Relation = nil
+			},
+			want: "silent/" + probe099DiscriminatingRelationRow + ": path-shape codes = [" + codeContainsRedundantStep + "]",
 		},
 		{
 			// Arm (b): the additivity baseline. A cassette re-baselined by
