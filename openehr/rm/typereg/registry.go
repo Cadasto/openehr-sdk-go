@@ -111,10 +111,16 @@ func (e *DecodeError) Error() string {
 		return (&DecodeError{}).Error()
 	}
 	// Every producer sets Inner; only a caller-built zero value leaves it
-	// nil, and %v would render that as a bare "<nil>".
+	// nil. Inner is any error a codec or caller can supply — including a
+	// boxed typed-nil pointer whose own Error() dereferences unguarded, the
+	// shape a failed errors.As / errors.AsType leaves behind — so a direct
+	// err.Error() call is not safe here the way it is for this package's own
+	// guarded types. %v is: fmt recovers a panicking Error() method itself
+	// and renders a nil-pointer receiver as "<nil>" (REQ-025 nil-receiver
+	// axis).
 	cause := "unspecified error"
 	if e.Inner != nil {
-		cause = e.Inner.Error()
+		cause = fmt.Sprintf("%v", e.Inner)
 	}
 	switch {
 	case e.Path != "" && e.Type != "":

@@ -214,11 +214,14 @@ type PathShapeSilentCase struct {
 	// [PathShapeFireCase].
 	Fetch, Offset int
 	// Relation, when non-nil, is the REQ-160 relation the run supplies on
-	// [lint.Options.Relation]. Only the VERSIONED_OBJECT negative needs one:
-	// on the default relation no VERSIONED_* class is ever unavoidable, so a
-	// skip tested there alone would pass with the guard deleted. Nil selects
-	// the default relation, which is not the same as switching a check off
-	// (REQ-161 § Relation supply).
+	// [lint.Options.Relation]. Two negatives need one: the VERSIONED_OBJECT
+	// negative (on the default relation no VERSIONED_* class is ever
+	// unavoidable, so a skip tested there alone would pass with the guard
+	// deleted), and the discriminating supplied-relation redundant-step
+	// negative (an overlay that opens a bypass route around the witness's
+	// otherwise-unavoidable step, so dropping Relation flips the verdict
+	// back to firing). Nil selects the default relation, which is not the
+	// same as switching a check off (REQ-161 § Relation supply).
 	Relation *contain.TypeRelation
 	// Want is the exact REQ-164 code multiset Query MUST raise (order
 	// irrelevant; nil means none).

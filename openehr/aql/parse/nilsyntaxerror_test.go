@@ -86,3 +86,17 @@ func TestRealSyntaxErrorStillCarriesItsPosition(t *testing.T) {
 		t.Errorf("SyntaxError.Error() = %q, want %q", got, want)
 	}
 }
+
+// TestSyntaxErrorOmitsPositionWhenZero pins REQ-025 § No panics' companion
+// honesty rule: a SyntaxError whose Pos was never set (the zero value, as a
+// nil receiver's Error delegates to) MUST NOT claim a fabricated "at 0:0:" —
+// that reads as a real position no construction site ever reports. Zero Pos
+// is the zero *SyntaxError's own shape, so this also pins what
+// TestNilSyntaxErrorAnswersInsteadOfPanicking's nil.Error() actually says.
+func TestSyntaxErrorOmitsPositionWhenZero(t *testing.T) {
+	zeroPos := &parse.SyntaxError{Msg: "unexpected token"}
+	want := "aql: syntax error: unexpected token"
+	if got := zeroPos.Error(); got != want {
+		t.Errorf("SyntaxError{Pos: zero}.Error() = %q, want %q (no dangling \"at 0:0:\")", got, want)
+	}
+}
