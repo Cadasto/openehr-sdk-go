@@ -305,15 +305,15 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 
 	httpResp, err := c.cfg.httpClient.Do(httpReq)
 	if err != nil {
-		// REQ-093 residual: this arm's own text is value-free, but a
-		// network failure from net/http arrives as *url.Error, whose
-		// Error() prints the resolved URL it was dialling — so the
-		// wrapped cause still carries whatever identifier the caller put
-		// in Path. Sanitising it means rewriting the wrapped error, which
-		// costs the caller the typed *url.Error; that trade is a
-		// follow-up, not this change. The other two doOnce diagnostics
-		// wrap body-read errors, which carry no request URL of their own.
-		return nil, fmt.Errorf("transport: %s %s: %w", req.effectiveMethod(), req.routeOrPlaceholder(), err)
+		// A network failure arrives from net/http as *url.Error, whose own
+		// Error() prints the resolved URL it was dialling — so this arm's
+		// value-free prefix is not enough on its own (REQ-093).
+		// sanitiseURLError substitutes the same route slot into that URL
+		// field while keeping the error's type and cause intact. The other
+		// two doOnce diagnostics wrap body-read errors, which carry no
+		// request URL of their own.
+		route := req.routeOrPlaceholder()
+		return nil, fmt.Errorf("transport: %s %s: %w", req.effectiveMethod(), route, sanitiseURLError(err, route))
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
@@ -590,6 +590,38 @@ func sanitisedURL(u *url.URL) string {
 	out := *u
 	out.User = nil
 	return out.String()
+}
+
+// sanitiseURLError replaces the resolved URL a wrapped net/http
+// *url.Error prints with route — the caller's route template, or the
+// "(unrouted)" placeholder — so a network failure's diagnostic stays
+// value-free (REQ-093). The resolved URL carries the expanded request
+// path, which may hold a caller-supplied identifier such as a live
+// ehr_id.
+//
+// What it guarantees the caller: the substitution is a shallow copy, so
+// the error is still a *url.Error under errors.AsType, with Op and Err
+// unchanged — Timeout(), Temporary(), Unwrap() and errors.Is against the
+// underlying cause all answer exactly as they did. Only the URL field's
+// text differs.
+//
+// *http.Client.Do documents that it always returns a *url.Error at the
+// top of the chain, so only a top-level match is substituted; anything
+// else is returned unchanged rather than rewritten mid-chain, where a
+// *url.Error could belong to a cause the transport did not build.
+func sanitiseURLError(err error, route string) error {
+	ue, ok := errors.AsType[*url.Error](err)
+	if !ok || ue == nil {
+		return err
+	}
+	// Identity, not chain membership: substitute only when the match IS
+	// the error net/http handed back, never one found deeper in the chain.
+	if error(ue) != err { //nolint:errorlint // identity by design — see above
+		return err
+	}
+	out := *ue
+	out.URL = route
+	return &out
 }
 
 // Decode is a typed wrapper around Do — executes req, decodes the

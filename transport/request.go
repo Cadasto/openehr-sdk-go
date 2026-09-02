@@ -40,9 +40,19 @@ type Request struct {
 	// id exploits. Use [ValidatePathSegment] to preflight one interpolated
 	// parameter.
 	Path string
-	// Route is the path template used for OTel span naming and error
-	// attribution (e.g. "/ehr/{ehr_id}/composition"). When empty the
-	// transport falls back to Path for those.
+	// Route is the path template the transport names the request by
+	// (e.g. "/ehr/{ehr_id}/composition"). When it is empty the two
+	// surfaces that need a name answer differently, and deliberately so:
+	//
+	//   - Telemetry falls back to Path — OTel span naming, the http.route
+	//     attribute (REQ-090) and Observation.Route (REQ-098) may
+	//     legitimately carry the resolved path.
+	//   - Diagnostic strings do not. They render the stable placeholder
+	//     "(unrouted)" instead, because Path may hold a caller-supplied
+	//     identifier and REQ-093 requires error strings stay value-free.
+	//
+	// The split is effectiveRoute (telemetry) versus routeOrPlaceholder
+	// (diagnostics); see those two methods for the precise contract.
 	//
 	// Optional for a raw transport.Do caller, but REQUIRED of any request
 	// that interpolates a parameter into Path: the REQ-150 arity check

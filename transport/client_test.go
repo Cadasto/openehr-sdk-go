@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1258,4 +1259,56 @@ func TestNewSkipsNilOption(t *testing.T) {
 	if !applied {
 		t.Error("the non-nil option was not applied — the guard skipped too much")
 	}
+}
+
+// TestSanitiseURLErrorGuards covers the two arms the REQ-093 network
+// path cannot reach through Client.Do: an error that is not a
+// *url.Error at all, and one where a *url.Error sits deeper in the
+// chain. Both must come back untouched — the helper rewrites only the
+// error net/http itself handed back, never one it found by unwrapping,
+// where the URL may belong to a cause the transport did not build.
+func TestSanitiseURLErrorGuards(t *testing.T) { // REQ-093
+	const route = "/ehr/{ehr_id}"
+
+	t.Run("not a url.Error", func(t *testing.T) {
+		in := errors.New("plain failure")
+		// Identity, not chain membership — the point of the assertion is
+		// that the very same error value comes back.
+		if got := sanitiseURLError(in, route); got != in { //nolint:errorlint // identity by design — see above
+			t.Errorf("sanitiseURLError(plain error) = %v, want the input returned unchanged", got)
+		}
+	})
+
+	t.Run("url.Error nested deeper in the chain", func(t *testing.T) {
+		nested := &url.Error{Op: "Get", URL: "https://cdr.example/ehr/live-id", Err: errors.New("dial failure")}
+		in := fmt.Errorf("outer: %w", nested)
+
+		got := sanitiseURLError(in, route)
+		if got != in { //nolint:errorlint // identity by design — the same error value must come back
+			t.Fatalf("sanitiseURLError(wrapped url.Error) = %v, want the input returned unchanged", got)
+		}
+		if nested.URL != "https://cdr.example/ehr/live-id" {
+			t.Errorf("the nested url.Error's URL was mutated to %q; the helper must copy, never write through", nested.URL)
+		}
+	})
+
+	t.Run("top-level url.Error is copied, not mutated", func(t *testing.T) {
+		cause := errors.New("dial failure")
+		in := &url.Error{Op: "Get", URL: "https://cdr.example/ehr/live-id", Err: cause}
+
+		got := sanitiseURLError(in, route)
+		ue, ok := errors.AsType[*url.Error](got)
+		if !ok {
+			t.Fatalf("sanitiseURLError returned %T, want a *url.Error", got)
+		}
+		if ue == in {
+			t.Error("sanitiseURLError returned the same pointer; the caller's error must not be mutated")
+		}
+		if in.URL != "https://cdr.example/ehr/live-id" {
+			t.Errorf("the input url.Error's URL was mutated to %q; the helper must copy", in.URL)
+		}
+		if ue.URL != route || ue.Op != in.Op || !errors.Is(ue, cause) {
+			t.Errorf("copy = {Op:%q URL:%q}, want {Op:%q URL:%q} with the cause still reachable", ue.Op, ue.URL, in.Op, route)
+		}
+	})
 }

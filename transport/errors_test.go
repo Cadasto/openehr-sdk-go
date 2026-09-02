@@ -3,14 +3,21 @@ package transport_test
 // errors_test.go — REQ-093 § value-free diagnostics, on the effectiveRoute
 // axis: a *transport.Request with no Route template falls back to Path for
 // telemetry (span naming, http.route attribute, Observation.Route — REQ-090 /
-// REQ-098, deliberately untouched here), but Path may carry a caller-supplied
-// identifier (an EHR id, a composition uid, …), and that must never reach a
-// human-readable error string (REQ-093's value-free discipline). This file
-// pins the fix across every surface that used to share the leak: the
-// *transport.WireError built by doOnce's non-2xx branch, the
-// *transport.DecodeError built by Decode's 2xx-but-undecodable branch, and
-// the two remaining doOnce "transport: %s %s: …" diagnostics (read-body
-// failure, over-limit) that do not carry a typed error at all.
+// REQ-098), but Path may carry a caller-supplied identifier (an EHR id, a
+// composition uid, …), and that must never reach a human-readable error
+// string (REQ-093's value-free discipline). This file pins the fix across
+// every surface that used to share the leak: the *transport.WireError built
+// by doOnce's non-2xx branch, the *transport.DecodeError built by Decode's
+// 2xx-but-undecodable branch, the two remaining doOnce
+// "transport: %s %s: …" diagnostics (read-body failure, over-limit) that do
+// not carry a typed error at all, and the URL a wrapped net/http *url.Error
+// prints from the network-failure arm.
+//
+// The telemetry half is pinned here too, as the carve-out it is rather than
+// an untested assumption: TestUnroutedObservationKeepsTheResolvedPath holds
+// Observation.Route to the request Path for an unrouted request, so the
+// placeholder cannot silently spread from the diagnostic axis onto the
+// telemetry one.
 //
 // Deliberately external (package transport_test): every assertion is about
 // what a consumer's errors.AsType / Error() call sees, reusing the
@@ -20,6 +27,7 @@ package transport_test
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -189,7 +197,7 @@ func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) { r
 // directly. Used where the fixture needs to control the *http.Response (and
 // in particular its Body) rather than what an httptest.Server can serve, so
 // the target URL only needs to parse, not resolve.
-func newBrokenTransportClient(t *testing.T, rt roundTripperFunc) *transport.Client {
+func newBrokenTransportClient(t *testing.T, rt roundTripperFunc, opts ...transport.Option) *transport.Client {
 	t.Helper()
 	cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{
 		Issuer: "https://test.example.com",
@@ -203,9 +211,135 @@ func newBrokenTransportClient(t *testing.T, rt roundTripperFunc) *transport.Clie
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, err := transport.New(cat, transport.WithHTTPClient(&http.Client{Transport: rt}))
+	c, err := transport.New(cat, append([]transport.Option{transport.WithHTTPClient(&http.Client{Transport: rt})}, opts...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return c
+}
+
+// recordingObserver captures the single Observation the transport emits
+// per logical call (REQ-098), so a test can assert on what an
+// out-of-band telemetry sink sees rather than only on the returned
+// error.
+type recordingObserver struct{ last transport.Observation }
+
+func (o *recordingObserver) OnRequest(obs transport.Observation) { o.last = obs }
+
+// networkFailureClient returns a *transport.Client whose every attempt
+// fails at the RoundTripper with cause, plus the hit counter and the
+// observer. Retries are switched off explicitly (they are off by
+// default, REQ-096) so the counter pins one attempt and the test cannot
+// pass by accident on a second try.
+func networkFailureClient(t *testing.T, cause error, obs transport.Observer) (*transport.Client, *int) {
+	t.Helper()
+	hits := 0
+	c := newBrokenTransportClient(t, func(*http.Request) (*http.Response, error) {
+		hits++
+		return nil, cause
+	}, transport.WithRetry(transport.NoRetry), transport.WithObserver(obs))
+	return c, &hits
+}
+
+// TestNetworkFailureSanitisesWrappedURL pins REQ-093 on the last
+// surface that leaked: a network failure comes back from net/http as a
+// *url.Error whose own Error() prints the resolved URL, so the
+// identifier a caller put in Request.Path reached the diagnostic even
+// though doOnce's own prefix already rendered the placeholder. The
+// transport now substitutes the same route slot into the *url.Error's
+// URL field — the route template, or "(unrouted)" — while keeping the
+// error's type, Op and cause, so nothing a caller inspects changes.
+func TestNetworkFailureSanitisesWrappedURL(t *testing.T) { // REQ-093
+	t.Run("unrouted request renders the placeholder", func(t *testing.T) {
+		cause := errors.New("simulated dial failure")
+		c, hits := networkFailureClient(t, cause, &recordingObserver{})
+
+		_, err := c.Do(t.Context(), requestWithUnroutedID("GET"))
+		if err == nil {
+			t.Fatal("Do with a RoundTripper that always fails succeeded; the premise of this test is gone")
+		}
+		if *hits != 1 {
+			t.Fatalf("RoundTripper hit %d times, want 1 — retries must be off so this test measures one attempt", *hits)
+		}
+		assertValueFree(t, err.Error())
+		if !errors.Is(err, cause) {
+			t.Errorf("err = %v; want errors.Is(_, cause) — sanitising the URL must not sever the chain", err)
+		}
+		ue, ok := errors.AsType[*url.Error](err)
+		if !ok {
+			t.Fatalf("errors.AsType[*url.Error] did not match %T (%v); the typed error a net/http caller relies on must survive sanitising", err, err)
+		}
+		if ue.URL != unroutedPlaceholder {
+			t.Errorf("url.Error.URL = %q, want the route slot %q — the resolved URL may carry a caller identifier", ue.URL, unroutedPlaceholder)
+		}
+		if strings.Contains(ue.Error(), routeUnsetIDMarker) {
+			t.Errorf("url.Error.Error() = %q leaks the identifier-bearing path %q", ue.Error(), routeUnsetIDPath)
+		}
+	})
+
+	t.Run("routed request keeps the template", func(t *testing.T) {
+		const route = "/ehr/{ehr_id}"
+		cause := errors.New("simulated dial failure")
+		c, _ := networkFailureClient(t, cause, &recordingObserver{})
+
+		_, err := c.Do(t.Context(), &transport.Request{Method: "GET", Path: routeUnsetIDPath, Route: route})
+		if err == nil {
+			t.Fatal("Do with a RoundTripper that always fails succeeded; the premise of this test is gone")
+		}
+		ue, ok := errors.AsType[*url.Error](err)
+		if !ok {
+			t.Fatalf("errors.AsType[*url.Error] did not match %T (%v)", err, err)
+		}
+		if ue.URL != route {
+			t.Errorf("url.Error.URL = %q, want the route template %q", ue.URL, route)
+		}
+		if strings.Contains(err.Error(), routeUnsetIDMarker) {
+			t.Errorf("error string = %q leaks the identifier-bearing path %q", err.Error(), routeUnsetIDPath)
+		}
+		if strings.Contains(err.Error(), unroutedPlaceholder) {
+			t.Errorf("error string = %q carries the unrouted placeholder despite a routed request", err.Error())
+		}
+	})
+
+	// REQ-098: the observation carries the same error the caller got, so
+	// a telemetry sink that logs Observation.Err must not re-introduce
+	// the leak the returned string no longer has.
+	t.Run("observer sees a value-free error", func(t *testing.T) {
+		cause := errors.New("simulated dial failure")
+		obs := &recordingObserver{}
+		c, _ := networkFailureClient(t, cause, obs)
+
+		if _, err := c.Do(t.Context(), requestWithUnroutedID("GET")); err == nil {
+			t.Fatal("Do with a RoundTripper that always fails succeeded; the premise of this test is gone")
+		}
+		if obs.last.Err == nil {
+			t.Fatal("Observation.Err is nil after a network failure; the premise of this test is gone")
+		}
+		assertValueFree(t, obs.last.Err.Error())
+	})
+}
+
+// TestUnroutedObservationKeepsTheResolvedPath pins the carve-out REQ-093
+// states explicitly: the placeholder binds the human-readable error
+// strings only. The telemetry surfaces resolve the route their own way,
+// so Observation.Route (REQ-098) still carries the request Path — an
+// identifier and all — for an unrouted request, and must NOT be
+// rewritten to the placeholder. The returned error string is asserted
+// beside it as the contrast: same call, two deliberately different
+// answers.
+func TestUnroutedObservationKeepsTheResolvedPath(t *testing.T) { // REQ-093, REQ-098
+	obs := &recordingObserver{}
+	c := newDecodeClient(t, http.StatusNotFound, `{"code":"NOT_FOUND"}`, nil, transport.WithObserver(obs))
+
+	_, err := c.Do(t.Context(), requestWithUnroutedID("GET"))
+	if err == nil {
+		t.Fatal("Do of a 404 succeeded; the premise of this test is gone")
+	}
+	if obs.last.Route != routeUnsetIDPath {
+		t.Errorf("Observation.Route = %q, want the request Path %q — telemetry keeps its Path fallback (REQ-090 / REQ-098)", obs.last.Route, routeUnsetIDPath)
+	}
+	if obs.last.Route == unroutedPlaceholder {
+		t.Errorf("Observation.Route = %q; the REQ-093 placeholder must not reach the telemetry axis", obs.last.Route)
+	}
+	assertValueFree(t, err.Error())
 }
