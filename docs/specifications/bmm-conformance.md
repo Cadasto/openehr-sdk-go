@@ -327,7 +327,7 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | `Integer64` | `int64` | |
 | `Real` | `rm.Real` (underlying `float64`) | The BMM `Real` is single-precision conceptually but openEHR JSON uses unbounded-precision numbers; `float64` is the safe choice. Emitted as the defined type `rm.Real` so the codec can attach the wire-tolerance rule from [`../docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). |
 | `Double` | `float64` | Same as `Real`, no codec tolerance attached. |
-| `Character` | `Character` | canonical JSON single-character **string**, not a number; hand-written named type (`openehr/rm/character.go`), like `Integer`/`Real` |
+| `Character` | `rm.Character` | canonical JSON single-character **string**, not a number; hand-written named type (`openehr/rm/character.go`), like `Integer`/`Real` |
 | `String` | `string` | |
 | `Octet` | `byte` | |
 | `Uri` | `string` | Validated at codec boundary; not `net/url.URL` to preserve round-trip exact representation |
