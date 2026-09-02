@@ -442,7 +442,7 @@ requirements:
     implementation: landed
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/demographic]
     probes: [PROBE-061, PROBE-071]
-    plans: [docs/plans/archive/2026-08-18-write-result-contract.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md]
+    plans: [docs/plans/archive/2026-08-18-write-result-contract.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md]
     tests:
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/directory/directory_test.go

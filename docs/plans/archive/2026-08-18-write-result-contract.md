@@ -9,6 +9,8 @@
 **Depends on:** landed REQ-094 Prefer state machine; `rm.IsTypedNil`
 **Defers:** a breaking `WriteOutcome[T]` result type; canjson marshal error typing; changing Prefer defaults; `contribution.Commit` `identifier`-slot population (Commit treats `identifier` as metadata-only today — REQ-094's landed-state paragraph names the gap); typing `ehr.Create`'s committed-but-unusable arm (it decodes through `transport.Decode`, shared with the read paths, which keep the bare `ErrInvalidShape`)
 
+> **Closed:** the `ehr.Create` deferral above is closed by [2026-09-01-ehr-create-empty-2xx-typing.md](2026-09-01-ehr-create-empty-2xx-typing.md).
+
 > **Execution (historical):** phases were worked in order; this copy is the archived record.
 
 **Goal:** Callers can tell “no body, write succeeded” from “write committed, body unusable” without inspecting `WireError` or correlating a parallel metadata value, and without treating a typed-nil resource as present.

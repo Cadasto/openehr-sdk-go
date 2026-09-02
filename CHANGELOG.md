@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **`ehr.Create` empty-2xx typing (REQ-094).** An empty or JSON-null 2xx body from `ehr.Create` now returns `*NoRepresentationError`, matching the versioned-write family — the last write-result keyed exception is closed. [plan](docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md)
+
 ## [0.24.0] - 2026-08-30
 
 Twenty-fourth `v0.x` minor — a 2xx body that will not decode is a typed error carrying the raw bytes, Definition catalogs tolerate timestamp layouts and re-emit unknown keys, and AQL gains write-side parity, path-shape lint and a 501 capability sentinel. **Breaking:** `aql.SelectField` is no longer usefully `==`-comparable.
