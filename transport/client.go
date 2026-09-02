@@ -305,7 +305,7 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 
 	httpResp, err := c.cfg.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("transport: %s %s: %w", req.effectiveMethod(), req.effectiveRoute(), err)
+		return nil, fmt.Errorf("transport: %s %s: %w", req.effectiveMethod(), req.routeOrPlaceholder(), err)
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
@@ -319,10 +319,10 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 	}
 	respBody, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, fmt.Errorf("transport: %s %s: read body: %w", req.effectiveMethod(), req.effectiveRoute(), err)
+		return nil, fmt.Errorf("transport: %s %s: read body: %w", req.effectiveMethod(), req.routeOrPlaceholder(), err)
 	}
 	if limit > 0 && int64(len(respBody)) > limit {
-		return nil, fmt.Errorf("transport: %s %s: read body: response exceeds limit of %d bytes", req.effectiveMethod(), req.effectiveRoute(), limit)
+		return nil, fmt.Errorf("transport: %s %s: read body: response exceeds limit of %d bytes", req.effectiveMethod(), req.routeOrPlaceholder(), limit)
 	}
 	resp := &Response{
 		StatusCode: httpResp.StatusCode,
@@ -440,7 +440,7 @@ func (c *Client) mapWireError(req *Request, target *url.URL, resp *Response) err
 		StatusCode: resp.StatusCode,
 		Method:     req.effectiveMethod(),
 		URL:        sanitisedURL(target),
-		Route:      req.effectiveRoute(),
+		Route:      req.routeOrPlaceholder(),
 		Sentinel:   statusToSentinel(resp.StatusCode),
 	}
 	if detail, ok := decodeOpenEHRError(resp.Body); ok {
@@ -615,7 +615,7 @@ func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata,
 		// that drops them.
 		return nil, resp.Metadata, &DecodeError{
 			Method: req.effectiveMethod(),
-			Route:  req.effectiveRoute(),
+			Route:  req.routeOrPlaceholder(),
 			Body:   resp.Body,
 			Inner:  err,
 		}

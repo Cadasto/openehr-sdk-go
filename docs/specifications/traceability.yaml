@@ -439,9 +439,19 @@ requirements:
     packages: [transport, openehr/client/query]
     probes: [PROBE-010, PROBE-011]
     plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
-    notes: ErrUnprocessable (422) sentinel added by the ITS-REST conformance remediation.
+    notes: >-
+      ErrUnprocessable (422) sentinel added by the ITS-REST conformance
+      remediation. An unset Route template no longer falls back to Path in
+      the human-readable error strings — WireError.Error, DecodeError.Error,
+      and doOnce's "transport: %s %s: …" diagnostics — since Path may carry
+      a caller-supplied identifier; a stable "(unrouted)" placeholder takes
+      its place instead. effectiveRoute's Path fallback is unchanged for the
+      telemetry surfaces (span naming, the http.route attribute,
+      Observation.Route), which may legitimately carry the resolved path.
+      Pinned by TestErrorStringsValueFreeWhenRouteUnset.
     tests:
       - transport/client_test.go
+      - transport/errors_test.go
 
   - id: REQ-094
     title: Prefer negotiation

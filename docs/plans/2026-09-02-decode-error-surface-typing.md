@@ -54,11 +54,11 @@
 
 **State:** `effectiveRoute()` "falls back to Path" (`client.go:159`). `DecodeError.Error()` prints `e.Route` (`errors.go:48`), and `DecodeError.Route` is set from `effectiveRoute()` (`client.go:618`). So a request with **no route template** (only a `Path` like `/ehr/7f3e…-live-id`) yields an error string containing that id — a REQ-093 value-free violation. The `fmt.Errorf("transport: %s %s: …", …, req.effectiveRoute(), …)` calls at `:308/:322/:325` share the leak.
 
-- [ ] **Step 1: Failing test.** Build a `*transport.Request` with `Path` set to an identifier-bearing path and `Route` empty; drive each error path (decode failure, read-body failure, over-limit); assert the returned `Error()` string does **not** contain the path/id — only method + a route placeholder + classification.
-- [ ] **Step 2:** Run → FAIL (the id appears today).
-- [ ] **Step 3: Fix.** Make the error-string surface value-free when `Route` is unset — either `effectiveRoute()` returns a stable placeholder (e.g. the method's generic route, or `"(unrouted)"`) **for diagnostic strings** while telemetry keeps its own resolution, or the call sites stop using `effectiveRoute()` for the human string and use `Route` alone (empty → placeholder). Keep the OTel span attribute (`client.go:180`) on the real resolution — spans are sanitised URLs, not REQ-093 error strings. Sweep the `WireError` neighbour on the same axis in the same change.
-- [ ] **Step 4:** Run → PASS; existing routed-request tests still show the template. `make ci`.
-- [ ] **Step 5: Commit** `fix(transport): keep error strings value-free when route template is unset (REQ-093)`.
+- [x] **Step 1: Failing test.** Build a `*transport.Request` with `Path` set to an identifier-bearing path and `Route` empty; drive each error path (decode failure, read-body failure, over-limit); assert the returned `Error()` string does **not** contain the path/id — only method + a route placeholder + classification.
+- [x] **Step 2:** Run → FAIL (the id appears today).
+- [x] **Step 3: Fix.** Make the error-string surface value-free when `Route` is unset — either `effectiveRoute()` returns a stable placeholder (e.g. the method's generic route, or `"(unrouted)"`) **for diagnostic strings** while telemetry keeps its own resolution, or the call sites stop using `effectiveRoute()` for the human string and use `Route` alone (empty → placeholder). Keep the OTel span attribute (`client.go:180`) on the real resolution — spans are sanitised URLs, not REQ-093 error strings. Sweep the `WireError` neighbour on the same axis in the same change.
+- [x] **Step 4:** Run → PASS; existing routed-request tests still show the template. `make ci`.
+- [x] **Step 5: Commit** `fix(transport): keep error strings value-free when route template is unset (REQ-093)`.
 
 ## Self-review
 

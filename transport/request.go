@@ -101,12 +101,36 @@ type Request struct {
 }
 
 // effectiveRoute returns Route, falling back to Path. Used for OTel
-// span naming and error attribution.
+// span naming and the REQ-098 Observation.Route — telemetry surfaces, which
+// may legitimately carry the resolved path. Human-readable error strings use
+// routeOrPlaceholder instead (REQ-093): see that doc comment for why the two
+// must not share a fallback.
 func (r *Request) effectiveRoute() string {
 	if r.Route != "" {
 		return r.Route
 	}
 	return r.Path
+}
+
+// unroutedRoute is the stable, value-free placeholder substituted for the
+// route template in diagnostic strings when the caller left Request.Route
+// unset. Its exact text is part of the REQ-093 contract, not an
+// implementation detail free to change: a caller may already match against
+// it, so keep it stable.
+const unroutedRoute = "(unrouted)"
+
+// routeOrPlaceholder returns Route, or unroutedRoute when Route is unset.
+// Unlike effectiveRoute, it never falls back to Path: Path may carry a
+// caller-supplied identifier (an EHR id, a composition uid, …), and REQ-093
+// requires transport error strings — doOnce's "transport: %s %s: …"
+// diagnostics, and the Route captured on WireError and DecodeError — stay
+// value-free. Every human-readable error surface in this package uses this
+// method instead of effectiveRoute.
+func (r *Request) routeOrPlaceholder() string {
+	if r.Route != "" {
+		return r.Route
+	}
+	return unroutedRoute
 }
 
 func (r *Request) effectiveServiceID() string {
