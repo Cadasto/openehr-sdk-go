@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
@@ -61,6 +62,13 @@ func TestDeleteStoredQueryRefusesEmptyVersion(t *testing.T) {
 			if !errors.Is(err, transport.ErrInvalidConfig) {
 				t.Errorf("DeleteStoredQuery(version=%q) err = %v, want errors.Is(err, transport.ErrInvalidConfig)", tt.version, err)
 			}
+			// Naming the operation is what separates this refusal from REQ-150's
+			// path-segment validator, which also rejects an empty segment with the
+			// same sentinel and no request: without this line the test stays green
+			// when the operation's own guard is removed.
+			if !strings.Contains(err.Error(), "definition.DeleteStoredQuery") {
+				t.Errorf("DeleteStoredQuery(version=%q) err = %v, want the operation's own refusal naming definition.DeleteStoredQuery", tt.version, err)
+			}
 			if hits != 0 {
 				t.Errorf("server hits = %d, want 0 — the refusal MUST precede any request", hits)
 			}
@@ -93,6 +101,13 @@ func TestGetStoredQueryRefusesEmptyVersion(t *testing.T) {
 			}
 			if !errors.Is(err, transport.ErrInvalidConfig) {
 				t.Errorf("GetStoredQuery(version=%q) err = %v, want errors.Is(err, transport.ErrInvalidConfig)", tt.version, err)
+			}
+			// Naming the operation is what separates this refusal from REQ-150's
+			// path-segment validator, which also rejects an empty segment with the
+			// same sentinel and no request: without this line the test stays green
+			// when the operation's own guard is removed.
+			if !strings.Contains(err.Error(), "definition.GetStoredQuery") {
+				t.Errorf("GetStoredQuery(version=%q) err = %v, want the operation's own refusal naming definition.GetStoredQuery", tt.version, err)
 			}
 			if hits != 0 {
 				t.Errorf("server hits = %d, want 0 — the refusal MUST precede any request", hits)
