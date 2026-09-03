@@ -6,7 +6,7 @@
 
 A first-party **Go SDK for openEHR** — `github.com/cadasto/openehr-sdk-go`, MIT. **openEHR-first**: openEHR REST `1.1.0-development`, the Reference Model, AQL, ADL 1.4 OPT, and SMART-on-openEHR auth are the normative scope. Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care) ship in the same module for v1, behind a clean `cadasto/` cut line so later extraction is a subtree move, not a rewrite.
 
-Go `1.26.x`, module floor `1.26.0` ([REQ-002](docs/specifications/packaging.md#req-002--go-version)). **Early implementation, pre-1.0** — landed-vs-planned in [docs/roadmap.md](docs/roadmap.md).
+Go `1.27.x`, module floor `1.27.0` ([REQ-002](docs/specifications/packaging.md#req-002--go-version)). **Early implementation, pre-1.0** — landed-vs-planned in [docs/roadmap.md](docs/roadmap.md).
 
 ## Source of truth
 
@@ -67,7 +67,7 @@ The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md
 
 ## Tooling & workflow
 
-Host Go `1.26.x` is the fast path; the Makefile auto-routes through a Docker dev image when host Go is missing ([Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml)). **Use the Makefile as the single entry point** — extend it, don't add ad-hoc scripts.
+Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev image when host Go is missing ([Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml)). **Use the Makefile as the single entry point** — extend it, don't add ad-hoc scripts.
 
 | Task | Command |
 |---|---|
@@ -89,7 +89,7 @@ Host Go `1.26.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 - **Never hand-edit a vendored fixture** under `resources/` or `testkit/cassettes/` — being byte-identical to upstream is its whole value. Re-sync instead.
 - `make probe-status` prints `MISSING` for any probe covered inline or in a sibling's file. That is the filename heuristic, **not** drift — `make spec-check` is the real gate.
-- **`make ci` cannot complete without Docker** — `test` → `aqlgen-verify` → `antlr-image` is the only *unconditional* Docker link. The rest reaches for Docker only when host tooling is missing: `vet`/`build`/`test` need host Go `1.26.x`, `fmt-check`/`lint` a host `golangci-lint` (routing: [ci.md](docs/ci.md)). With those installed, run `fmt-check`, `vet`, `spec-check`, `flat-conformance-verify`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
+- **`make ci` cannot complete without Docker** — `test` → `aqlgen-verify` → `antlr-image` is the only *unconditional* Docker link. The rest reaches for Docker only when host tooling is missing: `vet`/`build`/`test` need host Go `1.27.x`, `fmt-check`/`lint` a host `golangci-lint` **built with Go 1.27** (routing: [ci.md](docs/ci.md)). With those installed, run `fmt-check`, `vet`, `spec-check`, `flat-conformance-verify`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
 
 **Runtime dependencies** are deliberately minimal and reviewed — adding one is a decision, not a convenience. The current set, each confined to the package it serves:
 

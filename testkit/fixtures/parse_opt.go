@@ -20,8 +20,8 @@ func ParseOPTBytes(b []byte) (*template.OperationalTemplate, error) {
 	}
 	s := string(b)
 	s = strings.Replace(s, "<OPERATIONAL_TEMPLATE", "<template", 1)
-	if idx := strings.LastIndex(s, "</OPERATIONAL_TEMPLATE>"); idx >= 0 {
-		s = s[:idx] + "</template>" + s[idx+len("</OPERATIONAL_TEMPLATE>"):]
+	if before, after, found := strings.CutLast(s, "</OPERATIONAL_TEMPLATE>"); found {
+		s = before + "</template>" + after
 	}
 	return template.ParseOPT(bytes.NewReader([]byte(s)))
 }

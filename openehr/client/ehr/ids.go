@@ -86,9 +86,9 @@ func extractVersionUIDFromLocation(loc string) VersionUID {
 		loc = u.Path
 	}
 	loc = strings.TrimSuffix(loc, "/")
-	i := strings.LastIndex(loc, "/")
-	if i < 0 || i == len(loc)-1 {
+	_, after, found := strings.CutLast(loc, "/")
+	if !found || after == "" {
 		return ""
 	}
-	return VersionUID(loc[i+1:])
+	return VersionUID(after)
 }

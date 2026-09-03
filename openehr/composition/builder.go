@@ -136,7 +136,7 @@ func (b *Builder) SetQuantity(path string, magnitude float64, units string) erro
 // to a DV_CODED_TEXT node in the OPT.
 func (b *Builder) SetCodedText(path, terminology, code, display string) error {
 	return b.Set(path, &rm.DVCodedText{
-		DVText: rm.DVText{Value: display},
+		Value: display,
 		DefiningCode: rm.CodePhrase{
 			CodeString:    code,
 			TerminologyID: rm.TerminologyID{Value: terminology},

@@ -395,7 +395,7 @@ func (p PathValue) token() string { return p.Raw }
 // path is emitted VERBATIM — it is an openEHR identifier, never
 // caller-supplied data; route caller data through [Param].
 func Path(raw string) Value {
-	return PathValue{IdentifiedPath: IdentifiedPath{Raw: strings.TrimSpace(raw)}}
+	return PathValue{Raw: strings.TrimSpace(raw)}
 }
 
 // FuncCall is an AQL function call in a value position (REQ-117) — either

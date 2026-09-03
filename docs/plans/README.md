@@ -6,6 +6,12 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### Go 1.27 floor (2026-09-03)
+
+| Plan | Scope | Covers | Notes |
+|---|---|---|---|
+| [2026-09-03-go-1.27.md](2026-09-03-go-1.27.md) | Raise the module floor to Go 1.27.0 (REQ-002) and adopt 1.27 embedlit, CutLast, stdlib uuid generation, Registry.DecodeAs, URL.Clone, rand.N, and synctest on four sleep tests | REQ-002; STRAND-04 timeline note only | json/v2 canjson migration stays deferred |
+
 ### Deferred-work backlog (2026-09-01 / 02)
 
 Five plans from a consumer→SDK gap survey plus the review-round follow-ups that were living only in session notes — four already landed and archived (below), the remaining one is **not approved for implementation yet** — it exists so the work is ready. All amend shipped REQs in place (normative deltas ride in the implementing PR) **except** the RM-function stubs, which propose new ids. Landing the decode-error-surface plan settled the group's named cross-plan seam: it wired `canjson.ErrInvalidShape` (option A) rather than retiring it, so the fidelity plan's `Real`-precision task reuses that sentinel instead of minting its own — and the fidelity plan itself landed 2026-09-03, closing that reuse.

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
@@ -224,32 +225,32 @@ func TestTokenOAuth2Error(t *testing.T) {
 }
 
 func TestTokenConcurrentCoalesce(t *testing.T) {
-	var hits atomic.Int32
-	gate := make(chan struct{})
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits.Add(1)
-		<-gate // block until released
-		_, _ = w.Write([]byte(`{"access_token":"x","token_type":"Bearer","expires_in":3600}`))
-	}))
-	defer srv.Close()
+	synctest.Test(t, func(t *testing.T) {
+		var hits atomic.Int32
+		gate := make(chan struct{})
+		srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			<-gate // block until released
+			_, _ = w.Write([]byte(`{"access_token":"x","token_type":"Bearer","expires_in":3600}`))
+		}))
 
-	src, _ := New("c", "s", srv.URL, WithHTTPClient(srv.Client()))
-	var wg sync.WaitGroup
-	const N = 8
-	for range N {
-		wg.Go(func() {
-			if _, err := src.Token(t.Context()); err != nil {
-				t.Error(err)
-			}
-		})
-	}
-	// Let goroutines pile up on the in-flight exchange.
-	time.Sleep(20 * time.Millisecond)
-	close(gate)
-	wg.Wait()
-	if got := hits.Load(); got != 1 {
-		t.Errorf("expected coalesced into 1 exchange, got %d", got)
-	}
+		src, _ := New("c", "s", srv.URL, WithHTTPClient(srv.Client()))
+		var wg sync.WaitGroup
+		const N = 8
+		for range N {
+			wg.Go(func() {
+				if _, err := src.Token(t.Context()); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		synctest.Wait()
+		close(gate)
+		wg.Wait()
+		if got := hits.Load(); got != 1 {
+			t.Errorf("expected coalesced into 1 exchange, got %d", got)
+		}
+	})
 }
 
 func TestTokenCtxCancel(t *testing.T) {

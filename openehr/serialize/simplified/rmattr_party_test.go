@@ -276,7 +276,7 @@ func TestParticipationEncodeRefusals(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	openehrCode := func(code, value string) rm.DVCodedText {
 		return rm.DVCodedText{
-			DVText:       rm.DVText{Value: value},
+			Value:        value,
 			DefiningCode: rm.CodePhrase{CodeString: code, TerminologyID: rm.TerminologyID{Value: "openehr"}},
 		}
 	}
@@ -286,9 +286,7 @@ func TestParticipationEncodeRefusals(t *testing.T) {
 				Function:  rm.DVText{Value: "requester"},
 				Performer: rm.PartySelf{},
 				Time: &rm.DVInterval[rm.DVDateTime]{
-					Interval: rm.Interval[rm.DVDateTime]{
-						Lower: rm.DVDateTime{Value: "2021-12-21T14:19:31+01:00"},
-					},
+					Lower: rm.DVDateTime{Value: "2021-12-21T14:19:31+01:00"},
 				},
 			}}
 		},
@@ -304,7 +302,7 @@ func TestParticipationEncodeRefusals(t *testing.T) {
 		},
 		"mode in another terminology": func(c *rm.Composition) {
 			mode := rm.DVCodedText{
-				DVText:       rm.DVText{Value: "face-to-face communication"},
+				Value:        "face-to-face communication",
 				DefiningCode: rm.CodePhrase{CodeString: "216", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
 			}
 			c.Context.Participations = []rm.Participation{{
@@ -321,14 +319,14 @@ func TestParticipationEncodeRefusals(t *testing.T) {
 			c.Context.Participations = []rm.Participation{{
 				Function: rm.DVText{Value: "requester"},
 				Performer: rm.PartySelf{ExternalRef: &rm.PartyRef{
-					ObjectRef: rm.ObjectRef{ID: rm.HierObjectID{Value: "x"}, Namespace: "n", Type: partyRefType},
+					ID: rm.HierObjectID{Value: "x"}, Namespace: "n", Type: partyRefType,
 				}},
 			}}
 		},
 		"external ref with an empty type": func(c *rm.Composition) {
 			who := "Hospital"
 			c.Context.HealthCareFacility = rm.PartyIdentified{Name: &who, ExternalRef: &rm.PartyRef{
-				ObjectRef: rm.ObjectRef{ID: rm.HierObjectID{Value: "9091"}, Namespace: "HOSPITAL-NS"},
+				ID: rm.HierObjectID{Value: "9091"}, Namespace: "HOSPITAL-NS",
 			}}
 		},
 		"external ref with an indistinguishable object id": func(c *rm.Composition) {
@@ -336,7 +334,7 @@ func TestParticipationEncodeRefusals(t *testing.T) {
 			c.Context.HealthCareFacility = rm.PartyIdentified{Name: &who, ExternalRef: &rm.PartyRef{
 				// TEMPLATE_ID is scheme-less, so `|id_scheme`'s absence would read
 				// it back as a HIER_OBJECT_ID.
-				ObjectRef: rm.ObjectRef{ID: rm.TemplateID{Value: "t"}, Namespace: "HOSPITAL-NS", Type: partyRefType},
+				ID: rm.TemplateID{Value: "t"}, Namespace: "HOSPITAL-NS", Type: partyRefType,
 			}}
 		},
 	} {
@@ -618,7 +616,7 @@ func TestParticipationNilPerformerRefused(t *testing.T) {
 func TestParticipationModeDecorationRefused(t *testing.T) {
 	pt := "face to face"
 	mode := rm.DVCodedText{
-		DVText:       rm.DVText{Value: "face-to-face communication"},
+		Value:        "face-to-face communication",
 		DefiningCode: rm.CodePhrase{CodeString: "216", TerminologyID: rm.TerminologyID{Value: "openehr"}, PreferredTerm: &pt},
 	}
 	out := map[string]any{}

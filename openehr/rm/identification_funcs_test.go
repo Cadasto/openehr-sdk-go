@@ -230,14 +230,17 @@ func TestLocatableRefAsURI(t *testing.T) {
 	ref := rm.LocatableRef{
 		ID:   rm.ObjectVersionID{Value: "87284370-2D4B-4e3d-A3F3-F303D2F4F34B::ABC::1"},
 		Path: &path,
+
+		Namespace: "ehr",
 	}
-	ref.Namespace = "ehr"
 	if got := ref.AsURI(); got != "ehr:87284370-2D4B-4e3d-A3F3-F303D2F4F34B::ABC::1/items[at0002]" {
 		t.Errorf("AsURI = %q", got)
 	}
 
-	noPath := rm.LocatableRef{ID: rm.HierObjectID{Value: "abc"}}
-	noPath.Namespace = "ehr"
+	noPath := rm.LocatableRef{
+		ID:        rm.HierObjectID{Value: "abc"},
+		Namespace: "ehr",
+	}
 	if got := noPath.AsURI(); got != "ehr:abc" {
 		t.Errorf("AsURI(no path) = %q", got)
 	}

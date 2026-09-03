@@ -11,13 +11,13 @@ How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks loca
 
 ### CI jobs (`ci.yml`)
 
-Jobs run in parallel. All use Go **1.26.x** (`actions/setup-go@v6` with module cache).
+Jobs run in parallel. All use Go **1.27.x** (`actions/setup-go@v6` with module cache).
 
 | Job | Makefile targets | Purpose |
 |---|---|---|
 | **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `aqlgen-verify`, `vet`, `spec-check`, `flat-conformance-verify`, `build` | Static checks and compile-all without running tests |
 | **Test** | `test` | Unit tests; `test` already depends on `codegen-verify` and `aqlgen-verify` |
-| **Lint** | (via `golangci-lint-action` v2.13.0, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
+| **Lint** | (via `golangci-lint-action` v2.13.2, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
 | **Race** | `test-race` | **Push to `main` only** — `-race` is slower; catches data races in `typereg` and codecs |
 
 PRs do not run the **Race** job. Merge to `main` triggers it on the post-merge push.
@@ -52,14 +52,14 @@ Run `make help` for the full grouped list. Common targets:
 | Fixtures | `make flat-conformance-check` | The above **plus** a best-effort upstream-drift report (needs network; degrades with a note when offline). Dev helper, not a CI gate |
 | Specs | `make spec-context REQ=NNN` | Assemble the SDD context bundle for a REQ (dev/agent helper; not a CI gate) |
 | Specs | `make probe-status` | Each PROBE's status and whether its test file exists (dev helper; not a CI gate) |
-| Lint | `make lint` | `golangci-lint` on host if installed, else Docker (`LINT_IMAGE`) |
+| Lint | `make lint` | `golangci-lint` on host if the binary was built with Go 1.27, else Docker (`LINT_IMAGE`) |
 
 **Policy:** extend the [Makefile](../Makefile), not ad-hoc shell in workflows. CI and contributors share the same entry points ([AGENTS.md](../AGENTS.md) Tooling policy).
 
 ### Lint configuration
 
 - Config: [`.golangci.yml`](../.golangci.yml)
-- Pin: `golangci/golangci-lint:v2.13.0` (Makefile `LINT_IMAGE` and GitHub Action `version`)
+- Pin: `golangci/golangci-lint:v2.13.2` (Makefile `LINT_IMAGE` and GitHub Action `version`). Official release binaries are built with Go 1.27; a host `go install` from an older toolchain cannot load this module (golangci-lint refuses when its build Go is below the `go.mod` floor). `make lint` / `make fmt-check` then fall back to the pinned image.
 - Generated files (the `// Code generated … DO NOT EDIT.` set) are skipped via `exclusions: generated: lax` in `.golangci.yml`
 
 ## Dependency updates

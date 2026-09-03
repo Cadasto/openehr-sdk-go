@@ -345,8 +345,9 @@ func archetypeQualifiedPart(value string, i int) string {
 // concept, or "" when the concept is unspecialised. REQ-120.
 func (a *ArchetypeID) Specialisation() string {
 	d := a.DomainConcept()
-	if i := strings.LastIndexByte(d, '-'); i >= 0 {
-		return d[i+1:]
+	_, after, found := strings.CutLast(d, "-")
+	if found {
+		return after
 	}
 	return ""
 }

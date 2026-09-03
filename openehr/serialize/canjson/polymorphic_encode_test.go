@@ -57,7 +57,7 @@ func TestEncodeSubstitutedSubtypeInSliceKeepsType(t *testing.T) {
 		Items: []rm.DVTextLike{
 			rm.DVText{Value: "plain"},
 			rm.DVCodedText{
-				DVText:       rm.DVText{Value: "coded"},
+				Value:        "coded",
 				DefiningCode: rm.CodePhrase{CodeString: "at0002", TerminologyID: rm.TerminologyID{Value: "local"}},
 			},
 		},

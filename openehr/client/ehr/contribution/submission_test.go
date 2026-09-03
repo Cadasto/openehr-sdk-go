@@ -23,13 +23,13 @@ func (fakeNonVersion) BMMName() string              { return "WRONG_TYPE" }
 func newImportedVersion() *contribution.ImportedVersion[rm.Composition] {
 	inner := newOriginalVersion()
 	innerAny := rm.OriginalVersion[any]{
-		Version:        rm.Version[any]{CommitAudit: inner.Version.CommitAudit},
+		CommitAudit:    inner.Version.CommitAudit,
 		UID:            inner.Version.UID,
 		LifecycleState: inner.Version.LifecycleState,
 	}
 	return contribution.WrapImportedVersion(&rm.ImportedVersion[rm.Composition]{
-		Version: rm.Version[rm.Composition]{CommitAudit: inner.Version.CommitAudit},
-		Item:    innerAny,
+		CommitAudit: inner.Version.CommitAudit,
+		Item:        innerAny,
 	})
 }
 
@@ -39,7 +39,7 @@ func newImportedVersion() *contribution.ImportedVersion[rm.Composition] {
 func newOriginalVersionFolder() *contribution.OriginalVersion[rm.Folder] {
 	folder := rm.Folder{Name: rm.DVText{Value: "Encounters"}}
 	return contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Folder]{
-		Version:        rm.Version[rm.Folder]{CommitAudit: newCommitAudit()},
+		CommitAudit:    newCommitAudit(),
 		UID:            rm.ObjectVersionID{Value: "3::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &folder,
@@ -49,7 +49,7 @@ func newOriginalVersionFolder() *contribution.OriginalVersion[rm.Folder] {
 func newOriginalVersionEHRAccess() *contribution.OriginalVersion[rm.EHRAccess] {
 	access := rm.EHRAccess{}
 	return contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.EHRAccess]{
-		Version:        rm.Version[rm.EHRAccess]{CommitAudit: newCommitAudit()},
+		CommitAudit:    newCommitAudit(),
 		UID:            rm.ObjectVersionID{Value: "4::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &access,
@@ -121,7 +121,7 @@ func TestSubmissionValidate(t *testing.T) {
 				// generic instantiation is rejected.
 				Versions: []contribution.CommitVersion{
 					contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.PartyIdentified]{
-						Version:        rm.Version[rm.PartyIdentified]{CommitAudit: newCommitAudit()},
+						CommitAudit:    newCommitAudit(),
 						UID:            rm.ObjectVersionID{Value: "x::cdr.example::1"},
 						LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 					}),
@@ -175,12 +175,10 @@ func TestSubmissionValidate(t *testing.T) {
 				Audit: newAudit(),
 				Versions: []contribution.CommitVersion{
 					contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
-						Version: rm.Version[rm.Composition]{
-							CommitAudit: rm.AuditDetails{
-								Committer:  rm.PartySelf{},
-								ChangeType: rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}},
-								SystemID:   "cdr.example",
-							},
+						CommitAudit: rm.AuditDetails{
+							Committer:  rm.PartySelf{},
+							ChangeType: rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}},
+							SystemID:   "cdr.example",
 						},
 						UID:            rm.ObjectVersionID{Value: "1::cdr.example::1"},
 						LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
@@ -196,12 +194,10 @@ func TestSubmissionValidate(t *testing.T) {
 				Audit: newAudit(),
 				Versions: []contribution.CommitVersion{
 					contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
-						Version: rm.Version[rm.Composition]{
-							CommitAudit: rm.AuditDetails{
-								Committer:  (*rm.PartyIdentified)(nil),
-								ChangeType: rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}},
-								SystemID:   "cdr.example",
-							},
+						CommitAudit: rm.AuditDetails{
+							Committer:  (*rm.PartyIdentified)(nil),
+							ChangeType: rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}},
+							SystemID:   "cdr.example",
 						},
 						UID:            rm.ObjectVersionID{Value: "1::cdr.example::1"},
 						LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
@@ -356,7 +352,7 @@ func TestSubmissionMixesVersionable(t *testing.T) {
 		IsModifiable:    true,
 	}
 	statusVer := contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.EHRStatus]{
-		Version:        rm.Version[rm.EHRStatus]{CommitAudit: newCommitAudit()},
+		CommitAudit:    newCommitAudit(),
 		UID:            rm.ObjectVersionID{Value: "2::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &status,

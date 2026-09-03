@@ -552,7 +552,7 @@ func joinTarget(base *url.URL, path string, query url.Values) (*url.URL, error) 
 	if base == nil {
 		return nil, errors.New("nil base URL")
 	}
-	out := *base
+	out := base.Clone()
 	out.Path = joinPaths(base.Path, path)
 	if len(query) > 0 {
 		q := out.Query()
@@ -561,7 +561,7 @@ func joinTarget(base *url.URL, path string, query url.Values) (*url.URL, error) 
 		}
 		out.RawQuery = q.Encode()
 	}
-	return &out, nil
+	return out, nil
 }
 
 func joinPaths(a, b string) string {

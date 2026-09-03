@@ -59,7 +59,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 - **Full RM inventory:** decode every BMM type through the registry; identify sites that resist the pattern (e.g. further `VERSION[T]` whitelist decisions beyond `EVENT`).
 - **Default codec benchmark:** `encoding/json` (current, via generator-emitted `MarshalJSON`) vs `sonic` vs `easyjson` under seeder/benchmark workloads — a *performance* axis (throughput/allocations), codec swapped behind the same generated methods.
-- **`encoding/json/v2` as a *simplification* axis (Go 1.25):** distinct from the performance candidates above. The generator emits bespoke `MarshalJSON`/`UnmarshalJSON` (`internal/bmmgen/render_json{mar,unmar}.go`) and `openehr/internal/jsonpoly` largely to obtain what `encoding/json` v1 lacks: deterministic field order, correct zero/omit semantics (`omitzero`), and value-in-interface `_type` handling. `encoding/json/v2` (`GOEXPERIMENT=jsonv2`) provides these natively (`jsontext`, `MarshalerTo`/`UnmarshalerFrom`, marshal options), so it could *retire* a large share of that generated + hand-written marshaling surface rather than merely swap the codec behind it. Blocked on experimental status.
+- **`encoding/json/v2` as a *simplification* axis:** distinct from the performance candidates above. The generator emits bespoke `MarshalJSON`/`UnmarshalJSON` (`internal/bmmgen/render_json{mar,unmar}.go`) and `openehr/internal/jsonpoly` largely to obtain what `encoding/json` v1 lacks: deterministic field order, correct zero/omit semantics (`omitzero`), and value-in-interface `_type` handling. Go 1.27 ships `encoding/json/v2` and `encoding/json/jsontext` as ordinary stdlib (no `GOEXPERIMENT=jsonv2`); v1 is implemented on v2 with behaviour preserved. Native v2 options could *retire* a large share of that generated + hand-written marshaling surface rather than merely swap the codec behind it. The API is stable; the remaining gate is the byte-stable canjson fit-gap, not experimental status.
 - **Validation independence:** confirm `openehr/validation` can validate without taking on the codec's dependencies (REQ-013).
 
 **Evidence needed (remaining):**
@@ -67,7 +67,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 - Benchmark throughput, allocations, and memory residency for codec candidates.
 - Document any remaining abstract-generic classes requiring ADR whitelist (generator policy today: `EVENT` only).
 - `encoding/json/v2` fit-gap: whether `jsontext` + marshal options reproduce byte-stable canonical JSON (PROBE-030/031/038) and the polymorphic `_type` round-trip (REQ-052/040) without the generator's marshaler emit — and quantify the generated + `jsonpoly` LOC it would remove.
-- `encoding/json/v2` stability/timeline: experimental behind `GOEXPERIMENT=jsonv2` in Go 1.25; gate any adoption on a stable, un-gated API so the SDK's public-API and wire-stability promises hold.
+- `encoding/json/v2` stability/timeline: stable stdlib as of Go 1.27; remaining work is the fit-gap (byte-stable `_type`-first canjson, PROBE-030/031/038) before any generator/ADR change.
 
 **Resolution form (remaining):** ADR choosing the default codec (with tuning-knob notes for swapping). Amends REQ-052, REQ-053, possibly REQ-040 if registry shape needs tweaking. A `encoding/json/v2` resolution would additionally touch the codegen policy in [ADR 0002](../adr/0002-bmm-codegen-decisions.md), since it changes what the generator emits.
 

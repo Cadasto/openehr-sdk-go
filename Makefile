@@ -3,7 +3,7 @@
 # Policy in AGENTS.md > Tooling policy. Single entry point — extend here,
 # don't add ad-hoc scripts.
 #
-# Fast path  : host Go 1.26.x (recommended for daily development).
+# Fast path  : host Go 1.27.x (recommended for daily development).
 # Fallback   : `docker compose run --rm go …` using the `dev` stage in
 #              Dockerfile (gated behind the `dev` compose profile).
 .DEFAULT_GOAL := help
@@ -12,7 +12,7 @@
 
 COMPOSE         ?= docker compose
 COMPOSE_PROJECT ?= openehr-sdk-go
-LINT_IMAGE      ?= golangci/golangci-lint:v2.13.0-alpine
+LINT_IMAGE      ?= golangci/golangci-lint:v2.13.2-alpine
 DOCKER_MOUNT    = -v $(CURDIR):/app -w /app
 
 # ANTLR codegen (maintainer-only). The generator is Java, confined to the
@@ -23,8 +23,10 @@ ANTLR_IMAGE     ?= openehr-sdk-go/antlr:$(ANTLR_VERSION)
 AQL_GRAMMAR_DIR := resources/aql/grammar/active
 AQL_GEN_DIR     := openehr/aql/parse/gen
 
-HOST_GO_OK   := $(shell command -v go >/dev/null 2>&1 && go version 2>/dev/null | grep -qE 'go1\.26(\.|$$|[[:space:]])' && echo yes)
-HOST_GLCI_OK := $(shell command -v golangci-lint >/dev/null 2>&1 && echo yes)
+HOST_GO_OK   := $(shell command -v go >/dev/null 2>&1 && go version 2>/dev/null | grep -qE 'go1\.27(\.|$$|[[:space:]])' && echo yes)
+# Official golangci-lint binaries for this pin are built with Go 1.27; a
+# host binary compiled with an older toolchain cannot load a go 1.27.0 module.
+HOST_GLCI_OK := $(shell command -v golangci-lint >/dev/null 2>&1 && golangci-lint version 2>/dev/null | grep -qE 'built with go1\.27' && echo yes)
 
 ifeq ($(HOST_GO_OK),yes)
   GO = go
@@ -70,7 +72,7 @@ help: ## Show grouped targets and tooling policy
 	@echo "openehr-sdk-go"
 	@echo ""
 	@if [ "$(HOST_GO_OK)" = "yes" ]; then \
-		echo "Toolchain : host Go 1.26.x (fast path)"; \
+		echo "Toolchain : host Go 1.27.x (fast path)"; \
 		echo "  $$(go version 2>/dev/null)"; \
 	else \
 		echo "Toolchain : Docker fallback (compose profile dev)"; \
@@ -115,7 +117,7 @@ fmt-check: ## Fail if any file needs formatting (gofumpt/goimports)
 
 vet: ## Run go vet (generated ANTLR parser's unreachable code suppressed)
 	@# The generated parser (openehr/aql/parse/gen) emits unreachable code after
-	@# panics — inherent to ANTLR's Go target, not a defect. Go 1.26's `go vet`
+	@# panics — inherent to ANTLR's Go target, not a defect. Go 1.27's `go vet`
 	@# surfaces those diagnostics through the importing openehr/aql/parse package,
 	@# so a package-list exclusion can't suppress them. Disable only the
 	@# `unreachable` analyzer instead; `make lint` (golangci-lint, generated: lax)

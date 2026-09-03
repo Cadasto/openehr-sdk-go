@@ -210,7 +210,7 @@ func TestReadMultiple_ItemStructureVariants(t *testing.T) {
 // here when a C_CODE_PHRASE is declared under /defining_code.
 func TestReadSingle_DataValueNavigation(t *testing.T) {
 	cat := &rm.DVCodedText{
-		DVText: rm.DVText{Value: "event"},
+		Value: "event",
 		DefiningCode: rm.CodePhrase{
 			TerminologyID: rm.TerminologyID{Value: "openehr"},
 			CodeString:    "433",

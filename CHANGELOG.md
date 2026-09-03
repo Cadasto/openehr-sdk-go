@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **Go 1.27.0 module floor (REQ-002).** `go.mod`, Docker/Make, and CI now require Go ≥ 1.27.0; typed decode is a method on `*typereg.Registry` ([plan](docs/plans/2026-09-03-go-1.27.md)).
+
 ## [0.25.0] - 2026-09-03
 
 Twenty-fifth `v0.x` minor — REQ-052 lands as the SDK's own canonical-JSON output contract, `TERM_MAPPING.match` becomes a character string, and empty `ehr.Create` 2xx bodies type as no-representation. **Breaking:** `TermMapping.Match` is `rm.Character` not `rune`, and an empty stored-query version no longer falls back to latest.

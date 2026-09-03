@@ -19,11 +19,11 @@ func TestMarshalAuditDetails_DottedGrammar(t *testing.T) {
 		Description: rm.DVText{Value: "initial commit"},
 		Committer: rm.PartyIdentified{
 			Name: &name,
-			ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{
+			ExternalRef: &rm.PartyRef{
 				ID:        rm.HierObjectID{Value: "BC8132EA-8F4A-11E7-BB31-BE2E44B06B34"},
 				Namespace: "demographic",
 				Type:      "PERSON",
-			}},
+			},
 		},
 		SystemID: "cdr.example",
 	}
@@ -78,11 +78,11 @@ func TestMarshalAuditDetails_OmitsExternalRefWithoutID(t *testing.T) {
 			Name: &name,
 			// external_ref present but its id has no value — must not emit
 			// an orphan namespace/type with no id.
-			ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{
+			ExternalRef: &rm.PartyRef{
 				ID:        rm.HierObjectID{Value: ""},
 				Namespace: "demographic",
 				Type:      "PERSON",
-			}},
+			},
 		},
 	}
 	got, err := MarshalAuditDetails(a)
@@ -123,11 +123,11 @@ func TestMarshalAuditDetails_RejectsTypedNilObjectID(t *testing.T) {
 		ChangeType: rm.DVCodedText{DefiningCode: rm.CodePhrase{CodeString: "249"}},
 		Committer: rm.PartyIdentified{
 			Name: &name,
-			ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{
+			ExternalRef: &rm.PartyRef{
 				ID:        id,
 				Namespace: "demographic",
 				Type:      "PERSON",
-			}},
+			},
 		},
 	}
 	_, err := MarshalAuditDetails(a)

@@ -896,8 +896,10 @@ func (ex *astExtractor) limitValueAsExpr(v gen.ILimitValueContext, clause string
 // IdentifiedPath values, so consumers can compare paths from
 // Document.Paths and Query SELECT/WHERE/ORDER BY by equality.
 func extractIdentifiedPath(c gen.IIdentifiedPathContext, clause Clause) IdentifiedPath {
-	ip := IdentifiedPath{Pos: posOf(c.GetStart()), Clause: clause}
-	ip.Raw = sourceText(c)
+	ip := IdentifiedPath{
+		Pos: posOf(c.GetStart()), Clause: clause,
+		Raw: sourceText(c),
+	}
 	if id := c.IDENTIFIER(); id != nil {
 		ip.Alias = id.GetText()
 	}

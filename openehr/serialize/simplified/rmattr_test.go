@@ -291,7 +291,7 @@ func TestRMAttrLinkDecoratedMeaningRefusedOnEncode(t *testing.T) {
 	formatting := "markdown"
 	for name, meaning := range map[string]rm.DVTextLike{
 		"coded": &rm.DVCodedText{
-			DVText:       rm.DVText{Value: "problem related note"},
+			Value:        "problem related note",
 			DefiningCode: rm.CodePhrase{CodeString: "1", TerminologyID: rm.TerminologyID{Value: "local"}},
 		},
 		"formatted": &rm.DVText{Value: "problem related note", Formatting: &formatting},

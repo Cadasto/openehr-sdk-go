@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -135,27 +136,28 @@ func TestResolveCacheHit(t *testing.T) {
 }
 
 func TestResolveCacheExpiry(t *testing.T) {
-	var hits atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits.Add(1)
-		_, _ = w.Write(cassetteBytes(t, "smart-configuration.json"))
-	}))
-	defer srv.Close()
-	r := mustResolver(
-		t,
-		WithHTTPClient(srv.Client()),
-		WithDefaultTTL(1*time.Millisecond),
-	)
-	if _, err := r.Resolve(t.Context(), srv.URL); err != nil {
-		t.Fatal(err)
-	}
-	time.Sleep(10 * time.Millisecond)
-	if _, err := r.Resolve(t.Context(), srv.URL); err != nil {
-		t.Fatal(err)
-	}
-	if got := hits.Load(); got != 2 {
-		t.Errorf("expected refetch after TTL expiry, got %d hits", got)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		var hits atomic.Int32
+		srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			_, _ = w.Write(cassetteBytes(t, "smart-configuration.json"))
+		}))
+		r := mustResolver(
+			t,
+			WithHTTPClient(srv.Client()),
+			WithDefaultTTL(1*time.Millisecond),
+		)
+		if _, err := r.Resolve(t.Context(), srv.URL); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Sleep(10 * time.Millisecond)
+		if _, err := r.Resolve(t.Context(), srv.URL); err != nil {
+			t.Fatal(err)
+		}
+		if got := hits.Load(); got != 2 {
+			t.Errorf("expected refetch after TTL expiry, got %d hits", got)
+		}
+	})
 }
 
 func TestResolveRefreshInvalidates(t *testing.T) {
@@ -179,29 +181,30 @@ func TestResolveRefreshInvalidates(t *testing.T) {
 }
 
 func TestResolveCoalescesConcurrent(t *testing.T) {
-	var hits atomic.Int32
-	gate := make(chan struct{})
-	body := cassetteBytes(t, "smart-configuration.json")
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits.Add(1)
-		<-gate
-		_, _ = w.Write(body)
-	}))
-	defer srv.Close()
-	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	var wg sync.WaitGroup
-	const N = 8
-	for range N {
-		wg.Go(func() {
-			_, _ = r.Resolve(t.Context(), srv.URL)
-		})
-	}
-	time.Sleep(20 * time.Millisecond)
-	close(gate)
-	wg.Wait()
-	if got := hits.Load(); got != 1 {
-		t.Errorf("expected coalesced fetch, got %d", got)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		var hits atomic.Int32
+		gate := make(chan struct{})
+		body := cassetteBytes(t, "smart-configuration.json")
+		srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			<-gate
+			_, _ = w.Write(body)
+		}))
+		r := mustResolver(t, WithHTTPClient(srv.Client()))
+		var wg sync.WaitGroup
+		const N = 8
+		for range N {
+			wg.Go(func() {
+				_, _ = r.Resolve(t.Context(), srv.URL)
+			})
+		}
+		synctest.Wait()
+		close(gate)
+		wg.Wait()
+		if got := hits.Load(); got != 1 {
+			t.Errorf("expected coalesced fetch, got %d", got)
+		}
+	})
 }
 
 func TestResolveMissingServiceRequired(t *testing.T) {

@@ -127,12 +127,10 @@ func TestValidateRM_DVQuantityPrecision(t *testing.T) {
 // bare DVInterval[DVOrdered] — so inverted typed intervals validated clean.
 func TestValidateRM_DVIntervalLowerGreaterThanUpper(t *testing.T) {
 	iv := rm.DVInterval[rm.DVQuantity]{
-		Interval: rm.Interval[rm.DVQuantity]{
-			Lower:         rm.DVQuantity{Magnitude: 10, Units: "mg"},
-			Upper:         rm.DVQuantity{Magnitude: 5, Units: "mg"},
-			LowerIncluded: true,
-			UpperIncluded: true,
-		},
+		Lower:         rm.DVQuantity{Magnitude: 10, Units: "mg"},
+		Upper:         rm.DVQuantity{Magnitude: 5, Units: "mg"},
+		LowerIncluded: true,
+		UpperIncluded: true,
 	}
 	r := validation.ValidateRM(&iv)
 	if r.OK {
@@ -149,10 +147,8 @@ func TestValidateRM_DVIntervalLowerGreaterThanUpper(t *testing.T) {
 // interval). Exercised on the typed instantiation.
 func TestValidateRM_DVIntervalUnboundedSkipped(t *testing.T) {
 	iv := rm.DVInterval[rm.DVQuantity]{
-		Interval: rm.Interval[rm.DVQuantity]{
-			Lower:          rm.DVQuantity{Magnitude: 10, Units: "mg"},
-			UpperUnbounded: true,
-		},
+		Lower:          rm.DVQuantity{Magnitude: 10, Units: "mg"},
+		UpperUnbounded: true,
 	}
 	r := validation.ValidateRM(&iv)
 	// The interval itself emits no rm_invariant (no comparable bounds).
@@ -172,12 +168,10 @@ func TestValidateRM_DVIntervalUnboundedSkipped(t *testing.T) {
 // the raw magnitudes (10 > 5). The bound-ordering invariant is skipped.
 func TestValidateRM_DVIntervalDifferentUnitsSkipped(t *testing.T) {
 	iv := rm.DVInterval[rm.DVQuantity]{
-		Interval: rm.Interval[rm.DVQuantity]{
-			Lower:         rm.DVQuantity{Magnitude: 10, Units: "mg"},
-			Upper:         rm.DVQuantity{Magnitude: 5, Units: "kg"},
-			LowerIncluded: true,
-			UpperIncluded: true,
-		},
+		Lower:         rm.DVQuantity{Magnitude: 10, Units: "mg"},
+		Upper:         rm.DVQuantity{Magnitude: 5, Units: "kg"},
+		LowerIncluded: true,
+		UpperIncluded: true,
 	}
 	r := validation.ValidateRM(&iv)
 	for _, i := range r.Issues {
@@ -442,13 +436,11 @@ func TestRMFloorMappingsEmptyLiteralIsInvalid(t *testing.T) {
 func TestRMFloorDVCodedTextBadMatch(t *testing.T) {
 	badMatch := rm.Character("q") // not in {> = < ?}
 	txt := &rm.DVCodedText{
-		DVText: rm.DVText{
-			Value: "x",
-			Mappings: []rm.TermMapping{{
-				Match:  badMatch,
-				Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "1"},
-			}},
-		},
+		Value: "x",
+		Mappings: []rm.TermMapping{{
+			Match:  badMatch,
+			Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "1"},
+		}},
 		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "2"},
 	}
 	r := validation.ValidateRM(txt)
@@ -525,13 +517,11 @@ func TestValidateRM_NestedPurposeMappingBadMatch(t *testing.T) {
 	txt := &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{
 		Match: rm.Character("="),
 		Purpose: &rm.DVCodedText{
-			DVText: rm.DVText{
-				Value: "billing",
-				Mappings: []rm.TermMapping{{
-					Match:  rm.Character("x"), // not in {> = < ?}
-					Target: target,
-				}},
-			},
+			Value: "billing",
+			Mappings: []rm.TermMapping{{
+				Match:  rm.Character("x"), // not in {> = < ?}
+				Target: target,
+			}},
 			DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "532"},
 		},
 		Target: target,
@@ -554,10 +544,8 @@ func TestValidateRM_NestedPurposeMappingValid(t *testing.T) {
 	txt := &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{
 		Match: rm.Character("="),
 		Purpose: &rm.DVCodedText{
-			DVText: rm.DVText{
-				Value:    "billing",
-				Mappings: []rm.TermMapping{{Match: rm.Character("?"), Target: target}},
-			},
+			Value:        "billing",
+			Mappings:     []rm.TermMapping{{Match: rm.Character("?"), Target: target}},
 			DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "532"},
 		},
 		Target: target,

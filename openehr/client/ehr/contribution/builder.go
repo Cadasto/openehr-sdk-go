@@ -69,7 +69,7 @@ var lifecycleTerms = map[openehrclient.LifecycleState]string{
 // codedText builds an openEHR-terminology DV_CODED_TEXT.
 func codedText(value, code string) rm.DVCodedText {
 	return rm.DVCodedText{
-		DVText: rm.DVText{Value: value},
+		Value: value,
 		DefiningCode: rm.CodePhrase{
 			TerminologyID: rm.TerminologyID{Value: "openehr"},
 			CodeString:    code,

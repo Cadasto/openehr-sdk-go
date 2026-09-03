@@ -200,7 +200,7 @@ func TestEncodePartyRelatedComposerErrors(t *testing.T) {
 	comp, wt := genComposition(t, minimalObsOPT)
 	name := "Related Composer"
 	comp.Composer = &rm.PartyRelated{
-		PartyIdentified: rm.PartyIdentified{Name: &name},
+		Name: &name,
 		Relationship: rm.DVCodedText{
 			DVText: rm.DVText{Value: "mother"},
 			DefiningCode: rm.CodePhrase{
@@ -223,10 +223,10 @@ func TestEncodeComposerShapesCtxCannotCarry(t *testing.T) {
 		// `ctx/composer_self` is a bare Boolean — an external_ref beside it has
 		// nowhere to go and must not be dropped.
 		"PARTY_SELF carrying an external_ref": &rm.PartySelf{
-			ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{
+			ExternalRef: &rm.PartyRef{
 				ID:        &rm.HierObjectID{Value: "ref-1"},
 				Namespace: "demographic", Type: "PERSON",
-			}},
+			},
 		},
 		// A nameless PARTY_IDENTIFIED would write no ctx/ key at all, and a
 		// WithTemplate decode of that output defaults the composer to PARTY_SELF

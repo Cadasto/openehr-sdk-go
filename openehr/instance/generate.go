@@ -2,10 +2,9 @@ package instance
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"time"
+	"uuid"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
@@ -844,7 +843,7 @@ func (g *generator) applyPrimitiveExample(
 func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	if c.Category.DefiningCode.CodeString == "" {
 		c.Category = rm.DVCodedText{
-			DVText: rm.DVText{Value: "event"},
+			Value: "event",
 			DefiningCode: rm.CodePhrase{
 				CodeString:    "433",
 				TerminologyID: rm.TerminologyID{Value: "openehr"},
@@ -886,7 +885,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	if c.Context.Setting.DefiningCode.CodeString == "" ||
 		c.Context.Setting.DefiningCode.TerminologyID.Value != "openehr" {
 		c.Context.Setting = rm.DVCodedText{
-			DVText: rm.DVText{Value: "other care"},
+			Value: "other care",
 			DefiningCode: rm.CodePhrase{
 				CodeString:    "238",
 				TerminologyID: rm.TerminologyID{Value: "openehr"},
@@ -912,29 +911,14 @@ func isRequired(attr *tcimpl.CompiledAttribute) bool {
 	return e.Lower() >= 1
 }
 
-// newHierObjectID generates a HierObjectID with a random
-// UUID-shaped value. Used for LOCATABLE.uid where openEHR mandates
+// newHierObjectID generates a HierObjectID with a random RFC 9562
+// version-4 UUID. Used for LOCATABLE.uid where openEHR mandates
 // uniqueness (Composition, Entry root types). Returns a pointer so
 // canjson's polymorphic dispatch on the UIDBasedID interface emits
 // the `_type:"HIER_OBJECT_ID"` discriminator the decoder needs to
-// round-trip the field. Falls back to a time-derived hex string when
-// crypto/rand fails.
+// round-trip the field.
 func newHierObjectID() *rm.HierObjectID {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		// Random source exhausted; fall back to nanosecond timestamp
-		// so the generator keeps producing distinct ids.
-		ts := uint64(time.Now().UnixNano())
-		for i := range 8 {
-			b[i] = byte(ts >> (i * 8))
-		}
-	}
-	// RFC 4122 v4 layout.
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	s := hex.EncodeToString(b[:])
-	uuid := s[0:8] + "-" + s[8:12] + "-" + s[12:16] + "-" + s[16:20] + "-" + s[20:32]
-	return &rm.HierObjectID{Value: uuid}
+	return &rm.HierObjectID{Value: uuid.NewV4().String()}
 }
 
 // optionalSiblingIDCollides reports whether this optional child shares

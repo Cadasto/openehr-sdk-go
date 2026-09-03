@@ -181,18 +181,18 @@ func rmattrNotAList(g rmattrGroup, tail, seg string) error {
 // spelling rules [parseFlatKey] enforces everywhere else (canonical decimal, no
 // negatives).
 func rmattrSegIndex(g rmattrGroup, tail, seg string) (id string, idx int, err error) {
-	j := strings.LastIndex(seg, ":")
-	if j < 0 {
+	id, idxStr, found := strings.CutLast(seg, ":")
+	if !found {
 		return seg, -1, nil
 	}
-	n, convErr := strconv.Atoi(seg[j+1:])
+	n, convErr := strconv.Atoi(idxStr)
 	if convErr != nil {
 		return seg, -1, nil // not an index at all — part of the segment name
 	}
-	if n < 0 || seg[j+1:] != strconv.Itoa(n) {
-		return "", 0, fmt.Errorf("%w: invalid :index %q in %q", ErrUnknownPath, seg[j+1:], g.key(tail))
+	if n < 0 || idxStr != strconv.Itoa(n) {
+		return "", 0, fmt.Errorf("%w: invalid :index %q in %q", ErrUnknownPath, idxStr, g.key(tail))
 	}
-	return seg[:j], n, nil
+	return id, n, nil
 }
 
 // check refuses any tail outside a family's grammar, naming the offending FLAT

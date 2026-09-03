@@ -144,7 +144,7 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 	if err != nil {
 		return nil, nil, fmt.Errorf("demographic.Create: %w", err)
 	}
-	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
+	cfg := writeConfig{Prefer: transport.PreferMinimal}
 	for _, o := range opts {
 		if o != nil {
 			o(&cfg)
@@ -197,7 +197,7 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	if party == nil {
 		return nil, nil, fmt.Errorf("demographic.Update: %w: nil Party", transport.ErrInvalidConfig)
 	}
-	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
+	cfg := writeConfig{Prefer: transport.PreferMinimal}
 	for _, o := range opts {
 		if o != nil {
 			o(&cfg)
