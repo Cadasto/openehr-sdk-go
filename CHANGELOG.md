@@ -10,20 +10,23 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-09-03
+
+Twenty-fifth `v0.x` minor — REQ-052 lands as the SDK's own canonical-JSON output contract, `TERM_MAPPING.match` becomes a character string, and empty `ehr.Create` 2xx bodies type as no-representation. **Breaking:** `TermMapping.Match` is `rm.Character` not `rune`, and an empty stored-query version no longer falls back to latest.
+
 ### Added
 
-- **Canonical-JSON field order is the SDK's own output contract (REQ-052).** The deterministic encode profile is the SDK's guarantee, the decoder accepts members in any order, `_type` included, and no order is expected of other implementations.
-- **`ehr.Create` empty-2xx typing (REQ-094).** An empty, whitespace-only, or JSON-`null` 2xx body from `ehr.Create` now returns `*NoRepresentationError` with the commit metadata, matching the versioned-write family ([plan](docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md)).
-- **Stored-query `version` path hygiene (REQ-057).** The `version` path parameter is trimmed before reaching the wire and an explicit empty version is refused before any request — **breaking:** `RunStoredVersion` with an empty version no longer falls back to the latest.
+- **Canonical-JSON field order is the SDK's output contract (REQ-052).** The deterministic encode profile is the SDK's guarantee; the decoder accepts members in any order, `_type` included, and no order is expected of other implementations.
+- **`TERM_MAPPING.match` is `rm.Character` (REQ-046, REQ-052).** The named primitive encodes the RM's one-character JSON string; `TermMapping.Match` is `rm.Character` not `rune`, and an unset `Match` now fails encode.
+- **Canonical-JSON precision and presence pins (REQ-052).** `Real` decode refuses a literal past 17 significant digits instead of rounding silently; `DV_TEXT.mappings` and `DV_MULTIMEDIA` inline-data presence collapse are documented and pinned.
+- **Canonical-JSON decode shape sentinel (REQ-052).** Every generated RM/AOM `UnmarshalJSON` now classifies a JSON-shape failure with `canjson.ErrInvalidShape` so `errors.Is` matches, with message and unwrapped cause unchanged.
+- **RM-floor `TERM_MAPPING` invariants (REQ-112).** `ValidateRM` and its typed sugars now report a `match` outside `{'>','=','<','?'}` and a present-but-empty `DV_TEXT.mappings` as invariant violations.
+- **`ehr.Create` empty-2xx typing (REQ-094).** An empty, whitespace-only, or JSON-`null` 2xx body from `ehr.Create` now returns `*NoRepresentationError` with the commit metadata, matching the versioned-write family.
+- **Stored-query `version` path hygiene (REQ-057).** The `version` path parameter is trimmed before the wire and an explicit empty version is refused — **breaking:** an empty version no longer falls back to latest.
+- **Value-free diagnostics for unrouted requests (REQ-093).** Transport error strings render `(unrouted)` instead of a resolved path or URL when a request carries no route template, including the URL a wrapped `*url.Error` reports.
 - **Nil-safe AQL/decode error inspection (REQ-025).** The AQL-parse and type-registry error inspection sites now guard against a typed-nil `errors.AsType` match, and report no position where none is known.
-- **Discriminating PROBE-099 relation row (REQ-164).** A new near-miss row makes containment-relation threading mutation-detectable at probe level, where the prior supplied-relation row stayed inert.
-- **Canonical-JSON decode shape sentinel (REQ-052).** Every generated RM/AOM `UnmarshalJSON` now classifies a JSON-shape failure with `canjson.ErrInvalidShape` so `errors.Is` matches, with message and unwrapped cause unchanged ([plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md)).
-- **Value-free diagnostics for unrouted requests (REQ-093).** Transport error strings render the placeholder `(unrouted)` instead of a resolved path or URL when a request carries no route template, including the URL a wrapped `*url.Error` reports ([plan](docs/plans/archive/2026-09-02-decode-error-surface-typing.md)).
-- **`TERM_MAPPING.match` is a canonical single-character string (REQ-046, REQ-052).** A new `Character` named primitive decodes and encodes the RM's one-character JSON string, replacing the numeric spelling that could not represent it, refuses input `encoding/json` would otherwise silently replace with U+FFFD, and holds the same rule on canonical XML ([plan](docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md)).
-- **RM-floor `TERM_MAPPING` invariants (REQ-112).** `ValidateRM` and its typed sugars now report a `match` outside `{'>','=','<','?'}` and a present-but-empty `DV_TEXT.mappings` as invariant violations ([plan](docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md)).
-- **Canonical-JSON precision and presence pins (REQ-052).** `Real.UnmarshalJSON` now refuses a literal past 17 significant digits instead of rounding silently; `DV_TEXT.mappings` and `DV_MULTIMEDIA`'s base64 `[]`/`null`/absent re-encode collapse are documented and pinned ([plan](docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md)).
-- **Breaking: `TermMapping.Match` type change (REQ-046, REQ-052).** `Match` and the generated `IsValidMatchCode` parameter are both now `rm.Character`, not `rune` (write `Match: rm.Character("=")`); an unset `Match` now fails encode, and a magnitude past 17 significant digits now fails decode ([plan](docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md)).
 - **No-panic decode on hand-written primitives (REQ-025).** `Character`, `Real` and `Integer` refuse a nil receiver with an error instead of panicking; the generated types are unchanged.
+- **Discriminating PROBE-099 relation row (REQ-164).** A new near-miss row makes containment-relation threading mutation-detectable at probe level, where the prior supplied-relation row stayed inert.
 
 ## [0.24.0] - 2026-08-30
 
