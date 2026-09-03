@@ -26,16 +26,27 @@
 //
 //   - `_type` is the first JSON object key on every encoded concrete
 //     RM value.
+//
 //   - Remaining keys follow BMM property declaration order (= the
 //     order the generator emits struct fields).
+//
 //   - `Hash` (map[K]V) keys are emitted in lexicographic key order
 //     (stdlib behaviour), independent of struct field order.
+//
+//     The profile is the SDK's own output contract (fixed-point re-encode,
+//     byte-identical repeat encodes). Decode accepts members in any order,
+//     `_type` included, and no order is asserted for another
+//     implementation's output (REQ-052).
+//
 //   - Nil-pointer optional fields are emitted as ABSENT (no key), not
 //     as `null`. Both ABSENT and `null` are accepted on decode.
+//
 //   - Empty containers with BMM cardinality.lower == 0 are emitted as
 //     ABSENT (omitempty), not as `[]`.
+//
 //   - ISO 8601 dates/times/durations are passed through as JSON
 //     strings; the codec does not parse them to time.Time (REQ-046).
+//
 //   - Numeric magnitudes use IEEE 754 double-precision JSON numbers
 //     (no silent float32 coercion). REQ-052 requires a typed error on
 //     decode "rather than silently rounding" when a wire value exceeds
