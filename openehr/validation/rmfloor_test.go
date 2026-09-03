@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -456,5 +457,180 @@ func TestRMFloorDVCodedTextBadMatch(t *testing.T) {
 	}
 	if !containsIssue(r.Issues, "/mappings[0]/match", "term_mapping_match") {
 		t.Errorf("expected term_mapping_match at /mappings[0]/match, got %+v", r.Issues)
+	}
+}
+
+// TestValidateRM_TermMappingRoot pins REQ-112's "walks any RM root":
+// TERM_MAPPING is a registered RM concrete, so a stand-alone TERM_MAPPING
+// handed to the generic entry MUST be recognised and MUST report
+// `term_mapping_match` at /match when its match is outside {> = < ?}.
+// Before the node-level evaluator the match check lived only on the
+// parent DV_TEXT, so a TERM_MAPPING root validated clean.
+func TestValidateRM_TermMappingRoot(t *testing.T) {
+	tm := &rm.TermMapping{
+		Match:  rm.Character("x"), // not in {> = < ?}
+		Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "73211009"},
+	}
+	r := validation.ValidateRM(tm)
+	if r.OK {
+		t.Fatalf("ValidateRM(TERM_MAPPING with match=%q) should not be OK; issues=%+v", tm.Match, r.Issues)
+	}
+	if containsCode(r.Issues, "rm_type_unknown") {
+		t.Errorf("TERM_MAPPING must be a recognised RM root, got rm_type_unknown: %+v", r.Issues)
+	}
+	if !containsIssue(r.Issues, "/match", "term_mapping_match") {
+		t.Errorf("expected term_mapping_match at /match, got %+v", r.Issues)
+	}
+}
+
+// TestValidateRM_TermMappingRootValid is the positive twin: a valid
+// stand-alone TERM_MAPPING reports clean — no issues at all. Guards the
+// new walk into TERM_MAPPING's own attributes against false positives on
+// `match` / `target` (and the optional `purpose`).
+func TestValidateRM_TermMappingRootValid(t *testing.T) {
+	tm := &rm.TermMapping{
+		Match:  rm.Character("="),
+		Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "73211009"},
+	}
+	r := validation.ValidateRM(tm)
+	if !r.OK || len(r.Issues) != 0 {
+		t.Errorf("ValidateRM(valid TERM_MAPPING) want OK with no issues; got %+v", r.Issues)
+	}
+}
+
+// TestValidateRM_TermMappingMissingTarget pins the consequence of walking
+// into TERM_MAPPING: `target` is RM-mandatory (CODE_PHRASE), so a mapping
+// that omits it surfaces `required` at the mapping's /target — the floor's
+// required-set walk now reaches inside each mapping (REQ-112).
+func TestValidateRM_TermMappingMissingTarget(t *testing.T) {
+	txt := &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{
+		Match: rm.Character("="),
+		// Target intentionally omitted.
+	}}}
+	r := validation.ValidateRM(txt)
+	if r.OK {
+		t.Fatalf("ValidateRM(DV_TEXT with a mapping missing target) should not be OK; issues=%+v", r.Issues)
+	}
+	if !containsIssue(r.Issues, "/mappings[0]/target", "required") {
+		t.Errorf("expected required at /mappings[0]/target, got %+v", r.Issues)
+	}
+}
+
+// TestValidateRM_NestedPurposeMappingBadMatch pins the nested reach the
+// node-level evaluator buys: TERM_MAPPING.purpose is a DV_CODED_TEXT, which
+// carries `mappings` of its own. A bad match two levels down MUST surface
+// at its full path — the parent-only evaluator never looked there (REQ-112).
+func TestValidateRM_NestedPurposeMappingBadMatch(t *testing.T) {
+	target := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "73211009"}
+	txt := &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{
+		Match: rm.Character("="),
+		Purpose: &rm.DVCodedText{
+			DVText: rm.DVText{
+				Value: "billing",
+				Mappings: []rm.TermMapping{{
+					Match:  rm.Character("x"), // not in {> = < ?}
+					Target: target,
+				}},
+			},
+			DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "532"},
+		},
+		Target: target,
+	}}}
+	r := validation.ValidateRM(txt)
+	if r.OK {
+		t.Fatalf("ValidateRM(DV_TEXT with a bad nested purpose mapping) should not be OK; issues=%+v", r.Issues)
+	}
+	const want = "/mappings[0]/purpose/mappings[0]/match"
+	if !containsIssue(r.Issues, want, "term_mapping_match") {
+		t.Errorf("expected term_mapping_match at %s, got %+v", want, r.Issues)
+	}
+}
+
+// TestValidateRM_NestedPurposeMappingValid is the no-false-positive twin
+// of TestValidateRM_NestedPurposeMappingBadMatch: the same nesting with a
+// valid nested match reports clean — no issues at all.
+func TestValidateRM_NestedPurposeMappingValid(t *testing.T) {
+	target := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "73211009"}
+	txt := &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{
+		Match: rm.Character("="),
+		Purpose: &rm.DVCodedText{
+			DVText: rm.DVText{
+				Value:    "billing",
+				Mappings: []rm.TermMapping{{Match: rm.Character("?"), Target: target}},
+			},
+			DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "532"},
+		},
+		Target: target,
+	}}}
+	r := validation.ValidateRM(txt)
+	if !r.OK || len(r.Issues) != 0 {
+		t.Errorf("ValidateRM(DV_TEXT with a valid nested purpose mapping) want OK with no issues; got %+v", r.Issues)
+	}
+}
+
+// TestValidateRM_TermMappingEmptyMatchReportsBoth locks the deliberate
+// double report on an empty `match`: since the walk enters TERM_MAPPING,
+// the RM-mandatory attribute reads as absent (rm.Character's zero value is
+// not a legal Character) — so the floor emits BOTH `required` and
+// `term_mapping_match` at the same path. Two distinct codes for two
+// distinct statements; consumers dispatch on Code (REQ-112).
+func TestValidateRM_TermMappingEmptyMatchReportsBoth(t *testing.T) {
+	txt := &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{
+		Match:  rm.Character(""), // RM-mandatory, and outside {> = < ?}
+		Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "73211009"},
+	}}}
+	r := validation.ValidateRM(txt)
+	const path = "/mappings[0]/match"
+	if !containsIssue(r.Issues, path, "term_mapping_match") {
+		t.Errorf("expected term_mapping_match at %s, got %+v", path, r.Issues)
+	}
+	if !containsIssue(r.Issues, path, "required") {
+		t.Errorf("expected required at %s, got %+v", path, r.Issues)
+	}
+}
+
+// TestRMFloorMappingsNullIsValid pins the decode fact the Mappings_valid
+// invariant rests on: an explicit JSON `null` mappings decodes to a nil
+// slice — indistinguishable from an absent key — so the floor must NOT
+// report `mappings_valid`. Decoded through canjson (the wire decoder
+// consumers use) rather than encoding/json, so the pin covers the path
+// the claim in checkTermMappings is about (REQ-112 / REQ-052).
+func TestRMFloorMappingsNullIsValid(t *testing.T) {
+	var txt rm.DVText
+	if err := canjson.Unmarshal([]byte(`{"_type":"DV_TEXT","value":"x","mappings":null}`), &txt); err != nil {
+		t.Fatalf("canjson.Unmarshal: %v", err)
+	}
+	if txt.Mappings != nil {
+		t.Errorf("null mappings decoded to a non-nil slice (%#v) — the floor's absent/null reading depends on nil", txt.Mappings)
+	}
+	r := validation.ValidateRM(&txt)
+	if !r.OK {
+		t.Errorf("ValidateRM(DV_TEXT, mappings null) want OK; got %+v", r.Issues)
+	}
+	if containsCode(r.Issues, "mappings_valid") {
+		t.Errorf("null mappings must not be flagged mappings_valid; got %+v", r.Issues)
+	}
+}
+
+// TestRMFloorDVCodedTextMappingsEmptyLiteralIsInvalid is the DV_CODED_TEXT
+// half of the Mappings_valid pair: DV_CODED_TEXT inherits `mappings` from
+// DV_TEXT, so a literal `"mappings":[]` on a DV_CODED_TEXT body decodes to
+// a non-nil empty slice and MUST report `mappings_valid` at /mappings. The
+// match value set was already pinned on DV_CODED_TEXT
+// (TestRMFloorDVCodedTextBadMatch); mappings_valid was not (REQ-112).
+func TestRMFloorDVCodedTextMappingsEmptyLiteralIsInvalid(t *testing.T) {
+	const body = `{"_type":"DV_CODED_TEXT","value":"x",` +
+		`"defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"532"},` +
+		`"mappings":[]}`
+	var txt rm.DVCodedText
+	if err := canjson.Unmarshal([]byte(body), &txt); err != nil {
+		t.Fatalf("canjson.Unmarshal: %v", err)
+	}
+	r := validation.ValidateRM(&txt)
+	if r.OK {
+		t.Fatalf("expected a mappings_valid issue for a DV_CODED_TEXT with a literal empty mappings array")
+	}
+	if !containsIssue(r.Issues, "/mappings", "mappings_valid") {
+		t.Errorf("expected mappings_valid at /mappings, got %+v", r.Issues)
 	}
 }

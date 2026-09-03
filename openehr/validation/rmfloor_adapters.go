@@ -65,6 +65,23 @@ func asMappings(value any) ([]rm.TermMapping, bool) {
 	return nil, false
 }
 
+// asTermMapping recovers a TERM_MAPPING value (by value or by pointer).
+// The walk boxes `mappings` elements as pointers, so the pointer arm is
+// the one that fires during a descent; the value arm covers a caller
+// handing a TERM_MAPPING to [ValidateRM] directly.
+func asTermMapping(value any) (rm.TermMapping, bool) {
+	switch v := value.(type) {
+	case *rm.TermMapping:
+		if v == nil {
+			return rm.TermMapping{}, false
+		}
+		return *v, true
+	case rm.TermMapping:
+		return v, true
+	}
+	return rm.TermMapping{}, false
+}
+
 // dvIntervalNumericBounds returns the lower/upper magnitudes of a DV_INTERVAL
 // when both bounds are numerically comparable — same-unit DV_QUANTITY, or
 // DV_COUNT — and neither side is unbounded. It handles the monomorphised

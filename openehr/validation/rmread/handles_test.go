@@ -39,6 +39,7 @@ var handledTypes = []any{
 	// data values
 	rm.DVText{},
 	rm.DVCodedText{},
+	rm.TermMapping{},
 	rm.CodePhrase{},
 	rm.DVDate{},
 	rm.DVTime{},
@@ -78,7 +79,7 @@ var handledTypes = []any{
 }
 
 func TestHandles_ModelledTypes(t *testing.T) {
-	if got, want := len(handledTypes), 54; got != want {
+	if got, want := len(handledTypes), 55; got != want {
 		t.Errorf("handledTypes has %d entries, want %d — keep it in sync with Handles/ReadSingle", got, want)
 	}
 	for _, v := range handledTypes {
