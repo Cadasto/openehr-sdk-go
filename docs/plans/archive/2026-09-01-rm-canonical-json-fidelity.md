@@ -513,7 +513,7 @@ Landed at `1d09718`.
 - [bmm-conformance.md § Primitive type mapping](../../specifications/bmm-conformance.md#primitive-type-mapping) — REQ-046, the `Character` row (Task 1).
 - [wire.md § REQ-052](../../specifications/wire.md#req-052) — canonical `match` round-trip (Task 1), `mappings` collapse note (Task 2), `DV_MULTIMEDIA` base64 (Task 4).
 - [clinical-modeling.md § REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) — RM-floor invariants (Task 3).
-- [REQ.md](../../specifications/REQ.md) — registry rows for REQ-046 / REQ-052 / REQ-112 (REQ-052 stays `partial`).
+- [REQ.md](../../specifications/REQ.md) — registry rows for REQ-046 / REQ-052 / REQ-112 (REQ-052 stayed `partial` at landing; `landed` since 2026-09-03, see the Definition of Done above).
 
 ## Self-review notes
 

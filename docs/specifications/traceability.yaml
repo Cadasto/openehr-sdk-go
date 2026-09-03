@@ -244,8 +244,10 @@ requirements:
       and the openEHR specifications prescribe none, so it deferred to a
       publication that will not come. § REQ-052 now states the
       deterministic encode profile as the SDK's own output contract
-      (fixed-point re-encode and byte-identical repeat encodes; PROBE-030,
-      TestEncodeIsDeterministic) and requires the decoder to accept
+      (two successive encodes of a decoded value are byte-identical —
+      PROBE-030, which never compares against the input — and repeat
+      encodes are byte-identical; TestEncodeIsDeterministic,
+      TestEncodeHashKeysLexicographic) and requires the decoder to accept
       members in any order, _type included
       (TestDecodeAcceptsAnyMemberOrder). No order is asserted for other
       implementations' output. No open clause remains.

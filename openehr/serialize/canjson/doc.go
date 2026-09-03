@@ -22,7 +22,11 @@
 // # Wire profile
 //
 // The codec implements the deterministic profile pinned by REQ-052
-// (see docs/specifications/wire.md):
+// (see docs/specifications/wire.md). The profile is the SDK's own
+// output contract: two successive encodes of a decoded value are
+// byte-identical (PROBE-030), as are two encodes of one value. Decode
+// accepts members in any order, `_type` included, and no order is
+// asserted for another implementation's output.
 //
 //   - `_type` is the first JSON object key on every encoded concrete
 //     RM value.
@@ -32,11 +36,6 @@
 //
 //   - `Hash` (map[K]V) keys are emitted in lexicographic key order
 //     (stdlib behaviour), independent of struct field order.
-//
-//     The profile is the SDK's own output contract (fixed-point re-encode,
-//     byte-identical repeat encodes). Decode accepts members in any order,
-//     `_type` included, and no order is asserted for another
-//     implementation's output (REQ-052).
 //
 //   - Nil-pointer optional fields are emitted as ABSENT (no key), not
 //     as `null`. Both ABSENT and `null` are accepted on decode.

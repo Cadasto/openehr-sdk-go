@@ -12,7 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **Canonical-JSON field order is the SDK's own output contract (REQ-052).** § REQ-052 no longer defers to a future openEHR field-order rule: the encoder's deterministic profile stands as the SDK's guarantee, the decoder accepts members in any order, `_type` included, and no order is expected of other implementations, which completes REQ-052 (`landed`).
+- **Canonical-JSON field order is the SDK's own output contract (REQ-052).** The deterministic encode profile is the SDK's guarantee, the decoder accepts members in any order, `_type` included, and no order is expected of other implementations.
 - **`ehr.Create` empty-2xx typing (REQ-094).** An empty, whitespace-only, or JSON-`null` 2xx body from `ehr.Create` now returns `*NoRepresentationError` with the commit metadata, matching the versioned-write family ([plan](docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md)).
 - **Stored-query `version` path hygiene (REQ-057).** The `version` path parameter is trimmed before reaching the wire and an explicit empty version is refused before any request — **breaking:** `RunStoredVersion` with an empty version no longer falls back to the latest.
 - **Nil-safe AQL/decode error inspection (REQ-025).** The AQL-parse and type-registry error inspection sites now guard against a typed-nil `errors.AsType` match, and report no position where none is known.
