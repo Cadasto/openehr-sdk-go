@@ -234,7 +234,13 @@ func TestTokenConcurrentCoalesce(t *testing.T) {
 			_, _ = w.Write([]byte(`{"access_token":"x","token_type":"Bearer","expires_in":3600}`))
 		}))
 
-		src, _ := New("c", "s", srv.URL, WithHTTPClient(srv.Client()))
+		// Client() starts the in-memory server, which is what populates
+		// srv.URL, so it must be called before srv.URL is read.
+		cli := srv.Client()
+		src, err := New("c", "s", srv.URL, WithHTTPClient(cli))
+		if err != nil {
+			t.Fatal(err)
+		}
 		var wg sync.WaitGroup
 		const N = 8
 		for range N {

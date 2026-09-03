@@ -916,7 +916,10 @@ func isRequired(attr *tcimpl.CompiledAttribute) bool {
 // uniqueness (Composition, Entry root types). Returns a pointer so
 // canjson's polymorphic dispatch on the UIDBasedID interface emits
 // the `_type:"HIER_OBJECT_ID"` discriminator the decoder needs to
-// round-trip the field.
+// round-trip the field. uuid.NewV4 has no error path — it draws from
+// crypto/rand, which aborts the process rather than returning an error
+// if the operating system has no entropy — so the timestamp fallback
+// this replaced was already unreachable.
 func newHierObjectID() *rm.HierObjectID {
 	return &rm.HierObjectID{Value: uuid.NewV4().String()}
 }

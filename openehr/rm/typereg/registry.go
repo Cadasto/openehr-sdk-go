@@ -329,8 +329,9 @@ func (r *Registry) Decode(data []byte) (any, error) {
 	return v, nil
 }
 
-// DecodeAs is a typed wrapper over [Registry.DecodeAs] on the [Default]
-// registry. See [Registry.DecodeAs] for the type-parameter rules.
+// DecodeAs decodes data on the [Default] registry and returns the
+// decoded value typed as T. See [Registry.DecodeAs] for the
+// type-parameter rules it defers to.
 func DecodeAs[T any](data []byte) (T, error) {
 	return Default.DecodeAs[T](data)
 }
