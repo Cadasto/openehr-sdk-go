@@ -133,12 +133,13 @@ requirements:
     title: Canonical JSON
     canonical: docs/specifications/wire.md#req-052
     status: draft
-    implementation: partial
+    implementation: landed
     packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
     plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
+      - openehr/serialize/canjson/field_order_test.go
       - openehr/serialize/canjson/encode_test.go
       - openehr/serialize/canjson/marshal_sentinel_test.go
       - openehr/serialize/canjson/roundtrip_test.go
@@ -237,14 +238,19 @@ requirements:
       TERM_MAPPING.match bullet) carry the same canjson.ErrInvalidShape sentinel
       through an Is-only wrapper, with the message left unchanged by the
       classification.
-      REQ-052 stays partial regardless: § REQ-052's own Canonical-JSON
-      properties bullet list (not § Floating-point precision, which
-      contains no field-order clause) states "Field order SHOULD follow
-      the openEHR canonical-JSON specification when one is published" —
-      that SHOULD remains open pending that external publication; the
-      SDK's own deterministic field-order profile is what MUST govern
-      until then, and that MUST is met, but the SHOULD itself has no
-      canonical spec to defer to yet.
+      REQ-052 landed (2026-09-03): the former field-order SHOULD ("follow
+      the openEHR canonical-JSON specification when one is published")
+      was retired — JSON member order carries no meaning (RFC 8259 § 4)
+      and the openEHR specifications prescribe none, so it deferred to a
+      publication that will not come. § REQ-052 now states the
+      deterministic encode profile as the SDK's own output contract
+      (two successive encodes of a decoded value are byte-identical —
+      PROBE-030, which never compares against the input — and repeat
+      encodes are byte-identical; TestEncodeIsDeterministic,
+      TestEncodeHashKeysLexicographic) and requires the decoder to accept
+      members in any order, _type included
+      (TestDecodeAcceptsAnyMemberOrder). No order is asserted for other
+      implementations' output. No open clause remains.
 
   - id: REQ-056
     title: Canonical XML

@@ -41,7 +41,7 @@
 ## Definition of Done
 
 - Code and tests land with `// REQ-046` / `// REQ-052` / `// REQ-112` citations.
-- [`traceability.yaml`](../../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the change (REQ-052 gains these clauses; it **remains `partial`** — the recorded residual is the field-order SHOULD in § REQ-052's Canonical-JSON properties list, open pending the external canonical-JSON publication `traceability.yaml` names).
+- [`traceability.yaml`](../../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the change (REQ-052 gains these clauses; it **remains `partial`** — the recorded residual is the field-order SHOULD in § REQ-052's Canonical-JSON properties list, open pending the external canonical-JSON publication `traceability.yaml` names; that residual was retired on 2026-09-03 when the clause was reworded into the SDK's own output contract, and REQ-052 is `landed`).
 - The two indexes `spec-check` cannot see are updated: a [`roadmap.md`](../../roadmap.md) row for what landed; no numbering band moved (no new id).
 - Canonical spec prose updated in the **same PR** (the `Character` row in the primitive table; the REQ-052 `match` round-trip clause; the REQ-112 invariant clause).
 - `make codegen-verify`, `make spec-check`, and `make ci` pass.
@@ -513,7 +513,7 @@ Landed at `1d09718`.
 - [bmm-conformance.md § Primitive type mapping](../../specifications/bmm-conformance.md#primitive-type-mapping) — REQ-046, the `Character` row (Task 1).
 - [wire.md § REQ-052](../../specifications/wire.md#req-052) — canonical `match` round-trip (Task 1), `mappings` collapse note (Task 2), `DV_MULTIMEDIA` base64 (Task 4).
 - [clinical-modeling.md § REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) — RM-floor invariants (Task 3).
-- [REQ.md](../../specifications/REQ.md) — registry rows for REQ-046 / REQ-052 / REQ-112 (REQ-052 stays `partial`).
+- [REQ.md](../../specifications/REQ.md) — registry rows for REQ-046 / REQ-052 / REQ-112 (REQ-052 stayed `partial` at landing; `landed` since 2026-09-03, see the Definition of Done above).
 
 ## Self-review notes
 

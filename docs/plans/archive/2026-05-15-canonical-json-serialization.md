@@ -53,7 +53,7 @@ openEHR has not published a strict canonical-JSON field-order rule. **`docs/spec
 2. **Remaining keys follow BMM property declaration order** (the order `bmmgen` emits struct fields).
 3. **`Hash` map keys are always lexicographic** (stdlib), independent of rule 2.
 
-Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this ordering until the openEHR Foundation publishes an official canonical order.
+Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this ordering until the openEHR Foundation publishes an official canonical order. *(Rider, 2026-09-03: § REQ-052 no longer waits on such a publication — the ordering above is the SDK's own output contract, and the decoder accepts members in any order.)*
 
 ## Why now
 

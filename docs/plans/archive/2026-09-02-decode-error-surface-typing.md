@@ -3,7 +3,7 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
 
 **Date:** 2026-09-02
-**Status:** Done (2026-09-02) — both tasks executed; [REQ-093](../../specifications/transport.md#req-093--openehr-error-envelope-mapping) stays `landed` (it gained the `(unrouted)` placeholder clause), and [REQ-052](../../specifications/wire.md#req-052) stays **`partial`**: the decode-side shape sentinel now has a producer, but the § Floating-point precision mantissa arm — the one this plan never claimed — is still open.
+**Status:** Done (2026-09-02) — both tasks executed; [REQ-093](../../specifications/transport.md#req-093--openehr-error-envelope-mapping) stays `landed` (it gained the `(unrouted)` placeholder clause), and [REQ-052](../../specifications/wire.md#req-052) stayed **`partial`** at the time: the decode-side shape sentinel now has a producer, but the § Floating-point precision mantissa arm — the one this plan never claimed — was still open (closed by the fidelity plan; REQ-052 `landed` since 2026-09-03).
 **Owner:** SDK maintainers
 **Covers:** [REQ-052](../../specifications/wire.md#req-052) (the decode-side `canjson.ErrInvalidShape` producer) and [REQ-093](../../specifications/transport.md#req-093--openehr-error-envelope-mapping) (value-free diagnostics — the `effectiveRoute()` path-identifier leak). No new id.
 **Probes:** none new (unit-covered).

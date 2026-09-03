@@ -23,7 +23,7 @@ The probe suite verifies the SDK against the **openEHR wire contract**, not agai
 - A probe's **assertion** is wire-level: the HTTP request bytes (method, path, headers, body), the response status, the response body shape.
 - A probe's **definition** lives once, here, and is implemented in the SDK's test suite.
 - A probe **MUST NOT** assert on source-level idioms (function names, error types).
-- Decode→encode round-trips **MUST** be byte-stable (modulo documented field ordering).
+- Decode→encode round-trips **MUST** be byte-stable as [§ REQ-052](wire.md#req-052)'s field-order clause defines byte-stability.
 
 ### REQ-081 — Wire-level parity (retired)
 
@@ -575,9 +575,9 @@ client scenarios to SDK coverage:
 
 #### PROBE-030 — Canonical-JSON round trip
 
-- **Title:** Decoding a canonical-JSON Composition and re-encoding produces byte-identical output (modulo documented field ordering).
+- **Title:** Decoding a canonical-JSON Composition and re-encoding, then decoding and encoding that output again, produces two byte-identical SDK encodes.
 - **Preconditions:** A reference Composition cassette.
-- **Wire assertion:** `serialize.Decode → struct → serialize.Encode` produces output that, after the SDK's canonical-ordering pass, matches the input.
+- **Wire assertion:** Decode → Encode → Decode → Encode; the two SDK encodes are byte-identical. Equality with the input cassette is not asserted: the input may carry any member order (REQ-052), and it is the SDK's own output, not the server's bytes, that must be stable.
 - **Modes:** Sandbox (no network).
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_030_canjson_round_trip.go`](../../testkit/probes/serialize/probe_030_canjson_round_trip.go).
 - **Satisfies:** REQ-052, REQ-040, REQ-082
@@ -602,9 +602,9 @@ client scenarios to SDK coverage:
 
 #### PROBE-033 — Canonical-XML round trip
 
-- **Title:** Decoding a canonical-XML Composition and re-encoding produces byte-identical compact XML (modulo documented element/attribute ordering).
+- **Title:** Decoding a canonical-XML Composition and re-encoding, then decoding and encoding that output again, produces two byte-identical compact-XML SDK encodes.
 - **Preconditions:** A reference Composition XML fixture under `testkit/cassettes/compositions/` or `testkit/cassettes/rm/` (see [Vendored fixtures](#vendored-fixtures-testkitcassettes)).
-- **Wire assertion:** `canxml.Unmarshal → struct → canxml.Marshal` produces output that matches the input after the SDK's compact-XML canonicalisation pass.
+- **Wire assertion:** Decode → Encode → Decode → Encode; the two compact-XML SDK encodes are byte-identical. Equality with the input cassette is not asserted: the cassette's whitespace and serialisation choices need not match the SDK's compact form (§ REQ-056), and it is the SDK's own output that must be stable.
 - **Modes:** Sandbox (no network).
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_033_canxml_round_trip.go`](../../testkit/probes/serialize/probe_033_canxml_round_trip.go).
 - **Satisfies:** REQ-056, REQ-040, REQ-082
