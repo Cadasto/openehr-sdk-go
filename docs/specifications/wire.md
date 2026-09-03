@@ -100,7 +100,7 @@ The SDK's primary write payload **MUST** be openEHR canonical JSON. Read payload
 Canonical-JSON properties:
 
 - Every RM type instance carries `_type`. The encoder **MUST** emit it; the decoder **MUST** consult the type registry (REQ-040).
-- **Field order.** The encoder **MUST** write every RM value in this deterministic profile, so that two successive SDK encodes of a decoded value are byte-identical (PROBE-030 asserts exactly this, and never equality with the input bytes) and two encodes of the same value are byte-identical — the SDK's own output contract, which a consumer may rely on for byte comparison and hashing (see [`docs/plans/archive/2026-05-15-canonical-json-serialization.md`](../plans/archive/2026-05-15-canonical-json-serialization.md)):
+- **Field order.** The encoder **MUST** write every RM value in this deterministic profile, so that two successive SDK encodes of a decoded value are byte-identical (PROBE-030 asserts exactly this, and never equality with the input bytes) and two encodes of the same value are byte-identical — the SDK's own output contract, which a consumer may rely on for byte comparison and hashing:
   - `_type` is always the first key on every encoded concrete RM value.
   - Remaining object keys follow **BMM property declaration order** (the order code generation emits struct fields).
   - `Hash` (`map[K]V`) keys are serialized in **lexicographic key order** (independent of struct field order).

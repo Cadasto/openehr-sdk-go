@@ -35,8 +35,8 @@ type Result struct {
 }
 
 // Probe030CanjsonRoundTrip implements PROBE-030: decoding a
-// canonical-JSON RM value and re-encoding produces byte-identical
-// output after the SDK's canonical-ordering pass.
+// canonical-JSON RM value, encoding it, then decoding and encoding
+// that output again produces two byte-identical SDK encodes.
 //
 // The probe asserts byte-stability of the SDK's round-trip pipeline
 // (Decode → Encode → Decode → Encode), not byte equality against an

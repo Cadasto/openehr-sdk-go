@@ -23,7 +23,7 @@ The probe suite verifies the SDK against the **openEHR wire contract**, not agai
 - A probe's **assertion** is wire-level: the HTTP request bytes (method, path, headers, body), the response status, the response body shape.
 - A probe's **definition** lives once, here, and is implemented in the SDK's test suite.
 - A probe **MUST NOT** assert on source-level idioms (function names, error types).
-- Decode→encode round-trips **MUST** be byte-stable: two successive SDK encodes of a decoded value are byte-identical. Equality with the input bytes is not asserted — the input may carry any member order (REQ-052), and only the SDK's own encode is required to be stable.
+- Decode→encode round-trips **MUST** be byte-stable as [§ REQ-052](wire.md#req-052)'s field-order clause defines byte-stability.
 
 ### REQ-081 — Wire-level parity (retired)
 
@@ -604,7 +604,7 @@ client scenarios to SDK coverage:
 
 - **Title:** Decoding a canonical-XML Composition and re-encoding, then decoding and encoding that output again, produces two byte-identical compact-XML SDK encodes.
 - **Preconditions:** A reference Composition XML fixture under `testkit/cassettes/compositions/` or `testkit/cassettes/rm/` (see [Vendored fixtures](#vendored-fixtures-testkitcassettes)).
-- **Wire assertion:** Decode → Encode → Decode → Encode; the two compact-XML SDK encodes are byte-identical. Equality with the input cassette is not asserted (mirrors PROBE-030).
+- **Wire assertion:** Decode → Encode → Decode → Encode; the two compact-XML SDK encodes are byte-identical. Equality with the input cassette is not asserted: the cassette's whitespace and serialisation choices need not match the SDK's compact form (§ REQ-056), and it is the SDK's own output that must be stable.
 - **Modes:** Sandbox (no network).
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_033_canxml_round_trip.go`](../../testkit/probes/serialize/probe_033_canxml_round_trip.go).
 - **Satisfies:** REQ-056, REQ-040, REQ-082

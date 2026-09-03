@@ -13,8 +13,9 @@ import (
 )
 
 // Probe033CanxmlRoundTrip implements PROBE-033: decoding a
-// canonical-XML RM value and re-encoding produces byte-identical
-// compact output. Mirrors PROBE-030 (canjson) for the XML wire.
+// canonical-XML RM value, encoding it, then decoding and encoding
+// that output again produces two byte-identical compact-XML SDK
+// encodes. Mirrors PROBE-030 (canjson) for the XML wire.
 //
 // The probe asserts byte-stability of the SDK's XML round-trip
 // pipeline (Decode → Encode → Decode → Encode), not byte equality
