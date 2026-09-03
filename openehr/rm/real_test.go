@@ -1,6 +1,7 @@
 package rm
 
 import (
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -135,4 +136,66 @@ func TestRealUnmarshalJSONPrecisionLoss(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestRealUnmarshalJSONParseBeforeDigitPolicy pins the ORDER of the two
+// checks inside UnmarshalJSON: the literal is parsed first, so a
+// malformed or out-of-range value surfaces the parser's own typed error,
+// and the >17-significant-digit policy (REQ-052) only ever speaks about
+// a literal that actually parsed. A long-but-broken literal must not be
+// reported as precision loss, and must not acquire
+// typereg.ErrInvalidShape — that sentinel classifies the SDK's own
+// refusal of a representable-but-lossy value, not an encoding/json or
+// strconv failure. Removing the reorder fails this test.
+func TestRealUnmarshalJSONParseBeforeDigitPolicy(t *testing.T) {
+	t.Run("quoted non-numeric", func(t *testing.T) {
+		const lit = `"123456789012345678x"`
+		var r Real
+		err := r.UnmarshalJSON([]byte(lit))
+		if err == nil {
+			t.Fatalf("UnmarshalJSON(%s) = nil error, want a parse error", lit)
+		}
+		if _, ok := errors.AsType[*strconv.NumError](err); !ok {
+			t.Errorf("UnmarshalJSON(%s) err = %v (%T); want errors.AsType[*strconv.NumError] to reach it", lit, err, err)
+		}
+		if errors.Is(err, errPrecisionLoss) {
+			t.Errorf("UnmarshalJSON(%s) err = %v; want the parse failure, not the precision refusal", lit, err)
+		}
+		if errors.Is(err, typereg.ErrInvalidShape) {
+			t.Errorf("UnmarshalJSON(%s) err = %v; a strconv parse failure must not carry typereg.ErrInvalidShape", lit, err)
+		}
+	})
+
+	t.Run("bare out of range", func(t *testing.T) {
+		const lit = "1.234567890123456789e400"
+		var r Real
+		err := r.UnmarshalJSON([]byte(lit))
+		if err == nil {
+			t.Fatalf("UnmarshalJSON(%s) = nil error, want a range error", lit)
+		}
+		if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
+			t.Errorf("UnmarshalJSON(%s) err = %v (%T); want errors.AsType[*json.UnmarshalTypeError] to reach it", lit, err, err)
+		}
+		if errors.Is(err, errPrecisionLoss) {
+			t.Errorf("UnmarshalJSON(%s) err = %v; want the range failure, not the precision refusal", lit, err)
+		}
+		if errors.Is(err, typereg.ErrInvalidShape) {
+			t.Errorf("UnmarshalJSON(%s) err = %v; an encoding/json range failure must not carry typereg.ErrInvalidShape", lit, err)
+		}
+	})
+
+	t.Run("quoted out of range", func(t *testing.T) {
+		const lit = `"1.234567890123456789e400"`
+		var r Real
+		err := r.UnmarshalJSON([]byte(lit))
+		if err == nil {
+			t.Fatalf("UnmarshalJSON(%s) = nil error, want a range error", lit)
+		}
+		if _, ok := errors.AsType[*strconv.NumError](err); !ok {
+			t.Errorf("UnmarshalJSON(%s) err = %v (%T); want errors.AsType[*strconv.NumError] to reach it", lit, err, err)
+		}
+		if errors.Is(err, errPrecisionLoss) {
+			t.Errorf("UnmarshalJSON(%s) err = %v; want the range failure, not the precision refusal", lit, err)
+		}
+	})
 }

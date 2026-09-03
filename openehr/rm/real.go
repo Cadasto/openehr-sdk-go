@@ -75,6 +75,16 @@ var errPrecisionLoss = fmt.Errorf("rm.Real: %w: value carries more precision tha
 // for Unmarshaler ("approximate the behavior of Unmarshal itself"),
 // leaving the receiver unchanged rather than writing the zero value —
 // mirroring rm.Character.
+//
+// The two checks run in this order: the literal is PARSED first, into a
+// temporary, and a parse or range failure is returned as it comes —
+// *strconv.NumError from the quoted arm, *json.UnmarshalTypeError from
+// the bare arm, each reachable with errors.As and each staying outside
+// typereg.ErrInvalidShape. Only a literal that parsed is then measured
+// against maxSignificantDigits, and only a literal that passed both is
+// assigned to the receiver. Reversing the order would report
+// "1e400" or "123456789012345678x" as precision loss, which is a
+// misdiagnosis: the value never parsed at all.
 func (r *Real) UnmarshalJSON(b []byte) error {
 	if len(b) == 0 {
 		return errors.New("rm.Real: empty input")
@@ -87,22 +97,22 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 		if err := json.Unmarshal(b, &s); err != nil {
 			return fmt.Errorf("rm.Real: %w", err)
 		}
-		if significantDigits(s) > maxSignificantDigits {
-			return errPrecisionLoss
-		}
 		f, err := strconv.ParseFloat(s, 64)
 		if err != nil {
 			return fmt.Errorf("rm.Real: parse %q: %w", s, err)
 		}
+		if significantDigits(s) > maxSignificantDigits {
+			return errPrecisionLoss
+		}
 		*r = Real(f)
 		return nil
-	}
-	if significantDigits(string(b)) > maxSignificantDigits {
-		return errPrecisionLoss
 	}
 	var f float64
 	if err := json.Unmarshal(b, &f); err != nil {
 		return fmt.Errorf("rm.Real: %w", err)
+	}
+	if significantDigits(string(b)) > maxSignificantDigits {
+		return errPrecisionLoss
 	}
 	*r = Real(f)
 	return nil
