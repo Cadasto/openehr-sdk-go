@@ -187,15 +187,26 @@ requirements:
       (assertShapeSentinelDistinct asserts both).
       § Floating-point precision defines "exceeds JSON's number
       precision" as a decimal literal carrying more than 17 significant
-      decimal digits (float64's shortest-round-trip maximum) — a lower
-      bound, not an equivalence: a shorter literal can still be
-      binary-inexact and is accepted unreported by design (e.g.
-      9007199254740993, 16 digits, decodes to 9007199254740992; any
-      decimal fraction that is not a power of two, 0.1 included, is
-      binary-inexact regardless of digit count). A general exactness
-      check (big.Float) would catch those too but would also reject 0.1,
-      which the plan rejected as over-reporting. Within that definition,
-      both arms are now MET (2026-09-03,
+      decimal digits (float64's shortest-round-trip maximum) — a
+      digit-count budget, not an exactness test, and by design it is
+      wrong in both directions: a literal past 17 digits can still be
+      exactly representable in float64 and is refused anyway
+      (18446744073709551616, 2^64, is exact yet carries 20 significant
+      digits and fails the budget), while a shorter literal can be
+      binary-inexact and is accepted unreported (9007199254740993, 16
+      digits, decodes to 9007199254740992; any decimal fraction that is
+      not a power of two, 0.1 included, is binary-inexact regardless of
+      digit count). A general exactness check (big.Float) would classify
+      both of those correctly but would also reject 0.1 and every other
+      ordinary binary-inexact clinical literal, over-reporting the plan
+      rejected. Parse and range failures take precedence over the
+      digit-count budget: a malformed literal or one that
+      overflows/underflows float64 reports its own parse or range error
+      first, regardless of how many significant digits its mantissa
+      carries (TestRealUnmarshalJSONParseBeforeDigitPolicy) — the budget
+      applies only to a literal that parsed as syntactically valid and
+      in range. Within that definition, both arms are now MET
+      (2026-09-03,
       docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md): the
       OUT-OF-RANGE arm as before (1e400 fails with a typed
       *json.UnmarshalTypeError, reachable by errors.As through the
@@ -208,17 +219,24 @@ requirements:
       wrapping canjson.ErrInvalidShape past 17 of them instead of
       rounding — 0.1234567890123456789 (19 significant digits) now fails
       where it used to decode silently to 0.12345678901234568. The
-      retired TestUnmarshalMantissaPrecisionLossIsSilent (which pinned
-      the old silent behaviour) is replaced by
+      refusal message names the digit budget ("literal carries more than
+      17 significant decimal digits"), not float64's capacity — the
+      prior wording ("more precision than float64 can represent") was
+      false for an exact-but-long literal such as 2^64. The retired
+      TestUnmarshalMantissaPrecisionLossIsSilent (which pinned the old
+      silent behaviour) is replaced by
       TestUnmarshalMantissaPrecisionLossIsATypedError and a
       DV_PROPORTION inheritance twin; TestSignificantDigits and
-      TestRealUnmarshalJSON{CleanCases,PrecisionLoss,NullIsNoOp} in
-      openehr/rm/real_test.go pin the trigger directly, including the
+      TestRealUnmarshalJSON{CleanCases,PrecisionLoss,NullIsNoOp,ParseBeforeDigitPolicy}
+      in openehr/rm/real_test.go pin the trigger directly, including the
       17-digit boundary case that decodes cleanly without in fact
       round-tripping. No *typereg.DecodeError names a "/magnitude" path
       in the resulting chain — only polymorphic slots and whole-value
       _type mismatches attach one today — so classification rests on
-      errors.Is alone.
+      errors.Is alone. rm.Character's decode refusals (§ REQ-052's
+      TERM_MAPPING.match bullet) carry the same canjson.ErrInvalidShape sentinel
+      through an Is-only wrapper, with the message left unchanged by the
+      classification.
       REQ-052 stays partial regardless: § REQ-052's own Canonical-JSON
       properties bullet list (not § Floating-point precision, which
       contains no field-order clause) states "Field order SHOULD follow
@@ -233,16 +251,35 @@ requirements:
     canonical: docs/specifications/wire.md#req-056
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canxml, testkit/cassettes, testkit/fixtures]
-    plans: [docs/plans/archive/2026-05-15-canonical-xml-serialization.md]
+    packages:
+      - openehr/serialize/canxml
+      - openehr/rm  # Character's TextMarshaler/TextUnmarshaler make canonical XML enforce the one-character rule
+      - testkit/cassettes
+      - testkit/fixtures
+    plans: [docs/plans/archive/2026-05-15-canonical-xml-serialization.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md]
     probes: [PROBE-033, PROBE-034]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/serialize/canxml/decode_test.go
+      - openehr/rm/character_text_test.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
       - testkit/probes/serialize/probe_034_typereg_xsi_unknown.go
+    notes: >-
+      Review round (2026-09-03,
+      docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md) made
+      canonical XML enforce the Character value rule directly (valid
+      UTF-8, exactly one character; a genuine U+FFFD is a legal
+      Character and accepted): Character's encoding.TextMarshaler /
+      encoding.TextUnmarshaler implementation is what canonical XML
+      relies on for TERM_MAPPING.match, with no canxml-specific
+      sentinel. The JSON string arm's substitution check (§ REQ-052)
+      does not reach XML: encoding/xml refuses invalid UTF-8 itself
+      but converts a surrogate-half character reference (&#xD800;)
+      to U+FFFD without error, and that channel is accepted as a
+      genuine U+FFFD rather than closed by refusing a legal
+      character (pinned in openehr/rm/character_text_test.go).
 
   - id: REQ-051
     title: Cadasto spec-version header

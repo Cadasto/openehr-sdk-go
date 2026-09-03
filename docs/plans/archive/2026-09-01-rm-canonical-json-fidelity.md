@@ -3,9 +3,9 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Date:** 2026-09-01
-**Status:** Done (2026-09-03) — all five tasks landed: `TERM_MAPPING.match` is a canonical single-character `Character` primitive, `DV_TEXT.mappings`'s re-encode collapse is documented and pinned, the RM floor enforces `match`'s value set and `Mappings_valid`, `DV_MULTIMEDIA`'s inline-byte round-trip is pinned, and `Real` now reports mantissa precision loss on decode. **Correction:** Task 3's Interfaces line named `ValidateRM` / `ValidateComposition` as the issue producers; `ValidateComposition` (template-driven) has never routed through the RM floor, so it is `ValidateRM` and its typed sugars alone — corrected below. **Correction:** Task 5's controller decision expected a `*typereg.DecodeError` naming a `/magnitude` path in the DV_QUANTITY inheritance chain; verified against the generated `DVQuantity.UnmarshalJSON` and a minimal `encoding/json` probe that no per-field path wrapping exists for a scalar `Real` field (only polymorphic slots and whole-value `_type` mismatches attach one) — the landed test asserts `errors.Is(err, canjson.ErrInvalidShape)` only, recorded in the Task 5 report rather than asserted falsely.
+**Status:** Done (2026-09-03) — all five tasks landed: `TERM_MAPPING.match` is a canonical single-character `Character` primitive, `DV_TEXT.mappings`'s re-encode collapse is documented and pinned, the RM floor enforces `match`'s value set and `Mappings_valid`, `DV_MULTIMEDIA`'s inline-byte round-trip is pinned, and `Real` now refuses a literal past the 17-significant-digit budget instead of rounding silently. **Correction:** Task 3's Interfaces line named `ValidateRM` / `ValidateComposition` as the issue producers; `ValidateComposition` (template-driven) has never routed through the RM floor, so it is `ValidateRM` and its typed sugars alone — corrected below. **Correction:** Task 5's controller decision expected a `*typereg.DecodeError` naming a `/magnitude` path in the DV_QUANTITY inheritance chain; verified against the generated `DVQuantity.UnmarshalJSON` and a minimal `encoding/json` probe that no per-field path wrapping exists for a scalar `Real` field (only polymorphic slots and whole-value `_type` mismatches attach one) — the landed test asserts `errors.Is(err, canjson.ErrInvalidShape)` only, recorded in the Task 5 report rather than asserted falsely.
 **Owner:** SDK maintainers
-**Covers:** [REQ-046](../../specifications/bmm-conformance.md#req-046--primitive-type-mapping) (primitive type mapping), [REQ-052](../../specifications/wire.md#req-052) (canonical JSON round-trip), [REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (template-less RM floor). No new REQ id — every delta amends a shipped REQ in place (implementation-aligned; the normative table edit rides in the same PR).
+**Covers:** [REQ-046](../../specifications/bmm-conformance.md#req-046--primitive-type-mapping) (primitive type mapping), [REQ-052](../../specifications/wire.md#req-052) (canonical JSON round-trip), [REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (template-less RM floor), [REQ-056](../../specifications/wire.md#req-056) (canonical XML — added in review: the Character rule reaches canonical XML). No new REQ id — every delta amends a shipped REQ in place (implementation-aligned; the normative table edit rides in the same PR).
 **Probes:** PROBE-030 unchanged — no cassette or `testkit/` fixture changed; the new pins are unit tests: `openehr/rm/character_test.go`, `openehr/rm/real_test.go`, `openehr/serialize/canjson/mappings_presence_test.go`, `openehr/serialize/canjson/multimedia_bytes_test.go`, `openehr/validation/rmfloor_test.go`. PROBE-081 pattern reused for presence (no new probe minted).
 **Implementation:** landed
 **Depends on:** landed named-primitive precedent (`openehr/rm/integer.go`, `openehr/rm/real.go`); the template-less RM floor `openehr/validation/rmfloor.go` + `rmfloor_bytes.go` (REQ-112); the generator `internal/bmmgen`. All shipped; no new prerequisites.
@@ -41,7 +41,7 @@
 ## Definition of Done
 
 - Code and tests land with `// REQ-046` / `// REQ-052` / `// REQ-112` citations.
-- [`traceability.yaml`](../../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the change (REQ-052 gains these clauses; it **remains `partial`** — its FLAT/STRUCTURED and other open clauses are untouched).
+- [`traceability.yaml`](../../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the change (REQ-052 gains these clauses; it **remains `partial`** — the recorded residual is the field-order SHOULD in § REQ-052's Canonical-JSON properties list, open pending the external canonical-JSON publication `traceability.yaml` names).
 - The two indexes `spec-check` cannot see are updated: a [`roadmap.md`](../../roadmap.md) row for what landed; no numbering band moved (no new id).
 - Canonical spec prose updated in the **same PR** (the `Character` row in the primitive table; the REQ-052 `match` round-trip clause; the REQ-112 invariant clause).
 - `make codegen-verify`, `make spec-check`, and `make ci` pass.
@@ -67,7 +67,7 @@
 - **Create** `openehr/rm/character_test.go` — round-trip + refusal tests (Phase 1).
 - **Modify** `internal/bmmgen/primitives.go:20` — map `Character` → `Character` (Phase 1).
 - **Modify** `docs/specifications/bmm-conformance.md` — primitive-mapping table row + a justifying sentence (Phase 1).
-- **Modify** `docs/specifications/wire.md` — REQ-052 `match` round-trip clause (Phase 1); `mappings` decode-collapse note (Phase 2).
+- **Modify** `docs/specifications/wire.md` — REQ-052 `match` round-trip clause (Phase 1); `mappings` re-encode-collapse note (Phase 2).
 - **Regenerated** by `make codegen`: `openehr/rm/data_types_text_gen.go` + its `*_jsonmar_gen.go` / `*_jsonunmar_gen.go` (field becomes `Match Character`).
 - **Modify** `openehr/validation/rmfloor.go` — value-set + `Mappings_valid` invariants (Phase 3).
 - **Modify** `openehr/validation/rmfloor_test.go` — invariant tests (Phase 3).
@@ -247,7 +247,7 @@ git commit -m "fix(rm): TERM_MAPPING.match is a canonical single-character strin
 ### Task 2: Distinguish an empty `mappings` from an absent one on decode (Item B)
 
 **Files:**
-- Modify: `docs/specifications/wire.md` (REQ-052 decode-collapse note)
+- Modify: `docs/specifications/wire.md` (REQ-052 re-encode-collapse note)
 - Test: `openehr/serialize/canjson/mappings_presence_test.go` (create)
 - Modify (if a boundary helper is added): `openehr/validation/rmfloor_bytes.go`
 
@@ -481,20 +481,23 @@ git commit -m "test(canjson): pin DV_MULTIMEDIA inline base64 round-trip; record
 - Modify: `openehr/serialize/canjson/doc.go` (drop the "open half … still silent" note), `docs/specifications/wire.md` (§ REQ-052 Floating-point precision)
 
 **Interfaces:**
-- Produces: `Real.UnmarshalJSON` returns a typed error when the decimal literal carries more significant digits than `float64` can represent, instead of silently rounding.
+- Produces: `Real.UnmarshalJSON` returns a typed error when the decimal literal carries more than 17 significant decimal digits — a digit budget that is deliberately inexact in both directions (wire.md § Floating-point precision) — instead of silently rounding.
 
 **Context:** wire.md § REQ-052 requires a wire value exceeding JSON number precision to be a typed decode error "rather than silently rounding." `canjson/doc.go` records this half as **still open** — overflow (`1e400`) is already typed by the generated wrapper; only mantissa precision loss stays silent. Both `Real.UnmarshalJSON` branches (string `strconv.ParseFloat(s,64)` at `real.go:24`; number `json.Unmarshal(b,&f)` at `real.go:31`) round silently.
 
 - [x] **Step 1: Failing test.** `Real` decode of `0.12345678901234567890` (20 significant digits) returns an error; `0.5`, `80.5`, and a 17-digit value decode cleanly; `"0.5"` (quoted) too.
 - [x] **Step 2:** Run → today it rounds, `err == nil` → FAIL.
 - [x] **Step 3: Implement.** Add `significantDigits(s string) int` (strip sign / exponent / decimal point / leading zeros; ignore trailing zeros). In both branches, if `significantDigits(...) > 17` return a value-free typed error (REQ-093 — names no magnitude): `fmt.Errorf("rm.Real: %w: value carries more precision than float64 can represent", <sentinel>)`.
+
+> **Review rider:** the message quoted above is historical. Review reworded it to name the digit budget rather than float64's capacity, since the old wording was false for an exact-but-long literal such as 2^64.
+
 - [x] **Step 4:** Run → PASS. Confirm `DV_QUANTITY` / `DV_PROPORTION` magnitudes (which use `Real`) inherit the check.
 - [x] **Step 5: Spec.** wire.md § REQ-052 clause is now **met**, not deferred; drop the "open half … still silent" note in `canjson/doc.go`.
 - [x] **Step 6: Commit** `fix(rm): Real reports mantissa precision loss on decode (REQ-052)`.
 
 Landed at `1d09718`.
 
-**Decision (named):** the trigger is **>17 significant decimal digits** (float64's shortest-round-trip guarantee) — simple and non-over-reporting: it does **not** reject `0.1` (inexact but round-trips). A `big.Float` exactness check would wrongly reject `0.1` and is not the criterion. Second choice: which sentinel to wrap — a fresh `rm`/`canjson` precision sentinel, or **reuse `canjson.ErrInvalidShape`**. Settled: Plan B ([`2026-09-02-decode-error-surface-typing.md`](2026-09-02-decode-error-surface-typing.md)) landed option A, so the sentinel already has a producer — reuse it rather than minting a second.
+**Decision (named):** the trigger is **>17 significant decimal digits** (float64's shortest-round-trip guarantee) — a digit-count budget, not an exactness test, and by design wrong in both directions: it refuses some literals that are in fact exact (`18446744073709551616`, 2^64, 20 digits) and accepts some shorter ones that are not (`9007199254740993`, 16 digits, rounds) — but it never rejects `0.1` (inexact but round-trips), which is what matters in practice. A `big.Float` exactness check would classify both directions correctly but would also reject `0.1` and every other ordinary binary-inexact clinical literal, and is not the criterion. Second choice: which sentinel to wrap — a fresh `rm`/`canjson` precision sentinel, or **reuse `canjson.ErrInvalidShape`**. Settled: Plan B ([`2026-09-02-decode-error-surface-typing.md`](2026-09-02-decode-error-surface-typing.md)) landed option A, so the sentinel already has a producer — reuse it rather than minting a second.
 
 ---
 
