@@ -39,14 +39,29 @@
 //   - Numeric magnitudes use IEEE 754 double-precision JSON numbers
 //     (no silent float32 coercion). REQ-052 requires a typed error on
 //     decode "rather than silently rounding" when a wire value exceeds
-//     JSON's number precision. Half of that is met: an out-of-range
-//     magnitude (e.g. 1e400) already fails with a typed error — a
-//     *json.UnmarshalTypeError, reachable with errors.As through the
-//     generated UnmarshalJSON wrapper. The open half is mantissa
-//     precision loss, which is still silent: a magnitude of
-//     0.1234567890123456789 decodes to 0.12345678901234568 with a nil
-//     error. Closing it is tracked by
-//     docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md.
+//     JSON's number precision; the SDK defines that condition as a
+//     literal carrying more than 17 significant decimal digits —
+//     float64's shortest-round-trip maximum. This is a digit-count
+//     budget, not an exactness test, and by design it is wrong in both
+//     directions: a literal past 17 digits can still be exactly
+//     representable in float64 and is refused anyway (18446744073709551616,
+//     2^64, is exact yet carries 20 significant digits), while a shorter
+//     literal can be binary-inexact and decode unreported — an integer
+//     past 2^53 (e.g. 9007199254740993, 16 digits, decodes to
+//     9007199254740992) or any decimal fraction that is not a power of
+//     two (0.1 included). A general exactness check would classify both
+//     cases correctly but would also reject 0.1, which the plan rejected
+//     as over-reporting; >17 is chosen instead as a cheap, deterministic
+//     budget that never reports a short clinical literal. Within that
+//     definition both arms are met: an out-of-range magnitude (e.g.
+//     1e400) fails with a typed error — a *json.UnmarshalTypeError,
+//     reachable with errors.As through the generated UnmarshalJSON
+//     wrapper — and a magnitude past 17 significant decimal digits, such
+//     as 0.1234567890123456789, fails decode wrapping [ErrInvalidShape]
+//     instead of rounding to the nearest float64; a malformed or
+//     out-of-range literal reports its own parse/range error first, so
+//     the budget applies only once a literal has parsed. Closed by
+//     docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md.
 //
 // # Error classification
 //

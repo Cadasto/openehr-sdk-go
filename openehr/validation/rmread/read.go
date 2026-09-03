@@ -129,6 +129,11 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	case rm.DVCodedText:
 		return readDVCodedTextSingle(&p, attrName)
 
+	case *rm.TermMapping:
+		return readTermMappingSingle(p, attrName)
+	case rm.TermMapping:
+		return readTermMappingSingle(&p, attrName)
+
 	case *rm.CodePhrase:
 		return readCodePhraseSingle(p, attrName)
 	case rm.CodePhrase:
@@ -330,6 +335,7 @@ func Handles(parent any) bool {
 		*rm.Element, rm.Element,
 		*rm.DVText, rm.DVText,
 		*rm.DVCodedText, rm.DVCodedText,
+		*rm.TermMapping, rm.TermMapping,
 		*rm.CodePhrase, rm.CodePhrase,
 		*rm.DVDate, rm.DVDate,
 		*rm.DVTime, rm.DVTime,
@@ -415,6 +421,17 @@ func ReadMultiple(parent any, _ /* parentType */, attrName string) ([]any, bool)
 		return readClusterMultiple(p, attrName)
 	case rm.Cluster:
 		return readClusterMultiple(&p, attrName)
+
+	// --- DataValue containers: DV_TEXT.mappings (inherited by DV_CODED_TEXT) ---
+	case *rm.DVText:
+		return readDVTextMultiple(p, attrName)
+	case rm.DVText:
+		return readDVTextMultiple(&p, attrName)
+
+	case *rm.DVCodedText:
+		return readDVCodedTextMultiple(p, attrName)
+	case rm.DVCodedText:
+		return readDVCodedTextMultiple(&p, attrName)
 
 	// --- demographic: PARTY hierarchy + sub-components ---
 	case *rm.Person:
@@ -959,6 +976,52 @@ func readDVCodedTextSingle(t *rm.DVCodedText, attr string) (any, bool) {
 		return strPresent(t.Value)
 	case "defining_code":
 		return codePhrasePresent(t.DefiningCode)
+	}
+	return nil, false
+}
+
+// readDVTextMultiple serves the one DV_TEXT container: `mappings`, a
+// multiple of TERM_MAPPING (rminfo declares it so). Elements are boxed as
+// pointers into the backing array, which is what lets the caller's RM-type
+// switch recognise each one as a TERM_MAPPING node and descend into it —
+// without this reader `mappings` is unaddressable and TERM_MAPPING nodes
+// are never visited (REQ-112).
+func readDVTextMultiple(t *rm.DVText, attr string) ([]any, bool) {
+	switch attr {
+	case "mappings":
+		return boxPtrs(t.Mappings), true
+	}
+	return nil, false
+}
+
+// readDVCodedTextMultiple routes to the DV_TEXT reader: DV_CODED_TEXT
+// inherits `mappings` through its embedded DV_TEXT, so there is one
+// implementation for both.
+func readDVCodedTextMultiple(t *rm.DVCodedText, attr string) ([]any, bool) {
+	return readDVTextMultiple(&t.DVText, attr)
+}
+
+// readTermMappingSingle serves TERM_MAPPING's own attributes: the
+// RM-mandatory `match` (Character) and `target` (CODE_PHRASE), plus the
+// optional `purpose` (DV_CODED_TEXT, which carries `mappings` of its own —
+// so the walk nests). REQ-112.
+func readTermMappingSingle(m *rm.TermMapping, attr string) (any, bool) {
+	switch attr {
+	case "match":
+		// rm.Character is a one-rune string primitive whose zero value ("")
+		// is documented as not a legal Character, so emptiness is the
+		// absence signal — the same reading strPresent gives a String attr.
+		// An empty match therefore reports absent here (a `required` on the
+		// RM-mandatory attribute) as well as failing the value-set
+		// invariant, which names the allowed set.
+		if m.Match == "" {
+			return m.Match, false
+		}
+		return m.Match, true
+	case "purpose":
+		return ptrPresent(m.Purpose)
+	case "target":
+		return codePhrasePresent(m.Target)
 	}
 	return nil, false
 }

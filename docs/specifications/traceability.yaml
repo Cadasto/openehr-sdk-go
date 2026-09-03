@@ -47,8 +47,20 @@ requirements:
     implementation: landed
     packages: [openehr/rm]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
+    plans:
+      - docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md
     tests:
       - openehr/serialize/canjson/edgecases_test.go
+      - openehr/rm/character_test.go
+      - openehr/rm/character_text_test.go
+    notes: >-
+      landed (2026-09-03): Character, the RM's one primitive whose
+      canonical spelling (a one-character string) disagrees with a
+      numeric Go rune, is now a hand-written named type
+      (openehr/rm/character.go) carrying its own MarshalJSON /
+      UnmarshalJSON, exactly like Integer / Real, and the BMM primitive
+      map points at it. TERM_MAPPING.match is the only Character in the
+      RM.
 
   - id: REQ-048
     title: RM meta-model introspection
@@ -123,7 +135,7 @@ requirements:
     status: draft
     implementation: partial
     packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
@@ -137,6 +149,11 @@ requirements:
       - openehr/internal/jsonpoly/jsonpoly_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
+      - openehr/rm/character_test.go
+      - openehr/rm/character_text_test.go
+      - openehr/rm/real_test.go
+      - openehr/serialize/canjson/mappings_presence_test.go
+      - openehr/serialize/canjson/multimedia_bytes_test.go
     notes: >-
       partial (2026-09-02): the encode-side refusal sentinel clause
       requires canjson.Marshal / MarshalIndent to wrap the encode-only
@@ -168,36 +185,101 @@ requirements:
       the typereg WrapShapeError tests pin all of it, distinctness from
       canxml.ErrInvalidShape and transport.ErrInvalidShape included
       (assertShapeSentinelDistinct asserts both).
-      What keeps the REQ partial is one arm of § Floating-point
-      precision. Its MUST — report a wire value exceeding JSON's number
-      precision as a typed error "rather than silently rounding" — is
-      MET for OUT-OF-RANGE values: 1e400 fails with a typed
+      § Floating-point precision defines "exceeds JSON's number
+      precision" as a decimal literal carrying more than 17 significant
+      decimal digits (float64's shortest-round-trip maximum) — a
+      digit-count budget, not an exactness test, and by design it is
+      wrong in both directions: a literal past 17 digits can still be
+      exactly representable in float64 and is refused anyway
+      (18446744073709551616, 2^64, is exact yet carries 20 significant
+      digits and fails the budget), while a shorter literal can be
+      binary-inexact and is accepted unreported (9007199254740993, 16
+      digits, decodes to 9007199254740992; any decimal fraction that is
+      not a power of two, 0.1 included, is binary-inexact regardless of
+      digit count). A general exactness check (big.Float) would classify
+      both of those correctly but would also reject 0.1 and every other
+      ordinary binary-inexact clinical literal, over-reporting the plan
+      rejected. Parse and range failures take precedence over the
+      digit-count budget: a malformed literal or one that
+      overflows/underflows float64 reports its own parse or range error
+      first, regardless of how many significant digits its mantissa
+      carries (TestRealUnmarshalJSONParseBeforeDigitPolicy) — the budget
+      applies only to a literal that parsed as syntactically valid and
+      in range. Within that definition, both arms are now MET
+      (2026-09-03,
+      docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md): the
+      OUT-OF-RANGE arm as before (1e400 fails with a typed
       *json.UnmarshalTypeError, reachable by errors.As through the
-      generated UnmarshalJSON wrapper
-      (TestUnmarshalOverflowIsATypedError). It is OPEN for MANTISSA
-      precision loss, which is still silent: 0.1234567890123456789
-      decodes to 0.12345678901234568 with a nil error, pinned as
-      today's behaviour by TestUnmarshalMantissaPrecisionLossIsSilent —
-      the producer that closes the gap must invert that test. Tracked by
-      docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md
-      (Defers list); the sentinel alone does not discharge it, since the
-      § asks for an error where today there is none.
+      generated UnmarshalJSON wrapper — TestUnmarshalOverflowIsATypedError),
+      and the MANTISSA arm, previously open, is now closed for literals
+      past 17 significant digits — rm.significantDigits
+      (openehr/rm/real.go) counts a decimal literal's significant digits
+      (mantissa only: sign, decimal point and exponent excluded,
+      leading/trailing zeros ignored) and Real.UnmarshalJSON fails
+      wrapping canjson.ErrInvalidShape past 17 of them instead of
+      rounding — 0.1234567890123456789 (19 significant digits) now fails
+      where it used to decode silently to 0.12345678901234568. The
+      refusal message names the digit budget ("literal carries more than
+      17 significant decimal digits"), not float64's capacity — the
+      prior wording ("more precision than float64 can represent") was
+      false for an exact-but-long literal such as 2^64. The retired
+      TestUnmarshalMantissaPrecisionLossIsSilent (which pinned the old
+      silent behaviour) is replaced by
+      TestUnmarshalMantissaPrecisionLossIsATypedError and a
+      DV_PROPORTION inheritance twin; TestSignificantDigits and
+      TestRealUnmarshalJSON{CleanCases,PrecisionLoss,NullIsNoOp,ParseBeforeDigitPolicy}
+      in openehr/rm/real_test.go pin the trigger directly, including the
+      17-digit boundary case that decodes cleanly without in fact
+      round-tripping. No *typereg.DecodeError names a "/magnitude" path
+      in the resulting chain — only polymorphic slots and whole-value
+      _type mismatches attach one today — so classification rests on
+      errors.Is alone. rm.Character's decode refusals (§ REQ-052's
+      TERM_MAPPING.match bullet) carry the same canjson.ErrInvalidShape sentinel
+      through an Is-only wrapper, with the message left unchanged by the
+      classification.
+      REQ-052 stays partial regardless: § REQ-052's own Canonical-JSON
+      properties bullet list (not § Floating-point precision, which
+      contains no field-order clause) states "Field order SHOULD follow
+      the openEHR canonical-JSON specification when one is published" —
+      that SHOULD remains open pending that external publication; the
+      SDK's own deterministic field-order profile is what MUST govern
+      until then, and that MUST is met, but the SHOULD itself has no
+      canonical spec to defer to yet.
 
   - id: REQ-056
     title: Canonical XML
     canonical: docs/specifications/wire.md#req-056
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canxml, testkit/cassettes, testkit/fixtures]
-    plans: [docs/plans/archive/2026-05-15-canonical-xml-serialization.md]
+    packages:
+      - openehr/serialize/canxml
+      - openehr/rm  # Character's TextMarshaler/TextUnmarshaler make canonical XML enforce the one-character rule
+      - testkit/cassettes
+      - testkit/fixtures
+    plans: [docs/plans/archive/2026-05-15-canonical-xml-serialization.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md]
     probes: [PROBE-033, PROBE-034]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/serialize/canxml/decode_test.go
+      - openehr/rm/character_text_test.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
       - testkit/probes/serialize/probe_034_typereg_xsi_unknown.go
+    notes: >-
+      Review round (2026-09-03,
+      docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md) made
+      canonical XML enforce the Character value rule directly (valid
+      UTF-8, exactly one character; a genuine U+FFFD is a legal
+      Character and accepted): Character's encoding.TextMarshaler /
+      encoding.TextUnmarshaler implementation is what canonical XML
+      relies on for TERM_MAPPING.match, with no canxml-specific
+      sentinel. The JSON string arm's substitution check (§ REQ-052)
+      does not reach XML: encoding/xml refuses invalid UTF-8 itself
+      but converts a surrogate-half character reference (&#xD800;)
+      to U+FFFD without error, and that channel is accepted as a
+      genuine U+FFFD rather than closed by refusing a legal
+      character (pinned in openehr/rm/character_text_test.go).
 
   - id: REQ-051
     title: Cadasto spec-version header
@@ -1212,25 +1294,46 @@ requirements:
     # no compiled OPT. Enforces RM-mandatory attribute presence + a small
     # per-RM-type invariant catalogue (CODE_PHRASE, DV_QUANTITY,
     # DV_INTERVAL bounds for numeric-comparable bounds, OBJECT_REF
-    # type/namespace). Driver is a second walker alongside REQ-102/110;
-    # closed-RM-set helpers (rmTypeInfo / rmread) are shared across REQ-102/110/112.
+    # type/namespace, DV_TEXT/DV_CODED_TEXT Mappings_valid, and the
+    # TERM_MAPPING.match value set on TERM_MAPPING as a walked node).
+    # Driver is a second walker alongside
+    # REQ-102/110; closed-RM-set helpers (rmTypeInfo / rmread) are shared
+    # across REQ-102/110/112.
     implementation: landed
     packages:
       - openehr/validation
       - openehr/rm/rminfo  # AttributeNames added to Lookup
+      - openehr/validation/rmread  # mappings container + TERM_MAPPING attribute readers
     # PROBE-077 (RM-floor invariant matrix) is deferred to a follow-up
     # cycle; the unit-test cassette matrix in rmfloor_test.go covers the
-    # first-cycle catalogue (required-set absence + the four named
-    # leaf invariants). PROBE-081 (REQ-112) covers value-typed
-    # mandatory presence — EHR_STATUS.subject — decided from JSON-key
-    # presence by ValidateRMEHRStatusBytes (rmfloor_bytes.go), carried
-    # inline by rmfloor_bytes_test.go.
+    # first-cycle catalogue (required-set absence + the named leaf
+    # invariants, including the DV_TEXT/DV_CODED_TEXT term-mapping pair
+    # and its canjson decode-path absent/null-vs-literal-[] distinction).
+    # PROBE-081 (REQ-112) covers value-typed mandatory presence —
+    # EHR_STATUS.subject — decided from JSON-key presence by
+    # ValidateRMEHRStatusBytes (rmfloor_bytes.go), carried inline by
+    # rmfloor_bytes_test.go.
     probes: [PROBE-081]
     tests:
       - openehr/validation/rmfloor_test.go
       - openehr/validation/rmfloor_bytes_test.go
+      - openehr/validation/rmread/read_datavalues_test.go
+      - openehr/validation/rmread/handles_test.go
     plans:
       - docs/plans/archive/2026-06-29-rm-floor-validation.md
+      - docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md
+    notes: >-
+      landed (2026-09-03): the floor gained two TERM_MAPPING /
+      DV_TEXT.mappings invariants — match outside {'>','=','<','?'} and
+      a present-but-empty mappings (Mappings_valid) — raised from
+      ValidateRM and its typed sugars. ValidateComposition
+      (template-driven) has never routed through the RM floor and is
+      not a producer of these issues; the plan's own Interfaces line
+      first said otherwise and was corrected in its Status header.
+      Review round 1 (2026-09-03) made TERM_MAPPING a walked node:
+      rmread reads mappings / purpose / target, and term_mapping_match
+      fires on the node — as a container element, nested under
+      purpose.mappings, or as the ValidateRM root.
 
   - id: REQ-113
     title: Execution-oriented parsed AQL AST

@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -437,9 +438,16 @@ func emptyMandatorySuffix(sub map[string]any, path, anchor string) (string, bool
 func mappingsRMAttr(out map[string]any, base string, mappings []rm.TermMapping) error {
 	for i, tm := range mappings {
 		prefix := base + "/_mapping:" + strconv.Itoa(i)
-		if !strings.ContainsRune(matchCodes, tm.Match) {
-			return fmt.Errorf("%w: %q cannot carry TERM_MAPPING.match %q; it is one of %s (REQ-140)",
-				ErrUnsupportedDatatype, prefix+"|match", tm.Match, matchCodes)
+		matchStr := string(tm.Match)
+		// strings.Contains(s, "") is always true, so the length check comes first —
+		// otherwise a zero-value (empty) Character would slip through as "valid".
+		if utf8.RuneCountInString(matchStr) != 1 || !strings.Contains(matchCodes, matchStr) {
+			// REQ-093: name the field and the allowed set, not the caller-supplied
+			// value — tm.Match is a bare Character with no length invariant, so
+			// echoing it here would put an arbitrary-length caller string in the
+			// error rather than a value-free diagnostic.
+			return fmt.Errorf("%w: %q must be TERM_MAPPING.match, one of %s (REQ-140)",
+				ErrUnsupportedDatatype, prefix+"|match", matchCodes)
 		}
 		out[prefix+"|match"] = string(tm.Match)
 		if _, err := emitLeafValue(out, prefix+"/target", tm.Target, "CODE_PHRASE", false, false); err != nil {

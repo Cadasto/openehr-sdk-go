@@ -160,7 +160,7 @@ type TermMappingJSONMarshaller struct {
 	// * `'?'`: the kind of mapping is unknown.
 	//
 	// The first three values are taken from the ISO standards 2788 ( Guide to Establishment and development of monolingual thesauri) and 5964 (Guide to Establishment and development of multilingual thesauri).
-	Match rune `json:"match"`
+	Match Character `json:"match"`
 	// Purpose Purpose of the mapping e.g. 'automated data mining', 'billing', 'interoperability'.
 	Purpose *DVCodedText `json:"purpose,omitempty"`
 	// Target The target term of the mapping.

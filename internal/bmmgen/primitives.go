@@ -17,7 +17,7 @@ var primitiveGoType = map[string]string{
 	"Integer64": "int64",
 	"Real":      "Real",
 	"Double":    "float64",
-	"Character": "rune",
+	"Character": "Character", // was "rune": canonical JSON is a single-char string — REQ-046
 	"String":    "string",
 	"Octet":     "byte",
 	"Uri":       "string",

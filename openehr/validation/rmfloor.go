@@ -266,6 +266,12 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkDVInterval(value, path)
 	case rmType == "OBJECT_REF", rmType == "PARTY_REF", rmType == "ACCESS_GROUP_REF", rmType == "LOCATABLE_REF":
 		w.checkObjectRef(value, path)
+	case rmType == "DV_TEXT", rmType == "DV_CODED_TEXT":
+		// DV_CODED_TEXT inherits `mappings` from DV_TEXT via embedding —
+		// one evaluator, dispatched for both runtime types.
+		w.checkTermMappings(value, path)
+	case rmType == "TERM_MAPPING":
+		w.checkTermMapping(value, path)
 	}
 }
 
@@ -359,6 +365,61 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 			Path:   joinPath(path, "/namespace"),
 			Code:   "rm_invariant",
 			Detail: "OBJECT_REF.namespace must be non-empty",
+		})
+	}
+}
+
+// checkTermMappings enforces the REQ-112 Mappings_valid invariant on the
+// `mappings` attribute DV_TEXT carries (and DV_CODED_TEXT inherits via its
+// embedded DV_TEXT): a *present* mappings MUST be non-empty.
+//
+// Presence is read from Go slice nilness, which mirrors the wire
+// distinction canjson decode preserves: an absent `mappings` key and an
+// explicit JSON `null` both decode to a nil slice (pinned by
+// canjson's TestDVTextMappingsDecodePresenceAndEncodeCollapse), so they
+// are indistinguishable from "not supplied" and both valid; only a decoded
+// literal `"mappings":[]` produces the non-nil empty slice this check
+// flags. The element-level match check is NOT here — `mappings` is a
+// walked container (rmread reads it), so each TERM_MAPPING is a node of
+// its own and [rmFloorWalker.checkTermMapping] evaluates it there.
+//
+// Diagnostics name the attribute only — never the offending value
+// (REQ-093's value-free boundary-diagnostic discipline).
+func (w *rmFloorWalker) checkTermMappings(value any, path string) {
+	ms, ok := asMappings(value)
+	if !ok {
+		return
+	}
+	if ms != nil && len(ms) == 0 {
+		w.emit(Issue{
+			Path:   joinPath(path, "/mappings"),
+			Code:   "mappings_valid",
+			Detail: "DV_TEXT.mappings present but empty",
+		})
+	}
+}
+
+// checkTermMapping enforces the REQ-112 value-set invariant on a
+// TERM_MAPPING node: `match` MUST be one of '>', '=', '<', '?' (openEHR RM
+// Data Types). It runs on the node itself, so it fires wherever a mapping
+// sits — under a DV_TEXT / DV_CODED_TEXT `mappings` container, nested under
+// a mapping's own `purpose` (a DV_CODED_TEXT carrying further mappings), or
+// as the validated root.
+//
+// The diagnostic names the attribute and the allowed set only — never the
+// offending value (REQ-093).
+func (w *rmFloorWalker) checkTermMapping(value any, path string) {
+	m, ok := asTermMapping(value)
+	if !ok {
+		return
+	}
+	switch m.Match {
+	case ">", "=", "<", "?":
+	default:
+		w.emit(Issue{
+			Path:   joinPath(path, "/match"),
+			Code:   "term_mapping_match",
+			Detail: "TERM_MAPPING.match must be one of {'>', '=', '<', '?'}",
 		})
 	}
 }

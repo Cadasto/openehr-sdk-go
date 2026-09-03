@@ -254,7 +254,7 @@ func TestSettingEncodeRefusals(t *testing.T) {
 		{"non-openehr terminology", func(s *rm.DVCodedText) { s.DefiningCode.TerminologyID.Value = "SNOMED-CT" }},
 		{"empty terminology", func(s *rm.DVCodedText) { s.DefiningCode.TerminologyID.Value = "" }},
 		{"mappings extra", func(s *rm.DVCodedText) {
-			s.Mappings = []rm.TermMapping{{Match: '=', Target: rm.CodePhrase{CodeString: "x"}}}
+			s.Mappings = []rm.TermMapping{{Match: "=", Target: rm.CodePhrase{CodeString: "x"}}}
 		}},
 		{"formatting extra", func(s *rm.DVCodedText) { s.Formatting = str("plain") }},
 		{"language extra", func(s *rm.DVCodedText) { s.Language = &rm.CodePhrase{CodeString: "en"} }},

@@ -85,6 +85,8 @@ Schema, Class, Property, Type, FunctionParameter are the in-memory equivalents o
 
 The SDK **MUST** map openEHR primitive types to Go types per the table in [§ Primitive type mapping](#primitive-type-mapping) below. The mapping is fixed; alternative widenings (e.g. mapping `Real` to `float32`) are not permitted.
 
+`Character` is the one primitive whose canonical JSON spelling (a one-character string) disagrees with a numeric Go `rune`, so it maps to a named type carrying its own codec — the mapping is still fixed, this is the fixed target.
+
 ### REQ-047 — BMM-spec divergence resolution
 
 If the BMM file declares a class, property, or cardinality that contradicts a normative statement elsewhere in the openEHR specification, the **BMM file wins** for SDK conformance purposes. Reasoning:
@@ -325,7 +327,7 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | `Integer64` | `int64` | |
 | `Real` | `rm.Real` (underlying `float64`) | The BMM `Real` is single-precision conceptually but openEHR JSON uses unbounded-precision numbers; `float64` is the safe choice. Emitted as the defined type `rm.Real` so the codec can attach the wire-tolerance rule from [`../docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). |
 | `Double` | `float64` | Same as `Real`, no codec tolerance attached. |
-| `Character` | `rune` | |
+| `Character` | `rm.Character` | canonical JSON single-character **string**, not a number; hand-written named type (`openehr/rm/character.go`), like `Integer`/`Real` |
 | `String` | `string` | |
 | `Octet` | `byte` | |
 | `Uri` | `string` | Validated at codec boundary; not `net/url.URL` to preserve round-trip exact representation |
