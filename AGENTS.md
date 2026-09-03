@@ -61,6 +61,7 @@ The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md
 - **Errors:** wrap with `fmt.Errorf("…: %w", err)`; typed sentinels at boundaries; no panics in library code.
 - **Tests:** stdlib `testing` only — no assertion libraries — plus helpers in [`testkit/`](testkit/); behaviour tests for a public surface belong in the external `_test` package, so they exercise what consumers can reach. Guards carry the bar their spec sets — typically *removing the guard MUST fail a named test*.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) — scope is the touched area (`auth`, `rm`, `transport`, `client/ehr`, `docs`, `build`, …).
+- **Skills:** before writing or reviewing Go, load `go-coding:go-coding` then the focused skill matching the diff — `go-errors` for error paths, `go-testing` for any `_test.go`, `go-idioms` when modernizing or touching loops/maps/strings, `go-concurrency` for goroutines, channels, or context lifetimes, `go-layout` for a new package or exported API; the router alone doesn't count. An orchestrator dispatching implementer or reviewer subagents MUST carry this instruction in every brief — subagents don't inherit the session's skills. Detail: [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
 
 **CHANGELOG.md** — update only on request or when cutting a release. **One single-sentence bullet (~35 words max) per artefact class**: artefact + scope + key REQ/PROBE, never API inventories or per-REQ breakdowns (those live in `traceability.yaml`, commits, and PR bodies). Release notes are generated verbatim from the block, so a long entry is a defect — err short. Pre-1.0: `### Added` only.
 
@@ -101,7 +102,7 @@ Host Go `1.26.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 Rationale and the wider picture: [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
 
-**Recommended agent tooling:** the **go-coding** plugin (Go skills + the `go-reviewer` agent), **gopls-lsp** (code intelligence), and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
+**Agent tooling:** for Go, load `go-coding:go-coding` then the matching focused skill (§ Code style and conventions above). A review of a Go diff goes through the plugin's `go-reviewer` agent, or the reviewer loads the same focused skills itself when the workflow already provides a single reviewer seat (the SDD subagent-driven loop does). `/go-explain <topic>` is the one-shot idiom lookup for a Go question; `go-lint-setup` is never needed here — golangci-lint v2 is already pinned (`make lint`). Also: **gopls-lsp** (code intelligence) and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
 
 **Local agent config:** personal permission grants belong in the gitignored `.claude/settings.local.json` — never add a `permissions` block to the checked-in `.claude/settings.json` (shared hook/plugin config only).
 
