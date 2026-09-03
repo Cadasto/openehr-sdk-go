@@ -4,19 +4,27 @@ How AI assistants (Claude Code, Cursor, Copilot, Codex, …) work in this repo. 
 
 ## Recommended tooling (Claude Code / Cursor)
 
-**Strongly recommended:** the **[go-coding plugin](https://github.com/Cadasto/go-coding-plugin)** (`go-coding@cadasto`, Claude Code and Cursor). It encodes idiomatic-Go judgment and ties advice to the deterministic toolchain (gofumpt, `go vet`, golangci-lint v2 + `modernize`, `go test -race`) — the same tools the [Makefile](../Makefile) runs. Reach for these skills:
+**Binding for Go work:** the **[go-coding plugin](https://github.com/Cadasto/go-coding-plugin)** (`go-coding@cadasto`, Claude Code and Cursor). It encodes idiomatic-Go judgment and ties advice to the deterministic toolchain (gofumpt, `go vet`, golangci-lint v2 + `modernize`, `go test -race`) — the same tools the [Makefile](../Makefile) runs. Before writing or reviewing Go, load `go-coding:go-coding` then the focused skill matching the diff — loading the router alone doesn't count.
 
-| Skill / agent | Use for |
+**Which skill for which change:**
+
+| Change touches… | Load |
 |---|---|
-| `go-coding` | router — when unsure which standard or tool applies |
-| `go-errors` | wrapping (`%w`), `errors.Is`/`As`, sentinel vs typed errors |
-| `go-concurrency` | goroutine lifetimes/leaks, context, atomics, `-race` |
-| `go-testing` | table tests, `t.Parallel`, `synctest`, golden files |
-| `go-idioms` | modern idioms (the `modernize` set) / `go fix` |
-| `go-linting`, `go-lint-setup` | golangci-lint v2 config and adoption |
-| `go-layout` | package and module structure |
-| `go-explain` | one-shot lookup of a single idiom or tool |
-| `go-reviewer` (agent) | pre-PR review for the bugs linters miss (concurrency, error-swallowing, ctx misuse) |
+| any Go change — start here | `go-coding:go-coding` (router) |
+| error paths | `go-errors` |
+| any `_test.go` | `go-testing` |
+| modernizing, or loops/maps/strings | `go-idioms` |
+| goroutines, channels, or context lifetimes | `go-concurrency` |
+| a new package or exported API | `go-layout` |
+| a one-shot idiom/tool question, no editing | `/go-explain <topic>` |
+| golangci-lint v2 config/adoption | `go-linting`, `go-lint-setup` — not needed in this repo, the config is already pinned (`make lint`) |
+| reviewing a Go diff | the plugin's `go-reviewer` agent, unless the workflow already supplies a single reviewer seat |
+
+**Orchestrators: brief every subagent** — subagents don't inherit the parent session's skills:
+
+- Implementer brief: load the router plus the matching focused skill(s) above before writing.
+- Reviewer brief: load them before reviewing and cite the rule a finding rests on.
+- A reviewer seat that already exists (the SDD subagent-driven loop's own reviewer) applies the skills itself instead of spawning `go-reviewer`.
 
 Pair with the **gopls-lsp** plugin for code intelligence (defs/refs/rename/vulncheck). Run the deterministic tool rather than reasoning a rule out by hand — that's the whole point of the plugin.
 
@@ -43,7 +51,7 @@ For an exact attribute list, invariant, or signature — **before locking golden
 
 0. **Assemble context in one shot:** `make spec-context REQ=094` — bundles the registry row, the `traceability.yaml` block (packages, probes, tests, plans), the canonical spec excerpt, and any research strands that touch the REQ. Start here; it routes you to the canonical sources instead of grepping.
 1. **Locate** your task's REQ via the [REQ registry](specifications/REQ.md) → follow the row to its **canonical** topic spec (don't read prose out of `REQ.md` itself).
-2. **Inspect ground truth before editing** — RM shapes via MCP `type_specification_get`, terminology via `terminology_resolve`. Never hardcode a path or numeric literal without verifying.
+2. **Inspect ground truth before editing** — RM shapes via MCP `type_specification_get`, terminology via `terminology_resolve`. Never hardcode a path or numeric literal without verifying. Before writing the Go itself, load the matching go-coding skill (§ Recommended tooling above).
 3. **Cite identifiers** — tests and `doc.go` reference REQ-NNN / PROBE-NNN; update [traceability.yaml](specifications/traceability.yaml) when landing packages or probes; never renumber published IDs.
 4. **Don't decide open questions in code** — don't silently resolve a [research strand](specifications/research-strands.md), and don't add a normative MUST/SHOULD/MAY without a REQ to anchor it. Surface it or draft an [ADR](adr/).
 5. **Verify** — `make ci` (includes `make spec-check`) before claiming done. See [ci.md](ci.md). **For wire/client changes, green tests aren't enough:** read the `probes:` on the REQ's traceability entry (or `make spec-context`), open each `#### PROBE-NNN` in [conformance.md](specifications/conformance.md), and treat the task as done only when each is **Implemented (Sandbox)** or explicitly deferred in the plan. `make probe-status` lists each probe's status and whether its test file exists.
