@@ -71,15 +71,48 @@ func TestDecodePolymorphicSlotWithTypeLast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	if !bytes.Equal(ea, eb) || !strings.Contains(string(eb), `"_type":"DV_QUANTITY"`) {
-		t.Fatalf("re-encode differs by _type position or lost the slot type:\n %s\n %s", ea, eb)
+	// The full slot spelling, `_type` leading, so an encoder that wrote the
+	// discriminator anywhere but first inside the slot would fail here even
+	// with both encodes equal to each other.
+	const slot = `"value":{"_type":"DV_QUANTITY","magnitude":120,"units":"mm[Hg]"}`
+	if !bytes.Equal(ea, eb) || !strings.Contains(string(eb), slot) {
+		t.Fatalf("re-encode differs by _type position or the slot is not the canonical spelling:\n %s\n %s", ea, eb)
+	}
+}
+
+// REQ-052 § Field order: `Hash` (map[K]V) keys are written in lexicographic
+// key order, independent of struct field order and of the order the map was
+// populated. The keys are chosen so that byte-wise order differs from a
+// case-folded one ("B" sorts before "a"), pinning which "lexicographic" the
+// profile means; the pointer-to-map spelling the generator uses for optional
+// Hash fields is covered alongside the plain one.
+func TestEncodeHashKeysLexicographic(t *testing.T) {
+	other := map[string]string{"a": "x", "B": "y"}
+	v := rm.TranslationDetails{
+		Author:       map[string]string{"z": "3", "a": "1", "B": "2"},
+		Language:     rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}, CodeString: "en"},
+		OtherDetails: &other,
+	}
+	got, err := canjson.Marshal(&v)
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	for _, want := range []string{
+		`"author":{"B":"2","a":"1","z":"3"}`,
+		`"other_details":{"B":"y","a":"x"}`,
+	} {
+		if !strings.Contains(string(got), want) {
+			t.Fatalf("Hash keys are not in lexicographic order: want %s in\n %s", want, got)
+		}
 	}
 }
 
 // REQ-052 § Field order: the encoder MUST write the deterministic
 // profile, so two encodes of one value are byte-identical and `_type` is
-// the first key. PROBE-030 pins the fixed-point half over the cassette
-// corpus; this pins the repeat-encode half on a small value.
+// the first key. PROBE-030 pins encode-stability over the cassette corpus
+// (decode → encode → decode → encode, the two encodes byte-identical and
+// never compared against the input); this pins repeat-encode identity and
+// `_type`-first on a small value.
 func TestEncodeIsDeterministic(t *testing.T) {
 	v := rm.DVCodedText{
 		DVText: rm.DVText{Value: "x"},
