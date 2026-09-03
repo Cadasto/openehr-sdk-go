@@ -52,6 +52,7 @@ requirements:
     tests:
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/rm/character_test.go
+      - openehr/rm/character_text_test.go
     notes: >-
       landed (2026-09-03): Character, the RM's one primitive whose
       canonical spelling (a one-character string) disagrees with a
@@ -149,6 +150,7 @@ requirements:
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
       - openehr/rm/character_test.go
+      - openehr/rm/character_text_test.go
       - openehr/rm/real_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canjson/multimedia_bytes_test.go
@@ -1255,14 +1257,16 @@ requirements:
     # no compiled OPT. Enforces RM-mandatory attribute presence + a small
     # per-RM-type invariant catalogue (CODE_PHRASE, DV_QUANTITY,
     # DV_INTERVAL bounds for numeric-comparable bounds, OBJECT_REF
-    # type/namespace, DV_TEXT/DV_CODED_TEXT mappings/Mappings_valid +
-    # TERM_MAPPING.match value set). Driver is a second walker alongside
+    # type/namespace, DV_TEXT/DV_CODED_TEXT Mappings_valid, and the
+    # TERM_MAPPING.match value set on TERM_MAPPING as a walked node).
+    # Driver is a second walker alongside
     # REQ-102/110; closed-RM-set helpers (rmTypeInfo / rmread) are shared
     # across REQ-102/110/112.
     implementation: landed
     packages:
       - openehr/validation
       - openehr/rm/rminfo  # AttributeNames added to Lookup
+      - openehr/validation/rmread  # mappings container + TERM_MAPPING attribute readers
     # PROBE-077 (RM-floor invariant matrix) is deferred to a follow-up
     # cycle; the unit-test cassette matrix in rmfloor_test.go covers the
     # first-cycle catalogue (required-set absence + the named leaf
@@ -1276,6 +1280,8 @@ requirements:
     tests:
       - openehr/validation/rmfloor_test.go
       - openehr/validation/rmfloor_bytes_test.go
+      - openehr/validation/rmread/read_datavalues_test.go
+      - openehr/validation/rmread/handles_test.go
     plans:
       - docs/plans/archive/2026-06-29-rm-floor-validation.md
       - docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md
@@ -1287,6 +1293,10 @@ requirements:
       (template-driven) has never routed through the RM floor and is
       not a producer of these issues; the plan's own Interfaces line
       first said otherwise and was corrected in its Status header.
+      Review round 1 (2026-09-03) made TERM_MAPPING a walked node:
+      rmread reads mappings / purpose / target, and term_mapping_match
+      fires on the node — as a container element, nested under
+      purpose.mappings, or as the ValidateRM root.
 
   - id: REQ-113
     title: Execution-oriented parsed AQL AST
