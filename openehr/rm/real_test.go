@@ -64,6 +64,11 @@ func TestRealUnmarshalJSONCleanCases(t *testing.T) {
 		// rule's documented lower-bound trade-off, not a round-trip claim.
 		{"12345678901234567", 1.2345678901234568e16},
 		{"1.00000000000000000000", 1},
+		// The documented FALSE NEGATIVE of the digit-count budget
+		// (wire.md § Floating-point precision): 2^53+1 carries only 16
+		// significant digits, so the budget admits it, and float64 rounds
+		// it down to 2^53. Accepted unreported, by design.
+		{"9007199254740993", 9007199254740992},
 	}
 	for _, tc := range tests {
 		t.Run(tc.lit, func(t *testing.T) {
@@ -109,6 +114,12 @@ func TestRealUnmarshalJSONPrecisionLoss(t *testing.T) {
 	lossy := []string{
 		"0.12345678901234567890",  // 20 fractional digits
 		"1.2345678901234567890e5", // exponent form
+		// The documented FALSE POSITIVE of the digit-count budget
+		// (wire.md § Floating-point precision): 2^64 is exactly
+		// representable in float64, yet its 20-digit spelling fails the
+		// budget and is refused. Refused by design, not by accident — the
+		// budget counts digits, it does not test exactness.
+		"18446744073709551616",
 	}
 	for _, lit := range lossy {
 		t.Run(lit, func(t *testing.T) {
@@ -145,7 +156,7 @@ func TestRealUnmarshalJSONPrecisionLoss(t *testing.T) {
 // a literal that actually parsed. A long-but-broken literal must not be
 // reported as precision loss, and must not acquire
 // typereg.ErrInvalidShape — that sentinel classifies the SDK's own
-// refusal of a representable-but-lossy value, not an encoding/json or
+// refusal of a literal past the digit budget, not an encoding/json or
 // strconv failure. Removing the reorder fails this test.
 func TestRealUnmarshalJSONParseBeforeDigitPolicy(t *testing.T) {
 	t.Run("quoted non-numeric", func(t *testing.T) {
@@ -197,5 +208,68 @@ func TestRealUnmarshalJSONParseBeforeDigitPolicy(t *testing.T) {
 		if errors.Is(err, errPrecisionLoss) {
 			t.Errorf("UnmarshalJSON(%s) err = %v; want the range failure, not the precision refusal", lit, err)
 		}
+		if errors.Is(err, typereg.ErrInvalidShape) {
+			t.Errorf("UnmarshalJSON(%s) err = %v; a strconv range failure must not carry typereg.ErrInvalidShape", lit, err)
+		}
 	})
+}
+
+// TestRealPrecisionRefusalMessageUnchangedByClassification pins the
+// wire.md § REQ-052 Decode-side shape sentinel MUST on rm.Real: the
+// classification adds a sentinel, not a word of text. The old
+// fmt.Errorf("%w: %w") form spliced the sentinel's own prose
+// ("canjson: invalid JSON shape") into Error(); the sentinel now rides
+// on Is (see shapeClassified).
+//
+// The message text is also pinned honest (REQ-052 / REQ-093): the budget
+// counts significant digits, so it may not claim the value is
+// unrepresentable — 2^64 is exactly representable and still refused.
+func TestRealPrecisionRefusalMessageUnchangedByClassification(t *testing.T) {
+	const want = "rm.Real: literal carries more than 17 significant decimal digits"
+	var r Real
+	err := r.UnmarshalJSON([]byte("18446744073709551616"))
+	if err == nil {
+		t.Fatal("UnmarshalJSON(2^64) = nil error, want the precision refusal")
+	}
+	if got := err.Error(); got != want {
+		t.Errorf("err = %q, want %q", got, want)
+	}
+	if !errors.Is(err, typereg.ErrInvalidShape) {
+		t.Errorf("err = %v; want errors.Is(err, typereg.ErrInvalidShape)", err)
+	}
+	if strings.Contains(err.Error(), "invalid JSON shape") {
+		t.Errorf("err = %q; must not splice the sentinel's own prose into the message", err.Error())
+	}
+	// "more precision than float64 can represent" was the old text and is
+	// false for this very literal — 2^64 is exact in float64.
+	if strings.Contains(err.Error(), "can represent") {
+		t.Errorf("err = %q; the budget counts digits and must not claim unrepresentability", err.Error())
+	}
+	if cause := errors.Unwrap(err); cause == nil {
+		t.Errorf("errors.Unwrap(%v) = nil; the cause must stay reachable through unwrapping", err)
+	} else if cause.Error() != err.Error() {
+		t.Errorf("classified err = %q but its cause reads %q; the classification must not change the message", err.Error(), cause.Error())
+	}
+}
+
+// TestRealNilReceiverIsRefusedNotPanicked pins the nil-receiver axis
+// (idiom.md § No panics, REQ-025): UnmarshalJSON assigns through the
+// pointer, so a nil *Real would be dereferenced. `null` is the
+// discriminating second input — it is the value the method otherwise
+// treats as a no-op, so a nil check placed after the null arm would let
+// it through. Caller misuse is not a wire-shape problem, so the refusal
+// stays outside typereg.ErrInvalidShape. A panic fails the test run.
+func TestRealNilReceiverIsRefusedNotPanicked(t *testing.T) {
+	for _, in := range []string{"80.5", "null"} {
+		t.Run(in, func(t *testing.T) {
+			var r *Real
+			err := r.UnmarshalJSON([]byte(in))
+			if err == nil {
+				t.Fatalf("(*Real)(nil).UnmarshalJSON(%s) = nil error, want a refusal", in)
+			}
+			if errors.Is(err, typereg.ErrInvalidShape) {
+				t.Errorf("err = %v; caller misuse must not classify as a wire-shape failure", err)
+			}
+		})
+	}
 }

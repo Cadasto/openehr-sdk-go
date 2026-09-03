@@ -81,12 +81,13 @@ var (
 	// polymorphic document (e.g. nested CLUSTER/SECTION trees).
 	ErrMaxDepthExceeded = errors.New("typereg: nesting depth exceeds limit")
 	// ErrInvalidShape classifies a JSON-level shape failure — valid JSON
-	// that is the wrong shape for the target type — or a value a Go
-	// primitive type cannot represent without loss, such as a decimal
-	// literal carrying more precision than float64 holds (REQ-052). It
-	// is usually attached by [WrapShapeError] from inside a generated
-	// UnmarshalJSON method; a hand-written primitive codec (rm.Real, for
-	// mantissa precision loss) attaches it directly. Its message names
+	// that is the wrong shape for the target type — or a hand-written
+	// primitive codec's refusal of a value it will not accept: rm.Real
+	// past its 17-significant-digit budget (a digit count, not a
+	// representability test), rm.Character not exactly one character
+	// (REQ-052). It is usually attached by [WrapShapeError] from inside a
+	// generated UnmarshalJSON method; the hand-written codecs attach it
+	// directly through their own message-preserving wrapper. Its message names
 	// canjson because canjson is where callers meet it: it is
 	// re-exported as canjson.ErrInvalidShape and lives here only so code
 	// in openehr/rm can attach it without forming an

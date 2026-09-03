@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"unicode/utf8"
 
@@ -102,7 +103,8 @@ func TestTermMappingMatchEncodeRefusal(t *testing.T) {
 }
 
 // TestCharacterUnmarshalJSONNumber pins the back-compat number branch's
-// REQ-052 point 4 boundary: a legacy numeric code point still decodes, a JSON
+// boundary (wire.md § REQ-052's `TERM_MAPPING.match` bullet): a legacy
+// numeric code point still decodes, a JSON
 // null is a no-op (the encoding/json Unmarshaler convention), and anything
 // that is not a usable Unicode code point — zero, negative, or beyond the
 // Unicode range — is a decode error rather than a silently-manufactured
@@ -118,7 +120,8 @@ func TestCharacterUnmarshalJSONNumber(t *testing.T) {
 		}
 		// The back-compat arm is decode-only: re-encoding what it produced
 		// MUST give the canonical one-character string, never the number
-		// that came in (REQ-052 point 4, "never the encoded form").
+		// that came in (§ REQ-052's `TERM_MAPPING.match` bullet, "never the
+		// encoded form").
 		out, err := json.Marshal(c)
 		if err != nil {
 			t.Fatalf("Marshal after decoding 61: %v", err)
@@ -138,11 +141,11 @@ func TestCharacterUnmarshalJSONNumber(t *testing.T) {
 		}
 	})
 
-	// 65533 is U+FFFD spelled as a number. It survives utf8.ValidRune, so
-	// only the shared Character rule refuses it — and it must: MarshalJSON
-	// refuses U+FFFD, so accepting it here would let the back-compat arm
-	// manufacture a value the encoders cannot write back out.
-	for _, bad := range []string{"0", "-5", "1114112", "65533"} {
+	// 65533 (U+FFFD) is deliberately absent from this list: it is a genuine
+	// code point, and a number can only ever name one — a JSON number carries
+	// no bytes that could have been substituted — so the number arm accepts
+	// it. TestCharacterRefusesSubstitutedReplacementRune pins that acceptance.
+	for _, bad := range []string{"0", "-5", "1114112"} {
 		t.Run(bad, func(t *testing.T) {
 			var c rm.Character
 			if err := c.UnmarshalJSON([]byte(bad)); err == nil {
@@ -152,45 +155,99 @@ func TestCharacterUnmarshalJSONNumber(t *testing.T) {
 	}
 }
 
-// TestCharacterRejectsReplacementRune pins the U+FFFD boundary on both
-// arms. encoding/json substitutes U+FFFD for a lone UTF-16 surrogate
-// escape and for invalid raw UTF-8 WITHOUT reporting an error, so a
-// rune-count check alone sees one rune and launders corrupted input into
-// a "valid" Character. Both the substituted value and a literal U+FFFD
-// on the wire are therefore refused on decode, and an invalid-UTF-8 or
-// U+FFFD Go value is refused on encode (REQ-052; diagnostics value-free
-// per REQ-093).
-func TestCharacterRejectsReplacementRune(t *testing.T) {
-	decodeRefusals := map[string][]byte{
-		"lone surrogate escape": []byte(`"\uD800"`),
-		"raw invalid UTF-8":     {'"', 0xff, '"'},
-		"literal U+FFFD":        []byte(`"` + string(utf8.RuneError) + `"`),
+// TestCharacterRefusesSubstitutedReplacementRune pins where the U+FFFD
+// line is drawn. The openEHR BASE Character primitive excludes no code
+// point, so U+FFFD is itself a legal Character and MUST survive every
+// codec; refusing it outright would make a valid character
+// unrepresentable in JSON, text and XML alike. What MUST be refused is a
+// SUBSTITUTED U+FFFD: encoding/json replaces a lone UTF-16 surrogate
+// escape with U+FFFD and reports no error, so a rune count alone would
+// launder corrupted input into an apparently valid Character.
+//
+// The JSON string arm is the only entry point that can tell the two
+// apart, because only it still holds the raw bytes between the quotes:
+// U+FFFD is genuine there when the literal spells it (three raw bytes or
+// a \uFFFD escape) and substituted otherwise. An invalid raw byte never
+// reaches that decision — the whole input fails the UTF-8 check first
+// (REQ-052; diagnostics value-free per REQ-093).
+func TestCharacterRefusesSubstitutedReplacementRune(t *testing.T) {
+	// Every refusal must leave the receiver untouched, so each case starts
+	// from a legal Character rather than the zero value: a decoder that
+	// wrote before validating would show up as "=" turning into U+FFFD.
+	refusedDecodes := map[string][]byte{
+		"lone high surrogate escape": []byte(`"\uD800"`),
+		"lone low surrogate escape":  []byte(`"\uDC00"`),
+		"raw invalid UTF-8 byte":     {'"', 0xff, '"'},
 	}
-	for name, in := range decodeRefusals {
+	for name, in := range refusedDecodes {
 		t.Run("decode "+name, func(t *testing.T) {
-			var c rm.Character
+			c := rm.Character("=")
 			err := c.UnmarshalJSON(in)
 			if err == nil {
-				t.Fatalf("UnmarshalJSON(%s) = nil error, want a refusal; c = %q", in, c)
+				t.Fatalf("UnmarshalJSON(%s) = nil error, want a refusal; c = %q", in, string(c))
 			}
-			if c != "" {
-				t.Errorf("UnmarshalJSON(%s) wrote %q to the receiver on failure, want it untouched", in, c)
+			if c != "=" {
+				t.Errorf("UnmarshalJSON(%s) wrote %q to the receiver on failure, want it untouched", in, string(c))
 			}
 		})
 	}
 
-	encodeRefusals := map[string]rm.Character{
-		"invalid UTF-8":  rm.Character(string([]byte{0xff})),
-		"literal U+FFFD": rm.Character(utf8.RuneError),
+	// The accepted spellings all name U+FFFD (or, for the surrogate-pair
+	// cases, prove a well-formed pair is not caught by the substitution
+	// check) and all re-encode to the literal character — encoding/json
+	// emits `\ufffd` only for bytes that are not valid UTF-8, never for a
+	// genuine U+FFFD rune.
+	acceptedDecodes := []struct {
+		name string
+		in   []byte
+		want rm.Character
+	}{
+		{"escaped U+FFFD", []byte(`"\uFFFD"`), rm.Character(utf8.RuneError)},
+		{"mixed-case U+FFFD escape", []byte(`"\uFffD"`), rm.Character(utf8.RuneError)},
+		{"literal U+FFFD", []byte(`"` + string(utf8.RuneError) + `"`), rm.Character(utf8.RuneError)},
+		{"number 65533", []byte("65533"), rm.Character(utf8.RuneError)},
+		{"escaped surrogate pair", []byte(`"\uD83D\uDE00"`), "\U0001F600"},
+		{"literal astral character", []byte(`"😀"`), "\U0001F600"},
 	}
-	for name, c := range encodeRefusals {
-		t.Run("encode "+name, func(t *testing.T) {
-			out, err := c.MarshalJSON()
-			if err == nil {
-				t.Fatalf("MarshalJSON(%q) = %s, nil error; want a refusal", string(c), out)
+	for _, tc := range acceptedDecodes {
+		t.Run("decode "+tc.name, func(t *testing.T) {
+			var c rm.Character
+			if err := c.UnmarshalJSON(tc.in); err != nil {
+				t.Fatalf("UnmarshalJSON(%s): %v", tc.in, err)
+			}
+			if c != tc.want {
+				t.Fatalf("UnmarshalJSON(%s): c = %q, want %q", tc.in, string(c), string(tc.want))
+			}
+			out, err := json.Marshal(c)
+			if err != nil {
+				t.Fatalf("Marshal(%q) after decoding %s: %v", string(c), tc.in, err)
+			}
+			if want := `"` + string(tc.want) + `"`; string(out) != want {
+				t.Errorf("re-encoded %s as %s, want the literal one-character string %s", tc.in, out, want)
 			}
 		})
 	}
+
+	// Encode has no wire bytes to inspect, so the rule there is the value
+	// rule alone: valid UTF-8, one rune. A U+FFFD value passes; bytes that
+	// are not valid UTF-8 do not.
+	t.Run("encode U+FFFD", func(t *testing.T) {
+		c := rm.Character(utf8.RuneError)
+		out, err := c.MarshalJSON()
+		if err != nil {
+			t.Fatalf("MarshalJSON(U+FFFD): %v", err)
+		}
+		if want := `"` + string(utf8.RuneError) + `"`; string(out) != want {
+			t.Errorf("MarshalJSON(U+FFFD) = %s, want %s", out, want)
+		}
+	})
+
+	t.Run("encode invalid UTF-8", func(t *testing.T) {
+		c := rm.Character(string([]byte{0xff}))
+		if out, err := c.MarshalJSON(); err == nil {
+			t.Fatalf("MarshalJSON(0xff) = %s, nil error; want a refusal", out)
+		}
+	})
 }
 
 // TestCharacterAcceptsNonASCII guards against the U+FFFD and UTF-8
@@ -263,5 +320,163 @@ func TestCharacterDecodeRefusalsCarryShapeSentinel(t *testing.T) {
 				t.Errorf("MarshalJSON(%q) err = %v; the decode-side shape sentinel must not appear on an encode path", string(c), err)
 			}
 		})
+	}
+}
+
+// TestCharacterNilReceiverIsRefusedNotPanicked pins the nil-receiver axis
+// (idiom.md § No panics, REQ-025). Both decode entry points assign
+// through the pointer, so a direct call on a nil *rm.Character would
+// dereference it — and a nil pointer is caller-constructible input
+// reachable through the documented API, not a programmer error. The
+// refusal is a PLAIN error: caller misuse is not a wire-shape problem, so
+// it must stay outside typereg.ErrInvalidShape, which a consumer uses to
+// classify bad bytes. A panic here fails the test run outright.
+func TestCharacterNilReceiverIsRefusedNotPanicked(t *testing.T) {
+	// `null` is the discriminating second input: it is the one value both
+	// methods otherwise treat as a no-op, so a nil check placed after the
+	// null arm would let it through and panic on nothing at all.
+	for _, in := range []string{`"="`, "null"} {
+		t.Run("UnmarshalJSON "+in, func(t *testing.T) {
+			var c *rm.Character
+			err := c.UnmarshalJSON([]byte(in))
+			if err == nil {
+				t.Fatalf("(*rm.Character)(nil).UnmarshalJSON(%s) = nil error, want a refusal", in)
+			}
+			if errors.Is(err, typereg.ErrInvalidShape) {
+				t.Errorf("err = %v; caller misuse must not classify as a wire-shape failure", err)
+			}
+		})
+		t.Run("UnmarshalText "+in, func(t *testing.T) {
+			var c *rm.Character
+			err := c.UnmarshalText([]byte(in))
+			if err == nil {
+				t.Fatalf("(*rm.Character)(nil).UnmarshalText(%s) = nil error, want a refusal", in)
+			}
+			if errors.Is(err, typereg.ErrInvalidShape) {
+				t.Errorf("err = %v; caller misuse must not classify as a wire-shape failure", err)
+			}
+		})
+	}
+}
+
+// TestCharacterDecodeRefusalMessageUnchangedByClassification pins the
+// wire.md § REQ-052 Decode-side shape sentinel MUST that the failure's
+// message is "unchanged by the classification" and the cause "stays
+// reachable through unwrapping". The sentinel therefore cannot ride on a
+// fmt.Errorf("%w: %w") wrap, which splices the sentinel's own text
+// ("canjson: invalid JSON shape") into Error(); it rides on Is instead
+// (see shapeClassified in shape_classified.go).
+//
+// The discriminating facet is the exact text: a classified error reads
+// exactly as its cause, so errors.Unwrap(err).Error() == err.Error().
+func TestCharacterDecodeRefusalMessageUnchangedByClassification(t *testing.T) {
+	cases := []struct {
+		name string
+		in   []byte
+		want string
+	}{
+		{"empty string", []byte(`""`), "rm.Character: must be exactly one character, got 0"},
+		{"two characters", []byte(`"=="`), "rm.Character: must be exactly one character, got 2"},
+		{"raw invalid UTF-8 byte", []byte{'"', 0xff, '"'}, "rm.Character: input is not valid UTF-8"},
+		{"substituted surrogate escape", []byte(`"\uD800"`), "rm.Character: a lone UTF-16 surrogate escape was substituted"},
+		{"unusable code point", []byte("0"), "rm.Character: number is not a usable code point"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var c rm.Character
+			err := c.UnmarshalJSON(tc.in)
+			if err == nil {
+				t.Fatalf("UnmarshalJSON(%s) = nil error, want a refusal", tc.in)
+			}
+			if got := err.Error(); got != tc.want {
+				t.Errorf("UnmarshalJSON(%s) err = %q, want %q", tc.in, got, tc.want)
+			}
+			if !errors.Is(err, typereg.ErrInvalidShape) {
+				t.Errorf("UnmarshalJSON(%s) err = %v; want errors.Is(err, typereg.ErrInvalidShape)", tc.in, err)
+			}
+		})
+	}
+
+	// A pass-through encoding/json error is classified the same way, so
+	// the typed cause stays reachable — the half of the MUST that a
+	// text-only wrap would satisfy and an opaque replacement would not.
+	t.Run("encoding/json pass-through", func(t *testing.T) {
+		var c rm.Character
+		err := c.UnmarshalJSON([]byte("true"))
+		if err == nil {
+			t.Fatal("UnmarshalJSON(true) = nil error, want a refusal")
+		}
+		if !errors.Is(err, typereg.ErrInvalidShape) {
+			t.Errorf("err = %v; want errors.Is(err, typereg.ErrInvalidShape)", err)
+		}
+		if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
+			t.Errorf("err = %v (%T); want errors.AsType[*json.UnmarshalTypeError] to reach the cause", err, err)
+		}
+		cause := errors.Unwrap(err)
+		if cause == nil {
+			t.Fatalf("errors.Unwrap(%v) = nil; the cause must stay reachable through unwrapping", err)
+		}
+		if cause.Error() != err.Error() {
+			t.Errorf("classified err = %q but its cause reads %q; the classification must not change the message", err.Error(), cause.Error())
+		}
+	})
+}
+
+// TestCharacterRefusalTextCarriesNoSentinelProse is the can-fail control
+// for the test above, stated as the property rather than as a literal:
+// no Character refusal on any codec may splice the sentinel's own text
+// into its message. Restoring the `%w: %w` wrap fails this.
+func TestCharacterRefusalTextCarriesNoSentinelProse(t *testing.T) {
+	const prose = "invalid JSON shape"
+	inputs := [][]byte{[]byte(`""`), []byte(`"=="`), []byte(`"\uD800"`), []byte("0"), []byte("true"), []byte(`1.5`)}
+	for _, in := range inputs {
+		var c rm.Character
+		err := c.UnmarshalJSON(in)
+		if err == nil {
+			t.Fatalf("UnmarshalJSON(%s) = nil error, want a refusal", in)
+		}
+		if strings.Contains(err.Error(), prose) {
+			t.Errorf("UnmarshalJSON(%s) err = %q; must not contain the sentinel's own prose %q", in, err.Error(), prose)
+		}
+	}
+}
+
+// TestTermMappingMatchSubstitutedSurrogateRefusedThroughFunnel runs the
+// substituted-U+FFFD refusal through the GENERATED TERM_MAPPING decoder —
+// the path a consumer actually reaches — rather than through
+// rm.Character alone. The generated funnel hands the bytes to
+// encoding/json, which dispatches to Character.UnmarshalJSON, so the
+// refusal must survive that hop and still classify as a shape failure
+// (REQ-052 § Decode-side shape sentinel).
+func TestTermMappingMatchSubstitutedSurrogateRefusedThroughFunnel(t *testing.T) {
+	in := []byte(`{"_type":"TERM_MAPPING","match":"\uD800","target":{"_type":"CODE_PHRASE",` +
+		`"terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":"x"}}`)
+	var tm rm.TermMapping
+	err := canjson.Unmarshal(in, &tm)
+	if err == nil {
+		t.Fatalf("Unmarshal(%s) = nil error, want a refusal; match = %q", in, string(tm.Match))
+	}
+	if !errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; want errors.Is(err, canjson.ErrInvalidShape)", err)
+	}
+	if !strings.Contains(err.Error(), "rm.Character") {
+		t.Errorf("err = %v; want the rm.Character refusal to reach the caller", err)
+	}
+}
+
+// TestCharacterGenuineReplacementSurvivesTrailingWhitespace guards the
+// literal inspection against a direct caller's trailing whitespace, which
+// json.Unmarshal accepts: a genuine U+FFFD must not be misread as
+// substituted just because the literal did not end at the closing quote.
+func TestCharacterGenuineReplacementSurvivesTrailingWhitespace(t *testing.T) {
+	for _, in := range []string{"\"\\ufffd\" ", "\"\\uFFFD\"\n", "\"\xef\xbf\xbd\"\t"} {
+		var c rm.Character
+		if err := c.UnmarshalJSON([]byte(in)); err != nil {
+			t.Errorf("UnmarshalJSON(%q): %v, want a genuine U+FFFD to decode", in, err)
+			continue
+		}
+		if c != "\uFFFD" {
+			t.Errorf("UnmarshalJSON(%q) = %q, want U+FFFD", in, string(c))
+		}
 	}
 }

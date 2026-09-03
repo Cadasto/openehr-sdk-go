@@ -22,12 +22,32 @@ type xmlMatchHolder struct {
 	Match   rm.Character `xml:"match"`
 }
 
-// TestCharacterXMLElementContentValidated pins REQ-046 / REQ-052 on the
-// canonical-XML side: Character validity is a property of the value, not
-// of the codec that carried it. Before rm.Character implemented
-// encoding.TextUnmarshaler / encoding.TextMarshaler, encoding/xml treated
-// `match` as a plain string kind, so an empty or multi-character value
-// passed through XML unvalidated while canonical JSON refused it.
+// TestCharacterXMLElementContentValidated pins REQ-046 / REQ-052 /
+// REQ-056 on the canonical-XML side: Character validity is a property of
+// the value, not of the codec that carried it. Before rm.Character
+// implemented encoding.TextUnmarshaler / encoding.TextMarshaler,
+// encoding/xml treated `match` as a plain string kind, so an empty or
+// multi-character value passed through XML unvalidated while canonical
+// JSON refused it. REQ-056 (canonical XML) is cited because the XML
+// behaviour these cases fix is normative there too, not only in the JSON
+// clause that discovered it.
+//
+// U+FFFD is ACCEPTED here, in every spelling XML offers, because it is a
+// legal Character (the BASE primitive excludes no code point) and the
+// text codec has no wire bytes to judge a substitution by — encoding/xml
+// hands over decoded text only.
+//
+// That leaves one residual laundering channel, measured here rather than
+// assumed: encoding/xml refuses invalid UTF-8 (a raw bad byte, and the
+// CESU-8 spelling of a surrogate) and a character reference beyond
+// U+10FFFF, but a SURROGATE-HALF reference — &#xD800; — it converts with
+// Go's rune-to-string rule, which yields U+FFFD, and reports no error.
+// So a surrogate half arrives at UnmarshalText indistinguishable from a
+// genuine U+FFFD, and is accepted. Closing that would mean refusing
+// U+FFFD in XML altogether, i.e. making a legal Character
+// unrepresentable there — the very defect this round fixes on the JSON
+// side. The channel is recorded, not closed; the JSON string arm, which
+// does hold the literal, still refuses its own surrogate escapes.
 func TestCharacterXMLElementContentValidated(t *testing.T) {
 	decode := []struct {
 		name    string
@@ -40,6 +60,17 @@ func TestCharacterXMLElementContentValidated(t *testing.T) {
 		{name: "empty element", doc: `<term_mapping><match></match></term_mapping>`, wantErr: true},
 		{name: "self-closing element", doc: `<term_mapping><match/></term_mapping>`, wantErr: true},
 		{name: "two characters", doc: `<term_mapping><match>ab</match></term_mapping>`, wantErr: true},
+		{name: "literal U+FFFD", doc: `<term_mapping><match>` + "\uFFFD" + `</match></term_mapping>`, want: "\uFFFD"},
+		{name: "U+FFFD character reference", doc: `<term_mapping><match>&#xFFFD;</match></term_mapping>`, want: "\uFFFD"},
+		// The residual channel, pinned as it actually behaves: a
+		// surrogate-half reference is substituted by encoding/xml and
+		// reaches UnmarshalText as a plain U+FFFD, so it decodes.
+		{name: "surrogate half character reference", doc: `<term_mapping><match>&#xD800;</match></term_mapping>`, want: "\uFFFD"},
+		// The corrupted spellings encoding/xml refuses on its own, before
+		// UnmarshalText is consulted.
+		{name: "raw invalid UTF-8 byte", doc: "<term_mapping><match>\xff</match></term_mapping>", wantErr: true},
+		{name: "CESU-8 surrogate bytes", doc: "<term_mapping><match>\xed\xa0\x80</match></term_mapping>", wantErr: true},
+		{name: "character reference beyond Unicode", doc: `<term_mapping><match>&#x110000;</match></term_mapping>`, wantErr: true},
 	}
 	for _, tc := range decode {
 		t.Run("decode "+tc.name, func(t *testing.T) {
@@ -67,6 +98,7 @@ func TestCharacterXMLElementContentValidated(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "one character", match: "=", want: `<term_mapping><match>=</match></term_mapping>`},
+		{name: "U+FFFD", match: "\uFFFD", want: `<term_mapping><match>` + "\uFFFD" + `</match></term_mapping>`},
 		{name: "empty", match: "", wantErr: true},
 		{name: "two characters", match: "ab", wantErr: true},
 	}
@@ -160,7 +192,8 @@ func TestCharacterXMLViaTermMapping(t *testing.T) {
 // the claim that adding encoding.TextUnmarshaler / TextMarshaler leaves the
 // JSON surface alone. encoding/json prefers json.Unmarshaler over
 // encoding.TextUnmarshaler, and the discriminating facet is the back-compat
-// number arm (REQ-052 point 4): a JSON number reaches UnmarshalJSON but
+// number arm (§ REQ-052's `TERM_MAPPING.match` bullet): a JSON number
+// reaches UnmarshalJSON but
 // would never reach UnmarshalText, and the digits "61" are not a Character,
 // so if the text codec had taken over, 61 would fail instead of decoding
 // to "=".
@@ -185,31 +218,36 @@ func TestCharacterJSONUnaffectedByTextCodec(t *testing.T) {
 // TestCharacterTextCodecDirect pins the text codec's own contract, which
 // deliberately has no numeric back-compat arm — the pre-fix encoder wrote a
 // number in JSON only, and XML element content carries no JSON number kind
-// to be tolerant of. Refusals are the same rule as the JSON string arm:
-// invalid UTF-8 and U+FFFD included.
+// to be tolerant of. The rule here is the value rule alone: valid UTF-8,
+// exactly one rune. U+FFFD satisfies it and round-trips; only the JSON
+// string arm, which still holds the raw wire bytes, can tell a genuine
+// U+FFFD from a substituted one, and it is the only entry point that
+// tries. Bytes that are not valid UTF-8 are still refused here, for a
+// direct caller that hands them over without going through encoding/xml.
 func TestCharacterTextCodecDirect(t *testing.T) {
-	t.Run("round-trip", func(t *testing.T) {
-		var c rm.Character
-		if err := c.UnmarshalText([]byte("≥")); err != nil {
-			t.Fatalf("UnmarshalText(≥): %v", err)
-		}
-		if c != "≥" {
-			t.Fatalf("c = %q, want \"≥\"", string(c))
-		}
-		out, err := c.MarshalText()
-		if err != nil {
-			t.Fatalf("MarshalText(≥): %v", err)
-		}
-		if string(out) != "≥" {
-			t.Errorf("MarshalText(≥) = %q, want \"≥\"", out)
-		}
-	})
+	for _, want := range []rm.Character{"≥", "\uFFFD"} {
+		t.Run("round-trip "+string(want), func(t *testing.T) {
+			var c rm.Character
+			if err := c.UnmarshalText([]byte(want)); err != nil {
+				t.Fatalf("UnmarshalText(%q): %v", string(want), err)
+			}
+			if c != want {
+				t.Fatalf("c = %q, want %q", string(c), string(want))
+			}
+			out, err := c.MarshalText()
+			if err != nil {
+				t.Fatalf("MarshalText(%q): %v", string(want), err)
+			}
+			if string(out) != string(want) {
+				t.Errorf("MarshalText(%q) = %q, want %q", string(want), out, string(want))
+			}
+		})
+	}
 
 	refusals := map[string][]byte{
 		"empty":          {},
 		"two characters": []byte("ab"),
 		"invalid UTF-8":  {0xff},
-		"U+FFFD":         []byte("�"),
 		"decimal digits": []byte("61"),
 	}
 	for name, text := range refusals {
