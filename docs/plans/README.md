@@ -10,7 +10,7 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 | Plan | Scope | Covers | Notes |
 |---|---|---|---|
-| [2026-09-03-go-1.27.md](2026-09-03-go-1.27.md) | Raise the module floor to Go 1.27.0 (REQ-002) and adopt 1.27 embedlit, CutLast, stdlib uuid generation, Registry.DecodeAs, URL.Clone, rand.N, and synctest on four sleep tests | REQ-002; STRAND-04 timeline note only | json/v2 canjson migration stays deferred |
+| [archive/2026-09-03-go-1.27.md](archive/2026-09-03-go-1.27.md) | **Landed 2026-09-03 and archived**: raised the module floor to Go 1.27.0 (REQ-002) and adopted 1.27 embedlit, CutLast, stdlib uuid generation, Registry.DecodeAs, URL.Clone, rand.N, and synctest on four sleep tests | REQ-002; STRAND-04 timeline note only | json/v2 canjson migration stays deferred |
 
 ### Deferred-work backlog (2026-09-01 / 02)
 
