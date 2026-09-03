@@ -634,3 +634,27 @@ func TestRMFloorDVCodedTextMappingsEmptyLiteralIsInvalid(t *testing.T) {
 		t.Errorf("expected mappings_valid at /mappings, got %+v", r.Issues)
 	}
 }
+
+// TestRMFloorDVCodedTextMappingsNullIsValid is the DV_CODED_TEXT twin of
+// TestRMFloorMappingsNullIsValid: an explicit JSON null decodes to a nil
+// slice on the embedded DV_TEXT too, so the inherited `mappings` reads as
+// "not supplied" and MUST NOT report mappings_valid (REQ-112).
+func TestRMFloorDVCodedTextMappingsNullIsValid(t *testing.T) {
+	const body = `{"_type":"DV_CODED_TEXT","value":"x",` +
+		`"defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"532"},` +
+		`"mappings":null}`
+	var txt rm.DVCodedText
+	if err := canjson.Unmarshal([]byte(body), &txt); err != nil {
+		t.Fatalf("canjson.Unmarshal: %v", err)
+	}
+	if txt.Mappings != nil {
+		t.Errorf("null mappings decoded to a non-nil slice (%#v) — the floor's absent/null reading depends on nil", txt.Mappings)
+	}
+	r := validation.ValidateRM(&txt)
+	if !r.OK {
+		t.Errorf("ValidateRM(DV_CODED_TEXT, mappings null) want OK; got %+v", r.Issues)
+	}
+	if containsCode(r.Issues, "mappings_valid") {
+		t.Errorf("null mappings must not be flagged mappings_valid; got %+v", r.Issues)
+	}
+}
