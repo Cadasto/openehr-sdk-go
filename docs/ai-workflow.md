@@ -64,7 +64,7 @@ When you add, rename, remove, or materially change a [`cmd/examples/`](../cmd/ex
 
 ## Hooks
 
-After Write/Edit on a `*.go` file, Claude Code formats it via [`.claude/hooks/goformat-on-save.sh`](../.claude/hooks/goformat-on-save.sh) (gofumpt + goimports, host-only, skips `*_gen.go`). Details in [`.claude/CLAUDE.md`](../.claude/CLAUDE.md); `make fmt` is the authoritative full-tree pass.
+The Claude Code format-on-save hook is documented in [`.claude/CLAUDE.md`](../.claude/CLAUDE.md). `make fmt` is the authoritative full-tree pass.
 
 ## When stuck
 

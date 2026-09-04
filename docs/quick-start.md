@@ -191,20 +191,9 @@ Full normative list: [specifications/idiom.md](specifications/idiom.md).
 
 ---
 
-## Makefile essentials (contributors)
+## If you don't have host Go
 
-From the repo root:
-
-```bash
-make help     # discover targets
-make fmt      # gofumpt + goimports
-make test     # unit tests + codegen drift check
-make lint     # golangci-lint (same config as CI)
-make ci       # full PR gate — run before opening a PR
-make build    # compile all packages including cmd/examples
-```
-
-If host Go is missing, `make image-dev` once, then Make transparently routes through Docker. See [ci.md](ci.md).
+The Makefile routes every target through a Docker dev image when host Go 1.27.x is missing: run `make image-dev` once, then use `make` as normal. `make doctor` tells you which toolchain is active. Contributor targets and the PR gate are covered in [ci.md](ci.md) and [CONTRIBUTING.md](../CONTRIBUTING.md), not here.
 
 ---
 

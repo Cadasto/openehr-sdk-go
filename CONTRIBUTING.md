@@ -1,6 +1,6 @@
 # Contributing
 
-`openehr-sdk-go` is the first-party Go SDK for openEHR. Contributions are welcome; this file is the short version. Long form: [`AGENTS.md`](AGENTS.md).
+`openehr-sdk-go` is the first-party Go SDK for openEHR. Contributions are welcome. This file is the short version; how work actually flows here (the spec-first ladder and its gates) is in [`docs/development-process.md`](docs/development-process.md), and [`AGENTS.md`](AGENTS.md) is the entry point shared with coding agents.
 
 ## Before you start
 
@@ -46,26 +46,19 @@ Imperative mood. Body explains *why* (the *what* is in the diff). Reference REQ-
 
 ## Local development
 
+The three you will run most:
+
 ```bash
-make help        # grouped targets
-make ci          # full PR gate
-make test        # unit tests
-make fmt         # gofumpt + goimports
-make vet
-make lint
-make codegen     # regenerate RM + AOM from resources/bmm/
-make codegen-verify  # fail if codegen drifts
-make spec-check  # validate docs/specifications/traceability.yaml
-make spec-context REQ=NNN  # assemble the SDD context bundle for a REQ
-make probe-status  # each PROBE's status + whether its test file exists
+make ci      # the full PR gate; run it before opening a PR
+make test    # unit tests (includes the codegen drift check)
+make fmt     # gofumpt + goimports
 ```
 
-Go `1.27.x` on the host is the fast path; the Makefile transparently routes through a Docker dev image if host Go is missing. See [`docs/ci.md`](docs/ci.md).
+`make help` lists every target, grouped, and [`docs/ci.md`](docs/ci.md) explains what the gate checks. Toolchain setup, including the Docker fallback when you have no host Go, is in [`docs/quick-start.md`](docs/quick-start.md#prerequisites).
 
 ### Hooks and IDE integration
 
-- After Write/Edit on `*.go`, Claude Code formats the touched file with gofumpt + goimports (see [`.claude/hooks/goformat-on-save.sh`](.claude/hooks/goformat-on-save.sh)).
-- Pre-commit linters are not enforced by hook; run `make lint` before opening a PR.
+Nothing runs on commit, so run `make lint` yourself before opening a PR. If you use Claude Code, its format-on-save hook is described in [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
 
 ## Code style
 
