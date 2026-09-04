@@ -1,7 +1,6 @@
 # openehr-sdk-go
 
 [![CI](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/codeql.yml/badge.svg)](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/codeql.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/cadasto/openehr-sdk-go.svg)](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cadasto/openehr-sdk-go)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -40,13 +39,13 @@ composition: archetype_node_id=openEHR-EHR-COMPOSITION.encounter.v1
 OK: canonical-JSON Composition decoded from body_weight.json
 ```
 
-To use it in your own project:
+To use it in your own project — the SDK is pre-1.0, so pin an exact tag; a minor release can change the public API:
 
 ```bash
-go get github.com/cadasto/openehr-sdk-go@latest
+go get github.com/cadasto/openehr-sdk-go@latest   # pre-1.0: then pin the exact tag it resolves to
 ```
 
-The SDK is pre-1.0. A minor release can change the public API, so pin an exact tag in anything you ship. The version policy is in [releases.md](docs/releases.md), and the [roadmap](docs/roadmap.md) says what has actually landed.
+The version policy is in [releases.md](docs/releases.md), and the [roadmap](docs/roadmap.md) says what has actually landed.
 
 ## Who it's for
 
@@ -64,20 +63,20 @@ If you only need one piece (RM modeling, a codec, validation, AQL string constru
 
 The definitive landed-vs-planned status, with REQ and PROBE identifiers, is in the [roadmap](docs/roadmap.md) and the [REQ registry](docs/specifications/REQ.md).
 
-- **openEHR REST client** — System, EHR, EHR_STATUS, Composition, Directory, Contribution, Query, Definition (stored AQL), and Admin, over a versioned transport. [wire](docs/specifications/wire.md), [transport](docs/specifications/transport.md)
+- **openEHR REST client** — System, EHR, EHR_STATUS, Composition, Directory, Contribution, Query, Definition (stored AQL), Demographic, and Admin, over a versioned transport. [wire](docs/specifications/wire.md), [transport](docs/specifications/transport.md)
 - **Reference Model** — typed RM structs and a central type registry, generated from pinned BMM dictionaries, plus hand-written identifier, temporal, and locatable-path helpers. [rm-modeling](docs/specifications/rm-modeling.md)
 - **Serialization** — canonical JSON and XML round-trips, and bidirectional FLAT / STRUCTURED simplified-format codecs driven by a Web Template. [wire](docs/specifications/wire.md)
 - **Templates (ADL 1.4 OPT)** — operational-template parsing with typed primitive constraints, a compiled-template foundation, and WebTemplate JSON export for form generation. [rm-modeling](docs/specifications/rm-modeling.md)
 - **Compositions** — an OPT-driven builder, template-driven validation, and RM-instance synthesis from a template. [wire](docs/specifications/wire.md)
 - **AQL** — literal AQL wire models and result sets, fluent struct and verb builders, and static parse-and-lint. [wire](docs/specifications/wire.md)
 - **Authentication** — SMART-on-openEHR (PKCE), client credentials, JWT bearer, and basic token sources, all over one injected `TokenSource`. [auth](docs/specifications/auth.md)
-- **Service discovery** — a multi-backend service catalog with per-node spec pinning and partial-failure handling. [service-discovery](docs/specifications/service-discovery.md)
-- **Cadasto platform extras** — Datamap, MPI, Extra API, Admin, and Care aggregates. These ship in the same module for v1, behind a `cadasto/` cut line so they can be split out later as a subtree move rather than a rewrite. [module-layout](docs/specifications/module-layout.md)
+- **Service discovery** — a multi-backend service catalog with per-node spec pinning. [service-discovery](docs/specifications/service-discovery.md)
+- **Cadasto platform extras** — mostly on the roadmap: Datamap, MPI, an Extra API, and Care aggregates are **planned**, and the Cadasto admin package has health probes today (the rest is **partial**). They live in the same module behind a `cadasto/` cut line, so they can be split out later as a subtree move rather than a rewrite. [module-layout](docs/specifications/module-layout.md)
 - **Conformance** — an openEHR wire-conformance probe suite covering round-trip byte-stability and spec-correct envelopes. [conformance](docs/specifications/conformance.md)
 
 ## Getting started
 
-Start with [quick-start.md](docs/quick-start.md), then the runnable catalog in [examples.md](docs/examples.md). Both cover toolchain setup, whether you have host Go or use the Docker fallback.
+Start with [quick-start.md](docs/quick-start.md), then the runnable catalog in [examples.md](docs/examples.md). quick-start covers toolchain setup, whether you have host Go or use the Docker fallback.
 
 If you're working on the SDK itself, `make help` lists the grouped targets and [ci.md](docs/ci.md) explains the PR gate.
 
