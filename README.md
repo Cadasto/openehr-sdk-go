@@ -81,6 +81,10 @@ Start with [quick-start.md](docs/quick-start.md), then the runnable catalog in [
 
 If you're working on the SDK itself, `make help` lists the grouped targets and [ci.md](docs/ci.md) explains the PR gate.
 
+## AI-assisted development
+
+Much of this codebase and its documentation was written with AI coding assistants such as Claude Code and Cursor. The written specification is what keeps that honest: every change is measured against the specs in this repository, has to pass the [`make ci` gate](docs/ci.md), and is reviewed before a maintainer merges it. How the assistants are set up, and what they must look up rather than guess, is in [ai-workflow.md](docs/ai-workflow.md). The rules for contributing with AI help, including the `Assisted-by:` commit trailer, are in [CONTRIBUTING.md](CONTRIBUTING.md#ai-assisted-contributions).
+
 ## Documentation
 
 ### Spec-driven design (SDD)

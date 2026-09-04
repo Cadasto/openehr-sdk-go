@@ -42,7 +42,27 @@ fix(canjson): handle nil interface in polymorphic decode
 docs(plans): track REQ-110 follow-up
 ```
 
-Imperative mood. Body explains *why* (the *what* is in the diff). Reference REQ-NNN / PROBE-NNN / issue numbers when relevant.
+Imperative mood. Body explains *why* (the *what* is in the diff). Reference REQ-NNN / PROBE-NNN / issue numbers when relevant. If an AI tool helped write the change, add an `Assisted-by:` trailer — see [AI-assisted contributions](#ai-assisted-contributions).
+
+## AI-assisted contributions
+
+AI coding assistants are a normal part of how this project is built; the tooling is described in [`docs/ai-workflow.md`](docs/ai-workflow.md). Using one is fine. The rules:
+
+- **You are the author.** An assistant is a tool, not a co-author. You are accountable for every line you submit and should be able to explain any of it in review; a change you can't explain isn't ready.
+- **Say so.** Add an `Assisted-by:` git trailer to each commit an assistant helped with (format below).
+- **Same bar, no exceptions.** A REQ in the spec first for new behaviour, tests that fail if the guard is removed, `make ci` green, review.
+- **Look it up; don't take the model's word.** For openEHR facts (RM paths, terminology codes, wire shapes) use the ground-truth lookups in [`docs/ai-workflow.md` § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). An assistant's recollection of a spec is not a source.
+- **Keep private things out of the prompt.** No credentials, tokens, patient or personal data, or content from private repositories in an assistant's context.
+- **Licence provenance is on you.** Don't accept generated code that reproduces third-party code under a licence incompatible with MIT.
+
+The trailer names the tool, and the model when you know it. Trailers go at the end of the commit message: a blank line after the body, then one line per tool.
+
+```
+Assisted-by: Claude Code (claude-opus-4-8)
+Assisted-by: Cursor
+```
+
+Use `Assisted-by:`, not `Co-authored-by:` — the latter names a person and carries authorship. If a tool inserts a `Co-authored-by:` line for itself, change it to `Assisted-by:`. Reviewers may use assistants as well; a review is still a maintainer's call.
 
 ## Local development
 
