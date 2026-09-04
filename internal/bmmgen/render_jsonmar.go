@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
-	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -446,6 +445,5 @@ func genericTypeArgList(sc *bmm.SimpleClass) string {
 	if !sc.IsGeneric() {
 		return ""
 	}
-	keys := slices.Sorted(maps.Keys(sc.GenericParameterDefs))
-	return "[" + strings.Join(keys, ", ") + "]"
+	return "[" + strings.Join(sortedStringKeys(sc.GenericParameterDefs), ", ") + "]"
 }

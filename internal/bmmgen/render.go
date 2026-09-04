@@ -372,8 +372,7 @@ func renderConcreteClass(plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass) (str
 	// we're flattening, not embedding), the descendant wins.
 	props := collectFlattenedProperties(plan, sc, embedded)
 
-	keys := slices.Sorted(maps.Keys(props))
-	for _, name := range keys {
+	for _, name := range sortedStringKeys(props) {
 		prop := props[name]
 		field, err := renderField(plan, sc, pc.BMMName, prop)
 		if err != nil {
