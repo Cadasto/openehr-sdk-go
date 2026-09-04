@@ -237,9 +237,9 @@ func predicateNameOf(np gen.INodePredicateContext) *aql.PredicateName {
 func termCodeName(text string) *aql.PredicateName {
 	n := &aql.PredicateName{Kind: aql.NameTermCode}
 	rest := text
-	if i := strings.Index(rest, "|"); i >= 0 {
-		n.Display = strings.TrimSuffix(rest[i+1:], "|")
-		rest = rest[:i]
+	if before, after, found := strings.Cut(rest, "|"); found {
+		n.Display = strings.TrimSuffix(after, "|")
+		rest = before
 	}
 	term, code, ok := strings.Cut(rest, "::")
 	if !ok {

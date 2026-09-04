@@ -113,8 +113,8 @@ func TestDecodeRejectsIndexCollision(t *testing.T) {
 	for _, k := range slices.Sorted(maps.Keys(m)) {
 		if strings.Contains(k, ":0/") {
 			base = k
-			if i := strings.LastIndex(k, "|"); i >= 0 {
-				base = k[:i]
+			if before, _, found := strings.CutLast(k, "|"); found {
+				base = before
 			}
 			break
 		}

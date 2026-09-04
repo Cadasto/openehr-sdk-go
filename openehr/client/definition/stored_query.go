@@ -185,8 +185,8 @@ func PutStoredQueryVersion(ctx context.Context, c *transport.Client, qualifiedNa
 // remediation (REQ-057).
 func reservedQueryName(qualifiedName string) bool {
 	queryName := qualifiedName
-	if i := strings.LastIndex(qualifiedName, "::"); i >= 0 {
-		queryName = qualifiedName[i+2:]
+	if _, after, found := strings.CutLast(qualifiedName, "::"); found {
+		queryName = after
 	}
 	return strings.EqualFold(queryName, "aql")
 }

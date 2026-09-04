@@ -65,7 +65,8 @@ func spanOfText(start parse.Position, text string) Span {
 func advance(p parse.Position, text string) parse.Position {
 	if n := strings.Count(text, "\n"); n > 0 {
 		p.Line += n
-		p.Col = 1 + len([]rune(text[strings.LastIndex(text, "\n")+1:]))
+		_, last, _ := strings.CutLast(text, "\n")
+		p.Col = 1 + len([]rune(last))
 	} else {
 		p.Col += len([]rune(text))
 	}

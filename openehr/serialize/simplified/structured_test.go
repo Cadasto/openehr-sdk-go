@@ -16,8 +16,8 @@ import (
 // FLAT decoder folds `:0` back onto the index-less spelling.
 func indexEverySegment(key string) string {
 	path, suffix := key, ""
-	if i := strings.LastIndex(key, "|"); i >= 0 {
-		path, suffix = key[:i], key[i:]
+	if before, after, found := strings.CutLast(key, "|"); found {
+		path, suffix = before, "|"+after
 	}
 	segs := strings.Split(path, "/")
 	for i := 1; i < len(segs); i++ {

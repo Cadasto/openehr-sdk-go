@@ -73,7 +73,7 @@ func endOf(tok antlr.Token) Position {
 	}
 	text := tok.GetText()
 	if n := strings.Count(text, "\n"); n > 0 {
-		last := text[strings.LastIndex(text, "\n")+1:]
+		_, last, _ := strings.CutLast(text, "\n")
 		return Position{Line: tok.GetLine() + n, Col: 1 + len([]rune(last))}
 	}
 	// ANTLR columns are 0-based; posOf exposes 1-based, and so does this.
