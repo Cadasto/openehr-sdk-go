@@ -33,7 +33,7 @@ func classifyShape(err error) error {
 
 // shapeClassified is the [typereg.ErrInvalidShape]-carrying error
 // classifyShape returns, modelled on typereg's unexported shapeError
-// (openehr/rm/typereg/registry.go). It is likewise unexported:
+// (openehr/rm/typereg/errors.go). It is likewise unexported:
 // consumers classify with errors.Is against the sentinel and reach the
 // cause with errors.Is / errors.AsType, so the concrete type is not part
 // of the public surface and can change without a breaking release.
