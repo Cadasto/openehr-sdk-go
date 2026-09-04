@@ -12,6 +12,7 @@ linters:
     # go-coding plugin reference set
     - modernize              # range-int, min/max, slices/maps, strings.Cut … (go fix engine)
     - errorlint              # %w + errors.Is/As discipline
+    - exhaustive             # every enum member spelled in a switch; a default never signifies exhaustive
     - bodyclose              # unclosed http.Response.Body
     - rowserrcheck           # unchecked sql.Rows.Err
     - sqlclosecheck          # unclosed sql.Rows/Stmt
@@ -31,6 +32,11 @@ linters:
   disable:
     - depguard               # no third-party deps yet; enable when the module grows
   settings:
+    exhaustive:
+      default-signifies-exhaustive: false
+      # canxml.isNil lists only the nil-able reflect kinds; enumerating the
+      # other twenty-one would be noise, so the stdlib enum is ignored.
+      ignore-enum-types: '^reflect\.Kind$'
     revive:
       # Curated high-signal set. Listing rules explicitly keeps the policy
       # predictable (rather than tracking revive's shifting defaults).
