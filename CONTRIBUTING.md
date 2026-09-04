@@ -26,7 +26,7 @@
 
 1. Fork + branch from `main`. Name the branch after what it does: `feat/req-N-short-name`, `fix/short-name`, `docs/<area>`, etc.
 2. **Run `make ci` locally** before opening the PR. CI replicates the gate ([`docs/ci.md`](docs/ci.md)).
-3. Update [`CHANGELOG.md`](CHANGELOG.md) under `## [Unreleased]` if your change is consumer-visible. Pre-1.0 we use **only `### Added`**; fold fix-ups into Added bullets — see the file's preamble.
+3. Leave [`CHANGELOG.md`](CHANGELOG.md) to the maintainers — it is curated on request or when a release is cut, not per feature PR ([AGENTS.md](AGENTS.md#code-style-and-conventions)). Call out any consumer-visible change in the PR description so it can be folded in.
 4. If you add or change a REQ-marked behaviour, update [`docs/specifications/traceability.yaml`](docs/specifications/traceability.yaml) in the same PR (`make spec-check` enforces this).
 5. Cite REQ-NNN / PROBE-NNN in commit messages and doc comments. REQs are stable identifiers — never renumber.
 6. **New or changed `cmd/examples/`** — update [`docs/examples.md`](docs/examples.md) and [`cmd/examples/doc.go`](cmd/examples/doc.go) in the same PR; touch [`docs/quick-start.md`](docs/quick-start.md) when the onboarding path changes. See [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
@@ -74,7 +74,7 @@ make test    # unit tests (includes the codegen drift check)
 make fmt     # gofumpt + goimports
 ```
 
-`make help` lists every target, grouped, and [`docs/ci.md`](docs/ci.md) explains what the gate checks. Toolchain setup, including the Docker fallback when you have no host Go, is in [`docs/quick-start.md`](docs/quick-start.md#prerequisites).
+`make help` lists every target, grouped, and [`docs/ci.md`](docs/ci.md) explains what the gate checks. The Docker fallback when you have no host Go is in [`docs/quick-start.md`](docs/quick-start.md#if-you-dont-have-host-go).
 
 ### Hooks and IDE integration
 
@@ -84,7 +84,7 @@ Nothing runs on commit, so run `make lint` yourself before opening a PR. If you 
 
 The normative, elaborate idiom spec is [`docs/specifications/idiom.md`](docs/specifications/idiom.md) — context propagation, `*http.Client` injection, functional options, generics-no-reflection, error wrapping / typed errors, concurrency, imports & naming, and public-API stability. Formatting, lint, and commit conventions are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions). Read those first; the highlights that trip up most PRs:
 
-- **Building-block independence (REQ-013)**: `openehr/{rm,serialize,validation,template,instance,composition}/` and `openehr/aql/` (with its `parse`, `lint`, and `contain` blocks) MUST be usable standalone, with no imports of `transport/`, `auth/`, or `openehr/client/*`. Enforced by `TestXxxForbiddenImports` in each package. See [`docs/specifications/module-layout.md`](docs/specifications/module-layout.md).
+- **Building-block independence (REQ-013)**: the openEHR building-block packages and the AQL blocks MUST be usable standalone, with no `transport/` or `auth/` import. The exact package set and the per-package import guards are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions) and [`docs/specifications/module-layout.md`](docs/specifications/module-layout.md).
 - **No reflection** (REQ-024) — closed type-switches only on RM polymorphism. Generics are fine; `reflect.Value` is not.
 - **Strict-encode / permissive-decode** numerics per [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md).
 - **Comments**: WHY, not WHAT — identifiers carry the WHAT. Cite REQ-NNN / PROBE-NNN where relevant; do NOT cite issue numbers or commit SHAs (those rot). One short line per non-obvious choice; no multi-paragraph docstrings except package-level `doc.go`.
