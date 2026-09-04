@@ -179,10 +179,10 @@ func Deletion[T Versionable](precedingUID string, data *T, opts ...VersionOption
 // assembles the write-side version once Build resolves the batch audit.
 // T is instantiated at the call site, so the type-set is a compile-time
 // fact. The public constructors stay package-level functions returning
-// an inert [Change] that a non-generic [Builder.Add] accumulates — that
-// is the shipped fluent surface (REQ-130), not a workaround: Go 1.27
-// allows generic methods, but sixteen Add* methods would still be a
-// worse API than four constructors plus Add.
+// an inert [Change] that a non-generic [Builder.Add] accumulates
+// (REQ-130, REQ-023). Go 1.27 allows generic methods; four generic Add*
+// methods would still be a worse fluent surface than four constructors
+// plus Add.
 func newChange[T Versionable](ct ChangeType, precedingUID string, data *T, opts ...VersionOption) Change {
 	if data == nil {
 		return Change{err: fmt.Errorf("contribution: %s change has nil data", changeTypeTerms[ct])}
