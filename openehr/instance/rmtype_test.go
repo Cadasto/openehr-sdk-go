@@ -57,4 +57,8 @@ func TestParseBMMGeneric(t *testing.T) {
 	if _, _, ok := parseBMMGeneric("DV_INTERVAL<>"); ok {
 		t.Fatal("expected empty generic param to return ok=false")
 	}
+	base, param, ok = parseBMMGeneric("DV_INTERVAL<DV_INTERVAL<DV_QUANTITY>>")
+	if !ok || base != "DV_INTERVAL" || param != "DV_INTERVAL<DV_QUANTITY>" {
+		t.Fatalf("nested generic = %q %q %v, want DV_INTERVAL / DV_INTERVAL<DV_QUANTITY> / true — the closer is the last '>'", base, param, ok)
+	}
 }

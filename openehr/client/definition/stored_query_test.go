@@ -284,7 +284,10 @@ func TestPutStoredQueryReservedName(t *testing.T) {
 	defer srv.Close()
 	c := newClient(t, srv)
 
-	for _, name := range []string{"aql", "AQL", "Aql", " aql ", "ehr::aql", "org.openehr::AQL"} {
+	// The last name pins that the reserved segment is after the *final*
+	// "::": splitting on the first one would leave "reports::aql" and
+	// miss the reservation (REQ-057).
+	for _, name := range []string{"aql", "AQL", "Aql", " aql ", "ehr::aql", "org.openehr::AQL", "org.example::reports::aql"} {
 		t.Run(name, func(t *testing.T) {
 			for _, tc := range []struct {
 				label string

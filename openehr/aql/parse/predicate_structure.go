@@ -236,10 +236,9 @@ func predicateNameOf(np gen.INodePredicateContext) *aql.PredicateName {
 // consumer that has to split it is back to re-lexing.
 func termCodeName(text string) *aql.PredicateName {
 	n := &aql.PredicateName{Kind: aql.NameTermCode}
-	rest := text
-	if i := strings.Index(rest, "|"); i >= 0 {
-		n.Display = strings.TrimSuffix(rest[i+1:], "|")
-		rest = rest[:i]
+	rest, after, found := strings.Cut(text, "|")
+	if found {
+		n.Display = strings.TrimSuffix(after, "|")
 	}
 	term, code, ok := strings.Cut(rest, "::")
 	if !ok {

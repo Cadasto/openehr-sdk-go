@@ -258,8 +258,8 @@ func TestCompile_TermBindingsForNode(t *testing.T) {
 	}
 	// Use bare at-code when the locator is path-shaped.
 	nodeID := ref
-	if i := strings.LastIndex(ref, "["); i >= 0 {
-		nodeID = strings.TrimSuffix(ref[i+1:], "]")
+	if _, after, found := strings.CutLast(ref, "["); found {
+		nodeID = strings.TrimSuffix(after, "]")
 	}
 	filtered := c.TermBindingsForNode(nodeID)
 	if len(filtered) == 0 {

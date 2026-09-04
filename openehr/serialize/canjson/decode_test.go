@@ -362,8 +362,8 @@ func TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications(t *testing.T)
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; a shape failure raised beneath a polymorphic slot stays a shape failure — a DecodeError must not strip the classification", err)
 	}
-	if !errors.As(err, new(*json.UnmarshalTypeError)) {
-		t.Errorf("err = %v; want the encoding/json cause to stay reachable with errors.As", err)
+	if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
+		t.Errorf("err = %v; want the encoding/json cause to stay reachable with errors.AsType", err)
 	}
 	for _, sentinel := range []error{typereg.ErrUnknownType, typereg.ErrMissingType, typereg.ErrTypeMismatch} {
 		if errors.Is(err, sentinel) {
@@ -409,8 +409,8 @@ func TestUnmarshalNarrowSlotMissingTypeFallbackKeepsBothClassifications(t *testi
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; the fallback decodes through DV_TEXT's own funnel, so its shape failure must keep the sentinel", err)
 	}
-	if !errors.As(err, new(*json.UnmarshalTypeError)) {
-		t.Errorf("err = %v; want the encoding/json cause to stay reachable with errors.As", err)
+	if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
+		t.Errorf("err = %v; want the encoding/json cause to stay reachable with errors.AsType", err)
 	}
 	if errors.Is(err, typereg.ErrMissingType) {
 		t.Errorf("err = %v; the fallback consumed the missing-`_type` condition — what is reported is the retry's shape failure", err)
@@ -490,7 +490,8 @@ func TestDecoderDecodeStreamDivergesFromUnmarshal(t *testing.T) {
 			t.Errorf("Decode(\"\") err = %v; an empty stream is io.EOF, not a JSON shape failure", err)
 		}
 		var uq rm.DVQuantity
-		if uerr := canjson.Unmarshal([]byte(""), &uq); !errors.As(uerr, new(*json.SyntaxError)) {
+		uerr := canjson.Unmarshal([]byte(""), &uq)
+		if _, ok := errors.AsType[*json.SyntaxError](uerr); !ok {
 			t.Errorf("Unmarshal(\"\") err = %v; want *json.SyntaxError (the divergence this test pins)", uerr)
 		}
 	})
@@ -513,7 +514,8 @@ func TestDecoderDecodeStreamDivergesFromUnmarshal(t *testing.T) {
 			t.Errorf("second.Magnitude = %v; want 1.5", second.Magnitude)
 		}
 		var uq rm.DVQuantity
-		if uerr := canjson.Unmarshal([]byte(in), &uq); !errors.As(uerr, new(*json.SyntaxError)) {
+		uerr := canjson.Unmarshal([]byte(in), &uq)
+		if _, ok := errors.AsType[*json.SyntaxError](uerr); !ok {
 			t.Errorf("Unmarshal(two values) err = %v; want *json.SyntaxError (the divergence this test pins)", uerr)
 		}
 	})
@@ -533,7 +535,7 @@ func TestUnmarshalOverflowIsATypedError(t *testing.T) {
 		t.Fatal("Unmarshal(magnitude 1e400) = nil; want a typed range error")
 	}
 	if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
-		t.Errorf("err = %v (%T); want errors.As to reach *json.UnmarshalTypeError", err, err)
+		t.Errorf("err = %v (%T); want errors.AsType to reach *json.UnmarshalTypeError", err, err)
 	}
 }
 

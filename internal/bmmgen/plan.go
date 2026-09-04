@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -289,7 +290,7 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 			return cmp.Compare(a.GoName, b.GoName)
 		})
 	}
-	for _, fb := range sortedFileKeys(files) {
+	for _, fb := range sortedStringKeys(files) {
 		p.Files = append(p.Files, files[fb])
 	}
 
@@ -690,21 +691,7 @@ func computeConcreteSubtypes(p *Plan) {
 
 // sortedStringKeys returns the keys of m in lexicographic order.
 func sortedStringKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
-}
-
-func sortedFileKeys(files map[string]*PlannedFile) []string {
-	keys := make([]string, 0, len(files))
-	for k := range files {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
+	return slices.Sorted(maps.Keys(m))
 }
 
 // AncestorChain returns the BMM ancestor chain (immediate + their

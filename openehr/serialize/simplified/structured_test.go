@@ -15,9 +15,10 @@ import (
 // index (STRUCTURED arrays have positions, so the inverse always writes one). The
 // FLAT decoder folds `:0` back onto the index-less spelling.
 func indexEverySegment(key string) string {
-	path, suffix := key, ""
-	if i := strings.LastIndex(key, "|"); i >= 0 {
-		path, suffix = key[:i], key[i:]
+	path, after, found := strings.CutLast(key, "|")
+	suffix := ""
+	if found {
+		suffix = "|" + after
 	}
 	segs := strings.Split(path, "/")
 	for i := 1; i < len(segs); i++ {

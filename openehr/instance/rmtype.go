@@ -24,22 +24,20 @@ func newRMForOPTType(declared string) (any, error) {
 }
 
 // parseBMMGeneric splits "BASE<PARAM>" OPT/BMM generic notation.
-func parseBMMGeneric(declared string) (base, param string, ok bool) {
-	i := strings.Index(declared, "<")
-	if i < 0 {
+func parseBMMGeneric(declared string) (string, string, bool) {
+	base, rest, ok := strings.Cut(declared, "<")
+	if !ok {
 		return "", "", false
 	}
-	j := strings.LastIndex(declared, ">")
-	if j <= i {
+	param, after, ok := strings.CutLast(rest, ">")
+	if !ok || strings.TrimSpace(after) != "" {
 		return "", "", false
 	}
-	if strings.TrimSpace(declared[j+1:]) != "" {
+	param = strings.TrimSpace(param)
+	if param == "" {
 		return "", "", false
 	}
-	if param := strings.TrimSpace(declared[i+1 : j]); param == "" {
-		return "", "", false
-	}
-	return strings.TrimSpace(declared[:i]), strings.TrimSpace(declared[i+1 : j]), true
+	return strings.TrimSpace(base), param, true
 }
 
 // newGenericRM materialises closed-set BMM generic RM types the OPT
