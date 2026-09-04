@@ -600,6 +600,15 @@ requirements:
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
       - docs/plans/archive/2026-08-30-definition-metadata-decoding.md
     notes: >
+      What keeps this partial (2026-09-05 census, table in
+      testkit/cassettes/its_rest/README.md § Coverage against the client
+      surface): no vendored StoredQueryMetadata body (metadata or list), no
+      upstream-authored persisted CONTRIBUTION response for contribution.Get,
+      and no ITEM_TAG bodies (header-carried today, REQ-059 partial). Admin has
+      no bodies by contract and the VERSIONED_* read family is not implemented,
+      so neither counts. Everything else the clients decode has a vendored body
+      here or under ../compositions, ../rm, ../submissions.
+
       Amended 2026-08-30 (ADR 0019): the section now carries one KEYED exception
       to the OpenAPI-authoritative rule -- the REQ-144 Definition metadata
       timestamp decode tolerance, which accepts StoredQueryMetadata.saved values

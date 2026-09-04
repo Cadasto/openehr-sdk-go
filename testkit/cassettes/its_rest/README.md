@@ -82,6 +82,27 @@ Hand-crafted SMART configuration document that satisfies the openEHR SMART disco
 | `smart-configuration-mismatch.json` | Variant advertising `1.0.3` — exercises PROBE-003 (spec-version mismatch fails fast at discovery). |
 | `jwks.json` | Reference JWKS document with two RS256 keys; used to exercise JWKS rotation (PROBE-006). |
 
+## Coverage against the client surface
+
+What `openehr/client/*` decodes today, and whether a vendored body under this directory (or a sibling cassette tree) exercises it. This is the census behind REQ-095's `partial` (2026-09-05): the rows marked **gap** are what keeps it partial.
+
+| Client surface | Vendored body | Where |
+|---|---|---|
+| System `OPTIONS /` | yes | `system/capabilities.json` |
+| EHR, EHR_STATUS, FOLDER reads | yes | `ehr/` |
+| COMPOSITION reads and writes | yes | [`../compositions/`](../compositions/), [`../rm/`](../rm/) |
+| CONTRIBUTION submission (request bodies) | yes | [`../submissions/`](../submissions/) |
+| CONTRIBUTION read (`GET …/contribution/{uid}`) | **gap** | decoded from a hand-built body in `openehr/client/ehr/contribution/contribution_test.go`; no upstream-authored persisted CONTRIBUTION response |
+| Definition — template list, metadata, OPT | yes | `definition/` |
+| Definition — stored-query metadata and list | **gap** | hand-built in `openehr/client/definition/stored_query_test.go`; no vendored `StoredQueryMetadata` body |
+| Query — RESULT_SET | yes | `query/result_set.json` |
+| Demographic — five party kinds, ORIGINAL_VERSION, REVISION_HISTORY | yes | `demographic/` |
+| ITEM_TAG | **gap** | header-carried today (REQ-059 `partial`); no tag bodies until the dedicated endpoints land |
+| Admin | n/a | `204` by contract, no bodies |
+| VERSIONED_COMPOSITION / VERSIONED_EHR_STATUS | n/a | family not implemented (roadmap: deferred under STRAND-09) |
+| Error envelopes | yes | `errors/` |
+| SMART discovery | yes | `discovery/` |
+
 ## Conventions
 
 - Cassettes are immutable inputs. Never hand-edit a vendored cassette to make a test pass — fix the codec or open a follow-up to refresh from upstream.
