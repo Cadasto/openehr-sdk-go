@@ -138,8 +138,9 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 // the server supplied it); errors raised by this SDK always carry a non-nil
 // Meta. Together with the classification (the type itself, via errors.As),
 // Meta is the boundary-safe surface. Cause is internal diagnostics and may
-// carry payload-derived text — rm decode errors embed the offending value
-// (`parse %q`), the same class [transport.WithRawErrorBodies] gates for
+// carry payload-derived text — the strconv and encoding/json causes beneath
+// an rm decode error quote the offending literal, the same class
+// [transport.WithRawErrorBodies] gates for
 // [transport.OpenEHRErrorDetail] — so, like [*transport.WireError] (REQ-093),
 // Error is value-free and never interpolates Cause; callers that need the
 // diagnostics unwrap or read Cause deliberately.

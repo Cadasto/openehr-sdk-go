@@ -117,6 +117,16 @@
 //     [DecodeError] naming that slot: a [DecodeError] does not strip a
 //     shape classification raised beneath it, so a consumer reads the
 //     path off one and the kind off the other.
+//   - A hand-written primitive decoded at the top level — rm.Real,
+//     rm.Integer or rm.Character handed to [Unmarshal] directly rather
+//     than reached through a generated type — carries its own
+//     `rm.<Type>:` prefix, not the `canjson: <RM_TYPE>:` funnel. Real's
+//     precision refusal and every Character refusal wrap
+//     [ErrInvalidShape]; a strconv or encoding/json parse or range
+//     failure beneath any of the three carries no sentinel, by the
+//     precedence rule wire.md § REQ-052 states, and stays reachable with
+//     errors.AsType. A nil receiver on any of them, as on every generated
+//     type, is a typereg.ErrNilReceiver error (REQ-025).
 //
 // # Strict vs relaxed decode
 //

@@ -36,8 +36,8 @@ type decodeFake struct {
 const phiMarker = "NOTANUMBER-8f2c1d"
 
 // phiEchoingField reproduces the decoder class REQ-151 names by name: an
-// UnmarshalJSON whose error embeds the offending value in a `parse %q` message,
-// exactly as rm.Integer and rm.Real do (openehr/rm/integer.go, real.go). It is
+// UnmarshalJSON whose error quotes the offending value, as the strconv cause
+// beneath rm.Integer and rm.Real does (openehr/rm/integer.go, real.go). It is
 // spelled out here rather than imported so the guard does not depend on any
 // particular rm type keeping that message shape.
 type phiEchoingField struct{}

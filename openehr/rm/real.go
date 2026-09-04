@@ -132,7 +132,10 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 		}
 		f, err := strconv.ParseFloat(s, 64)
 		if err != nil {
-			return fmt.Errorf("rm.Real: parse %q: %w", s, err)
+			// The *strconv.NumError already quotes the literal once; a second
+			// echo here would double it (wire.md § REQ-052, causes may name
+			// the literal — the prefix must not repeat it).
+			return fmt.Errorf("rm.Real: parse quoted literal: %w", err)
 		}
 		if significantDigits(s) > maxSignificantDigits {
 			return errPrecisionLoss
