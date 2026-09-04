@@ -178,8 +178,11 @@ func Deletion[T Versionable](precedingUID string, data *T, opts ...VersionOption
 // newChange captures the caller's payload and options in a closure that
 // assembles the write-side version once Build resolves the batch audit.
 // T is instantiated at the call site, so the type-set is a compile-time
-// fact and the Builder itself stays non-generic — Go methods cannot carry
-// type parameters.
+// fact. The public constructors stay package-level functions returning
+// an inert [Change] that a non-generic [Builder.Add] accumulates — that
+// is the shipped fluent surface (REQ-130), not a workaround: Go 1.27
+// allows generic methods, but sixteen Add* methods would still be a
+// worse API than four constructors plus Add.
 func newChange[T Versionable](ct ChangeType, precedingUID string, data *T, opts ...VersionOption) Change {
 	if data == nil {
 		return Change{err: fmt.Errorf("contribution: %s change has nil data", changeTypeTerms[ct])}
