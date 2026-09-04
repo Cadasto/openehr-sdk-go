@@ -135,10 +135,11 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
+      - openehr/rm/quoted_literal_test.go
       - openehr/serialize/canjson/field_order_test.go
       - openehr/serialize/canjson/encode_test.go
       - openehr/serialize/canjson/marshal_sentinel_test.go
@@ -558,7 +559,7 @@ requirements:
     implementation: landed
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/demographic]
     probes: [PROBE-061, PROBE-071]
-    plans: [docs/plans/archive/2026-08-18-write-result-contract.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md]
+    plans: [docs/plans/archive/2026-08-18-write-result-contract.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md]
     tests:
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/directory/directory_test.go
@@ -2107,9 +2108,10 @@ requirements:
     canonical: docs/specifications/idiom.md#errors-req-025
     status: draft
     implementation: landed
-    packages: [transport, auth, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, internal]
-    plans: [docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md]
+    packages: [transport, auth, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, openehr/rm, openehr/aom/aom14, internal, internal/bmmgen]
+    plans: [docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md]
     tests:
+      - openehr/rm/typereg/nilreceiver_census_test.go
       - openehr/client/ehr/contribution/version_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
@@ -2400,8 +2402,9 @@ requirements:
     implementation: landed
     packages: [openehr/client/definition]
     adrs: [docs/adr/0019-definition-timestamp-tolerance.md]
-    plans: [docs/plans/archive/2026-08-30-definition-metadata-decoding.md]
+    plans: [docs/plans/archive/2026-08-30-definition-metadata-decoding.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md]
     tests:
+      - openehr/client/definition/null_body_test.go
       - openehr/client/definition/template_test.go
       - openehr/client/definition/stored_query_test.go
     notes: >-
@@ -2479,9 +2482,15 @@ requirements:
     probes: [PROBE-101]
     adrs: [docs/adr/0018-raw-bytes-on-decode-error.md]
     plans:
+      - docs/plans/archive/2026-09-04-error-axis-leftovers.md
       - docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md
       - docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md  # ehr.Create's hand-rolled DecodeError arm
     tests:
+      - transport/null_body_test.go
+      - openehr/client/ehr/composition/null_body_test.go
+      - openehr/client/system/null_body_test.go
+      - openehr/client/demographic/null_body_test.go
+      - openehr/client/definition/null_body_test.go
       - transport/decode_error_test.go
       - openehr/client/definition/decode_error_test.go
       - openehr/client/system/decode_error_test.go

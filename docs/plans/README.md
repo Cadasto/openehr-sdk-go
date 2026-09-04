@@ -6,6 +6,14 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### Leftover sweeps (2026-09-04)
+
+Two small plans draining the verified-open follow-ups the 2026-08-30 → 2026-09-03 review rounds left in PR bodies and session notes. Each amends landed requirements in place — no new id — and each lands in its own PR.
+
+| Plan | Scope | Covers | Notes |
+|---|---|---|---|
+| [archive/2026-09-04-error-axis-leftovers.md](archive/2026-09-04-error-axis-leftovers.md) | **Landed 2026-09-05 and archived**: `transport.IsNoRepresentationBody` is the one predicate for an empty / whitespace / JSON-`null` 2xx body across `transport.Decode`, every hand-rolled leaf read, the Definition list and synthesized-metadata arms and the write funnel; every generated `UnmarshalJSON` and the hand-written primitives refuse a nil receiver with `typereg.ErrNilReceiver` (registry-wide census); `rm.Real` / `rm.Integer` name a quoted literal once and `canjson` documents the top-level primitive failure shape; `typereg`'s error surface has its own file; the `exhaustive` linter is on with its eight findings fixed | REQ-151 / 094 / 144 / 025 / 052 (no new id) | STRAND-10 stays deferred (needs an ADR; its encode-side consequence is in the maintainer's notes) |
+
 ### Go 1.27 floor (2026-09-03)
 
 | Plan | Scope | Covers | Notes |

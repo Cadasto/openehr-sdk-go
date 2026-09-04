@@ -3,11 +3,11 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans (inline) or superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax. Before any Go edit load `go-coding:go-coding`, then `go-errors`, `go-testing`, and (Task 6) `go-lint-setup`.
 
 **Date:** 2026-09-04
-**Status:** Draft
+**Status:** landed (2026-09-05, archived in the implementing PR)
 **Owner:** SDK maintainers
-**Covers:** implementation-aligned amendments to landed [REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure), [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation), [REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding), [REQ-025](../specifications/idiom.md#errors-req-025), [REQ-052](../specifications/wire.md#req-052) — **no new requirement id**; every normative delta rides in this plan's PR and amends the owning section in place
+**Covers:** implementation-aligned amendments to landed [REQ-151](../../specifications/transport.md#req-151--typed-2xx-decode-failure), [REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation), [REQ-144](../../specifications/wire.md#req-144--definition-metadata-decoding), [REQ-025](../../specifications/idiom.md#errors-req-025), [REQ-052](../../specifications/wire.md#req-052) — **no new requirement id**; every normative delta rides in this plan's PR and amends the owning section in place
 **Probes:** none new; PROBE-101 unchanged in contract
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** landed `transport/` (REQ-090–094, REQ-150, REQ-151), `openehr/rm/typereg`, `internal/bmmgen`, the hand-written primitive codecs `rm.Real` / `rm.Integer` / `rm.Character` (REQ-046 / REQ-052, PR #145)
 **Defers:** STRAND-10 (`rmpath` not-found sentinel split — needs an ADR; its encode-side consequence is recorded in the maintainer's notes); STRAND-04 `encoding/json/v2` migration; any change to which errors carry `canjson.ErrInvalidShape` (Real's parse/range arm stays outside it by the pinned rule)
 
@@ -37,7 +37,7 @@ Implementation may start when:
 
 ## Definition of Done
 
-- `transport.IsNoRepresentationBody` is the only implementation of the no-representation predicate in the module (`grep -rn 'bytes.Equal(body, \[\]byte("null"))'` finds one hit, in `transport`).
+- `transport.IsNoRepresentationBody` is the only response-body no-representation predicate in the client and transport trees (`grep -rn 'byte("null")' openehr/client transport` finds one hit, in `transport/body.go`; the two JSON-presence helpers in `openehr/validation` and `openehr/bmm` test key presence, not response bodies, and may not import `transport` under REQ-013).
 - Every generated `UnmarshalJSON` and every hand-written primitive codec returns an error carrying `typereg.ErrNilReceiver` on a nil receiver, proven by a census over `typereg.Default.Names()`.
 - `exhaustive` is enabled in `.golangci.yml` and `make lint` is clean with zero `//nolint:exhaustive` directives.
 - transport.md § REQ-151, wire.md § REQ-052 and § REQ-144, idiom.md § REQ-025 carry the amended sentences; `traceability.yaml` lists the new tests; CHANGELOG has its bullets.
@@ -47,13 +47,13 @@ Implementation may start when:
 
 | Step | Status |
 |---|---|
-| Task 1 — `transport.IsNoRepresentationBody` + `Decode` null arm + § REQ-151 sentence | |
-| Task 2 — every hand-rolled leaf and the write funnel use the predicate | |
-| Task 3 — `typereg.ErrNilReceiver`, generator guard, regen, census test, § REQ-025 | |
-| Task 4 — duplicate `%q` echo dropped; canjson fourth decode-failure shape; § REQ-052 sentence | |
-| Task 5 — `typereg/errors.go` split | |
-| Task 6 — `exhaustive` linter enabled, findings fixed | |
-| Task 7 — CHANGELOG, traceability, plan indexes, `make spec-check`, `make ci`, archive | |
+| Task 1 — `transport.IsNoRepresentationBody` + `Decode` null arm + § REQ-151 sentence | done |
+| Task 2 — every hand-rolled leaf and the write funnel use the predicate | done |
+| Task 3 — `typereg.ErrNilReceiver`, generator guard, regen, census test, § REQ-025 | done |
+| Task 4 — duplicate `%q` echo dropped; canjson fourth decode-failure shape; § REQ-052 sentence | done |
+| Task 5 — `typereg/errors.go` split | done |
+| Task 6 — `exhaustive` linter enabled, findings fixed | done |
+| Task 7 — CHANGELOG, traceability, plan indexes, `make spec-check`, `make ci`, archive | done |
 
 ---
 
@@ -405,9 +405,9 @@ wire.md § REQ-052, appended to the **Decode-side shape sentinel** paragraph:
 
 ## Mapping to specs
 
-- [transport.md § REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) — the *empty* definition and the predicate (Tasks 1–2)
-- [transport.md § REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) — owns the definition the § REQ-151 sentence cites (Task 1)
-- [wire.md § REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding) — empty list bodies (Task 2)
-- [idiom.md § REQ-025](../specifications/idiom.md#errors-req-025) — nil receiver bullet (Task 3)
-- [wire.md § REQ-052](../specifications/wire.md#req-052) — decode-side shape sentinel, echo sentence (Task 4)
-- [REQ.md](../specifications/REQ.md) — no row changes (all covered REQs stay `landed`)
+- [transport.md § REQ-151](../../specifications/transport.md#req-151--typed-2xx-decode-failure) — the *empty* definition and the predicate (Tasks 1–2)
+- [transport.md § REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation) — owns the definition the § REQ-151 sentence cites (Task 1)
+- [wire.md § REQ-144](../../specifications/wire.md#req-144--definition-metadata-decoding) — empty list bodies (Task 2)
+- [idiom.md § REQ-025](../../specifications/idiom.md#errors-req-025) — nil receiver bullet (Task 3)
+- [wire.md § REQ-052](../../specifications/wire.md#req-052) — decode-side shape sentinel, echo sentence (Task 4)
+- [REQ.md](../../specifications/REQ.md) — no row changes (all covered REQs stay `landed`)
