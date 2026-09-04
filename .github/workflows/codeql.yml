@@ -1,0 +1,52 @@
+# CodeQL static analysis for the Go module.
+#
+# Runs GitHub's CodeQL queries on every pull request, every push to main,
+# and once a week — the schedule re-checks unchanged code against newly
+# released queries. Findings appear under Security → Code scanning.
+#
+# Go 1.27.x is set up before CodeQL's init so autobuild can compile a
+# `go 1.27.0` module; the runner's default Go may be older.
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    # Tuesdays 06:00 UTC — offset from the Monday codegen-drift run.
+    - cron: '0 6 * * 2'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.x'
+          cache: true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: go
+          build-mode: autobuild
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:go"

@@ -1,6 +1,7 @@
 # openehr-sdk-go
 
 [![CI](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/codeql.yml/badge.svg)](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/codeql.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/cadasto/openehr-sdk-go.svg)](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cadasto/openehr-sdk-go)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

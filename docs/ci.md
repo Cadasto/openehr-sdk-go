@@ -7,7 +7,9 @@ How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks loca
 | Workflow | File | When it runs |
 |---|---|---|
 | **CI** | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Every pull request; every push to `main` |
+| **CodeQL** | [`.github/workflows/codeql.yml`](../.github/workflows/codeql.yml) | Every pull request; every push to `main`; Tuesdays 06:00 UTC. Findings appear under **Security → Code scanning** |
 | **Codegen drift** | [`.github/workflows/codegen-drift.yml`](../.github/workflows/codegen-drift.yml) | Mondays 06:00 UTC; `workflow_dispatch` |
+| **Release** | [`.github/workflows/release.yml`](../.github/workflows/release.yml) | Push of a `v*` tag; `workflow_dispatch` dry-run. Process in [releases.md](releases.md) |
 
 ### CI jobs (`ci.yml`)
 
@@ -21,6 +23,10 @@ Jobs run in parallel. All use Go **1.27.x** (`actions/setup-go@v7` with module c
 | **Race** | `test-race` | **Push to `main` only** — `-race` is slower; catches data races in `typereg` and codecs |
 
 PRs do not run the **Race** job. Merge to `main` triggers it on the post-merge push.
+
+### CodeQL (`codeql.yml`)
+
+GitHub's CodeQL analysis for Go, with `build-mode: autobuild`. Go 1.27.x is set up before CodeQL initialises so autobuild can compile the `go 1.27.0` module. It runs on the same PR and `main` events as CI, plus a weekly schedule that re-checks unchanged code against newly released queries.
 
 ### Codegen drift bot
 
@@ -72,7 +78,6 @@ Run `make help` for the full grouped list. Common targets:
 |---|---|
 | `govulncheck ./...` | Before v1.0.0 or when non-stdlib deps land |
 | Conformance probe runner (`testkit/probes/…`) | Dedicated job when live-backend modes are needed |
-| Release on tag | When versioned module publishes are routine — release process documented in [docs/releases.md](releases.md) |
 
 ## See also
 
