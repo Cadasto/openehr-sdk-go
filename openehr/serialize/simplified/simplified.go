@@ -43,9 +43,9 @@ func newDecodeConfig(opts []Option) decodeConfig {
 }
 
 // Media types for the Simplified Formats (REQ-053). Emit these canonical
-// types. REQ-053 says input handling SHOULD also tolerate EHRbase's
-// non-conformant `.schema`-suffixed variants; this package does not yet
-// provide that (see deviations.md) — the codecs take bytes, not media types.
+// types — [Format.MediaType] does. [ParseMediaType] also accepts EHRbase's
+// non-conformant `.schema`-suffixed variants on input; the codecs themselves
+// take bytes, so negotiation happens one call before them.
 const (
 	MediaTypeFlat       = "application/openehr.wt.flat+json"
 	MediaTypeStructured = "application/openehr.wt.structured+json"

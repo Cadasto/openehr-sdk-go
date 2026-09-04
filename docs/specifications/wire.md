@@ -196,7 +196,7 @@ The codecs **MUST**:
 - Interconvert FLAT ↔ STRUCTURED **without** an OPT (the two are mechanical restructurings of one identifier grammar).
 - Report a missing or mismatched Web Template / OPT as a typed error when conversion cannot proceed without it.
 
-The codecs **MUST** use the canonical media types `application/openehr.wt.flat+json` (FLAT) and `application/openehr.wt.structured+json` (STRUCTURED); they **SHOULD** accept EHRbase's non-conformant `.schema`-suffixed variants on input for interoperability, but **MUST NOT** emit them. (The `.schema` acceptance is a SHOULD the implementation currently defers — see the package [deviations register](../../openehr/serialize/simplified/deviations.md).)
+The codecs **MUST** use the canonical media types `application/openehr.wt.flat+json` (FLAT) and `application/openehr.wt.structured+json` (STRUCTURED); they **SHOULD** accept EHRbase's non-conformant `.schema`-suffixed variants on input for interoperability, but **MUST NOT** emit them. (`simplified.ParseMediaType` accepts them — case-insensitively, parameters ignored — and `Format.MediaType` emits only the canonical strings; the codecs themselves take bytes, so negotiation happens one call before them. Recorded in the package [deviations register](../../openehr/serialize/simplified/deviations.md).)
 
 #### Leaf datatypes
 
