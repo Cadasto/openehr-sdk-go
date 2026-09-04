@@ -63,13 +63,13 @@ func spanOfText(start parse.Position, text string) Span {
 // construct rather than at its beginning ([parse.PathSegment] carries no
 // position of its own).
 func advance(p parse.Position, text string) parse.Position {
-	if n := strings.Count(text, "\n"); n > 0 {
-		p.Line += n
-		_, last, _ := strings.CutLast(text, "\n")
-		p.Col = 1 + len([]rune(last))
-	} else {
+	before, last, found := strings.CutLast(text, "\n")
+	if !found {
 		p.Col += len([]rune(text))
+		return p
 	}
+	p.Line += 1 + strings.Count(before, "\n")
+	p.Col = 1 + len([]rune(last))
 	return p
 }
 

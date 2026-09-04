@@ -24,7 +24,7 @@ func newRMForOPTType(declared string) (any, error) {
 }
 
 // parseBMMGeneric splits "BASE<PARAM>" OPT/BMM generic notation.
-func parseBMMGeneric(declared string) (base, param string, ok bool) {
+func parseBMMGeneric(declared string) (string, string, bool) {
 	base, rest, ok := strings.Cut(declared, "<")
 	if !ok {
 		return "", "", false
@@ -33,7 +33,8 @@ func parseBMMGeneric(declared string) (base, param string, ok bool) {
 	if !ok || strings.TrimSpace(after) != "" {
 		return "", "", false
 	}
-	if param = strings.TrimSpace(param); param == "" {
+	param = strings.TrimSpace(param)
+	if param == "" {
 		return "", "", false
 	}
 	return strings.TrimSpace(base), param, true
