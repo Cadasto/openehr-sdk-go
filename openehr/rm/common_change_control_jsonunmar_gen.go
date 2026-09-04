@@ -28,8 +28,12 @@ type ContributionJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *Contribution) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: CONTRIBUTION: %w", typereg.ErrNilReceiver)
+	}
 	var aux ContributionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("CONTRIBUTION", err)
@@ -99,8 +103,12 @@ type ImportedVersionJSONUnmarshaller[T any] struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (i *ImportedVersion[T]) UnmarshalJSON(data []byte) error {
+	if i == nil {
+		return fmt.Errorf("canjson: IMPORTED_VERSION: %w", typereg.ErrNilReceiver)
+	}
 	var aux ImportedVersionJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("IMPORTED_VERSION", err)
@@ -175,8 +183,12 @@ type OriginalVersionJSONUnmarshaller[T any] struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (o *OriginalVersion[T]) UnmarshalJSON(data []byte) error {
+	if o == nil {
+		return fmt.Errorf("canjson: ORIGINAL_VERSION: %w", typereg.ErrNilReceiver)
+	}
 	var aux OriginalVersionJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("ORIGINAL_VERSION", err)
@@ -245,8 +257,12 @@ type VersionedObjectJSONUnmarshaller[T any] struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (v *VersionedObject[T]) UnmarshalJSON(data []byte) error {
+	if v == nil {
+		return fmt.Errorf("canjson: VERSIONED_OBJECT: %w", typereg.ErrNilReceiver)
+	}
 	var aux VersionedObjectJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("VERSIONED_OBJECT", err)

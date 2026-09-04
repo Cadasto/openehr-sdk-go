@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // Character is the BMM Character primitive. In canonical openEHR JSON it is
@@ -138,7 +140,7 @@ func jsonLiteralSpellsReplacement(b []byte) bool {
 // problem — so it stays outside typereg.ErrInvalidShape.
 func (c *Character) UnmarshalJSON(b []byte) error {
 	if c == nil {
-		return errors.New("rm.Character: nil receiver")
+		return fmt.Errorf("rm.Character: %w", typereg.ErrNilReceiver)
 	}
 	if len(b) == 0 {
 		return errors.New("rm.Character: empty input")
@@ -243,7 +245,7 @@ func (c Character) MarshalJSON() ([]byte, error) {
 // every JSON value, so the JSON surface is unchanged by its presence.
 func (c *Character) UnmarshalText(text []byte) error {
 	if c == nil {
-		return errors.New("rm.Character: nil receiver")
+		return fmt.Errorf("rm.Character: %w", typereg.ErrNilReceiver)
 	}
 	s := string(text)
 	if err := characterFault(s); err != nil {

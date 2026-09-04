@@ -23,8 +23,12 @@ type ISO8601TimezoneJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (i *ISO8601Timezone) UnmarshalJSON(data []byte) error {
+	if i == nil {
+		return fmt.Errorf("canjson: Iso8601_timezone: %w", typereg.ErrNilReceiver)
+	}
 	var aux ISO8601TimezoneJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("Iso8601_timezone", err)
@@ -49,8 +53,12 @@ type TimeDefinitionsJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (t *TimeDefinitions) UnmarshalJSON(data []byte) error {
+	if t == nil {
+		return fmt.Errorf("canjson: Time_Definitions: %w", typereg.ErrNilReceiver)
+	}
 	var aux TimeDefinitionsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("Time_Definitions", err)

@@ -80,6 +80,14 @@ var (
 	// exhaustion and quadratic re-parsing from a crafted deeply-nested
 	// polymorphic document (e.g. nested CLUSTER/SECTION trees).
 	ErrMaxDepthExceeded = errors.New("typereg: nesting depth exceeds limit")
+	// ErrNilReceiver classifies an UnmarshalJSON / UnmarshalText call on a
+	// nil receiver — caller-constructible misuse (a failed errors.AsType
+	// leaves a typed nil behind; a zero-value struct holds one in a field)
+	// that the no-panic rule (REQ-025, idiom.md § No panics) turns into an
+	// error instead of a dereference. Every generated UnmarshalJSON and the
+	// hand-written primitive codecs (rm.Real, rm.Integer, rm.Character) wrap
+	// it; openehr/rm's nil-receiver census pins the whole registry.
+	ErrNilReceiver = errors.New("typereg: nil receiver")
 	// ErrInvalidShape classifies a JSON-level shape failure — valid JSON
 	// that is the wrong shape for the target type — or a hand-written
 	// primitive codec's refusal of a value it will not accept: rm.Real

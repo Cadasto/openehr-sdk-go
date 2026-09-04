@@ -52,8 +52,12 @@ type CompositionJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *Composition) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: COMPOSITION: %w", typereg.ErrNilReceiver)
+	}
 	var aux CompositionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("COMPOSITION", err)
@@ -141,8 +145,12 @@ type EventContextJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (e *EventContext) UnmarshalJSON(data []byte) error {
+	if e == nil {
+		return fmt.Errorf("canjson: EVENT_CONTEXT: %w", typereg.ErrNilReceiver)
+	}
 	var aux EventContextJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("EVENT_CONTEXT", err)

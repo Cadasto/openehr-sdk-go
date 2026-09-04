@@ -30,8 +30,12 @@ type AssertionJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (a *Assertion) UnmarshalJSON(data []byte) error {
+	if a == nil {
+		return fmt.Errorf("canjson: ASSERTION: %w", typereg.ErrNilReceiver)
+	}
 	var aux AssertionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("ASSERTION", err)
@@ -70,8 +74,12 @@ type AssertionVariableJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (a *AssertionVariable) UnmarshalJSON(data []byte) error {
+	if a == nil {
+		return fmt.Errorf("canjson: ASSERTION_VARIABLE: %w", typereg.ErrNilReceiver)
+	}
 	var aux AssertionVariableJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("ASSERTION_VARIABLE", err)
@@ -106,8 +114,12 @@ type ExprBinaryOperatorJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (e *ExprBinaryOperator) UnmarshalJSON(data []byte) error {
+	if e == nil {
+		return fmt.Errorf("canjson: EXPR_BINARY_OPERATOR: %w", typereg.ErrNilReceiver)
+	}
 	var aux ExprBinaryOperatorJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("EXPR_BINARY_OPERATOR", err)
@@ -155,8 +167,12 @@ type ExprLeafJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (e *ExprLeaf) UnmarshalJSON(data []byte) error {
+	if e == nil {
+		return fmt.Errorf("canjson: EXPR_LEAF: %w", typereg.ErrNilReceiver)
+	}
 	var aux ExprLeafJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("EXPR_LEAF", err)
@@ -191,8 +207,12 @@ type ExprUnaryOperatorJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (e *ExprUnaryOperator) UnmarshalJSON(data []byte) error {
+	if e == nil {
+		return fmt.Errorf("canjson: EXPR_UNARY_OPERATOR: %w", typereg.ErrNilReceiver)
+	}
 	var aux ExprUnaryOperatorJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("EXPR_UNARY_OPERATOR", err)

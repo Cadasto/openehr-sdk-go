@@ -23,8 +23,12 @@ type MeasurementServiceJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (m *MeasurementService) UnmarshalJSON(data []byte) error {
+	if m == nil {
+		return fmt.Errorf("canjson: MEASUREMENT_SERVICE: %w", typereg.ErrNilReceiver)
+	}
 	var aux MeasurementServiceJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("MEASUREMENT_SERVICE", err)
