@@ -7,7 +7,9 @@ How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks loca
 | Workflow | File | When it runs |
 |---|---|---|
 | **CI** | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Every pull request; every push to `main` |
+| **CodeQL** | GitHub [default setup](https://docs.github.com/en/code-security/code-scanning/enabling-code-scanning/configuring-default-setup-for-code-scanning) (no in-repo workflow) | Every pull request and every push to `main` (plus GitHub's periodic re-scan), for Go and Actions. Findings appear under **Security → Code scanning** |
 | **Codegen drift** | [`.github/workflows/codegen-drift.yml`](../.github/workflows/codegen-drift.yml) | Mondays 06:00 UTC; `workflow_dispatch` |
+| **Release** | [`.github/workflows/release.yml`](../.github/workflows/release.yml) | Push of a `v*` tag; `workflow_dispatch` dry-run. Process in [releases.md](releases.md) |
 
 ### CI jobs (`ci.yml`)
 
@@ -21,6 +23,12 @@ Jobs run in parallel. All use Go **1.27.x** (`actions/setup-go@v7` with module c
 | **Race** | `test-race` | **Push to `main` only** — `-race` is slower; catches data races in `typereg` and codecs |
 
 PRs do not run the **Race** job. Merge to `main` triggers it on the post-merge push.
+
+### CodeQL (default setup)
+
+CodeQL runs through GitHub's [default setup](https://docs.github.com/en/code-security/code-scanning/enabling-code-scanning/configuring-default-setup-for-code-scanning), enabled in **Settings → Code security**, not from an in-repo workflow. It scans Go and GitHub Actions on every PR and every push to `main`, and its extractor handles the `go 1.27.0` module. Results land under **Security → Code scanning**.
+
+An in-repo advanced workflow was tried and dropped: an advanced configuration and the default setup cannot both publish results, and the default setup already covers Go and Actions. If per-repo control is ever needed, disable the default setup first, then add a pinned `github/codeql-action` workflow that keeps the `actions` language alongside `go`.
 
 ### Codegen drift bot
 
@@ -72,7 +80,6 @@ Run `make help` for the full grouped list. Common targets:
 |---|---|
 | `govulncheck ./...` | Before v1.0.0 or when non-stdlib deps land |
 | Conformance probe runner (`testkit/probes/…`) | Dedicated job when live-backend modes are needed |
-| Release on tag | When versioned module publishes are routine — release process documented in [docs/releases.md](releases.md) |
 
 ## See also
 

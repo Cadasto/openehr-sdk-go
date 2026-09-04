@@ -1,18 +1,12 @@
 # Development process
 
-How work flows in this repository — the SDD **constitution**. This is a deliberately **thin map**: it
-states the loop and links to the canonical home for each rule rather than restating it (duplicated prose
-is the cardinal SDD anti-pattern). Source-of-truth modes and when spec vs code wins during a PR are
-defined in [specifications/README.md § Source of truth](specifications/README.md#source-of-truth):
-**spec-first** for new capability (normative spec leads; code and tests land through the plan chain),
-**implementation-aligned** for hardening on shipped code (code wins until the topic spec and
-`traceability.yaml` are updated in the same PR). Drift is measured continuously via `make spec-check`.
+How work flows in this repository. This is deliberately a thin map: it draws the ladder a change climbs and links to the one place each rule lives, instead of repeating the rule here.
 
-The machine-readable conventions for this repo — REQ identifier style, document paths, build targets,
-`PROBE`/`STRAND` toggles, and the ground-truth source — live in [`.sdd.yaml`](.sdd.yaml), the descriptor
-every `sdd-*` skill reads first so it never hard-codes paths or guesses identifier styles.
+Who wins when spec and code disagree during a PR is defined in [specifications/README.md § Source of truth](specifications/README.md#source-of-truth). In short: for new capability the spec leads (spec-first); for hardening code that has already shipped, the code leads until the topic spec and `traceability.yaml` catch up in the same PR (implementation-aligned). `make spec-check` measures the drift either way.
 
-## The loop
+The machine-readable side of these conventions (identifier style, document paths, build targets, the `PROBE`/`STRAND` toggles, the ground-truth source) is [`.sdd.yaml`](.sdd.yaml). The `sdd-*` skills read it first, so they never hard-code a path or guess an identifier format.
+
+## The ladder
 
 ```
 REQ  (capability + acceptance)                  [gate: worth doing]
@@ -24,26 +18,14 @@ REQ  (capability + acceptance)                  [gate: worth doing]
                      └─ update REQ.md Impl.; archive plan    [gate: Definition of Done]
 ```
 
-The rules at each rung are canonical elsewhere — read them there, don't duplicate them here:
+The rules at each rung live elsewhere; read them there:
 
-- **Document kinds, RFC-2119 force, the two source-of-truth modes, the traceability chain, the identifier
-  scheme** → [specifications/README.md](specifications/README.md).
-- **Definition of Ready / Definition of Done and the plan header (`**Covers:**`)** →
-  [plans/_template.md](plans/_template.md).
-- **The agent working loop** (`make spec-context REQ=NNN` → follow the **Canonical** link → look up
-  ground truth, never guess → cite IDs → verify with `make ci`) → [AGENTS.md](../AGENTS.md) and
-  [ai-workflow.md](ai-workflow.md).
-- **REQ style, paths, build targets, PROBE/STRAND toggles, ground-truth** → [`.sdd.yaml`](.sdd.yaml).
+- **Document kinds, RFC-2119 force, the two source-of-truth modes, the traceability chain, the identifier scheme** → [specifications/README.md](specifications/README.md).
+- **Definition of Ready / Definition of Done and the plan header (`**Covers:**`)** → [plans/_template.md](plans/_template.md).
+- **The agent working loop** (`make spec-context REQ=NNN`, follow the canonical link, look up ground truth, cite IDs, verify with `make ci`) → [AGENTS.md](../AGENTS.md) and [ai-workflow.md § The loop](ai-workflow.md#the-loop).
+- **REQ style, paths, build targets, PROBE/STRAND toggles, ground truth** → [`.sdd.yaml`](.sdd.yaml).
 
-**`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** `SDK-GAP-NN` was an
-ad-hoc, pre-SDD label for implementation increments — it named the *distance* between spec and code,
-not a durable capability, and duplicated what `REQ`/`PROBE` already do once a gap closed. It is retired:
-a newly discovered gap is worked **under a REQ** — extend an existing one or create a new one via
-`sdd-specify` — with a `PROBE` added for wire-level conformance. A GAP-style label may still appear as
-an **ephemeral in-flight plan filename**, but it must never be threaded into `traceability.yaml`, test
-names/identifiers, `doc.go`, or normative prose. See [ADR 0012](adr/0012-retire-sdk-gap-identifier.md)
-for the rationale and the permanent `SDK-GAP-NN` → `REQ`/`PROBE` crosswalk for anything encountered in
-git history.
+There is no `SDK-GAP` identifier. `REQ`/`PROBE` is the feature register, and a newly found gap is worked under a REQ with a `PROBE` for wire conformance. The rule is stated in [AGENTS.md](../AGENTS.md#spec-driven-workflow-agents); the rationale, and the crosswalk for any `SDK-GAP-NN` you meet in git history, is [ADR 0012](adr/0012-retire-sdk-gap-identifier.md).
 
 ## superpowers + SDD
 
