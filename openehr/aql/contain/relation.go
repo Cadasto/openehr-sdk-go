@@ -1,6 +1,8 @@
 package contain
 
 import (
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -546,9 +548,5 @@ func intersects(set map[string]bool, names []string) bool {
 }
 
 func keysOf(m map[string]bool) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	return out
+	return slices.Collect(maps.Keys(m))
 }

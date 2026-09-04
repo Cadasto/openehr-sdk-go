@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -690,21 +691,11 @@ func computeConcreteSubtypes(p *Plan) {
 
 // sortedStringKeys returns the keys of m in lexicographic order.
 func sortedStringKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
+	return slices.Sorted(maps.Keys(m))
 }
 
 func sortedFileKeys(files map[string]*PlannedFile) []string {
-	keys := make([]string, 0, len(files))
-	for k := range files {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
+	return slices.Sorted(maps.Keys(files))
 }
 
 // AncestorChain returns the BMM ancestor chain (immediate + their

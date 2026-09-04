@@ -14,6 +14,7 @@ package bmmdiff
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -193,7 +194,7 @@ func diffClass(name string, oldC, newC bmm.Class) (ClassChange, bool) {
 	newAnc := append([]string(nil), newC.Ancestors()...)
 	slices.Sort(oldAnc)
 	slices.Sort(newAnc)
-	if !stringSliceEqual(oldAnc, newAnc) {
+	if !slices.Equal(oldAnc, newAnc) {
 		ch.OldAncestors = oldAnc
 		ch.NewAncestors = newAnc
 		ch.AncestorsDiffer = true
@@ -470,22 +471,5 @@ func walkPackage(p *bmm.Package, path string, into map[string]string) {
 
 // sortedKeys returns the keys of m in lexicographic order.
 func sortedKeys[V any](m map[string]V) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	slices.Sort(out)
-	return out
-}
-
-func stringSliceEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
+	return slices.Sorted(maps.Keys(m))
 }
