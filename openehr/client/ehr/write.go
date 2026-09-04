@@ -123,7 +123,12 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 			return zero, meta, fmt.Errorf("%s: %w", label, err)
 		}
 		return zero, meta, nil
+	case transport.PreferDefault, transport.PreferMinimal:
+		return zero, meta, nil
 	default:
+		// An unknown Prefer value decodes nothing: metadata-only is the
+		// fail-safe arm (REQ-094), so a member added later cannot be
+		// mistaken for a representation the server never negotiated.
 		return zero, meta, nil
 	}
 }

@@ -313,12 +313,16 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 			fmt.Fprintf(&b, "\t%s json.RawMessage %s // polymorphic %s\n", goField, tag, ifaceName)
 		case polySlice, polySliceNarrow:
 			fmt.Fprintf(&b, "\t%s []json.RawMessage %s // polymorphic []%s\n", goField, tag, ifaceName)
-		default:
+		case polyNone:
 			line, err := renderField(plan, ef.Owner, ef.OwnerName, ef.Prop)
 			if err != nil {
 				return "", fmt.Errorf("render wire field %s.%s: %w", pc.BMMName, propName, err)
 			}
 			b.WriteString(line)
+		default:
+			// A kind added later must choose its wire spelling here rather
+			// than ride the non-polymorphic arm by omission.
+			return "", fmt.Errorf("render wire field %s.%s: unknown polymorphic kind %v", pc.BMMName, propName, kind)
 		}
 	}
 	b.WriteString("}\n\n")

@@ -1766,8 +1766,10 @@ func (k suffixKind) String() string {
 		return "number"
 	case kindBool:
 		return "boolean"
-	default:
+	case kindString:
 		return "string"
+	default:
+		return fmt.Sprintf("suffixKind(%d)", int(k))
 	}
 }
 
