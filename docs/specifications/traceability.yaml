@@ -446,7 +446,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/system, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/query, openehr/client/definition, openehr/client/admin, openehr/client/demographic]
-    plans: [docs/plans/archive/2026-05-15-rest-api-client.md, docs/plans/archive/2026-05-26-contribution-submission-shape.md, docs/plans/archive/2026-06-14-demographic-rest-client.md]
+    plans: [docs/plans/archive/2026-05-15-rest-api-client.md, docs/plans/archive/2026-05-26-contribution-submission-shape.md, docs/plans/archive/2026-06-14-demographic-rest-client.md, docs/plans/archive/2026-09-04-spec-interop-leftovers.md]
     probes: [PROBE-072, PROBE-073]
     tests:
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
@@ -596,6 +596,7 @@ requirements:
     probes: [PROBE-072]
     adrs: [docs/adr/0019-definition-timestamp-tolerance.md]
     plans:
+      - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
       - docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
       - docs/plans/archive/2026-08-30-definition-metadata-decoding.md
@@ -780,11 +781,13 @@ requirements:
     probes:
       - PROBE-076
     plans:
+      - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
       - docs/plans/archive/2026-07-14-flat-structured-codecs.md
       - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
       - docs/plans/archive/2026-08-05-flat-rm-attributes.md
     tests:
       - openehr/serialize/simplified/simplified_test.go
+      - openehr/serialize/simplified/mediatype_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
       - openehr/serialize/simplified/independence_test.go
       - openehr/serialize/simplified/datatypes_test.go
@@ -1332,6 +1335,7 @@ requirements:
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/handles_test.go
     plans:
+      - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
       - docs/plans/archive/2026-06-29-rm-floor-validation.md
       - docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md
     notes: >-

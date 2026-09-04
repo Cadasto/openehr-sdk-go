@@ -3,11 +3,11 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans (inline) or superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax. Before any Go edit load `go-coding:go-coding`, then `go-testing` (Tasks 2 and 4) and `go-layout` (Task 2 adds exported API).
 
 **Date:** 2026-09-04
-**Status:** Draft
+**Status:** landed (2026-09-05, archived in the implementing PR)
 **Owner:** SDK maintainers
-**Covers:** implementation-aligned amendments to landed [REQ-050](../specifications/wire.md#req-050), [REQ-053](../specifications/wire.md#req-053), [REQ-095](../specifications/wire.md#req-095), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor); evidence for open [STRAND-13](../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped); opens **STRAND-14** — **no new requirement id**
+**Covers:** implementation-aligned amendments to landed [REQ-050](../../specifications/wire.md#req-050), [REQ-053](../../specifications/wire.md#req-053), [REQ-095](../../specifications/wire.md#req-095), [REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor); evidence for open [STRAND-13](../../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped); opens **STRAND-14** — **no new requirement id**
 **Probes:** none new
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** landed `openehr/client/system` (Extras handling, PR #140), `openehr/serialize/simplified` (REQ-053), `internal/bmmgen` + `openehr/bmm.LoadAll`, `openehr/validation` (REQ-102 / REQ-110 / REQ-112)
 **Defers:** resolving STRAND-13 (the census is evidence; folding a primitive-mapped ancestor's properties needs an ADR and a regenerated tree, and REQ-048 forbids pre-empting it in code); resolving STRAND-14 (its ADR, if the answer is "yes, run the floor"); STRAND-10 and STRAND-12 (need an ADR and an upstream issue respectively); closing REQ-095's `partial` (this plan names what keeps it partial; it does not vendor the missing bodies)
 
@@ -47,13 +47,13 @@
 
 | Step | Status |
 |---|---|
-| Task 1 — § REQ-050 System-descriptor unknown-key binding | |
-| Task 2 — `simplified.ParseMediaType` / `Format` (REQ-053 SHOULD) | |
-| Task 3 — scope.md examples row | |
-| Task 4 — STRAND-13 census test + evidence paragraph | |
-| Task 5 — STRAND-14 opened; § REQ-112 sentence | |
-| Task 6 — REQ-095 coverage table + traceability + roadmap pointer | |
-| Task 7 — CHANGELOG, traceability, plan indexes, `make spec-check`, `make ci`, archive | |
+| Task 1 — § REQ-050 System-descriptor unknown-key binding | done |
+| Task 2 — `simplified.ParseMediaType` / `Format` (REQ-053 SHOULD) | done |
+| Task 3 — scope.md examples row | done |
+| Task 4 — STRAND-13 census test + evidence paragraph | done |
+| Task 5 — STRAND-14 opened; § REQ-112 sentence | done |
+| Task 6 — REQ-095 coverage table + traceability + roadmap pointer | done |
+| Task 7 — CHANGELOG, traceability, plan indexes, `make spec-check`, `make ci`, archive | done |
 
 ---
 
@@ -466,11 +466,11 @@ What `openehr/client/*` decodes today, and whether a vendored body under this di
 
 ## Mapping to specs
 
-- [wire.md § REQ-050](../specifications/wire.md#req-050) — System descriptor binding (Task 1)
-- [wire.md § REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding) — owns the unknown-key rule (Task 1)
-- [wire.md § REQ-053](../specifications/wire.md#req-053) — media types (Task 2)
-- [scope.md](../specifications/scope.md) — examples row (Task 3)
-- [research-strands.md § STRAND-13](../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) — census evidence (Task 4)
-- [research-strands.md § STRAND-14](../specifications/research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) — opened (Task 5)
-- [clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) — composition sentence (Task 5)
-- [wire.md § REQ-095](../specifications/wire.md#req-095) — coverage census (Task 6)
+- [wire.md § REQ-050](../../specifications/wire.md#req-050) — System descriptor binding (Task 1)
+- [wire.md § REQ-144](../../specifications/wire.md#req-144--definition-metadata-decoding) — owns the unknown-key rule (Task 1)
+- [wire.md § REQ-053](../../specifications/wire.md#req-053) — media types (Task 2)
+- [scope.md](../../specifications/scope.md) — examples row (Task 3)
+- [research-strands.md § STRAND-13](../../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) — census evidence (Task 4)
+- [research-strands.md § STRAND-14](../../specifications/research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) — opened (Task 5)
+- [clinical-modeling.md § REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) — composition sentence (Task 5)
+- [wire.md § REQ-095](../../specifications/wire.md#req-095) — coverage census (Task 6)
