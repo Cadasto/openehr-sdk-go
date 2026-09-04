@@ -246,6 +246,28 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 ---
 
+## STRAND-14 — Should template-driven validation also run the RM-floor invariants?
+
+**Status:** Open — opened 2026-09-05 from the review round of the [RM canonical-JSON fidelity plan](../plans/archive/2026-09-01-rm-canonical-json-fidelity.md), whose text claimed `ValidateComposition` would report the new `TERM_MAPPING` invariants; it never has, and the claim was corrected there rather than in code.
+
+**Question:** should `ValidateComposition` ([REQ-102](clinical-modeling.md#req-102--composition-validation)) and the [REQ-110](clinical-modeling.md#req-110--template-driven-validation-beyond-composition) entry points run the [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) per-type invariant catalogue as part of a template-driven pass, or stay exactly template conformance with the floor a separate call?
+
+**Why it's open:** today the two layers compose but do not chain. Template validity covers RM-mandatory presence, so a template-driven pass already reports the floor's (a) arm; the floor's (b) arm — `DV_INTERVAL` lower > upper, `TERM_MAPPING.match` outside its value set, `Mappings_valid`, `DV_QUANTITY.precision < 0` — fires only through `ValidateRM`. A caller who runs only `ValidateComposition` can therefore commit an RM-invalid composition that is template-valid. Whether that is a gap or a deliberate separation of concerns is the fork.
+
+**The trade-off:**
+
+- **Chain the floor into the template-driven pass.** One call, no way to forget the floor; issue codes stay disjoint (`term_mapping_match` beside the template codes). Against it: `Result` grows for every existing caller, the template walker and the floor walker visit the tree twice (or the floor's checks are re-hosted inside the template walk), and some floor findings duplicate template findings on the same node.
+- **Keep them separate and document the composition.** No behaviour change; callers who want both call both, and § REQ-112 says so. Against it: the gap stays reachable by default, and the plan-text defect that opened this strand shows how easily the two are assumed to chain.
+- **Opt-in chaining** — an option on the template-driven entry points. Additive and reversible. Against it: two code paths to keep in agreement, and an option nobody sets is the second option under another name.
+
+**Evidence needed:** how often a template-valid, RM-invalid composition reaches a consumer in practice (the consuming CDR project's validation pipeline is the first place to ask); the duplicate-issue rate if the floor is chained over the vendored composition corpus; the cost of a second walk at the benchmark harness's composition sizes.
+
+**Resolution form:** ADR-NNNN; amends REQ-102 / REQ-110 (if chaining) and REQ-112's composition sentence either way. Until then § REQ-112 states the current behaviour and points here, and the answer **MUST NOT** be pre-empted in code.
+
+**Affects:** REQ-102, REQ-110, REQ-112.
+
+---
+
 ## Index
 
 | Strand | Title | Status | Affects |
@@ -263,3 +285,4 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 | [STRAND-11](#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) | Probe recording format (HAR vs YAML) | Open | REQ-082 |
 | [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-047, REQ-048 |
 | [STRAND-13](#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) | Properties inherited from a primitive-mapped ancestor are dropped | Open | REQ-042, REQ-043, REQ-046, REQ-048 |
+| [STRAND-14](#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) | Template-driven validation and the RM floor | Open | REQ-102, REQ-110, REQ-112 |
