@@ -1,71 +1,84 @@
 # openehr-sdk-go
 
-[![CI](https://github.com/cadasto/openehr-sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/cadasto/openehr-sdk-go/actions/workflows/ci.yml)
+[![CI](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/cadasto/openehr-sdk-go.svg)](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cadasto/openehr-sdk-go)](https://goreportcard.com/report/github.com/cadasto/openehr-sdk-go)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cadasto/openehr-sdk-go)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/tag/Cadasto/openehr-sdk-go?sort=semver&label=release&color=blue)](docs/releases.md)
-[![Release notes](https://img.shields.io/badge/release_notes-CHANGELOG-blue)](CHANGELOG.md)
 
-A first-party, idiomatic **Go SDK for openEHR**. It lets you talk to openEHR REST CDRs, model Reference Model data in typed Go, build and validate clinical Compositions from operational templates, construct AQL, and authenticate with SMART-on-openEHR — all from one module. Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care aggregates) ride along in the same module for v1 convenience, behind a clean boundary so they can be split out later.
+A first-party Go SDK for openEHR. It covers the openEHR REST API, the Reference Model as typed Go structs, building and validating Compositions from operational templates, AQL, and SMART-on-openEHR authentication.
 
-The SDK is **openEHR-first** and idiomatic Go: `context.Context` on every I/O call, an injected `*http.Client`, functional options, and generics instead of reflection. Its core building blocks — RM modeling, serialization, validation, AQL, and template parsing — are usable standalone, without constructing an authenticated client. Every behaviour traces back to an in-repo normative specification (see [Spec-driven design](#spec-driven-design-sdd)).
+You don't have to take all of it. The building blocks (RM types, serialization, validation, AQL, template parsing) are plain packages with no dependency on the HTTP client or on auth. If all you need is to validate a Composition in a CI job, you import that one package and nothing else.
 
-> **Pre-1.0.** Public API may change across minor releases — pin to an exact tag. See [`docs/releases.md`](docs/releases.md) for the version policy and [`docs/roadmap.md`](docs/roadmap.md) for the landed-vs-planned matrix.
+Everything the SDK does traces back to a specification that lives in this repository. When the code and a spec disagree, the spec wins.
 
-```bash
-go get github.com/cadasto/openehr-sdk-go@latest   # pre-1.0: pin an exact tag for production
+It's written the way Go code usually is: every I/O call takes a `context.Context`, you pass in your own `*http.Client`, configuration is done with functional options, and RM polymorphism goes through generics and a type registry rather than reflection.
+
+## Try it
+
+This decodes a canonical-JSON Composition into a typed struct and reads a few fields. No network, no CDR:
+
+```go
+var c rm.Composition
+if err := canjson.Unmarshal(body, &c); err != nil {
+    log.Fatal(err)
+}
+fmt.Println(c.ArchetypeNodeID, c.Category.Value, len(c.Content))
 ```
 
-## Use cases
+The runnable version uses a fixture bundled with the repo, so it works straight from a clone:
 
-The primary consumers:
+```console
+$ go run ./cmd/examples/canonical_json
+composition: archetype_node_id=openEHR-EHR-COMPOSITION.encounter.v1
+  name="body_weight"
+  language=nl (terminology=ISO_639-1)
+  territory=NL
+  category=event
+  content items=1
+OK: canonical-JSON Composition decoded from body_weight.json
+```
 
-1. **Benchmark and load tools** — high-concurrency CRUD against the openEHR REST API for capacity planning.
-2. **Synthetic data seeders** — OPT-guided fakers driving bulk Compositions and demographic records.
-3. **MCP servers** — exposing openEHR operations as MCP tools for agentic clients, with token-forwarded auth.
-4. **Federative API clients** — fan-out over multiple openEHR backends with per-node spec pinning and partial-failure handling.
-5. **openEHR SMART apps with a Go backend** — server-side SMART-on-openEHR launch, token handling, and CDR calls behind a Go web or API service.
-
-Plus building-block use cases that import a single sub-package (RM modeling, codec, validation, AQL string construction, OPT parsing) without constructing an authenticated client.
-
-## Functionality
-
-What the SDK provides today and what's planned. The authoritative landed-vs-planned status and the REQ / PROBE identifiers live in the [roadmap matrix](docs/roadmap.md) and the [REQ registry](docs/specifications/REQ.md).
-
-- **openEHR REST client** — System, EHR, EHR_STATUS, Composition, Directory, Contribution, Query, Definition (stored AQL), and Admin operations over a versioned transport. → [wire](docs/specifications/wire.md), [transport](docs/specifications/transport.md)
-- **Reference Model** — typed RM structs with a central type registry, generated from pinned BMM dictionaries, plus hand-written identifier, temporal, and locatable-path helpers. → [rm-modeling](docs/specifications/rm-modeling.md)
-- **Serialization** — canonical JSON and XML round-trips, plus bidirectional FLAT / STRUCTURED simplified-format codecs driven by a Web Template. → [wire](docs/specifications/wire.md)
-- **Templates (ADL 1.4 OPT)** — operational-template parsing with typed primitive constraints, a compiled-template foundation, and WebTemplate JSON export for form generation. → [rm-modeling](docs/specifications/rm-modeling.md)
-- **Compositions** — OPT-driven builder, template-driven validation, and RM-instance synthesis from a template. → [wire](docs/specifications/wire.md)
-- **AQL** — literal AQL wire models and result sets, fluent struct/verb builders, and static parse-and-lint. → [wire](docs/specifications/wire.md)
-- **Authentication** — SMART-on-openEHR (PKCE), client-credentials, JWT-bearer, and basic token sources, layered over a generic injected `TokenSource`. → [auth](docs/specifications/auth.md)
-- **Service discovery** — multi-backend service catalog with per-node spec pinning and partial-failure handling. → [service-discovery](docs/specifications/service-discovery.md)
-- **Cadasto platform extras** — Datamap, MPI, Extra API, Admin, and Care aggregates, shipped in-module for v1 behind a clean cut line. → [module-layout](docs/specifications/module-layout.md)
-- **Conformance** — an openEHR wire-conformance probe suite (round-trip byte-stability, spec-correct envelopes). → [conformance](docs/specifications/conformance.md)
-
-_OET and ADL 2 are out of v1 scope._
-
-## Quickstart
-
-**New to the SDK?** Start with [docs/quick-start.md](docs/quick-start.md) and the runnable catalog in [docs/examples.md](docs/examples.md).
+To use it in your own project:
 
 ```bash
 go get github.com/cadasto/openehr-sdk-go@latest
-go run ./cmd/examples/canonical_json   # first building-block example (no network)
 ```
 
-Contributors:
+The SDK is pre-1.0. A minor release can change the public API, so pin an exact tag in anything you ship. The version policy is in [releases.md](docs/releases.md), and the [roadmap](docs/roadmap.md) says what has actually landed.
 
-```bash
-make help        # grouped targets (toolchain, test, lint, CI, …)
-make ci          # full PR gate (see docs/ci.md)
-make test        # unit tests (+ codegen drift check)
-make fmt         # gofumpt + goimports (via golangci-lint)
-```
+## Who it's for
 
-Toolchain setup — host Go vs. the Docker fallback — is covered in [docs/quick-start.md](docs/quick-start.md).
+It was built with a few kinds of consumer in mind:
+
+1. **Benchmark and load tools** running high-concurrency CRUD against the openEHR REST API.
+2. **Synthetic data seeders** that use an OPT to drive bulk Compositions and demographic records.
+3. **MCP servers** that expose openEHR operations as tools for agentic clients, forwarding the caller's token.
+4. **Federative API clients** that fan out over several openEHR backends, with per-node spec pinning and partial-failure handling.
+5. **SMART-on-openEHR apps with a Go backend**: server-side launch, token handling, and CDR calls from a Go web or API service.
+
+If you only need one piece (RM modeling, a codec, validation, AQL string construction, OPT parsing), you can import that package on its own.
+
+## What's in it
+
+The definitive landed-vs-planned status, with REQ and PROBE identifiers, is in the [roadmap](docs/roadmap.md) and the [REQ registry](docs/specifications/REQ.md).
+
+- **openEHR REST client** — System, EHR, EHR_STATUS, Composition, Directory, Contribution, Query, Definition (stored AQL), and Admin, over a versioned transport. [wire](docs/specifications/wire.md), [transport](docs/specifications/transport.md)
+- **Reference Model** — typed RM structs and a central type registry, generated from pinned BMM dictionaries, plus hand-written identifier, temporal, and locatable-path helpers. [rm-modeling](docs/specifications/rm-modeling.md)
+- **Serialization** — canonical JSON and XML round-trips, and bidirectional FLAT / STRUCTURED simplified-format codecs driven by a Web Template. [wire](docs/specifications/wire.md)
+- **Templates (ADL 1.4 OPT)** — operational-template parsing with typed primitive constraints, a compiled-template foundation, and WebTemplate JSON export for form generation. [rm-modeling](docs/specifications/rm-modeling.md)
+- **Compositions** — an OPT-driven builder, template-driven validation, and RM-instance synthesis from a template. [wire](docs/specifications/wire.md)
+- **AQL** — literal AQL wire models and result sets, fluent struct and verb builders, and static parse-and-lint. [wire](docs/specifications/wire.md)
+- **Authentication** — SMART-on-openEHR (PKCE), client credentials, JWT bearer, and basic token sources, all over one injected `TokenSource`. [auth](docs/specifications/auth.md)
+- **Service discovery** — a multi-backend service catalog with per-node spec pinning and partial-failure handling. [service-discovery](docs/specifications/service-discovery.md)
+- **Cadasto platform extras** — Datamap, MPI, Extra API, Admin, and Care aggregates. These ship in the same module for v1, behind a `cadasto/` cut line so they can be split out later as a subtree move rather than a rewrite. [module-layout](docs/specifications/module-layout.md)
+- **Conformance** — an openEHR wire-conformance probe suite covering round-trip byte-stability and spec-correct envelopes. [conformance](docs/specifications/conformance.md)
+
+## Getting started
+
+Start with [quick-start.md](docs/quick-start.md), then the runnable catalog in [examples.md](docs/examples.md). Both cover toolchain setup, whether you have host Go or use the Docker fallback.
+
+If you're working on the SDK itself, `make help` lists the grouped targets and [ci.md](docs/ci.md) explains the PR gate.
 
 ## Documentation
 
@@ -89,12 +102,13 @@ Open research strands live in [research-strands.md](docs/specifications/research
 | Doc | Scope |
 |---|---|
 | [docs/quick-start.md](docs/quick-start.md) · [docs/examples.md](docs/examples.md) | Developer onboarding + runnable catalog |
+| [docs/development-process.md](docs/development-process.md) | How work flows: the SDD ladder and its gates |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [docs/ci.md](docs/ci.md) | CI and contributor checks |
+| [docs/releases.md](docs/releases.md) | Release process + version policy |
+| [CHANGELOG.md](CHANGELOG.md) | Release log |
 | [AGENTS.md](AGENTS.md) | Entry point for coding agents |
 | [docs/ai-workflow.md](docs/ai-workflow.md) | AI agent conventions, MCP skills, example-doc upkeep |
-| [docs/ci.md](docs/ci.md) | CI and contributor checks |
-| [CHANGELOG.md](CHANGELOG.md) | Release log |
-| [docs/releases.md](docs/releases.md) | Release process + version policy |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting |
 
 ## License
