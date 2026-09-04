@@ -166,14 +166,14 @@ func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm
 
 	// REQ-094: an empty, whitespace-only, or JSON-null 2xx body commits
 	// the EHR but carries no usable representation. Classified against
-	// the raw bytes before decode is attempted, via the same
-	// isNoRepresentationBody helper WriteResult uses (transport.Decode
-	// does not special-case a null body, which would otherwise let one
-	// masquerade as a populated, all-zero-value *rm.EHR). The two 2xx
-	// failure arms split exactly here: this one is REQ-094's
+	// the raw bytes before decode is attempted, through the one predicate
+	// REQ-151 names (transport.IsNoRepresentationBody), which is also what
+	// WriteResult and transport.Decode use — so a null body cannot
+	// masquerade as a populated, all-zero-value *rm.EHR on any route. The
+	// two 2xx failure arms split exactly here: this one is REQ-094's
 	// *NoRepresentationError; the present-but-undecodable body below is
 	// REQ-151's *transport.DecodeError.
-	if isNoRepresentationBody(resp.Body) {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		return nil, meta, &NoRepresentationError{
 			Meta:  meta,
 			Cause: fmt.Errorf("ehr.Create: %w: 2xx with no representation body", transport.ErrInvalidShape),

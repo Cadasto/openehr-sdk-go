@@ -163,14 +163,14 @@ func getVersion(ctx context.Context, c *transport.Client, req *transport.Request
 		return nil, nil, err
 	}
 	meta := openehrclient.NewVersionMetadata(resp.Metadata)
-	if len(resp.Body) == 0 {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		// Mirror getParty: only a 204 legitimately carries no version body
 		// (a version_at_time with no match); any other empty-body 2xx is a
 		// wire anomaly surfaced as ErrInvalidShape.
 		if resp.StatusCode == http.StatusNoContent {
 			return nil, meta, nil
 		}
-		return nil, meta, fmt.Errorf("demographic: %w: %d response with empty body", transport.ErrInvalidShape, resp.StatusCode)
+		return nil, meta, fmt.Errorf("demographic: %w: %d response with empty or null body", transport.ErrInvalidShape, resp.StatusCode)
 	}
 	var env rm.OriginalVersion[json.RawMessage]
 	if err := json.Unmarshal(resp.Body, &env); err != nil {
