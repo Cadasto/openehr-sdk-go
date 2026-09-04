@@ -457,16 +457,13 @@ requirements:
       - openehr/client/demographic/versioned_test.go
       - openehr/client/system/system_test.go
     notes: >-
-      Convention alignment, no § of its own: system.ServiceCapabilities carries
-      an Extras map for unknown response keys and now follows the § REQ-144
-      catalog-descriptor rule by construction -- preserved on decode, re-emitted
-      on encode, and a key colliding with a documented field name ignored, the
-      documented field authoritative (TestCapabilitiesRoundTripsExtras). REQ-144
-      reaches only the two Definition descriptors, and no other § specifies
-      ServiceCapabilities' unknown-key behaviour, so the godoc on that Extras
-      field is deliberately left WITHOUT a REQ citation rather than borrowing
-      one that does not cover it; homing the convention normatively for the
-      System leaf would need its own requirement.
+      § REQ-050 "System descriptor" (2026-09-05) binds system.ServiceCapabilities
+      to the § REQ-144 unknown-key rule by citation -- unknown keys preserved on
+      decode into Extras, re-emitted on encode, an exact-name collision with a
+      documented field ignored (the field authoritative), a case-variant key
+      kept beside the field (TestCapabilitiesPreservesExtras,
+      TestCapabilitiesRoundTripsExtras). § REQ-144 keeps the rule text; this §
+      only names the third descriptor it reaches.
 
   - id: REQ-054
     title: Optimistic concurrency
