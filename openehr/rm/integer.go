@@ -34,7 +34,9 @@ func (i *Integer) UnmarshalJSON(b []byte) error {
 		}
 		n, err := strconv.ParseInt(s, 10, 32)
 		if err != nil {
-			return fmt.Errorf("rm.Integer: parse %q: %w", s, err)
+			// The *strconv.NumError already quotes the literal once; a second
+			// echo here would double it (wire.md § REQ-052).
+			return fmt.Errorf("rm.Integer: parse quoted literal: %w", err)
 		}
 		*i = Integer(n)
 		return nil

@@ -2504,7 +2504,7 @@ requirements:
       REQ-093's negative escape hatch disabled the cap; Unwrap keeps the
       codec's own diagnostics reachable; Error() names the method, the route
       and the classification only -- never the body and never the wrapped
-      decoder's text, which embeds offending values in `parse %q` form -- and
+      decoder's text, whose strconv / encoding/json causes quote the offending literal -- and
       answers on a nil receiver (REQ-025). The (*T, *Metadata, error) triple
       still populates metadata beside the error. Both disjointness arms are
       pinned negatively: a non-2xx stays *transport.WireError, and an empty
