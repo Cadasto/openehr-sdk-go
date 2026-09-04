@@ -38,8 +38,12 @@ type ItemListJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (i *ItemList) UnmarshalJSON(data []byte) error {
+	if i == nil {
+		return fmt.Errorf("canjson: ITEM_LIST: %w", typereg.ErrNilReceiver)
+	}
 	var aux ItemListJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("ITEM_LIST", err)
@@ -105,8 +109,12 @@ type ItemSingleJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (i *ItemSingle) UnmarshalJSON(data []byte) error {
+	if i == nil {
+		return fmt.Errorf("canjson: ITEM_SINGLE: %w", typereg.ErrNilReceiver)
+	}
 	var aux ItemSingleJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("ITEM_SINGLE", err)
@@ -173,8 +181,12 @@ type ItemTableJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (i *ItemTable) UnmarshalJSON(data []byte) error {
+	if i == nil {
+		return fmt.Errorf("canjson: ITEM_TABLE: %w", typereg.ErrNilReceiver)
+	}
 	var aux ItemTableJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("ITEM_TABLE", err)
@@ -240,8 +252,12 @@ type ItemTreeJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (i *ItemTree) UnmarshalJSON(data []byte) error {
+	if i == nil {
+		return fmt.Errorf("canjson: ITEM_TREE: %w", typereg.ErrNilReceiver)
+	}
 	var aux ItemTreeJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("ITEM_TREE", err)

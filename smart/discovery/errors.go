@@ -87,6 +87,9 @@ func (e *DiscoveryError) Error() string {
 		if e.SpecVersionGot != "" || e.SpecVersionWant != "" {
 			fmt.Fprintf(&b, " got=%q want=%q", e.SpecVersionGot, e.SpecVersionWant)
 		}
+	case ReasonFetchFailed, ReasonParseError, ReasonMalformedURL,
+		ReasonAuthEndpointsMissing, ReasonInsecureURL, ReasonIssuerMismatch:
+		// No reason-specific detail beyond the reason name written above.
 	}
 	if e.Inner != nil {
 		fmt.Fprintf(&b, ": %v", e.Inner)

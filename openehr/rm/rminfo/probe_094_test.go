@@ -271,6 +271,8 @@ func (r *bmmReduction) exclusionReason(name string) (reason string, accounted bo
 		// the edge. Saying so here is the difference between this arm
 		// catching that day and blessing it.
 		return "NOT DEFINED by the pinned schemas — a REQ-047 divergence, not an exclusion", false
+	case unaccountedFor:
+		return "no declared exclusion matches", false
 	}
 	return "no declared exclusion matches", false
 }

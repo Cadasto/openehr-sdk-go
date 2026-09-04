@@ -35,8 +35,12 @@ type PointIntervalJSONUnmarshaller[T any] struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (p *PointInterval[T]) UnmarshalJSON(data []byte) error {
+	if p == nil {
+		return fmt.Errorf("canjson: Point_interval: %w", typereg.ErrNilReceiver)
+	}
 	var aux PointIntervalJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("Point_interval", err)
@@ -79,8 +83,12 @@ type ProperIntervalJSONUnmarshaller[T any] struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (p *ProperInterval[T]) UnmarshalJSON(data []byte) error {
+	if p == nil {
+		return fmt.Errorf("canjson: Proper_interval: %w", typereg.ErrNilReceiver)
+	}
 	var aux ProperIntervalJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("Proper_interval", err)

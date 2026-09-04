@@ -13,6 +13,9 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 ### Added
 
 - **Go 1.27.0 module floor (REQ-002).** The module floor, Docker/Make tooling, and CI now require Go 1.27.0 or newer, and equivalent 1.27 standard-library helpers replaced hand-written code ([plan](docs/plans/archive/2026-09-03-go-1.27.md)).
+- **Null 2xx bodies classify as no representation (REQ-151, REQ-094, REQ-144).** `transport.IsNoRepresentationBody` is the one predicate behind `transport.Decode`, every hand-rolled leaf read, the Definition list and synthesized-metadata arms, and the write funnel, so a JSON `null` body no longer decodes as an all-zero resource ([plan](docs/plans/archive/2026-09-04-error-axis-leftovers.md)).
+- **Nil-receiver guard on every generated decoder (REQ-025).** Every generated `UnmarshalJSON` and the hand-written primitive codecs return an error carrying `typereg.ErrNilReceiver` instead of dereferencing a nil receiver, pinned by a registry-wide census.
+- **Quoted-literal parse errors name the literal once (REQ-052).** `rm.Real` and `rm.Integer` stop repeating a value their wrapped `strconv` cause already quotes, and the top-level primitive decode-failure shape is documented in `canjson`.
 
 ## [0.25.0] - 2026-09-03
 

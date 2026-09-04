@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // Real is the BMM Real primitive. Upstream CDR canonical JSON sometimes
@@ -115,7 +117,7 @@ var errPrecisionLoss = classifyShape(fmt.Errorf("rm.Real: literal carries more t
 // caller misuse is not a wire-shape problem.
 func (r *Real) UnmarshalJSON(b []byte) error {
 	if r == nil {
-		return errors.New("rm.Real: nil receiver")
+		return fmt.Errorf("rm.Real: %w", typereg.ErrNilReceiver)
 	}
 	if len(b) == 0 {
 		return errors.New("rm.Real: empty input")
@@ -130,7 +132,10 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 		}
 		f, err := strconv.ParseFloat(s, 64)
 		if err != nil {
-			return fmt.Errorf("rm.Real: parse %q: %w", s, err)
+			// The *strconv.NumError already quotes the literal once; a second
+			// echo here would double it (wire.md § REQ-052, causes may name
+			// the literal — the prefix must not repeat it).
+			return fmt.Errorf("rm.Real: parse quoted literal: %w", err)
 		}
 		if significantDigits(s) > maxSignificantDigits {
 			return errPrecisionLoss

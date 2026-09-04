@@ -632,9 +632,11 @@ func sanitiseURLError(err error, route string) error {
 // targeting Prefer=minimal endpoints typically use Do directly so the
 // empty-body shape does not trip the decoder.
 //
-// The two 2xx failures are distinct (REQ-151): an empty body fails with
-// [ErrInvalidShape], while a non-empty body that does not decode returns
-// a [DecodeError] carrying the raw bytes the server delivered.
+// The two 2xx failures are distinct (REQ-151): an empty, whitespace-only
+// or JSON-null body — no representation, see [IsNoRepresentationBody] —
+// fails with [ErrInvalidShape], while a non-empty body that does not
+// decode returns a [DecodeError] carrying the raw bytes the server
+// delivered.
 //
 // Generic over T per REQ-024.
 func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata, error) {
@@ -645,8 +647,8 @@ func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata,
 		}
 		return nil, nil, err
 	}
-	if len(resp.Body) == 0 {
-		return nil, resp.Metadata, fmt.Errorf("%w: response body is empty (Prefer mismatch?)", ErrInvalidShape)
+	if IsNoRepresentationBody(resp.Body) {
+		return nil, resp.Metadata, fmt.Errorf("%w: response body is empty or null (Prefer mismatch?)", ErrInvalidShape)
 	}
 	out := new(T)
 	if err := canjson.Unmarshal(resp.Body, out); err != nil {

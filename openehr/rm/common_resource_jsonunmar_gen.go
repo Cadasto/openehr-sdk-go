@@ -36,8 +36,12 @@ type ResourceDescriptionJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (r *ResourceDescription) UnmarshalJSON(data []byte) error {
+	if r == nil {
+		return fmt.Errorf("canjson: RESOURCE_DESCRIPTION: %w", typereg.ErrNilReceiver)
+	}
 	var aux ResourceDescriptionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("RESOURCE_DESCRIPTION", err)
@@ -91,8 +95,12 @@ type ResourceDescriptionItemJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (r *ResourceDescriptionItem) UnmarshalJSON(data []byte) error {
+	if r == nil {
+		return fmt.Errorf("canjson: RESOURCE_DESCRIPTION_ITEM: %w", typereg.ErrNilReceiver)
+	}
 	var aux ResourceDescriptionItemJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("RESOURCE_DESCRIPTION_ITEM", err)
@@ -133,8 +141,12 @@ type TranslationDetailsJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (t *TranslationDetails) UnmarshalJSON(data []byte) error {
+	if t == nil {
+		return fmt.Errorf("canjson: TRANSLATION_DETAILS: %w", typereg.ErrNilReceiver)
+	}
 	var aux TranslationDetailsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("TRANSLATION_DETAILS", err)

@@ -217,6 +217,7 @@ Library code **MUST NOT** panic on:
 
 - Wire input (malformed JSON, unexpected `_type`) — return a typed error.
 - Consumer input (nil maps, empty strings, invalid IDs) — return a typed error or document the preconditions.
+- A nil receiver on a decode method — every generated `UnmarshalJSON`, and the hand-written primitive codecs' `UnmarshalJSON` / `UnmarshalText` (`rm.Real`, `rm.Integer`, `rm.Character`) — return an error carrying `typereg.ErrNilReceiver`. A census over the type registry (`openehr/rm`) pins every registered type, so a generated companion that loses its guard fails by name.
 - Authentication failures — return `ErrUnauthorized` or a wrapped equivalent.
 
 Exported constructors **MUST NOT** panic on caller-constructible input, including a nil argument or a zero-value struct whose interface fields are nil. They **MUST** fail closed instead: return a typed error, or — when the signature does not return an error — return a value that a documented validation or marshalling path rejects with an error.

@@ -178,8 +178,8 @@ func Capabilities(ctx context.Context, c *transport.Client) (*ServiceCapabilitie
 		}
 		return nil, nil, err
 	}
-	if len(resp.Body) == 0 {
-		return nil, resp.Metadata, fmt.Errorf("system.Capabilities: %w: empty body", transport.ErrInvalidShape)
+	if transport.IsNoRepresentationBody(resp.Body) {
+		return nil, resp.Metadata, fmt.Errorf("system.Capabilities: %w: empty or null body", transport.ErrInvalidShape)
 	}
 	var sc ServiceCapabilities
 	if err := json.Unmarshal(resp.Body, &sc); err != nil {

@@ -31,6 +31,8 @@ func (d TopDir) String() string {
 		return "FORWARD"
 	case TopBackward:
 		return "BACKWARD"
+	case TopDirUnspecified:
+		return ""
 	}
 	return ""
 }

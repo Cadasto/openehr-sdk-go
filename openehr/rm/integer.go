@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // Integer is the BMM Integer primitive. Some upstream canonical JSON
@@ -20,7 +22,7 @@ type Integer int32
 // caller misuse is not a wire-shape problem.
 func (i *Integer) UnmarshalJSON(b []byte) error {
 	if i == nil {
-		return errors.New("rm.Integer: nil receiver")
+		return fmt.Errorf("rm.Integer: %w", typereg.ErrNilReceiver)
 	}
 	if len(b) == 0 {
 		return errors.New("rm.Integer: empty input")
@@ -32,7 +34,9 @@ func (i *Integer) UnmarshalJSON(b []byte) error {
 		}
 		n, err := strconv.ParseInt(s, 10, 32)
 		if err != nil {
-			return fmt.Errorf("rm.Integer: parse %q: %w", s, err)
+			// The *strconv.NumError already quotes the literal once; a second
+			// echo here would double it (wire.md § REQ-052).
+			return fmt.Errorf("rm.Integer: parse quoted literal: %w", err)
 		}
 		*i = Integer(n)
 		return nil

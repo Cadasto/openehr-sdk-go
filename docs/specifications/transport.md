@@ -282,6 +282,12 @@ unified under `*transport.DecodeError`: an empty body has no representation to d
 bytes to hand back, so where it is a failure at all it is an *absent* body rather than an unusable
 one. The arms take three shapes, named below.
 
+*Empty*, throughout this §, has the meaning [§ REQ-094](#req-094--prefer-response-shape-negotiation)
+gives it: zero bytes, whitespace only, or the JSON `null` literal. A `null` body unmarshals into a
+struct as a nil-error no-op, so every arm below **MUST** classify against the raw bytes ahead of
+decode — `transport.IsNoRepresentationBody` is the single implementation of that predicate, and a
+hand-rolled leaf **MUST** call it rather than test `len(body) == 0`.
+
 **The refusal arms.** A read that expected a representation and received an empty 2xx body
 **MUST** keep today's `transport.ErrInvalidShape` behaviour, so callers already keying on
 `errors.Is(err, transport.ErrInvalidShape)` keep working unchanged. This is the shared

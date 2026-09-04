@@ -1,7 +1,6 @@
 package ehr
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -57,18 +56,6 @@ func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 	return h, nil
 }
 
-// isNoRepresentationBody reports whether b is empty, whitespace-only, or the
-// JSON `null` literal — the REQ-094 "no usable representation" classification
-// shared by every 2xx representation-body consumer in this package
-// (WriteResult and ehr.Create). A JSON null literal unmarshals into a struct
-// target as a nil-error no-op, so classifying against the raw bytes here,
-// before decode is attempted, is what stops a null body from masquerading as
-// a populated, all-zero-value resource.
-func isNoRepresentationBody(b []byte) bool {
-	body := bytes.TrimSpace(b)
-	return len(body) == 0 || bytes.Equal(body, []byte("null"))
-}
-
 // WriteResult executes a Save / Update / Create / Put request and
 // decodes the response body per the Prefer state machine (REQ-094),
 // shared by the four versioned-write leaf clients (composition,
@@ -120,7 +107,7 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 	meta := NewVersionMetadata(resp.Metadata)
 	switch req.Prefer {
 	case transport.PreferRepresentation:
-		if isNoRepresentationBody(resp.Body) {
+		if transport.IsNoRepresentationBody(resp.Body) {
 			return zero, meta, &NoRepresentationError{
 				Meta:  meta,
 				Cause: fmt.Errorf("%s: %w: Prefer=return=representation but response body is empty", label, transport.ErrInvalidShape),
@@ -136,7 +123,12 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 			return zero, meta, fmt.Errorf("%s: %w", label, err)
 		}
 		return zero, meta, nil
+	case transport.PreferDefault, transport.PreferMinimal:
+		return zero, meta, nil
 	default:
+		// An unknown Prefer value decodes nothing: metadata-only is the
+		// fail-safe arm (REQ-094), so a member added later cannot be
+		// mistaken for a representation the server never negotiated.
 		return zero, meta, nil
 	}
 }
@@ -151,8 +143,9 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 // the server supplied it); errors raised by this SDK always carry a non-nil
 // Meta. Together with the classification (the type itself, via errors.As),
 // Meta is the boundary-safe surface. Cause is internal diagnostics and may
-// carry payload-derived text — rm decode errors embed the offending value
-// (`parse %q`), the same class [transport.WithRawErrorBodies] gates for
+// carry payload-derived text — the strconv and encoding/json causes beneath
+// an rm decode error quote the offending literal, the same class
+// [transport.WithRawErrorBodies] gates for
 // [transport.OpenEHRErrorDetail] — so, like [*transport.WireError] (REQ-093),
 // Error is value-free and never interpolates Cause; callers that need the
 // diagnostics unwrap or read Cause deliberately.
