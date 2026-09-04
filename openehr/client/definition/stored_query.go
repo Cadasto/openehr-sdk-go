@@ -238,7 +238,7 @@ func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, n
 			return &StoredQueryMetadata{Name: locName, Version: locVer, Q: aqlText}, resp.Metadata, nil
 		}
 	}
-	if len(resp.Body) == 0 {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		return &StoredQueryMetadata{Name: name, Version: version, Q: aqlText}, resp.Metadata, nil
 	}
 	var out StoredQueryMetadata
@@ -326,7 +326,7 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 		}
 		return nil, nil, err
 	}
-	if len(resp.Body) == 0 {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		return &StoredQueryMetadata{Name: name, Version: ver}, resp.Metadata, nil
 	}
 	var out StoredQueryMetadata
@@ -368,7 +368,7 @@ func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern str
 		}
 		return nil, nil, err
 	}
-	if len(resp.Body) == 0 {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		// An empty 2xx body is an empty catalog, not an absent one: return a
 		// non-nil zero-length slice so a caller re-serialising the result
 		// publishes [] rather than JSON null (REQ-144).

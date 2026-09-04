@@ -1,7 +1,6 @@
 package ehr
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -57,18 +56,6 @@ func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 	return h, nil
 }
 
-// isNoRepresentationBody reports whether b is empty, whitespace-only, or the
-// JSON `null` literal — the REQ-094 "no usable representation" classification
-// shared by every 2xx representation-body consumer in this package
-// (WriteResult and ehr.Create). A JSON null literal unmarshals into a struct
-// target as a nil-error no-op, so classifying against the raw bytes here,
-// before decode is attempted, is what stops a null body from masquerading as
-// a populated, all-zero-value resource.
-func isNoRepresentationBody(b []byte) bool {
-	body := bytes.TrimSpace(b)
-	return len(body) == 0 || bytes.Equal(body, []byte("null"))
-}
-
 // WriteResult executes a Save / Update / Create / Put request and
 // decodes the response body per the Prefer state machine (REQ-094),
 // shared by the four versioned-write leaf clients (composition,
@@ -120,7 +107,7 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 	meta := NewVersionMetadata(resp.Metadata)
 	switch req.Prefer {
 	case transport.PreferRepresentation:
-		if isNoRepresentationBody(resp.Body) {
+		if transport.IsNoRepresentationBody(resp.Body) {
 			return zero, meta, &NoRepresentationError{
 				Meta:  meta,
 				Cause: fmt.Errorf("%s: %w: Prefer=return=representation but response body is empty", label, transport.ErrInvalidShape),

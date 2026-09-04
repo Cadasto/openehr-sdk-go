@@ -246,7 +246,7 @@ func UploadTemplate(ctx context.Context, c *transport.Client, format TemplateFor
 		}
 		return nil, nil, err
 	}
-	if len(resp.Body) == 0 {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		// Some deployments return 204 with only headers. Surface a
 		// minimal metadata constructed from the Location header so
 		// the caller can still find the template.
@@ -332,7 +332,7 @@ func ListTemplates(ctx context.Context, c *transport.Client, format TemplateForm
 		}
 		return nil, nil, err
 	}
-	if len(resp.Body) == 0 {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		// An empty 2xx body is an empty catalog, not an absent one: return a
 		// non-nil zero-length slice so a caller re-serialising the result
 		// publishes [] rather than JSON null (REQ-144).
