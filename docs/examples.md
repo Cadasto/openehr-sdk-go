@@ -184,7 +184,9 @@ go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/cassettes/t
 
 ### aql-build
 
-**Purpose:** Build the same logical AQL query two ways — the struct-builder and the verb-functions — and prove both emit the same canonical string on the wire (REQ-055, PROBE-020). A third query demonstrates the REQ-117 containment algebra (`aql.Class` / `Contains` / `NotContains` / `ContainsOr`) and opt-in in-text paging (`LimitInline` / `OffsetInline`). A fourth pair shows the REQ-162 opt-in RM-semantics gate (`Builder.VerifyContainment`) — a question `Build` deliberately leaves unanswered — run over a clean containment tree and over one that is grammatically valid but RM-impossible. Pure building block: no transport, no auth. The executor lives at `openehr/client/query`.
+**Purpose:** Build the same logical AQL query two ways, the struct-builder and the verb-functions, and prove both emit the same canonical string on the wire (REQ-055, PROBE-020). Pure building block: no transport, no auth; the executor lives at `openehr/client/query`.
+
+The program then goes further. A third query demonstrates the REQ-117 containment algebra (`aql.Class` / `Contains` / `NotContains` / `ContainsOr`) and opt-in in-text paging (`LimitInline` / `OffsetInline`). A fourth pair shows the REQ-162 opt-in RM-semantics gate (`Builder.VerifyContainment`), a question `Build` deliberately leaves unanswered, run over a clean containment tree and over one that is grammatically valid but RM-impossible.
 
 ```bash
 go run ./cmd/examples/aql-build
@@ -220,7 +222,9 @@ containment verification (REQ-162) — opt-in; Build never runs it:
 
 ### aql-parse-structured
 
-**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2, REQ-113) — the read-side mirror of `aql.Builder` — and emit it back to canonical text via `Query.Emit()`. Since REQ-117 the catalogue covers the whole SDK grammar profile, and since REQ-118 that includes the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause; the residual `aql.ErrIncompleteAST` is a numeric literal the AST cannot represent, surfaced by `ParseQuery` rather than silently dropping a clause. With no argument the program walks three queries: the representative one below, a REQ-117 query exercising the closed shapes, and a REQ-118 query showing the `TOP` carrier alongside two literals whose **source text** differs from their canonical rendering (`1.50` → `1.5`, `"quoted"` → `'quoted'`) — the openEHR result schema names an unaliased column by its expression text, so `parse.LiteralExpr.Raw` keeps what was written while emission stays canonical. Pure building block: no transport, no auth.
+**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2, REQ-113), the read-side mirror of `aql.Builder`, and emit it back to canonical text via `Query.Emit()`. Since REQ-117 the catalogue covers the whole SDK grammar profile, and since REQ-118 that includes the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause; the residual `aql.ErrIncompleteAST` is a numeric literal the AST cannot represent, surfaced by `ParseQuery` rather than silently dropping a clause. Pure building block: no transport, no auth.
+
+With no argument the program walks three queries: the representative one below, a REQ-117 query exercising the closed shapes, and a REQ-118 query showing the `TOP` carrier alongside two literals whose **source text** differs from their canonical rendering (`1.50` → `1.5`, `"quoted"` → `'quoted'`). The openEHR result schema names an unaliased column by its expression text, so `parse.LiteralExpr.Raw` keeps what was written while emission stays canonical.
 
 ```bash
 go run ./cmd/examples/aql-parse-structured
@@ -306,7 +310,9 @@ canonical emission:
 
 ### lint-aql
 
-**Purpose:** Statically lint AQL before it reaches the CDR (REQ-109): parse against the SDK grammar profile (ADR 0007), then run the lint layers — syntax, shape (alias binding, parameter binding), RM containment and portability semantics against the pinned BMM (REQ-160/161, runs unconditionally, no template needed), path-shape and paging advisories over the query text plus the pinned BMM (REQ-164, likewise always on), and template-aware archetype / path checks against a compiled OPT. Shown via `validation.ValidateAQL`; the building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. Lint-clean is **not** spec-conformance and not execute-success — the CDR remains the path authority (PROBE-021).
+**Purpose:** Statically lint AQL before it reaches the CDR (REQ-109). The program parses against the SDK grammar profile (ADR 0007), then runs the lint layers: syntax; shape (alias binding, parameter binding); RM containment and portability semantics against the pinned BMM (REQ-160/161, always on, no template needed); path-shape and paging advisories over the query text plus the pinned BMM (REQ-164, likewise always on); and template-aware archetype and path checks against a compiled OPT.
+
+Shown via `validation.ValidateAQL`; the building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. Lint-clean is **not** spec-conformance and not execute-success; the CDR remains the path authority (PROBE-021).
 
 ```bash
 go run ./cmd/examples/lint-aql
@@ -609,7 +615,7 @@ Agents and contributors: when you add or materially change an example under `cmd
 
 The **Sample output:** blocks named in the allowlist of [`cmd/examples/transcripts_test.go`](../cmd/examples/transcripts_test.go) are verified mechanically against real program runs — that allowlist is the sole authority on which ones, and its exclusion census accounts for every other example. A deliberate output change therefore means regenerating the block verbatim from `go run ./cmd/examples/<name>`, not editing it by hand.
 
-An example that **gains** a verbatim sample-output block must be added to that allowlist in the same PR; a new block is otherwise unguarded, which is the one blind spot the test has.
+An example that **gains** a verbatim sample-output block must be added to that allowlist in the same PR. `TestSampleMarkerCensus` fails the build if a section publishes a bare sample-output marker without an allowlist entry, so an unlisted block is caught rather than left silently unverified.
 
 ---
 
