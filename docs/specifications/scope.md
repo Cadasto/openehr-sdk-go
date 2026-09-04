@@ -23,7 +23,7 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 | Sandbox + recorded fixtures | In-memory and recording-replay transports for hermetic SDK-consumer tests — specified ([conformance.md § REQ-082](conformance.md#req-082--runnability)), not yet built: `sandbox/` is reserved and recordings land under `testkit/recordings/` |
 | Testkit + conformance probes | Conformance probes, vendored fixture documents, and fixture-path resolution under `testkit/` ([conformance.md](conformance.md)); the probe runner is REQ-082 phase 1 |
 | openEHR wire conformance | The probe suite verifies wire-level correctness against the openEHR spec (REQ-080) |
-| Examples per primary use case | Worked example programs under `cmd/examples/` for benchmark, seeder, MCP, federator |
+| Examples per primary use case | Worked example programs under `cmd/examples/`, one per SDK surface, catalogued in [`../examples.md`](../examples.md); the four primary consumers — benchmark, seeder, MCP, federator ([use-cases.md](use-cases.md)) — are downstream products that follow those shapes, not programs in this tree |
 
 ## Out of scope (v1)
 
