@@ -16,16 +16,14 @@ func buildOriginalVersionRM() *rm.OriginalVersion[rm.Composition] {
 	name := "carol"
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	return &rm.OriginalVersion[rm.Composition]{
-		Version: rm.Version[rm.Composition]{
-			CommitAudit: rm.AuditDetails{
-				SystemID:  "cdr.example",
-				Committer: &rm.PartyIdentified{Name: &name},
-				ChangeType: rm.DVCodedText{
-					DVText:       rm.DVText{Value: "creation"},
-					DefiningCode: rm.CodePhrase{CodeString: "249"},
-				},
-				TimeCommitted: rm.DVDateTime{Value: "2026-05-17T12:00:00Z"},
+		CommitAudit: rm.AuditDetails{
+			SystemID:  "cdr.example",
+			Committer: &rm.PartyIdentified{Name: &name},
+			ChangeType: rm.DVCodedText{
+				DVText:       rm.DVText{Value: "creation"},
+				DefiningCode: rm.CodePhrase{CodeString: "249"},
 			},
+			TimeCommitted: rm.DVDateTime{Value: "2026-05-17T12:00:00Z"},
 		},
 		UID:            rm.ObjectVersionID{Value: "42::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
@@ -37,31 +35,27 @@ func buildOriginalVersionRM() *rm.OriginalVersion[rm.Composition] {
 func buildImportedVersionRM() *rm.ImportedVersion[rm.Composition] {
 	name := "dave"
 	inner := rm.OriginalVersion[any]{
-		Version: rm.Version[any]{
-			CommitAudit: rm.AuditDetails{
-				SystemID:  "cdr.example",
-				Committer: &rm.PartyIdentified{Name: &name},
-				ChangeType: rm.DVCodedText{
-					DVText:       rm.DVText{Value: "import"},
-					DefiningCode: rm.CodePhrase{CodeString: "240"},
-				},
-				TimeCommitted: rm.DVDateTime{Value: "2026-05-18T09:00:00Z"},
+		CommitAudit: rm.AuditDetails{
+			SystemID:  "cdr.example",
+			Committer: &rm.PartyIdentified{Name: &name},
+			ChangeType: rm.DVCodedText{
+				DVText:       rm.DVText{Value: "import"},
+				DefiningCode: rm.CodePhrase{CodeString: "240"},
 			},
+			TimeCommitted: rm.DVDateTime{Value: "2026-05-18T09:00:00Z"},
 		},
 		UID:            rm.ObjectVersionID{Value: "7::remote.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 	}
 	return &rm.ImportedVersion[rm.Composition]{
-		Version: rm.Version[rm.Composition]{
-			CommitAudit: rm.AuditDetails{
-				SystemID:  "cdr.example",
-				Committer: &rm.PartyIdentified{Name: &name},
-				ChangeType: rm.DVCodedText{
-					DVText:       rm.DVText{Value: "import"},
-					DefiningCode: rm.CodePhrase{CodeString: "240"},
-				},
-				TimeCommitted: rm.DVDateTime{Value: "2026-05-18T09:00:00Z"},
+		CommitAudit: rm.AuditDetails{
+			SystemID:  "cdr.example",
+			Committer: &rm.PartyIdentified{Name: &name},
+			ChangeType: rm.DVCodedText{
+				DVText:       rm.DVText{Value: "import"},
+				DefiningCode: rm.CodePhrase{CodeString: "240"},
 			},
+			TimeCommitted: rm.DVDateTime{Value: "2026-05-18T09:00:00Z"},
 		},
 		Item: inner,
 	}
@@ -387,8 +381,8 @@ func TestWrapOriginalVersionNilInputsDoNotPanic(t *testing.T) {
 	}{
 		{"nil version pointer", nil},
 		{"zero version (nil CommitAudit)", &rm.OriginalVersion[rm.Composition]{}},
-		{"typed-nil *rm.AuditDetails CommitAudit", &rm.OriginalVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.AuditDetails)(nil)}}},
-		{"typed-nil *rm.Attestation CommitAudit", &rm.OriginalVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.Attestation)(nil)}}},
+		{"typed-nil *rm.AuditDetails CommitAudit", &rm.OriginalVersion[rm.Composition]{CommitAudit: (*rm.AuditDetails)(nil)}},
+		{"typed-nil *rm.Attestation CommitAudit", &rm.OriginalVersion[rm.Composition]{CommitAudit: (*rm.Attestation)(nil)}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -454,8 +448,8 @@ func TestWrapImportedVersionNilInputsDoNotPanic(t *testing.T) {
 	}{
 		{"nil version pointer", nil},
 		{"zero version (nil CommitAudit)", &rm.ImportedVersion[rm.Composition]{}},
-		{"typed-nil *rm.AuditDetails CommitAudit", &rm.ImportedVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.AuditDetails)(nil)}}},
-		{"typed-nil *rm.Attestation CommitAudit", &rm.ImportedVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.Attestation)(nil)}}},
+		{"typed-nil *rm.AuditDetails CommitAudit", &rm.ImportedVersion[rm.Composition]{CommitAudit: (*rm.AuditDetails)(nil)}},
+		{"typed-nil *rm.Attestation CommitAudit", &rm.ImportedVersion[rm.Composition]{CommitAudit: (*rm.Attestation)(nil)}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

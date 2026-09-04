@@ -67,7 +67,7 @@ func TestReadMultiple_DVTextMappings(t *testing.T) {
 		rmType string
 	}{
 		{"DVText", &rm.DVText{Value: "x", Mappings: mappings}, "DV_TEXT"},
-		{"DVCodedText", &rm.DVCodedText{DVText: rm.DVText{Value: "x", Mappings: mappings}}, "DV_CODED_TEXT"},
+		{"DVCodedText", &rm.DVCodedText{Value: "x", Mappings: mappings}, "DV_CODED_TEXT"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -107,7 +107,7 @@ func TestReadMultiple_DVTextMappingsEmpty(t *testing.T) {
 func TestReadSingle_TermMapping(t *testing.T) {
 	tm := &rm.TermMapping{
 		Match:   rm.Character("="),
-		Purpose: &rm.DVCodedText{DVText: rm.DVText{Value: "billing"}},
+		Purpose: &rm.DVCodedText{Value: "billing"},
 		Target:  rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "73211009"},
 	}
 	for _, attr := range []string{"match", "purpose", "target"} {

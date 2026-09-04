@@ -132,7 +132,7 @@ func TestMarshalFlatRepeatingElementNullFlavourOnlyInstance(t *testing.T) {
 		&rm.Element{
 			ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "x"},
 			NullFlavour: &rm.DVCodedText{
-				DVText:       rm.DVText{Value: "unknown"},
+				Value:        "unknown",
 				DefiningCode: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: "openehr"}},
 			},
 		},
@@ -271,7 +271,7 @@ func TestRepeatingLeafOwnersRefuseReusedSiblingOnFirstEmission(t *testing.T) {
 	t.Run("the first emitting owner trips it", func(t *testing.T) {
 		out := map[string]any{}
 		owners := []any{&rm.Element{NullFlavour: &rm.DVCodedText{
-			DVText:       rm.DVText{Value: "unknown"},
+			Value:        "unknown",
 			DefiningCode: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: "openehr"}},
 		}}}
 		err := emitRepeatingLeafOwners(out, node, "root", owners, ambiguous)
@@ -346,7 +346,7 @@ func TestComposerExtrasProjectedToNameOnly(t *testing.T) {
 	)
 	comp.Composer = &rm.PartyIdentified{
 		Name:        &name,
-		ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{ID: &rm.GenericID{Value: "p-1", Scheme: "local"}, Namespace: "demographic", Type: "PERSON"}},
+		ExternalRef: &rm.PartyRef{ID: &rm.GenericID{Value: "p-1", Scheme: "local"}, Namespace: "demographic", Type: "PERSON"},
 		Identifiers: []rm.DVIdentifier{{ID: "id-0"}},
 	}
 	b, err := MarshalFlat(comp, repeatingLeafWT())
@@ -403,7 +403,7 @@ func TestPartyRefTypedNilIDDoesNotPanic(t *testing.T) {
 			out := map[string]any{}
 			party := &rm.PartyIdentified{
 				Name:        &name,
-				ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{ID: id, Namespace: "demographic", Type: "PERSON"}},
+				ExternalRef: &rm.PartyRef{ID: id, Namespace: "demographic", Type: "PERSON"},
 			}
 			err := partyRMAttr(out, "x/_provider", party)
 			if err != nil && !errors.Is(err, ErrUnsupportedDatatype) {
@@ -423,7 +423,7 @@ func TestRepeatingNullFlavourOnlyInstanceRoundTrips(t *testing.T) {
 		&rm.Element{
 			ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "x"},
 			NullFlavour: &rm.DVCodedText{
-				DVText:       rm.DVText{Value: "unknown"},
+				Value:        "unknown",
 				DefiningCode: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: "openehr"}},
 			},
 		},
@@ -565,10 +565,10 @@ func TestCompositeLeafKeepsItsOwnerUnderscoreAttrs(t *testing.T) {
 						Meaning: rm.DVText{Value: "m"}, Type: rm.DVText{Value: "t"},
 						Target: rm.DVEHRURI{DVURI: rm.DVURI{Value: "ehr://x"}},
 					}},
-					Value: &rm.DVInterval[rm.DVCount]{Interval: rm.Interval[rm.DVCount]{
+					Value: &rm.DVInterval[rm.DVCount]{
 						Lower: rm.DVCount{Magnitude: 1}, Upper: rm.DVCount{Magnitude: 8},
 						LowerIncluded: true, UpperIncluded: true,
-					}},
+					},
 				}},
 			},
 		}},

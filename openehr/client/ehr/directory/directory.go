@@ -182,7 +182,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, f
 	if folder == nil {
 		return nil, nil, fmt.Errorf("directory.Save: %w: nil Folder", transport.ErrInvalidConfig)
 	}
-	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
+	cfg := writeConfig{Prefer: transport.PreferMinimal}
 	for _, o := range opts {
 		if o != nil {
 			o(&cfg)
@@ -228,7 +228,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	if folder == nil {
 		return nil, nil, fmt.Errorf("directory.Update: %w: nil Folder", transport.ErrInvalidConfig)
 	}
-	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
+	cfg := writeConfig{Prefer: transport.PreferMinimal}
 	for _, o := range opts {
 		if o != nil {
 			o(&cfg)

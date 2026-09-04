@@ -232,7 +232,7 @@ func hostileLeaves() []hostileLeaf {
 func minimalSubmission() *contribution.Submission {
 	committer := "probe"
 	party := &rm.PartyIdentified{Name: &committer}
-	changeType := rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}}
+	changeType := rm.DVCodedText{Value: "creation", DefiningCode: rm.CodePhrase{CodeString: "249"}}
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	return &contribution.Submission{
 		Audit: contribution.UpdateAudit{
@@ -242,12 +242,10 @@ func minimalSubmission() *contribution.Submission {
 		},
 		Versions: []contribution.CommitVersion{
 			contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
-				Version: rm.Version[rm.Composition]{
-					CommitAudit: rm.AuditDetails{
-						SystemID:   "probe.example",
-						Committer:  party,
-						ChangeType: changeType,
-					},
+				CommitAudit: rm.AuditDetails{
+					SystemID:   "probe.example",
+					Committer:  party,
+					ChangeType: changeType,
 				},
 				UID:            rm.ObjectVersionID{Value: "1::probe.example::1"},
 				LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},

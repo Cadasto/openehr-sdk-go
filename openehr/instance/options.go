@@ -94,7 +94,7 @@ type Options struct {
 	// Each LOCATABLE root that openEHR requires a uid on (Composition,
 	// Observation, Evaluation, Instruction, Action, AdminEntry,
 	// GenericEntry) calls UIDSource once during synthesis. Nil falls
-	// back to a random RFC 4122 v4 UUID via crypto/rand. Tests pin a
+	// back to a random RFC 9562 v4 UUID (stdlib uuid.NewV4). Tests pin a
 	// counter or named-seed source for deterministic UIDs in golden
 	// fixtures.
 	UIDSource func() *rm.HierObjectID

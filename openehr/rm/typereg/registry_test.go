@@ -114,6 +114,18 @@ func TestDecodeAsConcreteValueTypeParameter(t *testing.T) {
 	}
 }
 
+func TestRegistryDecodeAsUsesReceiverNotDefault(t *testing.T) {
+	r := NewRegistry()
+	r.Register("FAKE_BOX_METHOD", func() any { return &fakeBox{} })
+	got, err := r.DecodeAs[fakeBox]([]byte(`{"_type":"FAKE_BOX_METHOD","payload":"via-method"}`))
+	if err != nil {
+		t.Fatalf("(*Registry).DecodeAs: %v", err)
+	}
+	if got.Payload != "via-method" {
+		t.Errorf("Payload = %q, want %q", got.Payload, "via-method")
+	}
+}
+
 func TestDecodeAsTypeMismatchIsErrTypeMismatch(t *testing.T) {
 	r := NewRegistry()
 	r.Register("FAKE_BOX", func() any { return &fakeBox{} })

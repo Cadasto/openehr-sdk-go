@@ -35,7 +35,7 @@ func TestDVTextLikeGetValue(t *testing.T) {
 		},
 		{
 			name: "DVCodedText pointer",
-			v:    &rm.DVCodedText{DVText: rm.DVText{Value: "moderate"}, DefiningCode: rm.CodePhrase{CodeString: "at0001"}},
+			v:    &rm.DVCodedText{Value: "moderate", DefiningCode: rm.CodePhrase{CodeString: "at0001"}},
 			want: "moderate",
 		},
 	}
@@ -89,8 +89,8 @@ func TestDVURILikeGetValue(t *testing.T) {
 	}{
 		{"DVURI value", rm.DVURI{Value: "https://example.org/x"}, "https://example.org/x"},
 		{"DVURI pointer", &rm.DVURI{Value: "https://example.org/x"}, "https://example.org/x"},
-		{"DVEHRURI value", rm.DVEHRURI{DVURI: rm.DVURI{Value: "ehr://e1/abc"}}, "ehr://e1/abc"},
-		{"DVEHRURI pointer", &rm.DVEHRURI{DVURI: rm.DVURI{Value: "ehr://e1/abc"}}, "ehr://e1/abc"},
+		{"DVEHRURI value", rm.DVEHRURI{Value: "ehr://e1/abc"}, "ehr://e1/abc"},
+		{"DVEHRURI pointer", &rm.DVEHRURI{Value: "ehr://e1/abc"}, "ehr://e1/abc"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -106,7 +106,7 @@ func TestDVURILikeGetValue(t *testing.T) {
 // GetChangeType / GetCommitter / GetDescription. Attestation inherits
 // the parent's audit fields via Go embedding.
 func TestAuditDetailsLikeAccessors(t *testing.T) {
-	change := rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}}
+	change := rm.DVCodedText{Value: "creation", DefiningCode: rm.CodePhrase{CodeString: "249"}}
 	descName := "alice"
 	committer := rm.PartyIdentified{Name: &descName}
 	when := rm.DVDateTime{Value: "2026-05-26T10:00:00Z"}
@@ -299,7 +299,7 @@ func TestDVTextLikeGetDefiningCode(t *testing.T) {
 		},
 		{
 			name:        "DVCodedText pointer — defining code present",
-			v:           &rm.DVCodedText{DVText: rm.DVText{Value: "moderate"}, DefiningCode: rm.CodePhrase{CodeString: "at0001"}},
+			v:           &rm.DVCodedText{Value: "moderate", DefiningCode: rm.CodePhrase{CodeString: "at0001"}},
 			wantCode:    rm.CodePhrase{CodeString: "at0001"},
 			wantPresent: true,
 		},

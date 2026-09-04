@@ -121,11 +121,11 @@ func TestPathValueIntrospection(t *testing.T) {
 	}
 	// Read-side shape: alias + segments are introspectable through the
 	// embedded aql.IdentifiedPath.
-	structured := aql.PathValue{IdentifiedPath: aql.IdentifiedPath{
+	structured := aql.PathValue{
 		Alias:    "b",
 		Segments: []aql.PathSegment{{Name: "y"}},
 		Raw:      "b/y",
-	}}
+	}
 	if structured.Alias != "b" || len(structured.Segments) != 1 {
 		t.Errorf("PathValue embedded path = %+v, want alias b + one segment", structured.IdentifiedPath)
 	}

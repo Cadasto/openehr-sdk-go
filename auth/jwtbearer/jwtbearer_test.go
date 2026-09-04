@@ -19,6 +19,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
@@ -426,28 +427,37 @@ func TestSourceCachesUntilExpiry(t *testing.T) {
 }
 
 func TestSourceCoalescesConcurrent(t *testing.T) {
-	var hits atomic.Int32
-	gate := make(chan struct{})
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits.Add(1)
-		<-gate
-		_, _ = w.Write([]byte(`{"access_token":"at","token_type":"Bearer","expires_in":3600}`))
-	}))
-	defer srv.Close()
-	src, _ := New(srv.URL, StaticAssertion("a"), WithHTTPClient(srv.Client()))
-	var wg sync.WaitGroup
-	const N = 5
-	for range N {
-		wg.Go(func() {
-			_, _ = src.Token(t.Context())
-		})
-	}
-	time.Sleep(20 * time.Millisecond)
-	close(gate)
-	wg.Wait()
-	if got := hits.Load(); got != 1 {
-		t.Errorf("expected 1 hit, got %d", got)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		var hits atomic.Int32
+		gate := make(chan struct{})
+		srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			<-gate
+			_, _ = w.Write([]byte(`{"access_token":"at","token_type":"Bearer","expires_in":3600}`))
+		}))
+		// Client() starts the in-memory server, which is what populates
+		// srv.URL, so it must be called before srv.URL is read.
+		cli := srv.Client()
+		src, err := New(srv.URL, StaticAssertion("a"), WithHTTPClient(cli))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wg sync.WaitGroup
+		const N = 5
+		for range N {
+			wg.Go(func() {
+				if _, err := src.Token(t.Context()); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		synctest.Wait()
+		close(gate)
+		wg.Wait()
+		if got := hits.Load(); got != 1 {
+			t.Errorf("expected 1 hit, got %d", got)
+		}
+	})
 }
 
 func TestSourceMapsOAuth2Error(t *testing.T) {

@@ -290,8 +290,10 @@ func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
 	if isKeywordLiteral(c) {
 		return
 	}
-	ip := IdentifiedPath{Pos: posOf(c.GetStart()), Clause: clauseOf(c)}
-	ip.Raw = sourceText(c)
+	ip := IdentifiedPath{
+		Pos: posOf(c.GetStart()), Clause: clauseOf(c),
+		Raw: sourceText(c),
+	}
 	if id := c.IDENTIFIER(); id != nil {
 		ip.Alias = id.GetText()
 	}

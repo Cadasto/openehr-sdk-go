@@ -329,11 +329,19 @@ func (r *Registry) Decode(data []byte) (any, error) {
 	return v, nil
 }
 
-// DecodeAs is a typed wrapper over [Registry.Decode] on the [Default]
-// registry. It returns the decoded value type-asserted to T. The zero
-// value of T is returned together with the error on any failure.
+// DecodeAs decodes data on the [Default] registry and returns the
+// decoded value typed as T. See [Registry.DecodeAs] for the
+// type-parameter rules it defers to.
+func DecodeAs[T any](data []byte) (T, error) {
+	return Default.DecodeAs[T](data)
+}
+
+// DecodeAs is a typed wrapper over [Registry.Decode]. It returns the
+// decoded value type-asserted to T. The zero value of T is returned
+// together with the error on any failure.
 //
-// Useful at codec call sites: typereg.DecodeAs[*rm.DVQuantity](data).
+// Useful at codec call sites: typereg.DecodeAs[*rm.DVQuantity](data)
+// or r.DecodeAs[T](data) on an isolated registry.
 //
 // Registry constructors return pointers (`&Concrete{}`) so the JSON
 // decoder can populate them. Callers may parameterise T with either
@@ -342,12 +350,12 @@ func (r *Registry) Decode(data []byte) (any, error) {
 // (`Concrete`) — the last case arises when a generic codec method is
 // instantiated with a concrete value type (e.g.
 // `DVInterval[DVQuantity].Lower` dispatched via `DecodeAs[DVQuantity]`).
-// The function first asserts to T directly (matches the pointer /
+// The method first asserts to T directly (matches the pointer /
 // interface shapes), then to `*T` and dereferences if successful —
 // closing the value-T gap without reflection.
-func DecodeAs[T any](data []byte) (T, error) {
+func (r *Registry) DecodeAs[T any](data []byte) (T, error) {
 	var zero T
-	v, err := Default.Decode(data)
+	v, err := r.Decode(data)
 	if err != nil {
 		return zero, err
 	}

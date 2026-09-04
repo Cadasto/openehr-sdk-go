@@ -2004,6 +2004,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [go.mod]
+    plans: [docs/plans/archive/2026-09-03-go-1.27.md]
 
   - id: REQ-003
     title: License

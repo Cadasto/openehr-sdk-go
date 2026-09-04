@@ -32,14 +32,12 @@ func TestRoundTripStableSimpleValues(t *testing.T) {
 		{
 			name: "DV_INTERVAL_DV_QUANTITY_bounds",
 			in: &rm.DVInterval[rm.DVOrdered]{
-				Interval: rm.Interval[rm.DVOrdered]{
-					Lower:          rm.DVQuantity{Magnitude: 60, Units: "kg"},
-					Upper:          rm.DVQuantity{Magnitude: 90, Units: "kg"},
-					LowerIncluded:  true,
-					UpperIncluded:  true,
-					LowerUnbounded: false,
-					UpperUnbounded: false,
-				},
+				Lower:          rm.DVQuantity{Magnitude: 60, Units: "kg"},
+				Upper:          rm.DVQuantity{Magnitude: 90, Units: "kg"},
+				LowerIncluded:  true,
+				UpperIncluded:  true,
+				LowerUnbounded: false,
+				UpperUnbounded: false,
 			},
 			into: func() any { return new(rm.DVInterval[rm.DVOrdered]) },
 		},

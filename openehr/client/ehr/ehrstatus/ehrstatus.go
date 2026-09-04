@@ -145,7 +145,7 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 	if status == nil {
 		return nil, nil, fmt.Errorf("ehrstatus.Put: %w: nil status", transport.ErrInvalidConfig)
 	}
-	cfg := putConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
+	cfg := putConfig{Prefer: transport.PreferMinimal}
 	for _, o := range opts {
 		if o != nil {
 			o(&cfg)

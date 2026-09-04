@@ -13,9 +13,10 @@ import (
 // to the OPT's parameterised interval is decided from the bounds'
 // runtime types, which survive the round-trip via their own `_type`.
 func TestIntervalRMTypeMatches_boundsBackedCollapse(t *testing.T) {
-	collapsed := rm.DVInterval[rm.DVOrdered]{}
-	collapsed.Lower = &rm.DVQuantity{Magnitude: 30, Units: "cm"}
-	collapsed.Upper = &rm.DVQuantity{Magnitude: 90, Units: "cm"}
+	collapsed := rm.DVInterval[rm.DVOrdered]{
+		Lower: &rm.DVQuantity{Magnitude: 30, Units: "cm"},
+		Upper: &rm.DVQuantity{Magnitude: 90, Units: "cm"},
+	}
 
 	cases := []struct {
 		name string
@@ -39,9 +40,10 @@ func TestIntervalRMTypeMatches_boundsBackedCollapse(t *testing.T) {
 
 	// A fully unbounded interval carries no bound to key off and
 	// trivially satisfies any element type.
-	unbounded := rm.DVInterval[rm.DVOrdered]{}
-	unbounded.LowerUnbounded = true
-	unbounded.UpperUnbounded = true
+	unbounded := rm.DVInterval[rm.DVOrdered]{
+		LowerUnbounded: true,
+		UpperUnbounded: true,
+	}
 	if !intervalRMTypeMatches("DV_INTERVAL", "DV_INTERVAL<DV_DATE>", unbounded) {
 		t.Error("fully unbounded interval should satisfy any DV_INTERVAL<T>")
 	}
@@ -49,9 +51,10 @@ func TestIntervalRMTypeMatches_boundsBackedCollapse(t *testing.T) {
 	// Every present bound must agree: a malformed interval whose bounds
 	// disagree does not satisfy the parameterised type even though one
 	// bound matches.
-	mixed := rm.DVInterval[rm.DVOrdered]{}
-	mixed.Lower = &rm.DVQuantity{Magnitude: 30, Units: "cm"}
-	mixed.Upper = &rm.DVDate{Value: "2024-01-01"}
+	mixed := rm.DVInterval[rm.DVOrdered]{
+		Lower: &rm.DVQuantity{Magnitude: 30, Units: "cm"},
+		Upper: &rm.DVDate{Value: "2024-01-01"},
+	}
 	if intervalRMTypeMatches("DV_INTERVAL", "DV_INTERVAL<DV_QUANTITY>", mixed) {
 		t.Error("interval with a DV_DATE upper must not satisfy DV_INTERVAL<DV_QUANTITY>")
 	}

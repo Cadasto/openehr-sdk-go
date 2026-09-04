@@ -1918,10 +1918,11 @@ func textJSON(value string) map[string]any {
 // that owns the |suffix grammar, shared by grouping and full key parsing so the
 // two cannot drift.
 func splitSuffix(key string) (base, suffix string) {
-	if i := strings.LastIndex(key, "|"); i >= 0 {
-		return key[:i], key[i+1:]
+	base, suffix, found := strings.CutLast(key, "|")
+	if !found {
+		return key, ""
 	}
-	return key, ""
+	return base, suffix
 }
 
 // flatSeg is one "/"-separated FLAT path segment: a Web Template id with an
@@ -1952,12 +1953,12 @@ func parseFlatKey(key string) (parsedKey, error) {
 	segs := make([]flatSeg, 0, len(parts))
 	for _, p := range parts {
 		seg := flatSeg{id: p, idx: -1}
-		if j := strings.LastIndex(p, ":"); j >= 0 {
-			if n, err := strconv.Atoi(p[j+1:]); err == nil {
-				if n < 0 || p[j+1:] != strconv.Itoa(n) {
-					return parsedKey{}, fmt.Errorf("%w: invalid :index %q in %q", ErrUnknownPath, p[j+1:], key)
+		if id, idxStr, found := strings.CutLast(p, ":"); found {
+			if n, err := strconv.Atoi(idxStr); err == nil {
+				if n < 0 || idxStr != strconv.Itoa(n) {
+					return parsedKey{}, fmt.Errorf("%w: invalid :index %q in %q", ErrUnknownPath, idxStr, key)
 				}
-				seg.id = p[:j]
+				seg.id = id
 				seg.idx = n
 			}
 		}

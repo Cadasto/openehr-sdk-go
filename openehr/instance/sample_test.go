@@ -277,3 +277,38 @@ func TestSampleValue_quantityMagnitudeVaries(t *testing.T) {
 		t.Errorf("DvQuantity magnitude did not vary across draws: %v", mags)
 	}
 }
+
+// TestSamplerNonPositiveLimit pins the non-positive guard in sampler.n:
+// math/rand/v2's N panics on a limit of zero or less, so a limit that is
+// not positive must short-circuit to 0 before any draw happens. Both
+// instantiations (int and int64) and both sampler shapes (nil source =
+// package-global generator, seeded source = caller-supplied) are covered;
+// removing the guard turns each of these calls into a panic.
+func TestSamplerNonPositiveLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		s    sampler
+	}{
+		{"globalSource", newSampler(nil)},
+		{"seededSource", newSampler(mrand.NewPCG(1, 2))},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, limit := range []int{0, -3} {
+				if got := tc.s.n(limit); got != 0 {
+					t.Errorf("sampler.n[int](%d) = %d, want 0", limit, got)
+				}
+				if got := tc.s.intN(limit); got != 0 {
+					t.Errorf("sampler.intN(%d) = %d, want 0", limit, got)
+				}
+			}
+			for _, limit := range []int64{0, -3} {
+				if got := tc.s.n(limit); got != 0 {
+					t.Errorf("sampler.n[int64](%d) = %d, want 0", limit, got)
+				}
+				if got := tc.s.int64N(limit); got != 0 {
+					t.Errorf("sampler.int64N(%d) = %d, want 0", limit, got)
+				}
+			}
+		})
+	}
+}

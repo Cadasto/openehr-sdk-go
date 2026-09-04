@@ -186,7 +186,7 @@ func TestContextStructuredShape(t *testing.T) {
 func TestSettingEncodeEmitsPair(t *testing.T) {
 	comp, wt := genComposition(t, minimalObsOPT)
 	comp.Context.Setting = rm.DVCodedText{
-		DVText:       rm.DVText{Value: "home"},
+		Value:        "home",
 		DefiningCode: rm.CodePhrase{CodeString: "225", TerminologyID: rm.TerminologyID{Value: "openehr"}},
 	}
 	f, err := simplified.MarshalFlat(comp, wt)
@@ -242,7 +242,7 @@ func TestSettingEncodeAllZeroWritesNothing(t *testing.T) {
 func TestSettingEncodeRefusals(t *testing.T) {
 	okSetting := func() rm.DVCodedText {
 		return rm.DVCodedText{
-			DVText:       rm.DVText{Value: "other care"},
+			Value:        "other care",
 			DefiningCode: rm.CodePhrase{CodeString: "238", TerminologyID: rm.TerminologyID{Value: "openehr"}},
 		}
 	}
@@ -1212,7 +1212,7 @@ func TestSettingEncodeDecodeSymmetry(t *testing.T) {
 		encodes bool
 	}{
 		{"code and rubric", rm.DVCodedText{
-			DVText:       rm.DVText{Value: "home"},
+			Value:        "home",
 			DefiningCode: rm.CodePhrase{CodeString: "225", TerminologyID: rm.TerminologyID{Value: "openehr"}},
 		}, true},
 		{"code with empty rubric", rm.DVCodedText{

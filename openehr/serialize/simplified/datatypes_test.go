@@ -210,7 +210,7 @@ func TestOtherOpenValueSet(t *testing.T) {
 // stamped with its dynamic type.
 func TestSubstitutedSubtypeRidesRaw(t *testing.T) {
 	out := map[string]any{}
-	v := rm.DVEHRURI{DVURI: rm.DVURI{Value: "ehr://ehr/1"}}
+	v := rm.DVEHRURI{Value: "ehr://ehr/1"}
 	if err := leafToFlat(out, "p/x", v, "DV_URI", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestSubstitutedSubtypeRidesRaw(t *testing.T) {
 // pair is inverse.
 func TestCodedTextAtTextLeafRidesSuffixes(t *testing.T) {
 	v := rm.DVCodedText{
-		DVText:       rm.DVText{Value: "Radial styloid tenosynovitis", Formatting: new("plain")},
+		Value: "Radial styloid tenosynovitis", Formatting: new("plain"),
 		DefiningCode: rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
 	}
 	for _, form := range []struct {
@@ -287,13 +287,11 @@ func TestCodedTextAtTextLeafRidesSuffixes(t *testing.T) {
 // `|raw`, stamped with its dynamic type (REQ-053: never drop silently).
 func TestDecoratedCodedTextAtTextLeaf(t *testing.T) {
 	v := rm.DVCodedText{
-		DVText: rm.DVText{
-			Value: "Radial styloid tenosynovitis",
-			Mappings: []rm.TermMapping{{
-				Match:  "=",
-				Target: rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
-			}},
-		},
+		Value: "Radial styloid tenosynovitis",
+		Mappings: []rm.TermMapping{{
+			Match:  "=",
+			Target: rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
+		}},
 		DefiningCode: rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
 	}
 	out := map[string]any{}
@@ -401,7 +399,7 @@ func TestNonLocalOrdinalRidesRaw(t *testing.T) {
 func TestPreferredTermRidesRaw(t *testing.T) {
 	pt := "Preferred rubric"
 	v := rm.DVCodedText{
-		DVText:       rm.DVText{Value: "v"},
+		Value:        "v",
 		DefiningCode: rm.CodePhrase{CodeString: "c", TerminologyID: rm.TerminologyID{Value: "openehr"}, PreferredTerm: &pt},
 	}
 	out := map[string]any{}
@@ -466,11 +464,11 @@ func TestDecoratedTextAtCodedLeafStampsDynamicType(t *testing.T) {
 //     `|raw` fragment and must emit **no** `_` keys, because the fragment already
 //     carries the normal_range and spelling it twice would let the two disagree.
 func TestNormalRangeNarrowsRawBoundary(t *testing.T) {
-	normal := &rm.DVInterval[rm.DVQuantity]{Interval: rm.Interval[rm.DVQuantity]{
+	normal := &rm.DVInterval[rm.DVQuantity]{
 		Lower:         rm.DVQuantity{Magnitude: 1, Units: "mm"},
 		Upper:         rm.DVQuantity{Magnitude: 9, Units: "mm"},
 		LowerIncluded: true, UpperIncluded: true,
-	}}
+	}
 
 	suffixed := map[string]any{}
 	q := rm.DVQuantity{Magnitude: 1, Units: "mm", NormalRange: normal}
@@ -633,7 +631,7 @@ func TestCodePhrasePreferredTermRidesSuffix(t *testing.T) {
 	}
 
 	nested := map[string]any{}
-	coded := rm.DVCodedText{DVText: rm.DVText{Value: "English"}, DefiningCode: cp}
+	coded := rm.DVCodedText{Value: "English", DefiningCode: cp}
 	if err := leafToFlat(nested, "p/y", coded, "DV_CODED_TEXT", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
@@ -1007,7 +1005,7 @@ func TestTerminologyOnlyCodePhraseRidesRaw(t *testing.T) {
 // decoration survive, and nothing falls back to |raw.
 func TestCodedTextWithFormattingRoundTrips(t *testing.T) {
 	v := rm.DVCodedText{
-		DVText:       rm.DVText{Value: "event", Formatting: new("markdown")},
+		Value: "event", Formatting: new("markdown"),
 		DefiningCode: rm.CodePhrase{CodeString: "433", TerminologyID: rm.TerminologyID{Value: "openehr"}},
 	}
 	for _, listOpen := range []bool{false, true} {

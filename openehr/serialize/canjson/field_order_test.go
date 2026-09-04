@@ -115,7 +115,7 @@ func TestEncodeHashKeysLexicographic(t *testing.T) {
 // `_type`-first on a small value.
 func TestEncodeIsDeterministic(t *testing.T) {
 	v := rm.DVCodedText{
-		DVText: rm.DVText{Value: "x"},
+		Value: "x",
 		DefiningCode: rm.CodePhrase{
 			TerminologyID: rm.TerminologyID{Value: "openehr"},
 			CodeString:    "532",

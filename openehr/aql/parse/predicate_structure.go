@@ -147,9 +147,10 @@ func structuredNodeComparison(np gen.INodePredicateContext) aql.SegmentPredicate
 		return nil
 	}
 	path := sourceText(op)
-	parsed := IdentifiedPath{}
-	parsed.Segments = segmentsFromObjectPath(op)
-	parsed.Raw = path
+	parsed := IdentifiedPath{
+		Segments: segmentsFromObjectPath(op),
+		Raw:      path,
+	}
 	return aql.ComparisonPredicate{Comparison: aql.Comparison{
 		Path:       path,
 		Op:         aql.Operator(cmp.GetText()),

@@ -24,25 +24,18 @@ func newSampler(src mrand.Source) sampler {
 	return sampler{rng: mrand.New(src)}
 }
 
-func (s sampler) intN(n int) int {
-	if n <= 0 {
+func (s sampler) n[T int | int64](limit T) T {
+	if limit <= 0 {
 		return 0
 	}
 	if s.rng != nil {
-		return s.rng.IntN(n)
+		return s.rng.N(limit)
 	}
-	return mrand.IntN(n)
+	return mrand.N(limit)
 }
 
-func (s sampler) int64N(n int64) int64 {
-	if n <= 0 {
-		return 0
-	}
-	if s.rng != nil {
-		return s.rng.Int64N(n)
-	}
-	return mrand.Int64N(n)
-}
+func (s sampler) intN(n int) int       { return s.n(n) }
+func (s sampler) int64N(n int64) int64 { return s.n(n) }
 
 func (s sampler) float64() float64 {
 	if s.rng != nil {
