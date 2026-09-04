@@ -30,8 +30,12 @@ type CBooleanJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CBoolean) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_BOOLEAN: %w", typereg.ErrNilReceiver)
+	}
 	var aux CBooleanJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_BOOLEAN", err)
@@ -67,8 +71,12 @@ type CDateJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CDate) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_DATE: %w", typereg.ErrNilReceiver)
+	}
 	var aux CDateJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_DATE", err)
@@ -115,8 +123,12 @@ type CDateTimeJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CDateTime) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_DATE_TIME: %w", typereg.ErrNilReceiver)
+	}
 	var aux CDateTimeJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_DATE_TIME", err)
@@ -167,8 +179,12 @@ type CDurationJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CDuration) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_DURATION: %w", typereg.ErrNilReceiver)
+	}
 	var aux CDurationJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_DURATION", err)
@@ -209,8 +225,12 @@ type CIntegerJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CInteger) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_INTEGER: %w", typereg.ErrNilReceiver)
+	}
 	var aux CIntegerJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_INTEGER", err)
@@ -244,8 +264,12 @@ type CRealJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CReal) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_REAL: %w", typereg.ErrNilReceiver)
+	}
 	var aux CRealJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_REAL", err)
@@ -281,8 +305,12 @@ type CStringJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CString) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_STRING: %w", typereg.ErrNilReceiver)
+	}
 	var aux CStringJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_STRING", err)
@@ -323,8 +351,12 @@ type CTimeJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CTime) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_TIME: %w", typereg.ErrNilReceiver)
+	}
 	var aux CTimeJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_TIME", err)

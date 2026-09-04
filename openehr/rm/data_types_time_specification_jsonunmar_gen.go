@@ -25,8 +25,12 @@ type DVGeneralTimeSpecificationJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (d *DVGeneralTimeSpecification) UnmarshalJSON(data []byte) error {
+	if d == nil {
+		return fmt.Errorf("canjson: DV_GENERAL_TIME_SPECIFICATION: %w", typereg.ErrNilReceiver)
+	}
 	var aux DVGeneralTimeSpecificationJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("DV_GENERAL_TIME_SPECIFICATION", err)
@@ -54,8 +58,12 @@ type DVPeriodicTimeSpecificationJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (d *DVPeriodicTimeSpecification) UnmarshalJSON(data []byte) error {
+	if d == nil {
+		return fmt.Errorf("canjson: DV_PERIODIC_TIME_SPECIFICATION: %w", typereg.ErrNilReceiver)
+	}
 	var aux DVPeriodicTimeSpecificationJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("DV_PERIODIC_TIME_SPECIFICATION", err)

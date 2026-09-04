@@ -32,8 +32,12 @@ type ItemTagJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (i *ItemTag) UnmarshalJSON(data []byte) error {
+	if i == nil {
+		return fmt.Errorf("canjson: ITEM_TAG: %w", typereg.ErrNilReceiver)
+	}
 	var aux ItemTagJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("ITEM_TAG", err)

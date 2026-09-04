@@ -33,8 +33,12 @@ type ArchetypeInternalRefJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (a *ArchetypeInternalRef) UnmarshalJSON(data []byte) error {
+	if a == nil {
+		return fmt.Errorf("canjson: ARCHETYPE_INTERNAL_REF: %w", typereg.ErrNilReceiver)
+	}
 	var aux ArchetypeInternalRefJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("ARCHETYPE_INTERNAL_REF", err)
@@ -74,8 +78,12 @@ type ArchetypeSlotJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (a *ArchetypeSlot) UnmarshalJSON(data []byte) error {
+	if a == nil {
+		return fmt.Errorf("canjson: ARCHETYPE_SLOT: %w", typereg.ErrNilReceiver)
+	}
 	var aux ArchetypeSlotJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("ARCHETYPE_SLOT", err)
@@ -115,8 +123,12 @@ type CComplexObjectJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CComplexObject) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_COMPLEX_OBJECT: %w", typereg.ErrNilReceiver)
+	}
 	var aux CComplexObjectJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_COMPLEX_OBJECT", err)
@@ -165,8 +177,12 @@ type CMultipleAttributeJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CMultipleAttribute) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_MULTIPLE_ATTRIBUTE: %w", typereg.ErrNilReceiver)
+	}
 	var aux CMultipleAttributeJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_MULTIPLE_ATTRIBUTE", err)
@@ -217,8 +233,12 @@ type CPrimitiveObjectJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CPrimitiveObject) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_PRIMITIVE_OBJECT: %w", typereg.ErrNilReceiver)
+	}
 	var aux CPrimitiveObjectJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_PRIMITIVE_OBJECT", err)
@@ -259,8 +279,12 @@ type CSingleAttributeJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *CSingleAttribute) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: C_SINGLE_ATTRIBUTE: %w", typereg.ErrNilReceiver)
+	}
 	var aux CSingleAttributeJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("C_SINGLE_ATTRIBUTE", err)
@@ -306,8 +330,12 @@ type CardinalityJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *Cardinality) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: CARDINALITY: %w", typereg.ErrNilReceiver)
+	}
 	var aux CardinalityJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("CARDINALITY", err)
@@ -344,8 +372,12 @@ type ConstraintRefJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (c *ConstraintRef) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("canjson: CONSTRAINT_REF: %w", typereg.ErrNilReceiver)
+	}
 	var aux ConstraintRefJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("CONSTRAINT_REF", err)

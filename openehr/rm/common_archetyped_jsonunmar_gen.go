@@ -30,8 +30,12 @@ type ArchetypedJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (a *Archetyped) UnmarshalJSON(data []byte) error {
+	if a == nil {
+		return fmt.Errorf("canjson: ARCHETYPED: %w", typereg.ErrNilReceiver)
+	}
 	var aux ArchetypedJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("ARCHETYPED", err)
@@ -68,8 +72,12 @@ type FeederAuditJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (f *FeederAudit) UnmarshalJSON(data []byte) error {
+	if f == nil {
+		return fmt.Errorf("canjson: FEEDER_AUDIT: %w", typereg.ErrNilReceiver)
+	}
 	var aux FeederAuditJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("FEEDER_AUDIT", err)
@@ -115,8 +123,12 @@ type FeederAuditDetailsJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (f *FeederAuditDetails) UnmarshalJSON(data []byte) error {
+	if f == nil {
+		return fmt.Errorf("canjson: FEEDER_AUDIT_DETAILS: %w", typereg.ErrNilReceiver)
+	}
 	var aux FeederAuditDetailsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("FEEDER_AUDIT_DETAILS", err)
@@ -194,8 +206,12 @@ type LinkJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (l *Link) UnmarshalJSON(data []byte) error {
+	if l == nil {
+		return fmt.Errorf("canjson: LINK: %w", typereg.ErrNilReceiver)
+	}
 	var aux LinkJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("LINK", err)

@@ -331,8 +331,16 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	b.WriteString("// sentinels inside *typereg.DecodeError for errors.Is / errors.As.\n")
 	b.WriteString("// A whole-value shape failure goes through typereg.WrapShapeError,\n")
 	b.WriteString("// which keeps the `canjson: <RM_TYPE>:` text and adds\n")
-	b.WriteString("// typereg.ErrInvalidShape (REQ-052).\n")
+	b.WriteString("// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with\n")
+	b.WriteString("// typereg.ErrNilReceiver rather than dereferenced (REQ-025).\n")
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalJSON(data []byte) error {\n", recv, pc.GoName, typeArgs)
+	// REQ-025: a nil receiver is caller-constructible input; refuse it with
+	// the shared typereg.ErrNilReceiver rather than dereferencing it on the
+	// first field assignment below. fmt and typereg are imported by every
+	// generated companion file already (the _type mismatch arm uses both).
+	fmt.Fprintf(&b, "\tif %s == nil {\n", recv)
+	fmt.Fprintf(&b, "\t\treturn fmt.Errorf(\"canjson: %s: %%w\", typereg.ErrNilReceiver)\n", pc.BMMName)
+	b.WriteString("\t}\n")
 	fmt.Fprintf(&b, "\tvar aux %s%s\n", wireName, typeArgs)
 	b.WriteString("\tif err := json.Unmarshal(data, &aux); err != nil {\n")
 	fmt.Fprintf(&b, "\t\treturn typereg.WrapShapeError(%q, err)\n", pc.BMMName)
