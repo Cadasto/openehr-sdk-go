@@ -181,7 +181,7 @@ Deferred Tier-3 gaps — dedicated ITEM_TAG endpoints, `VERSIONED_*` read famili
 | Testkit helpers + probe runner | **Partial** | `testkit/` | Probe packages landed but there is **no runner**: the `Result` type is duplicated across 12 packages and each probe is reached only from its own bespoke test. REQ-082 specified the modes, result contract, and per-mode rules; phases 1–2 of the [runnability plan](plans/2026-08-18-probe-runnability.md) build them. Recording format open ([STRAND-11](specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml)) |
 | openEHR conformance ratification | **Partial** | `testkit/conformance/webtemplate/` | REQ-080/082. **PROBE-086** round-trips the pinned upstream EHRbase FLAT corpus — 34 bodies this SDK did not write — exact on the modelled subset: **1466 of 1824 keys (80.4%)**, up from 10.5% on landing. Remaining refusals are censused in [SKIPPED.md](../testkit/conformance/webtemplate/SKIPPED.md). Live-CDR ratification and the Cassette/Live modes remain open |
 | Cadasto API conformance | **Planned** | `testkit/cassettes/cadasto/` | REQ-083 — anchored to the Cadasto platform API contract (stage 4) |
-| OpenAPI cassettes | **Partial** | `testkit/cassettes/` REQ-095 | Not all surfaces covered |
+| OpenAPI cassettes | **Partial** | `testkit/cassettes/` REQ-095 | Coverage table in [`testkit/cassettes/its_rest/README.md`](../testkit/cassettes/its_rest/README.md); the named gaps are stored-query metadata bodies, a persisted CONTRIBUTION response, and ITEM_TAG bodies |
 
 ---
 

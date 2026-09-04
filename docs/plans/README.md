@@ -6,6 +6,14 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### Leftover sweeps (2026-09-04)
+
+Two small plans draining the verified-open follow-ups the 2026-08-30 → 2026-09-03 review rounds left in PR bodies and session notes. Each amends landed requirements in place — no new id — and each lands in its own PR.
+
+| Plan | Scope | Covers | Notes |
+|---|---|---|---|
+| [archive/2026-09-04-spec-interop-leftovers.md](archive/2026-09-04-spec-interop-leftovers.md) | **Landed 2026-09-05 and archived**: § REQ-050 binds the System descriptor's unknown keys to the § REQ-144 rule; `simplified.ParseMediaType` / `Format.MediaType` accept EHRbase's `.schema`-suffixed media types on input and emit only the canonical strings; scope.md's examples row describes the tree; a `bmmgen` census pins the single property inherited from a primitive-mapped ancestor across every pinned schema root (STRAND-13 evidence); STRAND-14 is opened on chaining the RM floor into template-driven validation and § REQ-112 states the composition; REQ-095's `partial` has a named gap list in the cassette README | REQ-050 / 053 / 095 / 112 (no new id); STRAND-13 evidence; STRAND-14 opened | STRAND-13/14 stay open (each needs an ADR); REQ-095 stays `partial` with its gaps named |
+
 ### Go 1.27 floor (2026-09-03)
 
 | Plan | Scope | Covers | Notes |

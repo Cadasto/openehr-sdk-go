@@ -13,6 +13,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 ### Added
 
 - **Go 1.27.0 module floor (REQ-002).** The module floor, Docker/Make tooling, and CI now require Go 1.27.0 or newer, and equivalent 1.27 standard-library helpers replaced hand-written code ([plan](docs/plans/archive/2026-09-03-go-1.27.md)).
+- **Simplified-Formats media-type negotiation (REQ-053).** `simplified.ParseMediaType` classifies a Content-Type or Accept value as FLAT or STRUCTURED, accepting EHRbase's `.schema`-suffixed variants on input, while `Format.MediaType` emits only the two canonical strings ([plan](docs/plans/archive/2026-09-04-spec-interop-leftovers.md)).
 
 ## [0.25.0] - 2026-09-03
 

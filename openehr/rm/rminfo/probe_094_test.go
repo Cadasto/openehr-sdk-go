@@ -595,7 +595,10 @@ func TestProbe094AttributeSetsAreComplete(t *testing.T) {
 // Whether the generator should fold a primitive-mapped ancestor's properties —
 // which would make rminfo disagree with the emitted Go struct instead of with
 // the BMM — is a REQ-042/REQ-043 emission question, not this surface's, and it
-// is open as STRAND-13. It MUST NOT be resolved here.
+// is open as STRAND-13. It MUST NOT be resolved here. The cross-schema view of
+// the same question — every pinned root, not just the RM reduction — is
+// internal/bmmgen/primitive_ancestor_census_test.go, which pins the same single
+// entry.
 var unshippedProperties = map[string]string{
 	"Iso8601_timezone.value": "inherited from the primitive-mapped Iso8601_type; see STRAND-13",
 }
