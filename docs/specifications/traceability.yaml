@@ -2262,6 +2262,22 @@ requirements:
     packages: [openehr/rm, openehr/rm/typereg]
     adrs: [docs/adr/0003-rm-event-polymorphism.md]
 
+  - id: REQ-034
+    title: openEHR terminology vocabulary
+    canonical: docs/specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034
+    status: draft
+    implementation: planned
+    packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen]
+    plans: [docs/plans/2026-09-07-terminology-vocabulary.md]
+    notes: >-
+      The openEHR Terminology (openehr_terminology.xml, TERM Release-3.0.0) vendored
+      byte-identical with a sha256 manifest, and a stdlib-only openehr/terminology
+      accessor generated from it (termgen), drift-detected in `make test`. Replaces
+      the hand-typed openEHR code tables in openehr/client/ehr (lifecycle state),
+      openehr/client/ehr/contribution (audit change type), openehr/serialize/simplified
+      (participation mode, ctx/ defaults) and openehr/instance (setting / category
+      defaults). No probe: nothing crosses the wire; guard tests carry the bar.
+
   - id: REQ-043
     title: P_BMM to Go mapping rules
     canonical: docs/specifications/bmm-conformance.md#mapping-rules
