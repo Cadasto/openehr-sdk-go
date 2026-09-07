@@ -22,15 +22,16 @@ import (
 
 // floorInvariantCodes are the codes the RM floor's per-type invariant arm
 // (§ REQ-112 arm (b)) mints. None of them may appear in a template-driven
-// Result while STRAND-14 is open. `rm_invariant` is listed even though neither
-// injected defect emits it: it is the catch-all code for the rest of the
-// catalogue (DV_INTERVAL bounds, DV_QUANTITY precision, the OBJECT_REF floor),
-// so a chaining change that surfaces any of those trips this pin too.
+// Result while STRAND-14 is open. `rm_invariant` is the catch-all code for
+// most of the catalogue (DV_QUANTITY / DV_PROPORTION precision, DV_INTERVAL
+// bounds, the OBJECT_REF floor) — one injected defect below emits it, so this
+// pin exercises the catch-all arm as well as the two specific codes.
 var floorInvariantCodes = []string{"mappings_valid", "term_mapping_match", "rm_invariant"}
 
 // TestStrand14TemplateDrivenDoesNotChainRMFloor injects a floor-only defect on
-// a node vital_signs.opt models (the systolic ELEMENT's `name`) and asserts
-// both halves: the floor sees the defect, the template-driven pass does not.
+// a node vital_signs.opt models (the systolic ELEMENT's `name` or `value`) and
+// asserts both halves: the floor sees the defect, the template-driven pass does
+// not.
 func TestStrand14TemplateDrivenDoesNotChainRMFloor(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 
@@ -56,6 +57,21 @@ func TestStrand14TemplateDrivenDoesNotChainRMFloor(t *testing.T) {
 				t.Helper()
 				el := systolicElement(t, comp)
 				el.Name = rm.DVText{Value: "Systolic", Mappings: []rm.TermMapping{}}
+			},
+		},
+		{
+			name:   "DVQuantityPrecisionOutOfRange",
+			code:   "rm_invariant",
+			defect: "systolic ELEMENT value = DV_QUANTITY with precision -2 (below the RM's -1 floor), magnitude and units untouched",
+			inject: func(t *testing.T, comp *rm.Composition) {
+				t.Helper()
+				el := systolicElement(t, comp)
+				q, ok := el.Value.(*rm.DVQuantity)
+				if !ok {
+					t.Fatalf("fixture systolic ELEMENT value is %T, want *rm.DVQuantity — update this case alongside validVitalSignsComposition", el.Value)
+				}
+				prec := rm.Integer(-2)
+				q.Precision = &prec
 			},
 		},
 		{

@@ -5,7 +5,7 @@
 **Date:** 2026-09-04
 **Status:** landed (2026-09-05, archived in the implementing PR)
 **Owner:** SDK maintainers
-**Covers:** implementation-aligned amendments to landed [REQ-050](../../specifications/wire.md#req-050), [REQ-053](../../specifications/wire.md#req-053), [REQ-095](../../specifications/wire.md#req-095), [REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor); evidence for open [STRAND-13](../../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped); opens **STRAND-14** — **no new requirement id**
+**Covers:** implementation-aligned amendments to landed [REQ-050](../../specifications/wire.md#req-050), [REQ-053](../../specifications/wire.md#req-053), [REQ-095](../../specifications/wire.md#req-095), [REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor), and by citation [REQ-144](../../specifications/wire.md#req-144--definition-metadata-decoding) (the System descriptor joins its unknown-key rule) and [REQ-048](../../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface) (the STRAND-13 census is listed under it); evidence for open [STRAND-13](../../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped); opens **STRAND-14** — **no new requirement id**
 **Probes:** none new
 **Implementation:** landed
 **Depends on:** landed `openehr/client/system` (Extras handling, PR #140), `openehr/serialize/simplified` (REQ-053), `internal/bmmgen` + `openehr/bmm.LoadAll`, `openehr/validation` (REQ-102 / REQ-110 / REQ-112)

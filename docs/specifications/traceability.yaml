@@ -1328,7 +1328,7 @@ requirements:
     # ValidateRM (+ typed sugars for FOLDER / EHR_STATUS / EHR_ACCESS /
     # demographic PARTY) walks an RM root with rminfo as the sole driver —
     # no compiled OPT. Enforces RM-mandatory attribute presence + a small
-    # per-RM-type invariant catalogue (CODE_PHRASE, DV_QUANTITY,
+    # per-RM-type invariant catalogue (CODE_PHRASE, DV_QUANTITY, DV_PROPORTION,
     # DV_INTERVAL bounds for numeric-comparable bounds, OBJECT_REF
     # type/namespace, DV_TEXT/DV_CODED_TEXT Mappings_valid, and the
     # TERM_MAPPING.match value set on TERM_MAPPING as a walked node).
@@ -2439,6 +2439,7 @@ requirements:
     tests:
       - openehr/client/definition/template_test.go
       - openehr/client/definition/stored_query_test.go
+      - openehr/client/system/system_test.go
     notes: >-
       Decode of the two Definition catalog timestamps
       (TemplateMetadata.created_timestamp, StoredQueryMetadata.saved) accepts a

@@ -14,6 +14,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 - **Go 1.27.0 module floor (REQ-002).** The module floor, Docker/Make tooling, and CI now require Go 1.27.0 or newer, and equivalent 1.27 standard-library helpers replaced hand-written code ([plan](docs/plans/archive/2026-09-03-go-1.27.md)).
 - **Simplified-Formats media-type negotiation (REQ-053).** `simplified.ParseMediaType` classifies a single media-type token (a Content-Type value or one Accept media range) as FLAT or STRUCTURED, accepting the deprecated `.schema`-suffixed variants on input, while `Format.MediaType` emits only the two canonical strings ([plan](docs/plans/archive/2026-09-04-spec-interop-leftovers.md)).
+- **RM floor: DV_PROPORTION precision invariants (REQ-112).** `ValidateRM` and its typed sugars now report a `DV_PROPORTION.precision` below -1 and a precision of 0 on a non-integral numerator or denominator (the RM `Precision_validity` invariant), as they already did for `DV_QUANTITY.precision` ([plan](docs/plans/archive/2026-09-04-spec-interop-leftovers.md)).
 
 ## [0.25.0] - 2026-09-03
 
