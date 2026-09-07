@@ -7,19 +7,35 @@ import "strings"
 // onto [Result] after the probe returns (REQ-082).
 type Mode string
 
+// The four modes the runner can select. Sandbox, Cassette, and Live
+// are the three backends REQ-082 requires of a backend-facing probe;
+// ModeInRepo is the declared class for a probe that reaches no server.
 const (
-	ModeSandbox  Mode = "sandbox"
+	// ModeSandbox serves probes from the in-memory sandbox backend.
+	// The runner builds this client itself.
+	ModeSandbox Mode = "sandbox"
+	// ModeCassette replays a checked-in recording.
 	ModeCassette Mode = "cassette"
-	ModeLive     Mode = "live"
-	ModeInRepo   Mode = "in-repo"
+	// ModeLive reaches a real openEHR deployment.
+	ModeLive Mode = "live"
+	// ModeInRepo runs probes that assert over vendored inputs or the
+	// SDK's own output and reach no backend.
+	ModeInRepo Mode = "in-repo"
 )
 
 // Status is the closed set a probe may report (REQ-082).
 type Status string
 
+// The closed status vocabulary. Anything else a probe reports is
+// rewritten to StatusFail by the runner.
 const (
+	// StatusPass means the probe's assertion held.
 	StatusPass Status = "pass"
+	// StatusFail means the assertion did not hold, or the probe
+	// returned an error.
 	StatusFail Status = "fail"
+	// StatusSkip means a precondition was absent. The detail must name
+	// it; a skip with no named precondition is rewritten to a failure.
 	StatusSkip Status = "skip"
 )
 
@@ -28,8 +44,13 @@ const (
 // reach a live deployment by default.
 type Effect string
 
+// The two effect classifications. The zero value is not one of them:
+// see [ResolveEffect].
 const (
+	// EffectReadOnly means the probe writes nothing to the backend.
 	EffectReadOnly Effect = "read-only"
+	// EffectMutating means the probe writes, so Live mode needs the
+	// per-invocation opt-in.
 	EffectMutating Effect = "mutating"
 )
 

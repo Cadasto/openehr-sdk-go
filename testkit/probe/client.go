@@ -14,7 +14,7 @@ import (
 // is required (REQ-021). tokenSrc may be nil (anonymous).
 func NewClient(baseURL string, httpClient *http.Client, tokenSrc auth.TokenSource) (*transport.Client, error) {
 	if baseURL == "" {
-		return nil, fmt.Errorf("%w: empty base URL", ErrUnsatisfiableMode)
+		return nil, fmt.Errorf("probe.NewClient: %w: empty base URL", transport.ErrInvalidConfig)
 	}
 	if httpClient == nil {
 		return nil, fmt.Errorf("probe.NewClient: %w: HTTP client is required", transport.ErrInvalidConfig)
