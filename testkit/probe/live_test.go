@@ -16,17 +16,18 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-// liveTargets are local CDRs brought up alongside this work. A target
-// whose URL does not answer is skipped so CI stays green.
+// liveTargets are opt-in Live-mode CDRs. A target runs only when its
+// env var is set; GitHub CI and `make test` leave them unset, so these
+// subtests skip without dialing anyone (REQ-082: Live is pre-release,
+// Sandbox is the CI default).
 var liveTargets = []struct {
-	name     string
-	env      string
-	fallback string
-	user     string
-	pass     string
+	name string
+	env  string
+	user string
+	pass string
 }{
-	{name: "ehrbase", env: "OPENEHR_LIVE_EHRBASE", fallback: "http://127.0.0.1:8080/ehrbase/rest/openehr/v1"},
-	{name: "ferroehr", env: "OPENEHR_LIVE_FERROEHR", fallback: "http://127.0.0.1:8090/ferroehr/rest/openehr/v1", user: "ferroehr", pass: "ferroehr"},
+	{name: "ehrbase", env: "OPENEHR_LIVE_EHRBASE"},
+	{name: "ferroehr", env: "OPENEHR_LIVE_FERROEHR", user: "ferroehr", pass: "ferroehr"},
 }
 
 func createEHRProbe() probe.Entry {
@@ -51,7 +52,7 @@ func TestLiveCreateEHR(t *testing.T) {
 		t.Run(target.name, func(t *testing.T) {
 			base := os.Getenv(target.env)
 			if base == "" {
-				base = target.fallback
+				t.Skipf("set %s to a live openEHR REST base to run this probe; it is not part of CI", target.env)
 			}
 			var src auth.TokenSource
 			if target.user != "" {

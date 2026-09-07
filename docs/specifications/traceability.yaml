@@ -1012,8 +1012,8 @@ requirements:
     # definition, demographic, transport) no longer use httptest.
     # Cassette still has no recorder/replayer/corpus (STRAND-11).
     # Auth/discovery probes still stand up httptest identity servers.
-    # Live mode is wired (endpoint + mutating opt-in) and exercised
-    # against local EHRbase / FerroEHR when they are reachable.
+    # Live mode is wired and opt-in via OPENEHR_LIVE_*; CI leaves
+    # those unset and the live test skips without dialing.
     tests:
       - testkit/probe/run_test.go
       - testkit/probe/live_test.go
