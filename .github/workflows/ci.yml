@@ -43,6 +43,9 @@ jobs:
       - name: AQL parser verify
         run: make aqlgen-verify
 
+      - name: Terminology codegen verify
+        run: make termgen-verify
+
       - name: Vet
         run: make vet
 
