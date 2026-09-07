@@ -20,9 +20,10 @@ const (
 	FormatStructured
 	// formatSentinel is one past the last real format. It is the upper bound
 	// the internal completeness test walks, so a member added without an arm
-	// in String and MediaType fails a test rather than shipping silently
-	// (the exhaustive linter is not enabled in this repo). It is not itself a
-	// format, stays unexported, and must remain the last constant here.
+	// in String and MediaType fails a test rather than shipping silently. The
+	// exhaustive linter covers the same ground and is excluded from this one
+	// constant by the `[Ss]entinel$` rule in .golangci.yml, because it is not
+	// itself a format. It stays unexported and must remain the last constant.
 	formatSentinel
 )
 

@@ -37,6 +37,11 @@ linters:
       # canxml.isNil lists only the nil-able reflect kinds; enumerating the
       # other twenty-one would be noise, so the stdlib enum is ignored.
       ignore-enum-types: '^reflect\.Kind$'
+      # A `…Sentinel` constant is the one-past-the-last bound a completeness
+      # test walks (simplified.formatSentinel), not a member of the enum. It has
+      # no meaning to switch on, so requiring an arm for it would push a dead
+      # case into every switch over the type.
+      ignore-enum-members: '[Ss]entinel$'
     revive:
       # Curated high-signal set. Listing rules explicitly keeps the policy
       # predictable (rather than tracking revive's shifting defaults).
