@@ -1,11 +1,12 @@
-// Package sandbox will provide the in-memory and replayed-recording
-// transports that back the Sandbox and Cassette probe modes — the same
-// client interfaces as the production REST clients, for fast, hermetic
-// tests of applications built on the SDK.
+// Package sandbox is the in-memory openEHR backend that backs
+// REQ-082's Sandbox probe mode.
 //
-// NOT YET IMPLEMENTED. This package is a reserved name carrying no code:
-// the probe suite currently stands up a hand-written net/http/httptest
-// server per test instead, and no recording format exists. Both modes are
-// specified by REQ-082 (docs/specifications/conformance.md) and sequenced
-// by docs/plans/2026-08-18-probe-runnability.md. Do not import it yet.
+// [Backend] implements [http.RoundTripper], so a consumer (or the
+// probe runner) injects it as the Transport of an *http.Client and
+// hands that client to [transport.New]. There is no network listener
+// and no credential check — REQ-082 and REQ-013: this package imports
+// neither transport/ nor auth/.
+//
+// State is per-Backend and isolated: two probes sharing one instance
+// see each other's writes; two instances do not.
 package sandbox

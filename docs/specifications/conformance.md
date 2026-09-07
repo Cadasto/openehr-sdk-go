@@ -39,7 +39,7 @@ Every probe that asserts against a **backend** **MUST** be runnable in three mod
 | **Cassette** | a replayed **recording** | `testkit/recordings/` | Deterministic CI against captured real-deployment traffic |
 | **Live** | a reference openEHR deployment | none | Pre-release verification against a real backend |
 
-The probe definition is the single source; the runner picks the backend at invocation time.
+The probe definition is the single source; the runner ([`testkit/probe`](../../testkit/probe/)) picks the backend at invocation time.
 
 **Not every probe is backend-facing.** An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output — the AQL round-trip and catalogue properties, the upstream FLAT parity harness, the codec and validation multiset probes — and reaches no server in any mode. Such a probe **MUST** declare `In-repo` in its **Modes** line, and the three-mode rule above does **not** bind it: there is no backend for a recording to capture or a deployment to confirm. This is a declared class, not a shortfall, and it is why a blanket three-mode reading of this requirement is wrong — 16 of the 72 catalog entries are in-repo by construction.
 

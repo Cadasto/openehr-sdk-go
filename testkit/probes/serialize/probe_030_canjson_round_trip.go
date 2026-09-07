@@ -23,16 +23,11 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 )
 
-// Result captures the outcome of a probe invocation. Status is
-// "pass" / "fail" / "skip"; Detail is human-readable supplementary
-// text for failures or skips.
-type Result struct {
-	Probe  string
-	Status string
-	Detail string
-}
+// Result is the shared probe outcome (REQ-082).
+type Result = probe.Result
 
 // Probe030CanjsonRoundTrip implements PROBE-030: decoding a
 // canonical-JSON RM value, encoding it, then decoding and encoding

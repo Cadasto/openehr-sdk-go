@@ -7,7 +7,7 @@
 **Probes:** no new `PROBE-NNN` — this plan gives the existing catalog its missing execution modes. It promotes **PROBE-077**, **PROBE-078**, **PROBE-079** out of `Status: Deferred` (each one a landed, unit-covered requirement whose dedicated wire probe is unwritten) and unblocks **PROBE-065**, which is still `Status: Draft` — specified, never implemented. It is also the gate [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1 names for four `testkit/probes/rest/*` probes.
 **Implementation:** planned
 **Depends on:** landed `transport/` (REQ-090–098), the probe catalog in [conformance.md](../specifications/conformance.md), and the REQ-082 normative prose landed with this plan
-**Defers:** phases 3–4 (Cassette recording, Live mode) — both need access to a live openEHR deployment this project does not currently have; [STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) (the recording format) is deliberately unresolved until there is a capture to judge
+**Defers:** Cassette encoding ([STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml)) until a capture from the local EHRbase / FerroEHR CDRs is judged. Live mode is no longer blocked: both CDRs are reachable locally (EHRbase `:8080`, FerroEHR `:8090`).
 
 ## Goal
 
@@ -48,9 +48,11 @@ Scoped to phases 1–2 (what is reachable now):
 | Step | Status |
 |---|---|
 | REQ-082 normative prose + STRAND-11 (this PR) | done |
-| Phase 1 — shared result + runner | |
-| Phase 2 — `sandbox/` transport | |
-| `traceability.yaml` / REQ.md row | |
+| Phase 1 — shared result + runner | done — `testkit/probe`; refusals pinned by named tests |
+| Phase 2 — `sandbox/` transport | partial — EHR create/get/head; httptest retirement remaining |
+| Phase 4 — Live mode (local CDRs) | partial — runner Live path + `TestLiveCreateEHR` against EHRbase and FerroEHR |
+| Phase 3 — Cassette recording | blocked on STRAND-11 (now capturable) |
+| `traceability.yaml` / REQ.md row | done (REQ-082 stays `partial`) |
 | `make spec-check` | |
 | `make ci` | |
 
