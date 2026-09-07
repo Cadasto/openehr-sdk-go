@@ -47,7 +47,7 @@ The SDK targets **openEHR REST `1.1.0-development`** as its primary contract sur
 
 The version pin is enforced at discovery time (REQ-072), not on the first request. A mismatched advertised version **MUST** fail fast with a typed `DiscoveryError`.
 
-**System descriptor.** `system.Capabilities` decodes the `OPTIONS /` response into `ServiceCapabilities`, the descriptor that advertises the pinned `restapi_specs_version`. Its unknown response keys **MUST** be preserved on decode and re-emitted on encode under exactly the rule [§ REQ-144 *Unknown response keys*](#req-144--definition-metadata-decoding) states for the Definition descriptors — documented fields authoritative, an exact-name collision ignored on encode, a case-variant key preserved beside the field — so a deployment-specific capability the pin does not name survives a round trip through the SDK.
+**System descriptor.** `system.Capabilities` decodes the `OPTIONS /` response into `ServiceCapabilities`, the descriptor that advertises the pinned `restapi_specs_version`. Its unknown response keys **MUST** be preserved on decode and re-emitted on encode under exactly the rule [§ REQ-144 *Unknown response keys*](#req-144--definition-metadata-decoding) states for the Definition descriptors, so a deployment-specific capability the pin does not name survives a round trip through the SDK.
 
 ## Cadasto spec-version header
 
@@ -196,7 +196,7 @@ The codecs **MUST**:
 - Interconvert FLAT ↔ STRUCTURED **without** an OPT (the two are mechanical restructurings of one identifier grammar).
 - Report a missing or mismatched Web Template / OPT as a typed error when conversion cannot proceed without it.
 
-The codecs **MUST** use the canonical media types `application/openehr.wt.flat+json` (FLAT) and `application/openehr.wt.structured+json` (STRUCTURED); they **SHOULD** accept EHRbase's non-conformant `.schema`-suffixed variants on input for interoperability, but **MUST NOT** emit them. (`simplified.ParseMediaType` accepts them — case-insensitively, parameters ignored — and `Format.MediaType` emits only the canonical strings; the codecs themselves take bytes, so negotiation happens one call before them. Recorded in the package [deviations register](../../openehr/serialize/simplified/deviations.md).)
+The codecs **MUST** use the canonical media types `application/openehr.wt.flat+json` (FLAT) and `application/openehr.wt.structured+json` (STRUCTURED); they **SHOULD** accept EHRbase's non-conformant `.schema`-suffixed variants on input for interoperability, but **MUST NOT** emit them. A value naming neither format — including the WebTemplate resource type `application/openehr.wt+json`, a template projection rather than a composition format — **MUST** be refused with a typed error (`simplified.ErrUnknownMediaType`), never defaulted to a format. (`simplified.ParseMediaType` classifies **one** media-type token: a `Content-Type` value, or a single media range already selected from an `Accept` list — a comma-separated list is split by the caller, one call per range. It matches the type case-insensitively and ignores every parameter, `q` included; `Format.MediaType` emits only the canonical strings. The codecs themselves take bytes, so negotiation happens one call before them. Recorded in the package [deviations register](../../openehr/serialize/simplified/deviations.md).)
 
 #### Leaf datatypes
 

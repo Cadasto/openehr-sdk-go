@@ -254,7 +254,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 **Question:** should `ValidateComposition` ([REQ-102](clinical-modeling.md#req-102--composition-validation)) and the [REQ-110](clinical-modeling.md#req-110--template-driven-validation-beyond-composition) entry points run the [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) per-type invariant catalogue as part of a template-driven pass, or stay exactly template conformance with the floor a separate call?
 
-**Why it's open:** today the two layers compose but do not chain. Template validity covers RM-mandatory presence, so a template-driven pass already reports the floor's (a) arm; the floor's (b) arm — `DV_INTERVAL` lower > upper, `TERM_MAPPING.match` outside its value set, `Mappings_valid`, `DV_QUANTITY.precision < 0` — fires only through `ValidateRM`. A caller who runs only `ValidateComposition` can therefore commit an RM-invalid composition that is template-valid. Whether that is a gap or a deliberate separation of concerns is the fork.
+**Why it's open:** today the two layers compose but do not chain. Template validity covers RM-mandatory presence, so a template-driven pass already reports the floor's (a) arm; the floor's (b) arm — `DV_INTERVAL` lower > upper, `TERM_MAPPING.match` outside its value set, `Mappings_valid`, `DV_QUANTITY.precision < -1` (-1 means no limit) — fires only through `ValidateRM`. A caller who runs only `ValidateComposition` can therefore commit an RM-invalid composition that is template-valid. Whether that is a gap or a deliberate separation of concerns is the fork.
 
 **The trade-off:**
 
