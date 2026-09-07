@@ -7,8 +7,12 @@
 // and no credential check — REQ-082 and REQ-013: this package imports
 // neither transport/ nor auth/.
 //
-// State is per-Backend and isolated: two probes sharing one instance
-// see each other's writes; two instances do not.
+// Isolation is per Backend, not per package or process: the runner or
+// a test owns one Backend instance per run, so two probes never
+// observe each other's writes unless they are deliberately handed the
+// same instance (REQ-082 — sandbox state MUST be per-run and
+// isolated). The zero value is ready to use, like [bytes.Buffer];
+// [New] is a convenience constructor, not a requirement.
 //
 // [Handle] / [HandleFunc] / [Scripted] register planted routes that
 // take precedence over the built-in EHR surface, so a probe test can

@@ -84,10 +84,8 @@ func TestIsolation(t *testing.T) {
 func TestNoListener(t *testing.T) {
 	t.Parallel()
 	b := sandbox.New()
-	// A RoundTripper-backed client must not bind a port.
-	if _, ok := b.HTTPClient().Transport.(http.RoundTripper); !ok {
-		t.Fatal("HTTPClient.Transport is not a RoundTripper")
-	}
+	// A RoundTripper-backed client must not bind a port: the Transport
+	// is the Backend itself, not something wrapping a real listener.
 	if b.HTTPClient().Transport != b {
 		t.Fatal("HTTPClient.Transport is not the Backend itself")
 	}
@@ -109,7 +107,7 @@ func TestScriptedRouteOverridesBuiltin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200 from the scripted route (not the builtin 404)", resp.StatusCode)
 	}
@@ -130,7 +128,7 @@ func TestScriptedCatchAll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusPreconditionFailed {
 		t.Fatalf("status = %d, want 412", resp.StatusCode)
 	}

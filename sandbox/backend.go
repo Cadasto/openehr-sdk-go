@@ -1,28 +1,39 @@
 package sandbox
 
 import (
-	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+	"uuid"
 )
 
 const systemID = "sandbox.local"
 
 // Backend is an in-memory openEHR REST backend. It is safe for
-// concurrent use (REQ-026).
+// concurrent use (REQ-026). The zero value is ready to use, like
+// [bytes.Buffer] — ehrs allocates lazily under mu on first write, so
+// a caller never needs [New].
 type Backend struct {
 	mu      sync.Mutex
 	ehrs    map[string][]byte
 	scripts []scripted
 }
 
-// New returns an empty Backend.
+// New returns an empty Backend. Equivalent to the zero value
+// (var b Backend); New exists for callers who prefer a constructor.
 func New() *Backend {
-	return &Backend{ehrs: make(map[string][]byte)}
+	return &Backend{}
+}
+
+// ensureEHRs lazily allocates b.ehrs. Callers MUST hold b.mu.
+func (b *Backend) ensureEHRs() {
+	if b.ehrs == nil {
+		b.ehrs = make(map[string][]byte)
+	}
 }
 
 // HTTPClient returns an *http.Client whose Transport is b, so
@@ -34,10 +45,10 @@ func (b *Backend) HTTPClient() *http.Client {
 // RoundTrip serves one in-memory openEHR REST exchange.
 func (b *Backend) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req == nil {
-		return nil, fmt.Errorf("sandbox: nil request")
+		return nil, errors.New("sandbox: nil request")
 	}
 	if req.Body != nil {
-		defer req.Body.Close()
+		defer func() { _ = req.Body.Close() }()
 	}
 	if h := b.matchScript(req); h != nil {
 		return serveScript(h, req), nil
@@ -65,17 +76,26 @@ func (b *Backend) createEHR(id string) (*http.Response, error) {
 		id = newID()
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
+	// The ITS-REST EHR schema (resources/its-rest/ehr-validation.openapi.yaml,
+	// components.schemas.Ehr) types both ehr_status.id and ehr_access.id as
+	// OBJECT_VERSION_ID (ObjectRefOfObjectVersionId); the vendored
+	// testkit/cassettes/its_rest/ehr/ehr.json fixture instead uses
+	// HIER_OBJECT_ID for both — this backend follows the OpenAPI schema.
 	statusID := newID() + "::" + systemID + "::1"
+	accessID := newID() + "::" + systemID + "::1"
 	body := fmt.Appendf(nil, `{`+
 		`"_type":"EHR",`+
 		`"system_id":{"_type":"HIER_OBJECT_ID","value":%q},`+
 		`"ehr_id":{"_type":"HIER_OBJECT_ID","value":%q},`+
 		`"ehr_status":{"_type":"OBJECT_REF","namespace":"local","type":"EHR_STATUS",`+
 		`"id":{"_type":"OBJECT_VERSION_ID","value":%q}},`+
+		`"ehr_access":{"_type":"OBJECT_REF","namespace":"local","type":"EHR_ACCESS",`+
+		`"id":{"_type":"OBJECT_VERSION_ID","value":%q}},`+
 		`"time_created":{"_type":"DV_DATE_TIME","value":%q}`+
-		`}`, systemID, id, statusID, now)
+		`}`, systemID, id, statusID, accessID, now)
 
 	b.mu.Lock()
+	b.ensureEHRs()
 	if _, exists := b.ehrs[id]; exists {
 		b.mu.Unlock()
 		return jsonResponse(http.StatusConflict, []byte(`{"message":"ehr exists"}`)), nil
@@ -138,10 +158,9 @@ func jsonResponse(status int, body []byte) *http.Response {
 	}
 }
 
+// newID returns a random UUID v4 string. uuid.NewV4 has no error path —
+// it draws from crypto/rand internally — so there is nothing to
+// propagate here.
 func newID() string {
-	var b [16]byte
-	_, _ = rand.Read(b[:])
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+	return uuid.NewV4().String()
 }
