@@ -168,3 +168,29 @@ func TestParseRefusesAnotherRootElement(t *testing.T) {
 		t.Error("Parse(<archetype>) = _, nil; want a refusal — only <terminology> is the pin")
 	}
 }
+
+// TestParseRefusesTrailingContent is the can-fail control for the single-root
+// guard: encoding/xml stops at the first element, so a second top-level element
+// after the terminology root must be refused, not silently dropped — otherwise
+// it would slip past the sha256 pin at a version bump.
+func TestParseRefusesTrailingContent(t *testing.T) {
+	t.Parallel()
+	_, err := Parse(strings.NewReader(`<terminology name="openehr" version="3.0.0"/><codeset/>`))
+	if err == nil {
+		t.Fatal("Parse(two roots) = _, nil; want a refusal — the pin holds exactly one terminology element")
+	}
+	if !strings.Contains(err.Error(), "trailing") {
+		t.Errorf("Parse(two roots) error = %q, want it to name the trailing element", err)
+	}
+}
+
+// TestParseRefusesAnEmptyVocabulary is the can-fail control for the
+// at-least-one-of-each guard: a terminology root that parses to zero groups or
+// zero code sets (an upstream rename that emptied a table) must be refused, not
+// generated into a silently incomplete vocabulary.
+func TestParseRefusesAnEmptyVocabulary(t *testing.T) {
+	t.Parallel()
+	if _, err := Parse(strings.NewReader(`<terminology name="openehr" version="3.0.0"/>`)); err == nil {
+		t.Fatal("Parse(empty terminology) = _, nil; want a refusal — the pin must carry at least one group and one code set")
+	}
+}

@@ -66,14 +66,22 @@ func TestTablesMatchTheOpenEHRTerminology(t *testing.T) {
 		t.Errorf("the code sets hold %d codes in total, want 19", codes)
 	}
 
-	// Spot pins — the codes SDK surfaces default, validate and decode with.
+	// Spot pins — the codes SDK surfaces default, validate and decode with,
+	// including the members the group widening newly admits (252/666/816/817
+	// for change type, 800/801 for lifecycle state). Each anchors a rubric to
+	// a human-known literal independently of the pin, so a bad vendor sync
+	// that transposed a rubric would fail here, not just against the XML.
 	wantRubric(t, terminology.AuditChangeType, "523", "deleted")
 	wantRubric(t, terminology.AuditChangeType, "253", "unknown")
 	wantRubric(t, terminology.AuditChangeType, "252", "synthesis")
+	wantRubric(t, terminology.AuditChangeType, "666", "attestation")
+	wantRubric(t, terminology.AuditChangeType, "816", "restoration")
+	wantRubric(t, terminology.AuditChangeType, "817", "format conversion")
 	wantLen(t, terminology.AuditChangeType, 9)
 
 	wantRubric(t, terminology.VersionLifecycleState, "532", "complete")
 	wantRubric(t, terminology.VersionLifecycleState, "800", "inactive")
+	wantRubric(t, terminology.VersionLifecycleState, "801", "abandoned")
 	wantLen(t, terminology.VersionLifecycleState, 5)
 
 	// The upstream quirk the pin flags itself (SPECPR-51): code 532 is

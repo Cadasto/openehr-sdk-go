@@ -217,12 +217,24 @@ cmd_check() {
     fi
   done <<<"$hash_block"
 
-  # Detect vendored files absent from the manifest (extras).
-  local f name
+  # Detect vendored files absent from the manifest (extras). Compare each
+  # file name against the manifest's exact path set — never as a regex, so a
+  # file named like `o.*.xml` cannot pass by matching a real manifest row.
+  local f name line tracked
   for f in "$DEST"/*.xml; do
     [[ -e "$f" ]] || continue
     name="$(basename "$f")"
-    if ! grep -qE "  $name\$" <<<"$hash_block"; then
+    tracked=""
+    while IFS= read -r line; do
+      [[ -n "$line" ]] || continue
+      # Each manifest line is `<sha>  <path>`; strip up to the two-space
+      # separator and compare the path literally.
+      if [[ "${line#*  }" == "$name" ]]; then
+        tracked=1
+        break
+      fi
+    done <<<"$hash_block"
+    if [[ -z "$tracked" ]]; then
       echo "  UNTRACKED: $name (in resources/terminology/ but not in MANIFEST.txt)"
       rc=1
     fi

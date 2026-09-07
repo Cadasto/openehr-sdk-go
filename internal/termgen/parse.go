@@ -109,7 +109,8 @@ type xmlConcept struct {
 // maintainer has to read, not a programmer error to panic on.
 func Parse(r io.Reader) (*Terminology, error) {
 	var doc xmlTerminology
-	if err := xml.NewDecoder(r).Decode(&doc); err != nil {
+	dec := xml.NewDecoder(r)
+	if err := dec.Decode(&doc); err != nil {
 		return nil, fmt.Errorf("decode the terminology XML: %w", err)
 	}
 	if doc.Name != terminologyName {
@@ -117,6 +118,12 @@ func Parse(r io.Reader) (*Terminology, error) {
 	}
 	if doc.Version == "" {
 		return nil, errors.New("terminology carries no version attribute — the generated tables must name the release they came from")
+	}
+	// encoding/xml stops at the first element, so a second <terminology> or any
+	// trailing element would vanish silently past the sha256 pin. Require the
+	// document to hold exactly one terminology root.
+	if err := expectEOF(dec); err != nil {
+		return nil, err
 	}
 
 	t := &Terminology{Name: doc.Name, Language: doc.Language, Version: doc.Version, Date: doc.Date}
@@ -144,7 +151,28 @@ func Parse(r io.Reader) (*Terminology, error) {
 		}
 		t.Groups = append(t.Groups, def)
 	}
+	if len(t.Groups) == 0 || len(t.CodeSets) == 0 {
+		return nil, fmt.Errorf("terminology has %d group(s) and %d code set(s) — the pin must carry at least one of each; a renamed or dropped table would otherwise generate a silently incomplete vocabulary", len(t.Groups), len(t.CodeSets))
+	}
 	return t, nil
+}
+
+// expectEOF reports an error when the decoder holds any further element after
+// the terminology root — a well-formed pin carries exactly one. Trailing
+// whitespace, comments and processing instructions are ignored.
+func expectEOF(dec *xml.Decoder) error {
+	for {
+		tok, err := dec.Token()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("read past the terminology root: %w", err)
+		}
+		if se, ok := tok.(xml.StartElement); ok {
+			return fmt.Errorf("trailing <%s> after the terminology root — the pin must hold exactly one terminology element", se.Name.Local)
+		}
+	}
 }
 
 // codeSetDef validates one <codeset> and returns it as a [CodeSetDef].

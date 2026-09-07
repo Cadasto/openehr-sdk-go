@@ -168,14 +168,18 @@ func TestGenerateVitalSignsExamplePopulatesPrimitives(t *testing.T) {
 // carrying the generic example sentinel, which is a separate REQ-107 matter.
 func TestGenerateSettingMembershipAgainstThePin(t *testing.T) {
 	for _, tc := range []struct {
-		name, pinned, wantCode string
-		wantRubric             bool
+		name, terminology, pinned, wantCode string
+		wantRubric                          bool
 	}{
-		{name: "non-member replaced by the default", pinned: "999", wantCode: "238", wantRubric: true},
-		{name: "member kept", pinned: "227", wantCode: "227"},
+		{name: "non-member replaced by the default", terminology: "openehr", pinned: "999", wantCode: "238", wantRubric: true},
+		{name: "member kept", terminology: "openehr", pinned: "227", wantCode: "227"},
+		// 227 IS a `setting` member, but coded in a foreign terminology it
+		// still violates Setting_valid, so the terminology arm — not the
+		// membership arm — must replace it with the 238 default.
+		{name: "foreign-terminology setting replaced by the default", terminology: "SNOMED-CT", pinned: "227", wantCode: "238", wantRubric: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			c := compileSyntheticOPT(t, fmt.Sprintf(settingCodedOPT, tc.pinned))
+			c := compileSyntheticOPT(t, fmt.Sprintf(settingCodedOPT, tc.terminology, tc.pinned))
 			out, err := instance.Generate(context.Background(), c, instance.Options{
 				Policy:    instance.Example,
 				Territory: "NL",
@@ -500,10 +504,11 @@ func TestPolicyString(t *testing.T) {
 }
 
 // settingCodedOPT constrains `context/setting/defining_code` to exactly one
-// `openehr` code, given by the single %s. That is the seam
+// code, given by two %s: the terminology id, then the code. That is the seam
 // TestGenerateSettingMembershipAgainstThePin drives: the OPT-driven walk stamps
-// the pinned code on EVENT_CONTEXT.setting, so a non-member reaches
-// applyCompositionDefaults already openehr-coded and populated.
+// the pinned pair on EVENT_CONTEXT.setting, so a value that violates
+// Setting_valid (a non-member, or a code in a foreign terminology) reaches
+// applyCompositionDefaults already populated.
 const settingCodedOPT = `<?xml version="1.0" encoding="utf-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.openehr.org/v1">
   <language>
@@ -578,7 +583,7 @@ const settingCodedOPT = `<?xml version="1.0" encoding="utf-8"?>
                   <upper>1</upper>
                 </occurrences>
                 <node_id />
-                <terminology_id><value>openehr</value></terminology_id>
+                <terminology_id><value>%s</value></terminology_id>
                 <code_list>%s</code_list>
               </children>
             </attributes>
