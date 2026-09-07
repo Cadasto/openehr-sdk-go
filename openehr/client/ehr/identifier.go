@@ -36,9 +36,13 @@ type Identifier struct {
 // error rather than silently discarded. An empty body is not an error —
 // the identifier remains available via Location/ETag → VersionUID.
 //
-// No-op (returns nil) when m is nil or body is empty.
+// No-op (returns nil) when m is nil or the body carries no representation
+// — zero bytes, whitespace, or JSON `null`, as [transport.IsNoRepresentationBody]
+// defines empty for every 2xx arm (REQ-094, REQ-151). A server honouring
+// `Prefer: return=identifier` with `null` sent no identifier rather than a
+// malformed one, so Location/ETag stays the identifier of record.
 func (m *VersionMetadata) ResolveIdentifierBody(body []byte) error {
-	if m == nil || len(body) == 0 {
+	if m == nil || transport.IsNoRepresentationBody(body) {
 		return nil
 	}
 	var id Identifier

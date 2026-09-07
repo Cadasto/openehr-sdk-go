@@ -63,9 +63,9 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 	if resp.StatusCode == http.StatusNoContent {
 		return nil, openehrclient.NewVersionMetadata(resp.Metadata), ErrDeletedAtTime
 	}
-	if len(resp.Body) == 0 {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		return nil, openehrclient.NewVersionMetadata(resp.Metadata),
-			fmt.Errorf("composition.Get: %w: response body is empty", transport.ErrInvalidShape)
+			fmt.Errorf("composition.Get: %w: response body is empty or null", transport.ErrInvalidShape)
 	}
 	out := new(rm.Composition)
 	if err := canjson.Unmarshal(resp.Body, out); err != nil {

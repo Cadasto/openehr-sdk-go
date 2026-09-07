@@ -25,8 +25,12 @@ type ResourceAnnotationsJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (r *ResourceAnnotations) UnmarshalJSON(data []byte) error {
+	if r == nil {
+		return fmt.Errorf("canjson: RESOURCE_ANNOTATIONS: %w", typereg.ErrNilReceiver)
+	}
 	var aux ResourceAnnotationsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("RESOURCE_ANNOTATIONS", err)

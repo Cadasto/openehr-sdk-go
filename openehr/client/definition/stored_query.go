@@ -238,7 +238,7 @@ func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, n
 			return &StoredQueryMetadata{Name: locName, Version: locVer, Q: aqlText}, resp.Metadata, nil
 		}
 	}
-	if len(resp.Body) == 0 {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		return &StoredQueryMetadata{Name: name, Version: version, Q: aqlText}, resp.Metadata, nil
 	}
 	var out StoredQueryMetadata
@@ -326,7 +326,7 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 		}
 		return nil, nil, err
 	}
-	if len(resp.Body) == 0 {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		return &StoredQueryMetadata{Name: name, Version: ver}, resp.Metadata, nil
 	}
 	var out StoredQueryMetadata
@@ -343,9 +343,11 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 //
 // An empty 2xx response body comes back as a non-nil zero-length slice with
 // a nil error, so re-serialising the result yields [] rather than JSON null;
-// a JSON [] body decodes non-nil through encoding/json by construction. A
-// 2xx body that is literally JSON null still decodes to a nil slice and is
-// returned unchanged — § REQ-144 binds the empty-body arm only.
+// a JSON [] body decodes non-nil through encoding/json by construction.
+// "Empty" is the definition § REQ-144 takes from § REQ-094, implemented by
+// [transport.IsNoRepresentationBody] and classified ahead of decode, so a
+// null body takes this same arm and yields the non-nil empty slice rather
+// than the nil one encoding/json would otherwise produce.
 //
 // Wire: GET /definition/query/{qualified_query_name}.
 func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern string) ([]StoredQueryMetadata, *transport.Metadata, error) {
@@ -368,7 +370,7 @@ func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern str
 		}
 		return nil, nil, err
 	}
-	if len(resp.Body) == 0 {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		// An empty 2xx body is an empty catalog, not an absent one: return a
 		// non-nil zero-length slice so a caller re-serialising the result
 		// publishes [] rather than JSON null (REQ-144).

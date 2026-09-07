@@ -76,11 +76,19 @@ func TestNoRepresentationErrorStrings(t *testing.T) {
 	if got := (&openehrclient.NoRepresentationError{}).Error(); got != "ehr: committed write has no usable representation" {
 		t.Errorf("nil-Cause Error() = %q", got)
 	}
-	empty := &openehrclient.NoRepresentationError{
-		Cause: fmt.Errorf("composition: %w: Prefer=return=representation but response body is empty", transport.ErrInvalidShape),
-	}
-	if got := empty.Error(); got != "ehr: committed write has no usable representation (empty body)" {
-		t.Errorf("empty-body Error() = %q", got)
+	// The ErrInvalidShape cause now covers zero bytes, whitespace and JSON
+	// `null` alike (one predicate, REQ-151), so the summary must not claim
+	// "empty body" for a body that was the null literal.
+	for _, cause := range []string{
+		"composition: %w: Prefer=return=representation but response body is empty or null",
+		"composition: %w: Prefer=return=representation but response body is empty",
+	} {
+		empty := &openehrclient.NoRepresentationError{
+			Cause: fmt.Errorf(cause, transport.ErrInvalidShape),
+		}
+		if got := empty.Error(); got != "ehr: committed write has no usable representation (empty or null body)" {
+			t.Errorf("no-representation Error() = %q, want the empty-or-null summary", got)
+		}
 	}
 	decode := &openehrclient.NoRepresentationError{Cause: errors.New(`parse "secret-payload-value"`)}
 	if got := decode.Error(); strings.Contains(got, "secret-payload-value") {

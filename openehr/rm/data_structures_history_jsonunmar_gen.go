@@ -44,8 +44,12 @@ type HistoryJSONUnmarshaller[T ItemStructure] struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (h *History[T]) UnmarshalJSON(data []byte) error {
+	if h == nil {
+		return fmt.Errorf("canjson: HISTORY: %w", typereg.ErrNilReceiver)
+	}
 	var aux HistoryJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("HISTORY", err)
@@ -142,8 +146,12 @@ type IntervalEventJSONUnmarshaller[T ItemStructure] struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (i *IntervalEvent[T]) UnmarshalJSON(data []byte) error {
+	if i == nil {
+		return fmt.Errorf("canjson: INTERVAL_EVENT: %w", typereg.ErrNilReceiver)
+	}
 	var aux IntervalEventJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("INTERVAL_EVENT", err)
@@ -229,8 +237,12 @@ type PointEventJSONUnmarshaller[T ItemStructure] struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (p *PointEvent[T]) UnmarshalJSON(data []byte) error {
+	if p == nil {
+		return fmt.Errorf("canjson: POINT_EVENT: %w", typereg.ErrNilReceiver)
+	}
 	var aux PointEventJSONUnmarshaller[T]
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("POINT_EVENT", err)

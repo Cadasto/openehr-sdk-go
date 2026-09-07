@@ -37,8 +37,12 @@ type SectionJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (s *Section) UnmarshalJSON(data []byte) error {
+	if s == nil {
+		return fmt.Errorf("canjson: SECTION: %w", typereg.ErrNilReceiver)
+	}
 	var aux SectionJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("SECTION", err)

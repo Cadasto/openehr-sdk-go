@@ -379,6 +379,8 @@ func marshalPolyKind(plan *Plan, owner, emitting *bmm.SimpleClass, prop bmm.Prop
 		return polySingle
 	case polySlice, polySliceNarrow:
 		return polySlice
+	case polyNone:
+		// a non-polymorphic property has no kind to collapse
 	}
 	return polyNone
 }

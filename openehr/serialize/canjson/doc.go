@@ -84,7 +84,7 @@
 //   - [ErrInvalidShape] — decode only. Never appears on an encode
 //     path. Every shape error raised inside a generated RM type's
 //     [UnmarshalJSON] wraps it, over the encoding/json error, which
-//     stays reachable through unwrapping. Of the three decode outcomes
+//     stays reachable through unwrapping. Of the four decode outcomes
 //     described below, only the shape one carries it.
 //
 // Both are distinct from the transport-level transport.ErrInvalidShape,
@@ -117,6 +117,19 @@
 //     [DecodeError] naming that slot: a [DecodeError] does not strip a
 //     shape classification raised beneath it, so a consumer reads the
 //     path off one and the kind off the other.
+//   - A hand-written primitive decoded at the top level — rm.Real,
+//     rm.Integer or rm.Character handed to [Unmarshal] directly rather
+//     than reached through a generated type — carries its own
+//     `rm.<Type>:` prefix, not the `canjson: <RM_TYPE>:` funnel. Which
+//     refusals carry [ErrInvalidShape] differs by primitive, so it is worth
+//     stating per arm: on rm.Character every refusal carries it, including
+//     the encoding/json failures of its string arm; on rm.Real only the
+//     precision refusal does; on rm.Integer none does. An empty input
+//     carries no sentinel on any of the three, and neither does a strconv
+//     or encoding/json parse or range failure beneath rm.Real or rm.Integer
+//     — the precedence rule wire.md § REQ-052 states — and those causes
+//     stay reachable with errors.AsType. A nil receiver on any of them, as
+//     on every generated type, is a typereg.ErrNilReceiver error (REQ-025).
 //
 // # Strict vs relaxed decode
 //

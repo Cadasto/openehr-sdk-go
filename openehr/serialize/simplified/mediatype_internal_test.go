@@ -2,9 +2,10 @@ package simplified
 
 // REQ-053 — Format completeness. A member added to the Format iota block
 // without an arm in String and MediaType must fail a test rather than ship
-// silently: the exhaustive linter is not enabled in this repo, and the
-// exported-API tests loop over a hard-coded pair of formats, so neither would
-// notice. formatSentinel is unexported, which is why this test sits inside the
+// silently. The exhaustive linter also covers the switches (formatSentinel
+// itself is excluded from it by the `[Ss]entinel$` rule in .golangci.yml, not
+// being a format), but the exported-API tests loop over a hard-coded pair of
+// formats, so this test remains the bound-walking guard. formatSentinel is unexported, which is why this test sits inside the
 // package rather than in simplified_test.
 
 import (

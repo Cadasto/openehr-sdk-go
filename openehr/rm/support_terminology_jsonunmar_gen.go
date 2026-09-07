@@ -23,8 +23,12 @@ type OpenehrCodeSetIdentifiersJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (o *OpenehrCodeSetIdentifiers) UnmarshalJSON(data []byte) error {
+	if o == nil {
+		return fmt.Errorf("canjson: OPENEHR_CODE_SET_IDENTIFIERS: %w", typereg.ErrNilReceiver)
+	}
 	var aux OpenehrCodeSetIdentifiersJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("OPENEHR_CODE_SET_IDENTIFIERS", err)
@@ -49,8 +53,12 @@ type OpenehrTerminologyGroupIdentifiersJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (o *OpenehrTerminologyGroupIdentifiers) UnmarshalJSON(data []byte) error {
+	if o == nil {
+		return fmt.Errorf("canjson: OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS: %w", typereg.ErrNilReceiver)
+	}
 	var aux OpenehrTerminologyGroupIdentifiersJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS", err)
@@ -75,8 +83,12 @@ type TerminologyServiceJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (t *TerminologyService) UnmarshalJSON(data []byte) error {
+	if t == nil {
+		return fmt.Errorf("canjson: TERMINOLOGY_SERVICE: %w", typereg.ErrNilReceiver)
+	}
 	var aux TerminologyServiceJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("TERMINOLOGY_SERVICE", err)

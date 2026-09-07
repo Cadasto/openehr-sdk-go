@@ -294,7 +294,7 @@ func getParty(ctx context.Context, c *transport.Client, req *transport.Request) 
 		return nil, nil, err
 	}
 	meta := openehrclient.NewVersionMetadata(resp.Metadata)
-	if len(resp.Body) == 0 {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		// Only a 204 legitimately carries no version body (e.g. a
 		// version_at_time with no matching version). Any other empty-body 2xx
 		// is a wire anomaly — surface it as ErrInvalidShape rather than
@@ -305,7 +305,7 @@ func getParty(ctx context.Context, c *transport.Client, req *transport.Request) 
 		if resp.StatusCode == http.StatusNoContent {
 			return nil, meta, nil
 		}
-		return nil, meta, fmt.Errorf("demographic: %w: %d response with empty body", transport.ErrInvalidShape, resp.StatusCode)
+		return nil, meta, fmt.Errorf("demographic: %w: %d response with empty or null body", transport.ErrInvalidShape, resp.StatusCode)
 	}
 	party, err := typereg.DecodeAs[rm.Party](resp.Body)
 	if err != nil {

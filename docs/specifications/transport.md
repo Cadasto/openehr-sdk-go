@@ -264,9 +264,9 @@ representation, the SDK **MUST** return a `*transport.DecodeError`. That error *
 
 **`Error()` stays value-free.** `DecodeError.Error()` **MUST** carry the HTTP method, the route
 template and the classification only, in the REQ-093 discipline. It **MUST NOT** interpolate the
-body, and **MUST NOT** interpolate the wrapped decoder's text — codec errors embed offending
-values in `parse %q`-style messages, so echoing the cause would leak through the string surface
-what the field deliberately gates. Callers that need the diagnostics unwrap or read `Body`.
+body, and **MUST NOT** interpolate the wrapped decoder's text — a codec cause may embed the
+offending value (`*strconv.NumError` and `*json.UnmarshalTypeError` both do), so echoing the cause
+would leak through the string surface what the field deliberately gates. Callers that need the diagnostics unwrap or read `Body`.
 
 **Metadata still arrives.** The `(*T, *Metadata, error)` triple the leaf packages return **MUST**
 still populate `*Metadata` on this path. A decode failure does not cost the caller the response
@@ -281,6 +281,12 @@ empty-body arm. Each arm **MUST** keep the contract its own surface already had,
 unified under `*transport.DecodeError`: an empty body has no representation to decode and no
 bytes to hand back, so where it is a failure at all it is an *absent* body rather than an unusable
 one. The arms take three shapes, named below.
+
+*Empty*, throughout this §, has the meaning [§ REQ-094](#req-094--prefer-response-shape-negotiation)
+gives it: zero bytes, whitespace only, or the JSON `null` literal. A `null` body unmarshals into a
+struct as a nil-error no-op, so every arm below **MUST** classify against the raw bytes ahead of
+decode — `transport.IsNoRepresentationBody` is the single implementation of that predicate, and a
+hand-rolled leaf **MUST** call it rather than test `len(body) == 0`.
 
 **The refusal arms.** A read that expected a representation and received an empty 2xx body
 **MUST** keep today's `transport.ErrInvalidShape` behaviour, so callers already keying on

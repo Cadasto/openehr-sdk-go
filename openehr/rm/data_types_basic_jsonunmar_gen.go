@@ -25,8 +25,12 @@ type DVBooleanJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (d *DVBoolean) UnmarshalJSON(data []byte) error {
+	if d == nil {
+		return fmt.Errorf("canjson: DV_BOOLEAN: %w", typereg.ErrNilReceiver)
+	}
 	var aux DVBooleanJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("DV_BOOLEAN", err)
@@ -60,8 +64,12 @@ type DVIdentifierJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (d *DVIdentifier) UnmarshalJSON(data []byte) error {
+	if d == nil {
+		return fmt.Errorf("canjson: DV_IDENTIFIER: %w", typereg.ErrNilReceiver)
+	}
 	var aux DVIdentifierJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("DV_IDENTIFIER", err)
@@ -94,8 +102,12 @@ type DVStateJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (d *DVState) UnmarshalJSON(data []byte) error {
+	if d == nil {
+		return fmt.Errorf("canjson: DV_STATE: %w", typereg.ErrNilReceiver)
+	}
 	var aux DVStateJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("DV_STATE", err)

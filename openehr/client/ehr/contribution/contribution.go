@@ -1,7 +1,6 @@
 package contribution
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -98,10 +97,10 @@ func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	}
 	// JSON null decodes into rm.Contribution as a nil-error no-op —
 	// classify it as empty (REQ-094), same as the WriteResult family.
-	if body := bytes.TrimSpace(resp.Body); len(body) == 0 || bytes.Equal(body, []byte("null")) {
+	if transport.IsNoRepresentationBody(resp.Body) {
 		return nil, meta, &openehrclient.NoRepresentationError{
 			Meta:  meta,
-			Cause: fmt.Errorf("contribution.Commit: %w: Prefer=return=representation but response body is empty", transport.ErrInvalidShape),
+			Cause: fmt.Errorf("contribution.Commit: %w: Prefer=return=representation but response body is empty or null", transport.ErrInvalidShape),
 		}
 	}
 	var out rm.Contribution

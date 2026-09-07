@@ -36,8 +36,8 @@ type decodeFake struct {
 const phiMarker = "NOTANUMBER-8f2c1d"
 
 // phiEchoingField reproduces the decoder class REQ-151 names by name: an
-// UnmarshalJSON whose error embeds the offending value in a `parse %q` message,
-// exactly as rm.Integer and rm.Real do (openehr/rm/integer.go, real.go). It is
+// UnmarshalJSON whose error quotes the offending value, as the strconv cause
+// beneath rm.Integer and rm.Real does (openehr/rm/integer.go, real.go). It is
 // spelled out here rather than imported so the guard does not depend on any
 // particular rm type keeping that message shape.
 type phiEchoingField struct{}
@@ -362,7 +362,7 @@ func TestDecodeEmptyBodyStaysInvalidShape(t *testing.T) { // REQ-151
 // nilaqlerror_test.go already use. A failed errors.As leaves the caller holding
 // a typed nil, which boxes into a non-nil error interface; every method must
 // answer rather than dereference. Removing either nil guard fails this test.
-func TestDecodeErrorNilReceiver(t *testing.T) { // REQ-151
+func TestDecodeErrorNilReceiver(t *testing.T) { // REQ-151, REQ-025
 	var e *transport.DecodeError
 
 	t.Run("Error", func(t *testing.T) {

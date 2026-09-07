@@ -130,8 +130,8 @@ func TestEnumZeroValuesAreConservative(t *testing.T) {
 // per-code completeness guard would still pass, because it only checks the eight
 // codes that exist. Nothing else in the repo fails. This does — so the widening
 // arrives as a test failure to be answered deliberately, not as a diagnostic
-// that quietly stopped firing. (`exhaustive` is not enabled in .golangci.yml,
-// and enabling it repo-wide is a separate decision.)
+// that quietly stopped firing. (`exhaustive` is enabled in .golangci.yml and
+// covers switches over the type; this test covers the vocabulary itself.)
 func TestContainVerdictVocabularyIsPinned(t *testing.T) {
 	t.Parallel()
 	// The declared order is the contract this test reads; contain's own

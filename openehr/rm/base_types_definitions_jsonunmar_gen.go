@@ -23,8 +23,12 @@ type BasicDefinitionsJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (b *BasicDefinitions) UnmarshalJSON(data []byte) error {
+	if b == nil {
+		return fmt.Errorf("canjson: BASIC_DEFINITIONS: %w", typereg.ErrNilReceiver)
+	}
 	var aux BasicDefinitionsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("BASIC_DEFINITIONS", err)
@@ -49,8 +53,12 @@ type OpenehrDefinitionsJSONUnmarshaller struct {
 // sentinels inside *typereg.DecodeError for errors.Is / errors.As.
 // A whole-value shape failure goes through typereg.WrapShapeError,
 // which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052).
+// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
 func (o *OpenehrDefinitions) UnmarshalJSON(data []byte) error {
+	if o == nil {
+		return fmt.Errorf("canjson: OPENEHR_DEFINITIONS: %w", typereg.ErrNilReceiver)
+	}
 	var aux OpenehrDefinitionsJSONUnmarshaller
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return typereg.WrapShapeError("OPENEHR_DEFINITIONS", err)

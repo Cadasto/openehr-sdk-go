@@ -197,9 +197,9 @@ type DecodeError struct {
 
 // Error names the method, the route and the classification only — the REQ-093
 // value-free discipline (REQ-151). It never interpolates Body, and never the
-// wrapped decoder's text: codec messages embed the offending value in
-// `parse %q` form, so echoing the cause would leak through the string surface
-// what Body deliberately gates. Callers that need the diagnostics unwrap or
+// wrapped decoder's text: a codec cause may embed the offending value
+// (*strconv.NumError and *json.UnmarshalTypeError both do), so echoing the
+// cause would leak through the string surface what Body deliberately gates. Callers that need the diagnostics unwrap or
 // read Body.
 //
 // Error answers on a nil receiver instead of panicking: a failed errors.As
