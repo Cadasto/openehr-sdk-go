@@ -11,7 +11,7 @@ package bmmgen
 // strand (REQ-048 § The attribute tables are complete against the BMM).
 //
 // The census result is a single positive case, and one positive case proves
-// little on its own, so three guards keep the evidence honest:
+// little on its own, so these guards keep the evidence honest:
 //
 //   - TestPinnedSchemaRootsMatchVendoredSchemas checks the root list against
 //     what is actually vendored under resources/bmm, so adding a seventh schema
@@ -35,7 +35,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
-// pinnedSchemaRoots are the six roots vendored under resources/bmm, in the
+// pinnedSchemaRoots are the roots vendored under resources/bmm, in the
 // order the census reports them. Kept honest against the directory by
 // TestPinnedSchemaRootsMatchVendoredSchemas.
 var pinnedSchemaRoots = []string{
@@ -59,13 +59,11 @@ var primitiveAncestorDrops = map[string][]string{
 	},
 }
 
-// schemaFileSuffix is the filename suffix of a vendored BMM schema, and
-// schemaFilePrefix the prefix every openEHR-published one carries. Together
-// they define what counts as a schema root on disk.
-const (
-	schemaFilePrefix = "openehr_"
-	schemaFileSuffix = ".bmm.json"
-)
+// schemaFileSuffix is the filename suffix of a vendored BMM schema. It alone
+// defines what counts as a schema root on disk — bmm.FSResolver resolves a
+// root as <Root>/<id>.bmm.json, so any file carrying the suffix is a root the
+// census must walk, whatever its prefix.
+const schemaFileSuffix = ".bmm.json"
 
 // dvTemporalRoot is the schema root that carries the DV temporal types, and
 // dvTemporalRedeclarers the four types themselves. They descend from the
@@ -78,6 +76,7 @@ var dvTemporalRedeclarers = []string{"DV_DATE", "DV_TIME", "DV_DATE_TIME", "DV_D
 
 func TestPrimitiveMappedAncestorPropertyCensus(t *testing.T) { // STRAND-13
 	got := map[string][]string{}
+	dvChecked := false
 	for _, root := range pinnedSchemaRoots {
 		schema, err := bmm.LoadAll(root, bmm.FSResolver{Root: testResources})
 		if err != nil {
@@ -90,7 +89,11 @@ func TestPrimitiveMappedAncestorPropertyCensus(t *testing.T) { // STRAND-13
 		}
 		if root == dvTemporalRoot {
 			assertDVTemporalRedeclareValue(t, root, lookup)
+			dvChecked = true
 		}
+	}
+	if !dvChecked {
+		t.Errorf("assertDVTemporalRedeclareValue never ran: dvTemporalRoot = %q is not in pinnedSchemaRoots %v", dvTemporalRoot, pinnedSchemaRoots)
 	}
 	for _, key := range slices.Sorted(maps.Keys(got)) {
 		roots := got[key]
@@ -137,7 +140,7 @@ func TestPinnedSchemaRootsMatchVendoredSchemas(t *testing.T) { // STRAND-13
 }
 
 // vendoredSchemaRoots lists the schema roots present in dir — every
-// "openehr_*.bmm.json" file with the suffix stripped — sorted.
+// "*.bmm.json" file with the suffix stripped — sorted.
 func vendoredSchemaRoots(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -148,11 +151,7 @@ func vendoredSchemaRoots(dir string) ([]string, error) {
 		if entry.IsDir() {
 			continue
 		}
-		name := entry.Name()
-		if !strings.HasPrefix(name, schemaFilePrefix) {
-			continue
-		}
-		if root, ok := strings.CutSuffix(name, schemaFileSuffix); ok {
+		if root, ok := strings.CutSuffix(entry.Name(), schemaFileSuffix); ok {
 			roots = append(roots, root)
 		}
 	}
@@ -178,9 +177,7 @@ func schemaClassLookup(schema *bmm.Schema) func(string) (bmm.Class, bool) {
 // reachable ONLY through a primitive-mapped ancestor, sorted.
 //
 // lookup resolves a class or primitive name; primitive reports whether a name
-// is mapped to a Go primitive (isPrimitive, over a real schema). Keys are not
-// de-duplicated: a key emitted twice for one schema means the same ancestry was
-// walked twice, and callers surface that rather than hide it.
+// is mapped to a Go primitive (isPrimitive, over a real schema).
 func censusPrimitiveAncestorDrops(
 	classes []string,
 	lookup func(string) (bmm.Class, bool),

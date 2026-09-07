@@ -71,8 +71,9 @@ var acceptedMediaTypes = map[string]Format{
 // Content-Type value, or a single media range already picked out of an Accept
 // list. A comma-separated Accept list is not accepted: split it upstream and
 // call this once per range. The type is matched case-insensitively (RFC 2045)
-// and every parameter is ignored, `q` included, so a `q=0` range still
-// classifies; a malformed parameter still fails the whole value. Anything
+// and parameter values are ignored, `q` included, so a `q=0` range still
+// classifies; a parameter mime.ParseMediaType cannot parse refuses the whole
+// value. Anything
 // naming neither format — including the WebTemplate resource type
 // `application/openehr.wt+json`, which is a template projection rather than a
 // composition format — fails with [ErrUnknownMediaType]. It never panics on

@@ -143,5 +143,8 @@ func systolicElement(t *testing.T, comp *rm.Composition) *rm.Element {
 	if len(list.Items) != 1 {
 		t.Fatalf("fixture /content[0]/data/events[0]/data has %d items, want 1", len(list.Items))
 	}
+	if got := list.Items[0].ArchetypeNodeID; got != "at0004" {
+		t.Fatalf("fixture /content[0]/data/events[0]/data/items[0] is %q, want at0004 — update this helper alongside validVitalSignsComposition", got)
+	}
 	return &list.Items[0]
 }

@@ -152,7 +152,7 @@ func TestCensusPrimitiveAncestorDropsSynthetic(t *testing.T) { // STRAND-13
 		},
 		{
 			name:   "an ancestor name with no definition is skipped",
-			guards: "a census that assumed every ancestor name resolves would panic on a nil class, or stop the walk at the dangling name and lose C.v via P",
+			guards: "a walk that stopped at the first ancestor name it cannot resolve would lose C.v via P, which sits behind the dangling name in C's ancestor list",
 			// Missing is named but not defined; D names nothing else.
 			classes:   []string{"C", "D"},
 			primitive: []string{"P"},
@@ -165,7 +165,7 @@ func TestCensusPrimitiveAncestorDropsSynthetic(t *testing.T) { // STRAND-13
 		},
 		{
 			name:      "a primitive ancestor that declares nothing is not a drop",
-			guards:    "keying the census off primitive ancestry alone rather than off the primitive's declared properties — most primitive ancestors (Ordered, Temporal) declare nothing and must produce no entry",
+			guards:    "keying the census off primitive ancestry alone rather than off the primitive's declared properties — most primitive-mapped ancestors (Temporal, for one) declare nothing and must produce no entry",
 			classes:   []string{"C"},
 			primitive: []string{"P"},
 			schema: map[string]syntheticClass{
@@ -184,7 +184,7 @@ func TestCensusPrimitiveAncestorDropsSynthetic(t *testing.T) { // STRAND-13
 			}
 			got := censusPrimitiveAncestorDrops(tc.classes, s.lookup, s.isPrimitive)
 			if s.overflow {
-				t.Fatalf("the ancestor walk made more than %d name lookups: it is not terminating.\nthis case guards: %s", syntheticLookupBudget, tc.guards)
+				t.Fatalf("censusPrimitiveAncestorDrops(%v) made more than %d name lookups: the ancestor walk is not terminating.\nthis case guards: %s", tc.classes, syntheticLookupBudget, tc.guards)
 			}
 			if !slices.Equal(got, tc.want) {
 				t.Errorf("censusPrimitiveAncestorDrops(%v) = %v, want %v\nthis case guards: %s", tc.classes, got, tc.want, tc.guards)
