@@ -31,6 +31,7 @@ The SDK **MUST** treat the BMM files in `resources/bmm/` as the canonical source
 
 - **Covered by:** [`../resources/bmm/README.md`](../../resources/bmm/README.md)
 - **Lives in:** `resources/bmm/*.bmm.json`
+- **Sibling pin:** the openEHR Terminology vocabulary is pinned the same way under `resources/terminology/` — see [REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034).
 
 ### REQ-042 — Generated code, drift-detected
 

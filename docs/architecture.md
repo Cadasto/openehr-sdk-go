@@ -141,7 +141,7 @@ The SDK does not take a "base URL". It takes a `smart/discovery.ServiceCatalog` 
 
 ### `internal/` is invisible
 
-Anything under `internal/` is excluded from BC promises (REQ-005). Today this holds generator tooling — `internal/bmmgen` (RM/AOM/canonical JSON emission) and `internal/bmmdiff` (BMM corpus diff for version bumps) — plus the compiled-template foundation: `internal/templatecompile` (parsed OPT → walker-friendly compiled form behind the builder and validator) and `internal/templateinstance` (template-driven RM instance synthesis). When in doubt whether a helper belongs in a public package or `internal/`, ask: "would a consumer write a meaningful caller against this directly?" If no, it goes in `internal/`.
+Anything under `internal/` is excluded from BC promises (REQ-005). Today this holds generator tooling — `internal/bmmgen` (RM/AOM/canonical JSON emission), `internal/bmmdiff` (BMM corpus diff for version bumps) and `internal/termgen` (openEHR Terminology → `openehr/terminology` tables) — plus the compiled-template foundation: `internal/templatecompile` (parsed OPT → walker-friendly compiled form behind the builder and validator) and `internal/templateinstance` (template-driven RM instance synthesis). When in doubt whether a helper belongs in a public package or `internal/`, ask: "would a consumer write a meaningful caller against this directly?" If no, it goes in `internal/`.
 
 ## Code generation
 
@@ -156,6 +156,8 @@ The RM and AOM 1.4 types are generated from the pinned BMM corpus — the one pi
 | Generated AOM 1.4 | [`openehr/aom/aom14/`](../openehr/aom/aom14/) | One-way import of `rm` for base types |
 | Type registry | [`openehr/rm/typereg/`](../openehr/rm/typereg/) | Hand-written `Registry`; registrations in `typereg_gen.go` per [ADR 0002](adr/0002-bmm-codegen-decisions.md) |
 | RM structural lookup | [`openehr/rm/rminfo/`](../openehr/rm/rminfo/) | Two BMM-derived tables emitted by one run: `lookup_gen.go` (the class universe) and `absence_gen.go` (the declared names outside it, REQ-049); [ADR 0005](adr/0005-compiled-template-foundation.md) |
+| Terminology generator | [`internal/termgen/`](../internal/termgen/), [`cmd/termgen`](../cmd/termgen) | `make termgen` / `make termgen-verify` (chained in `make test`) |
+| Generated terminology | [`openehr/terminology/`](../openehr/terminology/) | `openehr_gen.go` — groups and code sets from `resources/terminology/` |
 
 ```mermaid
 flowchart LR

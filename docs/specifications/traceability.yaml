@@ -1911,7 +1911,10 @@ requirements:
       per-request and cannot express one state per version), a
       caller-supplied batch audit change_type that MUST NOT be derived, and
       omission of the server-assigned contribution / uid fields the pin's
-      UpdateVersion DTO does not declare.
+      UpdateVersion DTO does not declare. Change-type and lifecycle-state
+      validity is now membership of the pinned audit change type / version
+      lifecycle state groups (REQ-034), not a hand-typed four- or three-code
+      table.
 
   - id: REQ-140
     title: Underscore-prefixed RM attributes (simplified formats)
@@ -2089,7 +2092,7 @@ requirements:
     canonical: docs/specifications/module-layout.md#req-013--building-block-independence
     status: draft
     implementation: landed
-    packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck]
+    packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/terminology, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck]
     tests:
       - openehr/aql/contain/imports_test.go
       - openehr/aql/imports_test.go
@@ -2101,6 +2104,7 @@ requirements:
       - openehr/serialize/simplified/independence_test.go
       - openehr/template/webtemplate/independence_test.go
       - openehr/templatecompile/imports_test.go
+      - openehr/terminology/imports_test.go
       - openehr/validation/imports_test.go
 
   - id: REQ-014
@@ -2266,9 +2270,21 @@ requirements:
     title: openEHR terminology vocabulary
     canonical: docs/specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen]
-    plans: [docs/plans/2026-09-07-terminology-vocabulary.md]
+    plans: [docs/plans/archive/2026-09-07-terminology-vocabulary.md]
+    tests:
+      - internal/termgen/parse_test.go
+      - internal/termgen/render_test.go
+      - internal/termgen/run_test.go
+      - openehr/client/ehr/contribution/builder_test.go
+      - openehr/client/ehr/version_header_test.go
+      - openehr/instance/instance_test.go
+      - openehr/serialize/simplified/flat_decode_test.go
+      - openehr/serialize/simplified/rmattr_party_test.go
+      - openehr/terminology/imports_test.go
+      - openehr/terminology/tables_test.go
+      - openehr/terminology/terminology_test.go
     notes: >-
       The openEHR Terminology (openehr_terminology.xml, TERM Release-3.0.0) vendored
       byte-identical with a sha256 manifest, and a stdlib-only openehr/terminology

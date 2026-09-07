@@ -35,7 +35,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-031 | Embedded base structs | [rm-modeling.md § Embedded base structs](rm-modeling.md#embedded-base-structs-req-031) | landed |
 | REQ-032 | Interfaces for abstract RM | [rm-modeling.md § Abstract categories](rm-modeling.md#abstract-categories-req-032) | landed |
 | REQ-033 | No inheritance emulation | [rm-modeling.md § No inheritance emulation](rm-modeling.md#no-inheritance-emulation-req-033) | landed |
-| REQ-034 | openEHR terminology vocabulary | [rm-modeling.md § openEHR terminology vocabulary](rm-modeling.md#openehr-terminology-vocabulary-req-034) | planned |
+| REQ-034 | openEHR terminology vocabulary | [rm-modeling.md § openEHR terminology vocabulary](rm-modeling.md#openehr-terminology-vocabulary-req-034) | landed |
 | REQ-040 | Type registry | [rm-modeling.md § Type registry](rm-modeling.md#type-registry-req-040) | landed |
 | REQ-041 | Pinned BMM sources | [bmm-conformance.md § REQ-041](bmm-conformance.md#req-041--pinned-bmm-sources) | landed |
 | REQ-042 | Generated code, drift-detected | [bmm-conformance.md § REQ-042](bmm-conformance.md#req-042--generated-code-drift-detected) | landed |

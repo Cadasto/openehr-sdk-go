@@ -10,7 +10,7 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 | Plan | Scope | Covers | Notes |
 |---|---|---|---|
-| [2026-09-07-terminology-vocabulary.md](2026-09-07-terminology-vocabulary.md) | Vendor the openEHR Terminology (`openehr_terminology.xml`, TERM Release-3.0.0) under `resources/terminology/` with a sha256 manifest; generate a stdlib-only `openehr/terminology` accessor from it (`termgen`, drift-detected in `make test`); re-point the hand-typed `openehr` code tables in `openehr/client/ehr`, `contribution`, `simplified` and `instance` at it | [REQ-034](../specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034) (new); REQ-130 / REQ-013 amended in place | Lifecycle-state and change-type validity becomes group membership (5 and 9 codes); the `ctx/` `math_function` default becomes `640\|actual` (146 is `mean`) |
+| [archive/2026-09-07-terminology-vocabulary.md](archive/2026-09-07-terminology-vocabulary.md) | **Landed 2026-09-07 and archived**: vendored the openEHR Terminology (`openehr_terminology.xml`, TERM Release-3.0.0) under `resources/terminology/` with a sha256 manifest; generated a stdlib-only `openehr/terminology` accessor from it (`termgen`, drift-detected in `make test`); re-pointed the hand-typed `openehr` code tables in `openehr/client/ehr`, `contribution`, `simplified` and `instance` at it | [REQ-034](../specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034) (new); REQ-130 / REQ-013 amended in place | Lifecycle-state and change-type validity becomes group membership (5 and 9 codes); the `ctx/` `math_function` default becomes `640\|actual` (146 is `mean`) |
 
 ### Go 1.27 floor (2026-09-03)
 
