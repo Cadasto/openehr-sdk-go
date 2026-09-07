@@ -25,12 +25,12 @@ it carries the BMM: pinned in-tree and generated from, **not** fetched at build 
 |---|---|
 | File | `openehr_terminology.xml` (13,860 bytes) |
 | TERM release | `Release-3.0.0` — root attributes `name="openehr" language="en" version="3.0.0" date="2023-03-05"` |
-| Upstream commit | [`d45ef3e21a05d3759101ae7bdb260e8193a3d0da`](https://github.com/openEHR/specifications-TERM/tree/d45ef3e21a05d3759101ae7bdb260e8193a3d0da/computable/XML/en) |
-| `sha256` | `a1a64cc8665afff3992b4c511997e8a8acd1a3706efc32b775894aaf601f0bcf` |
 | Contents | **17** groups · **3** code sets · **249** concepts · **19** code-set codes |
 
-The release, the commit, the fetch timestamp, and the `sha256` are recorded in
-[`MANIFEST.txt`](MANIFEST.txt), which the sync script generates — do not edit it by hand.
+**Pin + integrity:** the exact upstream commit, the file's `sha256`, the release and the fetch
+timestamp are recorded in [`MANIFEST.txt`](MANIFEST.txt) — the one place they live. The sync
+script generates it, so do not edit it by hand. Regenerate with `make terminology-sync`; verify
+with `make terminology-verify` (see [the sync script](../../scripts/sync-terminology.sh)).
 
 ## Provenance
 
@@ -73,8 +73,10 @@ generated tables follow the pin. A bump is one explicit, reviewable commit:
 1. Run the sync at the new release tag.
 2. Review both diffs — the XML and the regenerated tables. A code or rubric that changed
    meaning, or a group that lost a member, is a behaviour change, not a refresh.
-3. Add a short CHANGELOG bullet under `## [Unreleased]`.
-4. Commit the pin, the manifest, and the regenerated tables together.
+3. Update the release tag in this README's pin table and in the [`resources/README.md`](../README.md)
+   inventory row — both name the pinned TERM release, and the manifest cannot update them.
+4. Add a short CHANGELOG bullet under `## [Unreleased]`.
+5. Commit the pin, the manifest, the regenerated tables and those doc rows together.
 
 With no `TERMINOLOGY_REF`, `sync` re-fetches the ref already pinned in `MANIFEST.txt`
 (and, with nothing pinned, the repository's latest GitHub release).
