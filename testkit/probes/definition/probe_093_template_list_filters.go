@@ -27,8 +27,8 @@ import (
 //
 // Inputs:
 //   - captured accumulates the query of every request the backend
-//     receives, in order. The caller wires it up (an httptest handler in
-//     Sandbox mode); the probe reads length deltas to count requests, so
+//     receives, in order. The caller wires it up (a `sandbox.Backend` scripted
+//     route in Sandbox mode); the probe reads length deltas to count requests, so
 //     it MUST NOT be reset between legs.
 //
 // The backend answers each list call with a template-metadata body; the

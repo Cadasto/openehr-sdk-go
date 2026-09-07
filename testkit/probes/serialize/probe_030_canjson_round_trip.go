@@ -43,7 +43,7 @@ type Result = probe.Result
 // twice during the probe so the probe owns the value lifecycle.
 //
 // Errors returned by canjson during the round-trip surface as
-// Result{Status:"fail"}; mechanical failures (e.g. nil factory)
+// Result{Status: probe.StatusFail}; mechanical failures (e.g. nil factory)
 // return a non-nil error so the harness can distinguish probe
 // failure from probe-framework failure.
 func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) {
