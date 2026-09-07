@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
 func TestDvFromSuffixes(t *testing.T) {
@@ -187,5 +188,47 @@ func TestParseFlatKeyRejectsBadIndex(t *testing.T) {
 	}
 	if pk.segs[1].id != "b:notanumber" || pk.segs[1].idx != -1 {
 		t.Errorf("non-numeric segment parsed as %+v, want id kept verbatim", pk.segs[1])
+	}
+}
+
+// TestCtxDefaultsAreGroupMembersWithPinnedRubrics — REQ-034: every openehr-coded
+// default the ctx/ completion synthesises is a member of its group and carries the
+// pin's rubric as its value. Would have caught the 146|actual pair (146 is `mean`).
+//
+// It lives in this internal test file rather than context_test.go, which is
+// `package simplified_test` and so cannot reach [defaultAttr].
+func TestCtxDefaultsAreGroupMembersWithPinnedRubrics(t *testing.T) {
+	for _, tc := range []struct {
+		attr  string
+		group *terminology.Group
+		code  string
+	}{
+		{"setting", terminology.Setting, "238"},
+		{"category", terminology.CompositionCategory, "433"},
+		{"math_function", terminology.EventMathFunction, "640"},
+	} {
+		t.Run(tc.attr, func(t *testing.T) {
+			rubric, member := tc.group.Rubric(tc.code)
+			if !member {
+				t.Fatalf("code %q is not a member of the %q group, so it cannot be defaulted to", tc.code, tc.group.Name())
+			}
+			v := defaultAttr(tc.attr, ctxInfo{})
+			if v == nil {
+				t.Fatalf("defaultAttr(%q) = nil, want a DV_CODED_TEXT default", tc.attr)
+			}
+			dc, ok := v["defining_code"].(map[string]any)
+			if !ok {
+				t.Fatalf("defaultAttr(%q) defining_code = %T, want a CODE_PHRASE object", tc.attr, v["defining_code"])
+			}
+			if dc["code_string"] != tc.code {
+				t.Errorf("defaultAttr(%q) code_string = %v, want %q", tc.attr, dc["code_string"], tc.code)
+			}
+			if term := codePhraseTerminology(dc); term != terminology.ID {
+				t.Errorf("defaultAttr(%q) terminology = %q, want %q", tc.attr, term, terminology.ID)
+			}
+			if v["value"] != rubric {
+				t.Errorf("defaultAttr(%q) value = %v, want the pin's rubric for %s (%q)", tc.attr, v["value"], tc.code, rubric)
+			}
+		})
 	}
 }

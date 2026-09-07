@@ -18,6 +18,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
 // capturedKeys maps a leaf rmType to the canonical top-level attribute keys its
@@ -431,15 +432,15 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 	return true
 }
 
-// normalStatusTerminology is the openEHR terminology the |normal_status suffix
-// implies: the wire carries only the ordinal code (N, H, HH, L, LL, …), which the
-// RM defines against the openEHR code set `normal statuses` — hence the
-// terminology_id `openehr` decode rebuilds the CODE_PHRASE with.
-const normalStatusTerminology = "openehr"
-
 // normalStatusCaptured reports whether a canonical normal_status CODE_PHRASE is
 // representable as the bare |normal_status code — that is, it carries nothing
 // beyond the code and sits in the terminology decode will rebuild it in.
+//
+// That terminology is [terminology.ID]: the wire carries only the ordinal code
+// (N, H, HH, L, LL, …), which the RM defines against the openEHR code set
+// `normal statuses`, so `openehr` is the terminology_id decode rebuilds the
+// CODE_PHRASE with. Only the *identifier* is read from the pin here — a bare
+// `|normal_status` decode stays lenient and does not check membership.
 func normalStatusCaptured(v any) bool {
 	if !codePhraseCaptured(v) {
 		return false
@@ -451,7 +452,7 @@ func normalStatusCaptured(v any) bool {
 	// An absent or empty terminology contradicts nothing, so it survives the
 	// implication decode makes.
 	tv := codePhraseTerminology(cp)
-	return tv == "" || tv == normalStatusTerminology
+	return tv == "" || tv == terminology.ID
 }
 
 // codePhraseTerminology returns the terminology_id value carried by a canonical
@@ -880,9 +881,9 @@ func emitOrdered(out map[string]any, flatPath string, o ordered) {
 		out[flatPath+"|magnitude_status"] = *o.magnitudeStatus
 	}
 	if o.normalStatus != nil {
-		// The bare ordinal code; the terminology is implied (see
-		// normalStatusTerminology) and normalStatusCaptured has already refused
-		// any value that would not survive that implication.
+		// The bare ordinal code; the terminology is implied, and
+		// [normalStatusCaptured] has already refused any value that would not
+		// survive that implication.
 		out[flatPath+"|normal_status"] = o.normalStatus.CodeString
 	}
 	if o.accuracy != nil {

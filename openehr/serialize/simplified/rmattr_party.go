@@ -53,6 +53,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
 // partyRefType is the OBJECT_REF `type` a party reference carries when the
@@ -475,87 +477,32 @@ func takeInlineIdentifiers(g rmattrGroup, ts rmattrTails) ([]any, error) {
 	return out, nil
 }
 
-// --- the vendored `participation mode` vocabulary -----------------------
-
-// participationModes is the openEHR Terminology **`participation mode`** group
-// (codes 193–224), vendored code → rubric.
-//
-// It is here because the reference gives `|mode` **no code channel**: the corpus
-// writes the bare rubric (`"face-to-face communication"`, `"not specified"`)
-// where PARTICIPATION.mode is a DV_CODED_TEXT whose `defining_code` is
-// RM-mandatory. Rebuilding that code is the only way to decode the key without
-// fabricating an empty CODE_PHRASE, and the group is small, closed and stable —
-// it is part of the openEHR Terminology, versioned with the specifications, not
-// a runtime terminology lookup. A rubric outside the table is refused loudly
-// rather than guessed; encode is the exact inverse and refuses a mode whose code
-// or terminology the rubric would not reproduce. Recorded in deviations.md
-// § vendored vocabularies.
-//
-// Source: openEHR Terminology, group `participation mode`
-// (https://specifications.openehr.org/releases/TERM/latest — the
-// `openehr_terminology.xml` group of that name).
-var participationModes = map[string]string{
-	"193": "not specified",
-	"194": "asynchronous audiovisual; recorded video",
-	"195": "live audiovisual; videoconference; videophone",
-	"196": "recorded video",
-	"197": "videophone",
-	"198": "videoconferencing",
-	"199": "asynchronous audio-only; dictated; voice mail",
-	"200": "dictated",
-	"201": "voice-mail",
-	"202": "live audio-only; telephone; internet phone; teleconference",
-	"203": "teleconference",
-	"204": "telephone",
-	"205": "internet telephone",
-	"206": "asynchronous text; email; fax; letter; handwritten note; SMS message",
-	"207": "email",
-	"208": "facsimile/telefax",
-	"209": "SMS message",
-	"210": "printed/typed letter",
-	"211": "handwritten note",
-	"212": "live text-only; internet chat; SMS chat; interactive written note",
-	"213": "internet chat",
-	"214": "SMS chat",
-	"215": "interactive written note",
-	"216": "face-to-face communication",
-	"217": "signing (face-to-face)",
-	"218": "signing over video",
-	"219": "physically present",
-	"220": "physically remote",
-	"221": "translated text",
-	"222": "interpreted audio-only",
-	"223": "interpreted face-to-face communication",
-	"224": "interpreted video communication",
-}
-
-// participationModeTerminology is the terminology the rubric implies. The wire
-// carries neither it nor the code, so both are rebuilt — and encode refuses a
-// mode coded anywhere else, since emitting its rubric alone would silently
-// re-terminologise it (the `|normal_status` precedent).
-const participationModeTerminology = "openehr"
-
-// participationModeCodes inverts [participationModes]. Built once; the group's
-// rubrics are distinct, and [TestParticipationModeVocabularyIsInvertible] pins
-// that, because a collision would make the round-trip pick a code by map order.
-var participationModeCodes = func() map[string]string {
-	out := make(map[string]string, len(participationModes))
-	for code, rubric := range participationModes {
-		out[rubric] = code
-	}
-	return out
-}()
+// --- the `participation mode` group, read from the pin ------------------
 
 // participationModeJSON rebuilds PARTICIPATION.mode from the rubric `|mode`
 // carries, naming key on an unknown one.
+//
+// `|mode` needs the group because the reference gives it **no code channel**:
+// the corpus writes the bare rubric (`"face-to-face communication"`,
+// `"not specified"`) where PARTICIPATION.mode is a DV_CODED_TEXT whose
+// `defining_code` is RM-mandatory, so reading the code back out of the group is
+// the only way to decode the key without fabricating an empty CODE_PHRASE. The
+// group is [terminology.ParticipationMode] — the pinned openEHR Terminology
+// table this SDK generates from `resources/terminology/openehr_terminology.xml`
+// (REQ-034), not a hand-typed copy and not a runtime terminology lookup. Both
+// the code and its terminology are rebuilt, since the wire carries neither.
+//
+// A rubric outside the group is refused loudly rather than guessed;
+// [participationModeRubric] is the exact inverse. Recorded in deviations.md
+// § vendored vocabularies.
 func participationModeJSON(key, rubric string) (map[string]any, error) {
-	code, known := participationModeCodes[rubric]
+	code, known := terminology.ParticipationMode.Code(rubric)
 	if !known {
 		return nil, fmt.Errorf("%w: %q is %q, which is not a rubric of the openEHR `participation mode` group; the key carries no code, so there is nothing else to rebuild PARTICIPATION.mode from (REQ-140)",
 			ErrUnsupportedDatatype, key, rubric)
 	}
 	return map[string]any{
 		"_type": "DV_CODED_TEXT", "value": rubric,
-		"defining_code": codePhraseJSON(code, participationModeTerminology),
+		"defining_code": codePhraseJSON(code, terminology.ID),
 	}, nil
 }

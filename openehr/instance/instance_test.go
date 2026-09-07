@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -147,6 +149,72 @@ func TestGenerateVitalSignsExamplePopulatesPrimitives(t *testing.T) {
 	}
 	if found.Units == "" {
 		t.Errorf("DV_QUANTITY leaf units empty under Example policy")
+	}
+}
+
+// TestGenerateSettingMembershipAgainstThePin — REQ-107 / REQ-034.
+// EVENT_CONTEXT.setting carries the RM invariant Setting_valid: the defining
+// code MUST be a member of the openEHR `setting` group. A template can pin an
+// `openehr`-coded setting that is not a member (the OPT below constrains
+// context/setting/defining_code to one code), which reads as populated and
+// openehr-coded and is still RM-invalid. Since the generator reads the pinned
+// terminology it replaces a non-member with the 238 default and leaves a real
+// member alone.
+//
+// wantRubric says the default fired, so the value must be 238's own rubric read
+// back from the pin — never a string typed beside the code (REQ-034). Where it
+// did not fire, the OPT-driven walk's own value stands and is not pinned here:
+// this OPT constrains `defining_code` only, so the walk leaves the DV_CODED_TEXT
+// carrying the generic example sentinel, which is a separate REQ-107 matter.
+func TestGenerateSettingMembershipAgainstThePin(t *testing.T) {
+	for _, tc := range []struct {
+		name, pinned, wantCode string
+		wantRubric             bool
+	}{
+		{name: "non-member replaced by the default", pinned: "999", wantCode: "238", wantRubric: true},
+		{name: "member kept", pinned: "227", wantCode: "227"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileSyntheticOPT(t, fmt.Sprintf(settingCodedOPT, tc.pinned))
+			out, err := instance.Generate(context.Background(), c, instance.Options{
+				Policy:    instance.Example,
+				Territory: "NL",
+				Composer:  testComposer(),
+			})
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			comp, err := instance.AsComposition(out)
+			if err != nil {
+				t.Fatalf("AsComposition: %v", err)
+			}
+			got := comp.Context.Setting.DefiningCode
+			if got.CodeString != tc.wantCode {
+				t.Errorf("setting pinned to openehr::%s generated code %q, want %q",
+					tc.pinned, got.CodeString, tc.wantCode)
+			}
+			if got.TerminologyID.Value != "openehr" {
+				t.Errorf("setting terminology = %q, want openehr", got.TerminologyID.Value)
+			}
+			if !terminology.Setting.Has(got.CodeString) {
+				t.Errorf("generated setting code %q is not a member of the `setting` group (Setting_valid)", got.CodeString)
+			}
+			if tc.wantRubric {
+				want, ok := terminology.Setting.Rubric(tc.wantCode)
+				if !ok {
+					t.Fatalf("code %q is not in the `setting` group, so it cannot be the default", tc.wantCode)
+				}
+				if comp.Context.Setting.Value != want {
+					t.Errorf("setting value = %q, want the pin's rubric for %s (%q)",
+						comp.Context.Setting.Value, tc.wantCode, want)
+				}
+			}
+			// The category default fires too — this OPT constrains nothing on it —
+			// so its rubric also comes from the pin rather than a typed string.
+			if want, _ := terminology.CompositionCategory.Rubric("433"); comp.Category.Value != want {
+				t.Errorf("category value = %q, want the pin's rubric for 433 (%q)", comp.Category.Value, want)
+			}
+		})
 	}
 }
 
@@ -430,6 +498,99 @@ func TestPolicyString(t *testing.T) {
 		t.Error("Policy(99).String() should contain 'unknown'")
 	}
 }
+
+// settingCodedOPT constrains `context/setting/defining_code` to exactly one
+// `openehr` code, given by the single %s. That is the seam
+// TestGenerateSettingMembershipAgainstThePin drives: the OPT-driven walk stamps
+// the pinned code on EVENT_CONTEXT.setting, so a non-member reaches
+// applyCompositionDefaults already openehr-coded and populated.
+const settingCodedOPT = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.openehr.org/v1">
+  <language>
+    <terminology_id><value>ISO_639-1</value></terminology_id>
+    <code_string>en</code_string>
+  </language>
+  <template_id><value>setting_coded</value></template_id>
+  <concept>setting_coded</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>context</rm_attribute_name>
+      <existence>
+        <lower_included>true</lower_included>
+        <upper_included>true</upper_included>
+        <lower_unbounded>false</lower_unbounded>
+        <upper_unbounded>false</upper_unbounded>
+        <lower>1</lower>
+        <upper>1</upper>
+      </existence>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>EVENT_CONTEXT</rm_type_name>
+        <occurrences>
+          <lower_included>true</lower_included>
+          <upper_included>true</upper_included>
+          <lower_unbounded>false</lower_unbounded>
+          <upper_unbounded>false</upper_unbounded>
+          <lower>1</lower>
+          <upper>1</upper>
+        </occurrences>
+        <node_id />
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>setting</rm_attribute_name>
+          <existence>
+            <lower_included>true</lower_included>
+            <upper_included>true</upper_included>
+            <lower_unbounded>false</lower_unbounded>
+            <upper_unbounded>false</upper_unbounded>
+            <lower>1</lower>
+            <upper>1</upper>
+          </existence>
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>DV_CODED_TEXT</rm_type_name>
+            <occurrences>
+              <lower_included>true</lower_included>
+              <upper_included>true</upper_included>
+              <lower_unbounded>false</lower_unbounded>
+              <upper_unbounded>false</upper_unbounded>
+              <lower>1</lower>
+              <upper>1</upper>
+            </occurrences>
+            <node_id />
+            <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+              <rm_attribute_name>defining_code</rm_attribute_name>
+              <existence>
+                <lower_included>true</lower_included>
+                <upper_included>true</upper_included>
+                <lower_unbounded>false</lower_unbounded>
+                <upper_unbounded>false</upper_unbounded>
+                <lower>1</lower>
+                <upper>1</upper>
+              </existence>
+              <children xsi:type="C_CODE_PHRASE">
+                <rm_type_name>CODE_PHRASE</rm_type_name>
+                <occurrences>
+                  <lower_included>true</lower_included>
+                  <upper_included>true</upper_included>
+                  <lower_unbounded>false</lower_unbounded>
+                  <upper_unbounded>false</upper_unbounded>
+                  <lower>1</lower>
+                  <upper>1</upper>
+                </occurrences>
+                <node_id />
+                <terminology_id><value>openehr</value></terminology_id>
+                <code_list>%s</code_list>
+              </children>
+            </attributes>
+          </children>
+        </attributes>
+      </children>
+    </attributes>
+    <archetype_id>
+      <value>openEHR-EHR-COMPOSITION.setting_coded.v1</value>
+    </archetype_id>
+  </definition>
+</template>`
 
 const requiredSlotOnlyUnsynthesisableOPT = `<?xml version="1.0" encoding="utf-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.openehr.org/v1">

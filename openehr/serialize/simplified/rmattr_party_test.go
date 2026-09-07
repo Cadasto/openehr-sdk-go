@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
 // --- context/_health_care_facility --------------------------------------
@@ -106,10 +107,11 @@ func TestRMAttrHealthCareFacilityHierObjectID(t *testing.T) {
 // --- context/_participation:N and <entry>/_other_participation:N -------
 
 // TestRMAttrParticipationRoundTrip — REQ-140. `context/_participation:N` carries
-// the PARTICIPATION grammar: `|function`, `|mode` (the openEHR rubric alone — see
-// [participationModes]), the performer's party suffixes inline on the same key
-// base, and the performer's identifiers as the reference's **inlined** indexed
-// suffixes. Exactly `ehrbase_conformance_party_identified.json`'s keys.
+// the PARTICIPATION grammar: `|function`, `|mode` (the openEHR rubric alone —
+// see [terminology.ParticipationMode]), the performer's party suffixes inline on
+// the same key base, and the performer's identifiers as the reference's
+// **inlined** indexed suffixes. Exactly
+// `ehrbase_conformance_party_identified.json`'s keys.
 func TestRMAttrParticipationRoundTrip(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	comp := assertRMAttrRoundTrip(t, wt, map[string]any{
@@ -134,7 +136,7 @@ func TestRMAttrParticipationRoundTrip(t *testing.T) {
 		t.Errorf("function = %q, want requester", got)
 	}
 	if p.Mode == nil || p.Mode.DefiningCode.CodeString != "216" ||
-		p.Mode.DefiningCode.TerminologyID.Value != participationModeTerminology {
+		p.Mode.DefiningCode.TerminologyID.Value != terminology.ID {
 		t.Errorf("mode = %+v, want the openehr 216 rubric rebuilt", p.Mode)
 	}
 	performer, ok := p.Performer.(*rm.PartyIdentified)
@@ -257,15 +259,51 @@ func TestRMAttrParticipationFunctionRequired(t *testing.T) {
 	}
 }
 
-// TestParticipationModeVocabularyIsInvertible — REQ-140. `|mode` carries the
-// rubric alone, so the vendored group is read backwards on decode. Two codes
-// sharing a rubric would make that lookup pick one by map order — a
-// non-deterministic round-trip.
-func TestParticipationModeVocabularyIsInvertible(t *testing.T) {
-	if len(participationModeCodes) != len(participationModes) {
-		t.Errorf("the vendored `participation mode` group has %d codes but only %d distinct rubrics; "+
-			"the rubric->code lookup decode uses would pick one by map order",
-			len(participationModes), len(participationModeCodes))
+// TestParticipationModeRoundTripsEveryGroupMember — REQ-140 / REQ-034. `|mode`
+// carries the bare rubric; decode rebuilds code + terminology from the pinned
+// `participation mode` group and encode is the exact inverse, for all 32 members.
+func TestParticipationModeRoundTripsEveryGroupMember(t *testing.T) {
+	n := 0
+	for c := range terminology.ParticipationMode.All() {
+		n++
+		got, err := participationModeJSON("x|mode", c.Rubric)
+		if err != nil {
+			t.Errorf("participationModeJSON(%q) err = %v, want nil (a group member is decodable)", c.Rubric, err)
+			continue
+		}
+		if got["value"] != c.Rubric {
+			t.Errorf("participationModeJSON(%q) value = %v, want %q", c.Rubric, got["value"], c.Rubric)
+		}
+		dc, ok := got["defining_code"].(map[string]any)
+		if !ok {
+			t.Errorf("participationModeJSON(%q) defining_code = %T, want a CODE_PHRASE object", c.Rubric, got["defining_code"])
+			continue
+		}
+		if dc["code_string"] != c.Code {
+			t.Errorf("participationModeJSON(%q) code_string = %v, want %q", c.Rubric, dc["code_string"], c.Code)
+		}
+		if term := codePhraseTerminology(dc); term != terminology.ID {
+			t.Errorf("participationModeJSON(%q) terminology = %q, want %q", c.Rubric, term, terminology.ID)
+		}
+		back, err := participationModeRubric("x|mode", rm.DVCodedText{
+			Value:        c.Rubric,
+			DefiningCode: rm.CodePhrase{CodeString: c.Code, TerminologyID: rm.TerminologyID{Value: terminology.ID}},
+		})
+		if err != nil {
+			t.Errorf("participationModeRubric(%s|%s) err = %v, want nil", c.Code, c.Rubric, err)
+			continue
+		}
+		if back != c.Rubric {
+			t.Errorf("participationModeRubric(%s|%s) = %q, want %q", c.Code, c.Rubric, back, c.Rubric)
+		}
+	}
+	if n != 32 {
+		t.Fatalf("participation mode group has %d members, want 32", n)
+	}
+	// A rubric the group does not carry has nothing to rebuild the RM-mandatory
+	// defining_code from, so it is refused rather than guessed.
+	if _, err := participationModeJSON("x|mode", "telepathy"); !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Errorf("participationModeJSON(unknown rubric) err = %v, want ErrUnsupportedDatatype", err)
 	}
 }
 
