@@ -36,7 +36,7 @@ var (
 	// that the no-panic rule (REQ-025, idiom.md § No panics) turns into an
 	// error instead of a dereference. Every generated UnmarshalJSON and the
 	// hand-written primitive codecs (rm.Real, rm.Integer, rm.Character) wrap
-	// it; openehr/rm's nil-receiver census pins the whole registry.
+	// it; the nil-receiver census in this package pins the whole registry.
 	ErrNilReceiver = errors.New("typereg: nil receiver")
 	// ErrInvalidShape classifies a JSON-level shape failure — valid JSON
 	// that is the wrong shape for the target type — or a hand-written

@@ -136,8 +136,8 @@ func jsonLiteralSpellsReplacement(b []byte) bool {
 // A nil receiver is refused rather than dereferenced (REQ-025, idiom.md
 // § No panics): the method assigns through the pointer, and a nil
 // pointer is caller-constructible input reachable through the documented
-// API. That refusal is a plain error — caller misuse is not a wire-shape
-// problem — so it stays outside typereg.ErrInvalidShape.
+// API. That refusal carries typereg.ErrNilReceiver and deliberately not
+// typereg.ErrInvalidShape — caller misuse is not a wire-shape problem.
 func (c *Character) UnmarshalJSON(b []byte) error {
 	if c == nil {
 		return fmt.Errorf("rm.Character: %w", typereg.ErrNilReceiver)
@@ -234,7 +234,7 @@ func (c Character) MarshalJSON() ([]byte, error) {
 // number in JSON only, and XML element content carries no JSON number
 // kind to be tolerant of.
 //
-// The error is a plain error, deliberately outside typereg.ErrInvalidShape:
+// The error is deliberately outside typereg.ErrInvalidShape:
 // that sentinel's own text names canonical JSON, and canxml classifies
 // nothing at element level — it returns encoding/xml's errors unchanged
 // and reserves canxml.ErrInvalidShape for xmi:type rejection and for a

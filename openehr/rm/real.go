@@ -113,7 +113,7 @@ var errPrecisionLoss = classifyShape(fmt.Errorf("rm.Real: literal carries more t
 // A nil receiver is refused rather than dereferenced (REQ-025, idiom.md
 // § No panics): the method assigns through the pointer, and a nil
 // pointer is caller-constructible input reachable through the documented
-// API. That refusal is a plain error, outside typereg.ErrInvalidShape —
+// API. That refusal carries typereg.ErrNilReceiver, not typereg.ErrInvalidShape —
 // caller misuse is not a wire-shape problem.
 func (r *Real) UnmarshalJSON(b []byte) error {
 	if r == nil {

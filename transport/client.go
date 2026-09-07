@@ -648,7 +648,7 @@ func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata,
 		return nil, nil, err
 	}
 	if IsNoRepresentationBody(resp.Body) {
-		return nil, resp.Metadata, fmt.Errorf("%w: response body is empty or null (Prefer mismatch?)", ErrInvalidShape)
+		return nil, resp.Metadata, fmt.Errorf("%w: response body is empty or null", ErrInvalidShape)
 	}
 	out := new(T)
 	if err := canjson.Unmarshal(resp.Body, out); err != nil {

@@ -18,7 +18,7 @@ type Integer int32
 // A nil receiver is refused rather than dereferenced (REQ-025, idiom.md
 // § No panics): the method assigns through the pointer, and a nil
 // pointer is caller-constructible input reachable through the documented
-// API. That refusal is a plain error, outside typereg.ErrInvalidShape —
+// API. That refusal carries typereg.ErrNilReceiver, not typereg.ErrInvalidShape —
 // caller misuse is not a wire-shape problem.
 func (i *Integer) UnmarshalJSON(b []byte) error {
 	if i == nil {

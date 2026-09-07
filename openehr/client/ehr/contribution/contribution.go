@@ -100,7 +100,7 @@ func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	if transport.IsNoRepresentationBody(resp.Body) {
 		return nil, meta, &openehrclient.NoRepresentationError{
 			Meta:  meta,
-			Cause: fmt.Errorf("contribution.Commit: %w: Prefer=return=representation but response body is empty", transport.ErrInvalidShape),
+			Cause: fmt.Errorf("contribution.Commit: %w: Prefer=return=representation but response body is empty or null", transport.ErrInvalidShape),
 		}
 	}
 	var out rm.Contribution

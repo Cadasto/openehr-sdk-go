@@ -110,7 +110,7 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 		if transport.IsNoRepresentationBody(resp.Body) {
 			return zero, meta, &NoRepresentationError{
 				Meta:  meta,
-				Cause: fmt.Errorf("%s: %w: Prefer=return=representation but response body is empty", label, transport.ErrInvalidShape),
+				Cause: fmt.Errorf("%s: %w: Prefer=return=representation but response body is empty or null", label, transport.ErrInvalidShape),
 			}
 		}
 		out, err := decode(resp.Body)
