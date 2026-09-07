@@ -7,7 +7,7 @@
 **Probes:** no new `PROBE-NNN` — this plan gives the existing catalog its missing execution modes. It promotes **PROBE-077**, **PROBE-078**, **PROBE-079** out of `Status: Deferred` (each one a landed, unit-covered requirement whose dedicated wire probe is unwritten) and unblocks **PROBE-065**, which is still `Status: Draft` — specified, never implemented. It is also the gate [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1 names for four `testkit/probes/rest/*` probes.
 **Implementation:** planned
 **Depends on:** landed `transport/` (REQ-090–098), the probe catalog in [conformance.md](../specifications/conformance.md), and the REQ-082 normative prose landed with this plan
-**Defers:** Cassette encoding ([STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml)) until a capture from the local EHRbase / FerroEHR CDRs is judged. Live mode is no longer blocked: both CDRs are reachable locally (EHRbase `:8080`, FerroEHR `:8090`).
+**Defers:** Cassette recorder/replayer/corpus (Phase 3) — encoding is settled ([ADR 0020](../adr/0020-cassette-recording-har.md), HAR 1.2). Live mode is no longer blocked: both CDRs are reachable locally (EHRbase `:8080`, FerroEHR `:8090`).
 
 ## Goal
 
@@ -51,7 +51,7 @@ Scoped to phases 1–2 (what is reachable now):
 | Phase 1 — shared result + runner | done — `testkit/probe`; refusals pinned by named tests |
 | Phase 2 — `sandbox/` transport | partial — EHR + scripted routes; versioned / definition / demographic / transport probes off httptest. Auth/discovery httptest remain (OIDC/JWKS, not CDR) |
 | Phase 4 — Live mode (local CDRs) | partial — runner Live path + opt-in `TestLiveCreateEHR` (`OPENEHR_LIVE_*`; skipped in CI) |
-| Phase 3 — Cassette recording | blocked on STRAND-11 (now capturable) |
+| Phase 3 — Cassette recording | encoding settled (ADR 0020, HAR 1.2); recorder/replayer/corpus not started |
 | `traceability.yaml` / REQ.md row | done (REQ-082 stays `partial`) |
 | `make spec-check` | |
 | `make ci` | |
@@ -76,7 +76,7 @@ Scoped to phases 1–2 (what is reachable now):
 
 **Definition of done:** no `httptest.NewServer` remains in `testkit/probes/**`; `sandbox/` is documented for consumers in [quick-start.md](../quick-start.md); `make ci` green.
 
-### Phase 3 — Cassette recording and replay *(blocked: needs a live CDR)*
+### Phase 3 — Cassette recording and replay *(encoding settled: [ADR 0020](../adr/0020-cassette-recording-har.md))*
 
 **Tasks:** resolve STRAND-11 with an ADR against a real capture; implement the recorder as a `transport` wrapper and the replayer as a transport; capture the corpus once; enforce capture-time redaction and provenance per REQ-082.
 

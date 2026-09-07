@@ -74,7 +74,7 @@ Sandbox state **MUST** be per-run and isolated: two probes running against one s
 
 #### Cassette mode
 
-The recording **encoding** is deliberately not fixed here: whether recordings are HTTP Archive (`.har`) or a purpose-built YAML schema is open as [STRAND-11](research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml), to be resolved by ADR against a real capture. Every rule below binds regardless of the encoding chosen.
+The recording **encoding** is HTTP Archive 1.2 (`.har`), settled by [ADR 0020](../adr/0020-cassette-recording-har.md) against a live EHRbase capture. Provenance and redaction attestation live on `log` as a `_req082` object — HAR has no native slot for them. Every rule below binds to that encoding.
 
 Recordings are checked-in evidence and are held to the same standard as any vendored corpus:
 

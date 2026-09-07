@@ -15,5 +15,9 @@ not by reasoning about the formats.
 - Captured: `2026-09-07T18:53:48Z`
 - Redaction ran at capture time (`Authorization`, `Cookie`, `Set-Cookie`, `Proxy-Authorization`). None of those headers were present on this exchange.
 
-This directory is **evidence for STRAND-11**, not the Cassette corpus
-(`testkit/recordings/` stays empty until the ADR picks an encoding).
+**Decision:** [ADR 0020](../../adr/0020-cassette-recording-har.md) — Cassette
+recordings are HAR 1.2. The YAML file stays here as the rejected alternative.
+
+`log._req082` on the HAR is the REQ-082 provenance / redaction slot the ADR
+requires. This directory is evidence, not the Cassette corpus
+(`testkit/recordings/` stays empty until the recorder lands).
