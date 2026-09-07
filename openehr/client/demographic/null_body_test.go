@@ -12,6 +12,16 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
+// There is deliberately no "204 with a JSON `null` body" case here: a 204
+// cannot carry content (RFC 9110 6.4.1) and Go's net/http enforces that at
+// both ends — the server's Write after WriteHeader(204) returns "status code
+// does not allow body" with n=0, and the client discards the bytes even when a
+// non-conforming server puts them on the wire with a Content-Length. So the
+// 204 arm of the carve-out below only ever sees an empty body, which makes the
+// carve-out's own condition unobservable through `null`. The carve-out itself
+// is pinned by the empty-bodied 204 tests in party_test.go / versioned_test.go
+// (they fail when it is deleted).
+
 // TestGetNullBodyIsInvalidShape pins § REQ-151's refusal arm on the
 // polymorphic demographic read: a 200 whose body is the JSON `null` literal is
 // a wire anomaly exactly like an empty one — it MUST surface as
