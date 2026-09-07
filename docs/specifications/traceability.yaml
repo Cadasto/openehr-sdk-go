@@ -2271,7 +2271,7 @@ requirements:
     canonical: docs/specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034
     status: draft
     implementation: landed
-    packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen]
+    packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen, openehr/client/ehr, openehr/client/ehr/contribution, openehr/serialize/simplified, openehr/instance]
     plans: [docs/plans/archive/2026-09-07-terminology-vocabulary.md]
     tests:
       - internal/termgen/parse_test.go
@@ -2292,7 +2292,10 @@ requirements:
       the hand-typed openEHR code tables in openehr/client/ehr (lifecycle state),
       openehr/client/ehr/contribution (audit change type), openehr/serialize/simplified
       (participation mode, ctx/ defaults) and openehr/instance (setting / category
-      defaults). No probe: nothing crosses the wire; guard tests carry the bar.
+      defaults). No new probe: the vocabulary itself never crosses the wire; its
+      wire consequences — the widened change-type and lifecycle-state validity —
+      ride PROBE-084 (the REQ-130 contribution body) and the REQ-059 openehr-version
+      header tests. Guard tests carry the bar.
 
   - id: REQ-043
     title: P_BMM to Go mapping rules

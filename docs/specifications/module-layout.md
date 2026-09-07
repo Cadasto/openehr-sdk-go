@@ -106,6 +106,8 @@ Application code (cmd/examples, downstream consumers)
     ├─ (building-block use, no transport) ──→ openehr/validation/   ──→ openehr/rm/  openehr/template/
     └─ (building-block use, no transport) ──→ openehr/template/
 
+openehr/{rm, serialize, instance, client/*} ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, REQ-034)
+
 cadasto/care      ──→ openehr/client/*
 cadasto/{extra, datamap, mpi, admin} ──→ transport/
 

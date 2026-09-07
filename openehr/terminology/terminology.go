@@ -32,7 +32,11 @@ type Group struct {
 }
 
 // newGroup builds a group from its openehr_id, its display name and its
-// concepts in source order. Only the generated tables call it.
+// concepts in source order. Only the generated tables call it, and its
+// precondition — every concept present, and unique by both code and rubric so
+// the two indexes are invertible — is what makes that safe: the generator
+// refuses a pin that breaks it (see internal/termgen) and termgen-verify gates
+// the result, so newGroup itself trusts its input rather than re-checking it.
 func newGroup(id, name string, concepts []Concept) *Group {
 	g := &Group{
 		id:       id,

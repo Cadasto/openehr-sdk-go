@@ -612,7 +612,7 @@ func TestParticipationModeRoundTripsEveryGroupMember(t *testing.T) {
 }
 ```
 
-`context_test.go`: 
+`context_test.go`:
 
 ```go
 // TestCtxDefaultsAreGroupMembersWithPinnedRubrics — REQ-034: every openehr-coded
