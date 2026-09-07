@@ -1007,9 +1007,11 @@ requirements:
     # PROBE-086 is In-repo (parity property; REQ-082's declared Modes class
     # for a probe that asserts no wire exchange — not a mode shortfall).
     #
-    # `partial` remains correct: the runner and Sandbox EHR surface landed;
-    # Cassette still has no recorder/replayer/corpus (STRAND-11), and
-    # backend-facing probe tests still stand up some httptest fakes.
+    # `partial` remains correct: the runner, Sandbox EHR surface, and
+    # scripted routes landed; CDR-facing probe tests (versioned,
+    # definition, demographic, transport) no longer use httptest.
+    # Cassette still has no recorder/replayer/corpus (STRAND-11).
+    # Auth/discovery probes still stand up httptest identity servers.
     # Live mode is wired (endpoint + mutating opt-in) and exercised
     # against local EHRbase / FerroEHR when they are reachable.
     tests:

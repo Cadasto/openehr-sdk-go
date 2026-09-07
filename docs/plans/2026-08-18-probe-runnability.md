@@ -49,7 +49,7 @@ Scoped to phases 1–2 (what is reachable now):
 |---|---|
 | REQ-082 normative prose + STRAND-11 (this PR) | done |
 | Phase 1 — shared result + runner | done — `testkit/probe`; refusals pinned by named tests |
-| Phase 2 — `sandbox/` transport | partial — EHR create/get/head; httptest retirement remaining |
+| Phase 2 — `sandbox/` transport | partial — EHR + scripted routes; versioned / definition / demographic / transport probes off httptest. Auth/discovery httptest remain (OIDC/JWKS, not CDR) |
 | Phase 4 — Live mode (local CDRs) | partial — runner Live path + `TestLiveCreateEHR` against EHRbase and FerroEHR |
 | Phase 3 — Cassette recording | blocked on STRAND-11 (now capturable) |
 | `traceability.yaml` / REQ.md row | done (REQ-082 stays `partial`) |

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,23 +12,15 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/demographic"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/smart/discovery"
+	"github.com/cadasto/openehr-sdk-go/sandbox"
+	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	demographicprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/demographic"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
+func newClient(t *testing.T, b *sandbox.Backend) *transport.Client {
 	t.Helper()
-	cat, _ := discovery.NewStaticCatalog(discovery.StaticConfig{
-		Issuer: "https://test.example.com",
-		Services: map[string]discovery.ServiceEntry{
-			discovery.ServiceIDOpenEHRRest: {
-				BaseURL:     discovery.MustParseURL(srv.URL + "/openehr/v1"),
-				SpecVersion: discovery.SpecVersionPin,
-			},
-		},
-	})
-	c, err := transport.New(cat, transport.WithHTTPClient(srv.Client()))
+	c, err := probe.NewClient("https://sandbox.local/openehr/v1", b.HTTPClient(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,8 +41,8 @@ func cassette(t *testing.T, name string) []byte {
 // partyEchoServer serves the PARTY body for typed reads/writes and wraps it in
 // an ORIGINAL_VERSION envelope on the version sub-path, so a single fixture
 // drives the whole create → get → get-version round-trip the probe asserts.
-func partyEchoServer(body []byte) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func partyEchoBackend(body []byte) *sandbox.Backend {
+	return sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"`+string(demographicprobes073VOID)+`::cdr::1"`)
 		w.Header().Set("Location", r.URL.Path)
 		if strings.Contains(r.URL.Path, "/version") {
@@ -66,7 +57,7 @@ func partyEchoServer(body []byte) *httptest.Server {
 			w.WriteHeader(http.StatusCreated)
 		}
 		_, _ = w.Write(body)
-	}))
+	})
 }
 
 // demographicprobes073VOID mirrors the probe's fixed versioned-object id for
@@ -87,11 +78,10 @@ func TestProbe073DemographicRoundTrip(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.typ), func(t *testing.T) {
-			srv := partyEchoServer(cassette(t, tc.cassette))
-			defer srv.Close()
+			b := partyEchoBackend(cassette(t, tc.cassette))
 
 			r, err := demographicprobes.Probe073DemographicRoundTrip(
-				context.Background(), newClient(t, srv), tc.party, tc.typ,
+				context.Background(), newClient(t, b), tc.party, tc.typ,
 			)
 			if err != nil {
 				t.Fatalf("Probe073: %v", err)
@@ -110,11 +100,10 @@ func TestProbe073DemographicRoundTrip(t *testing.T) {
 // _type does not round-trip to the input party's concrete type.
 func TestProbe073DetectsTypeDrift(t *testing.T) {
 	// Server returns a PERSON body, but the probe is told to expect an ORGANISATION.
-	srv := partyEchoServer(cassette(t, "person.json"))
-	defer srv.Close()
+	b := partyEchoBackend(cassette(t, "person.json"))
 
 	r, err := demographicprobes.Probe073DemographicRoundTrip(
-		context.Background(), newClient(t, srv),
+		context.Background(), newClient(t, b),
 		&rm.Organisation{Name: rm.DVText{Value: "x"}}, demographic.Organisation,
 	)
 	if err != nil {
@@ -132,7 +121,7 @@ func TestProbe073DetectsTypeDrift(t *testing.T) {
 func TestProbe073DetectsVersionDataDrift(t *testing.T) {
 	person := cassette(t, "person.json")
 	org := cassette(t, "organisation.json")
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"`+demographicprobes073VOID+`::cdr::1"`)
 		w.Header().Set("Location", r.URL.Path)
 		if strings.Contains(r.URL.Path, "/version") {
@@ -147,11 +136,10 @@ func TestProbe073DetectsVersionDataDrift(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 		}
 		_, _ = w.Write(person)
-	}))
-	defer srv.Close()
+	})
 
 	r, err := demographicprobes.Probe073DemographicRoundTrip(
-		context.Background(), newClient(t, srv),
+		context.Background(), newClient(t, b),
 		&rm.Person{Name: rm.DVText{Value: "Jane Doe"}}, demographic.Person,
 	)
 	if err != nil {
