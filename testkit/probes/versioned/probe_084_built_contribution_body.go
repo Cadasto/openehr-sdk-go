@@ -68,14 +68,16 @@ var probe084Batch = []probe084Step{
 	{label: "deletion of a FOLDER", rmType: "FOLDER", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::4", wantCode: "523"},
 }
 
-// probe084BatchCode is the batch audit's change type — openEHR `unknown`,
-// which is deliberately NOT one of the four codes the builder authors per
-// operation. Since the versions between them now carry all four, a code
-// from outside that set is the only batch value no derivation rule over the
-// versions could reproduce, so the non-derivation arm cannot pass by
-// coincidence. It reaches the audit through Builder.WithAudit — the
-// documented escape hatch for a code outside the authored table — which
-// this probe therefore also exercises on the wire.
+// probe084BatchCode is the batch audit's change type — openEHR `unknown`, a
+// member of the *audit change type* group that is deliberately NOT one of
+// the four codes the builder's constructors carry per operation (`creation`,
+// `amendment`, `modification`, `deleted`). Since the versions between them
+// now carry all four, a code from outside that quartet is the only batch
+// value no derivation rule over the versions could reproduce, so the
+// non-derivation arm cannot pass by coincidence. It reaches the audit
+// through Builder.WithAudit — the caller-supplied-audit path, and the only
+// route for a code outside the group altogether — which this probe
+// therefore also exercises on the wire.
 const probe084BatchCode = "253"
 
 // Probe084BuiltContributionBody implements PROBE-084: a
@@ -191,9 +193,10 @@ func buildProbe084Submission() (*contribution.Submission, error) {
 	if len(changes) != len(probe084Batch) {
 		return nil, fmt.Errorf("built %d changes for %d expected steps", len(changes), len(probe084Batch))
 	}
-	// The batch audit is set wholesale so its change type can be a code
-	// outside the authored table (see probe084BatchCode); the committer and
-	// system id are then layered on, exercising both entry points.
+	// The batch audit is set wholesale so its change type is the caller's own
+	// rather than one of the four per-operation codes (see
+	// probe084BatchCode); the committer and system id are then layered on,
+	// exercising both entry points.
 	return contribution.NewBuilder().
 		WithAudit(contribution.UpdateAudit{
 			ChangeType: rm.DVCodedText{
