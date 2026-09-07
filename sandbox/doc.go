@@ -9,4 +9,8 @@
 //
 // State is per-Backend and isolated: two probes sharing one instance
 // see each other's writes; two instances do not.
+//
+// [Handle] / [HandleFunc] / [Scripted] register planted routes that
+// take precedence over the built-in EHR surface, so a probe test can
+// serve a hostile or fixture response without httptest.NewServer.
 package sandbox

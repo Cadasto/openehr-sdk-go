@@ -92,3 +92,49 @@ func TestNoListener(t *testing.T) {
 		t.Fatal("HTTPClient.Transport is not the Backend itself")
 	}
 }
+
+func TestScriptedRouteOverridesBuiltin(t *testing.T) {
+	t.Parallel()
+	b := sandbox.New()
+	b.HandleFunc(http.MethodGet, "/ehr/", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[1, 2, 3]`))
+	})
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://sandbox.local/openehr/v1/ehr/missing", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := b.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 from the scripted route (not the builtin 404)", resp.StatusCode)
+	}
+}
+
+func TestScriptedCatchAll(t *testing.T) {
+	t.Parallel()
+	hits := 0
+	b := sandbox.Scripted(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusPreconditionFailed)
+	})
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, "https://sandbox.local/openehr/v1/ehr/x/composition/y", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := b.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusPreconditionFailed {
+		t.Fatalf("status = %d, want 412", resp.StatusCode)
+	}
+	if hits != 1 {
+		t.Fatalf("hits = %d, want 1", hits)
+	}
+}

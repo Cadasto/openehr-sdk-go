@@ -15,8 +15,9 @@ const systemID = "sandbox.local"
 // Backend is an in-memory openEHR REST backend. It is safe for
 // concurrent use (REQ-026).
 type Backend struct {
-	mu   sync.Mutex
-	ehrs map[string][]byte
+	mu      sync.Mutex
+	ehrs    map[string][]byte
+	scripts []scripted
 }
 
 // New returns an empty Backend.
@@ -38,17 +39,25 @@ func (b *Backend) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.Body != nil {
 		defer req.Body.Close()
 	}
+	if h := b.matchScript(req); h != nil {
+		return serveScript(h, req), nil
+	}
 	path := resourcePath(req.URL.Path)
 	switch {
 	case req.Method == http.MethodPost && path == "/ehr":
 		return b.createEHR("")
 	case req.Method == http.MethodPut && strings.HasPrefix(path, "/ehr/"):
-		return b.createEHR(strings.TrimPrefix(path, "/ehr/"))
+		rest := strings.TrimPrefix(path, "/ehr/")
+		if rest != "" && !strings.Contains(rest, "/") {
+			return b.createEHR(rest)
+		}
 	case (req.Method == http.MethodGet || req.Method == http.MethodHead) && strings.HasPrefix(path, "/ehr/"):
-		return b.getEHR(req.Method, strings.TrimPrefix(path, "/ehr/"))
-	default:
-		return jsonResponse(http.StatusNotFound, []byte(`{"message":"not found"}`)), nil
+		rest := strings.TrimPrefix(path, "/ehr/")
+		if rest != "" && !strings.Contains(rest, "/") {
+			return b.getEHR(req.Method, rest)
+		}
 	}
+	return jsonResponse(http.StatusNotFound, []byte(`{"message":"not found"}`)), nil
 }
 
 func (b *Backend) createEHR(id string) (*http.Response, error) {
