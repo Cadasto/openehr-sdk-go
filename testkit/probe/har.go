@@ -3,6 +3,9 @@ package probe
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"os"
+	"strings"
 )
 
 // HAR is an HTTP Archive 1.2 recording (ADR 0020). Cassette mode
@@ -25,7 +28,7 @@ type HARLog struct {
 
 // HARReq082 is the REQ-082 attestation carried on every Cassette
 // recording. Removing either required field must fail
-// [TestHARRejectsMissingAttestation].
+// TestHARRejectsMissingAttestation in har_test.go.
 type HARReq082 struct {
 	Provenance HARProvenance `json:"provenance"`
 	Redaction  HARRedaction  `json:"redaction"`
@@ -99,13 +102,51 @@ type HARContent struct {
 	Text     string `json:"text,omitempty"`
 }
 
-// ValidateHAR decodes a HAR 1.2 recording and refuses one that is
-// missing the ADR 0020 attestation. Removing the _req082 check must
-// fail [TestHARRejectsMissingAttestation].
-func ValidateHAR(data []byte) (HAR, error) {
+// credentialHeaders are the header names capture-time redaction has to
+// strip. The _req082 attestation is a claim about the capture tool;
+// this set is the check on the recorded bytes, so a tool that reported
+// a redaction it never performed is caught rather than trusted
+// (REQ-082: an unredacted capture must be detectable, not merely
+// unlikely).
+var credentialHeaders = map[string]struct{}{
+	"authorization":       {},
+	"cookie":              {},
+	"proxy-authorization": {},
+	"set-cookie":          {},
+}
+
+// credentialQueryKeys are request-URL query keys that carry a
+// credential in the URL itself, where stripping headers never reaches.
+var credentialQueryKeys = map[string]struct{}{
+	"access_token":  {},
+	"api_key":       {},
+	"apikey":        {},
+	"authorization": {},
+	"client_secret": {},
+	"password":      {},
+	"token":         {},
+}
+
+// ValidateHAR reads the HAR 1.2 recording at path and refuses one that
+// must not be replayed (REQ-082): unreadable or malformed bytes, the
+// wrong log version, a missing or incomplete ADR 0020 attestation, an
+// empty entries list, or a credential the capture-time redaction left
+// behind. Every refusal wraps [ErrUnsatisfiableMode], so a caller can
+// discard the recording on the sentinel alone.
+//
+// A refusal names the offending entry and the header or query key, and
+// never the value or any recorded payload text (REQ-093). Removing the
+// _req082 check must fail TestHARRejectsMissingAttestation in
+// har_test.go; removing the credential scan must fail
+// TestHARRejectsUnredactedCapture there.
+func ValidateHAR(path string) (HAR, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return HAR{}, fmt.Errorf("%w: read HAR: %w", ErrUnsatisfiableMode, err)
+	}
 	var rec HAR
 	if err := json.Unmarshal(data, &rec); err != nil {
-		return HAR{}, fmt.Errorf("probe: decode HAR: %w", err)
+		return HAR{}, fmt.Errorf("%w: decode HAR: %w", ErrUnsatisfiableMode, err)
 	}
 	if rec.Log.Version != "1.2" {
 		return HAR{}, fmt.Errorf("%w: HAR log.version = %q, want 1.2", ErrUnsatisfiableMode, rec.Log.Version)
@@ -123,5 +164,70 @@ func ValidateHAR(data []byte) (HAR, error) {
 	if len(rec.Log.Entries) == 0 {
 		return HAR{}, fmt.Errorf("%w: HAR log.entries is empty", ErrUnsatisfiableMode)
 	}
+	if err := refuseUnredacted(rec); err != nil {
+		return HAR{}, err
+	}
 	return rec, nil
+}
+
+// refuseUnredacted scans every recorded request and response for a
+// credential that survived capture-time redaction. It is the content
+// half of the attestation check: log._req082.redaction.ran says the
+// tool ran, this says it worked.
+func refuseUnredacted(rec HAR) error {
+	for i, e := range rec.Log.Entries {
+		if name, found := credentialHeader(e.Request.Headers); found {
+			return fmt.Errorf("%w: HAR entry %d request header %q survived redaction", ErrUnsatisfiableMode, i, name)
+		}
+		if name, found := credentialHeader(e.Response.Headers); found {
+			return fmt.Errorf("%w: HAR entry %d response header %q survived redaction", ErrUnsatisfiableMode, i, name)
+		}
+		if key, found := credentialQueryKey(e.Request.URL); found {
+			return fmt.Errorf("%w: HAR entry %d request URL query key %q survived redaction", ErrUnsatisfiableMode, i, key)
+		}
+	}
+	return nil
+}
+
+// credentialHeader reports the first credential-bearing header in
+// headers, matched case-insensitively. It returns the canonical
+// lower-case name from [credentialHeaders] rather than the recorded
+// spelling, so a refusal message can never echo bytes read out of the
+// recording (REQ-093).
+func credentialHeader(headers []HARHeader) (string, bool) {
+	for _, h := range headers {
+		name := strings.ToLower(strings.TrimSpace(h.Name))
+		if _, bad := credentialHeaders[name]; bad {
+			return name, true
+		}
+	}
+	return "", false
+}
+
+// credentialQueryKey reports the first credential-bearing query key in
+// rawURL, matched case-insensitively, and returns the canonical
+// lower-case name for the same reason [credentialHeader] does.
+//
+// The query is split by hand rather than through [url.ParseQuery]
+// because that function drops the pairs it cannot parse: a key whose
+// percent-escapes are malformed would then slip past the scan
+// unexamined. Here such a key is compared in its raw form instead.
+func credentialQueryKey(rawURL string) (string, bool) {
+	_, query, ok := strings.Cut(rawURL, "?")
+	if !ok {
+		return "", false
+	}
+	query, _, _ = strings.Cut(query, "#")
+	for _, pair := range strings.FieldsFunc(query, func(r rune) bool { return r == '&' || r == ';' }) {
+		raw, _, _ := strings.Cut(pair, "=")
+		key := raw
+		if decoded, err := url.QueryUnescape(raw); err == nil {
+			key = decoded
+		}
+		key = strings.ToLower(strings.TrimSpace(key))
+		if _, bad := credentialQueryKeys[key]; bad {
+			return key, true
+		}
+	}
+	return "", false
 }

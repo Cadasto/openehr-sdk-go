@@ -448,18 +448,122 @@ func TestRun_CassetteSatisfiedWhenRecordingPresent(t *testing.T) {
 	}
 }
 
-// recordingDir returns a temp directory holding a placeholder
-// recording for each id.
+// validHAR is the smallest recording ValidateHAR accepts: HAR 1.2, one
+// plain GET with a 200 response and no credential headers, and a
+// _req082 block whose provenance is complete and whose redaction ran.
+const validHAR = `{
+  "log": {
+    "version": "1.2",
+    "_req082": {
+      "provenance": {
+        "deployment": "test-fixture",
+        "base_url": "http://127.0.0.1/openehr/v1",
+        "captured_at": "2026-09-07T00:00:00Z",
+        "sdk_commit": "0000000"
+      },
+      "redaction": {"ran": true, "headers_stripped": ["authorization"]}
+    },
+    "entries": [
+      {
+        "startedDateTime": "2026-09-07T00:00:00Z",
+        "request": {
+          "method": "GET",
+          "url": "http://127.0.0.1/openehr/v1/ehr",
+          "headers": [{"name": "Accept", "value": "application/json"}]
+        },
+        "response": {
+          "status": 200,
+          "headers": [{"name": "Content-Type", "value": "application/json"}],
+          "content": {"mimeType": "application/json", "text": "{}"}
+        }
+      }
+    ]
+  }
+}
+`
+
+// recordingDir returns a temp directory holding one valid HAR
+// recording named "<id>.har" per id. The Cassette arm validates the
+// recording it finds, so a stand-in file would now be refused: a
+// fixture that means "this probe has a recording" has to be a real
+// attested HAR.
 func recordingDir(t *testing.T, ids ...string) string {
 	t.Helper()
 	dir := t.TempDir()
 	for _, id := range ids {
-		path := filepath.Join(dir, id+".yaml")
-		if err := os.WriteFile(path, []byte("# recording placeholder\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		writeRecording(t, dir, id+".har", validHAR)
 	}
 	return dir
+}
+
+// writeRecording drops one corpus file into dir.
+func writeRecording(t *testing.T, dir, name, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestRun_CassetteRefusesMalformedRecording pins that a file with the
+// right name is not yet a recording: the Cassette arm validates what
+// it finds, so junk bytes refuse the run with ErrUnsatisfiableMode and
+// the probe never executes. Without that call the run would go green
+// against a file nothing could replay (REQ-082).
+func TestRun_CassetteRefusesMalformedRecording(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeRecording(t, dir, "PROBE-010.har", "not a HAR at all")
+
+	var seen []*transport.Client
+	sum, err := probe.Run(t.Context(), probe.Config{
+		Mode:         probe.ModeCassette,
+		Client:       mustClient(t),
+		RecordingDir: dir,
+	}, []probe.Entry{capture("PROBE-010", &seen)})
+	if !errors.Is(err, probe.ErrUnsatisfiableMode) {
+		t.Fatalf("Run(cassette, junk PROBE-010.har) error = %v, want %v", err, probe.ErrUnsatisfiableMode)
+	}
+	if !strings.Contains(err.Error(), "decode HAR") {
+		t.Fatalf("Run(cassette, junk PROBE-010.har) error = %q, want it to say the recording could not be decoded", err)
+	}
+	if len(seen) != 0 {
+		t.Fatalf("the probe ran %d times against an undecodable recording, want 0", len(seen))
+	}
+	if len(sum.Results) != 0 {
+		t.Fatalf("Summary.Results has %d entries, want 0 (nothing must run)", len(sum.Results))
+	}
+}
+
+// TestRun_CassetteIgnoresNonHARPrefixMatch pins that the corpus lookup
+// matches the extension as well as the id: a PROBE-010.yaml left
+// beside the recordings shares the prefix but is not a recording, so
+// the run must report that no recording exists rather than adopt the
+// neighbour and fail to decode it.
+func TestRun_CassetteIgnoresNonHARPrefixMatch(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeRecording(t, dir, "PROBE-010.yaml", "# recording placeholder\n")
+	// A directory carrying the recording name is not a recording
+	// either; the lookup takes regular files only.
+	if err := os.Mkdir(filepath.Join(dir, "PROBE-010.har"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var seen []*transport.Client
+	_, err := probe.Run(t.Context(), probe.Config{
+		Mode:         probe.ModeCassette,
+		Client:       mustClient(t),
+		RecordingDir: dir,
+	}, []probe.Entry{capture("PROBE-010", &seen)})
+	if !errors.Is(err, probe.ErrUnsatisfiableMode) {
+		t.Fatalf("Run(cassette, PROBE-010.yaml only) error = %v, want %v", err, probe.ErrUnsatisfiableMode)
+	}
+	if !strings.Contains(err.Error(), "no recording for") {
+		t.Fatalf("Run(cassette, PROBE-010.yaml only) error = %q, want it to say no recording was found", err)
+	}
+	if len(seen) != 0 {
+		t.Fatalf("the probe ran %d times with no recording present, want 0", len(seen))
+	}
 }
 
 // TestParseModes pins the tolerant parenthetical/dash-clause stripping

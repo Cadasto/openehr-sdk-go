@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -26,11 +27,12 @@ const sandboxBaseURL = "https://sandbox.local/openehr/v1"
 var (
 	// ErrUnsatisfiableMode is returned when the invocation asked for a
 	// mode the selected probes cannot run in — Cassette with no
-	// recording, Live with no endpoint, in-repo mode for a
-	// backend-facing probe, a probe whose declared Modes exclude the
-	// requested one, or a backend wiring that would silently swap one
-	// mode's backend for another's. The runner must not fall back to
-	// another mode.
+	// recording, Cassette with a recording that is malformed or whose
+	// provenance and redaction cannot be attested (see [ValidateHAR]),
+	// Live with no endpoint, in-repo mode for a backend-facing probe, a
+	// probe whose declared Modes exclude the requested one, or a backend
+	// wiring that would silently swap one mode's backend for another's.
+	// The runner must not fall back to another mode.
 	ErrUnsatisfiableMode = errors.New("probe: mode cannot be satisfied")
 
 	// ErrAllSkipped is returned when every selected probe reported
@@ -107,8 +109,8 @@ type Config struct {
 
 	// RecordingDir is the Cassette-mode corpus root
 	// (testkit/recordings/). A selected backend-facing probe is
-	// unsatisfiable unless a file whose name starts with the probe id
-	// exists in this directory.
+	// unsatisfiable unless this directory holds a .har file whose name
+	// starts with the probe id and that passes [ValidateHAR].
 	RecordingDir string
 
 	// Endpoint is the Live-mode openEHR REST base URL. Required for
@@ -347,12 +349,19 @@ func satisfiable(cfg Config, e Entry) error {
 		if cfg.RecordingDir == "" {
 			return fmt.Errorf("%w: cassette mode needs a recording directory for %s", ErrUnsatisfiableMode, e.ID)
 		}
-		ok, err := recordingExists(cfg.RecordingDir, e.ID)
+		path, err := findRecording(cfg.RecordingDir, e.ID)
 		if err != nil {
 			return fmt.Errorf("%w: recording directory %s unreadable: %w", ErrUnsatisfiableMode, cfg.RecordingDir, err)
 		}
-		if !ok {
+		if path == "" {
 			return fmt.Errorf("%w: no recording for %s in %s", ErrUnsatisfiableMode, e.ID, cfg.RecordingDir)
+		}
+		// A recording whose provenance cannot be stated, or that still
+		// carries a credential, is discarded rather than replayed
+		// (REQ-082). ValidateHAR's refusals already wrap the sentinel;
+		// the probe id is added so the refusal reads like its siblings.
+		if _, err := ValidateHAR(path); err != nil {
+			return fmt.Errorf("%s: %w", e.ID, err)
 		}
 		return nil
 	case ModeLive:
@@ -441,28 +450,36 @@ func modeList(modes []Mode) string {
 	return strings.Join(parts, ", ")
 }
 
-// recordingExists reports whether dir contains a file whose name
-// starts with id (case-insensitively). The error return distinguishes
-// a directory the runner cannot read at all — missing, permission
-// denied — from one it read successfully but that simply holds no
-// matching recording; collapsing both into "false" would report every
-// unreadable directory as "no recording for <id>", which sends the
-// caller looking for a missing cassette file instead of a filesystem
-// problem.
-func recordingExists(dir, id string) (bool, error) {
+// findRecording returns the path of the first regular file in dir
+// whose name starts with id and ends with ".har", both compared
+// case-insensitively; an empty path means the directory was read but
+// holds no such file.
+//
+// The extension is part of the match, not a formality: only a HAR file
+// can be validated and replayed, so a leftover PROBE-010.yaml or
+// PROBE-010.md beside the corpus must read as "no recording" rather
+// than as a recording the runner then fails to decode.
+//
+// The error return distinguishes a directory the runner cannot read at
+// all — missing, permission denied — from one it read successfully but
+// that simply holds no matching recording; collapsing both into an
+// empty path would report every unreadable directory as "no recording
+// for <id>", which sends the caller looking for a missing cassette
+// file instead of a filesystem problem.
+func findRecording(dir, id string) (string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	prefix := strings.ToLower(id)
 	for _, e := range entries {
-		if e.IsDir() {
+		if !e.Type().IsRegular() {
 			continue
 		}
 		name := strings.ToLower(e.Name())
-		if strings.HasPrefix(name, prefix) {
-			return true, nil
+		if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, ".har") {
+			return filepath.Join(dir, e.Name()), nil
 		}
 	}
-	return false, nil
+	return "", nil
 }
