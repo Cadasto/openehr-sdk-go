@@ -1,6 +1,6 @@
 # Plan — Error-axis leftovers (null bodies, nil receivers, decode-failure shapes, enum switches)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans (inline) or superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax. Before any Go edit load `go-coding:go-coding`, then `go-errors`, `go-testing`, and (Task 6) `go-lint-setup`.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans (inline) or superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax. Before any Go edit load `go-coding:go-coding`, then `go-errors`, `go-testing`, and (Task 6) `go-lint-setup`.
 
 **Date:** 2026-09-04
 **Status:** landed (2026-09-05, archived in the implementing PR)
@@ -68,7 +68,7 @@ Implementation may start when:
 **Interfaces:**
 - Produces: `func IsNoRepresentationBody(b []byte) bool` — true for zero bytes, whitespace only, or the JSON `null` literal (surrounding whitespace ignored). Tasks 2 and 3 rely on this exact name.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 // transport/decode_error_test.go
@@ -114,9 +114,9 @@ func TestIsNoRepresentationBody(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails** — `go test ./transport/ -run 'TestDecodeNullBody|TestIsNoRepresentationBody'`. Expected: compile error (undefined `IsNoRepresentationBody`); after stubbing the func to `return len(b) == 0`, the `null` cases fail because `Decode` returns a zero struct and nil error.
+- [x] **Step 2: Run to verify it fails** — `go test ./transport/ -run 'TestDecodeNullBody|TestIsNoRepresentationBody'`. Expected: compile error (undefined `IsNoRepresentationBody`); after stubbing the func to `return len(b) == 0`, the `null` cases fail because `Decode` returns a zero struct and nil error.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```go
 // transport/body.go
@@ -143,13 +143,13 @@ func IsNoRepresentationBody(b []byte) bool {
 
 In `Decode`, replace `if len(resp.Body) == 0 {` with `if IsNoRepresentationBody(resp.Body) {` and the message with `"%w: response body is empty or null (Prefer mismatch?)"`. Update the doc comment's "an empty body fails with [ErrInvalidShape]" to "an empty, whitespace-only or JSON-null body fails with [ErrInvalidShape] (see [IsNoRepresentationBody])".
 
-- [ ] **Step 4: Spec** — in transport.md § REQ-151, append to the paragraph **An empty 2xx body keeps its existing per-surface contract**:
+- [x] **Step 4: Spec** — in transport.md § REQ-151, append to the paragraph **An empty 2xx body keeps its existing per-surface contract**:
 
 > *Empty*, throughout this §, has the meaning [§ REQ-094](#req-094--prefer-response-shape-negotiation) gives it: zero bytes, whitespace only, or the JSON `null` literal. A `null` body unmarshals into a struct as a nil-error no-op, so every arm below **MUST** classify against the raw bytes ahead of decode — `transport.IsNoRepresentationBody` is the single implementation of that predicate, and a hand-rolled leaf **MUST** call it rather than test `len(body) == 0`.
 
-- [ ] **Step 5: Verify** — `go test ./transport/ -count=1`; `$(go env GOROOT)/bin/gofmt -l transport/`. Expected: PASS, no files listed.
+- [x] **Step 5: Verify** — `go test ./transport/ -count=1`; `$(go env GOROOT)/bin/gofmt -l transport/`. Expected: PASS, no files listed.
 
-- [ ] **Step 6: Commit** — `git commit -m "fix(transport): classify a JSON-null 2xx body as no representation (REQ-151)"`
+- [x] **Step 6: Commit** — `git commit -m "fix(transport): classify a JSON-null 2xx body as no representation (REQ-151)"`
 
 ## Task 2: Every hand-rolled leaf and the write funnel use the predicate
 
@@ -165,7 +165,7 @@ In `Decode`, replace `if len(resp.Body) == 0 {` with `if IsNoRepresentationBody(
 **Interfaces:**
 - Consumes: `transport.IsNoRepresentationBody` from Task 1.
 
-- [ ] **Step 1: Write the failing tests** — one `null`-body case per surface, each asserting the surface-specific facet (not merely "an error"):
+- [x] **Step 1: Write the failing tests** — one `null`-body case per surface, each asserting the surface-specific facet (not merely "an error"):
 
 ```go
 // composition_test.go — REQ-151 refusal arm
@@ -190,13 +190,13 @@ func TestGetNullBodyIsInvalidShape(t *testing.T) {
 // stored_query_test.go — ListStoredQueries: "null" → non-nil empty slice; GetStoredQuery: "null" → synthesized {Name, Version}.
 ```
 
-- [ ] **Step 2: Run to verify they fail** — the list tests fail with `list = nil` (a `null` unmarshals to a nil slice); the refusal-arm tests fail with `err = <nil>` and an all-zero value.
+- [x] **Step 2: Run to verify they fail** — the list tests fail with `list = nil` (a `null` unmarshals to a nil slice); the refusal-arm tests fail with `err = <nil>` and an all-zero value.
 
-- [ ] **Step 3: Implement** — at each site replace `len(resp.Body) == 0` with `transport.IsNoRepresentationBody(resp.Body)`; in `ehr/write.go` remove the local helper and its `bytes` import if now unused; in `contribution.go` replace the inline check. Keep every existing message and error type; only the predicate widens.
+- [x] **Step 3: Implement** — at each site replace `len(resp.Body) == 0` with `transport.IsNoRepresentationBody(resp.Body)`; in `ehr/write.go` remove the local helper and its `bytes` import if now unused; in `contribution.go` replace the inline check. Keep every existing message and error type; only the predicate widens.
 
-- [ ] **Step 4: Verify** — `go test ./openehr/client/... -count=1`; `gofmt -l openehr/client`; `grep -rn 'byte("null")' --include=*.go . | grep -v _test` must list only `transport/body.go`.
+- [x] **Step 4: Verify** — `go test ./openehr/client/... -count=1`; `gofmt -l openehr/client`; `grep -rn 'byte("null")' --include=*.go . | grep -v _test` must list only `transport/body.go`.
 
-- [ ] **Step 5: Commit** — `git commit -m "fix(client): route every 2xx no-representation check through transport.IsNoRepresentationBody (REQ-151, REQ-094, REQ-144)"`
+- [x] **Step 5: Commit** — `git commit -m "fix(client): route every 2xx no-representation check through transport.IsNoRepresentationBody (REQ-151, REQ-094, REQ-144)"`
 
 ## Task 3: Nil-receiver guard on every generated `UnmarshalJSON` (REQ-025)
 
@@ -206,15 +206,15 @@ func TestGetNullBodyIsInvalidShape(t *testing.T) {
 - Regenerate: `make codegen` (29 `openehr/rm/*_jsonunmar_gen.go` + 6 `openehr/aom/aom14/*_jsonunmar_gen.go`)
 - Modify: `openehr/rm/real.go`, `openehr/rm/integer.go`, `openehr/rm/character.go` (three `UnmarshalJSON` guards + `Character.UnmarshalText`) — wrap the sentinel instead of a bare `errors.New`
 - Modify: `docs/specifications/idiom.md` § REQ-025 **No panics**
-- Test: `openehr/rm/nilreceiver_census_test.go` (package `rm_test`), plus `internal/bmmgen/render_jsonunmar_polymorphic_test.go` (assert the rendered source contains the guard)
+- Test: `openehr/rm/typereg/nilreceiver_census_test.go` (package `typereg_test`), plus `internal/bmmgen/render_jsonunmar_polymorphic_test.go` (assert the rendered source contains the guard)
 
 **Interfaces:**
 - Produces: `var typereg.ErrNilReceiver = errors.New("typereg: nil receiver")`.
 
-- [ ] **Step 1: Write the failing census test**
+- [x] **Step 1: Write the failing census test**
 
 ```go
-// openehr/rm/nilreceiver_census_test.go
+// openehr/rm/typereg/nilreceiver_census_test.go
 package rm_test
 
 // REQ-025: a nil receiver on any UnmarshalJSON is caller-constructible input
@@ -267,9 +267,9 @@ func callWithoutPanicking(t *testing.T, f func() error) (err error) {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails** — `go test ./openehr/rm/ -run TestNilReceiverUnmarshalJSONCensus`. Expected: FAIL — today every generated type panics (nil dereference on `x.Field = ...`) and the census reports it via `callWithoutPanicking`; the primitives return an error that is not the sentinel.
+- [x] **Step 2: Run to verify it fails** — `go test ./openehr/rm/ -run TestNilReceiverUnmarshalJSONCensus`. Expected: FAIL — today every generated type panics (nil dereference on `x.Field = ...`) and the census reports it via `callWithoutPanicking`; the primitives return an error that is not the sentinel.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `typereg/registry.go`, inside the existing `var (...)` sentinel block:
 
@@ -291,13 +291,13 @@ In `render_jsonunmar.go`, immediately after the `func (%s *%s%s) UnmarshalJSON(d
 
 (`fmt` and `typereg` are already imported by every generated `*_jsonunmar_gen.go`; no import-list change.) Then `make codegen`, and in each hand-written codec replace `errors.New("rm.Real: nil receiver")` with `fmt.Errorf("rm.Real: %w", typereg.ErrNilReceiver)` (likewise Integer, Character ×2). Drop the now-unused `errors` import only where nothing else uses it.
 
-- [ ] **Step 4: Spec** — in idiom.md § REQ-025 **No panics**, add a bullet after "Consumer input":
+- [x] **Step 4: Spec** — in idiom.md § REQ-025 **No panics**, add a bullet after "Consumer input":
 
 > - A nil receiver on a decode method — every generated `UnmarshalJSON`, and the hand-written primitive codecs' `UnmarshalJSON` / `UnmarshalText` — return an error carrying `typereg.ErrNilReceiver`. A census over the type registry pins it.
 
-- [ ] **Step 5: Verify** — `make codegen-verify` (no drift), `go test ./openehr/rm/... ./internal/bmmgen/... -count=1`, `go vet ./...`. Expected: PASS.
+- [x] **Step 5: Verify** — `make codegen-verify` (no drift), `go test ./openehr/rm/... ./internal/bmmgen/... -count=1`, `go vet ./...`. Expected: PASS.
 
-- [ ] **Step 6: Commit** — `git commit -m "fix(rm): refuse a nil receiver in every generated UnmarshalJSON with typereg.ErrNilReceiver (REQ-025)"`
+- [x] **Step 6: Commit** — `git commit -m "fix(rm): refuse a nil receiver in every generated UnmarshalJSON with typereg.ErrNilReceiver (REQ-025)"`
 
 ## Task 4: Duplicate value echo dropped; the fourth decode-failure shape documented (REQ-052)
 
@@ -308,7 +308,7 @@ In `render_jsonunmar.go`, immediately after the `func (%s *%s%s) UnmarshalJSON(d
 - Modify: `openehr/client/ehr/write.go` `NoRepresentationError` doc and `traceability.yaml` REQ-151 notes — both say rm decode errors embed values "in `parse %q` form"; reword to "the wrapped strconv / encoding/json cause quotes the literal"
 - Test: `openehr/rm/real_test.go` — assert the message contains the literal exactly once (`strings.Count(err.Error(), lit) == 1`) for a quoted malformed literal; same for Integer
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 func TestQuotedLiteralParseErrorNamesTheLiteralOnce(t *testing.T) { // REQ-052
@@ -329,11 +329,11 @@ func TestQuotedLiteralParseErrorNamesTheLiteralOnce(t *testing.T) { // REQ-052
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails** — count is 2 today.
+- [x] **Step 2: Run to verify it fails** — count is 2 today.
 
-- [ ] **Step 3: Implement** the two one-line message changes.
+- [x] **Step 3: Implement** the two one-line message changes.
 
-- [ ] **Step 4: Docs** — canjson `doc.go`, fourth bullet:
+- [x] **Step 4: Docs** — canjson `doc.go`, fourth bullet:
 
 ```
 //   - A hand-written primitive decoded at the top level — rm.Real, rm.Integer
@@ -350,9 +350,9 @@ wire.md § REQ-052, appended to the **Decode-side shape sentinel** paragraph:
 
 > A cause beneath the sentinel **MAY** name the offending literal — `*strconv.NumError` and `*json.UnmarshalTypeError` both do — because the value-free discipline binds the boundary strings (`WireError.Error()`, `DecodeError.Error()`; [§ REQ-093](transport.md#req-093--openehr-error-envelope-mapping), [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure)), not codec causes. A codec's own prefix **MUST NOT** repeat a value the wrapped cause already carries.
 
-- [ ] **Step 5: Verify** — `go test ./openehr/rm/ ./openehr/serialize/canjson/ -count=1`; `go doc ./openehr/serialize/canjson | head -80` shows the bullet.
+- [x] **Step 5: Verify** — `go test ./openehr/rm/ ./openehr/serialize/canjson/ -count=1`; `go doc ./openehr/serialize/canjson | head -80` shows the bullet.
 
-- [ ] **Step 6: Commit** — `git commit -m "docs(rm,canjson): name a quoted literal once and document the top-level primitive decode-failure shape (REQ-052)"`
+- [x] **Step 6: Commit** — `git commit -m "docs(rm,canjson): name a quoted literal once and document the top-level primitive decode-failure shape (REQ-052)"`
 
 ## Task 5: `typereg/errors.go` split
 
@@ -360,11 +360,11 @@ wire.md § REQ-052, appended to the **Decode-side shape sentinel** paragraph:
 - Create: `openehr/rm/typereg/errors.go`
 - Modify: `openehr/rm/typereg/registry.go` (remove what moved), `openehr/rm/shape_classified.go` comment (`registry.go` → `errors.go`)
 
-- [ ] **Step 1: Move** the sentinel `var (...)` block (`ErrMissingType` … `ErrInvalidShape`, `ErrNilReceiver`), `DecodeError` with its methods, `WrapShapeError`, `shapeError` with its methods, verbatim, into `errors.go` with the package doc line `// Error surface of the type registry: sentinels, DecodeError, and the shape-classification wrapper the generated funnel uses.` Keep `jsonNestingDepth`, `Registry`, `Decode`, `DecodeAs` in `registry.go`.
+- [x] **Step 1: Move** the sentinel `var (...)` block (`ErrMissingType` … `ErrInvalidShape`, `ErrNilReceiver`), `DecodeError` with its methods, `WrapShapeError`, `shapeError` with its methods, verbatim, into `errors.go` with the package doc line `// Error surface of the type registry: sentinels, DecodeError, and the shape-classification wrapper the generated funnel uses.` Keep `jsonNestingDepth`, `Registry`, `Decode`, `DecodeAs` in `registry.go`.
 
-- [ ] **Step 2: Verify** — `go build ./... && go test ./openehr/rm/typereg/ -count=1`, then compare the exported surface: `go doc ./openehr/rm/typereg | grep -E '^(func|type|var|const)' | sort` on this branch must equal the same command's output on the base commit (run it in the main checkout). Expected: identical list, tests PASS.
+- [x] **Step 2: Verify** — `go build ./... && go test ./openehr/rm/typereg/ -count=1`, then compare the exported surface: `go doc ./openehr/rm/typereg | grep -E '^(func|type|var|const)' | sort` on this branch must equal the same command's output on the base commit (run it in the main checkout), **plus the one line this plan deliberately adds** — `ErrNilReceiver` (Task 3). The move itself must contribute no other delta; tests PASS.
 
-- [ ] **Step 3: Commit** — `git commit -m "refactor(typereg): move the error surface into errors.go"`
+- [x] **Step 3: Commit** — `git commit -m "refactor(typereg): move the error surface into errors.go"`
 
 ## Task 6: `exhaustive` linter enabled, findings fixed
 
@@ -384,24 +384,24 @@ wire.md § REQ-052, appended to the **Decode-side shape sentinel** paragraph:
   6. `openehr/serialize/simplified/flat_decode.go:1764` — add `case kindString: return "string"`; `default:` returns `fmt.Sprintf("suffixKind(%d)", int(k))`.
   7. `smart/discovery/errors.go:81` — add `case ReasonFetchFailed, ReasonParseError, ReasonMalformedURL, ReasonAuthEndpointsMissing, ReasonInsecureURL, ReasonIssuerMismatch: // no reason-specific detail`.
 
-- [ ] **Step 1: Run the linter before changing code** — `docker run --rm -v "$PWD":/app -w /app -e GOFLAGS=-buildvcs=false golangci/golangci-lint:v2.13.2-alpine golangci-lint run --enable-only=exhaustive ./...`. Expected: 8 findings (the census above).
+- [x] **Step 1: Run the linter before changing code** — `docker run --rm -v "$PWD":/app -w /app -e GOFLAGS=-buildvcs=false golangci/golangci-lint:v2.13.2-alpine golangci-lint run --enable-only=exhaustive ./...`. Expected: 8 findings (the census above).
 
-- [ ] **Step 2: Edit config and the seven sites.**
+- [x] **Step 2: Edit config and the seven sites.**
 
-- [ ] **Step 3: Verify** — rerun the Step 1 command: 0 findings; `make lint` clean; `go test ./internal/bmmgen/ ./openehr/aql/ ./openehr/client/ehr/ ./openehr/rm/rminfo/ ./openehr/serialize/... ./smart/discovery/ -count=1` PASS; `grep -rn "nolint:exhaustive" --include=*.go .` empty.
+- [x] **Step 3: Verify** — rerun the Step 1 command: 0 findings; `make lint` clean; `go test ./internal/bmmgen/ ./openehr/aql/ ./openehr/client/ehr/ ./openehr/rm/rminfo/ ./openehr/serialize/... ./smart/discovery/ -count=1` PASS; `grep -rn "nolint:exhaustive" --include=*.go .` empty.
 
-- [ ] **Step 4: Commit** — `git commit -m "build(lint): enable exhaustive and spell every enum member in the eight flagged switches"`
+- [x] **Step 4: Commit** — `git commit -m "build(lint): enable exhaustive and spell every enum member in the eight flagged switches"`
 
 ## Task 7: Close-out
 
-- [ ] **CHANGELOG** `## [Unreleased] / ### Added` — three one-sentence bullets, artefact-class grain:
+- [x] **CHANGELOG** `## [Unreleased] / ### Added` — three one-sentence bullets, artefact-class grain:
   - **Null 2xx bodies classify as no representation (REQ-151, REQ-094, REQ-144).** `transport.IsNoRepresentationBody` is the one predicate behind `transport.Decode`, every hand-rolled leaf read, the Definition list and synthesized-metadata arms, and the write funnel, so a JSON `null` body no longer decodes as an all-zero resource.
   - **Nil-receiver guard on every generated decoder (REQ-025).** Every generated `UnmarshalJSON` and the hand-written primitive codecs return an error carrying `typereg.ErrNilReceiver` instead of dereferencing a nil receiver, pinned by a registry-wide census.
   - **Quoted-literal parse errors name the literal once (REQ-052).** `rm.Real` / `rm.Integer` stop repeating a value their wrapped `strconv` cause already quotes; the top-level primitive decode-failure shape is documented.
-- [ ] **traceability.yaml** — REQ-151: add `transport/body.go` intent to notes, tests `+ composition/system/demographic/definition null cases` (file paths only); REQ-025: packages `+ openehr/rm, openehr/aom/aom14, internal/bmmgen`, tests `+ openehr/rm/nilreceiver_census_test.go`; REQ-052: tests `+ openehr/rm/real_test.go` (already listed? check) and notes on the echo rule; REQ-144: tests already cover `template_test.go` / `stored_query_test.go`.
-- [ ] **Indexes** — `docs/plans/README.md`: this plan's row (landed + archived); `docs/plans/archive/README.md`: row; `git mv` this file to `archive/`, set **Status:** landed / **Implementation:** landed.
-- [ ] **Gates** — `make spec-check`, `make ci`. Expected: green.
-- [ ] **Commit + PR** — `git commit -m "docs(plan): archive the error-axis leftovers plan in its implementing PR"`; before pushing, `gh pr list` and `git fetch origin main` to confirm no collision with a parallel session; push; open the PR with the summary, the one-home-per-fact pointers (this plan, the amended §§), and a "Follow-ups (not in this PR)" section naming STRAND-10.
+- [x] **traceability.yaml** — REQ-151: add `transport/body.go` intent to notes, tests `+ composition/system/demographic/definition null cases` (file paths only); REQ-025: packages `+ openehr/rm, openehr/aom/aom14, internal/bmmgen`, tests `+ openehr/rm/typereg/nilreceiver_census_test.go`; REQ-052: tests `+ openehr/rm/real_test.go` (already listed? check) and notes on the echo rule; REQ-144: tests already cover `template_test.go` / `stored_query_test.go`.
+- [x] **Indexes** — `docs/plans/README.md`: this plan's row (landed + archived); `docs/plans/archive/README.md`: row; `git mv` this file to `archive/`, set **Status:** landed / **Implementation:** landed.
+- [x] **Gates** — `make spec-check`, `make ci`. Expected: green.
+- [x] **Commit + PR** — `git commit -m "docs(plan): archive the error-axis leftovers plan in its implementing PR"`; before pushing, `gh pr list` and `git fetch origin main` to confirm no collision with a parallel session; push; open the PR with the summary, the one-home-per-fact pointers (this plan, the amended §§), and a "Follow-ups (not in this PR)" section naming STRAND-10.
 
 ## Mapping to specs
 
