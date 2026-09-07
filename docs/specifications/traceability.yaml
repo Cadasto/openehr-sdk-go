@@ -614,9 +614,11 @@ requirements:
       PreferIdentifier writes) -- hand-built in tests only, e.g.
       openehr/client/ehr/composition/composition_test.go
       TestSaveIdentifierPopulatesVersionUIDFromBody. Admin has no bodies by
-      contract and the VERSIONED_* read family is not implemented, so neither
-      counts. Everything else the clients decode has a vendored body here or
-      under ../compositions, ../rm, ../submissions.
+      contract and the VERSIONED_COMPOSITION / VERSIONED_EHR_STATUS family is
+      not implemented (VERSIONED_PARTY is, and is vendored under
+      demographic/), so neither counts. The other decoded surfaces in the
+      table have a vendored body here or under ../compositions, ../rm,
+      ../submissions.
 
       Amended 2026-08-30 (ADR 0019): the section now carries one KEYED exception
       to the OpenAPI-authoritative rule -- the REQ-144 Definition metadata
@@ -707,8 +709,9 @@ requirements:
     # location are NOT deferred ctx/ forms — ADR 0016 assigns them to the
     # REQ-140 underscore grammar). `.schema`-suffixed media types on input are
     # landed, not deferred: simplified.ParseMediaType (2026-09-05) accepts the
-    # two canonical strings plus EHRbase's .schema variants on input, while
-    # Format.MediaType keeps emitting the canonical strings only (deviations.md).
+    # two canonical strings plus the deprecated .schema variants (retired from
+    # the spec, still served by EHRbase) on input, while Format.MediaType keeps
+    # emitting the canonical strings only (deviations.md).
     # First-class _-attr decomposition is NO LONGER deferred:
     # REQ-140 landed the whole underscore grammar on 2026-08-05, which narrowed
     # the |raw boundary rather than relying on it (wire.md § REQ-140). The upstream byte-conformance probe landed 2026-08-01 as
@@ -805,6 +808,7 @@ requirements:
       - openehr/serialize/simplified/simplified_test.go
       - openehr/serialize/simplified/mediatype_test.go
       - openehr/serialize/simplified/mediatype_fuzz_test.go
+      - openehr/serialize/simplified/mediatype_internal_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
       - openehr/serialize/simplified/independence_test.go
       - openehr/serialize/simplified/datatypes_test.go
@@ -1349,6 +1353,7 @@ requirements:
     tests:
       - openehr/validation/rmfloor_test.go
       - openehr/validation/strand14_nonchaining_test.go
+      - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/handles_test.go
@@ -2426,9 +2431,11 @@ requirements:
     canonical: docs/specifications/wire.md#req-144--definition-metadata-decoding
     status: draft
     implementation: landed
-    packages: [openehr/client/definition]
+    packages: [openehr/client/definition, openehr/client/system]
     adrs: [docs/adr/0019-definition-timestamp-tolerance.md]
-    plans: [docs/plans/archive/2026-08-30-definition-metadata-decoding.md]
+    plans:
+      - docs/plans/archive/2026-08-30-definition-metadata-decoding.md
+      - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
     tests:
       - openehr/client/definition/template_test.go
       - openehr/client/definition/stored_query_test.go
@@ -2460,9 +2467,10 @@ requirements:
       arm: ListTemplates/ListStoredQueries return a non-nil zero-length slice
       (a nil slice boxed in a non-nil interface marshals as JSON null -- the
       read-side twin of the REQ-094 typed-nil trap). The unknown-key (Extras)
-      contract is this §'s too, for BOTH descriptors, including the
-      documented-field-wins collision rule: StoredQueryMetadata reached
-      TemplateMetadata's re-emit parity here. Pinned per descriptor by
+      contract is this §'s too, for the two Definition descriptors and, by
+      § REQ-050, the System descriptor, including the documented-field-wins
+      collision rule: StoredQueryMetadata reached TemplateMetadata's re-emit
+      parity here. Pinned per descriptor by
       the collision rows of TestStoredQueryMetadataExtrasRoundTrip and
       TestTemplateMetadataRoundTrip -- one row per mechanism, since deleting
       the known-key deletion and restoring Extras-last precedence fail

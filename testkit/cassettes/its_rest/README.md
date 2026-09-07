@@ -23,6 +23,8 @@ Pinned commit: `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04, ITS-REST 1.1
 | `system/` | openEHR REST System API responses | `openehr/client/system/` tests |
 | `ehr/` | openEHR REST EHR API read-path responses (EHR, EHR_STATUS, Folder) | `openehr/client/ehr/`, `.../ehrstatus`, `.../directory` tests |
 | `definition/` | openEHR REST Definition API responses (ADL 1.4 OPT + metadata) | `openehr/client/definition/` tests |
+| `query/` | openEHR REST Query API RESULT_SET response | `openehr/client/query/` tests read `result_set.json` |
+| `demographic/` | openEHR REST Demographic API PARTY CRUD + VERSIONED_PARTY responses | `openehr/client/demographic/` tests read the party files |
 
 Composition GET responses (Phase 3 reads) are exercised against the canonical-JSON cassettes vendored under [`../compositions/`](../compositions/) and [`../rm/`](../rm/) — those carry full COMPOSITION shapes and are reused here without duplication. Resolve paths via [`../../fixtures/`](../../fixtures/). ADL 2 source-form templates are **deferred** until their leaf client lands in a later phase of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/archive/2026-05-15-rest-api-client.md); AQL already has a vendored RESULT_SET body (`query/result_set.json`), and stored-query metadata bodies are a separate, already-landed-client gap named in the Coverage table below, not a leaf-client deferral.
 
@@ -81,6 +83,29 @@ Hand-crafted SMART configuration document that satisfies the openEHR SMART disco
 | `smart-configuration.json` | Reference SMART config advertising `org.openehr.rest` at spec_version `1.1.0-development`. |
 | `smart-configuration-mismatch.json` | Variant advertising `1.0.3` — exercises PROBE-003 (spec-version mismatch fails fast at discovery). |
 | `jwks.json` | Reference JWKS document with two RS256 keys; used to exercise JWKS rotation (PROBE-006). |
+
+### `query/`
+
+Hand-crafted to the ITS-REST OpenAPI result-set example shape (`meta._type: "RESULTSET"`). Landed 2026-05-21 with the query client (commit `145314e`).
+
+| File | Notes |
+|---|---|
+| `result_set.json` | Single-column, single-row RESULT_SET for `SELECT e/ehr_id/value FROM EHR e`; exercises `openehr/client/query` decode of the `meta`/`q`/`columns`/`rows` envelope. |
+
+### `demographic/`
+
+Hand-crafted to the ITS-REST OpenAPI shape for the five DEMOGRAPHIC party kinds plus their VERSIONED_PARTY read-path bodies. Landed 2026-06-16 with the demographic PARTY CRUD client (commit `8338271`).
+
+| File | Notes |
+|---|---|
+| `person.json` | `PERSON` with a `name` and one `PARTY_IDENTITY`. |
+| `organisation.json` | `ORGANISATION` with a `name` and one `PARTY_IDENTITY`. |
+| `group.json` | `GROUP` with a `name` and one `PARTY_IDENTITY`. |
+| `agent.json` | `AGENT` with a `name` and one `PARTY_IDENTITY`. |
+| `role.json` | `ROLE` with a `name` and one `PARTY_IDENTITY`. |
+| `original_version.json` | `ORIGINAL_VERSION` wrapping a `PERSON`, with `preceding_version_uid`, `lifecycle_state`, `commit_audit`, and `contribution` `OBJECT_REF`. |
+| `revision_history.json` | `REVISION_HISTORY` with one `REVISION_HISTORY_ITEM`. |
+| `versioned_party.json` | `VERSIONED_PARTY` root (`uid`, `owner_id`, `time_created`). |
 
 ## Coverage against the client surface
 
