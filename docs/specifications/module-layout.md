@@ -80,6 +80,8 @@ Application-specific layer. Shipped in the same module in v1 for adoption conven
 | `cmd/bmmgen/` | CLI entry point for the BMM-driven code generator (REQ-042). |
 | `internal/` | Implementation helpers excluded from BC promises (Go convention). |
 | `internal/bmmgen/` | BMM code-generator implementation. Reads `resources/bmm/*.bmm.json` via `openehr/bmm/` and emits `openehr/rm/`, `openehr/aom/aom14/`, and the `typereg` registry. Not part of the public API. |
+| `cmd/termgen/` | CLI entry point for the openEHR terminology code generator (REQ-034): `-resources ./resources/terminology -out . [-verify]`. Driven by `make termgen` / `make termgen-verify`. |
+| `internal/termgen/` | Terminology code-generator implementation. Parses the pinned `resources/terminology/openehr_terminology.xml` and renders `openehr/terminology/openehr_gen.go`. Go-internal, consumed only by `cmd/termgen/`. |
 | `resources/` | Pinned SDK assets (BMM schemas under `resources/bmm/`, future XSDs and similar). See [`../resources/README.md`](../../resources/README.md) and [`../resources/bmm/README.md`](../../resources/bmm/README.md). |
 | `docs/` | Narrative documentation (architecture, AI workflow, ADRs, plans). |
 | `docs/specifications/` | Normative specifications — this tree. |

@@ -123,7 +123,7 @@ func TestRegistryAccessorsUseTheTables(t *testing.T) {
 		t.Errorf("CodeSetByID(%q).ID() = %q, want %q", "s", s.ID(), "s")
 	}
 	if _, ok := CodeSetByID("zzz"); ok {
-		t.Error("CodeSetByID unknown")
+		t.Errorf("CodeSetByID(%q) = _, true — want absence reported for an id no table carries", "zzz")
 	}
 	if got := len(slices.Collect(CodeSets())); got != 1 {
 		t.Errorf("CodeSets yields %d, want 1", got)
