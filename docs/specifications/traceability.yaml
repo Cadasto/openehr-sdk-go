@@ -567,6 +567,7 @@ requirements:
       - openehr/client/ehr/resource_test.go
       - openehr/client/ehr/write_test.go
       - openehr/client/ehr/ehr_test.go  # TestCreateEmpty2xxBody -- ehr.Create's empty/null-body arm
+      - openehr/client/ehr/decode_error_test.go  # the return=identifier arm: refusal shape, and the no-representation classification
       - openehr/client/ehr/contribution/representation_test.go
       - openehr/client/demographic/party_test.go
       - testkit/probes/versioned/probe_071_composition_write_response_shape.go
