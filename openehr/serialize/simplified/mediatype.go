@@ -77,33 +77,23 @@ var acceptedMediaTypes = map[string]Format{
 // ParseMediaType classifies one media-type token as FLAT or STRUCTURED — a
 // Content-Type value, or a single media range already picked out of an Accept
 // list. A comma-separated Accept list is not accepted: split it upstream and
-// call this once per range. The type is matched case-insensitively (RFC 2045)
-// and every parameter is ignored — `q` included, so a `q=0` range still
-// classifies, and a malformed parameter included too: a broken parameter
-// beside an otherwise unambiguous type still classifies on that type, because
-// the type part says which format the body is and the codec validates the
-// bytes regardless (REQ-053 is liberal on input). Only a value whose type
-// part itself does not parse is refused. Anything naming neither format —
-// including the WebTemplate resource type `application/openehr.wt+json`,
-// which is a template projection rather than a composition format — fails
-// with [ErrUnknownMediaType]. It never panics on any input (REQ-025).
+// call this once per range. The type is matched case-insensitively (RFC 2045),
+// and well-formed parameters are ignored whether or not this package
+// recognises them — `q` included, so a `q=0` range still classifies, because
+// this call does no Accept negotiation. A value whose type part or parameters
+// do not parse is refused; a comma-separated list is one such value, and
+// refusing it is what stops a whole Accept list from being read as its first
+// range. Anything naming neither format — including the WebTemplate resource
+// type `application/openehr.wt+json`, which is a template projection rather
+// than a composition format — fails with [ErrUnknownMediaType]. It never
+// panics on any input (REQ-025).
 //
 // The codecs themselves take bytes; this is the one call a consumer makes
 // before them to decide which codec a negotiated body belongs to.
 func ParseMediaType(s string) (Format, error) {
 	mt, _, err := mime.ParseMediaType(s)
 	if err != nil {
-		// A malformed parameter still yields the type it followed, so classify
-		// on that type instead of refusing an unambiguous body. Every other
-		// parse error means the type part never parsed and there is nothing to
-		// classify. The empty-type check is defensive: no current stdlib input
-		// pairs ErrInvalidMediaParameter with an empty type (a duplicate
-		// parameter name yields an empty type under a different error), and it
-		// keeps the cause wrapped rather than falling through to the
-		// value-only refusal below.
-		if !errors.Is(err, mime.ErrInvalidMediaParameter) || mt == "" {
-			return FormatUnknown, fmt.Errorf("%w: %w", ErrUnknownMediaType, err)
-		}
+		return FormatUnknown, fmt.Errorf("%w: %w", ErrUnknownMediaType, err)
 	}
 	if f, ok := acceptedMediaTypes[mt]; ok {
 		return f, nil
