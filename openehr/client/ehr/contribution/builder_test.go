@@ -2,6 +2,7 @@ package contribution_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
 // marshalSubmission renders sub through the canonical-JSON path the wire
@@ -61,6 +63,17 @@ func termOf(m map[string]any, field string) string {
 		return ""
 	}
 	s, _ := tid["value"].(string)
+	return s
+}
+
+// valueOf reads a DV_CODED_TEXT's `value` — the rubric a human reads —
+// from a decoded body.
+func valueOf(m map[string]any, field string) string {
+	ct, ok := m[field].(map[string]any)
+	if !ok {
+		return ""
+	}
+	s, _ := ct["value"].(string)
 	return s
 }
 
@@ -294,7 +307,7 @@ func TestBuilderRefusals(t *testing.T) {
 		},
 		{
 			name:    "unknown batch change_type code",
-			builder: newBuilder().WithChangeType(contribution.ChangeType("253")).Add(contribution.Creation(&comp)),
+			builder: newBuilder().WithChangeType(contribution.ChangeType("999")).Add(contribution.Creation(&comp)),
 			want:    "audit-change-type code",
 		},
 	}
@@ -497,7 +510,7 @@ func TestBuilderBuildIsIdempotentOnTheErrorPath(t *testing.T) {
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	b := contribution.NewBuilder().
 		WithCommitterName("alice").
-		WithChangeType(contribution.ChangeType("253")).
+		WithChangeType(contribution.ChangeType("999")).
 		Add(contribution.Amendment("", &comp))
 	first, err1 := b.Build()
 	second, err2 := b.Build()
@@ -513,8 +526,8 @@ func TestBuilderBuildIsIdempotentOnTheErrorPath(t *testing.T) {
 }
 
 // TestBuilderWithAuditCarriesAnyChangeType — [Builder.WithChangeType] admits
-// only the four codes the SDK authors, so a caller who needs another one
-// (`253` unknown, say) supplies the whole audit instead. That path must
+// the openEHR group; a code outside it (a deployment-local extension, say)
+// still reaches the wire only by supplying the whole audit. That path must
 // satisfy the required-change_type gate without widening the code set.
 func TestBuilderWithAuditCarriesAnyChangeType(t *testing.T) {
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
@@ -523,8 +536,8 @@ func TestBuilderWithAuditCarriesAnyChangeType(t *testing.T) {
 		WithAudit(contribution.UpdateAudit{
 			Committer: &rm.PartyIdentified{Name: &name},
 			ChangeType: rm.DVCodedText{
-				DVText:       rm.DVText{Value: "unknown"},
-				DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "253"},
+				DVText:       rm.DVText{Value: "custom"},
+				DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "999"},
 			},
 		}).
 		Add(contribution.Creation(&comp)).
@@ -533,8 +546,11 @@ func TestBuilderWithAuditCarriesAnyChangeType(t *testing.T) {
 		t.Fatalf("Build: %v", err)
 	}
 	audit, versions := marshalSubmission(t, sub)
-	if got := codeOf(audit, "change_type"); got != "253" {
-		t.Errorf("audit.change_type = %q, want the caller's 253", got)
+	if got := codeOf(audit, "change_type"); got != "999" {
+		t.Errorf("audit.change_type = %q, want the caller's 999", got)
+	}
+	if got := valueOf(audit, "change_type"); got != "custom" {
+		t.Errorf("audit.change_type value = %q, want the caller's \"custom\"", got)
 	}
 	// The version audit still carries the operation's own code.
 	ca, ok := versions[0]["commit_audit"].(map[string]any)
@@ -543,6 +559,75 @@ func TestBuilderWithAuditCarriesAnyChangeType(t *testing.T) {
 	}
 	if got := codeOf(ca, "change_type"); got != "249" {
 		t.Errorf("versions[0].change_type = %q, want 249", got)
+	}
+}
+
+// TestWithChangeTypeAdmitsEveryGroupMemberWithItsRubric — REQ-034: the batch
+// audit accepts every member of the pinned openEHR *audit change type* group,
+// and the rubric that reaches the wire is the pin's own, never one typed
+// beside the code in this SDK.
+func TestWithChangeTypeAdmitsEveryGroupMemberWithItsRubric(t *testing.T) {
+	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
+	for c := range terminology.AuditChangeType.All() {
+		t.Run(c.Code, func(t *testing.T) {
+			sub, err := contribution.NewBuilder().
+				WithCommitterName("alice").
+				WithChangeType(contribution.ChangeType(c.Code)).
+				Add(contribution.Creation(&comp)).
+				Build()
+			if err != nil {
+				t.Fatalf("Build with batch change type %s (%s): %v", c.Code, c.Rubric, err)
+			}
+			audit, _ := marshalSubmission(t, sub)
+			if got := codeOf(audit, "change_type"); got != c.Code {
+				t.Errorf("audit.change_type code = %q, want %q", got, c.Code)
+			}
+			if got := termOf(audit, "change_type"); got != terminology.ID {
+				t.Errorf("audit.change_type terminology = %q, want %q", got, terminology.ID)
+			}
+			if got := valueOf(audit, "change_type"); got != c.Rubric {
+				t.Errorf("audit.change_type value = %q, want the pinned rubric %q", got, c.Rubric)
+			}
+		})
+	}
+}
+
+// TestChangeTypeConstantsCoverTheGroup — REQ-034: the promoted constants MUST
+// be exactly the group's members, so a member the pin carries is always
+// nameable and no constant outlives its concept.
+func TestChangeTypeConstantsCoverTheGroup(t *testing.T) {
+	want := map[contribution.ChangeType]bool{
+		contribution.ChangeTypeCreation:         true,
+		contribution.ChangeTypeAmendment:        true,
+		contribution.ChangeTypeModification:     true,
+		contribution.ChangeTypeSynthesis:        true,
+		contribution.ChangeTypeDeleted:          true,
+		contribution.ChangeTypeAttestation:      true,
+		contribution.ChangeTypeRestoration:      true,
+		contribution.ChangeTypeFormatConversion: true,
+		contribution.ChangeTypeUnknown:          true,
+	}
+	for c := range terminology.AuditChangeType.All() {
+		if !want[contribution.ChangeType(c.Code)] {
+			t.Errorf("group member %s (%s) has no ChangeType constant", c.Code, c.Rubric)
+		}
+	}
+	if len(want) != terminology.AuditChangeType.Len() {
+		t.Errorf("%d constants, group has %d members", len(want), terminology.AuditChangeType.Len())
+	}
+}
+
+// TestChangeTypeCodedTextOutsideTheGroupIsZero — a code the pin does not
+// carry has no rubric to render, so [contribution.ChangeType.CodedText]
+// reports the absence as the zero DV_CODED_TEXT rather than fabricating a
+// coded value with an empty rubric (REQ-034).
+func TestChangeTypeCodedTextOutsideTheGroupIsZero(t *testing.T) {
+	outside := contribution.ChangeType("999")
+	if got := outside.CodedText(); !reflect.DeepEqual(got, rm.DVCodedText{}) {
+		t.Errorf("ChangeType(%q).CodedText() = %+v, want the zero DVCodedText", outside, got)
+	}
+	if rubric, ok := outside.Rubric(); ok {
+		t.Errorf("ChangeType(%q).Rubric() = %q, true — want absence reported", outside, rubric)
 	}
 }
 

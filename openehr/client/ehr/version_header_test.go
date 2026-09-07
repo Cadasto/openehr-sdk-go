@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -46,16 +47,49 @@ func TestFormatLifecycleStateHeader(t *testing.T) {
 		}
 	})
 
+	// The known codes are the pinned openEHR *version lifecycle state*
+	// group's members, not a list typed here (REQ-034): every member is
+	// valid, formats into a header, and reports the pin's own rubric.
 	t.Run("accepts all known codes", func(t *testing.T) {
-		for _, s := range []LifecycleState{LifecycleStateComplete, LifecycleStateIncomplete, LifecycleStateDeleted} {
+		for c := range terminology.VersionLifecycleState.All() {
+			s := LifecycleState(c.Code)
 			if !s.IsValid() {
 				t.Errorf("%q should be valid", s)
 			}
 			if _, err := FormatLifecycleStateHeader(s); err != nil {
 				t.Errorf("FormatLifecycleStateHeader(%q): %v", s, err)
 			}
+			rubric, ok := s.Rubric()
+			if !ok {
+				t.Errorf("LifecycleState(%q).Rubric() reported absence, want %q", s, c.Rubric)
+				continue
+			}
+			if rubric != c.Rubric {
+				t.Errorf("LifecycleState(%q).Rubric() = %q, want the pinned %q", s, rubric, c.Rubric)
+			}
 		}
 	})
+}
+
+// TestLifecycleStateConstantsCoverTheGroup — REQ-034: the promoted constants
+// MUST be exactly the group's members, so a member the pin carries is always
+// nameable and no constant outlives its concept.
+func TestLifecycleStateConstantsCoverTheGroup(t *testing.T) {
+	want := map[LifecycleState]bool{
+		LifecycleStateComplete:   true,
+		LifecycleStateIncomplete: true,
+		LifecycleStateDeleted:    true,
+		LifecycleStateInactive:   true,
+		LifecycleStateAbandoned:  true,
+	}
+	for c := range terminology.VersionLifecycleState.All() {
+		if !want[LifecycleState(c.Code)] {
+			t.Errorf("group member %s (%s) has no LifecycleState constant", c.Code, c.Rubric)
+		}
+	}
+	if len(want) != terminology.VersionLifecycleState.Len() {
+		t.Errorf("%d constants, group has %d members", len(want), terminology.VersionLifecycleState.Len())
+	}
 }
 
 // TestFormatLifecycleStateHeaderInjection guards the header-injection vector
