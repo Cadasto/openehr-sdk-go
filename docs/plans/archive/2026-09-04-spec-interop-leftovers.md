@@ -64,13 +64,13 @@
 - Modify: `docs/specifications/wire.md` § REQ-144 **Unknown response keys** — the sentence "Both descriptors carry an `Extras` map" gains "(and, by [§ REQ-050](#req-050), the System descriptor `ServiceCapabilities`)"
 - Modify: `docs/specifications/traceability.yaml` REQ-050 `notes:` — replace "Convention alignment, no § of its own:" with "Bound by § REQ-050 to the § REQ-144 unknown-key rule:"
 
-- [ ] **Step 1: Spec** — append to § REQ-050:
+- [x] **Step 1: Spec** — append to § REQ-050:
 
 > **System descriptor.** `system.Capabilities` decodes the `OPTIONS /` response into `ServiceCapabilities`, the descriptor that advertises the pinned `restapi_specs_version`. Its unknown response keys **MUST** be preserved on decode and re-emitted on encode under exactly the rule [§ REQ-144 *Unknown response keys*](#req-144--definition-metadata-decoding) states for the Definition descriptors — documented fields authoritative, exact-name collision ignored on encode, case-variant keys preserved beside the field — so a deployment-specific capability the pin does not name survives a round trip through the SDK.
 
-- [ ] **Step 2: Verify** — `make spec-check`; `go test ./openehr/client/system/ -run 'Extras|Collision' -count=1` (existing tests already pin the behaviour; no code change).
+- [x] **Step 2: Verify** — `make spec-check`; `go test ./openehr/client/system/ -run 'Extras|Collision' -count=1` (existing tests already pin the behaviour; no code change).
 
-- [ ] **Step 3: Commit** — `git commit -m "docs(spec): bind the System descriptor's unknown keys to the § REQ-144 rule from § REQ-050"`
+- [x] **Step 3: Commit** — `git commit -m "docs(spec): bind the System descriptor's unknown keys to the § REQ-144 rule from § REQ-050"`
 
 ## Task 2: `simplified.ParseMediaType` accepts the `.schema`-suffixed variants on input (REQ-053)
 
@@ -97,7 +97,7 @@
   func ParseMediaType(s string) (Format, error)
   ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```go
 package simplified_test
@@ -151,9 +151,9 @@ func TestFormatMediaTypeEmitsCanonicalOnly(t *testing.T) { // REQ-053: MUST NOT 
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails** — `go test ./openehr/serialize/simplified/ -run 'TestParseMediaType|TestFormatMediaType'`. Expected: compile error (undefined `Format`, `ParseMediaType`).
+- [x] **Step 2: Run to verify it fails** — `go test ./openehr/serialize/simplified/ -run 'TestParseMediaType|TestFormatMediaType'`. Expected: compile error (undefined `Format`, `ParseMediaType`).
 
-- [ ] **Step 3: Implement** `mediatype.go`:
+- [x] **Step 3: Implement** `mediatype.go`:
 
 ```go
 package simplified
@@ -238,22 +238,22 @@ func ParseMediaType(s string) (Format, error) {
 
 (`mime.ParseMediaType` already lowercases the type; `strings.ToLower` is belt and braces and costs nothing.)
 
-- [ ] **Step 4: Docs** — the four documentation edits listed under Files; the `simplified.go` comment becomes: "Media types for the Simplified Formats (REQ-053). Emit these canonical types — [Format.MediaType] does. [ParseMediaType] also accepts EHRbase's non-conformant `.schema`-suffixed variants on input; the codecs themselves take bytes, so negotiation happens one call before them."
+- [x] **Step 4: Docs** — the four documentation edits listed under Files; the `simplified.go` comment becomes: "Media types for the Simplified Formats (REQ-053). Emit these canonical types — [Format.MediaType] does. [ParseMediaType] also accepts EHRbase's non-conformant `.schema`-suffixed variants on input; the codecs themselves take bytes, so negotiation happens one call before them."
 
-- [ ] **Step 5: Verify** — `go test ./openehr/serialize/simplified/ -count=1`; `/usr/local/go/bin/gofmt -l openehr/serialize/simplified`; `go vet ./openehr/serialize/simplified/`; `go test ./openehr/serialize/simplified/ -run TestIndependence` (REQ-013 import guard, if the package has one — `independence_test.go` exists).
+- [x] **Step 5: Verify** — `go test ./openehr/serialize/simplified/ -count=1`; `/usr/local/go/bin/gofmt -l openehr/serialize/simplified`; `go vet ./openehr/serialize/simplified/`; `go test ./openehr/serialize/simplified/ -run TestIndependence` (REQ-013 import guard, if the package has one — `independence_test.go` exists).
 
-- [ ] **Step 6: Commit** — `git commit -m "feat(simplified): ParseMediaType accepts the EHRbase .schema-suffixed media types on input (REQ-053)"`
+- [x] **Step 6: Commit** — `git commit -m "feat(simplified): ParseMediaType accepts the EHRbase .schema-suffixed media types on input (REQ-053)"`
 
 ## Task 3: scope.md's examples row describes the tree
 
 **Files:**
 - Modify: `docs/specifications/scope.md` — the row "| Examples per primary use case | Worked example programs under `cmd/examples/` for benchmark, seeder, MCP, federator |"
 
-- [ ] **Step 1: Edit** the row to: "| Examples per primary use case | Worked example programs under `cmd/examples/`, one per SDK surface, catalogued in [`../examples.md`](../examples.md); the four primary consumers — benchmark, seeder, MCP, federator ([use-cases.md](use-cases.md)) — are downstream products that follow those shapes, not programs in this tree |"
+- [x] **Step 1: Edit** the row to: "| Examples per primary use case | Worked example programs under `cmd/examples/`, one per SDK surface, catalogued in [`../examples.md`](../examples.md); the four primary consumers — benchmark, seeder, MCP, federator ([use-cases.md](use-cases.md)) — are downstream products that follow those shapes, not programs in this tree |"
 
-- [ ] **Step 2: Verify** — `make spec-check` (the examples census guard counts `cmd/examples/` entries, not this row).
+- [x] **Step 2: Verify** — `make spec-check` (the examples census guard counts `cmd/examples/` entries, not this row).
 
-- [ ] **Step 3: Commit** — `git commit -m "docs(spec): scope.md names the examples the tree carries, not the downstream consumers"`
+- [x] **Step 3: Commit** — `git commit -m "docs(spec): scope.md names the examples the tree carries, not the downstream consumers"`
 
 ## Task 4: STRAND-13 census — properties inherited from a primitive-mapped ancestor
 
@@ -265,7 +265,7 @@ func ParseMediaType(s string) (Format, error) {
 **Interfaces:**
 - Consumes: `bmm.LoadAll(rootID, bmm.FSResolver{Root: testResources})` (`testResources` is defined in `plan_test.go`), `isPrimitive(name)` (`primitives.go`), `classProperties(c bmm.Class)` (`render_rminfo.go`).
 
-- [ ] **Step 1: Write the census test**
+- [x] **Step 1: Write the census test**
 
 ```go
 package bmmgen
@@ -364,17 +364,17 @@ func transitiveAncestors(lookup func(string) (bmm.Class, bool), name string) []s
 }
 ```
 
-- [ ] **Step 2: Run it** — `go test ./internal/bmmgen/ -run TestPrimitiveMappedAncestorPropertyCensus -v`. Expected: either PASS (the pin is complete) or a list of unpinned drops naming class, property, ancestor and roots. **Do not fold anything in**; add each reported drop to `primitiveAncestorDrops` verbatim and carry the list into Step 3. (The `roots` slice in the pin must match the order of `pinnedSchemaRoots`.)
+- [x] **Step 2: Run it** — `go test ./internal/bmmgen/ -run TestPrimitiveMappedAncestorPropertyCensus -v`. Expected: either PASS (the pin is complete) or a list of unpinned drops naming class, property, ancestor and roots. **Do not fold anything in**; add each reported drop to `primitiveAncestorDrops` verbatim and carry the list into Step 3. (The `roots` slice in the pin must match the order of `pinnedSchemaRoots`.)
 
-- [ ] **Step 3: Strand** — under STRAND-13 *Evidence needed*, append:
+- [x] **Step 3: Strand** — under STRAND-13 *Evidence needed*, append:
 
 > **Evidence (2026-09-05 census):** `internal/bmmgen/primitive_ancestor_census_test.go` walks every `class_definitions` class in each of the six pinned schema roots (`base 1.3.0`, `rm 1.2.0`, `am 1.4.0`, `am 2.4.0`, `lang 1.1.0`, `term 3.1.0`) and lists each property inherited from a primitive-mapped ancestor. Result: *[the pinned set, e.g. exactly one — `Iso8601_timezone.value` via `Iso8601_type`, present in every root because all six include `base`]*. The set is pinned by the test so growth is loud. What this settles: *[if one entry — the fold-into-both option's blast radius is one generated struct and one rminfo row; if more — name them and say the family is larger than the RM reduction showed]*. The strand stays open: the fold is still an ADR (§ Mapping rules inheritance) plus a regenerated tree.
 
   Replace the bracketed text with the actual census output; the plan carries no other placeholder.
 
-- [ ] **Step 4: Verify** — `go test ./internal/bmmgen/ -count=1`; `/usr/local/go/bin/gofmt -l internal/bmmgen`; `make spec-check`.
+- [x] **Step 4: Verify** — `go test ./internal/bmmgen/ -count=1`; `/usr/local/go/bin/gofmt -l internal/bmmgen`; `make spec-check`.
 
-- [ ] **Step 5: Commit** — `git commit -m "test(bmmgen): pin the primitive-mapped-ancestor property census across every pinned schema root (STRAND-13)"`
+- [x] **Step 5: Commit** — `git commit -m "test(bmmgen): pin the primitive-mapped-ancestor property census across every pinned schema root (STRAND-13)"`
 
 ## Task 5: STRAND-14 — should template-driven validation also run the RM floor?
 
@@ -382,7 +382,7 @@ func transitiveAncestors(lookup func(string) (bmm.Class, bool), name string) []s
 - Modify: `docs/specifications/research-strands.md` — new section before `## Index`; new index row after STRAND-13's
 - Modify: `docs/specifications/clinical-modeling.md` § REQ-112 — one sentence after "(template validity implies RM validity, so the two compose)."
 
-- [ ] **Step 1: Strand section**
+- [x] **Step 1: Strand section**
 
 ```markdown
 ## STRAND-14 — Should template-driven validation also run the RM-floor invariants?
@@ -391,7 +391,7 @@ func transitiveAncestors(lookup func(string) (bmm.Class, bool), name string) []s
 
 **Question:** should `ValidateComposition` (REQ-102) and the REQ-110 entry points run the REQ-112 per-type invariant catalogue as part of a template-driven pass, or stay exactly template-conformance with the floor a separate call?
 
-**Why it's open:** today the two layers compose but do not chain. Template validity covers RM-mandatory presence, so a template-driven pass already reports the floor's (a) arm; the floor's (b) arm — `DV_INTERVAL` lower > upper, `TERM_MAPPING.match` outside its value set, `Mappings_valid`, `DV_QUANTITY.precision < 0` — fires only through `ValidateRM`. A caller who runs only `ValidateComposition` can therefore commit an RM-invalid composition that is template-valid. Whether that is a gap or a deliberate separation of concerns is the fork.
+**Why it's open:** today the two layers compose but do not chain. Template validity covers RM-mandatory presence, so a template-driven pass already reports the floor's (a) arm; the floor's (b) arm — `DV_INTERVAL` lower > upper, `TERM_MAPPING.match` outside its value set, `Mappings_valid`, `DV_QUANTITY.precision < -1` — fires only through `ValidateRM`. A caller who runs only `ValidateComposition` can therefore commit an RM-invalid composition that is template-valid. Whether that is a gap or a deliberate separation of concerns is the fork.
 
 **The trade-off:**
 
@@ -410,11 +410,11 @@ func transitiveAncestors(lookup func(string) (bmm.Class, bool), name string) []s
 
   Index row: `| [STRAND-14](#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) | Template-driven validation and the RM floor | Open | REQ-102, REQ-110, REQ-112 |`
 
-- [ ] **Step 2: § REQ-112 sentence** — after "(template validity implies RM validity, so the two compose)." append: " They compose but do not chain: `ValidateComposition` and the REQ-110 entry points do **not** run this floor's per-type invariant catalogue, so a caller wanting both runs both — whether the template-driven pass should chain the floor is open as [STRAND-14](research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) and **MUST NOT** be pre-empted in code."
+- [x] **Step 2: § REQ-112 sentence** — after "(template validity implies RM validity, so the two compose)." append: " They compose but do not chain: `ValidateComposition` and the REQ-110 entry points do **not** run this floor's per-type invariant catalogue, so a caller wanting both runs both — whether the template-driven pass should chain the floor is open as [STRAND-14](research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) and **MUST NOT** be pre-empted in code."
 
-- [ ] **Step 3: Verify** — `make spec-check`.
+- [x] **Step 3: Verify** — `make spec-check`.
 
-- [ ] **Step 4: Commit** — `git commit -m "docs(spec): open STRAND-14 on chaining the RM floor into template-driven validation; § REQ-112 states the composition"`
+- [x] **Step 4: Commit** — `git commit -m "docs(spec): open STRAND-14 on chaining the RM floor into template-driven validation; § REQ-112 states the composition"`
 
 ## Task 6: REQ-095 coverage — name what keeps it partial
 
@@ -423,9 +423,9 @@ func transitiveAncestors(lookup func(string) (bmm.Class, bool), name string) []s
 - Modify: `docs/specifications/traceability.yaml` REQ-095 `notes:` — append a "What keeps this partial (2026-09-05 census):" sentence pointing at the README table
 - Modify: `docs/roadmap.md` — the OpenAPI cassettes row's Notes cell: "Not all surfaces covered" → "Coverage table in [`testkit/cassettes/its_rest/README.md`](../testkit/cassettes/its_rest/README.md); stored-query metadata and ITEM_TAG bodies are the named gaps"
 
-- [ ] **Step 1: Census the tree** — `ls testkit/cassettes/its_rest/*/` against `openehr/client/*` and the pinned OAS paths (`resources/its-rest/*.openapi.yaml`). As of 2026-09-04: `system/` (capabilities), `ehr/` (EHR, EHR_STATUS, FOLDER), `definition/` (template list, template metadata, one OPT — **no stored-query metadata or list body**), `demographic/` (five party kinds, ORIGINAL_VERSION, REVISION_HISTORY), `query/` (RESULT_SET), `errors/`, `discovery/`; composition bodies live under `../compositions/` and `../rm/`; contribution request bodies under `../submissions/`. Not vendored: stored-query metadata / list responses, ITEM_TAG bodies (the SDK reads tags from headers today, REQ-059 partial), Admin (no bodies by contract), the VERSIONED_COMPOSITION / VERSIONED_EHR_STATUS family (not implemented).
+- [x] **Step 1: Census the tree** — `ls testkit/cassettes/its_rest/*/` against `openehr/client/*` and the pinned OAS paths (`resources/its-rest/*.openapi.yaml`). As of 2026-09-04: `system/` (capabilities), `ehr/` (EHR, EHR_STATUS, FOLDER), `definition/` (template list, template metadata, one OPT — **no stored-query metadata or list body**), `demographic/` (five party kinds, ORIGINAL_VERSION, REVISION_HISTORY), `query/` (RESULT_SET), `errors/`, `discovery/`; composition bodies live under `../compositions/` and `../rm/`; contribution request bodies under `../submissions/`. Not vendored: stored-query metadata / list responses, ITEM_TAG bodies (the SDK reads tags from headers today, REQ-059 partial), Admin (no bodies by contract), the VERSIONED_COMPOSITION / VERSIONED_EHR_STATUS family (not implemented).
 
-- [ ] **Step 2: README table**
+- [x] **Step 2: README table**
 
 ```markdown
 ## Coverage against the client surface
@@ -452,17 +452,17 @@ What `openehr/client/*` decodes today, and whether a vendored body under this di
 
   Verify the CONTRIBUTION-read row against `openehr/client/ehr/contribution/contribution_test.go` before committing (if a vendored body exists, the row is "yes" and names it).
 
-- [ ] **Step 3: Verify** — `make spec-check`; every path in the table exists (`ls`).
+- [x] **Step 3: Verify** — `make spec-check`; every path in the table exists (`ls`).
 
-- [ ] **Step 4: Commit** — `git commit -m "docs(cassettes): name the ITS-REST bodies still missing behind REQ-095's partial"`
+- [x] **Step 4: Commit** — `git commit -m "docs(cassettes): name the ITS-REST bodies still missing behind REQ-095's partial"`
 
 ## Task 7: Close-out
 
-- [ ] **CHANGELOG** `## [Unreleased] / ### Added` — one bullet: **Simplified-Formats media-type negotiation (REQ-053).** `simplified.ParseMediaType` classifies a Content-Type or Accept value as FLAT or STRUCTURED, accepting EHRbase's `.schema`-suffixed variants on input, while `Format.MediaType` emits only the two canonical strings ([plan](docs/plans/archive/2026-09-04-spec-interop-leftovers.md)).
-- [ ] **traceability.yaml** — REQ-053: tests `+ openehr/serialize/simplified/mediatype_test.go`, plans `+ this plan (archive path)`; REQ-050: notes rewritten (Task 1), plans `+ this plan`; REQ-095: notes (Task 6), plans `+ this plan`; REQ-112: plans `+ this plan`.
-- [ ] **Indexes** — `docs/plans/README.md` (the *Leftover sweeps* section from the sibling plan gains this row; if that section is not on this branch, add it), `docs/plans/archive/README.md` row; `git mv` this file to `archive/` with **Status:** landed, links repointed to `../../specifications/`.
-- [ ] **Gates** — `make spec-check`, `make ci`.
-- [ ] **Commit + PR** — before pushing, `git fetch origin main` and `gh pr list`; the PR body names the one behaviour addition (the media-type helper), the two strands (13 evidence, 14 opened), and the REQ-095 census; "Follow-ups (not in this PR)" lists STRAND-10, STRAND-12 and the REQ-095 gaps themselves.
+- [x] **CHANGELOG** `## [Unreleased] / ### Added` — one bullet: **Simplified-Formats media-type negotiation (REQ-053).** `simplified.ParseMediaType` classifies a Content-Type or Accept value as FLAT or STRUCTURED, accepting EHRbase's `.schema`-suffixed variants on input, while `Format.MediaType` emits only the two canonical strings ([plan](docs/plans/archive/2026-09-04-spec-interop-leftovers.md)).
+- [x] **traceability.yaml** — REQ-053: tests `+ openehr/serialize/simplified/mediatype_test.go`, plans `+ this plan (archive path)`; REQ-050: notes rewritten (Task 1), plans `+ this plan`; REQ-095: notes (Task 6), plans `+ this plan`; REQ-112: plans `+ this plan`.
+- [x] **Indexes** — `docs/plans/README.md` (the *Leftover sweeps* section from the sibling plan gains this row; if that section is not on this branch, add it), `docs/plans/archive/README.md` row; `git mv` this file to `archive/` with **Status:** landed, links repointed to `../../specifications/`.
+- [x] **Gates** — `make spec-check`, `make ci`.
+- [x] **Commit + PR** — before pushing, `git fetch origin main` and `gh pr list`; the PR body names the one behaviour addition (the media-type helper), the two strands (13 evidence, 14 opened), and the REQ-095 census; "Follow-ups (not in this PR)" lists STRAND-10, STRAND-12 and the REQ-095 gaps themselves.
 
 ## Mapping to specs
 

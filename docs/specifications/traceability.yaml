@@ -90,8 +90,11 @@ requirements:
       - openehr/rm/rminfo/imports_test.go
       - openehr/rm/rminfo/probe_094_test.go
       - internal/bmmgen/render_rminfo_hierarchy_test.go
+      - internal/bmmgen/primitive_ancestor_census_test.go
+      - internal/bmmgen/primitive_ancestor_census_synthetic_test.go
     plans:
       - docs/plans/archive/2026-08-18-rminfo-class-hierarchy.md
+      - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
 
   - id: REQ-049
     title: RM class-universe absence reasons
@@ -605,10 +608,15 @@ requirements:
       testkit/cassettes/its_rest/README.md § Coverage against the client
       surface): no vendored StoredQueryMetadata body (metadata or list), no
       upstream-authored persisted CONTRIBUTION response for contribution.Get,
-      and no ITEM_TAG bodies (header-carried today, REQ-059 partial). Admin has
-      no bodies by contract and the VERSIONED_* read family is not implemented,
-      so neither counts. Everything else the clients decode has a vendored body
-      here or under ../compositions, ../rm, ../submissions.
+      no ITEM_TAG bodies (header-carried today, REQ-059 partial), and no
+      vendored ITS-REST Identifier write-response body ({"uid": ...}, decoded
+      by openehr/client/ehr/identifier.go ResolveIdentifierBody on
+      PreferIdentifier writes) -- hand-built in tests only, e.g.
+      openehr/client/ehr/composition/composition_test.go
+      TestSaveIdentifierPopulatesVersionUIDFromBody. Admin has no bodies by
+      contract and the VERSIONED_* read family is not implemented, so neither
+      counts. Everything else the clients decode has a vendored body here or
+      under ../compositions, ../rm, ../submissions.
 
       Amended 2026-08-30 (ADR 0019): the section now carries one KEYED exception
       to the OpenAPI-authoritative rule -- the REQ-144 Definition metadata
@@ -697,8 +705,11 @@ requirements:
     # values for the defaulted attributes are not round-tripped; the
     # EVENT_CONTEXT optionals participations / health_care_facility / end_time /
     # location are NOT deferred ctx/ forms — ADR 0016 assigns them to the
-    # REQ-140 underscore grammar); .schema media
-    # types on input. First-class _-attr decomposition is NO LONGER deferred:
+    # REQ-140 underscore grammar). `.schema`-suffixed media types on input are
+    # landed, not deferred: simplified.ParseMediaType (2026-09-05) accepts the
+    # two canonical strings plus EHRbase's .schema variants on input, while
+    # Format.MediaType keeps emitting the canonical strings only (deviations.md).
+    # First-class _-attr decomposition is NO LONGER deferred:
     # REQ-140 landed the whole underscore grammar on 2026-08-05, which narrowed
     # the |raw boundary rather than relying on it (wire.md § REQ-140). The upstream byte-conformance probe landed 2026-08-01 as
     # PROBE-086 (testkit/conformance/webtemplate) — deliberately not in this
@@ -755,9 +766,10 @@ requirements:
     # above. STRUCTURED gained the `"|"` member — a bare leaf value beside the
     # same leaf's members, which a DV_MULTIMEDIA leaf always has; it is this
     # codec's choice within the format's conventions, not corpus-pinned.
-    # Still deferred: `.schema` media types on input, ACTIVITY
-    # action_archetype_id (STRING — the last unmapped leaf type on encode), and
-    # reused-sibling FLAT (the REQ-116 residual, fail-loud in both directions).
+    # Still deferred: ACTIVITY action_archetype_id (STRING — the last
+    # unmapped leaf type on encode), and reused-sibling FLAT (the REQ-116
+    # residual, fail-loud in both directions). `.schema` media types on input
+    # are no longer on this list — landed 2026-09-05, see above.
     #
     # Tidied 2026-08-06 (no behaviour change; the REQ-140 block carries the
     # mirror note). The STRUCTURED `"|"` member gained RFC-2119 force — it was
@@ -772,6 +784,10 @@ requirements:
     # so the normative home now agrees with this block, deviations.md and the
     # test citations; § REQ-140 keeps a pointer and retains the two behavioural
     # rules that govern the underscore positions too.
+    #
+    # Landed 2026-09-05 (spec-and-interop leftovers plan): `.schema`-suffixed
+    # media types on input (the § REQ-053 SHOULD) closed
+    # via simplified.ParseMediaType — see mediatype_test.go and deviations.md.
     implementation: landed
     adrs:
       - docs/adr/0015-flat-metadata-spelling.md
@@ -788,6 +804,7 @@ requirements:
     tests:
       - openehr/serialize/simplified/simplified_test.go
       - openehr/serialize/simplified/mediatype_test.go
+      - openehr/serialize/simplified/mediatype_fuzz_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
       - openehr/serialize/simplified/independence_test.go
       - openehr/serialize/simplified/datatypes_test.go
@@ -1331,6 +1348,7 @@ requirements:
     probes: [PROBE-081]
     tests:
       - openehr/validation/rmfloor_test.go
+      - openehr/validation/strand14_nonchaining_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/handles_test.go

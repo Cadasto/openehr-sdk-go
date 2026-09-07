@@ -24,7 +24,7 @@ Pinned commit: `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04, ITS-REST 1.1
 | `ehr/` | openEHR REST EHR API read-path responses (EHR, EHR_STATUS, Folder) | `openehr/client/ehr/`, `.../ehrstatus`, `.../directory` tests |
 | `definition/` | openEHR REST Definition API responses (ADL 1.4 OPT + metadata) | `openehr/client/definition/` tests |
 
-Composition GET responses (Phase 3 reads) are exercised against the canonical-JSON cassettes vendored under [`../compositions/`](../compositions/) and [`../rm/`](../rm/) — those carry full COMPOSITION shapes and are reused here without duplication. Resolve paths via [`../../fixtures/`](../../fixtures/). AQL cassettes and ADL 2 source-form templates are **deferred** until their leaf clients land in later phases of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/archive/2026-05-15-rest-api-client.md).
+Composition GET responses (Phase 3 reads) are exercised against the canonical-JSON cassettes vendored under [`../compositions/`](../compositions/) and [`../rm/`](../rm/) — those carry full COMPOSITION shapes and are reused here without duplication. Resolve paths via [`../../fixtures/`](../../fixtures/). ADL 2 source-form templates are **deferred** until their leaf client lands in a later phase of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/archive/2026-05-15-rest-api-client.md); AQL already has a vendored RESULT_SET body (`query/result_set.json`), and stored-query metadata bodies are a separate, already-landed-client gap named in the Coverage table below, not a leaf-client deferral.
 
 ## Provenance
 
@@ -54,7 +54,7 @@ Hand-crafted capabilities response matching the openEHR REST 1.1.0-development S
 
 ### `definition/`
 
-Hand-crafted Definition API fixtures for the ADL 1.4 template lifecycle (Phase 6). ADL 2 source-form and stored-AQL fixtures will land alongside their leaf-client implementations.
+Hand-crafted Definition API fixtures for the ADL 1.4 template lifecycle (Phase 6). ADL 2 source-form fixtures will land alongside their leaf-client implementation; stored-query metadata bodies are a separate gap — their leaf client has already landed (`openehr/client/definition`), but no vendored `StoredQueryMetadata` body exists yet (see the Coverage table).
 
 | File | Format | Notes |
 |---|---|---|
@@ -98,6 +98,7 @@ What `openehr/client/*` decodes today, and whether a vendored body under this di
 | Query — RESULT_SET | yes | `query/result_set.json` |
 | Demographic — five party kinds, ORIGINAL_VERSION, REVISION_HISTORY | yes | `demographic/` |
 | ITEM_TAG | **gap** | header-carried today (REQ-059 `partial`); no tag bodies until the dedicated endpoints land |
+| `Identifier` write response (`{"uid": …}`, `Prefer: return=identifier`) | **gap** | decoded by `openehr/client/ehr/identifier.go` `ResolveIdentifierBody`; hand-built in tests only, e.g. `openehr/client/ehr/composition/composition_test.go`; no vendored body |
 | Admin | n/a | `204` by contract, no bodies |
 | VERSIONED_COMPOSITION / VERSIONED_EHR_STATUS | n/a | family not implemented (roadmap: deferred under STRAND-09) |
 | Error envelopes | yes | `errors/` |
