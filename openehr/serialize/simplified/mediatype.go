@@ -67,12 +67,16 @@ var acceptedMediaTypes = map[string]Format{
 	"application/openehr.wt.structured.schema+json": FormatStructured,
 }
 
-// ParseMediaType classifies a Content-Type or Accept value as FLAT or
-// STRUCTURED. The type is matched case-insensitively (RFC 2045) and any
-// parameters (`; charset=utf-8`) are ignored. Anything else — including the
-// WebTemplate resource type `application/openehr.wt+json`, which is a template
-// projection rather than a composition format — fails with
-// [ErrUnknownMediaType]. It never panics on any input (REQ-025).
+// ParseMediaType classifies one media-type token as FLAT or STRUCTURED — a
+// Content-Type value, or a single media range already picked out of an Accept
+// list. A comma-separated Accept list is not accepted: split it upstream and
+// call this once per range. The type is matched case-insensitively (RFC 2045)
+// and every parameter is ignored, `q` included, so a `q=0` range still
+// classifies; a malformed parameter still fails the whole value. Anything
+// naming neither format — including the WebTemplate resource type
+// `application/openehr.wt+json`, which is a template projection rather than a
+// composition format — fails with [ErrUnknownMediaType]. It never panics on
+// any input (REQ-025).
 //
 // The codecs themselves take bytes; this is the one call a consumer makes
 // before them to decide which codec a negotiated body belongs to.
