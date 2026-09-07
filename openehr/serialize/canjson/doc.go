@@ -120,13 +120,16 @@
 //   - A hand-written primitive decoded at the top level — rm.Real,
 //     rm.Integer or rm.Character handed to [Unmarshal] directly rather
 //     than reached through a generated type — carries its own
-//     `rm.<Type>:` prefix, not the `canjson: <RM_TYPE>:` funnel. Real's
-//     precision refusal and Character's own refusals wrap
-//     [ErrInvalidShape]; an empty input, and a strconv or encoding/json
-//     parse or range failure beneath any of the three, carry no sentinel, by the
-//     precedence rule wire.md § REQ-052 states, and stays reachable with
-//     errors.AsType. A nil receiver on any of them, as on every generated
-//     type, is a typereg.ErrNilReceiver error (REQ-025).
+//     `rm.<Type>:` prefix, not the `canjson: <RM_TYPE>:` funnel. Which
+//     refusals carry [ErrInvalidShape] differs by primitive, so it is worth
+//     stating per arm: on rm.Character every refusal carries it, including
+//     the encoding/json failures of its string arm; on rm.Real only the
+//     precision refusal does; on rm.Integer none does. An empty input
+//     carries no sentinel on any of the three, and neither does a strconv
+//     or encoding/json parse or range failure beneath rm.Real or rm.Integer
+//     — the precedence rule wire.md § REQ-052 states — and those causes
+//     stay reachable with errors.AsType. A nil receiver on any of them, as
+//     on every generated type, is a typereg.ErrNilReceiver error (REQ-025).
 //
 // # Strict vs relaxed decode
 //

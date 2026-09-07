@@ -568,6 +568,7 @@ requirements:
       - openehr/client/ehr/write_test.go
       - openehr/client/ehr/ehr_test.go  # TestCreateEmpty2xxBody -- ehr.Create's empty/null-body arm
       - openehr/client/ehr/decode_error_test.go  # the return=identifier arm: refusal shape, and the no-representation classification
+      - transport/null_body_test.go  # TestIsNoRepresentationBody is tagged REQ-151, REQ-094
       - openehr/client/ehr/contribution/representation_test.go
       - openehr/client/demographic/party_test.go
       - testkit/probes/versioned/probe_071_composition_write_response_shape.go
@@ -2160,6 +2161,7 @@ requirements:
       - transport/client_test.go
       - transport/nilwireerror_test.go
       - transport/nilwiredereference_internal_test.go
+      - transport/decode_error_test.go  # TestDecodeErrorNilReceiver -- the DecodeError nil-receiver axis
       - auth/nilautherror_test.go
       - smart/discovery/nildiscoveryerror_test.go
       - openehr/rm/typereg/nildecodeerror_test.go

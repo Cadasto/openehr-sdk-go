@@ -344,10 +344,10 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 // An empty 2xx response body comes back as a non-nil zero-length slice with
 // a nil error, so re-serialising the result yields [] rather than JSON null;
 // a JSON [] body decodes non-nil through encoding/json by construction.
-// "Empty" is the definition § REQ-144 takes from § REQ-094 — zero bytes,
-// whitespace, or the JSON null literal — so a null body takes this same arm
-// and yields the non-nil empty slice, not the nil one encoding/json would
-// otherwise produce.
+// "Empty" is the definition § REQ-144 takes from § REQ-094, implemented by
+// [transport.IsNoRepresentationBody] and classified ahead of decode, so a
+// null body takes this same arm and yields the non-nil empty slice rather
+// than the nil one encoding/json would otherwise produce.
 //
 // Wire: GET /definition/query/{qualified_query_name}.
 func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern string) ([]StoredQueryMetadata, *transport.Metadata, error) {

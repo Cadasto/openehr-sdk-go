@@ -161,7 +161,7 @@ func (e *NoRepresentationError) Error() string {
 		return "ehr: no representation"
 	}
 	if errors.Is(e.Cause, transport.ErrInvalidShape) {
-		return "ehr: committed write has no usable representation (empty body)"
+		return "ehr: committed write has no usable representation (empty or null body)"
 	}
 	if e.Cause != nil {
 		return "ehr: committed write has no usable representation (decode failed)"

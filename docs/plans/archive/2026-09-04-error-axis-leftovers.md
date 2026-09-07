@@ -17,6 +17,8 @@
 
 **Tech Stack:** Go 1.27.0 (module floor, REQ-002), `encoding/json`, `internal/bmmgen` (regenerate with `make codegen`), golangci-lint v2.13.2 via the Makefile's pinned Docker image (the host binary is 1.26-built and refused by `HOST_GLCI_OK`).
 
+> **Reading note.** Where a task quotes prose destined for another file, its cross-references are rendered as code (`§ REQ-094`) rather than links: the real links are relative to the destination spec and would not resolve from `docs/plans/archive/`.
+
 ## Global Constraints
 
 - **REQ-025:** library code MUST NOT panic on wire or caller input; a nil receiver is caller-constructible input.
@@ -141,11 +143,11 @@ func IsNoRepresentationBody(b []byte) bool {
 }
 ```
 
-In `Decode`, replace `if len(resp.Body) == 0 {` with `if IsNoRepresentationBody(resp.Body) {` and the message with `"%w: response body is empty or null (Prefer mismatch?)"`. Update the doc comment's "an empty body fails with [ErrInvalidShape]" to "an empty, whitespace-only or JSON-null body fails with [ErrInvalidShape] (see [IsNoRepresentationBody])".
+In `Decode`, replace `if len(resp.Body) == 0 {` with `if IsNoRepresentationBody(resp.Body) {` and the message with `"%w: response body is empty or null"` (the earlier draft of this step kept a `(Prefer mismatch?)` hint; it was dropped in the review wave because `Decode` serves read paths that never send `Prefer`). Update the doc comment's "an empty body fails with [ErrInvalidShape]" to "an empty, whitespace-only or JSON-null body fails with [ErrInvalidShape] (see [IsNoRepresentationBody])".
 
 - [x] **Step 4: Spec** — in transport.md § REQ-151, append to the paragraph **An empty 2xx body keeps its existing per-surface contract**:
 
-> *Empty*, throughout this §, has the meaning [§ REQ-094](#req-094--prefer-response-shape-negotiation) gives it: zero bytes, whitespace only, or the JSON `null` literal. A `null` body unmarshals into a struct as a nil-error no-op, so every arm below **MUST** classify against the raw bytes ahead of decode — `transport.IsNoRepresentationBody` is the single implementation of that predicate, and a hand-rolled leaf **MUST** call it rather than test `len(body) == 0`.
+> *Empty*, throughout this §, has the meaning `§ REQ-094` gives it: zero bytes, whitespace only, or the JSON `null` literal. A `null` body unmarshals into a struct as a nil-error no-op, so every arm below **MUST** classify against the raw bytes ahead of decode — `transport.IsNoRepresentationBody` is the single implementation of that predicate, and a hand-rolled leaf **MUST** call it rather than test `len(body) == 0`.
 
 - [x] **Step 5: Verify** — `go test ./transport/ -count=1`; `$(go env GOROOT)/bin/gofmt -l transport/`. Expected: PASS, no files listed.
 
@@ -159,7 +161,7 @@ In `Decode`, replace `if len(resp.Body) == 0 {` with `if IsNoRepresentationBody(
 - Modify: `openehr/client/demographic/party.go` (`getParty`) and `openehr/client/demographic/versioned.go` (the version read) — keep the `204 → nil` carve-out inside the predicate branch exactly as today
 - Modify: `openehr/client/definition/template.go` (`UploadTemplate` synthesized arm; `ListTemplates`) and `openehr/client/definition/stored_query.go` (`putStoredQuery`, `GetStoredQuery`, `ListStoredQueries`)
 - Modify: `openehr/client/ehr/write.go` (delete `isNoRepresentationBody`, call `transport.IsNoRepresentationBody`), `openehr/client/ehr/ehr.go`, `openehr/client/ehr/contribution/contribution.go` (replace the inline `bytes.TrimSpace` + `bytes.Equal` pair)
-- Modify: `docs/specifications/wire.md` § REQ-144 **Empty list bodies** — add "(empty as [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) defines it — zero bytes, whitespace, or JSON `null`)"
+- Modify: `docs/specifications/wire.md` § REQ-144 **Empty list bodies** — say that empty is as `§ REQ-094` defines it, citing that § rather than restating its three cases (the first draft of this step restated them and named `§ REQ-151`; the review wave replaced both with the citation to the owning §)
 - Tests: `composition/composition_test.go`, `system/system_test.go`, `demographic/party_test.go`, `definition/template_test.go`, `definition/stored_query_test.go`
 
 **Interfaces:**
@@ -339,16 +341,18 @@ func TestQuotedLiteralParseErrorNamesTheLiteralOnce(t *testing.T) { // REQ-052
 //   - A hand-written primitive decoded at the top level — rm.Real, rm.Integer
 //     or rm.Character handed to [Unmarshal] directly rather than reached
 //     through a generated type — carries its own `rm.<Type>:` prefix, not the
-//     `canjson: <RM_TYPE>:` funnel. Real's precision refusal and every
-//     Character refusal wrap [ErrInvalidShape]; a strconv or encoding/json
-//     parse or range failure beneath any of the three carries no sentinel,
-//     by the precedence rule wire.md § REQ-052 states, and stays reachable
-//     with errors.AsType.
+//     `canjson: <RM_TYPE>:` funnel. Which refusals carry [ErrInvalidShape]
+//     differs by primitive: on rm.Character every refusal carries it,
+//     including its string arm's encoding/json failures; on rm.Real only the
+//     precision refusal; on rm.Integer none. An empty input carries no
+//     sentinel on any of the three. (This step shipped the coarser wording;
+//     the per-primitive split landed in the review wave after the arms were
+//     measured.)
 ```
 
 wire.md § REQ-052, appended to the **Decode-side shape sentinel** paragraph:
 
-> A cause beneath the sentinel **MAY** name the offending literal — `*strconv.NumError` and `*json.UnmarshalTypeError` both do — because the value-free discipline binds the boundary strings (`WireError.Error()`, `DecodeError.Error()`; [§ REQ-093](transport.md#req-093--openehr-error-envelope-mapping), [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure)), not codec causes. A codec's own prefix **MUST NOT** repeat a value the wrapped cause already carries.
+> A cause beneath the sentinel **MAY** name the offending literal — `*strconv.NumError` and `*json.UnmarshalTypeError` both do — because the value-free discipline binds the boundary strings (`WireError.Error()`, `DecodeError.Error()`; `§ REQ-093`, `§ REQ-151`), not codec causes. A codec's own prefix **MUST NOT** repeat a value the wrapped cause already carries.
 
 - [x] **Step 5: Verify** — `go test ./openehr/rm/ ./openehr/serialize/canjson/ -count=1`; `go doc ./openehr/serialize/canjson | head -80` shows the bullet.
 

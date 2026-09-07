@@ -362,7 +362,7 @@ func TestDecodeEmptyBodyStaysInvalidShape(t *testing.T) { // REQ-151
 // nilaqlerror_test.go already use. A failed errors.As leaves the caller holding
 // a typed nil, which boxes into a non-nil error interface; every method must
 // answer rather than dereference. Removing either nil guard fails this test.
-func TestDecodeErrorNilReceiver(t *testing.T) { // REQ-151
+func TestDecodeErrorNilReceiver(t *testing.T) { // REQ-151, REQ-025
 	var e *transport.DecodeError
 
 	t.Run("Error", func(t *testing.T) {
