@@ -28,7 +28,8 @@ type scripted struct {
 // (REQ-082). A non-empty path matches the request's full URL path or
 // its resource-stripped form (see resourcePath) exactly, or as a
 // suffix of either; a path ending in "/" additionally matches any
-// request whose path falls under that subtree.
+// request whose full or resource-stripped path starts with it, i.e.
+// that subtree.
 //
 // h == nil is not silently dropped: it registers a route that fails
 // closed, answering every matching request with 500 and a body naming
@@ -45,8 +46,9 @@ func (b *Backend) Handle(method, path string, h http.Handler) {
 	b.scripts = append(b.scripts, scripted{method: method, path: path, h: h})
 }
 
-// HandleFunc registers a scripted route (see [Handle]). fn == nil
-// behaves as in [Handle]: the route fails closed rather than being
+// HandleFunc registers a scripted route (see [Backend.Handle]).
+// fn == nil behaves as in [Backend.Handle]: the route fails closed
+// rather than being
 // dropped.
 func (b *Backend) HandleFunc(method, path string, fn func(http.ResponseWriter, *http.Request)) {
 	if fn == nil {
@@ -70,7 +72,7 @@ func nilHandler(method, path string) http.Handler {
 // use this in place of httptest.NewServer so planted and hostile
 // backends stay listener-free (REQ-082). fn == nil is not a caller
 // error: every request gets a 500 naming the registration (see
-// [Handle]).
+// [Backend.Handle]).
 func Scripted(fn func(http.ResponseWriter, *http.Request)) *Backend {
 	b := New()
 	b.HandleFunc("", "", fn)
@@ -107,8 +109,12 @@ func (s scripted) match(req *http.Request) bool {
 	if strings.HasSuffix(p, s.path) || strings.HasSuffix(rp, s.path) {
 		return true
 	}
-	// A trailing slash means "this subtree".
-	if strings.HasSuffix(s.path, "/") && (strings.Contains(p, s.path) || strings.HasPrefix(rp, s.path)) {
+	// A trailing slash means "this subtree": the registered path must
+	// start the request path, not merely appear somewhere inside it.
+	// Anchoring both sides matters now that resourcePath strips any
+	// base prefix — an unanchored Contains on the full path would let
+	// "/ehr/" match "/openehr/v1/composition/ehr/x".
+	if strings.HasSuffix(s.path, "/") && (strings.HasPrefix(p, s.path) || strings.HasPrefix(rp, s.path)) {
 		return true
 	}
 	return false
@@ -124,8 +130,8 @@ func serveScript(h http.Handler, req *http.Request) *http.Response {
 	body := rec.body.Bytes()
 	return &http.Response{
 		StatusCode:    code,
-		Status:        http.StatusText(code),
-		Header:        rec.header,
+		Status:        statusLine(code),
+		Header:        rec.snapshot(),
 		Body:          io.NopCloser(bytes.NewReader(body)),
 		ContentLength: int64(len(body)),
 		Proto:         "HTTP/1.1",
@@ -137,11 +143,20 @@ func serveScript(h http.Handler, req *http.Request) *http.Response {
 
 // recorder is a listener-free http.ResponseWriter so scripted routes
 // can use the same HandlerFunc shape as httptest.
+//
+// snapped holds the headers as they stood at the first WriteHeader (or
+// first Write), mirroring the ResponseRecorder in net/http/httptest,
+// which snapshots
+// there too. Handing the live map to the response instead would let a
+// header set after WriteHeader show up in the sandbox response while a
+// real server, which has already put the header block on the wire,
+// drops it — a Sandbox-only behaviour REQ-082 forbids.
 type recorder struct {
-	header http.Header
-	code   int
-	body   bytes.Buffer
-	wrote  bool
+	header  http.Header
+	snapped http.Header
+	code    int
+	body    bytes.Buffer
+	wrote   bool
 }
 
 func (r *recorder) Header() http.Header { return r.header }
@@ -159,4 +174,18 @@ func (r *recorder) WriteHeader(code int) {
 	}
 	r.wrote = true
 	r.code = code
+	r.snapped = r.header.Clone()
+}
+
+// snapshot returns the headers the response carries: those captured at
+// the first WriteHeader/Write, or — for a handler that wrote nothing
+// at all — a copy of whatever it left in the header map.
+func (r *recorder) snapshot() http.Header {
+	if r.snapped != nil {
+		return r.snapped
+	}
+	if h := r.header.Clone(); h != nil {
+		return h
+	}
+	return make(http.Header)
 }
