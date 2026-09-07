@@ -44,10 +44,15 @@
 // layer beneath that: a second driver that walks any RM root with
 // rminfo as the sole structural source — no OPT — and enforces
 // RM-mandatory attribute presence plus a small per-RM-type invariant
-// catalogue (CODE_PHRASE, DV_QUANTITY precision, DV_INTERVAL numeric
-// bounds, OBJECT_REF id/type/namespace). Template validity implies RM
-// validity, so the two compose: callers with a template run [Validate],
-// callers without one run [ValidateRM], callers wanting both run both.
+// catalogue (CODE_PHRASE, DV_QUANTITY precision, DV_PROPORTION
+// precision, DV_INTERVAL numeric bounds, OBJECT_REF
+// id/type/namespace). Template validity does not imply RM validity:
+// the template layer covers RM-mandatory presence on the nodes the
+// template models, not the per-type invariant catalogue, so a
+// composition can pass [Validate] and still be RM-invalid. The two
+// layers therefore compose but do not chain: callers with a template
+// run [Validate], callers without one run [ValidateRM], callers
+// wanting both run both.
 //
 // Path strings in [Issue.Path] are built by appending OPT-side
 // attribute names and matched-child predicates to the parent OPT

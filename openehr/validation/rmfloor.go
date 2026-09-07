@@ -7,8 +7,8 @@ package validation
 //   - RM-mandatory attribute absences (rminfo.RequiredAttributes per type
 //     plus the container "lower bound ≥ 1" reading);
 //   - per-RM-type invariants on the leaves it touches (CODE_PHRASE
-//     code_string, DV_INTERVAL numeric bounds, DV_QUANTITY precision, the
-//     OBJECT_REF id/type/namespace floor).
+//     code_string, DV_INTERVAL numeric bounds, DV_QUANTITY precision,
+//     DV_PROPORTION precision, the OBJECT_REF id/type/namespace floor).
 //
 // REQ-112 surface. Independent of REQ-102/110 (template-driven); both
 // drivers may run against the same root — REQ-110 enforces template
@@ -21,6 +21,7 @@ package validation
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -259,6 +260,8 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkCodePhrase(value, path)
 	case rmType == "DV_QUANTITY":
 		w.checkDVQuantity(value, path)
+	case rmType == "DV_PROPORTION":
+		w.checkDVProportion(value, path)
 	case strings.HasPrefix(rmType, "DV_INTERVAL"):
 		// rmTypeInfo reports the numeric instantiations as
 		// "DV_INTERVAL<DV_QUANTITY>" / "<DV_COUNT>" (and "DV_INTERVAL" for
@@ -311,6 +314,72 @@ func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 			Detail: fmt.Sprintf("DV_QUANTITY.precision must be ≥ -1 (-1 = no limit); got %d", *q.Precision),
 		})
 	}
+}
+
+// checkDVProportion enforces the two precision arms the RM puts on
+// DV_PROPORTION:
+//
+//   - Range. precision, when set, must be ≥ -1. The BMM property doc
+//     string gives it the same reading as DV_QUANTITY.precision — a
+//     number of decimal places, where 0 means integral and -1 means "no
+//     limit" — so only precision < -1 is out of range. (DV_QUANTITY
+//     carries no `invariants` map in the vendored BMM; this arm rests on
+//     the property doc string for both carriers.)
+//   - Integrality. DV_PROPORTION's own BMM invariant
+//     `Precision_validity: precision = 0 implies is_integral`, read
+//     through `Is_integral_validity: is_integral implies
+//     (numerator.floor = numerator and denominator.floor = denominator)`.
+//     A precision of 0 therefore requires whole-number operands, and a
+//     fractional numerator or denominator breaches the RM even though the
+//     precision value itself is in range.
+//
+// The remaining DV_PROPORTION invariants are type-specific denominator
+// rules (`Valid_denominator`, `Unitary_validity`, `Percent_validity`,
+// `Fraction_validity`, `Type_validity`) and are NOT in the floor: they
+// turn on the `type` proportion-kind code, a different axis from
+// precision.
+//
+// Diagnostics name the attribute and the offending operand, never the
+// operand's value (REQ-093); the precision value itself is named because
+// it is the constraint being reported.
+func (w *rmFloorWalker) checkDVProportion(value any, path string) {
+	p, ok := asDVProportion(value)
+	if !ok || p.Precision == nil {
+		return
+	}
+	switch prec := int(*p.Precision); {
+	case prec < -1:
+		w.emit(Issue{
+			Path:   path,
+			Code:   "rm_invariant",
+			Detail: fmt.Sprintf("DV_PROPORTION.precision must be ≥ -1 (-1 = no limit); got %d", prec),
+		})
+	case prec == 0:
+		var fractional []string
+		if !isIntegralReal(p.Numerator) {
+			fractional = append(fractional, "numerator")
+		}
+		if !isIntegralReal(p.Denominator) {
+			fractional = append(fractional, "denominator")
+		}
+		if len(fractional) > 0 {
+			w.emit(Issue{
+				Path:   path,
+				Code:   "rm_invariant",
+				Detail: "DV_PROPORTION.precision is 0, which requires a whole-number numerator and denominator (RM Precision_validity); not integral: " + strings.Join(fractional, ", "),
+			})
+		}
+	}
+}
+
+// isIntegralReal reports whether v is a whole number — the
+// `numerator.floor = numerator` reading of the RM's Is_integral_validity
+// invariant. NaN fails the equality on its own, but ±Inf would pass it
+// (truncation is the identity there), so finiteness is checked too: an
+// infinite operand is not a whole number.
+func isIntegralReal(v rm.Real) bool {
+	f := float64(v)
+	return !math.IsInf(f, 0) && math.Trunc(f) == f
 }
 
 // checkDVInterval enforces the spec floor on DV_INTERVAL when both
