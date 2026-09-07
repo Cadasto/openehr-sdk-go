@@ -1,13 +1,16 @@
 package bmmgen
 
 // STRAND-13 evidence: which class_definitions classes inherit a property from
-// a primitive_types ancestor the generator maps to a Go primitive — and so
-// never plans as a class, dropping the property from both the emitted struct
-// and the rminfo tables. The strand's "evidence needed" is exactly this census,
-// run across every pinned schema root rather than the RM reduction PROBE-094
-// surfaces. The set is PINNED, not tolerated: a new entry must be added here by
-// name (and the strand updated) before it can pass, and an entry that stops
-// occurring is reported as stale. Folding anything in is forbidden ahead of the
+// an ancestor the generator drops — one mapped to a Go primitive, or one on the
+// skipped-primitive list — and so never plans as a class, dropping the property
+// from both the emitted struct and the rminfo tables. The census asks the
+// question with the generator's own predicate ([generatorDropsAncestor]), so
+// both halves of the condition the generator actually evaluates are covered.
+// The strand's "evidence needed" is exactly this census, run across every
+// pinned schema root rather than the RM reduction PROBE-094 surfaces. The set
+// is PINNED, not tolerated: a new entry must be added here by name (and the
+// strand updated) before it can pass, and an entry that stops occurring is
+// reported as stale. Folding anything in is forbidden ahead of the
 // strand (REQ-048 § The attribute tables are complete against the BMM).
 //
 // The census result is a single positive case, and one positive case proves
@@ -44,7 +47,7 @@ var pinnedSchemaRoots = []string{
 }
 
 // primitiveAncestorDrops is the census result as of 2026-09-05:
-// "<Class>.<property> via <primitive-mapped ancestor>" -> the roots it appears
+// "<Class>.<property> via <dropped ancestor>" -> the roots it appears
 // in (same order as pinnedSchemaRoots). Exactly one: Iso8601_timezone declares
 // no properties of its own and reaches `value` only through Iso8601_type. It
 // shows up in every root that includes base; openehr_term_3.1.0 includes no
@@ -84,7 +87,7 @@ func TestPrimitiveMappedAncestorPropertyCensus(t *testing.T) { // STRAND-13
 		}
 		lookup := schemaClassLookup(schema)
 		classes := slices.Sorted(maps.Keys(schema.ClassDefinitions))
-		for _, key := range censusPrimitiveAncestorDrops(classes, lookup, isPrimitive) {
+		for _, key := range censusPrimitiveAncestorDrops(classes, lookup, generatorDropsAncestor) {
 			got[key] = append(got[key], root)
 		}
 		if root == dvTemporalRoot {
@@ -99,7 +102,7 @@ func TestPrimitiveMappedAncestorPropertyCensus(t *testing.T) { // STRAND-13
 		roots := got[key]
 		want, pinned := primitiveAncestorDrops[key]
 		if !pinned {
-			t.Errorf("unpinned drop %s (in %v): a class_definitions property is inherited from a primitive-mapped ancestor and silently dropped — pin it here and record it under STRAND-13", key, roots)
+			t.Errorf("unpinned drop %s (in %v): a class_definitions property is inherited from an ancestor the generator drops (primitive-mapped or skipped-primitive) and is silently lost — pin it here and record it under STRAND-13", key, roots)
 			continue
 		}
 		if !slices.Equal(roots, want) {
@@ -159,6 +162,22 @@ func vendoredSchemaRoots(dir string) ([]string, error) {
 	return roots, nil
 }
 
+// generatorDropsAncestor is the predicate the generator itself applies when it
+// decides an ancestor contributes nothing to the emitted struct: render.go
+// (renderConcreteClass) and render_jsonmar.go both skip an ancestor on
+// `isPrimitive(anc) || isSkippedPrimitive(anc)`, and plan.go skips the same
+// names when it plans primitive_types. A property reachable only through such
+// an ancestor is therefore absent from the emitted struct and from the rminfo
+// tables alike. The census must ask the question this way: passing isPrimitive
+// alone would leave the skipped-primitive half of the generator's condition
+// uncensused — the skipped foundation types that actually occur (Ordered,
+// Numeric, Ordered_Numeric, ROUTINE, TUPLE) declare no properties, so the
+// answer is the same today, but nothing would catch a future schema giving one
+// of them a property.
+func generatorDropsAncestor(name string) bool {
+	return isPrimitive(name) || isSkippedPrimitive(name)
+}
+
 // schemaClassLookup resolves a name against a loaded schema, class definitions
 // first and primitive types second — the same two maps the generator consults.
 func schemaClassLookup(schema *bmm.Schema) func(string) (bmm.Class, bool) {
@@ -173,23 +192,24 @@ func schemaClassLookup(schema *bmm.Schema) func(string) (bmm.Class, bool) {
 
 // censusPrimitiveAncestorDrops is the census core, kept free of schema loading
 // so the synthetic cases can drive it directly. For each named class it emits
-// one "<Class>.<property> via <primitive-mapped ancestor>" key per property
-// reachable ONLY through a primitive-mapped ancestor, sorted.
+// one "<Class>.<property> via <dropped ancestor>" key per property reachable
+// ONLY through an ancestor the generator drops, sorted.
 //
-// lookup resolves a class or primitive name; primitive reports whether a name
-// is mapped to a Go primitive (isPrimitive, over a real schema).
+// lookup resolves a class or primitive name; dropsAncestor reports whether the
+// generator drops an ancestor of that name — [generatorDropsAncestor] over a
+// real schema.
 func censusPrimitiveAncestorDrops(
 	classes []string,
 	lookup func(string) (bmm.Class, bool),
-	primitive func(string) bool,
+	dropsAncestor func(string) bool,
 ) []string {
 	var out []string
 	for _, name := range classes {
-		// A property the class itself, or any non-primitive ancestor,
-		// declares is planned and shipped (DV_DATE redeclares `value`
-		// beside inheriting it from Iso8601_type, and the generator
-		// emits it) — only a property reachable solely through a
-		// primitive-mapped ancestor is dropped.
+		// A property the class itself, or any ancestor the generator
+		// keeps, declares is planned and shipped (DV_DATE redeclares
+		// `value` beside inheriting it from Iso8601_type, and the
+		// generator emits it) — only a property reachable solely
+		// through a dropped ancestor is lost.
 		declared := map[string]bool{}
 		if c, ok := lookup(name); ok {
 			props, _ := classProperties(c)
@@ -199,7 +219,7 @@ func censusPrimitiveAncestorDrops(
 		}
 		ancestors := transitiveAncestors(lookup, name)
 		for _, anc := range ancestors {
-			if primitive(anc) {
+			if dropsAncestor(anc) {
 				continue
 			}
 			if ac, ok := lookup(anc); ok {
@@ -210,7 +230,7 @@ func censusPrimitiveAncestorDrops(
 			}
 		}
 		for _, anc := range ancestors {
-			if !primitive(anc) {
+			if !dropsAncestor(anc) {
 				continue
 			}
 			ac, ok := lookup(anc)

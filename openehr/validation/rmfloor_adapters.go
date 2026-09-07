@@ -41,6 +41,21 @@ func asDVQuantity(value any) (rm.DVQuantity, bool) {
 	return rm.DVQuantity{}, false
 }
 
+// asDVProportion recovers a DV_PROPORTION value (by value or by pointer)
+// from any concrete carrying it.
+func asDVProportion(value any) (rm.DVProportion, bool) {
+	switch v := value.(type) {
+	case *rm.DVProportion:
+		if v == nil {
+			return rm.DVProportion{}, false
+		}
+		return *v, true
+	case rm.DVProportion:
+		return v, true
+	}
+	return rm.DVProportion{}, false
+}
+
 // asMappings recovers the DV_TEXT.mappings slice (by value or by
 // pointer) from any concrete carrying it — DV_TEXT itself, and
 // DV_CODED_TEXT, which inherits the attribute via its embedded DV_TEXT.

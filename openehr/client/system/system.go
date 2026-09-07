@@ -43,7 +43,9 @@ type ServiceCapabilities struct {
 	Endpoints []string `json:"endpoints,omitempty"`
 	// Extras preserves deployment-specific fields not in the
 	// documented capabilities shape.
-	// [ServiceCapabilities.MarshalJSON] re-emits them.
+	// [ServiceCapabilities.MarshalJSON] re-emits them. Preserved under
+	// the § REQ-144 unknown-response-keys rule, which § REQ-050 extends
+	// to this descriptor.
 	//
 	// Extras keys are matched against the documented field names
 	// case-sensitively, while encoding/json decodes those field names

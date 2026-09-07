@@ -35,8 +35,12 @@ type syntheticClass struct {
 // reports a miss, the walk unwinds, and the case fails on the overflow flag.
 const syntheticLookupBudget = 200
 
-// syntheticSchema resolves synthetic classes, answers the primitive-mapped
-// question, and counts resolutions for the budget above.
+// syntheticSchema resolves synthetic classes, answers the "does the generator
+// drop this ancestor?" question the census core asks, and counts resolutions
+// for the budget above. Over a real schema that question is
+// [generatorDropsAncestor] — primitive-mapped OR skipped-primitive; here a
+// single set of names stands in for both halves, since the census core treats
+// them identically.
 type syntheticSchema struct {
 	classes   map[string]syntheticClass
 	primitive map[string]bool

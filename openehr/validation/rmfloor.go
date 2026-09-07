@@ -7,8 +7,8 @@ package validation
 //   - RM-mandatory attribute absences (rminfo.RequiredAttributes per type
 //     plus the container "lower bound ≥ 1" reading);
 //   - per-RM-type invariants on the leaves it touches (CODE_PHRASE
-//     code_string, DV_INTERVAL numeric bounds, DV_QUANTITY precision, the
-//     OBJECT_REF id/type/namespace floor).
+//     code_string, DV_INTERVAL numeric bounds, DV_QUANTITY precision,
+//     DV_PROPORTION precision, the OBJECT_REF id/type/namespace floor).
 //
 // REQ-112 surface. Independent of REQ-102/110 (template-driven); both
 // drivers may run against the same root — REQ-110 enforces template
@@ -259,6 +259,8 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkCodePhrase(value, path)
 	case rmType == "DV_QUANTITY":
 		w.checkDVQuantity(value, path)
+	case rmType == "DV_PROPORTION":
+		w.checkDVProportion(value, path)
 	case strings.HasPrefix(rmType, "DV_INTERVAL"):
 		// rmTypeInfo reports the numeric instantiations as
 		// "DV_INTERVAL<DV_QUANTITY>" / "<DV_COUNT>" (and "DV_INTERVAL" for
@@ -309,6 +311,28 @@ func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 			Path:   path,
 			Code:   "rm_invariant",
 			Detail: fmt.Sprintf("DV_QUANTITY.precision must be ≥ -1 (-1 = no limit); got %d", *q.Precision),
+		})
+	}
+}
+
+// checkDVProportion enforces the spec floor on DV_PROPORTION: precision,
+// when set, must be ≥ -1. The RM gives DV_PROPORTION.precision the same
+// reading as DV_QUANTITY.precision — a number of decimal places, where 0
+// means integral and -1 means "no limit" — so this is the DV_QUANTITY
+// check on a second carrier, and only precision < -1 is out of range.
+// numerator / denominator / type carry their own RM invariants (the
+// type-specific integrality and unitary/percent rules); those are not
+// part of this precision axis and are deferred.
+func (w *rmFloorWalker) checkDVProportion(value any, path string) {
+	p, ok := asDVProportion(value)
+	if !ok {
+		return
+	}
+	if p.Precision != nil && int(*p.Precision) < -1 {
+		w.emit(Issue{
+			Path:   path,
+			Code:   "rm_invariant",
+			Detail: fmt.Sprintf("DV_PROPORTION.precision must be ≥ -1 (-1 = no limit); got %d", *p.Precision),
 		})
 	}
 }
