@@ -119,6 +119,8 @@ testkit/  -. helpers for .-→ all of the above
 - `openehr/validation/` MUST NOT take on `openehr/serialize/`'s codec dependencies — validation is structural over the in-memory RM, not over the wire bytes.
 - `openehr/bmm/` MUST NOT depend on `transport/`, `auth/`, or any HTTP package — it is a building block (REQ-045).
 - `internal/bmmgen` depends on `openehr/bmm/` and the standard `text/template` / `go/format` packages — no SDK runtime packages.
+- `openehr/terminology/` is stdlib-only — it MUST NOT import any package of this module, since it sits *below* `openehr/rm` (REQ-034, enforced by `TestTerminologyForbiddenImports`).
+- `internal/termgen` is a generator tool consumed only by `cmd/termgen` at build time — no library package imports it.
 
 ## REQ-010 — `cadasto/` cut line
 

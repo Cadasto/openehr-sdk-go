@@ -27,7 +27,7 @@ it carries the BMM: pinned in-tree and generated from, **not** fetched at build 
 | TERM release | `Release-3.0.0` — root attributes `name="openehr" language="en" version="3.0.0" date="2023-03-05"` |
 | Contents | **17** groups · **3** code sets · **249** concepts · **19** code-set codes |
 
-**Pin + integrity:** the exact upstream commit, the file's `sha256`, the release and the fetch
+**Pin + integrity:** the exact upstream commit, the file's `sha256` and the fetch
 timestamp are recorded in [`MANIFEST.txt`](MANIFEST.txt) — the one place they live. The sync
 script generates it, so do not edit it by hand. Regenerate with `make terminology-sync`; verify
 with `make terminology-verify` (see [the sync script](../../scripts/sync-terminology.sh)).
@@ -73,8 +73,9 @@ generated tables follow the pin. A bump is one explicit, reviewable commit:
 1. Run the sync at the new release tag.
 2. Review both diffs — the XML and the regenerated tables. A code or rubric that changed
    meaning, or a group that lost a member, is a behaviour change, not a refresh.
-3. Update the release tag in this README's pin table and in the [`resources/README.md`](../README.md)
-   inventory row — both name the pinned TERM release, and the manifest cannot update them.
+3. Update **the pin table in this README** (release tag, byte size, root attributes, counts) and
+   the release tag in the [`resources/README.md`](../README.md) inventory row — the manifest
+   cannot update either of them.
 4. Add a short CHANGELOG bullet under `## [Unreleased]`.
 5. Commit the pin, the manifest, the regenerated tables and those doc rows together.
 
