@@ -1,8 +1,9 @@
 package simplified_test
 
 // REQ-053 — media-type negotiation. ParseMediaType accepts the two canonical
-// Simplified Formats strings and EHRbase's `.schema`-suffixed variants on
-// input; Format.MediaType emits only the canonical strings.
+// Simplified Formats strings and the deprecated `.schema`-suffixed variants
+// (retired from the specification, still served by EHRbase) on input;
+// Format.MediaType emits only the canonical strings.
 
 import (
 	"errors"
@@ -31,10 +32,15 @@ var parseMediaTypeCases = []parseMediaTypeCase{
 	// Accepted vocabulary: the two canonical strings (REQ-053 MUST).
 	{"flat canonical", "application/openehr.wt.flat+json", simplified.FormatFlat},
 	{"structured canonical", "application/openehr.wt.structured+json", simplified.FormatStructured},
-	// EHRbase's `.schema`-suffixed variants, accepted on input only (REQ-053 SHOULD).
+	// The deprecated `.schema`-suffixed variants — retired from the
+	// specification, still served by EHRbase — accepted on input only
+	// (REQ-053 SHOULD).
 	{"flat schema variant", "application/openehr.wt.flat.schema+json", simplified.FormatFlat},
 	{"structured schema variant", "application/openehr.wt.structured.schema+json", simplified.FormatStructured},
-	// "matched case-insensitively (RFC 2045)".
+	// "matched case-insensitively (RFC 2045)" — mime.ParseMediaType lower-cases
+	// the type it returns, so the package does no case folding of its own and
+	// the lookup map is keyed lower-case. Stdlib behaviour the contract rests
+	// on, pinned here so an upstream change surfaces as a failure.
 	{"mixed case", "Application/OpenEHR.WT.Flat+JSON", simplified.FormatFlat},
 	// "every parameter is ignored".
 	{"charset parameter ignored", "application/openehr.wt.flat+json; charset=utf-8", simplified.FormatFlat},
@@ -52,12 +58,27 @@ var parseMediaTypeCases = []parseMediaTypeCase{
 	// first range.
 	{"accept list refused", "application/openehr.wt.flat+json, application/json", simplified.FormatUnknown},
 
-	// "a malformed parameter still fails the whole value" — mime.ParseMediaType
-	// reports "invalid media parameter" for all three of these while still
-	// returning the recognised type, and ParseMediaType checks the error first.
-	{"parameter without value", "application/openehr.wt.flat+json; charset", simplified.FormatUnknown},
-	{"parameter without name", "application/openehr.wt.flat+json; =utf-8", simplified.FormatUnknown},
-	{"empty parameter", "application/openehr.wt.flat+json;;", simplified.FormatUnknown},
+	// "a malformed parameter included too: a broken parameter beside an
+	// otherwise unambiguous type still classifies on that type".
+	// mime.ParseMediaType reports mime.ErrInvalidMediaParameter for all three
+	// of these while still returning the recognised type, so ParseMediaType
+	// classifies on that type rather than refusing a body whose format is not
+	// in doubt (REQ-053 is liberal on input, and the codec validates the bytes
+	// anyway).
+	{"parameter without value", "application/openehr.wt.flat+json; charset", simplified.FormatFlat},
+	{"parameter without name", "application/openehr.wt.flat+json; =utf-8", simplified.FormatFlat},
+	{"empty parameter", "application/openehr.wt.flat+json;;", simplified.FormatFlat},
+	// A duplicate parameter name is a different error class — "mime: duplicate
+	// parameter name", not ErrInvalidMediaParameter — and mime.ParseMediaType
+	// returns no type alongside it, so there is nothing to classify on and the
+	// value is refused.
+	{"duplicate parameter name", "application/openehr.wt.flat+json; charset=a; charset=b", simplified.FormatUnknown},
+	// "Only a value whose type part itself does not parse is refused" — a
+	// well-formed parameter does not rescue a broken type part, and neither
+	// value yields a type to look up ("mime: expected token after slash",
+	// "mime: no media type").
+	{"empty subtype with valid parameter", "application/; charset=utf-8", simplified.FormatUnknown},
+	{"missing type before slash", "/flat+json", simplified.FormatUnknown},
 
 	// "Anything naming neither format … fails with ErrUnknownMediaType": the
 	// accepted vocabulary is four exact subtypes, so every near-miss spelling
@@ -80,6 +101,28 @@ var parseMediaTypeCases = []parseMediaTypeCase{
 	{"plain json", "application/json", simplified.FormatUnknown},
 	{"text plain", "text/plain", simplified.FormatUnknown},
 	{"not a media type", "not a media type", simplified.FormatUnknown},
+
+	// REQ-025 no-panic, pinned the way this repo pins it: a named table of
+	// hostile inputs beside FuzzParseMediaType, so the property holds as a
+	// deterministic test and not only under a fuzz run. Each row records what
+	// mime.ParseMediaType actually does with the value — several of these
+	// classify under the liberal-parameter rule rather than being refused.
+	{"semicolon only", ";", simplified.FormatUnknown},                     // "mime: no media type"
+	{"slash only", "/", simplified.FormatUnknown},                         // "mime: no media type"
+	{"type with empty subtype", "application/", simplified.FormatUnknown}, // "mime: expected token after slash"
+	// An unterminated quoted parameter value is ErrInvalidMediaParameter with
+	// the type intact, so it classifies under the liberal-parameter rule.
+	{"unterminated quoted parameter", `application/openehr.wt.flat+json; charset="utf`, simplified.FormatFlat},
+	// An RFC 2231 extended parameter parses cleanly (charset=x), so this one
+	// classifies with no error at all — nothing hostile reaches the lookup.
+	{"rfc 2231 parameter continuation", "application/openehr.wt.flat+json; charset*=utf-8''x", simplified.FormatFlat},
+	// Control bytes after the subtype are content, not trailing whitespace:
+	// "mime: unexpected content after media subtype", so no type comes back.
+	{"nul byte after subtype", "application/openehr.wt.flat+json\x00", simplified.FormatUnknown},
+	{"del byte after subtype", "application/openehr.wt.flat+json\x7f", simplified.FormatUnknown},
+	// 10 KiB of one token character: mime.ParseMediaType accepts it as a type
+	// with no slash and no error, so it reaches the lookup and misses there.
+	{"ten kibibyte token", strings.Repeat("a", 10*1024), simplified.FormatUnknown},
 }
 
 func TestParseMediaType(t *testing.T) { // REQ-053
@@ -117,7 +160,7 @@ func TestFormatMediaTypeEmitsCanonicalOnly(t *testing.T) { // REQ-053: the .sche
 	}
 	for _, f := range []simplified.Format{simplified.FormatFlat, simplified.FormatStructured} {
 		if strings.Contains(f.MediaType(), ".schema") {
-			t.Errorf("%v.MediaType() = %q emits the EHRbase .schema variant; REQ-053 forbids emitting it", f, f.MediaType())
+			t.Errorf("%v.MediaType() = %q emits a deprecated .schema variant; REQ-053 forbids emitting it", f, f.MediaType())
 		}
 		if back, err := simplified.ParseMediaType(f.MediaType()); err != nil || back != f {
 			t.Errorf("ParseMediaType(%v.MediaType()) = %v, %v; want %v, nil", f, back, err, f)
