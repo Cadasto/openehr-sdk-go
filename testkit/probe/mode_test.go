@@ -237,3 +237,38 @@ func TestNewClientEmptyBaseURL(t *testing.T) {
 		t.Fatal("NewClient(\"\") reported an unsatisfiable mode; an empty base URL is invalid configuration")
 	}
 }
+
+// TestNewClientMalformedBaseURL pins that a base URL which fails to
+// parse, or parses but names no scheme/host, is a configuration error
+// rather than a panic. [discovery.MustParseURL] panics on exactly the
+// unparsable case, and live_test.go reads its base URL straight from
+// an environment variable — a typo there must fail, not crash the
+// process.
+func TestNewClientMalformedBaseURL(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		baseURL string
+	}{
+		{name: "unparsable", baseURL: "http://[::1:8080/openehr/v1"},
+		{name: "relative, no scheme or host", baseURL: "openehr/v1"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := probe.NewClient(tc.baseURL, &http.Client{}, nil)
+			if !errors.Is(err, transport.ErrInvalidConfig) {
+				t.Fatalf("NewClient(%q) error = %v, want %v", tc.baseURL, err, transport.ErrInvalidConfig)
+			}
+		})
+	}
+
+	// A valid, absolute base URL still builds a client.
+	c, err := probe.NewClient("https://cdr.example.com/openehr/v1", &http.Client{}, nil)
+	if err != nil {
+		t.Fatalf("NewClient(valid) error = %v, want nil", err)
+	}
+	if c == nil {
+		t.Fatal("NewClient(valid) = nil client, want a built client")
+	}
+}

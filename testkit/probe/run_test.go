@@ -462,26 +462,170 @@ func recordingDir(t *testing.T, ids ...string) string {
 	return dir
 }
 
+// TestParseModes pins the tolerant parenthetical/dash-clause stripping
+// (a catalog Modes line commonly carries a planning note) alongside
+// the two refusals: an unknown token is a catalog typo, and a ";"
+// separator is not a recognised delimiter — either one must fail
+// loudly ([probe.ErrInvalidEntry]) rather than silently narrow the
+// probe's declared modes.
 func TestParseModes(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		in   string
-		want []probe.Mode
+		name    string
+		in      string
+		want    []probe.Mode
+		wantErr bool
 	}{
-		{"Sandbox, Cassette, Live.", []probe.Mode{probe.ModeSandbox, probe.ModeCassette, probe.ModeLive}},
-		{"In-repo (unit-level property; no backend).", []probe.Mode{probe.ModeInRepo}},
-		{"Sandbox (planned); Cassette, Live not yet scoped.", []probe.Mode{probe.ModeSandbox}},
+		{
+			name: "comma separated with trailing period",
+			in:   "Sandbox, Cassette, Live.",
+			want: []probe.Mode{probe.ModeSandbox, probe.ModeCassette, probe.ModeLive},
+		},
+		{
+			name: "parenthetical note, no trailing modes",
+			in:   "In-repo (unit-level; no backend)",
+			want: []probe.Mode{probe.ModeInRepo},
+		},
+		{
+			name: "parenthetical note after modes",
+			in:   "Sandbox, Cassette, Live (planned).",
+			want: []probe.Mode{probe.ModeSandbox, probe.ModeCassette, probe.ModeLive},
+		},
+		{
+			name: "empty line",
+			in:   "",
+			want: nil,
+		},
+		{
+			name:    "unknown token",
+			in:      "Sanbdox, Live.",
+			wantErr: true,
+		},
+		{
+			name:    "semicolon is not a recognised delimiter",
+			in:      "Sandbox; Cassette",
+			wantErr: true,
+		},
 	}
 	for _, tc := range cases {
-		got := probe.ParseModes(tc.in)
-		if len(got) != len(tc.want) {
-			t.Fatalf("ParseModes(%q) = %v, want %v", tc.in, got, tc.want)
-			continue
-		}
-		for i := range got {
-			if got[i] != tc.want[i] {
-				t.Fatalf("ParseModes(%q)[%d] = %q, want %q", tc.in, i, got[i], tc.want[i])
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := probe.ParseModes(tc.in)
+			if tc.wantErr {
+				if !errors.Is(err, probe.ErrInvalidEntry) {
+					t.Fatalf("ParseModes(%q) error = %v, want %v", tc.in, err, probe.ErrInvalidEntry)
+				}
+				if got != nil {
+					t.Fatalf("ParseModes(%q) = %v, want nil on error", tc.in, got)
+				}
+				return
 			}
-		}
+			if err != nil {
+				t.Fatalf("ParseModes(%q) error = %v, want nil", tc.in, err)
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("ParseModes(%q) = %v, want %v", tc.in, got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("ParseModes(%q)[%d] = %q, want %q", tc.in, i, got[i], tc.want[i])
+				}
+			}
+		})
+	}
+}
+
+// TestRun_CassetteRecordingDirUnreadable pins that a RecordingDir the
+// runner cannot read at all — missing, permission denied — is
+// reported distinctly from one that read fine but held no matching
+// recording. Collapsing both into "no recording for" sends the caller
+// looking for a missing cassette file instead of a filesystem problem.
+func TestRun_CassetteRecordingDirUnreadable(t *testing.T) {
+	t.Parallel()
+	backend := stub("PROBE-010", probe.StatusPass, false, probe.EffectReadOnly)
+	missing := filepath.Join(t.TempDir(), "does-not-exist")
+
+	_, err := probe.Run(t.Context(), probe.Config{
+		Mode:         probe.ModeCassette,
+		Client:       mustClient(t),
+		RecordingDir: missing,
+	}, []probe.Entry{backend})
+	if !errors.Is(err, probe.ErrUnsatisfiableMode) {
+		t.Fatalf("Run() error = %v, want %v", err, probe.ErrUnsatisfiableMode)
+	}
+	if !strings.Contains(err.Error(), "unreadable") {
+		t.Fatalf("Run() error = %q, want it to say the directory is unreadable", err)
+	}
+
+	_, err = probe.Run(t.Context(), probe.Config{
+		Mode:         probe.ModeCassette,
+		Client:       mustClient(t),
+		RecordingDir: t.TempDir(),
+	}, []probe.Entry{backend})
+	if !errors.Is(err, probe.ErrUnsatisfiableMode) {
+		t.Fatalf("Run() error = %v, want %v", err, probe.ErrUnsatisfiableMode)
+	}
+	if !strings.Contains(err.Error(), "no recording for") {
+		t.Fatalf("Run() error = %q, want it to say no recording was found", err)
+	}
+}
+
+// TestRun_MutatingLiveRunsWithOptIn pins the "opt-in actually opens the
+// gate" half of REQ-082's Live-mode mutation guard — the refusal half
+// (AllowMutating: false) is already pinned elsewhere, but nothing
+// exercised AllowMutating: true actually letting a mutating (or
+// unclassified, which resolves to mutating) probe run.
+func TestRun_MutatingLiveRunsWithOptIn(t *testing.T) {
+	t.Parallel()
+	mutating := stub("PROBE-080", probe.StatusPass, false, probe.EffectMutating)
+	unclassified := stub("PROBE-081", probe.StatusPass, false, "")
+	cfg := probe.Config{
+		Mode:          probe.ModeLive,
+		Endpoint:      "https://cdr.example.com/openehr/v1",
+		HTTPClient:    &http.Client{},
+		AllowMutating: true,
+	}
+
+	sum, err := probe.Run(t.Context(), cfg, []probe.Entry{mutating, unclassified})
+	if err != nil {
+		t.Fatalf("Run() with AllowMutating = true: %v", err)
+	}
+	if !sum.Green() || sum.Passed != 2 {
+		t.Fatalf("Run() with AllowMutating = true: green=%v passed=%d, want green with passed=2", sum.Green(), sum.Passed)
+	}
+
+	cfg.AllowMutating = false
+	sum, err = probe.Run(t.Context(), cfg, []probe.Entry{mutating, unclassified})
+	if !errors.Is(err, probe.ErrMutatingNotOptedIn) {
+		t.Fatalf("Run() with AllowMutating = false error = %v, want %v", err, probe.ErrMutatingNotOptedIn)
+	}
+	if len(sum.Results) != 0 {
+		t.Fatalf("Run() with AllowMutating = false recorded %d results, want 0 (nothing must run)", len(sum.Results))
+	}
+}
+
+// TestRun_NoPartialExecutionOnUnsatisfiable pins that Run checks every
+// entry's satisfiability before running any of them: a second entry
+// the mode cannot satisfy must stop the first from ever executing,
+// not merely stop before a third.
+func TestRun_NoPartialExecutionOnUnsatisfiable(t *testing.T) {
+	t.Parallel()
+	var seen []*transport.Client
+	first := capture("PROBE-090", &seen)
+	second := stub("PROBE-091", probe.StatusPass, false, probe.EffectReadOnly)
+	second.Modes = []probe.Mode{probe.ModeSandbox}
+
+	sum, err := probe.Run(t.Context(), probe.Config{
+		Mode:   probe.ModeLive,
+		Client: mustClient(t),
+	}, []probe.Entry{first, second})
+	if !errors.Is(err, probe.ErrUnsatisfiableMode) {
+		t.Fatalf("Run() error = %v, want %v", err, probe.ErrUnsatisfiableMode)
+	}
+	if len(seen) != 0 {
+		t.Fatalf("the first entry ran despite the second being unsatisfiable; saw %d clients, want 0", len(seen))
+	}
+	if len(sum.Results) != 0 {
+		t.Fatalf("Summary.Results has %d entries, want 0 (nothing must run before every entry is checked)", len(sum.Results))
 	}
 }

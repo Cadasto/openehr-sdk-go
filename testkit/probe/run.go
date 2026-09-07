@@ -347,7 +347,11 @@ func satisfiable(cfg Config, e Entry) error {
 		if cfg.RecordingDir == "" {
 			return fmt.Errorf("%w: cassette mode needs a recording directory for %s", ErrUnsatisfiableMode, e.ID)
 		}
-		if !recordingExists(cfg.RecordingDir, e.ID) {
+		ok, err := recordingExists(cfg.RecordingDir, e.ID)
+		if err != nil {
+			return fmt.Errorf("%w: recording directory %s unreadable: %w", ErrUnsatisfiableMode, cfg.RecordingDir, err)
+		}
+		if !ok {
 			return fmt.Errorf("%w: no recording for %s in %s", ErrUnsatisfiableMode, e.ID, cfg.RecordingDir)
 		}
 		return nil
@@ -437,10 +441,18 @@ func modeList(modes []Mode) string {
 	return strings.Join(parts, ", ")
 }
 
-func recordingExists(dir, id string) bool {
+// recordingExists reports whether dir contains a file whose name
+// starts with id (case-insensitively). The error return distinguishes
+// a directory the runner cannot read at all — missing, permission
+// denied — from one it read successfully but that simply holds no
+// matching recording; collapsing both into "false" would report every
+// unreadable directory as "no recording for <id>", which sends the
+// caller looking for a missing cassette file instead of a filesystem
+// problem.
+func recordingExists(dir, id string) (bool, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return false
+		return false, err
 	}
 	prefix := strings.ToLower(id)
 	for _, e := range entries {
@@ -449,8 +461,8 @@ func recordingExists(dir, id string) bool {
 		}
 		name := strings.ToLower(e.Name())
 		if strings.HasPrefix(name, prefix) {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }

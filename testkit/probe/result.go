@@ -1,6 +1,9 @@
 package probe
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // Mode is the backend the runner selected for a probe invocation.
 // A backend-facing probe must not read this; the runner stamps it
@@ -75,10 +78,17 @@ type Result struct {
 }
 
 // ParseModes splits a catalog Modes line into the mode tokens it
-// names. Parenthetical notes and trailing clauses are ignored so
-// "Sandbox, Cassette, Live." and "In-repo (unit-level; no backend)"
-// both parse.
-func ParseModes(line string) []Mode {
+// names, in order. Parenthetical notes and trailing dash clauses are
+// stripped first, so "Sandbox, Cassette, Live.", "In-repo (unit-level;
+// no backend)" and "Sandbox, Cassette, Live (planned)." all parse. An
+// empty line — once that stripping leaves nothing — returns (nil,
+// nil): there is nothing to parse, which is not an error.
+//
+// A token that survives stripping but names none of the four modes
+// returns [ErrInvalidEntry]: a catalog typo (e.g. "Sanbdox") must fail
+// loudly rather than silently narrow the probe's declared modes to
+// whatever recognisable tokens happened to be left.
+func ParseModes(line string) ([]Mode, error) {
 	line = strings.TrimSpace(line)
 	if i := strings.Index(line, "—"); i >= 0 {
 		line = line[:i]
@@ -88,11 +98,12 @@ func ParseModes(line string) []Mode {
 	}
 	line = strings.TrimRight(line, ". \t")
 	if line == "" {
-		return nil
+		return nil, nil
 	}
 	var out []Mode
 	for part := range strings.SplitSeq(line, ",") {
-		switch token := strings.ToLower(strings.TrimSpace(part)); token {
+		token := strings.ToLower(strings.TrimSpace(part))
+		switch token {
 		case "sandbox":
 			out = append(out, ModeSandbox)
 		case "cassette":
@@ -101,7 +112,9 @@ func ParseModes(line string) []Mode {
 			out = append(out, ModeLive)
 		case "in-repo":
 			out = append(out, ModeInRepo)
+		default:
+			return nil, fmt.Errorf("%w: unknown mode token %q in %q", ErrInvalidEntry, token, line)
 		}
 	}
-	return out
+	return out, nil
 }
