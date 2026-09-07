@@ -17,9 +17,10 @@ import (
 // while `253` is *unknown*, a member in its own right. Which code each
 // builder operation carries is docs/specifications/wire.md § REQ-130.
 //
-// [Builder.WithChangeType] refuses a code outside the group; such a code
-// reaches the wire only by supplying a whole [UpdateAudit] via
-// [Builder.WithAudit].
+// [Builder.WithChangeType] refuses a code outside the group, and
+// [Builder.Build] applies the same membership check to a wholesale
+// [Builder.WithAudit], so no path ships a change type the openEHR
+// AUDIT_DETAILS.Change_type_valid invariant would reject.
 type ChangeType string
 
 const (
@@ -370,6 +371,32 @@ func (b *Builder) Add(changes ...Change) *Builder {
 	return b
 }
 
+// validateBatchChangeType gates the batch audit's change_type at Build time,
+// so a wholesale [Builder.WithAudit] cannot slip a code past the bar
+// [Builder.WithChangeType] enforces. The openEHR AUDIT_DETAILS.Change_type_valid
+// invariant admits only members of the *audit change type* group under the
+// `openehr` terminology, so a code outside it — by whatever path it arrived —
+// is refused here rather than shipped as an RM-invalid audit, and a member
+// must carry the group's own rubric (REQ-034; wire.md § REQ-130). A caller who
+// genuinely needs an off-spec audit hand-wires a [Submission] directly.
+func validateBatchChangeType(ct rm.DVCodedText) error {
+	code := ct.DefiningCode.CodeString
+	if code == "" {
+		return errors.New("batch audit change_type is required — set it with WithChangeType")
+	}
+	if id := ct.DefiningCode.TerminologyID.Value; id != terminology.ID {
+		return fmt.Errorf("batch audit change_type %q is coded in terminology %q, not %q", code, id, terminology.ID)
+	}
+	rubric, ok := terminology.AuditChangeType.Rubric(code)
+	if !ok {
+		return fmt.Errorf("batch audit change_type %q is not a member of the openEHR audit-change-type group", code)
+	}
+	if ct.Value != rubric {
+		return fmt.Errorf("batch audit change_type %q must carry its pinned rubric %q, not %q", code, rubric, ct.Value)
+	}
+	return nil
+}
+
 // Build assembles the accumulated changes into a [Submission] that passes
 // [Submission.Validate], or returns every accumulated error joined and no
 // submission. It is idempotent: the returned submission is freshly
@@ -389,12 +416,12 @@ func (b *Builder) Build() (*Submission, error) {
 	// change_type and committer are both required on the pin's write-side
 	// audit DTO, and both are checked here so one Build reports both. The
 	// change type is the builder's own gate — an audit that reached
-	// Validate with an empty code would ship a body the pin rejects — and
-	// the committer is checked eagerly rather than left to Validate, which
-	// runs only after this error set is empty and would therefore defer a
-	// missing committer to a second Build.
-	if b.audit.ChangeType.DefiningCode.CodeString == "" {
-		errs = append(errs, errors.New("contribution.Builder: batch audit change_type is required — set it with WithChangeType"))
+	// Validate with an empty or non-group code would ship a body the pin
+	// rejects — and the committer is checked eagerly rather than left to
+	// Validate, which runs only after this error set is empty and would
+	// therefore defer a missing committer to a second Build.
+	if err := validateBatchChangeType(b.audit.ChangeType); err != nil {
+		errs = append(errs, fmt.Errorf("contribution.Builder: %w", err))
 	}
 	if err := checkCommitter(b.audit.Committer); err != nil {
 		errs = append(errs, fmt.Errorf("contribution.Builder: batch audit %w — set it with WithCommitter or WithCommitterName", err))

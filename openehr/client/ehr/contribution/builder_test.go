@@ -528,11 +528,53 @@ func TestBuilderBuildIsIdempotentOnTheErrorPath(t *testing.T) {
 	}
 }
 
-// TestBuilderWithAuditCarriesAnyChangeType — [Builder.WithChangeType] admits
-// the openEHR group; a code outside it (a deployment-local extension, say)
-// still reaches the wire only by supplying the whole audit. That path must
-// satisfy the required-change_type gate without widening the code set.
-func TestBuilderWithAuditCarriesAnyChangeType(t *testing.T) {
+// TestBuilderWithAuditCarriesAGroupMember — a wholesale [Builder.WithAudit] is
+// the caller's path for a batch audit the operation constructors do not build
+// (a committer with identifiers, a synthesis batch, …). It still ships, as
+// long as its change_type is a group member carrying the pinned rubric: here
+// 252 "synthesis", which no Creation/Amendment/Modification/Deletion sets.
+func TestBuilderWithAuditCarriesAGroupMember(t *testing.T) {
+	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
+	name := "alice"
+	sub, err := contribution.NewBuilder().
+		WithAudit(contribution.UpdateAudit{
+			Committer: &rm.PartyIdentified{Name: &name},
+			ChangeType: rm.DVCodedText{
+				DVText:       rm.DVText{Value: "synthesis"},
+				DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "252"},
+			},
+		}).
+		Add(contribution.Creation(&comp)).
+		Build()
+	if err != nil {
+		t.Fatalf("Build with a wholesale audit carrying group member 252: %v", err)
+	}
+	audit, versions := marshalSubmission(t, sub)
+	if got := codeOf(audit, "change_type"); got != "252" {
+		t.Errorf("audit.change_type = %q, want 252", got)
+	}
+	if got := valueOf(audit, "change_type"); got != "synthesis" {
+		t.Errorf("audit.change_type value = %q, want the pinned rubric %q", got, "synthesis")
+	}
+	// The version audit still carries the operation's own code.
+	ca, ok := versions[0]["commit_audit"].(map[string]any)
+	if !ok {
+		t.Fatalf("versions[0].commit_audit missing")
+	}
+	if got := codeOf(ca, "change_type"); got != "249" {
+		t.Errorf("versions[0].change_type = %q, want 249", got)
+	}
+}
+
+// TestBuilderWithAuditRefusesANonGroupChangeType — the openEHR
+// AUDIT_DETAILS.Change_type_valid invariant admits only members of the *audit
+// change type* group under the `openehr` terminology, so a wholesale
+// [Builder.WithAudit] carrying a non-member code is refused at Build with the
+// same force [Builder.WithChangeType] applies: the builder never ships an
+// RM-invalid audit, whichever path set the change type (REQ-034; wire.md
+// § REQ-130). A caller who genuinely wants an off-spec audit hand-wires a
+// Submission instead.
+func TestBuilderWithAuditRefusesANonGroupChangeType(t *testing.T) {
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	name := "alice"
 	sub, err := contribution.NewBuilder().
@@ -545,23 +587,14 @@ func TestBuilderWithAuditCarriesAnyChangeType(t *testing.T) {
 		}).
 		Add(contribution.Creation(&comp)).
 		Build()
-	if err != nil {
-		t.Fatalf("Build: %v", err)
+	if err == nil {
+		t.Fatalf("Build accepted a wholesale audit with non-group change_type 999: %+v", sub)
 	}
-	audit, versions := marshalSubmission(t, sub)
-	if got := codeOf(audit, "change_type"); got != "999" {
-		t.Errorf("audit.change_type = %q, want the caller's 999", got)
+	if sub != nil {
+		t.Error("Build returned a submission alongside the refusal")
 	}
-	if got := valueOf(audit, "change_type"); got != "custom" {
-		t.Errorf("audit.change_type value = %q, want the caller's \"custom\"", got)
-	}
-	// The version audit still carries the operation's own code.
-	ca, ok := versions[0]["commit_audit"].(map[string]any)
-	if !ok {
-		t.Fatalf("versions[0].commit_audit missing")
-	}
-	if got := codeOf(ca, "change_type"); got != "249" {
-		t.Errorf("versions[0].change_type = %q, want 249", got)
+	if !strings.Contains(err.Error(), "999") {
+		t.Errorf("refusal does not name the offending code 999: %v", err)
 	}
 }
 

@@ -75,9 +75,11 @@ var probe084Batch = []probe084Step{
 // now carry all four, a code from outside that quartet is the only batch
 // value no derivation rule over the versions could reproduce, so the
 // non-derivation arm cannot pass by coincidence. It reaches the audit
-// through Builder.WithAudit — the caller-supplied-audit path, and the only
-// route for a code outside the group altogether — which this probe
-// therefore also exercises on the wire.
+// through Builder.WithAudit — the caller-supplied-audit path for a batch the
+// four constructors do not build — which this probe therefore also exercises
+// on the wire. (253 is itself a group member carrying the pinned rubric
+// "unknown"; Build refuses a non-group code on every path, WithAudit
+// included.)
 const probe084BatchCode = "253"
 
 // Probe084BuiltContributionBody implements PROBE-084: a
