@@ -679,8 +679,9 @@ func defaultAttr(attr string, ci ctxInfo) map[string]any {
 
 // ctxCodedDefault builds the DV_CODED_TEXT for a ctx/ default from the pinned
 // group, so the value is the code's own rubric and never a string typed beside
-// the code (REQ-034). The codes are constants of this file and members of their
-// groups — TestCtxDefaultsAreGroupMembersWithPinnedRubrics pins that.
+// the code (REQ-034). The codes are string literals at the call sites above and
+// members of their groups — TestCtxDefaultsAreGroupMembersWithPinnedRubrics
+// pins that.
 func ctxCodedDefault(g *terminology.Group, code string) map[string]any {
 	rubric, _ := g.Rubric(code)
 	return map[string]any{

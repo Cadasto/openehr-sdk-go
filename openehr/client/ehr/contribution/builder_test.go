@@ -125,6 +125,9 @@ func TestBuilderCreationWireShape(t *testing.T) {
 	if got := termOf(v, "lifecycle_state"); got != "openehr" {
 		t.Errorf("lifecycle_state terminology = %q, want openehr", got)
 	}
+	if got := valueOf(v, "lifecycle_state"); got != "complete" {
+		t.Errorf("lifecycle_state value = %q, want the pinned rubric %q (default 532) — REQ-034", got, "complete")
+	}
 	if _, has := v["preceding_version_uid"]; has {
 		t.Error("a creation must not carry preceding_version_uid")
 	}
@@ -587,6 +590,40 @@ func TestWithChangeTypeAdmitsEveryGroupMemberWithItsRubric(t *testing.T) {
 			}
 			if got := valueOf(audit, "change_type"); got != c.Rubric {
 				t.Errorf("audit.change_type value = %q, want the pinned rubric %q", got, c.Rubric)
+			}
+		})
+	}
+}
+
+// TestVersionLifecycleStateCarriesThePinnedRubric — REQ-034, the lifecycle twin
+// of [TestWithChangeTypeAdmitsEveryGroupMemberWithItsRubric]: a version's
+// `lifecycle_state` is a DV_CODED_TEXT the SDK builds from a code, so every
+// member of the pinned openEHR *version lifecycle state* group must reach the
+// wire carrying the pin's own rubric as its `value` — never a string typed
+// beside the code in this SDK, and never an empty one.
+func TestVersionLifecycleStateCarriesThePinnedRubric(t *testing.T) {
+	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
+	for c := range terminology.VersionLifecycleState.All() {
+		t.Run(c.Code, func(t *testing.T) {
+			sub, err := newBuilder().
+				Add(contribution.Creation(&comp, contribution.WithLifecycleState(ehr.LifecycleState(c.Code)))).
+				Build()
+			if err != nil {
+				t.Fatalf("Build with WithLifecycleState(%q): %v", c.Code, err)
+			}
+			_, versions := marshalSubmission(t, sub)
+			if len(versions) != 1 {
+				t.Fatalf("WithLifecycleState(%q): len(versions) = %d, want 1", c.Code, len(versions))
+			}
+			v := versions[0]
+			if got := codeOf(v, "lifecycle_state"); got != c.Code {
+				t.Errorf("WithLifecycleState(%q): lifecycle_state code = %q, want %q", c.Code, got, c.Code)
+			}
+			if got := termOf(v, "lifecycle_state"); got != "openehr" {
+				t.Errorf("WithLifecycleState(%q): lifecycle_state terminology = %q, want %q", c.Code, got, "openehr")
+			}
+			if got := valueOf(v, "lifecycle_state"); got != c.Rubric {
+				t.Errorf("WithLifecycleState(%q): lifecycle_state value = %q, want the pinned rubric %q", c.Code, got, c.Rubric)
 			}
 		})
 	}

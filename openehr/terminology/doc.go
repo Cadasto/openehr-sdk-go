@@ -30,10 +30,13 @@
 // No runtime terminology-service lookup — the generated tables are pure Go
 // literals.
 //
-// Consumed by [openehr/client/ehr] and [openehr/client/ehr/contribution] for
+// Consumed by [github.com/cadasto/openehr-sdk-go/openehr/client/ehr] and
+// [github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution] for
 // version-lifecycle-state and audit-change-type validity and rubrics, by
-// [openehr/serialize/simplified] for participation modes and the ctx/
-// defaults, and by [openehr/instance] for setting and category defaults.
+// [github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified] for
+// participation modes and the ctx/ defaults, and by
+// [github.com/cadasto/openehr-sdk-go/openehr/instance] for setting and
+// category defaults.
 // Any SDK surface that emits, defaults, validates or decodes an openehr
 // coded value takes the code set, the rubric and the membership verdict from
 // here; a hand-typed openEHR code table elsewhere is a defect (REQ-034).

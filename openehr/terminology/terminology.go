@@ -200,7 +200,7 @@ func CodeSets() iter.Seq[*CodeSet] {
 // terminology has no such group.
 func GroupByID(id string) (*Group, bool) {
 	for _, g := range groups {
-		if g.id == id {
+		if g.ID() == id {
 			return g, true
 		}
 	}
@@ -211,7 +211,7 @@ func GroupByID(id string) (*Group, bool) {
 // pinned terminology has no such code set.
 func CodeSetByID(id string) (*CodeSet, bool) {
 	for _, s := range codeSets {
-		if s.id == id {
+		if s.ID() == id {
 			return s, true
 		}
 	}

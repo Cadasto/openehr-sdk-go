@@ -23,8 +23,14 @@ func TestGroupLookups(t *testing.T) {
 	if c, ok := g.Code("one"); !ok || c != "1" {
 		t.Errorf("Code(one) = %q,%v", c, ok)
 	}
-	if !g.Has("1") || g.Has("3") || g.Has("") {
-		t.Error("Has misreports membership")
+	if got := g.Has("1"); !got {
+		t.Errorf("Has(%q) = %v, want true — a member of the group", "1", got)
+	}
+	if got := g.Has("3"); got {
+		t.Errorf("Has(%q) = %v, want false — not a member", "3", got)
+	}
+	if got := g.Has(""); got {
+		t.Errorf("Has(%q) = %v, want false — the empty code is never a member", "", got)
 	}
 	if _, ok := g.Rubric("3"); ok {
 		t.Error("Rubric on an unknown code must report absence")
@@ -65,8 +71,20 @@ func TestNilGroupAndCodeSetAreInert(t *testing.T) { // REQ-025
 func TestCodeSetLookups(t *testing.T) {
 	t.Parallel()
 	s := newCodeSet("demo_set", "demo set", []string{"N", "H"})
-	if !s.Has("N") || s.Has("X") || s.Len() != 2 || s.ID() != "demo_set" || s.Name() != "demo set" {
-		t.Error("code-set surface")
+	if got := s.Has("N"); !got {
+		t.Errorf("Has(%q) = %v, want true — a member of the code set", "N", got)
+	}
+	if got := s.Has("X"); got {
+		t.Errorf("Has(%q) = %v, want false — not a member", "X", got)
+	}
+	if got := s.Len(); got != 2 {
+		t.Errorf("Len() = %d, want 2", got)
+	}
+	if got := s.ID(); got != "demo_set" {
+		t.Errorf("ID() = %q, want %q", got, "demo_set")
+	}
+	if got := s.Name(); got != "demo set" {
+		t.Errorf("Name() = %q, want %q", got, "demo set")
 	}
 	if got := slices.Collect(s.All()); !slices.Equal(got, []string{"N", "H"}) {
 		t.Errorf("All = %v", got)
@@ -82,17 +100,27 @@ func TestRegistryAccessorsUseTheTables(t *testing.T) {
 	b := newGroup("b", "b", []Concept{{"2", "two"}})
 	groups = []*Group{a, b}
 	codeSets = []*CodeSet{newCodeSet("s", "s", []string{"N"})}
-	if got := slices.Collect(Groups()); len(got) != 2 || got[0] != a || got[1] != b {
-		t.Error("Groups order")
+	got := slices.Collect(Groups())
+	if len(got) != 2 {
+		t.Fatalf("len(slices.Collect(Groups())) = %d, want 2 (the two tables just installed)", len(got))
 	}
-	if g, ok := GroupByID("b"); !ok || g != b {
-		t.Error("GroupByID")
+	if !slices.Equal(got, []*Group{a, b}) {
+		t.Errorf("Groups() = [%q %q], want source order [%q %q]", got[0].ID(), got[1].ID(), a.ID(), b.ID())
+	}
+	g, ok := GroupByID("b")
+	if !ok {
+		t.Errorf("GroupByID(%q) reported absence, want the installed group", "b")
+	} else if g != b {
+		t.Errorf("GroupByID(%q) = %q, want %q", "b", g.ID(), b.ID())
 	}
 	if _, ok := GroupByID("zzz"); ok {
-		t.Error("GroupByID unknown")
+		t.Errorf("GroupByID(%q) = _, true — want absence reported for an id no table carries", "zzz")
 	}
-	if s, ok := CodeSetByID("s"); !ok || s.ID() != "s" {
-		t.Error("CodeSetByID")
+	s, ok := CodeSetByID("s")
+	if !ok {
+		t.Errorf("CodeSetByID(%q) reported absence, want the installed code set", "s")
+	} else if s.ID() != "s" {
+		t.Errorf("CodeSetByID(%q).ID() = %q, want %q", "s", s.ID(), "s")
 	}
 	if _, ok := CodeSetByID("zzz"); ok {
 		t.Error("CodeSetByID unknown")
