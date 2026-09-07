@@ -59,6 +59,7 @@ endef
         fmt fmt-check vet \
         codegen codegen-verify antlr-image aqlgen aqlgen-verify \
         its-rest-sync its-rest-check \
+        terminology-sync terminology-check terminology-verify \
         test test-race \
         lint lint-ci \
         mod-tidy mod-tidy-check \
@@ -168,6 +169,15 @@ flat-conformance-check: ## Verify the vendored FLAT conformance corpus matches M
 flat-conformance-verify: ## Offline sha256 integrity of the vendored FLAT corpus (no network, no curl/jq) — run by `make ci`
 	@./scripts/sync-flat-conformance.sh verify
 
+terminology-sync: ## Vendor the openEHR Terminology (openehr_terminology.xml) into resources/terminology/ and regenerate the accessor (needs network; TERMINOLOGY_REF to pin)
+	@./scripts/sync-terminology.sh sync
+
+terminology-check: ## Verify the vendored terminology matches MANIFEST + report a newer upstream release (offline integrity; network for drift)
+	@./scripts/sync-terminology.sh check
+
+terminology-verify: ## Offline sha256 integrity of the vendored openEHR Terminology (no network, no curl/jq) — run by `make ci`
+	@./scripts/sync-terminology.sh verify
+
 ##@ Test
 
 test: codegen-verify aqlgen-verify ## Run unit tests (includes codegen drift checks)
@@ -215,4 +225,4 @@ clean: ## Remove bin/, coverage artefacts, and *.out files
 
 ##@ CI
 
-ci: fmt-check mod-tidy-check vet test lint spec-check flat-conformance-verify build ## Full local PR gate (see docs/ci.md)
+ci: fmt-check mod-tidy-check vet test lint spec-check flat-conformance-verify terminology-verify build ## Full local PR gate (see docs/ci.md)
