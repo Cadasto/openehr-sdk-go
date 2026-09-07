@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** [REQ-082](../specifications/conformance.md#req-082--runnability) (Runnability, **Impl. `partial`**); unblocks the deferred wire-level probes named under [REQ-080](../specifications/conformance.md#req-080--openehr-wire-conformance)
 **Probes:** no new `PROBE-NNN` — this plan gives the existing catalog its missing execution modes. It promotes **PROBE-077**, **PROBE-078**, **PROBE-079** out of `Status: Deferred` (each one a landed, unit-covered requirement whose dedicated wire probe is unwritten) and unblocks **PROBE-065**, which is still `Status: Draft` — specified, never implemented. It is also the gate [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1 names for four `testkit/probes/rest/*` probes.
-**Implementation:** planned
+**Implementation:** partial
 **Depends on:** landed `transport/` (REQ-090–098), the probe catalog in [conformance.md](../specifications/conformance.md), and the REQ-082 normative prose landed with this plan
 **Defers:** Cassette recorder/replayer/corpus (Phase 3) — encoding is settled ([ADR 0020](../adr/0020-cassette-recording-har.md), HAR 1.2). Live mode is no longer blocked: both CDRs are reachable locally (EHRbase `:8080`, FerroEHR `:8090`).
 
@@ -32,7 +32,7 @@ Implementation may start when:
 
 Scoped to phases 1–2 (what is reachable now):
 
-- One shared probe result type with a single canonical home; the 11 byte-identical per-package copies deleted.
+- One shared probe result type with a single canonical home; the 12 per-package `Result` types are now `type Result = probe.Result` aliases (same identity), not separate copies.
 - A runner that executes the catalog, a subset, or one probe, in Sandbox mode, and whose summary distinguishes pass from skip.
 - `sandbox/` serves every backend-facing catalog probe with no network listener and no credentials, and the hand-rolled `httptest` servers in `testkit/probes/**` are gone (in-repo probes reach no transport and are out of this bullet's scope).
 - **REQ-082's refusals are each pinned by a named test**, since a fail-closed rule nobody exercises is a fail-open rule with good intentions:
@@ -48,9 +48,9 @@ Scoped to phases 1–2 (what is reachable now):
 | Step | Status |
 |---|---|
 | REQ-082 normative prose + STRAND-11 (this PR) | done |
-| Phase 1 — shared result + runner | done — `testkit/probe`; refusals pinned by named tests |
+| Phase 1 — shared result + runner | done — `testkit/probe`; the 12 per-package `Result` types are `type Result = probe.Result` aliases, not copies; refusals pinned by named tests |
 | Phase 2 — `sandbox/` transport | partial — EHR + scripted routes; versioned / definition / demographic / transport probes off httptest. Auth/discovery httptest remain (OIDC/JWKS, not CDR) |
-| Phase 4 — Live mode (local CDRs) | partial — runner Live path + opt-in `TestLiveCreateEHR` (`OPENEHR_LIVE_*`; skipped in CI) |
+| Phase 4 — Live mode (local CDRs) | partial — runner Live path + `TestLiveCreateEHR`: `OPENEHR_LIVE_*` names the target, `OPENEHR_LIVE_ALLOW_MUTATING` is the separate write opt-in REQ-082 requires; both unset in CI, so the test skips without dialing |
 | Phase 3 — Cassette recording | encoding settled (ADR 0020, HAR 1.2); recorder/replayer/corpus not started |
 | `traceability.yaml` / REQ.md row | done (REQ-082 stays `partial`) |
 | `make spec-check` | |
