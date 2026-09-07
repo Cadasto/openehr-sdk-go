@@ -1,0 +1,72 @@
+# STRAND-11 evidence — one live EHRbase EHR create, purpose-built YAML.
+# Review question: can a reviewer see that no bearer token / cookie / patient
+# data leaked? Compare with ehr-create.har in the same directory.
+
+provenance:
+  deployment: ehrbase/ehrbase:latest (2.35.1)
+  base_url: http://127.0.0.1:8080/ehrbase/rest/openehr/v1
+  captured_at: 2026-09-07T18:53:48Z
+  sdk_commit: c673a67e
+
+redaction:
+  ran: true
+  headers_stripped:
+    - Authorization
+    - Cookie
+    - Set-Cookie
+    - Proxy-Authorization
+  any_redacted_in_this_capture: false
+
+exchanges:
+  - method: POST
+    url: http://127.0.0.1:8080/ehrbase/rest/openehr/v1/ehr
+    request:
+      headers:
+        Accept: "application/json"
+        Prefer: "return=representation"
+        Content-Type: "application/json"
+        User-Agent: "openehr-sdk-go-strand-11-capture/1.0"
+      body: null
+    response:
+      status: 201
+      status_text: ""
+      headers:
+        Vary: "Access-Control-Request-Headers"
+        Location: "http://127.0.0.1:8080/ehrbase/rest/openehr/v1/ehr/dedb09f5-15ab-45e4-a8fe-8a9a961d5f21"
+        ETag: "\"dedb09f5-15ab-45e4-a8fe-8a9a961d5f21\""
+        Last-Modified: "Fri, 02 Jan 1970 10:12:04 GMT"
+        X-Content-Type-Options: "nosniff"
+        X-XSS-Protection: "0"
+        Cache-Control: "no-cache, no-store, max-age=0, must-revalidate"
+        Pragma: "no-cache"
+        Expires: "0"
+        X-Frame-Options: "DENY"
+        Content-Type: "application/json"
+        Transfer-Encoding: "chunked"
+        Date: "Mon, 07 Sep 2026 18:53:48 GMT"
+        Connection: "close"
+      body: |
+        {
+          "_type": "EHR",
+          "system_id": {
+            "_type": "HIER_OBJECT_ID",
+            "value": "local.ehrbase.org"
+          },
+          "ehr_id": {
+            "_type": "HIER_OBJECT_ID",
+            "value": "dedb09f5-15ab-45e4-a8fe-8a9a961d5f21"
+          },
+          "ehr_status": {
+            "_type": "OBJECT_REF",
+            "namespace": "local",
+            "type": "EHR_STATUS",
+            "id": {
+              "_type": "OBJECT_VERSION_ID",
+              "value": "42fe5236-74c6-418c-8bf7-a18de5e76e6b::local.ehrbase.org::1"
+            }
+          },
+          "time_created": {
+            "_type": "DV_DATE_TIME",
+            "value": "2026-09-07T18:53:48.187633Z"
+          }
+        }
