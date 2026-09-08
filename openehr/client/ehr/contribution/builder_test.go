@@ -185,6 +185,15 @@ func TestBuilderPrecedingVersionPerOperation(t *testing.T) {
 			if got := codeOf(ca, "change_type"); got != tc.wantCode {
 				t.Errorf("change_type code = %q, want %q", got, tc.wantCode)
 			}
+			// The rubric beside the code is the pin's, never one typed in
+			// this package or this test (REQ-034).
+			wantRubric, ok := terminology.AuditChangeType.Rubric(tc.wantCode)
+			if !ok {
+				t.Fatalf("code %q is not in the pinned audit-change-type group, so this table row is stale", tc.wantCode)
+			}
+			if got := valueOf(ca, "change_type"); got != wantRubric {
+				t.Errorf("change_type value = %q, want the pinned rubric %q for %s", got, wantRubric, tc.wantCode)
+			}
 			uid, ok := v["preceding_version_uid"].(map[string]any)
 			if !ok {
 				t.Fatalf("preceding_version_uid missing on a %s: %v", tc.name, v)
@@ -595,6 +604,64 @@ func TestBuilderWithAuditRefusesANonGroupChangeType(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "999") {
 		t.Errorf("refusal does not name the offending code 999: %v", err)
+	}
+}
+
+// TestBuilderWithAuditRefusesAnOffSpecChangeType pins the two Build-time arms
+// a non-member code never reaches: a group member carrying a hand-typed
+// rubric, and an openEHR code declared under a foreign terminology. Each is an
+// AUDIT_DETAILS.Change_type_valid violation the wholesale WithAudit path must
+// not ship, and each row's inputs satisfy every other arm, so the refusal it
+// asserts can only come from the arm under test — deleting the rubric check or
+// the terminology-id check fails exactly one row (REQ-034, REQ-130).
+func TestBuilderWithAuditRefusesAnOffSpecChangeType(t *testing.T) {
+	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
+	name := "alice"
+	cases := []struct {
+		name        string
+		terminology string
+		code, value string
+		wantFacets  []string // substrings the refusal must carry
+	}{
+		{
+			name:        "group member with a hand-typed rubric",
+			terminology: "openehr",
+			code:        "252",
+			value:       "custom",
+			wantFacets:  []string{`"252"`, "pinned rubric", `"synthesis"`, `"custom"`},
+		},
+		{
+			name:        "openEHR code under a foreign terminology",
+			terminology: "SNOMED-CT",
+			code:        "249",
+			value:       "creation",
+			wantFacets:  []string{`"249"`, "coded in terminology", `"SNOMED-CT"`},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sub, err := contribution.NewBuilder().
+				WithAudit(contribution.UpdateAudit{
+					Committer: &rm.PartyIdentified{Name: &name},
+					ChangeType: rm.DVCodedText{
+						DVText:       rm.DVText{Value: tc.value},
+						DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: tc.terminology}, CodeString: tc.code},
+					},
+				}).
+				Add(contribution.Creation(&comp)).
+				Build()
+			if err == nil {
+				t.Fatalf("Build accepted a wholesale audit with change_type %s::%s|%s: %+v", tc.terminology, tc.code, tc.value, sub)
+			}
+			if sub != nil {
+				t.Error("Build returned a submission alongside the refusal")
+			}
+			for _, want := range tc.wantFacets {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("refusal for %s::%s|%s = %q, want it to carry %q", tc.terminology, tc.code, tc.value, err, want)
+				}
+			}
+		})
 	}
 }
 

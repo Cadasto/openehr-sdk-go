@@ -172,25 +172,50 @@ func TestParseRefusesAnotherRootElement(t *testing.T) {
 // TestParseRefusesTrailingContent is the can-fail control for the single-root
 // guard: encoding/xml stops at the first element, so a second top-level element
 // after the terminology root must be refused, not silently dropped — otherwise
-// it would slip past the sha256 pin at a version bump.
+// it would slip past the sha256 pin at a version bump. The second root is
+// appended to the otherwise valid fixture, so the trailing element is the only
+// reason Parse can refuse the document: with the EOF guard deleted, the fixture
+// parses cleanly and the nil-error arm fails on its own, not by riding an
+// unrelated refusal.
 func TestParseRefusesTrailingContent(t *testing.T) {
 	t.Parallel()
-	_, err := Parse(strings.NewReader(`<terminology name="openehr" version="3.0.0"/><codeset/>`))
+	_, err := Parse(strings.NewReader(fixture + `<codeset/>`))
 	if err == nil {
-		t.Fatal("Parse(two roots) = _, nil; want a refusal — the pin holds exactly one terminology element")
+		t.Fatal("Parse(fixture + a second root) = _, nil; want a refusal — the pin holds exactly one terminology element")
 	}
 	if !strings.Contains(err.Error(), "trailing") {
-		t.Errorf("Parse(two roots) error = %q, want it to name the trailing element", err)
+		t.Errorf("Parse(fixture + a second root) error = %q, want it to name the trailing element", err)
 	}
 }
 
 // TestParseRefusesAnEmptyVocabulary is the can-fail control for the
 // at-least-one-of-each guard: a terminology root that parses to zero groups or
 // zero code sets (an upstream rename that emptied a table) must be refused, not
-// generated into a silently incomplete vocabulary.
+// generated into a silently incomplete vocabulary. The two one-sided rows pin
+// the *each*: a guard weakened to at-least-one-of-either passes them and fails
+// here, and every refusal must name the table that is empty.
 func TestParseRefusesAnEmptyVocabulary(t *testing.T) {
 	t.Parallel()
-	if _, err := Parse(strings.NewReader(`<terminology name="openehr" version="3.0.0"/>`)); err == nil {
-		t.Fatal("Parse(empty terminology) = _, nil; want a refusal — the pin must carry at least one group and one code set")
+	const attrs = `name="openehr" language="en" version="9.9.9" date="2026-01-01"`
+	const oneGroup = `<group openehr_id="audit_change_type" name="audit change type"><concept id="249" rubric="creation"/></group>`
+	const oneCodeSet = `<codeset openehr_id="normal_statuses" name="normal statuses"><code value="N"/></codeset>`
+	tests := []struct {
+		name, body, want string
+	}{
+		{name: "no groups and no code sets", body: "", want: "0 group(s) and 0 code set(s)"},
+		{name: "groups but no code sets", body: oneGroup, want: "0 code set(s)"},
+		{name: "code sets but no groups", body: oneCodeSet, want: "0 group(s)"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := Parse(strings.NewReader(`<terminology ` + attrs + `>` + tc.body + `</terminology>`))
+			if err == nil {
+				t.Fatalf("Parse(%s) = _, nil; want a refusal — the pin must carry at least one group and one code set", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("Parse(%s) error = %q, want it to name the empty table (%q)", tc.name, err, tc.want)
+			}
+		})
 	}
 }
