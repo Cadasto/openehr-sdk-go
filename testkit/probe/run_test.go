@@ -865,3 +865,114 @@ func TestRun_CancelledContextStopsTheRun(t *testing.T) {
 		t.Fatalf("passed+failed+skipped = %d for %d selected; a cancelled run must still account for every entry", got, sum.Selected)
 	}
 }
+
+// TestRun_CassetteRefusesUnredactedRecording pins, through [probe.Run]
+// itself rather than a direct [probe.ValidateHAR] call, that a
+// well-formed and attested recording — log._req082.redaction.ran is
+// true — still gets its content scanned: a captured Authorization
+// header must refuse the run, and the probe must never execute. If the
+// Cassette arm of satisfiable ever stopped calling ValidateHAR before
+// wiring the recording, this test would go green against a recording
+// that leaks a credential (REQ-082, REQ-093).
+func TestRun_CassetteRefusesUnredactedRecording(t *testing.T) {
+	t.Parallel()
+	tainted := strings.Replace(validHAR,
+		`{"name": "Accept", "value": "application/json"}`,
+		`{"name": "Authorization", "value": "Bearer secret"}`,
+		1)
+	if tainted == validHAR {
+		t.Fatal("strings.Replace did not change validHAR; the Accept header text has drifted out of sync with this test")
+	}
+
+	dir := t.TempDir()
+	writeRecording(t, dir, "PROBE-010.har", tainted)
+
+	ran := false
+	entry := probe.Entry{
+		ID:     "PROBE-010",
+		Effect: probe.EffectReadOnly,
+		Run: func(context.Context, *transport.Client) (probe.Result, error) {
+			ran = true
+			return probe.Result{Probe: "PROBE-010", Status: probe.StatusPass}, nil
+		},
+	}
+
+	sum, err := probe.Run(t.Context(), probe.Config{
+		Mode:         probe.ModeCassette,
+		Client:       mustClient(t),
+		RecordingDir: dir,
+	}, []probe.Entry{entry})
+	if !errors.Is(err, probe.ErrUnsatisfiableMode) {
+		t.Fatalf("Run(cassette, unredacted PROBE-010.har) error = %v, want %v", err, probe.ErrUnsatisfiableMode)
+	}
+	if !strings.Contains(err.Error(), "PROBE-010") {
+		t.Fatalf("Run(cassette, unredacted PROBE-010.har) error = %q, want it to name PROBE-010", err)
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "authorization") {
+		t.Fatalf("Run(cassette, unredacted PROBE-010.har) error = %q, want it to name the authorization header", err)
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "secret") {
+		t.Fatalf("Run(cassette, unredacted PROBE-010.har) error = %q, must never echo the header value (REQ-093)", err)
+	}
+	if ran {
+		t.Fatal("the probe ran against an unredacted recording; the run must refuse before any probe executes")
+	}
+	if len(sum.Results) != 0 {
+		t.Fatalf("Summary.Results has %d entries, want 0 (nothing must run)", len(sum.Results))
+	}
+}
+
+// TestRun_TwoProbeErrorsBothReachTheCaller pins that a second probe
+// error does not get lost behind the first: Run must keep going past
+// PROBE-010's failure, run PROBE-011, record both as failures, and
+// join both causes into the returned error so errors.Is can reach
+// either one. If Run instead stopped at the first error, PROBE-011
+// would never run, sum.Failed would read 1, and errors.Is(err,
+// errSecond) would fail.
+func TestRun_TwoProbeErrorsBothReachTheCaller(t *testing.T) {
+	t.Parallel()
+	errFirst := errors.New("first probe broke")
+	errSecond := errors.New("second probe broke")
+	entries := []probe.Entry{
+		{
+			ID:     "PROBE-010",
+			Effect: probe.EffectReadOnly,
+			Run: func(context.Context, *transport.Client) (probe.Result, error) {
+				return probe.Result{}, errFirst
+			},
+		},
+		{
+			ID:     "PROBE-011",
+			Effect: probe.EffectReadOnly,
+			Run: func(context.Context, *transport.Client) (probe.Result, error) {
+				return probe.Result{}, errSecond
+			},
+		},
+	}
+
+	sum, err := probe.Run(t.Context(), probe.Config{Mode: probe.ModeSandbox}, entries)
+	if err == nil {
+		t.Fatal("Run() error = nil, want both probe errors joined")
+	}
+	if !errors.Is(err, errFirst) {
+		t.Fatalf("Run() error = %v, want errors.Is to reach the first probe's error", err)
+	}
+	if !errors.Is(err, errSecond) {
+		t.Fatalf("Run() error = %v, want errors.Is to reach the second probe's error too", err)
+	}
+	if sum.Failed != 2 || sum.Passed != 0 {
+		t.Fatalf("failed=%d passed=%d, want failed=2 passed=0", sum.Failed, sum.Passed)
+	}
+	if sum.Green() {
+		t.Fatal("Summary.Green() = true with two probe errors")
+	}
+	if len(sum.Results) != 2 {
+		t.Fatalf("Summary.Results has %d entries, want 2 (both probes recorded)", len(sum.Results))
+	}
+	if got := sum.Results[0]; got.Probe != "PROBE-010" || got.Status != probe.StatusFail {
+		t.Fatalf("first result = %+v, want PROBE-010 recorded as a failure", got)
+	}
+	if got := sum.Results[1]; got.Probe != "PROBE-011" || got.Status != probe.StatusFail {
+		t.Fatalf("second result = %+v, want PROBE-011 recorded as a failure", got)
+	}
+}

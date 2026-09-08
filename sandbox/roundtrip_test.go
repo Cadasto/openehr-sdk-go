@@ -392,3 +392,74 @@ func duplicates(ids map[string]int) []string {
 	}
 	return dup
 }
+
+// TestConcurrentCreateSameEHRIDOneWins is the race pin for the
+// check-and-insert inside createEHR (REQ-026): many goroutines PUT the
+// very same EHR id at once, so every call but one must see an id
+// already taken and answer 409, and exactly one must win the 201. A
+// backend whose existence check and map write were not one atomic
+// section under the mutex could let two calls both read "absent" and
+// both answer 201, or lose the winner's body to a racing write.
+func TestConcurrentCreateSameEHRIDOneWins(t *testing.T) {
+	t.Parallel()
+	const (
+		goroutines = 32
+		target     = "https://sandbox.local/openehr/v1/ehr/same-ehr-id"
+	)
+	b := sandbox.New()
+
+	var (
+		mu       sync.Mutex
+		statuses []int
+		wg       sync.WaitGroup
+	)
+	for i := range goroutines {
+		wg.Go(func() {
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, target, nil)
+			if err != nil {
+				t.Errorf("goroutine %d: http.NewRequestWithContext(PUT, %q): %v", i, target, err)
+				return
+			}
+			resp, err := b.RoundTrip(req)
+			if err != nil {
+				t.Errorf("goroutine %d: RoundTrip(PUT %s): %v", i, target, err)
+				return
+			}
+			defer func() { _ = resp.Body.Close() }()
+			mu.Lock()
+			statuses = append(statuses, resp.StatusCode)
+			mu.Unlock()
+		})
+	}
+	wg.Wait()
+
+	var created, conflicted int
+	var other []int
+	for _, s := range statuses {
+		switch s {
+		case http.StatusCreated:
+			created++
+		case http.StatusConflict:
+			conflicted++
+		default:
+			other = append(other, s)
+		}
+	}
+	if len(other) > 0 {
+		t.Fatalf("%d concurrent PUT %s calls produced unexpected statuses %v, want only %d and %d", goroutines, target, other, http.StatusCreated, http.StatusConflict)
+	}
+	if created != 1 {
+		t.Fatalf("%d concurrent PUT %s calls produced %d %d responses, want exactly 1 (statuses: %v)", goroutines, target, created, http.StatusCreated, statuses)
+	}
+	if conflicted != goroutines-1 {
+		t.Fatalf("%d concurrent PUT %s calls produced %d %d responses, want exactly %d", goroutines, target, conflicted, http.StatusConflict, goroutines-1)
+	}
+
+	resp := roundTrip(t, b, http.MethodGet, target)
+	if resp.status != http.StatusOK {
+		t.Fatalf("RoundTrip(GET %s) status = %d, want %d", target, resp.status, http.StatusOK)
+	}
+	if len(resp.body) == 0 {
+		t.Fatal("RoundTrip(GET same-ehr-id) body is empty, want the winner's created EHR to have persisted")
+	}
+}
