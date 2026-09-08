@@ -10,8 +10,9 @@ import (
 )
 
 // scripted is one Handle/HandleFunc registration. An empty method or
-// path matches any request; otherwise method is exact and path is a
-// suffix on either the full URL path or the stripped resource path.
+// path matches any request; otherwise method is exact and path must
+// equal either the full URL path or the stripped resource path — or,
+// with a trailing slash, prefix either as a subtree.
 type scripted struct {
 	method string
 	path   string
@@ -26,10 +27,12 @@ type scripted struct {
 // request path, so Handle("", "", h) is a catch-all — the
 // planted-backend shape probe tests use instead of httptest.NewServer
 // (REQ-082). A non-empty path matches the request's full URL path or
-// its resource-stripped form (see resourcePath) exactly, or as a
-// suffix of either; a path ending in "/" additionally matches any
-// request whose full or resource-stripped path starts with it, i.e.
-// that subtree.
+// its resource-stripped form (see resourcePath) exactly; a path
+// ending in "/" additionally matches any request whose full or
+// resource-stripped path starts with it, i.e. that subtree. The match
+// is anchored: a route "/ehr/x" answers "/ehr/x" and its base-prefixed
+// form "/openehr/v1/ehr/x", but never "/composition/ehr/x" merely
+// because that path ends the same way.
 //
 // h == nil is not silently dropped: it registers a route that fails
 // closed, answering every matching request with 500 and a body naming
@@ -103,10 +106,13 @@ func (s scripted) match(req *http.Request) bool {
 		p = req.URL.Path
 	}
 	rp := resourcePath(p)
+	// Exact match on the full path or its resource-stripped form. The
+	// stripped form is what tolerates the deployment base: a route
+	// "/ehr/x" still answers an incoming "/openehr/v1/ehr/x", because
+	// resourcePath cuts the base away before the comparison. The match
+	// is anchored, not a loose suffix — a suffix would let "/ehr/x" also
+	// fire on "/composition/ehr/x", which is a different resource.
 	if p == s.path || rp == s.path {
-		return true
-	}
-	if strings.HasSuffix(p, s.path) || strings.HasSuffix(rp, s.path) {
 		return true
 	}
 	// A trailing slash means "this subtree": the registered path must

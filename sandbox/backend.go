@@ -121,10 +121,15 @@ func (b *Backend) createEHR(req *http.Request, id string) (*http.Response, error
 	b.ehrs[id] = body
 	b.mu.Unlock()
 
-	// ITS-REST response 201_EHR defines exactly these two headers
-	// (components.responses.201_EHR): ETag_EHR is "the ehr_id enclosed
-	// by double quotes" and Location_EHR is `format: url` — an absolute
-	// URL, as its own example shows.
+	// The sandbox sets exactly the two headers ITS-REST response
+	// 201_EHR names (components.responses.201_EHR): ETag_EHR, "the
+	// ehr_id enclosed by double quotes", and Location_EHR, `format:
+	// url` — an absolute URL, as its own example shows. Emitting just
+	// these is what keeps cross-mode parity (REQ-082): the sandbox adds
+	// no Sandbox-only header a probe would then miss against a real CDR.
+	// A live server may of course add headers of its own (Date, Server,
+	// even an ETag of its choosing) — the rule is only that the sandbox
+	// does not go beyond what 201_EHR defines.
 	resp := jsonResponse(req, http.StatusCreated, body)
 	resp.Header.Set("Location", ehrLocation(req, id))
 	resp.Header.Set("ETag", `"`+id+`"`)
@@ -132,11 +137,13 @@ func (b *Backend) createEHR(req *http.Request, id string) (*http.Response, error
 }
 
 // getEHR answers GET/HEAD /ehr/{id}. It deliberately emits no ETag and
-// no Location: ITS-REST response 200_EHR
-// (components.responses.200_EHR) defines only Content-Type, so a
-// conformant CDR returns neither. Emitting them here would make
-// transport.Metadata.ETag non-empty in Sandbox mode and empty against a
-// real CDR — a cross-mode disagreement REQ-082 forbids.
+// no Location: ITS-REST response 200_EHR (components.responses.200_EHR)
+// defines only Content-Type, so the sandbox emits only that. A live
+// server may add headers of its own (Date, Server, even an ETag), but
+// none of those are guaranteed by the spec, so a probe cannot rely on
+// them. Emitting an ETag here would make transport.Metadata.ETag
+// non-empty in Sandbox mode while a conformant CDR that sticks to
+// 200_EHR leaves it empty — the cross-mode disagreement REQ-082 forbids.
 func (b *Backend) getEHR(req *http.Request, id string) (*http.Response, error) {
 	b.mu.Lock()
 	body, ok := b.ehrs[id]

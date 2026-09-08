@@ -234,6 +234,37 @@ func TestPutDuplicateEHRConflicts(t *testing.T) {
 	}
 }
 
+// TestDuplicateCreateDoesNotCorruptStoredBody pins that a rejected
+// duplicate create leaves the stored EHR untouched. createEHR returns
+// 409 before it writes the store, so the first body must survive
+// byte-for-byte: a GET after the conflict returns exactly what the
+// original create stored, not anything the duplicate attempt built
+// (which carries fresh, random status and access ids).
+func TestDuplicateCreateDoesNotCorruptStoredBody(t *testing.T) {
+	t.Parallel()
+	const url = "https://sandbox.local/openehr/v1/ehr/fixed-ehr-id"
+	b := sandbox.New()
+
+	created := roundTrip(t, b, http.MethodPut, url)
+	if created.status != http.StatusCreated {
+		t.Fatalf("RoundTrip(PUT /ehr/fixed-ehr-id) first call status = %d, want %d", created.status, http.StatusCreated)
+	}
+	original := created.body
+
+	conflict := roundTrip(t, b, http.MethodPut, url)
+	if conflict.status != http.StatusConflict {
+		t.Fatalf("RoundTrip(PUT /ehr/fixed-ehr-id) duplicate call status = %d, want %d", conflict.status, http.StatusConflict)
+	}
+
+	fetched := roundTrip(t, b, http.MethodGet, url)
+	if fetched.status != http.StatusOK {
+		t.Fatalf("RoundTrip(GET /ehr/fixed-ehr-id) status = %d, want %d", fetched.status, http.StatusOK)
+	}
+	if string(fetched.body) != string(original) {
+		t.Errorf("RoundTrip(GET /ehr/fixed-ehr-id) body = %q, want it byte-for-byte identical to the originally created body %q — the 409 must not overwrite the store", fetched.body, original)
+	}
+}
+
 // TestUnroutedRequest404 pins the bare unmatched-route 404 — a
 // resource the sandbox does not serve at all — as distinct from the
 // looked-up-and-absent EHR 404. The two carry different bodies, so a

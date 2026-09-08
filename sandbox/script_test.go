@@ -139,3 +139,45 @@ func TestSubtreeRouteIsAnchored(t *testing.T) {
 		t.Errorf("RoundTrip(GET /definition/ehr/x) status = %d, want %d", outside.status, http.StatusNotFound)
 	}
 }
+
+// TestScriptedRouteMatchIsAnchored pins that a scripted route matches
+// its path exactly — allowing for the deployment base — rather than as
+// an arbitrary suffix. A route registered as "/ehr/x" owns "/ehr/x"
+// and its base-prefixed "/openehr/v1/ehr/x", but must not fire on
+// "/composition/ehr/x" just because that path ends in "/ehr/x": that
+// is a different resource. This is a can-fail control — the suffix-only
+// case answers 418 under the old unanchored HasSuffix match and the
+// built-in 404 once the match is anchored.
+func TestScriptedRouteMatchIsAnchored(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		url  string
+		want int
+	}{
+		{
+			name: "base-prefixed path is owned by the route",
+			url:  "https://sandbox.local/openehr/v1/ehr/x",
+			want: http.StatusTeapot,
+		},
+		{
+			name: "suffix-only path falls through to the default 404",
+			url:  "https://sandbox.local/openehr/v1/composition/ehr/x",
+			want: http.StatusNotFound,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b := sandbox.New()
+			b.HandleFunc(http.MethodGet, "/ehr/x", func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusTeapot)
+			})
+			got := roundTrip(t, b, http.MethodGet, tc.url)
+			if got.status != tc.want {
+				t.Errorf("RoundTrip(GET %s) status = %d, want %d — a %q route matches its path exactly, not any path that merely ends in it",
+					tc.url, got.status, tc.want, "/ehr/x")
+			}
+		})
+	}
+}
