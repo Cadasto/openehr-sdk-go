@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - **Cassette capture harness and a create-then-read recording (REQ-082).** `cmd/probe-record` (`make probe-record`) drives a registered scenario against a live CDR and publishes a recording only after validating and replaying it in memory, so a capture that leaks a credential never reaches disk and one that cannot be replayed never replaces the recording already there; `testkit/recordings/ehr-lifecycle.har` is the second corpus file, covering `POST /ehr` then `GET` and `HEAD` of the created id. `probe.HAR.Validate` judges an in-memory recording and `probe.CredentialInURL` names the credential channel a URL carries; provenance `base_url` is now scanned for credentials alongside the entry URLs.
+- **Template upload interoperates with XML-only deployments (REQ-144).** `definition.UploadTemplate` accepts `application/json, application/xml` and derives the template id from the `Location` header, so a deployment serving the ADL 1.4 template surface only as XML (EHRbase) no longer answers `406`.
 
 ## [0.26.0] - 2026-09-08
 

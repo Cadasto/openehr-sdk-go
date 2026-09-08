@@ -1,6 +1,7 @@
 package definition
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -202,6 +203,20 @@ func WithUploadVersion(v string) UploadOption {
 // `application/xml` automatically. ADL 2 source-form upload (Content-
 // Type `text/plain`) is not yet implemented.
 //
+// The request accepts both `application/json` and `application/xml`. The
+// ITS-REST 201 response may carry the created template as a JSON
+// TemplateIdentifier, an XML OperationalTemplate, or an empty body — the
+// last when the server applies its `return=minimal` default, since this
+// call sends no `Prefer` header. A deployment that serves the ADL 1.4
+// template surface only as XML (EHRbase among them) answers `406 Not
+// Acceptable` to an `application/json`-only Accept, so accepting both is
+// what keeps the upload interoperable. A JSON object body is decoded into
+// the returned [*TemplateMetadata]; an empty or XML body yields a minimal
+// record whose TemplateID is the trailing segment of the Location header.
+// A response that carries neither a JSON `template_id` nor a Location
+// header is an error ([transport.ErrInvalidShape]) — the caller never
+// receives an empty id.
+//
 // Wire: POST /definition/template/{format}. The decoded
 // [*TemplateMetadata] reflects the deployment's view of the freshly
 // uploaded template.
@@ -234,7 +249,7 @@ func UploadTemplate(ctx context.Context, c *transport.Client, format TemplateFor
 		Route:       "/definition/template/{format}",
 		Body:        raw,
 		ContentType: format.ContentType(),
-		Accept:      "application/json",
+		Accept:      "application/json, application/xml",
 	}
 	if cfg.versionParam != "" {
 		req.Query = url.Values{"version": []string{cfg.versionParam}}
@@ -246,17 +261,40 @@ func UploadTemplate(ctx context.Context, c *transport.Client, format TemplateFor
 		}
 		return nil, nil, err
 	}
-	if transport.IsNoRepresentationBody(resp.Body) {
-		// Some deployments return 204 with only headers. Surface a
-		// minimal metadata constructed from the Location header so
-		// the caller can still find the template.
-		return &TemplateMetadata{TemplateID: extractLastPathSegment(resp.Metadata.Location)}, resp.Metadata, nil
+	// Strip a leading UTF-8 BOM before sniffing or decoding: it survives
+	// TrimSpace, so a BOM-prefixed XML body would otherwise miss the '<' arm and
+	// be fed to json.Unmarshal — the failure this negotiation exists to avoid —
+	// and a BOM-prefixed JSON body would fail decode.
+	payload := bytes.TrimPrefix(resp.Body, []byte{0xEF, 0xBB, 0xBF})
+	locID := extractLastPathSegment(resp.Metadata.Location)
+	// A minimal reply (empty or `null` — the server's return=minimal default,
+	// or a 204 header-only reply) and an XML OperationalTemplate body (what an
+	// XML-only deployment such as EHRbase returns) both identify the template by
+	// its Location header rather than a decodable JSON record; feeding an XML
+	// document to json.Unmarshal would otherwise fail an otherwise-successful
+	// upload. Anything else is decoded as JSON — a TemplateIdentifier object
+	// yields the metadata, and a non-object body is a genuine decode failure
+	// surfaced as a typed error below. The id is the trailing Location segment
+	// (ITS-REST 201_Template_adl1_4_upload).
+	if trimmed := bytes.TrimSpace(payload); transport.IsNoRepresentationBody(payload) || (len(trimmed) > 0 && trimmed[0] == '<') {
+		if locID == "" {
+			return nil, resp.Metadata, fmt.Errorf("definition.UploadTemplate: %w: upload succeeded but the response carried neither a JSON body nor a Location header to name the template", transport.ErrInvalidShape)
+		}
+		return &TemplateMetadata{TemplateID: locID}, resp.Metadata, nil
 	}
 	var out TemplateMetadata
-	if err := json.Unmarshal(resp.Body, &out); err != nil {
+	if err := json.Unmarshal(payload, &out); err != nil {
 		return nil, resp.Metadata, fmt.Errorf("definition.UploadTemplate: %w", &transport.DecodeError{
 			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
 		})
+	}
+	if out.TemplateID == "" {
+		// A JSON body that omits template_id still identifies the template by
+		// its Location; backfill so the caller never gets an empty id.
+		out.TemplateID = locID
+	}
+	if out.TemplateID == "" {
+		return nil, resp.Metadata, fmt.Errorf("definition.UploadTemplate: %w: upload succeeded but the JSON response omitted template_id and no Location header was present", transport.ErrInvalidShape)
 	}
 	return &out, resp.Metadata, nil
 }
