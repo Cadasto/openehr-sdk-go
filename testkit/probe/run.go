@@ -95,8 +95,10 @@ type Config struct {
 	Client *transport.Client
 
 	// Sandbox is the in-memory backend a Sandbox-mode run serves from.
-	// Nil means the runner creates a fresh one per run, so sandbox
-	// state stays per-run and isolated (REQ-082).
+	// Nil is the isolating default: the runner creates a fresh backend
+	// for each probe, so no probe can observe another's writes. Setting
+	// it is the opt-in for probes that are meant to share state — the
+	// whole run then serves from this one backend (REQ-082).
 	Sandbox *sandbox.Backend
 
 	// HTTPClient is the injected transport a Live-mode run uses when
@@ -109,8 +111,8 @@ type Config struct {
 
 	// RecordingDir is the Cassette-mode corpus root
 	// (testkit/recordings/). A selected backend-facing probe is
-	// unsatisfiable unless this directory holds a .har file whose name
-	// starts with the probe id and that passes [ValidateHAR].
+	// unsatisfiable unless this directory holds a file named
+	// "<probe id>.har" that passes [ValidateHAR].
 	RecordingDir string
 
 	// Endpoint is the Live-mode openEHR REST base URL. Required for
@@ -203,15 +205,22 @@ func Select(catalog []Entry, ids ...string) ([]Entry, error) {
 // Run validates every entry before executing any of them
 // ([ErrInvalidEntry]) and refuses a mode the selection cannot satisfy
 // ([ErrUnsatisfiableMode], [ErrMutatingNotOptedIn]) without running
-// anything. It then builds one client for the whole run — for Sandbox
-// mode the runner builds it from cfg.Sandbox, and a Live or Cassette
-// client that turns out to be sandbox-backed is refused.
+// anything. It then wires the backend every entry reaches, still
+// before the first probe runs. Sandbox mode hands each probe a fresh
+// backend of its own, so two probes cannot observe each other's writes
+// (REQ-082); a caller that sets cfg.Sandbox has asked for the
+// opposite, and the whole run then serves from that one backend. Live
+// and Cassette mode build one client for the whole run, and a Live or
+// Cassette client that turns out to be sandbox-backed is refused.
 //
 // A probe that returns an error is recorded as a failure and the run
 // continues; Run returns the completed summary alongside an
 // [errors.Join] of those errors, so an erroring probe can never leave
 // a green partial summary. A run whose probes all skipped returns the
-// summary and [ErrAllSkipped].
+// summary and [ErrAllSkipped]. A cancelled ctx stops the run between
+// probes, and every probe the run did not reach is recorded as a
+// failure, so a stopped run cannot read green either; the context
+// error is joined into the returned error alongside them.
 func Run(ctx context.Context, cfg Config, entries []Entry) (Summary, error) {
 	if len(entries) == 0 {
 		return Summary{Mode: cfg.Mode}, fmt.Errorf("%w: no entries to run", ErrEmptySelection)
@@ -226,32 +235,44 @@ func Run(ctx context.Context, cfg Config, entries []Entry) (Summary, error) {
 		}
 	}
 
-	// One client for the whole run, never one per probe. An all-in-repo
-	// selection needs no backend at all, so none is built.
-	var client *transport.Client
-	if slices.ContainsFunc(entries, func(e Entry) bool { return !e.InRepo }) {
-		c, err := buildClient(cfg)
-		if err != nil {
-			return refused, err
-		}
-		client = c
+	clients, err := buildClients(cfg, entries)
+	if err != nil {
+		return refused, err
 	}
 
 	sum := Summary{Mode: cfg.Mode, Selected: len(entries)}
 	var probeErrs []error
-	for _, e := range entries {
-		var c *transport.Client
-		if !e.InRepo {
-			c = client
+	for i, e := range entries {
+		// Cancellation is checked between probes, not only inside them:
+		// a probe that ignores ctx would otherwise keep the run going
+		// long after the caller walked away. Every entry the run never
+		// reached — this one included — is recorded as a failure, the
+		// same treatment an erroring probe gets, so a caller reading
+		// only the summary cannot mistake a stopped run for a finished
+		// one. The context error itself is reported once.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			probeErrs = append(probeErrs, fmt.Errorf("run stopped before %s: %w", e.ID, ctxErr))
+			for _, missed := range entries[i:] {
+				sum = sum.add(canonicalise(Result{
+					Probe:  missed.ID,
+					Mode:   resultMode(cfg, missed),
+					Status: StatusFail,
+					Detail: "not run: " + ctxErr.Error(),
+				}))
+			}
+			break
 		}
-		r, err := e.Run(ctx, c)
+		r, err := e.Run(ctx, clients[i])
 		if err != nil {
 			probeErrs = append(probeErrs, fmt.Errorf("%s: %w", e.ID, err))
-			r = Result{Probe: e.ID, Status: StatusFail, Detail: "probe error: " + err.Error()}
+			r = Result{Status: StatusFail, Detail: "probe error: " + err.Error()}
 		}
-		if r.Probe == "" {
-			r.Probe = e.ID
-		}
+		// The runner attributes the result, never the probe: a probe
+		// that reported some other id — a copied stub, a stale constant
+		// — would otherwise file its verdict under that id, and the
+		// summary would name a probe that never ran. Id and mode both
+		// come from the entry the runner actually invoked.
+		r.Probe = e.ID
 		r.Mode = resultMode(cfg, e)
 		sum = sum.add(canonicalise(r))
 	}
@@ -379,11 +400,53 @@ func satisfiable(cfg Config, e Entry) error {
 	}
 }
 
-// buildClient produces the one transport the run's backend-facing
-// probes share. Sandbox mode is built here rather than by the caller,
-// so the label and the backend cannot diverge; Live and Cassette use
-// the caller's client but only after it is shown not to be
-// sandbox-backed.
+// buildClients wires the transport each entry runs against, by
+// position — nil where the entry is in-repo and reaches no backend,
+// so an all-in-repo selection builds nothing at all. Every client is
+// built before the first probe runs, so a wiring the mode cannot
+// satisfy refuses the whole run instead of failing part-way through.
+//
+// Sandbox mode is the one case where the positions differ from each
+// other. With no cfg.Sandbox each backend-facing entry gets a client
+// over a backend of its own, so one probe cannot observe another's
+// writes (REQ-082). With an explicit cfg.Sandbox — the caller saying
+// these probes share state — and in Live and Cassette mode, every
+// position holds the same client.
+func buildClients(cfg Config, entries []Entry) ([]*transport.Client, error) {
+	clients := make([]*transport.Client, len(entries))
+	perProbe := cfg.Mode == ModeSandbox && cfg.Sandbox == nil
+	var shared *transport.Client
+	for i, e := range entries {
+		if e.InRepo {
+			continue
+		}
+		if perProbe {
+			c, err := buildClient(cfg)
+			if err != nil {
+				return nil, err
+			}
+			clients[i] = c
+			continue
+		}
+		if shared == nil {
+			c, err := buildClient(cfg)
+			if err != nil {
+				return nil, err
+			}
+			shared = c
+		}
+		clients[i] = shared
+	}
+	return clients, nil
+}
+
+// buildClient produces one transport for the mode cfg names. Sandbox
+// mode builds a client over cfg.Sandbox, or over a fresh backend when
+// that field is nil — [buildClients] calls it once per probe in that
+// case, which is what keeps the probes isolated. Sandbox mode is built
+// here rather than by the caller, so the label and the backend cannot
+// diverge; Live and Cassette use the caller's client but only after it
+// is shown not to be sandbox-backed.
 func buildClient(cfg Config) (*transport.Client, error) {
 	switch cfg.Mode {
 	case ModeSandbox:
@@ -431,6 +494,15 @@ func buildClient(cfg Config) (*transport.Client, error) {
 // in-memory sandbox backend. Running that under the Live or Cassette
 // label is a silent fallback to Sandbox: the summary would claim a
 // deployment or a recording answered when nothing left the process.
+//
+// What it catches is the direct [*sandbox.Backend] transport — the
+// sandbox's own client handed over under another label, which is the
+// realistic mistake. A round tripper that wraps a sandbox backend
+// inside itself cannot be caught: an [http.RoundTripper] is opaque in
+// Go, with no standard way to unwrap what it delegates to. That part
+// of the contract is documented rather than enforced, and the
+// caller-supplied transport is trusted, as REQ-082 intends — the
+// runner receives an already-configured client.
 func refuseSandboxTransport(hc *http.Client, mode Mode) error {
 	if hc == nil {
 		return nil
@@ -450,10 +522,15 @@ func modeList(modes []Mode) string {
 	return strings.Join(parts, ", ")
 }
 
-// findRecording returns the path of the first regular file in dir
-// whose name starts with id and ends with ".har", both compared
-// case-insensitively; an empty path means the directory was read but
-// holds no such file.
+// findRecording returns the path of the regular file in dir named
+// exactly "<id>.har", compared case-insensitively; an empty path means
+// the directory was read but holds no such file.
+//
+// The match is the whole name, not a prefix: "PROBE-0100.har" and
+// "PROBE-010-v2.har" both begin with PROBE-010, and a prefix rule
+// would let either one answer for it — a probe would then replay a
+// neighbour's recording and report a verdict that belongs to another
+// probe.
 //
 // The extension is part of the match, not a formality: only a HAR file
 // can be validated and replayed, so a leftover PROBE-010.yaml or
@@ -471,13 +548,12 @@ func findRecording(dir, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	prefix := strings.ToLower(id)
+	want := strings.ToLower(id) + ".har"
 	for _, e := range entries {
 		if !e.Type().IsRegular() {
 			continue
 		}
-		name := strings.ToLower(e.Name())
-		if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, ".har") {
+		if strings.ToLower(e.Name()) == want {
 			return filepath.Join(dir, e.Name()), nil
 		}
 	}

@@ -115,6 +115,13 @@ var credentialHeaders = map[string]struct{}{
 	"set-cookie":          {},
 }
 
+// A HAR cookies[] array is deliberately not modelled. The types above
+// carry no cookies field, so a cookie reaches a recording only through
+// the Cookie or Set-Cookie header, which the set above already
+// refuses; and keeping cookies out of a capture in the first place is
+// the recorder's capture-time job, not the validator's (REQ-082
+// requires redaction at capture time, never at review time).
+
 // credentialQueryKeys are request-URL query keys that carry a
 // credential in the URL itself, where stripping headers never reaches.
 var credentialQueryKeys = map[string]struct{}{
@@ -127,18 +134,56 @@ var credentialQueryKeys = map[string]struct{}{
 	"token":         {},
 }
 
+// bodyCredentialMarkers are substrings whose presence in a recorded
+// body means a credential survived capture-time redaction. The set is
+// deliberately narrow, because the bodies here are clinical openEHR
+// JSON: a generic word like "token", "secret" or "password" turns up
+// as legitimate content — an archetype term, a template path, a note —
+// so scanning for those would refuse sound recordings far more often
+// than leaked ones. Every marker below is an OAuth or OIDC field name
+// clinical content has no reason to carry.
+//
+// The quotes around the last one are part of the needle, not part of
+// the name: they keep it matching a JSON key rather than the word
+// authorization in prose. A refusal reports the name without them.
+var bodyCredentialMarkers = []string{
+	"access_token",
+	"refresh_token",
+	"id_token",
+	"client_secret",
+	`"authorization"`,
+}
+
+// authSchemes are the HTTP authentication schemes an Authorization
+// header value opens with, looked for separately from
+// [bodyCredentialMarkers] because the word on its own proves nothing:
+// "Basic metabolic panel" is a lab result. A match counts only when
+// the scheme is followed by a credential-shaped run — see
+// [credentialRun].
+var authSchemes = []string{"bearer ", "basic "}
+
+// credentialRunMin is how many credential-shaped characters must
+// follow an auth scheme before the pair reads as a leaked header value
+// rather than an English phrase. An encoded credential is far longer
+// than this; a clinical phrase breaks at its first space well before
+// it.
+const credentialRunMin = 16
+
 // ValidateHAR reads the HAR 1.2 recording at path and refuses one that
 // must not be replayed (REQ-082): unreadable or malformed bytes, the
 // wrong log version, a missing or incomplete ADR 0020 attestation, an
-// empty entries list, or a credential the capture-time redaction left
-// behind. Every refusal wraps [ErrUnsatisfiableMode], so a caller can
-// discard the recording on the sentinel alone.
+// empty entries list, an entry replay could not use, or a credential
+// the capture-time redaction left behind. Every refusal wraps
+// [ErrUnsatisfiableMode], so a caller can discard the recording on the
+// sentinel alone.
 //
-// A refusal names the offending entry and the header or query key, and
-// never the value or any recorded payload text (REQ-093). Removing the
-// _req082 check must fail TestHARRejectsMissingAttestation in
-// har_test.go; removing the credential scan must fail
-// TestHARRejectsUnredactedCapture there.
+// A refusal names the offending entry and the channel — the header,
+// the query key, the URL's userinfo, the body marker — and never the
+// value or any recorded payload text (REQ-093). Removing the _req082
+// check must fail TestHARRejectsMissingAttestation in har_test.go;
+// removing the credential scan must fail
+// TestHARRejectsUnredactedCapture there; removing the per-entry
+// structural check must fail TestHARRejectsUnreplayableEntry.
 func ValidateHAR(path string) (HAR, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -164,10 +209,41 @@ func ValidateHAR(path string) (HAR, error) {
 	if len(rec.Log.Entries) == 0 {
 		return HAR{}, fmt.Errorf("%w: HAR log.entries is empty", ErrUnsatisfiableMode)
 	}
+	if err := refuseUnreplayable(rec); err != nil {
+		return HAR{}, err
+	}
 	if err := refuseUnredacted(rec); err != nil {
 		return HAR{}, err
 	}
 	return rec, nil
+}
+
+// refuseUnreplayable rejects an entry replay has nothing to work with:
+// no request method, no request URL or one that does not parse, or no
+// response status. HAR 1.2 requires all three, and a recording missing
+// one is a capture that went wrong — better refused here, where the
+// caller is choosing a recording, than surfacing later as an unmatched
+// request or a zero-status response inside a probe.
+func refuseUnreplayable(rec HAR) error {
+	for i, e := range rec.Log.Entries {
+		if strings.TrimSpace(e.Request.Method) == "" {
+			return fmt.Errorf("%w: HAR entry %d request.method is empty", ErrUnsatisfiableMode, i)
+		}
+		raw := strings.TrimSpace(e.Request.URL)
+		if raw == "" {
+			return fmt.Errorf("%w: HAR entry %d request.url is empty", ErrUnsatisfiableMode, i)
+		}
+		// The parse error is dropped rather than wrapped: its message
+		// quotes the URL it failed on, and a recorded URL is exactly
+		// the payload text a refusal must not echo (REQ-093).
+		if _, err := url.Parse(raw); err != nil {
+			return fmt.Errorf("%w: HAR entry %d request.url does not parse", ErrUnsatisfiableMode, i)
+		}
+		if e.Response.Status <= 0 {
+			return fmt.Errorf("%w: HAR entry %d response.status is not set", ErrUnsatisfiableMode, i)
+		}
+	}
+	return nil
 }
 
 // refuseUnredacted scans every recorded request and response for a
@@ -185,8 +261,94 @@ func refuseUnredacted(rec HAR) error {
 		if key, found := credentialQueryKey(e.Request.URL); found {
 			return fmt.Errorf("%w: HAR entry %d request URL query key %q survived redaction", ErrUnsatisfiableMode, i, key)
 		}
+		if urlUserinfo(e.Request.URL) {
+			return fmt.Errorf("%w: HAR entry %d request URL userinfo survived redaction", ErrUnsatisfiableMode, i)
+		}
+		if e.Request.PostData != nil {
+			if marker, found := bodyCredential(e.Request.PostData.Text); found {
+				return fmt.Errorf("%w: HAR entry %d request body carries %q, which survived redaction", ErrUnsatisfiableMode, i, marker)
+			}
+		}
+		if marker, found := bodyCredential(e.Response.Content.Text); found {
+			return fmt.Errorf("%w: HAR entry %d response body carries %q, which survived redaction", ErrUnsatisfiableMode, i, marker)
+		}
 	}
 	return nil
+}
+
+// urlUserinfo reports whether rawURL carries a user:password
+// component. That is the credential channel neither a header strip nor
+// a query-key scan reaches — the credential rides in the URL's
+// authority instead. Only its presence is reported, never the userinfo
+// itself, so a refusal cannot echo it (REQ-093).
+func urlUserinfo(rawURL string) bool {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		// A URL that does not parse is refused by refuseUnreplayable
+		// before this scan runs, so there is nothing to report here.
+		return false
+	}
+	return u.User != nil
+}
+
+// bodyCredential reports the first credential marker in body, matched
+// case-insensitively, and returns the canonical marker from
+// [bodyCredentialMarkers] or [authSchemes] rather than any recorded
+// text — a refusal names what was found, never the credential itself
+// (REQ-093).
+func bodyCredential(body string) (string, bool) {
+	if body == "" {
+		return "", false
+	}
+	lower := strings.ToLower(body)
+	for _, marker := range bodyCredentialMarkers {
+		if strings.Contains(lower, marker) {
+			return strings.Trim(marker, `"`), true
+		}
+	}
+	for _, scheme := range authSchemes {
+		if schemeCarriesCredential(lower, scheme) {
+			return strings.TrimSpace(scheme), true
+		}
+	}
+	return "", false
+}
+
+// schemeCarriesCredential reports whether lower (already lower-cased)
+// holds scheme followed by something credential-shaped. Every
+// occurrence is tried, so a clinical phrase early in a body does not
+// hide a real header value later in it.
+func schemeCarriesCredential(lower, scheme string) bool {
+	rest := lower
+	for {
+		i := strings.Index(rest, scheme)
+		if i < 0 {
+			return false
+		}
+		rest = rest[i+len(scheme):]
+		if credentialRun(rest) >= credentialRunMin {
+			return true
+		}
+	}
+}
+
+// credentialRun counts the leading characters of s drawn from the
+// base64 and JWT alphabet — the shape an encoded credential has, and
+// the shape ordinary prose loses at its first space or punctuation.
+// The alphabet carries both letter cases, so the count does not depend
+// on the caller having lower-cased s.
+func credentialRun(s string) int {
+	n := 0
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '+', r == '/', r == '=', r == '-', r == '_', r == '.':
+		default:
+			return n
+		}
+		n++
+	}
+	return n
 }
 
 // credentialHeader reports the first credential-bearing header in

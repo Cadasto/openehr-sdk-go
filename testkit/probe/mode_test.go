@@ -38,8 +38,9 @@ func capture(id string, seen *[]*transport.Client) probe.Entry {
 
 // TestSandboxModeBuildsItsOwnClient pins that Sandbox mode is a real
 // backend choice: with no Client and no Sandbox configured the runner
-// still hands the probe a working sandbox-backed transport, and it
-// builds exactly one for the whole run.
+// still hands every probe a working sandbox-backed transport, and each
+// probe gets one of its own (see
+// [TestSandboxModeIsolatesProbesFromEachOther] for why).
 func TestSandboxModeBuildsItsOwnClient(t *testing.T) {
 	t.Parallel()
 	var seen []*transport.Client
@@ -56,14 +57,61 @@ func TestSandboxModeBuildsItsOwnClient(t *testing.T) {
 	if len(seen) != 2 {
 		t.Fatalf("probes saw %d clients, want 2", len(seen))
 	}
-	if seen[0] == nil {
-		t.Fatal("the probe was handed a nil client; sandbox mode must build one")
+	for i, c := range seen {
+		if c == nil {
+			t.Fatalf("probe %d was handed a nil client; sandbox mode must build one", i)
+		}
+		if _, ok := c.HTTPClient().Transport.(*sandbox.Backend); !ok {
+			t.Fatalf("sandbox-mode transport for probe %d = %T, want *sandbox.Backend", i, c.HTTPClient().Transport)
+		}
 	}
-	if seen[0] != seen[1] {
-		t.Fatal("each probe got its own client; the runner must build one per run")
+	if seen[0] == seen[1] {
+		t.Fatal("both probes got the same client; with no configured backend each probe must get its own")
 	}
-	if _, ok := seen[0].HTTPClient().Transport.(*sandbox.Backend); !ok {
-		t.Fatalf("sandbox-mode transport = %T, want *sandbox.Backend", seen[0].HTTPClient().Transport)
+}
+
+// TestSandboxModeIsolatesProbesFromEachOther pins REQ-082's isolation
+// rule: two probes in one Sandbox run must not observe each other's
+// writes unless the caller asked them to share a backend. The first
+// probe creates an EHR at a fixed id and the second looks for that
+// exact id — under one shared backend it would find it, so this fails
+// if the runner ever goes back to wiring a single sandbox per run.
+// Sharing on purpose is [TestSandboxModeUsesTheConfiguredBackend].
+func TestSandboxModeIsolatesProbesFromEachOther(t *testing.T) {
+	t.Parallel()
+	const id openehrclient.EHRID = "9a1f0f6e-1d2c-4c0b-9b3a-6d5e4c3b2a10"
+
+	create := probe.Entry{
+		ID:     "PROBE-077",
+		Effect: probe.EffectMutating,
+		Run: func(ctx context.Context, c *transport.Client) (probe.Result, error) {
+			if _, _, err := openehrclient.Create(ctx, c, openehrclient.WithEHRID(id)); err != nil {
+				return probe.Result{}, err
+			}
+			return probe.Result{Status: probe.StatusPass}, nil
+		},
+	}
+	lookFor := probe.Entry{
+		ID:     "PROBE-078",
+		Effect: probe.EffectReadOnly,
+		Run: func(ctx context.Context, c *transport.Client) (probe.Result, error) {
+			ok, err := openehrclient.Exists(ctx, c, id)
+			if err != nil {
+				return probe.Result{}, err
+			}
+			if ok {
+				return probe.Result{Status: probe.StatusFail, Detail: "the second probe saw the first probe's EHR; sandbox state leaked between probes"}, nil
+			}
+			return probe.Result{Status: probe.StatusPass}, nil
+		},
+	}
+
+	sum, err := probe.Run(t.Context(), probe.Config{Mode: probe.ModeSandbox}, []probe.Entry{create, lookFor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sum.Green() {
+		t.Fatalf("sandbox isolation: %s", sum.Results[1].Detail)
 	}
 }
 

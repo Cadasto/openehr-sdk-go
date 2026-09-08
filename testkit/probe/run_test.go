@@ -534,9 +534,54 @@ func TestRun_CassetteRefusesMalformedRecording(t *testing.T) {
 	}
 }
 
+// TestRun_CassetteRecordingNameIsExact pins that the corpus lookup
+// matches the whole file name, not a prefix of it. PROBE-0100.har and
+// PROBE-010-v2.har both start with PROBE-010; under a prefix rule
+// either could answer for it, and the probe would go green on a
+// recording captured for a different probe. The second half is the
+// can-fail control: the same lookup does bind the file actually named
+// after the probe, so the test fails if the match were tightened into
+// matching nothing at all.
+func TestRun_CassetteRecordingNameIsExact(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeRecording(t, dir, "PROBE-0100.har", validHAR)
+	writeRecording(t, dir, "PROBE-010-v2.har", validHAR)
+
+	var seen []*transport.Client
+	_, err := probe.Run(t.Context(), probe.Config{
+		Mode:         probe.ModeCassette,
+		Client:       mustClient(t),
+		RecordingDir: dir,
+	}, []probe.Entry{capture("PROBE-010", &seen)})
+	if !errors.Is(err, probe.ErrUnsatisfiableMode) {
+		t.Fatalf("Run(cassette, only PROBE-0100.har and PROBE-010-v2.har) error = %v, want %v", err, probe.ErrUnsatisfiableMode)
+	}
+	if !strings.Contains(err.Error(), "no recording for") {
+		t.Fatalf("Run(cassette, prefix neighbours only) error = %q, want it to say no recording was found", err)
+	}
+	if len(seen) != 0 {
+		t.Fatalf("the probe ran %d times against a neighbour's recording, want 0", len(seen))
+	}
+
+	// The exactly named recording is still found.
+	writeRecording(t, dir, "PROBE-010.har", validHAR)
+	sum, err := probe.Run(t.Context(), probe.Config{
+		Mode:         probe.ModeCassette,
+		Client:       mustClient(t),
+		RecordingDir: dir,
+	}, []probe.Entry{capture("PROBE-010", &seen)})
+	if err != nil {
+		t.Fatalf("Run(cassette, PROBE-010.har present) = %v, want it satisfied", err)
+	}
+	if !sum.Green() || len(seen) != 1 {
+		t.Fatalf("Run(cassette, PROBE-010.har present) green=%v probes run=%d, want green with one run", sum.Green(), len(seen))
+	}
+}
+
 // TestRun_CassetteIgnoresNonHARPrefixMatch pins that the corpus lookup
 // matches the extension as well as the id: a PROBE-010.yaml left
-// beside the recordings shares the prefix but is not a recording, so
+// beside the recordings shares the id but is not a recording, so
 // the run must report that no recording exists rather than adopt the
 // neighbour and fail to decode it.
 func TestRun_CassetteIgnoresNonHARPrefixMatch(t *testing.T) {
@@ -731,5 +776,92 @@ func TestRun_NoPartialExecutionOnUnsatisfiable(t *testing.T) {
 	}
 	if len(sum.Results) != 0 {
 		t.Fatalf("Summary.Results has %d entries, want 0 (nothing must run before every entry is checked)", len(sum.Results))
+	}
+}
+
+// TestRun_ResultIsAttributedToTheEntry pins that the runner, not the
+// probe, decides which id a result is filed under. A probe that
+// reports another probe's id — a stub copied from its neighbour, a
+// constant left behind after a rename — would otherwise put its
+// verdict on that other probe, and the summary would carry a row for a
+// probe that never ran.
+func TestRun_ResultIsAttributedToTheEntry(t *testing.T) {
+	t.Parallel()
+	misreporting := probe.Entry{
+		ID:     "PROBE-010",
+		InRepo: true,
+		Run: func(context.Context, *transport.Client) (probe.Result, error) {
+			return probe.Result{Probe: "PROBE-999", Status: probe.StatusPass}, nil
+		},
+	}
+	sum, err := probe.Run(t.Context(), probe.Config{Mode: probe.ModeSandbox}, []probe.Entry{misreporting})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := sum.Results[0].Probe; got != "PROBE-010" {
+		t.Fatalf("result probe id = %q, want %q — the runner stamps the entry it invoked", got, "PROBE-010")
+	}
+}
+
+// TestRun_CancelledContextStopsTheRun pins that cancellation is
+// honoured between probes and not only inside them: a probe that never
+// reads ctx would otherwise let a cancelled run work through the rest
+// of the selection. The probes the run never reached are recorded as
+// failures — the same treatment an erroring probe gets — so a caller
+// reading only the summary cannot mistake a stopped run for a
+// finished one, and the counts still add up to the selection.
+func TestRun_CancelledContextStopsTheRun(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	var ran []string
+	first := probe.Entry{
+		ID:     "PROBE-010",
+		InRepo: true,
+		Run: func(context.Context, *transport.Client) (probe.Result, error) {
+			ran = append(ran, "PROBE-010")
+			// The caller walks away while the first probe is running.
+			cancel()
+			return probe.Result{Status: probe.StatusPass}, nil
+		},
+	}
+	second := probe.Entry{
+		ID:     "PROBE-011",
+		InRepo: true,
+		Run: func(context.Context, *transport.Client) (probe.Result, error) {
+			ran = append(ran, "PROBE-011")
+			return probe.Result{Status: probe.StatusPass}, nil
+		},
+	}
+
+	sum, err := probe.Run(ctx, probe.Config{Mode: probe.ModeSandbox}, []probe.Entry{first, second})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run(cancelled ctx) error = %v, want it to carry %v", err, context.Canceled)
+	}
+	if len(ran) != 1 || ran[0] != "PROBE-010" {
+		t.Fatalf("probes run = %v, want only PROBE-010; the run must stop at the cancellation", ran)
+	}
+	if !strings.Contains(err.Error(), "PROBE-011") {
+		t.Fatalf("Run(cancelled ctx) error = %q, want it to name the probe the run stopped before", err)
+	}
+	if sum.Green() {
+		t.Fatal("Summary.Green() = true for a cancelled run; a run that stopped part-way must not read as green")
+	}
+
+	// The probe the run never reached is on the summary as a failure,
+	// not silently missing from it.
+	if len(sum.Results) != 2 {
+		t.Fatalf("summary has %d results for %d selected, want every entry accounted for", len(sum.Results), sum.Selected)
+	}
+	notRun := sum.Results[1]
+	if notRun.Probe != "PROBE-011" || notRun.Status != probe.StatusFail {
+		t.Fatalf("second result = %+v, want PROBE-011 recorded as a failure", notRun)
+	}
+	if !strings.HasPrefix(notRun.Detail, "not run:") {
+		t.Fatalf("second result detail = %q, want it to open with \"not run:\" so the row says why", notRun.Detail)
+	}
+	if got := sum.Passed + sum.Failed + sum.Skipped; got != sum.Selected {
+		t.Fatalf("passed+failed+skipped = %d for %d selected; a cancelled run must still account for every entry", got, sum.Selected)
 	}
 }

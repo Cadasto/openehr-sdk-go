@@ -178,6 +178,27 @@ func TestHARRejectsUnredactedCapture(t *testing.T) {
 				`{"request":{"method":"GET","url":"http://x","headers":[` + header("authorization") + `]},"response":{"status":200}}]`),
 			want: `entry 1 request header "authorization"`,
 		},
+		{
+			name: "userinfo in the request URL",
+			raw:  harWith(`[{"request":{"method":"GET","url":"http://operator:` + credentialValue + `@x/ehr"},"response":{"status":200}}]`),
+			want: "entry 0 request URL userinfo",
+		},
+		{
+			name: "access_token in the response body",
+			raw:  harWith(`[{"request":{"method":"GET","url":"http://x"},"response":{"status":200,"content":{"text":"{\"access_token\":\"` + credentialValue + `\"}"}}}]`),
+			want: `entry 0 response body carries "access_token"`,
+		},
+		{
+			name: "authorization key in the response body",
+			raw:  harWith(`[{"request":{"method":"GET","url":"http://x"},"response":{"status":200,"content":{"text":"{\"authorization\":\"` + credentialValue + `\"}"}}}]`),
+			want: `entry 0 response body carries "authorization"`,
+		},
+		{
+			name: "bearer token in the request body",
+			raw: harWith(`[{"request":{"method":"POST","url":"http://x","postData":{"text":"assertion=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"}},` +
+				`"response":{"status":200}}]`),
+			want: `entry 0 request body carries "bearer"`,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -220,5 +241,70 @@ func assertRefused(t *testing.T, raw, want string) {
 	}
 	if strings.Contains(err.Error(), credentialValue) {
 		t.Fatalf("ValidateHAR(%q) error = %q, want it never to echo the credential value (REQ-093)", path, err)
+	}
+}
+
+// TestHARRejectsUnreplayableEntry pins the per-entry structural check.
+// Replay needs a method, a URL it can parse, and a status code; an
+// entry missing one is a capture that went wrong, and refusing it here
+// — where a recording is being chosen — beats letting it surface later
+// as an unmatched request or a zero-status response inside a probe.
+func TestHARRejectsUnreplayableEntry(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{
+			name: "no request method",
+			raw:  harWith(`[{"request":{"method":"","url":"http://x"},"response":{"status":200}}]`),
+			want: "entry 0 request.method is empty",
+		},
+		{
+			name: "no request URL",
+			raw:  harWith(`[{"request":{"method":"GET"},"response":{"status":200}}]`),
+			want: "entry 0 request.url is empty",
+		},
+		{
+			name: "unparseable request URL",
+			raw:  harWith(`[{"request":{"method":"GET","url":"http://[::1:8080/ehr"},"response":{"status":200}}]`),
+			want: "entry 0 request.url does not parse",
+		},
+		{
+			name: "no response status",
+			raw:  harWith(`[{"request":{"method":"GET","url":"http://x"},"response":{}}]`),
+			want: "entry 0 response.status is not set",
+		},
+		{
+			name: "the second entry is the incomplete one",
+			raw: harWith(`[{"request":{"method":"GET","url":"http://x"},"response":{"status":200}},` +
+				`{"request":{"method":"GET","url":"http://x"},"response":{"status":0}}]`),
+			want: "entry 1 response.status is not set",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assertRefused(t, tc.raw, tc.want)
+		})
+	}
+}
+
+// TestHARAcceptsClinicalBodyThatReadsLikeACredential is the other half
+// of the body scan: it has to stay narrow enough for clinical content.
+// "Basic metabolic panel" is a lab test, "bearer of the card" is a
+// sentence, and the words token, secret and password all appear in
+// ordinary clinical text — a scan that refused those would reject
+// sound recordings far more often than leaked ones, and the corpus
+// would learn to work around it.
+func TestHARAcceptsClinicalBodyThatReadsLikeACredential(t *testing.T) {
+	t.Parallel()
+	body := `{\"name\":\"Basic metabolic panel\",\"note\":\"the bearer of the card; token given at reception, password on file\"}`
+	raw := harWith(`[{"request":{"method":"POST","url":"http://x/ehr","postData":{"text":"` + body + `"}},` +
+		`"response":{"status":201,"content":{"text":"` + body + `"}}}]`)
+	path := harFile(t, raw)
+	if _, err := probe.ValidateHAR(path); err != nil {
+		t.Fatalf("ValidateHAR(clinical body) error = %v, want nil — the body scan must not fire on clinical text", err)
 	}
 }
