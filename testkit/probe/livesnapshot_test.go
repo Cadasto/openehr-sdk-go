@@ -120,13 +120,16 @@ func coreLiveEntries(id openehrclient.EHRID) []probe.Entry {
 			Run: func(ctx context.Context, c *transport.Client) (probe.Result, error) {
 				v, err := system.Version(ctx, c)
 				if err != nil {
-					// The OPTIONS / capabilities operation is optional; a
-					// deployment that does not implement it answers 404.
-					// That is a skip with a named precondition, not a
-					// failure — the probe passes against a deployment that
-					// does serve it (REQ-082 Live).
+					// OPTIONS / is the openEHR REST System API's "Options and
+					// Conformance" operation: the spec defines it and services
+					// SHOULD respond (system-validation.openapi.yaml). A
+					// deployment that answers 404 (EHRbase 2.35.1 does) is
+					// deviating from that SHOULD — an accepted deployment
+					// deviation, recorded as a skip so the suite stays green
+					// while the gap stays visible. The probe passes against a
+					// deployment that serves it (REQ-082 Live).
 					if errors.Is(err, transport.ErrNotFound) {
-						return probe.Result{Status: probe.StatusSkip, Detail: "deployment does not implement the OPTIONS / capabilities operation"}, nil
+						return probe.Result{Status: probe.StatusSkip, Detail: "deployment does not implement the spec's OPTIONS / conformance operation (accepted deviation)"}, nil
 					}
 					return liveFail(err), nil
 				}
