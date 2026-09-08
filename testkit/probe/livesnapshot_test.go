@@ -148,17 +148,20 @@ func coreLiveEntries(id openehrclient.EHRID) []probe.Entry {
 	}
 }
 
-// TestLiveCoreSnapshot runs the core read/write suite against a live openEHR
-// deployment and logs each probe's verdict — a conformance snapshot of the
-// core EHR surface. It is opt-in and skipped in CI: OPENEHR_LIVE_EHRBASE names
-// the target, and OPENEHR_LIVE_ALLOW_MUTATING is the separate write opt-in
-// REQ-082 requires. It fails unless the run is green — an all-skipped or
-// failing run is not a pass (REQ-082) — so it doubles as a Live gate for the
-// core flows.
-func TestLiveCoreSnapshot(t *testing.T) {
+// runLiveSnapshot runs entries as a mutating Live snapshot against the
+// OPENEHR_LIVE_* deployment and fails unless the run is green. It is the shared
+// opt-in harness for the Live snapshots (core and composition): OPENEHR_LIVE_EHRBASE
+// names the target, OPENEHR_LIVE_ALLOW_MUTATING is the separate write opt-in
+// REQ-082 requires, and OPENEHR_LIVE_EHRBASE_BASIC (when set) carries user:pass
+// Basic credentials. It skips in CI (both env vars unset), pins the mutating
+// refusal before the write-opt-in skip, preflights reachability, strips userinfo
+// from the logged base, and enforces sum.Green() — an all-skipped or failing run
+// is not a pass (REQ-082). label names the snapshot in the log lines.
+func runLiveSnapshot(t *testing.T, label string, entries []probe.Entry) {
+	t.Helper()
 	base := os.Getenv("OPENEHR_LIVE_EHRBASE")
 	if base == "" {
-		t.Skip("set OPENEHR_LIVE_EHRBASE to a live openEHR REST base to run the core Live snapshot; not part of CI")
+		t.Skip("set OPENEHR_LIVE_EHRBASE to a live openEHR REST base to run the Live snapshot; not part of CI")
 	}
 
 	var src auth.TokenSource
@@ -174,21 +177,18 @@ func TestLiveCoreSnapshot(t *testing.T) {
 		src = s
 	}
 
-	id := openehrclient.EHRID(uuid.NewV4().String())
-	t.Logf("per-run EHR id %s", id)
-
 	hc := &http.Client{Timeout: 10 * time.Second}
 	cfg := probe.Config{Mode: probe.ModeLive, Endpoint: base, HTTPClient: hc, TokenSource: src}
 
-	// A live base alone does not authorise writing: exercise the mutating
-	// refusal before skipping, so the opt-in guard is pinned even when the env
-	// switch is unset (mirrors TestLiveCreateEHR — the create entry is mutating,
-	// so Run refuses the whole suite up front).
+	// A live base alone does not authorise writing: exercise the mutating refusal
+	// before skipping, so the opt-in guard is pinned even when the env switch is
+	// unset (mirrors TestLiveCreateEHR — a mutating entry makes Run refuse the
+	// whole suite up front).
 	if os.Getenv(envAllowMutating) == "" {
-		if _, err := probe.Run(t.Context(), cfg, coreLiveEntries(id)); !errors.Is(err, probe.ErrMutatingNotOptedIn) {
+		if _, err := probe.Run(t.Context(), cfg, entries); !errors.Is(err, probe.ErrMutatingNotOptedIn) {
 			t.Fatalf("Run without the mutating opt-in = %v, want %v", err, probe.ErrMutatingNotOptedIn)
 		}
-		t.Skipf("set %s to let the snapshot's create probe write to %s", envAllowMutating, safeBase(base))
+		t.Skipf("set %s to let the snapshot's mutating probes write to %s", envAllowMutating, safeBase(base))
 	}
 	cfg.AllowMutating = true
 
@@ -201,10 +201,10 @@ func TestLiveCoreSnapshot(t *testing.T) {
 		t.Skipf("deployment not reachable at %s", safeBase(base))
 	}
 
-	sum, err := probe.Run(t.Context(), cfg, coreLiveEntries(id))
+	sum, err := probe.Run(t.Context(), cfg, entries)
 
-	t.Logf("live core snapshot vs %s — %d passed, %d skipped, %d failed of %d",
-		safeBase(base), sum.Passed, sum.Skipped, sum.Failed, sum.Selected)
+	t.Logf("live %s snapshot vs %s — %d passed, %d skipped, %d failed of %d",
+		label, safeBase(base), sum.Passed, sum.Skipped, sum.Failed, sum.Selected)
 	for _, r := range sum.Results {
 		detail := r.Detail
 		if detail == "" {
@@ -217,7 +217,17 @@ func TestLiveCoreSnapshot(t *testing.T) {
 	// (sum.Failed==0 alone would miss it) and any probe failure; err carries the
 	// run's ErrAllSkipped / joined probe errors for the message (REQ-082).
 	if !sum.Green() {
-		t.Errorf("live core snapshot vs %s is not green: %d passed, %d skipped, %d failed of %d (run err: %v)",
-			safeBase(base), sum.Passed, sum.Skipped, sum.Failed, sum.Selected, err)
+		t.Errorf("live %s snapshot vs %s is not green: %d passed, %d skipped, %d failed of %d (run err: %v)",
+			label, safeBase(base), sum.Passed, sum.Skipped, sum.Failed, sum.Selected, err)
 	}
+}
+
+// TestLiveCoreSnapshot runs the core read/write suite against a live openEHR
+// deployment — a conformance snapshot of the core EHR surface. It is opt-in and
+// skipped in CI (see runLiveSnapshot) and fails unless the run is green, so it
+// doubles as a Live gate for the core flows.
+func TestLiveCoreSnapshot(t *testing.T) {
+	id := openehrclient.EHRID(uuid.NewV4().String())
+	t.Logf("per-run EHR id %s", id)
+	runLiveSnapshot(t, "core", coreLiveEntries(id))
 }

@@ -1036,6 +1036,7 @@ requirements:
       - testkit/probe/record_test.go
       - testkit/probe/cassette_test.go
       - testkit/probe/livesnapshot_test.go
+      - testkit/probe/livecomposition_test.go
       - cmd/probe-record/main_test.go
       - sandbox/backend_test.go
       - sandbox/independence_test.go
