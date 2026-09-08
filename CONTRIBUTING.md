@@ -53,7 +53,7 @@ AI coding assistants are a normal part of how this project is built; the tooling
 - **Same bar, no exceptions.** A REQ in the spec first for new behaviour, tests that fail if the guard is removed, `make ci` green, review.
 - **Look it up; don't take the model's word.** For openEHR facts (RM paths, terminology codes, wire shapes) use the ground-truth lookups in [`docs/ai-workflow.md` § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). An assistant's recollection of a spec is not a source.
 - **Keep private things out of the prompt.** No credentials, tokens, patient or personal data, or content from private repositories in an assistant's context.
-- **Licence provenance is on you.** Don't accept generated code that reproduces third-party code under a licence incompatible with MIT.
+- **Licence provenance is on you.** Don't accept generated code that reproduces third-party code under a licence incompatible with MIT. In-tree third-party material is inventoried in [`LICENSING.md`](LICENSING.md).
 
 The trailer names the tool, and the model when you know it. Trailers go at the end of the commit message: a blank line after the body, then one line per tool.
 

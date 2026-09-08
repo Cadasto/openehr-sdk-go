@@ -32,7 +32,9 @@ The SDK **MUST** set the `go.mod` `go` directive to the **current stable Go mino
 
 The SDK **MUST** be distributed under the MIT License.
 
-- **Lives in:** [`LICENSE`](../../LICENSE)
+Vendored third-party artefacts **MUST** retain their upstream licences and **MUST** be inventoried in [`LICENSING.md`](../../LICENSING.md). They are not re-licensed as MIT.
+
+- **Lives in:** [`LICENSE`](../../LICENSE), [`LICENSING.md`](../../LICENSING.md)
 
 ---
 

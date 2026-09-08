@@ -1,6 +1,6 @@
 # Third-party licenses — vendored cassettes
 
-Some cassette fixtures under this directory are vendored from upstream projects. Per the upstream license terms, copyright and license notices are retained here.
+Some cassette fixtures under this directory are vendored from upstream projects. Per the upstream license terms, copyright and license notices are retained here. The repository-wide inventory is [`LICENSING.md`](../../LICENSING.md); a full copy of Apache License 2.0 is [`licenses/Apache-2.0.txt`](../../licenses/Apache-2.0.txt).
 
 ## ehrbase/openEHR_SDK
 
@@ -16,6 +16,8 @@ you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
+
+(full text: [`licenses/Apache-2.0.txt`](../../licenses/Apache-2.0.txt))
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,13 +45,15 @@ limitations under the License.
 **Pinned commit:** recorded in [`ROBOT_SOURCE.txt`](ROBOT_SOURCE.txt) — the upstream commit the curated cassettes were ingested from (provenance pin, not a per-file `sha256` lock). The AQL conformance corpus from the same repository is vendored separately and carries its own pin, [`aql/conformance/AQL_SOURCE.txt`](aql/conformance/AQL_SOURCE.txt).
 
 ```
-Copyright vitasystems GmbH and Hannover Medical School (ehrbase project).
+Copyright (c) 2019 Vitasystems GmbH and Hannover Medical School.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
+
+(full text: licenses/Apache-2.0.txt)
 ```
 
 **Vendored:** Minimal-entry and `Test_dv_*` template triplets under `templates/` + `compositions/`; `persistent_minimal.en.v1`; flat `rm/ehr_status_*` and `rm/folder_*` JSON; `submissions/*.json` CONTRIBUTION create wire from `contributions/`; the FROM-family AQL combination CSVs under `aql/conformance/`.
