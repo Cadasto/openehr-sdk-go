@@ -4,8 +4,8 @@
 # commit the ingest read from — NOT a per-file sha256 lock.
 source_repo: ehrbase/integration-tests
 source_path: tests/robot/_resources/test_data_sets
-commit: 206ee8c5389e0c0d75cb2366b1dfb0987644a383
-commit_date: 2026-01-28T18:33:37+02:00
-recorded_utc: 2026-08-21
-source_tree: https://github.com/ehrbase/integration-tests/tree/206ee8c5389e0c0d75cb2366b1dfb0987644a383/tests/robot/_resources/test_data_sets
+commit: b4625fc28d6785c05adfd6db26339b4bb2272e06
+commit_date: 2026-08-24T13:05:04+03:00
+recorded_utc: 2026-09-08
+source_tree: https://github.com/ehrbase/integration-tests/tree/b4625fc28d6785c05adfd6db26339b4bb2272e06/tests/robot/_resources/test_data_sets
 license: Apache-2.0 (see THIRD_PARTY_LICENSES.md)

@@ -78,7 +78,7 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
 ### ehrbase (openEHR_SDK)
 
-**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (commit `4b5a710d3ddc3529a45222fb0398a2440bf83a9b`, 2026-05-17).
+**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (RM / template-triplet pin `4b5a710d3ddc3529a45222fb0398a2440bf83a9b`, 2026-05-17; WebTemplate + FLAT pin `e57511c6aca27ed501d31d663762c37c3491e74e`).
 
 **RM-only** (`rm/`, no OPT):
 
@@ -101,7 +101,7 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 | `IDCR - Laboratory Test Report.v0` | yes | — | yes | XML round-trip |
 | `IDCR -  Adverse Reaction List.v1` | yes | — | yes | XML round-trip (upstream double space in id) |
 
-**WebTemplate oracles** (`webtemplate/`, pinned at commit `22b01e0c99b53669394e56da29c2410838b5cf7e` — OPT beside its reference WebTemplate golden, stems match `template_id`):
+**WebTemplate oracles** (`webtemplate/`, pinned at commit `e57511c6aca27ed501d31d663762c37c3491e74e` — OPT beside its reference WebTemplate golden, stems match `template_id`):
 
 | Template id | Role | Size (OPT + golden) |
 |---|---|---|
@@ -128,6 +128,8 @@ The Corona pair is the largest cassette in the repo — the size is the cost of 
 **Persistent:** `persistent_minimal.en.v1` (OPT + JSON + XML, round-trip).
 
 **Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip); `Test_dv_*` (24 OPT+JSON pairs, round-trip except four `Test_dv_interval_*` — probes skip; see PROBE-038). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
+
+**Added at the `b4625fc` pin** (valid OPT + canonical JSON only): `family_history.v.1.2.3`, `my_spanish_template_v0`, `terminology_test.ehrbase.org.v1`, `terminology_test2.ehrbase.org.v1`.
 
 **RM JSON** (`rm/`, flat names): 8 `ehr_status_valid_*` in PROBE-030/033 (excludes ECIS alternate wire); 12 `ehr_status_invalid_*` on disk for client/validation work but excluded from probe discovery (`ehr_status_invalid_*` prefix); 14 `folder_*` including `folder_update_*`.
 

@@ -25,7 +25,7 @@
 # EXPECTED_COMMIT. Only a re-pin (or a missing pin file) moves the recorded date.
 set -euo pipefail
 
-EXPECTED_COMMIT=206ee8c5389e0c0d75cb2366b1dfb0987644a383
+EXPECTED_COMMIT=b4625fc28d6785c05adfd6db26339b4bb2272e06
 
 ROBOT="${ROBOT_ROOT:-/src/ehrbase/integration-tests/tests/robot/_resources/test_data_sets}"
 # Canonicalise: prefix-stripping below compares against
