@@ -1,7 +1,7 @@
 # REQ-116 compiled-path snapshot — templates pinning NO node name.
 # These paths must stay byte-identical for the whole of REQ-116:
 # a diff here is a regression, not an expected delta.
-# corpus: 58 OPTs — 9 pin a name, 47 pin none, 2 do not compile
+# corpus: 62 OPTs — 9 pin a name, 51 pin none, 2 do not compile
 
 ## definition/body_weight
 !! does not compile: template: invalid OPT: missing or empty template_id
@@ -1402,6 +1402,49 @@
 /content[openEHR-EHR-OBSERVATION.cluster_slot.v0]/data/events[at0002]/data
 /content[openEHR-EHR-OBSERVATION.cluster_slot.v0]/data/events[at0002]/data/items[at0004]
 
+## templates/family_history.v.1.2.3  nodes=41
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[at0005]
+/content[openEHR-EHR-EVALUATION.family_history.v2]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0004]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0004]/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0048]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0060]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0060]/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0060]/value/defining_code
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0016]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0016]/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0016]/value/defining_code
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0005]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0005]/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0023]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0023]/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0023]/value/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0058]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0058]/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0009]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0009]/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0009]/value/defining_code
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0010]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0010]/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0010]/value/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0014]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0014]/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0014]/value/defining_code
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0008]/items[at0014]/value
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0053]
+/content[openEHR-EHR-EVALUATION.family_history.v2]/protocol
+/content[openEHR-EHR-EVALUATION.family_history.v2]/protocol/items[at0045]
+
 ## templates/minimal_action_2  nodes=10
 /
 /category
@@ -1455,6 +1498,18 @@
 /content[openEHR-EHR-OBSERVATION.minimal.v1]/data/events[at0002]/data/items[at0004]
 /content[openEHR-EHR-OBSERVATION.minimal.v1]/data/events[at0002]/data/items[at0004]/value
 
+## templates/my_spanish_template_v0  nodes=10
+/
+/category
+/category/defining_code
+/context
+/content[openEHR-EHR-OBSERVATION.my_spanish_observation.v0]
+/content[openEHR-EHR-OBSERVATION.my_spanish_observation.v0]/data
+/content[openEHR-EHR-OBSERVATION.my_spanish_observation.v0]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.my_spanish_observation.v0]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.my_spanish_observation.v0]/data/events[at0002]/data/items[at0004]
+/content[openEHR-EHR-OBSERVATION.my_spanish_observation.v0]/data/events[at0002]/data/items[at0004]/value
+
 ## templates/nested.en.v1  nodes=21
 /
 /category
@@ -1491,6 +1546,44 @@
 
 ## templates/social
 !! does not compile: template: invalid OPT: expected element type <template> but have <OPERATIONAL_TEMPLATE>
+
+## templates/terminology_test.ehrbase.org.v1  nodes=17
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[at0002]
+/context/other_context/items[at0002]/value
+/context/other_context/items[at0005]
+/context/other_context/items[at0005]/value
+/context/other_context/items[at0006]
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]/data/items[at0004]
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]/data/items[at0004]/value
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]/data/items[at0004]/value/defining_code
+
+## templates/terminology_test2.ehrbase.org.v1  nodes=17
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[at0002]
+/context/other_context/items[at0002]/value
+/context/other_context/items[at0005]
+/context/other_context/items[at0005]/value
+/context/other_context/items[at0006]
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]/data/items[at0004]
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]/data/items[at0004]/value
+/content[openEHR-EHR-OBSERVATION.terminology_test.v0]/data/events[at0002]/data/items[at0004]/value/defining_code
 
 ## templates/vital_signs  nodes=41
 /

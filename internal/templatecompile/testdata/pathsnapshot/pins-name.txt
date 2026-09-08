@@ -1,7 +1,7 @@
 # REQ-116 compiled-path snapshot — templates pinning at least one node name.
 # Phase 3 adds name predicates to these paths; the diff on this file
 # is the deliberately recorded delta.
-# corpus: 58 OPTs — 9 pin a name, 47 pin none, 2 do not compile
+# corpus: 62 OPTs — 9 pin a name, 51 pin none, 2 do not compile
 
 ## templates/IDCR -  Adverse Reaction List.v1  nodes=67
 /

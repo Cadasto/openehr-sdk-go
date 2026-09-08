@@ -136,7 +136,7 @@
 			},
 			"wf_definition": {
 				"_type": "DV_PARSABLE",
-				"value": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Hello World</title></head><body>Hello World!</body></html>",
+				"value": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>Hello World</title></head><body>Hello World!</body></html>",
 				"formalism": "text/html"
 			},
 			"activities": [
@@ -174,7 +174,7 @@
 					},
 					"timing": {
 						"_type": "DV_PARSABLE",
-						"value": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Hello World</title></head><body>Hello World!</body></html>",
+						"value": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>Hello World</title></head><body>Hello World!</body></html>",
 						"formalism": "text/html"
 					},
 					"action_archetype_id": "/.*/",

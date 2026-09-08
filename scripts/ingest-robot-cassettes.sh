@@ -48,6 +48,23 @@ for opt in "$ROBOT"/valid_templates/all_types/Test_dv_*.opt; do
   json="$ROBOT/compositions/CANONICAL_JSON/${base}.json"
   [[ -f "$json" ]] || json="$ROBOT/compositions/CANONICAL_JSON/${base}__.json"
   [[ -f "$json" ]] || continue
+	cp "$opt" "$CAS/templates/${base}.opt"
+	cp "$json" "$CAS/compositions/${base}.json"
+done
+
+# all_types OPT+JSON pairs added after the 206ee8c pin (not Test_dv_*).
+# Valid canonical JSON only — invalid/update variants stay upstream.
+for base in \
+  family_history.v.1.2.3 \
+  my_spanish_template_v0 \
+  terminology_test.ehrbase.org.v1 \
+  terminology_test2.ehrbase.org.v1
+do
+  opt="$ROBOT/valid_templates/all_types/${base}.opt"
+  [[ -f "$opt" ]] || { echo "missing OPT: $opt" >&2; exit 1; }
+  json="$ROBOT/compositions/CANONICAL_JSON/${base}.json"
+  [[ -f "$json" ]] || json="$ROBOT/compositions/CANONICAL_JSON/${base}__.json"
+  [[ -f "$json" ]] || { echo "missing composition JSON for $base" >&2; exit 1; }
   cp "$opt" "$CAS/templates/${base}.opt"
   cp "$json" "$CAS/compositions/${base}.json"
 done

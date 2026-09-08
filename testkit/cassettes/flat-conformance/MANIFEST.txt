@@ -4,9 +4,9 @@ source_repo: ehrbase/openEHR_SDK
 source_opt: test-data/src/main/resources/operationaltemplate/conformance_ehrbase.de.v0.opt
 source_flat: test-data/src/main/resources/composition/flat/simSDT/conformance
 ref: develop
-commit: 30ab1c51308f053382365bcb59f55242419c6e85
-fetched_utc: 2026-07-29T12:55:02Z
-source_tree: https://github.com/ehrbase/openEHR_SDK/tree/30ab1c51308f053382365bcb59f55242419c6e85/test-data/src/main/resources/composition/flat/simSDT/conformance
+commit: e57511c6aca27ed501d31d663762c37c3491e74e
+fetched_utc: 2026-09-08T19:13:57Z
+source_tree: https://github.com/ehrbase/openEHR_SDK/tree/e57511c6aca27ed501d31d663762c37c3491e74e/test-data/src/main/resources/composition/flat/simSDT/conformance
 license: Apache-2.0 (see testkit/cassettes/THIRD_PARTY_LICENSES.md)
 #
 # sha256  path
