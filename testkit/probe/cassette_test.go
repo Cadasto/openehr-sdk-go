@@ -24,6 +24,64 @@ func ehrCreateRecording(t *testing.T) string {
 	return filepath.Join(filepath.Dir(file), "..", "recordings", "ehr-create.har")
 }
 
+// ehrLifecycleRecording is the vendored EHRbase capture of the create-then-read
+// path (POST /ehr, then GET and HEAD the created id).
+func ehrLifecycleRecording(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	return filepath.Join(filepath.Dir(file), "..", "recordings", "ehr-lifecycle.har")
+}
+
+// TestCassette_ReplaysEHRLifecycle replays the three-exchange capture and drives
+// the same create-then-confirm sequence a probe would: create, then GET and
+// HEAD the id the create returned. It witnesses that the recorded reader path
+// resolves the id from the recorded create response — coverage the
+// single-exchange POST /ehr recording cannot give, since GET and HEAD share a
+// path and are told apart only by method.
+func TestCassette_ReplaysEHRLifecycle(t *testing.T) {
+	t.Parallel()
+	har, err := probe.ValidateHAR(ehrLifecycleRecording(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := probe.NewClient("https://sandbox.local/openehr/v1", probe.NewReplayer(har).HTTPClient(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = "5fdb1b6a-fd89-4610-973e-e6a4d20b2cb5"
+
+	rec, meta, err := ehr.Create(t.Context(), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec == nil || rec.EHRID.Value != want {
+		t.Fatalf("ehr.Create EHRID = %v, want %s", rec, want)
+	}
+	if meta == nil || meta.ETag == "" {
+		t.Fatalf("ehr.Create metadata ETag = %v, want the recorded ETag", meta)
+	}
+
+	id := ehr.EHRID(rec.EHRID.Value)
+	got, _, err := ehr.Get(t.Context(), c, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.EHRID.Value != want {
+		t.Fatalf("ehr.Get EHRID = %v, want %s", got, want)
+	}
+
+	exists, err := ehr.Exists(t.Context(), c, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists {
+		t.Fatal("ehr.Exists on the recorded id = false, want true")
+	}
+}
+
 func TestCassette_ReplaysVendoredEHRCreate(t *testing.T) {
 	t.Parallel()
 	har, err := probe.ValidateHAR(ehrCreateRecording(t))

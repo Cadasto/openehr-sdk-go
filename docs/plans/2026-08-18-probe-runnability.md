@@ -1,13 +1,13 @@
 # Plan — Probe runnability: the sandbox transport and the three-mode runner
 
 **Date:** 2026-08-18
-**Status:** Phases 0–3 landed (Phase 0 2026-08-18; Phases 1–2 and the Cassette recorder / replayer / first corpus file 2026-09-08) — the Phase 3 corpus remainder and Phase 4 Live runs are the open work
+**Status:** Phases 0–2 landed (Phase 0 2026-08-18; Phases 1–2 2026-09-08); Phase 3 partial — the Cassette recorder, replayer, `cmd/probe-record` capture harness and the `ehr-create` / `ehr-lifecycle` recordings are in, the rest of the corpus and the Phase 4 Live runs are the open work
 **Owner:** SDK maintainers
 **Covers:** [REQ-082](../specifications/conformance.md#req-082--runnability) (Runnability, **Impl. `partial`**); unblocks the deferred wire-level probes named under [REQ-080](../specifications/conformance.md#req-080--openehr-wire-conformance)
 **Probes:** no new `PROBE-NNN` — this plan gives the existing catalog its missing execution modes. It promotes **PROBE-077**, **PROBE-078**, **PROBE-079** out of `Status: Deferred` (each one a landed, unit-covered requirement whose dedicated wire probe is unwritten) and unblocks **PROBE-065**, which is still `Status: Draft` — specified, never implemented. It is also the gate [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1 names for four `testkit/probes/rest/*` probes.
 **Implementation:** partial
 **Depends on:** landed `transport/` (REQ-090–098), the probe catalog in [conformance.md](../specifications/conformance.md), and the REQ-082 normative prose landed with this plan
-**Defers:** Cassette corpus coverage beyond the vendored `POST /ehr` (Phase 3 remainder). Encoding is settled ([ADR 0020](../adr/0020-cassette-recording-har.md), HAR 1.2). Live mode is no longer blocked: both CDRs are reachable locally (EHRbase `:8080`, FerroEHR `:8090`).
+**Defers:** Cassette corpus coverage beyond the two vendored recordings — `ehr-create` (`POST /ehr`) and `ehr-lifecycle` (`POST /ehr`, then `GET` and `HEAD` the created id) — which between them reach one catalog probe (Phase 3 remainder); and the full REQ-082 replay key, which today names method and resource path only. Encoding is settled ([ADR 0020](../adr/0020-cassette-recording-har.md), HAR 1.2). Live mode is no longer blocked: both CDRs are reachable locally (EHRbase `:8080`, FerroEHR `:8090`).
 
 ## Goal
 
@@ -51,7 +51,7 @@ Scoped to phases 1–2 (what is reachable now):
 | Phase 1 — shared result + runner | done — `testkit/probe`; the 12 per-package `Result` types are `type Result = probe.Result` aliases, not copies; refusals pinned by named tests; per-probe **Effect** metadata partial (5 of the 56 backend-facing entries carry it today; the 16 in-repo entries need none) |
 | Phase 2 — `sandbox/` transport | partial — EHR + scripted routes; versioned / definition / demographic / transport probes off httptest. Auth/discovery httptest remain (OIDC/JWKS, not CDR) |
 | Phase 4 — Live mode (local CDRs) | partial — runner Live path + `TestLiveCreateEHR`: `OPENEHR_LIVE_*` names the target, `OPENEHR_LIVE_ALLOW_MUTATING` is the separate write opt-in REQ-082 requires; both unset in CI, so the test skips without dialing |
-| Phase 3 — Cassette recording | partial — HAR 1.2 recorder/replayer landed; `testkit/recordings/ehr-create.har` is the first corpus file; unmatched replay fails closed. Remaining catalog probes still need recordings |
+| Phase 3 — Cassette recording | partial — HAR 1.2 recorder/replayer + the `cmd/probe-record` capture harness (`make probe-record`) landed; `testkit/recordings/{ehr-create,ehr-lifecycle}.har` are the first corpus files; a capture is validated and replayed in memory before it is published, and unmatched replay fails closed. Remaining catalog probes still need recordings |
 | `traceability.yaml` / REQ.md row | done (REQ-082 stays `partial`) |
 | `make spec-check` | |
 | `make ci` | |
@@ -80,7 +80,7 @@ Scoped to phases 1–2 (what is reachable now):
 
 **Tasks:** resolve STRAND-11 with an ADR against a real capture (done: ADR 0020); implement the recorder as a `transport` wrapper and the replayer as a transport; capture the corpus once; enforce capture-time redaction and provenance per REQ-082.
 
-**Landed:** `probe.Recorder` / `probe.Replayer`; unmatched replay returns `ErrUnmatchedRecording` without dialling; capture-time redaction is attested and content-scanned; `testkit/recordings/ehr-create.har` replays `ehr.Create`.
+**Landed:** `probe.Recorder` / `probe.Replayer`; the `cmd/probe-record` capture harness (`make probe-record`) drives a named scenario against a live CDR and re-validates the result before it is vendored; unmatched replay returns `ErrUnmatchedRecording` without dialling; capture-time redaction is attested and content-scanned; `testkit/recordings/ehr-create.har` replays `ehr.Create` and `ehr-lifecycle.har` the create-then-read path (`POST /ehr`, then `GET`/`HEAD` the created id).
 
 **Definition of done:** every probe that can run on replay does; an unmatched request fails closed. The unmatched-request half is done; catalog-wide recordings are not.
 

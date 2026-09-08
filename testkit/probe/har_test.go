@@ -264,6 +264,87 @@ func assertRefused(t *testing.T, raw, want string) {
 	}
 }
 
+// harProvenanceBaseURL puts rawURL in log._req082.provenance.base_url of an
+// otherwise-valid single-entry recording, so a case varies only the
+// provenance URL. The entry itself stays clean: what is under test is the
+// one URL capture-time redaction does not rewrite.
+func harProvenanceBaseURL(rawURL string) string {
+	return `{"log":{"version":"1.2","_req082":{"provenance":{"deployment":"d","base_url":` +
+		strconv.Quote(rawURL) +
+		`,"captured_at":"t","sdk_commit":"c"},"redaction":{"ran":true}},` +
+		`"entries":[{"request":{"method":"GET","url":"http://x"},"response":{"status":200}}]}}`
+}
+
+// TestHARRejectsCredentialInProvenanceBaseURL pins the provenance half of the
+// credential scan. The recorder strips userinfo and credential query keys from
+// every entry URL, but provenance carries the operator's base URL as given —
+// so it is the one channel where a credential reaches the recording with no
+// redaction pass in front of it (REQ-082: credentials MUST NOT reach disk).
+//
+// Removing the CredentialInURL call from HAR.Validate fails here.
+func TestHARRejectsCredentialInProvenanceBaseURL(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		base string
+		want string
+	}{
+		{"userinfo", "https://operator:" + credentialValue + "@cdr.example/openehr/v1", "userinfo"},
+		{"user-only userinfo", "https://" + credentialValue + "@cdr.example/openehr/v1", "userinfo"},
+		{"access_token query", "https://cdr.example/openehr/v1?access_token=" + credentialValue, "access_token"},
+		{"password query", "https://cdr.example/openehr/v1?password=" + credentialValue, "password"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assertRefused(t, harProvenanceBaseURL(tc.base), tc.want)
+		})
+	}
+}
+
+// TestHARAcceptsACleanProvenanceBaseURL is the positive control for the scan
+// above: an ordinary deployment base URL, query string and all, must still be
+// accepted. A provenance check that refused everything would pass the refusal
+// cases without proving anything.
+func TestHARAcceptsACleanProvenanceBaseURL(t *testing.T) {
+	t.Parallel()
+	for _, base := range []string{
+		"http://localhost:8080/ehrbase/rest/openehr/v1",
+		"https://cdr.example/openehr/v1?tenant=demo",
+		"", // a base URL is not among the fields provenance must carry
+	} {
+		if _, err := probe.ValidateHAR(harFile(t, harProvenanceBaseURL(base))); err != nil {
+			t.Fatalf("ValidateHAR with base_url %q = %v, want it accepted", base, err)
+		}
+	}
+}
+
+// TestCredentialInURLNamesTheChannelNotTheValue pins the exported helper the
+// capture harness shares with this validator (cmd/probe-record), so both
+// refuse the same set rather than keeping two copies that drift apart. It
+// reports the channel — a query-key name, or "userinfo" — never the
+// credential (REQ-093).
+func TestCredentialInURLNamesTheChannelNotTheValue(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		raw   string
+		want  string
+		found bool
+	}{
+		{"https://operator:" + credentialValue + "@cdr.example/openehr/v1", "userinfo", true},
+		{"https://cdr.example/openehr/v1?API_KEY=" + credentialValue, "api_key", true},
+		{"https://cdr.example/openehr/v1?tenant=demo", "", false},
+		{"", "", false},
+	} {
+		got, found := probe.CredentialInURL(tc.raw)
+		if found != tc.found || got != tc.want {
+			t.Fatalf("CredentialInURL(%q) = %q, %v; want %q, %v", tc.raw, got, found, tc.want, tc.found)
+		}
+		if strings.Contains(got, credentialValue) {
+			t.Fatalf("CredentialInURL(%q) echoed the credential value (REQ-093)", tc.raw)
+		}
+	}
+}
+
 // TestHARRejectsUnreplayableEntry pins the per-entry structural check.
 // Replay needs a method, a URL it can parse, and a status code; an
 // entry missing one is a capture that went wrong, and refusing it here

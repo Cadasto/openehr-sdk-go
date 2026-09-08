@@ -1003,7 +1003,7 @@ requirements:
     canonical: docs/specifications/conformance.md#req-082--runnability
     status: draft
     implementation: partial
-    packages: [testkit, testkit/probe, sandbox, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/demographic, testkit/probes/transport, testkit/probes/discovery, testkit/probes/template]
+    packages: [testkit, testkit/probe, cmd/probe-record, sandbox, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/demographic, testkit/probes/transport, testkit/probes/discovery, testkit/probes/template]
     adrs: [docs/adr/0020-cassette-recording-har.md]
     # PROBE-086 is In-repo (parity property; REQ-082's declared Modes class
     # for a probe that asserts no wire exchange — not a mode shortfall).
@@ -1011,12 +1011,13 @@ requirements:
     # `partial` remains correct: the runner, Sandbox EHR surface, and
     # scripted routes landed; CDR-facing probe tests (versioned,
     # definition, demographic, transport) no longer use httptest.
-    # Cassette encoding is HAR 1.2 (ADR 0020); recorder, replayer, and
-    # the first corpus file (testkit/recordings/ehr-create.har) landed.
-    # The replay key is method + REST-stripped path (Phase 3); REQ-082's
-    # full Cassette key also names the headers/body fields a probe's
-    # assertion depends on, deferred until a recording that branches on
-    # them lands (the ehr-create corpus does not).
+    # Cassette encoding is HAR 1.2 (ADR 0020); recorder, replayer, the
+    # cmd/probe-record capture harness (make probe-record), and the
+    # corpus files testkit/recordings/{ehr-create,ehr-lifecycle}.har
+    # landed. The replay key is method + REST-stripped path (Phase 3);
+    # REQ-082's full Cassette key also names the headers/body fields a
+    # probe's assertion depends on, deferred until a recording that
+    # branches on them lands (neither corpus recording does yet).
     # Remaining catalog probes still need recordings. Auth/discovery
     # probes still stand up httptest identity servers.
     # Live mode is wired: OPENEHR_LIVE_* names the target and
@@ -1030,6 +1031,7 @@ requirements:
       - testkit/probe/replay_test.go
       - testkit/probe/record_test.go
       - testkit/probe/cassette_test.go
+      - cmd/probe-record/main_test.go
       - sandbox/backend_test.go
       - sandbox/independence_test.go
       - sandbox/nilhandler_test.go

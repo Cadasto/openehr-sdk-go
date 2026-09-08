@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Cassette capture harness and a create-then-read recording (REQ-082).** `cmd/probe-record` (`make probe-record`) drives a registered scenario against a live CDR and publishes a recording only after validating and replaying it in memory, so a capture that leaks a credential never reaches disk and one that cannot be replayed never replaces the recording already there; `testkit/recordings/ehr-lifecycle.har` is the second corpus file, covering `POST /ehr` then `GET` and `HEAD` of the created id. `probe.HAR.Validate` judges an in-memory recording and `probe.CredentialInURL` names the credential channel a URL carries; provenance `base_url` is now scanned for credentials alongside the entry URLs.
+
 ## [0.26.0] - 2026-09-08
 
 Twenty-sixth `v0.x` minor — the openEHR Terminology is vendored and generated as the single home for every `openehr` code, and the probe catalog becomes runnable through a Sandbox/Cassette runner. **Breaking:** `testkit/probes/*` `Result` is now an alias of `probe.Result` with a typed `Status` (was a per-package struct with `Status string`), `contribution.Builder.Build` refuses an off-spec batch `audit.change_type` on every path including `WithAudit`, `ChangeType.IsValid` / `LifecycleState.IsValid` widen to full group membership, and the `ctx/` `math_function` default is `640|actual` (was `146|actual`).
