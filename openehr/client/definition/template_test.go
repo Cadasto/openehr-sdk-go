@@ -138,6 +138,11 @@ func TestUploadTemplate(t *testing.T) {
 	if captured.Header.Get("Content-Type") != "application/xml" {
 		t.Errorf("Content-Type = %q", captured.Header.Get("Content-Type"))
 	}
+	// The upload accepts both representations so an XML-only deployment
+	// (EHRbase 406s an application/json-only Accept) still interoperates.
+	if got, want := captured.Header.Get("Accept"), "application/json, application/xml"; got != want {
+		t.Errorf("Accept = %q, want %q", got, want)
+	}
 	if !bytes.Equal(capturedBody, opt) {
 		t.Error("upload body bytes mismatch")
 	}
@@ -171,6 +176,56 @@ func TestUploadTemplateLocationFallback(t *testing.T) {
 	}
 	if meta.TemplateID != "body_weight.v1" {
 		t.Errorf("fallback TemplateID = %q (want body_weight.v1)", meta.TemplateID)
+	}
+}
+
+// TestUploadTemplateXMLBodyFallsBackToLocation is the can-fail control for the
+// XML-representation arm: a deployment that serves the ADL 1.4 surface as XML
+// (EHRbase) answers 201 with an OperationalTemplate body and Content-Type
+// application/xml. That body is not JSON, so it is surfaced through the
+// Location-derived id rather than fed to json.Unmarshal — which would fail the
+// upload with a decode error. Delete the body sniff and this test fails.
+func TestUploadTemplateXMLBodyFallsBackToLocation(t *testing.T) {
+	opt := readCassette(t, "body_weight.opt")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><template><template_id><value>body_weight.v1</value></template_id></template>`))
+	}))
+	defer srv.Close()
+
+	meta, _, err := definition.UploadTemplate(t.Context(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt))
+	if err != nil {
+		t.Fatalf("UploadTemplate(XML body) = %v, want nil error (an XML body must not be decoded as JSON)", err)
+	}
+	if meta == nil || meta.TemplateID != "body_weight.v1" {
+		t.Fatalf("UploadTemplate(XML body) = %+v, want TemplateID body_weight.v1 from the Location header", meta)
+	}
+}
+
+// TestUploadTemplateJSONBackfillsTemplateIDFromLocation pins the backfill arm:
+// a JSON object body that omits template_id still identifies the template by
+// its Location. Without the backfill the caller gets an empty TemplateID.
+func TestUploadTemplateJSONBackfillsTemplateIDFromLocation(t *testing.T) {
+	opt := readCassette(t, "body_weight.opt")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"concept":"Body Weight"}`))
+	}))
+	defer srv.Close()
+
+	meta, _, err := definition.UploadTemplate(t.Context(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt))
+	if err != nil {
+		t.Fatalf("UploadTemplate(json without template_id) = %v, want nil error", err)
+	}
+	if meta == nil || meta.TemplateID != "body_weight.v1" {
+		t.Fatalf("UploadTemplate(json without template_id) TemplateID = %+v, want body_weight.v1 backfilled from Location", meta)
+	}
+	if meta.Concept != "Body Weight" {
+		t.Errorf("Concept = %q, want Body Weight (the JSON body must still decode)", meta.Concept)
 	}
 }
 

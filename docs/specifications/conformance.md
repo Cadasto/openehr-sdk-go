@@ -712,7 +712,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 - **Title:** `POST /definition/template/adl1.4` with an OPT body succeeds; a subsequent `GET` returns the same OPT bytes.
 - **Preconditions:** Backend supports ADL1.4 template upload at the standard path.
-- **Wire assertion:** Upload request carries `Content-Type: application/xml`; GET response body equals the uploaded OPT bytes (modulo backend-side reformatting documented per deployment).
+- **Wire assertion:** Upload request carries `Content-Type: application/xml` and `Accept: application/json, application/xml` — a JSON-only Accept is refused `406 Not Acceptable` by XML-only deployments (EHRbase), and the `201` body may be a JSON `TemplateIdentifier`, an XML `OperationalTemplate`, or empty (governed by `Prefer`), so the template id falls back to the `Location` header when the body is not a JSON object. GET response body equals the uploaded OPT bytes (modulo backend-side reformatting documented per deployment).
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/definition/probe_067_template_upload_round_trip.go`](../../testkit/probes/definition/probe_067_template_upload_round_trip.go).
 
