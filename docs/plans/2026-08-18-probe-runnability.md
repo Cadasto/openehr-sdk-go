@@ -24,7 +24,7 @@ The defect this closes is not a missing feature but a missing independent witnes
 Implementation may start when:
 
 - **`Covers:`** names REQ-082 — done; the normative prose (mode selection, probe contract, per-mode rules, cross-mode agreement) lands with this plan.
-- The recording-format fork is *recorded rather than settled* — STRAND-11, gated on a live capture. Phases 1–2 do not depend on it.
+- The recording-format fork is *settled* — STRAND-11 Resolved by [ADR 0020](../adr/0020-cassette-recording-har.md) (HAR 1.2, judged against a live capture). Phases 1–2 never depended on it.
 - REQ-082's fail-closed clauses are normative and name their refusal paths — an unsatisfiable mode fails loudly, an all-skipped run is not green, a `skip` is never a pass, an unclassified **Effect** is `mutating` — so phase 1 can pin each with a named test (the DoD lists them).
 - Phases below name concrete tasks and their verification command.
 
@@ -78,7 +78,7 @@ Scoped to phases 1–2 (what is reachable now):
 
 ### Phase 3 — Cassette recording and replay *(encoding settled: [ADR 0020](../adr/0020-cassette-recording-har.md))*
 
-**Tasks:** resolve STRAND-11 with an ADR against a real capture; implement the recorder as a `transport` wrapper and the replayer as a transport; capture the corpus once; enforce capture-time redaction and provenance per REQ-082.
+**Tasks:** resolve STRAND-11 with an ADR against a real capture (done: ADR 0020); implement the recorder as a `transport` wrapper and the replayer as a transport; capture the corpus once; enforce capture-time redaction and provenance per REQ-082.
 
 **Definition of done:** every probe that can run on replay does; an unmatched request fails closed.
 

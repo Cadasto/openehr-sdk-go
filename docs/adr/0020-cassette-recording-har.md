@@ -39,7 +39,8 @@ which file a second implementation (or a reviewer) can treat as the corpus.
 - Review diffs are larger and noisier than the YAML alternative. That cost is accepted so
   the corpus stays a published interchange format rather than an SDK-private schema.
 - Browser-oriented HAR fields (`timings`, `cache`, `pageref`) are unused. Recorders MAY omit
-  them; replayers MUST ignore them.
+  them, and replay does not read them: the normalised match key is defined in REQ-082
+  (conformance.md § Cassette mode) and these fields are outside it.
 - Reversing this later is a corpus migration: every checked-in recording would have to be
   rewritten. That is the one-way door this ADR exists to walk.
 

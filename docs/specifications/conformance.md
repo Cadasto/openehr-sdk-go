@@ -64,7 +64,7 @@ Status is the closed set `pass` / `fail` / `skip`:
 
 Every backend-facing probe **MUST** declare its effect as **read-only** or **mutating**, as an **Effect** field in its catalog entry — part of the probe's definition here, not a runner-side annotation.
 
-The catalog predates this field and no entry carries one yet. Until an entry is classified, a probe **MUST** be treated as **mutating**: the unclassified default is the restrictive one, so a writer cannot reach a live deployment merely because nobody got round to labelling it. Populating the catalog is phase 1 of the plan; an in-repo probe needs no declaration, having no backend to affect.
+The catalog predates this field and most entries do not carry one yet. Until an entry is classified, a probe **MUST** be treated as **mutating**: the unclassified default is the restrictive one, so a writer cannot reach a live deployment merely because nobody got round to labelling it. Populating the catalog is phase 1 of the plan; an in-repo probe needs no declaration, having no backend to affect.
 
 #### Sandbox mode
 
@@ -80,7 +80,7 @@ Recordings are checked-in evidence and are held to the same standard as any vend
 
 - A recording **MUST** carry its provenance — the deployment it came from, the date, and the SDK commit that captured it. A recording whose provenance cannot be stated **MUST** be discarded rather than replayed.
 - Recordings **MUST** be redacted **at capture time**, never at review time. Credentials (`Authorization`, cookies, tokens, client secrets, JWKS private material) and patient-identifying data **MUST NOT** reach disk. A recording **MUST** record that redaction ran, so an unredacted capture is detectable rather than merely unlikely.
-- Replay matching **MUST** be on a normalised request key — method, path, and the headers and body fields the probe's assertion depends on — **not** byte-exact equality: a capture necessarily carries timestamps, generated UUIDs, and `ETag` values that differ on every run, and byte-exact matching would make every recording single-use.
+- Replay matching **MUST** be on a normalised request key — method, path, and the headers and body fields the probe's assertion depends on — **not** byte-exact equality: a capture necessarily carries timestamps, generated UUIDs, and `ETag` values that differ on every run, and byte-exact matching would make every recording single-use. Browser-oriented HAR fields (`timings`, `cache`, `pageref`) are outside that key, and a replayer **MUST** ignore them.
 - An unmatched request **MUST** fail the probe. The replayer **MUST NOT** pass a request through to a network, and **MUST NOT** synthesise a plausible response — a recording with a gap is a recording that must be recaptured.
 - Where one probe issues the same normalised request more than once and expects different responses (a write followed by a read of what it wrote), the recording **MUST** preserve exchange order and the replayer **MUST** consume matches in that order.
 
