@@ -176,7 +176,7 @@ func TestReplayer_MethodIsPartOfTheKey(t *testing.T) {
 // refused everything would pass.
 func TestReplayer_HeadDoesNotAnswerGet(t *testing.T) {
 	t.Parallel()
-	const path = "/openehr/v1/ehr/b544d754-8e17-4502-afeb-64041028efd3"
+	const path = "/openehr/v1/ehr/5fdb1b6a-fd89-4610-973e-e6a4d20b2cb5"
 	for _, tc := range []struct{ recorded, driven string }{
 		{recorded: http.MethodGet, driven: http.MethodHead},
 		{recorded: http.MethodHead, driven: http.MethodGet},

@@ -51,7 +51,7 @@ func TestCassette_ReplaysEHRLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "b544d754-8e17-4502-afeb-64041028efd3"
+	const want = "5fdb1b6a-fd89-4610-973e-e6a4d20b2cb5"
 
 	rec, meta, err := ehr.Create(t.Context(), c)
 	if err != nil {
