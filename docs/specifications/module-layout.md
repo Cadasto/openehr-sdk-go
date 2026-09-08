@@ -82,7 +82,7 @@ Application-specific layer. Shipped in the same module in v1 for adoption conven
 | `internal/bmmgen/` | BMM code-generator implementation. Reads `resources/bmm/*.bmm.json` via `openehr/bmm/` and emits `openehr/rm/`, `openehr/aom/aom14/`, and the `typereg` registry. Not part of the public API. |
 | `cmd/termgen/` | CLI entry point for the openEHR terminology code generator (REQ-034): `-resources ./resources/terminology -out . [-verify]`. Driven by `make termgen` / `make termgen-verify`. |
 | `internal/termgen/` | Terminology code-generator implementation. Parses the pinned `resources/terminology/openehr_terminology.xml` and renders `openehr/terminology/openehr_gen.go`. Go-internal, consumed only by `cmd/termgen/`. |
-| `resources/` | Pinned SDK assets (BMM schemas under `resources/bmm/`, future XSDs and similar). See [`../resources/README.md`](../../resources/README.md) and [`../resources/bmm/README.md`](../../resources/bmm/README.md). |
+| `resources/` | Pinned SDK assets (BMM schemas under `resources/bmm/`, the openEHR Terminology under `resources/terminology/`, future XSDs and similar). See [`../resources/README.md`](../../resources/README.md), [`../resources/bmm/README.md`](../../resources/bmm/README.md) and [`../resources/terminology/README.md`](../../resources/terminology/README.md). |
 | `docs/` | Narrative documentation (architecture, AI workflow, ADRs, plans). |
 | `docs/specifications/` | Normative specifications — this tree. |
 
@@ -106,7 +106,7 @@ Application code (cmd/examples, downstream consumers)
     ├─ (building-block use, no transport) ──→ openehr/validation/   ──→ openehr/rm/  openehr/template/
     └─ (building-block use, no transport) ──→ openehr/template/
 
-openehr/{rm, serialize, instance, client/*} ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, REQ-034)
+openehr/{serialize, instance, client/*} ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
 
 cadasto/care      ──→ openehr/client/*
 cadasto/{extra, datamap, mpi, admin} ──→ transport/
@@ -123,7 +123,7 @@ testkit/  -. helpers for .-→ all of the above
 - `openehr/validation/` MUST NOT take on `openehr/serialize/`'s codec dependencies — validation is structural over the in-memory RM, not over the wire bytes.
 - `openehr/bmm/` MUST NOT depend on `transport/`, `auth/`, or any HTTP package — it is a building block (REQ-045).
 - `internal/bmmgen` depends on `openehr/bmm/` and the standard `text/template` / `go/format` packages — no SDK runtime packages.
-- `openehr/terminology/` is stdlib-only — it MUST NOT import any package of this module, since it sits *below* `openehr/rm` (REQ-034, enforced by `TestTerminologyForbiddenImports`).
+- `openehr/terminology/` is stdlib-only — the rule is REQ-034's, enforced by `TestTerminologyForbiddenImports`; it sits *below* `openehr/rm`, so `openehr/rm` may import it later without a cycle.
 - `internal/termgen` is a generator tool consumed only by `cmd/termgen` at build time — no library package imports it.
 
 ## REQ-010 — `cadasto/` cut line

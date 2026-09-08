@@ -71,6 +71,7 @@ flowchart TD
   App -. building-block .-> Template
   App -. building-block .-> Terminology
   Serialize --> Terminology
+  Client --> Terminology
 
   Care --> Client
   Cadasto --> Http
