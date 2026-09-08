@@ -108,7 +108,7 @@ Every REST call flows through three layers:
 
 ### Minimal wiring (in-process sandbox)
 
-[`sandbox.Backend`](../sandbox/doc.go) is an in-memory openEHR REST backend that implements `http.RoundTripper` — no listener, no credentials. Inject it as the client's Transport (REQ-021, REQ-082):
+[`sandbox.Backend`](../sandbox/doc.go) is an in-memory openEHR REST backend that implements `http.RoundTripper` — no listener, no credentials. Inject it as the client's Transport:
 
 ```go
 b := sandbox.New()
@@ -183,7 +183,7 @@ These rules show up in every public API. Breaking them usually means fighting th
 | Inject `*http.Client` — the SDK never allocates one | Connection pooling and TLS stay under your control. |
 | Use functional options (`transport.WithHTTPClient`, …) | No giant config structs; options compose cleanly. |
 | Prefer package-level functions over repository structs | Repositories exist as injection seams, not the primary surface. |
-| Import building blocks without `transport/` when you can | Keeps CLI tools and validators lightweight (REQ-013). |
+| Import building blocks without `transport/` when you can | Keeps CLI tools and validators lightweight. |
 
 Full normative list: [specifications/idiom.md](specifications/idiom.md).
 
