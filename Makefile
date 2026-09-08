@@ -223,7 +223,9 @@ probe-status: ## Show each PROBE's status and whether its test file exists
 	@bash scripts/probe-status.sh
 
 probe-record: ## Capture a REQ-082 Cassette recording from a live CDR (usage: make probe-record ARGS="-base URL -deployment NAME -scenario ehr-lifecycle"; see testkit/recordings/README.md)
-	@$(GO) run ./cmd/probe-record -sdk-commit "$$(git rev-parse HEAD 2>/dev/null)" $(ARGS)
+	@rev="$$(git rev-parse HEAD 2>/dev/null)"; \
+	 if [ -n "$$(git status --porcelain 2>/dev/null)" ]; then rev="$$rev-dirty"; fi; \
+	 $(GO) run ./cmd/probe-record -sdk-commit "$$rev" $(ARGS)
 
 ##@ Build
 

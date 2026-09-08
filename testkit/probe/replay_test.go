@@ -163,3 +163,52 @@ func TestReplayer_MethodIsPartOfTheKey(t *testing.T) {
 		t.Fatalf("POST against a GET-only recording of the same path: error = %v, want %v", err, probe.ErrUnmatchedRecording)
 	}
 }
+
+// TestReplayer_HeadDoesNotAnswerGet is the same pin on the pair the
+// ehr-lifecycle corpus actually contains: a GET and a HEAD of one EHR path,
+// told apart by nothing but the method. TestReplayer_MethodIsPartOfTheKey
+// uses GET against POST, which a key that merely separated body-bearing
+// methods from the rest would still pass; this one would not.
+//
+// Both directions are driven, so a key that folded HEAD into GET one way
+// round is caught either way, and each arm ends with the recording's own
+// method matching — the positive control, without which a replayer that
+// refused everything would pass.
+func TestReplayer_HeadDoesNotAnswerGet(t *testing.T) {
+	t.Parallel()
+	const path = "/openehr/v1/ehr/b544d754-8e17-4502-afeb-64041028efd3"
+	for _, tc := range []struct{ recorded, driven string }{
+		{recorded: http.MethodGet, driven: http.MethodHead},
+		{recorded: http.MethodHead, driven: http.MethodGet},
+	} {
+		t.Run(tc.recorded+"-recording", func(t *testing.T) {
+			t.Parallel()
+			newReplayer := func() *probe.Replayer {
+				return probe.NewReplayer(probe.HAR{Log: probe.HARLog{
+					Version: "1.2",
+					Entries: []probe.HAREntry{{
+						Request:  probe.HARRequest{Method: tc.recorded, URL: "http://cdr.example" + path},
+						Response: probe.HARResponse{Status: http.StatusOK, Content: probe.HARContent{Text: `{}`}},
+					}},
+				}})
+			}
+			drive := func(r *probe.Replayer, method string) error {
+				req, err := http.NewRequestWithContext(t.Context(), method, "https://sandbox.local"+path, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				resp, err := r.RoundTrip(req)
+				if resp != nil {
+					_ = resp.Body.Close()
+				}
+				return err
+			}
+			if err := drive(newReplayer(), tc.driven); !errors.Is(err, probe.ErrUnmatchedRecording) {
+				t.Fatalf("%s against a %s-only recording of the same path: error = %v, want %v", tc.driven, tc.recorded, err, probe.ErrUnmatchedRecording)
+			}
+			if err := drive(newReplayer(), tc.recorded); err != nil {
+				t.Fatalf("%s against its own %s recording = %v, want it served", tc.recorded, tc.recorded, err)
+			}
+		})
+	}
+}

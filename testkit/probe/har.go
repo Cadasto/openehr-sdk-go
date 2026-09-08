@@ -187,20 +187,10 @@ var authSchemes = []string{"bearer ", "basic "}
 const credentialRunMin = 16
 
 // ValidateHAR reads the HAR 1.2 recording at path and refuses one that
-// must not be replayed (REQ-082): unreadable or malformed bytes, the
-// wrong log version, a missing or incomplete ADR 0020 attestation, an
-// empty entries list, an entry replay could not use, or a credential
-// the capture-time redaction left behind. Every refusal wraps
+// must not be replayed (REQ-082): unreadable or malformed bytes, or
+// anything [HAR.Validate] refuses. Every refusal wraps
 // [ErrUnsatisfiableMode], so a caller can discard the recording on the
 // sentinel alone.
-//
-// A refusal names the offending entry and the channel — the header,
-// the query key, the URL's userinfo, the body marker — and never the
-// value or any recorded payload text (REQ-093). Removing the _req082
-// check must fail TestHARRejectsMissingAttestation in har_test.go;
-// removing the credential scan must fail
-// TestHARRejectsUnredactedCapture there; removing the per-entry
-// structural check must fail TestHARRejectsUnreplayableEntry.
 func ValidateHAR(path string) (HAR, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -210,29 +200,82 @@ func ValidateHAR(path string) (HAR, error) {
 	if err := json.Unmarshal(data, &rec); err != nil {
 		return HAR{}, fmt.Errorf("%w: decode HAR: %w", ErrUnsatisfiableMode, err)
 	}
-	if rec.Log.Version != "1.2" {
-		return HAR{}, fmt.Errorf("%w: HAR log.version = %q, want 1.2", ErrUnsatisfiableMode, rec.Log.Version)
-	}
-	if rec.Log.Req082 == nil {
-		return HAR{}, fmt.Errorf("%w: HAR log._req082 is required", ErrUnsatisfiableMode)
-	}
-	p := rec.Log.Req082.Provenance
-	if p.Deployment == "" || p.CapturedAt == "" || p.SDKCommit == "" {
-		return HAR{}, fmt.Errorf("%w: HAR log._req082.provenance is incomplete", ErrUnsatisfiableMode)
-	}
-	if !rec.Log.Req082.Redaction.Ran {
-		return HAR{}, fmt.Errorf("%w: HAR log._req082.redaction.ran is not true", ErrUnsatisfiableMode)
-	}
-	if len(rec.Log.Entries) == 0 {
-		return HAR{}, fmt.Errorf("%w: HAR log.entries is empty", ErrUnsatisfiableMode)
-	}
-	if err := refuseUnreplayable(rec); err != nil {
-		return HAR{}, err
-	}
-	if err := refuseUnredacted(rec); err != nil {
+	if err := rec.Validate(); err != nil {
 		return HAR{}, err
 	}
 	return rec, nil
+}
+
+// Validate refuses a recording that must not be replayed (REQ-082):
+// the wrong log version, a missing or incomplete ADR 0020 attestation,
+// provenance whose base URL carries a credential, an empty entries
+// list, an entry replay could not use, or a credential the
+// capture-time redaction left behind. Every refusal wraps
+// [ErrUnsatisfiableMode].
+//
+// It is separate from [ValidateHAR] so a capture tool can judge the
+// document it holds in memory, before any of it is written: REQ-082
+// requires that a credential never reach disk, and a validator that
+// only reads files can be asked that question only after it already
+// has (cmd/probe-record).
+//
+// A refusal names the offending entry and the channel — the header,
+// the query key, the URL's userinfo, the body marker — and never the
+// value or any recorded payload text (REQ-093). Removing the _req082
+// check must fail TestHARRejectsMissingAttestation in har_test.go;
+// removing the provenance URL scan must fail
+// TestHARRejectsCredentialInProvenanceBaseURL; removing the
+// credential scan must fail TestHARRejectsUnredactedCapture; removing
+// the per-entry structural check must fail
+// TestHARRejectsUnreplayableEntry.
+func (h HAR) Validate() error {
+	if h.Log.Version != "1.2" {
+		return fmt.Errorf("%w: HAR log.version = %q, want 1.2", ErrUnsatisfiableMode, h.Log.Version)
+	}
+	if h.Log.Req082 == nil {
+		return fmt.Errorf("%w: HAR log._req082 is required", ErrUnsatisfiableMode)
+	}
+	p := h.Log.Req082.Provenance
+	if p.Deployment == "" || p.CapturedAt == "" || p.SDKCommit == "" {
+		return fmt.Errorf("%w: HAR log._req082.provenance is incomplete", ErrUnsatisfiableMode)
+	}
+	// Provenance is the one recorded URL no redaction pass rewrites: the
+	// recorder strips entry URLs, but base_url is copied from the
+	// operator's -base as given. Scanning it here is what makes the
+	// redaction claim cover the whole document rather than its entries
+	// (REQ-082).
+	if channel, found := CredentialInURL(p.BaseURL); found {
+		return fmt.Errorf("%w: HAR log._req082.provenance.base_url carries a credential (%s)", ErrUnsatisfiableMode, channel)
+	}
+	if !h.Log.Req082.Redaction.Ran {
+		return fmt.Errorf("%w: HAR log._req082.redaction.ran is not true", ErrUnsatisfiableMode)
+	}
+	if len(h.Log.Entries) == 0 {
+		return fmt.Errorf("%w: HAR log.entries is empty", ErrUnsatisfiableMode)
+	}
+	if err := refuseUnreplayable(h); err != nil {
+		return err
+	}
+	return refuseUnredacted(h)
+}
+
+// CredentialInURL reports the credential channel rawURL carries — the
+// name of the offending query key, or "userinfo" — and never the value
+// (REQ-093). It is exported so a capture tool refuses a
+// credential-bearing base URL against the same set this validator
+// scans, instead of keeping a second copy that drifts out of step
+// (cmd/probe-record).
+func CredentialInURL(rawURL string) (string, bool) {
+	if rawURL == "" {
+		return "", false
+	}
+	if key, found := credentialQueryKey(rawURL); found {
+		return key, true
+	}
+	if urlUserinfo(rawURL) {
+		return "userinfo", true
+	}
+	return "", false
 }
 
 // refuseUnreplayable rejects an entry replay has nothing to work with:
