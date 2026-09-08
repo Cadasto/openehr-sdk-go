@@ -21,17 +21,12 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
+	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-// Result captures the outcome of a probe invocation.  Status is
-// "pass" / "fail" / "skip"; Detail is human-readable supplementary text.
-// Same shape as the other probe families.
-type Result struct {
-	Probe  string
-	Status string
-	Detail string
-}
+// Result is the shared probe outcome (REQ-082).
+type Result = probe.Result
 
 // refreshingTokenSource is a test-double TokenSource + Reauther used by
 // PROBE-007. Before Reauth is called it vends oldToken; after Reauth it

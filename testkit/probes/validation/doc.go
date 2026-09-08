@@ -17,11 +17,7 @@
 // the issue-code multiset per (OPT, root) shape via [validation.Validate].
 package validationprobes
 
-// Result captures the outcome of a probe invocation. Status is
-// "pass" / "fail" / "skip"; Detail is human-readable supplementary
-// text for failures or skips.
-type Result struct {
-	Probe  string
-	Status string
-	Detail string
-}
+import "github.com/cadasto/openehr-sdk-go/testkit/probe"
+
+// Result is the shared probe outcome (REQ-082).
+type Result = probe.Result

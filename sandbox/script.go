@@ -1,0 +1,197 @@
+package sandbox
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"net/http"
+	"slices"
+	"strings"
+)
+
+// scripted is one Handle/HandleFunc registration. An empty method or
+// path matches any request; otherwise method is exact and path must
+// equal either the full URL path or the stripped resource path — or,
+// with a trailing slash, prefix either as a subtree.
+type scripted struct {
+	method string
+	path   string
+	h      http.Handler
+}
+
+// Handle registers a scripted route that takes precedence over the
+// built-in EHR surface. Routes are tried in registration order; the
+// first match wins.
+//
+// An empty method matches any method; an empty path matches any
+// request path, so Handle("", "", h) is a catch-all — the
+// planted-backend shape probe tests use instead of httptest.NewServer
+// (REQ-082). A non-empty path matches the request's full URL path or
+// its resource-stripped form (see resourcePath) exactly; a path
+// ending in "/" additionally matches any request whose full or
+// resource-stripped path starts with it, i.e. that subtree. The match
+// is anchored: a route "/ehr/x" answers "/ehr/x" and its base-prefixed
+// form "/openehr/v1/ehr/x", but never "/composition/ehr/x" merely
+// because that path ends the same way.
+//
+// h == nil is not silently dropped: it registers a route that fails
+// closed, answering every matching request with 500 and a body naming
+// the method and path it was registered for. REQ-025 forbids treating
+// caller input as a silent no-op — a dropped nil handler would look
+// like "this route never fired" to a test asserting on it, rather
+// than the caller mistake it is.
+func (b *Backend) Handle(method, path string, h http.Handler) {
+	if h == nil {
+		h = nilHandler(method, path)
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.scripts = append(b.scripts, scripted{method: method, path: path, h: h})
+}
+
+// HandleFunc registers a scripted route (see [Backend.Handle]).
+// fn == nil behaves as in [Backend.Handle]: the route fails closed
+// rather than being
+// dropped.
+func (b *Backend) HandleFunc(method, path string, fn func(http.ResponseWriter, *http.Request)) {
+	if fn == nil {
+		b.Handle(method, path, nil)
+		return
+	}
+	b.Handle(method, path, http.HandlerFunc(fn))
+}
+
+// nilHandler answers every request with 500 and a body naming the
+// nil registration, so a nil Handle/HandleFunc call fails loudly at
+// request time instead of vanishing (REQ-025).
+func nilHandler(method, path string) http.Handler {
+	msg := fmt.Sprintf("sandbox: nil handler registered for %s %s", method, path)
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, msg, http.StatusInternalServerError)
+	})
+}
+
+// Scripted returns a Backend whose only behaviour is fn. Probe tests
+// use this in place of httptest.NewServer so planted and hostile
+// backends stay listener-free (REQ-082). fn == nil is not a caller
+// error: every request gets a 500 naming the registration (see
+// [Backend.Handle]).
+func Scripted(fn func(http.ResponseWriter, *http.Request)) *Backend {
+	b := New()
+	b.HandleFunc("", "", fn)
+	return b
+}
+
+func (b *Backend) matchScript(req *http.Request) http.Handler {
+	b.mu.Lock()
+	scripts := slices.Clone(b.scripts)
+	b.mu.Unlock()
+	for _, s := range scripts {
+		if s.match(req) {
+			return s.h
+		}
+	}
+	return nil
+}
+
+func (s scripted) match(req *http.Request) bool {
+	if s.method != "" && s.method != req.Method {
+		return false
+	}
+	if s.path == "" {
+		return true
+	}
+	p := ""
+	if req.URL != nil {
+		p = req.URL.Path
+	}
+	rp := resourcePath(p)
+	// Exact match on the full path or its resource-stripped form. The
+	// stripped form is what tolerates the deployment base: a route
+	// "/ehr/x" still answers an incoming "/openehr/v1/ehr/x", because
+	// resourcePath cuts the base away before the comparison. The match
+	// is anchored, not a loose suffix — a suffix would let "/ehr/x" also
+	// fire on "/composition/ehr/x", which is a different resource.
+	if p == s.path || rp == s.path {
+		return true
+	}
+	// A trailing slash means "this subtree": the registered path must
+	// start the request path, not merely appear somewhere inside it.
+	// Anchoring both sides matters now that resourcePath strips any
+	// base prefix — an unanchored Contains on the full path would let
+	// "/ehr/" match "/openehr/v1/composition/ehr/x".
+	if strings.HasSuffix(s.path, "/") && (strings.HasPrefix(p, s.path) || strings.HasPrefix(rp, s.path)) {
+		return true
+	}
+	return false
+}
+
+func serveScript(h http.Handler, req *http.Request) *http.Response {
+	rec := &recorder{header: make(http.Header)}
+	h.ServeHTTP(rec, req)
+	code := rec.code
+	if code == 0 {
+		code = http.StatusOK
+	}
+	body := rec.body.Bytes()
+	return &http.Response{
+		StatusCode:    code,
+		Status:        statusLine(code),
+		Header:        rec.snapshot(),
+		Body:          io.NopCloser(bytes.NewReader(body)),
+		ContentLength: int64(len(body)),
+		Proto:         "HTTP/1.1",
+		ProtoMajor:    1,
+		ProtoMinor:    1,
+		Request:       req,
+	}
+}
+
+// recorder is a listener-free http.ResponseWriter so scripted routes
+// can use the same HandlerFunc shape as httptest.
+//
+// snapped holds the headers as they stood at the first WriteHeader (or
+// first Write), mirroring the ResponseRecorder in net/http/httptest,
+// which snapshots
+// there too. Handing the live map to the response instead would let a
+// header set after WriteHeader show up in the sandbox response while a
+// real server, which has already put the header block on the wire,
+// drops it — a Sandbox-only behaviour REQ-082 forbids.
+type recorder struct {
+	header  http.Header
+	snapped http.Header
+	code    int
+	body    bytes.Buffer
+	wrote   bool
+}
+
+func (r *recorder) Header() http.Header { return r.header }
+
+func (r *recorder) Write(p []byte) (int, error) {
+	if !r.wrote {
+		r.WriteHeader(http.StatusOK)
+	}
+	return r.body.Write(p)
+}
+
+func (r *recorder) WriteHeader(code int) {
+	if r.wrote {
+		return
+	}
+	r.wrote = true
+	r.code = code
+	r.snapped = r.header.Clone()
+}
+
+// snapshot returns the headers the response carries: those captured at
+// the first WriteHeader/Write, or — for a handler that wrote nothing
+// at all — a copy of whatever it left in the header map.
+func (r *recorder) snapshot() http.Header {
+	if r.snapped != nil {
+		return r.snapped
+	}
+	if h := r.header.Clone(); h != nil {
+		return h
+	}
+	return make(http.Header)
+}

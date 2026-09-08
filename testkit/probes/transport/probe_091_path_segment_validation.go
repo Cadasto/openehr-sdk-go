@@ -78,8 +78,8 @@ const (
 //
 // Inputs:
 //   - captured returns the ESCAPED path of every request the backend has
-//     received so far, in order. The caller wires it up (an httptest
-//     recorder in Sandbox mode). The probe reads length deltas to count
+//     received so far, in order. The caller wires it up (a `sandbox.Backend`
+//     scripted route in Sandbox mode). The probe reads length deltas to count
 //     requests and inspects the last entry to check encode-once (REQ-095),
 //     so it MUST NOT be reset between legs.
 func Probe091PathSegmentValidation(ctx context.Context, c *transport.Client, captured func() []string) (Result, error) {

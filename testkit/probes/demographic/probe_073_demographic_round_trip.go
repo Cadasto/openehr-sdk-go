@@ -27,8 +27,8 @@ const probeVOID openehrclient.VersionedObjectID = "demographic-probe-vo-1"
 //     registry).
 //
 // All three MUST yield the same concrete type as the input party. The caller
-// wires c to a server that echoes the PARTY body for type t (Sandbox: an
-// httptest server; Cassette / Live later).
+// wires c to a server that echoes the PARTY body for type t (Sandbox: a
+// `sandbox.Backend` scripted route; Cassette / Live later).
 func Probe073DemographicRoundTrip(ctx context.Context, c *transport.Client, party rm.Party, t demographic.Type) (Result, error) {
 	r := Result{Probe: "PROBE-073"}
 	if c == nil {

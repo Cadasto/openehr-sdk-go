@@ -21,7 +21,7 @@ import (
 // at versions that do not yet exist at submission time, so a spec-
 // conformant CDR rejects it. The probe inspects the captured request
 // body (Sandbox mode; the caller supplies a transport.Client wired to
-// an httptest server) and asserts:
+// a `sandbox.Backend` scripted route) and asserts:
 //
 //   - `versions[i]._type` ∈ {"ORIGINAL_VERSION","IMPORTED_VERSION"}
 //   - `versions[i].data._type` is present (the inline payload)
