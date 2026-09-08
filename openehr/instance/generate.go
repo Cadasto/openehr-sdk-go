@@ -13,6 +13,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
 // Generate synthesises an RM instance for the compiled template's
@@ -842,11 +843,14 @@ func (g *generator) applyPrimitiveExample(
 // values land regardless of whether the OPT pinned them.
 func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	if c.Category.DefiningCode.CodeString == "" {
+		// The rubric comes from the pinned `composition category` group, never
+		// typed beside the code (REQ-034).
+		value, _ := terminology.CompositionCategory.Rubric("433")
 		c.Category = rm.DVCodedText{
-			Value: "event",
+			Value: value,
 			DefiningCode: rm.CodePhrase{
 				CodeString:    "433",
-				TerminologyID: rm.TerminologyID{Value: "openehr"},
+				TerminologyID: rm.TerminologyID{Value: terminology.ID},
 			},
 		}
 	}
@@ -877,18 +881,21 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	// "Populated" is therefore not enough: a template that leaves setting
 	// unconstrained lets the generic example synthesiser invent an
 	// archetype-local code (`local`/`example`), which reads as populated and
-	// still violates the invariant. Pin the documented default whenever what we
-	// hold is not openehr-coded, so the generator cannot emit an RM-invalid
-	// composition (REQ-107). The residual case — an `openehr` terminology with a
-	// code outside the `setting` group — needs the terminology tables to detect
-	// and is left to the RM-floor validator (REQ-112).
+	// still violates the invariant. Nor is "openehr-coded" enough: a template
+	// can pin an `openehr` code that is not in the group. All three cases now
+	// take the documented default, because the pinned terminology tables
+	// (REQ-034) answer membership directly — so the generator cannot emit a
+	// composition that breaks Setting_valid (REQ-107). Checking the invariant on
+	// a composition the generator did not build stays a REQ-112 RM-floor job.
 	if c.Context.Setting.DefiningCode.CodeString == "" ||
-		c.Context.Setting.DefiningCode.TerminologyID.Value != "openehr" {
+		c.Context.Setting.DefiningCode.TerminologyID.Value != terminology.ID ||
+		!terminology.Setting.Has(c.Context.Setting.DefiningCode.CodeString) {
+		rubric, _ := terminology.Setting.Rubric("238")
 		c.Context.Setting = rm.DVCodedText{
-			Value: "other care",
+			Value: rubric,
 			DefiningCode: rm.CodePhrase{
 				CodeString:    "238",
-				TerminologyID: rm.TerminologyID{Value: "openehr"},
+				TerminologyID: rm.TerminologyID{Value: terminology.ID},
 			},
 		}
 	}

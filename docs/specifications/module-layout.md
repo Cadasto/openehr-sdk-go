@@ -30,6 +30,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `openehr/rm/` | RM types (clinical + demographic) as concrete structs with embedded base types; abstract RM categories as Go interfaces. **Generated** from the pinned `openehr_rm_*.bmm.json` schema (REQ-042). |
 | `openehr/rm/typereg/` | Central type registry mapping `_type` discriminator → concrete Go type. **Generated** as part of the RM emission. |
 | `openehr/bmm/` | Public BMM loader and in-memory model (`bmm.Schema`, `bmm.Class`, `bmm.Property`, …). Parses P_BMM JSON; resolves `includes`. Importable as a building block (REQ-013, REQ-045). |
+| `openehr/terminology/` | The openEHR Terminology's `openehr` groups and code sets as compiled-in, closed tables — **generated** from the pinned `resources/terminology/openehr_terminology.xml` by `cmd/termgen` (REQ-034). Stdlib-only; sits below `openehr/rm` and joins the REQ-013 set. |
 | `openehr/serialize/` | Canonical JSON / XML, FLAT, STRUCTURED codecs. |
 | `openehr/validation/` | Validation interfaces and implementations: Composition vs OPT, demographic structural validation, AQL syntax / path resolution. |
 | `openehr/template/` | ADL 1.4 operational template (OPT: `.opt` / `OPERATIONAL_TEMPLATE`) parse and path utilities. **Consumes** `openehr/aom/` types but does not own them. OET (`.oet`) is out of scope for v1. |
@@ -79,7 +80,9 @@ Application-specific layer. Shipped in the same module in v1 for adoption conven
 | `cmd/bmmgen/` | CLI entry point for the BMM-driven code generator (REQ-042). |
 | `internal/` | Implementation helpers excluded from BC promises (Go convention). |
 | `internal/bmmgen/` | BMM code-generator implementation. Reads `resources/bmm/*.bmm.json` via `openehr/bmm/` and emits `openehr/rm/`, `openehr/aom/aom14/`, and the `typereg` registry. Not part of the public API. |
-| `resources/` | Pinned SDK assets (BMM schemas under `resources/bmm/`, future XSDs and similar). See [`../resources/README.md`](../../resources/README.md) and [`../resources/bmm/README.md`](../../resources/bmm/README.md). |
+| `cmd/termgen/` | CLI entry point for the openEHR terminology code generator (REQ-034): `-resources ./resources/terminology -out . [-verify]`. Driven by `make termgen` / `make termgen-verify`. |
+| `internal/termgen/` | Terminology code-generator implementation. Parses the pinned `resources/terminology/openehr_terminology.xml` and renders `openehr/terminology/openehr_gen.go`. Go-internal, consumed only by `cmd/termgen/`. |
+| `resources/` | Pinned SDK assets (BMM schemas under `resources/bmm/`, the openEHR Terminology under `resources/terminology/`, future XSDs and similar). See [`../resources/README.md`](../../resources/README.md), [`../resources/bmm/README.md`](../../resources/bmm/README.md) and [`../resources/terminology/README.md`](../../resources/terminology/README.md). |
 | `docs/` | Narrative documentation (architecture, AI workflow, ADRs, plans). |
 | `docs/specifications/` | Normative specifications — this tree. |
 
@@ -103,6 +106,8 @@ Application code (cmd/examples, downstream consumers)
     ├─ (building-block use, no transport) ──→ openehr/validation/   ──→ openehr/rm/  openehr/template/
     └─ (building-block use, no transport) ──→ openehr/template/
 
+openehr/{serialize, instance, client/*} ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
+
 cadasto/care      ──→ openehr/client/*
 cadasto/{extra, datamap, mpi, admin} ──→ transport/
 
@@ -118,6 +123,8 @@ testkit/  -. helpers for .-→ all of the above
 - `openehr/validation/` MUST NOT take on `openehr/serialize/`'s codec dependencies — validation is structural over the in-memory RM, not over the wire bytes.
 - `openehr/bmm/` MUST NOT depend on `transport/`, `auth/`, or any HTTP package — it is a building block (REQ-045).
 - `internal/bmmgen` depends on `openehr/bmm/` and the standard `text/template` / `go/format` packages — no SDK runtime packages.
+- `openehr/terminology/` is stdlib-only — the rule is REQ-034's, enforced by `TestTerminologyForbiddenImports`; it sits *below* `openehr/rm`, so `openehr/rm` may import it later without a cycle.
+- `internal/termgen` is a generator tool consumed only by `cmd/termgen` at build time — no library package imports it.
 
 ## REQ-010 — `cadasto/` cut line
 
@@ -135,7 +142,7 @@ No `cadasto/<X>` package **MAY** import another `cadasto/<Y>` package directly. 
 
 ## REQ-013 — Building-block independence
 
-Each of `openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/template`, `openehr/aql`, and the AQL building blocks `openehr/aql/parse` + `openehr/aql/lint` + `openehr/aql/contain` + `openehr/aql/internal/semcheck` **MUST** be importable and useful without constructing an authenticated client or instantiating `transport/` or `auth/`. (`aql/parse` pulls the pure-Go ANTLR runtime — its sole third-party dependency — but neither it nor `aql/lint` imports `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`; `aql/contain` imports only `openehr/rm`, `openehr/rm/rminfo`, and the standard library; `openehr/aql` itself gained its first in-module dependency with REQ-162 — an import of `aql/contain` and the Go-internal `aql/internal/semcheck`, the containment verdict→code engine REQ-161's linter also consumes (one engine, two adapters, no drift) — but still imports none of the wire layers or `openehr/validation`; `semcheck` is Go-internal, so it adds no public API, and its own non-test imports are limited to `aql/contain` and the standard library; enforced by `TestAQLParseForbiddenImports` / `TestAQLLintForbiddenImports` / `TestContainForbiddenImports` / `TestAQLForbiddenImports` / `TestSemcheckForbiddenImports`.)
+Each of `openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/template`, `openehr/terminology`, `openehr/aql`, and the AQL building blocks `openehr/aql/parse` + `openehr/aql/lint` + `openehr/aql/contain` + `openehr/aql/internal/semcheck` **MUST** be importable and useful without constructing an authenticated client or instantiating `transport/` or `auth/`. (`aql/parse` pulls the pure-Go ANTLR runtime — its sole third-party dependency — but neither it nor `aql/lint` imports `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`; `aql/contain` imports only `openehr/rm`, `openehr/rm/rminfo`, and the standard library; `openehr/terminology` imports nothing outside the standard library — it sits below `openehr/rm`, so `openehr/rm` may import it later (REQ-034); `openehr/aql` itself gained its first in-module dependency with REQ-162 — an import of `aql/contain` and the Go-internal `aql/internal/semcheck`, the containment verdict→code engine REQ-161's linter also consumes (one engine, two adapters, no drift) — but still imports none of the wire layers or `openehr/validation`; `semcheck` is Go-internal, so it adds no public API, and its own non-test imports are limited to `aql/contain` and the standard library; enforced by `TestAQLParseForbiddenImports` / `TestAQLLintForbiddenImports` / `TestContainForbiddenImports` / `TestAQLForbiddenImports` / `TestSemcheckForbiddenImports` / `TestTerminologyForbiddenImports`.)
 
 See [use-cases.md § Building-block use cases](use-cases.md#building-block-use-cases).
 

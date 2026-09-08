@@ -58,7 +58,9 @@ endef
 .PHONY: help doctor go-version image-dev \
         fmt fmt-check vet \
         codegen codegen-verify antlr-image aqlgen aqlgen-verify \
+        termgen termgen-verify \
         its-rest-sync its-rest-check \
+        terminology-sync terminology-check terminology-verify \
         test test-race \
         lint lint-ci \
         mod-tidy mod-tidy-check \
@@ -132,6 +134,12 @@ codegen: ## Regenerate RM and AOM 1.4 from pinned BMM sources
 codegen-verify: ## Fail if generated code drifts from resources/bmm
 	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out . -verify
 
+termgen: ## Regenerate openehr/terminology from the pinned resources/terminology/openehr_terminology.xml
+	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out .
+
+termgen-verify: ## Fail if openehr/terminology drifts from resources/terminology
+	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out . -verify
+
 antlr-image: ## Build the ANTLR codegen image (maintainer-only; needs Docker + network)
 	@docker build --target antlr --build-arg ANTLR_VERSION=$(ANTLR_VERSION) -t $(ANTLR_IMAGE) .
 
@@ -168,9 +176,18 @@ flat-conformance-check: ## Verify the vendored FLAT conformance corpus matches M
 flat-conformance-verify: ## Offline sha256 integrity of the vendored FLAT corpus (no network, no curl/jq) — run by `make ci`
 	@./scripts/sync-flat-conformance.sh verify
 
+terminology-sync: ## Vendor the openEHR Terminology (openehr_terminology.xml) into resources/terminology/ and regenerate the accessor (needs network; TERMINOLOGY_REF to pin)
+	@./scripts/sync-terminology.sh sync
+
+terminology-check: ## Verify the vendored terminology matches MANIFEST + report a newer upstream release (offline integrity; network for drift)
+	@./scripts/sync-terminology.sh check
+
+terminology-verify: ## Offline sha256 integrity of the vendored openEHR Terminology (no network, no curl/jq) — run by `make ci`
+	@./scripts/sync-terminology.sh verify
+
 ##@ Test
 
-test: codegen-verify aqlgen-verify ## Run unit tests (includes codegen drift checks)
+test: codegen-verify aqlgen-verify termgen-verify ## Run unit tests (includes codegen drift checks)
 	@$(GO) test ./... -count=1
 
 test-race: ## Run unit tests with -race (main-branch CI job)
@@ -215,4 +232,4 @@ clean: ## Remove bin/, coverage artefacts, and *.out files
 
 ##@ CI
 
-ci: fmt-check mod-tidy-check vet test lint spec-check flat-conformance-verify build ## Full local PR gate (see docs/ci.md)
+ci: fmt-check mod-tidy-check vet test lint spec-check flat-conformance-verify terminology-verify build ## Full local PR gate (see docs/ci.md)

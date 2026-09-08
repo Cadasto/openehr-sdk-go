@@ -50,7 +50,7 @@ Full taxonomy and the package tree are in [module-layout.md](docs/specifications
 - No `cadasto/<X>` imports another `cadasto/<Y>` directly — share through openEHR-core types or interface contracts.
 - `auth/` is layered: generic `TokenSource` at the bottom; SMART (`auth/smart`) and other providers on top.
 - `internal/…` is consumer-invisible and excluded from semver promises.
-- **Building-block independence (REQ-013):** `openehr/{rm,serialize,validation,template}` and the AQL blocks `openehr/aql` + `aql/parse` + `aql/lint` + `aql/contain` MUST be usable standalone, with no `transport/` or `auth/` import. `openehr/aql` is no longer models-only — it imports `aql/contain` and the Go-internal `aql/internal/semcheck` for REQ-162 containment verification.
+- **Building-block independence (REQ-013):** `openehr/{rm,serialize,validation,template,terminology}` and the AQL blocks `openehr/aql` + `aql/parse` + `aql/lint` + `aql/contain` MUST be usable standalone, with no `transport/` or `auth/` import. `openehr/aql` is no longer models-only — it imports `aql/contain` and the Go-internal `aql/internal/semcheck` for REQ-162 containment verification. `openehr/terminology` is stdlib-only and sits below `openehr/rm` (REQ-034).
 
 ## Code style and conventions
 

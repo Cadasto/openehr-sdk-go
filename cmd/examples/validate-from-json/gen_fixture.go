@@ -14,6 +14,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -94,13 +95,21 @@ func validateAgainstVitalSigns(comp *rm.Composition) validation.Result {
 }
 
 func minimalComposition() *rm.Composition {
+	// Source the category rubric and terminology id from the pin rather than
+	// typing them beside the code — the one-home-per-code rule (REQ-034). A
+	// miss means the pin no longer carries `event`; stop rather than write a
+	// fixture with an empty Category.value.
+	eventRubric, ok := terminology.CompositionCategory.Rubric("433")
+	if !ok {
+		panic("code 433 (event) is not a member of the pinned composition_category group")
+	}
 	return &rm.Composition{
 		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
 		Name:            rm.DVText{Value: "Encounter"},
 		Category: rm.DVCodedText{
-			DVText: rm.DVText{Value: "event"},
+			DVText: rm.DVText{Value: eventRubric},
 			DefiningCode: rm.CodePhrase{
-				TerminologyID: rm.TerminologyID{Value: "openehr"},
+				TerminologyID: rm.TerminologyID{Value: terminology.ID},
 				CodeString:    "433",
 			},
 		},

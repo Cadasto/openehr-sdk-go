@@ -114,7 +114,7 @@ The SMART-on-openEHR configuration document advertised by the deployment — typ
 An executable assertion that the SDK exercises against the sandbox transport, a replayed recording, or a live deployment (REQ-082), to verify wire-level conformance to openEHR REST + SMART-on-openEHR. Each probe has a stable `PROBE-NNN` ID (see [conformance.md](conformance.md)). The shared result type and runner live in [`testkit/probe`](../../testkit/probe/).
 
 **Building-block use case**
-A consumer that imports one core package (`openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/aql` models-only, `openehr/template`) without constructing an authenticated client. The SDK's surface MUST support this (REQ-013).
+A consumer that imports one core package (`openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/aql` models-only, `openehr/template`, `openehr/terminology`) without constructing an authenticated client. The SDK's surface MUST support this (REQ-013).
 
 **Sandbox**
 The in-memory `http.RoundTripper` that backs REQ-082's Sandbox mode ([`sandbox.Backend`](../../sandbox/doc.go)), injected as the `*http.Client` Transport so production leaf clients run unchanged. No network listener and no credentials. EHR create/get/head are implemented; remaining resources follow as httptest handlers are retired.

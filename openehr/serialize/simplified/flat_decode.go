@@ -22,6 +22,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
 // maxRepeatIndex bounds a single FLAT :index during decode/interconversion, and
@@ -265,7 +266,7 @@ var metadataAliases = map[string]string{
 var metadataAliasTerminology = map[string]string{
 	"language|terminology":        "ISO_639-1",
 	"territory|terminology":       "ISO_3166-1",
-	"context/setting|terminology": "openehr",
+	"context/setting|terminology": terminology.ID,
 }
 
 // contextMetaOwnedBases are the EVENT_CONTEXT leaves the ctx/ short forms own
@@ -605,7 +606,7 @@ func applyContext(compJSON map[string]any, ci ctxInfo) error {
 			// already refused in siphonContext) — REQ-053.
 			ctxObj["setting"] = map[string]any{
 				"_type": "DV_CODED_TEXT", "value": ci.settingValue,
-				"defining_code": codePhraseJSON(ci.settingCode, "openehr"),
+				"defining_code": codePhraseJSON(ci.settingCode, terminology.ID),
 			}
 		}
 	}
@@ -663,23 +664,39 @@ func defaultAttr(attr string, ci ctxInfo) map[string]any {
 		}
 		return map[string]any{"_type": "DV_DATE_TIME", "value": ci.time}
 	case "setting":
-		return map[string]any{"_type": "DV_CODED_TEXT", "value": "other care", "defining_code": codePhraseJSON("238", "openehr")}
+		return ctxCodedDefault(terminology.Setting, "238")
 	case "category":
-		return map[string]any{"_type": "DV_CODED_TEXT", "value": "event", "defining_code": codePhraseJSON("433", "openehr")}
+		return ctxCodedDefault(terminology.CompositionCategory, "433")
 	case "math_function":
-		return map[string]any{"_type": "DV_CODED_TEXT", "value": "actual", "defining_code": codePhraseJSON("146", "openehr")}
+		// 640 is `actual` — the earlier 146|actual pair was inconsistent (146 is
+		// `mean`), so the code is corrected to match the evidently intended rubric.
+		return ctxCodedDefault(terminology.EventMathFunction, "640")
 	case "width":
 		return map[string]any{"_type": "DV_DURATION", "value": "PT0S"}
 	}
 	return nil
 }
 
-// codePhraseJSON is a canonical CODE_PHRASE object.
-func codePhraseJSON(code, terminology string) map[string]any {
+// ctxCodedDefault builds the DV_CODED_TEXT for a ctx/ default from the pinned
+// group, so the value is the code's own rubric and never a string typed beside
+// the code (REQ-034). The codes are string literals at the call sites above and
+// members of their groups — TestCtxDefaultsAreGroupMembersWithPinnedRubrics
+// pins that.
+func ctxCodedDefault(g *terminology.Group, code string) map[string]any {
+	rubric, _ := g.Rubric(code)
+	return map[string]any{
+		"_type": "DV_CODED_TEXT", "value": rubric,
+		"defining_code": codePhraseJSON(code, terminology.ID),
+	}
+}
+
+// codePhraseJSON is a canonical CODE_PHRASE object. The second argument is the
+// TERMINOLOGY_ID value — [terminology.ID] for every openEHR-coded site.
+func codePhraseJSON(code, terminologyID string) map[string]any {
 	return map[string]any{
 		"_type":          "CODE_PHRASE",
 		"code_string":    code,
-		"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": terminology},
+		"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": terminologyID},
 	}
 }
 
@@ -1862,7 +1879,9 @@ func applyOrderedSuffixes(dv, sfx map[string]any) error {
 		if err != nil {
 			return err
 		}
-		dv["normal_status"] = codePhraseJSON(code, normalStatusTerminology)
+		// The bare code alone: the terminology is the implied openehr, and this
+		// decode stays lenient about membership (see [normalStatusCaptured]).
+		dv["normal_status"] = codePhraseJSON(code, terminology.ID)
 	}
 	return nil
 }

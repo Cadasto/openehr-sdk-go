@@ -75,7 +75,7 @@ A server-side web or API service that performs a SMART-on-openEHR launch, handle
 
 ## Building-block use cases
 
-REQ-013 mandates that each core package be importable and useful without constructing an authenticated client. These five building-block consumers exist today and motivate the rule:
+REQ-013 mandates that each core package be importable and useful without constructing an authenticated client. These six building-block consumers exist today and motivate the rule:
 
 | Building block | Consumer pattern |
 |---|---|
@@ -84,6 +84,7 @@ REQ-013 mandates that each core package be importable and useful without constru
 | `openehr/validation/` alone | CI validators that check Composition-vs-OPT conformance on pull-request; webhook handlers that gate uploads; pre-commit hooks in a clinical-modeling repo. |
 | `openehr/aql/` alone | AQL builders, linters, formatters, and static analysers that don't execute the query — they parse, normalise, judge RM containment, and report. |
 | `openehr/template/` alone | ADL 1.4 OPT (`.opt`) parsing and path utilities for IDE plugins and CI; OET out of scope for v1. |
+| `openehr/terminology/` alone | Code ↔ rubric and group / code-set membership lookups over the pinned openEHR Terminology, for validators, form renderers and mapping tools that never touch a CDR (REQ-034). |
 
 These consumers **MUST NOT** be forced to import `transport/`, `auth/`, or `smart/`. Their dependency graph stops at the leaf package they use.
 

@@ -17,8 +17,8 @@ Jobs run in parallel. All use Go **1.27.x** (`actions/setup-go@v7` with module c
 
 | Job | Makefile targets | Purpose |
 |---|---|---|
-| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `aqlgen-verify`, `vet`, `spec-check`, `flat-conformance-verify`, `build` | Static checks and compile-all without running tests |
-| **Test** | `test` | Unit tests; `test` already depends on `codegen-verify` and `aqlgen-verify` |
+| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `aqlgen-verify`, `termgen-verify`, `vet`, `spec-check`, `flat-conformance-verify`, `terminology-verify`, `build` | Static checks and compile-all without running tests |
+| **Test** | `test` | Unit tests; `test` already depends on `codegen-verify`, `aqlgen-verify` and `termgen-verify` |
 | **Lint** | (via `golangci-lint-action` v2.13.2, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
 | **Race** | `test-race` | **Push to `main` only** — `-race` is slower; catches data races in `typereg` and codecs |
 
@@ -48,16 +48,19 @@ Run `make help` for the full grouped list. Common targets:
 
 | Group | Target | What it does |
 |---|---|---|
-| CI | `make ci` | Full PR gate (fmt, mod tidy, vet, test, lint, spec-check, flat-conformance-verify, build) |
-| Test | `make test` | Unit tests; depends on `codegen-verify` |
+| CI | `make ci` | Full PR gate (fmt, mod tidy, vet, test, lint, spec-check, flat-conformance-verify, terminology-verify, build) |
+| Test | `make test` | Unit tests; depends on `codegen-verify`, `aqlgen-verify` and `termgen-verify` |
 | Test | `make test-race` | `-race` detector (main-branch job only) |
 | Format | `make fmt-check` | Fail if `golangci-lint fmt --diff` (gofumpt + goimports) would change any file |
 | Modules | `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |
 | Codegen | `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
 | Codegen | `make aqlgen-verify` | Committed AQL parser matches `resources/aql/grammar/active/` (needs Docker) |
+| Codegen | `make termgen-verify` | `openehr/terminology/openehr_gen.go` matches the pinned `resources/terminology/openehr_terminology.xml`; regenerate with `make termgen` |
 | Specs | `make spec-check` | `docs/specifications/traceability.yaml` paths and probes match the tree |
 | Fixtures | `make flat-conformance-verify` | Offline `sha256` integrity of the pinned upstream FLAT corpus against its `MANIFEST.txt`; no network and no `curl`/`jq` needed, so it is safe in the gate. Catches a hand-edit to a vendored fixture whose whole value is being byte-identical to upstream |
 | Fixtures | `make flat-conformance-check` | The above **plus** a best-effort upstream-drift report (needs network; degrades with a note when offline). Dev helper, not a CI gate |
+| Fixtures | `make terminology-verify` | Offline `sha256` integrity of the pinned openEHR Terminology against its `MANIFEST.txt` |
+| Fixtures | `make terminology-check` | The above **plus** a best-effort report of a newer upstream TERM release (needs network). Dev helper, not a CI gate |
 | Specs | `make spec-context REQ=NNN` | Assemble the SDD context bundle for a REQ (dev/agent helper; not a CI gate) |
 | Specs | `make probe-status` | Each PROBE's status and whether its test file exists (dev helper; not a CI gate) |
 | Lint | `make lint` | `golangci-lint` on host if the binary was built with Go 1.27, else Docker (`LINT_IMAGE`) |

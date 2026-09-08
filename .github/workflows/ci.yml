@@ -43,6 +43,9 @@ jobs:
       - name: AQL parser verify
         run: make aqlgen-verify
 
+      - name: Terminology codegen verify
+        run: make termgen-verify
+
       - name: Vet
         run: make vet
 
@@ -53,6 +56,11 @@ jobs:
       # upstream FLAT corpus against hand-edits.
       - name: Vendored fixture integrity
         run: make flat-conformance-verify
+
+      # Same offline sha256 guard for the pinned openEHR Terminology, whose
+      # whole value is being byte-identical to the TERM release (REQ-034).
+      - name: Vendored terminology integrity
+        run: make terminology-verify
 
       - name: Build
         run: make build

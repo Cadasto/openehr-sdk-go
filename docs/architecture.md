@@ -32,7 +32,7 @@ The package taxonomy — every package with its scope notes — is **normative i
 
 The module resolves into three concentric layers, each usable without the one above it:
 
-1. **Building blocks (no I/O).** `openehr/rm` (+ `typereg`, `rminfo`), `openehr/bmm`, `openehr/aom`, `openehr/serialize`, `openehr/template`, `openehr/validation`, `openehr/instance`, `openehr/composition`, and `openehr/aql` (query models, builders, and opt-in containment verification). Pure data structures and algorithms — decode a canonical JSON Composition, validate it against an OPT, build one from a template, render an AQL string, check a containment chain against the pinned RM. They never reach for the network and never import `transport/` or `auth/` (REQ-013), so a CI validator or a synthetic-data faker can depend on exactly one of them.
+1. **Building blocks (no I/O).** `openehr/rm` (+ `typereg`, `rminfo`), `openehr/terminology` (the pinned openEHR vocabulary, stdlib-only, below `openehr/rm`), `openehr/bmm`, `openehr/aom`, `openehr/serialize`, `openehr/template`, `openehr/validation`, `openehr/instance`, `openehr/composition`, and `openehr/aql` (query models, builders, and opt-in containment verification). Pure data structures and algorithms — decode a canonical JSON Composition, validate it against an OPT, build one from a template, render an AQL string, check a containment chain against the pinned RM. They never reach for the network and never import `transport/` or `auth/` (REQ-013), so a CI validator or a synthetic-data faker can depend on exactly one of them.
 2. **The HTTP path.** `auth/` produces a `TokenSource`; `transport/` wraps the caller's injected `*http.Client` and layers auth, retry, OpenTelemetry, and the ITS-REST envelope onto it; `openehr/client/*` are the thin, typed leaf clients (System, EHR + sub-resources, Query, Definition, Admin) that call through `transport/` and decode with the codecs. `smart/discovery` supplies the `ServiceCatalog` that tells the transport where the openEHR REST base URL lives.
 3. **Application & platform.** `smart/` adds SMART-on-openEHR launch context and ID-token validation on top of discovery; `cadasto/*` carries the platform extras (Extra API, Datamap, MPI, Care, admin health) behind the cut line described below.
 
@@ -50,7 +50,9 @@ flowchart TD
   Aql["openehr/aql/"]
   Client["openehr/client/*"]
   Rm["openehr/rm/"]
+  Terminology["openehr/terminology/<br/>(stdlib-only, below rm)"]
   Serialize["openehr/serialize/"]
+  Instance["openehr/instance/"]
   Validation["openehr/validation/"]
   Template["openehr/template/"]
   Http["transport/"]
@@ -68,6 +70,12 @@ flowchart TD
   App -. building-block .-> Serialize
   App -. building-block .-> Validation
   App -. building-block .-> Template
+  App -. building-block .-> Terminology
+  App -. building-block .-> Instance
+  Serialize --> Terminology
+  Client --> Terminology
+  Instance --> Terminology
+  Instance --> Template
 
   Care --> Client
   Cadasto --> Http
@@ -141,7 +149,7 @@ The SDK does not take a "base URL". It takes a `smart/discovery.ServiceCatalog` 
 
 ### `internal/` is invisible
 
-Anything under `internal/` is excluded from BC promises (REQ-005). Today this holds generator tooling — `internal/bmmgen` (RM/AOM/canonical JSON emission) and `internal/bmmdiff` (BMM corpus diff for version bumps) — plus the compiled-template foundation: `internal/templatecompile` (parsed OPT → walker-friendly compiled form behind the builder and validator) and `internal/templateinstance` (template-driven RM instance synthesis). When in doubt whether a helper belongs in a public package or `internal/`, ask: "would a consumer write a meaningful caller against this directly?" If no, it goes in `internal/`.
+Anything under `internal/` is excluded from BC promises (REQ-005). Today this holds generator tooling — `internal/bmmgen` (RM/AOM/canonical JSON emission), `internal/bmmdiff` (BMM corpus diff for version bumps) and `internal/termgen` (openEHR Terminology → `openehr/terminology` tables) — plus the compiled-template foundation: `internal/templatecompile` (parsed OPT → walker-friendly compiled form behind the builder and validator) and `internal/templateinstance` (template-driven RM instance synthesis). When in doubt whether a helper belongs in a public package or `internal/`, ask: "would a consumer write a meaningful caller against this directly?" If no, it goes in `internal/`.
 
 ## Code generation
 
@@ -156,6 +164,8 @@ The RM and AOM 1.4 types are generated from the pinned BMM corpus — the one pi
 | Generated AOM 1.4 | [`openehr/aom/aom14/`](../openehr/aom/aom14/) | One-way import of `rm` for base types |
 | Type registry | [`openehr/rm/typereg/`](../openehr/rm/typereg/) | Hand-written `Registry`; registrations in `typereg_gen.go` per [ADR 0002](adr/0002-bmm-codegen-decisions.md) |
 | RM structural lookup | [`openehr/rm/rminfo/`](../openehr/rm/rminfo/) | Two BMM-derived tables emitted by one run: `lookup_gen.go` (the class universe) and `absence_gen.go` (the declared names outside it, REQ-049); [ADR 0005](adr/0005-compiled-template-foundation.md) |
+| Terminology generator | [`internal/termgen/`](../internal/termgen/), [`cmd/termgen`](../cmd/termgen) | `make termgen` / `make termgen-verify` (chained in `make test`) |
+| Generated terminology | [`openehr/terminology/`](../openehr/terminology/) | `openehr_gen.go` — groups and code sets from `resources/terminology/` |
 
 ```mermaid
 flowchart LR

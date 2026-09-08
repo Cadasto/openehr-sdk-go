@@ -17,6 +17,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
 // MarshalFlat encodes comp as FLAT JSON using wt (REQ-053).
@@ -186,7 +187,7 @@ func emitContextSetting(out map[string]any, s rm.DVCodedText) error {
 		}
 		return fmt.Errorf("%w: ctx/setting requires a coded value, but EVENT_CONTEXT.setting carries no defining code beside value %q", ErrUnsupportedDatatype, s.Value)
 	}
-	if s.DefiningCode.TerminologyID.Value != "openehr" {
+	if s.DefiningCode.TerminologyID.Value != terminology.ID {
 		return fmt.Errorf("%w: ctx/setting implies the openehr terminology, but EVENT_CONTEXT.setting is coded in %q", ErrUnsupportedDatatype, s.DefiningCode.TerminologyID.Value)
 	}
 	if extras {

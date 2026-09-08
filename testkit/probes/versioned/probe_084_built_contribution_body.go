@@ -10,6 +10,7 @@ import (
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -68,14 +69,18 @@ var probe084Batch = []probe084Step{
 	{label: "deletion of a FOLDER", rmType: "FOLDER", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::4", wantCode: "523"},
 }
 
-// probe084BatchCode is the batch audit's change type — openEHR `unknown`,
-// which is deliberately NOT one of the four codes the builder authors per
-// operation. Since the versions between them now carry all four, a code
-// from outside that set is the only batch value no derivation rule over the
-// versions could reproduce, so the non-derivation arm cannot pass by
-// coincidence. It reaches the audit through Builder.WithAudit — the
-// documented escape hatch for a code outside the authored table — which
-// this probe therefore also exercises on the wire.
+// probe084BatchCode is the batch audit's change type — openEHR `unknown`, a
+// member of the *audit change type* group that is deliberately NOT one of
+// the four codes the builder's constructors carry per operation (`creation`,
+// `amendment`, `modification`, `deleted`). Since the versions between them
+// now carry all four, a code from outside that quartet is the only batch
+// value no derivation rule over the versions could reproduce, so the
+// non-derivation arm cannot pass by coincidence. It reaches the audit
+// through Builder.WithAudit — the caller-supplied-audit path for a batch the
+// four constructors do not build — which this probe therefore also exercises
+// on the wire. (253 is itself a group member carrying the pinned rubric
+// "unknown"; Build refuses a non-group code on every path, WithAudit
+// included.)
 const probe084BatchCode = "253"
 
 // Probe084BuiltContributionBody implements PROBE-084: a
@@ -191,14 +196,22 @@ func buildProbe084Submission() (*contribution.Submission, error) {
 	if len(changes) != len(probe084Batch) {
 		return nil, fmt.Errorf("built %d changes for %d expected steps", len(changes), len(probe084Batch))
 	}
-	// The batch audit is set wholesale so its change type can be a code
-	// outside the authored table (see probe084BatchCode); the committer and
-	// system id are then layered on, exercising both entry points.
+	// The batch audit is set wholesale so its change type is the caller's own
+	// rather than one of the four per-operation codes (see
+	// probe084BatchCode); the committer and system id are then layered on,
+	// exercising both entry points. The rubric beside the code comes from the
+	// pin rather than being typed here (REQ-034) — so a pin that no longer
+	// carried 253 would fail loudly here instead of planting a body Build
+	// would refuse for a reason the probe never meant to assert.
+	batchRubric, ok := terminology.AuditChangeType.Rubric(probe084BatchCode)
+	if !ok {
+		return nil, fmt.Errorf("code %q is not a member of the pinned openEHR audit-change-type group", probe084BatchCode)
+	}
 	return contribution.NewBuilder().
 		WithAudit(contribution.UpdateAudit{
 			ChangeType: rm.DVCodedText{
-				DVText:       rm.DVText{Value: "unknown"},
-				DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: probe084BatchCode},
+				DVText:       rm.DVText{Value: batchRubric},
+				DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: terminology.ID}, CodeString: probe084BatchCode},
 			},
 		}).
 		WithCommitterName("probe-084").

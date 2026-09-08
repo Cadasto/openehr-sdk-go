@@ -14,6 +14,7 @@ import (
 	"strconv"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
 // partyRMAttr writes a standalone party under path: its own suffixes plus the
@@ -238,22 +239,22 @@ func participationRMAttr(out map[string]any, path string, p rm.Participation) er
 // carries.
 //
 // The key has no code and no terminology channel, so decode rebuilds both from
-// the vendored group ([participationModes]). Anything that rebuild would not
-// reproduce is a typed error rather than a narrowing: a mode coded outside
-// `openehr` (silent re-terminologisation), a code the group does not carry, a
-// rubric that disagrees with the group's, or a DV_CODED_TEXT decoration the bare
-// key cannot hold.
+// the pinned group ([terminology.ParticipationMode]). Anything that rebuild
+// would not reproduce is a typed error rather than a narrowing: a mode coded
+// outside `openehr` (silent re-terminologisation), a code the group does not
+// carry, a rubric that disagrees with the group's, or a DV_CODED_TEXT
+// decoration the bare key cannot hold.
 func participationModeRubric(key string, mode rm.DVCodedText) (string, error) {
 	if mode.Formatting != nil || mode.Hyperlink != nil || mode.Language != nil ||
 		mode.Encoding != nil || len(mode.Mappings) > 0 || mode.DefiningCode.PreferredTerm != nil {
 		return "", fmt.Errorf("%w: %q is a bare rubric and cannot carry a decorated DV_CODED_TEXT (formatting, hyperlink, language, encoding, mappings or a preferred term)",
 			ErrUnsupportedDatatype, key)
 	}
-	if term := mode.DefiningCode.TerminologyID.Value; term != participationModeTerminology {
+	if term := mode.DefiningCode.TerminologyID.Value; term != terminology.ID {
 		return "", fmt.Errorf("%w: %q implies the %q terminology, but PARTICIPATION.mode is coded in %q",
-			ErrUnsupportedDatatype, key, participationModeTerminology, term)
+			ErrUnsupportedDatatype, key, terminology.ID, term)
 	}
-	rubric, known := participationModes[mode.DefiningCode.CodeString]
+	rubric, known := terminology.ParticipationMode.Rubric(mode.DefiningCode.CodeString)
 	if !known {
 		return "", fmt.Errorf("%w: %q carries code %q, which is not in the openEHR `participation mode` group; the key carries only the rubric, so decode could not rebuild the code (REQ-140)",
 			ErrUnsupportedDatatype, key, mode.DefiningCode.CodeString)
