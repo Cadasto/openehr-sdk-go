@@ -1013,6 +1013,10 @@ requirements:
     # definition, demographic, transport) no longer use httptest.
     # Cassette encoding is HAR 1.2 (ADR 0020); recorder, replayer, and
     # the first corpus file (testkit/recordings/ehr-create.har) landed.
+    # The replay key is method + REST-stripped path (Phase 3); REQ-082's
+    # full Cassette key also names the headers/body fields a probe's
+    # assertion depends on, deferred until a recording that branches on
+    # them lands (the ehr-create corpus does not).
     # Remaining catalog probes still need recordings. Auth/discovery
     # probes still stand up httptest identity servers.
     # Live mode is wired: OPENEHR_LIVE_* names the target and

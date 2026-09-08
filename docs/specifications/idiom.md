@@ -242,7 +242,7 @@ Practical implications:
 Documented exceptions:
 
 - Builders (`aql.New().From(...)`, `composition.NewBuilder(opt)`) are **not** goroutine-safe and **MUST NOT** be shared across goroutines — they are construct-then-finalise types, not long-lived clients. Document this in each builder's `doc.go`.
-- The recorder/replay transport in `sandbox/` (REQ-082, not yet built) **MAY** be single-goroutine in record mode if the consumer-side construction is single-threaded; if so it **MUST** be documented.
+- The Cassette [`Recorder`](../../testkit/probe/record.go) and [`Replayer`](../../testkit/probe/replay.go) (REQ-082) guard their captured and remaining exchanges with a mutex, so both are safe to share across goroutines — no single-goroutine restriction applies.
 
 ## String iteration
 
