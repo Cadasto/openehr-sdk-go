@@ -2,13 +2,13 @@ package transportprobes_test
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
-	"github.com/cadasto/openehr-sdk-go/smart/discovery"
+	"github.com/cadasto/openehr-sdk-go/sandbox"
+	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/transport"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -19,21 +19,9 @@ import (
 // the two cannot drift apart.
 const restBasePath = "/openehr/v1"
 
-func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
+func newClient(t *testing.T, b *sandbox.Backend) *transport.Client {
 	t.Helper()
-	cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{
-		Issuer: "https://test.example.com",
-		Services: map[string]discovery.ServiceEntry{
-			discovery.ServiceIDOpenEHRRest: {
-				BaseURL:     discovery.MustParseURL(srv.URL + restBasePath),
-				SpecVersion: discovery.SpecVersionPin,
-			},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	c, err := transport.New(cat, transport.WithHTTPClient(srv.Client()))
+	c, err := probe.NewClient("https://sandbox.local/openehr/v1", b.HTTPClient(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +36,7 @@ func TestProbe091PathSegmentValidation(t *testing.T) {
 		mu       sync.Mutex
 		captured []string
 	)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		captured = append(captured, r.URL.EscapedPath())
 		mu.Unlock()
@@ -60,15 +48,14 @@ func TestProbe091PathSegmentValidation(t *testing.T) {
 			w.Header().Set("Content-Type", "application/xml")
 			_, _ = w.Write([]byte(`<template/>`))
 		}
-	}))
-	defer srv.Close()
+	})
 
 	snapshot := func() []string {
 		mu.Lock()
 		defer mu.Unlock()
 		return append([]string(nil), captured...)
 	}
-	res, err := probes.Probe091PathSegmentValidation(t.Context(), newClient(t, srv), snapshot)
+	res, err := probes.Probe091PathSegmentValidation(t.Context(), newClient(t, b), snapshot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,13 +71,12 @@ func TestProbe091PathSegmentValidation(t *testing.T) {
 
 // TestProbe091RejectsMissingInputs pins the probe's own guard rails.
 func TestProbe091RejectsMissingInputs(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
-	defer srv.Close()
+	b := sandbox.Scripted(func(http.ResponseWriter, *http.Request) {})
 
 	if _, err := probes.Probe091PathSegmentValidation(t.Context(), nil, func() []string { return nil }); err == nil {
 		t.Error("nil client: want an error")
 	}
-	if _, err := probes.Probe091PathSegmentValidation(t.Context(), newClient(t, srv), nil); err == nil {
+	if _, err := probes.Probe091PathSegmentValidation(t.Context(), newClient(t, b), nil); err == nil {
 		t.Error("nil recorder: want an error")
 	}
 }
@@ -136,9 +122,9 @@ func probe101Conformant() probe101Arms {
 const probe101ValidEHR = `{"_type":"EHR","ehr_id":{"value":"11111111-1111-4111-8111-111111111111"},` +
 	`"system_id":{"value":"cdr.example"},"time_created":{"value":"2026-01-01T00:00:00Z"}}`
 
-// probe101Server routes by path suffix and records every request path.
-func probe101Server(arms probe101Arms, record func(string)) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// probe101Backend routes by path suffix and records every request path.
+func probe101Backend(arms probe101Arms, record func(string)) *sandbox.Backend {
+	return sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		record(r.URL.EscapedPath())
 		status, body := http.StatusOK, `{}`
 		switch {
@@ -152,7 +138,7 @@ func probe101Server(arms probe101Arms, record func(string)) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(body))
-	}))
+	})
 }
 
 // runProbe101 drives the probe against a backend serving arms.
@@ -162,19 +148,18 @@ func runProbe101(t *testing.T, arms probe101Arms) (probes.Result, []string) {
 		mu       sync.Mutex
 		captured []string
 	)
-	srv := probe101Server(arms, func(p string) {
+	b := probe101Backend(arms, func(p string) {
 		mu.Lock()
 		captured = append(captured, p)
 		mu.Unlock()
 	})
-	defer srv.Close()
 
 	snapshot := func() []string {
 		mu.Lock()
 		defer mu.Unlock()
 		return append([]string(nil), captured...)
 	}
-	res, err := probes.Probe101DecodeFailureSurfaced(t.Context(), newClient(t, srv), snapshot, probe101UndecodableEHR, probe101MissingEHR)
+	res, err := probes.Probe101DecodeFailureSurfaced(t.Context(), newClient(t, b), snapshot, probe101UndecodableEHR, probe101MissingEHR)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,9 +252,8 @@ func TestProbe101FlagsADecodableList(t *testing.T) { // PROBE-101, REQ-151
 
 // TestProbe101RejectsMissingInputs pins the probe's own guard rails.
 func TestProbe101RejectsMissingInputs(t *testing.T) { // PROBE-101
-	srv := probe101Server(probe101Conformant(), func(string) {})
-	defer srv.Close()
-	c := newClient(t, srv)
+	b := probe101Backend(probe101Conformant(), func(string) {})
+	c := newClient(t, b)
 	recorder := func() []string { return nil }
 
 	if _, err := probes.Probe101DecodeFailureSurfaced(t.Context(), nil, recorder, probe101UndecodableEHR, probe101MissingEHR); err == nil {

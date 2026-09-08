@@ -25,5 +25,6 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | [0017](0017-aql-semantic-layer.md) | AQL semantic layer: derived containment relation, overlays, opt-in enforcement | Accepted (2026-08-22) |
 | [0018](0018-raw-bytes-on-decode-error.md) | Raw response bytes on the typed 2xx decode error | Accepted (2026-08-30) |
 | [0019](0019-definition-timestamp-tolerance.md) | Definition metadata timestamps: a closed tolerant layout set on decode, RFC 3339 on encode | Accepted (2026-08-30) |
+| [0020](0020-cassette-recording-har.md) | Cassette recordings are HTTP Archive 1.2 | Accepted (2026-09-07) |
 
 See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.

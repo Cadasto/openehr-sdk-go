@@ -5,13 +5,13 @@
 **Owner:** SDK maintainers
 **Covers:** [REQ-082](../specifications/conformance.md#req-082--runnability) (Runnability, **Impl. `partial`**); unblocks the deferred wire-level probes named under [REQ-080](../specifications/conformance.md#req-080--openehr-wire-conformance)
 **Probes:** no new `PROBE-NNN` — this plan gives the existing catalog its missing execution modes. It promotes **PROBE-077**, **PROBE-078**, **PROBE-079** out of `Status: Deferred` (each one a landed, unit-covered requirement whose dedicated wire probe is unwritten) and unblocks **PROBE-065**, which is still `Status: Draft` — specified, never implemented. It is also the gate [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1 names for four `testkit/probes/rest/*` probes.
-**Implementation:** planned
+**Implementation:** partial
 **Depends on:** landed `transport/` (REQ-090–098), the probe catalog in [conformance.md](../specifications/conformance.md), and the REQ-082 normative prose landed with this plan
-**Defers:** phases 3–4 (Cassette recording, Live mode) — both need access to a live openEHR deployment this project does not currently have; [STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) (the recording format) is deliberately unresolved until there is a capture to judge
+**Defers:** Cassette recorder/replayer/corpus (Phase 3) — encoding is settled ([ADR 0020](../adr/0020-cassette-recording-har.md), HAR 1.2). Live mode is no longer blocked: both CDRs are reachable locally (EHRbase `:8080`, FerroEHR `:8090`).
 
 ## Goal
 
-Make the probe catalog (66 entries) runnable the way REQ-082 requires, starting with the two modes CI can run with nothing external at run time — Sandbox outright, Cassette by replaying a vendored recording (capturing one still needs a deployment). Consumers are twofold: the SDK's own CI, which today reaches each probe only through a bespoke hand-written test, and SDK **integrators**, for whom `sandbox/` is the advertised way to test an application against a fake CDR — a package that currently contains no code.
+Make the probe catalog (72 entries) runnable the way REQ-082 requires, starting with the two modes CI can run with nothing external at run time — Sandbox outright, Cassette by replaying a vendored recording (capturing one still needs a deployment). Consumers are twofold: the SDK's own CI, which today reaches each probe only through a bespoke hand-written test, and SDK **integrators**, for whom `sandbox/` is the advertised way to test an application against a fake CDR — a package whose in-memory backend (`backend.go`, `script.go`) now covers EHR create/get/head and scripted routes, with the remaining catalog surface still to migrate.
 
 ## Why this is the next conformance step
 
@@ -24,7 +24,7 @@ The defect this closes is not a missing feature but a missing independent witnes
 Implementation may start when:
 
 - **`Covers:`** names REQ-082 — done; the normative prose (mode selection, probe contract, per-mode rules, cross-mode agreement) lands with this plan.
-- The recording-format fork is *recorded rather than settled* — STRAND-11, gated on a live capture. Phases 1–2 do not depend on it.
+- The recording-format fork is *settled* — STRAND-11 Resolved by [ADR 0020](../adr/0020-cassette-recording-har.md) (HAR 1.2, judged against a live capture). Phases 1–2 never depended on it.
 - REQ-082's fail-closed clauses are normative and name their refusal paths — an unsatisfiable mode fails loudly, an all-skipped run is not green, a `skip` is never a pass, an unclassified **Effect** is `mutating` — so phase 1 can pin each with a named test (the DoD lists them).
 - Phases below name concrete tasks and their verification command.
 
@@ -32,7 +32,7 @@ Implementation may start when:
 
 Scoped to phases 1–2 (what is reachable now):
 
-- One shared probe result type with a single canonical home; the 11 byte-identical per-package copies deleted.
+- One shared probe result type with a single canonical home; the 12 per-package `Result` types are now `type Result = probe.Result` aliases (same identity), not separate copies.
 - A runner that executes the catalog, a subset, or one probe, in Sandbox mode, and whose summary distinguishes pass from skip.
 - `sandbox/` serves every backend-facing catalog probe with no network listener and no credentials, and the hand-rolled `httptest` servers in `testkit/probes/**` are gone (in-repo probes reach no transport and are out of this bullet's scope).
 - **REQ-082's refusals are each pinned by a named test**, since a fail-closed rule nobody exercises is a fail-open rule with good intentions:
@@ -48,9 +48,11 @@ Scoped to phases 1–2 (what is reachable now):
 | Step | Status |
 |---|---|
 | REQ-082 normative prose + STRAND-11 (this PR) | done |
-| Phase 1 — shared result + runner | |
-| Phase 2 — `sandbox/` transport | |
-| `traceability.yaml` / REQ.md row | |
+| Phase 1 — shared result + runner | done — `testkit/probe`; the 12 per-package `Result` types are `type Result = probe.Result` aliases, not copies; refusals pinned by named tests; per-probe **Effect** metadata partial (5 of the 56 backend-facing entries carry it today; the 16 in-repo entries need none) |
+| Phase 2 — `sandbox/` transport | partial — EHR + scripted routes; versioned / definition / demographic / transport probes off httptest. Auth/discovery httptest remain (OIDC/JWKS, not CDR) |
+| Phase 4 — Live mode (local CDRs) | partial — runner Live path + `TestLiveCreateEHR`: `OPENEHR_LIVE_*` names the target, `OPENEHR_LIVE_ALLOW_MUTATING` is the separate write opt-in REQ-082 requires; both unset in CI, so the test skips without dialing |
+| Phase 3 — Cassette recording | encoding settled (ADR 0020, HAR 1.2); recorder/replayer/corpus not started |
+| `traceability.yaml` / REQ.md row | done (REQ-082 stays `partial`) |
 | `make spec-check` | |
 | `make ci` | |
 
@@ -74,13 +76,13 @@ Scoped to phases 1–2 (what is reachable now):
 
 **Definition of done:** no `httptest.NewServer` remains in `testkit/probes/**`; `sandbox/` is documented for consumers in [quick-start.md](../quick-start.md); `make ci` green.
 
-### Phase 3 — Cassette recording and replay *(blocked: needs a live CDR)*
+### Phase 3 — Cassette recording and replay *(encoding settled: [ADR 0020](../adr/0020-cassette-recording-har.md))*
 
-**Tasks:** resolve STRAND-11 with an ADR against a real capture; implement the recorder as a `transport` wrapper and the replayer as a transport; capture the corpus once; enforce capture-time redaction and provenance per REQ-082.
+**Tasks:** resolve STRAND-11 with an ADR against a real capture (done: ADR 0020); implement the recorder as a `transport` wrapper and the replayer as a transport; capture the corpus once; enforce capture-time redaction and provenance per REQ-082.
 
 **Definition of done:** every probe that can run on replay does; an unmatched request fails closed.
 
-### Phase 4 — Live mode *(blocked: needs a live CDR)*
+### Phase 4 — Live mode *(wired, pre-release; not blocked)*
 
 **Tasks:** endpoint and credential configuration; the mutating-probe opt-in gate; per-run resource scoping; promote PROBE-077 / 078 / 079 out of `Status: Deferred`, implement PROBE-065, and write the four STRAND-09 REST probes.
 
@@ -90,6 +92,6 @@ Scoped to phases 1–2 (what is reachable now):
 
 - [conformance.md § REQ-082](../specifications/conformance.md#req-082--runnability) — normative contract
 - [conformance.md § REQ-080](../specifications/conformance.md#req-080--openehr-wire-conformance) — the conformance suite this unblocks
-- [research-strands.md § STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) — recording format, open
+- [research-strands.md § STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) — recording format, resolved ([ADR 0020](../adr/0020-cassette-recording-har.md))
 - [research-strands.md § STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) — the REST probes gated on this plan
 - [REQ.md](../specifications/REQ.md) — registry row

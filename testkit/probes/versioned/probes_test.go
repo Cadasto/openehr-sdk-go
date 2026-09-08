@@ -7,7 +7,6 @@ import (
 	"flag"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -17,8 +16,9 @@ import (
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/smart/discovery"
+	"github.com/cadasto/openehr-sdk-go/sandbox"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/versioned"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -30,18 +30,9 @@ const (
 	updatedVUID     openehrclient.VersionUID        = "1234abcd-5678-9012-3456-7890abcdef00::cdr.example::2"
 )
 
-func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
+func newClient(t *testing.T, b *sandbox.Backend) *transport.Client {
 	t.Helper()
-	cat, _ := discovery.NewStaticCatalog(discovery.StaticConfig{
-		Issuer: "https://test.example.com",
-		Services: map[string]discovery.ServiceEntry{
-			discovery.ServiceIDOpenEHRRest: {
-				BaseURL:     discovery.MustParseURL(srv.URL + "/openehr/v1"),
-				SpecVersion: discovery.SpecVersionPin,
-			},
-		},
-	})
-	c, err := transport.New(cat, transport.WithHTTPClient(srv.Client()))
+	c, err := probe.NewClient("https://sandbox.local/openehr/v1", b.HTTPClient(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,12 +41,11 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 
 func TestProbe010PutWithoutIfMatch(t *testing.T) {
 	// PROBE-010 is a compile-time guard exercise — no network needed.
-	// Construct a client against any throwaway server.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Construct a client against any throwaway backend.
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("PROBE-010 must short-circuit before any network call")
-	}))
-	defer srv.Close()
-	r, err := probes.Probe010PutWithoutIfMatch(context.Background(), newClient(t, srv), ehrIDFixture)
+	})
+	r, err := probes.Probe010PutWithoutIfMatch(context.Background(), newClient(t, b), ehrIDFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,12 +55,11 @@ func TestProbe010PutWithoutIfMatch(t *testing.T) {
 }
 
 func TestProbe011PutStaleIfMatch_412(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusPreconditionFailed)
 		_, _ = w.Write([]byte(`{"message":"stale","code":"PRECONDITION_FAILED"}`))
-	}))
-	defer srv.Close()
-	r, err := probes.Probe011PutStaleIfMatch(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, "stale", &rm.Composition{})
+	})
+	r, err := probes.Probe011PutStaleIfMatch(context.Background(), newClient(t, b), ehrIDFixture, compositionVOID, "stale", &rm.Composition{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,12 +69,11 @@ func TestProbe011PutStaleIfMatch_412(t *testing.T) {
 }
 
 func TestProbe011PutStaleIfMatch_409(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
 		_, _ = w.Write([]byte(`{"message":"stale","code":"VERSION_CONFLICT"}`))
-	}))
-	defer srv.Close()
-	r, err := probes.Probe011PutStaleIfMatch(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, "stale", &rm.Composition{})
+	})
+	r, err := probes.Probe011PutStaleIfMatch(context.Background(), newClient(t, b), ehrIDFixture, compositionVOID, "stale", &rm.Composition{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +88,7 @@ func TestProbe012ETagRoundTrip(t *testing.T) {
 	// returns a fresh VersionUID. The fake server below alternates
 	// between the two phases on a single shared state.
 	var phase int
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		phase++
 		switch r.Method {
 		case http.MethodGet:
@@ -119,10 +107,9 @@ func TestProbe012ETagRoundTrip(t *testing.T) {
 		default:
 			t.Errorf("unexpected method %q", r.Method)
 		}
-	}))
-	defer srv.Close()
+	})
 
-	r, err := probes.Probe012ETagRoundTrip(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, &rm.Composition{})
+	r, err := probes.Probe012ETagRoundTrip(context.Background(), newClient(t, b), ehrIDFixture, compositionVOID, &rm.Composition{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,15 +129,14 @@ const bareCompositionBody = `{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","v
 func TestProbe071CompositionWriteResponseShape_BareBody_POSTOnly(t *testing.T) {
 	// Happy path, POST-only: caller omits voID/ifMatch so the PUT arm
 	// is skipped. The probe still passes on a clean bare-body decode.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(initialVUID))
 		w.Header().Set("ETag", `"`+string(initialVUID)+`"`)
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(bareCompositionBody))
-	}))
-	defer srv.Close()
+	})
 
-	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, "", "", &rm.Composition{})
+	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, b), ehrIDFixture, "", "", &rm.Composition{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +148,7 @@ func TestProbe071CompositionWriteResponseShape_BareBody_POSTOnly(t *testing.T) {
 func TestProbe071CompositionWriteResponseShape_BareBody_POSTPlusPUT(t *testing.T) {
 	// Happy path, both arms: caller supplies voID + ifMatch so the
 	// PUT arm runs. Server returns a bare COMPOSITION on both verbs.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
 			w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(initialVUID))
@@ -176,10 +162,9 @@ func TestProbe071CompositionWriteResponseShape_BareBody_POSTPlusPUT(t *testing.T
 			t.Errorf("unexpected method %q", r.Method)
 		}
 		_, _ = w.Write([]byte(bareCompositionBody))
-	}))
-	defer srv.Close()
+	})
 
-	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(initialVUID), &rm.Composition{})
+	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, b), ehrIDFixture, compositionVOID, string(initialVUID), &rm.Composition{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,14 +177,13 @@ func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion_POST(t *te
 	// Non-conformant deployment: server returns ORIGINAL_VERSION on
 	// POST. The strict-against-spec SDK MUST decode-fail; the probe
 	// reports that as fail status (server side is the bug).
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(initialVUID))
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"x::y::1"},"data":{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","value":"x"}}}`))
-	}))
-	defer srv.Close()
+	})
 
-	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, "", "", &rm.Composition{})
+	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, b), ehrIDFixture, "", "", &rm.Composition{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +196,7 @@ func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion_PUT(t *tes
 	// Non-conformant deployment on the PUT path: POST returns the
 	// spec-correct bare body but PUT returns ORIGINAL_VERSION. The
 	// probe must fail on the PUT arm and surface the asymmetry.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
 			w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(initialVUID))
@@ -225,10 +209,9 @@ func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion_PUT(t *tes
 		default:
 			t.Errorf("unexpected method %q", r.Method)
 		}
-	}))
-	defer srv.Close()
+	})
 
-	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(initialVUID), &rm.Composition{})
+	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, b), ehrIDFixture, compositionVOID, string(initialVUID), &rm.Composition{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,19 +247,18 @@ func newOriginalVersionFixture() *contribution.OriginalVersion[rm.Composition] {
 
 func TestProbe072ContributionSubmissionShapePass(t *testing.T) {
 	var capturedBody []byte
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		capturedBody = b
 		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/contribution/cont-1")
 		w.WriteHeader(http.StatusCreated)
-	}))
-	defer srv.Close()
+	})
 	ov := newOriginalVersionFixture()
 	sub := &contribution.Submission{
 		Audit:    ov.CommitAudit,
 		Versions: []contribution.CommitVersion{ov},
 	}
-	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &capturedBody, ehrIDFixture, sub)
+	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, b), &capturedBody, ehrIDFixture, sub)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,19 +275,18 @@ func TestProbe072ContributionSubmissionShapeRejectsObjectRef(t *testing.T) {
 	// flag the REQ-050/095 regression.
 	planted := []byte(`{"_type":"CONTRIBUTION","audit":{"_type":"AUDIT_DETAILS","system_id":"x"},"versions":[{"_type":"OBJECT_REF","id":{"_type":"OBJECT_VERSION_ID","value":"1::x::1"}}]}`)
 	var captured []byte
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.ReadAll(r.Body)
 		captured = planted
 		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/contribution/cont-1")
 		w.WriteHeader(http.StatusCreated)
-	}))
-	defer srv.Close()
+	})
 	ov := newOriginalVersionFixture()
 	sub := &contribution.Submission{
 		Audit:    ov.CommitAudit,
 		Versions: []contribution.CommitVersion{ov},
 	}
-	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &captured, ehrIDFixture, sub)
+	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, b), &captured, ehrIDFixture, sub)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,16 +301,15 @@ func TestProbe072RejectsTimeCommittedAudit(t *testing.T) {
 	// (SPECITS-95 / ITS-REST PR 131).
 	planted := []byte(`{"audit":{"_type":"AUDIT_DETAILS","system_id":"x","change_type":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"249"}},"time_committed":{"value":"2026-01-01T00:00:00Z"}},"versions":[{"_type":"ORIGINAL_VERSION","data":{"_type":"COMPOSITION"},"commit_audit":{"_type":"AUDIT_DETAILS","change_type":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"249"}}}}]}`)
 	var captured []byte
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.ReadAll(r.Body)
 		captured = planted
 		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/contribution/cont-1")
 		w.WriteHeader(http.StatusCreated)
-	}))
-	defer srv.Close()
+	})
 	ov := newOriginalVersionFixture()
 	sub := &contribution.Submission{Audit: ov.CommitAudit, Versions: []contribution.CommitVersion{ov}}
-	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &captured, ehrIDFixture, sub)
+	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, b), &captured, ehrIDFixture, sub)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,7 +324,7 @@ func TestProbe013CrossEHRIsolation(t *testing.T) {
 		ehrBID          openehrclient.EHRID      = "ehrB-aaaa-bbbb-cccc-dddddddddddd"
 		versionUIDFromA openehrclient.VersionUID = "9999abcd-5678-9012-3456-7890abcdef00::cdr.example::1"
 	)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		// Tenant-isolated server: any composition GET under ehrBID for a
 		// VersionUID that doesn't belong to ehrBID is a hard 404. The
 		// probe MUST NOT see EHR A's id or data on this path.
@@ -356,9 +336,8 @@ func TestProbe013CrossEHRIsolation(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"message":"not found","code":"NOT_FOUND"}`))
-	}))
-	defer srv.Close()
-	r, err := probes.Probe013CrossEHRIsolation(context.Background(), newClient(t, srv), ehrAID, ehrBID, versionUIDFromA)
+	})
+	r, err := probes.Probe013CrossEHRIsolation(context.Background(), newClient(t, b), ehrAID, ehrBID, versionUIDFromA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,12 +349,11 @@ func TestProbe013CrossEHRIsolation(t *testing.T) {
 func TestProbe013RejectsTenantLeak(t *testing.T) {
 	// Negative branch: a server that returns 200 for the cross-EHR
 	// read MUST be flagged as a tenant leak by the probe.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","value":"leak"},"archetype_node_id":"openEHR-EHR-COMPOSITION.x.v1","language":{"_type":"CODE_PHRASE","code_string":"en","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_639-1"}},"territory":{"_type":"CODE_PHRASE","code_string":"GB","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_3166-1"}},"category":{"_type":"DV_CODED_TEXT","value":"event","defining_code":{"_type":"CODE_PHRASE","code_string":"433","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"}}}}`))
-	}))
-	defer srv.Close()
-	r, err := probes.Probe013CrossEHRIsolation(context.Background(), newClient(t, srv), "ehrA", "ehrB", "vuid")
+	})
+	r, err := probes.Probe013CrossEHRIsolation(context.Background(), newClient(t, b), "ehrA", "ehrB", "vuid")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -397,11 +375,11 @@ const contributionGetBody = `{
     "id": {"_type": "OBJECT_VERSION_ID", "value": "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"}}]
 }`
 
-// contributionGetServer answers 200 with a canonical contribution for
+// contributionGetBackend answers 200 with a canonical contribution for
 // presentUID and 404 for anything else, recording every request.
-func contributionGetServer(t *testing.T, captured *[]*http.Request, presentUID string) *httptest.Server {
+func contributionGetBackend(t *testing.T, captured *[]*http.Request, presentUID string) *sandbox.Backend {
 	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		*captured = append(*captured, r.Clone(r.Context()))
 		if strings.HasSuffix(r.URL.Path, "/contribution/"+presentUID) {
 			w.Header().Set("Content-Type", "application/json")
@@ -411,16 +389,15 @@ func contributionGetServer(t *testing.T, captured *[]*http.Request, presentUID s
 		}
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"message":"no such contribution"}`))
-	}))
+	})
 }
 
 func TestProbe092ContributionGetPass(t *testing.T) {
 	const presentUID = "0826851c-c4c2-4d61-92b9-410fb8275ff0"
 	var captured []*http.Request
-	srv := contributionGetServer(t, &captured, presentUID)
-	defer srv.Close()
+	b := contributionGetBackend(t, &captured, presentUID)
 
-	r, err := probes.Probe092ContributionGet(context.Background(), newClient(t, srv), &captured, ehrIDFixture, presentUID, "missing-uid")
+	r, err := probes.Probe092ContributionGet(context.Background(), newClient(t, b), &captured, ehrIDFixture, presentUID, "missing-uid")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,17 +412,16 @@ func TestProbe092ContributionGetPass(t *testing.T) {
 func TestProbe092ContributionGetFlagsWrongMethod(t *testing.T) {
 	const presentUID = "0826851c-c4c2-4d61-92b9-410fb8275ff0"
 	var captured []*http.Request
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		planted := r.Clone(r.Context())
 		planted.Method = http.MethodPost
 		captured = append(captured, planted)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(contributionGetBody))
-	}))
-	defer srv.Close()
+	})
 
-	r, err := probes.Probe092ContributionGet(context.Background(), newClient(t, srv), &captured, ehrIDFixture, presentUID, "missing-uid")
+	r, err := probes.Probe092ContributionGet(context.Background(), newClient(t, b), &captured, ehrIDFixture, presentUID, "missing-uid")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -456,19 +432,18 @@ func TestProbe092ContributionGetFlagsWrongMethod(t *testing.T) {
 
 func TestProbe092ContributionGetRejectsMissingInputs(t *testing.T) {
 	var captured []*http.Request
-	srv := contributionGetServer(t, &captured, "u")
-	defer srv.Close()
+	b := contributionGetBackend(t, &captured, "u")
 	if _, err := probes.Probe092ContributionGet(context.Background(), nil, &captured, ehrIDFixture, "u", "m"); err == nil {
 		t.Error("nil client: expected an error")
 	}
-	if _, err := probes.Probe092ContributionGet(context.Background(), newClient(t, srv), nil, ehrIDFixture, "u", "m"); err == nil {
+	if _, err := probes.Probe092ContributionGet(context.Background(), newClient(t, b), nil, ehrIDFixture, "u", "m"); err == nil {
 		t.Error("nil recorder: expected an error")
 	}
 }
 
-// contributionCommitServer records the request body and answers a bare 201.
-func contributionCommitServer(captured *[]byte, plant []byte) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// contributionCommitBackend records the request body and answers a bare 201.
+func contributionCommitBackend(captured *[]byte, plant []byte) *sandbox.Backend {
+	return sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		if plant != nil {
 			b = plant
@@ -476,7 +451,7 @@ func contributionCommitServer(captured *[]byte, plant []byte) *httptest.Server {
 		*captured = b
 		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/contribution/cont-1")
 		w.WriteHeader(http.StatusCreated)
-	}))
+	})
 }
 
 // submissionCorpus loads the vendored submission corpus PROBE-084 uses as
@@ -503,9 +478,8 @@ func submissionCorpus(t *testing.T) [][]byte {
 
 func TestProbe084BuiltContributionBodyPass(t *testing.T) {
 	var captured []byte
-	srv := contributionCommitServer(&captured, nil)
-	defer srv.Close()
-	r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, ehrIDFixture, submissionCorpus(t))
+	b := contributionCommitBackend(&captured, nil)
+	r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, b), &captured, ehrIDFixture, submissionCorpus(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -643,9 +617,8 @@ func TestProbe084BuiltContributionBodyRejects(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var captured []byte
-			srv := contributionCommitServer(&captured, tc.planted)
-			defer srv.Close()
-			r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, ehrIDFixture, submissionCorpus(t))
+			b := contributionCommitBackend(&captured, tc.planted)
+			r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, b), &captured, ehrIDFixture, submissionCorpus(t))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -669,9 +642,8 @@ var updateGolden = flag.Bool("update", false, "update probe golden files")
 // is the SDK's own output, and a change to it is a reviewable wire change.
 func TestProbe084BuiltBodyGolden(t *testing.T) {
 	var captured []byte
-	srv := contributionCommitServer(&captured, nil)
-	defer srv.Close()
-	r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, ehrIDFixture, submissionCorpus(t))
+	b := contributionCommitBackend(&captured, nil)
+	r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, b), &captured, ehrIDFixture, submissionCorpus(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -708,10 +680,9 @@ func TestProbe084BuiltBodyGolden(t *testing.T) {
 // probe rather than passing unnoticed.
 func TestProbe084BuiltContributionBodyCorpusArm(t *testing.T) {
 	var captured []byte
-	srv := contributionCommitServer(&captured, nil)
-	defer srv.Close()
+	b := contributionCommitBackend(&captured, nil)
 	hostile := [][]byte{[]byte(`{"versions":[{"_type":"ORIGINAL_VERSION","invented_field":1}]}`)}
-	r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, ehrIDFixture, hostile)
+	r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, b), &captured, ehrIDFixture, hostile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -725,19 +696,18 @@ func TestProbe084BuiltContributionBodyCorpusArm(t *testing.T) {
 // an error, never a passing result (REQ-082).
 func TestProbe084BuiltContributionBodyFrameworkMisuse(t *testing.T) {
 	var captured []byte
-	srv := contributionCommitServer(&captured, nil)
-	defer srv.Close()
+	b := contributionCommitBackend(&captured, nil)
 	corpus := submissionCorpus(t)
 	if _, err := probes.Probe084BuiltContributionBody(context.Background(), nil, &captured, ehrIDFixture, corpus); err == nil {
 		t.Error("nil client: expected an error")
 	}
-	if _, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), nil, ehrIDFixture, corpus); err == nil {
+	if _, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, b), nil, ehrIDFixture, corpus); err == nil {
 		t.Error("nil recorder: expected an error")
 	}
-	if _, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, "", corpus); err == nil {
+	if _, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, b), &captured, "", corpus); err == nil {
 		t.Error("empty ehr id: expected an error")
 	}
-	if _, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, ehrIDFixture, nil); err == nil {
+	if _, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, b), &captured, ehrIDFixture, nil); err == nil {
 		t.Error("empty corpus: expected an error")
 	}
 }

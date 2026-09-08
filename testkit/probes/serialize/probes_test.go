@@ -8,6 +8,7 @@ import (
 
 	conformance "github.com/cadasto/openehr-sdk-go/testkit/conformance/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	serializeprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/serialize"
 )
 
@@ -157,10 +158,12 @@ func TestProbe076(t *testing.T) {
 				t.Fatalf("probe framework error: %v", err)
 			}
 			switch r.Status {
-			case "pass":
+			case probe.StatusPass:
 				passes++
-			case "skip":
+			case probe.StatusSkip:
 				t.Skipf("skip: %s", r.Detail)
+			case probe.StatusFail:
+				t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
 			default:
 				t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
 			}

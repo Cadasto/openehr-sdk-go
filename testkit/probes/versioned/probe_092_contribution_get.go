@@ -28,7 +28,7 @@ import (
 //
 // Inputs:
 //   - captured accumulates every request the backend receives, in order.
-//     The caller wires it up (an httptest handler in Sandbox mode); the
+//     The caller wires it up (a `sandbox.Backend` scripted route in Sandbox mode); the
 //     probe reads length deltas to count requests, so it MUST NOT be
 //     reset between legs.
 //   - presentUID is a uid the backend answers 200 for with a canonical

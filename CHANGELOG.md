@@ -18,6 +18,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 - **One empty-body predicate across every 2xx decode arm (REQ-151, REQ-094, REQ-144).** `transport.IsNoRepresentationBody` is the single empty-body predicate across every 2xx decode arm, so a JSON `null` body no longer decodes as an all-zero resource ([plan](docs/plans/archive/2026-09-04-error-axis-leftovers.md)).
 - **Nil-receiver guard on every generated decoder (REQ-025).** Every generated `UnmarshalJSON` and the hand-written primitive codecs return an error carrying `typereg.ErrNilReceiver` instead of dereferencing a nil receiver, pinned by a registry-wide census.
 - **Quoted-literal parse errors name the literal once (REQ-052).** `rm.Real` and `rm.Integer` stop repeating a value their wrapped `strconv` cause already quotes, and the top-level primitive decode-failure shape is documented in `canjson`.
+- **Probe runner and in-memory sandbox (REQ-082, partial).** `testkit/probe` is the fail-closed probe runner (Sandbox or Live mode selection, one shared result type) and `sandbox.Backend` an in-memory openEHR REST `http.RoundTripper` with no listener and no credentials ([plan](docs/plans/2026-08-18-probe-runnability.md)).
 
 ## [0.25.0] - 2026-09-03
 

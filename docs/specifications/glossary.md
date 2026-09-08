@@ -111,16 +111,16 @@ The SMART-on-openEHR configuration document advertised by the deployment — typ
 ## SDK internals
 
 **Conformance probe**
-An executable assertion that the SDK exercises against either the sandbox transport, a replayed recording, or a live deployment (REQ-082 — of the three, only in-repo and hand-written-fake execution exists today), to verify wire-level conformance to openEHR REST + SMART-on-openEHR. Each probe has a stable `PROBE-NNN` ID (see [conformance.md](conformance.md)).
+An executable assertion that the SDK exercises against the sandbox transport, a replayed recording, or a live deployment (REQ-082), to verify wire-level conformance to openEHR REST + SMART-on-openEHR. Each probe has a stable `PROBE-NNN` ID (see [conformance.md](conformance.md)). The shared result type and runner live in [`testkit/probe`](../../testkit/probe/).
 
 **Building-block use case**
 A consumer that imports one core package (`openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/aql` models-only, `openehr/template`) without constructing an authenticated client. The SDK's surface MUST support this (REQ-013).
 
 **Sandbox**
-The in-memory transport that will back REQ-082's Sandbox mode, implementing the same client interfaces as the production REST clients, for hermetic tests in SDK consumers. **Not yet implemented** — `sandbox/` is a reserved name holding only a package comment; probe tests stand up a hand-written `httptest` server each.
+The in-memory `http.RoundTripper` that backs REQ-082's Sandbox mode ([`sandbox.Backend`](../../sandbox/doc.go)), injected as the `*http.Client` Transport so production leaf clients run unchanged. No network listener and no credentials. EHR create/get/head are implemented; remaining resources follow as httptest handlers are retired.
 
 **Testkit**
-The package tree `testkit/` carrying the conformance probes (`testkit/probes/`), vendored fixture documents (`testkit/cassettes/`), fixture-path resolution (`testkit/fixtures/`), and corpus-scale conformance harnesses (`testkit/conformance/`). The doubles, builders, recorder/replay helpers, and probe runner once listed here do not exist yet — the runner is REQ-082 phase 1.
+The package tree `testkit/` carrying the conformance probes (`testkit/probes/`), the shared result type and catalog runner (`testkit/probe/`), vendored fixture documents (`testkit/cassettes/`), fixture-path resolution (`testkit/fixtures/`), and corpus-scale conformance harnesses (`testkit/conformance/`). Cassette-mode HAR recordings will land under `testkit/recordings/` once the recorder/replayer/corpus is built; the encoding is already settled (ADR 0020).
 
 **Cut line**
 A package-tree boundary that nothing on the upstream side may import from. The `cadasto/` subtree is the load-bearing cut line for v1 (REQ-010, REQ-011).

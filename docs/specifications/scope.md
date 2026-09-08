@@ -20,8 +20,8 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 | Auth providers — alternative grants | Client Credentials, JWT Bearer; abstracted under `auth.TokenSource` |
 | Service discovery | First-class `ServiceCatalog`, cached, refresh-able, with hand-built catalogs for non-discovering backends ([service-discovery.md](service-discovery.md)) |
 | Cadasto-platform extras | Cadasto Extra API, **Datamap V2** (REQ-058), minimal MPI search (preview), Admin endpoints, Care aggregates — shipped in the same module under `cadasto/` ([module-layout.md § Cadasto extras](module-layout.md#cadasto-extras)) |
-| Sandbox + recorded fixtures | In-memory and recording-replay transports for hermetic SDK-consumer tests — specified ([conformance.md § REQ-082](conformance.md#req-082--runnability)), not yet built: `sandbox/` is reserved and recordings land under `testkit/recordings/` |
-| Testkit + conformance probes | Conformance probes, vendored fixture documents, and fixture-path resolution under `testkit/` ([conformance.md](conformance.md)); the probe runner is REQ-082 phase 1 |
+| Sandbox + recorded fixtures | In-memory `sandbox.Backend` (`http.RoundTripper`) for hermetic SDK-consumer tests ([conformance.md § REQ-082](conformance.md#req-082--runnability)); Cassette recordings will land under `testkit/recordings/` once the recorder/replayer/corpus is built — the HAR 1.2 encoding is already settled ([ADR 0020](../adr/0020-cassette-recording-har.md)) |
+| Testkit + conformance probes | Conformance probes, the shared result type and catalog runner (`testkit/probe/`), vendored fixture documents, and fixture-path resolution under `testkit/` ([conformance.md](conformance.md)) |
 | openEHR wire conformance | The probe suite verifies wire-level correctness against the openEHR spec (REQ-080) |
 | Examples per primary use case | Worked example programs under `cmd/examples/`, catalogued in [`../examples.md`](../examples.md); the four primary consumers — benchmark, seeder, MCP, federator ([use-cases.md](use-cases.md)) — are downstream products that follow those shapes, not programs in this tree |
 

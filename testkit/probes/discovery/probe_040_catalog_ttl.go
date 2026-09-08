@@ -23,17 +23,11 @@ import (
 	"sync/atomic"
 
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
+	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 )
 
-// Result captures the outcome of a probe invocation. Status is
-// "pass" / "fail" / "skip"; Detail is human-readable supplementary
-// text for failures or skips. Same shape as the serialize / versioned
-// probe families.
-type Result struct {
-	Probe  string
-	Status string
-	Detail string
-}
+// Result is the shared probe outcome (REQ-082).
+type Result = probe.Result
 
 // Probe040CatalogTTL implements PROBE-040: two successive resolves
 // of the same issuer within the catalog's declared TTL window MUST

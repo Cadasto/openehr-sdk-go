@@ -1,40 +1,54 @@
 #!/usr/bin/env bash
-# probe-status.sh — list every PROBE in conformance.md with its declared status
-# and whether a probe test file exists on disk.
+# probe-status.sh — list every PROBE in conformance.md with its declared
+# status, Modes, Effect, and whether a probe test file exists on disk.
 #
-# For wire/client work the PROBE state is the definition of done: a change isn't
-# finished while its probe is still Draft with no test file (unless the plan
-# explicitly defers it).
-#
-# The conformance.md Status column is authoritative. The test-file column is a
-# heuristic keyed on the `probe_NNN_*.go` filename, so a probe co-located in
-# another probe's file (e.g. PROBE-026 living in probe_025_*.go) reads MISSING.
+# Modes / Effect are the REQ-082 catalog fields (an absent Effect is
+# treated as mutating). The test-file column is a filename heuristic
+# and is not the runner's per-mode state — `go test ./testkit/probe/`
+# is.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONF="${ROOT}/docs/specifications/conformance.md"
 PROBES_DIR="${ROOT}/testkit/probes"
 
-printf '%-11s | %-24s | %s\n' "PROBE" "Status (conformance.md)" "Test file"
-printf '%s-+-%s-+-%s\n' "-----------" "------------------------" "---------"
+printf '%-11s | %-16s | %-28s | %-12s | %s\n' "PROBE" "Status" "Modes" "Effect" "Test file"
+printf '%s-+-%s-+-%s-+-%s-+-%s\n' "-----------" "----------------" "----------------------------" "------------" "---------"
 
 awk '
   /^#### PROBE-[0-9]+/ {
-    if (id != "") print id "\t" status
-    id=$2; status="(no status line)"; next
+    if (id != "") print id "\t" status "\t" modes "\t" effect
+    id=$2; status="(no status)"; modes="(none)"; effect="mutating"; next
   }
   id != "" && /^- \*\*Status:\*\*/ {
     s=$0
-    sub(/^- \*\*Status:\*\*[[:space:]]*/, "", s)   # strip "- **Status:** "
-    sub(/ —.*/, "", s)                             # drop em-dash tail ("— see ...")
-    sub(/ - .*/, "", s)                            # drop ascii "- ..." tail
-    sub(/\.[[:space:]]*$/, "", s)                  # drop trailing period
+    sub(/^- \*\*Status:\*\*[[:space:]]*/, "", s)
+    sub(/ —.*/, "", s)
+    sub(/ - .*/, "", s)
+    sub(/\.[[:space:]]*$/, "", s)
     status=s
   }
-  END { if (id != "") print id "\t" status }
-' "$CONF" | while IFS=$'\t' read -r id status; do
+  id != "" && /^- \*\*Modes:\*\*/ {
+    s=$0
+    sub(/^- \*\*Modes:\*\*[[:space:]]*/, "", s)
+    sub(/ —.*/, "", s)
+    sub(/ \(.*/, "", s)
+    sub(/;.*$/, "", s)
+    sub(/\.[[:space:]]*$/, "", s)
+    modes=s
+  }
+  id != "" && /^- \*\*Effect:\*\*/ {
+    s=$0
+    sub(/^- \*\*Effect:\*\*[[:space:]]*/, "", s)
+    sub(/ —.*/, "", s)
+    sub(/ \(.*/, "", s)
+    sub(/\.[[:space:]]*$/, "", s)
+    effect=s
+  }
+  END { if (id != "") print id "\t" status "\t" modes "\t" effect }
+' "$CONF" | while IFS=$'\t' read -r id status modes effect; do
   num="${id#PROBE-}"
   f="$(ls "${PROBES_DIR}"/*/probe_"${num}"_*.go 2>/dev/null | head -1 || true)"
   if [[ -n "$f" ]]; then file="${f#"${ROOT}/"}"; else file="MISSING"; fi
-  printf '%-11s | %-24s | %s\n' "$id" "$status" "$file"
+  printf '%-11s | %-16s | %-28s | %-12s | %s\n' "$id" "$status" "$modes" "$effect" "$file"
 done

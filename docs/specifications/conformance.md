@@ -39,7 +39,7 @@ Every probe that asserts against a **backend** **MUST** be runnable in three mod
 | **Cassette** | a replayed **recording** | `testkit/recordings/` | Deterministic CI against captured real-deployment traffic |
 | **Live** | a reference openEHR deployment | none | Pre-release verification against a real backend |
 
-The probe definition is the single source; the runner picks the backend at invocation time.
+The probe definition is the single source; the runner ([`testkit/probe`](../../testkit/probe/)) picks the backend at invocation time.
 
 **Not every probe is backend-facing.** An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output — the AQL round-trip and catalogue properties, the upstream FLAT parity harness, the codec and validation multiset probes — and reaches no server in any mode. Such a probe **MUST** declare `In-repo` in its **Modes** line, and the three-mode rule above does **not** bind it: there is no backend for a recording to capture or a deployment to confirm. This is a declared class, not a shortfall, and it is why a blanket three-mode reading of this requirement is wrong — 16 of the 72 catalog entries are in-repo by construction.
 
@@ -64,7 +64,7 @@ Status is the closed set `pass` / `fail` / `skip`:
 
 Every backend-facing probe **MUST** declare its effect as **read-only** or **mutating**, as an **Effect** field in its catalog entry — part of the probe's definition here, not a runner-side annotation.
 
-The catalog predates this field and no entry carries one yet. Until an entry is classified, a probe **MUST** be treated as **mutating**: the unclassified default is the restrictive one, so a writer cannot reach a live deployment merely because nobody got round to labelling it. Populating the catalog is phase 1 of the plan; an in-repo probe needs no declaration, having no backend to affect.
+The catalog predates this field and most entries do not carry one yet. Until an entry is classified, a probe **MUST** be treated as **mutating**: the unclassified default is the restrictive one, so a writer cannot reach a live deployment merely because nobody got round to labelling it. Populating the catalog is phase 1 of the plan; an in-repo probe needs no declaration, having no backend to affect.
 
 #### Sandbox mode
 
@@ -74,13 +74,13 @@ Sandbox state **MUST** be per-run and isolated: two probes running against one s
 
 #### Cassette mode
 
-The recording **encoding** is deliberately not fixed here: whether recordings are HTTP Archive (`.har`) or a purpose-built YAML schema is open as [STRAND-11](research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml), to be resolved by ADR against a real capture. Every rule below binds regardless of the encoding chosen.
+The recording **encoding** is HTTP Archive 1.2 (`.har`), settled by [ADR 0020](../adr/0020-cassette-recording-har.md) against a live EHRbase capture. Provenance and redaction attestation live on `log` as a `_req082` object — HAR has no native slot for them. Every rule below binds to that encoding.
 
 Recordings are checked-in evidence and are held to the same standard as any vendored corpus:
 
 - A recording **MUST** carry its provenance — the deployment it came from, the date, and the SDK commit that captured it. A recording whose provenance cannot be stated **MUST** be discarded rather than replayed.
 - Recordings **MUST** be redacted **at capture time**, never at review time. Credentials (`Authorization`, cookies, tokens, client secrets, JWKS private material) and patient-identifying data **MUST NOT** reach disk. A recording **MUST** record that redaction ran, so an unredacted capture is detectable rather than merely unlikely.
-- Replay matching **MUST** be on a normalised request key — method, path, and the headers and body fields the probe's assertion depends on — **not** byte-exact equality: a capture necessarily carries timestamps, generated UUIDs, and `ETag` values that differ on every run, and byte-exact matching would make every recording single-use.
+- Replay matching **MUST** be on a normalised request key — method, path, and the headers and body fields the probe's assertion depends on — **not** byte-exact equality: a capture necessarily carries timestamps, generated UUIDs, and `ETag` values that differ on every run, and byte-exact matching would make every recording single-use. Browser-oriented HAR fields (`timings`, `cache`, `pageref`) are outside that key, and a replayer **MUST** ignore them.
 - An unmatched request **MUST** fail the probe. The replayer **MUST NOT** pass a request through to a network, and **MUST NOT** synthesise a plausible response — a recording with a gap is a recording that must be recaptured.
 - Where one probe issues the same normalised request more than once and expects different responses (a write followed by a read of what it wrote), the recording **MUST** preserve exchange order and the replayer **MUST** consume matches in that order.
 
@@ -159,7 +159,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions** — what state the system must be in.
 - **Wire assertion** — what's checked at the byte / status level.
 - **Modes** — Sandbox / Cassette / Live for a backend-facing probe, or In-repo for a probe that reaches no server in any mode (REQ-082). For a backend-facing probe this line is the authoritative record of which modes it supports today.
-- **Effect** — read-only or mutating (REQ-082). Absent means *treated as* mutating; the catalog is not yet populated.
+- **Effect** — read-only or mutating (REQ-082). Absent means *treated as* mutating; the catalog is only partially populated.
 - **Status** — Draft (in this spec), Implemented (in code), Ratified (passes against a reference openEHR deployment), Deferred (the requirement it covers is landed and unit-covered, but this dedicated probe is not written), Deprecated (scheduled removal; may be unrunnable when implementation is already gone pre-v1.0).
 - **Satisfies** — REQ-IDs this probe exercises (inverse of the [REQ registry](REQ.md)).
 

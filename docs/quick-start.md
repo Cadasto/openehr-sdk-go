@@ -106,22 +106,17 @@ Every REST call flows through three layers:
 2. **Transport client** — injects your `*http.Client`, attaches auth, handles retries and OTel (`transport`).
 3. **Leaf client** — typed methods per REST resource (`openehr/client/ehr`, `query`, `definition`, …).
 
-### Minimal wiring (in-process mock)
+### Minimal wiring (in-process sandbox)
 
-The [`ehr_create`](../cmd/examples/ehr_create/main.go) example spins up an `httptest` server and calls `ehr.Create`:
-
-```bash
-go run ./cmd/examples/ehr_create
-```
-
-Core wiring (abbreviated):
+[`sandbox.Backend`](../sandbox/doc.go) is an in-memory openEHR REST backend that implements `http.RoundTripper` — no listener, no credentials. Inject it as the client's Transport (REQ-021, REQ-082):
 
 ```go
+b := sandbox.New()
 cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{
-	Issuer: "https://example.test",
+	Issuer: "https://sandbox.local",
 	Services: map[string]discovery.ServiceEntry{
 		discovery.ServiceIDOpenEHRRest: {
-			BaseURL:     discovery.MustParseURL("https://cdr.example/openehr/v1"),
+			BaseURL:     discovery.MustParseURL("https://sandbox.local/openehr/v1"),
 			SpecVersion: discovery.SpecVersionPin,
 		},
 	},
@@ -129,14 +124,17 @@ cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{
 if err != nil {
 	log.Fatal(err)
 }
-
-hc := &http.Client{Timeout: 30 * time.Second}
-c, err := transport.New(cat, transport.WithHTTPClient(hc))
+c, err := transport.New(cat, transport.WithHTTPClient(b.HTTPClient()))
 if err != nil {
 	log.Fatal(err)
 }
-
 ehr, meta, err := openehrclient.Create(ctx, c)
+```
+
+The [`ehr_create`](../cmd/examples/ehr_create/main.go) example is the same call against a throwaway handler if you want to run it without importing `sandbox/`:
+
+```bash
+go run ./cmd/examples/ehr_create
 ```
 
 ### Pointing at a real CDR

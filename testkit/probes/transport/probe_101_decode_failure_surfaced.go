@@ -43,8 +43,8 @@ import (
 //
 // Inputs:
 //   - captured returns the ESCAPED path of every request the backend has
-//     received so far, in order. The caller wires it up (an httptest recorder
-//     in Sandbox mode). The probe reads length deltas to count requests per
+//     received so far, in order. The caller wires it up (a `sandbox.Backend`
+//     scripted route in Sandbox mode). The probe reads length deltas to count requests per
 //     arm, so it MUST NOT be reset between arms.
 //   - undecodableID is an EHR id the backend answers 200 for with a body that
 //     cannot decode as an EHR; missingID is one it answers 404 for. The

@@ -5,19 +5,18 @@
 // standard-library testing package.
 //
 // What is here: the probes themselves, one package per area, under
-// testkit/probes/; corpus-scale parity harnesses under
+// testkit/probes/; the shared result type and catalog runner under
+// testkit/probe/; corpus-scale parity harnesses under
 // testkit/conformance/; vendored fixture documents under
 // testkit/cassettes/; and fixture-path resolution in testkit/fixtures/.
 // This root package exports nothing.
 //
-// What is NOT here, despite earlier documentation claiming otherwise:
-// test doubles, fluent builders, a clock abstraction, a JWKS fixture, a
-// token-source double, recorder/replay helpers, and a probe runner. The
-// runner and the recorder are specified by REQ-082
-// (docs/specifications/conformance.md) and sequenced by
-// docs/plans/2026-08-18-probe-runnability.md; the rest are not currently
-// planned. Each probe is reached from its own test, and every probe that
-// needs a backend stands up a net/http/httptest server of its own.
+// The shared result type and catalog runner live in testkit/probe/
+// (REQ-082). Cassette recordings, when captured, land under
+// testkit/recordings/ — not under testkit/cassettes/, which holds
+// fixture bodies. Several backend-facing probe tests still stand up a
+// net/http/httptest server; migrating those onto sandbox/ is the rest
+// of the REQ-082 plan.
 //
 // Conformance probes are the openEHR wire-conformance contract: defined
 // once, implemented in each language, and — once REQ-082's modes are
