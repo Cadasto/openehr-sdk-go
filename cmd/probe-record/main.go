@@ -114,10 +114,14 @@ func run(args []string, usage io.Writer) error {
 	if *sdkCommit == "" {
 		return errors.New("-sdk-commit is required — build stamping is unavailable, so pass it")
 	}
+	// provenanceBaseURL trims as well as refusing, and the trimmed form is
+	// what both the recording and the dial should use — otherwise a -base with
+	// stray whitespace is attested one way and dialed another.
 	provBase, err := provenanceBaseURL(*base)
 	if err != nil {
 		return err
 	}
+	*base = provBase
 
 	tok, err := tokenSource(*cred)
 	if err != nil {
