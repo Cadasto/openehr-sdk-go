@@ -144,7 +144,7 @@ Deferred Tier-3 gaps — dedicated ITEM_TAG endpoints, `VERSIONED_*` read famili
 
 | Target | Status | Notes |
 |---|---|---|
-| EHRbase CDR | **Partial** | Vendored EHRbase OpenAPI specs in [`resources/ehrbase/`](../resources/ehrbase/README.md) (deployment extensions, **not** the normative contract); WebTemplate export matches `openEHR_SDK` v2.3 (PROBE-075) and the FLAT codec round-trips EHRbase's own corpus at 80.4% (PROBE-086). Ratification against a **running** deployment is open — see stage 5 |
+| EHRbase CDR | **Partial** | WebTemplate export matches `openEHR_SDK` v2.3 (PROBE-075) and the FLAT codec round-trips EHRbase's own corpus at 80.4% (PROBE-086). EHRbase-only admin helpers (`PurgeTemplates`) are documented as deployment extensions (REQ-099), not as a second OpenAPI pin. Ratification against a **running** deployment is open — see stage 5 |
 | Any ITS-REST 1.1.0 CDR | **Partial** | The clients target the vendored [`resources/its-rest/`](../resources/its-rest/README.md) pin; conformance is asserted in Sandbox, not yet against a live third-party CDR |
 | Static / non-discovering backend | **Landed** | Build a `discovery.ServiceCatalog` by hand — no base-URL parameter (REQ-070); see [quick-start.md](quick-start.md) |
 

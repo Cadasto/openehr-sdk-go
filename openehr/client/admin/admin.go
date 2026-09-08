@@ -64,10 +64,10 @@ func DeleteAllEHRs(ctx context.Context, c *transport.Client, ids ...ehr.EHRID) e
 // This is NOT part of the openEHR ITS-REST Admin contract (which defines
 // only /admin/ehr/{ehr_id} and /admin/ehr/all). It is an EHRbase-specific
 // extension: EHRbase exposes "delete all templates" as
-// DELETE admin/template/all (operationId deleteAllTemplates —
-// resources/ehrbase/admin.openapi.yaml line 653). The SDK targets that
-// segment; against a non-EHRbase deployment the endpoint is absent and a
-// 404 surfaces as transport.ErrNotFound (safe to ignore). The admin base
+// DELETE /admin/template/all (operationId deleteAllTemplates). See
+// https://docs.ehrbase.org/docs/EHRbase/Explore/Admin-REST and REQ-099.
+// Against a non-EHRbase deployment the endpoint is absent and a 404
+// surfaces as transport.ErrNotFound (safe to ignore). The admin base
 // path is deployment-specific; this assumes the same base as the other
 // /admin/* calls.
 func PurgeTemplates(ctx context.Context, c *transport.Client) error {

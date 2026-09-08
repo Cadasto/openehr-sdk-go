@@ -52,3 +52,9 @@ make its-rest-check         # verify local copies + report if upstream advanced
 ```
 
 A version bump is an explicit, reviewable commit (diff the YAML + `MANIFEST.txt`).
+
+## Licence
+
+Each file declares **Creative Commons Attribution-NoDerivs 3.0 Unported**
+(© openEHR Foundation) on `info.license`. They are vendored unmodified.
+Repository-wide inventory: [`LICENSING.md`](../../LICENSING.md).

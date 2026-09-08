@@ -24,6 +24,7 @@
 | Use cases — primary and building-block | [`../docs/specifications/use-cases.md`](../docs/specifications/use-cases.md) |
 | Open research strands (STRAND-NN) | [`../docs/specifications/research-strands.md`](../docs/specifications/research-strands.md) |
 | Closed architectural decisions | [`adr/`](adr/) |
+| Third-party / vendored licences | [`../LICENSING.md`](../LICENSING.md) |
 | Implementation plans (per phase) | [`plans/`](plans/) |
 
 ## Package organization

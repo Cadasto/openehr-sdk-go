@@ -2073,7 +2073,7 @@ requirements:
     canonical: docs/specifications/packaging.md#req-003--license
     status: draft
     implementation: landed
-    packages: [LICENSE]
+    packages: [LICENSE, LICENSING.md]
 
   - id: REQ-004
     title: Semantic versioning
