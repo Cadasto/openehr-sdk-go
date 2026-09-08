@@ -1022,7 +1022,11 @@ requirements:
     # probes still stand up httptest identity servers.
     # Live mode is wired: OPENEHR_LIVE_* names the target and
     # OPENEHR_LIVE_ALLOW_MUTATING is the separate write opt-in; CI
-    # leaves both unset and the live test skips without dialing.
+    # leaves both unset and the live tests skip without dialing.
+    # TestLiveCoreSnapshot is the current Live baseline (core EHR
+    # create/get/exists/status green vs EHRbase 2.35.1; the System
+    # capabilities probe skips the OPTIONS / accepted deviation,
+    # conformance.md Live mode).
     tests:
       - testkit/probe/run_test.go
       - testkit/probe/mode_test.go
@@ -1031,6 +1035,7 @@ requirements:
       - testkit/probe/replay_test.go
       - testkit/probe/record_test.go
       - testkit/probe/cassette_test.go
+      - testkit/probe/livesnapshot_test.go
       - cmd/probe-record/main_test.go
       - sandbox/backend_test.go
       - sandbox/independence_test.go
