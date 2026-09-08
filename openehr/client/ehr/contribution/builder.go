@@ -284,6 +284,13 @@ func NewBuilder() *Builder { return &Builder{} }
 
 // WithAudit replaces the batch commit audit wholesale. Later WithCommitter
 // / WithSystemID / WithDescription / WithChangeType calls refine it.
+//
+// It is not a bypass: [Builder.Build] gates the audit's `change_type` on
+// membership of the openEHR *audit change type* group and on the pinned
+// rubric exactly as [Builder.WithChangeType] does, so a code outside the
+// group, a foreign terminology id, or a hand-typed rubric supplied here is
+// refused at Build (REQ-034). A caller who needs an off-spec audit hand-wires
+// a [Submission].
 func (b *Builder) WithAudit(a UpdateAudit) *Builder {
 	if b == nil {
 		return b

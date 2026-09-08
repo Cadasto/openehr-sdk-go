@@ -79,8 +79,13 @@ func resolveOPTPath(args []string) string {
 // openehr/validation/composition_test.go.
 func exampleVitalSignsComposition() *rm.Composition {
 	// Source the category rubric and terminology id from the pin rather than
-	// typing them beside the code — the one-home-per-code rule (REQ-034).
-	eventRubric, _ := terminology.CompositionCategory.Rubric("433")
+	// typing them beside the code — the one-home-per-code rule (REQ-034). A
+	// miss means the pin no longer carries `event`; stop rather than ship an
+	// empty Category.value into the validator.
+	eventRubric, ok := terminology.CompositionCategory.Rubric("433")
+	if !ok {
+		log.Fatalf("code 433 (event) is not a member of the pinned composition_category group")
+	}
 	return &rm.Composition{
 		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
 		Name:            rm.DVText{Value: "Encounter"},
