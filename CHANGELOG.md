@@ -10,16 +10,20 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-09-08
+
+Twenty-sixth `v0.x` minor — the openEHR Terminology is vendored and generated as the single home for every `openehr` code, and the probe catalog becomes runnable through a Sandbox/Cassette runner. **Breaking:** `testkit/probes/*` `Result` is now an alias of `probe.Result` with a typed `Status` (was a per-package struct with `Status string`), `contribution.Builder.Build` refuses an off-spec batch `audit.change_type` on every path including `WithAudit`, `ChangeType.IsValid` / `LifecycleState.IsValid` widen to full group membership, and the `ctx/` `math_function` default is `640|actual` (was `146|actual`).
+
 ### Added
 
-- **Go 1.27.0 module floor (REQ-002).** The module floor, Docker/Make tooling, and CI now require Go 1.27.0 or newer, and equivalent 1.27 standard-library helpers replaced hand-written code ([plan](docs/plans/archive/2026-09-03-go-1.27.md)).
-- **Simplified-Formats media-type negotiation (REQ-053).** `simplified.ParseMediaType` classifies a single media-type token (a Content-Type value or one Accept media range) as FLAT or STRUCTURED, accepting the deprecated `.schema`-suffixed variants on input, while `Format.MediaType` emits only the two canonical strings ([plan](docs/plans/archive/2026-09-04-spec-interop-leftovers.md)).
-- **RM floor: DV_PROPORTION precision invariants (REQ-112).** `ValidateRM` and its typed sugars now report a `DV_PROPORTION.precision` below -1 and a precision of 0 on a non-integral numerator or denominator (the RM `Precision_validity` invariant), as they already did for `DV_QUANTITY.precision` ([plan](docs/plans/archive/2026-09-04-spec-interop-leftovers.md)).
-- **One empty-body predicate across every 2xx decode arm (REQ-151, REQ-094, REQ-144).** `transport.IsNoRepresentationBody` is the single empty-body predicate across every 2xx decode arm, so a JSON `null` body no longer decodes as an all-zero resource ([plan](docs/plans/archive/2026-09-04-error-axis-leftovers.md)).
+- **Go 1.27.0 module floor (REQ-002).** The module floor, Docker/Make tooling, and CI now require Go 1.27.0 or newer, and equivalent 1.27 standard-library helpers replaced hand-written code.
+- **Simplified-Formats media-type negotiation (REQ-053).** `simplified.ParseMediaType` classifies a single media-type token (a Content-Type value or one Accept media range) as FLAT or STRUCTURED, accepting the deprecated `.schema`-suffixed variants on input, while `Format.MediaType` emits only the two canonical strings.
+- **RM floor: DV_PROPORTION precision invariants (REQ-112).** `ValidateRM` and its typed sugars now report a `DV_PROPORTION.precision` below -1 and a precision of 0 on a non-integral numerator or denominator (the RM `Precision_validity` invariant), as they already did for `DV_QUANTITY.precision`.
+- **One empty-body predicate across every 2xx decode arm (REQ-151, REQ-094, REQ-144).** `transport.IsNoRepresentationBody` is the single empty-body predicate across every 2xx decode arm, so a JSON `null` body no longer decodes as an all-zero resource.
 - **Nil-receiver guard on every generated decoder (REQ-025).** Every generated `UnmarshalJSON` and the hand-written primitive codecs return an error carrying `typereg.ErrNilReceiver` instead of dereferencing a nil receiver, pinned by a registry-wide census.
 - **Quoted-literal parse errors name the literal once (REQ-052).** `rm.Real` and `rm.Integer` stop repeating a value their wrapped `strconv` cause already quotes, and the top-level primitive decode-failure shape is documented in `canjson`.
-- **Probe runner and in-memory sandbox (REQ-082, partial).** `testkit/probe` is the fail-closed probe runner (Sandbox, Cassette, or Live mode selection, one shared result type) with a capture-time HAR `Recorder`, a fail-closed `Replayer`, and the first vendored recording (`testkit/recordings/ehr-create.har`); `sandbox.Backend` is an in-memory openEHR REST `http.RoundTripper` with no listener and no credentials ([plan](docs/plans/2026-08-18-probe-runnability.md)).
-- **openEHR terminology vocabulary (REQ-034).** The openEHR Terminology (TERM Release-3.0.0) is vendored and generated into the stdlib-only `openehr/terminology` accessor; lifecycle-state and change-type validity is now group membership, enforced on every `Build` path including `WithAudit` (REQ-130), and the `ctx/` `math_function` default is `640|actual` ([plan](docs/plans/archive/2026-09-07-terminology-vocabulary.md)).
+- **Probe runner, in-memory sandbox, and Cassette replay (REQ-082, partial).** `testkit/probe` is the fail-closed runner over Sandbox, Cassette, and Live modes, with a HAR recorder, replayer, and first vendored recording; `sandbox.Backend` fakes openEHR REST with no listener.
+- **openEHR terminology vocabulary (REQ-034, REQ-130).** The openEHR Terminology (TERM Release-3.0.0) is vendored and generated into the stdlib-only `openehr/terminology` accessor, making group membership the single home for every `openehr` code and rubric the SDK emits.
 
 ## [0.25.0] - 2026-09-03
 
