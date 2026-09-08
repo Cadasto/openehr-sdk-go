@@ -34,8 +34,8 @@ which file a second implementation (or a reviewer) can treat as the corpus.
 
 ## Consequences
 
-- The corpus under `testkit/recordings/` is `.har`. A recording without `_req082.provenance`
-  or without `_req082.redaction.ran: true` is discarded, not replayed.
+- The corpus, once captured under `testkit/recordings/`, will be `.har`. A recording without
+  `_req082.provenance` or without `_req082.redaction.ran: true` is discarded, not replayed.
 - Review diffs are larger and noisier than the YAML alternative. That cost is accepted so
   the corpus stays a published interchange format rather than an SDK-private schema.
 - Browser-oriented HAR fields (`timings`, `cache`, `pageref`) are unused. Recorders MAY omit

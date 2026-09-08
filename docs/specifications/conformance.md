@@ -159,7 +159,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions** — what state the system must be in.
 - **Wire assertion** — what's checked at the byte / status level.
 - **Modes** — Sandbox / Cassette / Live for a backend-facing probe, or In-repo for a probe that reaches no server in any mode (REQ-082). For a backend-facing probe this line is the authoritative record of which modes it supports today.
-- **Effect** — read-only or mutating (REQ-082). Absent means *treated as* mutating; the catalog is not yet populated.
+- **Effect** — read-only or mutating (REQ-082). Absent means *treated as* mutating; the catalog is only partially populated.
 - **Status** — Draft (in this spec), Implemented (in code), Ratified (passes against a reference openEHR deployment), Deferred (the requirement it covers is landed and unit-covered, but this dedicated probe is not written), Deprecated (scheduled removal; may be unrunnable when implementation is already gone pre-v1.0).
 - **Satisfies** — REQ-IDs this probe exercises (inverse of the [REQ registry](REQ.md)).
 

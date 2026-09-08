@@ -11,7 +11,7 @@
 
 ## Goal
 
-Make the probe catalog (66 entries) runnable the way REQ-082 requires, starting with the two modes CI can run with nothing external at run time — Sandbox outright, Cassette by replaying a vendored recording (capturing one still needs a deployment). Consumers are twofold: the SDK's own CI, which today reaches each probe only through a bespoke hand-written test, and SDK **integrators**, for whom `sandbox/` is the advertised way to test an application against a fake CDR — a package that currently contains no code.
+Make the probe catalog (72 entries) runnable the way REQ-082 requires, starting with the two modes CI can run with nothing external at run time — Sandbox outright, Cassette by replaying a vendored recording (capturing one still needs a deployment). Consumers are twofold: the SDK's own CI, which today reaches each probe only through a bespoke hand-written test, and SDK **integrators**, for whom `sandbox/` is the advertised way to test an application against a fake CDR — a package whose in-memory backend (`backend.go`, `script.go`) now covers EHR create/get/head and scripted routes, with the remaining catalog surface still to migrate.
 
 ## Why this is the next conformance step
 
@@ -48,7 +48,7 @@ Scoped to phases 1–2 (what is reachable now):
 | Step | Status |
 |---|---|
 | REQ-082 normative prose + STRAND-11 (this PR) | done |
-| Phase 1 — shared result + runner | done — `testkit/probe`; the 12 per-package `Result` types are `type Result = probe.Result` aliases, not copies; refusals pinned by named tests |
+| Phase 1 — shared result + runner | done — `testkit/probe`; the 12 per-package `Result` types are `type Result = probe.Result` aliases, not copies; refusals pinned by named tests; per-probe **Effect** metadata partial (5 of the 56 backend-facing entries carry it today; the 16 in-repo entries need none) |
 | Phase 2 — `sandbox/` transport | partial — EHR + scripted routes; versioned / definition / demographic / transport probes off httptest. Auth/discovery httptest remain (OIDC/JWKS, not CDR) |
 | Phase 4 — Live mode (local CDRs) | partial — runner Live path + `TestLiveCreateEHR`: `OPENEHR_LIVE_*` names the target, `OPENEHR_LIVE_ALLOW_MUTATING` is the separate write opt-in REQ-082 requires; both unset in CI, so the test skips without dialing |
 | Phase 3 — Cassette recording | encoding settled (ADR 0020, HAR 1.2); recorder/replayer/corpus not started |
@@ -82,7 +82,7 @@ Scoped to phases 1–2 (what is reachable now):
 
 **Definition of done:** every probe that can run on replay does; an unmatched request fails closed.
 
-### Phase 4 — Live mode *(blocked: needs a live CDR)*
+### Phase 4 — Live mode *(wired, pre-release; not blocked)*
 
 **Tasks:** endpoint and credential configuration; the mutating-probe opt-in gate; per-run resource scoping; promote PROBE-077 / 078 / 079 out of `Status: Deferred`, implement PROBE-065, and write the four STRAND-09 REST probes.
 
@@ -92,6 +92,6 @@ Scoped to phases 1–2 (what is reachable now):
 
 - [conformance.md § REQ-082](../specifications/conformance.md#req-082--runnability) — normative contract
 - [conformance.md § REQ-080](../specifications/conformance.md#req-080--openehr-wire-conformance) — the conformance suite this unblocks
-- [research-strands.md § STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) — recording format, open
+- [research-strands.md § STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) — recording format, resolved ([ADR 0020](../adr/0020-cassette-recording-har.md))
 - [research-strands.md § STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) — the REST probes gated on this plan
 - [REQ.md](../specifications/REQ.md) — registry row

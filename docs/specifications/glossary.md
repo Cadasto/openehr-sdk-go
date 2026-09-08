@@ -120,7 +120,7 @@ A consumer that imports one core package (`openehr/rm`, `openehr/serialize`, `op
 The in-memory `http.RoundTripper` that backs REQ-082's Sandbox mode ([`sandbox.Backend`](../../sandbox/doc.go)), injected as the `*http.Client` Transport so production leaf clients run unchanged. No network listener and no credentials. EHR create/get/head are implemented; remaining resources follow as httptest handlers are retired.
 
 **Testkit**
-The package tree `testkit/` carrying the conformance probes (`testkit/probes/`), the shared result type and catalog runner (`testkit/probe/`), vendored fixture documents (`testkit/cassettes/`), Cassette-mode HAR recordings (`testkit/recordings/`, ADR 0020), fixture-path resolution (`testkit/fixtures/`), and corpus-scale conformance harnesses (`testkit/conformance/`).
+The package tree `testkit/` carrying the conformance probes (`testkit/probes/`), the shared result type and catalog runner (`testkit/probe/`), vendored fixture documents (`testkit/cassettes/`), fixture-path resolution (`testkit/fixtures/`), and corpus-scale conformance harnesses (`testkit/conformance/`). Cassette-mode HAR recordings will land under `testkit/recordings/` once the recorder/replayer/corpus is built; the encoding is already settled (ADR 0020).
 
 **Cut line**
 A package-tree boundary that nothing on the upstream side may import from. The `cadasto/` subtree is the load-bearing cut line for v1 (REQ-010, REQ-011).
