@@ -116,11 +116,12 @@ var credentialHeaders = map[string]struct{}{
 }
 
 // A HAR cookies[] array is deliberately not modelled. The types above
-// carry no cookies field, so a cookie reaches a recording only through
-// the Cookie or Set-Cookie header, which the set above already
-// refuses; and keeping cookies out of a capture in the first place is
-// the recorder's capture-time job, not the validator's (REQ-082
-// requires redaction at capture time, never at review time).
+// carry no cookies field, so this validator sees a cookie only when it
+// rides in the Cookie or Set-Cookie header, which the set above
+// refuses. A cookie carried in the cookies[] array alone is invisible
+// here and would be caught only by the recorder redacting it at
+// capture time — which is where cookies belong anyway, since REQ-082
+// requires redaction at capture time, never at review time.
 
 // credentialQueryKeys are request-URL query keys that carry a
 // credential in the URL itself, where stripping headers never reaches.
@@ -141,18 +142,25 @@ var credentialQueryKeys = map[string]struct{}{
 // as legitimate content — an archetype term, a template path, a note —
 // so scanning for those would refuse sound recordings far more often
 // than leaked ones. Every marker below is an OAuth or OIDC field name
-// clinical content has no reason to carry.
+// clinical content has no reason to carry, wherever in the body it
+// turns up.
 //
-// The quotes around the last one are part of the needle, not part of
-// the name: they keep it matching a JSON key rather than the word
-// authorization in prose. A refusal reports the name without them.
+// The word authorization is not in this list: it is a real word, and a
+// JSON value is quoted just like a key, so even `"authorization"` as a
+// substring would refuse {"value":"Authorization"} — an ELEMENT named
+// Authorization. It is checked in key position instead, by
+// [authorizationKeyPresent].
 var bodyCredentialMarkers = []string{
 	"access_token",
 	"refresh_token",
 	"id_token",
 	"client_secret",
-	`"authorization"`,
 }
+
+// bodyAuthorizationKey is the JSON key an Authorization header lands
+// under when a capture copies headers into a body. The quotes are part
+// of the needle; the name a refusal reports is the word without them.
+const bodyAuthorizationKey = `"authorization"`
 
 // authSchemes are the HTTP authentication schemes an Authorization
 // header value opens with, looked for separately from
@@ -167,6 +175,15 @@ var authSchemes = []string{"bearer ", "basic "}
 // rather than an English phrase. An encoded credential is far longer
 // than this; a clinical phrase breaks at its first space well before
 // it.
+//
+// The threshold is a deliberate trade, and it has a known miss: a
+// Basic credential shorter than sixteen base64 characters sitting in
+// body text goes uncaught. Lowering it to catch that would start
+// refusing clinical phrases — "Basic metabolic panel" is the standing
+// example — and a scan that refuses sound recordings is one the corpus
+// learns to work around. The defence that catches the short credential
+// is capture-time redaction, which sees the Authorization header
+// before anything copies it into a body (REQ-082).
 const credentialRunMin = 16
 
 // ValidateHAR reads the HAR 1.2 recording at path and refuses one that
@@ -272,6 +289,18 @@ func refuseUnredacted(rec HAR) error {
 		if marker, found := bodyCredential(e.Response.Content.Text); found {
 			return fmt.Errorf("%w: HAR entry %d response body carries %q, which survived redaction", ErrUnsatisfiableMode, i, marker)
 		}
+		// A redirect Location is a URL the recording carries just like
+		// the request URL, so it gets the same two URL checks. Most
+		// recordings leave the field empty; an empty one has nothing to
+		// scan.
+		if e.Response.RedirectURL != "" {
+			if key, found := credentialQueryKey(e.Response.RedirectURL); found {
+				return fmt.Errorf("%w: HAR entry %d response redirectURL query key %q survived redaction", ErrUnsatisfiableMode, i, key)
+			}
+			if urlUserinfo(e.Response.RedirectURL) {
+				return fmt.Errorf("%w: HAR entry %d response redirectURL userinfo survived redaction", ErrUnsatisfiableMode, i)
+			}
+		}
 	}
 	return nil
 }
@@ -284,8 +313,10 @@ func refuseUnredacted(rec HAR) error {
 func urlUserinfo(rawURL string) bool {
 	u, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil {
-		// A URL that does not parse is refused by refuseUnreplayable
-		// before this scan runs, so there is nothing to report here.
+		// A request URL that does not parse is refused by
+		// refuseUnreplayable before this scan runs. A redirectURL is not
+		// structurally checked, but one that will not parse has no
+		// authority to read a userinfo out of either way.
 		return false
 	}
 	return u.User != nil
@@ -293,9 +324,16 @@ func urlUserinfo(rawURL string) bool {
 
 // bodyCredential reports the first credential marker in body, matched
 // case-insensitively, and returns the canonical marker from
-// [bodyCredentialMarkers] or [authSchemes] rather than any recorded
-// text — a refusal names what was found, never the credential itself
-// (REQ-093).
+// [bodyCredentialMarkers], the authorization key, or one of
+// [authSchemes] rather than any recorded text — a refusal names what
+// was found, never the credential itself (REQ-093).
+//
+// The body is scanned as opaque text: a base64-encoded or otherwise
+// packed body is not decoded first. Decoding arbitrary bodies to hunt
+// for credentials inside them is a heuristic with no clean stopping
+// point — each layer suggests another — and the same argument as at
+// [credentialRunMin] applies: capture-time redaction is what keeps a
+// credential out of the body in the first place (REQ-082).
 func bodyCredential(body string) (string, bool) {
 	if body == "" {
 		return "", false
@@ -303,8 +341,11 @@ func bodyCredential(body string) (string, bool) {
 	lower := strings.ToLower(body)
 	for _, marker := range bodyCredentialMarkers {
 		if strings.Contains(lower, marker) {
-			return strings.Trim(marker, `"`), true
+			return marker, true
 		}
+	}
+	if authorizationKeyPresent(lower) {
+		return strings.Trim(bodyAuthorizationKey, `"`), true
 	}
 	for _, scheme := range authSchemes {
 		if schemeCarriesCredential(lower, scheme) {
@@ -312,6 +353,27 @@ func bodyCredential(body string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// authorizationKeyPresent reports whether lower (already lower-cased)
+// carries [bodyAuthorizationKey] in JSON key position: the quoted name
+// followed, after any whitespace, by a colon. That is the one position
+// the word cannot be clinical content in — as a value it is an ELEMENT
+// name, as prose it is a note. Every occurrence is tried, so the word
+// appearing as a value early in a body does not hide a real key later
+// in it.
+func authorizationKeyPresent(lower string) bool {
+	rest := lower
+	for {
+		i := strings.Index(rest, bodyAuthorizationKey)
+		if i < 0 {
+			return false
+		}
+		rest = rest[i+len(bodyAuthorizationKey):]
+		if strings.HasPrefix(strings.TrimLeft(rest, " \t\r\n"), ":") {
+			return true
+		}
+	}
 }
 
 // schemeCarriesCredential reports whether lower (already lower-cased)

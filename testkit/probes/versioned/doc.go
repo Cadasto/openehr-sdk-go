@@ -6,7 +6,9 @@
 // Probes are plain functions returning (Result, error) so they can
 // run inside `go test`, inside the conformance harness, or from
 // third-party integrations. They take a [transport.Client] backed by
-// any compliant openEHR REST deployment (sandbox, cassette, live).
+// any compliant openEHR REST deployment — the sandbox today, with
+// Cassette and Live the REQ-082 modes still to be wired up for this
+// package.
 package versionedprobes
 
 import "github.com/cadasto/openehr-sdk-go/testkit/probe"

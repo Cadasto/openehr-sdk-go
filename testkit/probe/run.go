@@ -89,9 +89,12 @@ type Entry struct {
 type Config struct {
 	Mode Mode
 
-	// Client is a caller-supplied transport, used in Cassette mode
-	// (the replayer) and optionally in Live mode. It must be nil in
-	// Sandbox mode — set Sandbox instead.
+	// Client is the caller-supplied transport used in Cassette mode
+	// once the recording has been validated, and optionally in Live
+	// mode. The runner validates the recording and then hands this
+	// client to the probes as given; whether it replays that recording
+	// is the caller's responsibility. It must be nil in Sandbox mode —
+	// set Sandbox instead.
 	Client *transport.Client
 
 	// Sandbox is the in-memory backend a Sandbox-mode run serves from.

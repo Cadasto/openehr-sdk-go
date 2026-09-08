@@ -4,8 +4,9 @@
 // properties of one openEHR resource (PROBE-091 and PROBE-101 today).
 //
 // Probes are plain functions returning (Result, error) and run against
-// any compliant transport.Client backend — sandbox, cassette, or live
-// deployment.
+// any compliant transport.Client backend. Today that is the sandbox;
+// Cassette and Live are REQ-082 modes still to be wired up for this
+// package.
 package transportprobes
 
 import "github.com/cadasto/openehr-sdk-go/testkit/probe"

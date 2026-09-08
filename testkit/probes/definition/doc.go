@@ -3,8 +3,9 @@
 // alongside ADL 2 and stored-AQL surfaces).
 //
 // Probes are plain functions returning (Result, error) and run
-// against any compliant transport.Client backend — sandbox, cassette,
-// or live deployment.
+// against any compliant transport.Client backend. Today that is the
+// sandbox; Cassette and Live are REQ-082 modes still to be wired up
+// for this package.
 package definitionprobes
 
 import "github.com/cadasto/openehr-sdk-go/testkit/probe"

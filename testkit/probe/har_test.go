@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -39,6 +40,25 @@ func harFile(t *testing.T, raw string) string {
 // a credential still sitting in the bytes.
 func harWith(entries string) string {
 	return `{"log":{"version":"1.2","_req082":{"provenance":{"deployment":"d","base_url":"http://x","captured_at":"t","sdk_commit":"c"},"redaction":{"ran":true}},"entries":` + entries + `}}`
+}
+
+// harResponseBody, harRequestURL and harRedirectURL each put one value
+// in an otherwise-valid single-entry recording, so a case varies only
+// the channel it is about. Each value is quoted rather than
+// hand-escaped, which lets a case be written as the JSON or the URL it
+// actually is.
+func harResponseBody(body string) string {
+	return harWith(`[{"request":{"method":"GET","url":"http://x"},` +
+		`"response":{"status":200,"content":{"text":` + strconv.Quote(body) + `}}}]`)
+}
+
+func harRequestURL(rawURL string) string {
+	return harWith(`[{"request":{"method":"GET","url":` + strconv.Quote(rawURL) + `},"response":{"status":200}}]`)
+}
+
+func harRedirectURL(rawURL string) string {
+	return harWith(`[{"request":{"method":"GET","url":"http://x"},` +
+		`"response":{"status":302,"redirectURL":` + strconv.Quote(rawURL) + `}}]`)
 }
 
 func TestHARAcceptsStrand11Capture(t *testing.T) {
@@ -306,5 +326,198 @@ func TestHARAcceptsClinicalBodyThatReadsLikeACredential(t *testing.T) {
 	path := harFile(t, raw)
 	if _, err := probe.ValidateHAR(path); err != nil {
 		t.Fatalf("ValidateHAR(clinical body) error = %v, want nil — the body scan must not fire on clinical text", err)
+	}
+}
+
+// TestHARAuthorizationMarkerIsAKey pins where the word authorization
+// counts: in JSON key position, not anywhere in the body. A JSON value
+// is quoted just like a key, so a scan for the quoted word alone would
+// refuse {"value":"Authorization"} — an ELEMENT named Authorization,
+// which is clinical content, not a leak. Reverting the check to a
+// plain substring match must fail the accepted cases below.
+//
+// The refused bodies carry "Bearer x", which is far under
+// [probe.ValidateHAR]'s credential-run threshold, so the auth-scheme
+// rule cannot fire on them: the refusal can only come from the key
+// match, which is what isolates it here.
+func TestHARAuthorizationMarkerIsAKey(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		body string
+		want string // the refusal substring; empty means the body must be accepted
+	}{
+		{
+			name: "the word as a JSON value is clinical content",
+			body: `{"value":"Authorization"}`,
+		},
+		{
+			name: "an element named Authorization is clinical content",
+			body: `{"name":"Authorization","value":"x"}`,
+		},
+		{
+			name: "the word as a JSON key is a leak",
+			body: `{"authorization":"Bearer x"}`,
+			want: `entry 0 response body carries "authorization"`,
+		},
+		{
+			name: "capitalised, with a space before the colon",
+			body: `{"Authorization" : "Bearer x"}`,
+			want: `entry 0 response body carries "authorization"`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			raw := harResponseBody(tc.body)
+			if tc.want != "" {
+				assertRefused(t, raw, tc.want)
+				return
+			}
+			path := harFile(t, raw)
+			if _, err := probe.ValidateHAR(path); err != nil {
+				t.Fatalf("ValidateHAR(%s) error = %v, want nil — the word authorization outside key position is clinical content", tc.body, err)
+			}
+		})
+	}
+}
+
+// TestHARRejectsCredentialInRedirectURL pins the response redirectURL
+// as a scanned channel. A redirect Location is a URL the recording
+// carries just like the request URL, and an OAuth flow puts the token
+// straight into it — so the query-key and userinfo checks have to
+// reach it too. The field was modelled and never read until this test.
+func TestHARRejectsCredentialInRedirectURL(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name     string
+		redirect string
+		want     string
+	}{
+		{
+			name:     "access_token in the redirect query",
+			redirect: "http://x/callback?access_token=" + credentialValue,
+			want:     `entry 0 response redirectURL query key "access_token"`,
+		},
+		{
+			name:     "userinfo in the redirect authority",
+			redirect: "http://user:" + credentialValue + "@x/",
+			want:     "entry 0 response redirectURL userinfo",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assertRefused(t, harRedirectURL(tc.redirect), tc.want)
+		})
+	}
+}
+
+// TestHARRejectsBasicCredentialInBody is the true positive for the
+// second auth scheme, which nothing else covered. "Basic metabolic
+// panel" has to stay accepted — that is
+// [TestHARAcceptsClinicalBodyThatReadsLikeACredential] — but a real
+// Basic credential is base64 and runs far past the threshold, so the
+// pair reads as a leaked header value rather than an English phrase.
+// Deleting "basic " from the scheme list must fail this test.
+func TestHARRejectsBasicCredentialInBody(t *testing.T) {
+	t.Parallel()
+	const encoded = "dXNlcjpzdXBlcnNlY3JldA==" // "user:supersecret"
+	path := harFile(t, harResponseBody(`{"note":"Basic `+encoded+`"}`))
+	_, err := probe.ValidateHAR(path)
+	if !errors.Is(err, probe.ErrUnsatisfiableMode) {
+		t.Fatalf("ValidateHAR(basic credential) error = %v, want it to wrap %v", err, probe.ErrUnsatisfiableMode)
+	}
+	if want := `entry 0 response body carries "basic"`; !strings.Contains(err.Error(), want) {
+		t.Fatalf("ValidateHAR(basic credential) error = %q, want it to contain %q so the message names the scheme that fired", err, want)
+	}
+	if strings.Contains(err.Error(), encoded) {
+		t.Fatalf("ValidateHAR(basic credential) error = %q, want it never to echo the encoded credential (REQ-093)", err)
+	}
+}
+
+// TestHARRefusesEveryCredentialQueryKey walks the query-key denylist
+// one entry at a time, the way the header cases already do — a set
+// covered by a single example is a set whose other entries can be
+// dropped unnoticed. The keys are spelled out here because har_test is
+// an external test package and cannot read the unexported set, which
+// is the point: removing one from har.go must fail the case named
+// after it.
+func TestHARRefusesEveryCredentialQueryKey(t *testing.T) {
+	t.Parallel()
+	keys := []string{
+		"access_token",
+		"api_key",
+		"apikey",
+		"authorization",
+		"client_secret",
+		"password",
+		"token",
+	}
+	for _, key := range keys {
+		t.Run(key, func(t *testing.T) {
+			t.Parallel()
+			raw := harRequestURL("http://x/ehr?" + key + "=" + credentialValue)
+			assertRefused(t, raw, `entry 0 request URL query key "`+key+`"`)
+		})
+	}
+}
+
+// TestHARRefusesEveryBodyMarker is the same sweep over the body
+// markers: each OAuth or OIDC field name in JSON key position, one
+// case per marker, so removing one from har.go fails the case that
+// names it. The authorization key has its own test —
+// [TestHARAuthorizationMarkerIsAKey] — because it is matched by
+// position rather than as a plain substring.
+func TestHARRefusesEveryBodyMarker(t *testing.T) {
+	t.Parallel()
+	markers := []string{
+		"access_token",
+		"refresh_token",
+		"id_token",
+		"client_secret",
+	}
+	for _, marker := range markers {
+		t.Run(marker, func(t *testing.T) {
+			t.Parallel()
+			raw := harResponseBody(`{"` + marker + `":"` + credentialValue + `"}`)
+			assertRefused(t, raw, `entry 0 response body carries "`+marker+`"`)
+		})
+	}
+}
+
+// TestHARRefusesMalformedEscapeCredentialKey pins why the query is
+// split by hand instead of through [net/url.ParseQuery]: that function
+// drops every pair whose percent-escapes it cannot decode, so one
+// malformed pair can carry a credential key out of the scan. The three
+// cases are the three shapes that matters for — a malformed escape
+// beside the credential, an escaped spelling of the key itself, and a
+// malformed escape inside the credential's own value, which is the one
+// ParseQuery drops even when it returns what it could parse.
+func TestHARRefusesMalformedEscapeCredentialKey(t *testing.T) {
+	t.Parallel()
+	const want = `entry 0 request URL query key "access_token"`
+	cases := []struct {
+		name  string
+		query string
+	}{
+		{
+			name:  "a malformed escape in another pair",
+			query: "junk=%ZZ&access_token=" + credentialValue,
+		},
+		{
+			name:  "a percent-encoded credential key",
+			query: "%61ccess_token=" + credentialValue,
+		},
+		{
+			name:  "a malformed escape in the credential's own value",
+			query: "access_token=%ZZ" + credentialValue,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assertRefused(t, harRequestURL("http://x/ehr?"+tc.query), want)
+		})
 	}
 }
