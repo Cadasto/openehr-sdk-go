@@ -82,6 +82,96 @@ func TestRecorder_RedactsAuthorization(t *testing.T) {
 	}
 }
 
+// TestRecorder_StripsURLUserinfo pins that user:pass@ authority credentials are
+// stripped at capture time, not merely refused on load: the recorder writes
+// redaction.ran=true, so a userinfo leftover would be an attested-but-unredacted
+// recording. Deleting the u.User strip makes the recorded URL keep the userinfo
+// and ValidateHAR then refuses the file — this test catches both.
+func TestRecorder_StripsURLUserinfo(t *testing.T) {
+	t.Parallel()
+	rec := probe.NewRecorder(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{}`)),
+			Request:    req,
+		}, nil
+	}), probe.HARProvenance{
+		Deployment: "ehrbase-local",
+		BaseURL:    "http://127.0.0.1:8080/ehrbase/rest/openehr/v1",
+		CapturedAt: "2026-09-07T18:53:48Z",
+		SDKCommit:  "deadbeef",
+	})
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://user:pass@127.0.0.1:8080/ehrbase/rest/openehr/v1/ehr/x", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := rec.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+
+	har := rec.HAR()
+	if got := har.Log.Entries[0].Request.URL; strings.Contains(got, "pass@") || strings.Contains(got, "user:") {
+		t.Fatalf("recorded URL still carries userinfo: %s", got)
+	}
+	path := filepath.Join(t.TempDir(), "userinfo.har")
+	data, err := json.Marshal(har)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := probe.ValidateHAR(path); err != nil {
+		t.Fatalf("ValidateHAR(recorded) = %v, want the userinfo-stripped recording accepted", err)
+	}
+}
+
+// TestRecorder_BodyCredentialIsRefusedByValidateHAR pins the division of labour:
+// bodies are not a capture-time redaction channel, so a credential in a request
+// body survives into the recording — and must then be caught when the file is
+// loaded (REQ-082 / REQ-093).
+func TestRecorder_BodyCredentialIsRefusedByValidateHAR(t *testing.T) {
+	t.Parallel()
+	rec := probe.NewRecorder(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{}`)),
+			Request:    req,
+		}, nil
+	}), probe.HARProvenance{
+		Deployment: "ehrbase-local",
+		BaseURL:    "http://127.0.0.1:8080/ehrbase/rest/openehr/v1",
+		CapturedAt: "2026-09-07T18:53:48Z",
+		SDKCommit:  "deadbeef",
+	})
+
+	body := `{"token":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payloadsegment"}`
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "http://127.0.0.1:8080/ehrbase/rest/openehr/v1/ehr", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := rec.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+
+	path := filepath.Join(t.TempDir(), "bodycred.har")
+	data, err := json.Marshal(rec.HAR())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := probe.ValidateHAR(path); err == nil {
+		t.Fatal("ValidateHAR accepted a recording whose request body carries a Bearer credential")
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {

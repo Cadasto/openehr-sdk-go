@@ -30,9 +30,14 @@ func NewReplayer(har HAR) *Replayer {
 	}
 }
 
-// HTTPClient returns an *http.Client whose Transport is r.
+// HTTPClient returns an *http.Client whose Transport is r. A recorded 3xx is
+// handed back unfollowed: Cassette replay is 1:1, so following the redirect
+// would consume a second entry the probe never drove.
 func (r *Replayer) HTTPClient() *http.Client {
-	return &http.Client{Transport: r}
+	return &http.Client{
+		Transport:     r,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
 }
 
 // RoundTrip serves the first remaining recorded exchange whose
@@ -79,10 +84,13 @@ func recordedPath(raw string) string {
 	return u.Path
 }
 
-// replayKey is the normalised request key REQ-082 matches on: method
-// plus the openEHR resource path, with the REST base prefix stripped
-// so a capture against EHRbase and a replay against any catalog URL
-// agree.
+// replayKey is the Phase-3 replay key: the request method plus the openEHR
+// resource path, with the REST base prefix stripped so a capture against
+// EHRbase and a replay against any catalog URL agree. REQ-082's full Cassette
+// key also names the headers and body fields a probe's assertion depends on;
+// that is deferred until a recording whose exchanges differ only on those
+// fields lands (the current corpus does not), and the deferral is recorded in
+// the REQ-082 traceability notes.
 func replayKey(method, path string) string {
 	return strings.ToUpper(method) + " " + stripRESTPrefix(path)
 }

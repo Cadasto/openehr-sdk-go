@@ -14,9 +14,12 @@ import (
 	"time"
 )
 
-// Recorder is a capture-time http.RoundTripper. It forwards every
-// request to next, then appends a redacted HAR exchange. Credentials
-// stay on the wire and are stripped from the recording (REQ-082).
+// Recorder is a capture-time http.RoundTripper. It forwards every request to
+// next, then appends a redacted HAR exchange: credentials stay on the wire
+// but are stripped from the recording — the credential header set, the
+// credential URL query keys, and any user:pass@ URL userinfo (REQ-082). A
+// credential that survives in a request or response body is caught by
+// [ValidateHAR] when the recording is loaded, not stripped here.
 type Recorder struct {
 	next       http.RoundTripper
 	provenance HARProvenance
@@ -125,16 +128,22 @@ func requestURL(req *http.Request) string {
 
 func redactURL(raw string) string {
 	u, err := url.Parse(raw)
-	if err != nil || u.RawQuery == "" {
+	if err != nil {
 		return raw
 	}
-	q := u.Query()
-	for key := range q {
-		if _, bad := credentialQueryKeys[strings.ToLower(key)]; bad {
-			q.Del(key)
+	// Credentials can ride the authority as user:pass@host; strip them the
+	// same way the header and query sets are stripped, so a recording never
+	// carries userinfo — ValidateHAR refuses one that does.
+	u.User = nil
+	if u.RawQuery != "" {
+		q := u.Query()
+		for key := range q {
+			if _, bad := credentialQueryKeys[strings.ToLower(key)]; bad {
+				q.Del(key)
+			}
 		}
+		u.RawQuery = q.Encode()
 	}
-	u.RawQuery = q.Encode()
 	return u.String()
 }
 
