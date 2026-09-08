@@ -1,7 +1,7 @@
 # Plan — Probe runnability: the sandbox transport and the three-mode runner
 
 **Date:** 2026-08-18
-**Status:** Phases 0–2 landed (Phase 0 2026-08-18; Phases 1–2 2026-09-08); Phase 3 partial — the Cassette recorder, replayer, `cmd/probe-record` capture harness and the `ehr-create` / `ehr-lifecycle` recordings are in, the rest of the corpus and the Phase 4 Live runs are the open work
+**Status:** Phases 0–2 landed (Phase 0 2026-08-18; Phases 1–2 2026-09-08); Phase 3 partial — the Cassette recorder, replayer, `cmd/probe-record` capture harness and the `ehr-create` / `ehr-lifecycle` recordings are in, the rest of the corpus is open; Phase 4 partial — the runner's Live path with `TestLiveCreateEHR` and the `TestLiveCoreSnapshot` core-EHR snapshot are in, catalog-wide Live runnability is the open work
 **Owner:** SDK maintainers
 **Covers:** [REQ-082](../specifications/conformance.md#req-082--runnability) (Runnability, **Impl. `partial`**); unblocks the deferred wire-level probes named under [REQ-080](../specifications/conformance.md#req-080--openehr-wire-conformance)
 **Probes:** no new `PROBE-NNN` — this plan gives the existing catalog its missing execution modes. It promotes **PROBE-077**, **PROBE-078**, **PROBE-079** out of `Status: Deferred` (each one a landed, unit-covered requirement whose dedicated wire probe is unwritten) and unblocks **PROBE-065**, which is still `Status: Draft` — specified, never implemented. It is also the gate [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1 names for four `testkit/probes/rest/*` probes.

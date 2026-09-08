@@ -88,6 +88,7 @@ Recordings are checked-in evidence and are held to the same standard as any vend
 
 - A **read-only** probe **MAY** run against any reachable deployment.
 - A **mutating** probe **MUST** be self-scoping: it creates the resources it needs, derived from a per-run identifier, and **MUST NOT** depend on server state it did not create. A probe requiring a pre-seeded EHR **MUST** `skip` when that precondition is absent rather than fail.
+- A probe whose precondition is a **spec-defined but SHOULD-level deployment capability** — an operation the openEHR REST spec defines and services SHOULD expose — **MUST** `skip`, naming the absent capability, when the deployment does not expose it, rather than fail: the omission is a recorded, accepted deployment deviation, not an SDK defect (a **MUST**-level capability absent is a failure). The System capabilities operation (`OPTIONS /`, ITS-REST *Options and Conformance*) is the current instance — EHRbase 2.35.1 answers `404`, so the Live core snapshot's System-version probe skips against it and passes against a deployment that serves it.
 - The runner **MUST** refuse to execute mutating probes in Live mode without an explicit per-invocation opt-in. Writing to a deployment **MUST** be something the operator asked for, never a default that a mode flag turned on.
 - Cleanup is best-effort — a deployment may forbid deletion. The per-run identifier **MUST** appear in every resource a mutating probe creates, so anything it leaves behind is attributable and removable by hand.
 
