@@ -51,7 +51,7 @@ Scoped to phases 1–2 (what is reachable now):
 | Phase 1 — shared result + runner | done — `testkit/probe`; the 12 per-package `Result` types are `type Result = probe.Result` aliases, not copies; refusals pinned by named tests; per-probe **Effect** metadata partial (5 of the 56 backend-facing entries carry it today; the 16 in-repo entries need none) |
 | Phase 2 — `sandbox/` transport | partial — EHR + scripted routes; versioned / definition / demographic / transport probes off httptest. Auth/discovery httptest remain (OIDC/JWKS, not CDR) |
 | Phase 4 — Live mode (local CDRs) | partial — runner Live path + `TestLiveCreateEHR`: `OPENEHR_LIVE_*` names the target, `OPENEHR_LIVE_ALLOW_MUTATING` is the separate write opt-in REQ-082 requires; both unset in CI, so the test skips without dialing |
-| Phase 3 — Cassette recording | partial — HAR 1.2 recorder/replayer landed; `testkit/recordings/ehr-create.har` is the first corpus file; unmatched replay fails closed. Remaining catalog probes still need recordings |
+| Phase 3 — Cassette recording | partial — HAR 1.2 recorder/replayer + the `cmd/probe-record` capture harness (`make probe-record`) landed; `testkit/recordings/{ehr-create,ehr-lifecycle}.har` are the first corpus files; unmatched replay fails closed. Remaining catalog probes still need recordings |
 | `traceability.yaml` / REQ.md row | done (REQ-082 stays `partial`) |
 | `make spec-check` | |
 | `make ci` | |
@@ -80,7 +80,7 @@ Scoped to phases 1–2 (what is reachable now):
 
 **Tasks:** resolve STRAND-11 with an ADR against a real capture (done: ADR 0020); implement the recorder as a `transport` wrapper and the replayer as a transport; capture the corpus once; enforce capture-time redaction and provenance per REQ-082.
 
-**Landed:** `probe.Recorder` / `probe.Replayer`; unmatched replay returns `ErrUnmatchedRecording` without dialling; capture-time redaction is attested and content-scanned; `testkit/recordings/ehr-create.har` replays `ehr.Create`.
+**Landed:** `probe.Recorder` / `probe.Replayer`; the `cmd/probe-record` capture harness (`make probe-record`) drives a named scenario against a live CDR and re-validates the result before it is vendored; unmatched replay returns `ErrUnmatchedRecording` without dialling; capture-time redaction is attested and content-scanned; `testkit/recordings/ehr-create.har` replays `ehr.Create` and `ehr-lifecycle.har` the create-then-read path (`POST /ehr`, then `GET`/`HEAD` the created id).
 
 **Definition of done:** every probe that can run on replay does; an unmatched request fails closed. The unmatched-request half is done; catalog-wide recordings are not.
 
