@@ -4,9 +4,7 @@ All notable changes to `github.com/cadasto/openehr-sdk-go` are recorded here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — release policy in [`docs/releases.md`](docs/releases.md).
 
-Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fold into the relevant bullet. `v0.x` minors *may* break public API — **pin to the exact tag**; breaking changes are called out per release below.
-
-**Keep it terse — the release notes are generated verbatim from each version block, so length here is length there.** Each bullet is **one sentence, ~35 words max**: artefact class + scope + the key REQ/PROBE, nothing more. **No inline lists of types, methods, parameters, or per-REQ breakdowns** — that detail lives in [`traceability.yaml`](docs/specifications/traceability.yaml), commit messages, and PR bodies. The optional per-release summary line is **one sentence**. If a bullet runs past two lines on screen it is too long — cut it in half. (See [`AGENTS.md`](AGENTS.md#code-style-and-conventions).)
+`v0.x` minors *may* break public API — **pin to the exact tag**; breaking changes are called out per release below.
 
 ## [Unreleased]
 

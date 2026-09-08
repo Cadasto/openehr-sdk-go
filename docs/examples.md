@@ -15,20 +15,20 @@ Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<na
 | [canonical_json](#canonical_json) | No | `rm`, `canjson` | Decode canonical JSON → typed `Composition` |
 | [canxml_roundtrip](#canxml_roundtrip) | No | `canjson`, `canxml` | JSON ↔ XML cross-format invariant |
 | [opt-parse](#opt-parse) | No | `template` | Parse ADL 1.4 OPT, walk paths |
-| [primitive-validate](#primitive-validate) | No | `template`, `constraints` | Primitive constraint validation (REQ-103) |
+| [primitive-validate](#primitive-validate) | No | `template`, `constraints` | Primitive constraint validation |
 | [validate-composition](#validate-composition) | No | `template`, `validation` | In-memory composition vs OPT |
 | [validate-from-json](#validate-from-json) | No | `canjson`, `template`, `validation` | Wire bytes → validate |
 | [generate-example](#generate-example) | No | `template`, `instance`, `canjson` | OPT → synthesised RM instance → JSON |
-| [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL (REQ-055); containment algebra + in-text paging (REQ-117) |
-| [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured `parse.Query` AST + round-trip emit (REQ-113), incl. the REQ-117 catalogue closures and the REQ-118 `SELECT TOP` carrier + literal source text |
-| [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
-| [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
-| [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths (REQ-111) |
-| [webtemplate-export](#webtemplate-export) | No | `template`, `templatecompile`, `template/webtemplate` | Compiled OPT → EHRbase v2.3 WebTemplate JSON (REQ-106) |
-| [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template/webtemplate`, `canjson`, `validation` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + conformant `WithTemplate` decode (REQ-053) |
+| [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL; containment algebra + in-text paging |
+| [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured `parse.Query` AST + round-trip emit, incl. the catalogue closures and the `SELECT TOP` carrier + literal source text |
+| [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` |
+| [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports |
+| [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths |
+| [webtemplate-export](#webtemplate-export) | No | `template`, `templatecompile`, `template/webtemplate` | Compiled OPT → EHRbase v2.3 WebTemplate JSON |
+| [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template/webtemplate`, `canjson`, `validation` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + conformant `WithTemplate` decode |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
-| [contribution-build](#contribution-build) | Optional mock (`-commit`) | `client/ehr/contribution`, `canjson` | Fluent multi-version `Contribution_create` assembly (REQ-130) |
-| [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth` | Standalone PKCE launch; **state + verifier persistence** across redirect (REQ-061) |
+| [contribution-build](#contribution-build) | Optional mock (`-commit`) | `client/ehr/contribution`, `canjson` | Fluent multi-version `Contribution_create` assembly |
+| [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth` | Standalone PKCE launch; **state + verifier persistence** across redirect |
 
 ---
 
@@ -105,7 +105,7 @@ go run ./cmd/examples/primitive-validate
 
 **Packages:** `openehr/template`, `openehr/template/constraints`
 
-Uses an embedded minimal OPT (same shape as conformance PROBE-024). Expects some demo cases to **fail** validation intentionally.
+Uses an embedded minimal OPT. Expects some demo cases to **fail** validation intentionally.
 
 ---
 
@@ -121,7 +121,7 @@ go run ./cmd/examples/validate-composition -invalid   # demo a required-field fa
 
 **Packages:** `openehr/template`, `openehr/validation`, `internal/templatecompile`
 
-**Note:** this example calls the internal `templatecompile.Compile` directly (it lives in-repo). External modules use the public `openehr/templatecompile.Compile` bridge instead — see [compile-build-validate](#compile-build-validate) (REQ-111, [ADR 0010](adr/0010-public-compiled-template-bridge.md)).
+**Note:** this example calls the internal `templatecompile.Compile` directly (it lives in-repo). External modules use the public `openehr/templatecompile.Compile` bridge instead — see [compile-build-validate](#compile-build-validate) ([ADR 0010](adr/0010-public-compiled-template-bridge.md)).
 
 **Default fixture:** hand-built vital-signs composition matching `vital_signs.opt`.
 
@@ -184,9 +184,9 @@ go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/cassettes/t
 
 ### aql-build
 
-**Purpose:** Build the same logical AQL query two ways, the struct-builder and the verb-functions, and prove both emit the same canonical string on the wire (REQ-055, PROBE-020). Pure building block: no transport, no auth; the executor lives at `openehr/client/query`.
+**Purpose:** Build the same logical AQL query two ways, the struct-builder and the verb-functions, and prove both emit the same canonical string on the wire. Pure building block: no transport, no auth; the executor lives at `openehr/client/query`.
 
-The program then goes further. A third query demonstrates the REQ-117 containment algebra (`aql.Class` / `Contains` / `NotContains` / `ContainsOr`) and opt-in in-text paging (`LimitInline` / `OffsetInline`). A fourth pair shows the REQ-162 opt-in RM-semantics gate (`Builder.VerifyContainment`), a question `Build` deliberately leaves unanswered, run over a clean containment tree and over one that is grammatically valid but RM-impossible.
+The program then goes further. A third query demonstrates the containment algebra (`aql.Class` / `Contains` / `NotContains` / `ContainsOr`) and opt-in in-text paging (`LimitInline` / `OffsetInline`). A fourth pair shows the opt-in RM-semantics gate (`Builder.VerifyContainment`), a question `Build` deliberately leaves unanswered, run over a clean containment tree and over one that is grammatically valid but RM-impossible.
 
 ```bash
 go run ./cmd/examples/aql-build
@@ -218,13 +218,13 @@ containment verification (REQ-162) — opt-in; Build never runs it:
     no containment route under the pinned RM connects OBSERVATION to EVALUATION, so this CONTAINS can never match
 ```
 
-**What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`. Keep paging on **one** channel — the envelope (`Limit`/`Offset`) by default, the in-text form only when the bound must survive stored-query registration; requesting both is a build-time error. `VerifyContainment` is opt-in and answers the RM question, not the shape one — dispatch on `contain.Finding.Code`; a nil relation uses the REQ-160 default, and a `contain.Default().WithOverlay(...)` copy accounts for a dialect that admits more.
+**What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`. Keep paging on **one** channel — the envelope (`Limit`/`Offset`) by default, the in-text form only when the bound must survive stored-query registration; requesting both is a build-time error. `VerifyContainment` is opt-in and answers the RM question, not the shape one — dispatch on `contain.Finding.Code`; a nil relation uses the default, and a `contain.Default().WithOverlay(...)` copy accounts for a dialect that admits more.
 
 ### aql-parse-structured
 
-**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2, REQ-113), the read-side mirror of `aql.Builder`, and emit it back to canonical text via `Query.Emit()`. Since REQ-117 the catalogue covers the whole SDK grammar profile, and since REQ-118 that includes the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause; the residual `aql.ErrIncompleteAST` is a numeric literal the AST cannot represent, surfaced by `ParseQuery` rather than silently dropping a clause. Pure building block: no transport, no auth.
+**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2), the read-side mirror of `aql.Builder`, and emit it back to canonical text via `Query.Emit()`. The catalogue covers the whole SDK grammar profile, including the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause; the residual `aql.ErrIncompleteAST` is a numeric literal the AST cannot represent, surfaced by `ParseQuery` rather than silently dropping a clause. Pure building block: no transport, no auth.
 
-With no argument the program walks three queries: the representative one below, a REQ-117 query exercising the closed shapes, and a REQ-118 query showing the `TOP` carrier alongside two literals whose **source text** differs from their canonical rendering (`1.50` → `1.5`, `"quoted"` → `'quoted'`). The openEHR result schema names an unaliased column by its expression text, so `parse.LiteralExpr.Raw` keeps what was written while emission stays canonical.
+With no argument the program walks three queries: the representative one below, a query exercising the closed catalogue shapes, and a query showing the `TOP` carrier alongside two literals whose **source text** differs from their canonical rendering (`1.50` → `1.5`, `"quoted"` → `'quoted'`). The openEHR result schema names an unaliased column by its expression text, so `parse.LiteralExpr.Raw` keeps what was written while emission stays canonical.
 
 ```bash
 go run ./cmd/examples/aql-parse-structured
@@ -310,9 +310,9 @@ canonical emission:
 
 ### lint-aql
 
-**Purpose:** Statically lint AQL before it reaches the CDR (REQ-109). The program parses against the SDK grammar profile (ADR 0007), then runs the lint layers: syntax; shape (alias binding, parameter binding); RM containment and portability semantics against the pinned BMM (REQ-160/161, always on, no template needed); path-shape and paging advisories over the query text plus the pinned BMM (REQ-164, likewise always on); and template-aware archetype and path checks against a compiled OPT.
+**Purpose:** Statically lint AQL before it reaches the CDR. The program parses against the SDK grammar profile, then runs the lint layers: syntax; shape (alias binding, parameter binding); RM containment and portability semantics against the pinned BMM (always on, no template needed); path-shape and paging advisories over the query text plus the pinned BMM (likewise always on); and template-aware archetype and path checks against a compiled OPT.
 
-Shown via `validation.ValidateAQL`; the building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. Lint-clean is **not** spec-conformance and not execute-success; the CDR remains the path authority (PROBE-021).
+Shown via `validation.ValidateAQL`; the building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. Lint-clean is **not** spec-conformance and not execute-success; the CDR remains the path authority.
 
 ```bash
 go run ./cmd/examples/lint-aql
@@ -352,13 +352,13 @@ result   : OK — no errors, 3 advisories
   [warning] aql_select_no_alias (c): SELECT item 1 carries no AS alias; the result column's name is then engine-defined, and a stored-query contract depends on a stable one
 ```
 
-**What to copy into your app:** for CI / pre-flight checks call `lint.LintString(q, nil)` (Layers 1–2, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or `validation.ValidateAQL`) to add archetype / path checks. Dispatch on `Issue.Code`; treat only `Error`-severity issues as hard failures — but read `Result.Issues`, not just `Result.OK`: OK means *no errors*, not *no issues*, and most of the REQ-161 portability and all of the REQ-164 path-shape codes are advisory (the last block above).
+**What to copy into your app:** for CI / pre-flight checks call `lint.LintString(q, nil)` (Layers 1–2, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or `validation.ValidateAQL`) to add archetype / path checks. Dispatch on `Issue.Code`; treat only `Error`-severity issues as hard failures — but read `Result.Issues`, not just `Result.OK`: OK means *no errors*, not *no issues*, and most of the portability and all of the path-shape codes are advisory (the last block above).
 
 ---
 
 ### compile-build-validate
 
-**Purpose:** Drive the whole clinical pipeline through **public packages only** (REQ-111) — the shape an external module uses. Parse an OPT, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the REQ-101 builder, serialise to canonical JSON, round-trip it, and validate. Before REQ-111 the compiled template was only constructable inside the SDK module, so this exact program could not be written downstream.
+**Purpose:** Drive the whole clinical pipeline through **public packages only** — the shape an external module uses. Parse an OPT, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the builder, serialise to canonical JSON, round-trip it, and validate. Before this bridge existed, the compiled template was only constructable inside the SDK module, so this exact program could not be written downstream.
 
 ```bash
 go run ./cmd/examples/compile-build-validate
@@ -382,7 +382,7 @@ ehr_status : ValidateEHRStatus callable — 6 issue(s), root type mismatch as ex
 
 ### template-explore
 
-**Purpose:** Introspect a compiled OPT through the public node-level types (REQ-111) — the building block for a form generator or a path-discovery tool. Walks the `templatecompile.CompiledNode` tree to print the template structure (RM type, pinned archetype id / at-code, cardinality + required, term label, slot / primitive markers), then lists the addressable primitive-leaf paths — the canonical `composition.Builder.Set` targets.
+**Purpose:** Introspect a compiled OPT through the public node-level types — the building block for a form generator or a path-discovery tool. Walks the `templatecompile.CompiledNode` tree to print the template structure (RM type, pinned archetype id / at-code, cardinality + required, term label, slot / primitive markers), then lists the addressable primitive-leaf paths — the canonical `composition.Builder.Set` targets.
 
 ```bash
 go run ./cmd/examples/template-explore
@@ -417,7 +417,7 @@ addressable primitive-leaf paths (6) — Builder.Set targets:
 
 ### webtemplate-export
 
-**Purpose:** Export a compiled OPT as EHRbase `openEHR_SDK` v2.3 **WebTemplate JSON** (REQ-106, ADR 0014) — the lossy, UI-oriented projection form renderers and FLAT-path mappers consume. Prints the form-oriented tree (FLAT-path `id`, RM type, occurrences, input widgets), then the deterministic document; `-json` dumps the full indented WebTemplate instead.
+**Purpose:** Export a compiled OPT as EHRbase `openEHR_SDK` v2.3 **WebTemplate JSON** — the lossy, UI-oriented projection form renderers and FLAT-path mappers consume. Prints the form-oriented tree (FLAT-path `id`, RM type, occurrences, input widgets), then the deterministic document; `-json` dumps the full indented WebTemplate instead.
 
 ```bash
 go run ./cmd/examples/webtemplate-export
@@ -452,7 +452,7 @@ encounter [COMPOSITION] 1..1
 
 ### flat-roundtrip
 
-**Purpose:** Convert a canonical `COMPOSITION` to the **FLAT** and **STRUCTURED** Simplified Formats and back (REQ-053), driven by the composition's Web Template (REQ-106). Shows the encode/decode entry points, the OPT-free `FlatToStructured`, the `COMPOSITION → FLAT → COMPOSITION → FLAT` round-trip, and the **conformant decode** (`WithTemplate`) whose result validates against the OPT — with no transport or auth.
+**Purpose:** Convert a canonical `COMPOSITION` to the **FLAT** and **STRUCTURED** Simplified Formats and back, driven by the composition's Web Template. Shows the encode/decode entry points, the OPT-free `FlatToStructured`, the `COMPOSITION → FLAT → COMPOSITION → FLAT` round-trip, and the **conformant decode** (`WithTemplate`) whose result validates against the OPT — with no transport or auth.
 
 ```bash
 go run ./cmd/examples/flat-roundtrip
@@ -516,7 +516,7 @@ To hit a real backend, swap the catalog base URL and add `transport.WithTokenSou
 
 ### contribution-build
 
-**Purpose:** Assemble a multi-version CONTRIBUTION with `contribution.Builder` (REQ-130) — two vendored canonical compositions committed in one batch, one as a first version and one as an amendment — and print the `Contribution_create` body. `-commit` additionally POSTs it through `contribution.Commit` to an in-process fake CDR and asserts the captured request is byte-identical to what was built.
+**Purpose:** Assemble a multi-version CONTRIBUTION with `contribution.Builder` — two vendored canonical compositions committed in one batch, one as a first version and one as an amendment — and print the `Contribution_create` body. `-commit` additionally POSTs it through `contribution.Commit` to an in-process fake CDR and asserts the captured request is byte-identical to what was built.
 
 ```bash
 go run ./cmd/examples/contribution-build
@@ -582,7 +582,7 @@ OK: standalone SMART PKCE launch flow completed (in-process stub)
 3. On the redirect callback, retrieve the stored `AuthorizationRequest` by `callbackState`, delete it (replay prevention), and pass it to `ExchangeAuthorizationCode`.
 4. `ExchangeAuthorizationCode` re-validates `state` internally (CSRF guard) and sends the `code_verifier` to the token endpoint (PKCE proof).
 
-See [specifications/auth.md § REQ-061](specifications/auth.md#req-061--pkce-flow) for the normative rules.
+See [specifications/auth.md § PKCE flow](specifications/auth.md#req-061--pkce-flow) for the normative rules.
 
 ---
 
