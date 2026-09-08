@@ -3,8 +3,8 @@ package probe_test
 import (
 	"bytes"
 	"context"
-	"errors"
 	"os"
+	"strings"
 	"testing"
 	"uuid"
 
@@ -40,12 +40,13 @@ type committedVersion struct {
 	uid openehrclient.VersionUID
 }
 
-// compositionLiveEntries is the clinical write/read path: upload the OPT
-// (idempotent — a template already on the deployment is the precondition met,
-// not a failure), commit the vendored composition under the per-run EHR id,
-// then read the committed version back. The composition reuses the EHR the
-// caller created earlier in the same run.
-func compositionLiveEntries(id openehrclient.EHRID, optBody []byte, comp *rm.Composition, out *committedVersion) []probe.Entry {
+// compositionLiveEntries is the clinical write/read path: upload the per-run
+// OPT, commit the composition under the per-run EHR id, then read the committed
+// version back. templateID embeds the run identifier, so the template write is
+// self-scoping (REQ-082 Live): it collides with no other run and depends on no
+// pre-seeded catalog entry — a genuine 201, never a foreign 409 counted as a
+// pass. The composition reuses the EHR the caller created earlier in the run.
+func compositionLiveEntries(id openehrclient.EHRID, templateID string, optBody []byte, comp *rm.Composition, out *committedVersion) []probe.Entry {
 	live := []probe.Mode{probe.ModeLive}
 	return []probe.Entry{
 		{
@@ -53,16 +54,14 @@ func compositionLiveEntries(id openehrclient.EHRID, optBody []byte, comp *rm.Com
 			Effect: probe.EffectMutating,
 			Modes:  live,
 			Run: func(ctx context.Context, c *transport.Client) (probe.Result, error) {
-				_, _, err := definition.UploadTemplate(ctx, c, definition.FormatADL14, bytes.NewReader(optBody))
+				meta, _, err := definition.UploadTemplate(ctx, c, definition.FormatADL14, bytes.NewReader(optBody))
 				if err != nil {
-					// A template already present answers 409; that is the
-					// precondition met, not a failure.
-					if errors.Is(err, transport.ErrVersionConflict) {
-						return probe.Result{Status: probe.StatusPass, Detail: "template already present"}, nil
-					}
 					return liveFail(err), nil
 				}
-				return probe.Result{Status: probe.StatusPass}, nil
+				if meta == nil || meta.TemplateID == "" {
+					return liveFailf("upload returned no template id"), nil
+				}
+				return probe.Result{Status: probe.StatusPass, Detail: meta.TemplateID}, nil
 			},
 		},
 		{
@@ -70,7 +69,7 @@ func compositionLiveEntries(id openehrclient.EHRID, optBody []byte, comp *rm.Com
 			Effect: probe.EffectMutating,
 			Modes:  live,
 			Run: func(ctx context.Context, c *transport.Client) (probe.Result, error) {
-				_, meta, err := composition.Save(ctx, c, id, comp, composition.WithTemplateID(liveTemplateID))
+				_, meta, err := composition.Save(ctx, c, id, comp, composition.WithTemplateID(templateID))
 				if err != nil {
 					return liveFail(err), nil
 				}
@@ -96,29 +95,45 @@ func compositionLiveEntries(id openehrclient.EHRID, optBody []byte, comp *rm.Com
 				if got == nil {
 					return liveFailf("get returned a nil composition"), nil
 				}
-				return probe.Result{Status: probe.StatusPass}, nil
+				// A light identity check (not a deep compare): the CDR returned
+				// the composition committed against the per-run template.
+				if got.ArchetypeDetails == nil || got.ArchetypeDetails.TemplateID == nil || got.ArchetypeDetails.TemplateID.Value != templateID {
+					return liveFailf("get returned template_id %+v, want %s", got.ArchetypeDetails, templateID), nil
+				}
+				return probe.Result{Status: probe.StatusPass, Detail: templateID}, nil
 			},
 		},
 	}
 }
 
 // TestLiveCompositionSnapshot runs the clinical write/read path against a live
-// deployment: create a per-run EHR, upload the EHRbase-origin OPT, commit its
-// canonical composition, and read the committed version back. It is the
-// highest-value REQ-080 wire-conformance signal — the SDK's own canonical
-// encoding has to be accepted by a real CDR. Opt-in and skipped in CI, sharing
-// the runLiveSnapshot harness with TestLiveCoreSnapshot.
+// deployment (REQ-082 Live): create a per-run EHR, upload the per-run OPT,
+// commit its canonical composition, and read the committed version back. It
+// exercises the REQ-080 wire — the SDK's own canonical composition encoding has
+// to be accepted by a real CDR — without being a catalog PROBE. Opt-in and
+// skipped in CI, sharing the runLiveSnapshot harness with TestLiveCoreSnapshot.
+//
+// The EHRbase-origin fixture template and composition are rewritten to a per-run
+// template id so every resource the run creates carries the run identifier
+// (REQ-082 self-scoping); the structure is unchanged, so a conformant CDR
+// accepts both and a failure is the SDK's wire encoding.
 func TestLiveCompositionSnapshot(t *testing.T) {
 	id := openehrclient.EHRID(uuid.NewV4().String())
-	t.Logf("per-run EHR id %s", id)
+	// Per-run template id: embeds the run identifier so the mutating template
+	// upload is self-scoping — no collision with another run, no dependency on a
+	// pre-seeded catalog template (REQ-082 Live).
+	templateID := "sdk_snapshot_" + strings.ReplaceAll(string(id), "-", "") + ".v1"
+	t.Logf("per-run EHR id %s, template %s", id, templateID)
 
-	optBody := mustReadFile(t, fixtures.TemplateOpt(liveTemplateID))
+	src := []byte(liveTemplateID)
+	dst := []byte(templateID)
+	optBody := bytes.ReplaceAll(mustReadFile(t, fixtures.TemplateOpt(liveTemplateID)), src, dst)
 	var comp rm.Composition
-	if err := canjson.Unmarshal(mustReadFile(t, fixtures.CompositionJSON(liveTemplateID)), &comp); err != nil {
+	if err := canjson.Unmarshal(bytes.ReplaceAll(mustReadFile(t, fixtures.CompositionJSON(liveTemplateID)), src, dst), &comp); err != nil {
 		t.Fatalf("decode composition fixture %s: %v", liveTemplateID, err)
 	}
 
 	out := &committedVersion{}
-	entries := append([]probe.Entry{createEHRProbe(id)}, compositionLiveEntries(id, optBody, &comp, out)...)
+	entries := append([]probe.Entry{createEHRProbe(id)}, compositionLiveEntries(id, templateID, optBody, &comp, out)...)
 	runLiveSnapshot(t, "composition", entries)
 }

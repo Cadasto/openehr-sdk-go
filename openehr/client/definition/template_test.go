@@ -185,13 +185,16 @@ func TestUploadTemplateLocationFallback(t *testing.T) {
 // application/xml. That body is not JSON, so it is surfaced through the
 // Location-derived id rather than fed to json.Unmarshal — which would fail the
 // upload with a decode error. Delete the body sniff and this test fails.
+//
+// The XML body names a template_id that DIFFERS from the Location tail, so a
+// pass proves the id is taken from Location, not parsed out of the body.
 func TestUploadTemplateXMLBodyFallsBackToLocation(t *testing.T) {
 	opt := readCassette(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
+		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/from_location.v1")
 		w.Header().Set("Content-Type", "application/xml")
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`<?xml version="1.0"?><template><template_id><value>body_weight.v1</value></template_id></template>`))
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><template><template_id><value>from_body.v1</value></template_id></template>`))
 	}))
 	defer srv.Close()
 
@@ -199,8 +202,51 @@ func TestUploadTemplateXMLBodyFallsBackToLocation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UploadTemplate(XML body) = %v, want nil error (an XML body must not be decoded as JSON)", err)
 	}
+	if meta == nil || meta.TemplateID != "from_location.v1" {
+		t.Fatalf("UploadTemplate(XML body) = %+v, want TemplateID from_location.v1 (the Location tail, not the body's from_body.v1)", meta)
+	}
+}
+
+// TestUploadTemplateBOMPrefixedXMLFallsBackToLocation pins BOM handling: a
+// UTF-8 BOM survives TrimSpace, so a BOM-prefixed XML body would miss the '<'
+// sniff and be fed to json.Unmarshal — the decode failure the negotiation
+// exists to avoid. Delete the BOM strip and this test fails.
+func TestUploadTemplateBOMPrefixedXMLFallsBackToLocation(t *testing.T) {
+	opt := readCassette(t, "body_weight.opt")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write(append([]byte{0xEF, 0xBB, 0xBF}, []byte(`<?xml version="1.0"?><template/>`)...))
+	}))
+	defer srv.Close()
+
+	meta, _, err := definition.UploadTemplate(t.Context(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt))
+	if err != nil {
+		t.Fatalf("UploadTemplate(BOM+XML) = %v, want nil error", err)
+	}
 	if meta == nil || meta.TemplateID != "body_weight.v1" {
-		t.Fatalf("UploadTemplate(XML body) = %+v, want TemplateID body_weight.v1 from the Location header", meta)
+		t.Fatalf("UploadTemplate(BOM+XML) = %+v, want TemplateID body_weight.v1 from Location", meta)
+	}
+}
+
+// TestUploadTemplateEmptyBodyNoLocationErrors pins the empty-id guard: a 201
+// with no decodable body AND no Location header cannot name the template, so
+// the upload MUST NOT return a metadata record with an empty TemplateID and a
+// nil error. Drop the guard and this returns success with an empty id.
+func TestUploadTemplateEmptyBodyNoLocationErrors(t *testing.T) {
+	opt := readCassette(t, "body_weight.opt")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated) // no body, no Location
+	}))
+	defer srv.Close()
+
+	meta, _, err := definition.UploadTemplate(t.Context(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt))
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("UploadTemplate(empty body, no Location) err = %v, want transport.ErrInvalidShape", err)
+	}
+	if meta != nil {
+		t.Errorf("UploadTemplate(empty body, no Location) meta = %+v, want nil", meta)
 	}
 }
 
