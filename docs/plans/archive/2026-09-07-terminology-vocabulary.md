@@ -6,7 +6,7 @@
 **Status:** landed (2026-09-07, archived in the implementing PR)
 **Owner:** SDK maintainers
 **Covers:** [REQ-034](../../specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034) (new — `planned` → `landed` in this plan's PR); implementation-aligned amendments to landed [REQ-130](../../specifications/wire.md#req-130--contribution-builder) (change-type and lifecycle-state sentences) and [REQ-013](../../specifications/module-layout.md#req-013--building-block-independence) (the package set gains `openehr/terminology`)
-**Probes:** none — nothing crosses the wire; the guard tests carry the bar
+**Probes:** no new probe — the guard tests carry the bar, and the one wire consequence (the batch `audit.change_type` the builder now gates on every path) rides the existing [PROBE-084](../../specifications/conformance.md#probe-084--built-contribution-body-shape), extended here
 **Implementation:** landed
 **Depends on:** `resources/` pin discipline (REQ-041, [ADR 0001](../../adr/0001-bmm-version-bump-runbook.md) pattern), `cmd/bmmgen` / `internal/bmmgen` (the `-verify` drift pattern to mirror), the landed consumers in `openehr/client/ehr`, `openehr/client/ehr/contribution`, `openehr/serialize/simplified`, `openehr/instance`
 **Defers:** wiring the template-less RM floor's coded invariants (REQ-112: `Setting_valid`, `Category_validity`, `Change_type_valid`, `Mode_valid`, `Normal_status_validity`, …) to the accessor — a follow-up plan; membership validation of a bare `|normal_status` code on FLAT decode (today lenient, stays lenient); the two `openehr_term_3.1.0.bmm.json` service *interfaces* in `resources/bmm/` (unrelated — that BMM models the terminology *service* API, not the vocabulary)

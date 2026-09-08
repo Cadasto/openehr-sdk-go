@@ -18,8 +18,9 @@ import (
 // builder operation carries is docs/specifications/wire.md § REQ-130.
 //
 // [Builder.WithChangeType] refuses a code outside the group, and
-// [Builder.Build] applies the same membership check to a wholesale
-// [Builder.WithAudit], so no path ships a change type the openEHR
+// [Builder.Build] gates a wholesale [Builder.WithAudit] on all three facets
+// of the same bar — group membership, the `openehr` terminology id, and the
+// group's own rubric — so no path ships a change type the openEHR
 // AUDIT_DETAILS.Change_type_valid invariant would reject.
 type ChangeType string
 

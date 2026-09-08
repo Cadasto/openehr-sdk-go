@@ -129,10 +129,15 @@ func manifestRef(path string) (string, error) {
 	return "", fmt.Errorf("%s carries no non-empty \"ref:\" line — the pinned release is unknown", path)
 }
 
-// writeAtomic writes body to path via a "<path>.tmp" rename, creating the
-// directory if needed. It skips the write entirely when path already holds
-// byte-identical bytes, which keeps the modification time (and editors)
-// still on a no-op regeneration.
+// writeAtomic writes body to path via a rename from a uniquely named
+// temporary file in the same directory, creating the directory if needed. It
+// skips the write entirely when path already holds byte-identical bytes,
+// which keeps the modification time (and editors) still on a no-op
+// regeneration.
+//
+// The temporary name is unique per call rather than a fixed "<path>.tmp": two
+// concurrent generator runs sharing one fixed name could rename each other's
+// bytes into place and both report success.
 func writeAtomic(path string, body []byte) error {
 	if existing, err := os.ReadFile(path); err == nil && bytes.Equal(existing, body) {
 		return nil
@@ -141,13 +146,31 @@ func writeAtomic(path string, body []byte) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("mkdir %s: %w", dir, err)
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, body, 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", tmp, err)
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return fmt.Errorf("create a temporary file in %s: %w", dir, err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return fmt.Errorf("rename %s -> %s: %w", tmp, path, err)
+	name := tmp.Name()
+	// Close is checked because these bytes are the generated table: a failed
+	// flush would rename a truncated file over a good one.
+	if _, err := tmp.Write(body); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(name)
+		return fmt.Errorf("write %s: %w", name, err)
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(name)
+		return fmt.Errorf("close %s: %w", name, err)
+	}
+	// CreateTemp makes the file 0600; the generated table is source, so it
+	// carries the same mode a plain WriteFile would have given it.
+	if err := os.Chmod(name, 0o644); err != nil {
+		_ = os.Remove(name)
+		return fmt.Errorf("chmod %s: %w", name, err)
+	}
+	if err := os.Rename(name, path); err != nil {
+		_ = os.Remove(name)
+		return fmt.Errorf("rename %s -> %s: %w", name, path, err)
 	}
 	return nil
 }

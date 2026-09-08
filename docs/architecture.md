@@ -52,6 +52,7 @@ flowchart TD
   Rm["openehr/rm/"]
   Terminology["openehr/terminology/<br/>(stdlib-only, below rm)"]
   Serialize["openehr/serialize/"]
+  Instance["openehr/instance/"]
   Validation["openehr/validation/"]
   Template["openehr/template/"]
   Http["transport/"]
@@ -70,8 +71,11 @@ flowchart TD
   App -. building-block .-> Validation
   App -. building-block .-> Template
   App -. building-block .-> Terminology
+  App -. building-block .-> Instance
   Serialize --> Terminology
   Client --> Terminology
+  Instance --> Terminology
+  Instance --> Template
 
   Care --> Client
   Cadasto --> Http

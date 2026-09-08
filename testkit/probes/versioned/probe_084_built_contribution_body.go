@@ -10,6 +10,7 @@ import (
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -198,12 +199,19 @@ func buildProbe084Submission() (*contribution.Submission, error) {
 	// The batch audit is set wholesale so its change type is the caller's own
 	// rather than one of the four per-operation codes (see
 	// probe084BatchCode); the committer and system id are then layered on,
-	// exercising both entry points.
+	// exercising both entry points. The rubric beside the code comes from the
+	// pin rather than being typed here (REQ-034) — so a pin that no longer
+	// carried 253 would fail loudly here instead of planting a body Build
+	// would refuse for a reason the probe never meant to assert.
+	batchRubric, ok := terminology.AuditChangeType.Rubric(probe084BatchCode)
+	if !ok {
+		return nil, fmt.Errorf("code %q is not a member of the pinned openEHR audit-change-type group", probe084BatchCode)
+	}
 	return contribution.NewBuilder().
 		WithAudit(contribution.UpdateAudit{
 			ChangeType: rm.DVCodedText{
-				DVText:       rm.DVText{Value: "unknown"},
-				DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: probe084BatchCode},
+				DVText:       rm.DVText{Value: batchRubric},
+				DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: terminology.ID}, CodeString: probe084BatchCode},
 			},
 		}).
 		WithCommitterName("probe-084").

@@ -202,9 +202,12 @@ func TestParseRefusesAnEmptyVocabulary(t *testing.T) {
 	tests := []struct {
 		name, body, want string
 	}{
+		// Each want is the full count pair, never a one-sided substring:
+		// "0 code set(s)" alone also matches the both-empty message, so a
+		// row could otherwise pass on the wrong refusal.
 		{name: "no groups and no code sets", body: "", want: "0 group(s) and 0 code set(s)"},
-		{name: "groups but no code sets", body: oneGroup, want: "0 code set(s)"},
-		{name: "code sets but no groups", body: oneCodeSet, want: "0 group(s)"},
+		{name: "groups but no code sets", body: oneGroup, want: "1 group(s) and 0 code set(s)"},
+		{name: "code sets but no groups", body: oneCodeSet, want: "0 group(s) and 1 code set(s)"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
