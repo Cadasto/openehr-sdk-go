@@ -23,7 +23,10 @@ func TestReplayer_UnmatchedFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = r.RoundTrip(req)
+	resp, err := r.RoundTrip(req)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
 	if !errors.Is(err, probe.ErrUnmatchedRecording) {
 		t.Fatalf("RoundTrip() error = %v, want %v", err, probe.ErrUnmatchedRecording)
 	}
@@ -57,7 +60,7 @@ func TestReplayer_ServesMatchingExchange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("status = %d, want 201", resp.StatusCode)
 	}
@@ -73,7 +76,10 @@ func TestReplayer_ServesMatchingExchange(t *testing.T) {
 	}
 
 	// Consumed in order: a second identical request must fail closed.
-	_, err = r.RoundTrip(req)
+	resp2, err := r.RoundTrip(req)
+	if resp2 != nil {
+		_ = resp2.Body.Close()
+	}
 	if !errors.Is(err, probe.ErrUnmatchedRecording) {
 		t.Fatalf("second RoundTrip() error = %v, want consumed-match fail-closed", err)
 	}

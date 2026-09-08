@@ -40,10 +40,13 @@ func (r *Replayer) HTTPClient() *http.Client {
 // [ErrUnmatchedRecording] and does not dial.
 func (r *Replayer) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req == nil {
-		return nil, fmt.Errorf("probe: nil request")
+		return nil, errors.New("probe: nil request")
 	}
 	if req.Body != nil {
-		defer req.Body.Close()
+		// RoundTrip must close the request body (http.RoundTripper
+		// contract). The replayer matches on method and path only, so it
+		// never reads the body and the close error is not actionable.
+		defer func() { _ = req.Body.Close() }()
 	}
 	if err := req.Context().Err(); err != nil {
 		return nil, err

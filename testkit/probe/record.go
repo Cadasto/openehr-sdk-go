@@ -2,6 +2,7 @@ package probe
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -54,10 +55,10 @@ func (r *Recorder) HAR() HAR {
 // RoundTrip forwards req to next and records the redacted exchange.
 func (r *Recorder) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req == nil {
-		return nil, fmt.Errorf("probe: nil request")
+		return nil, errors.New("probe: nil request")
 	}
 	if r.next == nil {
-		return nil, fmt.Errorf("probe: recorder has no next transport")
+		return nil, errors.New("probe: recorder has no next transport")
 	}
 	if err := req.Context().Err(); err != nil {
 		return nil, err
