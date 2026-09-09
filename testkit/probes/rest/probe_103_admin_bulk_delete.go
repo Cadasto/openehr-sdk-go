@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
-	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/admin"
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
@@ -19,8 +19,10 @@ import (
 // segment per id (REQ-099).
 //
 // captured returns the requests the backend received; the probe reads the
-// newest to confirm the verb, the literal `/all` path, and one `ehr_id`
-// parameter per id supplied.
+// newest to confirm the verb, the exact `/admin/ehr/all` path, the absence of
+// a request body, and one `ehr_id` parameter per id supplied. The OAS
+// operation `admin_ehr_delete_all` declares parameters and no requestBody, so
+// a body on the wire is off-contract however the server treats it.
 func Probe103AdminBulkDelete(ctx context.Context, c *transport.Client, captured func() []*http.Request, ids []openehrclient.EHRID) (Result, error) {
 	r := Result{Probe: "PROBE-103"}
 	if c == nil {
@@ -52,10 +54,32 @@ func Probe103AdminBulkDelete(ctx context.Context, c *transport.Client, captured 
 		r.Detail = fmt.Sprintf("bulk delete used %s, want DELETE", req.Method)
 		return r, nil
 	}
-	if !strings.HasSuffix(req.URL.Path, "/admin/ehr/all") {
+	wantPath, err := servicePath(c, "/admin/ehr/all")
+	if err != nil {
+		return r, fmt.Errorf("PROBE-103: %w", err)
+	}
+	if req.URL.Path != wantPath {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("bulk delete path %q, want a trailing /admin/ehr/all", req.URL.Path)
+		r.Detail = fmt.Sprintf("bulk delete path %q, want the exact /admin/ehr/all path %q", req.URL.Path, wantPath)
 		return r, nil
+	}
+	// The subset is named by query parameters only: the operation declares no
+	// requestBody, so anything on the wire here is off-contract.
+	if req.ContentLength != 0 {
+		r.Status = "fail"
+		r.Detail = fmt.Sprintf("bulk delete carried a request body of %d byte(s); admin_ehr_delete_all declares parameters only", req.ContentLength)
+		return r, nil
+	}
+	if req.Body != nil {
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return r, fmt.Errorf("PROBE-103: read the captured request body: %w", err)
+		}
+		if len(body) > 0 {
+			r.Status = "fail"
+			r.Detail = fmt.Sprintf("bulk delete carried a request body of %d byte(s); admin_ehr_delete_all declares parameters only", len(body))
+			return r, nil
+		}
 	}
 	// One repeatable ehr_id parameter per id, and never a path segment per id.
 	want := make([]string, len(ids))

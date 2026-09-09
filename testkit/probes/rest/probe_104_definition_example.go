@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -16,7 +15,9 @@ import (
 // response decodes into a full COMPOSITION for the named template (REQ-095).
 //
 // captured returns the requests the backend received; the probe reads the
-// newest to confirm the verb and the example route.
+// newest to confirm the verb and the exact example route — every segment of
+// it, so a request that carried the wrong format or the wrong template id is
+// caught rather than passed by a prefix-and-suffix match.
 func Probe104DefinitionExample(ctx context.Context, c *transport.Client, captured func() []*http.Request, templateID string, format definition.TemplateFormat) (Result, error) {
 	r := Result{Probe: "PROBE-104"}
 	if c == nil {
@@ -59,9 +60,13 @@ func Probe104DefinitionExample(ctx context.Context, c *transport.Client, capture
 		r.Detail = fmt.Sprintf("example fetch used %s, want GET", req.Method)
 		return r, nil
 	}
-	if !strings.Contains(req.URL.Path, "/definition/template/") || !strings.HasSuffix(req.URL.Path, "/example") {
+	wantPath, err := servicePath(c, "/definition/template/"+format.PathSegment()+"/"+templateID+"/example")
+	if err != nil {
+		return r, fmt.Errorf("PROBE-104: %w", err)
+	}
+	if req.URL.Path != wantPath {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("example path %q, want …/definition/template/{format}/{template_id}/example", req.URL.Path)
+		r.Detail = fmt.Sprintf("example path %q, want the example route %q", req.URL.Path, wantPath)
 		return r, nil
 	}
 
