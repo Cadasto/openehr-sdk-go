@@ -843,7 +843,7 @@ requirements:
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
       - docs/plans/archive/2026-08-26-aql-small-corrections.md
       - docs/plans/archive/2026-08-26-aql-write-side-parity.md
-    notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
+    notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-079 (Location recovery) is witnessed Live by testkit/probe/livestoredquery_test.go (REQ-082); PROBE-078 stays deferred."
     tests:
       - openehr/aql/aql_test.go
       - openehr/aql/builder_test.go

@@ -86,7 +86,7 @@ Scoped to phases 1–2 (what is reachable now):
 
 ### Phase 4 — Live mode *(wired, pre-release; not blocked)*
 
-**Tasks:** endpoint and credential configuration; the mutating-probe opt-in gate; per-run resource scoping; promote PROBE-077 / 078 / 079 out of `Status: Deferred` (**PROBE-079 done** — Live snapshot; **PROBE-066** implemented alongside it in the same stored-AQL snapshot), implement PROBE-065, and write the four STRAND-09 REST probes.
+**Tasks:** endpoint and credential configuration; the mutating-probe opt-in gate; per-run resource scoping; promote PROBE-077 / 078 / 079 out of `Status: Deferred` (**PROBE-079** and **PROBE-066** promoted on the Live snapshot's witness; their dedicated Sandbox probe files are still open), implement PROBE-065, and write the four STRAND-09 REST probes.
 
 **Definition of done:** REQ-082 reaches `Impl. landed`; the `v1.0.0` gates on the REQ-080 probe suite passing and on a reference deployment passing the live suite (REQ-082) become measurable.
 
