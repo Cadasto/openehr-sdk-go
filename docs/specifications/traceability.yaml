@@ -864,7 +864,9 @@ requirements:
     notes: >-
       POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param);
       PutStoredQuery recovers {name,version} from Location header. Verified by
-      query/execute.go, definition/stored_query.go; PROBE-078/079 deferred.
+      query/execute.go, definition/stored_query.go; PROBE-079 (Location recovery)
+      and PROBE-066 (stored execution) are witnessed Live by
+      testkit/probe/livestoredquery_test.go (REQ-082), PROBE-078 stays deferred.
       The Extras (unknown-key) behaviour of StoredQueryMetadata is NOT recorded
       here: § REQ-144 owns both catalog descriptors' decode/encode contract.
       The 2026-09-02 leftovers plan closed a version-trim asymmetry with name:
@@ -1026,7 +1028,11 @@ requirements:
     # TestLiveCoreSnapshot is the current Live baseline (core EHR
     # create/get/exists/status green vs EHRbase 2.35.1; the System
     # capabilities probe skips the OPTIONS / accepted deviation,
-    # conformance.md Live mode).
+    # conformance.md Live mode). TestLiveCompositionSnapshot adds the
+    # per-run template-upload / composition write / read-back path, and
+    # TestLiveStoredQuerySnapshot the stored-AQL path — PutStoredQuery
+    # Location recovery (PROBE-079) and stored execution → typed
+    # ResultSet (PROBE-066), both green vs EHRbase 2.35.1.
     tests:
       - testkit/probe/run_test.go
       - testkit/probe/mode_test.go
@@ -1037,6 +1043,7 @@ requirements:
       - testkit/probe/cassette_test.go
       - testkit/probe/livesnapshot_test.go
       - testkit/probe/livecomposition_test.go
+      - testkit/probe/livestoredquery_test.go
       - cmd/probe-record/main_test.go
       - sandbox/backend_test.go
       - sandbox/independence_test.go

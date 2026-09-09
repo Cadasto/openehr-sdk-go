@@ -706,7 +706,8 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** A stored query registered under a known qualified name.
 - **Wire assertion:** Request path matches the qualified-name URL template; response decodes as `query.ResultSet` with `Columns` and `Rows` populated.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Live snapshot) — the stored execution returns a typed `ResultSet` with `Columns` and `Rows` populated against a live CDR ([`testkit/probe/livestoredquery_test.go`](../../testkit/probe/livestoredquery_test.go)); a bound parameter scopes the result to the run's own EHR, so the row read back is this run's, not merely a decodable shape. The Sandbox and Cassette arms remain planned.
+- **Satisfies:** REQ-057.
 
 #### PROBE-067 — Template upload round-trip
 
@@ -783,8 +784,8 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Title:** A body-less `PUT /definition/query/{qualified_query_name}[/{version}]` store reply recovers the server-assigned `{name, version}` from the `Location` response header, per [wire.md § Stored AQL](wire.md#req-057).
 - **Preconditions:** A store operation whose response is the canonical `200_StoredQuery_stored` shape — empty body, `Location` header carrying the qualified name and version.
 - **Wire assertion:** `definition.PutStoredQuery` MUST recover `{name, version}` by parsing `Location` first; a JSON body, when present, is a lenient fallback; the caller's input `{name, version}` is the last-resort fallback. A malformed `Location` MUST NOT fail the call.
-- **Modes:** Sandbox (planned); Cassette, Live not yet scoped.
-- **Status:** Deferred — REQ-057 recovery order is landed and unit-covered ([`openehr/client/definition/stored_query_test.go`](../../openehr/client/definition/stored_query_test.go)); the dedicated wire-level PROBE-079 is deferred to a follow-up cycle (tracked in [roadmap.md](../roadmap.md)).
+- **Modes:** Live (snapshot); Sandbox planned; Cassette not yet scoped.
+- **Status:** Implemented (Live snapshot) — the Location recovery is witnessed against a live CDR by [`testkit/probe/livestoredquery_test.go`](../../testkit/probe/livestoredquery_test.go): EHRbase answers the body-less store with `200` and `Location: …/definition/query/{name}/{version}`, and the recovered `{name, version}` match the name stored. REQ-057 recovery order is also unit-covered ([`openehr/client/definition/stored_query_test.go`](../../openehr/client/definition/stored_query_test.go)). A dedicated Sandbox probe file remains planned.
 - **Satisfies:** REQ-057.
 
 #### PROBE-084 — Built contribution body matches `Contribution_create`
