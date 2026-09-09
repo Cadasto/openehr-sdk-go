@@ -43,7 +43,7 @@ The probe definition is the single source; the runner ([`testkit/probe`](../../t
 
 **Not every probe is backend-facing.** An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output — the AQL round-trip and catalogue properties, the upstream FLAT parity harness, the codec and validation multiset probes — and reaches no server in any mode. Such a probe **MUST** declare `In-repo` in its **Modes** line, and the three-mode rule above does **not** bind it: there is no backend for a recording to capture or a deployment to confirm. This is a declared class, not a shortfall, and it is why a blanket three-mode reading of this requirement is wrong — 16 of the 75 catalog entries are in-repo by construction.
 
-For a backend-facing probe, its **Modes** line is the authoritative statement of which of the three it currently supports, and any mode missing from that line is an open gap in *this* requirement rather than a defect in the probe. Today 14 entries declare all three; the rest are the work [REQ-082's plan](../plans/2026-08-18-probe-runnability.md) sequences.
+For a backend-facing probe, its **Modes** line is the authoritative statement of which of the three it currently supports, and any mode missing from that line is an open gap in *this* requirement rather than a defect in the probe. Today 12 entries declare all three; the rest are the work [REQ-082's plan](../plans/2026-08-18-probe-runnability.md) sequences.
 
 A **recording** is a captured HTTP exchange — method, URL, request and response headers, status, and both bodies. It is a different artefact from the vendored **fixture documents** under `testkit/cassettes/` (§ Vendored fixtures below), which are bodies only and carry no exchange. The two **MUST NOT** share a directory: a fixture is hand-curated input, a recording is captured evidence, and only the second can go stale against a deployment.
 
@@ -653,11 +653,12 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 #### PROBE-060 — EHR creation round-trip
 
-- **Title:** `POST /ehr` with an initial `EHR_STATUS` body returns `201`, surfaces the assigned `ehr_id`, and a follow-up `GET` returns the same status.
+- **Title:** `POST /ehr` with an initial `EHR_STATUS` body answers with a `Location` naming the assigned `ehr_id`, the SDK surfaces that id, and a follow-up `GET` of the EHR_STATUS returns the status that was committed.
 - **Preconditions:** Backend supports server-assigned `ehr_id`.
-- **Wire assertion:** POST returns `201` with `Location` header; SDK extracts `ehr_id`; a subsequent GET returns the same EHR_STATUS.
-- **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_060_ehr_creation_round_trip.go`](../../testkit/probes/rest/probe_060_ehr_creation_round_trip.go). Server-assigned create (`POST /ehr`) with an initial EHR_STATUS body carrying a distinctive archetype and queryable/modifiable flags; the SDK recovers the id from the response, and a follow-up `ehr_status` GET round-trips those fields. Can-fail plant serves a divergent read-back.
+- **Wire assertion:** The create is one `POST` on the exact service-relative `/ehr` path whose body decodes, independently of the SDK, as the submitted EHR_STATUS (`archetype_node_id`, `is_queryable`, `is_modifiable`); the response carries a `Location` ending in `/ehr/{ehr_id}` for the id the SDK recovered; the read-back is one `GET` on `/ehr/{ehr_id}/ehr_status` for that id and returns the same fields. The `201` status itself is consumed by the transport (a non-2xx fails the call) and is not surfaced by the leaf, so the probe does not assert the number.
+- **Effect:** mutating.
+- **Modes:** Sandbox; Cassette, Live not yet scoped.
+- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_060_ehr_creation_round_trip.go`](../../testkit/probes/rest/probe_060_ehr_creation_round_trip.go); harness in [`probes_test.go`](../../testkit/probes/rest/probes_test.go). Server-assigned create with an initial EHR_STATUS carrying a distinctive archetype and queryable/modifiable flags; the SDK recovers the id, and the `ehr_status` read-back on that id round-trips the fields. Can-fail plants: a divergent read-back status, a create answered without `Location`, a submitted body that is not the EHR_STATUS, and a read-back issued on another EHR's path.
 - **Satisfies:** REQ-095.
 
 #### PROBE-061 — Composition versioned write with `Prefer: return=representation`
@@ -672,10 +673,11 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 #### PROBE-062 — `openehr-audit-details` header round-trip
 
 - **Title:** A write carrying `openehr-audit-details` is reflected in the resulting Contribution's audit envelope on read-back.
-- **Preconditions:** Existing EHR; a known `*rm.AuditDetails` value.
-- **Wire assertion:** Write request carries `openehr-audit-details` in the openEHR dotted-attribute grammar (`change_type.code_string="…",committer.name="…",system_id="…"` — REQ-059, **not** JSON); subsequent Contribution GET returns the same audit fields (committer name, change-type, system_id).
-- **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_062_audit_details_header.go`](../../testkit/probes/rest/probe_062_audit_details_header.go). The write emits `openehr-audit-details` in the dotted grammar (asserted by its component tokens, not JSON, and against the canonical encoding); the Contribution read-back reflects the change-type and system_id. Encoder also unit-covered by `openehr/client/ehr/audit_test.go` (dotted-grammar golden). Can-fail plants a JSON header and a divergent read-back audit.
+- **Preconditions:** Existing EHR; a known `*rm.AuditDetails` value; the uid of the Contribution the write creates — server-assigned and not returned by a single-resource write, so the Sandbox fake serves it and a Live caller recovers it from the versioned object's revision history.
+- **Wire assertion:** Write request carries `openehr-audit-details` in the openEHR dotted-attribute grammar (`change_type.code_string="…",committer.name="…",system_id="…"` — REQ-059, **not** JSON), judged by a parser in the probe that is independent of the SDK encoder: only the seven attributes the upstream contract documents may appear, and `change_type.code_string`, `committer.name`, `system_id` (and `description.value` when set) equal the input. The subsequent Contribution GET returns the same audit fields (committer name, change-type, system_id), and its `versions` list names the version uid the write's `Location` returned, which binds the read-back to the write.
+- **Effect:** mutating.
+- **Modes:** Sandbox; Cassette, Live not yet scoped.
+- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_062_audit_details_header.go`](../../testkit/probes/rest/probe_062_audit_details_header.go); harness in [`probes_test.go`](../../testkit/probes/rest/probes_test.go). The probe's parser is pinned on its own by `TestParseAuditDetailsHeader` in [`audit_grammar_test.go`](../../testkit/probes/rest/audit_grammar_test.go) (escapes, duplicates and stray whitespace, which no plant can reach), and the encoder is unit-covered by `openehr/client/ehr/audit_test.go` (dotted-grammar golden). Can-fail plants: a JSON header, a `;` separator, an unquoted value, a rewritten committer, a dropped `system_id`, an undocumented attribute, and read-backs with a divergent system_id, a divergent committer, and a `versions` list that does not name the committed version.
 - **Satisfies:** REQ-059.
 
 #### PROBE-063 — Discovery-routed request
@@ -845,30 +847,30 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 - **Title:** The System API's single operation is `OPTIONS /`; its response decodes into the typed service capabilities with a declared `restapi_specs_version`.
 - **Preconditions:** A backend that answers the ITS-REST *Options and Conformance* operation at the service root.
-- **Wire assertion:** The request uses `OPTIONS` (not `GET`) against the service root, exactly one request is issued, and the response decodes into `system.ServiceCapabilities` with a non-empty `restapi_specs_version`. The verb is the assertion — a deployment or SDK that issued a `GET` would miss the operation the spec defines.
+- **Wire assertion:** The request uses `OPTIONS` (not `GET`) against the service root — the client's configured base path, with or without its trailing slash — exactly one request is issued, and the response decodes into `system.ServiceCapabilities` with a non-empty `restapi_specs_version`. The verb is the assertion — a deployment or SDK that issued a `GET` would miss the operation the spec defines.
 - **Effect:** read-only.
 - **Modes:** Sandbox; Cassette, Live not yet scoped.
-- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_102_system_capabilities.go`](../../testkit/probes/rest/probe_102_system_capabilities.go); harness in [`probes_test.go`](../../testkit/probes/rest/probes_test.go). Promoted from the package `httptest` assertions per [STRAND-09](research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1. Can-fail plants a `GET` verb and a version-less body.
+- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_102_system_capabilities.go`](../../testkit/probes/rest/probe_102_system_capabilities.go); harness in [`probes_test.go`](../../testkit/probes/rest/probes_test.go). Promoted from the package `httptest` assertions per [STRAND-09](research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1. Can-fail plants a `GET` verb, a path off the service root, and a version-less body.
 - **Satisfies:** REQ-095.
 
 #### PROBE-103 — Admin bulk-delete via `DELETE /admin/ehr/all`
 
 - **Title:** The Admin bulk-delete surface is `DELETE /admin/ehr/all`; a subset delete restricts to the named EHRs via the repeatable `ehr_id` query parameter — not a body, and not a path segment per id.
 - **Preconditions:** A backend exposing the ITS-REST Admin `/admin/ehr/all` operation (the Admin API is upstream `x-status: DEVELOPMENT`).
-- **Wire assertion:** The request uses `DELETE` against the literal `/admin/ehr/all` path and carries one `ehr_id` query parameter per id supplied, no id appearing as a path segment. A 2xx (including `202` Accepted and `204` No Content) is success.
+- **Wire assertion:** The request uses `DELETE` against the exact service-relative `/admin/ehr/all` path, carries one `ehr_id` query parameter per id supplied, no id appearing as a path segment, and no request body (the OAS `admin_ehr_delete_all` operation declares parameters only). A 2xx (including `202` Accepted and `204` No Content) is success.
 - **Effect:** mutating — the Sandbox arm issues the delete against the fake.
 - **Modes:** Sandbox; Cassette, Live not yet scoped.
-- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_103_admin_bulk_delete.go`](../../testkit/probes/rest/probe_103_admin_bulk_delete.go); harness in [`probes_test.go`](../../testkit/probes/rest/probes_test.go). Promoted per [STRAND-09](research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1. Can-fail plant strips the `ehr_id` parameters.
+- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_103_admin_bulk_delete.go`](../../testkit/probes/rest/probe_103_admin_bulk_delete.go); harness in [`probes_test.go`](../../testkit/probes/rest/probes_test.go). Promoted per [STRAND-09](research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1. Can-fail plants strip the `ehr_id` parameters, append an id as a path segment, and add a request body.
 - **Satisfies:** REQ-099.
 
 #### PROBE-104 — Definition example via `GET …/{template_id}/example`
 
 - **Title:** The Definition example endpoint is `GET /definition/template/{format}/{template_id}/example`; its response decodes into a full COMPOSITION for the named template.
 - **Preconditions:** A backend exposing the ITS-REST Definition example operation for a loaded template.
-- **Wire assertion:** The request uses `GET` against the `…/definition/template/{format}/{template_id}/example` route and the response decodes into a `*rm.Composition` with a non-empty `archetype_node_id`.
+- **Wire assertion:** The request uses `GET` against the exact `…/definition/template/{format}/{template_id}/example` route, with the requested format's path segment and the template id in place, and the response decodes into a `*rm.Composition` with a non-empty `archetype_node_id`.
 - **Effect:** read-only.
 - **Modes:** Sandbox; Cassette, Live not yet scoped.
-- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_104_definition_example.go`](../../testkit/probes/rest/probe_104_definition_example.go); harness in [`probes_test.go`](../../testkit/probes/rest/probes_test.go). Promoted per [STRAND-09](research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1. Can-fail plant serves a body with no `archetype_node_id`.
+- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_104_definition_example.go`](../../testkit/probes/rest/probe_104_definition_example.go); harness in [`probes_test.go`](../../testkit/probes/rest/probes_test.go). Promoted per [STRAND-09](research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1. Can-fail plants serve a body with no `archetype_node_id` and rewrite the format and template-id segments.
 - **Satisfies:** REQ-095.
 
 ### RM model introspection

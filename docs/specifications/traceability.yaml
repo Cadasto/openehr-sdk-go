@@ -501,6 +501,9 @@ requirements:
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/directory/directory_test.go
       - transport/response_test.go
+      - testkit/probes/rest/probe_062_audit_details_header.go
+      - testkit/probes/rest/audit_grammar_test.go
+      - testkit/probes/rest/probes_test.go
 
   - id: REQ-090
     title: OpenTelemetry hooks
@@ -608,6 +611,11 @@ requirements:
       - docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
       - docs/plans/archive/2026-08-30-definition-metadata-decoding.md
+    tests:
+      - testkit/probes/rest/probe_060_ehr_creation_round_trip.go
+      - testkit/probes/rest/probe_102_system_capabilities.go
+      - testkit/probes/rest/probe_104_definition_example.go
+      - testkit/probes/rest/probes_test.go
     notes: >
       What keeps this partial (2026-09-05 census, table in
       testkit/cassettes/its_rest/README.md § Coverage against the client
@@ -683,6 +691,8 @@ requirements:
     plans: [docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     tests:
       - openehr/client/admin/admin_test.go
+      - testkit/probes/rest/probe_103_admin_bulk_delete.go
+      - testkit/probes/rest/probes_test.go
 
   - id: REQ-053
     title: FLAT and STRUCTURED

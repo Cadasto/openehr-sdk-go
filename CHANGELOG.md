@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Template upload interoperates with XML-only deployments (REQ-144).** `definition.UploadTemplate` accepts `application/json, application/xml` and derives the template id from the `Location` header, so a deployment serving the ADL 1.4 template surface only as XML (EHRbase) no longer answers `406`.
 - **Live conformance snapshot for the stored-AQL path (REQ-082, REQ-057).** `TestLiveStoredQuerySnapshot` registers a per-run stored query and executes it scoped to the run's own EHR against a real CDR, witnessing PROBE-079 and PROBE-066; opt-in and skipped in CI.
 - **Sandbox conformance probes for composition minimal-return and verb-aware query scoping (REQ-094, REQ-055).** PROBE-065 drives the default `return=minimal` composition write and its read-back; PROBE-078 holds every query endpoint and verb to the spec's scope channel.
-- **ITS-REST binding conformance probes (STRAND-09 item 1; REQ-059, REQ-095, REQ-099).** A new `testkit/probes/rest` suite ratifies REST surfaces previously covered only by unit `httptest` assertions — the System capabilities operation (`OPTIONS /`, PROBE-102), the Admin bulk-delete (`DELETE /admin/ehr/all`, PROBE-103), the Definition example endpoint (PROBE-104), and the `openehr-audit-details` dotted-grammar header with its Contribution round-trip (PROBE-062) — plus the EHR creation round-trip (PROBE-060).
+- **ITS-REST binding conformance probes (STRAND-09 item 1; REQ-059, REQ-095, REQ-099).** A `testkit/probes/rest` suite ratifies in Sandbox the System, Admin, Definition-example, audit-details header and EHR-creation wire shapes previously held only by unit tests.
 
 ## [0.26.0] - 2026-09-08
 
