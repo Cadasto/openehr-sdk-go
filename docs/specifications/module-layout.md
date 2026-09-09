@@ -165,7 +165,7 @@ The package **MUST** mirror the `Repository` pattern used by `openehr/client/ehr
 Out of scope at v1: bulk operations, async-job admin endpoints, ITS-REST capability negotiation (lives in `openehr/client/system`).
 
 - **Lives in:** [`openehr/client/admin/`](../../openehr/client/admin)
-- **Probes:** unit tests `TestDeleteEHR*`, `TestDeleteAllEHRs`, `TestPurgeTemplates`, `TestRepositoryRoundTrip` in `openehr/client/admin/admin_test.go`
+- **Probes:** PROBE-103 (`DELETE /admin/ehr/all` with the repeatable `ehr_id` parameter, Sandbox) at [`testkit/probes/rest/probe_103_admin_bulk_delete.go`](../../testkit/probes/rest/probe_103_admin_bulk_delete.go); unit tests `TestDeleteEHR*`, `TestDeleteAllEHRs`, `TestPurgeTemplates`, `TestRepositoryRoundTrip` in `openehr/client/admin/admin_test.go`
 
 ## Boundary rules (summary)
 
