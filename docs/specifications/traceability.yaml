@@ -611,11 +611,6 @@ requirements:
       - docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
       - docs/plans/archive/2026-08-30-definition-metadata-decoding.md
-    tests:
-      - testkit/probes/rest/probe_060_ehr_creation_round_trip.go
-      - testkit/probes/rest/probe_102_system_capabilities.go
-      - testkit/probes/rest/probe_104_definition_example.go
-      - testkit/probes/rest/probes_test.go
     notes: >
       What keeps this partial (2026-09-05 census, table in
       testkit/cassettes/its_rest/README.md § Coverage against the client
@@ -656,6 +651,10 @@ requirements:
       - openehr/client/query/path_encoding_test.go
       - openehr/client/ehr/path_encoding_test.go
       - openehr/client/ehr/composition/path_encoding_test.go
+      - testkit/probes/rest/probe_060_ehr_creation_round_trip.go
+      - testkit/probes/rest/probe_102_system_capabilities.go
+      - testkit/probes/rest/probe_104_definition_example.go
+      - testkit/probes/rest/probes_test.go
 
   - id: REQ-096
     title: Unambiguous "disable retry"
