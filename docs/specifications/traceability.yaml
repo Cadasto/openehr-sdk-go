@@ -487,12 +487,12 @@ requirements:
     status: draft
     implementation: partial
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
+    probes: [PROBE-062]
     plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     notes: >-
-      PROBE-062 (dotted openehr-audit-details round-trip) is registered in
-      conformance.md as Draft; encoder + write-path wire coverage via audit_test
-      and composition/directory tests. Full probe implementation deferred per
-      STRAND-09 until REQ-082 sandbox gate — not listed under probes: while Draft.
+      PROBE-062 (dotted openehr-audit-details round-trip) is implemented
+      (Sandbox) at testkit/probes/rest/ per STRAND-09 item 1; encoder +
+      write-path wire coverage via audit_test and composition/directory tests.
     tests:
       - openehr/client/ehr/itemtag_wire_test.go
       - openehr/client/ehr/itemtags/itemtags_test.go
@@ -601,7 +601,7 @@ requirements:
     status: draft
     implementation: partial
     packages: [testkit/cassettes/its_rest, transport, openehr/client, openehr/client/definition, openehr/client/query, openehr/client/admin, openehr/client/demographic, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus]
-    probes: [PROBE-072]
+    probes: [PROBE-060, PROBE-072, PROBE-102, PROBE-104]
     adrs: [docs/adr/0019-definition-timestamp-tolerance.md]
     plans:
       - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
@@ -679,7 +679,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/client/admin]
-    probes: [PROBE-070]
+    probes: [PROBE-070, PROBE-103]
     plans: [docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     tests:
       - openehr/client/admin/admin_test.go
@@ -1010,7 +1010,7 @@ requirements:
     canonical: docs/specifications/conformance.md#req-082--runnability
     status: draft
     implementation: partial
-    packages: [testkit, testkit/probe, cmd/probe-record, sandbox, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/demographic, testkit/probes/transport, testkit/probes/discovery, testkit/probes/template, testkit/probes/query]
+    packages: [testkit, testkit/probe, cmd/probe-record, sandbox, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/demographic, testkit/probes/transport, testkit/probes/discovery, testkit/probes/template, testkit/probes/query, testkit/probes/rest]
     adrs: [docs/adr/0020-cassette-recording-har.md]
     # PROBE-086 is In-repo (parity property; REQ-082's declared Modes class
     # for a probe that asserts no wire exchange — not a mode shortfall).
