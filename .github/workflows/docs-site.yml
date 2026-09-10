@@ -6,9 +6,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # The site embeds the docs-theme brand layer at a pinned ref, so a rebuild
-  # is also worthwhile on a schedule — it surfaces a moved file or a tag that
-  # was retargeted, rather than waiting for the next edit here.
+  # The site embeds the docs-theme brand layer at a pinned commit, so a rebuild
+  # is also worthwhile on a schedule — it surfaces a file moved or removed
+  # upstream, or one that no longer matches its recorded sha256 in
+  # sources.json, rather than waiting for the next edit here.
   schedule:
     - cron: '0 6 * * 1'
 

@@ -9,8 +9,10 @@
   {{ super() }}
   {%- set dest = page.meta.redirect %}
   {%- if dest %}
-    <meta http-equiv="refresh" content="0;url={{ dest }}">
-    <link rel="canonical" href="{{ dest }}">
+    {#- No <link rel="canonical"> here: Material already emits a self-
+        canonical before this block, and a second, conflicting one makes
+        search engines discard both. -#}
+    <meta http-equiv="refresh" content="0;url={{ dest | e }}">
     <script>location.replace({{ dest | tojson }})</script>
   {%- endif %}
 {% endblock %}
