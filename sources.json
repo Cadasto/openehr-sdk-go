@@ -1,0 +1,37 @@
+{
+  "$comment": [
+    "The brand layer is pulled at build time so this repository never",
+    "keeps a second copy of Cadasto/docs-theme. Bump `theme.ref` when a",
+    "docs-theme release should land here — `make docs-sync` then refreshes",
+    "the copies and the build uses them. `sources` is empty: the install",
+    "and example prose is authored in this repo (`pages/`, `docs/`), not",
+    "fetched from another product."
+  ],
+  "theme": {
+    "$comment": [
+      "Cadasto/docs-theme files written onto their live MkDocs paths. Those",
+      "destinations are gitignored. `ref` is the commit a release tag points",
+      "at rather than the tag itself: two of these files are Jinja templates",
+      "that the build executes, docs-site.yml rebuilds weekly on a schedule,",
+      "and a tag can be moved — so a tag would let the published site change",
+      "with nothing in this repository recording it. To pick up a brand",
+      "release, resolve its tag to a commit and replace `ref`:",
+      "  gh api repos/Cadasto/docs-theme/commits/<tag> --jq .sha",
+      "(use that, not git/ref/tags — for an annotated tag the latter",
+      "returns the tag object's sha, which raw.githubusercontent 404s.)",
+      "`ref_tag` is documentation only; the sync script does not read it."
+    ],
+    "repo": "Cadasto/docs-theme",
+    "ref": "b440667b92c621d0f2dd67ae4a02bba845245ed4",
+    "ref_tag": "v0.2.0",
+    "files": [
+      {"path": "tokens.css", "dest": "pages/stylesheets/tokens.css"},
+      {"path": "material.css", "dest": "pages/stylesheets/material.css"},
+      {"path": "landing.css", "dest": "pages/stylesheets/landing.css"},
+      {"path": "overrides/home.html", "dest": "overrides/home.html"},
+      {"path": "overrides/partials/copyright.html", "dest": "overrides/partials/copyright.html"},
+      {"path": "assets/cadasto-mark.png", "dest": "pages/assets/cadasto-mark.png"}
+    ]
+  },
+  "sources": []
+}

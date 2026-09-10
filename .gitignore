@@ -48,6 +48,18 @@ _scratch*
 bin/
 /lint-aql
 
+# Documentation site (MkDocs). Brand files are fetched by `make docs-sync`
+# from Cadasto/docs-theme at the commit in sources.json — do not commit them.
+/site/
+/.fetched/
+/.cache/
+/pages/stylesheets/tokens.css
+/pages/stylesheets/material.css
+/pages/stylesheets/landing.css
+/overrides/home.html
+/overrides/partials/copyright.html
+/pages/assets/cadasto-mark.png
+
 # OS
 .DS_Store
 Thumbs.db
