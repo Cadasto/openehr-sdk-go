@@ -53,6 +53,8 @@ API.
 The shortest program on each path is on [Examples](examples.md). The
 repository copies, with live-CDR auth wiring, are in
 [quick-start.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/quick-start.md).
+Which CDRs this repository records is on
+[Workflow](workflow.md#which-cdr).
 
 ## What this page does not cover
 

@@ -42,6 +42,11 @@ These packages must remain usable without importing `transport/` or `auth/`
 
 ## REST client
 
+Typed leaves over the vendored
+[ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
+pin. Which CDRs this repository records is on
+[Workflow](workflow.md#which-cdr).
+
 | Import | Role |
 |---|---|
 | `transport` | Injected `*http.Client`, retries, error mapping, optional OTel |

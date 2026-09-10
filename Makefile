@@ -304,6 +304,16 @@ docs-check: docs-build ## Build the site and assert the published output is comp
 	  || { echo "docs-check: install page is missing the module path"; exit 1; }; \
 	grep -q 'openehr-sdk-go@v0.27.0' "$(DOCS_BUILD)/install/index.html" \
 	  || { echo "docs-check: install page is missing the pinned go get tag"; exit 1; }; \
+	grep -q 'specifications.openehr.org' "$(DOCS_BUILD)/index.html" \
+	  || { echo "docs-check: landing page is missing the openEHR spec links"; exit 1; }; \
+	grep -q 'Release-1.1.0' "$(DOCS_BUILD)/index.html" \
+	  || { echo "docs-check: landing page does not pin ITS-REST Release-1.1.0"; exit 1; }; \
+	grep -q 'which-cdr' "$(DOCS_BUILD)/workflow/index.html" \
+	  || { echo "docs-check: workflow page is missing the Which CDR section"; exit 1; }; \
+	for cdr in EHRbase FerroEHR Cadasto Better; do \
+	  grep -q "$$cdr" "$(DOCS_BUILD)/workflow/index.html" \
+	    || { echo "docs-check: workflow page is missing $$cdr in the CDR table"; exit 1; }; \
+	done; \
 	test -s "$(DOCS_BUILD)/examples/index.html" \
 	  || { echo "docs-check: examples page not emitted"; exit 1; }; \
 	grep -q 'cmd/examples' "$(DOCS_BUILD)/examples/index.html" \
@@ -316,6 +326,16 @@ docs-check: docs-build ## Build the site and assert the published output is comp
 	  || { echo "docs-check: reference page does not target the module on pkg.go.dev"; exit 1; }; \
 	grep -q 'href="reference/"' "$(DOCS_BUILD)/index.html" \
 	  || { echo "docs-check: landing nav is missing the Go reference item"; exit 1; }; \
+	test -s "$(DOCS_BUILD)/workflow/index.html" \
+	  || { echo "docs-check: workflow page not emitted"; exit 1; }; \
+	grep -q 'In the SDK' "$(DOCS_BUILD)/workflow/index.html" \
+	  || { echo "docs-check: workflow page is missing the in-SDK scope mark"; exit 1; }; \
+	grep -q 'href="workflow/"' "$(DOCS_BUILD)/index.html" \
+	  || { echo "docs-check: landing nav is missing the Workflow item"; exit 1; }; \
+	test -s "$(DOCS_BUILD)/stylesheets/workflow.css" \
+	  || { echo "docs-check: workflow.css not emitted — is it inside pages/?"; exit 1; }; \
+	grep -q 'h2.section-title' "$(DOCS_BUILD)/stylesheets/landing.css" \
+	  || { echo "docs-check: landing.css is missing h2.section-title — pin docs-theme >= v0.3.0"; exit 1; }; \
 	test -s "$(DOCS_BUILD)/contact/index.html" \
 	  || { echo "docs-check: contact page not emitted"; exit 1; }; \
 	grep -q 'info@cadasto.com' "$(DOCS_BUILD)/contact/index.html" \

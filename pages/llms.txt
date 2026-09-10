@@ -6,6 +6,22 @@
 > packages (RM, codecs, validation, templates, AQL) import without the HTTP
 > client or auth.
 
+openEHR is an open specification for an electronic health record.
+Two-level modelling: the
+[Reference Model](https://specifications.openehr.org/releases/RM/development/ehr.html)
+plus archetypes. Platform operations are in the
+[Service Model](https://specifications.openehr.org/releases/SM/development/openehr_platform.html).
+This SDK is a Go client for the
+[ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
+binding (openEHR REST `1.1.0` in this repository). The
+intended target is any ITS-REST CDR. Live probes can point at EHRbase
+(`OPENEHR_LIVE_EHRBASE`) or FerroEHR (`OPENEHR_LIVE_FERROEHR`).
+Cadasto B.V. writes this SDK; extras under `cadasto/` are planned or
+partial. Broader interop, including Better Platform, is work in
+progress — no published matrix yet. The Web Template export still
+emits the EHRbase dialect, not Better camelCase ids (ADR 0014). See
+Workflow for the per-deployment notes.
+
 The module path is `github.com/cadasto/openehr-sdk-go`. The module floor is Go
 1.27.x. The SDK is pre-1.0: pin an exact tag. The specification in the
 repository is the source of truth; when code and a spec disagree, the spec wins.
@@ -21,6 +37,9 @@ Runnable programs live under `cmd/examples/` and work offline.
   programs and the full `cmd/examples/` catalog.
 - [Packages](https://cadasto.github.io/openehr-sdk-go/packages/): Import map for
   building blocks, REST leaves, auth, sandbox, and Cadasto extras.
+- [Workflow](https://cadasto.github.io/openehr-sdk-go/workflow/):
+  Where the SDK sits between a modelling tool and a CDR, and which
+  deployments this repository records.
 - [Go reference](https://cadasto.github.io/openehr-sdk-go/reference/):
   Redirects to the generated API on
   [pkg.go.dev](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go).
@@ -36,7 +55,13 @@ Runnable programs live under `cmd/examples/` and work offline.
 - [docs/specifications/](https://github.com/cadasto/openehr-sdk-go/tree/main/docs/specifications)
 - [Go reference](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go)
 
+## openEHR specifications
+
+- [specifications.openehr.org](https://specifications.openehr.org/)
+- [RM — EHR Information Model](https://specifications.openehr.org/releases/RM/development/ehr.html)
+- [SM — Platform Service Model](https://specifications.openehr.org/releases/SM/development/openehr_platform.html)
+- [ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
+
 ## Optional
 
-- [openEHR specifications](https://specifications.openehr.org/)
 - [Cadasto](https://www.cadasto.com/)

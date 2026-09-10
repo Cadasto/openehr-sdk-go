@@ -28,8 +28,27 @@ Typed compositions, checkable templates, and AQL — imported like any other Go 
 </div>
 
 <p class="home-reassure" markdown="1">
-MIT-licensed. Pre-1.0 — pin an exact module tag.
+No backend needed to start. Point the client at yours when you have one.
 </p>
+
+</div>
+
+<h2 class="section-title">What openEHR is</h2>
+
+<div class="product-card" markdown="1">
+
+openEHR is an open specification for an electronic health record.
+Clinical content uses two-level modelling: a stable
+[Reference Model](https://specifications.openehr.org/releases/RM/development/ehr.html)
+and archetypes that constrain it. Platform operations — EHR, definition,
+query — are defined by the
+[Service Model](https://specifications.openehr.org/releases/SM/development/openehr_platform.html).
+This SDK is a Go client for the
+[ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
+binding of that platform (the pin this repository calls openEHR REST
+`1.1.0`).
+
+[Which CDR →](workflow.md#which-cdr)
 
 </div>
 

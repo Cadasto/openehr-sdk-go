@@ -57,6 +57,7 @@ extra_css:
   - stylesheets/tokens.css
   - stylesheets/material.css
   - stylesheets/landing.css
+  - stylesheets/workflow.css
 
 extra:
   social:
@@ -75,6 +76,7 @@ nav:
   - Install: install.md
   - Examples: examples.md
   - Packages: packages.md
+  - Workflow: workflow.md
   - Go reference: reference.md
   - Contributing: contributing.md
   - Contact: contact.md

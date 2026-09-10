@@ -1,0 +1,31 @@
+/* Workflow page. Tokens come from the fetched brand layer. */
+
+.workflow .scope {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.6rem;
+  border-radius: 2rem;
+  margin-bottom: 0.65rem;
+}
+
+.workflow .scope--in {
+  background: color-mix(in srgb, var(--cadasto-green) 22%, transparent);
+  color: var(--cadasto-heading);
+}
+
+.workflow .scope--out {
+  background: var(--cadasto-surface);
+  border: 1px solid var(--cadasto-border);
+  color: var(--cadasto-fg-muted);
+}
+
+.workflow .legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin: 1.25rem 0 2rem;
+  color: var(--cadasto-fg-muted);
+  font-size: 0.85rem;
+}
