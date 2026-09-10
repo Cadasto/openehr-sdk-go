@@ -247,6 +247,14 @@ FETCHED      := .fetched
 # CHANGELOG.md, i.e. the heading just under `## [Unreleased]`. Same headings
 # scripts/release-notes.sh parses, so the cut commit moves both at once.
 DOCS_RELEASE := $(shell sed -n 's/^## \[\([0-9][0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)
+# The ITS-REST tag the site must name: the `ref:` the vendoring script recorded
+# in resources/its-rest/MANIFEST.txt. Read from there rather than hardcoded, so
+# re-pinning the OpenAPI files moves the assertion with them.
+ITS_REST_PIN := $(shell sed -n 's/^ref: *//p' resources/its-rest/MANIFEST.txt)
+# The published base URL and the nav slugs, both from mkdocs.yml, so the
+# llms.txt assertions below follow a page added to or renamed in the nav.
+DOCS_SITE_URL  := $(shell sed -n 's/^site_url: *//p' mkdocs.yml)
+DOCS_NAV_SLUGS := $(shell sed -n '/^nav:/,/^[a-z]/p' mkdocs.yml | sed -n 's/^  - [^:]*: *\([a-z0-9_-]*\)\.md$$/\1/p')
 DOCKER_USER  := $(shell id -u):$(shell id -g)
 DOCKER_DOCS  := docker run --rm -u $(DOCKER_USER) -e PYTHONDONTWRITEBYTECODE=1 \
                   -v "$(CURDIR):/docs" -w /docs
@@ -320,8 +328,12 @@ docs-check: docs-build ## Build the site and assert the published output is comp
 	  || { echo "docs-check: pages/index.md (the landing quick start) does not pin 'go get …@v$(DOCS_RELEASE)', the latest release in CHANGELOG.md"; exit 1; }; \
 	grep -q 'specifications.openehr.org' "$(DOCS_BUILD)/index.html" \
 	  || { echo "docs-check: landing page is missing the openEHR spec links"; exit 1; }; \
-	grep -q 'Release-1.1.0' "$(DOCS_BUILD)/index.html" \
-	  || { echo "docs-check: landing page does not pin ITS-REST Release-1.1.0"; exit 1; }; \
+	test -n "$(ITS_REST_PIN)" \
+	  || { echo "docs-check: resources/its-rest/MANIFEST.txt records no 'ref:' line — cannot tell which ITS-REST tag the site should name"; exit 1; }; \
+	grep -q '$(ITS_REST_PIN)' "$(DOCS_BUILD)/index.html" \
+	  || { echo "docs-check: pages/index.md does not name '$(ITS_REST_PIN)', the ITS-REST tag recorded in resources/its-rest/MANIFEST.txt"; exit 1; }; \
+	grep -q '$(ITS_REST_PIN)' "$(DOCS_BUILD)/workflow/index.html" \
+	  || { echo "docs-check: pages/workflow.md does not name '$(ITS_REST_PIN)', the ITS-REST tag recorded in resources/its-rest/MANIFEST.txt"; exit 1; }; \
 	grep -q 'which-cdr' "$(DOCS_BUILD)/workflow/index.html" \
 	  || { echo "docs-check: workflow page is missing the Which CDR section"; exit 1; }; \
 	for cdr in EHRbase FerroEHR Cadasto Better; do \
@@ -378,6 +390,22 @@ docs-check: docs-build ## Build the site and assert the published output is comp
 	done; \
 	find "$(DOCS_BUILD)/assets/external/fonts.gstatic.com/" -name '*.woff2' 2>/dev/null | grep -q . \
 	  || { echo "docs-check: the stylesheet was localised but no .woff2 binary was — pages would refetch the fonts from Google"; exit 1; }; \
+	test -s "$(DOCS_BUILD)/llms.txt" \
+	  || { echo "docs-check: llms.txt not emitted — is it inside pages/?"; exit 1; }; \
+	test -n "$(DOCS_SITE_URL)" \
+	  || { echo "docs-check: mkdocs.yml records no 'site_url:' — cannot tell which URLs pages/llms.txt should carry"; exit 1; }; \
+	test -n "$(DOCS_NAV_SLUGS)" \
+	  || { echo "docs-check: no page slugs parsed from the mkdocs.yml nav — the llms.txt coverage check would assert nothing"; exit 1; }; \
+	for slug in $(DOCS_NAV_SLUGS); do \
+	  case "$$slug" in \
+	    index) url="$(DOCS_SITE_URL))" ;; \
+	    *)     url="$(DOCS_SITE_URL)$$slug/" ;; \
+	  esac; \
+	  grep -qF "$$url" "$(DOCS_BUILD)/llms.txt" \
+	    || { echo "docs-check: pages/llms.txt does not link the '$$slug' page listed in the mkdocs.yml nav"; exit 1; }; \
+	done; \
+	grep -q 'CHANGELOG.md' "$(DOCS_BUILD)/llms.txt" \
+	  || { echo "docs-check: pages/llms.txt does not link CHANGELOG.md"; exit 1; }; \
 	! grep -q 'markdown="1"' "$(DOCS_BUILD)/index.html" \
 	  || { echo "docs-check: literal markdown=\"1\" reached the landing page"; exit 1; }; \
 	! grep -rqE '(href|src)="[^":]*\.md"' "$(DOCS_BUILD)" \
