@@ -47,7 +47,7 @@ SDK clients for those ship as **Draft** and may change between minor versions.
 
 ```bash
 make its-rest-sync          # fetch latest from master, rewrite MANIFEST.txt
-ITS_REST_REF=v1.2.0 make its-rest-sync   # pin a tag / branch / commit instead
+ITS_REST_REF=Release-1.1.0 make its-rest-sync   # pin a tag / branch / commit instead
 make its-rest-check         # verify local copies + report if upstream advanced
 ```
 

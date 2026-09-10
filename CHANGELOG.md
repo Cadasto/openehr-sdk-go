@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- **Vendored openEHR REST API (ITS-REST) OpenAPI specs pinned to `Release-1.1.0`.** `resources/its-rest/` moves from the `master` branch tip to the tagged `Release-1.1.0` release (commit `2405899`), so the vendored contract is pinned to a reproducible release rather than a moving branch. The only content delta is the upstream amendment record in `overview-validation.openapi.yaml`; every schema, path, header and status code is byte-identical, so no client behaviour changes.
+
 ## [0.27.0] - 2026-09-09
 
 Twenty-seventh `v0.x` minor — the probe catalog gains Live snapshots against a real CDR and dedicated Sandbox witnesses for the ITS-REST binding, so conformance claims rest on runnable probes rather than unit assertions. Purely additive: no existing signature or answer changes.
