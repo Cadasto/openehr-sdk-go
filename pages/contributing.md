@@ -49,7 +49,9 @@ ADR settles them.
 
 `make docs-serve` previews the site on `http://127.0.0.1:8000`.
 `make docs-check` runs the strict build plus the output assertions, and is the
-gate CI applies before publishing to GitHub Pages.
+gate CI applies to every pull request. `docs-site.yml` deploys the site from
+`main` once the repository's Pages source is set to GitHub Actions, which is
+not enabled yet (as of 2026-09-10).
 
 ```bash
 make docs-serve

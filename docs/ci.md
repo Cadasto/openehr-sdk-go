@@ -11,7 +11,7 @@ How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks loca
 | **Codegen drift** | [`.github/workflows/codegen-drift.yml`](../.github/workflows/codegen-drift.yml) | Mondays 06:00 UTC; `workflow_dispatch` |
 | **Release** | [`.github/workflows/release.yml`](../.github/workflows/release.yml) | Push of a `v*` tag; `workflow_dispatch` dry-run. Process in [releases.md](releases.md) |
 | **Docs CI** | [`.github/workflows/docs-ci.yml`](../.github/workflows/docs-ci.yml) | Every pull request into `main`; `workflow_dispatch`. Runs `make docs-check` |
-| **Docs site** | [`.github/workflows/docs-site.yml`](../.github/workflows/docs-site.yml) | Push to `main`; Mondays 06:00 UTC; `workflow_dispatch`. Builds the MkDocs site and deploys to GitHub Pages |
+| **Docs site** | [`.github/workflows/docs-site.yml`](../.github/workflows/docs-site.yml) | Push to `main`; Mondays 06:00 UTC; `workflow_dispatch`. Builds the MkDocs site and deploys it to GitHub Pages once the repository's Pages source is set to GitHub Actions, which is not enabled yet (as of 2026-09-10) |
 
 ### CI jobs (`ci.yml`)
 
