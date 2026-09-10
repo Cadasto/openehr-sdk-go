@@ -243,6 +243,10 @@ clean: ## Remove bin/, coverage artefacts, and *.out files
 MKDOCS_IMAGE ?= squidfunk/mkdocs-material:9.7.6
 DOCS_BUILD   := site
 FETCHED      := .fetched
+# The release the site's `go get` lines must name: the first `## [X.Y.Z]` in
+# CHANGELOG.md, i.e. the heading just under `## [Unreleased]`. Same headings
+# scripts/release-notes.sh parses, so the cut commit moves both at once.
+DOCS_RELEASE := $(shell sed -n 's/^## \[\([0-9][0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)
 DOCKER_USER  := $(shell id -u):$(shell id -g)
 DOCKER_DOCS  := docker run --rm -u $(DOCKER_USER) -e PYTHONDONTWRITEBYTECODE=1 \
                   -v "$(CURDIR):/docs" -w /docs
@@ -263,10 +267,16 @@ docs-sync: ## Fetch the pinned docs-theme brand layer
 docs-sync-offline: ## Reuse the cached brand files instead of fetching
 	$(PYTHON_DOCS) scripts/sync_sources.py --offline
 
-docs-build: docs-sync ## Build the documentation site to site/
+# Which sync `docs-build` (and so `docs-check`) runs. Override it rather than
+# running the sync by hand: `make docs-check DOCS_SYNC=docs-sync-offline`
+# reuses the cached brand layer, where a bare `make docs-sync-offline` would be
+# undone by the very next `docs-check`.
+DOCS_SYNC ?= docs-sync
+
+docs-build: $(DOCS_SYNC) ## Build the site to site/ (DOCS_SYNC=docs-sync-offline builds from the cache)
 	$(MKDOCS_RUN) build -d /docs/$(DOCS_BUILD)
 
-docs-check: docs-build ## Build the site and assert the published output is complete
+docs-check: docs-build ## Build the site and assert the published output is complete (honours DOCS_SYNC)
 	@set -e; \
 	test -s "$(DOCS_BUILD)/index.html" \
 	  || { echo "docs-check: no index.html in $(DOCS_BUILD)/"; exit 1; }; \
@@ -300,10 +310,14 @@ docs-check: docs-build ## Build the site and assert the published output is comp
 	  || { echo "docs-check: the company mark is not referenced from docs-page footers"; exit 1; }; \
 	test -s "$(DOCS_BUILD)/assets/logo.svg" \
 	  || { echo "docs-check: logo/favicon not emitted — is it inside pages/?"; exit 1; }; \
-	grep -q 'github.com/cadasto/openehr-sdk-go' "$(DOCS_BUILD)/install/index.html" \
-	  || { echo "docs-check: install page is missing the module path"; exit 1; }; \
-	grep -q 'openehr-sdk-go@v0.27.0' "$(DOCS_BUILD)/install/index.html" \
-	  || { echo "docs-check: install page is missing the pinned go get tag"; exit 1; }; \
+	grep -q 'openehr-sdk-go\.git' "$(DOCS_BUILD)/install/index.html" \
+	  || { echo "docs-check: install page is missing the git clone URL — the module path alone is in every page header, so it proves nothing"; exit 1; }; \
+	test -n "$(DOCS_RELEASE)" \
+	  || { echo "docs-check: no '## [X.Y.Z]' release heading found in CHANGELOG.md — cannot tell which tag the site should pin"; exit 1; }; \
+	grep -q 'openehr-sdk-go@v$(DOCS_RELEASE)' "$(DOCS_BUILD)/install/index.html" \
+	  || { echo "docs-check: pages/install.md does not pin 'go get …@v$(DOCS_RELEASE)', the latest release in CHANGELOG.md"; exit 1; }; \
+	grep -q 'openehr-sdk-go@v$(DOCS_RELEASE)' "$(DOCS_BUILD)/index.html" \
+	  || { echo "docs-check: pages/index.md (the landing quick start) does not pin 'go get …@v$(DOCS_RELEASE)', the latest release in CHANGELOG.md"; exit 1; }; \
 	grep -q 'specifications.openehr.org' "$(DOCS_BUILD)/index.html" \
 	  || { echo "docs-check: landing page is missing the openEHR spec links"; exit 1; }; \
 	grep -q 'Release-1.1.0' "$(DOCS_BUILD)/index.html" \
@@ -311,8 +325,8 @@ docs-check: docs-build ## Build the site and assert the published output is comp
 	grep -q 'which-cdr' "$(DOCS_BUILD)/workflow/index.html" \
 	  || { echo "docs-check: workflow page is missing the Which CDR section"; exit 1; }; \
 	for cdr in EHRbase FerroEHR Cadasto Better; do \
-	  grep -q "$$cdr" "$(DOCS_BUILD)/workflow/index.html" \
-	    || { echo "docs-check: workflow page is missing $$cdr in the CDR table"; exit 1; }; \
+	  grep -q "<strong>$$cdr" "$(DOCS_BUILD)/workflow/index.html" \
+	    || { echo "docs-check: workflow page is missing the $$cdr row of the CDR table"; exit 1; }; \
 	done; \
 	test -s "$(DOCS_BUILD)/examples/index.html" \
 	  || { echo "docs-check: examples page not emitted"; exit 1; }; \
@@ -336,6 +350,14 @@ docs-check: docs-build ## Build the site and assert the published output is comp
 	  || { echo "docs-check: workflow.css not emitted — is it inside pages/?"; exit 1; }; \
 	grep -q 'h2.section-title' "$(DOCS_BUILD)/stylesheets/landing.css" \
 	  || { echo "docs-check: landing.css is missing h2.section-title — pin docs-theme >= v0.3.0"; exit 1; }; \
+	test -s "$(DOCS_BUILD)/packages/index.html" \
+	  || { echo "docs-check: packages page not emitted"; exit 1; }; \
+	grep -q 'openehr/client/ehr/composition' "$(DOCS_BUILD)/packages/index.html" \
+	  || { echo "docs-check: packages page is missing the client package tree"; exit 1; }; \
+	test -s "$(DOCS_BUILD)/contributing/index.html" \
+	  || { echo "docs-check: contributing page not emitted"; exit 1; }; \
+	grep -q 'make ci' "$(DOCS_BUILD)/contributing/index.html" \
+	  || { echo "docs-check: contributing page does not name the make ci gate"; exit 1; }; \
 	test -s "$(DOCS_BUILD)/contact/index.html" \
 	  || { echo "docs-check: contact page not emitted"; exit 1; }; \
 	grep -q 'info@cadasto.com' "$(DOCS_BUILD)/contact/index.html" \
@@ -354,6 +376,8 @@ docs-check: docs-build ## Build the site and assert the published output is comp
 	  grep -rq "font-weight: *$$w" "$(DOCS_BUILD)/assets/external/fonts.googleapis.com/" \
 	    || { echo "docs-check: no Fira Sans $$w face was localised"; exit 1; }; \
 	done; \
+	find "$(DOCS_BUILD)/assets/external/fonts.gstatic.com/" -name '*.woff2' 2>/dev/null | grep -q . \
+	  || { echo "docs-check: the stylesheet was localised but no .woff2 binary was — pages would refetch the fonts from Google"; exit 1; }; \
 	! grep -q 'markdown="1"' "$(DOCS_BUILD)/index.html" \
 	  || { echo "docs-check: literal markdown=\"1\" reached the landing page"; exit 1; }; \
 	! grep -rqE '(href|src)="[^":]*\.md"' "$(DOCS_BUILD)" \
