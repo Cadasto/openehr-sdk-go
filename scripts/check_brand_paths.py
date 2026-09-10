@@ -3,11 +3,11 @@
 
 `sources.json` `theme.files[].dest` is the source of truth. The same six paths
 are repeated in `.gitignore` (so fetched content cannot be committed) and in the
-Makefile's `THEME_FETCHED` (so `make clean` reaps them). Nothing in the build
+Makefile's `THEME_FETCHED` (so `make docs-clean` reaps them). Nothing in the build
 notices when they drift, and each drift fails silently in its own way: a path
 missing from `.gitignore` makes fetched content committable, reintroducing the
 second copy this repository exists to avoid; a path missing from
-`THEME_FETCHED` survives `make clean` and is then reused by `--offline`
+`THEME_FETCHED` survives `make docs-clean` and is then reused by `--offline`
 indefinitely.
 
 Run from the repository root. Exits non-zero with the difference on drift.
@@ -42,6 +42,8 @@ def gitignore_dests() -> set[str]:
         line.strip().lstrip("/")
         for line in (ROOT / ".gitignore").read_text().splitlines()
         if re.match(r"^/(pages|overrides)/", line.strip())
+        # Glob rules (the atomic-write `.tmp` siblings) name no destination.
+        and "*" not in line
     }
 
 

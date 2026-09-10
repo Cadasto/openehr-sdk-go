@@ -22,19 +22,23 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import http.client
 import json
 import posixpath
 import re
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "sources.json"
 OUT_DIR = ROOT / ".fetched"
-#: Records `repo@ref` per fetched brand file. `--offline` needs it to tell a
-#: copy fetched at the pinned ref from one an earlier ref left behind.
+#: Records `repo@ref:path[:sha256]` per fetched file — brand files and
+#: `sources` entries alike. `--offline` needs it to tell a copy fetched at the
+#: pinned ref from one an earlier ref, or a different upstream path, left
+#: behind.
 THEME_LOCK = OUT_DIR / "theme.lock"
 
 RAW = "https://raw.githubusercontent.com/{repo}/{ref}/{path}"
@@ -109,7 +113,8 @@ def _fail_fetch(
         )
     elif not offline:
         print(
-            "      run `make docs-sync-offline` to build from the cached copies.",
+            "      run `make docs-check DOCS_SYNC=docs-sync-offline` to build "
+            "from the cached copies.",
             file=sys.stderr,
         )
     return 1
@@ -123,6 +128,36 @@ def _theme_dest(raw_dest: str) -> Path:
             f"sync: theme dest {raw_dest!r} must stay under the repository root."
         )
     return dest
+
+
+def _out_dest(name: str) -> Path:
+    """Resolve a `sources` entry's destination, refusing anything outside `.fetched/`.
+
+    `name` comes from `sources.json` and is pasted straight into a filename, so
+    a `../` in it would write outside the cache the same way a bad `theme.dest`
+    would — so the `_theme_dest` guard applies here too.
+    """
+    dest = (OUT_DIR / f"{name}.md").resolve()
+    if not dest.is_relative_to(OUT_DIR):
+        raise SystemExit(
+            f"sync: source name {name!r} must stay under .fetched/."
+        )
+    return dest
+
+
+def _digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _is_client_error(error: Exception) -> bool:
+    """Is this a 4xx — a mis-configured source rather than an unreachable one?
+
+    A 404 means the upstream file moved or was removed, or `ref` is wrong. That
+    is a `sources.json` defect: serving yesterday's cached copy in its place
+    would hide the very drift the weekly rebuild exists to surface, so it must
+    never reach the `--offline` fallback.
+    """
+    return isinstance(error, urllib.error.HTTPError) and 400 <= error.code < 500
 
 
 def _read_lock() -> dict[str, str]:
@@ -144,55 +179,118 @@ def sync_theme(theme: dict, offline: bool) -> int:
     uses, because `__main__` passes it straight to `SystemExit`.
 
     Fetched as bytes, not text, because the company mark is a PNG; reusing the
-    `fetch()` path above would corrupt it. Every write records `repo@ref` in
-    `THEME_LOCK`, which is what lets `--offline` refuse a copy left behind by an
-    earlier ref. Without it the fallback can only ask whether the file exists,
-    and a bumped `theme.ref` plus a flaky network publishes a site built from a
-    mix of two brands, with nothing non-zero anywhere in the pipeline.
+    `fetch()` path above would corrupt it. Three things have to line up before
+    a file is accepted:
+
+    * `theme.ref` is a full commit sha — a tag can be moved, and the weekly
+      rebuild would then publish a different brand with nothing here recording
+      it (`sources.json` says the same, at length);
+    * the bytes hash to the `sha256` recorded beside the entry, so an upstream
+      edit at a *different* path, or a corrupted transfer, cannot pass;
+    * `THEME_LOCK` records `repo@ref:path:sha256` per destination, which is
+      what lets `--offline` refuse a copy left behind by an earlier ref or by
+      a file that has since moved upstream.
+
+    Without those, a bumped `theme.ref` plus a flaky network publishes a site
+    built from a mix of two brands, with nothing non-zero anywhere in the
+    pipeline.
     """
     for key in ("repo", "ref", "files"):
         if key not in theme:
             raise SystemExit(f'sync: sources.json "theme" is missing {key!r}.')
 
     repo, ref = theme["repo"], theme["ref"]
-    stamp = f"{repo}@{ref}"
+    if not re.fullmatch(r"[0-9a-f]{40}", ref):
+        raise SystemExit(
+            f'sync: sources.json "theme.ref" is {ref!r}, which is not a commit. '
+            f"sources.json's own instruction: `ref` is the commit a release tag "
+            f"points at rather than the tag itself — \"resolve its tag to a "
+            f'commit and replace `ref`: gh api repos/{repo}/commits/<tag> '
+            f'--jq .sha".'
+        )
+
     lock = _read_lock()
     status = 0
+    settled = 0
 
     for item in theme["files"]:
-        if "path" not in item or "dest" not in item:
+        missing = [key for key in ("path", "dest", "sha256") if key not in item]
+        if missing:
             raise SystemExit(
-                f'sync: every "theme.files" entry needs "path" and "dest"; '
-                f"got {item!r}."
+                f'sync: every "theme.files" entry needs "path", "dest" and '
+                f"\"sha256\"; {item!r} is missing {missing}."
             )
-        name = item["dest"]
+        name, expected = item["dest"], item["sha256"]
         dest = _theme_dest(name)
         url = RAW.format(repo=repo, ref=ref, path=item["path"])
+        stamp = f"{repo}@{ref}:{item['path']}:{expected}"
 
         try:
             data = fetch_bytes(url)
         except FETCH_ERRORS as error:
-            if offline and dest.exists() and lock.get(name) == stamp:
-                print(f"  ! {name}: unreachable, reusing the {stamp} copy ({error})")
-                continue
-            if offline and dest.exists():
-                cached = lock.get(name) or "an unrecorded ref"
+            if _is_client_error(error):
                 print(
-                    f"sync: cached {name} came from {cached}, but sources.json "
-                    f"pins {stamp}.\n      refusing to build a mixed brand "
-                    f"layer — fetch it online.",
+                    f"sync: {url}\n      {error}\n      that is a sources.json "
+                    f"problem — the file moved, was removed, or the ref is "
+                    f"wrong — not an unreachable network, so no cached copy "
+                    f"stands in for it.",
                     file=sys.stderr,
                 )
                 status = 1
                 break
+            if offline and dest.exists():
+                if lock.get(name) != stamp:
+                    cached = lock.get(name) or "an unrecorded ref"
+                    print(
+                        f"sync: cached {name} came from {cached}, but "
+                        f"sources.json pins {stamp}.\n      refusing to build a "
+                        f"mixed brand layer — fetch it online.",
+                        file=sys.stderr,
+                    )
+                    status = 1
+                    break
+                actual = _digest(dest.read_bytes())
+                if actual != expected:
+                    print(
+                        f"sync: cached {name} hashes {actual}, but sources.json "
+                        f"records {expected}.\n      refusing to reuse it — "
+                        f"fetch it online.",
+                        file=sys.stderr,
+                    )
+                    status = 1
+                    break
+                settled += 1
+                print(f"  ! {name}: unreachable, reusing the {stamp} copy ({error})")
+                continue
             status = _fail_fetch(url, error, offline, dest)
+            break
+
+        actual = _digest(data)
+        if actual != expected:
+            print(
+                f"sync: {name} fetched from {repo}@{ref}:{item['path']}\n"
+                f"      hashes {actual},\n"
+                f"      but sources.json records {expected}.\n"
+                f"      refusing to write it — if the change upstream is "
+                f"intended, update the sha256 beside that entry.",
+                file=sys.stderr,
+            )
+            status = 1
             break
 
         write_atomic(dest, data)
         lock[name] = stamp
-        print(f"  ✓ {name}  ←  {stamp}:{item['path']}")
+        settled += 1
+        print(f"  ✓ {name}  ←  {repo}@{ref}:{item['path']}")
 
     _write_lock(lock)
+    if status == 0 and settled == 0:
+        print(
+            'sync: sources.json "theme.files" is empty — the site would build '
+            "without the brand layer at all.",
+            file=sys.stderr,
+        )
+        return 1
     return status
 
 
@@ -262,18 +360,39 @@ def main() -> int:
     config = json.loads(CONFIG.read_text())
     OUT_DIR.mkdir(exist_ok=True)
 
+    lock = _read_lock()
     for source in config["sources"]:
         name, repo, ref, path = (
             source["name"], source["repo"], source["ref"], source["path"],
         )
-        destination = OUT_DIR / f"{name}.md"
+        destination = _out_dest(name)
+        key = str(destination.relative_to(ROOT))
+        stamp = f"{repo}@{ref}:{path}"
         url = RAW.format(repo=repo, ref=ref, path=path)
 
         try:
             text = fetch(url)
         except FETCH_ERRORS as error:
+            if _is_client_error(error):
+                print(
+                    f"sync: {url}\n      {error}\n      that is a sources.json "
+                    f"problem — the file moved, was removed, or the ref is "
+                    f"wrong — not an unreachable network, so no cached copy "
+                    f"stands in for it.",
+                    file=sys.stderr,
+                )
+                return 1
             if args.offline and destination.exists():
-                print(f"  ! {name}: unreachable, reusing cached copy ({error})")
+                if lock.get(key) != stamp:
+                    cached = lock.get(key) or "an unrecorded ref"
+                    print(
+                        f"sync: cached {name} came from {cached}, but "
+                        f"sources.json pins {stamp}.\n      refusing to build "
+                        f"from a stale copy — fetch it online.",
+                        file=sys.stderr,
+                    )
+                    return 1
+                print(f"  ! {name}: unreachable, reusing the {stamp} copy ({error})")
                 continue
             return _fail_fetch(url, error, args.offline, destination)
 
@@ -282,19 +401,25 @@ def main() -> int:
         text = absolutise_links(text, repo, ref, path)
         text = shift_headings(text, source.get("heading_shift", 0))
 
-        destination.write_text(
-            f"<!-- Fetched from {repo}@{ref}:{path} by scripts/sync_sources.py."
-            f" Do not edit; edit it in that repository. -->\n\n{text}"
+        write_atomic(
+            destination,
+            (
+                f"<!-- Fetched from {stamp} by scripts/sync_sources.py."
+                f" Do not edit; edit it in that repository. -->\n\n{text}"
+            ).encode("utf-8"),
         )
-        print(f"  ✓ {name}  ←  {repo}@{ref}:{path}")
+        lock[key] = stamp
+        print(f"  ✓ {name}  ←  {stamp}")
+    if config["sources"]:
+        _write_lock(lock)
 
-    theme = config.get("theme")
-    if theme:
-        result = sync_theme(theme, args.offline)
-        if result != 0:
-            return result
-
-    return 0
+    if "theme" not in config:
+        raise SystemExit(
+            'sync: sources.json has no "theme" block. The brand layer is not '
+            "optional — without it the site builds unstyled and unbranded, and "
+            "nothing downstream notices."
+        )
+    return sync_theme(config["theme"], args.offline)
 
 
 if __name__ == "__main__":

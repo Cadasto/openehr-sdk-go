@@ -59,6 +59,13 @@ bin/
 /overrides/home.html
 /overrides/partials/copyright.html
 /pages/assets/cadasto-mark.png
+# scripts/sync_sources.py writes each fetched file through a `<dest>.tmp`
+# sibling; a killed sync leaves one behind. (`*.tmp` further down catches
+# these too — these keep the docs block standing on its own.)
+/pages/stylesheets/*.tmp
+/pages/assets/*.tmp
+/overrides/*.tmp
+/overrides/partials/*.tmp
 
 # OS
 .DS_Store
@@ -66,7 +73,7 @@ Thumbs.db
 tmp/
 .tmp/
 
-# bmmgen / gofmt atomic-write tempfiles
+# bmmgen / gofmt / docs-sync atomic-write tempfiles
 *.tmp
 # AQL parser codegen scratch dirs (make aqlgen / aqlgen-verify)
 openehr/aql/parse/gen.tmp/
