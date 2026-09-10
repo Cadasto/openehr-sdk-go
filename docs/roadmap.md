@@ -37,7 +37,7 @@ Each stage groups several deliverables; a stage is only as done as its weakest r
 | **3 — Deployment & adoption** | Application SMART (`smart/` AppContext) on discovery | **Partial** |
 | | EHRbase CDR support | **Partial** |
 | | Worked examples (`cmd/examples/`) | **Landed** |
-| | Documentation website | **Planned** |
+| | Documentation website | **Landed** |
 | **4 — Platform extras & ADL 2** | Cadasto extras (`cadasto/*`) | **Planned** |
 | | ADL 2 / AOM 2.4 — codegen and the Definition ADL 2 format | **Deferred** |
 | **5 — Conformance ratification** | Sandbox transport + probe runner | **Partial** |
@@ -196,7 +196,7 @@ Deferred Tier-3 gaps — dedicated ITEM_TAG endpoints, `VERSIONED_*` read famili
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | Codegen and BMM-corpus diff tooling |
 | Developer onboarding | **Landed** | [quick-start.md](quick-start.md) — install, two integration paths, REST wiring |
 | Worked examples | **Landed** | [`cmd/examples/`](../cmd/examples/) — 17 runnable programs, catalogued in [examples.md](examples.md) (the single list) |
-| Documentation website | **Planned** | No site generator in the tree yet; docs are read from `docs/` and on GitHub |
+| Documentation website | **Landed** | Material for MkDocs site under [`pages/`](../pages/), built with `make docs-check` and published to GitHub Pages from `main` by `docs-site.yml`; the repository's `docs/` stays the canonical source and the site links into it |
 
 ---
 
