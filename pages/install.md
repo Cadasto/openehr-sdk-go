@@ -12,7 +12,7 @@ Add the module, pin a tag, then pick a path.
 
 | Requirement | Notes |
 |---|---|
-| **Go 1.27 or newer** | The floor in `go.mod` is `1.27.0`. |
+| **Go 1.27 or newer** | `go.mod` declares `go 1.27.0`. |
 | **A clinical data repository (CDR)** | Optional. Nothing on this page needs one: the building-block examples and the REST examples both run offline. |
 
 ## Add the module

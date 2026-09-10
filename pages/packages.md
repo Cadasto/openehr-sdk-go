@@ -19,8 +19,8 @@ identifiers, is in the
 
 ## Building blocks (no HTTP)
 
-These packages must remain usable without importing `transport/` or `auth/`
-(REQ-013).
+None of these import `transport/` or `auth/`. That independence is REQ-013 in
+[module-layout.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/specifications/module-layout.md#req-013--building-block-independence).
 
 | Import | Role |
 |---|---|
@@ -32,6 +32,7 @@ These packages must remain usable without importing `transport/` or `auth/`
 | `openehr/serialize/simplified` | FLAT and STRUCTURED |
 | `openehr/template` | ADL 1.4 operational template parse and paths |
 | `openehr/templatecompile` | Compile an OPT for the builder, validator, and AQL lint |
+| `openehr/template/webtemplate` | Web Template JSON export from a compiled OPT, EHRbase v2.3 ids |
 | `openehr/validation` | Composition against OPT; AQL lint entry |
 | `openehr/instance` | Synthesise an RM instance from a compiled template |
 | `openehr/composition` | OPT-driven Composition builder |
@@ -52,6 +53,7 @@ been run against.
 |---|---|
 | `transport` | Injected `*http.Client`, retries, error mapping, optional OTel |
 | `smart/discovery` | Service catalog |
+| `smart` | SMART launch context and ID-token claims after the `auth/smart` exchange (**partial**: app registration is open) |
 | `openehr/client/ehr` | EHR identity and version metadata |
 | `openehr/client/ehr/composition` | Composition CRUD |
 | `openehr/client/ehr/contribution` | Multi-version commits |
@@ -60,9 +62,9 @@ been run against.
 | `openehr/client/ehr/itemtags` | `openehr-item-tag` headers on composition, EHR_STATUS and directory reads and on composition writes (**partial**; the dedicated ITEM_TAG endpoints are deferred) |
 | `openehr/client/query` | Ad-hoc and stored AQL |
 | `openehr/client/definition` | Templates and stored queries |
-| `openehr/client/demographic` | Demographic API (upstream: development) |
+| `openehr/client/demographic` | Demographic API; `DEVELOPMENT` status inside ITS-REST Release-1.1.0 |
 | `openehr/client/system` | Capabilities and version |
-| `openehr/client/admin` | ITS-REST admin (upstream: development) |
+| `openehr/client/admin` | ITS-REST admin; `DEVELOPMENT` status inside ITS-REST Release-1.1.0 |
 
 ## Auth
 

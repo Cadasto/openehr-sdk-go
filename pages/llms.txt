@@ -32,6 +32,8 @@ Runnable programs live under `cmd/examples/` and work offline.
 
 ## Documentation
 
+- [Home](https://cadasto.github.io/openehr-sdk-go/): the landing page: what
+  openEHR is, what the SDK covers, and the quick start.
 - [Install](https://cadasto.github.io/openehr-sdk-go/install/): `go get`, the
   Go 1.27 requirement, and the choice between the building-block packages and
   the REST client.
@@ -57,6 +59,8 @@ Runnable programs live under `cmd/examples/` and work offline.
 - [docs/examples.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md)
 - [docs/specifications/](https://github.com/cadasto/openehr-sdk-go/tree/main/docs/specifications)
 - [docs/roadmap.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/roadmap.md)
+- [CHANGELOG.md](https://github.com/cadasto/openehr-sdk-go/blob/main/CHANGELOG.md)
+- [Releases](https://github.com/cadasto/openehr-sdk-go/releases)
 
 ## openEHR specifications
 
