@@ -1,9 +1,9 @@
 ---
 title: openEHR Go SDK
 description: >-
-  A first-party Go SDK for openEHR — typed Reference Model, canonical codecs,
-  OPT-driven compositions, AQL, and SMART-on-openEHR auth. Building-block
-  packages import without the HTTP client.
+  Cadasto's Go SDK for openEHR: typed Reference Model, canonical codecs,
+  operational templates you can validate against, AQL, and SMART-on-openEHR
+  auth. The building-block packages import without the HTTP client.
 hide:
   - navigation
   - toc
@@ -33,22 +33,44 @@ No backend needed to start. Point the client at yours when you have one.
 
 </div>
 
-<h2 class="section-title">What openEHR is</h2>
+<h2 class="section-title">openEHR and this SDK</h2>
+
+<div class="two-products" markdown="1">
 
 <div class="product-card" markdown="1">
 
-openEHR is an open specification for an electronic health record.
-Clinical content uses two-level modelling: a stable
+### What openEHR is
+
+openEHR is an open specification for an electronic health record. Clinical
+content is modelled on two levels: a stable
 [Reference Model](https://specifications.openehr.org/releases/RM/development/ehr.html)
-and archetypes that constrain it. Platform operations — EHR, definition,
-query — are defined by the
+that every record shares, and archetypes that constrain it for one purpose.
+Creating an EHR, uploading a template, running a query — those platform
+operations come from the
 [Service Model](https://specifications.openehr.org/releases/SM/development/openehr_platform.html).
 This SDK is a Go client for the
-[ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
-binding of that platform (the pin this repository calls openEHR REST
-`1.1.0`).
+[ITS-REST Release-1.1.0](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
+binding of that platform, so it can talk to any clinical data repository (CDR)
+that implements that binding.
 
 [Which CDR →](workflow.md#which-cdr)
+
+</div>
+
+<div class="product-card" markdown="1">
+
+### Who it is for
+
+Go developers meeting openEHR, and openEHR developers meeting Go. It was
+written with a few kinds of consumer in mind: benchmark and load tools running
+high-concurrency CRUD, synthetic data seeders that drive bulk Compositions from
+a template, MCP servers that forward the caller's token, federative clients
+that fan out over several CDRs, and SMART-on-openEHR apps with a Go backend.
+
+You do not have to adopt the whole module. If the job only needs one
+building-block package, import that one.
+
+</div>
 
 </div>
 
@@ -61,7 +83,9 @@ binding of that platform (the pin this repository calls openEHR REST
 :material-package-variant:
 
 ### Import only what you use
-RM types, codecs, validation, templates, and AQL are ordinary packages. They do not pull `transport/` or `auth/`. A CI job that validates a Composition never takes a network dependency.
+Reference Model types, codecs, validation, templates, and AQL are ordinary Go
+packages, and none of them reaches for `transport/` or `auth/`. A CI job that
+validates a Composition takes no network dependency.
 
 </div>
 
@@ -70,7 +94,9 @@ RM types, codecs, validation, templates, and AQL are ordinary packages. They do 
 :material-language-go:
 
 ### Idiomatic Go
-The public surface reads like the rest of a Go module: short package names, constructors that return errors, and types you pass around without a framework.
+The public surface reads like any other Go module: short package names,
+constructors that return errors, and plain types you pass around. There is no
+framework to adopt first.
 
 </div>
 
@@ -79,7 +105,9 @@ The public surface reads like the rest of a Go module: short package names, cons
 :material-hexagon-outline:
 
 ### Typed Reference Model
-Compositions and data values are generated Go structs, not maps of strings. You read `c.Name` and `len(c.Content)` after a decode.
+Compositions and data values are generated Go structs, not maps of strings.
+After a decode you read `c.Name` and `len(c.Content)`, and a misspelt field is
+a compile error rather than a surprise at runtime.
 
 </div>
 
@@ -88,7 +116,8 @@ Compositions and data values are generated Go structs, not maps of strings. You 
 :material-file-check:
 
 ### Templates you can check
-Parse an ADL 1.4 OPT, compile it, and validate a Composition against it before anything reaches a CDR.
+Parse an ADL 1.4 operational template (OPT), compile it, and validate a
+Composition against it before anything reaches a CDR.
 
 </div>
 
@@ -97,7 +126,9 @@ Parse an ADL 1.4 OPT, compile it, and validate a Composition against it before a
 :material-code-tags:
 
 ### AQL as data
-Build a query from structs or parse one from text. Lint it before you send it.
+Archetype Query Language (AQL) queries are ordinary values here. Build one from structs
+or parse one from text, then lint it against a compiled template before you
+send it.
 
 </div>
 
@@ -106,7 +137,9 @@ Build a query from structs or parse one from text. Lint it before you send it.
 :material-key-chain:
 
 ### One TokenSource
-SMART-on-openEHR, client credentials, JWT bearer, and HTTP Basic implement one interface. Attach it once, or swap it per request.
+SMART-on-openEHR, client credentials, JWT bearer, and HTTP Basic all implement
+`auth.TokenSource`. Attach one to the client, or override it for a single
+request.
 
 </div>
 
@@ -121,7 +154,8 @@ SMART-on-openEHR, client credentials, JWT bearer, and HTTP Basic implement one i
 :material-cube-outline:
 
 ### Building blocks
-Decode JSON, parse an OPT, validate a Composition, build or lint AQL — no network.
+Decode canonical JSON, parse an OPT, validate a Composition, build or lint AQL.
+None of it goes near the network.
 
 [See the packages](packages.md){ .md-button }
 
@@ -132,7 +166,9 @@ Decode JSON, parse an OPT, validate a Composition, build or lint AQL — no netw
 :material-api:
 
 ### REST client
-Typed leaves for EHR, composition, query, and definition. Point at a mock or a live openEHR REST deployment.
+The REST client packages cover EHR, composition, query, and definition. Point
+them at the in-process mock the examples use, or at a live openEHR REST
+deployment.
 
 [Run an example](examples.md){ .md-button }
 
@@ -156,7 +192,8 @@ if err := canjson.Unmarshal(body, &c); err != nil {
 fmt.Println(c.ArchetypeNodeID, c.Category.Value, len(c.Content))
 ```
 
-Pin the tag: the SDK is pre-1.0. The module floor is Go **1.27.x**.
+Requires Go 1.27 or newer. The SDK is pre-1.0, so pin an exact tag: a minor
+release can change the public API.
 
 [Install →](install.md) · [Examples →](examples.md) · [Go reference →](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go)
 

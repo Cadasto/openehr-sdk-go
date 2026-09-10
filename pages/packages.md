@@ -1,20 +1,21 @@
 ---
 description: >-
   Package map for the openEHR Go SDK — building blocks that stay free of
-  transport, the REST client leaves, auth providers, sandbox, and testkit.
+  transport, the REST client packages, auth providers, sandbox, and testkit.
 ---
 
 # Packages
 
-The module path is `github.com/cadasto/openehr-sdk-go`. The taxonomy below is
-the published layout in
+The module path is `github.com/cadasto/openehr-sdk-go`. The layout below is
+the published one, described in
 [docs/specifications/module-layout.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/specifications/module-layout.md).
 API detail is on [pkg.go.dev](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go).
 
-Landed-versus-planned status, with `REQ` identifiers, is the
+These tables name the packages a consumer imports directly. Internal
+packages and a few narrower helpers are left out; the layout document has the
+full tree. Which parts have landed and which are planned, with their `REQ`
+identifiers, is in the
 [roadmap](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/roadmap.md).
-This page lists what a consumer imports. It does not restate the normative
-requirements.
 
 ## Building blocks (no HTTP)
 
@@ -23,14 +24,15 @@ These packages must remain usable without importing `transport/` or `auth/`
 
 | Import | Role |
 |---|---|
-| `openehr/rm` | Reference Model types, generated from pinned BMM |
+| `openehr/rm` | Reference Model types, generated from the BMM this SDK builds against |
 | `openehr/rm/typereg` | `_type` discriminator → concrete Go type |
+| `openehr/terminology` | openEHR terminology groups and code sets, generated from the openEHR Terminology release |
 | `openehr/serialize/canjson` | Canonical JSON |
 | `openehr/serialize/canxml` | Canonical XML |
 | `openehr/serialize/simplified` | FLAT and STRUCTURED |
 | `openehr/template` | ADL 1.4 operational template parse and paths |
 | `openehr/templatecompile` | Compile an OPT for the builder, validator, and AQL lint |
-| `openehr/validation` | Composition vs OPT; AQL lint entry |
+| `openehr/validation` | Composition against OPT; AQL lint entry |
 | `openehr/instance` | Synthesise an RM instance from a compiled template |
 | `openehr/composition` | OPT-driven Composition builder |
 | `openehr/aql` | AQL builders and request / result models |
@@ -42,10 +44,9 @@ These packages must remain usable without importing `transport/` or `auth/`
 
 ## REST client
 
-Typed leaves over the vendored
-[ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
-pin. Which CDRs this repository records is on
-[Workflow](workflow.md#which-cdr).
+Typed packages over the ITS-REST Release-1.1.0 OpenAPI files kept in this
+repository. [Workflow](workflow.md#which-cdr) lists the CDRs this client has
+been run against.
 
 | Import | Role |
 |---|---|
@@ -56,6 +57,7 @@ pin. Which CDRs this repository records is on
 | `openehr/client/ehr/contribution` | Multi-version commits |
 | `openehr/client/ehr/directory` | Directory / folder |
 | `openehr/client/ehr/ehrstatus` | EHR_STATUS |
+| `openehr/client/ehr/itemtags` | `openehr-item-tag` headers on composition, EHR_STATUS and directory reads and on composition writes (**partial**; the dedicated ITEM_TAG endpoints are deferred) |
 | `openehr/client/query` | Ad-hoc and stored AQL |
 | `openehr/client/definition` | Templates and stored queries |
 | `openehr/client/demographic` | Demographic API (upstream: development) |
@@ -64,7 +66,7 @@ pin. Which CDRs this repository records is on
 
 ## Auth
 
-Generic `auth.TokenSource` at the bottom; providers on top.
+The generic `auth.TokenSource` sits at the bottom; the providers build on it.
 
 | Import | Role |
 |---|---|
@@ -73,6 +75,7 @@ Generic `auth.TokenSource` at the bottom; providers on top.
 | `auth/clientcreds` | OAuth2 client credentials |
 | `auth/jwtbearer` | JWT Bearer (RFC 7523) |
 | `auth/basic` | HTTP Basic |
+| `auth/introspect` | Opt-in RFC 7662 token introspection, for a consumer acting as a resource server |
 
 ## Test and sandbox
 
@@ -80,14 +83,15 @@ Generic `auth.TokenSource` at the bottom; providers on top.
 |---|---|
 | `sandbox` | In-memory openEHR backend (`http.RoundTripper`) |
 | `testkit/probe` | Shared probe result type and catalog runner |
-| `testkit/cassettes` | Vendored fixture documents (bodies, not HTTP recordings) |
+| `testkit/cassettes` | Fixture documents kept in the repository (bodies, not HTTP recordings) |
 | `testkit/recordings` | Cassette-mode HAR 1.2 recordings |
 
 ## Cadasto extras
 
-Shipped in the same module behind a `cadasto/` cut line. Most of this surface
-is **planned**; `cadasto/admin` has health probes today (**partial**). Do not
-treat these as the openEHR REST contract.
+The `cadasto/` packages ship in the same module, kept separate so they can
+move to their own module later. Most of the surface is **planned**;
+`cadasto/admin` has health probes today. None of it is part of the openEHR
+REST contract.
 
 | Import | Maturity |
 |---|---|
@@ -96,10 +100,3 @@ treat these as the openEHR REST contract.
 | `cadasto/datamap` | **planned** |
 | `cadasto/mpi` | **planned** |
 | `cadasto/care` | **planned** |
-
-## Who it was built for
-
-The README names the intended consumers: benchmark and load tools, synthetic
-data seeders, MCP servers that forward the caller's token, federative clients
-over several backends, and SMART-on-openEHR apps with a Go backend. Importing
-one building-block package is enough if that is all the job needs.

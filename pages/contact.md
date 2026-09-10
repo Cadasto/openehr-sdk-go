@@ -7,7 +7,8 @@ description: >-
 # Contact
 
 The openEHR Go SDK is a [Cadasto](https://www.cadasto.com/) product. Cadasto's
-[About](https://www.cadasto.com/about-us/) page states the position behind it.
+[About](https://www.cadasto.com/about-us/) page introduces the company behind
+it.
 
 ## Email
 
@@ -15,15 +16,15 @@ Write to [info@cadasto.com](mailto:info@cadasto.com).
 
 ## Sales enquiries
 
-Cadasto sells only through authorised resellers, so there is no direct sale. Use
-the [form on cadasto.com](https://www.cadasto.com/contact/) to get a reply from
-Cadasto or from the reseller for your region — this site has no form.
+Cadasto sells only through authorised resellers, so there is no direct sale.
+Use the [form on cadasto.com](https://www.cadasto.com/contact/) to reach
+Cadasto or the reseller for your region. This site carries no form of its own.
 
 ## Product issues
 
 Bugs, questions about the SDK, and pull requests belong in
 [cadasto/openehr-sdk-go](https://github.com/cadasto/openehr-sdk-go).
-[Contributing](contributing.md) is the short path.
+[Contributing](contributing.md) is the short path to building and testing it.
 
 ## Company
 

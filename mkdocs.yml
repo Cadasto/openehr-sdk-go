@@ -4,7 +4,7 @@ site_url: https://cadasto.github.io/openehr-sdk-go/
 # which the theme and the social-card generator both prefer. This is what a page
 # added without one would inherit, and what 404.html shows.
 site_description: >-
-  A first-party Go SDK for openEHR — typed Reference Model, canonical codecs,
+  Cadasto's Go SDK for openEHR — typed Reference Model, canonical codecs,
   OPT-driven compositions, AQL, and SMART-on-openEHR auth. Building blocks
   import without the HTTP client.
 repo_url: https://github.com/cadasto/openehr-sdk-go
@@ -74,9 +74,9 @@ copyright: Cadasto B.V. · MIT License
 nav:
   - Home: index.md
   - Install: install.md
+  - Workflow: workflow.md
   - Examples: examples.md
   - Packages: packages.md
-  - Workflow: workflow.md
   - Go reference: reference.md
   - Contributing: contributing.md
   - Contact: contact.md
