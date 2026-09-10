@@ -1,0 +1,47 @@
+{
+  "$comment": [
+    "The brand layer is pulled at build time so this repository never",
+    "keeps a second copy of Cadasto/docs-theme. Bump `theme.ref` when a",
+    "docs-theme release should land here — `make docs-sync` then refreshes",
+    "the copies and the build uses them. `sources` is empty: the install",
+    "and example prose is authored in this repo (`pages/`, `docs/`), not",
+    "fetched from another product."
+  ],
+  "theme": {
+    "$comment": [
+      "Cadasto/docs-theme files written onto their live MkDocs paths. Those",
+      "destinations are gitignored. `ref` is the commit a release tag points",
+      "at rather than the tag itself: two of these files are Jinja templates",
+      "that the build executes, docs-site.yml rebuilds weekly on a schedule,",
+      "and a tag can be moved — so a tag would let the published site change",
+      "with nothing in this repository recording it. To pick up a brand",
+      "release, resolve its tag to a commit and replace `ref`:",
+      "  gh api repos/Cadasto/docs-theme/commits/<tag> --jq .sha",
+      "(use that, not git/ref/tags — for an annotated tag the latter",
+      "returns the tag object's sha, which raw.githubusercontent 404s.)",
+      "`ref_tag` is documentation only; the sync script does not read it.",
+      "Each file also records the `sha256` of its bytes at that commit. The",
+      "sync refuses any fetched or cached copy that hashes differently, so a",
+      "file moved upstream or a corrupted transfer fails the build instead of",
+      "shipping. `make docs-sync` names the digest it expected on a mismatch."
+    ],
+    "repo": "Cadasto/docs-theme",
+    "ref": "1b584211501367c23efd247e8b2ac42d744f5ef5",
+    "ref_tag": "v0.3.0",
+    "files": [
+      {"path": "tokens.css", "dest": "pages/stylesheets/tokens.css",
+       "sha256": "bbb05189c66380c0d527b6004b1e2a78f94f4149f9fd0fe9fd54d46567675d32"},
+      {"path": "material.css", "dest": "pages/stylesheets/material.css",
+       "sha256": "d67e7f73fafbdb9b42766fc84193b40abc74d7283cc14ac273f3e6352566f117"},
+      {"path": "landing.css", "dest": "pages/stylesheets/landing.css",
+       "sha256": "c748a3dae97edf0b13991e549101ac65e22802a8d7e35a00a0033746f9ae2973"},
+      {"path": "overrides/home.html", "dest": "overrides/home.html",
+       "sha256": "c59fc6911c2a711496136e28e8821de1bcb18de1373fb59f2464bb487a48676f"},
+      {"path": "overrides/partials/copyright.html", "dest": "overrides/partials/copyright.html",
+       "sha256": "3362f546bc4289c1c69d7e35b5407b21dde4f9428a5996d416024888404b10ae"},
+      {"path": "assets/cadasto-mark.png", "dest": "pages/assets/cadasto-mark.png",
+       "sha256": "f982c8ddf03346ce614d636588f34e8c33f356c08cd892933b6f7c42f9645b75"}
+    ]
+  },
+  "sources": []
+}

@@ -1,0 +1,34 @@
+{#-
+  The theme's own `main.html` is nothing but `{% extends "base.html" %}`, so
+  replacing it loses no theme content. `home.html` extends this file, which is
+  why the landing page picks the structured data up too.
+
+  Emitted on the landing page only: it describes the product, and repeating a
+  product claim on every documentation page would be noise to a parser rather
+  than a stronger signal.
+-#}
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  {%- if page and page.is_homepage %}
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": {{ config.site_name | tojson }},
+        "url": {{ config.site_url | tojson }},
+        "description": {{ config.site_description | trim | tojson }},
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Any",
+        "license": "https://spdx.org/licenses/MIT.html",
+        "codeRepository": "https://github.com/cadasto/openehr-sdk-go",
+        "author": {
+          "@type": "Organization",
+          "name": "Cadasto B.V.",
+          "url": "https://www.cadasto.com/"
+        }
+      }
+    </script>
+  {%- endif %}
+{% endblock %}

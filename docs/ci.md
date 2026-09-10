@@ -10,6 +10,8 @@ How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks loca
 | **CodeQL** | GitHub [default setup](https://docs.github.com/en/code-security/code-scanning/enabling-code-scanning/configuring-default-setup-for-code-scanning) (no in-repo workflow) | Every pull request and every push to `main` (plus GitHub's periodic re-scan), for Go and Actions. Findings appear under **Security → Code scanning** |
 | **Codegen drift** | [`.github/workflows/codegen-drift.yml`](../.github/workflows/codegen-drift.yml) | Mondays 06:00 UTC; `workflow_dispatch` |
 | **Release** | [`.github/workflows/release.yml`](../.github/workflows/release.yml) | Push of a `v*` tag; `workflow_dispatch` dry-run. Process in [releases.md](releases.md) |
+| **Docs CI** | [`.github/workflows/docs-ci.yml`](../.github/workflows/docs-ci.yml) | Every pull request into `main`; `workflow_dispatch`. Runs `make docs-check` |
+| **Docs site** | [`.github/workflows/docs-site.yml`](../.github/workflows/docs-site.yml) | Push to `main`; Mondays 06:00 UTC; `workflow_dispatch`. Builds the MkDocs site and deploys it to GitHub Pages once the repository's Pages source is set to GitHub Actions, which is not enabled yet (as of 2026-09-10) |
 
 ### CI jobs (`ci.yml`)
 
@@ -39,9 +41,11 @@ This complements PR CI: it catches generator-template drift between human-driven
 ## Local reproduction
 
 ```bash
-make doctor    # toolchain diagnosis
-make ci        # full PR gate (fmt, mod tidy, vet, test, lint, spec-check, fixture integrity, build)
-make test-race # optional; matches main-branch Race job
+make doctor      # toolchain diagnosis
+make ci          # full PR gate (fmt, mod tidy, vet, test, lint, spec-check, fixture integrity, build)
+make test-race   # optional; matches main-branch Race job
+make docs-serve  # documentation site on http://127.0.0.1:8000 (needs Docker)
+make docs-check  # strict MkDocs build plus the published-output assertions
 ```
 
 Run `make help` for the full grouped list. Common targets:
@@ -57,6 +61,8 @@ Run `make help` for the full grouped list. Common targets:
 | Codegen | `make aqlgen-verify` | Committed AQL parser matches `resources/aql/grammar/active/` (needs Docker) |
 | Codegen | `make termgen-verify` | `openehr/terminology/openehr_gen.go` matches the pinned `resources/terminology/openehr_terminology.xml`; regenerate with `make termgen` |
 | Specs | `make spec-check` | `docs/specifications/traceability.yaml` paths and probes match the tree |
+| Docs | `make docs-check` | Strict MkDocs build plus published-output assertions (needs Docker; fetches docs-theme). The `go get` tag it asserts on the install and landing pages is read from the first release heading in [`CHANGELOG.md`](../CHANGELOG.md); `DOCS_SYNC=docs-sync-offline` builds from the cached brand layer instead of refetching |
+| Docs | `make docs-serve` | Live preview on `http://127.0.0.1:8000` |
 | Fixtures | `make flat-conformance-verify` | Offline `sha256` integrity of the pinned upstream FLAT corpus against its `MANIFEST.txt`; no network and no `curl`/`jq` needed, so it is safe in the gate. Catches a hand-edit to a vendored fixture whose whole value is being byte-identical to upstream |
 | Fixtures | `make flat-conformance-check` | The above **plus** a best-effort upstream-drift report (needs network; degrades with a note when offline). Dev helper, not a CI gate |
 | Fixtures | `make terminology-verify` | Offline `sha256` integrity of the pinned openEHR Terminology against its `MANIFEST.txt` |

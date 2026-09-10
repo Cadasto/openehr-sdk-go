@@ -76,7 +76,7 @@ The definitive landed-vs-planned status, with REQ and PROBE identifiers, is in t
 
 ## Getting started
 
-Start with [quick-start.md](docs/quick-start.md), then the runnable catalog in [examples.md](docs/examples.md). quick-start covers toolchain setup, whether you have host Go or use the Docker fallback.
+Start with [quick-start.md](docs/quick-start.md), then the runnable catalog in [examples.md](docs/examples.md). quick-start covers toolchain setup, whether you have host Go or use the Docker fallback. Preview the documentation site locally with `make docs-serve`; `make docs-check` gates it on every pull request, and [`docs-site.yml`](.github/workflows/docs-site.yml) deploys it from `main` to [cadasto.github.io/openehr-sdk-go](https://cadasto.github.io/openehr-sdk-go/) once the repository's Pages source is set to GitHub Actions, which is not enabled yet (as of 2026-09-10).
 
 If you're working on the SDK itself, `make help` lists the grouped targets and [ci.md](docs/ci.md) explains the PR gate.
 
