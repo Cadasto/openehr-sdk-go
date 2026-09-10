@@ -1,0 +1,42 @@
+# openEHR Go SDK
+
+> A first-party Go SDK for openEHR. It covers the openEHR REST API, the
+> Reference Model as typed Go structs, building and validating Compositions from
+> operational templates, AQL, and SMART-on-openEHR authentication. Building-block
+> packages (RM, codecs, validation, templates, AQL) import without the HTTP
+> client or auth.
+
+The module path is `github.com/cadasto/openehr-sdk-go`. The module floor is Go
+1.27.x. The SDK is pre-1.0: pin an exact tag. The specification in the
+repository is the source of truth; when code and a spec disagree, the spec wins.
+MIT-licensed, developed by Cadasto B.V.
+
+Runnable programs live under `cmd/examples/` and work offline.
+
+## Documentation
+
+- [Install](https://cadasto.github.io/openehr-sdk-go/install/): `go get`, the
+  Go 1.27.x floor, building-block path vs REST client path.
+- [Examples](https://cadasto.github.io/openehr-sdk-go/examples/): Showcase
+  programs and the full `cmd/examples/` catalog.
+- [Packages](https://cadasto.github.io/openehr-sdk-go/packages/): Import map for
+  building blocks, REST leaves, auth, sandbox, and Cadasto extras.
+- [Go reference](https://cadasto.github.io/openehr-sdk-go/reference/):
+  Redirects to the generated API on
+  [pkg.go.dev](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go).
+- [Contributing](https://cadasto.github.io/openehr-sdk-go/contributing/):
+  `make ci`, the specification-driven loop, and the docs-site targets.
+- [Contact](https://cadasto.github.io/openehr-sdk-go/contact/): Cadasto B.V.
+  email, reseller sales route, and registered details.
+
+## Canonical sources in the repository
+
+- [docs/quick-start.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/quick-start.md)
+- [docs/examples.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md)
+- [docs/specifications/](https://github.com/cadasto/openehr-sdk-go/tree/main/docs/specifications)
+- [Go reference](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go)
+
+## Optional
+
+- [openEHR specifications](https://specifications.openehr.org/)
+- [Cadasto](https://www.cadasto.com/)

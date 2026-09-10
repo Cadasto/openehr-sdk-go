@@ -1,0 +1,104 @@
+site_name: openEHR Go SDK
+site_url: https://cadasto.github.io/openehr-sdk-go/
+# Fallback only: every page in `nav` carries its own `description` front matter,
+# which the theme and the social-card generator both prefer. This is what a page
+# added without one would inherit, and what 404.html shows.
+site_description: >-
+  A first-party Go SDK for openEHR — typed Reference Model, canonical codecs,
+  OPT-driven compositions, AQL, and SMART-on-openEHR auth. Building blocks
+  import without the HTTP client.
+repo_url: https://github.com/cadasto/openehr-sdk-go
+repo_name: cadasto/openehr-sdk-go
+
+docs_dir: pages
+
+# Warnings are build failures. Both `make docs-build` and CI rely on this rather
+# than passing --strict, so the two can never diverge.
+strict: true
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: warn
+    unrecognized_links: warn
+
+theme:
+  name: material
+  custom_dir: overrides
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  palette:
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  font: false
+  features:
+    - navigation.tabs
+    - navigation.top
+    - content.code.copy
+    - toc.integrate
+
+extra_css:
+  - https://fonts.googleapis.com/css2?family=Fira+Sans:wght@500;700&family=Roboto:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Roboto+Mono:ital,wght@0,400;0,700;1,400&display=swap
+  - stylesheets/tokens.css
+  - stylesheets/material.css
+  - stylesheets/landing.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/cadasto/openehr-sdk-go
+    - icon: fontawesome/brands/golang
+      link: https://pkg.go.dev/github.com/cadasto/openehr-sdk-go
+    - icon: fontawesome/solid/globe
+      link: https://www.cadasto.com
+  generator: false
+
+copyright: Cadasto B.V. · MIT License
+
+nav:
+  - Home: index.md
+  - Install: install.md
+  - Examples: examples.md
+  - Packages: packages.md
+  - Go reference: reference.md
+  - Contributing: contributing.md
+  - Contact: contact.md
+
+plugins:
+  - search
+  - social:
+      cards_layout_options:
+        font_family: Roboto
+        background_color: "#070e2b"
+        color: "#ffffff"
+  - privacy
+
+markdown_extensions:
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.snippets:
+      base_path: ['.fetched']
+      check_paths: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html

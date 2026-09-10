@@ -1,0 +1,16 @@
+{#-
+  Instant hop to an external URL from page.meta.redirect. Used by the
+  Go reference nav entry so /reference/ is a real site path that lands
+  on pkg.go.dev.
+-#}
+{% extends "main.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  {%- set dest = page.meta.redirect %}
+  {%- if dest %}
+    <meta http-equiv="refresh" content="0;url={{ dest }}">
+    <link rel="canonical" href="{{ dest }}">
+    <script>location.replace({{ dest | tojson }})</script>
+  {%- endif %}
+{% endblock %}
