@@ -18,7 +18,7 @@ in the repository. This page is the showcase — start here.
 Fixture paths resolve relative to the source file, so each `go run` works from
 any working directory inside a clone.
 
-## canonical_json
+## Decode canonical JSON {#canonical_json}
 
 Smallest building-block path: decode vendored canonical JSON into a typed
 `rm.Composition`. No transport, no auth.
@@ -40,7 +40,7 @@ OK: canonical-JSON Composition decoded from body_weight.json
 Packages: `openehr/rm`, `openehr/serialize/canjson`. Fixture:
 `testkit/cassettes/compositions/body_weight.json`.
 
-## validate-from-json
+## Validate JSON against a template {#validate-from-json}
 
 CI shape: bytes → RM → compiled OPT → validation issues.
 
@@ -51,7 +51,7 @@ go run ./cmd/examples/validate-from-json
 Packages: `canjson`, `template`, `validation`. Prints `OK` or the constraint
 violations.
 
-## aql-build
+## Build an AQL query {#aql-build}
 
 Struct builder and verb functions emit the same AQL string.
 
@@ -62,7 +62,7 @@ go run ./cmd/examples/aql-build
 Packages: `openehr/aql`. Use this when the query is assembled in code rather
 than pasted as text.
 
-## ehr_create {#ehr_create}
+## Create an EHR {#create-an-ehr}
 
 Smallest REST create: a static catalog, an injected client, `ehr.Create`.
 The example stands up an in-process handler — no listener, no credentials.
@@ -77,21 +77,21 @@ call through `sandbox.Backend` as the transport, see
 
 ## The rest of the catalog
 
-| Example | Network | Demonstrates |
-|---|---|---|
-| [canxml_roundtrip](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/canxml_roundtrip) | No | JSON ↔ XML cross-format invariant |
-| [opt-parse](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/opt-parse) | No | Parse ADL 1.4 OPT, walk paths |
-| [primitive-validate](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/primitive-validate) | No | Primitive constraint validation |
-| [validate-composition](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/validate-composition) | No | In-memory composition vs OPT |
-| [generate-example](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/generate-example) | No | OPT → synthesised RM instance → JSON |
-| [aql-parse-structured](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/aql-parse-structured) | No | Parse AQL → structured AST + emit |
-| [lint-aql](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/lint-aql) | No | AQL static lint + `ValidateAQL` |
-| [compile-build-validate](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/compile-build-validate) | No | Public compile → build → validate |
-| [template-explore](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/template-explore) | No | Compiled OPT structure + leaf paths |
-| [webtemplate-export](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/webtemplate-export) | No | Compiled OPT → EHRbase WebTemplate JSON |
-| [flat-roundtrip](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/flat-roundtrip) | No | COMPOSITION ↔ FLAT / STRUCTURED |
-| [contribution-build](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/contribution-build) | Optional mock | Fluent `Contribution_create` assembly |
-| [smart-launch](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/smart-launch) | Mock | Standalone PKCE launch; state + verifier persistence |
+| Example | Program | Network | Demonstrates |
+|---|---|---|---|
+| [JSON and XML round-trip](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/canxml_roundtrip) | `canxml_roundtrip` | No | JSON ↔ XML cross-format invariant |
+| [Parse an operational template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/opt-parse) | `opt-parse` | No | Parse ADL 1.4 OPT, walk paths |
+| [Validate primitive constraints](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/primitive-validate) | `primitive-validate` | No | Primitive constraint validation |
+| [Validate a composition against a template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/validate-composition) | `validate-composition` | No | In-memory composition vs OPT |
+| [Synthesise a composition from a template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/generate-example) | `generate-example` | No | OPT → synthesised RM instance → JSON |
+| [Parse AQL into a structured tree](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/aql-parse-structured) | `aql-parse-structured` | No | Parse AQL → structured AST + emit |
+| [Lint an AQL query](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/lint-aql) | `lint-aql` | No | AQL static lint + `ValidateAQL` |
+| [Compile, build, and validate](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/compile-build-validate) | `compile-build-validate` | No | Public compile → build → validate |
+| [Explore a compiled template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/template-explore) | `template-explore` | No | Compiled OPT structure + leaf paths |
+| [Export a Web Template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/webtemplate-export) | `webtemplate-export` | No | Compiled OPT → EHRbase WebTemplate JSON |
+| [FLAT and STRUCTURED round-trip](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/flat-roundtrip) | `flat-roundtrip` | No | COMPOSITION ↔ FLAT / STRUCTURED |
+| [Build a contribution](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/contribution-build) | `contribution-build` | Optional mock | Fluent `Contribution_create` assembly |
+| [Run a SMART PKCE launch](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/smart-launch) | `smart-launch` | Mock | Standalone PKCE launch; state + verifier persistence |
 
 Build every example:
 
@@ -99,5 +99,6 @@ Build every example:
 go build ./cmd/examples/...
 ```
 
-Suggested order if you are new: `canonical_json` → `validate-from-json` →
-`aql-build` → `ehr_create` → `smart-launch`.
+Suggested order if you are new: Decode canonical JSON → Validate JSON
+against a template → Build an AQL query → Create an EHR → Run a SMART
+PKCE launch.
