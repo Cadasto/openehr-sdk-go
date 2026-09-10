@@ -11,10 +11,11 @@ content is modelled on two levels: the
 [Reference Model](https://specifications.openehr.org/releases/RM/development/ehr.html)
 plus archetypes that constrain it. Platform operations are in the
 [Service Model](https://specifications.openehr.org/releases/SM/development/openehr_platform.html).
-This SDK is a Go client for the
-[ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
-Release-1.1.0 binding, so any clinical data repository (CDR) implementing that
-binding is a target. Live probes are opt-in and can point at EHRbase
+This SDK is a Go client for that platform's REST binding,
+[ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/).
+Its typed clients are written against the Release-1.1.0 OpenAPI files vendored
+in the repository, so any clinical data repository (CDR) implementing them is a
+target. Live probes are opt-in and can point at EHRbase
 (`OPENEHR_LIVE_EHRBASE`) or FerroEHR (`OPENEHR_LIVE_FERROEHR`); the
 per-deployment notes are on Workflow.
 

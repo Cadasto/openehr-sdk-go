@@ -146,13 +146,16 @@ no compatibility matrix.
 `make test` never dials a CDR. The Live probes skip unless you set the
 variables below.
 
+The [roadmap](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/roadmap.md#deployment-targets)
+tracks the status of each target; this table says how to point the SDK at one.
+
 | Deployment | Notes |
 |---|---|
-| **openEHR REST** | The contract is ITS-REST Release-1.1.0. The OpenAPI files are in [`resources/its-rest/`](https://github.com/cadasto/openehr-sdk-go/blob/main/resources/its-rest/README.md). |
+| **openEHR REST** | The client is written against the ITS-REST Release-1.1.0 OpenAPI files in [`resources/its-rest/`](https://github.com/cadasto/openehr-sdk-go/blob/main/resources/its-rest/README.md). The SDK's pinned contract version is `1.1.0-development` ([REQ-050](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/specifications/wire.md#req-050)): by default the discovery resolver rejects a required service that advertises a different `spec_version`, and `discovery.WithAcceptedSpecVersions` widens the accepted set. |
 | **Cadasto** | Cadasto B.V. writes this SDK. Point the client at a Cadasto CDR the same way as any other ITS-REST base. The extra APIs under `cadasto/` are listed on [Packages](packages.md#cadasto-extras). |
 | **EHRbase** | Web Template export and the FLAT codec follow the EHRbase reference implementation ([ADR 0014](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/adr/0014-webtemplate-reference-implementation-lock.md)). Set `OPENEHR_LIVE_EHRBASE` to run the Live probes against an instance; we have run the opt-in Live snapshots against EHRbase 2.35.1 locally, and they are not part of CI. |
 | **FerroEHR** | Set `OPENEHR_LIVE_FERROEHR` to name the deployment and `OPENEHR_LIVE_FERROEHR_BASIC` to carry its `user:pass` credential, then run the Live probes. They are not part of CI. |
-| **Better Platform** | **Work in progress.** There is no Live probe yet. Web Template export emits EHRbase ids (`blood_pressure`) rather than Better camelCase ids (`bloodPressure`) — [ADR 0014](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/adr/0014-webtemplate-reference-implementation-lock.md). |
+| **Better Platform** | There is no Live probe yet. Web Template export emits EHRbase ids (`blood_pressure`) rather than Better camelCase ids (`bloodPressure`) — [ADR 0014](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/adr/0014-webtemplate-reference-implementation-lock.md). |
 
 ## Terms on this page
 

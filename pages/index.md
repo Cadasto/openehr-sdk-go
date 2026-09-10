@@ -48,10 +48,11 @@ that every record shares, and archetypes that constrain it for one purpose.
 Creating an EHR, uploading a template, running a query — those platform
 operations come from the
 [Service Model](https://specifications.openehr.org/releases/SM/development/openehr_platform.html).
-This SDK is a Go client for the
-[ITS-REST Release-1.1.0](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
-binding of that platform, so it can talk to any clinical data repository (CDR)
-that implements that binding.
+This SDK is a Go client for that platform's REST binding,
+[ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/).
+Its typed clients are written against the Release-1.1.0 OpenAPI files vendored
+in the repository, so it can talk to any clinical data repository (CDR) that
+implements them.
 
 [Which CDR →](workflow.md#which-cdr)
 
