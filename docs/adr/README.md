@@ -26,5 +26,7 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | [0018](0018-raw-bytes-on-decode-error.md) | Raw response bytes on the typed 2xx decode error | Accepted (2026-08-30) |
 | [0019](0019-definition-timestamp-tolerance.md) | Definition metadata timestamps: a closed tolerant layout set on decode, RFC 3339 on encode | Accepted (2026-08-30) |
 | [0020](0020-cassette-recording-har.md) | Cassette recordings are HTTP Archive 1.2 | Accepted (2026-09-07) |
+| [0021](0021-json-member-order-not-a-contract.md) | Encoded JSON member order is not part of the canonical JSON contract | Accepted (2026-09-14) |
+| [0022](0022-canonical-json-encoding-json-v2.md) | Canonical JSON is encoded by `encoding/json/v2` | Accepted (2026-09-14) |
 
 See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.

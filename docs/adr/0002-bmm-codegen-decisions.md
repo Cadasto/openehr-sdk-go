@@ -41,12 +41,30 @@ Every BMM `function` becomes a Go method whose body is `panic("not implemented: 
 
 A curated set ([`internal/bmmgen/manual_impl.go`](../../internal/bmmgen/manual_impl.go)), keyed `OWNER.function` on the BMM declaring class, lists functions that are hand-written in a non-generated file. `renderFunctions` skips stub emission for those keys at both emit sites (the abstract-descendant loop and the concrete / abstract-generic loop), so a hand-written method does not collide with a generated panic stub (`method redeclared`). A declaring-owner key (e.g. `UID_BASED_ID.root`, `PATHABLE.item_at_path`) suppresses the stub on every concrete descendant at once. This realises the [ADR 0011](0011-rm-behavioural-functions-surface.md) surface for REQ-120..123; functions absent from the set keep emitting fail-loud stubs (D6).
 
+### D8 — The generator emits no bespoke JSON codec methods
+
+Superseding the emission policy `internal/bmmgen/render_jsonmar.go` and `internal/bmmgen/render_jsonunmar.go` implemented, the generator no longer emits a `MarshalJSON` / `UnmarshalJSON` pair per generated type. Canonical JSON is produced and consumed by `encoding/json/v2` ([ADR 0022](0022-canonical-json-encoding-json-v2.md)), and the properties the bespoke methods supplied are obtained as follows.
+
+| Property | Was | Is |
+|---|---|---|
+| `_type` on every concrete RM value | hand-rolled prologue in each generated `MarshalJSON` | a generated `MarshalJSONTo` calling `json.MarshalEncode` on an anonymous struct whose first field is `_type` and whose second embeds a method-free alias of the class |
+| `_type` on a value held in an interface | `openehr/internal/jsonpoly` (80 lines, 177 call sites) | nothing. v2 calls a pointer-receiver marshaler regardless of addressability (`go doc encoding/json` § Migrating to v2) |
+| Polymorphic dispatch at a substitutable slot | `typereg.DecodeAs[T]` called from each generated `UnmarshalJSON` | one `json.UnmarshalFromFunc` per polymorphic interface, built from `typereg.Default` at init and supplied through `json.WithUnmarshalers`. Every hook **MUST** pass `dec.Options()` into any nested decode, or a deeper interface slot silently loses its hook |
+| Member order | struct field order, fixed by emission order | not a contract ([REQ-052](../specifications/wire.md#req-052)); `_type` first is a SHOULD, and `Hash` sorting is `json.Deterministic(true)` set by the generated marshaler |
+| Zero versus omit | `omitempty` on every generated tag | `omitzero` on pointer fields; `omitempty` retained on container fields. See the warning below |
+| Shape-failure classification (`canjson.ErrInvalidShape`) | `typereg.WrapShapeError` at each generated funnel | one shared runtime helper called by every generated `UnmarshalJSONFrom`, so 110 copies of the classification collapse into one. The sentinel's contract stays [REQ-052](../specifications/wire.md#req-052) § Decode-side shape sentinel, not this ADR's |
+| Nil-receiver refusal (REQ-025) | first statement of each generated `UnmarshalJSON` (`internal/bmmgen/render_jsonunmar.go:345`) | first statement of each generated `UnmarshalJSONFrom`, unchanged in force |
+
+The invariant D8 asserts: **no per-type JSON codec logic is generated into `openehr/rm/*_gen.go` or `openehr/aom/aom14/*_gen.go` beyond the two-method delegation above.**
+
+**Warning, on the `omitzero` row.** `go doc encoding/json` § Migrating to v2 recommends migrating `omitempty` to `omitzero` for a bool, number, pointer or interface value, and that is right for the 42 `*string`, 16 `*bool`, 23 pointer-to-number, 6 `*map[string]T` and 5 `*any` fields the generator emits. It is wrong for container fields. v2's `omitempty` omits a field that encodes as an empty JSON value, so a nil slice and a non-nil empty slice are both omitted, which is the collapse `wire.md:112` documents and `TestDVTextMappingsDecodePresenceAndEncodeCollapse` pins. Under `omitzero` a non-nil empty slice is not zero and would emit `[]`, which `wire.md:112` states would be RM-invalid (`Mappings_valid`). A blanket sweep would break an RM invariant silently.
+
 ## Consequences
 
 - Consumers construct COMPOSITION values from a single `rm` import; no six-package import fan-out.
 - Calling unimplemented BMM functions panics by design — see package doc on `openehr/rm`.
 - `make test` chains `codegen-verify`; hand-edits to `*_gen.go` fail CI.
-- `Event[T]` cassette decode required the codec-facing-interface policy change recorded in [ADR 0003](0003-rm-event-polymorphism.md), now accepted. D4 is narrowed accordingly: abstract generic → struct only when no concrete descendants exist; classes in `bmmgen.codecPolymorphicAbstractGenericNames` (EVENT today) emit as Go interfaces instead.
+- [ADR 0003](0003-rm-event-polymorphism.md)'s whitelist stands, and its justification is re-homed. It was adopted because `encoding/json` could not select a concrete shape at `HISTORY.events` and the generated `UnmarshalJSON` copied the slice without dispatch. With D8 that generated method is gone, so the *codec* argument no longer applies, but the *type-shape* decision does: `History[T].Events` is `[]Event`, an interface slice, and that is the Go API the SDK ships. The whitelist is a public-surface decision now, not a codec workaround, so changing it would be a breaking API change rather than a codec tuning knob.
 
 ## References
 
