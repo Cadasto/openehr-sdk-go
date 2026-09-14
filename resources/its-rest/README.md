@@ -53,6 +53,12 @@ make its-rest-check         # verify local copies + report if upstream advanced
 
 A version bump is an explicit, reviewable commit (diff the YAML + `MANIFEST.txt`).
 
+The public documentation site names this tag: `pages/index.md`,
+`pages/workflow.md`, `pages/packages.md` and `pages/llms.txt` all carry it, and
+`make docs-check` fails when the landing page or the workflow page stops naming
+the `ref:` recorded in `MANIFEST.txt`. A re-pin therefore updates those pages in
+the same commit.
+
 ## Licence
 
 Each file declares **Creative Commons Attribution-NoDerivs 3.0 Unported**

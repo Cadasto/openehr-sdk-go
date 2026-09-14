@@ -1,0 +1,25 @@
+name: Docs CI
+
+# Verification only — never publishes. This is the gate on PRs into main, so a
+# broken site is caught before the merge that triggers docs-site.yml's deploy.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and verify the site
+        run: make docs-check

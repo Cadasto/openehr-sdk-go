@@ -1,0 +1,18 @@
+{#-
+  Instant hop to an external URL from page.meta.redirect. Used by the
+  Go reference nav entry so /reference/ is a real site path that lands
+  on pkg.go.dev.
+-#}
+{% extends "main.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  {%- set dest = page.meta.redirect %}
+  {%- if dest %}
+    {#- No <link rel="canonical"> here: Material already emits a self-
+        canonical before this block, and a second, conflicting one makes
+        search engines discard both. -#}
+    <meta http-equiv="refresh" content="0;url={{ dest | e }}">
+    <script>location.replace({{ dest | tojson }})</script>
+  {%- endif %}
+{% endblock %}

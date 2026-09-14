@@ -37,7 +37,7 @@ Each stage groups several deliverables; a stage is only as done as its weakest r
 | **3 — Deployment & adoption** | Application SMART (`smart/` AppContext) on discovery | **Partial** |
 | | EHRbase CDR support | **Partial** |
 | | Worked examples (`cmd/examples/`) | **Landed** |
-| | Documentation website | **Planned** |
+| | Documentation website | **Landed** |
 | **4 — Platform extras & ADL 2** | Cadasto extras (`cadasto/*`) | **Planned** |
 | | ADL 2 / AOM 2.4 — codegen and the Definition ADL 2 format | **Deferred** |
 | **5 — Conformance ratification** | Sandbox transport + probe runner | **Partial** |
@@ -145,6 +145,8 @@ Deferred Tier-3 gaps — dedicated ITEM_TAG endpoints, `VERSIONED_*` read famili
 | Target | Status | Notes |
 |---|---|---|
 | EHRbase CDR | **Partial** | WebTemplate export matches `openEHR_SDK` v2.3 (PROBE-075) and the FLAT codec round-trips EHRbase's own corpus at 80.4% (PROBE-086). EHRbase-only admin helpers (`PurgeTemplates`) are documented as deployment extensions (REQ-099), not as a second OpenAPI pin. Ratification against a **running** deployment is open — see stage 5 |
+| FerroEHR | **Partial** | Live probe target: `OPENEHR_LIVE_FERROEHR` names the deployment and `OPENEHR_LIVE_FERROEHR_BASIC` carries its `user:pass` credential ([`testkit/probe/live_test.go`](../testkit/probe/live_test.go)); the Cassette replay key strips its `/ferroehr/rest/openehr/v1` base ([`testkit/probe/replay.go`](../testkit/probe/replay.go)). Opt-in, not run in CI; no Live snapshot recorded yet |
+| Better Platform | **Deferred** | No Live probe target. Web Template export emits EHRbase ids (`blood_pressure`); the Better camelCase variant (`bloodPressure`) is not produced ([ADR 0014](adr/0014-webtemplate-reference-implementation-lock.md)) |
 | Any ITS-REST 1.1.0 CDR | **Partial** | The clients target the vendored [`resources/its-rest/`](../resources/its-rest/README.md) pin; conformance is asserted in Sandbox, not yet against a live third-party CDR |
 | Static / non-discovering backend | **Landed** | Build a `discovery.ServiceCatalog` by hand — no base-URL parameter (REQ-070); see [quick-start.md](quick-start.md) |
 
@@ -196,7 +198,7 @@ Deferred Tier-3 gaps — dedicated ITEM_TAG endpoints, `VERSIONED_*` read famili
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | Codegen and BMM-corpus diff tooling |
 | Developer onboarding | **Landed** | [quick-start.md](quick-start.md) — install, two integration paths, REST wiring |
 | Worked examples | **Landed** | [`cmd/examples/`](../cmd/examples/) — 17 runnable programs, catalogued in [examples.md](examples.md) (the single list) |
-| Documentation website | **Planned** | No site generator in the tree yet; docs are read from `docs/` and on GitHub |
+| Documentation website | **Landed** | Material for MkDocs site under [`pages/`](../pages/). `make docs-check` builds it and gates it on every pull request ([`docs-ci.yml`](../.github/workflows/docs-ci.yml)); [`docs-site.yml`](../.github/workflows/docs-site.yml) deploys it to GitHub Pages from `main` once the repository's Pages source is set to GitHub Actions, which is not enabled yet (as of 2026-09-10). The repository's `docs/` stays the canonical source and the site links into it |
 
 ---
 

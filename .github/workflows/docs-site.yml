@@ -1,0 +1,54 @@
+name: Docs site
+
+# Publishing only. Pull requests are gated by docs-ci.yml, which runs the same
+# `make docs-check` without the Pages permissions or the deploy step.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # The site embeds the docs-theme brand layer at a pinned commit, so a rebuild
+  # is also worthwhile on a schedule — it surfaces a file moved or removed
+  # upstream, or one that no longer matches its recorded sha256 in
+  # sources.json, rather than waiting for the next edit here.
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and verify the site
+        run: make docs-check
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
