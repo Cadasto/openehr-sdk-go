@@ -1,6 +1,6 @@
 ---
 description: >-
-  How to reach Cadasto B.V., the company behind the openEHR Go SDK — email, the
+  How to reach Cadasto B.V., the company behind the openEHR Go SDK: email, the
   reseller sales route, where to open a product issue, and registered details.
 ---
 

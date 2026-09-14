@@ -17,7 +17,7 @@ template: home.html
 # openEHR Go SDK
 
 <p class="home-tagline">
-Typed compositions, checkable templates, and AQL — imported like any other Go package.
+Typed compositions, checkable templates, and AQL. Imported like any other Go package.
 </p>
 
 <div class="home-cta" markdown="1">
@@ -45,8 +45,8 @@ openEHR is an open specification for an electronic health record. Clinical
 content is modelled on two levels: a stable
 [Reference Model](https://specifications.openehr.org/releases/RM/development/ehr.html)
 that every record shares, and archetypes that constrain it for one purpose.
-Creating an EHR, uploading a template, running a query — those platform
-operations come from the
+Platform operations like creating an EHR, uploading a template, and running a
+query come from the
 [Service Model](https://specifications.openehr.org/releases/SM/development/openehr_platform.html).
 This SDK is a Go client for that platform's REST binding,
 [ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/).
@@ -107,8 +107,8 @@ framework to adopt first.
 
 ### Typed Reference Model
 Compositions and data values are generated Go structs, not maps of strings.
-After a decode you read `c.Name` and `len(c.Content)`, and a misspelt field is
-a compile error rather than a surprise at runtime.
+After a decode you read `c.Name` and `len(c.Content)`, and the compiler catches
+a misspelt field.
 
 </div>
 

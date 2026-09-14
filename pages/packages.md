@@ -1,6 +1,6 @@
 ---
 description: >-
-  Package map for the openEHR Go SDK — building blocks that stay free of
+  Package map for the openEHR Go SDK: building blocks that stay free of
   transport, the REST client packages, auth providers, sandbox, and testkit.
 ---
 
@@ -97,7 +97,7 @@ REST contract.
 
 | Import | Maturity |
 |---|---|
-| `cadasto/admin` | **partial** — live/ready probes |
+| `cadasto/admin` | **partial**, live/ready probes |
 | `cadasto/extra` | **planned** |
 | `cadasto/datamap` | **planned** |
 | `cadasto/mpi` | **planned** |

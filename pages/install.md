@@ -55,7 +55,7 @@ a live CDR, is
 [Workflow](workflow.md#which-cdr) lists the CDRs this client has been run
 against.
 
-The full import map is on [Packages](packages.md) — including the `cadasto/`
-packages, which ship in the same module but are not part of the openEHR REST
+The full import map is on [Packages](packages.md), including the `cadasto/`
+packages. Those ship in the same module but are not part of the openEHR REST
 surface. Package-level API detail is on
 [pkg.go.dev](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go).

@@ -1,8 +1,8 @@
 ---
 title: Workflow
 description: >-
-  Where the openEHR Go SDK sits between a modelling tool and a CDR — compile
-  and check in process, then write and query over REST.
+  Where the openEHR Go SDK sits between a modelling tool and a CDR. Compile and
+  check in process, then write and query over REST.
 ---
 
 # Workflow
@@ -25,8 +25,8 @@ repository (CDR) and marks which steps the SDK covers.
 
 ### 1. Model
 Author archetypes and an operational template (OPT) in a clinical modelling
-tool, then export the OPT as ADL 1.4 `.opt`. The SDK does not replace that
-tool. It starts from the file you already have.
+tool, then export the OPT as ADL 1.4 `.opt`. Authoring stays in that tool; the
+SDK starts from the file you export.
 
 </div>
 
@@ -106,16 +106,16 @@ definition API. ADL 2 upload is **deferred**.
 <span class="scope scope--in">In the SDK</span>
 
 ### 4. Write
-Attach one `auth.TokenSource` — SMART-on-openEHR, client credentials, JWT
+Attach one `auth.TokenSource`: SMART-on-openEHR, client credentials, JWT
 bearer, or HTTP Basic. Then create an EHR, commit a Composition, or batch
 several versions through a contribution. Point the service catalog at your
 [ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
 CDR.
 
-In tests you have two ways to avoid a real CDR. Injecting `sandbox.Backend` as
-the client's `http.RoundTripper` answers requests in memory, with no server at
-all; the examples take the other route and start a loopback `httptest` server,
-which needs no credentials.
+In tests you have two ways to avoid a real CDR. Inject `sandbox.Backend` as the
+client's `http.RoundTripper` and requests are answered in memory, with no
+server at all. The examples take the other route and start a loopback
+`httptest` server, which needs no credentials.
 
 Packages: `client/ehr` and the providers under `auth/`.
 
@@ -155,7 +155,7 @@ tracks the status of each target; this table says how to point the SDK at one.
 | **Cadasto** | Cadasto B.V. writes this SDK. Point the client at a Cadasto CDR the same way as any other ITS-REST base. The extra APIs under `cadasto/` are listed on [Packages](packages.md#cadasto-extras). |
 | **EHRbase** | Web Template export and the FLAT codec follow the EHRbase reference implementation ([ADR 0014](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/adr/0014-webtemplate-reference-implementation-lock.md)). Set `OPENEHR_LIVE_EHRBASE` to run the Live probes against an instance; we have run the opt-in Live snapshots against EHRbase 2.35.1 locally, and they are not part of CI. |
 | **FerroEHR** | Set `OPENEHR_LIVE_FERROEHR` to name the deployment and `OPENEHR_LIVE_FERROEHR_BASIC` to carry its `user:pass` credential, then run the Live probes. They are not part of CI. |
-| **Better Platform** | There is no Live probe yet. Web Template export emits EHRbase ids (`blood_pressure`) rather than Better camelCase ids (`bloodPressure`) — [ADR 0014](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/adr/0014-webtemplate-reference-implementation-lock.md). |
+| **Better Platform** | There is no Live probe yet. Web Template export emits EHRbase ids (`blood_pressure`) rather than Better camelCase ids (`bloodPressure`). See [ADR 0014](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/adr/0014-webtemplate-reference-implementation-lock.md). |
 
 ## Terms on this page
 
@@ -165,7 +165,7 @@ tracks the status of each target; this table says how to point the SDK at one.
 | Web Template | JSON path map the SDK exports from a compiled OPT |
 | Canonical JSON / XML | openEHR ITS encodings with a `_type` discriminator |
 | FLAT / STRUCTURED | Simplified formats, bidirectional, Web-Template-driven |
-| AQL | Archetype Query Language — build, parse, lint, then execute |
+| AQL | Archetype Query Language: build, parse, lint, then execute |
 | RM | Reference Model types generated from the BMM this SDK builds against |
 | TokenSource | One interface for SMART, client credentials, JWT bearer, and Basic |
 

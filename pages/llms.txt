@@ -14,8 +14,8 @@ plus archetypes that constrain it. Platform operations are in the
 This SDK is a Go client for that platform's REST binding,
 [ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/).
 Its typed clients are written against the Release-1.1.0 OpenAPI files vendored
-in the repository, so any clinical data repository (CDR) implementing them is a
-target. Live probes are opt-in and can point at EHRbase
+in the repository, so it can talk to any clinical data repository (CDR) that
+implements them. Live probes are opt-in and can point at EHRbase
 (`OPENEHR_LIVE_EHRBASE`) or FerroEHR (`OPENEHR_LIVE_FERROEHR`); the
 per-deployment notes are on Workflow.
 
@@ -37,21 +37,21 @@ Runnable programs live under `cmd/examples/` and work offline.
 - [Install](https://cadasto.github.io/openehr-sdk-go/install/): `go get`, the
   Go 1.27 requirement, and the choice between the building-block packages and
   the REST client.
-- [Workflow](https://cadasto.github.io/openehr-sdk-go/workflow/): Where the
+- [Workflow](https://cadasto.github.io/openehr-sdk-go/workflow/): where the
   SDK sits between a modelling tool and a CDR, and which deployments it has
   been run against.
-- [Examples](https://cadasto.github.io/openehr-sdk-go/examples/): Showcase
-  programs and the full `cmd/examples/` catalogue.
-- [Packages](https://cadasto.github.io/openehr-sdk-go/packages/): Import map
+- [Examples](https://cadasto.github.io/openehr-sdk-go/examples/): four
+  programs in detail, plus the full `cmd/examples/` catalogue.
+- [Packages](https://cadasto.github.io/openehr-sdk-go/packages/): import map
   for the building blocks, the REST client, auth, sandbox, and the Cadasto
   extras.
 - [Go reference](https://cadasto.github.io/openehr-sdk-go/reference/):
-  Redirects to the generated API on
+  redirects to the generated API on
   [pkg.go.dev](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go).
 - [Contributing](https://cadasto.github.io/openehr-sdk-go/contributing/):
   `make ci`, the specification-driven loop, and the docs-site targets.
-- [Contact](https://cadasto.github.io/openehr-sdk-go/contact/): Cadasto B.V.
-  email, the reseller sales route, and registered details.
+- [Contact](https://cadasto.github.io/openehr-sdk-go/contact/): the Cadasto
+  B.V. email address, the reseller sales route, and registered details.
 
 ## Canonical sources in the repository
 
@@ -65,8 +65,8 @@ Runnable programs live under `cmd/examples/` and work offline.
 ## openEHR specifications
 
 - [specifications.openehr.org](https://specifications.openehr.org/)
-- [RM — EHR Information Model](https://specifications.openehr.org/releases/RM/development/ehr.html)
-- [SM — Platform Service Model](https://specifications.openehr.org/releases/SM/development/openehr_platform.html)
+- [RM: EHR Information Model](https://specifications.openehr.org/releases/RM/development/ehr.html)
+- [SM: Platform Service Model](https://specifications.openehr.org/releases/SM/development/openehr_platform.html)
 - [ITS-REST](https://specifications.openehr.org/releases/ITS-REST/Release-1.1.0/)
 
 ## Optional

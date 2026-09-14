@@ -1,6 +1,6 @@
 ---
 description: >-
-  Runnable programs under cmd/examples/ — decode, validate, synthesise, build
+  Runnable programs under cmd/examples/: decode, validate, synthesise, build
   AQL, create an EHR, and run a SMART PKCE launch. All of them work offline.
 ---
 
@@ -8,25 +8,24 @@ description: >-
 
 The programs under
 [`cmd/examples/`](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples)
-are short programs to copy from, not products. Between them they cover the
-building blocks end to end — decode, parse, compile, validate, synthesise,
-encode, and AQL — plus the smallest REST create and a SMART launch. The REST
-examples talk to an in-process mock, so none of them needs a clinical data
-repository (CDR).
+are short programs to copy from. Between them they cover the building blocks
+end to end (decode, parse, compile, validate, synthesise, encode, and AQL),
+plus the smallest REST create and a SMART launch. The REST examples talk to an
+in-process mock, so none of them needs a clinical data repository (CDR).
 
 The catalogue with flags, fixtures, and notes on what to copy into your own
 application is
 [docs/examples.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md)
-in the repository. This page is the showcase, and a good place to start.
+in the repository. This page covers four of them in detail.
 
 Fixture paths resolve relative to the source file, so each `go run` works from
 any working directory inside a clone.
 
 ## Decode canonical JSON {#canonical_json}
 
-This is the smallest building-block program there is. It decodes a
-canonical-JSON Composition from the repository fixtures into a typed
-`rm.Composition`, with no transport and no auth in sight.
+The smallest building-block program in the repository. It decodes a
+canonical-JSON Composition from the fixtures into a typed `rm.Composition`,
+without importing transport or auth.
 
 ```bash
 go run ./cmd/examples/canonical_json
@@ -47,9 +46,9 @@ Packages: `openehr/rm`, `openehr/serialize/canjson`. Fixture:
 
 ## Validate JSON against a template {#validate-from-json}
 
-This is the shape a CI check takes. The program reads the bytes, decodes them
-into Reference Model objects, compiles the operational template (OPT), and
-prints either `OK` or the constraint violations it found.
+A CI check has this shape. The program reads the bytes, decodes them into
+Reference Model objects, compiles the operational template (OPT), and prints
+either `OK` or the constraint violations it found.
 
 ```bash
 go run ./cmd/examples/validate-from-json
@@ -70,9 +69,10 @@ Packages: `openehr/aql`.
 
 ## Create an EHR {#create-an-ehr}
 
-This is the smallest REST create: a static service catalog, an injected
-client, and one call to `ehr.Create`. The program starts a loopback `httptest`
-server in the same process, so it needs neither a CDR nor credentials.
+Three pieces make the smallest REST create: a static service catalog, an
+injected client, and one call to `ehr.Create`. The program starts a loopback
+`httptest` server in the same process, so it needs neither a CDR nor
+credentials.
 
 ```bash
 go run ./cmd/examples/ehr_create

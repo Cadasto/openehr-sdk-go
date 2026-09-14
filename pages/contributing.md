@@ -1,6 +1,6 @@
 ---
 description: >-
-  How to build, test, and propose a change to the openEHR Go SDK — Makefile
+  How to build, test, and propose a change to the openEHR Go SDK: Makefile
   targets, the specification-driven loop, and where to open an issue.
 ---
 
