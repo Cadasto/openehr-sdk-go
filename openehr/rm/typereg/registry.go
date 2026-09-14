@@ -11,16 +11,17 @@ package typereg
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"maps"
 	"slices"
 	"sync"
 )
 
-// maxDecodeDepth bounds the JSON nesting depth Decode accepts. encoding/json
-// caps nesting at 10000; this far lower bound reflects real RM data, which
-// nests only a few dozen levels (COMPOSITION > SECTION > … > CLUSTER > ELEMENT),
+// maxDecodeDepth bounds the JSON nesting depth Decode accepts. jsontext caps
+// nesting near 10000; this far lower bound reflects real RM data, which nests
+// only a few dozen levels (COMPOSITION > SECTION > … > CLUSTER > ELEMENT),
 // while still bounding the recursive polymorphic decode path.
 const maxDecodeDepth = 512
 
@@ -134,23 +135,26 @@ func (r *Registry) Decode(data []byte) (any, error) {
 	if d := jsonNestingDepth(data); d > maxDecodeDepth {
 		return nil, fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)
 	}
-	var head struct {
-		Type string `json:"_type"`
-	}
-	if err := json.Unmarshal(data, &head); err != nil {
+	typeName, err := peekType(jsontext.Value(data))
+	if err != nil {
 		return nil, fmt.Errorf("typereg.Decode: read _type: %w", err)
 	}
-	if head.Type == "" {
+	if typeName == "" {
 		return nil, fmt.Errorf("typereg.Decode: %w", ErrMissingType)
 	}
-	ctor, ok := r.Lookup(head.Type)
+	ctor, ok := r.Lookup(typeName)
 	if !ok {
-		return nil, fmt.Errorf("typereg.Decode %q: %w", head.Type, ErrUnknownType)
+		return nil, fmt.Errorf("typereg.Decode %q: %w", typeName, ErrUnknownType)
 	}
 	v := ctor()
-	dec := json.NewDecoder(bytes.NewReader(data))
-	if err := dec.Decode(v); err != nil {
-		return nil, fmt.Errorf("typereg.Decode %q: %w", head.Type, err)
+	// Decode the concrete type through encoding/json/v2 with the same joined
+	// option set every generated decoder threads (decodeOptions): the caller's
+	// options, the polymorphic interface hooks, and v2 error semantics. A nested
+	// value therefore decodes under the same matching, escaping and hook rules as
+	// the enclosing type it sits inside (REQ-052).
+	dec := jsontext.NewDecoder(bytes.NewReader(data))
+	if err := json.UnmarshalDecode(dec, v, decodeOptions(dec)); err != nil {
+		return nil, fmt.Errorf("typereg.Decode %q: %w", typeName, err)
 	}
 	return v, nil
 }
