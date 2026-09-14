@@ -34,12 +34,22 @@
 //     concrete type before reading the rest; member order is otherwise
 //     unspecified and a consumer MUST NOT rely on it.
 //
+//   - Member names are matched case-sensitively on this codec path
+//     (encoding/json/v2 default; canjson sets no case-insensitive
+//     option). A wrongly-cased member, `Magnitude` for `magnitude`, does
+//     not populate the field. This is a change from the v1 codec, which
+//     matched a struct field case-insensitively. The case-insensitive
+//     Extras rule (wire.md § Unknown response keys) binds only the
+//     Definition, System and AQL surfaces, which stay on v1 (REQ-052).
+//
 //   - `<`, `>` and `&` are emitted literally: encoding/json/v2 does not
 //     HTML-escape (REQ-052).
 //
 //   - `Hash` (map[K]V) keys are emitted in lexicographic key order, an
 //     encoder-determinism property obtained with json.Deterministic(true)
-//     (REQ-052). Two encodes of one value are therefore byte-identical.
+//     (REQ-052). Two encodes of one value therefore agree on member
+//     order; this is a determinism property, not a byte-level promise
+//     REQ-052 makes to a consumer.
 //
 //   - Nil-pointer optional fields are emitted as ABSENT (no key), not
 //     as `null`. Both ABSENT and `null` are accepted on decode.
@@ -104,14 +114,13 @@
 //
 //   - Malformed JSON reaches the caller before any generated decode
 //     method runs, because the codec validates the whole input first.
-//     No sentinel: [Unmarshal] and [Decoder.Decode] both return a
-//     *encoding/json/jsontext.SyntacticError, except that
-//     [Decoder.Decode] reports an empty stream as io.EOF (a truncated
-//     value wraps io.ErrUnexpectedEOF in both). Invalid UTF-8 and a lone
-//     surrogate escape are refused on this same path, before rm.Character
-//     sees the bytes, so they too are malformed input carrying no
-//     sentinel: a bare *jsontext.SyntacticError. Task 7 reconciles
-//     rm.Character's own side of the substitution rule.
+//     No sentinel: the codec reports its own syntax or truncated-input
+//     error (a *jsontext.SyntacticError), except that [Decoder.Decode]
+//     reports an empty stream as io.EOF and a truncated value wraps
+//     io.ErrUnexpectedEOF. Invalid UTF-8 and a lone surrogate escape are
+//     refused on this same path, before rm.Character sees the bytes, so
+//     they too are malformed input carrying no sentinel. Task 7
+//     reconciles rm.Character's own side of the substitution rule.
 //   - A duplicate member name is refused during tokenisation, before any
 //     generated decode method runs. The entry point classifies that
 //     refusal with [ErrInvalidShape], keeping the cause reachable, so
@@ -133,17 +142,23 @@
 //     slot. A [DecodeError] does not strip a shape classification raised
 //     beneath it, so a consumer reads the path off one and the kind off
 //     the other.
-//   - A hand-written primitive decoded at the top level — rm.Real,
+//   - A hand-written primitive decoded at the top level (rm.Real,
 //     rm.Integer or rm.Character handed to [Unmarshal] directly rather
-//     than reached through a generated type — carries its own
+//     than reached through a generated type) carries its own
 //     `rm.<Type>:` prefix, not the `canjson: <RM_TYPE>:` funnel. Which
-//     refusals carry [ErrInvalidShape] differs by primitive, so it is worth
-//     stating per arm: on rm.Character every refusal carries it, including
-//     the encoding/json failures of its string arm; on rm.Real only the
-//     precision refusal does; on rm.Integer none does. An empty input
-//     carries no sentinel on any of the three, and neither does a strconv
-//     or encoding/json parse or range failure beneath rm.Real or rm.Integer
-//     — the precedence rule wire.md § REQ-052 states — and those causes
+//     refusals carry [ErrInvalidShape] differs by primitive, so it is
+//     worth stating per arm. On rm.Character a refusal it raises itself,
+//     applying the one-character rule to a value the tokenizer accepted
+//     (an empty or multi-character string, or a control character, and the
+//     encoding/json type mismatch of its string arm), carries the
+//     sentinel. A lone surrogate or invalid UTF-8 does not reach
+//     rm.Character on this path: the tokenizer refuses it first, so it is
+//     malformed input carrying no sentinel, the same treatment as
+//     malformed JSON above. On rm.Real only the precision refusal carries
+//     the sentinel; on rm.Integer none does. An empty input carries no
+//     sentinel on any of the three, and neither does a strconv or
+//     encoding/json parse or range failure beneath rm.Real or rm.Integer
+//     (the precedence rule wire.md § REQ-052 states), and those causes
 //     stay reachable with errors.AsType. A nil receiver on any of them, as
 //     on every generated type, is a typereg.ErrNilReceiver error (REQ-025).
 //
