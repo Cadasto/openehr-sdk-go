@@ -1,11 +1,13 @@
 package canjson_test
 
 import (
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // benchCompositionPayload synthesises a Composition with `width`
@@ -102,6 +104,49 @@ func BenchmarkDecodeDVQuantity(b *testing.B) {
 		var q rm.DVQuantity
 		if err := canjson.Unmarshal(body, &q); err != nil {
 			b.Fatalf("Unmarshal: %v", err)
+		}
+	}
+}
+
+// benchCassette is the largest real cassette vendored under
+// testkit/cassettes (97 725 bytes). The synthetic payloads above repeat one
+// ADMIN_ENTRY shape; this one carries the depth and datatype spread of a real
+// CDR document, DV_MULTIMEDIA included, so the two together bracket the codec
+// between a wide tree and a deep one.
+const benchCassette = "Demonstration.v1"
+
+// BenchmarkDecodeCompositionCassette measures decode plus encode of the largest
+// vendored cassette, the baseline the json/v2 migration is measured against
+// (plan 2026-09-14-json-v2-migration.md phase 3.5). b.SetBytes reports against
+// the input document, so the MB/s figure is comparable with
+// BenchmarkDecodeComposition_400.
+//
+// The cassette is held out of the round-trip probes (its DV_MULTIMEDIA content
+// is not byte-stable through the profile) but it decodes and encodes cleanly,
+// which is all this benchmark asks of it. The setup decode and encode below are
+// the control: a cassette that stopped decoding would fail here rather than
+// quietly measuring an error path.
+func BenchmarkDecodeCompositionCassette(b *testing.B) {
+	payload, err := os.ReadFile(fixtures.CompositionJSON(benchCassette))
+	if err != nil {
+		b.Fatalf("read cassette %s: %v", benchCassette, err)
+	}
+	var setup rm.Composition
+	if err := canjson.Unmarshal(payload, &setup); err != nil {
+		b.Fatalf("setup decode of %s: %v", benchCassette, err)
+	}
+	if _, err := canjson.Marshal(&setup); err != nil {
+		b.Fatalf("setup encode of %s: %v", benchCassette, err)
+	}
+	b.SetBytes(int64(len(payload)))
+	b.ReportAllocs()
+	for b.Loop() {
+		var c rm.Composition
+		if err := canjson.Unmarshal(payload, &c); err != nil {
+			b.Fatalf("Unmarshal: %v", err)
+		}
+		if _, err := canjson.Marshal(&c); err != nil {
+			b.Fatalf("Marshal: %v", err)
 		}
 	}
 }
