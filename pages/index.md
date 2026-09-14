@@ -147,7 +147,7 @@ request.
 
 </div>
 
-<h2 class="section-title">Two ways in</h2>
+<h2 class="section-title">Two integration paths</h2>
 
 <div class="two-products" markdown="1">
 
