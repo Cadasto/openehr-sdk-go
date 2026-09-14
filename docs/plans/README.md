@@ -6,6 +6,14 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### Canonical JSON on `encoding/json/v2` (2026-09-14)
+
+One plan, drafted from three read-only analyses (code fit-gap, specification and probe deltas, blast radius and phase order) and from four decisions the maintainer has already taken: JSON object member order carries no meaning, the conformance tests must assert round-trip fidelity semantically rather than by comparing bytes, `_type` first is a recommendation rather than a rule, and the canonical-JSON path moves to `encoding/json/v2`. The plan is **not approved for implementation yet**: its two decision records, ADR 0021 (member order is not a contract) and ADR 0022 (the codec is `encoding/json/v2`), are drafted inside it and stay Proposed until the maintainer accepts them, which is the plan's Definition of Ready. It amends REQ-052 in place and allocates no new REQ or PROBE id.
+
+| Plan | Scope | Covers | Notes |
+|---|---|---|---|
+| [2026-09-14-json-v2-migration.md](2026-09-14-json-v2-migration.md) | Retire the generator's 278 per-type `MarshalJSON` / `UnmarshalJSON` methods and `openehr/internal/jsonpoly` in favour of a generated `MarshalJSONTo` / `UnmarshalJSONFrom` pair plus one registered unmarshaler per polymorphic interface; withdraw REQ-052's encode profile (`_type` first becomes a SHOULD, general member order is unspecified); rewrite PROBE-030 to a semantic oracle (typed deep comparison plus the REQ-112 floor, with wire-equivalence as a secondary check) and realign PROBE-038's catalog wording | REQ-052 / REQ-040 / REQ-053 (all stay `landed`, implementation-aligned amendment; no new id); ADR 0021 + ADR 0022 proposed, ADR 0002 amended with D8; closes STRAND-04's codec sub-question | **Parked** behind its Definition of Ready until both ADRs are Accepted. Five packages move, everything else stays on `encoding/json` v1; `openehr/serialize/simplified` is deferred until a `Decoder.UseNumber` replacement exists. Encoded bytes change (no HTML escaping, `omitzero` on pointer fields), so the consuming CDR project must recompute anything it stored as a hash of SDK output |
+
 ### Go 1.27 floor (2026-09-03)
 
 | Plan | Scope | Covers | Notes |
