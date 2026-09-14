@@ -340,6 +340,32 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 		}
 	}
 
+	// Polymorphic decode hooks — one file per target, in the target
+	// package (they close over the interface types it declares) and
+	// registered into the shared typereg aggregate at init (ADR 0022).
+	hooksBody, err := RenderJSONHooksFile(plan)
+	if err != nil {
+		return tr, err
+	}
+	if hooksBody != nil {
+		hooksPath := filepath.Join(outDir, "jsonhooks_gen.go")
+		tr.Files = append(tr.Files, hooksPath)
+		result.Files = append(result.Files, hooksPath)
+		if opts.Verify {
+			drift, err := compareFile(hooksPath, hooksBody)
+			if err != nil {
+				return tr, err
+			}
+			if drift != nil {
+				result.Drifts = append(result.Drifts, *drift)
+			}
+		} else {
+			if err := writeAtomic(hooksPath, hooksBody); err != nil {
+				return tr, err
+			}
+		}
+	}
+
 	// rminfo data tables — emitted alongside the RM target (one
 	// sub-package down). Both renderers return nil for non-RM targets,
 	// so AOM 1.4 doesn't get them. The package lives in its own

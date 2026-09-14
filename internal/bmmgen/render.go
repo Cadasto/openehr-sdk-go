@@ -608,6 +608,13 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 	goName := FieldName(name)
 	jsonTag := fmt.Sprintf("`json:%q`", name)
 	jsonTagOpt := fmt.Sprintf("`json:%q`", name+",omitempty")
+	// omitzero, not omitempty, on a POINTER field: under encoding/json/v2
+	// omitempty omits any value that encodes empty — including a non-nil
+	// pointer to an empty string — whereas omitzero omits only the nil
+	// pointer, restoring the v1 spelling where a pointer to "" still emits
+	// (REQ-052, Q6). Container fields keep omitempty (their nil/empty
+	// collapse is intended, e.g. DV_TEXT.mappings, wire.md:112).
+	jsonTagOptZero := fmt.Sprintf("`json:%q`", name+",omitzero")
 
 	docLines := propertyDoc(goName, propertyDocText(prop))
 
@@ -620,7 +627,11 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 		if p.IsMandatory {
 			return docLines + fmt.Sprintf("\t%s %s %s\n", goName, ref, jsonTag), nil
 		}
-		return docLines + fmt.Sprintf("\t%s %s %s\n", goName, ref, jsonTagOpt), nil
+		tag := jsonTagOpt
+		if strings.HasPrefix(ref, "*") {
+			tag = jsonTagOptZero
+		}
+		return docLines + fmt.Sprintf("\t%s %s %s\n", goName, ref, tag), nil
 
 	case *bmm.SinglePropertyOpen:
 		// Open generic parameter: emit the type name verbatim — it
@@ -648,7 +659,7 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 		tag := jsonTag
 		ref := typ
 		if !p.IsMandatory {
-			tag = jsonTagOpt
+			tag = jsonTagOptZero
 			ref = "*" + typ
 		}
 		return docLines + fmt.Sprintf("\t%s %s %s\n", goName, ref, tag), nil
