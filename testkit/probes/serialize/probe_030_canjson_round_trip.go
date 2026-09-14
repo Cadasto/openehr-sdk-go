@@ -60,7 +60,21 @@ type Result = probe.Result
 // return a non-nil error so the harness can distinguish probe
 // failure from probe-framework failure.
 func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) {
-	return probe030RoundTrip(body, factory, canjson.Marshal)
+	return probe030RoundTrip(body, factory, canjson.Marshal, false)
+}
+
+// Probe030CanjsonRoundTripInput runs PROBE-030 for one input from
+// [Probe030Inputs], honoring its SkipFloor flag: an input whose vendored
+// content carries an RM-floor finding independent of the round trip runs the
+// fidelity legs (typed deep comparison, wire equivalence) but skips the
+// validation.ValidateRM leg. Use this when iterating the corpus;
+// Probe030CanjsonRoundTrip is the body/factory form with the floor leg always
+// on.
+func Probe030CanjsonRoundTripInput(in Probe030Input) (Result, error) {
+	if in.loadErr != nil {
+		return Result{Probe: "PROBE-030", Status: "fail", Detail: "cassette discovery: " + in.loadErr.Error()}, nil
+	}
+	return probe030RoundTrip(in.Body, in.Factory, canjson.Marshal, in.SkipFloor)
 }
 
 // probe030RoundTrip runs the PROBE-030 pipeline with reEncode as the
@@ -70,7 +84,11 @@ func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) {
 // polymorphic slot narrowed, on the re-encode path: each mutation
 // changes B without touching A, so reflect.DeepEqual and the
 // wire-equivalence secondary both flag it (probe_030_guard_internal_test.go).
-func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]byte, error)) (Result, error) {
+//
+// skipFloor drops only the validation.ValidateRM leg, for an input whose
+// vendored content carries an RM-floor finding independent of the round trip
+// (see [Probe030Input.SkipFloor]); the fidelity legs always run.
+func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]byte, error), skipFloor bool) (Result, error) {
 	r := Result{Probe: "PROBE-030"}
 	if factory == nil {
 		return r, errors.New("PROBE-030: factory is nil")
@@ -115,10 +133,12 @@ func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]by
 		r.Detail = fmt.Sprintf("A and B differ across the re-encode (a field or polymorphic slot was lost)\nb1=%s\nb2=%s", b1, b2)
 		return r, nil
 	}
-	if vr := validation.ValidateRM(valueB); !vr.OK {
-		r.Status = "fail"
-		r.Detail = "round-tripped value does not satisfy the RM floor (REQ-112): " + firstIssue(vr)
-		return r, nil
+	if !skipFloor {
+		if vr := validation.ValidateRM(valueB); !vr.OK {
+			r.Status = "fail"
+			r.Detail = "round-tripped value does not satisfy the RM floor (REQ-112): " + firstIssue(vr)
+			return r, nil
+		}
 	}
 	if ok, diff := wireequiv.Equivalent(b1, b2); !ok {
 		r.Status = "fail"
@@ -129,16 +149,19 @@ func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]by
 	return r, nil
 }
 
-// Probe030Inputs is the canonical set of inputs exercised by
-// PROBE-030 in sandbox mode. The harness asserts that each input
-// survives the round trip with its meaning intact (typed deep
-// comparison of A and B plus the RM floor, REQ-112) across this set
-// when fed the vendored cassettes (REQ-080). The set spans leaf RM
-// values and
-// full composition cassettes vendored under
-// `testkit/cassettes/compositions/` and `testkit/cassettes/rm/`. The Event/History polymorphism
-// that initially blocked composition round-trip is resolved in ADR
-// 0003 (docs/adr/0003-rm-event-polymorphism.md).
+// Probe030Inputs is the set of inputs exercised by PROBE-030 in sandbox
+// mode. Each input survives the round trip with its meaning intact
+// (typed deep comparison of A and B, plus wire equivalence, and the RM
+// floor unless the input sets SkipFloor) when fed the vendored cassettes
+// (REQ-080, REQ-112). The set spans leaf RM values and full composition
+// cassettes vendored under `testkit/cassettes/compositions/` and
+// `testkit/cassettes/rm/`. The Event/History polymorphism that initially
+// blocked composition round-trip is resolved in ADR 0003
+// (docs/adr/0003-rm-event-polymorphism.md).
+//
+// Every discovered cassette stays in the set so the fidelity legs run on
+// all of them; an input carrying an RM-floor finding independent of the
+// round trip sets SkipFloor, which drops only the ValidateRM leg.
 //
 // Populated at package init: the leaf entries are inline; cassette
 // entries are discovered from disk so adding a fixture file does not
@@ -177,39 +200,29 @@ type Probe030Input struct {
 	Name    string
 	Body    []byte
 	Factory func() any
-	// loadErr is set when the cassette discovery step failed at init
-	// for this entry; Probe030CanjsonRoundTrip surfaces it as Status=fail.
+	// SkipFloor drops only the validation.ValidateRM leg for this input,
+	// for a cassette whose vendored content carries an RM-floor finding
+	// independent of the round trip. The fidelity legs (typed deep
+	// comparison, wire equivalence) still run. See probe030SkipFloor.
+	SkipFloor bool
+	// loadErr is set when the cassette discovery step failed at init for
+	// this entry; Probe030CanjsonRoundTripInput surfaces it as Status=fail.
 	loadErr error
 }
 
-// probe030FloorGateExcluded lists cassettes kept in the vendored corpus for
-// fidelity round-trip coverage (openehr/serialize/canjson TestRoundTripCassettes
-// still exercises them by typed deep equality and wire equivalence) but held out
-// of PROBE-030, which additionally requires the round-tripped value to satisfy
-// validation.ValidateRM (REQ-112) with no issues. The spec sanctions holding a
-// cassette out of a probe so the probe stays green (conformance.md, cassette
-// discovery).
+// probe030SkipFloor names cassettes whose vendored content carries an RM-floor
+// finding that is present before any round trip, so the ValidateRM leg is
+// skipped for them while the fidelity legs still run. Vendored content is not
+// edited.
 //
-// Each cassette below carries RM-floor findings that are invariant to the round
-// trip: ValidateRM reports the same issue set on the input decode and on the
-// re-encoded value, so the round trip degrades nothing (the fidelity test proves
-// that separately). The findings are not serialization defects:
-//
-//   - minimal_action_2 and clinical_content_validation contain an ACTION, and
-//     openehr/validation/rmread.readActionSingle omits ACTION.time and
-//     ACTION.ism_transition, so ValidateRM reports them as required-but-absent
-//     even though the re-encode carries both keys (a reader gap, fixable by
-//     adding the two attributes to that reader, mirroring readInstructionSingle).
-//   - clinical_notes.v0 carries several such findings (an EVENT.time, an
-//     ACTIVITY's timing and action_archetype_id, empty DV_TEXT values) that the
-//     input already trips; the round trip preserves them unchanged.
-//
-// Once the RM-floor readers are complete and the corpus is floor-clean, these
-// entries can be removed and the gate tightened back to the whole corpus.
-var probe030FloorGateExcluded = map[string]bool{
-	"compositions/minimal_action_2.json":            true,
-	"compositions/clinical_content_validation.json": true,
-	"compositions/clinical_notes.v0.json":           true,
+// clinical_notes.v0 has an empty string at
+// `/content[2]/activities[0]/action_archetype_id`, a required ACTIVITY
+// attribute, which the RM floor reports as absent. That is a genuine finding in
+// the vendored composition, invariant to the round trip (ValidateRM reports it
+// on the input decode and on the re-encoded value alike), so it is held out of
+// the floor leg only.
+var probe030SkipFloor = map[string]bool{
+	"compositions/clinical_notes.v0.json": true,
 }
 
 // loadCassetteInputs discovers vendored cassettes relative to this
@@ -232,9 +245,6 @@ func loadCassetteInputs() ([]Probe030Input, error) {
 	}
 	out := make([]Probe030Input, 0, len(rels))
 	for _, rel := range rels {
-		if probe030FloorGateExcluded[rel.Rel] {
-			continue
-		}
 		body, err := os.ReadFile(fixtures.ResolveCompositionJSON(rel))
 		if err != nil {
 			return nil, fmt.Errorf("PROBE-030: read cassette %q: %w", rel.Rel, err)
@@ -244,9 +254,10 @@ func loadCassetteInputs() ([]Probe030Input, error) {
 			continue
 		}
 		out = append(out, Probe030Input{
-			Name:    "cassette:" + rel.Rel,
-			Body:    body,
-			Factory: factory,
+			Name:      "cassette:" + rel.Rel,
+			Body:      body,
+			Factory:   factory,
+			SkipFloor: probe030SkipFloor[rel.Rel],
 		})
 	}
 	return out, nil

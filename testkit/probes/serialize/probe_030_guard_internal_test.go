@@ -18,7 +18,7 @@ import (
 // Status == "pass".
 func TestProbe030GuardCatchesDroppedFieldOnReEncode(t *testing.T) {
 	body := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg"}`)
-	r, err := probe030RoundTrip(body, func() any { return new(rm.DVQuantity) }, dropMemberReEncoder("units"))
+	r, err := probe030RoundTrip(body, func() any { return new(rm.DVQuantity) }, dropMemberReEncoder("units"), false)
 	if err != nil {
 		t.Fatalf("probe framework error: %v", err)
 	}
@@ -31,19 +31,25 @@ func TestProbe030GuardCatchesDroppedFieldOnReEncode(t *testing.T) {
 }
 
 // TestProbe030GuardCatchesNarrowedPolymorphicSlot is the can-fail control for a
-// polymorphic slot narrowed on the re-encode path. The double deletes `_type`
-// from ELEMENT.value, narrowing the DATA_VALUE slot toward its interface zero.
-// The round trip must not report pass: either the third decode refuses the
-// discriminator-less slot, or B decodes to a different concrete than A and the
-// typed deep comparison flags it.
+// polymorphic slot rewritten to a different concrete on the re-encode path. The
+// double replaces ELEMENT.value (a DV_QUANTITY) with a decodable DV_TEXT, so B
+// decodes cleanly but holds a different dynamic type in the slot than A. B is
+// still RM-valid, so only the typed deep comparison of A and B can catch it,
+// which is what this pins. Replacing that comparison with an always-true one
+// turns this test red: the wire-equivalence secondary then fires with a
+// different detail, so the "A and B differ" assertion below fails.
 func TestProbe030GuardCatchesNarrowedPolymorphicSlot(t *testing.T) {
 	body := []byte(`{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"n"},"value":{"_type":"DV_QUANTITY","magnitude":120,"units":"mm[Hg]"}}`)
-	r, err := probe030RoundTrip(body, func() any { return new(rm.Element) }, stripSlotTypeReEncoder("value"))
+	double := retypeSlotReEncoder("value", map[string]any{"_type": "DV_TEXT", "value": "120 mm[Hg]"})
+	r, err := probe030RoundTrip(body, func() any { return new(rm.Element) }, double, false)
 	if err != nil {
 		t.Fatalf("probe framework error: %v", err)
 	}
 	if r.Status != "fail" {
-		t.Fatalf("status = %q (detail: %s), want fail: narrowing value._type must be caught", r.Status, r.Detail)
+		t.Fatalf("status = %q (detail: %s), want fail: retyping value to a different concrete must be caught", r.Status, r.Detail)
+	}
+	if !strings.Contains(r.Detail, "A and B differ") {
+		t.Fatalf("detail = %q; want the typed deep comparison to fire, so the A-versus-B guard is what caught the changed dynamic type", r.Detail)
 	}
 }
 
@@ -65,10 +71,11 @@ func dropMemberReEncoder(member string) func(any) ([]byte, error) {
 	}
 }
 
-// stripSlotTypeReEncoder is a lossy re-encode double: it canjson-encodes the
-// value and then deletes `_type` from the named object-valued slot, standing in
-// for a codec that narrows a polymorphic slot by dropping its discriminator.
-func stripSlotTypeReEncoder(slot string) func(any) ([]byte, error) {
+// retypeSlotReEncoder is a lossy re-encode double: it canjson-encodes the value
+// and then replaces the named object-valued slot with a different decodable
+// concrete, standing in for a codec that narrows a polymorphic slot to the
+// wrong dynamic type. B then decodes to a different concrete than A.
+func retypeSlotReEncoder(slot string, replacement map[string]any) func(any) ([]byte, error) {
 	return func(v any) ([]byte, error) {
 		b, err := canjson.Marshal(v)
 		if err != nil {
@@ -78,9 +85,7 @@ func stripSlotTypeReEncoder(slot string) func(any) ([]byte, error) {
 		if err := json.Unmarshal(b, &m); err != nil {
 			return nil, err
 		}
-		if child, ok := m[slot].(map[string]any); ok {
-			delete(child, "_type")
-		}
+		m[slot] = replacement
 		return json.Marshal(m)
 	}
 }

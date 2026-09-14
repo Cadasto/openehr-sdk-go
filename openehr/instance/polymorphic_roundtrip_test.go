@@ -2,7 +2,6 @@ package instance_test
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
 // TestCorpusRoundTripValidates is the REQ-107 dossier acceptance
@@ -80,7 +80,8 @@ func TestCorpusRoundTripValidates(t *testing.T) {
 				t.Fatalf("re-decode: %v", err)
 			}
 			if !reflect.DeepEqual(rt, rt2) {
-				t.Errorf("round trip not value-stable (a subtype/bound _type likely dropped): %s", firstDiff(data, again))
+				_, diff := wireequiv.Equivalent(data, again)
+				t.Errorf("round trip not value-stable (a subtype/bound _type likely dropped): %s", diff)
 			}
 
 			// Validation delta (sub-gap B): the round-trip must introduce no
@@ -93,21 +94,6 @@ func TestCorpusRoundTripValidates(t *testing.T) {
 			}
 		})
 	}
-}
-
-// firstDiff returns a bounded, human-readable description of where two
-// byte slices first diverge, so a byte-stability failure points at the
-// offending key instead of dumping the whole (multi-KB) payload.
-func firstDiff(a, b []byte) string {
-	n := min(len(a), len(b))
-	i := 0
-	for i < n && a[i] == b[i] {
-		i++
-	}
-	window := func(s []byte) string {
-		return string(s[max(i-40, 0):min(i+40, len(s))])
-	}
-	return fmt.Sprintf("at byte %d (len %d vs %d):\n  first:  …%s…\n  second: …%s…", i, len(a), len(b), window(a), window(b))
 }
 
 func issueCounts(issues []validation.Issue) map[string]int {

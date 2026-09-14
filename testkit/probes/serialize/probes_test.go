@@ -39,7 +39,7 @@ func TestProbe030(t *testing.T) {
 
 	for _, in := range serializeprobes.Probe030Inputs {
 		t.Run(in.Name, func(t *testing.T) {
-			r, err := serializeprobes.Probe030CanjsonRoundTrip(in.Body, in.Factory)
+			r, err := serializeprobes.Probe030CanjsonRoundTripInput(in)
 			if err != nil {
 				t.Fatalf("probe framework error: %v", err)
 			}
@@ -47,6 +47,29 @@ func TestProbe030(t *testing.T) {
 				t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
 			}
 		})
+	}
+}
+
+// TestProbe030InputsCoverWholeCorpus pins the input-set size to every leaf entry
+// plus every discoverable cassette with a factory. A cassette carrying an
+// RM-floor finding independent of the round trip is held out of the ValidateRM
+// leg by SkipFloor, never removed from the input set, so this fails if a future
+// hold-out silently shrinks the probe.
+func TestProbe030InputsCoverWholeCorpus(t *testing.T) {
+	rels, err := fixtures.ListCompositionJSON()
+	if err != nil {
+		t.Fatalf("list cassettes: %v", err)
+	}
+	const inlineLeaves = 2 // DV_QUANTITY, DV_CODED_TEXT
+	want := inlineLeaves
+	for _, rel := range rels {
+		if _, ok := fixtures.FactoryForJSONRel(rel); ok {
+			want++
+		}
+	}
+	if got := len(serializeprobes.Probe030Inputs); got != want {
+		t.Errorf("Probe030Inputs has %d entries, want %d (%d inline leaves + %d discoverable cassettes); a hold-out must keep the cassette in the input set and use SkipFloor",
+			got, want, inlineLeaves, want-inlineLeaves)
 	}
 }
 

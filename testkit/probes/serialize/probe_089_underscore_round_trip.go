@@ -696,6 +696,12 @@ func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (R
 // fixture's keys — the latter is what brings the composite leaves (the ENTRY
 // `subject`, a `DV_INTERVAL<T>`, a DV_MULTIMEDIA) into scope, since their keys
 // carry no underscore of their own.
+//
+// This leg keeps its own decodeNumberMap + sameFlatValue rather than
+// wireequiv.Equivalent: it does not ask whether two documents are equivalent, it
+// partitions the family key set into dropped, invented, raw and changed buckets
+// against a base-path membership test, which the oracle's first-difference model
+// does not express.
 func probe089EncodeDiff(keys map[string]any, emitted []byte) string {
 	got, err := decodeNumberMap(emitted)
 	if err != nil {
