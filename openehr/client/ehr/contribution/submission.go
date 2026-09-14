@@ -2,6 +2,7 @@ package contribution
 
 import (
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 
@@ -45,12 +46,28 @@ type Submission struct {
 // CommitVersion is the marker interface for Submission.Versions[i].
 // Closed type-set: *[OriginalVersion][T] and *[ImportedVersion][T] for the
 // four versionable T's. Other types satisfying this method set
-// (json.Marshaler + BMMName() string) are detected at Submission.Validate
+// (json.MarshalerTo + BMMName() string) are detected at Submission.Validate
 // via the BMMName check.
+//
+// The write-side wrappers marshal through the encoding/json/v2 streaming pair
+// (ADR 0022), so the constraint is [jsonv2.MarshalerTo], not the v1
+// json.Marshaler. The assertions below fail the build if any of the eight
+// committed instantiations stops satisfying it (R16, Q7).
 type CommitVersion interface {
-	json.Marshaler
+	jsonv2.MarshalerTo
 	BMMName() string
 }
+
+var (
+	_ CommitVersion = (*OriginalVersion[rm.Composition])(nil)
+	_ CommitVersion = (*OriginalVersion[rm.EHRStatus])(nil)
+	_ CommitVersion = (*OriginalVersion[rm.Folder])(nil)
+	_ CommitVersion = (*OriginalVersion[rm.EHRAccess])(nil)
+	_ CommitVersion = (*ImportedVersion[rm.Composition])(nil)
+	_ CommitVersion = (*ImportedVersion[rm.EHRStatus])(nil)
+	_ CommitVersion = (*ImportedVersion[rm.Folder])(nil)
+	_ CommitVersion = (*ImportedVersion[rm.EHRAccess])(nil)
+)
 
 // Validate enforces the documented closed type-set: each
 // Submission.Versions[i] must be an *[OriginalVersion][T] or

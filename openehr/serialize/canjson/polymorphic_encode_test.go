@@ -73,12 +73,11 @@ func TestEncodeSubstitutedSubtypeInSliceKeepsType(t *testing.T) {
 }
 
 // TestEncodeConcreteIntervalKeepsBoundType locks the DV_INTERVAL[T]
-// exception documented in rm/doc.go: the generic bounds are NOT routed
-// through jsonpoly, yet a concrete DVInterval[DVQuantity] holding *value*
-// bounds still emits each bound's `_type` — the bound is an addressable
-// struct field, so its pointer-receiver MarshalJSON runs when the wire
-// struct is marshalled by-pointer. The `_type` must also survive a
-// round-trip (REQ-052).
+// behaviour documented in rm/doc.go: a concrete DVInterval[DVQuantity]
+// holding *value* bounds still emits each bound's `_type` because the
+// streaming codec gives DVQuantity a value-receiver MarshalJSONTo (ADR 0022),
+// so the method runs whether the bound is held by value or pointer. The
+// `_type` must also survive a round-trip (REQ-052).
 func TestEncodeConcreteIntervalKeepsBoundType(t *testing.T) {
 	iv := &rm.DVInterval[rm.DVQuantity]{}
 	iv.Lower = rm.DVQuantity{Magnitude: 5, Units: "cm"}

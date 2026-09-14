@@ -2,6 +2,7 @@ package contribution_test
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"strings"
 	"testing"
 
@@ -10,12 +11,14 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
 
-// fakeNonVersion satisfies json.Marshaler + BMMName() but is not a
+// fakeNonVersion satisfies json.MarshalerTo + BMMName() but is not a
 // member of the closed CommitVersion set — Validate must reject it.
 type fakeNonVersion struct{}
 
-func (fakeNonVersion) MarshalJSON() ([]byte, error) { return []byte(`{"_type":"WRONG"}`), nil }
-func (fakeNonVersion) BMMName() string              { return "WRONG_TYPE" }
+func (fakeNonVersion) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return enc.WriteValue([]byte(`{"_type":"WRONG"}`))
+}
+func (fakeNonVersion) BMMName() string { return "WRONG_TYPE" }
 
 // newImportedVersion builds a minimal IMPORTED_VERSION<COMPOSITION> for
 // the closed-set tests. ImportedVersion wraps an OriginalVersion under

@@ -459,8 +459,14 @@ func TestTermMappingMatchSubstitutedSurrogateRefusedThroughFunnel(t *testing.T) 
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; want errors.Is(err, canjson.ErrInvalidShape)", err)
 	}
-	if !strings.Contains(err.Error(), "rm.Character") {
-		t.Errorf("err = %v; want the rm.Character refusal to reach the caller", err)
+	// Under encoding/json/v2 (ADR 0022) jsontext refuses a lone UTF-16 surrogate
+	// escape during tokenisation, before rm.Character's substituted-U+FFFD
+	// detector can inspect the value (Task 2 report Q4). The value is still
+	// refused and still shape-classified through TERM_MAPPING's funnel; only the
+	// message author moved from rm.Character to jsontext. The JSON-side detector
+	// is retired in Task 7 (ruling R15); this test re-pins to jsontext's text.
+	if !strings.Contains(err.Error(), "jsontext: invalid surrogate pair") {
+		t.Errorf("err = %v; want the jsontext surrogate refusal to reach the caller", err)
 	}
 }
 

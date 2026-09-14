@@ -11,11 +11,11 @@
       "value": "unknown",
       "defining_code": {
         "_type": "CODE_PHRASE",
+        "code_string": "253",
         "terminology_id": {
           "_type": "TERMINOLOGY_ID",
           "value": "openehr"
-        },
-        "code_string": "253"
+        }
       }
     }
   },
@@ -34,11 +34,11 @@
           "value": "creation",
           "defining_code": {
             "_type": "CODE_PHRASE",
+            "code_string": "249",
             "terminology_id": {
               "_type": "TERMINOLOGY_ID",
               "value": "openehr"
-            },
-            "code_string": "249"
+            }
           }
         }
       },
@@ -47,46 +47,46 @@
         "value": "complete",
         "defining_code": {
           "_type": "CODE_PHRASE",
+          "code_string": "532",
           "terminology_id": {
             "_type": "TERMINOLOGY_ID",
             "value": "openehr"
-          },
-          "code_string": "532"
+          }
         }
       },
       "data": {
         "_type": "COMPOSITION",
-        "name": null,
         "archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1",
-        "language": {
-          "_type": "CODE_PHRASE",
-          "terminology_id": {
-            "_type": "TERMINOLOGY_ID",
-            "value": ""
-          },
-          "code_string": ""
-        },
-        "territory": {
-          "_type": "CODE_PHRASE",
-          "terminology_id": {
-            "_type": "TERMINOLOGY_ID",
-            "value": ""
-          },
-          "code_string": ""
-        },
         "category": {
           "_type": "DV_CODED_TEXT",
           "value": "",
           "defining_code": {
             "_type": "CODE_PHRASE",
+            "code_string": "",
             "terminology_id": {
               "_type": "TERMINOLOGY_ID",
               "value": ""
-            },
-            "code_string": ""
+            }
           }
         },
-        "composer": null
+        "composer": null,
+        "language": {
+          "_type": "CODE_PHRASE",
+          "code_string": "",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": ""
+          }
+        },
+        "name": null,
+        "territory": {
+          "_type": "CODE_PHRASE",
+          "code_string": "",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": ""
+          }
+        }
       }
     },
     {
@@ -103,11 +103,11 @@
           "value": "amendment",
           "defining_code": {
             "_type": "CODE_PHRASE",
+            "code_string": "250",
             "terminology_id": {
               "_type": "TERMINOLOGY_ID",
               "value": "openehr"
-            },
-            "code_string": "250"
+            }
           }
         }
       },
@@ -120,46 +120,46 @@
         "value": "complete",
         "defining_code": {
           "_type": "CODE_PHRASE",
+          "code_string": "532",
           "terminology_id": {
             "_type": "TERMINOLOGY_ID",
             "value": "openehr"
-          },
-          "code_string": "532"
+          }
         }
       },
       "data": {
         "_type": "COMPOSITION",
-        "name": null,
         "archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1",
-        "language": {
-          "_type": "CODE_PHRASE",
-          "terminology_id": {
-            "_type": "TERMINOLOGY_ID",
-            "value": ""
-          },
-          "code_string": ""
-        },
-        "territory": {
-          "_type": "CODE_PHRASE",
-          "terminology_id": {
-            "_type": "TERMINOLOGY_ID",
-            "value": ""
-          },
-          "code_string": ""
-        },
         "category": {
           "_type": "DV_CODED_TEXT",
           "value": "",
           "defining_code": {
             "_type": "CODE_PHRASE",
+            "code_string": "",
             "terminology_id": {
               "_type": "TERMINOLOGY_ID",
               "value": ""
-            },
-            "code_string": ""
+            }
           }
         },
-        "composer": null
+        "composer": null,
+        "language": {
+          "_type": "CODE_PHRASE",
+          "code_string": "",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": ""
+          }
+        },
+        "name": null,
+        "territory": {
+          "_type": "CODE_PHRASE",
+          "code_string": "",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": ""
+          }
+        }
       }
     },
     {
@@ -176,11 +176,11 @@
           "value": "modification",
           "defining_code": {
             "_type": "CODE_PHRASE",
+            "code_string": "251",
             "terminology_id": {
               "_type": "TERMINOLOGY_ID",
               "value": "openehr"
-            },
-            "code_string": "251"
+            }
           }
         }
       },
@@ -197,22 +197,22 @@
         "value": "complete",
         "defining_code": {
           "_type": "CODE_PHRASE",
+          "code_string": "532",
           "terminology_id": {
             "_type": "TERMINOLOGY_ID",
             "value": "openehr"
-          },
-          "code_string": "532"
+          }
         }
       },
       "data": {
         "_type": "EHR_STATUS",
-        "name": null,
         "archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+        "is_modifiable": true,
+        "is_queryable": true,
+        "name": null,
         "subject": {
           "_type": "PARTY_SELF"
-        },
-        "is_queryable": true,
-        "is_modifiable": true
+        }
       }
     },
     {
@@ -229,11 +229,11 @@
           "value": "deleted",
           "defining_code": {
             "_type": "CODE_PHRASE",
+            "code_string": "523",
             "terminology_id": {
               "_type": "TERMINOLOGY_ID",
               "value": "openehr"
-            },
-            "code_string": "523"
+            }
           }
         }
       },
@@ -246,20 +246,20 @@
         "value": "complete",
         "defining_code": {
           "_type": "CODE_PHRASE",
+          "code_string": "532",
           "terminology_id": {
             "_type": "TERMINOLOGY_ID",
             "value": "openehr"
-          },
-          "code_string": "532"
+          }
         }
       },
       "data": {
         "_type": "FOLDER",
+        "archetype_node_id": "",
         "name": {
           "_type": "DV_TEXT",
           "value": "Encounters"
-        },
-        "archetype_node_id": ""
+        }
       }
     }
   ]

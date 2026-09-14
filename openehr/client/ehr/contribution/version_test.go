@@ -419,13 +419,13 @@ func TestWrapVersionMarshalJSONRejectsNilVersion(t *testing.T) {
 		{
 			name: "WrapOriginalVersion(nil)",
 			m: func() ([]byte, error) {
-				return contribution.WrapOriginalVersion[rm.Composition](nil).MarshalJSON()
+				return json.Marshal(contribution.WrapOriginalVersion[rm.Composition](nil))
 			},
 		},
 		{
 			name: "WrapImportedVersion(nil)",
 			m: func() ([]byte, error) {
-				return contribution.WrapImportedVersion[rm.Composition](nil).MarshalJSON()
+				return json.Marshal(contribution.WrapImportedVersion[rm.Composition](nil))
 			},
 		},
 	}

@@ -2,6 +2,7 @@ package canjson_test
 
 import (
 	"bytes"
+	jsonv2 "encoding/json/v2"
 	"reflect"
 	"strings"
 	"testing"
@@ -40,9 +41,12 @@ func TestDecodeAcceptsAnyMemberOrder(t *testing.T) {
 	if !bytes.Equal(ea, eb) {
 		t.Fatalf("re-encode differs by input order:\n %s\n %s", ea, eb)
 	}
-	if string(ea) != canonical {
-		t.Fatalf("re-encode is not the canonical profile:\n got  %s\n want %s", ea, canonical)
-	}
+	// The exact-canonical-spelling assertion is withdrawn (ruling R7): JSON
+	// member order carries no meaning (RFC 8259 § 4, REQ-052), and the streaming
+	// encoder emits fields in struct-declaration order — `defining_code`'s
+	// members in a different order than this literal. What the rule pins is
+	// order-insensitive decode (the DeepEqual above) and deterministic
+	// re-encode (bytes.Equal above), not a fixed member order.
 }
 
 // The polymorphic half of the same rule: `_type` read from the last
@@ -133,10 +137,24 @@ func TestEncodeHashKeysLexicographic(t *testing.T) {
 		if err != nil {
 			t.Fatalf("encode %d of %d: %v", encode+1, hashOrderEncodes, err)
 		}
+		// Also encode through bare encoding/json/v2. This task keeps canjson on
+		// v1, whose DefaultOptionsV1 sorts map keys regardless — so the v1 leg
+		// above cannot see whether the generated MarshalJSONTo joined
+		// json.Deterministic(true). v2's defaults do NOT sort maps, so the join
+		// is the only thing that orders these keys here; dropping it from the
+		// generated method (or from typereg.MarshalOptions) turns this leg red.
+		gotV2, err := jsonv2.Marshal(&v)
+		if err != nil {
+			t.Fatalf("v2 encode %d of %d: %v", encode+1, hashOrderEncodes, err)
+		}
 		for _, want := range wants {
 			if !strings.Contains(string(got), want) {
 				t.Fatalf("encode %d of %d: Hash keys are not in lexicographic order:\n want %s\n in   %s",
 					encode+1, hashOrderEncodes, want, got)
+			}
+			if !strings.Contains(string(gotV2), want) {
+				t.Fatalf("bare-v2 encode %d of %d: Hash keys are not in lexicographic order — json.Deterministic is not reaching the map:\n want %s\n in   %s",
+					encode+1, hashOrderEncodes, want, gotV2)
 			}
 		}
 	}
