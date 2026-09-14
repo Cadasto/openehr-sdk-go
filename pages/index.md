@@ -17,7 +17,7 @@ template: home.html
 # openEHR Go SDK
 
 <p class="home-tagline">
-Typed compositions, checkable templates, and AQL builder and validator.<br>
+Typed compositions, checkable templates and AQL builder.<br>
 Imported like any other Go package.
 </p>
 
