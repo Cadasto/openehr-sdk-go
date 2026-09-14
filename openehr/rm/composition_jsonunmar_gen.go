@@ -4,190 +4,44 @@
 package rm
 
 import (
-	"encoding/json"
-	"errors"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.composition — canonical-JSON UnmarshalJSON companions
+// BMM package: org.openehr.rm.composition — canonical-JSON UnmarshalJSONFrom companions
 
-type CompositionJSONUnmarshaller struct {
-	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string          `json:"archetype_node_id"`
-	UID             json.RawMessage `json:"uid,omitempty"` // polymorphic UIDBasedID
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Language Mandatory indicator of the localised language in which this Composition is written. Coded from openEHR Code Set  `languages`. The language of an Entry if different from the Composition is indicated in `ENTRY._language_`.
-	Language CodePhrase `json:"language"`
-	// Territory Name of territory in which this Composition was written. Coded from openEHR  countries  code set, which is an expression of the ISO 3166 standard.
-	Territory CodePhrase `json:"territory"`
-	// Category Temporal category of this Composition, i.e.
-	//
-	// * `431|persistent|` - of potential life-time validity;
-	// * `451|episodic|` - valid over the life of a care episode;
-	// * `433|event|` - valid at the time of recording (long-term validity requires subsequent clinical assessment).
-	//
-	// or any other code defined in the openEHR terminology group 'category'.
-	Category DVCodedText `json:"category"`
-	// Context The clinical session context of this Composition, i.e. the contextual attributes of the clinical session.
-	Context  *EventContext     `json:"context,omitempty"`
-	Composer json.RawMessage   `json:"composer"`          // polymorphic PartyProxy
-	Content  []json.RawMessage `json:"content,omitempty"` // polymorphic []ContentItem
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Composition.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *Composition) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Composition.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *Composition) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: COMPOSITION: %w", typereg.ErrNilReceiver)
 	}
-	var aux CompositionJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("COMPOSITION", err)
-	}
-	if aux.Class != "" && aux.Class != "COMPOSITION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "COMPOSITION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/name", Inner: jerr}
-				}
-				c.Name = &def
-			} else {
-				return &typereg.DecodeError{Path: "/name", Inner: err}
-			}
-		} else {
-			c.Name = dv
-		}
-	}
-	c.ArchetypeNodeID = aux.ArchetypeNodeID
-	if len(aux.UID) > 0 && string(aux.UID) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/uid", Inner: err}
-		}
-		c.UID = dv
-	}
-	c.Links = aux.Links
-	c.ArchetypeDetails = aux.ArchetypeDetails
-	c.FeederAudit = aux.FeederAudit
-	c.Language = aux.Language
-	c.Territory = aux.Territory
-	c.Category = aux.Category
-	c.Context = aux.Context
-	if len(aux.Composer) > 0 && string(aux.Composer) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Composer)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/composer", Inner: err}
-		}
-		c.Composer = dv
-	}
-	if aux.Content != nil {
-		c.Content = make([]ContentItem, len(aux.Content))
-		for idx, raw := range aux.Content {
-			if len(raw) == 0 || string(raw) == "null" {
-				continue
-			}
-			dv, err := typereg.DecodeAs[ContentItem](raw)
-			if err != nil {
-				return &typereg.DecodeError{Path: fmt.Sprintf("/content/%d", idx), Inner: err}
-			}
-			c.Content[idx] = dv
-		}
-	}
-	return nil
+	return typereg.DecodeInto(dec, "COMPOSITION", &struct {
+		Type string `json:"_type"`
+		*rawComposition
+	}{rawComposition: (*rawComposition)(c)})
 }
 
-type EventContextJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// StartTime Start time of the clinical session or other kind of event during which a provider performs a service of any kind for the patient.
-	StartTime DVDateTime `json:"start_time"`
-	// EndTime Optional end time of the clinical session.
-	EndTime *DVDateTime `json:"end_time,omitempty"`
-	// Location The actual location where the session occurred, e.g. 'microbiology lab 2', 'home', 'ward A3'  and so on.
-	Location *string `json:"location,omitempty"`
-	// Setting The setting in which the clinical session took place. Coded using the openEHR Terminology,  setting  group.
-	Setting            DVCodedText     `json:"setting"`
-	OtherContext       json.RawMessage `json:"other_context,omitempty"`        // polymorphic ItemStructure
-	HealthCareFacility json.RawMessage `json:"health_care_facility,omitempty"` // polymorphic PartyIdentifiedLike
-	// Participations Parties involved in the healthcare event. These would normally include the physician(s) and often the patient (but not the latter if the clinical session is a pathology test for example).
-	Participations []Participation `json:"participations,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into EventContext.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (e *EventContext) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into EventContext.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (e *EventContext) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EVENT_CONTEXT: %w", typereg.ErrNilReceiver)
 	}
-	var aux EventContextJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("EVENT_CONTEXT", err)
-	}
-	if aux.Class != "" && aux.Class != "EVENT_CONTEXT" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EVENT_CONTEXT", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	e.StartTime = aux.StartTime
-	e.EndTime = aux.EndTime
-	e.Location = aux.Location
-	e.Setting = aux.Setting
-	if len(aux.OtherContext) > 0 && string(aux.OtherContext) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.OtherContext)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/other_context", Inner: err}
-		}
-		e.OtherContext = dv
-	}
-	if len(aux.HealthCareFacility) > 0 && string(aux.HealthCareFacility) != "null" {
-		dv, err := typereg.DecodeAs[PartyIdentifiedLike](aux.HealthCareFacility)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def PartyIdentified
-				if jerr := json.Unmarshal(aux.HealthCareFacility, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/health_care_facility", Inner: jerr}
-				}
-				e.HealthCareFacility = &def
-			} else {
-				return &typereg.DecodeError{Path: "/health_care_facility", Inner: err}
-			}
-		} else {
-			e.HealthCareFacility = dv
-		}
-	}
-	e.Participations = aux.Participations
-	return nil
+	return typereg.DecodeInto(dec, "EVENT_CONTEXT", &struct {
+		Type string `json:"_type"`
+		*rawEventContext
+	}{rawEventContext: (*rawEventContext)(e)})
 }

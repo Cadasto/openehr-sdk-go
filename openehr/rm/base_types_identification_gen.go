@@ -50,7 +50,7 @@ type LocatableRef struct {
 	// ID Globally unique id of an object, regardless of where it is stored.
 	ID UIDBasedID `json:"id"`
 	// Path The path to an instance, as an absolute path with respect to the object found at `VERSION._data_`. An empty path means that the object referred to by `_id_` is being specified.
-	Path *string `json:"path,omitempty"`
+	Path *string `json:"path,omitzero"`
 }
 
 // ObjectID Ancestor class of identifiers of informational objects. Ids may be completely meaningless, in which case their only job is to refer to something, or may carry some information to do with the identified object.

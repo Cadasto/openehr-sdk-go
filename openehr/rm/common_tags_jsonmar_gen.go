@@ -4,47 +4,30 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.tags — canonical-JSON MarshalJSON companions
+// BMM package: org.openehr.rm.common.tags — canonical-JSON MarshalJSONTo companions
 
-type ItemTagJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Key The tag key. May not be empty or contain leading or trailing whitespace.
-	Key string `json:"key"`
-	// Value The value. If set, may not be empty.
-	Value *string `json:"value,omitempty"`
-	// Target Identifier of target, which may be a `VERSIONED_OBJECT<T>` or a `VERSION<T>`.
-	Target json.RawMessage `json:"target"`
-	// TargetPath Optional archetype (i.e. AQL) or RM path within `_target_`, used to tag a fine-grained element.
-	TargetPath *string `json:"target_path,omitempty"`
-	// OwnerID Identifier of owner object, such as EHR.
-	OwnerID json.RawMessage `json:"owner_id"`
-}
+// rawItemTag is the method-free canonical-JSON alias for ItemTag. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawItemTag ItemTag
 
-// MarshalJSON emits canonical openEHR JSON for ItemTag with `_type`
-// (value "ITEM_TAG") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (i *ItemTag) MarshalJSON() ([]byte, error) {
-	rawTarget, err := jsonpoly.Marshal(i.Target)
-	if err != nil {
-		return nil, err
-	}
-	rawOwnerID, err := jsonpoly.Marshal(i.OwnerID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ItemTagJSONMarshaller{
-		Class:      "ITEM_TAG",
-		Key:        i.Key,
-		Value:      i.Value,
-		Target:     rawTarget,
-		TargetPath: i.TargetPath,
-		OwnerID:    rawOwnerID,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for ItemTag with `_type`
+// (value "ITEM_TAG") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (i ItemTag) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawItemTag
+	}{"ITEM_TAG", (*rawItemTag)(&i)}, typereg.MarshalOptions(enc))
 }

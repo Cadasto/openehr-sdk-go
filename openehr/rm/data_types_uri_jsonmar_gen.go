@@ -3,42 +3,51 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-// BMM package: org.openehr.rm.data_types.uri — canonical-JSON MarshalJSON companions
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+)
 
-type DVEHRURIJSONMarshaller struct {
+// BMM package: org.openehr.rm.data_types.uri — canonical-JSON MarshalJSONTo companions
+
+// DVEHRURIJSONWire is the flat canonical-JSON wire struct for DVEHRURI. DVEHRURI embeds
+// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// promote that ancestor's methods and emit the wrong `_type`; the flat
+// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+type DVEHRURIJSONWire struct {
 	Class string `json:"_type"`
 	// Value Value of URI as a String. 'Plain-text' URIs are allowed, enabling better readability, but must be RFC-3986 encoded in use.
 	Value string `json:"value"`
 }
 
-// MarshalJSON emits canonical openEHR JSON for DVEHRURI with `_type`
-// (value "DV_EHR_URI") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVEHRURI) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVEHRURIJSONMarshaller{
+// MarshalJSONTo emits canonical openEHR JSON for DVEHRURI with `_type`
+// (value "DV_EHR_URI") as the leading member (REQ-052, Q6). The receiver is a
+// value so a by-value instance in a polymorphic slot keeps its `_type`.
+func (d DVEHRURI) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &DVEHRURIJSONWire{
 		Class: "DV_EHR_URI",
 		Value: d.Value,
-	})
+	}, typereg.MarshalOptions(enc))
 }
 
-type DVURIJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value Value of URI as a String. 'Plain-text' URIs are allowed, enabling better readability, but must be RFC-3986 encoded in use.
-	Value string `json:"value"`
-}
+// rawDVURI is the method-free canonical-JSON alias for DVURI. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVURI DVURI
 
-// MarshalJSON emits canonical openEHR JSON for DVURI with `_type`
-// (value "DV_URI") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVURI) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVURIJSONMarshaller{
-		Class: "DV_URI",
-		Value: d.Value,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for DVURI with `_type`
+// (value "DV_URI") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (d DVURI) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVURI
+	}{"DV_URI", (*rawDVURI)(&d)}, typereg.MarshalOptions(enc))
 }

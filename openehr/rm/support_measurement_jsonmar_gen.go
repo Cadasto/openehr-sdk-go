@@ -3,21 +3,31 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-// BMM package: org.openehr.rm.support.measurement — canonical-JSON MarshalJSON companions
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+)
 
-type MeasurementServiceJSONMarshaller struct {
-	Class string `json:"_type"`
-}
+// BMM package: org.openehr.rm.support.measurement — canonical-JSON MarshalJSONTo companions
 
-// MarshalJSON emits canonical openEHR JSON for MeasurementService with `_type`
-// (value "MEASUREMENT_SERVICE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (m *MeasurementService) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&MeasurementServiceJSONMarshaller{
-		Class: "MEASUREMENT_SERVICE",
-	})
+// rawMeasurementService is the method-free canonical-JSON alias for MeasurementService. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawMeasurementService MeasurementService
+
+// MarshalJSONTo emits canonical openEHR JSON for MeasurementService with `_type`
+// (value "MEASUREMENT_SERVICE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (m MeasurementService) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawMeasurementService
+	}{"MEASUREMENT_SERVICE", (*rawMeasurementService)(&m)}, typereg.MarshalOptions(enc))
 }

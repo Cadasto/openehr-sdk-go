@@ -4,75 +4,27 @@
 package rm
 
 import (
-	"encoding/json"
-	"errors"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.tags — canonical-JSON UnmarshalJSON companions
+// BMM package: org.openehr.rm.common.tags — canonical-JSON UnmarshalJSONFrom companions
 
-type ItemTagJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Key The tag key. May not be empty or contain leading or trailing whitespace.
-	Key string `json:"key"`
-	// Value The value. If set, may not be empty.
-	Value  *string         `json:"value,omitempty"`
-	Target json.RawMessage `json:"target"` // polymorphic UIDBasedID
-	// TargetPath Optional archetype (i.e. AQL) or RM path within `_target_`, used to tag a fine-grained element.
-	TargetPath *string         `json:"target_path,omitempty"`
-	OwnerID    json.RawMessage `json:"owner_id"` // polymorphic ObjectRefLike
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ItemTag.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (i *ItemTag) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ItemTag.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (i *ItemTag) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ITEM_TAG: %w", typereg.ErrNilReceiver)
 	}
-	var aux ItemTagJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ITEM_TAG", err)
-	}
-	if aux.Class != "" && aux.Class != "ITEM_TAG" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ITEM_TAG", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	i.Key = aux.Key
-	i.Value = aux.Value
-	if len(aux.Target) > 0 && string(aux.Target) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.Target)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/target", Inner: err}
-		}
-		i.Target = dv
-	}
-	i.TargetPath = aux.TargetPath
-	if len(aux.OwnerID) > 0 && string(aux.OwnerID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.OwnerID)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.OwnerID, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/owner_id", Inner: jerr}
-				}
-				i.OwnerID = &def
-			} else {
-				return &typereg.DecodeError{Path: "/owner_id", Inner: err}
-			}
-		} else {
-			i.OwnerID = dv
-		}
-	}
-	return nil
+	return typereg.DecodeInto(dec, "ITEM_TAG", &struct {
+		Type string `json:"_type"`
+		*rawItemTag
+	}{rawItemTag: (*rawItemTag)(i)})
 }

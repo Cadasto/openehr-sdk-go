@@ -8,7 +8,7 @@ package rm
 // DVDate Represents an absolute point in time, as measured on the Gregorian calendar, and specified only to the day. Semantics defined by ISO 8601. Used for recording dates in real world time. The partial form is used for approximate birth dates, dates of death, etc.
 type DVDate struct {
 	// Accuracy Time accuracy, expressed as a duration.
-	Accuracy *DVDuration `json:"accuracy,omitempty"`
+	Accuracy *DVDuration `json:"accuracy,omitzero"`
 	// MagnitudeStatus Optional status of magnitude with values:
 	//
 	// * `"="`   :   magnitude is a point value
@@ -19,11 +19,11 @@ type DVDate struct {
 	// * `"~"`   :   value is approximately magnitude
 	//
 	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
+	MagnitudeStatus *string `json:"magnitude_status,omitzero"`
 	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
+	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitzero"`
 	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
+	NormalStatus *CodePhrase `json:"normal_status,omitzero"`
 	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
 	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
 	// Value ISO8601 date string.
@@ -61,7 +61,7 @@ func (d *DVDate) Subtract(aDiff DVDuration) DVDate {
 // Used for recording a precise point in real world time, and for approximate time stamps, e.g. the origin of a `HISTORY` in an `OBSERVATION` which is only partially known.
 type DVDateTime struct {
 	// Accuracy Time accuracy, expressed as a duration.
-	Accuracy *DVDuration `json:"accuracy,omitempty"`
+	Accuracy *DVDuration `json:"accuracy,omitzero"`
 	// MagnitudeStatus Optional status of magnitude with values:
 	//
 	// * `"="`   :   magnitude is a point value
@@ -72,11 +72,11 @@ type DVDateTime struct {
 	// * `"~"`   :   value is approximately magnitude
 	//
 	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
+	MagnitudeStatus *string `json:"magnitude_status,omitzero"`
 	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
+	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitzero"`
 	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
+	NormalStatus *CodePhrase `json:"normal_status,omitzero"`
 	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
 	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
 	// Value ISO8601 date/time string.
@@ -115,9 +115,9 @@ type DVDuration struct {
 	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
 	//
 	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *Real `json:"accuracy,omitempty"`
+	Accuracy *Real `json:"accuracy,omitzero"`
 	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
-	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
+	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitzero"`
 	// MagnitudeStatus Optional status of magnitude with values:
 	//
 	// * `"="`   :   magnitude is a point value
@@ -128,11 +128,11 @@ type DVDuration struct {
 	// * `"~"`   :   value is approximately magnitude
 	//
 	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
+	MagnitudeStatus *string `json:"magnitude_status,omitzero"`
 	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
+	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitzero"`
 	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
+	NormalStatus *CodePhrase `json:"normal_status,omitzero"`
 	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
 	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
 	// Value ISO8601 duration string, including described deviations to support negative values and weeks.
@@ -185,7 +185,7 @@ func (DVTime) isDVTemporal() {}
 // Used for recording real world times, rather than scientifically measured fine amounts of time. The partial form is used for approximate times of events and substance administrations.
 type DVTime struct {
 	// Accuracy Time accuracy, expressed as a duration.
-	Accuracy *DVDuration `json:"accuracy,omitempty"`
+	Accuracy *DVDuration `json:"accuracy,omitzero"`
 	// MagnitudeStatus Optional status of magnitude with values:
 	//
 	// * `"="`   :   magnitude is a point value
@@ -196,11 +196,11 @@ type DVTime struct {
 	// * `"~"`   :   value is approximately magnitude
 	//
 	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
+	MagnitudeStatus *string `json:"magnitude_status,omitzero"`
 	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
+	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitzero"`
 	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
+	NormalStatus *CodePhrase `json:"normal_status,omitzero"`
 	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
 	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
 	// Value ISO8601 time string

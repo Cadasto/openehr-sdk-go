@@ -4,106 +4,44 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.base.foundation_types.interval — canonical-JSON UnmarshalJSON companions
+// BMM package: org.openehr.base.foundation_types.interval — canonical-JSON UnmarshalJSONFrom companions
 
-type PointIntervalJSONUnmarshaller[T any] struct {
-	Class string `json:"_type"`
-	// Lower Lower bound.
-	Lower T `json:"lower,omitempty"`
-	// Upper Upper bound.
-	Upper T `json:"upper,omitempty"`
-	// LowerUnbounded Lower boundary open (i.e. = -infinity).
-	LowerUnbounded bool `json:"lower_unbounded"`
-	// UpperUnbounded Upper boundary open (i.e. = +infinity).
-	UpperUnbounded bool `json:"upper_unbounded"`
-	// LowerIncluded Lower boundary value included in range if not `_lower_unbounded_`.
-	LowerIncluded bool `json:"lower_included"`
-	// UpperIncluded Upper boundary value included in range if not `_upper_unbounded_`.
-	UpperIncluded bool `json:"upper_included"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into PointInterval.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (p *PointInterval[T]) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into PointInterval.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (p *PointInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: Point_interval: %w", typereg.ErrNilReceiver)
 	}
-	var aux PointIntervalJSONUnmarshaller[T]
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("Point_interval", err)
-	}
-	if aux.Class != "" && aux.Class != "Point_interval" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "Point_interval", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	p.Lower = aux.Lower
-	p.Upper = aux.Upper
-	p.LowerUnbounded = aux.LowerUnbounded
-	p.UpperUnbounded = aux.UpperUnbounded
-	p.LowerIncluded = aux.LowerIncluded
-	p.UpperIncluded = aux.UpperIncluded
-	return nil
+	return typereg.DecodeInto(dec, "Point_interval", &struct {
+		Type string `json:"_type"`
+		*rawPointInterval[T]
+	}{rawPointInterval: (*rawPointInterval[T])(p)})
 }
 
-type ProperIntervalJSONUnmarshaller[T any] struct {
-	Class string `json:"_type"`
-	// Lower Lower bound.
-	Lower T `json:"lower,omitempty"`
-	// Upper Upper bound.
-	Upper T `json:"upper,omitempty"`
-	// LowerUnbounded True if `_lower_` boundary open (i.e. = `-infinity`).
-	LowerUnbounded bool `json:"lower_unbounded"`
-	// UpperUnbounded True if `_upper_` boundary open (i.e. = `+infinity`).
-	UpperUnbounded bool `json:"upper_unbounded"`
-	// LowerIncluded True if `_lower_` boundary value included in range, if `not _lower_unbounded_`.
-	LowerIncluded bool `json:"lower_included"`
-	// UpperIncluded True if `_upper_` boundary value included in range if `not _upper_unbounded_`.
-	UpperIncluded bool `json:"upper_included"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ProperInterval.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (p *ProperInterval[T]) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ProperInterval.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (p *ProperInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: Proper_interval: %w", typereg.ErrNilReceiver)
 	}
-	var aux ProperIntervalJSONUnmarshaller[T]
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("Proper_interval", err)
-	}
-	if aux.Class != "" && aux.Class != "Proper_interval" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "Proper_interval", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	p.Lower = aux.Lower
-	p.Upper = aux.Upper
-	p.LowerUnbounded = aux.LowerUnbounded
-	p.UpperUnbounded = aux.UpperUnbounded
-	p.LowerIncluded = aux.LowerIncluded
-	p.UpperIncluded = aux.UpperIncluded
-	return nil
+	return typereg.DecodeInto(dec, "Proper_interval", &struct {
+		Type string `json:"_type"`
+		*rawProperInterval[T]
+	}{rawProperInterval: (*rawProperInterval[T])(p)})
 }

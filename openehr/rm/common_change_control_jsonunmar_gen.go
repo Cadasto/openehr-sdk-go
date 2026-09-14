@@ -4,292 +4,78 @@
 package rm
 
 import (
-	"encoding/json"
-	"errors"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.change_control — canonical-JSON UnmarshalJSON companions
+// BMM package: org.openehr.rm.common.change_control — canonical-JSON UnmarshalJSONFrom companions
 
-type ContributionJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// UID Unique identifier for this Contribution.
-	UID      HierObjectID      `json:"uid"`
-	Versions []json.RawMessage `json:"versions"` // polymorphic []ObjectRefLike
-	Audit    json.RawMessage   `json:"audit"`    // polymorphic AuditDetailsLike
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Contribution.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *Contribution) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Contribution.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *Contribution) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: CONTRIBUTION: %w", typereg.ErrNilReceiver)
 	}
-	var aux ContributionJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("CONTRIBUTION", err)
-	}
-	if aux.Class != "" && aux.Class != "CONTRIBUTION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "CONTRIBUTION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.UID = aux.UID
-	if aux.Versions != nil {
-		c.Versions = make([]ObjectRefLike, len(aux.Versions))
-		for idx, raw := range aux.Versions {
-			if len(raw) == 0 || string(raw) == "null" {
-				continue
-			}
-			dv, err := typereg.DecodeAs[ObjectRefLike](raw)
-			if err != nil {
-				if errors.Is(err, typereg.ErrMissingType) {
-					var def ObjectRef
-					if jerr := json.Unmarshal(raw, &def); jerr != nil {
-						return &typereg.DecodeError{Path: fmt.Sprintf("/versions/%d", idx), Inner: jerr}
-					}
-					c.Versions[idx] = &def
-				} else {
-					return &typereg.DecodeError{Path: fmt.Sprintf("/versions/%d", idx), Inner: err}
-				}
-			} else {
-				c.Versions[idx] = dv
-			}
-		}
-	}
-	if len(aux.Audit) > 0 && string(aux.Audit) != "null" {
-		dv, err := typereg.DecodeAs[AuditDetailsLike](aux.Audit)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def AuditDetails
-				if jerr := json.Unmarshal(aux.Audit, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/audit", Inner: jerr}
-				}
-				c.Audit = &def
-			} else {
-				return &typereg.DecodeError{Path: "/audit", Inner: err}
-			}
-		} else {
-			c.Audit = dv
-		}
-	}
-	return nil
+	return typereg.DecodeInto(dec, "CONTRIBUTION", &struct {
+		Type string `json:"_type"`
+		*rawContribution
+	}{rawContribution: (*rawContribution)(c)})
 }
 
-type ImportedVersionJSONUnmarshaller[T any] struct {
-	Class        string          `json:"_type"`
-	Contribution json.RawMessage `json:"contribution"` // polymorphic ObjectRefLike
-	// Signature OpenPGP digital signature or digest of content committed in this Version.
-	Signature   *string         `json:"signature,omitempty"`
-	CommitAudit json.RawMessage `json:"commit_audit"` // polymorphic AuditDetailsLike
-	// Item The `ORIGINAL_VERSION` object that was imported.
-	Item OriginalVersion[any] `json:"item"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ImportedVersion.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (i *ImportedVersion[T]) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ImportedVersion.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (i *ImportedVersion[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: IMPORTED_VERSION: %w", typereg.ErrNilReceiver)
 	}
-	var aux ImportedVersionJSONUnmarshaller[T]
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("IMPORTED_VERSION", err)
-	}
-	if aux.Class != "" && aux.Class != "IMPORTED_VERSION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "IMPORTED_VERSION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Contribution) > 0 && string(aux.Contribution) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.Contribution)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.Contribution, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/contribution", Inner: jerr}
-				}
-				i.Contribution = &def
-			} else {
-				return &typereg.DecodeError{Path: "/contribution", Inner: err}
-			}
-		} else {
-			i.Contribution = dv
-		}
-	}
-	i.Signature = aux.Signature
-	if len(aux.CommitAudit) > 0 && string(aux.CommitAudit) != "null" {
-		dv, err := typereg.DecodeAs[AuditDetailsLike](aux.CommitAudit)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def AuditDetails
-				if jerr := json.Unmarshal(aux.CommitAudit, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/commit_audit", Inner: jerr}
-				}
-				i.CommitAudit = &def
-			} else {
-				return &typereg.DecodeError{Path: "/commit_audit", Inner: err}
-			}
-		} else {
-			i.CommitAudit = dv
-		}
-	}
-	i.Item = aux.Item
-	return nil
+	return typereg.DecodeInto(dec, "IMPORTED_VERSION", &struct {
+		Type string `json:"_type"`
+		*rawImportedVersion[T]
+	}{rawImportedVersion: (*rawImportedVersion[T])(i)})
 }
 
-type OriginalVersionJSONUnmarshaller[T any] struct {
-	Class        string          `json:"_type"`
-	Contribution json.RawMessage `json:"contribution"` // polymorphic ObjectRefLike
-	// Signature OpenPGP digital signature or digest of content committed in this Version.
-	Signature   *string         `json:"signature,omitempty"`
-	CommitAudit json.RawMessage `json:"commit_audit"` // polymorphic AuditDetailsLike
-	// UID Stored version of inheritance precursor.
-	UID ObjectVersionID `json:"uid"`
-	// PrecedingVersionUID Stored version of inheritance precursor.
-	PrecedingVersionUID *ObjectVersionID `json:"preceding_version_uid,omitempty"`
-	// OtherInputVersionUids Identifiers of other versions whose content was merged into this version, if any.
-	OtherInputVersionUids []ObjectVersionID `json:"other_input_version_uids,omitempty"`
-	// LifecycleState Lifecycle state of the content item in this version; coded by openEHR vocabulary `version lifecycle state`.
-	LifecycleState DVCodedText `json:"lifecycle_state"`
-	// Attestations Set of attestations relating to this version.
-	Attestations []Attestation `json:"attestations,omitempty"`
-	// Data Data content of this Version.
-	Data *T `json:"data,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into OriginalVersion.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (o *OriginalVersion[T]) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into OriginalVersion.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (o *OriginalVersion[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: ORIGINAL_VERSION: %w", typereg.ErrNilReceiver)
 	}
-	var aux OriginalVersionJSONUnmarshaller[T]
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ORIGINAL_VERSION", err)
-	}
-	if aux.Class != "" && aux.Class != "ORIGINAL_VERSION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ORIGINAL_VERSION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Contribution) > 0 && string(aux.Contribution) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.Contribution)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.Contribution, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/contribution", Inner: jerr}
-				}
-				o.Contribution = &def
-			} else {
-				return &typereg.DecodeError{Path: "/contribution", Inner: err}
-			}
-		} else {
-			o.Contribution = dv
-		}
-	}
-	o.Signature = aux.Signature
-	if len(aux.CommitAudit) > 0 && string(aux.CommitAudit) != "null" {
-		dv, err := typereg.DecodeAs[AuditDetailsLike](aux.CommitAudit)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def AuditDetails
-				if jerr := json.Unmarshal(aux.CommitAudit, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/commit_audit", Inner: jerr}
-				}
-				o.CommitAudit = &def
-			} else {
-				return &typereg.DecodeError{Path: "/commit_audit", Inner: err}
-			}
-		} else {
-			o.CommitAudit = dv
-		}
-	}
-	o.UID = aux.UID
-	o.PrecedingVersionUID = aux.PrecedingVersionUID
-	o.OtherInputVersionUids = aux.OtherInputVersionUids
-	o.LifecycleState = aux.LifecycleState
-	o.Attestations = aux.Attestations
-	o.Data = aux.Data
-	return nil
+	return typereg.DecodeInto(dec, "ORIGINAL_VERSION", &struct {
+		Type string `json:"_type"`
+		*rawOriginalVersion[T]
+	}{rawOriginalVersion: (*rawOriginalVersion[T])(o)})
 }
 
-type VersionedObjectJSONUnmarshaller[T any] struct {
-	Class string `json:"_type"`
-	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
-	UID     HierObjectID    `json:"uid"`
-	OwnerID json.RawMessage `json:"owner_id"` // polymorphic ObjectRefLike
-	// TimeCreated Time of initial creation of this versioned object.
-	TimeCreated DVDateTime `json:"time_created"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into VersionedObject.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (v *VersionedObject[T]) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into VersionedObject.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (v *VersionedObject[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if v == nil {
 		return fmt.Errorf("canjson: VERSIONED_OBJECT: %w", typereg.ErrNilReceiver)
 	}
-	var aux VersionedObjectJSONUnmarshaller[T]
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("VERSIONED_OBJECT", err)
-	}
-	if aux.Class != "" && aux.Class != "VERSIONED_OBJECT" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "VERSIONED_OBJECT", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	v.UID = aux.UID
-	if len(aux.OwnerID) > 0 && string(aux.OwnerID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.OwnerID)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.OwnerID, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/owner_id", Inner: jerr}
-				}
-				v.OwnerID = &def
-			} else {
-				return &typereg.DecodeError{Path: "/owner_id", Inner: err}
-			}
-		} else {
-			v.OwnerID = dv
-		}
-	}
-	v.TimeCreated = aux.TimeCreated
-	return nil
+	return typereg.DecodeInto(dec, "VERSIONED_OBJECT", &struct {
+		Type string `json:"_type"`
+		*rawVersionedObject[T]
+	}{rawVersionedObject: (*rawVersionedObject[T])(v)})
 }

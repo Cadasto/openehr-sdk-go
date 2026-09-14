@@ -10,15 +10,15 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // CCodedText Constrainer class for Coded text data.
 type CCodedText struct {
 	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitempty"`
+	AssumedValue *any `json:"assumed_value,omitzero"`
 	// CodeList Optional list of codes from the terminology. No list means any code from the terminology is allowed.
-	CodeList *[]string `json:"code_list,omitempty"`
+	CodeList *[]string `json:"code_list,omitzero"`
 	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
 	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
 	Occurrences rm.Interval[Integer] `json:"occurrences"`
-	Reference   *string              `json:"reference,omitempty"`
+	Reference   *string              `json:"reference,omitzero"`
 	// RMTypeName Reference model type that this node corresponds to.
 	RMTypeName string `json:"rm_type_name"`
 	// Terminology Terminology identifier.
@@ -28,7 +28,7 @@ type CCodedText struct {
 // COrdinal Constrainer class for Ordinal data.
 type COrdinal struct {
 	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitempty"`
+	AssumedValue *any `json:"assumed_value,omitzero"`
 	// List Value set of allowed Ordinals in the constraint.
 	List []Ordinal `json:"list,omitempty"`
 	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
@@ -43,7 +43,7 @@ type COrdinal struct {
 // CQuantity Constrainer class for Quantity data.
 type CQuantity struct {
 	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitempty"`
+	AssumedValue *any `json:"assumed_value,omitzero"`
 	// List Value set of allowed individual Quantity item constraints in this Quantity constraint.
 	List []CQuantityItem `json:"list,omitempty"`
 	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
@@ -62,7 +62,7 @@ type CQuantityItem struct {
 	// Magnitude Quantity magnitude constraint.
 	Magnitude rm.Interval[Real] `json:"magnitude"`
 	// Units Optional units constraint.
-	Units *string `json:"units,omitempty"`
+	Units *string `json:"units,omitzero"`
 }
 
 // Ordinal Constrainer object representing a single Ordinal value.

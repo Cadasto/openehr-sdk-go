@@ -4,14 +4,19 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.generic — canonical-JSON MarshalJSON companions
+// BMM package: org.openehr.rm.common.generic — canonical-JSON MarshalJSONTo companions
 
-type AttestationJSONMarshaller struct {
+// AttestationJSONWire is the flat canonical-JSON wire struct for Attestation. Attestation embeds
+// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// promote that ancestor's methods and emit the wrong `_type`; the flat
+// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+type AttestationJSONWire struct {
 	Class string `json:"_type"`
 	// SystemID Identifier of the logical EHR system where the change was committed. This is almost always owned by the organisation legally responsible for the EHR, and is distinct from any application, or any hosting infrastructure.
 	SystemID string `json:"system_id"`
@@ -20,235 +25,185 @@ type AttestationJSONMarshaller struct {
 	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
 	ChangeType DVCodedText `json:"change_type"`
 	// Description Reason for committal. This may be used to qualify the value in the `_change_type_` field. For example, if the change affects only the EHR directory, this field might be used to indicate 'Folder "episode 2018-02-16" added' or similar.
-	Description json.RawMessage `json:"description,omitempty"`
+	Description DVTextLike `json:"description,omitempty"`
 	// Committer Identity and optional reference into identity management service, of user who committed the item.
-	Committer json.RawMessage `json:"committer"`
+	Committer PartyProxy `json:"committer"`
 	// AttestedView Optional visual representation of content attested e.g. screen image.
-	AttestedView *DVMultimedia `json:"attested_view,omitempty"`
+	AttestedView *DVMultimedia `json:"attested_view,omitzero"`
 	// Proof Proof of attestation.
-	Proof *string `json:"proof,omitempty"`
+	Proof *string `json:"proof,omitzero"`
 	// Items Items attested, expressed as fully qualified runtime paths to the items in question. Although not recommended, these may include fine-grained items which have been attested in some other system. Otherwise it is assumed to be for the entire VERSION with which it is associated.
 	Items []DVEHRURI `json:"items,omitempty"`
 	// Reason Reason of this attestation. Optionally coded by the openEHR Terminology group  attestation reason ; includes values like  authorisation ,  witness  etc.
-	Reason json.RawMessage `json:"reason"`
+	Reason DVTextLike `json:"reason"`
 	// IsPending True if this attestation is outstanding; False means it has been completed.
 	IsPending bool `json:"is_pending"`
 }
 
-// MarshalJSON emits canonical openEHR JSON for Attestation with `_type`
-// (value "ATTESTATION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *Attestation) MarshalJSON() ([]byte, error) {
-	rawDescription, err := jsonpoly.Marshal(a.Description)
-	if err != nil {
-		return nil, err
-	}
-	rawCommitter, err := jsonpoly.Marshal(a.Committer)
-	if err != nil {
-		return nil, err
-	}
-	rawReason, err := jsonpoly.Marshal(a.Reason)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&AttestationJSONMarshaller{
+// MarshalJSONTo emits canonical openEHR JSON for Attestation with `_type`
+// (value "ATTESTATION") as the leading member (REQ-052, Q6). The receiver is a
+// value so a by-value instance in a polymorphic slot keeps its `_type`.
+func (a Attestation) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &AttestationJSONWire{
 		Class:         "ATTESTATION",
 		SystemID:      a.SystemID,
 		TimeCommitted: a.TimeCommitted,
 		ChangeType:    a.ChangeType,
-		Description:   rawDescription,
-		Committer:     rawCommitter,
+		Description:   a.Description,
+		Committer:     a.Committer,
 		AttestedView:  a.AttestedView,
 		Proof:         a.Proof,
 		Items:         a.Items,
-		Reason:        rawReason,
+		Reason:        a.Reason,
 		IsPending:     a.IsPending,
-	})
+	}, typereg.MarshalOptions(enc))
 }
 
-type AuditDetailsJSONMarshaller struct {
-	Class string `json:"_type"`
-	// SystemID Identifier of the logical EHR system where the change was committed. This is almost always owned by the organisation legally responsible for the EHR, and is distinct from any application, or any hosting infrastructure.
-	SystemID string `json:"system_id"`
-	// TimeCommitted Time of committal of the item.
-	TimeCommitted DVDateTime `json:"time_committed"`
-	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
-	ChangeType DVCodedText `json:"change_type"`
-	// Description Reason for committal. This may be used to qualify the value in the `_change_type_` field. For example, if the change affects only the EHR directory, this field might be used to indicate 'Folder "episode 2018-02-16" added' or similar.
-	Description json.RawMessage `json:"description,omitempty"`
-	// Committer Identity and optional reference into identity management service, of user who committed the item.
-	Committer json.RawMessage `json:"committer"`
+// rawAuditDetails is the method-free canonical-JSON alias for AuditDetails. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawAuditDetails AuditDetails
+
+// MarshalJSONTo emits canonical openEHR JSON for AuditDetails with `_type`
+// (value "AUDIT_DETAILS") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (a AuditDetails) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawAuditDetails
+	}{"AUDIT_DETAILS", (*rawAuditDetails)(&a)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for AuditDetails with `_type`
-// (value "AUDIT_DETAILS") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *AuditDetails) MarshalJSON() ([]byte, error) {
-	rawDescription, err := jsonpoly.Marshal(a.Description)
-	if err != nil {
-		return nil, err
-	}
-	rawCommitter, err := jsonpoly.Marshal(a.Committer)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&AuditDetailsJSONMarshaller{
-		Class:         "AUDIT_DETAILS",
-		SystemID:      a.SystemID,
-		TimeCommitted: a.TimeCommitted,
-		ChangeType:    a.ChangeType,
-		Description:   rawDescription,
-		Committer:     rawCommitter,
-	})
+// rawParticipation is the method-free canonical-JSON alias for Participation. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawParticipation Participation
+
+// MarshalJSONTo emits canonical openEHR JSON for Participation with `_type`
+// (value "PARTICIPATION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (p Participation) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawParticipation
+	}{"PARTICIPATION", (*rawParticipation)(&p)}, typereg.MarshalOptions(enc))
 }
 
-type ParticipationJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Function The function of the Party in this participation (note that a given party might participate in more than one way in a particular activity). This attribute should be coded, but cannot be limited to the HL7v3:ParticipationFunction vocabulary, since it is too limited and hospital-oriented.
-	Function json.RawMessage `json:"function"`
-	// Mode Optional field for recording the 'mode' of the performer / activity interaction, e.g. present, by telephone, by email etc.
-	Mode *DVCodedText `json:"mode,omitempty"`
-	// Performer The id and possibly demographic system link of the party participating in the activity.
-	Performer json.RawMessage `json:"performer"`
-	// Time The time interval during which the participation took place, if it is used in an observational context (i.e. recording facts about the past); or the intended time interval of the participation when used in future contexts, such as EHR Instructions.
-	Time *DVInterval[DVDateTime] `json:"time,omitempty"`
+// rawPartyIdentified is the method-free canonical-JSON alias for PartyIdentified. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawPartyIdentified PartyIdentified
+
+// MarshalJSONTo emits canonical openEHR JSON for PartyIdentified with `_type`
+// (value "PARTY_IDENTIFIED") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (p PartyIdentified) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawPartyIdentified
+	}{"PARTY_IDENTIFIED", (*rawPartyIdentified)(&p)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for Participation with `_type`
-// (value "PARTICIPATION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (p *Participation) MarshalJSON() ([]byte, error) {
-	rawFunction, err := jsonpoly.Marshal(p.Function)
-	if err != nil {
-		return nil, err
-	}
-	rawPerformer, err := jsonpoly.Marshal(p.Performer)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ParticipationJSONMarshaller{
-		Class:     "PARTICIPATION",
-		Function:  rawFunction,
-		Mode:      p.Mode,
-		Performer: rawPerformer,
-		Time:      p.Time,
-	})
-}
-
-type PartyIdentifiedJSONMarshaller struct {
+// PartyRelatedJSONWire is the flat canonical-JSON wire struct for PartyRelated. PartyRelated embeds
+// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// promote that ancestor's methods and emit the wrong `_type`; the flat
+// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+type PartyRelatedJSONWire struct {
 	Class string `json:"_type"`
 	// ExternalRef Optional reference to more detailed demographic or identification information for this party, in an external system.
-	ExternalRef *PartyRef `json:"external_ref,omitempty"`
+	ExternalRef *PartyRef `json:"external_ref,omitzero"`
 	// Name Optional human-readable name (in String form).
-	Name *string `json:"name,omitempty"`
-	// Identifiers One or more formal identifiers (possibly computable).
-	Identifiers []DVIdentifier `json:"identifiers,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for PartyIdentified with `_type`
-// (value "PARTY_IDENTIFIED") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (p *PartyIdentified) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&PartyIdentifiedJSONMarshaller{
-		Class:       "PARTY_IDENTIFIED",
-		ExternalRef: p.ExternalRef,
-		Name:        p.Name,
-		Identifiers: p.Identifiers,
-	})
-}
-
-type PartyRelatedJSONMarshaller struct {
-	Class string `json:"_type"`
-	// ExternalRef Optional reference to more detailed demographic or identification information for this party, in an external system.
-	ExternalRef *PartyRef `json:"external_ref,omitempty"`
-	// Name Optional human-readable name (in String form).
-	Name *string `json:"name,omitempty"`
+	Name *string `json:"name,omitzero"`
 	// Identifiers One or more formal identifiers (possibly computable).
 	Identifiers []DVIdentifier `json:"identifiers,omitempty"`
 	// Relationship Relationship of subject of this ENTRY to the subject of the record. May be coded. If it is the patient, coded as  self.
 	Relationship DVCodedText `json:"relationship"`
 }
 
-// MarshalJSON emits canonical openEHR JSON for PartyRelated with `_type`
-// (value "PARTY_RELATED") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (p *PartyRelated) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&PartyRelatedJSONMarshaller{
+// MarshalJSONTo emits canonical openEHR JSON for PartyRelated with `_type`
+// (value "PARTY_RELATED") as the leading member (REQ-052, Q6). The receiver is a
+// value so a by-value instance in a polymorphic slot keeps its `_type`.
+func (p PartyRelated) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &PartyRelatedJSONWire{
 		Class:        "PARTY_RELATED",
 		ExternalRef:  p.ExternalRef,
 		Name:         p.Name,
 		Identifiers:  p.Identifiers,
 		Relationship: p.Relationship,
-	})
+	}, typereg.MarshalOptions(enc))
 }
 
-type PartySelfJSONMarshaller struct {
-	Class string `json:"_type"`
-	// ExternalRef Optional reference to more detailed demographic or identification information for this party, in an external system.
-	ExternalRef *PartyRef `json:"external_ref,omitempty"`
+// rawPartySelf is the method-free canonical-JSON alias for PartySelf. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawPartySelf PartySelf
+
+// MarshalJSONTo emits canonical openEHR JSON for PartySelf with `_type`
+// (value "PARTY_SELF") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (p PartySelf) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawPartySelf
+	}{"PARTY_SELF", (*rawPartySelf)(&p)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for PartySelf with `_type`
-// (value "PARTY_SELF") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (p *PartySelf) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&PartySelfJSONMarshaller{
-		Class:       "PARTY_SELF",
-		ExternalRef: p.ExternalRef,
-	})
+// rawRevisionHistory is the method-free canonical-JSON alias for RevisionHistory. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawRevisionHistory RevisionHistory
+
+// MarshalJSONTo emits canonical openEHR JSON for RevisionHistory with `_type`
+// (value "REVISION_HISTORY") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (r RevisionHistory) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawRevisionHistory
+	}{"REVISION_HISTORY", (*rawRevisionHistory)(&r)}, typereg.MarshalOptions(enc))
 }
 
-type RevisionHistoryJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Items The items in this history in most-recent-last order.
-	Items []RevisionHistoryItem `json:"items"`
-}
+// rawRevisionHistoryItem is the method-free canonical-JSON alias for RevisionHistoryItem. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawRevisionHistoryItem RevisionHistoryItem
 
-// MarshalJSON emits canonical openEHR JSON for RevisionHistory with `_type`
-// (value "REVISION_HISTORY") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (r *RevisionHistory) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&RevisionHistoryJSONMarshaller{
-		Class: "REVISION_HISTORY",
-		Items: r.Items,
-	})
-}
-
-type RevisionHistoryItemJSONMarshaller struct {
-	Class string `json:"_type"`
-	// VersionID Version identifier for this revision.
-	VersionID ObjectVersionID `json:"version_id"`
-	// Audits The audits for this revision; there will always be at least one commit audit (which may itself be an `ATTESTATION`), there may also be further attestations.
-	Audits json.RawMessage `json:"audits"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for RevisionHistoryItem with `_type`
-// (value "REVISION_HISTORY_ITEM") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (r *RevisionHistoryItem) MarshalJSON() ([]byte, error) {
-	rawAudits, err := jsonpoly.MarshalSlice(r.Audits)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&RevisionHistoryItemJSONMarshaller{
-		Class:     "REVISION_HISTORY_ITEM",
-		VersionID: r.VersionID,
-		Audits:    rawAudits,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for RevisionHistoryItem with `_type`
+// (value "REVISION_HISTORY_ITEM") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (r RevisionHistoryItem) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawRevisionHistoryItem
+	}{"REVISION_HISTORY_ITEM", (*rawRevisionHistoryItem)(&r)}, typereg.MarshalOptions(enc))
 }

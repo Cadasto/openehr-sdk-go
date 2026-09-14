@@ -4,642 +4,236 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.demographic — canonical-JSON MarshalJSON companions
+// BMM package: org.openehr.rm.demographic — canonical-JSON MarshalJSONTo companions
 
-type AddressJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Details Archetypable structured address.
-	Details json.RawMessage `json:"details"`
+// rawAddress is the method-free canonical-JSON alias for Address. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawAddress Address
+
+// MarshalJSONTo emits canonical openEHR JSON for Address with `_type`
+// (value "ADDRESS") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (a Address) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawAddress
+	}{"ADDRESS", (*rawAddress)(&a)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for Address with `_type`
-// (value "ADDRESS") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *Address) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(a.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(a.UID)
-	if err != nil {
-		return nil, err
-	}
-	rawDetails, err := jsonpoly.Marshal(a.Details)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&AddressJSONMarshaller{
-		Class:            "ADDRESS",
-		Name:             rawName,
-		ArchetypeNodeID:  a.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            a.Links,
-		ArchetypeDetails: a.ArchetypeDetails,
-		FeederAudit:      a.FeederAudit,
-		Details:          rawDetails,
-	})
+// rawAgent is the method-free canonical-JSON alias for Agent. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawAgent Agent
+
+// MarshalJSONTo emits canonical openEHR JSON for Agent with `_type`
+// (value "AGENT") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (a Agent) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawAgent
+	}{"AGENT", (*rawAgent)(&a)}, typereg.MarshalOptions(enc))
 }
 
-type AgentJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages json.RawMessage `json:"languages,omitempty"`
-	// Roles Identifiers of the Version container for each Role played by this Party.
-	Roles []PartyRef `json:"roles,omitempty"`
-	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
-	Identities []PartyIdentity `json:"identities"`
-	// Contacts Contacts for this party.
-	Contacts []Contact `json:"contacts,omitempty"`
-	// Details All other details for this Party.
-	Details json.RawMessage `json:"details,omitempty"`
-	// Relationships Relationships in which this Party takes part as source.
-	Relationships []PartyRelationship `json:"relationships,omitempty"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+// rawCapability is the method-free canonical-JSON alias for Capability. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCapability Capability
+
+// MarshalJSONTo emits canonical openEHR JSON for Capability with `_type`
+// (value "CAPABILITY") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (c Capability) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCapability
+	}{"CAPABILITY", (*rawCapability)(&c)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for Agent with `_type`
-// (value "AGENT") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *Agent) MarshalJSON() ([]byte, error) {
-	rawLanguages, err := jsonpoly.MarshalSlice(a.Languages)
-	if err != nil {
-		return nil, err
-	}
-	rawDetails, err := jsonpoly.Marshal(a.Details)
-	if err != nil {
-		return nil, err
-	}
-	rawName, err := jsonpoly.Marshal(a.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(a.UID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&AgentJSONMarshaller{
-		Class:            "AGENT",
-		Languages:        rawLanguages,
-		Roles:            a.Roles,
-		Identities:       a.Identities,
-		Contacts:         a.Contacts,
-		Details:          rawDetails,
-		Relationships:    a.Relationships,
-		Name:             rawName,
-		ArchetypeNodeID:  a.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            a.Links,
-		ArchetypeDetails: a.ArchetypeDetails,
-		FeederAudit:      a.FeederAudit,
-	})
+// rawContact is the method-free canonical-JSON alias for Contact. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawContact Contact
+
+// MarshalJSONTo emits canonical openEHR JSON for Contact with `_type`
+// (value "CONTACT") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (c Contact) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawContact
+	}{"CONTACT", (*rawContact)(&c)}, typereg.MarshalOptions(enc))
 }
 
-type CapabilityJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Credentials The qualifications of the performer of the role for this capability. This might include professional qualifications and official identifications such as provider numbers etc.
-	Credentials json.RawMessage `json:"credentials"`
-	// TimeValidity Valid time interval for the credentials of this capability.
-	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitempty"`
+// rawGroup is the method-free canonical-JSON alias for Group. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawGroup Group
+
+// MarshalJSONTo emits canonical openEHR JSON for Group with `_type`
+// (value "GROUP") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (g Group) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawGroup
+	}{"GROUP", (*rawGroup)(&g)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for Capability with `_type`
-// (value "CAPABILITY") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *Capability) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(c.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(c.UID)
-	if err != nil {
-		return nil, err
-	}
-	rawCredentials, err := jsonpoly.Marshal(c.Credentials)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&CapabilityJSONMarshaller{
-		Class:            "CAPABILITY",
-		Name:             rawName,
-		ArchetypeNodeID:  c.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            c.Links,
-		ArchetypeDetails: c.ArchetypeDetails,
-		FeederAudit:      c.FeederAudit,
-		Credentials:      rawCredentials,
-		TimeValidity:     c.TimeValidity,
-	})
+// rawOrganisation is the method-free canonical-JSON alias for Organisation. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawOrganisation Organisation
+
+// MarshalJSONTo emits canonical openEHR JSON for Organisation with `_type`
+// (value "ORGANISATION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (o Organisation) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawOrganisation
+	}{"ORGANISATION", (*rawOrganisation)(&o)}, typereg.MarshalOptions(enc))
 }
 
-type ContactJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Addresses A set of address alternatives for this contact purpose and time validity combination.
-	Addresses []Address `json:"addresses"`
-	// TimeValidity Valid time interval for this contact descriptor.
-	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitempty"`
+// rawPartyIdentity is the method-free canonical-JSON alias for PartyIdentity. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawPartyIdentity PartyIdentity
+
+// MarshalJSONTo emits canonical openEHR JSON for PartyIdentity with `_type`
+// (value "PARTY_IDENTITY") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (p PartyIdentity) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawPartyIdentity
+	}{"PARTY_IDENTITY", (*rawPartyIdentity)(&p)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for Contact with `_type`
-// (value "CONTACT") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *Contact) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(c.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(c.UID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ContactJSONMarshaller{
-		Class:            "CONTACT",
-		Name:             rawName,
-		ArchetypeNodeID:  c.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            c.Links,
-		ArchetypeDetails: c.ArchetypeDetails,
-		FeederAudit:      c.FeederAudit,
-		Addresses:        c.Addresses,
-		TimeValidity:     c.TimeValidity,
-	})
+// rawPartyRelationship is the method-free canonical-JSON alias for PartyRelationship. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawPartyRelationship PartyRelationship
+
+// MarshalJSONTo emits canonical openEHR JSON for PartyRelationship with `_type`
+// (value "PARTY_RELATIONSHIP") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (p PartyRelationship) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawPartyRelationship
+	}{"PARTY_RELATIONSHIP", (*rawPartyRelationship)(&p)}, typereg.MarshalOptions(enc))
 }
 
-type GroupJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages json.RawMessage `json:"languages,omitempty"`
-	// Roles Identifiers of the Version container for each Role played by this Party.
-	Roles []PartyRef `json:"roles,omitempty"`
-	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
-	Identities []PartyIdentity `json:"identities"`
-	// Contacts Contacts for this party.
-	Contacts []Contact `json:"contacts,omitempty"`
-	// Details All other details for this Party.
-	Details json.RawMessage `json:"details,omitempty"`
-	// Relationships Relationships in which this Party takes part as source.
-	Relationships []PartyRelationship `json:"relationships,omitempty"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+// rawPerson is the method-free canonical-JSON alias for Person. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawPerson Person
+
+// MarshalJSONTo emits canonical openEHR JSON for Person with `_type`
+// (value "PERSON") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (p Person) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawPerson
+	}{"PERSON", (*rawPerson)(&p)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for Group with `_type`
-// (value "GROUP") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (g *Group) MarshalJSON() ([]byte, error) {
-	rawLanguages, err := jsonpoly.MarshalSlice(g.Languages)
-	if err != nil {
-		return nil, err
-	}
-	rawDetails, err := jsonpoly.Marshal(g.Details)
-	if err != nil {
-		return nil, err
-	}
-	rawName, err := jsonpoly.Marshal(g.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(g.UID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&GroupJSONMarshaller{
-		Class:            "GROUP",
-		Languages:        rawLanguages,
-		Roles:            g.Roles,
-		Identities:       g.Identities,
-		Contacts:         g.Contacts,
-		Details:          rawDetails,
-		Relationships:    g.Relationships,
-		Name:             rawName,
-		ArchetypeNodeID:  g.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            g.Links,
-		ArchetypeDetails: g.ArchetypeDetails,
-		FeederAudit:      g.FeederAudit,
-	})
+// rawRole is the method-free canonical-JSON alias for Role. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawRole Role
+
+// MarshalJSONTo emits canonical openEHR JSON for Role with `_type`
+// (value "ROLE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (r Role) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawRole
+	}{"ROLE", (*rawRole)(&r)}, typereg.MarshalOptions(enc))
 }
 
-type OrganisationJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages json.RawMessage `json:"languages,omitempty"`
-	// Roles Identifiers of the Version container for each Role played by this Party.
-	Roles []PartyRef `json:"roles,omitempty"`
-	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
-	Identities []PartyIdentity `json:"identities"`
-	// Contacts Contacts for this party.
-	Contacts []Contact `json:"contacts,omitempty"`
-	// Details All other details for this Party.
-	Details json.RawMessage `json:"details,omitempty"`
-	// Relationships Relationships in which this Party takes part as source.
-	Relationships []PartyRelationship `json:"relationships,omitempty"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for Organisation with `_type`
-// (value "ORGANISATION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (o *Organisation) MarshalJSON() ([]byte, error) {
-	rawLanguages, err := jsonpoly.MarshalSlice(o.Languages)
-	if err != nil {
-		return nil, err
-	}
-	rawDetails, err := jsonpoly.Marshal(o.Details)
-	if err != nil {
-		return nil, err
-	}
-	rawName, err := jsonpoly.Marshal(o.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(o.UID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&OrganisationJSONMarshaller{
-		Class:            "ORGANISATION",
-		Languages:        rawLanguages,
-		Roles:            o.Roles,
-		Identities:       o.Identities,
-		Contacts:         o.Contacts,
-		Details:          rawDetails,
-		Relationships:    o.Relationships,
-		Name:             rawName,
-		ArchetypeNodeID:  o.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            o.Links,
-		ArchetypeDetails: o.ArchetypeDetails,
-		FeederAudit:      o.FeederAudit,
-	})
-}
-
-type PartyIdentityJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Details The value of the identity. This will often taken the form of a parseable string or a small structure of strings.
-	Details json.RawMessage `json:"details"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for PartyIdentity with `_type`
-// (value "PARTY_IDENTITY") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (p *PartyIdentity) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(p.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(p.UID)
-	if err != nil {
-		return nil, err
-	}
-	rawDetails, err := jsonpoly.Marshal(p.Details)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&PartyIdentityJSONMarshaller{
-		Class:            "PARTY_IDENTITY",
-		Name:             rawName,
-		ArchetypeNodeID:  p.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            p.Links,
-		ArchetypeDetails: p.ArchetypeDetails,
-		FeederAudit:      p.FeederAudit,
-		Details:          rawDetails,
-	})
-}
-
-type PartyRelationshipJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Details The detailed description of the relationship.
-	Details json.RawMessage `json:"details,omitempty"`
-	// Target Target of relationship.
-	Target PartyRef `json:"target"`
-	// TimeValidity Valid time interval for this relationship.
-	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitempty"`
-	// Source Source of relationship.
-	Source PartyRef `json:"source"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for PartyRelationship with `_type`
-// (value "PARTY_RELATIONSHIP") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (p *PartyRelationship) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(p.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(p.UID)
-	if err != nil {
-		return nil, err
-	}
-	rawDetails, err := jsonpoly.Marshal(p.Details)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&PartyRelationshipJSONMarshaller{
-		Class:            "PARTY_RELATIONSHIP",
-		Name:             rawName,
-		ArchetypeNodeID:  p.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            p.Links,
-		ArchetypeDetails: p.ArchetypeDetails,
-		FeederAudit:      p.FeederAudit,
-		Details:          rawDetails,
-		Target:           p.Target,
-		TimeValidity:     p.TimeValidity,
-		Source:           p.Source,
-	})
-}
-
-type PersonJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages json.RawMessage `json:"languages,omitempty"`
-	// Roles Identifiers of the Version container for each Role played by this Party.
-	Roles []PartyRef `json:"roles,omitempty"`
-	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
-	Identities []PartyIdentity `json:"identities"`
-	// Contacts Contacts for this party.
-	Contacts []Contact `json:"contacts,omitempty"`
-	// Details All other details for this Party.
-	Details json.RawMessage `json:"details,omitempty"`
-	// Relationships Relationships in which this Party takes part as source.
-	Relationships []PartyRelationship `json:"relationships,omitempty"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for Person with `_type`
-// (value "PERSON") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (p *Person) MarshalJSON() ([]byte, error) {
-	rawLanguages, err := jsonpoly.MarshalSlice(p.Languages)
-	if err != nil {
-		return nil, err
-	}
-	rawDetails, err := jsonpoly.Marshal(p.Details)
-	if err != nil {
-		return nil, err
-	}
-	rawName, err := jsonpoly.Marshal(p.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(p.UID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&PersonJSONMarshaller{
-		Class:            "PERSON",
-		Languages:        rawLanguages,
-		Roles:            p.Roles,
-		Identities:       p.Identities,
-		Contacts:         p.Contacts,
-		Details:          rawDetails,
-		Relationships:    p.Relationships,
-		Name:             rawName,
-		ArchetypeNodeID:  p.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            p.Links,
-		ArchetypeDetails: p.ArchetypeDetails,
-		FeederAudit:      p.FeederAudit,
-	})
-}
-
-type RoleJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
-	Identities []PartyIdentity `json:"identities"`
-	// Contacts Contacts for this party.
-	Contacts []Contact `json:"contacts,omitempty"`
-	// Details All other details for this Party.
-	Details json.RawMessage `json:"details,omitempty"`
-	// Relationships Relationships in which this Party takes part as source.
-	Relationships []PartyRelationship `json:"relationships,omitempty"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// TimeValidity Valid time interval for this role.
-	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitempty"`
-	// Performer Reference to Version container of Actor playing the role.
-	Performer PartyRef `json:"performer"`
-	// Capabilities The capabilities of this role.
-	Capabilities []Capability `json:"capabilities,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for Role with `_type`
-// (value "ROLE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (r *Role) MarshalJSON() ([]byte, error) {
-	rawDetails, err := jsonpoly.Marshal(r.Details)
-	if err != nil {
-		return nil, err
-	}
-	rawName, err := jsonpoly.Marshal(r.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(r.UID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&RoleJSONMarshaller{
-		Class:            "ROLE",
-		Identities:       r.Identities,
-		Contacts:         r.Contacts,
-		Details:          rawDetails,
-		Relationships:    r.Relationships,
-		Name:             rawName,
-		ArchetypeNodeID:  r.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            r.Links,
-		ArchetypeDetails: r.ArchetypeDetails,
-		FeederAudit:      r.FeederAudit,
-		TimeValidity:     r.TimeValidity,
-		Performer:        r.Performer,
-		Capabilities:     r.Capabilities,
-	})
-}
-
-type VersionedPartyJSONMarshaller struct {
+// VersionedPartyJSONWire is the flat canonical-JSON wire struct for VersionedParty. VersionedParty embeds
+// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// promote that ancestor's methods and emit the wrong `_type`; the flat
+// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+type VersionedPartyJSONWire struct {
 	Class string `json:"_type"`
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
 	UID HierObjectID `json:"uid"`
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID json.RawMessage `json:"owner_id"`
+	OwnerID ObjectRefLike `json:"owner_id"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
 
-// MarshalJSON emits canonical openEHR JSON for VersionedParty with `_type`
-// (value "VERSIONED_PARTY") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (v *VersionedParty) MarshalJSON() ([]byte, error) {
-	rawOwnerID, err := jsonpoly.Marshal(v.OwnerID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&VersionedPartyJSONMarshaller{
+// MarshalJSONTo emits canonical openEHR JSON for VersionedParty with `_type`
+// (value "VERSIONED_PARTY") as the leading member (REQ-052, Q6). The receiver is a
+// value so a by-value instance in a polymorphic slot keeps its `_type`.
+func (v VersionedParty) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &VersionedPartyJSONWire{
 		Class:       "VERSIONED_PARTY",
 		UID:         v.UID,
-		OwnerID:     rawOwnerID,
+		OwnerID:     v.OwnerID,
 		TimeCreated: v.TimeCreated,
-	})
+	}, typereg.MarshalOptions(enc))
 }

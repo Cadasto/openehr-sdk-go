@@ -3,36 +3,51 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-// BMM package: org.openehr.base.foundation_types.time — canonical-JSON MarshalJSON companions
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+)
 
-type ISO8601TimezoneJSONMarshaller struct {
-	Class string `json:"_type"`
+// BMM package: org.openehr.base.foundation_types.time — canonical-JSON MarshalJSONTo companions
+
+// rawISO8601Timezone is the method-free canonical-JSON alias for ISO8601Timezone. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawISO8601Timezone ISO8601Timezone
+
+// MarshalJSONTo emits canonical openEHR JSON for ISO8601Timezone with `_type`
+// (value "Iso8601_timezone") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (i ISO8601Timezone) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawISO8601Timezone
+	}{"Iso8601_timezone", (*rawISO8601Timezone)(&i)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for ISO8601Timezone with `_type`
-// (value "Iso8601_timezone") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (i *ISO8601Timezone) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ISO8601TimezoneJSONMarshaller{
-		Class: "Iso8601_timezone",
-	})
-}
+// rawTimeDefinitions is the method-free canonical-JSON alias for TimeDefinitions. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawTimeDefinitions TimeDefinitions
 
-type TimeDefinitionsJSONMarshaller struct {
-	Class string `json:"_type"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for TimeDefinitions with `_type`
-// (value "Time_Definitions") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (t *TimeDefinitions) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&TimeDefinitionsJSONMarshaller{
-		Class: "Time_Definitions",
-	})
+// MarshalJSONTo emits canonical openEHR JSON for TimeDefinitions with `_type`
+// (value "Time_Definitions") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (t TimeDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawTimeDefinitions
+	}{"Time_Definitions", (*rawTimeDefinitions)(&t)}, typereg.MarshalOptions(enc))
 }

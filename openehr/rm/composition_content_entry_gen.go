@@ -8,7 +8,7 @@ package rm
 // Action Used to record a clinical action that has been performed, which may have been ad hoc, or due to the execution of an Activity in an Instruction workflow. Every Action corresponds to a careflow step of some kind or another.
 type Action struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -18,11 +18,11 @@ type Action struct {
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
 	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// InstructionDetails Details of the Instruction that caused this Action to be performed, if there was one.
-	InstructionDetails *InstructionDetails `json:"instruction_details,omitempty"`
+	InstructionDetails *InstructionDetails `json:"instruction_details,omitzero"`
 	// IsmTransition Details of transition in the Instruction state machine caused by this Action.
 	IsmTransition IsmTransition `json:"ism_transition"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
@@ -66,7 +66,7 @@ type Activity struct {
 	// Defaults to  `/.*/`, meaning any archetype.
 	ActionArchetypeID string `json:"action_archetype_id"`
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -74,7 +74,7 @@ type Activity struct {
 	// Description Description of the activity, in the form of an archetyped structure.
 	Description ItemStructure `json:"description"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
@@ -85,7 +85,7 @@ type Activity struct {
 	//
 	// * timing is represented structurally in the `_description_` attribute (e.g. via archetyped elements), or
 	// * unavailable, e.g. imported legacy data; in such cases, the `INSTRUCTION._narrative_` should carry text that indicates the timing of its `_activities_`.
-	Timing *DVParsable `json:"timing,omitempty"`
+	Timing *DVParsable `json:"timing,omitzero"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }
@@ -97,7 +97,7 @@ type Activity struct {
 // Not to be used for any clinically significant information.
 type AdminEntry struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -107,7 +107,7 @@ type AdminEntry struct {
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
@@ -208,7 +208,7 @@ func (o *Observation) SubjectIsSelf() bool {
 // Should not be used for actionable statements such as medication orders - these are represented using the `INSTRUCTION` type.
 type Evaluation struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -218,7 +218,7 @@ type Evaluation struct {
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
 	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
@@ -260,7 +260,7 @@ type Instruction struct {
 	// Activities List of all activities in Instruction.
 	Activities []Activity `json:"activities,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -268,9 +268,9 @@ type Instruction struct {
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// ExpiryTime Optional expiry date/time to assist determination of when an Instruction can be assumed to have expired. This helps prevent false listing of Instructions as Active when they clearly must have been terminated in some way or other.
-	ExpiryTime *DVDateTime `json:"expiry_time,omitempty"`
+	ExpiryTime *DVDateTime `json:"expiry_time,omitzero"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
 	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
@@ -304,7 +304,7 @@ type Instruction struct {
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 	// WfDefinition Optional workflow engine executable expression of the Instruction.
-	WfDefinition *DVParsable `json:"wf_definition,omitempty"`
+	WfDefinition *DVParsable `json:"wf_definition,omitzero"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
 	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
 }
@@ -328,13 +328,13 @@ type InstructionDetails struct {
 // IsmTransition Model of a transition in the Instruction State Machine, caused by a careflow step. The attributes document the careflow step as well as the ISM transition.
 type IsmTransition struct {
 	// CareflowStep The step in the careflow process which occurred as part of generating this action, e.g.  dispense ,  start_administration. This attribute represents the clinical  label for the activity, as  opposed to current_state which represents  the state machine (ISM)  computable form. Defined in archetype.
-	CareflowStep *DVCodedText `json:"careflow_step,omitempty"`
+	CareflowStep *DVCodedText `json:"careflow_step,omitzero"`
 	// CurrentState The ISM current state. Coded by openEHR terminology group Instruction states.
 	CurrentState DVCodedText `json:"current_state"`
 	// Reason Optional possibility of adding one or more reasons for this careflow step having been taken. Multiple reasons may occur in medication management for example.
 	Reason []DVTextLike `json:"reason,omitempty"`
 	// Transition The ISM transition which occurred to arrive in the current_state. Coded by openEHR terminology group  Instruction transitions.
-	Transition *DVCodedText `json:"transition,omitempty"`
+	Transition *DVCodedText `json:"transition,omitzero"`
 }
 
 // Observation Entry subtype for all clinical data in the past or present, i.e. which (by the time it is recorded) has already occurred. `OBSERVATION` data is expressed using the class `HISTORY<T>`, which guarantees that it is situated in time. `OBSERVATION` is used for all notionally objective (i.e. measured in some way) observations of phenomena, and patient-reported phenomena, e.g. pain.
@@ -342,7 +342,7 @@ type IsmTransition struct {
 // Not to be used for recording opinion or future statements of any kind, including instructions, intentions, plans etc.
 type Observation struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -352,7 +352,7 @@ type Observation struct {
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
 	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
@@ -375,7 +375,7 @@ type Observation struct {
 	// Generally only used when the recorder needs to make it explicit. Otherwise, Composition composer and other participants are assumed.
 	Provider PartyProxy `json:"provider,omitempty"`
 	// State Optional recording of the state of subject of this observation during the observation process, in the form of a separate history of values which may be of any complexity. State may also be recorded within the History of the data attribute.
-	State *History[ItemStructure] `json:"state,omitempty"`
+	State *History[ItemStructure] `json:"state,omitzero"`
 	// Subject Id of human subject of this `ENTRY`, e.g.:
 	//
 	// * organ donor

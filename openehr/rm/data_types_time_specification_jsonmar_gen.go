@@ -3,42 +3,51 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-// BMM package: org.openehr.rm.data_types.time_specification — canonical-JSON MarshalJSON companions
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+)
 
-type DVGeneralTimeSpecificationJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The specification, in the HL7v3 syntax for `PIVL` or `EIVL` types.
-	Value DVParsable `json:"value"`
+// BMM package: org.openehr.rm.data_types.time_specification — canonical-JSON MarshalJSONTo companions
+
+// rawDVGeneralTimeSpecification is the method-free canonical-JSON alias for DVGeneralTimeSpecification. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVGeneralTimeSpecification DVGeneralTimeSpecification
+
+// MarshalJSONTo emits canonical openEHR JSON for DVGeneralTimeSpecification with `_type`
+// (value "DV_GENERAL_TIME_SPECIFICATION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (d DVGeneralTimeSpecification) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVGeneralTimeSpecification
+	}{"DV_GENERAL_TIME_SPECIFICATION", (*rawDVGeneralTimeSpecification)(&d)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for DVGeneralTimeSpecification with `_type`
-// (value "DV_GENERAL_TIME_SPECIFICATION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVGeneralTimeSpecification) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVGeneralTimeSpecificationJSONMarshaller{
-		Class: "DV_GENERAL_TIME_SPECIFICATION",
-		Value: d.Value,
-	})
-}
+// rawDVPeriodicTimeSpecification is the method-free canonical-JSON alias for DVPeriodicTimeSpecification. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVPeriodicTimeSpecification DVPeriodicTimeSpecification
 
-type DVPeriodicTimeSpecificationJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The specification, in the HL7v3 syntax for `PIVL` or `EIVL` types.
-	Value DVParsable `json:"value"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for DVPeriodicTimeSpecification with `_type`
-// (value "DV_PERIODIC_TIME_SPECIFICATION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVPeriodicTimeSpecification) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVPeriodicTimeSpecificationJSONMarshaller{
-		Class: "DV_PERIODIC_TIME_SPECIFICATION",
-		Value: d.Value,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for DVPeriodicTimeSpecification with `_type`
+// (value "DV_PERIODIC_TIME_SPECIFICATION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (d DVPeriodicTimeSpecification) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVPeriodicTimeSpecification
+	}{"DV_PERIODIC_TIME_SPECIFICATION", (*rawDVPeriodicTimeSpecification)(&d)}, typereg.MarshalOptions(enc))
 }

@@ -3,179 +3,91 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-// BMM package: org.openehr.rm.data_types.quantity.date_time — canonical-JSON MarshalJSON companions
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+)
 
-type DVDateJSONMarshaller struct {
-	Class string `json:"_type"`
-	// MagnitudeStatus Optional status of magnitude with values:
-	//
-	// * `"="`   :   magnitude is a point value
-	// * `"<"`   :   value is < magnitude
-	// * `">"`   :   value is > magnitude
-	// * `"<="` : value is <= magnitude
-	// * `">="` : value is >= magnitude
-	// * `"~"`   :   value is approximately magnitude
-	//
-	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
-	// Accuracy Time accuracy, expressed as a duration.
-	Accuracy *DVDuration `json:"accuracy,omitempty"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
-	// Value ISO8601 date string.
-	Value string `json:"value"`
+// BMM package: org.openehr.rm.data_types.quantity.date_time — canonical-JSON MarshalJSONTo companions
+
+// rawDVDate is the method-free canonical-JSON alias for DVDate. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVDate DVDate
+
+// MarshalJSONTo emits canonical openEHR JSON for DVDate with `_type`
+// (value "DV_DATE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (d DVDate) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVDate
+	}{"DV_DATE", (*rawDVDate)(&d)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for DVDate with `_type`
-// (value "DV_DATE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVDate) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVDateJSONMarshaller{
-		Class:                "DV_DATE",
-		MagnitudeStatus:      d.MagnitudeStatus,
-		Accuracy:             d.Accuracy,
-		NormalStatus:         d.NormalStatus,
-		NormalRange:          d.NormalRange,
-		OtherReferenceRanges: d.OtherReferenceRanges,
-		Value:                d.Value,
-	})
+// rawDVDateTime is the method-free canonical-JSON alias for DVDateTime. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVDateTime DVDateTime
+
+// MarshalJSONTo emits canonical openEHR JSON for DVDateTime with `_type`
+// (value "DV_DATE_TIME") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (d DVDateTime) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVDateTime
+	}{"DV_DATE_TIME", (*rawDVDateTime)(&d)}, typereg.MarshalOptions(enc))
 }
 
-type DVDateTimeJSONMarshaller struct {
-	Class string `json:"_type"`
-	// MagnitudeStatus Optional status of magnitude with values:
-	//
-	// * `"="`   :   magnitude is a point value
-	// * `"<"`   :   value is < magnitude
-	// * `">"`   :   value is > magnitude
-	// * `"<="` : value is <= magnitude
-	// * `">="` : value is >= magnitude
-	// * `"~"`   :   value is approximately magnitude
-	//
-	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
-	// Accuracy Time accuracy, expressed as a duration.
-	Accuracy *DVDuration `json:"accuracy,omitempty"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
-	// Value ISO8601 date/time string.
-	Value string `json:"value"`
+// rawDVDuration is the method-free canonical-JSON alias for DVDuration. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVDuration DVDuration
+
+// MarshalJSONTo emits canonical openEHR JSON for DVDuration with `_type`
+// (value "DV_DURATION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (d DVDuration) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVDuration
+	}{"DV_DURATION", (*rawDVDuration)(&d)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for DVDateTime with `_type`
-// (value "DV_DATE_TIME") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVDateTime) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVDateTimeJSONMarshaller{
-		Class:                "DV_DATE_TIME",
-		MagnitudeStatus:      d.MagnitudeStatus,
-		Accuracy:             d.Accuracy,
-		NormalStatus:         d.NormalStatus,
-		NormalRange:          d.NormalRange,
-		OtherReferenceRanges: d.OtherReferenceRanges,
-		Value:                d.Value,
-	})
-}
+// rawDVTime is the method-free canonical-JSON alias for DVTime. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVTime DVTime
 
-type DVDurationJSONMarshaller struct {
-	Class string `json:"_type"`
-	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
-	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
-	// MagnitudeStatus Optional status of magnitude with values:
-	//
-	// * `"="`   :   magnitude is a point value
-	// * `"<"`   :   value is < magnitude
-	// * `">"`   :   value is > magnitude
-	// * `"<="` : value is <= magnitude
-	// * `">="` : value is >= magnitude
-	// * `"~"`   :   value is approximately magnitude
-	//
-	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
-	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
-	//
-	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *Real `json:"accuracy,omitempty"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
-	// Value ISO8601 duration string, including described deviations to support negative values and weeks.
-	Value string `json:"value"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for DVDuration with `_type`
-// (value "DV_DURATION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVDuration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVDurationJSONMarshaller{
-		Class:                "DV_DURATION",
-		AccuracyIsPercent:    d.AccuracyIsPercent,
-		MagnitudeStatus:      d.MagnitudeStatus,
-		Accuracy:             d.Accuracy,
-		NormalStatus:         d.NormalStatus,
-		NormalRange:          d.NormalRange,
-		OtherReferenceRanges: d.OtherReferenceRanges,
-		Value:                d.Value,
-	})
-}
-
-type DVTimeJSONMarshaller struct {
-	Class string `json:"_type"`
-	// MagnitudeStatus Optional status of magnitude with values:
-	//
-	// * `"="`   :   magnitude is a point value
-	// * `"<"`   :   value is < magnitude
-	// * `">"`   :   value is > magnitude
-	// * `"<="` : value is <= magnitude
-	// * `">="` : value is >= magnitude
-	// * `"~"`   :   value is approximately magnitude
-	//
-	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
-	// Accuracy Time accuracy, expressed as a duration.
-	Accuracy *DVDuration `json:"accuracy,omitempty"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
-	// Value ISO8601 time string
-	Value string `json:"value"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for DVTime with `_type`
-// (value "DV_TIME") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVTime) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVTimeJSONMarshaller{
-		Class:                "DV_TIME",
-		MagnitudeStatus:      d.MagnitudeStatus,
-		Accuracy:             d.Accuracy,
-		NormalStatus:         d.NormalStatus,
-		NormalRange:          d.NormalRange,
-		OtherReferenceRanges: d.OtherReferenceRanges,
-		Value:                d.Value,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for DVTime with `_type`
+// (value "DV_TIME") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (d DVTime) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVTime
+	}{"DV_TIME", (*rawDVTime)(&d)}, typereg.MarshalOptions(enc))
 }

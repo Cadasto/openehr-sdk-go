@@ -4,76 +4,46 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_types.uri — canonical-JSON UnmarshalJSON companions
+// BMM package: org.openehr.rm.data_types.uri — canonical-JSON UnmarshalJSONFrom companions
 
-type DVEHRURIJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value Value of URI as a String. 'Plain-text' URIs are allowed, enabling better readability, but must be RFC-3986 encoded in use.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVEHRURI.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVEHRURI) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVEHRURI.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVEHRURI) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_EHR_URI: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVEHRURIJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_EHR_URI", err)
+	var wire DVEHRURIJSONWire
+	if err := typereg.DecodeInto(dec, "DV_EHR_URI", &wire); err != nil {
+		return err
 	}
-	if aux.Class != "" && aux.Class != "DV_EHR_URI" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_EHR_URI", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.Value = aux.Value
+	d.Value = wire.Value
 	return nil
 }
 
-type DVURIJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value Value of URI as a String. 'Plain-text' URIs are allowed, enabling better readability, but must be RFC-3986 encoded in use.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVURI.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVURI) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVURI.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVURI) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_URI: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVURIJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_URI", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_URI" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_URI", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "DV_URI", &struct {
+		Type string `json:"_type"`
+		*rawDVURI
+	}{rawDVURI: (*rawDVURI)(d)})
 }

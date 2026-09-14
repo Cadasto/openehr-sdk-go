@@ -3,72 +3,71 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-// BMM package: org.openehr.rm.data_types.basic — canonical-JSON MarshalJSON companions
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+)
 
-type DVBooleanJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value Boolean value of this item. Actual values may be language or implementation dependent.
-	Value bool `json:"value"`
+// BMM package: org.openehr.rm.data_types.basic — canonical-JSON MarshalJSONTo companions
+
+// rawDVBoolean is the method-free canonical-JSON alias for DVBoolean. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVBoolean DVBoolean
+
+// MarshalJSONTo emits canonical openEHR JSON for DVBoolean with `_type`
+// (value "DV_BOOLEAN") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (d DVBoolean) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVBoolean
+	}{"DV_BOOLEAN", (*rawDVBoolean)(&d)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for DVBoolean with `_type`
-// (value "DV_BOOLEAN") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVBoolean) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVBooleanJSONMarshaller{
-		Class: "DV_BOOLEAN",
-		Value: d.Value,
-	})
+// rawDVIdentifier is the method-free canonical-JSON alias for DVIdentifier. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVIdentifier DVIdentifier
+
+// MarshalJSONTo emits canonical openEHR JSON for DVIdentifier with `_type`
+// (value "DV_IDENTIFIER") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (d DVIdentifier) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVIdentifier
+	}{"DV_IDENTIFIER", (*rawDVIdentifier)(&d)}, typereg.MarshalOptions(enc))
 }
 
-type DVIdentifierJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Issuer Optional authority which issues the kind of id used in the id field of this object.
-	Issuer *string `json:"issuer,omitempty"`
-	// Assigner Optional organisation that assigned the id to the item being identified.
-	Assigner *string `json:"assigner,omitempty"`
-	// ID The identifier value. Often structured, according to the definition of the issuing authority's rules.
-	ID string `json:"id"`
-	// Type Optional identifier type, such as  prescription , or  Social Security Number . One day a controlled vocabulary might be possible for this.
-	Type *string `json:"type,omitempty"`
-}
+// rawDVState is the method-free canonical-JSON alias for DVState. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVState DVState
 
-// MarshalJSON emits canonical openEHR JSON for DVIdentifier with `_type`
-// (value "DV_IDENTIFIER") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVIdentifier) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVIdentifierJSONMarshaller{
-		Class:    "DV_IDENTIFIER",
-		Issuer:   d.Issuer,
-		Assigner: d.Assigner,
-		ID:       d.ID,
-		Type:     d.Type,
-	})
-}
-
-type DVStateJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The state name. State names are determined by a state/event table defined in archetypes, and coded using openEHR Terminology or local archetype terms, as specified by the archetype.
-	Value DVCodedText `json:"value"`
-	// IsTerminal Indicates whether this state is a terminal state, such as  "aborted",  "completed" etc. from which no further transitions are possible.
-	IsTerminal bool `json:"is_terminal"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for DVState with `_type`
-// (value "DV_STATE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVState) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVStateJSONMarshaller{
-		Class:      "DV_STATE",
-		Value:      d.Value,
-		IsTerminal: d.IsTerminal,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for DVState with `_type`
+// (value "DV_STATE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (d DVState) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVState
+	}{"DV_STATE", (*rawDVState)(&d)}, typereg.MarshalOptions(enc))
 }

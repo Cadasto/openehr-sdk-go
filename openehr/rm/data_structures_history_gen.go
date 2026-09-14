@@ -33,17 +33,17 @@ func (p *PointEvent[T]) Offset() DVDuration {
 // For a periodic series of events, period will be set, and the time of each Event in the History must correspond; i.e. the `EVENT._offset_` must be a multiple of period for each Event. Missing events in a period History are however allowed.
 type History[T ItemStructure] struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// Duration Duration of the entire History; either corresponds to the duration of all the events, and/or the duration represented by the summary, if it exists.
-	Duration *DVDuration `json:"duration,omitempty"`
+	Duration *DVDuration `json:"duration,omitzero"`
 	// Events The events in the series. This attribute is of a generic type whose parameter must be a descendant of `ITEM_SUTRUCTURE`.
 	Events []Event `json:"events,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
@@ -51,7 +51,7 @@ type History[T ItemStructure] struct {
 	// Origin Time origin of this event history. The first event is not necessarily at the origin point.
 	Origin DVDateTime `json:"origin"`
 	// Period Period between samples in this segment if periodic.
-	Period *DVDuration `json:"period,omitempty"`
+	Period *DVDuration `json:"period,omitzero"`
 	// Summary Optional summary data that aggregates, organizes, reduces and transforms the event series. This may be a text or image that presents a graphical presentation, or some data that assists with the interpretation of the data.
 	Summary ItemStructure `json:"summary,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
@@ -66,7 +66,7 @@ func (h *History[T]) IsPeriodic() bool {
 // IntervalEvent Defines a single interval event in a series.
 type IntervalEvent[T ItemStructure] struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -74,7 +74,7 @@ type IntervalEvent[T ItemStructure] struct {
 	// Data The data of this event.
 	Data T `json:"data"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// MathFunction Mathematical function of the data of this event, e.g.  maximum, mean etc. Coded using https://github.com/openEHR/terminology/blob/master/openEHR_RM/en/openehr_terminology.xml[openEHR vocabulary `event math function`]. Default value `640|actual|`, meaning 'actual value'.
@@ -82,7 +82,7 @@ type IntervalEvent[T ItemStructure] struct {
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
 	Name DVTextLike `json:"name"`
 	// SampleCount Optional count of original samples to which this event corresponds.
-	SampleCount *Integer `json:"sample_count,omitempty"`
+	SampleCount *Integer `json:"sample_count,omitzero"`
 	// State Optional state data for this event.
 	State ItemStructure `json:"state,omitempty"`
 	// Time Time of this event. If the width is non-zero, it is the time point of the trailing edge of the event.
@@ -101,7 +101,7 @@ func (i *IntervalEvent[T]) IntervalStartTime() DVDateTime {
 // PointEvent Defines a single point event in a series.
 type PointEvent[T ItemStructure] struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -109,7 +109,7 @@ type PointEvent[T ItemStructure] struct {
 	// Data The data of this event.
 	Data T `json:"data"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.

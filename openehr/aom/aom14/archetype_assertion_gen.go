@@ -10,9 +10,9 @@ type Assertion struct {
 	// Expression Root of expression tree.
 	Expression ExprItem `json:"expression"`
 	// StringExpression String form of expression, in case an expression evaluator taking String expressions is used for evaluation.
-	StringExpression *string `json:"string_expression,omitempty"`
+	StringExpression *string `json:"string_expression,omitzero"`
 	// Tag Expression tag, used for differentiating multiple assertions.
-	Tag *string `json:"tag,omitempty"`
+	Tag *string `json:"tag,omitzero"`
 	// Variables Definitions of variables used in the assertion expression.
 	Variables []AssertionVariable `json:"variables,omitempty"`
 }
@@ -32,7 +32,7 @@ type ExprBinaryOperator struct {
 	// Operator Code of operator.
 	Operator OperatorKind `json:"operator"`
 	// PrecedenceOverridden True if the natural precedence of operators is overridden in the expression represented by this node of the expression tree. If True, parentheses should be introduced around the totality of the syntax expression corresponding to this operator node and its operands.
-	PrecedenceOverridden *bool `json:"precedence_overridden,omitempty"`
+	PrecedenceOverridden *bool `json:"precedence_overridden,omitzero"`
 	// RightOperand Right operand node.
 	RightOperand ExprItem `json:"right_operand"`
 	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
@@ -81,7 +81,7 @@ type ExprUnaryOperator struct {
 	// Operator Code of operator.
 	Operator OperatorKind `json:"operator"`
 	// PrecedenceOverridden True if the natural precedence of operators is overridden in the expression represented by this node of the expression tree. If True, parentheses should be introduced around the totality of the syntax expression corresponding to this operator node and its operands.
-	PrecedenceOverridden *bool `json:"precedence_overridden,omitempty"`
+	PrecedenceOverridden *bool `json:"precedence_overridden,omitzero"`
 	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
 	Type string `json:"type"`
 }

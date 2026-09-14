@@ -4,196 +4,70 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_structures.history — canonical-JSON MarshalJSON companions
+// BMM package: org.openehr.rm.data_structures.history — canonical-JSON MarshalJSONTo companions
 
-type HistoryJSONMarshaller[T ItemStructure] struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Origin Time origin of this event history. The first event is not necessarily at the origin point.
-	Origin DVDateTime `json:"origin"`
-	// Period Period between samples in this segment if periodic.
-	Period *DVDuration `json:"period,omitempty"`
-	// Duration Duration of the entire History; either corresponds to the duration of all the events, and/or the duration represented by the summary, if it exists.
-	Duration *DVDuration `json:"duration,omitempty"`
-	// Summary Optional summary data that aggregates, organizes, reduces and transforms the event series. This may be a text or image that presents a graphical presentation, or some data that assists with the interpretation of the data.
-	Summary json.RawMessage `json:"summary,omitempty"`
-	// Events The events in the series. This attribute is of a generic type whose parameter must be a descendant of `ITEM_SUTRUCTURE`.
-	Events json.RawMessage `json:"events,omitempty"`
+// rawHistory is the method-free canonical-JSON alias for History. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawHistory[T ItemStructure] History[T]
+
+// MarshalJSONTo emits canonical openEHR JSON for History with `_type`
+// (value "HISTORY") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (h History[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawHistory[T]
+	}{"HISTORY", (*rawHistory[T])(&h)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for History with `_type`
-// (value "HISTORY") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (h *History[T]) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(h.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(h.UID)
-	if err != nil {
-		return nil, err
-	}
-	rawSummary, err := jsonpoly.Marshal(h.Summary)
-	if err != nil {
-		return nil, err
-	}
-	rawEvents, err := jsonpoly.MarshalSlice(h.Events)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&HistoryJSONMarshaller[T]{
-		Class:            "HISTORY",
-		Name:             rawName,
-		ArchetypeNodeID:  h.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            h.Links,
-		ArchetypeDetails: h.ArchetypeDetails,
-		FeederAudit:      h.FeederAudit,
-		Origin:           h.Origin,
-		Period:           h.Period,
-		Duration:         h.Duration,
-		Summary:          rawSummary,
-		Events:           rawEvents,
-	})
+// rawIntervalEvent is the method-free canonical-JSON alias for IntervalEvent. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawIntervalEvent[T ItemStructure] IntervalEvent[T]
+
+// MarshalJSONTo emits canonical openEHR JSON for IntervalEvent with `_type`
+// (value "INTERVAL_EVENT") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (i IntervalEvent[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawIntervalEvent[T]
+	}{"INTERVAL_EVENT", (*rawIntervalEvent[T])(&i)}, typereg.MarshalOptions(enc))
 }
 
-type IntervalEventJSONMarshaller[T ItemStructure] struct {
-	Class string `json:"_type"`
-	// Time Time of this event. If the width is non-zero, it is the time point of the trailing edge of the event.
-	Time DVDateTime `json:"time"`
-	// State Optional state data for this event.
-	State json.RawMessage `json:"state,omitempty"`
-	// Data The data of this event.
-	Data T `json:"data"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Width Duration of the time interval during which the values recorded under `data` are true and, if set, the values recorded under `state` are true. Void if an instantaneous event.
-	Width DVDuration `json:"width"`
-	// SampleCount Optional count of original samples to which this event corresponds.
-	SampleCount *Integer `json:"sample_count,omitempty"`
-	// MathFunction Mathematical function of the data of this event, e.g.  maximum, mean etc. Coded using https://github.com/openEHR/terminology/blob/master/openEHR_RM/en/openehr_terminology.xml[openEHR vocabulary `event math function`]. Default value `640|actual|`, meaning 'actual value'.
-	MathFunction DVCodedText `json:"math_function"`
-}
+// rawPointEvent is the method-free canonical-JSON alias for PointEvent. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawPointEvent[T ItemStructure] PointEvent[T]
 
-// MarshalJSON emits canonical openEHR JSON for IntervalEvent with `_type`
-// (value "INTERVAL_EVENT") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (i *IntervalEvent[T]) MarshalJSON() ([]byte, error) {
-	rawState, err := jsonpoly.Marshal(i.State)
-	if err != nil {
-		return nil, err
-	}
-	rawName, err := jsonpoly.Marshal(i.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(i.UID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&IntervalEventJSONMarshaller[T]{
-		Class:            "INTERVAL_EVENT",
-		Time:             i.Time,
-		State:            rawState,
-		Data:             i.Data,
-		Name:             rawName,
-		ArchetypeNodeID:  i.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            i.Links,
-		ArchetypeDetails: i.ArchetypeDetails,
-		FeederAudit:      i.FeederAudit,
-		Width:            i.Width,
-		SampleCount:      i.SampleCount,
-		MathFunction:     i.MathFunction,
-	})
-}
-
-type PointEventJSONMarshaller[T ItemStructure] struct {
-	Class string `json:"_type"`
-	// Time Time of this event. If the width is non-zero, it is the time point of the trailing edge of the event.
-	Time DVDateTime `json:"time"`
-	// State Optional state data for this event.
-	State json.RawMessage `json:"state,omitempty"`
-	// Data The data of this event.
-	Data T `json:"data"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for PointEvent with `_type`
-// (value "POINT_EVENT") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (p *PointEvent[T]) MarshalJSON() ([]byte, error) {
-	rawState, err := jsonpoly.Marshal(p.State)
-	if err != nil {
-		return nil, err
-	}
-	rawName, err := jsonpoly.Marshal(p.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(p.UID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&PointEventJSONMarshaller[T]{
-		Class:            "POINT_EVENT",
-		Time:             p.Time,
-		State:            rawState,
-		Data:             p.Data,
-		Name:             rawName,
-		ArchetypeNodeID:  p.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            p.Links,
-		ArchetypeDetails: p.ArchetypeDetails,
-		FeederAudit:      p.FeederAudit,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for PointEvent with `_type`
+// (value "POINT_EVENT") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (p PointEvent[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawPointEvent[T]
+	}{"POINT_EVENT", (*rawPointEvent[T])(&p)}, typereg.MarshalOptions(enc))
 }

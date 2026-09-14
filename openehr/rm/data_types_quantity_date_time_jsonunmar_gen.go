@@ -4,243 +4,78 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_types.quantity.date_time — canonical-JSON UnmarshalJSON companions
+// BMM package: org.openehr.rm.data_types.quantity.date_time — canonical-JSON UnmarshalJSONFrom companions
 
-type DVDateJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// MagnitudeStatus Optional status of magnitude with values:
-	//
-	// * `"="`   :   magnitude is a point value
-	// * `"<"`   :   value is < magnitude
-	// * `">"`   :   value is > magnitude
-	// * `"<="` : value is <= magnitude
-	// * `">="` : value is >= magnitude
-	// * `"~"`   :   value is approximately magnitude
-	//
-	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
-	// Accuracy Time accuracy, expressed as a duration.
-	Accuracy *DVDuration `json:"accuracy,omitempty"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
-	// Value ISO8601 date string.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVDate.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVDate) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVDate.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVDate) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_DATE: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVDateJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_DATE", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_DATE" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_DATE", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.MagnitudeStatus = aux.MagnitudeStatus
-	d.Accuracy = aux.Accuracy
-	d.NormalStatus = aux.NormalStatus
-	d.NormalRange = aux.NormalRange
-	d.OtherReferenceRanges = aux.OtherReferenceRanges
-	d.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "DV_DATE", &struct {
+		Type string `json:"_type"`
+		*rawDVDate
+	}{rawDVDate: (*rawDVDate)(d)})
 }
 
-type DVDateTimeJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// MagnitudeStatus Optional status of magnitude with values:
-	//
-	// * `"="`   :   magnitude is a point value
-	// * `"<"`   :   value is < magnitude
-	// * `">"`   :   value is > magnitude
-	// * `"<="` : value is <= magnitude
-	// * `">="` : value is >= magnitude
-	// * `"~"`   :   value is approximately magnitude
-	//
-	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
-	// Accuracy Time accuracy, expressed as a duration.
-	Accuracy *DVDuration `json:"accuracy,omitempty"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
-	// Value ISO8601 date/time string.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVDateTime.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVDateTime) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVDateTime.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVDateTime) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_DATE_TIME: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVDateTimeJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_DATE_TIME", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_DATE_TIME" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_DATE_TIME", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.MagnitudeStatus = aux.MagnitudeStatus
-	d.Accuracy = aux.Accuracy
-	d.NormalStatus = aux.NormalStatus
-	d.NormalRange = aux.NormalRange
-	d.OtherReferenceRanges = aux.OtherReferenceRanges
-	d.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "DV_DATE_TIME", &struct {
+		Type string `json:"_type"`
+		*rawDVDateTime
+	}{rawDVDateTime: (*rawDVDateTime)(d)})
 }
 
-type DVDurationJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
-	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
-	// MagnitudeStatus Optional status of magnitude with values:
-	//
-	// * `"="`   :   magnitude is a point value
-	// * `"<"`   :   value is < magnitude
-	// * `">"`   :   value is > magnitude
-	// * `"<="` : value is <= magnitude
-	// * `">="` : value is >= magnitude
-	// * `"~"`   :   value is approximately magnitude
-	//
-	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
-	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
-	//
-	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *Real `json:"accuracy,omitempty"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
-	// Value ISO8601 duration string, including described deviations to support negative values and weeks.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVDuration.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVDuration) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVDuration.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVDuration) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_DURATION: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVDurationJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_DURATION", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_DURATION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_DURATION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.AccuracyIsPercent = aux.AccuracyIsPercent
-	d.MagnitudeStatus = aux.MagnitudeStatus
-	d.Accuracy = aux.Accuracy
-	d.NormalStatus = aux.NormalStatus
-	d.NormalRange = aux.NormalRange
-	d.OtherReferenceRanges = aux.OtherReferenceRanges
-	d.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "DV_DURATION", &struct {
+		Type string `json:"_type"`
+		*rawDVDuration
+	}{rawDVDuration: (*rawDVDuration)(d)})
 }
 
-type DVTimeJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// MagnitudeStatus Optional status of magnitude with values:
-	//
-	// * `"="`   :   magnitude is a point value
-	// * `"<"`   :   value is < magnitude
-	// * `">"`   :   value is > magnitude
-	// * `"<="` : value is <= magnitude
-	// * `">="` : value is >= magnitude
-	// * `"~"`   :   value is approximately magnitude
-	//
-	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
-	// Accuracy Time accuracy, expressed as a duration.
-	Accuracy *DVDuration `json:"accuracy,omitempty"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
-	// Value ISO8601 time string
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVTime.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVTime) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVTime.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVTime) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_TIME: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVTimeJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_TIME", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_TIME" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_TIME", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.MagnitudeStatus = aux.MagnitudeStatus
-	d.Accuracy = aux.Accuracy
-	d.NormalStatus = aux.NormalStatus
-	d.NormalRange = aux.NormalRange
-	d.OtherReferenceRanges = aux.OtherReferenceRanges
-	d.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "DV_TIME", &struct {
+		Type string `json:"_type"`
+		*rawDVTime
+	}{rawDVTime: (*rawDVTime)(d)})
 }

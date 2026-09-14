@@ -4,70 +4,44 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.base.foundation_types.time — canonical-JSON UnmarshalJSON companions
+// BMM package: org.openehr.base.foundation_types.time — canonical-JSON UnmarshalJSONFrom companions
 
-type ISO8601TimezoneJSONUnmarshaller struct {
-	Class string `json:"_type"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ISO8601Timezone.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (i *ISO8601Timezone) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ISO8601Timezone.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (i *ISO8601Timezone) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: Iso8601_timezone: %w", typereg.ErrNilReceiver)
 	}
-	var aux ISO8601TimezoneJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("Iso8601_timezone", err)
-	}
-	if aux.Class != "" && aux.Class != "Iso8601_timezone" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "Iso8601_timezone", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	return nil
+	return typereg.DecodeInto(dec, "Iso8601_timezone", &struct {
+		Type string `json:"_type"`
+		*rawISO8601Timezone
+	}{rawISO8601Timezone: (*rawISO8601Timezone)(i)})
 }
 
-type TimeDefinitionsJSONUnmarshaller struct {
-	Class string `json:"_type"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into TimeDefinitions.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (t *TimeDefinitions) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into TimeDefinitions.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (t *TimeDefinitions) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if t == nil {
 		return fmt.Errorf("canjson: Time_Definitions: %w", typereg.ErrNilReceiver)
 	}
-	var aux TimeDefinitionsJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("Time_Definitions", err)
-	}
-	if aux.Class != "" && aux.Class != "Time_Definitions" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "Time_Definitions", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	return nil
+	return typereg.DecodeInto(dec, "Time_Definitions", &struct {
+		Type string `json:"_type"`
+		*rawTimeDefinitions
+	}{rawTimeDefinitions: (*rawTimeDefinitions)(t)})
 }

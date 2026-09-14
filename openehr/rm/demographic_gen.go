@@ -21,7 +21,7 @@ func (Person) isActor() {}
 // Address Address of contact, which may be electronic or geographic.
 type Address struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -29,7 +29,7 @@ type Address struct {
 	// Details Archetypable structured address.
 	Details ItemStructure `json:"details"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
@@ -46,7 +46,7 @@ func (a *Address) Type() DVTextLike {
 // Agent Generic concept of any kind of agent, including devices, software systems, but not humans or organisations.
 type Agent struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -56,7 +56,7 @@ type Agent struct {
 	// Details All other details for this Party.
 	Details ItemStructure `json:"details,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
 	Identities []PartyIdentity `json:"identities"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
@@ -76,7 +76,7 @@ type Agent struct {
 // Capability Capability of a role, such as  ehr modifier,  health care provider. Capability should be backed up by credentials.
 type Capability struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -84,13 +84,13 @@ type Capability struct {
 	// Credentials The qualifications of the performer of the role for this capability. This might include professional qualifications and official identifications such as provider numbers etc.
 	Credentials ItemStructure `json:"credentials"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
 	Name DVTextLike `json:"name"`
 	// TimeValidity Valid time interval for the credentials of this capability.
-	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitempty"`
+	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitzero"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }
@@ -100,19 +100,19 @@ type Contact struct {
 	// Addresses A set of address alternatives for this contact purpose and time validity combination.
 	Addresses []Address `json:"addresses"`
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
 	Name DVTextLike `json:"name"`
 	// TimeValidity Valid time interval for this contact descriptor.
-	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitempty"`
+	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitzero"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }
@@ -125,7 +125,7 @@ func (c *Contact) Purpose() DVTextLike {
 // Group A group is a real world group of parties which is created by another party, usually an organisation, for some specific purpose. A typical clinical example is that of the specialist care team, e.g.  cardiology team . The members of the group usually work together.
 type Group struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -135,7 +135,7 @@ type Group struct {
 	// Details All other details for this Party.
 	Details ItemStructure `json:"details,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
 	Identities []PartyIdentity `json:"identities"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
@@ -155,7 +155,7 @@ type Group struct {
 // Organisation Generic description of organisations. An organisation is a legally constituted body whose existence (in general) outlives the existence of parties considered to be part of it.
 type Organisation struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -165,7 +165,7 @@ type Organisation struct {
 	// Details All other details for this Party.
 	Details ItemStructure `json:"details,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
 	Identities []PartyIdentity `json:"identities"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
@@ -263,7 +263,7 @@ func (r *Role) Type() DVTextLike {
 // PartyIdentity An identity  owned  by a Party, such as a person name or company name, and which is used by the Party to identify itself. Actual structure is archetyped.
 type PartyIdentity struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -271,7 +271,7 @@ type PartyIdentity struct {
 	// Details The value of the identity. This will often taken the form of a parseable string or a small structure of strings.
 	Details ItemStructure `json:"details"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
@@ -288,7 +288,7 @@ func (p *PartyIdentity) Purpose() DVTextLike {
 // PartyRelationship Generic description of a relationship between parties.
 type PartyRelationship struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -296,7 +296,7 @@ type PartyRelationship struct {
 	// Details The detailed description of the relationship.
 	Details ItemStructure `json:"details,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
@@ -306,7 +306,7 @@ type PartyRelationship struct {
 	// Target Target of relationship.
 	Target PartyRef `json:"target"`
 	// TimeValidity Valid time interval for this relationship.
-	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitempty"`
+	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitzero"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }
@@ -319,7 +319,7 @@ func (p *PartyRelationship) Type() DVTextLike {
 // Person Generic description of persons. Provides a dedicated type to which Person archetypes can be targeted.
 type Person struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -329,7 +329,7 @@ type Person struct {
 	// Details All other details for this Party.
 	Details ItemStructure `json:"details,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
 	Identities []PartyIdentity `json:"identities"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
@@ -349,7 +349,7 @@ type Person struct {
 // Role Generic description of a role performed by an Actor. The role corresponds to a competency of the Party. Roles are used to define the responsibilities undertaken by a Party for a purpose. Roles should have credentials qualifying the performer to perform the role.
 type Role struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -361,7 +361,7 @@ type Role struct {
 	// Details All other details for this Party.
 	Details ItemStructure `json:"details,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
 	Identities []PartyIdentity `json:"identities"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
@@ -373,7 +373,7 @@ type Role struct {
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// TimeValidity Valid time interval for this role.
-	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitempty"`
+	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitzero"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }

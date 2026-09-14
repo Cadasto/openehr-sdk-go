@@ -4,196 +4,90 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_structures.item_structure — canonical-JSON MarshalJSON companions
+// BMM package: org.openehr.rm.data_structures.item_structure — canonical-JSON MarshalJSONTo companions
 
-type ItemListJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Items Physical representation of the list.
-	Items []Element `json:"items,omitempty"`
+// rawItemList is the method-free canonical-JSON alias for ItemList. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawItemList ItemList
+
+// MarshalJSONTo emits canonical openEHR JSON for ItemList with `_type`
+// (value "ITEM_LIST") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (i ItemList) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawItemList
+	}{"ITEM_LIST", (*rawItemList)(&i)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for ItemList with `_type`
-// (value "ITEM_LIST") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (i *ItemList) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(i.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(i.UID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ItemListJSONMarshaller{
-		Class:            "ITEM_LIST",
-		Name:             rawName,
-		ArchetypeNodeID:  i.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            i.Links,
-		ArchetypeDetails: i.ArchetypeDetails,
-		FeederAudit:      i.FeederAudit,
-		Items:            i.Items,
-	})
+// rawItemSingle is the method-free canonical-JSON alias for ItemSingle. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawItemSingle ItemSingle
+
+// MarshalJSONTo emits canonical openEHR JSON for ItemSingle with `_type`
+// (value "ITEM_SINGLE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (i ItemSingle) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawItemSingle
+	}{"ITEM_SINGLE", (*rawItemSingle)(&i)}, typereg.MarshalOptions(enc))
 }
 
-type ItemSingleJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	Item        Element      `json:"item"`
+// rawItemTable is the method-free canonical-JSON alias for ItemTable. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawItemTable ItemTable
+
+// MarshalJSONTo emits canonical openEHR JSON for ItemTable with `_type`
+// (value "ITEM_TABLE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (i ItemTable) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawItemTable
+	}{"ITEM_TABLE", (*rawItemTable)(&i)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for ItemSingle with `_type`
-// (value "ITEM_SINGLE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (i *ItemSingle) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(i.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(i.UID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ItemSingleJSONMarshaller{
-		Class:            "ITEM_SINGLE",
-		Name:             rawName,
-		ArchetypeNodeID:  i.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            i.Links,
-		ArchetypeDetails: i.ArchetypeDetails,
-		FeederAudit:      i.FeederAudit,
-		Item:             i.Item,
-	})
-}
+// rawItemTree is the method-free canonical-JSON alias for ItemTree. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawItemTree ItemTree
 
-type ItemTableJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Rows Physical representation of the table as a list of `CLUSTERs`, each containing the data of one row of the table.
-	Rows []Cluster `json:"rows,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for ItemTable with `_type`
-// (value "ITEM_TABLE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (i *ItemTable) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(i.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(i.UID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ItemTableJSONMarshaller{
-		Class:            "ITEM_TABLE",
-		Name:             rawName,
-		ArchetypeNodeID:  i.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            i.Links,
-		ArchetypeDetails: i.ArchetypeDetails,
-		FeederAudit:      i.FeederAudit,
-		Rows:             i.Rows,
-	})
-}
-
-type ItemTreeJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Items The items comprising the `ITEM_TREE`. Can include 0 or more `CLUSTERs` and/or 0 or more individual `ELEMENTs`.
-	Items json.RawMessage `json:"items,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for ItemTree with `_type`
-// (value "ITEM_TREE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (i *ItemTree) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(i.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(i.UID)
-	if err != nil {
-		return nil, err
-	}
-	rawItems, err := jsonpoly.MarshalSlice(i.Items)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ItemTreeJSONMarshaller{
-		Class:            "ITEM_TREE",
-		Name:             rawName,
-		ArchetypeNodeID:  i.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            i.Links,
-		ArchetypeDetails: i.ArchetypeDetails,
-		FeederAudit:      i.FeederAudit,
-		Items:            rawItems,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for ItemTree with `_type`
+// (value "ITEM_TREE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (i ItemTree) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawItemTree
+	}{"ITEM_TREE", (*rawItemTree)(&i)}, typereg.MarshalOptions(enc))
 }

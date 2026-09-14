@@ -3,59 +3,51 @@
 
 package aom14
 
-import "encoding/json"
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-// BMM package: org.openehr.am.aom14.archetype.ontology — canonical-JSON MarshalJSON companions
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+)
 
-type ArchetypeOntologyJSONMarshaller struct {
-	Class string `json:"_type"`
-	// TermCodes List of all term codes in the ontology. Most of these correspond to “at” codes in an ADL archetype, which are the node_ids on C_OBJECT descendants. There may be an extra one, if a different term is used as the overall archetype concept from that used as the node_id of the outermost C_OBJECT in the definition part.
-	TermCodes []string `json:"term_codes"`
-	// ConstraintCodes List of all term codes in the ontology. These correspond to the “ac” codes in an ADL archetype, or equivalently, the CONSTRAINT_REF.reference values in the archetype definition.
-	ConstraintCodes []string `json:"constraint_codes"`
-	// ParentArchetype Archetype which owns this terminology.
-	ParentArchetype *Archetype `json:"parent_archetype"`
-	// TerminologiesAvailable List of terminologies to which term or constraint bindings exist in this terminology.
-	TerminologiesAvailable []string `json:"terminologies_available,omitempty"`
-	// SpecialisationDepth Specialisation depth of this archetype. Unspecialised archetypes have depth 0, with each additional level of specialisation adding 1 to the specialisation_depth.
-	SpecialisationDepth Integer  `json:"specialisation_depth"`
-	TermAttributeNames  []string `json:"term_attribute_names"`
+// BMM package: org.openehr.am.aom14.archetype.ontology — canonical-JSON MarshalJSONTo companions
+
+// rawArchetypeOntology is the method-free canonical-JSON alias for ArchetypeOntology. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawArchetypeOntology ArchetypeOntology
+
+// MarshalJSONTo emits canonical openEHR JSON for ArchetypeOntology with `_type`
+// (value "ARCHETYPE_ONTOLOGY") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (a ArchetypeOntology) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawArchetypeOntology
+	}{"ARCHETYPE_ONTOLOGY", (*rawArchetypeOntology)(&a)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for ArchetypeOntology with `_type`
-// (value "ARCHETYPE_ONTOLOGY") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *ArchetypeOntology) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ArchetypeOntologyJSONMarshaller{
-		Class:                  "ARCHETYPE_ONTOLOGY",
-		TermCodes:              a.TermCodes,
-		ConstraintCodes:        a.ConstraintCodes,
-		ParentArchetype:        a.ParentArchetype,
-		TerminologiesAvailable: a.TerminologiesAvailable,
-		SpecialisationDepth:    a.SpecialisationDepth,
-		TermAttributeNames:     a.TermAttributeNames,
-	})
-}
+// rawArchetypeTerm is the method-free canonical-JSON alias for ArchetypeTerm. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawArchetypeTerm ArchetypeTerm
 
-type ArchetypeTermJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Code Code of this term.
-	Code string `json:"code"`
-	// Items Hash of keys (“text”, “description” etc) and corresponding values.
-	Items *map[string]string `json:"items,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for ArchetypeTerm with `_type`
-// (value "ARCHETYPE_TERM") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *ArchetypeTerm) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ArchetypeTermJSONMarshaller{
-		Class: "ARCHETYPE_TERM",
-		Code:  a.Code,
-		Items: a.Items,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for ArchetypeTerm with `_type`
+// (value "ARCHETYPE_TERM") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (a ArchetypeTerm) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawArchetypeTerm
+	}{"ARCHETYPE_TERM", (*rawArchetypeTerm)(&a)}, typereg.MarshalOptions(enc))
 }

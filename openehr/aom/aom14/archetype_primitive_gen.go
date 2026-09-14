@@ -10,7 +10,7 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // CBoolean Constraint on instances of Boolean. Both attributes cannot be set to False, since this would mean that the Boolean value being constrained cannot be True or False.
 type CBoolean struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *bool `json:"assumed_value,omitempty"`
+	AssumedValue *bool `json:"assumed_value,omitzero"`
 	// FalseValid True if the value False is allowed.
 	FalseValid bool `json:"false_valid"`
 	// TrueValid True if the value True is allowed.
@@ -20,35 +20,35 @@ type CBoolean struct {
 // CDate ISO 8601-compatible constraint on instances of Date in the form either of a set of validity values, or an actual date range. There is no validity flag for ‘year’, since it must always be by definition mandatory in order to have a sensible date at all. Syntax expressions of instances of this class include “YYYY-??-??” (date with optional month and day).
 type CDate struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
+	AssumedValue *string `json:"assumed_value,omitzero"`
 	// DayValidity Validity of day in constrained date.
-	DayValidity *rm.ValidityKind `json:"day_validity,omitempty"`
+	DayValidity *rm.ValidityKind `json:"day_validity,omitzero"`
 	// MonthValidity Validity of month in constrained date.
-	MonthValidity *rm.ValidityKind `json:"month_validity,omitempty"`
+	MonthValidity *rm.ValidityKind `json:"month_validity,omitzero"`
 	// Range Interval of Dates specifying constraint.
-	Range *rm.Interval[string] `json:"range,omitempty"`
+	Range *rm.Interval[string] `json:"range,omitzero"`
 }
 
 // CDateTime ISO 8601-compatible constraint on instances of Date_Time. There is no validity flag for ‘year’, since it must always be by definition mandatory in order to have a sensible date/time at all. Syntax expressions of instances of this class include “YYYY-MM-DDT??:??:??” (date/time with optional time) and “YYYY-MMDDTHH:MM:xx” (date/time, seconds not allowed).
 type CDateTime struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
+	AssumedValue *string `json:"assumed_value,omitzero"`
 	// DayValidity Validity of day in constrained date.
-	DayValidity *rm.ValidityKind `json:"day_validity,omitempty"`
+	DayValidity *rm.ValidityKind `json:"day_validity,omitzero"`
 	// HourValidity Validity of hour in constrained time.
-	HourValidity *rm.ValidityKind `json:"hour_validity,omitempty"`
+	HourValidity *rm.ValidityKind `json:"hour_validity,omitzero"`
 	// MillisecondValidity Validity of millisecond in constrained time.
-	MillisecondValidity *rm.ValidityKind `json:"millisecond_validity,omitempty"`
+	MillisecondValidity *rm.ValidityKind `json:"millisecond_validity,omitzero"`
 	// MinuteValidity Validity of minute in constrained time.
-	MinuteValidity *rm.ValidityKind `json:"minute_validity,omitempty"`
+	MinuteValidity *rm.ValidityKind `json:"minute_validity,omitzero"`
 	// MonthValidity Validity of month in constrained date.
-	MonthValidity *rm.ValidityKind `json:"month_validity,omitempty"`
+	MonthValidity *rm.ValidityKind `json:"month_validity,omitzero"`
 	// Range Range of Date_times specifying constraint.
-	Range *rm.Interval[string] `json:"range,omitempty"`
+	Range *rm.Interval[string] `json:"range,omitzero"`
 	// SecondValidity Validity of second in constrained time.
-	SecondValidity *rm.ValidityKind `json:"second_validity,omitempty"`
+	SecondValidity *rm.ValidityKind `json:"second_validity,omitzero"`
 	// TimezoneValidity Validity of timezone in constrained date.
-	TimezoneValidity *rm.ValidityKind `json:"timezone_validity,omitempty"`
+	TimezoneValidity *rm.ValidityKind `json:"timezone_validity,omitzero"`
 }
 
 // ValidityIsRange True if validity is in the form of a range; useful for developers to check which kind of constraint has been set.
@@ -66,32 +66,32 @@ func (c *CDateTime) ValidityIsRange() bool {
 // * the values used in an interval constraint may be negated, i.e. a leading minus (`'-'`) sign may be used.
 type CDuration struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
+	AssumedValue *string `json:"assumed_value,omitzero"`
 	// DaysAllowed True if days are allowed in the constrained Duration.
-	DaysAllowed *bool `json:"days_allowed,omitempty"`
+	DaysAllowed *bool `json:"days_allowed,omitzero"`
 	// FractionalSecondsAllowed True if fractional seconds are allowed in the constrained Duration.
-	FractionalSecondsAllowed *bool `json:"fractional_seconds_allowed,omitempty"`
+	FractionalSecondsAllowed *bool `json:"fractional_seconds_allowed,omitzero"`
 	// HoursAllowed True if hours are allowed in the constrained Duration.
-	HoursAllowed *bool `json:"hours_allowed,omitempty"`
+	HoursAllowed *bool `json:"hours_allowed,omitzero"`
 	// MinutesAllowed True if minutes are allowed in the constrained Duration.
-	MinutesAllowed *bool `json:"minutes_allowed,omitempty"`
+	MinutesAllowed *bool `json:"minutes_allowed,omitzero"`
 	// MonthsAllowed True if months are allowed in the constrained Duration.
-	MonthsAllowed *bool `json:"months_allowed,omitempty"`
+	MonthsAllowed *bool `json:"months_allowed,omitzero"`
 	// Range Range of Durations specifying constraint.
-	Range          *rm.Interval[string] `json:"range,omitempty"`
-	SecondsAllowed *bool                `json:"seconds_allowed,omitempty"`
-	WeeksAllowed   *bool                `json:"weeks_allowed,omitempty"`
-	YearsAllowed   *bool                `json:"years_allowed,omitempty"`
+	Range          *rm.Interval[string] `json:"range,omitzero"`
+	SecondsAllowed *bool                `json:"seconds_allowed,omitzero"`
+	WeeksAllowed   *bool                `json:"weeks_allowed,omitzero"`
+	YearsAllowed   *bool                `json:"years_allowed,omitzero"`
 }
 
 // CInteger Constraint on instances of Integer.
 type CInteger struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *Integer `json:"assumed_value,omitempty"`
+	AssumedValue *Integer `json:"assumed_value,omitzero"`
 	// List Set of Integers specifying constraint.
 	List []Integer `json:"list,omitempty"`
 	// Range Range of Integers specifying constraint.
-	Range *rm.Interval[Integer] `json:"range,omitempty"`
+	Range *rm.Interval[Integer] `json:"range,omitzero"`
 }
 
 // CPrimitive Parent of types representing constraints on primitive types.
@@ -233,23 +233,23 @@ func (c *CTime) ValidValue(aValue any) bool {
 // CReal Constraint on instances of Real.
 type CReal struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *Real `json:"assumed_value,omitempty"`
+	AssumedValue *Real `json:"assumed_value,omitzero"`
 	// List Set of Reals specifying constraint.
 	List []Real `json:"list,omitempty"`
 	// Range Range of Real specifying constraint.
-	Range *rm.Interval[Real] `json:"range,omitempty"`
+	Range *rm.Interval[Real] `json:"range,omitzero"`
 }
 
 // CString Constraint on instances of STRING.
 type CString struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
+	AssumedValue *string `json:"assumed_value,omitzero"`
 	// List Set of Strings specifying constraint.
 	List []string `json:"list,omitempty"`
 	// ListOpen True if the list is being used to specify the constraint but is not considered exhaustive.
 	ListOpen bool `json:"list_open"`
 	// Pattern Regular expression pattern for proposed instances of String to match.
-	Pattern *string `json:"pattern,omitempty"`
+	Pattern *string `json:"pattern,omitzero"`
 }
 
 // ValidValue True if a_value is valid with respect to constraint expressed in concrete instance of this type.
@@ -260,17 +260,17 @@ func (c *CString) ValidValue(aValue string) bool {
 // CTime ISO 8601-compatible constraint on instances of Time. There is no validity flag for ‘hour’, since it must always be by definition mandatory in order to have a sensible time at all. Syntax expressions of instances of this class include “HH:??:xx” (time with optional minutes and seconds not allowed).
 type CTime struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
+	AssumedValue *string `json:"assumed_value,omitzero"`
 	// MillisecondValidity Validity of millisecond in constrained time.
-	MillisecondValidity *rm.ValidityKind `json:"millisecond_validity,omitempty"`
+	MillisecondValidity *rm.ValidityKind `json:"millisecond_validity,omitzero"`
 	// MinuteValidity Validity of minute in constrained time.
-	MinuteValidity *rm.ValidityKind `json:"minute_validity,omitempty"`
+	MinuteValidity *rm.ValidityKind `json:"minute_validity,omitzero"`
 	// Range Interval of Times specifying constraint.
-	Range *rm.Interval[string] `json:"range,omitempty"`
+	Range *rm.Interval[string] `json:"range,omitzero"`
 	// SecondValidity Validity of second in constrained time.
-	SecondValidity *rm.ValidityKind `json:"second_validity,omitempty"`
+	SecondValidity *rm.ValidityKind `json:"second_validity,omitzero"`
 	// TimezoneValidity Validity of timezone in constrained date.
-	TimezoneValidity *rm.ValidityKind `json:"timezone_validity,omitempty"`
+	TimezoneValidity *rm.ValidityKind `json:"timezone_validity,omitzero"`
 }
 
 // ValidityIsRange True if validity is in the form of a range; useful for developers to check which kind of constraint has been set.

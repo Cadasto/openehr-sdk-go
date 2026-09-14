@@ -4,40 +4,27 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.support.measurement — canonical-JSON UnmarshalJSON companions
+// BMM package: org.openehr.rm.support.measurement — canonical-JSON UnmarshalJSONFrom companions
 
-type MeasurementServiceJSONUnmarshaller struct {
-	Class string `json:"_type"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into MeasurementService.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (m *MeasurementService) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into MeasurementService.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (m *MeasurementService) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if m == nil {
 		return fmt.Errorf("canjson: MEASUREMENT_SERVICE: %w", typereg.ErrNilReceiver)
 	}
-	var aux MeasurementServiceJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("MEASUREMENT_SERVICE", err)
-	}
-	if aux.Class != "" && aux.Class != "MEASUREMENT_SERVICE" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "MEASUREMENT_SERVICE", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	return nil
+	return typereg.DecodeInto(dec, "MEASUREMENT_SERVICE", &struct {
+		Type string `json:"_type"`
+		*rawMeasurementService
+	}{rawMeasurementService: (*rawMeasurementService)(m)})
 }

@@ -4,154 +4,110 @@
 package aom14
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.am.aom14.archetype.assertion — canonical-JSON MarshalJSON companions
+// BMM package: org.openehr.am.aom14.archetype.assertion — canonical-JSON MarshalJSONTo companions
 
-type AssertionJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Tag Expression tag, used for differentiating multiple assertions.
-	Tag *string `json:"tag,omitempty"`
-	// StringExpression String form of expression, in case an expression evaluator taking String expressions is used for evaluation.
-	StringExpression *string `json:"string_expression,omitempty"`
-	// Expression Root of expression tree.
-	Expression json.RawMessage `json:"expression"`
-	// Variables Definitions of variables used in the assertion expression.
-	Variables []AssertionVariable `json:"variables,omitempty"`
+// rawAssertion is the method-free canonical-JSON alias for Assertion. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawAssertion Assertion
+
+// MarshalJSONTo emits canonical openEHR JSON for Assertion with `_type`
+// (value "ASSERTION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (a Assertion) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawAssertion
+	}{"ASSERTION", (*rawAssertion)(&a)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for Assertion with `_type`
-// (value "ASSERTION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *Assertion) MarshalJSON() ([]byte, error) {
-	rawExpression, err := jsonpoly.Marshal(a.Expression)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&AssertionJSONMarshaller{
-		Class:            "ASSERTION",
-		Tag:              a.Tag,
-		StringExpression: a.StringExpression,
-		Expression:       rawExpression,
-		Variables:        a.Variables,
-	})
+// rawAssertionVariable is the method-free canonical-JSON alias for AssertionVariable. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawAssertionVariable AssertionVariable
+
+// MarshalJSONTo emits canonical openEHR JSON for AssertionVariable with `_type`
+// (value "ASSERTION_VARIABLE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (a AssertionVariable) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawAssertionVariable
+	}{"ASSERTION_VARIABLE", (*rawAssertionVariable)(&a)}, typereg.MarshalOptions(enc))
 }
 
-type AssertionVariableJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Name of variable.
-	Name string `json:"name"`
-	// Definition Formal definition of the variable.
-	Definition string `json:"definition"`
+// rawExprBinaryOperator is the method-free canonical-JSON alias for ExprBinaryOperator. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawExprBinaryOperator ExprBinaryOperator
+
+// MarshalJSONTo emits canonical openEHR JSON for ExprBinaryOperator with `_type`
+// (value "EXPR_BINARY_OPERATOR") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (e ExprBinaryOperator) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawExprBinaryOperator
+	}{"EXPR_BINARY_OPERATOR", (*rawExprBinaryOperator)(&e)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for AssertionVariable with `_type`
-// (value "ASSERTION_VARIABLE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *AssertionVariable) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&AssertionVariableJSONMarshaller{
-		Class:      "ASSERTION_VARIABLE",
-		Name:       a.Name,
-		Definition: a.Definition,
-	})
+// rawExprLeaf is the method-free canonical-JSON alias for ExprLeaf. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawExprLeaf ExprLeaf
+
+// MarshalJSONTo emits canonical openEHR JSON for ExprLeaf with `_type`
+// (value "EXPR_LEAF") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (e ExprLeaf) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawExprLeaf
+	}{"EXPR_LEAF", (*rawExprLeaf)(&e)}, typereg.MarshalOptions(enc))
 }
 
-type ExprBinaryOperatorJSONMarshaller struct {
-	Class string `json:"_type"`
-	// PrecedenceOverridden True if the natural precedence of operators is overridden in the expression represented by this node of the expression tree. If True, parentheses should be introduced around the totality of the syntax expression corresponding to this operator node and its operands.
-	PrecedenceOverridden *bool `json:"precedence_overridden,omitempty"`
-	// Operator Code of operator.
-	Operator OperatorKind `json:"operator"`
-	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
-	Type string `json:"type"`
-	// LeftOperand Left operand node.
-	LeftOperand json.RawMessage `json:"left_operand"`
-	// RightOperand Right operand node.
-	RightOperand json.RawMessage `json:"right_operand"`
-}
+// rawExprUnaryOperator is the method-free canonical-JSON alias for ExprUnaryOperator. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawExprUnaryOperator ExprUnaryOperator
 
-// MarshalJSON emits canonical openEHR JSON for ExprBinaryOperator with `_type`
-// (value "EXPR_BINARY_OPERATOR") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (e *ExprBinaryOperator) MarshalJSON() ([]byte, error) {
-	rawLeftOperand, err := jsonpoly.Marshal(e.LeftOperand)
-	if err != nil {
-		return nil, err
-	}
-	rawRightOperand, err := jsonpoly.Marshal(e.RightOperand)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ExprBinaryOperatorJSONMarshaller{
-		Class:                "EXPR_BINARY_OPERATOR",
-		PrecedenceOverridden: e.PrecedenceOverridden,
-		Operator:             e.Operator,
-		Type:                 e.Type,
-		LeftOperand:          rawLeftOperand,
-		RightOperand:         rawRightOperand,
-	})
-}
-
-type ExprLeafJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
-	Type string `json:"type"`
-	// ReferenceType Type of reference: “constant”, “attribute”, “function”, “constraint”. The first three are used to indicate the referencing mechanism for an operand. The last is used to indicate a constraint operand, as happens in the case of the right-hand operand of the ‘matches’ operator.
-	ReferenceType string `json:"reference_type"`
-	// Item The value referred to; a manifest constant, an attribute path (in the form of a String), or for the right-hand side of a ‘matches’ node, a constraint, often a C_PRIMITIVE_OBJECT.
-	Item any `json:"item"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for ExprLeaf with `_type`
-// (value "EXPR_LEAF") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (e *ExprLeaf) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ExprLeafJSONMarshaller{
-		Class:         "EXPR_LEAF",
-		Type:          e.Type,
-		ReferenceType: e.ReferenceType,
-		Item:          e.Item,
-	})
-}
-
-type ExprUnaryOperatorJSONMarshaller struct {
-	Class string `json:"_type"`
-	// PrecedenceOverridden True if the natural precedence of operators is overridden in the expression represented by this node of the expression tree. If True, parentheses should be introduced around the totality of the syntax expression corresponding to this operator node and its operands.
-	PrecedenceOverridden *bool `json:"precedence_overridden,omitempty"`
-	// Operator Code of operator.
-	Operator OperatorKind `json:"operator"`
-	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
-	Type string `json:"type"`
-	// Operand Operand node.
-	Operand json.RawMessage `json:"operand"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for ExprUnaryOperator with `_type`
-// (value "EXPR_UNARY_OPERATOR") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (e *ExprUnaryOperator) MarshalJSON() ([]byte, error) {
-	rawOperand, err := jsonpoly.Marshal(e.Operand)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ExprUnaryOperatorJSONMarshaller{
-		Class:                "EXPR_UNARY_OPERATOR",
-		PrecedenceOverridden: e.PrecedenceOverridden,
-		Operator:             e.Operator,
-		Type:                 e.Type,
-		Operand:              rawOperand,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for ExprUnaryOperator with `_type`
+// (value "EXPR_UNARY_OPERATOR") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (e ExprUnaryOperator) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawExprUnaryOperator
+	}{"EXPR_UNARY_OPERATOR", (*rawExprUnaryOperator)(&e)}, typereg.MarshalOptions(enc))
 }

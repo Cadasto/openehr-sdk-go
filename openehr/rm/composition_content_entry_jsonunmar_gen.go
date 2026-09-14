@@ -4,927 +4,146 @@
 package rm
 
 import (
-	"encoding/json"
-	"errors"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.composition.content.entry — canonical-JSON UnmarshalJSON companions
+// BMM package: org.openehr.rm.composition.content.entry — canonical-JSON UnmarshalJSONFrom companions
 
-type ActionJSONUnmarshaller struct {
-	Class       string          `json:"_type"`
-	Protocol    json.RawMessage `json:"protocol,omitempty"`     // polymorphic ItemStructure
-	GuidelineID json.RawMessage `json:"guideline_id,omitempty"` // polymorphic ObjectRefLike
-	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
-	Language CodePhrase `json:"language"`
-	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
-	Encoding CodePhrase `json:"encoding"`
-	// OtherParticipations Other participations at `ENTRY` level.
-	OtherParticipations []Participation `json:"other_participations,omitempty"`
-	WorkflowID          json.RawMessage `json:"workflow_id,omitempty"` // polymorphic ObjectRefLike
-	Subject             json.RawMessage `json:"subject"`               // polymorphic PartyProxy
-	Provider            json.RawMessage `json:"provider,omitempty"`    // polymorphic PartyProxy
-	Name                json.RawMessage `json:"name"`                  // polymorphic DVTextLike
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string          `json:"archetype_node_id"`
-	UID             json.RawMessage `json:"uid,omitempty"` // polymorphic UIDBasedID
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Time Point in time at which this action completed. To indicate an unknown time, use a `DV_DATE_TIME` instance with `_value_` set to the time of creation (or some other known time before which the Action is known to have occurred, e.g. data accession timestamp from integration engine), and `_magnitude_status_` set to `<`.
-	Time DVDateTime `json:"time"`
-	// IsmTransition Details of transition in the Instruction state machine caused by this Action.
-	IsmTransition IsmTransition `json:"ism_transition"`
-	// InstructionDetails Details of the Instruction that caused this Action to be performed, if there was one.
-	InstructionDetails *InstructionDetails `json:"instruction_details,omitempty"`
-	Description        json.RawMessage     `json:"description"` // polymorphic ItemStructure
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Action.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *Action) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Action.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *Action) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ACTION: %w", typereg.ErrNilReceiver)
 	}
-	var aux ActionJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ACTION", err)
-	}
-	if aux.Class != "" && aux.Class != "ACTION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ACTION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Protocol) > 0 && string(aux.Protocol) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.Protocol)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/protocol", Inner: err}
-		}
-		a.Protocol = dv
-	}
-	if len(aux.GuidelineID) > 0 && string(aux.GuidelineID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.GuidelineID)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.GuidelineID, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/guideline_id", Inner: jerr}
-				}
-				a.GuidelineID = &def
-			} else {
-				return &typereg.DecodeError{Path: "/guideline_id", Inner: err}
-			}
-		} else {
-			a.GuidelineID = dv
-		}
-	}
-	a.Language = aux.Language
-	a.Encoding = aux.Encoding
-	a.OtherParticipations = aux.OtherParticipations
-	if len(aux.WorkflowID) > 0 && string(aux.WorkflowID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.WorkflowID)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.WorkflowID, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/workflow_id", Inner: jerr}
-				}
-				a.WorkflowID = &def
-			} else {
-				return &typereg.DecodeError{Path: "/workflow_id", Inner: err}
-			}
-		} else {
-			a.WorkflowID = dv
-		}
-	}
-	if len(aux.Subject) > 0 && string(aux.Subject) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Subject)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/subject", Inner: err}
-		}
-		a.Subject = dv
-	}
-	if len(aux.Provider) > 0 && string(aux.Provider) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Provider)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/provider", Inner: err}
-		}
-		a.Provider = dv
-	}
-	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/name", Inner: jerr}
-				}
-				a.Name = &def
-			} else {
-				return &typereg.DecodeError{Path: "/name", Inner: err}
-			}
-		} else {
-			a.Name = dv
-		}
-	}
-	a.ArchetypeNodeID = aux.ArchetypeNodeID
-	if len(aux.UID) > 0 && string(aux.UID) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/uid", Inner: err}
-		}
-		a.UID = dv
-	}
-	a.Links = aux.Links
-	a.ArchetypeDetails = aux.ArchetypeDetails
-	a.FeederAudit = aux.FeederAudit
-	a.Time = aux.Time
-	a.IsmTransition = aux.IsmTransition
-	a.InstructionDetails = aux.InstructionDetails
-	if len(aux.Description) > 0 && string(aux.Description) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.Description)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/description", Inner: err}
-		}
-		a.Description = dv
-	}
-	return nil
+	return typereg.DecodeInto(dec, "ACTION", &struct {
+		Type string `json:"_type"`
+		*rawAction
+	}{rawAction: (*rawAction)(a)})
 }
 
-type ActivityJSONUnmarshaller struct {
-	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string          `json:"archetype_node_id"`
-	UID             json.RawMessage `json:"uid,omitempty"` // polymorphic UIDBasedID
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Timing Timing of the activity, in the form of a parsable string. If used, the preferred syntax is ISO8601 'R' format, but other formats may be used including HL7 GTS.
-	//
-	// May be omitted if:
-	//
-	// * timing is represented structurally in the `_description_` attribute (e.g. via archetyped elements), or
-	// * unavailable, e.g. imported legacy data; in such cases, the `INSTRUCTION._narrative_` should carry text that indicates the timing of its `_activities_`.
-	Timing *DVParsable `json:"timing,omitempty"`
-	// ActionArchetypeID Perl-compliant regular expression pattern, enclosed in  '//' delimiters, indicating the valid identifiers of archetypes for Actions corresponding to this Activity specification.
-	//
-	// Defaults to  `/.*/`, meaning any archetype.
-	ActionArchetypeID string          `json:"action_archetype_id"`
-	Description       json.RawMessage `json:"description"` // polymorphic ItemStructure
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Activity.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *Activity) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Activity.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *Activity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ACTIVITY: %w", typereg.ErrNilReceiver)
 	}
-	var aux ActivityJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ACTIVITY", err)
-	}
-	if aux.Class != "" && aux.Class != "ACTIVITY" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ACTIVITY", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/name", Inner: jerr}
-				}
-				a.Name = &def
-			} else {
-				return &typereg.DecodeError{Path: "/name", Inner: err}
-			}
-		} else {
-			a.Name = dv
-		}
-	}
-	a.ArchetypeNodeID = aux.ArchetypeNodeID
-	if len(aux.UID) > 0 && string(aux.UID) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/uid", Inner: err}
-		}
-		a.UID = dv
-	}
-	a.Links = aux.Links
-	a.ArchetypeDetails = aux.ArchetypeDetails
-	a.FeederAudit = aux.FeederAudit
-	a.Timing = aux.Timing
-	a.ActionArchetypeID = aux.ActionArchetypeID
-	if len(aux.Description) > 0 && string(aux.Description) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.Description)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/description", Inner: err}
-		}
-		a.Description = dv
-	}
-	return nil
+	return typereg.DecodeInto(dec, "ACTIVITY", &struct {
+		Type string `json:"_type"`
+		*rawActivity
+	}{rawActivity: (*rawActivity)(a)})
 }
 
-type AdminEntryJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
-	Language CodePhrase `json:"language"`
-	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
-	Encoding CodePhrase `json:"encoding"`
-	// OtherParticipations Other participations at `ENTRY` level.
-	OtherParticipations []Participation `json:"other_participations,omitempty"`
-	WorkflowID          json.RawMessage `json:"workflow_id,omitempty"` // polymorphic ObjectRefLike
-	Subject             json.RawMessage `json:"subject"`               // polymorphic PartyProxy
-	Provider            json.RawMessage `json:"provider,omitempty"`    // polymorphic PartyProxy
-	Name                json.RawMessage `json:"name"`                  // polymorphic DVTextLike
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string          `json:"archetype_node_id"`
-	UID             json.RawMessage `json:"uid,omitempty"` // polymorphic UIDBasedID
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit    `json:"feeder_audit,omitempty"`
-	Data        json.RawMessage `json:"data"` // polymorphic ItemStructure
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into AdminEntry.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *AdminEntry) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into AdminEntry.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *AdminEntry) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ADMIN_ENTRY: %w", typereg.ErrNilReceiver)
 	}
-	var aux AdminEntryJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ADMIN_ENTRY", err)
-	}
-	if aux.Class != "" && aux.Class != "ADMIN_ENTRY" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ADMIN_ENTRY", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	a.Language = aux.Language
-	a.Encoding = aux.Encoding
-	a.OtherParticipations = aux.OtherParticipations
-	if len(aux.WorkflowID) > 0 && string(aux.WorkflowID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.WorkflowID)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.WorkflowID, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/workflow_id", Inner: jerr}
-				}
-				a.WorkflowID = &def
-			} else {
-				return &typereg.DecodeError{Path: "/workflow_id", Inner: err}
-			}
-		} else {
-			a.WorkflowID = dv
-		}
-	}
-	if len(aux.Subject) > 0 && string(aux.Subject) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Subject)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/subject", Inner: err}
-		}
-		a.Subject = dv
-	}
-	if len(aux.Provider) > 0 && string(aux.Provider) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Provider)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/provider", Inner: err}
-		}
-		a.Provider = dv
-	}
-	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/name", Inner: jerr}
-				}
-				a.Name = &def
-			} else {
-				return &typereg.DecodeError{Path: "/name", Inner: err}
-			}
-		} else {
-			a.Name = dv
-		}
-	}
-	a.ArchetypeNodeID = aux.ArchetypeNodeID
-	if len(aux.UID) > 0 && string(aux.UID) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/uid", Inner: err}
-		}
-		a.UID = dv
-	}
-	a.Links = aux.Links
-	a.ArchetypeDetails = aux.ArchetypeDetails
-	a.FeederAudit = aux.FeederAudit
-	if len(aux.Data) > 0 && string(aux.Data) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.Data)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/data", Inner: err}
-		}
-		a.Data = dv
-	}
-	return nil
+	return typereg.DecodeInto(dec, "ADMIN_ENTRY", &struct {
+		Type string `json:"_type"`
+		*rawAdminEntry
+	}{rawAdminEntry: (*rawAdminEntry)(a)})
 }
 
-type EvaluationJSONUnmarshaller struct {
-	Class       string          `json:"_type"`
-	Protocol    json.RawMessage `json:"protocol,omitempty"`     // polymorphic ItemStructure
-	GuidelineID json.RawMessage `json:"guideline_id,omitempty"` // polymorphic ObjectRefLike
-	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
-	Language CodePhrase `json:"language"`
-	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
-	Encoding CodePhrase `json:"encoding"`
-	// OtherParticipations Other participations at `ENTRY` level.
-	OtherParticipations []Participation `json:"other_participations,omitempty"`
-	WorkflowID          json.RawMessage `json:"workflow_id,omitempty"` // polymorphic ObjectRefLike
-	Subject             json.RawMessage `json:"subject"`               // polymorphic PartyProxy
-	Provider            json.RawMessage `json:"provider,omitempty"`    // polymorphic PartyProxy
-	Name                json.RawMessage `json:"name"`                  // polymorphic DVTextLike
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string          `json:"archetype_node_id"`
-	UID             json.RawMessage `json:"uid,omitempty"` // polymorphic UIDBasedID
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit    `json:"feeder_audit,omitempty"`
-	Data        json.RawMessage `json:"data"` // polymorphic ItemStructure
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Evaluation.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (e *Evaluation) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Evaluation.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (e *Evaluation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EVALUATION: %w", typereg.ErrNilReceiver)
 	}
-	var aux EvaluationJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("EVALUATION", err)
-	}
-	if aux.Class != "" && aux.Class != "EVALUATION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EVALUATION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Protocol) > 0 && string(aux.Protocol) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.Protocol)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/protocol", Inner: err}
-		}
-		e.Protocol = dv
-	}
-	if len(aux.GuidelineID) > 0 && string(aux.GuidelineID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.GuidelineID)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.GuidelineID, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/guideline_id", Inner: jerr}
-				}
-				e.GuidelineID = &def
-			} else {
-				return &typereg.DecodeError{Path: "/guideline_id", Inner: err}
-			}
-		} else {
-			e.GuidelineID = dv
-		}
-	}
-	e.Language = aux.Language
-	e.Encoding = aux.Encoding
-	e.OtherParticipations = aux.OtherParticipations
-	if len(aux.WorkflowID) > 0 && string(aux.WorkflowID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.WorkflowID)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.WorkflowID, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/workflow_id", Inner: jerr}
-				}
-				e.WorkflowID = &def
-			} else {
-				return &typereg.DecodeError{Path: "/workflow_id", Inner: err}
-			}
-		} else {
-			e.WorkflowID = dv
-		}
-	}
-	if len(aux.Subject) > 0 && string(aux.Subject) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Subject)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/subject", Inner: err}
-		}
-		e.Subject = dv
-	}
-	if len(aux.Provider) > 0 && string(aux.Provider) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Provider)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/provider", Inner: err}
-		}
-		e.Provider = dv
-	}
-	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/name", Inner: jerr}
-				}
-				e.Name = &def
-			} else {
-				return &typereg.DecodeError{Path: "/name", Inner: err}
-			}
-		} else {
-			e.Name = dv
-		}
-	}
-	e.ArchetypeNodeID = aux.ArchetypeNodeID
-	if len(aux.UID) > 0 && string(aux.UID) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/uid", Inner: err}
-		}
-		e.UID = dv
-	}
-	e.Links = aux.Links
-	e.ArchetypeDetails = aux.ArchetypeDetails
-	e.FeederAudit = aux.FeederAudit
-	if len(aux.Data) > 0 && string(aux.Data) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.Data)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/data", Inner: err}
-		}
-		e.Data = dv
-	}
-	return nil
+	return typereg.DecodeInto(dec, "EVALUATION", &struct {
+		Type string `json:"_type"`
+		*rawEvaluation
+	}{rawEvaluation: (*rawEvaluation)(e)})
 }
 
-type InstructionJSONUnmarshaller struct {
-	Class       string          `json:"_type"`
-	Protocol    json.RawMessage `json:"protocol,omitempty"`     // polymorphic ItemStructure
-	GuidelineID json.RawMessage `json:"guideline_id,omitempty"` // polymorphic ObjectRefLike
-	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
-	Language CodePhrase `json:"language"`
-	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
-	Encoding CodePhrase `json:"encoding"`
-	// OtherParticipations Other participations at `ENTRY` level.
-	OtherParticipations []Participation `json:"other_participations,omitempty"`
-	WorkflowID          json.RawMessage `json:"workflow_id,omitempty"` // polymorphic ObjectRefLike
-	Subject             json.RawMessage `json:"subject"`               // polymorphic PartyProxy
-	Provider            json.RawMessage `json:"provider,omitempty"`    // polymorphic PartyProxy
-	Name                json.RawMessage `json:"name"`                  // polymorphic DVTextLike
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string          `json:"archetype_node_id"`
-	UID             json.RawMessage `json:"uid,omitempty"` // polymorphic UIDBasedID
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit    `json:"feeder_audit,omitempty"`
-	Narrative   json.RawMessage `json:"narrative"` // polymorphic DVTextLike
-	// ExpiryTime Optional expiry date/time to assist determination of when an Instruction can be assumed to have expired. This helps prevent false listing of Instructions as Active when they clearly must have been terminated in some way or other.
-	ExpiryTime *DVDateTime `json:"expiry_time,omitempty"`
-	// WfDefinition Optional workflow engine executable expression of the Instruction.
-	WfDefinition *DVParsable `json:"wf_definition,omitempty"`
-	// Activities List of all activities in Instruction.
-	Activities []Activity `json:"activities,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Instruction.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (i *Instruction) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Instruction.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (i *Instruction) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: INSTRUCTION: %w", typereg.ErrNilReceiver)
 	}
-	var aux InstructionJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("INSTRUCTION", err)
-	}
-	if aux.Class != "" && aux.Class != "INSTRUCTION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "INSTRUCTION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Protocol) > 0 && string(aux.Protocol) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.Protocol)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/protocol", Inner: err}
-		}
-		i.Protocol = dv
-	}
-	if len(aux.GuidelineID) > 0 && string(aux.GuidelineID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.GuidelineID)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.GuidelineID, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/guideline_id", Inner: jerr}
-				}
-				i.GuidelineID = &def
-			} else {
-				return &typereg.DecodeError{Path: "/guideline_id", Inner: err}
-			}
-		} else {
-			i.GuidelineID = dv
-		}
-	}
-	i.Language = aux.Language
-	i.Encoding = aux.Encoding
-	i.OtherParticipations = aux.OtherParticipations
-	if len(aux.WorkflowID) > 0 && string(aux.WorkflowID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.WorkflowID)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.WorkflowID, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/workflow_id", Inner: jerr}
-				}
-				i.WorkflowID = &def
-			} else {
-				return &typereg.DecodeError{Path: "/workflow_id", Inner: err}
-			}
-		} else {
-			i.WorkflowID = dv
-		}
-	}
-	if len(aux.Subject) > 0 && string(aux.Subject) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Subject)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/subject", Inner: err}
-		}
-		i.Subject = dv
-	}
-	if len(aux.Provider) > 0 && string(aux.Provider) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Provider)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/provider", Inner: err}
-		}
-		i.Provider = dv
-	}
-	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/name", Inner: jerr}
-				}
-				i.Name = &def
-			} else {
-				return &typereg.DecodeError{Path: "/name", Inner: err}
-			}
-		} else {
-			i.Name = dv
-		}
-	}
-	i.ArchetypeNodeID = aux.ArchetypeNodeID
-	if len(aux.UID) > 0 && string(aux.UID) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/uid", Inner: err}
-		}
-		i.UID = dv
-	}
-	i.Links = aux.Links
-	i.ArchetypeDetails = aux.ArchetypeDetails
-	i.FeederAudit = aux.FeederAudit
-	if len(aux.Narrative) > 0 && string(aux.Narrative) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Narrative)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Narrative, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/narrative", Inner: jerr}
-				}
-				i.Narrative = &def
-			} else {
-				return &typereg.DecodeError{Path: "/narrative", Inner: err}
-			}
-		} else {
-			i.Narrative = dv
-		}
-	}
-	i.ExpiryTime = aux.ExpiryTime
-	i.WfDefinition = aux.WfDefinition
-	i.Activities = aux.Activities
-	return nil
+	return typereg.DecodeInto(dec, "INSTRUCTION", &struct {
+		Type string `json:"_type"`
+		*rawInstruction
+	}{rawInstruction: (*rawInstruction)(i)})
 }
 
-type InstructionDetailsJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// InstructionID Reference to causing Instruction.
-	InstructionID LocatableRef `json:"instruction_id"`
-	// ActivityID Identifier of Activity within Instruction, in the form of its archetype path.
-	ActivityID string          `json:"activity_id"`
-	WfDetails  json.RawMessage `json:"wf_details,omitempty"` // polymorphic ItemStructure
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into InstructionDetails.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (i *InstructionDetails) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into InstructionDetails.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (i *InstructionDetails) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: INSTRUCTION_DETAILS: %w", typereg.ErrNilReceiver)
 	}
-	var aux InstructionDetailsJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("INSTRUCTION_DETAILS", err)
-	}
-	if aux.Class != "" && aux.Class != "INSTRUCTION_DETAILS" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "INSTRUCTION_DETAILS", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	i.InstructionID = aux.InstructionID
-	i.ActivityID = aux.ActivityID
-	if len(aux.WfDetails) > 0 && string(aux.WfDetails) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.WfDetails)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/wf_details", Inner: err}
-		}
-		i.WfDetails = dv
-	}
-	return nil
+	return typereg.DecodeInto(dec, "INSTRUCTION_DETAILS", &struct {
+		Type string `json:"_type"`
+		*rawInstructionDetails
+	}{rawInstructionDetails: (*rawInstructionDetails)(i)})
 }
 
-type IsmTransitionJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// CurrentState The ISM current state. Coded by openEHR terminology group Instruction states.
-	CurrentState DVCodedText `json:"current_state"`
-	// Transition The ISM transition which occurred to arrive in the current_state. Coded by openEHR terminology group  Instruction transitions.
-	Transition *DVCodedText `json:"transition,omitempty"`
-	// CareflowStep The step in the careflow process which occurred as part of generating this action, e.g.  dispense ,  start_administration. This attribute represents the clinical  label for the activity, as  opposed to current_state which represents  the state machine (ISM)  computable form. Defined in archetype.
-	CareflowStep *DVCodedText      `json:"careflow_step,omitempty"`
-	Reason       []json.RawMessage `json:"reason,omitempty"` // polymorphic []DVTextLike
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into IsmTransition.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (i *IsmTransition) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into IsmTransition.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (i *IsmTransition) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ISM_TRANSITION: %w", typereg.ErrNilReceiver)
 	}
-	var aux IsmTransitionJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ISM_TRANSITION", err)
-	}
-	if aux.Class != "" && aux.Class != "ISM_TRANSITION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ISM_TRANSITION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	i.CurrentState = aux.CurrentState
-	i.Transition = aux.Transition
-	i.CareflowStep = aux.CareflowStep
-	if aux.Reason != nil {
-		i.Reason = make([]DVTextLike, len(aux.Reason))
-		for idx, raw := range aux.Reason {
-			if len(raw) == 0 || string(raw) == "null" {
-				continue
-			}
-			dv, err := typereg.DecodeAs[DVTextLike](raw)
-			if err != nil {
-				if errors.Is(err, typereg.ErrMissingType) {
-					var def DVText
-					if jerr := json.Unmarshal(raw, &def); jerr != nil {
-						return &typereg.DecodeError{Path: fmt.Sprintf("/reason/%d", idx), Inner: jerr}
-					}
-					i.Reason[idx] = &def
-				} else {
-					return &typereg.DecodeError{Path: fmt.Sprintf("/reason/%d", idx), Inner: err}
-				}
-			} else {
-				i.Reason[idx] = dv
-			}
-		}
-	}
-	return nil
+	return typereg.DecodeInto(dec, "ISM_TRANSITION", &struct {
+		Type string `json:"_type"`
+		*rawIsmTransition
+	}{rawIsmTransition: (*rawIsmTransition)(i)})
 }
 
-type ObservationJSONUnmarshaller struct {
-	Class       string          `json:"_type"`
-	Protocol    json.RawMessage `json:"protocol,omitempty"`     // polymorphic ItemStructure
-	GuidelineID json.RawMessage `json:"guideline_id,omitempty"` // polymorphic ObjectRefLike
-	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
-	Language CodePhrase `json:"language"`
-	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
-	Encoding CodePhrase `json:"encoding"`
-	// OtherParticipations Other participations at `ENTRY` level.
-	OtherParticipations []Participation `json:"other_participations,omitempty"`
-	WorkflowID          json.RawMessage `json:"workflow_id,omitempty"` // polymorphic ObjectRefLike
-	Subject             json.RawMessage `json:"subject"`               // polymorphic PartyProxy
-	Provider            json.RawMessage `json:"provider,omitempty"`    // polymorphic PartyProxy
-	Name                json.RawMessage `json:"name"`                  // polymorphic DVTextLike
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string          `json:"archetype_node_id"`
-	UID             json.RawMessage `json:"uid,omitempty"` // polymorphic UIDBasedID
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Data The data of this observation, in the form of a history of values which may be of any complexity.
-	Data History[ItemStructure] `json:"data"`
-	// State Optional recording of the state of subject of this observation during the observation process, in the form of a separate history of values which may be of any complexity. State may also be recorded within the History of the data attribute.
-	State *History[ItemStructure] `json:"state,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Observation.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (o *Observation) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Observation.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (o *Observation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: OBSERVATION: %w", typereg.ErrNilReceiver)
 	}
-	var aux ObservationJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("OBSERVATION", err)
-	}
-	if aux.Class != "" && aux.Class != "OBSERVATION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "OBSERVATION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Protocol) > 0 && string(aux.Protocol) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.Protocol)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/protocol", Inner: err}
-		}
-		o.Protocol = dv
-	}
-	if len(aux.GuidelineID) > 0 && string(aux.GuidelineID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.GuidelineID)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.GuidelineID, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/guideline_id", Inner: jerr}
-				}
-				o.GuidelineID = &def
-			} else {
-				return &typereg.DecodeError{Path: "/guideline_id", Inner: err}
-			}
-		} else {
-			o.GuidelineID = dv
-		}
-	}
-	o.Language = aux.Language
-	o.Encoding = aux.Encoding
-	o.OtherParticipations = aux.OtherParticipations
-	if len(aux.WorkflowID) > 0 && string(aux.WorkflowID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectRefLike](aux.WorkflowID)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def ObjectRef
-				if jerr := json.Unmarshal(aux.WorkflowID, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/workflow_id", Inner: jerr}
-				}
-				o.WorkflowID = &def
-			} else {
-				return &typereg.DecodeError{Path: "/workflow_id", Inner: err}
-			}
-		} else {
-			o.WorkflowID = dv
-		}
-	}
-	if len(aux.Subject) > 0 && string(aux.Subject) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Subject)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/subject", Inner: err}
-		}
-		o.Subject = dv
-	}
-	if len(aux.Provider) > 0 && string(aux.Provider) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Provider)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/provider", Inner: err}
-		}
-		o.Provider = dv
-	}
-	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/name", Inner: jerr}
-				}
-				o.Name = &def
-			} else {
-				return &typereg.DecodeError{Path: "/name", Inner: err}
-			}
-		} else {
-			o.Name = dv
-		}
-	}
-	o.ArchetypeNodeID = aux.ArchetypeNodeID
-	if len(aux.UID) > 0 && string(aux.UID) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/uid", Inner: err}
-		}
-		o.UID = dv
-	}
-	o.Links = aux.Links
-	o.ArchetypeDetails = aux.ArchetypeDetails
-	o.FeederAudit = aux.FeederAudit
-	o.Data = aux.Data
-	o.State = aux.State
-	return nil
+	return typereg.DecodeInto(dec, "OBSERVATION", &struct {
+		Type string `json:"_type"`
+		*rawObservation
+	}{rawObservation: (*rawObservation)(o)})
 }

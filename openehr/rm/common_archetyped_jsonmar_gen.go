@@ -4,151 +4,90 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.archetyped — canonical-JSON MarshalJSON companions
+// BMM package: org.openehr.rm.common.archetyped — canonical-JSON MarshalJSONTo companions
 
-type ArchetypedJSONMarshaller struct {
-	Class string `json:"_type"`
-	// ArchetypeID Globally unique archetype identifier.
-	ArchetypeID ArchetypeID `json:"archetype_id"`
-	// TemplateID Globally unique template identifier, if a template was active at this point in the structure. Normally, a template would only be used at the top of a top-level structure, but the possibility exists for templates at lower levels.
-	TemplateID *TemplateID `json:"template_id,omitempty"`
-	// RMVersion Version of the openEHR reference model used to create this object. Expressed in terms of the release version string, e.g.  1.0 ,  1.2.4 .
-	RMVersion string `json:"rm_version"`
+// rawArchetyped is the method-free canonical-JSON alias for Archetyped. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawArchetyped Archetyped
+
+// MarshalJSONTo emits canonical openEHR JSON for Archetyped with `_type`
+// (value "ARCHETYPED") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (a Archetyped) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawArchetyped
+	}{"ARCHETYPED", (*rawArchetyped)(&a)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for Archetyped with `_type`
-// (value "ARCHETYPED") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *Archetyped) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ArchetypedJSONMarshaller{
-		Class:       "ARCHETYPED",
-		ArchetypeID: a.ArchetypeID,
-		TemplateID:  a.TemplateID,
-		RMVersion:   a.RMVersion,
-	})
+// rawFeederAudit is the method-free canonical-JSON alias for FeederAudit. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawFeederAudit FeederAudit
+
+// MarshalJSONTo emits canonical openEHR JSON for FeederAudit with `_type`
+// (value "FEEDER_AUDIT") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (f FeederAudit) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawFeederAudit
+	}{"FEEDER_AUDIT", (*rawFeederAudit)(&f)}, typereg.MarshalOptions(enc))
 }
 
-type FeederAuditJSONMarshaller struct {
-	Class string `json:"_type"`
-	// OriginatingSystemItemIds Identifiers used for the item in the originating system, e.g. filler and placer ids.
-	OriginatingSystemItemIds []DVIdentifier `json:"originating_system_item_ids,omitempty"`
-	// FeederSystemItemIds Identifiers used for the item in the feeder system, where the feeder system is distinct from the originating system.
-	FeederSystemItemIds []DVIdentifier `json:"feeder_system_item_ids,omitempty"`
-	// OriginalContent Optional inline inclusion of or reference to original content corresponding to the openEHR content at this node. Typically a URI reference to a document or message in a persistent store associated with the EHR.
-	OriginalContent json.RawMessage `json:"original_content,omitempty"`
-	// OriginatingSystemAudit Any audit information for the information item from the originating system.
-	OriginatingSystemAudit FeederAuditDetails `json:"originating_system_audit"`
-	// FeederSystemAudit Any audit information for the information item from the feeder system, if different from the originating system.
-	FeederSystemAudit *FeederAuditDetails `json:"feeder_system_audit,omitempty"`
+// rawFeederAuditDetails is the method-free canonical-JSON alias for FeederAuditDetails. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawFeederAuditDetails FeederAuditDetails
+
+// MarshalJSONTo emits canonical openEHR JSON for FeederAuditDetails with `_type`
+// (value "FEEDER_AUDIT_DETAILS") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (f FeederAuditDetails) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawFeederAuditDetails
+	}{"FEEDER_AUDIT_DETAILS", (*rawFeederAuditDetails)(&f)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for FeederAudit with `_type`
-// (value "FEEDER_AUDIT") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (f *FeederAudit) MarshalJSON() ([]byte, error) {
-	rawOriginalContent, err := jsonpoly.Marshal(f.OriginalContent)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&FeederAuditJSONMarshaller{
-		Class:                    "FEEDER_AUDIT",
-		OriginatingSystemItemIds: f.OriginatingSystemItemIds,
-		FeederSystemItemIds:      f.FeederSystemItemIds,
-		OriginalContent:          rawOriginalContent,
-		OriginatingSystemAudit:   f.OriginatingSystemAudit,
-		FeederSystemAudit:        f.FeederSystemAudit,
-	})
-}
+// rawLink is the method-free canonical-JSON alias for Link. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawLink Link
 
-type FeederAuditDetailsJSONMarshaller struct {
-	Class string `json:"_type"`
-	// SystemID Identifier of the system which handled the information item. This is the IT system owned by the organisation legally responsible for handling the data, and at which the data were previously created or passed by an earlier system.
-	SystemID string `json:"system_id"`
-	// Location Identifier of the particular site/facility within an organisation which handled the item. For computability, this identifier needs to be e.g. a PKI identifier which can be included in the identifier list of the `PARTY_IDENTIFIED` object.
-	Location json.RawMessage `json:"location,omitempty"`
-	// Subject Identifiers for subject of the received information item.
-	Subject json.RawMessage `json:"subject,omitempty"`
-	// Provider Optional provider(s) who created, committed, forwarded or otherwise handled the item.
-	Provider json.RawMessage `json:"provider,omitempty"`
-	// Time Time of handling the item. For an originating system, this will be time of creation, for an intermediate feeder system, this will be a time of accession or other time of handling, where available.
-	Time *DVDateTime `json:"time,omitempty"`
-	// VersionID Any identifier used in the system such as  "interim" ,  "final" , or numeric versions if available.
-	VersionID *string `json:"version_id,omitempty"`
-	// OtherDetails Optional attribute to carry any custom meta-data. May be archetyped.
-	OtherDetails json.RawMessage `json:"other_details,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for FeederAuditDetails with `_type`
-// (value "FEEDER_AUDIT_DETAILS") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (f *FeederAuditDetails) MarshalJSON() ([]byte, error) {
-	rawLocation, err := jsonpoly.Marshal(f.Location)
-	if err != nil {
-		return nil, err
-	}
-	rawSubject, err := jsonpoly.Marshal(f.Subject)
-	if err != nil {
-		return nil, err
-	}
-	rawProvider, err := jsonpoly.Marshal(f.Provider)
-	if err != nil {
-		return nil, err
-	}
-	rawOtherDetails, err := jsonpoly.Marshal(f.OtherDetails)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&FeederAuditDetailsJSONMarshaller{
-		Class:        "FEEDER_AUDIT_DETAILS",
-		SystemID:     f.SystemID,
-		Location:     rawLocation,
-		Subject:      rawSubject,
-		Provider:     rawProvider,
-		Time:         f.Time,
-		VersionID:    f.VersionID,
-		OtherDetails: rawOtherDetails,
-	})
-}
-
-type LinkJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Meaning Used to describe the relationship, usually in clinical terms, such as  in response to  (the relationship between test results and an order),  follow-up to  and so on. Such relationships can represent any clinically meaningful connection between pieces of information. Values for meaning include those described in Annex C, ENV 13606 pt 2 under the categories of  generic ,  documenting and reporting ,  organisational ,  clinical ,  circumstancial , and  view management .
-	Meaning json.RawMessage `json:"meaning"`
-	// Type The type attribute is used to indicate a clinical or domain-level meaning for the kind of link, for example  problem  or  issue . If type values are designed appropriately, they can be used by the requestor of EHR extracts to categorise links which must be followed and which can be broken when the extract is created.
-	Type json.RawMessage `json:"type"`
-	// Target The logical  to  object in the link relation, as per the linguistic sense of the meaning attribute.
-	Target DVEHRURI `json:"target"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for Link with `_type`
-// (value "LINK") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (l *Link) MarshalJSON() ([]byte, error) {
-	rawMeaning, err := jsonpoly.Marshal(l.Meaning)
-	if err != nil {
-		return nil, err
-	}
-	rawType, err := jsonpoly.Marshal(l.Type)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&LinkJSONMarshaller{
-		Class:   "LINK",
-		Meaning: rawMeaning,
-		Type:    rawType,
-		Target:  l.Target,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for Link with `_type`
+// (value "LINK") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (l Link) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawLink
+	}{"LINK", (*rawLink)(&l)}, typereg.MarshalOptions(enc))
 }

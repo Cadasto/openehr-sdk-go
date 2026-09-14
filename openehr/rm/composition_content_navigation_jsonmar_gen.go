@@ -4,62 +4,30 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.composition.content.navigation — canonical-JSON MarshalJSON companions
+// BMM package: org.openehr.rm.composition.content.navigation — canonical-JSON MarshalJSONTo companions
 
-type SectionJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Items Ordered list of content items under this section, which may include:
-	//
-	// * more `SECTIONs`;
-	// * `ENTRYs`.
-	Items json.RawMessage `json:"items,omitempty"`
-}
+// rawSection is the method-free canonical-JSON alias for Section. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawSection Section
 
-// MarshalJSON emits canonical openEHR JSON for Section with `_type`
-// (value "SECTION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (s *Section) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(s.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(s.UID)
-	if err != nil {
-		return nil, err
-	}
-	rawItems, err := jsonpoly.MarshalSlice(s.Items)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&SectionJSONMarshaller{
-		Class:            "SECTION",
-		Name:             rawName,
-		ArchetypeNodeID:  s.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            s.Links,
-		ArchetypeDetails: s.ArchetypeDetails,
-		FeederAudit:      s.FeederAudit,
-		Items:            rawItems,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for Section with `_type`
+// (value "SECTION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (s Section) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawSection
+	}{"SECTION", (*rawSection)(&s)}, typereg.MarshalOptions(enc))
 }

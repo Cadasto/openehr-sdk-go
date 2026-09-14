@@ -4,546 +4,261 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.base.base_types.identification — canonical-JSON UnmarshalJSON companions
+// BMM package: org.openehr.base.base_types.identification — canonical-JSON UnmarshalJSONFrom companions
 
-type AccessGroupRefJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Namespace Namespace to which this identifier belongs in the local system context (and possibly in any other openEHR compliant environment) e.g.  terminology ,  demographic . These names are not yet standardised. Legal values for `_namespace_` are:
-	//
-	// * `"local"`
-	// * `"unknown"`
-	// * a string matching the standard regex `[a-zA-Z][a-zA-Z0-9_.:\/&?=+-]*`.
-	//
-	// Note that the first two are just special values of the regex, and will be matched by it.
-	Namespace string `json:"namespace"`
-	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
-	Type string          `json:"type"`
-	ID   json.RawMessage `json:"id"` // polymorphic ObjectID
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into AccessGroupRef.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *AccessGroupRef) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into AccessGroupRef.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *AccessGroupRef) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ACCESS_GROUP_REF: %w", typereg.ErrNilReceiver)
 	}
-	var aux AccessGroupRefJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ACCESS_GROUP_REF", err)
+	var wire AccessGroupRefJSONWire
+	if err := typereg.DecodeInto(dec, "ACCESS_GROUP_REF", &wire); err != nil {
+		return err
 	}
-	if aux.Class != "" && aux.Class != "ACCESS_GROUP_REF" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ACCESS_GROUP_REF", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	a.Namespace = aux.Namespace
-	a.Type = aux.Type
-	if len(aux.ID) > 0 && string(aux.ID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectID](aux.ID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/id", Inner: err}
-		}
-		a.ID = dv
-	}
+	a.Namespace = wire.Namespace
+	a.Type = wire.Type
+	a.ID = wire.ID
 	return nil
 }
 
-type ArchetypeIDJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ArchetypeID.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *ArchetypeID) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ArchetypeID.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *ArchetypeID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPE_ID: %w", typereg.ErrNilReceiver)
 	}
-	var aux ArchetypeIDJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ARCHETYPE_ID", err)
-	}
-	if aux.Class != "" && aux.Class != "ARCHETYPE_ID" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ARCHETYPE_ID", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	a.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "ARCHETYPE_ID", &struct {
+		Type string `json:"_type"`
+		*rawArchetypeID
+	}{rawArchetypeID: (*rawArchetypeID)(a)})
 }
 
-type GenericIDJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
-	// Scheme Name of the scheme to which this identifier conforms. Ideally this name will be recognisable globally but realistically it may be a local ad hoc scheme whose name is not controlled or standardised in any way.
-	Scheme string `json:"scheme"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into GenericID.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (g *GenericID) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into GenericID.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (g *GenericID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if g == nil {
 		return fmt.Errorf("canjson: GENERIC_ID: %w", typereg.ErrNilReceiver)
 	}
-	var aux GenericIDJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("GENERIC_ID", err)
-	}
-	if aux.Class != "" && aux.Class != "GENERIC_ID" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "GENERIC_ID", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	g.Value = aux.Value
-	g.Scheme = aux.Scheme
-	return nil
+	return typereg.DecodeInto(dec, "GENERIC_ID", &struct {
+		Type string `json:"_type"`
+		*rawGenericID
+	}{rawGenericID: (*rawGenericID)(g)})
 }
 
-type HierObjectIDJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into HierObjectID.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (h *HierObjectID) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into HierObjectID.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (h *HierObjectID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if h == nil {
 		return fmt.Errorf("canjson: HIER_OBJECT_ID: %w", typereg.ErrNilReceiver)
 	}
-	var aux HierObjectIDJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("HIER_OBJECT_ID", err)
-	}
-	if aux.Class != "" && aux.Class != "HIER_OBJECT_ID" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "HIER_OBJECT_ID", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	h.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "HIER_OBJECT_ID", &struct {
+		Type string `json:"_type"`
+		*rawHierObjectID
+	}{rawHierObjectID: (*rawHierObjectID)(h)})
 }
 
-type ISOOIDJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ISOOID.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (i *ISOOID) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ISOOID.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (i *ISOOID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ISO_OID: %w", typereg.ErrNilReceiver)
 	}
-	var aux ISOOIDJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ISO_OID", err)
-	}
-	if aux.Class != "" && aux.Class != "ISO_OID" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ISO_OID", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	i.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "ISO_OID", &struct {
+		Type string `json:"_type"`
+		*rawISOOID
+	}{rawISOOID: (*rawISOOID)(i)})
 }
 
-type InternetIDJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into InternetID.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (i *InternetID) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into InternetID.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (i *InternetID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: INTERNET_ID: %w", typereg.ErrNilReceiver)
 	}
-	var aux InternetIDJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("INTERNET_ID", err)
-	}
-	if aux.Class != "" && aux.Class != "INTERNET_ID" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "INTERNET_ID", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	i.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "INTERNET_ID", &struct {
+		Type string `json:"_type"`
+		*rawInternetID
+	}{rawInternetID: (*rawInternetID)(i)})
 }
 
-type LocatableRefJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Namespace Namespace to which this identifier belongs in the local system context (and possibly in any other openEHR compliant environment) e.g.  terminology ,  demographic . These names are not yet standardised. Legal values for `_namespace_` are:
-	//
-	// * `"local"`
-	// * `"unknown"`
-	// * a string matching the standard regex `[a-zA-Z][a-zA-Z0-9_.:\/&?=+-]*`.
-	//
-	// Note that the first two are just special values of the regex, and will be matched by it.
-	Namespace string `json:"namespace"`
-	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
-	Type string `json:"type"`
-	// Path The path to an instance, as an absolute path with respect to the object found at `VERSION._data_`. An empty path means that the object referred to by `_id_` is being specified.
-	Path *string         `json:"path,omitempty"`
-	ID   json.RawMessage `json:"id"` // polymorphic UIDBasedID
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into LocatableRef.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (l *LocatableRef) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into LocatableRef.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (l *LocatableRef) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if l == nil {
 		return fmt.Errorf("canjson: LOCATABLE_REF: %w", typereg.ErrNilReceiver)
 	}
-	var aux LocatableRefJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("LOCATABLE_REF", err)
+	var wire LocatableRefJSONWire
+	if err := typereg.DecodeInto(dec, "LOCATABLE_REF", &wire); err != nil {
+		return err
 	}
-	if aux.Class != "" && aux.Class != "LOCATABLE_REF" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "LOCATABLE_REF", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	l.Namespace = aux.Namespace
-	l.Type = aux.Type
-	l.Path = aux.Path
-	if len(aux.ID) > 0 && string(aux.ID) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.ID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/id", Inner: err}
-		}
-		l.ID = dv
-	}
+	l.Namespace = wire.Namespace
+	l.Type = wire.Type
+	l.Path = wire.Path
+	l.ID = wire.ID
 	return nil
 }
 
-type ObjectRefJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Namespace Namespace to which this identifier belongs in the local system context (and possibly in any other openEHR compliant environment) e.g.  terminology ,  demographic . These names are not yet standardised. Legal values for `_namespace_` are:
-	//
-	// * `"local"`
-	// * `"unknown"`
-	// * a string matching the standard regex `[a-zA-Z][a-zA-Z0-9_.:\/&?=+-]*`.
-	//
-	// Note that the first two are just special values of the regex, and will be matched by it.
-	Namespace string `json:"namespace"`
-	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
-	Type string          `json:"type"`
-	ID   json.RawMessage `json:"id"` // polymorphic ObjectID
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ObjectRef.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (o *ObjectRef) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ObjectRef.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (o *ObjectRef) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: OBJECT_REF: %w", typereg.ErrNilReceiver)
 	}
-	var aux ObjectRefJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("OBJECT_REF", err)
-	}
-	if aux.Class != "" && aux.Class != "OBJECT_REF" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "OBJECT_REF", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	o.Namespace = aux.Namespace
-	o.Type = aux.Type
-	if len(aux.ID) > 0 && string(aux.ID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectID](aux.ID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/id", Inner: err}
-		}
-		o.ID = dv
-	}
-	return nil
+	return typereg.DecodeInto(dec, "OBJECT_REF", &struct {
+		Type string `json:"_type"`
+		*rawObjectRef
+	}{rawObjectRef: (*rawObjectRef)(o)})
 }
 
-type ObjectVersionIDJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ObjectVersionID.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (o *ObjectVersionID) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ObjectVersionID.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (o *ObjectVersionID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: OBJECT_VERSION_ID: %w", typereg.ErrNilReceiver)
 	}
-	var aux ObjectVersionIDJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("OBJECT_VERSION_ID", err)
-	}
-	if aux.Class != "" && aux.Class != "OBJECT_VERSION_ID" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "OBJECT_VERSION_ID", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	o.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "OBJECT_VERSION_ID", &struct {
+		Type string `json:"_type"`
+		*rawObjectVersionID
+	}{rawObjectVersionID: (*rawObjectVersionID)(o)})
 }
 
-type PartyRefJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Namespace Namespace to which this identifier belongs in the local system context (and possibly in any other openEHR compliant environment) e.g.  terminology ,  demographic . These names are not yet standardised. Legal values for `_namespace_` are:
-	//
-	// * `"local"`
-	// * `"unknown"`
-	// * a string matching the standard regex `[a-zA-Z][a-zA-Z0-9_.:\/&?=+-]*`.
-	//
-	// Note that the first two are just special values of the regex, and will be matched by it.
-	Namespace string `json:"namespace"`
-	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
-	Type string          `json:"type"`
-	ID   json.RawMessage `json:"id"` // polymorphic ObjectID
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into PartyRef.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (p *PartyRef) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into PartyRef.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (p *PartyRef) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: PARTY_REF: %w", typereg.ErrNilReceiver)
 	}
-	var aux PartyRefJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("PARTY_REF", err)
+	var wire PartyRefJSONWire
+	if err := typereg.DecodeInto(dec, "PARTY_REF", &wire); err != nil {
+		return err
 	}
-	if aux.Class != "" && aux.Class != "PARTY_REF" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTY_REF", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	p.Namespace = aux.Namespace
-	p.Type = aux.Type
-	if len(aux.ID) > 0 && string(aux.ID) != "null" {
-		dv, err := typereg.DecodeAs[ObjectID](aux.ID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/id", Inner: err}
-		}
-		p.ID = dv
-	}
+	p.Namespace = wire.Namespace
+	p.Type = wire.Type
+	p.ID = wire.ID
 	return nil
 }
 
-type TemplateIDJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into TemplateID.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (t *TemplateID) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into TemplateID.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (t *TemplateID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if t == nil {
 		return fmt.Errorf("canjson: TEMPLATE_ID: %w", typereg.ErrNilReceiver)
 	}
-	var aux TemplateIDJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("TEMPLATE_ID", err)
-	}
-	if aux.Class != "" && aux.Class != "TEMPLATE_ID" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "TEMPLATE_ID", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	t.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "TEMPLATE_ID", &struct {
+		Type string `json:"_type"`
+		*rawTemplateID
+	}{rawTemplateID: (*rawTemplateID)(t)})
 }
 
-type TerminologyIDJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into TerminologyID.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (t *TerminologyID) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into TerminologyID.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (t *TerminologyID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if t == nil {
 		return fmt.Errorf("canjson: TERMINOLOGY_ID: %w", typereg.ErrNilReceiver)
 	}
-	var aux TerminologyIDJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("TERMINOLOGY_ID", err)
-	}
-	if aux.Class != "" && aux.Class != "TERMINOLOGY_ID" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "TERMINOLOGY_ID", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	t.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "TERMINOLOGY_ID", &struct {
+		Type string `json:"_type"`
+		*rawTerminologyID
+	}{rawTerminologyID: (*rawTerminologyID)(t)})
 }
 
-type UuidJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Uuid.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (u *Uuid) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Uuid.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (u *Uuid) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if u == nil {
 		return fmt.Errorf("canjson: UUID: %w", typereg.ErrNilReceiver)
 	}
-	var aux UuidJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("UUID", err)
-	}
-	if aux.Class != "" && aux.Class != "UUID" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "UUID", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	u.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "UUID", &struct {
+		Type string `json:"_type"`
+		*rawUuid
+	}{rawUuid: (*rawUuid)(u)})
 }
 
-type VersionTreeIDJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value String form of this identifier.
-	Value string `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into VersionTreeID.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (v *VersionTreeID) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into VersionTreeID.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (v *VersionTreeID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if v == nil {
 		return fmt.Errorf("canjson: VERSION_TREE_ID: %w", typereg.ErrNilReceiver)
 	}
-	var aux VersionTreeIDJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("VERSION_TREE_ID", err)
-	}
-	if aux.Class != "" && aux.Class != "VERSION_TREE_ID" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "VERSION_TREE_ID", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	v.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "VERSION_TREE_ID", &struct {
+		Type string `json:"_type"`
+		*rawVersionTreeID
+	}{rawVersionTreeID: (*rawVersionTreeID)(v)})
 }

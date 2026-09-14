@@ -4,14 +4,19 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.base.base_types.identification — canonical-JSON MarshalJSON companions
+// BMM package: org.openehr.base.base_types.identification — canonical-JSON MarshalJSONTo companions
 
-type AccessGroupRefJSONMarshaller struct {
+// AccessGroupRefJSONWire is the flat canonical-JSON wire struct for AccessGroupRef. AccessGroupRef embeds
+// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// promote that ancestor's methods and emit the wrong `_type`; the flat
+// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+type AccessGroupRefJSONWire struct {
 	Class string `json:"_type"`
 	// Namespace Namespace to which this identifier belongs in the local system context (and possibly in any other openEHR compliant environment) e.g.  terminology ,  demographic . These names are not yet standardised. Legal values for `_namespace_` are:
 	//
@@ -24,121 +29,126 @@ type AccessGroupRefJSONMarshaller struct {
 	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
 	Type string `json:"type"`
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID json.RawMessage `json:"id"`
+	ID ObjectID `json:"id"`
 }
 
-// MarshalJSON emits canonical openEHR JSON for AccessGroupRef with `_type`
-// (value "ACCESS_GROUP_REF") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *AccessGroupRef) MarshalJSON() ([]byte, error) {
-	rawID, err := jsonpoly.Marshal(a.ID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&AccessGroupRefJSONMarshaller{
+// MarshalJSONTo emits canonical openEHR JSON for AccessGroupRef with `_type`
+// (value "ACCESS_GROUP_REF") as the leading member (REQ-052, Q6). The receiver is a
+// value so a by-value instance in a polymorphic slot keeps its `_type`.
+func (a AccessGroupRef) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &AccessGroupRefJSONWire{
 		Class:     "ACCESS_GROUP_REF",
 		Namespace: a.Namespace,
 		Type:      a.Type,
-		ID:        rawID,
-	})
+		ID:        a.ID,
+	}, typereg.MarshalOptions(enc))
 }
 
-type ArchetypeIDJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
+// rawArchetypeID is the method-free canonical-JSON alias for ArchetypeID. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawArchetypeID ArchetypeID
+
+// MarshalJSONTo emits canonical openEHR JSON for ArchetypeID with `_type`
+// (value "ARCHETYPE_ID") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (a ArchetypeID) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawArchetypeID
+	}{"ARCHETYPE_ID", (*rawArchetypeID)(&a)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for ArchetypeID with `_type`
-// (value "ARCHETYPE_ID") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *ArchetypeID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ArchetypeIDJSONMarshaller{
-		Class: "ARCHETYPE_ID",
-		Value: a.Value,
-	})
+// rawGenericID is the method-free canonical-JSON alias for GenericID. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawGenericID GenericID
+
+// MarshalJSONTo emits canonical openEHR JSON for GenericID with `_type`
+// (value "GENERIC_ID") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (g GenericID) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawGenericID
+	}{"GENERIC_ID", (*rawGenericID)(&g)}, typereg.MarshalOptions(enc))
 }
 
-type GenericIDJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
-	// Scheme Name of the scheme to which this identifier conforms. Ideally this name will be recognisable globally but realistically it may be a local ad hoc scheme whose name is not controlled or standardised in any way.
-	Scheme string `json:"scheme"`
+// rawHierObjectID is the method-free canonical-JSON alias for HierObjectID. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawHierObjectID HierObjectID
+
+// MarshalJSONTo emits canonical openEHR JSON for HierObjectID with `_type`
+// (value "HIER_OBJECT_ID") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (h HierObjectID) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawHierObjectID
+	}{"HIER_OBJECT_ID", (*rawHierObjectID)(&h)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for GenericID with `_type`
-// (value "GENERIC_ID") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (g *GenericID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&GenericIDJSONMarshaller{
-		Class:  "GENERIC_ID",
-		Value:  g.Value,
-		Scheme: g.Scheme,
-	})
+// rawISOOID is the method-free canonical-JSON alias for ISOOID. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawISOOID ISOOID
+
+// MarshalJSONTo emits canonical openEHR JSON for ISOOID with `_type`
+// (value "ISO_OID") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (i ISOOID) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawISOOID
+	}{"ISO_OID", (*rawISOOID)(&i)}, typereg.MarshalOptions(enc))
 }
 
-type HierObjectIDJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
+// rawInternetID is the method-free canonical-JSON alias for InternetID. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawInternetID InternetID
+
+// MarshalJSONTo emits canonical openEHR JSON for InternetID with `_type`
+// (value "INTERNET_ID") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (i InternetID) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawInternetID
+	}{"INTERNET_ID", (*rawInternetID)(&i)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for HierObjectID with `_type`
-// (value "HIER_OBJECT_ID") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (h *HierObjectID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&HierObjectIDJSONMarshaller{
-		Class: "HIER_OBJECT_ID",
-		Value: h.Value,
-	})
-}
-
-type ISOOIDJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id.
-	Value string `json:"value"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for ISOOID with `_type`
-// (value "ISO_OID") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (i *ISOOID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ISOOIDJSONMarshaller{
-		Class: "ISO_OID",
-		Value: i.Value,
-	})
-}
-
-type InternetIDJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id.
-	Value string `json:"value"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for InternetID with `_type`
-// (value "INTERNET_ID") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (i *InternetID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&InternetIDJSONMarshaller{
-		Class: "INTERNET_ID",
-		Value: i.Value,
-	})
-}
-
-type LocatableRefJSONMarshaller struct {
+// LocatableRefJSONWire is the flat canonical-JSON wire struct for LocatableRef. LocatableRef embeds
+// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// promote that ancestor's methods and emit the wrong `_type`; the flat
+// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+type LocatableRefJSONWire struct {
 	Class string `json:"_type"`
 	// Namespace Namespace to which this identifier belongs in the local system context (and possibly in any other openEHR compliant environment) e.g.  terminology ,  demographic . These names are not yet standardised. Legal values for `_namespace_` are:
 	//
@@ -151,31 +161,69 @@ type LocatableRefJSONMarshaller struct {
 	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
 	Type string `json:"type"`
 	// Path The path to an instance, as an absolute path with respect to the object found at `VERSION._data_`. An empty path means that the object referred to by `_id_` is being specified.
-	Path *string `json:"path,omitempty"`
+	Path *string `json:"path,omitzero"`
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID json.RawMessage `json:"id"`
+	ID UIDBasedID `json:"id"`
 }
 
-// MarshalJSON emits canonical openEHR JSON for LocatableRef with `_type`
-// (value "LOCATABLE_REF") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (l *LocatableRef) MarshalJSON() ([]byte, error) {
-	rawID, err := jsonpoly.Marshal(l.ID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&LocatableRefJSONMarshaller{
+// MarshalJSONTo emits canonical openEHR JSON for LocatableRef with `_type`
+// (value "LOCATABLE_REF") as the leading member (REQ-052, Q6). The receiver is a
+// value so a by-value instance in a polymorphic slot keeps its `_type`.
+func (l LocatableRef) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &LocatableRefJSONWire{
 		Class:     "LOCATABLE_REF",
 		Namespace: l.Namespace,
 		Type:      l.Type,
 		Path:      l.Path,
-		ID:        rawID,
-	})
+		ID:        l.ID,
+	}, typereg.MarshalOptions(enc))
 }
 
-type ObjectRefJSONMarshaller struct {
+// rawObjectRef is the method-free canonical-JSON alias for ObjectRef. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawObjectRef ObjectRef
+
+// MarshalJSONTo emits canonical openEHR JSON for ObjectRef with `_type`
+// (value "OBJECT_REF") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (o ObjectRef) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawObjectRef
+	}{"OBJECT_REF", (*rawObjectRef)(&o)}, typereg.MarshalOptions(enc))
+}
+
+// rawObjectVersionID is the method-free canonical-JSON alias for ObjectVersionID. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawObjectVersionID ObjectVersionID
+
+// MarshalJSONTo emits canonical openEHR JSON for ObjectVersionID with `_type`
+// (value "OBJECT_VERSION_ID") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (o ObjectVersionID) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawObjectVersionID
+	}{"OBJECT_VERSION_ID", (*rawObjectVersionID)(&o)}, typereg.MarshalOptions(enc))
+}
+
+// PartyRefJSONWire is the flat canonical-JSON wire struct for PartyRef. PartyRef embeds
+// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// promote that ancestor's methods and emit the wrong `_type`; the flat
+// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+type PartyRefJSONWire struct {
 	Class string `json:"_type"`
 	// Namespace Namespace to which this identifier belongs in the local system context (and possibly in any other openEHR compliant environment) e.g.  terminology ,  demographic . These names are not yet standardised. Legal values for `_namespace_` are:
 	//
@@ -188,147 +236,97 @@ type ObjectRefJSONMarshaller struct {
 	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
 	Type string `json:"type"`
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID json.RawMessage `json:"id"`
+	ID ObjectID `json:"id"`
 }
 
-// MarshalJSON emits canonical openEHR JSON for ObjectRef with `_type`
-// (value "OBJECT_REF") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (o *ObjectRef) MarshalJSON() ([]byte, error) {
-	rawID, err := jsonpoly.Marshal(o.ID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ObjectRefJSONMarshaller{
-		Class:     "OBJECT_REF",
-		Namespace: o.Namespace,
-		Type:      o.Type,
-		ID:        rawID,
-	})
-}
-
-type ObjectVersionIDJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for ObjectVersionID with `_type`
-// (value "OBJECT_VERSION_ID") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (o *ObjectVersionID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ObjectVersionIDJSONMarshaller{
-		Class: "OBJECT_VERSION_ID",
-		Value: o.Value,
-	})
-}
-
-type PartyRefJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Namespace Namespace to which this identifier belongs in the local system context (and possibly in any other openEHR compliant environment) e.g.  terminology ,  demographic . These names are not yet standardised. Legal values for `_namespace_` are:
-	//
-	// * `"local"`
-	// * `"unknown"`
-	// * a string matching the standard regex `[a-zA-Z][a-zA-Z0-9_.:\/&?=+-]*`.
-	//
-	// Note that the first two are just special values of the regex, and will be matched by it.
-	Namespace string `json:"namespace"`
-	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
-	Type string `json:"type"`
-	// ID Globally unique id of an object, regardless of where it is stored.
-	ID json.RawMessage `json:"id"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for PartyRef with `_type`
-// (value "PARTY_REF") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (p *PartyRef) MarshalJSON() ([]byte, error) {
-	rawID, err := jsonpoly.Marshal(p.ID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&PartyRefJSONMarshaller{
+// MarshalJSONTo emits canonical openEHR JSON for PartyRef with `_type`
+// (value "PARTY_REF") as the leading member (REQ-052, Q6). The receiver is a
+// value so a by-value instance in a polymorphic slot keeps its `_type`.
+func (p PartyRef) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &PartyRefJSONWire{
 		Class:     "PARTY_REF",
 		Namespace: p.Namespace,
 		Type:      p.Type,
-		ID:        rawID,
-	})
+		ID:        p.ID,
+	}, typereg.MarshalOptions(enc))
 }
 
-type TemplateIDJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
+// rawTemplateID is the method-free canonical-JSON alias for TemplateID. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawTemplateID TemplateID
+
+// MarshalJSONTo emits canonical openEHR JSON for TemplateID with `_type`
+// (value "TEMPLATE_ID") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (t TemplateID) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawTemplateID
+	}{"TEMPLATE_ID", (*rawTemplateID)(&t)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for TemplateID with `_type`
-// (value "TEMPLATE_ID") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (t *TemplateID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&TemplateIDJSONMarshaller{
-		Class: "TEMPLATE_ID",
-		Value: t.Value,
-	})
+// rawTerminologyID is the method-free canonical-JSON alias for TerminologyID. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawTerminologyID TerminologyID
+
+// MarshalJSONTo emits canonical openEHR JSON for TerminologyID with `_type`
+// (value "TERMINOLOGY_ID") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (t TerminologyID) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawTerminologyID
+	}{"TERMINOLOGY_ID", (*rawTerminologyID)(&t)}, typereg.MarshalOptions(enc))
 }
 
-type TerminologyIDJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id in the form defined below.
-	Value string `json:"value"`
+// rawUuid is the method-free canonical-JSON alias for Uuid. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawUuid Uuid
+
+// MarshalJSONTo emits canonical openEHR JSON for Uuid with `_type`
+// (value "UUID") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (u Uuid) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawUuid
+	}{"UUID", (*rawUuid)(&u)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for TerminologyID with `_type`
-// (value "TERMINOLOGY_ID") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (t *TerminologyID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&TerminologyIDJSONMarshaller{
-		Class: "TERMINOLOGY_ID",
-		Value: t.Value,
-	})
-}
+// rawVersionTreeID is the method-free canonical-JSON alias for VersionTreeID. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawVersionTreeID VersionTreeID
 
-type UuidJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value The value of the id.
-	Value string `json:"value"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for Uuid with `_type`
-// (value "UUID") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (u *Uuid) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&UuidJSONMarshaller{
-		Class: "UUID",
-		Value: u.Value,
-	})
-}
-
-type VersionTreeIDJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value String form of this identifier.
-	Value string `json:"value"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for VersionTreeID with `_type`
-// (value "VERSION_TREE_ID") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (v *VersionTreeID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&VersionTreeIDJSONMarshaller{
-		Class: "VERSION_TREE_ID",
-		Value: v.Value,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for VersionTreeID with `_type`
+// (value "VERSION_TREE_ID") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (v VersionTreeID) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawVersionTreeID
+	}{"VERSION_TREE_ID", (*rawVersionTreeID)(&v)}, typereg.MarshalOptions(enc))
 }

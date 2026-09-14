@@ -4,430 +4,129 @@
 package rm
 
 import (
-	"encoding/json"
-	"errors"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_types.quantity — canonical-JSON UnmarshalJSON companions
+// BMM package: org.openehr.rm.data_types.quantity — canonical-JSON UnmarshalJSONFrom companions
 
-type DVCountJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
-	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
-	// MagnitudeStatus Optional status of magnitude with values:
-	//
-	// * `"="`   :   magnitude is a point value
-	// * `"<"`   :   value is < magnitude
-	// * `">"`   :   value is > magnitude
-	// * `"<="` : value is <= magnitude
-	// * `">="` : value is >= magnitude
-	// * `"~"`   :   value is approximately magnitude
-	//
-	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
-	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
-	//
-	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *Real `json:"accuracy,omitempty"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	Magnitude    int64       `json:"magnitude"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVCount] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVCount] `json:"other_reference_ranges,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVCount.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVCount) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVCount.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVCount) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_COUNT: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVCountJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_COUNT", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_COUNT" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_COUNT", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.AccuracyIsPercent = aux.AccuracyIsPercent
-	d.MagnitudeStatus = aux.MagnitudeStatus
-	d.Accuracy = aux.Accuracy
-	d.NormalStatus = aux.NormalStatus
-	d.Magnitude = aux.Magnitude
-	d.NormalRange = aux.NormalRange
-	d.OtherReferenceRanges = aux.OtherReferenceRanges
-	return nil
+	return typereg.DecodeInto(dec, "DV_COUNT", &struct {
+		Type string `json:"_type"`
+		*rawDVCount
+	}{rawDVCount: (*rawDVCount)(d)})
 }
 
-type DVIntervalJSONUnmarshaller[T DVOrdered] struct {
-	Class string          `json:"_type"`
-	Lower json.RawMessage `json:"lower,omitempty"` // polymorphic T
-	Upper json.RawMessage `json:"upper,omitempty"` // polymorphic T
-	// LowerUnbounded True if `_lower_` boundary open (i.e. = `-infinity`).
-	LowerUnbounded bool `json:"lower_unbounded"`
-	// UpperUnbounded True if `_upper_` boundary open (i.e. = `+infinity`).
-	UpperUnbounded bool `json:"upper_unbounded"`
-	// LowerIncluded True if `_lower_` boundary value included in range, if `not _lower_unbounded_`.
-	LowerIncluded bool `json:"lower_included"`
-	// UpperIncluded True if `_upper_` boundary value included in range if `not _upper_unbounded_`.
-	UpperIncluded bool `json:"upper_included"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVInterval.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVInterval[T]) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVInterval.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_INTERVAL: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVIntervalJSONUnmarshaller[T]
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_INTERVAL", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_INTERVAL" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_INTERVAL", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Lower) > 0 && string(aux.Lower) != "null" {
-		dv, err := typereg.DecodeAs[T](aux.Lower)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/lower", Inner: err}
-		}
-		d.Lower = dv
-	}
-	if len(aux.Upper) > 0 && string(aux.Upper) != "null" {
-		dv, err := typereg.DecodeAs[T](aux.Upper)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/upper", Inner: err}
-		}
-		d.Upper = dv
-	}
-	d.LowerUnbounded = aux.LowerUnbounded
-	d.UpperUnbounded = aux.UpperUnbounded
-	d.LowerIncluded = aux.LowerIncluded
-	d.UpperIncluded = aux.UpperIncluded
-	return nil
+	return typereg.DecodeInto(dec, "DV_INTERVAL", &struct {
+		Type string `json:"_type"`
+		*rawDVInterval[T]
+	}{rawDVInterval: (*rawDVInterval[T])(d)})
 }
 
-type DVOrdinalJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
-	// Symbol Coded textual representation of this value in the enumeration, which may be strings made from  +  symbols, or other enumerations of terms such as  `mild`, `moderate`, `severe`, or even the same number series as the values, e.g. 1, 2, 3.
-	Symbol DVCodedText `json:"symbol"`
-	// Value Value in ordered enumeration of values. Any integer value can be used.
-	Value Integer `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVOrdinal.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVOrdinal) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVOrdinal.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVOrdinal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_ORDINAL: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVOrdinalJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_ORDINAL", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_ORDINAL" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_ORDINAL", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.NormalStatus = aux.NormalStatus
-	d.NormalRange = aux.NormalRange
-	d.OtherReferenceRanges = aux.OtherReferenceRanges
-	d.Symbol = aux.Symbol
-	d.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "DV_ORDINAL", &struct {
+		Type string `json:"_type"`
+		*rawDVOrdinal
+	}{rawDVOrdinal: (*rawDVOrdinal)(d)})
 }
 
-type DVProportionJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
-	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
-	// MagnitudeStatus Optional status of magnitude with values:
-	//
-	// * `"="`   :   magnitude is a point value
-	// * `"<"`   :   value is < magnitude
-	// * `">"`   :   value is > magnitude
-	// * `"<="` : value is <= magnitude
-	// * `">="` : value is >= magnitude
-	// * `"~"`   :   value is approximately magnitude
-	//
-	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
-	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
-	//
-	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *Real `json:"accuracy,omitempty"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// Numerator Numerator of ratio
-	Numerator Real `json:"numerator"`
-	// Denominator Denominator of ratio.
-	Denominator Real `json:"denominator"`
-	// Type Indicates semantic type of proportion, including percent, unitary etc.
-	Type Integer `json:"type"`
-	// Precision Precision  to  which  the  `_numerator_` and `_denominator_` values of  the  proportion are expressed, in terms of number  of decimal places. The value 0 implies an integral quantity. The value -1 implies no limit, i.e. any number of decimal places.
-	Precision *Integer `json:"precision,omitempty"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVProportion] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVProportion] `json:"other_reference_ranges,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVProportion.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVProportion) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVProportion.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVProportion) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_PROPORTION: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVProportionJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_PROPORTION", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_PROPORTION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_PROPORTION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.AccuracyIsPercent = aux.AccuracyIsPercent
-	d.MagnitudeStatus = aux.MagnitudeStatus
-	d.Accuracy = aux.Accuracy
-	d.NormalStatus = aux.NormalStatus
-	d.Numerator = aux.Numerator
-	d.Denominator = aux.Denominator
-	d.Type = aux.Type
-	d.Precision = aux.Precision
-	d.NormalRange = aux.NormalRange
-	d.OtherReferenceRanges = aux.OtherReferenceRanges
-	return nil
+	return typereg.DecodeInto(dec, "DV_PROPORTION", &struct {
+		Type string `json:"_type"`
+		*rawDVProportion
+	}{rawDVProportion: (*rawDVProportion)(d)})
 }
 
-type DVQuantityJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
-	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
-	// MagnitudeStatus Optional status of magnitude with values:
-	//
-	// * `"="`   :   magnitude is a point value
-	// * `"<"`   :   value is < magnitude
-	// * `">"`   :   value is > magnitude
-	// * `"<="` : value is <= magnitude
-	// * `">="` : value is >= magnitude
-	// * `"~"`   :   value is approximately magnitude
-	//
-	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
-	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
-	//
-	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *Real `json:"accuracy,omitempty"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// Magnitude Numeric magnitude of the quantity.
-	Magnitude Real `json:"magnitude"`
-	// Precision Precision to which the value of the quantity is expressed, in terms of number of decimal places. The value 0 implies an integral quantity.
-	// The value -1 implies no limit, i.e. any number of decimal places.
-	Precision *Integer `json:"precision,omitempty"`
-	// Units Quantity units, expressed as a code or syntax string from either UCUM (the default) or the units system specified in `_units_system_`, when set.
-	//
-	// In either case, the value is the code or syntax - normally formed of standard ASCII - which is in principal not the same as the display string, although in simple cases such as 'm' (for meters) it will be.
-	//
-	// If the `_units_display_name_` field is set, this may be used for display. If not, the implementations must effect the resolution of the `_units_` value to a display form locally, e.g. by lookup of reference tables, request to a terminology service etc.
-	//
-	// Example values from UCUM: "kg/m^2", “mm[Hg]", "ms-1", "km/h".
-	Units string `json:"units"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVQuantity] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVQuantity] `json:"other_reference_ranges,omitempty"`
-	// UnitsSystem Optional field used to specify a units system from which codes in `_units_` are defined. Value is a URI identifying a terminology containing units concepts from the  (https://www.hl7.org/fhir/terminologies-systems.html[HL7 FHIR terminologies list]).
-	//
-	// If not set, the UCUM standard (case-sensitive codes) is assumed as the units system.
-	UnitsSystem *string `json:"units_system,omitempty"`
-	// UnitsDisplayName Optional field containing the displayable form of the `_units_` field, e.g. `'°C'`.
-	//
-	// If not set, the application environment needs to determine the displayable form.
-	//
-	// NOTE: The display name may be language-dependent for various older and non-systematic units. For this reason, it is not recommended to add unit display names to archetypes, only to templates (for localisation purposes).
-	UnitsDisplayName *string `json:"units_display_name,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVQuantity.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVQuantity) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVQuantity.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVQuantity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_QUANTITY: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVQuantityJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_QUANTITY", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_QUANTITY" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_QUANTITY", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.AccuracyIsPercent = aux.AccuracyIsPercent
-	d.MagnitudeStatus = aux.MagnitudeStatus
-	d.Accuracy = aux.Accuracy
-	d.NormalStatus = aux.NormalStatus
-	d.Magnitude = aux.Magnitude
-	d.Precision = aux.Precision
-	d.Units = aux.Units
-	d.NormalRange = aux.NormalRange
-	d.OtherReferenceRanges = aux.OtherReferenceRanges
-	d.UnitsSystem = aux.UnitsSystem
-	d.UnitsDisplayName = aux.UnitsDisplayName
-	return nil
+	return typereg.DecodeInto(dec, "DV_QUANTITY", &struct {
+		Type string `json:"_type"`
+		*rawDVQuantity
+	}{rawDVQuantity: (*rawDVQuantity)(d)})
 }
 
-type DVScaleJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
-	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
-	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
-	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
-	// Symbol Coded textual representation of this value in the scale range, which may be strings made from symbols or other enumerations of terms such as  `no breathlessness`, `very very slight`, `slight breathlessness`. Codes come from archetypes.
-	//
-	// In some cases, a scale may include values that have no code/symbol. In this case, the symbol will be a `DV-CODED_TEXT` including the `_terminology_id_` and a blank String value for `_code_string_`.
-	Symbol DVCodedText `json:"symbol"`
-	// Value Real number value of Scale item.
-	Value Real `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVScale.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVScale) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVScale.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVScale) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_SCALE: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVScaleJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_SCALE", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_SCALE" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_SCALE", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.NormalStatus = aux.NormalStatus
-	d.NormalRange = aux.NormalRange
-	d.OtherReferenceRanges = aux.OtherReferenceRanges
-	d.Symbol = aux.Symbol
-	d.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "DV_SCALE", &struct {
+		Type string `json:"_type"`
+		*rawDVScale
+	}{rawDVScale: (*rawDVScale)(d)})
 }
 
-type ReferenceRangeJSONUnmarshaller[T DVOrdered] struct {
-	Class   string          `json:"_type"`
-	Meaning json.RawMessage `json:"meaning"` // polymorphic DVTextLike
-	// Range The data range for this meaning, e.g. critical  etc.
-	Range DVInterval[DVOrdered] `json:"range"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ReferenceRange.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (r *ReferenceRange[T]) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ReferenceRange.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (r *ReferenceRange[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: REFERENCE_RANGE: %w", typereg.ErrNilReceiver)
 	}
-	var aux ReferenceRangeJSONUnmarshaller[T]
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("REFERENCE_RANGE", err)
-	}
-	if aux.Class != "" && aux.Class != "REFERENCE_RANGE" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "REFERENCE_RANGE", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Meaning) > 0 && string(aux.Meaning) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Meaning)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Meaning, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/meaning", Inner: jerr}
-				}
-				r.Meaning = &def
-			} else {
-				return &typereg.DecodeError{Path: "/meaning", Inner: err}
-			}
-		} else {
-			r.Meaning = dv
-		}
-	}
-	r.Range = aux.Range
-	return nil
+	return typereg.DecodeInto(dec, "REFERENCE_RANGE", &struct {
+		Type string `json:"_type"`
+		*rawReferenceRange[T]
+	}{rawReferenceRange: (*rawReferenceRange[T])(r)})
 }

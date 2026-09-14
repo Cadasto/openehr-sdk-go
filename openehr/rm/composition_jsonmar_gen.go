@@ -4,128 +4,50 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.composition — canonical-JSON MarshalJSON companions
+// BMM package: org.openehr.rm.composition — canonical-JSON MarshalJSONTo companions
 
-type CompositionJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Language Mandatory indicator of the localised language in which this Composition is written. Coded from openEHR Code Set  `languages`. The language of an Entry if different from the Composition is indicated in `ENTRY._language_`.
-	Language CodePhrase `json:"language"`
-	// Territory Name of territory in which this Composition was written. Coded from openEHR  countries  code set, which is an expression of the ISO 3166 standard.
-	Territory CodePhrase `json:"territory"`
-	// Category Temporal category of this Composition, i.e.
-	//
-	// * `431|persistent|` - of potential life-time validity;
-	// * `451|episodic|` - valid over the life of a care episode;
-	// * `433|event|` - valid at the time of recording (long-term validity requires subsequent clinical assessment).
-	//
-	// or any other code defined in the openEHR terminology group 'category'.
-	Category DVCodedText `json:"category"`
-	// Context The clinical session context of this Composition, i.e. the contextual attributes of the clinical session.
-	Context *EventContext `json:"context,omitempty"`
-	// Composer The person primarily responsible for the content of the Composition (but not necessarily its committal into the EHR system). This is the identifier which should appear on the screen. It may or may not be the person who entered the data. When it is the patient, the special self  instance of `PARTY_PROXY` will be used.
-	Composer json.RawMessage `json:"composer"`
-	// Content The content of this Composition.
-	Content json.RawMessage `json:"content,omitempty"`
+// rawComposition is the method-free canonical-JSON alias for Composition. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawComposition Composition
+
+// MarshalJSONTo emits canonical openEHR JSON for Composition with `_type`
+// (value "COMPOSITION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (c Composition) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawComposition
+	}{"COMPOSITION", (*rawComposition)(&c)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for Composition with `_type`
-// (value "COMPOSITION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *Composition) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(c.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(c.UID)
-	if err != nil {
-		return nil, err
-	}
-	rawComposer, err := jsonpoly.Marshal(c.Composer)
-	if err != nil {
-		return nil, err
-	}
-	rawContent, err := jsonpoly.MarshalSlice(c.Content)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&CompositionJSONMarshaller{
-		Class:            "COMPOSITION",
-		Name:             rawName,
-		ArchetypeNodeID:  c.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            c.Links,
-		ArchetypeDetails: c.ArchetypeDetails,
-		FeederAudit:      c.FeederAudit,
-		Language:         c.Language,
-		Territory:        c.Territory,
-		Category:         c.Category,
-		Context:          c.Context,
-		Composer:         rawComposer,
-		Content:          rawContent,
-	})
-}
+// rawEventContext is the method-free canonical-JSON alias for EventContext. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawEventContext EventContext
 
-type EventContextJSONMarshaller struct {
-	Class string `json:"_type"`
-	// StartTime Start time of the clinical session or other kind of event during which a provider performs a service of any kind for the patient.
-	StartTime DVDateTime `json:"start_time"`
-	// EndTime Optional end time of the clinical session.
-	EndTime *DVDateTime `json:"end_time,omitempty"`
-	// Location The actual location where the session occurred, e.g. 'microbiology lab 2', 'home', 'ward A3'  and so on.
-	Location *string `json:"location,omitempty"`
-	// Setting The setting in which the clinical session took place. Coded using the openEHR Terminology,  setting  group.
-	Setting DVCodedText `json:"setting"`
-	// OtherContext Other optional context which will be archetyped.
-	OtherContext json.RawMessage `json:"other_context,omitempty"`
-	// HealthCareFacility The health care facility under whose care the event took place. This is the most specific workgroup or delivery unit within a care delivery enterprise that has an official identifier in the health system, and can be used to ensure medico-legal accountability.
-	HealthCareFacility json.RawMessage `json:"health_care_facility,omitempty"`
-	// Participations Parties involved in the healthcare event. These would normally include the physician(s) and often the patient (but not the latter if the clinical session is a pathology test for example).
-	Participations []Participation `json:"participations,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for EventContext with `_type`
-// (value "EVENT_CONTEXT") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (e *EventContext) MarshalJSON() ([]byte, error) {
-	rawOtherContext, err := jsonpoly.Marshal(e.OtherContext)
-	if err != nil {
-		return nil, err
-	}
-	rawHealthCareFacility, err := jsonpoly.Marshal(e.HealthCareFacility)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&EventContextJSONMarshaller{
-		Class:              "EVENT_CONTEXT",
-		StartTime:          e.StartTime,
-		EndTime:            e.EndTime,
-		Location:           e.Location,
-		Setting:            e.Setting,
-		OtherContext:       rawOtherContext,
-		HealthCareFacility: rawHealthCareFacility,
-		Participations:     e.Participations,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for EventContext with `_type`
+// (value "EVENT_CONTEXT") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value — the shape the like-interface
+// accessors admit — still carries its `_type` (REQ-052 substitution).
+func (e EventContext) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawEventContext
+	}{"EVENT_CONTEXT", (*rawEventContext)(&e)}, typereg.MarshalOptions(enc))
 }

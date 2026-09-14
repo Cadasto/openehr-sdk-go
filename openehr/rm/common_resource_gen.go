@@ -21,41 +21,41 @@ type ResourceDescription struct {
 	// OtherContributors Other contributors to the resource, probably listed in  `'name <email>'`  form.
 	OtherContributors []string `json:"other_contributors,omitempty"`
 	// OtherDetails Additional non language-sensitive resource meta-data, as a list of name/value pairs.
-	OtherDetails *map[string]string `json:"other_details,omitempty"`
+	OtherDetails *map[string]string `json:"other_details,omitzero"`
 	// ParentResource Reference to owning resource.
 	ParentResource AuthoredResource `json:"parent_resource"`
 	// ResourcePackageURI URI of package to which this resource belongs.
-	ResourcePackageURI *string `json:"resource_package_uri,omitempty"`
+	ResourcePackageURI *string `json:"resource_package_uri,omitzero"`
 }
 
 // ResourceDescriptionItem Language-specific detail of resource description. When a resource is translated for use in another language environment, each `RESOURCE_DESCRIPTION_ITEM` needs to be copied and translated into the new language.
 type ResourceDescriptionItem struct {
 	// Copyright Optional copyright statement for the resource as a knowledge resource.
-	Copyright *string `json:"copyright,omitempty"`
+	Copyright *string `json:"copyright,omitzero"`
 	// Keywords Keywords which characterise this resource, used e.g. for indexing and searching.
 	Keywords []string `json:"keywords,omitempty"`
 	// Language The localised language in which the items in this description item are written. Coded from openEHR code set `languages`.
 	Language CodePhrase `json:"language"`
 	// Misuse Description of any misuses of the resource, i.e. contexts in which it should not be used.
-	Misuse *string `json:"misuse,omitempty"`
+	Misuse *string `json:"misuse,omitzero"`
 	// OriginalResourceURI URIs of original clinical document(s) or description of which resource is a formalisation, in the language of this description item; keyed by meaning.
-	OriginalResourceURI *map[string]string `json:"original_resource_uri,omitempty"`
+	OriginalResourceURI *map[string]string `json:"original_resource_uri,omitzero"`
 	// OtherDetails Additional language-sensitive resource metadata, as a list of name/value pairs.
-	OtherDetails *map[string]string `json:"other_details,omitempty"`
+	OtherDetails *map[string]string `json:"other_details,omitzero"`
 	// Purpose Purpose of the resource.
 	Purpose string `json:"purpose"`
 	// Use Description of the uses of the resource, i.e. contexts in which it could be used.
-	Use *string `json:"use,omitempty"`
+	Use *string `json:"use,omitzero"`
 }
 
 // TranslationDetails Class providing details of a natural language translation.
 type TranslationDetails struct {
 	// Accreditaton Accreditation of translator, usually a national translator's registration or association membership id.
-	Accreditaton *string `json:"accreditaton,omitempty"`
+	Accreditaton *string `json:"accreditaton,omitzero"`
 	// Author Translator name and other demographic details.
 	Author map[string]string `json:"author"`
 	// Language Language of the translation.
 	Language CodePhrase `json:"language"`
 	// OtherDetails Any other meta-data.
-	OtherDetails *map[string]string `json:"other_details,omitempty"`
+	OtherDetails *map[string]string `json:"other_details,omitzero"`
 }
