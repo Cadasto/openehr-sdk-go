@@ -25,7 +25,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -34,6 +33,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
 // Probe076SimplifiedRoundTrip runs the round-trip conformance checks for one
@@ -163,21 +163,13 @@ func firstIssue(r validation.Result) string {
 	return r.Issues[0].Code + " " + r.Issues[0].Path
 }
 
-// flatMapsEqual compares two FLAT payloads for exact semantic equality. Both
-// sides are decoded with json.Number — comparing through float64 would round
-// integers above 2^53 on both sides and mask a regression of exactly the
-// precision guarantee the codec documents (json.Number values compare as
-// strings under DeepEqual, i.e. exactly).
+// flatMapsEqual reports whether two FLAT payloads are wire-equivalent. It
+// defers to the shared [wireequiv.Equivalent] oracle, which parses both sides
+// with json.Number so integers above 2^53 compare as text rather than through a
+// lossy float64, the precision guarantee the codec documents.
 func flatMapsEqual(a, b []byte) bool {
-	ma, err := decodeNumberMap(a)
-	if err != nil {
-		return false
-	}
-	mb, err := decodeNumberMap(b)
-	if err != nil {
-		return false
-	}
-	return reflect.DeepEqual(ma, mb)
+	ok, _ := wireequiv.Equivalent(a, b)
+	return ok
 }
 
 func decodeNumberMap(b []byte) (map[string]any, error) {

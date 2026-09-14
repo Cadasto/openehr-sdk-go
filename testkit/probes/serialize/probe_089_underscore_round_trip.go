@@ -49,6 +49,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 	conformance "github.com/cadasto/openehr-sdk-go/testkit/conformance/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
 // FLAT path fragments of the vendored PROBE-086 corpus template — the one OPT
@@ -827,52 +828,13 @@ func probe089WalkMembers(node any, visit func(name string, value any)) {
 	}
 }
 
-// flatDiff reports how two FLAT payloads differ, or "" when they are equal.
-// Both sides are compared through json.Number, so integers above 2^53 compare
-// exactly (see [flatMapsEqual]).
+// flatDiff reports how two FLAT payloads differ, or "" when they are
+// wire-equivalent. It defers to the shared [wireequiv.Equivalent] oracle, which
+// names the first differing JSON Pointer and compares numbers as their literal
+// text so an integer above 2^53 is not rounded (see [flatMapsEqual]).
 func flatDiff(want, got []byte) string {
-	mw, err := decodeNumberMap(want)
-	if err != nil {
-		return "left side is not a JSON object: " + err.Error()
-	}
-	mg, err := decodeNumberMap(got)
-	if err != nil {
-		return "right side is not a JSON object: " + err.Error()
-	}
-	var missing, extra, mismatched []string
-	for k, v := range mw {
-		have, ok := mg[k]
-		if !ok {
-			missing = append(missing, k)
-			continue
-		}
-		if !sameFlatValue(v, have) {
-			mismatched = append(mismatched, fmt.Sprintf("%s (want=%v got=%v)", k, v, have))
-		}
-	}
-	for k := range mg {
-		if _, ok := mw[k]; !ok {
-			extra = append(extra, k)
-		}
-	}
-	var b strings.Builder
-	for _, part := range []struct {
-		label string
-		keys  []string
-	}{
-		{"missing", missing},
-		{"extra", extra},
-		{"mismatched", mismatched},
-	} {
-		if len(part.keys) == 0 {
-			continue
-		}
-		if b.Len() > 0 {
-			b.WriteString("; ")
-		}
-		fmt.Fprintf(&b, "%s %s", part.label, strings.Join(slices.Sorted(slices.Values(part.keys)), ", "))
-	}
-	return b.String()
+	_, diff := wireequiv.Equivalent(want, got)
+	return diff
 }
 
 // sameFlatValue compares two decoded FLAT leaf values. json.Number compares as
