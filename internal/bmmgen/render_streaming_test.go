@@ -49,11 +49,18 @@ func marshalLeadsWithType(chunk, aliasEmbed string) bool {
 // the alias in renderMarshalAlias, or after another field in renderMarshalFlat,
 // turns the census red.
 func TestRenderMarshalLeadsWithType(t *testing.T) {
-	// Prove the witness discriminates: an anonymous wrapper whose alias embed
-	// precedes `_type` must read as NOT leading with `_type`.
-	const reordered = "\t}{\n\t\t*rawX\n\t\tType string `json:\"_type\"`\n"
-	if marshalLeadsWithType(reordered, "*rawX") {
-		t.Fatal("marshalLeadsWithType accepted a wrapper whose alias embed precedes `_type` — the witness does not discriminate, so the census below proves nothing")
+	// Prove the witness discriminates on BOTH shapes: an anonymous alias wrapper
+	// whose alias embed precedes `_type`, and a flat wire struct whose `_type`
+	// tag follows another tagged field, must each read as NOT leading with
+	// `_type`. Without both, the census could be trivially satisfied for the
+	// shape the witness happens not to exercise.
+	const aliasReordered = "\t}{\n\t\t*rawX\n\t\tType string `json:\"_type\"`\n"
+	if marshalLeadsWithType(aliasReordered, "*rawX") {
+		t.Fatal("marshalLeadsWithType accepted an alias wrapper whose embed precedes `_type` — the alias branch of the witness does not discriminate")
+	}
+	const flatReordered = "type XJSONWire struct {\n\tValue string `json:\"value\"`\n\tClass string `json:\"_type\"`\n}"
+	if marshalLeadsWithType(flatReordered, "") {
+		t.Fatal("marshalLeadsWithType accepted a flat wire struct whose `_type` tag follows another tagged field — the flat branch of the witness does not discriminate")
 	}
 
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
