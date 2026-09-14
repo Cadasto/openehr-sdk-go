@@ -54,22 +54,21 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 | Abstract generic `EVENT` polymorphism (`History.events`) | Promote `EVENT` to a Go interface; `POINT_EVENT` / `INTERVAL_EVENT` concrete; whitelist in generator | [ADR 0003](../adr/0003-rm-event-polymorphism.md) |
 | `Real` / `Integer` wire tolerance (quoted vs numeric JSON) | Strict encode, permissive decode via `rm.Real` / `rm.Integer` defined types | [ADR 0004](../adr/0004-numeric-wire-tolerance.md) |
 | Polymorphic round-trip fidelity (REQ-052/040) | Value-in-interface `_type` on encode via `openehr/internal/jsonpoly`; round-tripped `DV_INTERVAL<T>` validated from its bounds' runtime types; corpus round-trips byte-stable | [archived plan](../plans/archive/2026-06-23-polymorphic-encode-decode.md) |
+| `encoding/json/v2` as the canonical-JSON codec; encoded member order is not a contract | Migrate to standard-library v2; retire the generator's per-type `MarshalJSON` / `UnmarshalJSON` and `openehr/internal/jsonpoly`; `_type` first becomes a SHOULD and round-trip fidelity is asserted semantically rather than byte-wise | [ADR 0021](../adr/0021-json-member-order-not-a-contract.md), [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) |
 
 ### Still open
 
 - **Full RM inventory:** decode every BMM type through the registry; identify sites that resist the pattern (e.g. further `VERSION[T]` whitelist decisions beyond `EVENT`).
-- **Default codec benchmark:** `encoding/json` (current, via generator-emitted `MarshalJSON`) vs `sonic` vs `easyjson` under seeder/benchmark workloads — a *performance* axis (throughput/allocations), codec swapped behind the same generated methods.
-- **`encoding/json/v2` as a *simplification* axis:** distinct from the performance candidates above. The generator emits bespoke `MarshalJSON`/`UnmarshalJSON` (`internal/bmmgen/render_json{mar,unmar}.go`) and `openehr/internal/jsonpoly` largely to obtain what `encoding/json` v1 lacks: deterministic field order, correct zero/omit semantics (`omitzero`), and value-in-interface `_type` handling. Go 1.27 ships `encoding/json/v2` and `encoding/json/jsontext` as ordinary stdlib (no `GOEXPERIMENT=jsonv2`); v1 is implemented on v2 with behaviour preserved. Native v2 options could *retire* a large share of that generated + hand-written marshaling surface rather than merely swap the codec behind it. The API is stable; the remaining gate is the byte-stable canjson fit-gap, not experimental status.
+- **Codec performance against the standard-library baseline:** with the codec settled by [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md), the open question is no longer which codec but whether the migrated path is within budget for seeder and benchmark workloads, measured against the retired generated marshalers on `openehr/serialize/canjson/bench_test.go` rather than against `sonic` or `easyjson`. A regression is a plan task, not a codec fork.
 - **Validation independence:** confirm `openehr/validation` can validate without taking on the codec's dependencies (REQ-013).
 
 **Evidence needed (remaining):**
 
 - Benchmark throughput, allocations, and memory residency for codec candidates.
 - Document any remaining abstract-generic classes requiring ADR whitelist (generator policy today: `EVENT` only).
-- `encoding/json/v2` fit-gap: whether `jsontext` + marshal options reproduce byte-stable canonical JSON (PROBE-030/031/038) and the polymorphic `_type` round-trip (REQ-052/040) without the generator's marshaler emit — and quantify the generated + `jsonpoly` LOC it would remove.
-- `encoding/json/v2` stability/timeline: stable stdlib as of Go 1.27; remaining work is the fit-gap (byte-stable `_type`-first canjson, PROBE-030/031/038) before any generator/ADR change.
+- `encoding/json/v2` migration evidence: `_type` emission (first-member SHOULD) and the polymorphic `_type` round-trip survive the retirement of the generated marshalers, asserted by PROBE-030 and PROBE-038, whose byte assertions are replaced by typed deep comparison plus [wire-equivalence](conformance.md#terms); the generated and `jsonpoly` line count removed is recorded in the plan's close-out.
 
-**Resolution form (remaining):** ADR choosing the default codec (with tuning-knob notes for swapping). Amends REQ-052, REQ-053, possibly REQ-040 if registry shape needs tweaking. A `encoding/json/v2` resolution would additionally touch the codegen policy in [ADR 0002](../adr/0002-bmm-codegen-decisions.md), since it changes what the generator emits.
+**Resolution form (remaining):** ADR choosing the default codec (with tuning-knob notes for swapping). Amends REQ-052, REQ-053, possibly REQ-040 if registry shape needs tweaking. The `encoding/json/v2` resolution additionally touched the codegen policy in [ADR 0002](../adr/0002-bmm-codegen-decisions.md), since it changed what the generator emits.
 
 **Implementation gate:** Phase 1b — affects every read path in `openehr/client/*` and openEHR wire conformance (REQ-080).
 
