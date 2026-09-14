@@ -29,7 +29,7 @@ Imported like any other Go package.
 </div>
 
 <p class="home-reassure" markdown="1">
-No backend needed to start. Point the client at yours when you have one.
+No backend needed to start. Going live adds a base URL and a token source.
 </p>
 
 </div>
