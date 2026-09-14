@@ -683,9 +683,9 @@ func TestUnmarshalMatchesMemberNamesExactly(t *testing.T) {
 	// The operation-specific facet: the exactly-cased member populated, the
 	// mis-cased one did not.
 	if q.Magnitude != 0 {
-		t.Errorf("q.Magnitude = %v; want 0 — a mis-cased \"Magnitude\" must not match the field", q.Magnitude)
+		t.Errorf("q.Magnitude = %v; want 0: a mis-cased \"Magnitude\" must not match the field", q.Magnitude)
 	}
 	if q.Units != "kg" {
-		t.Errorf("q.Units = %q; want \"kg\" — the exactly-cased member must populate", q.Units)
+		t.Errorf("q.Units = %q; want \"kg\": the exactly-cased member must populate", q.Units)
 	}
 }
