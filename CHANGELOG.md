@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Canonical JSON is encoded by `encoding/json/v2` (REQ-052, ADR 0021/0022).** Encoded member order is no longer a contract, `_type`-first is a recommendation, `<`/`>`/`&` are no longer escaped, and the generated per-type JSON marshalers are retired.
+- **RM and AOM types implement `encoding/json/v2`'s `MarshalerTo`/`UnmarshalerFrom` (ADR 0002 D8, ADR 0022).** The v1 `MarshalJSON`/`UnmarshalJSON` pair and the exported `*JSONMarshaller`/`*JSONUnmarshaller` wire types are gone, `contribution.CommitVersion` requires `json.MarshalerTo`, and RM values held in maps now carry `_type`.
+- **RM floor validation reads `ACTION.time`, `ism_transition` and `instruction_details` (REQ-112).** `ValidateRM` no longer reports the two mandatory ACTION attributes as missing on a well-formed composition.
 - **Vendored openEHR REST API (ITS-REST) OpenAPI specs pinned to `Release-1.1.0`.** `resources/its-rest/` moves from the `master` branch tip to the tagged `Release-1.1.0` release (commit `2405899`), so the vendored contract is pinned to a reproducible release rather than a moving branch. The only content delta is the upstream amendment record in `overview-validation.openapi.yaml`; every schema, path, header and status code is byte-identical, so no client behaviour changes.
 
 ## [0.27.0] - 2026-09-09

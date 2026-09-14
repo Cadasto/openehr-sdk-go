@@ -1,12 +1,12 @@
 # Plan: canonical JSON on `encoding/json/v2`
 
 **Date:** 2026-09-14
-**Status:** Draft. The two decision records this plan drafts, ADR 0021 (member order is not a contract) and ADR 0022 (the codec is `encoding/json/v2`), are quoted in Phase 0 and stay **Proposed** until the maintainer accepts them. Phase 1 onward starts once both are Accepted.
+**Status:** landed (2026-09-14, archived in the implementing PR). ADR 0021 and ADR 0022 were accepted 2026-09-14 (maintainer sign-off, ruling R3), and Phases 0 through 4 all landed on this branch across ten tasks; the open-question, results and rulings tables below are filled in from those tasks' reports.
 **Owner:** SDK maintainers
-**Covers:** [REQ-052](../specifications/wire.md#req-052) (Canonical JSON, Impl. `landed`, amended in place), [REQ-040](../specifications/rm-modeling.md#type-registry-req-040) (Type registry, Impl. `landed`, dispatch mechanism changes, contract does not), [REQ-053](../specifications/wire.md#req-053) (FLAT and STRUCTURED, Impl. `landed`, one test rewrite only). [REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) is deliberately **not** listed: `transport.Decode` already routes every 2xx body through `canjson.Unmarshal` (`transport/client.go:654`) and keeps doing so, so no package, probe or test row moves in `traceability.yaml`; only the identity of the wrapped cause changes, and Phase 3 re-pins it.
-**Probes:** [PROBE-030](../specifications/conformance.md#probe-030--canonical-json-round-trip) and [PROBE-038](../specifications/conformance.md#probe-038--rm-polymorphic-decode-coverage) are **rewritten, not new**. No new `PROBE-NNN` id is allocated, so the guarded census sentence at `docs/specifications/conformance.md:44` and the all-three-modes tally at `:46` are untouched. PROBE-089's catalog prose gets a one-line wording fix (`conformance.md:569`). PROBE-031 (unknown `_type`) and PROBE-033 (canonical XML) are unchanged.
-**Implementation:** planned
-**Depends on:** the Go 1.27.0 module floor (`go.mod:3`), which puts `encoding/json/v2` and `encoding/json/jsontext` in the ordinary standard library; the landed `openehr/serialize/canjson`, `openehr/rm/typereg` and generated RM and AOM trees; [ADR 0002](../adr/0002-bmm-codegen-decisions.md) (codegen policy, amended by this plan), [ADR 0003](../adr/0003-rm-event-polymorphism.md) and [ADR 0004](../adr/0004-numeric-wire-tolerance.md) (both unchanged)
+**Covers:** [REQ-052](../../specifications/wire.md#req-052) (Canonical JSON, Impl. `landed`, amended in place), [REQ-040](../../specifications/rm-modeling.md#type-registry-req-040) (Type registry, Impl. `landed`, dispatch mechanism changes, contract does not), [REQ-053](../../specifications/wire.md#req-053) (FLAT and STRUCTURED, Impl. `landed`, one test rewrite only). [REQ-151](../../specifications/transport.md#req-151--typed-2xx-decode-failure) is deliberately **not** listed: `transport.Decode` already routes every 2xx body through `canjson.Unmarshal` (`transport/client.go:654`) and keeps doing so, so no package, probe or test row moves in `traceability.yaml`; only the identity of the wrapped cause changes, and Phase 3 re-pins it.
+**Probes:** [PROBE-030](../../specifications/conformance.md#probe-030--canonical-json-round-trip) and [PROBE-038](../../specifications/conformance.md#probe-038--rm-polymorphic-decode-coverage) are **rewritten, not new**. No new `PROBE-NNN` id is allocated, so the guarded census sentence at `docs/specifications/conformance.md:44` and the all-three-modes tally at `:46` are untouched. PROBE-089's catalog prose gets a one-line wording fix (`conformance.md:569`). PROBE-031 (unknown `_type`) and PROBE-033 (canonical XML) are unchanged.
+**Implementation:** landed
+**Depends on:** the Go 1.27.0 module floor (`go.mod:3`), which puts `encoding/json/v2` and `encoding/json/jsontext` in the ordinary standard library; the landed `openehr/serialize/canjson`, `openehr/rm/typereg` and generated RM and AOM trees; [ADR 0002](../../adr/0002-bmm-codegen-decisions.md) (codegen policy, amended by this plan), [ADR 0003](../../adr/0003-rm-event-polymorphism.md) and [ADR 0004](../../adr/0004-numeric-wire-tolerance.md) (both unchanged)
 **Defers:** `openehr/serialize/simplified` and the `testkit` decoders that share its reliance on `Decoder.UseNumber` (`flat_decode.go:708-709`, `datatypes.go:787-788`, `testkit/conformance/webtemplate/runner.go:438-439`, `testkit/probes/serialize/probe_076_simplified_round_trip.go:184-185`, `probe_038_canjson_rm_polymorphic_decode.go:98-99`). Trigger: a `UseNumber` replacement with its own tests, plus `json.Deterministic(true)` for the `map[string]any` encode half (`flat_encode.go:29`, `structured.go:33,47,64,77`). Also deferred: the `Extras` carriers (`openehr/client/definition`, `openehr/client/system`, `openehr/aql`), `openehr/template/webtemplate`, `openehr/bmm`, the `auth/*` and `smart/*` packages, `openehr/validation` and `cmd/*`, each with its reason and trigger in Phase 3. Reclassifying the rewritten PROBE-030 to `In-repo` is a REQ-082 question and stays a follow-up, because it would move the guarded count at `conformance.md:44` from 16 to 17.
 
 ## Goal
@@ -62,7 +62,7 @@ Implementation may start when:
 ## Definition of Done
 
 - Code and tests land with `// REQ-` and `// PROBE-` citations.
-- [`traceability.yaml`](../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the implementation. REQ-052 stays `landed` throughout, because the amendment is implementation-aligned and merges with the code it describes; `scripts/spec-check.sh:300-305` enforces agreement between the two, so if the plan ever splits such that the spec text merges first, both move to `partial` in the same commit and back at close-out.
+- [`traceability.yaml`](../../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the implementation. REQ-052 stays `landed` throughout, because the amendment is implementation-aligned and merges with the code it describes; `scripts/spec-check.sh:300-305` enforces agreement between the two, so if the plan ever splits such that the spec text merges first, both move to `partial` in the same commit and back at close-out.
 - **The two indexes `make spec-check` cannot see.** The roadmap row for canonical JSON (`docs/roadmap.md:59`) still promises "byte-stable `_type` round-trips" and is rewritten. The REQ.md numbering band is **untouched**: this plan allocates no new REQ id, so no headroom is consumed and no band changes state.
 - Canonical spec prose and **Status:** lines updated in the same PR: REQ-052's member-order, escaping, duplicate-name and error-type clauses; PROBE-030, PROBE-038 and PROBE-089's catalog prose; the `### Terms` section.
 - STRAND-04's codec sub-question is marked resolved. The strand itself stays **Partially resolved**: the full RM inventory (`research-strands.md:60`) and validation independence (`:63`) are untouched by this work.
@@ -75,12 +75,12 @@ Implementation may start when:
 
 | Step | Status |
 |---|---|
-| Spec / registry updated (`traceability.yaml`, REQ.md row) | |
-| Indexes `spec-check` misses (`roadmap.md:59` row; REQ.md numbering band not touched, no new id) | |
-| Code | |
-| Tests with `// REQ-` / `// PROBE-` comments | |
-| `make spec-check` | |
-| `make ci` | |
+| Spec / registry updated (`traceability.yaml`, REQ.md row) | Done |
+| Indexes `spec-check` misses (`roadmap.md:59` row; REQ.md numbering band not touched, no new id) | Done |
+| Code | Done |
+| Tests with `// REQ-` / `// PROBE-` comments | Done |
+| `make spec-check` | Done |
+| `make ci` | Done |
 
 ## Phases
 
@@ -153,10 +153,10 @@ The maintainer took two decisions, and this repository records one decision per 
 > - **Status:** Proposed, 2026-09-14.
 > - **Supersedes:** none.
 > - **Superseded by:** none.
-> - **Strand:** retires the byte-stability premise in [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance)'s remaining evidence item.
-> - **Introduces:** none. **Amends:** [REQ-052](../specifications/wire.md#req-052) (the field-order profile and the probe obligation it carries).
-> - **Plan:** [2026-09-14-json-v2-migration.md](../plans/2026-09-14-json-v2-migration.md).
-> - **Related:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (the codec decision this one unblocks); [REQ-056](../specifications/wire.md#req-056) (canonical XML, deliberately not amended); [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the validation floor the rewritten PROBE-030 asserts).
+> - **Strand:** retires the byte-stability premise in [STRAND-04](../../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance)'s remaining evidence item.
+> - **Introduces:** none. **Amends:** [REQ-052](../../specifications/wire.md#req-052) (the field-order profile and the probe obligation it carries).
+> - **Plan:** [2026-09-14-json-v2-migration.md](2026-09-14-json-v2-migration.md).
+> - **Related:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (the codec decision this one unblocks); [REQ-056](../../specifications/wire.md#req-056) (canonical XML, deliberately not amended); [REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the validation floor the rewritten PROBE-030 asserts).
 >
 > ## Context
 >
@@ -164,7 +164,7 @@ The maintainer took two decisions, and this repository records one decision per 
 >
 > No openEHR specification asks for it. RFC 8259 § 4 assigns no meaning to JSON object member order, the openEHR specifications prescribe none, and CDR implementations differ in the order they emit. The decoder's obligation to accept any order, already stated at `wire.md:110`, is the real interoperability rule and is unaffected.
 >
-> The promise has a price. It constrains the codec: any encoder the SDK adopts must reproduce one spelling for one value, which is the gate [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance) named at `research-strands.md:68`. It also shapes the conformance suite: a probe that compares two encodes tests the encoder's self-consistency, which passes even when the encoder drops the same field on both passes.
+> The promise has a price. It constrains the codec: any encoder the SDK adopts must reproduce one spelling for one value, which is the gate [STRAND-04](../../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance) named at `research-strands.md:68`. It also shapes the conformance suite: a probe that compares two encodes tests the encoder's self-consistency, which passes even when the encoder drops the same field on both passes.
 >
 > ## Decision
 >
@@ -173,7 +173,7 @@ The maintainer took two decisions, and this repository records one decision per 
 > - `_type` first becomes a **SHOULD**. It has a reason that survives the withdrawal: a consumer decoding as a stream can select the concrete type before reading the rest of the object.
 > - Beyond `_type`, member order is **unspecified**, and a consumer **MUST NOT** rely on it.
 > - The decoder **MUST** continue to accept members in any order, `_type` included.
-> - Conformance is asserted **semantically**: decoded values are compared, and the recovered value is passed through the reference-model floor ([REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor)). Where a check on encoded form is useful it is wire-equivalence, defined once in the conformance catalog's Terms section. No probe asserts byte equality of encoded JSON.
+> - Conformance is asserted **semantically**: decoded values are compared, and the recovered value is passed through the reference-model floor ([REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor)). Where a check on encoded form is useful it is wire-equivalence, defined once in the conformance catalog's Terms section. No probe asserts byte equality of encoded JSON.
 > - `Hash` (`map[K]V`) members are emitted in lexicographic key order as a **SHOULD**, re-stated as a determinism property of the encoder rather than an order promise to a consumer. Go randomises map iteration, so without it one unchanged value has no reproducible encoding at all. A unit test pins it; no probe does.
 >
 > **Open point for the maintainer: SHOULD or MUST for encoder determinism.** The case for MUST is that six live assertions depend on one value encoding identically twice: `openehr/serialize/canjson/field_order_test.go:132`, `openehr/serialize/canjson/marshal_sentinel_test.go:66`, `openehr/client/ehr/contribution/builder_test.go:364` and `:373`, `openehr/instance/valuefill_test.go:70`, and `openehr/serialize/simplified/roundtrip_test.go:39`. The case for SHOULD is that none of them is an interoperability obligation: they are the SDK's own tooling, and stating an internal implementation property as a normative MUST on the wire format is the category error this ADR exists to correct. The draft takes SHOULD.
@@ -183,7 +183,7 @@ The maintainer took two decisions, and this repository records one decision per 
 > - **A consumer that hashed, diffed or signed SDK output loses a guarantee it may have relied on.** Pre-1.0 this is a `### Changed` CHANGELOG entry and a minor bump (`CHANGELOG.md:7`), not a deprecation cycle. A consumer needing a stable digest computes it over a canonicalisation of its own choosing. The SDK does not ship one, because an SDK-blessed canonical form would be the same promise wearing a different name.
 > - **The probe suite gets stronger, not weaker.** A byte comparison of two encodes passes whenever the encoder is self-consistent, including when it drops a field on both passes. Typed deep comparison plus `ValidateRM` catches exactly that class. This is the substantive argument for the change, not its mitigation.
 > - **Two documented re-encode collapses become visible.** `wire.md:112-113` records that `DV_TEXT.mappings` and `DV_MULTIMEDIA.data` lose the present-but-empty distinction on re-encode, so the decode of a cassette and the decode of its re-encode can legitimately differ. PROBE-030 therefore compares the values on either side of the *second* encode, where both derive from SDK output. The collapses themselves are unchanged.
-> - **Canonical XML is untouched.** [REQ-056](../specifications/wire.md#req-056)'s element-order profile and PROBE-033's byte assertion stand. The asymmetry is principled: element order is part of an XML document's identity in a way member order is not part of a JSON object's.
+> - **Canonical XML is untouched.** [REQ-056](../../specifications/wire.md#req-056)'s element-order profile and PROBE-033's byte assertion stand. The asymmetry is principled: element order is part of an XML document's identity in a way member order is not part of a JSON object's.
 > - **The withdrawal is one-way.** Restoring an order promise after consumers have absorbed its removal is not a cheap change, which is why this half of the work is the ADR-worthy fork and the codec swap (reversible, one funnel at `openehr/serialize/canjson/marshal.go:28`) is not.
 >
 > ## Alternatives considered
@@ -199,11 +199,11 @@ The maintainer took two decisions, and this repository records one decision per 
 > - **Status:** Proposed, 2026-09-14.
 > - **Supersedes:** none.
 > - **Superseded by:** none.
-> - **Strand:** resolves the `encoding/json/v2` simplification sub-question and the default-codec sub-question of [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance).
+> - **Strand:** resolves the `encoding/json/v2` simplification sub-question and the default-codec sub-question of [STRAND-04](../../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance).
 > - **Introduces:** none. **Amends:** [ADR 0002](0002-bmm-codegen-decisions.md) (what the generator emits for JSON: new D8).
 > - **Depends on:** [ADR 0021](0021-json-member-order-not-a-contract.md). Without the order withdrawal this decision would be a different and worse one.
-> - **Plan:** [2026-09-14-json-v2-migration.md](../plans/2026-09-14-json-v2-migration.md).
-> - **Related:** [ADR 0003](0003-rm-event-polymorphism.md) (the EVENT interface whitelist, whose codec justification this decision re-homes); [ADR 0004](0004-numeric-wire-tolerance.md) (strict encode, permissive decode, kept hand-written and unchanged); [REQ-040](../specifications/rm-modeling.md#type-registry-req-040) (the registry the dispatch hooks read).
+> - **Plan:** [2026-09-14-json-v2-migration.md](2026-09-14-json-v2-migration.md).
+> - **Related:** [ADR 0003](0003-rm-event-polymorphism.md) (the EVENT interface whitelist, whose codec justification this decision re-homes); [ADR 0004](0004-numeric-wire-tolerance.md) (strict encode, permissive decode, kept hand-written and unchanged); [REQ-040](../../specifications/rm-modeling.md#type-registry-req-040) (the registry the dispatch hooks read).
 >
 > ## Context
 >
@@ -255,9 +255,9 @@ ADR 0002's Decision section runs D1 through D7 (`docs/adr/0002-bmm-codegen-decis
 > | `_type` on every concrete RM value | hand-rolled prologue in each generated `MarshalJSON` | a generated `MarshalJSONTo` calling `json.MarshalEncode` on an anonymous struct whose first field is `_type` and whose second embeds a method-free alias of the class |
 > | `_type` on a value held in an interface | `openehr/internal/jsonpoly` (80 lines, 177 call sites) | nothing. v2 calls a pointer-receiver marshaler regardless of addressability (`go doc encoding/json` § Migrating to v2) |
 > | Polymorphic dispatch at a substitutable slot | `typereg.DecodeAs[T]` called from each generated `UnmarshalJSON` | one `json.UnmarshalFromFunc` per polymorphic interface, built from `typereg.Default` at init and supplied through `json.WithUnmarshalers`. Every hook **MUST** pass `dec.Options()` into any nested decode, or a deeper interface slot silently loses its hook |
-> | Member order | struct field order, fixed by emission order | not a contract ([REQ-052](../specifications/wire.md#req-052)); `_type` first is a SHOULD, and `Hash` sorting is `json.Deterministic(true)` set by the generated marshaler |
+> | Member order | struct field order, fixed by emission order | not a contract ([REQ-052](../../specifications/wire.md#req-052)); `_type` first is a SHOULD, and `Hash` sorting is `json.Deterministic(true)` set by the generated marshaler |
 > | Zero versus omit | `omitempty` on every generated tag | `omitzero` on pointer fields; `omitempty` retained on container fields. See the warning below |
-> | Shape-failure classification (`canjson.ErrInvalidShape`) | `typereg.WrapShapeError` at each generated funnel | one shared runtime helper called by every generated `UnmarshalJSONFrom`, so 110 copies of the classification collapse into one. The sentinel's contract stays [REQ-052](../specifications/wire.md#req-052) § Decode-side shape sentinel, not this ADR's |
+> | Shape-failure classification (`canjson.ErrInvalidShape`) | `typereg.WrapShapeError` at each generated funnel | one shared runtime helper called by every generated `UnmarshalJSONFrom`, so 110 copies of the classification collapse into one. The sentinel's contract stays [REQ-052](../../specifications/wire.md#req-052) § Decode-side shape sentinel, not this ADR's |
 > | Nil-receiver refusal (REQ-025) | first statement of each generated `UnmarshalJSON` (`internal/bmmgen/render_jsonunmar.go:345`) | first statement of each generated `UnmarshalJSONFrom`, unchanged in force |
 >
 > The invariant D8 asserts: **no per-type JSON codec logic is generated into `openehr/rm/*_gen.go` or `openehr/aom/aom14/*_gen.go` beyond the two-method delegation above.**
@@ -274,11 +274,11 @@ Three edits to `docs/specifications/research-strands.md`. The strand's **Status*
 
 Add a row to the resolved sub-questions table (after `research-strands.md:57`):
 
-> | `encoding/json/v2` as the canonical-JSON codec; encoded member order is not a contract | Migrate to standard-library v2; retire the generator's per-type `MarshalJSON` / `UnmarshalJSON` and `openehr/internal/jsonpoly`; `_type` first becomes a SHOULD and round-trip fidelity is asserted semantically rather than byte-wise | [ADR 0021](../adr/0021-json-member-order-not-a-contract.md), [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) |
+> | `encoding/json/v2` as the canonical-JSON codec; encoded member order is not a contract | Migrate to standard-library v2; retire the generator's per-type `MarshalJSON` / `UnmarshalJSON` and `openehr/internal/jsonpoly`; `_type` first becomes a SHOULD and round-trip fidelity is asserted semantically rather than byte-wise | [ADR 0021](../../adr/0021-json-member-order-not-a-contract.md), [ADR 0022](../../adr/0022-canonical-json-encoding-json-v2.md) |
 
 Replace the two "Still open" bullets at `:61-62` (default codec benchmark, `encoding/json/v2` as a simplification axis) with one:
 
-> - **Codec performance against the standard-library baseline:** with the codec settled by [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md), the open question is no longer which codec but whether the migrated path is within budget for seeder and benchmark workloads, measured against the retired generated marshalers on `openehr/serialize/canjson/bench_test.go` rather than against `sonic` or `easyjson`. A regression is a plan task, not a codec fork.
+> - **Codec performance against the standard-library baseline:** with the codec settled by [ADR 0022](../../adr/0022-canonical-json-encoding-json-v2.md), the open question is no longer which codec but whether the migrated path is within budget for seeder and benchmark workloads, measured against the retired generated marshalers on `openehr/serialize/canjson/bench_test.go` rather than against `sonic` or `easyjson`. A regression is a plan task, not a codec fork.
 
 Replace the two `encoding/json/v2` evidence bullets at `:68-69` with:
 
@@ -293,7 +293,7 @@ Block shape follows `docs/specifications/traceability.yaml:123-134` (REQ-040) an
 ```yaml
   - id: REQ-052
     packages: [ … ]                                  # DROP openehr/internal/jsonpoly (line 140)
-    plans:    [ … , docs/plans/2026-09-14-json-v2-migration.md ]   # ADD
+    plans:    [ … , docs/plans/archive/2026-09-14-json-v2-migration.md ]   # ADD
     probes:   [PROBE-030, PROBE-031, PROBE-038]      # unchanged
     adrs:     [ … , docs/adr/0021-….md, docs/adr/0022-….md ]       # ADD both
     tests:
@@ -348,14 +348,18 @@ One rule falls out of the proofs and binds every hook the generator or the runti
 
 #### 1.2 Open questions
 
-| # | Question | How it is answered | Fallback if the answer is no |
-|---|---|---|---|
-| Q1 | Does an `UnmarshalFromFunc` keyed on `*DVOrdered` fire for `DVInterval[T].Lower` when `T` is instantiated as the interface, and stay quiet when `T` is concrete? | Throwaway program mirroring Brief A Proof 2b with a generic `DVInterval[T]`. `go doc encoding/json/v2.UnmarshalFromFunc` requires T to be an unnamed pointer or an interface type, which suggests the hook fires on the instantiated type, but the generic case was not exercised. Six `T` and one `*T` wire fields are affected | Keep a hand-written `UnmarshalJSONFrom` on `DVInterval[T]` that routes its bounds through `typereg.DecodeAs[T]`, as `openehr/rm/data_types_quantity_jsonunmar_gen.go:114-127` does today. This is the riskiest unknown in the plan |
-| Q2 | Does v2's composite error message prefix break the "message unchanged by the classification" clause at `docs/specifications/wire.md:119`, or can the SDK wrapper strip it? | Throwaway program plus the existing sentinel tests. Brief A Proof 3b recorded the composite form: `json: cannot unmarshal JSON object into Go main.Slot within "/slot": decode /slot: typereg: _type not in registry` | Reword the clause in Phase 0.2's error-type edit so it binds the SDK's own message text and leaves the decoder's prefix out of scope. No code change either way |
-| Q3 | Do the 204 JSON cassettes under `testkit/cassettes/` and the 34-body EHRbase FLAT corpus under `testkit/cassettes/flat-conformance/compositions/` decode under v2 defaults with zero duplicate-name and zero case-mismatch rejections? | One throwaway program over both corpora, run before any generator change | Set `jsontext.AllowDuplicateNames(true)` or `json.MatchCaseInsensitiveNames(true)` for the affected inputs and record the exception in REQ-052. A hit here also changes the duplicate-name sentence drafted in Phase 0.2 |
-| Q4 | Is `rm.Character`'s substituted-U+FFFD detector still reachable once `jsontext` refuses invalid UTF-8 first, and does the genuine-U+FFFD acceptance still hold? | The existing tests, run under v2: `openehr/rm/character_test.go:173` and `:451` (refusals), `:471` (genuine U+FFFD accepted), `:380-381` (the SDK's exact message strings) | Set `jsontext.AllowInvalidUTF8(true)` and keep `jsonLiteralSpellsReplacement` (`openehr/rm/character.go:72-109`) load-bearing on the JSON path. Otherwise accept the `jsontext` refusal, re-pin the message, and delete the JSON-side detector while leaving the XML value rule alone |
-| Q5 | Does `json.RejectUnknownMembers(true)`, if a consumer sets it, trip on the `_type` member reaching the method-free alias? | Throwaway program over the design sketch in Phase 2.1 | Give the alias an ignored `_type` field, or strip the member in the shared decode helper. Neither blocks the migration; the answer decides whether the option is usable by a consumer at all |
-| Q6 | Do the 13 mandatory container fields keep their `null` spelling with `json.FormatNilSliceAsNull(true)` and `json.FormatNilMapAsNull(true)`, and do the 53 pointer fields behave as intended under `omitzero` with the `DV_TEXT.mappings` pin unchanged? | The 13 fields are listed in Brief A section 1d (`openehr/rm/common_resource_jsonmar_gen.go:17`, `:29`, `:98`, `openehr/rm/resource_jsonmar_gen.go:13`, `openehr/rm/common_generic_jsonmar_gen.go:216`, `openehr/rm/demographic_jsonmar_gen.go:71`, `:203`, `:242`, `:311`, `:489`, `:554`, `openehr/aom/aom14/archetype_ontology_jsonmar_gen.go:13`, `:15`). Exercised by a new table test plus `mappings_presence_test.go:27` | Drop the two `FormatNil*` options and let the mandatory containers spell as `[]` and `{}`, which is arguably the better canonical spelling for a BMM-mandatory collection, and record it in REQ-052. The pointer-field half has no fallback: `omitzero` is the ruling, and container fields keep `omitempty` |
+Answered by Task 2's read-only spike (host toolchain `go1.27.1 linux/amd64`, scratch module, nothing in the repository touched). Every standard-library claim below cites a `go doc` symbol confirmed on the host.
+
+| # | Question | Answer | How it is answered | Fallback if the answer is no |
+|---|---|---|---|---|
+| Q1 | Does an `UnmarshalFromFunc` keyed on `*DVOrdered` fire for `DVInterval[T].Lower` when `T` is instantiated as the interface, and stay quiet when `T` is concrete? | Yes. The hook fires twice for an interface-bound interval and zero times for a concrete-bound one; the generic case needs no bespoke bound router (`go doc encoding/json/v2.UnmarshalFromFunc`) | Throwaway program mirroring Brief A Proof 2b with a generic `DVInterval[T]`. `go doc encoding/json/v2.UnmarshalFromFunc` requires T to be an unnamed pointer or an interface type, which suggests the hook fires on the instantiated type, but the generic case was not exercised. Six `T` and one `*T` wire fields are affected | Keep a hand-written `UnmarshalJSONFrom` on `DVInterval[T]` that routes its bounds through `typereg.DecodeAs[T]`, as `openehr/rm/data_types_quantity_jsonunmar_gen.go:114-127` does today. This is the riskiest unknown in the plan |
+| Q2 | Does v2's composite error message prefix break the "message unchanged by the classification" clause at `docs/specifications/wire.md:119`, or can the SDK wrapper strip it? | No hard break. The decoder wraps the SDK's message inside a `*json.SemanticError`, but `SemanticError.Err` recovers it verbatim and `errors.Is` still reaches the sentinel through the wrap; the plan's reword is adequate, and the boundary can strip the outer prefix if ever needed | Throwaway program plus the existing sentinel tests. Brief A Proof 3b recorded the composite form: `json: cannot unmarshal JSON object into Go main.Slot within "/slot": decode /slot: typereg: _type not in registry` | Reword the clause in Phase 0.2's error-type edit so it binds the SDK's own message text and leaves the decoder's prefix out of scope. No code change either way |
+| Q3 | Do the 204 JSON cassettes under `testkit/cassettes/` and the 34-body EHRbase FLAT corpus under `testkit/cassettes/flat-conformance/compositions/` decode under v2 defaults with zero duplicate-name and zero case-mismatch rejections? | Yes. All 204 files (the 34-body FLAT corpus included) decode clean with zero duplicate-name and zero case-mismatch rejections; a synthetic duplicate and a synthetic case-mismatch each proved both detectors fire, so the zero count is real | One throwaway program over both corpora, run before any generator change | Set `jsontext.AllowDuplicateNames(true)` or `json.MatchCaseInsensitiveNames(true)` for the affected inputs and record the exception in REQ-052. A hit here also changes the duplicate-name sentence drafted in Phase 0.2 |
+| Q4 | Is `rm.Character`'s substituted-U+FFFD detector still reachable once `jsontext` refuses invalid UTF-8 first, and does the genuine-U+FFFD acceptance still hold? | No, the refusal branch is unreachable: `jsontext` refuses invalid UTF-8 and a lone surrogate escape before `rm.Character` ever sees the value. Genuine U+FFFD still decodes. Route 2 (accept the `jsontext` refusal, re-pin the message, delete the JSON-side detector) was taken in Task 7; the XML value rule is untouched | The existing tests, run under v2: `openehr/rm/character_test.go:173` and `:451` (refusals), `:471` (genuine U+FFFD accepted), `:380-381` (the SDK's exact message strings) | Set `jsontext.AllowInvalidUTF8(true)` and keep `jsonLiteralSpellsReplacement` (`openehr/rm/character.go:72-109`) load-bearing on the JSON path. Otherwise accept the `jsontext` refusal, re-pin the message, and delete the JSON-side detector while leaving the XML value rule alone |
+| Q5 | Does `json.RejectUnknownMembers(true)`, if a consumer sets it, trip on the `_type` member reaching the method-free alias? | Yes, the alias declares no `_type` field so the option rejects it. The generated alias carries an ignored `_type` field so the option stays usable by a consumer at zero runtime cost | Throwaway program over the design sketch in Phase 2.1 | Give the alias an ignored `_type` field, or strip the member in the shared decode helper. Neither blocks the migration; the answer decides whether the option is usable by a consumer at all |
+| Q6 | Do the 13 mandatory container fields keep their `null` spelling with `json.FormatNilSliceAsNull(true)` and `json.FormatNilMapAsNull(true)`, and do the 53 pointer fields behave as intended under `omitzero` with the `DV_TEXT.mappings` pin unchanged? | Yes on both halves. `FormatNilSliceAsNull(true)`/`FormatNilMapAsNull(true)` restore the `null` spelling for mandatory containers; `omitzero` omits a nil pointer and emits a non-nil one (including a pointer to `""`); the `DV_TEXT.mappings` `omitempty` collapse holds unchanged with `FormatNilSliceAsNull(true)` also set | The 13 fields are listed in Brief A section 1d (`openehr/rm/common_resource_jsonmar_gen.go:17`, `:29`, `:98`, `openehr/rm/resource_jsonmar_gen.go:13`, `openehr/rm/common_generic_jsonmar_gen.go:216`, `openehr/rm/demographic_jsonmar_gen.go:71`, `:203`, `:242`, `:311`, `:489`, `:554`, `openehr/aom/aom14/archetype_ontology_jsonmar_gen.go:13`, `:15`). Exercised by a new table test plus `mappings_presence_test.go:27` | Drop the two `FormatNil*` options and let the mandatory containers spell as `[]` and `{}`, which is arguably the better canonical spelling for a BMM-mandatory collection, and record it in REQ-052. The pointer-field half has no fallback: `omitzero` is the ruling, and container fields keep `omitempty` |
+
+Task 2 also answered a seventh question the controller added mid-plan (R12): on Go 1.27, v1 `encoding/json.Marshal`/`Unmarshal` call `MarshalJSONTo`/`UnmarshalJSONFrom` on a type with only those methods, including a value or a pointer held in an interface field (`go doc encoding/json` § Migrating to v2). Yes, confirmed both directions. This is why the stay-on-v1 packages (Phase 3.4) still serialise the migrated RM types correctly, and why `CommitVersion` (Phase 3.3) could move to a `json.MarshalerTo` constraint instead of keeping a v1 shim (ruling R16).
 
 #### 1.3 The nets, built before anything changes
 
@@ -364,6 +368,8 @@ One rule falls out of the proofs and binds every hook the generator or the runti
 | Differential decode parity over the corpus: a new test decoding all 204 cassettes under both `encoding/json` and `encoding/json/v2` into the same generated types and comparing with `reflect.DeepEqual` | Seed one cassette copy with a key differing from its tag only by case. The test must report that cassette as divergent. If it reports none, the harness is not looking. This also answers Q3 |
 | Strengthen `TestEncodeHashKeysLexicographic` (`openehr/serialize/canjson/field_order_test.go:89`) so it is mutation-detectable under a randomised map order | As written it checks three keys in `author` and two in `other_details`; with v2's unsorted default a single encode lands sorted by luck roughly one time in six and one time in two. Widen to six or more keys, or encode 20 times and require every encode sorted. Then dropping `json.Deterministic(true)` from one generated method turns it red reliably |
 | Four new benchmarks so the baseline exists on both sides (listed in Phase 3.4) | A benchmark is not a guard; its control is `b.Fatalf` on a setup error, already the pattern at `openehr/serialize/canjson/bench_test.go:56` |
+
+**Corpus figure, corrected.** The "204 cassettes" above is the scanned count, not the compared count. Task 3's built net reports the corpus precisely: 204 scanned, 150 typed (carry a registered `_type`), 103 compared, 47 refused by both codecs identically (46 `submissions/*` CONTRIBUTION cassettes whose `versions[0]` resolves to `*rm.OriginalVersion[interface{}]`, plus one deliberately invalid fixture), and 54 skipped for having no usable `_type` (the FLAT and ITS-REST corpora, which are not canonical JSON). Zero cassettes diverged between the two packages. A can-fail control later showed this net is an *entry-point* parity net (both `encoding/json` and `encoding/json/v2` call the same generated method), not a codec-semantics differential; it stays meaningful after the migration because Go 1.27's `encoding/json` also honours `UnmarshalerFrom` (Q7).
 
 **Exit criterion:** Q1 to Q6 each carry a recorded yes or no in this plan, each no names its fallback, the differential harness is green over the corpus, and the strengthened `Hash` test fails when `Deterministic` is removed. Rollback: delete the added `_test.go` files. Nothing has shipped.
 
@@ -392,6 +398,8 @@ func (d *DVCodedText) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	return canjsonrt.DecodeInto(dec, "DV_CODED_TEXT", (*rawDVCodedText)(d))
 }
 ```
+
+**Correction (ruling R19).** The alias-only shape above is not universal. `type rawT T` promotes an embedded ancestor's own `MarshalJSONTo`/`UnmarshalJSONFrom` through Go method promotion, so for a class that embeds a marshaler-bearing concrete ancestor (nine direct embeds plus five more that embed one of those, fourteen classes in total: `AccessGroupRef`, `Attestation`, `DVCodedText`, `DVEHRURI`, `LocatableRef`, `OpenehrDefinitions`, `PartyRef`, `PartyRelated`, `TerminologyService`, and the five `Versioned*[T]` wrappers over `VersionedObject[T]`) the alias would silently emit the ancestor's `_type` and drop the subclass's own fields. Those fourteen classes take a flat wire struct instead, built from the same `effectiveFields` enumeration, with field copies both ways; every other concrete class keeps the zero-copy alias shown above. Both shapes call the same shared decode helper and the same encoder option join. Pinned by a registered-type census (`type_census_test.go`) that marshals every registered type's zero value and asserts the wire discriminator matches the registered name.
 
 The shared runtime helper, one copy for the whole tree, carries what 110 generated bodies carry today: the `_type` mismatch check, the `canjson: <RM_TYPE>:` prefix and the `typereg.WrapShapeError` classification.
 
@@ -426,6 +434,8 @@ Also in this task: `json.Deterministic(true)` in the generated marshalers, the `
 #### 2.2 `canjson` moves its entry points to v2
 
 `openehr/serialize/canjson/marshal.go:29,43` and `decode.go:98,112,132` are the four public entry points, roughly ten lines. `MarshalIndent` becomes `json.Marshal(v, jsontext.WithIndent(indent), jsontext.WithIndentPrefix(prefix))`; the `Decoder` wraps a `jsontext.Decoder`. The public API, the three sentinels and their `errors.Is` behaviour are unchanged. The package doc (`openehr/serialize/canjson/doc.go`) and the error-type prose at `decode.go:25,91,125,129` and `doc.go:67,101` are rewritten to match the amended REQ-052.
+
+**Correction (ruling R23).** The `MarshalIndent` expression above is literal and would panic: `jsontext`'s option validation rejects an indent or prefix containing any byte other than space or tab, where v1 accepted any byte. The shipped code guards the indent and prefix first and returns `canjson.ErrInvalidValue` before building the `jsontext` options, so a caller who previously relied on v1 accepting an arbitrary indent (for example `"\n"`) now gets an error instead of a panic. REQ-025 (no panics in library code) and the unchanged-public-API constraint outrank the plan's literal expression.
 
 Error classification, restated for v2:
 
@@ -556,7 +566,7 @@ No import changes here. `transport` keeps its v1 imports, and `transport.Decode`
 
 | Guard | Can-fail control |
 |---|---|
-| A 2xx body that will not decode is a `*transport.DecodeError` carrying the raw bytes (REQ-151, [ADR 0018](../adr/0018-raw-bytes-on-decode-error.md)) | `transport/decode_error_test.go`. Return the bare `canjson` error instead of building `&DecodeError{...}` at `transport/client.go:657`; the `Body` assertion must go red. `decode_error_test.go:137` asserts the wrapped type and is re-pinned to `*json.SemanticError` |
+| A 2xx body that will not decode is a `*transport.DecodeError` carrying the raw bytes (REQ-151, [ADR 0018](../../adr/0018-raw-bytes-on-decode-error.md)) | `transport/decode_error_test.go`. Return the bare `canjson` error instead of building `&DecodeError{...}` at `transport/client.go:657`; the `Body` assertion must go red. `decode_error_test.go:137` asserts the wrapped type and is re-pinned to `*json.SemanticError` |
 | An empty or `null` body is refused before decode | `transport/null_body_test.go` and `IsNoRepresentationBody` (`transport/body.go:18`). This matters more under v2, which always zeroes on a `null` where v1 sometimes no-ops (`json.MergeWithLegacySemantics` restores the old behaviour and is not used). Mutation: replace the call with `len(body) == 0`; the `null`-body case must go red |
 | `CommitVersion` still accepts every generated version type | `openehr/client/ehr/contribution/submission.go:51` constrains on `json.Marshaler`. Decide in this phase whether the constraint moves to `json.MarshalerTo` or the generated types keep a thin `MarshalJSON` beside the streaming one, and pin the decision with a compile-time assertion in the contribution package |
 
@@ -615,29 +625,42 @@ go test -run '^$' -bench . -benchmem -count=10 \
 benchstat /tmp/bench-v1.txt /tmp/bench-v2.txt
 ```
 
-Results, filled in when the phase runs:
+Results, from Task 9's like-for-like `-count=10` run (v1 at `90473f9f`, v2 at `93d06e1f`, both measured back to back on the same 13th Gen i7-13700H, WSL2, `go1.27.1`). Both columns are `-count=10` at the default one-second benchtime, so they are directly comparable with each other; the plan's pre-filled v1 column above came from a separate `-benchtime 200x` run at `d3e9d998` and reads a little differently for that reason (for example `EncodeDVQuantity` 1069 ns/op there against 749.4 ns/op in the like-for-like run), so the table below supersedes it. The Delta column is time/op (`sec/op`), the metric ruling R26 judges.
 
 | Benchmark | v1 ns/op | v2 ns/op | v1 allocs/op | v2 allocs/op | Delta |
 |---|---|---|---|---|---|
-| `BenchmarkEncodeComposition_400` | 2 920 117 | | 9 283 | | |
-| `BenchmarkDecodeComposition_400` | 6 038 604 | | 21 665 | | |
-| `BenchmarkEncodeDVQuantity` | 1 069 | | 6 | | |
-| `BenchmarkDecodeDVQuantity` | 1 515 | | 3 | | |
-| `BenchmarkDecodeCompositionCassette` | | | | | |
-| `BenchmarkRegistryDecodeElement` | | | | | |
-| `BenchmarkRegistryDecodeDVQuantity` | | | | | |
-| `BenchmarkFlatCorpusRoundTrip` | | | | | |
-| `BenchmarkMarshalFlat` | | | | | |
-| `BenchmarkUnmarshalFlat` | | | | | |
+| `BenchmarkEncodeComposition_400` | 2 936 000 | 1 532 000 | 9 281 | 16 444 | -47.82% |
+| `BenchmarkDecodeComposition_400` | 5 998 000 | 6 536 000 | 21 665 | 16 860 | +8.98% |
+| `BenchmarkEncodeDVQuantity` | 749.4 | 828.2 | 6 | 9 | +10.52% |
+| `BenchmarkDecodeDVQuantity` | 863.4 | 1 190.5 | 3 | 5 | +37.88% |
+| `BenchmarkDecodeCompositionCassette` | 5 293 000 | 3 266 000 | 6 279 | 5 220 | -38.30% |
+| `BenchmarkRegistryDecodeElement` | 5 520 | 6 284 | 29 | 39 | +13.84% |
+| `BenchmarkRegistryDecodeDVQuantity` | 1 652 | 1 962 | 9 | 18 | +18.80% |
+| `BenchmarkFlatCorpusRoundTrip` | 12 640 000 | 12 860 000 | 68 400 | 69 940 | +1.77% |
+| `BenchmarkMarshalFlat` | 128 200 | 134 300 | 1 103 | 1 193 | +4.73% |
+| `BenchmarkUnmarshalFlat` | 650 400 | 667 900 | 2 962 | 2 884 | +2.69% |
 
-The number worth watching is `allocs/op` on `BenchmarkDecodeComposition_400`: 21 665 allocations for one composition is largely the intermediate `[]byte` at every `MarshalJSON` and `UnmarshalJSON` boundary, and the streaming pair this plan adopts is what removes it. A regression is a plan task under STRAND-04's narrowed performance question, not a reason to reopen the codec choice.
+**R26 verdict, one line per benchmark** (material regression: v2 time/op worse than v1 by more than 20 percent at p < 0.05; every p-value below is 0.000 to 0.007, all below the 0.05 bar):
+
+- `BenchmarkEncodeComposition_400`: within threshold (-47.82%, an improvement).
+- `BenchmarkDecodeComposition_400`: within threshold (+8.98%).
+- `BenchmarkEncodeDVQuantity`: within threshold (+10.52%).
+- `BenchmarkDecodeDVQuantity`: **material regression** (+37.88%). The smallest decode payload, where the fixed per-call overhead of the `DecodeInto` buffer-peek-unmarshal path (three passes per nesting level) dominates; allocations rise from 3 to 5. Named follow-up, not a codec change: read the discriminator from the declared wire field instead of `peekType`.
+- `BenchmarkDecodeCompositionCassette`: within threshold (-38.30%, an improvement).
+- `BenchmarkRegistryDecodeElement`: within threshold (+13.84%).
+- `BenchmarkRegistryDecodeDVQuantity`: within threshold (+18.80%).
+- `BenchmarkFlatCorpusRoundTrip`: within threshold (+1.77%).
+- `BenchmarkMarshalFlat`: within threshold (+4.73%).
+- `BenchmarkUnmarshalFlat`: within threshold (+2.69%).
+
+The number the plan flagged to watch went the intended direction: `BenchmarkDecodeComposition_400` allocations dropped from 21 665 to 16 860 (-22.18%) and its bytes from 2 703 KiB to 1 016 KiB (-62.40%), the streaming pair removing the intermediate `[]byte` at each marshal and unmarshal boundary as designed. The large real-payload paths improve on every axis at once: `EncodeComposition_400` -47.82% time and -57.12% bytes; `DecodeCompositionCassette` -38.30% time, -88.01% bytes and 62.11% higher throughput. The cost lands entirely on the tiny leaf values, where one benchmark of ten crosses the R26 line: `BenchmarkDecodeDVQuantity`, +37.88 percent, a follow-up rather than a reason to reopen the codec choice.
 
 ### Phase 4: close-out
 
 | Task | Detail |
 |---|---|
 | Roadmap row | `docs/roadmap.md:59` still reads "Deterministic encode profile as the SDK's own output contract, order-agnostic decode, and byte-stable `_type` round-trips". Rewrite it: the codec is `encoding/json/v2`, `_type` first is a recommendation, decode is order-agnostic, and round-trip fidelity is asserted semantically (PROBE-030/031/038). The `Real` 17-significant-digit sentence in the same row is unchanged. This row is one of the two indexes `make spec-check` cannot see |
-| REQ.md Impl. column | `docs/specifications/REQ.md:51` stays `landed` (Phase 0.10). REQ-040 and REQ-053 stay `landed`. No numbering band moves: this plan allocates no new REQ id, so the band table in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy) is untouched, which is the second index the gate cannot see |
+| REQ.md Impl. column | `docs/specifications/REQ.md:51` stays `landed` (Phase 0.10). REQ-040 and REQ-053 stay `landed`. No numbering band moves: this plan allocates no new REQ id, so the band table in [REQ.md § Numbering policy](../../specifications/REQ.md#numbering-policy) is untouched, which is the second index the gate cannot see |
 | STRAND-04 | The codec sub-question is marked resolved by ADR 0021 and ADR 0022 (Phase 0.8). The strand stays **Partially resolved**: the full RM inventory and validation independence are untouched |
 | CHANGELOG | Queue the `### Changed` bullet from the Definition of Done for the release that ships this. Following the live precedent at `CHANGELOG.md:11`, which already carries a `### Changed` section under `## [Unreleased]`. `AGENTS.md:67` says pre-1.0 entries are `### Added` only; that wording question is a maintainer item outside this plan, and `AGENTS.md` is not edited here |
 | Consumer note | The consuming CDR project needs the four facts the CHANGELOG bullet compresses: encoded bytes differ from v0.27.x and any stored hash or byte-compared snapshot of SDK output must be recomputed; the SDK's own sentinels keep their identity and `errors.Is` behaviour while the standard-library error types beneath them change; decode is stricter on invalid UTF-8, a lone surrogate escape and duplicate member names; and the packages that did not move, listed in Phase 3.4, behave exactly as before |
@@ -645,15 +668,43 @@ The number worth watching is `allocs/op` on `BenchmarkDecodeComposition_400`: 21
 
 **Verification:** `make spec-check` prints `spec-check: OK`, and `make ci` passes. `make ci` runs `fmt-check mod-tidy-check vet test lint spec-check flat-conformance-verify terminology-verify build` (`Makefile:428`), and `make test` runs `codegen-verify` first (`Makefile:192`), so any generator change not followed by `make codegen` fails the gate immediately.
 
+### Close-out facts
+
+- **Removed line counts.** Task 4's generator rewrite and regeneration (`90473f9f..cc2ceaf2`) net -7 629 lines: 131 files changed, 6 256 insertions, 13 885 deletions. The `make codegen` regeneration commit alone removed 13 136 lines across 104 files (110 rm and 29 aom `MarshalJSON`/`UnmarshalJSON` method pairs and their generator templates), including the 214-line `openehr/internal/jsonpoly` package (`jsonpoly.go` 80 lines, `jsonpoly_test.go` 134 lines). Task 6 re-homed `jsonpoly`'s test assertions into `openehr/serialize/canjson/polymorphic_encode_test.go` (1 file, +186/-2) once Task 4 had already deleted the package; no further deletion was needed there.
+- **Value-receiver fact.** `MarshalJSONTo` is generated with a value receiver (ADR 0002 D8, ADR 0022) because v1 entry points skip a pointer-receiver marshal method on an unaddressable value obtained from an interface (`json.CallMethodsWithLegacySemantics`, the default for `encoding/json.Marshal`); v2 has no such restriction either way. Without the value receiver, a concrete value (not a pointer) held in a `DVTextLike`-typed field would silently drop its `_type` under a v1 caller, reproducing the exact defect `jsonpoly` existed to route around.
+- **Work outside the plan's scope, exposed by the probe rewrite.** Task 8's PROBE-030 rewrite (Phase 3.1) surfaced a pre-existing gap in `openehr/validation/rmread`: `readActionSingle` read only the ENTRY-level attributes, so `ValidateRM` reported `ACTION.time` and `ACTION.ism_transition` (both RM-mandatory) as absent on every well-formed ACTION. `openehr/validation` is outside this plan's Phase 2 scope, but the fix is three switch arms in one file (`read.go`) with its own table test, so it landed in Task 8's fix round (ruling R27) rather than being routed around with a per-cassette exclusion list.
+
+### Rulings recorded during implementation (Tasks 4 to 9)
+
+Rendered in this plan's own shape: what, why, cost if wrong. Full detail and evidence sit in each task's own report; this transcribes the substance the maintainer needs on the plan itself.
+
+- **R19, hybrid generator shape:** classes with no marshaler-bearing embedded ancestor get the zero-copy alias; the 14 that embed one (nine direct embeds plus five `Versioned*[T]` wrappers) get a flat wire struct built from `effectiveFields`, because the alias would otherwise promote the ancestor's `_type` and drop the subclass's fields. Pinned by a registered-type census (`canjson/type_census_test.go`) marshalling every registered type's zero value and checking the wire discriminator. Cost if wrong: a second generator template to maintain; reverting to a uniform flat shape is a generator-only change plus `make codegen`.
+- **R20, `jsonpoly` deletion timing:** Task 4's generator rewrite deleted `openehr/internal/jsonpoly` as part of the same change (the generator no longer emits its call sites, so it became dead code inside that task), narrowing Task 6 to re-homing the test table rather than performing the deletion itself. Cost if wrong: none; the deletion is what Task 6 would have done anyway.
+- **R21/R26, the `DecodeInto` three-pass structure and the benchmark threshold:** `DecodeInto` buffers, peeks and unmarshals each subtree, three passes per nesting level; this was deferred to Task 9's benchmarks rather than fixed inline. A benchmark counts as a material regression when v2 time/op is worse than the v1 baseline by more than 20 percent at p < 0.05; only `BenchmarkDecodeDVQuantity` (+37.88 percent) crosses that line, and it becomes a named follow-up (read the discriminator from the declared wire field instead of `peekType`) rather than a fix in this plan. Cost if wrong: a slower small-value decode ships until the follow-up lands; the threshold itself is a judgment call the maintainer can tighten with the measured numbers in hand.
+- **R22, two CHANGELOG bullets:** the Go type-surface break (`MarshalerTo`/`UnmarshalerFrom` replacing the v1 pair, `*JSONMarshaller` wire types removed, `CommitVersion` requiring `json.MarshalerTo`, map-held RM values carrying `_type`) is a separate artefact class from the wire-bytes bullet the Definition of Done already names, so it gets its own one-sentence `### Changed` bullet rather than being folded into the first. Cost if wrong: the maintainer deletes one bullet at release cut.
+- **R23, `MarshalIndent` refuses instead of panicking:** the plan's literal Phase 2.2 expression (`json.Marshal(v, jsontext.WithIndent(indent), jsontext.WithIndentPrefix(prefix))`) would panic on a non-space/tab indent or prefix, because `jsontext`'s option validation is stricter than v1's. The shipped code guards first and returns `canjson.ErrInvalidValue`. Cost if wrong: a consumer who relied on v1 accepting an arbitrary indent byte now gets an error instead of a panic, which is the safer failure mode.
+- **R24, the wire.md TERM_MAPPING.match sentence:** the tokenizer's refusal of invalid UTF-8 and a lone surrogate escape is malformed input carrying no SDK sentinel, cross-referenced to the malformed-JSON exclusion bullet; refusals `rm.Character` itself raises keep `ErrInvalidShape`. Amended in Task 5's fix round rather than deferred, because the spec must not contradict a green test on the branch for a whole task. Cost if wrong: one sentence re-edited by a later task.
+- **R25, controller-applied mechanical fixes:** punctuation-only review findings (stray em dashes in comments, a commit subject misattributing work another task already did) were applied directly by the controller in the worktree and verified deterministically (grep, `gofmt`, a focused test run), instead of a full fix-round dispatch and re-review. Cost if wrong: none material; the final whole-branch review sees the file again.
+- **R27, the ACTION reader fix replaces a per-cassette exclusion list:** PROBE-030's floor-gate exclusion list (three cassettes) was replaced by fixing the gap it worked around (`readActionSingle` gains `time`, `ism_transition` and `instruction_details`, with a table test), so the probe gates every ACTION-bearing cassette instead of skipping the ones that would have failed. One genuine finding survives as a floor-leg-only hold-out: `clinical_notes.v0.json` carries an empty `action_archetype_id` in vendored content, not something this plan edits. Cost if wrong: a test pinning a specific finding count on an ACTION-bearing cassette may need re-pinning; the risk was judged small (three switch arms, one file) against the alternative of a probe that gates only the cassettes that already pass.
+- **R28, the ACTION reader fix gets its own CHANGELOG bullet:** because it changes `ValidateRM`'s consumer-visible findings (an ACTION no longer reports two mandatory attributes as missing), it is not folded silently into another bullet. Cost if wrong: the maintainer deletes one bullet at release cut.
+
+### Follow-ups
+
+- The generated decode helper (`openehr/rm/typereg/streaming.go`) re-joins the SDK's hook aggregate once per nesting level when a caller passes `WithUnmarshalers`, which is linear per level and quadratic over a path (bounded by the depth guard); correctness is intact, only the cache is lost on that path. The same helper's pointer check for a caller's own hooks does not cover the `WithUnmarshalers(nil)` case explicitly.
+- Pre-existing em dashes remain in `openehr/serialize/canjson/decode_test.go` and `openehr/serialize/canjson/doc.go` passages no task in this plan rewrote.
+- The CONTRIBUTION decode gap (ruling R17): `versions[0]` into `*rm.OriginalVersion[interface{}]` fails to resolve a concrete type, so 46 `submissions/*` cassettes are refused by both `encoding/json` and `encoding/json/v2` alike. Pre-existing and outside this plan; both codecs agree, so it is not a parity problem, but nothing else in the suite names it.
+- `BenchmarkDecodeDVQuantity` is a material regression under ruling R26 (+37.88 percent time/op): read the discriminator from the declared wire field instead of `peekType`, which would remove the extra buffer-peek-unmarshal pass on the smallest decode payloads.
+- `clinical_notes.v0.json` (vendored content) carries an empty `action_archetype_id` and is held out of PROBE-030's floor leg only (the polymorphic round-trip leg still runs it); the RM floor genuinely cannot validate that cassette as it stands.
+
 ## Mapping to specs
 
-- [wire.md § REQ-052](../specifications/wire.md#req-052): the normative contract for canonical JSON (the member-order clause, the decode-side shape sentinel, the encode-side refusal sentinel, and the floating-point precision section)
-- [wire.md § REQ-053](../specifications/wire.md#req-053): FLAT and STRUCTURED, whose codecs stay on `encoding/json` v1 in this plan
-- [rm-modeling.md § Type registry (REQ-040)](../specifications/rm-modeling.md#type-registry-req-040): the registry the polymorphic dispatch hooks read
-- [clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor): the reference-model floor the rewritten PROBE-030 asserts
-- [transport.md § REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure): the typed 2xx decode failure, re-pinned but not amended
-- [conformance.md § PROBE-030](../specifications/conformance.md#probe-030--canonical-json-round-trip) and [§ PROBE-038](../specifications/conformance.md#probe-038--rm-polymorphic-decode-coverage): the two probes rewritten
-- [research-strands.md § STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance): the strand whose codec sub-question this closes
-- [ADR 0002](../adr/0002-bmm-codegen-decisions.md): codegen policy, amended with D8
-- [ADR 0003](../adr/0003-rm-event-polymorphism.md), [ADR 0004](../adr/0004-numeric-wire-tolerance.md), [ADR 0018](../adr/0018-raw-bytes-on-decode-error.md): unchanged, and each named where the migration could have disturbed it
-- [REQ.md](../specifications/REQ.md): registry rows for REQ-040, REQ-052 and REQ-053
+- [wire.md § REQ-052](../../specifications/wire.md#req-052): the normative contract for canonical JSON (the member-order clause, the decode-side shape sentinel, the encode-side refusal sentinel, and the floating-point precision section)
+- [wire.md § REQ-053](../../specifications/wire.md#req-053): FLAT and STRUCTURED, whose codecs stay on `encoding/json` v1 in this plan
+- [rm-modeling.md § Type registry (REQ-040)](../../specifications/rm-modeling.md#type-registry-req-040): the registry the polymorphic dispatch hooks read
+- [clinical-modeling.md § REQ-112](../../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor): the reference-model floor the rewritten PROBE-030 asserts
+- [transport.md § REQ-151](../../specifications/transport.md#req-151--typed-2xx-decode-failure): the typed 2xx decode failure, re-pinned but not amended
+- [conformance.md § PROBE-030](../../specifications/conformance.md#probe-030--canonical-json-round-trip) and [§ PROBE-038](../../specifications/conformance.md#probe-038--rm-polymorphic-decode-coverage): the two probes rewritten
+- [research-strands.md § STRAND-04](../../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance): the strand whose codec sub-question this closes
+- [ADR 0002](../../adr/0002-bmm-codegen-decisions.md): codegen policy, amended with D8
+- [ADR 0003](../../adr/0003-rm-event-polymorphism.md), [ADR 0004](../../adr/0004-numeric-wire-tolerance.md), [ADR 0018](../../adr/0018-raw-bytes-on-decode-error.md): unchanged, and each named where the migration could have disturbed it
+- [REQ.md](../../specifications/REQ.md): registry rows for REQ-040, REQ-052 and REQ-053
