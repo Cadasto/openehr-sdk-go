@@ -20,6 +20,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
 // systolicPath is the DV_QUANTITY leaf under the vital_signs
@@ -113,8 +114,8 @@ func TestExternalBuildRoundTrip(t *testing.T) {
 		}
 	}
 
-	// (c) canonical idempotence: once decoded, encode→decode→encode is
-	// byte-stable.
+	// (c) canonical idempotence: once decoded, encode->decode->encode is
+	// wire-equivalent (member order is not a contract, REQ-052).
 	var decoded2 rm.Composition
 	if err := canjson.Unmarshal(second, &decoded2); err != nil {
 		t.Fatalf("canjson.Unmarshal (second): %v", err)
@@ -123,8 +124,8 @@ func TestExternalBuildRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("canjson.Marshal (third): %v", err)
 	}
-	if !bytes.Equal(second, third) {
-		t.Errorf("canonical form not idempotent across round-trips:\n second = %s\n third  = %s", second, third)
+	if ok, diff := wireequiv.Equivalent(second, third); !ok {
+		t.Errorf("canonical form not idempotent across round trips: %s\n second = %s\n third  = %s", diff, second, third)
 	}
 }
 

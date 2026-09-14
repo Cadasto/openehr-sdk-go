@@ -137,13 +137,13 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/cassettes, testkit/fixtures]
+    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/cassettes, testkit/fixtures, testkit/wireequiv]
     plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md, docs/plans/2026-09-14-json-v2-migration.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md, docs/adr/0021-json-member-order-not-a-contract.md, docs/adr/0022-canonical-json-encoding-json-v2.md]
     tests:
       - openehr/rm/quoted_literal_test.go
-      - openehr/serialize/canjson/field_order_test.go
+      - openehr/serialize/canjson/member_order_test.go
       - openehr/serialize/canjson/encode_test.go
       - openehr/serialize/canjson/marshal_sentinel_test.go
       - openehr/serialize/canjson/roundtrip_test.go
@@ -160,6 +160,7 @@ requirements:
       - openehr/rm/real_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canjson/multimedia_bytes_test.go
+      - testkit/wireequiv/wireequiv_test.go
     notes: >-
       partial (2026-09-02): the encode-side refusal sentinel clause
       requires canjson.Marshal / MarshalIndent to wrap the encode-only

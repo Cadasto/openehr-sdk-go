@@ -9,13 +9,15 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
 // REQ-052 § Field order: the decoder MUST accept members in any order,
 // `_type` included — JSON member order carries no meaning (RFC 8259 § 4)
 // and servers differ in the order they emit. A permuted spelling, with
 // `_type` last at every level, decodes to the same value as the canonical
-// spelling and re-encodes to the same bytes.
+// spelling and re-encodes to a wire-equivalent document (member order is
+// not a contract, REQ-052).
 func TestDecodeAcceptsAnyMemberOrder(t *testing.T) {
 	const canonical = `{"_type":"DV_CODED_TEXT","value":"x","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"532"}}`
 	const permuted = `{"defining_code":{"code_string":"532","terminology_id":{"value":"openehr","_type":"TERMINOLOGY_ID"},"_type":"CODE_PHRASE"},"value":"x","_type":"DV_CODED_TEXT"}`
@@ -38,15 +40,15 @@ func TestDecodeAcceptsAnyMemberOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode permuted: %v", err)
 	}
-	if !bytes.Equal(ea, eb) {
-		t.Fatalf("re-encode differs by input order:\n %s\n %s", ea, eb)
+	if ok, diff := wireequiv.Equivalent(ea, eb); !ok {
+		t.Fatalf("re-encodes of the two member orderings are not wire-equivalent: %s\n %s\n %s", diff, ea, eb)
 	}
 	// The exact-canonical-spelling assertion is withdrawn (ruling R7): JSON
 	// member order carries no meaning (RFC 8259 § 4, REQ-052), and the streaming
-	// encoder emits fields in struct-declaration order — `defining_code`'s
+	// encoder emits fields in struct-declaration order, `defining_code`'s
 	// members in a different order than this literal. What the rule pins is
-	// order-insensitive decode (the DeepEqual above) and deterministic
-	// re-encode (bytes.Equal above), not a fixed member order.
+	// order-insensitive decode (the DeepEqual above) and a wire-equivalent
+	// re-encode (the wireequiv check above), not a fixed member order.
 }
 
 // The polymorphic half of the same rule: `_type` read from the last
@@ -67,20 +69,18 @@ func TestDecodePolymorphicSlotWithTypeLast(t *testing.T) {
 	if !reflect.DeepEqual(a, b) {
 		t.Fatalf("slot dispatch depends on _type position:\n first %+v\n last  %+v", a, b)
 	}
-	ea, err := canjson.Marshal(&a)
-	if err != nil {
-		t.Fatalf("encode: %v", err)
-	}
 	eb, err := canjson.Marshal(&b)
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	// The full slot spelling, `_type` leading, so an encoder that wrote the
-	// discriminator anywhere but first inside the slot would fail here even
-	// with both encodes equal to each other.
+	// The full slot spelling, `_type` leading: an encoder that wrote the
+	// discriminator anywhere but first inside the slot would fail here. Byte
+	// equality of the two re-encodes is not asserted (member order is not a
+	// contract, REQ-052); what this pins is the `_type`-first SHOULD witness at
+	// a substitutable slot.
 	const slot = `"value":{"_type":"DV_QUANTITY","magnitude":120,"units":"mm[Hg]"}`
-	if !bytes.Equal(ea, eb) || !strings.Contains(string(eb), slot) {
-		t.Fatalf("re-encode differs by _type position or the slot is not the canonical spelling:\n %s\n %s", ea, eb)
+	if !strings.Contains(string(eb), slot) {
+		t.Fatalf("the slot is not the canonical `_type`-first spelling:\n %s", eb)
 	}
 }
 
