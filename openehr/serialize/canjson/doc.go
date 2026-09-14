@@ -158,7 +158,7 @@
 //     malformed JSON above. On rm.Real only the precision refusal carries
 //     the sentinel; on rm.Integer none does. An empty input carries no
 //     sentinel on any of the three, and neither does a strconv or
-//     encoding/json parse or range failure beneath rm.Real or rm.Integer
+//     encoding/json/v2 parse or range failure beneath rm.Real or rm.Integer
 //     (the precedence rule wire.md § REQ-052 states), and those causes
 //     stay reachable with errors.AsType. A nil receiver on any of them, as
 //     on every generated type, is a typereg.ErrNilReceiver error (REQ-025).

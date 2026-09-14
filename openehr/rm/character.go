@@ -48,7 +48,7 @@ var (
 // MarshalText) so the five cannot drift apart. The returned error
 // carries the value-free reason alone (REQ-093); each caller adds its
 // own "rm.Character: " prefix, and only the decode callers classify it
-// with typereg.ErrInvalidShape (see classifyShape).
+// with typereg.ErrInvalidShape (see typereg.ClassifyShape).
 //
 // Every code point passes, U+FFFD included: the BASE Character
 // primitive excludes none, so refusing one here would make a legal
@@ -88,7 +88,7 @@ func characterFault(s string) error {
 // bare-Character decode classifies the way the generated TERM_MAPPING funnel
 // would (REQ-052 § Decode-side shape sentinel). The classification rides on
 // errors.Is and leaves the message and the cause untouched (see
-// classifyShape), so the codec's own error stays both readable and
+// typereg.ClassifyShape), so the codec's own error stays both readable and
 // reachable with errors.AsType. The encode direction deliberately stays
 // outside that sentinel — canjson attaches its own encode-only
 // ErrInvalidValue there.
@@ -114,10 +114,10 @@ func (c *Character) UnmarshalJSON(b []byte) error {
 		// reach characterFault (ruling R15).
 		var s string
 		if err := json.Unmarshal(b, &s); err != nil {
-			return classifyShape(fmt.Errorf("rm.Character: %w", err))
+			return typereg.ClassifyShape(fmt.Errorf("rm.Character: %w", err))
 		}
 		if err := characterFault(s); err != nil {
-			return classifyShape(fmt.Errorf("rm.Character: %w", err))
+			return typereg.ClassifyShape(fmt.Errorf("rm.Character: %w", err))
 		}
 		*c = Character(s)
 		return nil
@@ -132,10 +132,10 @@ func (c *Character) UnmarshalJSON(b []byte) error {
 	// refused rather than silently mapped to U+0000 or U+FFFD.
 	var n rune
 	if err := json.Unmarshal(b, &n); err != nil {
-		return classifyShape(fmt.Errorf("rm.Character: %w", err))
+		return typereg.ClassifyShape(fmt.Errorf("rm.Character: %w", err))
 	}
 	if n == 0 || !utf8.ValidRune(n) {
-		return classifyShape(errors.New("rm.Character: number is not a usable code point"))
+		return typereg.ClassifyShape(errors.New("rm.Character: number is not a usable code point"))
 	}
 	// Past that gate string(n) is one valid UTF-8 rune by construction, so
 	// characterFault has nothing left to add. 65533 is accepted here: a

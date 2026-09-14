@@ -367,7 +367,7 @@ func TestCharacterNilReceiverIsRefusedNotPanicked(t *testing.T) {
 // reachable through unwrapping". The sentinel therefore cannot ride on a
 // fmt.Errorf("%w: %w") wrap, which splices the sentinel's own text
 // ("canjson: invalid JSON shape") into Error(); it rides on Is instead
-// (see shapeClassified in shape_classified.go).
+// (see typereg.ClassifyShape).
 //
 // The discriminating facet is the exact text: a classified error reads
 // exactly as its cause, so errors.Unwrap(err).Error() == err.Error().
@@ -375,16 +375,28 @@ func TestCharacterDecodeRefusalMessageUnchangedByClassification(t *testing.T) {
 	cases := []struct {
 		name string
 		in   []byte
-		want string
+		// want is the exact message for a refusal rm.Character spells itself.
+		// wantContains is used instead for a tokenizer refusal, whose text is
+		// jsontext's own and carries an offset that would make an exact pin
+		// brittle across inputs and Go versions; that row asserts a stable
+		// fragment plus the "unchanged by the classification" property.
+		want         string
+		wantContains string
 	}{
-		{"empty string", []byte(`""`), "rm.Character: must be exactly one character, got 0"},
-		{"two characters", []byte(`"=="`), "rm.Character: must be exactly one character, got 2"},
+		{"empty string", []byte(`""`), "rm.Character: must be exactly one character, got 0", ""},
+		{"two characters", []byte(`"=="`), "rm.Character: must be exactly one character, got 2", ""},
 		// Under encoding/json/v2 the tokenizer refuses these two forms while
 		// decoding the string, before characterFault runs (ruling R15), so the
 		// message is jsontext's own, still behind rm.Character's prefix.
-		{"raw invalid UTF-8 byte", []byte{'"', 0xff, '"'}, "rm.Character: jsontext: invalid UTF-8 after offset 1"},
-		{"substituted surrogate escape", []byte(`"\uD800"`), "rm.Character: jsontext: invalid surrogate pair `\\uD800\"` in string after offset 1"},
-		{"unusable code point", []byte("0"), "rm.Character: number is not a usable code point"},
+		// TestTermMappingMatchSubstitutedSurrogateRefusedThroughFunnel pins the
+		// same bytes through the canjson funnel, where they carry NO sentinel:
+		// there the codec validates the whole document before any decode runs,
+		// while on this direct call the tokenizer runs inside rm.Character,
+		// whose string arm classifies the refusal, so the two tests answer the
+		// ErrInvalidShape question oppositely and both correctly.
+		{"raw invalid UTF-8 byte", []byte{'"', 0xff, '"'}, "", "invalid UTF-8"},
+		{"substituted surrogate escape", []byte(`"\uD800"`), "", "invalid surrogate pair"},
+		{"unusable code point", []byte("0"), "rm.Character: number is not a usable code point", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -393,8 +405,24 @@ func TestCharacterDecodeRefusalMessageUnchangedByClassification(t *testing.T) {
 			if err == nil {
 				t.Fatalf("UnmarshalJSON(%s) = nil error, want a refusal", tc.in)
 			}
-			if got := err.Error(); got != tc.want {
-				t.Errorf("UnmarshalJSON(%s) err = %q, want %q", tc.in, got, tc.want)
+			got := err.Error()
+			if tc.want != "" {
+				if got != tc.want {
+					t.Errorf("UnmarshalJSON(%s) err = %q, want %q", tc.in, got, tc.want)
+				}
+			} else {
+				if !strings.HasPrefix(got, "rm.Character: ") || !strings.Contains(got, tc.wantContains) {
+					t.Errorf("UnmarshalJSON(%s) err = %q, want it to start with %q and contain %q", tc.in, got, "rm.Character: ", tc.wantContains)
+				}
+				// The classification adds a sentinel, not a word of text, so the
+				// cause reads exactly as the classified error (REQ-052).
+				cause := errors.Unwrap(err)
+				if cause == nil {
+					t.Fatalf("UnmarshalJSON(%s): errors.Unwrap = nil; the cause must stay reachable", tc.in)
+				}
+				if cause.Error() != got {
+					t.Errorf("UnmarshalJSON(%s): classified err = %q but its cause reads %q; the classification must not change the message", tc.in, got, cause.Error())
+				}
 			}
 			if !errors.Is(err, typereg.ErrInvalidShape) {
 				t.Errorf("UnmarshalJSON(%s) err = %v; want errors.Is(err, typereg.ErrInvalidShape)", tc.in, err)

@@ -219,7 +219,7 @@ func TestRealUnmarshalJSONParseBeforeDigitPolicy(t *testing.T) {
 // classification adds a sentinel, not a word of text. The old
 // fmt.Errorf("%w: %w") form spliced the sentinel's own prose
 // ("canjson: invalid JSON shape") into Error(); the sentinel now rides
-// on Is (see shapeClassified).
+// on Is (see typereg.ClassifyShape).
 //
 // The message text is also pinned honest (REQ-052 / REQ-093): the budget
 // counts significant digits, so it may not claim the value is

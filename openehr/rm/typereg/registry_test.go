@@ -1,6 +1,8 @@
 package typereg
 
 import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"errors"
 	"strings"
 	"testing"
@@ -67,6 +69,46 @@ func TestDecodeMissingType(t *testing.T) {
 	_, err := r.Decode([]byte(`{}`))
 	if err == nil {
 		t.Fatal("expected error for missing _type")
+	}
+}
+
+// TestDecodeNonObjectRefusedAtPeek pins that a value that is not a JSON
+// object is refused at the _type peek. It carries no SDK sentinel: the peek
+// surfaces encoding/json/v2's own shape error (a *json.SemanticError), which
+// is distinct from ErrMissingType, the sentinel for an object that simply
+// lacks the discriminator. Mutation: feed a valid object instead of the
+// array and the *json.SemanticError assertion goes red.
+func TestDecodeNonObjectRefusedAtPeek(t *testing.T) {
+	r := NewRegistry()
+	_, err := r.Decode([]byte(`[1,2,3]`))
+	if err == nil {
+		t.Fatal("expected error for a non-object input")
+	}
+	if _, ok := errors.AsType[*json.SemanticError](err); !ok {
+		t.Errorf("err = %v (%T); want the peek's *encoding/json/v2.SemanticError reachable", err, err)
+	}
+	if errors.Is(err, ErrMissingType) {
+		t.Errorf("err = %v; a non-object is a shape failure at the peek, not a missing discriminator", err)
+	}
+}
+
+// TestDecodeDuplicateTypeRefusedAtPeek pins that a duplicate `_type` member
+// is refused at the peek by the v2 tokenizer, which rejects duplicate object
+// member names (RFC 8259 § 4). The refusal carries jsontext.ErrDuplicateName
+// and, unlike the canjson entry point, NO ErrInvalidShape: the registry does
+// not classify a tokenizer refusal as a shape error. Mutation: drop one of
+// the two `_type` members and the ErrDuplicateName assertion goes red.
+func TestDecodeDuplicateTypeRefusedAtPeek(t *testing.T) {
+	r := NewRegistry()
+	_, err := r.Decode([]byte(`{"_type":"A","_type":"B"}`))
+	if err == nil {
+		t.Fatal("expected error for a duplicate _type member")
+	}
+	if !errors.Is(err, jsontext.ErrDuplicateName) {
+		t.Errorf("err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
+	}
+	if errors.Is(err, ErrInvalidShape) {
+		t.Errorf("err = %v; the registry peek does not classify a tokenizer refusal as a shape error", err)
 	}
 }
 
