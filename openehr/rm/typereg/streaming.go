@@ -90,20 +90,30 @@ func Unmarshalers() json.Options {
 	return json.WithUnmarshalers(aggregateUnmarshalers())
 }
 
-// MarshalOptions returns the encode options every generated MarshalJSONTo
-// joins on top of the encoder's own options: json.Deterministic(true) so a
-// map (openEHR Hash) emits its keys in lexicographic order (REQ-052), and
-// FormatNilSliceAsNull / FormatNilMapAsNull so a mandatory nil container keeps
-// its v1 "null" spelling instead of v2's default "[]" / "{}" (Q6). The three
-// are joined afresh in every method so the spelling holds no matter which
-// package (v1 or v2, canonical or a stay-on-v1 caller) drives the encode.
-func MarshalOptions(enc *jsontext.Encoder) json.Options {
+// EncodeOptions returns the encoder-independent canonical-JSON encode option
+// set: json.Deterministic(true) so a map (openEHR Hash) emits its keys in
+// lexicographic order (REQ-052), and FormatNilSliceAsNull / FormatNilMapAsNull
+// so a mandatory nil container keeps its "null" spelling instead of v2's
+// default "[]" / "{}" (Q6). It is the single home for these three options: an
+// entry point with no encoder in hand (canjson.Marshal / MarshalIndent) joins
+// it directly, and [MarshalOptions] joins it on top of an encoder's own
+// options. The set is rebuilt afresh on every call so the spelling holds no
+// matter which package (v1 or v2, canonical or a stay-on-v1 caller) drives the
+// encode.
+func EncodeOptions() json.Options {
 	return json.JoinOptions(
-		enc.Options(),
 		json.Deterministic(true),
 		json.FormatNilSliceAsNull(true),
 		json.FormatNilMapAsNull(true),
 	)
+}
+
+// MarshalOptions returns the encode options every generated MarshalJSONTo
+// joins on top of the encoder's own options: the encoder's own options first,
+// then [EncodeOptions] so the deterministic-map and nil-container spellings
+// hold from any entry point.
+func MarshalOptions(enc *jsontext.Encoder) json.Options {
+	return json.JoinOptions(enc.Options(), EncodeOptions())
 }
 
 // DecodeInto is the shared decode body for a concrete type's

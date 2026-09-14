@@ -1,11 +1,11 @@
 // Package canjson implements the openEHR canonical JSON codec for
 // the SDK's generated Reference Model types.
 //
-// The codec is a thin orchestration layer over stdlib encoding/json:
-// the heavy lifting lives in the per-RM-type [MarshalJSON] and
-// [UnmarshalJSON] methods that the BMM code generator emits. This
-// package only exposes the public entry points and a shared error
-// type ([DecodeError]).
+// The codec is a thin orchestration layer over encoding/json/v2 and
+// encoding/json/jsontext: the heavy lifting lives in the per-RM-type
+// MarshalJSONTo / UnmarshalJSONFrom streaming pair that the BMM code
+// generator emits (ADR 0022). This package only exposes the public
+// entry points and a shared error type ([DecodeError]).
 //
 // # Building-block independence
 //
@@ -21,21 +21,25 @@
 //
 // # Wire profile
 //
-// The codec implements the deterministic profile pinned by REQ-052
-// (see docs/specifications/wire.md). The profile is the SDK's own
-// output contract: two successive encodes of a decoded value are
-// byte-identical (PROBE-030), as are two encodes of one value. Decode
-// accepts members in any order, `_type` included, and no order is
-// asserted for another implementation's output.
+// The codec implements the profile pinned by REQ-052 (see
+// docs/specifications/wire.md). Member order carries no meaning
+// (RFC 8259 § 4): the decoder accepts members in any order, `_type`
+// included, and the SDK asserts no order for another implementation's
+// output. Round-trip fidelity is asserted semantically (typed deep
+// equality plus the reference-model validation floor), never by
+// comparing encoded bytes (PROBE-030).
 //
-//   - `_type` is the first JSON object key on every encoded concrete
-//     RM value.
+//   - The encoder emits `_type` first on every concrete RM value. This
+//     is a SHOULD, so a consumer decoding a stream can select the
+//     concrete type before reading the rest; member order is otherwise
+//     unspecified and a consumer MUST NOT rely on it.
 //
-//   - Remaining keys follow BMM property declaration order (= the
-//     order the generator emits struct fields).
+//   - `<`, `>` and `&` are emitted literally: encoding/json/v2 does not
+//     HTML-escape (REQ-052).
 //
-//   - `Hash` (map[K]V) keys are emitted in lexicographic key order
-//     (stdlib behaviour), independent of struct field order.
+//   - `Hash` (map[K]V) keys are emitted in lexicographic key order, an
+//     encoder-determinism property obtained with json.Deterministic(true)
+//     (REQ-052). Two encodes of one value are therefore byte-identical.
 //
 //   - Nil-pointer optional fields are emitted as ABSENT (no key), not
 //     as `null`. Both ABSENT and `null` are accepted on decode.
@@ -65,7 +69,7 @@
 //     budget that never reports a short clinical literal. Within that
 //     definition both arms are met: an out-of-range magnitude (e.g.
 //     1e400) fails with a typed error — a *json.UnmarshalTypeError,
-//     reachable with errors.As through the generated UnmarshalJSON
+//     reachable with errors.As through the generated decode-method
 //     wrapper — and a magnitude past 17 significant decimal digits, such
 //     as 0.1234567890123456789, fails decode wrapping [ErrInvalidShape]
 //     instead of rounding to the nearest float64; a malformed or
@@ -78,14 +82,17 @@
 // The package keeps its two sentinels one-directional (REQ-052), so a
 // caller can classify a failure with errors.Is alone:
 //
-//   - [ErrInvalidValue] — encode only. Every [Marshal] / [MarshalIndent]
-//     failure wraps it, over the encoder's own error, which stays
-//     reachable through unwrapping.
-//   - [ErrInvalidShape] — decode only. Never appears on an encode
-//     path. Every shape error raised inside a generated RM type's
-//     [UnmarshalJSON] wraps it, over the encoding/json error, which
-//     stays reachable through unwrapping. Of the four decode outcomes
-//     described below, only the shape one carries it.
+//   - [ErrInvalidValue] is encode only. Every [Marshal] / [MarshalIndent]
+//     failure wraps it, over the encoder's own error (a
+//     *encoding/json/v2.SemanticError, or a *jsontext.SyntacticError for
+//     invalid UTF-8 reached on output), which stays reachable through
+//     unwrapping.
+//   - [ErrInvalidShape] is decode only and never appears on an encode
+//     path. A shape error raised inside a generated RM type's decode
+//     method wraps it, over the encoding/json/v2 error, which stays
+//     reachable through unwrapping; a duplicate member name wraps it too
+//     (see below). The other decode outcomes described below do not
+//     carry it.
 //
 // Both are distinct from the transport-level transport.ErrInvalidShape,
 // which classifies a response body rather than a codec operation.
@@ -95,12 +102,21 @@
 //
 // What a decode failure looks like depends on where it happens:
 //
-//   - Malformed JSON reaches the caller unchanged from encoding/json,
-//     because encoding/json validates the whole input before it
-//     dispatches to any UnmarshalJSON method. [Unmarshal] returns
-//     *json.SyntaxError for it; [Decoder.Decode] classifies a
-//     truncated stream differently, as io.ErrUnexpectedEOF, and an
-//     empty one as io.EOF. No sentinel.
+//   - Malformed JSON reaches the caller before any generated decode
+//     method runs, because the codec validates the whole input first.
+//     No sentinel: [Unmarshal] and [Decoder.Decode] both return a
+//     *encoding/json/jsontext.SyntacticError, except that
+//     [Decoder.Decode] reports an empty stream as io.EOF (a truncated
+//     value wraps io.ErrUnexpectedEOF in both). Invalid UTF-8 and a lone
+//     surrogate escape are refused on this same path, before rm.Character
+//     sees the bytes, so they too are malformed input carrying no
+//     sentinel: a bare *jsontext.SyntacticError. Task 7 reconciles
+//     rm.Character's own side of the substitution rule.
+//   - A duplicate member name is refused during tokenisation, before any
+//     generated decode method runs. The entry point classifies that
+//     refusal with [ErrInvalidShape], keeping the cause reachable, so
+//     errors.Is finds both the sentinel and jsontext.ErrDuplicateName
+//     (RFC 8259 § 4; REQ-052).
 //   - A polymorphic dispatch failure — a missing, unknown or
 //     mismatched `_type` — arrives as [DecodeError] carrying the path,
 //     either at a slot or on `/_type` where the whole value's `_type`
@@ -109,14 +125,14 @@
 //     to a [DecodeError] travelling out through it, so a nested
 //     dispatch failure never turns into a shape error.
 //   - A shape error inside a generated RM type is wrapped by that
-//     type's generated UnmarshalJSON with a `canjson: <RM_TYPE>:`
-//     prefix, so the encoding/json error stays reachable with
-//     errors.As but is not returned verbatim. This is the one that
-//     wraps [ErrInvalidShape] — and when the failing type is the one
-//     selected at a polymorphic slot, the error is ALSO a
-//     [DecodeError] naming that slot: a [DecodeError] does not strip a
-//     shape classification raised beneath it, so a consumer reads the
-//     path off one and the kind off the other.
+//     type's generated decode method with a `canjson: <RM_TYPE>:`
+//     prefix, so the encoding/json/v2 error stays reachable with
+//     errors.As but is not returned verbatim. This wraps
+//     [ErrInvalidShape]; when the failing type is the one selected at a
+//     polymorphic slot, the error is ALSO a [DecodeError] naming that
+//     slot. A [DecodeError] does not strip a shape classification raised
+//     beneath it, so a consumer reads the path off one and the kind off
+//     the other.
 //   - A hand-written primitive decoded at the top level — rm.Real,
 //     rm.Integer or rm.Character handed to [Unmarshal] directly rather
 //     than reached through a generated type — carries its own

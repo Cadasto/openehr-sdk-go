@@ -1,7 +1,10 @@
 package canjson
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
+	"errors"
+	"fmt"
 	"io"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -14,28 +17,40 @@ import (
 // range. It is decode-only: encode failures wrap [ErrInvalidValue]
 // instead (REQ-052).
 //
-// Every shape error raised inside a generated RM type's
-// [UnmarshalJSON] — the `canjson: <RM_TYPE>:` family — wraps it, over
-// the encoding/json error, which stays reachable with errors.As; for a
-// whole-value shape failure a single errors.Unwrap step lands on it. A
-// decode failure reaches the caller one of three ways (REQ-052):
+// It is wrapped over the underlying codec error, which stays reachable
+// with errors.As, in two situations (REQ-052):
 //
-//   - Malformed JSON, which encoding/json reports before any
-//     UnmarshalJSON method runs. No sentinel: [Unmarshal] returns
-//     *json.SyntaxError, [Decoder.Decode] io.ErrUnexpectedEOF or
-//     io.EOF.
-//   - A polymorphic dispatch failure — a missing, unknown or
-//     mismatched `_type`, at a slot or on `/_type` for the whole value
-//     — which arrives as a [DecodeError] carrying the path. No
-//     sentinel either, even when it travels out through an enclosing
-//     type's `canjson: <RM_TYPE>:` prefix. Match it with errors.As for
+//   - A shape failure raised inside a generated RM type's decode — the
+//     `canjson: <RM_TYPE>:` family — where the bytes are valid JSON but
+//     the wrong shape for the target. The cause is a
+//     *encoding/json/v2.SemanticError. When the failure happens inside
+//     the concrete type selected at a polymorphic slot the error is ALSO
+//     a [DecodeError] naming that slot, so both classifications hold: the
+//     path from the [DecodeError], the kind from this sentinel.
+//   - A JSON object carrying the same member name twice. jsontext refuses
+//     it (RFC 8259 § 4: names SHOULD be unique, and duplicates leave no
+//     single defined value) before any generated decode runs; the entry
+//     point classifies that refusal with this sentinel. The cause stays
+//     reachable, so errors.Is finds both this sentinel and
+//     jsontext.ErrDuplicateName.
+//
+// Two decode failures stay OUTSIDE the sentinel by design (REQ-052) and
+// never acquire it:
+//
+//   - Malformed JSON, which the codec reports before any generated decode
+//     runs. No sentinel: [Unmarshal] and [Decoder.Decode] both return a
+//     *encoding/json/jsontext.SyntacticError, except that [Decoder.Decode]
+//     reports an empty stream as io.EOF. Invalid UTF-8 and a lone
+//     surrogate escape are refused on this same path (jsontext rejects
+//     them before rm.Character sees the bytes), so they too are malformed
+//     input carrying no sentinel — a bare *jsontext.SyntacticError.
+//   - A polymorphic dispatch failure — a missing, unknown or mismatched
+//     `_type`, at a slot or on `/_type` for the whole value — which
+//     arrives as a [DecodeError] carrying the path. No sentinel either,
+//     even when it travels out through an enclosing type's
+//     `canjson: <RM_TYPE>:` prefix. Match it with errors.As for
 //     [DecodeError], or errors.Is against [typereg.ErrMissingType] /
 //     [typereg.ErrUnknownType] / [typereg.ErrTypeMismatch].
-//   - A shape failure — valid JSON in the wrong shape. This one wraps
-//     the sentinel. When it happens inside the concrete type selected
-//     at a polymorphic slot it is ALSO a [DecodeError] naming that
-//     slot, so both classifications hold: the path from the
-//     [DecodeError], the kind from the sentinel.
 //
 // The value lives in [typereg] so generated code under openehr/rm can
 // attach it without forming an `openehr/rm → openehr/serialize` import
@@ -68,48 +83,66 @@ type decoderConfig struct {
 //
 // v1 NOTE: the relaxed escape hatch is recognised by the option
 // surface but enforced by future generator output — the current
-// generated [UnmarshalJSON] methods only implement strict dispatch.
-// Setting this option today is a no-op for built-in RM types; the
-// hook stays here so the API does not break when the relaxed path
-// lands.
+// generated decode methods only implement strict dispatch. Setting
+// this option today is a no-op for built-in RM types; the hook stays
+// here so the API does not break when the relaxed path lands.
 func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 	return func(c *decoderConfig) { c.relaxedTypeDispatch = enabled }
+}
+
+// classifyDecode gives a duplicate-object-member-name refusal the
+// decode-side shape classification REQ-052 mandates. jsontext raises
+// [jsontext.ErrDuplicateName] before any generated decode method runs (a
+// well-formed value whose shape is nonetheless rejected), so it reaches
+// the entry point as a bare *jsontext.SyntacticError with no sentinel;
+// this wraps [ErrInvalidShape] over it while keeping the cause reachable
+// through unwrapping. Every other error is returned untouched: a shape
+// failure raised inside a generated type already carries the sentinel
+// from its own funnel, and malformed JSON and dispatch failures MUST NOT
+// acquire it.
+func classifyDecode(err error) error {
+	if err != nil && errors.Is(err, jsontext.ErrDuplicateName) {
+		return fmt.Errorf("%w: %w", ErrInvalidShape, err)
+	}
+	return err
 }
 
 // Unmarshal parses canonical-JSON-encoded data and stores the result
 // in the value pointed to by v. v MUST be a non-nil pointer to a
 // generated RM type (or a slice/map containing such types).
 //
-// Polymorphic fields on v are populated via the per-type
-// [UnmarshalJSON] methods the BMM generator emits; each consults
-// [typereg.Default] to resolve `_type` discriminators.
+// Polymorphic fields on v are populated via the per-type decode methods
+// the BMM generator emits (encoding/json/v2); each consults
+// [typereg.Default] to resolve `_type` discriminators. The entry point
+// threads [typereg.Unmarshalers], the aggregate of every generated
+// interface hook, so a polymorphic slot at the top level resolves too.
 //
-// Returns [poly.DecodeError] wrapping a typereg sentinel
+// Returns a [DecodeError] wrapping a typereg sentinel
 // ([typereg.ErrMissingType] / ErrUnknownType / ErrTypeMismatch) at
-// polymorphic dispatch failures (via generated UnmarshalJSON).
-// Malformed JSON comes back unchanged from encoding/json as
-// *json.SyntaxError; a shape error inside a generated RM type keeps a
-// `canjson: <RM_TYPE>:` prefix from that type's UnmarshalJSON and
-// wraps [ErrInvalidShape]. Neither malformed JSON nor a dispatch
-// failure carries the sentinel; a shape failure beneath a polymorphic
-// slot carries both it and a [DecodeError]. See the sentinel's own
-// documentation for where the lines fall.
+// polymorphic dispatch failures. Malformed JSON comes back as a
+// *encoding/json/jsontext.SyntacticError carrying no sentinel; a
+// duplicate member name and a shape error inside a generated RM type
+// both wrap [ErrInvalidShape], the latter behind a `canjson: <RM_TYPE>:`
+// prefix. A shape failure beneath a polymorphic slot carries both the
+// sentinel and a [DecodeError]. See the sentinel's own documentation for
+// where the lines fall.
 func Unmarshal(data []byte, v any) error {
-	return json.Unmarshal(data, v)
+	return classifyDecode(json.Unmarshal(data, v, typereg.Unmarshalers()))
 }
 
 // Decoder reads and decodes canonical-JSON values from a stream.
-// Wrapping `encoding/json.Decoder` keeps the swap path (sonic /
-// easyjson) cheap.
+// It wraps an [encoding/json/jsontext.Decoder] and drives the
+// generated encoding/json/v2 decode methods through
+// [encoding/json/v2.UnmarshalDecode].
 type Decoder struct {
-	dec *json.Decoder
+	dec *jsontext.Decoder
 	cfg decoderConfig
 }
 
 // NewDecoder returns a [Decoder] that reads canonical-JSON values
 // from r. Apply options to configure dispatch policy.
 func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
-	d := &Decoder{dec: json.NewDecoder(r)}
+	d := &Decoder{dec: jsontext.NewDecoder(r)}
 	for _, o := range opts {
 		if o != nil {
 			o(&d.cfg)
@@ -120,20 +153,18 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 
 // Decode reads the next JSON value from the stream and stores it in
 // v. Errors follow the same classification as [Unmarshal], except
-// where reading a stream rather than a whole input changes the
-// answer: a truncated value is reported as io.ErrUnexpectedEOF here,
-// where [Unmarshal] reports a *json.SyntaxError ("unexpected end of
-// JSON input"); an empty or whitespace-only stream is io.EOF; and
-// content after the first value is simply the next value in the
-// stream, not a syntax error — `{"a":1}x` fails in [Unmarshal] and
-// succeeds here. Other syntax errors are the same *json.SyntaxError
-// in both.
+// where reading a stream rather than a whole input changes the answer.
+// An empty or whitespace-only stream is io.EOF, where [Unmarshal]
+// reports a *encoding/json/jsontext.SyntacticError; and content after
+// the first value is simply the next value in the stream, not an error
+// — `{"a":1}x` fails in [Unmarshal] and succeeds here. A truncated
+// value is a *jsontext.SyntacticError wrapping io.ErrUnexpectedEOF in
+// both.
 func (d *Decoder) Decode(v any) error {
-	return d.dec.Decode(v)
+	return classifyDecode(json.UnmarshalDecode(d.dec, v, typereg.Unmarshalers()))
 }
 
 // RelaxedTypeDispatch reports whether the decoder was configured with
-// the relaxed dispatch policy. Used by generated [UnmarshalJSON]
-// methods once they support the relaxed path (currently informational
-// only).
+// the relaxed dispatch policy. Used by generated decode methods once
+// they support the relaxed path (currently informational only).
 func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch }
