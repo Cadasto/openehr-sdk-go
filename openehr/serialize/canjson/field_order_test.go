@@ -80,29 +80,64 @@ func TestDecodePolymorphicSlotWithTypeLast(t *testing.T) {
 	}
 }
 
+// hashOrderEncodes is how many times [TestEncodeHashKeysLexicographic] encodes
+// the same value. An encoder that does not sort map keys draws a fresh Go map
+// iteration order on every encode, so detection rests on both the width of the
+// map and on repetition. With eight keys in `author`, one encode of an unsorted
+// encoder lands sorted by luck about one time in 8! (40320); requiring all
+// twenty encodes to be sorted, and both maps on each of them, leaves no
+// realistic way for an unsorted encoder to pass.
+const hashOrderEncodes = 20
+
 // REQ-052 § Field order: `Hash` (map[K]V) keys are written in lexicographic
 // key order, independent of struct field order and of the order the map was
 // populated. The keys are chosen so that byte-wise order differs from a
-// case-folded one ("B" sorts before "a"), pinning which "lexicographic" the
-// profile means; the pointer-to-map spelling the generator uses for optional
-// Hash fields is covered alongside the plain one.
+// case-folded one ("Zeta" sorts before "alpha", "_internal" between them),
+// pinning which "lexicographic" the profile means; the pointer-to-map spelling
+// the generator uses for optional Hash fields is covered alongside the plain
+// one.
+//
+// Can-fail control. The mutation that turns this red is dropping
+// `json.Deterministic(true)` from the generated TRANSLATION_DETAILS marshaler
+// once the canonical-JSON path has moved to encoding/json/v2 (ADR 0022): v2
+// writes map members in Go map iteration order unless that option is joined in,
+// and that order is randomised per encode. Eight keys in `author` and seven in
+// `other_details`, encoded [hashOrderEncodes] times with every encode required
+// to be sorted, is what makes the miss reliable rather than a coin flip: the
+// three and two keys this test carried before would have landed sorted by luck
+// about one encode in six and one in two. Under encoding/json, which sorts map
+// keys unconditionally, the guard holds trivially, which is the point of
+// putting it in place before the codec moves.
 func TestEncodeHashKeysLexicographic(t *testing.T) {
-	other := map[string]string{"a": "x", "B": "y"}
+	other := map[string]string{
+		"accuracy": "high", "Review": "2026-09-01", "scope": "site",
+		"_draft": "no", "note": "n", "Purpose": "p", "version": "2",
+	}
 	v := rm.TranslationDetails{
-		Author:       map[string]string{"z": "3", "a": "1", "B": "2"},
+		Author: map[string]string{
+			"organisation": "Cadasto", "alpha": "1", "ORCID": "0000-0002",
+			"zulu": "z", "_internal": "i", "beta": "2", "Zeta": "Z", "name": "T",
+		},
 		Language:     rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}, CodeString: "en"},
 		OtherDetails: &other,
 	}
-	got, err := canjson.Marshal(&v)
-	if err != nil {
-		t.Fatalf("encode: %v", err)
+	// Byte-wise key order: capitals (0x41 and up) before "_" (0x5F) before
+	// lower case (0x61 and up). A case-folded or populate-order encoder
+	// produces neither spelling.
+	wants := []string{
+		`"author":{"ORCID":"0000-0002","Zeta":"Z","_internal":"i","alpha":"1","beta":"2","name":"T","organisation":"Cadasto","zulu":"z"}`,
+		`"other_details":{"Purpose":"p","Review":"2026-09-01","_draft":"no","accuracy":"high","note":"n","scope":"site","version":"2"}`,
 	}
-	for _, want := range []string{
-		`"author":{"B":"2","a":"1","z":"3"}`,
-		`"other_details":{"B":"y","a":"x"}`,
-	} {
-		if !strings.Contains(string(got), want) {
-			t.Fatalf("Hash keys are not in lexicographic order: want %s in\n %s", want, got)
+	for encode := range hashOrderEncodes {
+		got, err := canjson.Marshal(&v)
+		if err != nil {
+			t.Fatalf("encode %d of %d: %v", encode+1, hashOrderEncodes, err)
+		}
+		for _, want := range wants {
+			if !strings.Contains(string(got), want) {
+				t.Fatalf("encode %d of %d: Hash keys are not in lexicographic order:\n want %s\n in   %s",
+					encode+1, hashOrderEncodes, want, got)
+			}
 		}
 	}
 }
