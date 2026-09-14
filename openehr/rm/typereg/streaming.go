@@ -15,11 +15,12 @@ package typereg
 import (
 	jsonv1 "encoding/json"
 	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
-
-	json "encoding/json/v2"
+	"sync/atomic"
 )
 
 // decodeOptions are the options every nested decode threads: the caller's own
@@ -29,50 +30,64 @@ import (
 // path). A v1 caller's DefaultOptionsV1 sets ReportErrorsWithLegacySemantics,
 // which otherwise returns a hook error position-less; the generated codec is
 // v2-native, so it reports positions the same way from either entry point.
+//
+// A caller may pass its own json.WithUnmarshalers to the outermost Unmarshal.
+// Because WithUnmarshalers is single-valued, joining our aggregate on top would
+// drop the caller's hooks for every nested value. So the caller's hooks are
+// joined AFTER our aggregate (SDK first: the canonical-JSON polymorphic
+// dispatch wins for the interfaces it covers; the caller's hooks reach every
+// other type, at every depth). The pointer check keeps a nested decode — whose
+// options already carry our aggregate — from re-joining it to itself.
 func decodeOptions(dec *jsontext.Decoder) json.Options {
+	hooks := aggregateUnmarshalers()
+	if caller, ok := json.GetOption(dec.Options(), json.WithUnmarshalers); ok && caller != hooks {
+		hooks = json.JoinUnmarshalers(hooks, caller)
+	}
 	return json.JoinOptions(
 		dec.Options(),
-		Unmarshalers(),
+		json.WithUnmarshalers(hooks),
 		jsonv1.ReportErrorsWithLegacySemantics(false),
 	)
 }
 
-// unmarshalers is the process-wide aggregate of per-interface decode hooks.
-// The rm and aom14 packages each register their json.UnmarshalFromFunc hooks
-// into it at package init (via [RegisterUnmarshaler]); [Unmarshalers] hands
-// the joined option to every nested decode so a polymorphic slot resolves from
-// any entry point, including a bare encoding/json/v2 Unmarshal with no options.
+// The process-wide aggregate of per-interface decode hooks. The rm and aom14
+// packages each register their json.UnmarshalFromFunc hooks into it at package
+// init. Registration serialises through unmarshalerRegMu (init-time only); the
+// joined aggregate is published in an atomic.Pointer so [decodeOptions] reads
+// it lock-free on the decode hot path.
 var (
-	unmarshalersMu     sync.RWMutex
-	unmarshalerHooks   []*json.Unmarshalers
-	unmarshalersJoined json.Options
+	unmarshalerRegMu sync.Mutex           // guards unmarshalerHooks during registration
+	unmarshalerHooks []*json.Unmarshalers // append-only, init-time
+	unmarshalerAgg   atomic.Pointer[json.Unmarshalers]
 )
 
 // RegisterUnmarshaler adds one per-interface decode hook to the aggregate.
 // The generator emits one call per polymorphic interface from the owning
 // package's init(); the interface's dispatch runs through [DecodePolymorphic].
 // A nil hook is ignored so a partially generated tree cannot panic here.
+// Registration is expected only at package init; it is safe for concurrent use
+// but is not part of any hot path.
 func RegisterUnmarshaler(hook *json.Unmarshalers) {
 	if hook == nil {
 		return
 	}
-	unmarshalersMu.Lock()
-	defer unmarshalersMu.Unlock()
+	unmarshalerRegMu.Lock()
+	defer unmarshalerRegMu.Unlock()
 	unmarshalerHooks = append(unmarshalerHooks, hook)
-	unmarshalersJoined = json.WithUnmarshalers(json.JoinUnmarshalers(unmarshalerHooks...))
+	unmarshalerAgg.Store(json.JoinUnmarshalers(unmarshalerHooks...))
+}
+
+// aggregateUnmarshalers returns the joined SDK interface hooks, or nil when
+// none are registered (JoinUnmarshalers treats a nil element as empty).
+func aggregateUnmarshalers() *json.Unmarshalers {
+	return unmarshalerAgg.Load()
 }
 
 // Unmarshalers returns the aggregate of every registered interface hook as a
-// single json.Options, ready to join into a decode. It is safe for concurrent
-// use; the option is rebuilt only when a hook registers (during init). A tree
-// with no registered hooks returns an empty, harmless option.
+// single json.Options. Kept for external callers; the SDK decode path uses
+// [decodeOptions], which also honours a caller-supplied WithUnmarshalers.
 func Unmarshalers() json.Options {
-	unmarshalersMu.RLock()
-	defer unmarshalersMu.RUnlock()
-	if unmarshalersJoined == nil {
-		return json.WithUnmarshalers(nil)
-	}
-	return unmarshalersJoined
+	return json.WithUnmarshalers(aggregateUnmarshalers())
 }
 
 // MarshalOptions returns the encode options every generated MarshalJSONTo
@@ -135,8 +150,7 @@ func DecodeInto(dec *jsontext.Decoder, rmType string, out any) error {
 // WrapShapeError, which adds [ErrInvalidShape] and the `canjson: <rmType>:`
 // text.
 func classifyDecode(rmType string, err error) error {
-	var de *DecodeError
-	if errors.As(err, &de) && de.Path == "" {
+	if de, ok := errors.AsType[*DecodeError](err); ok && de != nil && de.Path == "" {
 		if p := slotPointer(err); p != "" {
 			return WrapShapeError(rmType, &DecodeError{Path: p, Type: de.Type, Inner: de.Inner})
 		}
@@ -184,7 +198,10 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 	}
 	name, err := peekType(raw)
 	if err != nil {
-		return WrapShapeError("", err)
+		// The slot value is not a JSON object (e.g. an array where an RM value
+		// is expected): a shape failure. Name the interface being filled so the
+		// message reads `canjson: <Interface>:` rather than a bare colon.
+		return WrapShapeError(reflect.TypeFor[T]().Name(), err)
 	}
 	var v any
 	switch {
@@ -215,14 +232,20 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 	return nil
 }
 
+// typeDiscriminator is the head struct peekType decodes into. It is a named
+// unexported type so a decode failure names `typereg.typeDiscriminator` rather
+// than leaking an anonymous `struct { Type string … }` Go spelling into a
+// consumer-visible message.
+type typeDiscriminator struct {
+	Type string `json:"_type"`
+}
+
 // peekType reads the _type discriminator from a raw JSON object without
 // decoding the whole value. An empty string means the member is absent; a
 // non-object or malformed value returns the decode error for the caller to
 // classify as a shape failure.
 func peekType(raw jsontext.Value) (string, error) {
-	var head struct {
-		Type string `json:"_type"`
-	}
+	var head typeDiscriminator
 	if err := json.Unmarshal(raw, &head); err != nil {
 		return "", err
 	}
