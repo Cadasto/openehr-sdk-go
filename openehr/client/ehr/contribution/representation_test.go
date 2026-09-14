@@ -1,7 +1,7 @@
 package contribution_test
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -125,7 +125,7 @@ func TestCommitRepresentationUndecodable(t *testing.T) {
 	if !ok {
 		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
-	if _, ok := errors.AsType[*json.SyntaxError](err); !ok {
+	if _, ok := errors.AsType[*jsontext.SyntacticError](err); !ok {
 		t.Fatalf("decode cause not in chain: %v", err)
 	}
 	if errors.Is(err, transport.ErrInvalidShape) {

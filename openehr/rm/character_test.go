@@ -13,25 +13,26 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
 
-// wireEscapes maps a match character to the substring encoding/json's default
-// HTML-escaping emits for it inside a string literal — `<`, `>` and `&` come
-// out as the literal six-byte escape sequences `\u003c`, `\u003e`, `\u0026`.
-// This is the same carve-out docs/specifications/wire.md § REQ-052's TERM_MAPPING.match
-// bullet now records explicitly (mirroring § Unknown response keys): the
-// escaped form decodes to the identical single character, so the normative
-// obligation is on the decoded value, not the literal bytes. Every other
-// character round-trips through canjson.Marshal literally.
+// wireEscapes maps a match character to its `\uXXXX` escape spelling, an
+// alternative accepted decode input for `<`, `>` and `&`. Under
+// encoding/json/v2 (ADR 0022) the encoder does NOT HTML-escape, so
+// canjson.Marshal emits these characters literally (census row 21); the escape
+// spelling is still accepted on decode. This is the carve-out
+// docs/specifications/wire.md § REQ-052's TERM_MAPPING.match bullet records
+// (mirroring § Unknown response keys): the escaped form decodes to the
+// identical single character, so the normative obligation is on the decoded
+// value, not the literal bytes.
 var wireEscapes = map[string]string{"<": "\\u003c", ">": "\\u003e", "&": "\\u0026"}
 
 // REQ-046 / REQ-052: TERM_MAPPING.match is a single-character canonical JSON string.
 func TestTermMappingMatchRoundTrip(t *testing.T) {
 	for _, want := range []string{">", "=", "<", "?"} {
 		// Feed both spellings the carve-out admits: the literal character,
-		// and — for the three encoding/json HTML-escapes — the `\u003c` /
-		// `\u003e` form the encoder itself emits. Decoding the escaped
-		// spelling pins the other half of the wire.md carve-out: the
-		// obligation is on the decoded character, so the escape must decode
-		// to the identical single Character, not to a six-rune literal.
+		// and, for `<`, `>` and `&`, the `\uXXXX` escape spelling a producer
+		// may still send. Decoding the escaped spelling pins the other half of
+		// the wire.md carve-out: the obligation is on the decoded character, so
+		// the escape must decode to the identical single Character, not to a
+		// six-rune literal.
 		spellings := map[string]string{"literal": want}
 		if esc, escaped := wireEscapes[want]; escaped {
 			spellings["escaped"] = esc
@@ -52,11 +53,11 @@ func TestTermMappingMatchRoundTrip(t *testing.T) {
 				if err != nil {
 					t.Fatalf("encode %q: %v", want, err)
 				}
-				wireForm := want
-				if esc, escaped := wireEscapes[want]; escaped {
-					wireForm = esc
-				}
-				if !bytes.Contains(out, []byte(`"match":"`+wireForm+`"`)) {
+				// v2 does not HTML-escape (ADR 0022), so the encoder emits
+				// the literal character (census row 21); the `\uXXXX` escape
+				// spelling is an accepted decode input only, not what Marshal
+				// writes.
+				if !bytes.Contains(out, []byte(`"match":"`+want+`"`)) {
 					t.Errorf("encoded form = %s, want match as one-char string %q", out, want)
 				}
 			})
@@ -441,13 +442,16 @@ func TestCharacterRefusalTextCarriesNoSentinelProse(t *testing.T) {
 	}
 }
 
-// TestTermMappingMatchSubstitutedSurrogateRefusedThroughFunnel runs the
-// substituted-U+FFFD refusal through the GENERATED TERM_MAPPING decoder —
-// the path a consumer actually reaches — rather than through
-// rm.Character alone. The generated funnel hands the bytes to
-// encoding/json, which dispatches to Character.UnmarshalJSON, so the
-// refusal must survive that hop and still classify as a shape failure
-// (REQ-052 § Decode-side shape sentinel).
+// TestTermMappingMatchSubstitutedSurrogateRefusedThroughFunnel runs a lone
+// UTF-16 surrogate escape in TERM_MAPPING.match through the GENERATED
+// TERM_MAPPING decoder, the path a consumer actually reaches, rather than
+// through rm.Character alone. Under encoding/json/v2 (ADR 0022) jsontext
+// refuses the lone surrogate during tokenisation, before rm.Character's
+// substituted-U+FFFD detector can inspect the value (Task 2 report Q4, ruling
+// R15). So canjson refuses the value as malformed input and it carries NO SDK
+// sentinel, the same as any other syntactic refusal (REQ-052: invalid UTF-8
+// and a lone surrogate are malformed input). Task 7 reconciles rm.Character's
+// own side of this.
 func TestTermMappingMatchSubstitutedSurrogateRefusedThroughFunnel(t *testing.T) {
 	in := []byte(`{"_type":"TERM_MAPPING","match":"\uD800","target":{"_type":"CODE_PHRASE",` +
 		`"terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":"x"}}`)
@@ -456,15 +460,13 @@ func TestTermMappingMatchSubstitutedSurrogateRefusedThroughFunnel(t *testing.T) 
 	if err == nil {
 		t.Fatalf("Unmarshal(%s) = nil error, want a refusal; match = %q", in, string(tm.Match))
 	}
-	if !errors.Is(err, canjson.ErrInvalidShape) {
-		t.Errorf("err = %v; want errors.Is(err, canjson.ErrInvalidShape)", err)
+	// A lone surrogate is malformed input jsontext refuses before any generated
+	// decode runs, so it does NOT acquire the decode-side shape sentinel.
+	if errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; a lone surrogate is malformed input and must not carry canjson.ErrInvalidShape", err)
 	}
-	// Under encoding/json/v2 (ADR 0022) jsontext refuses a lone UTF-16 surrogate
-	// escape during tokenisation, before rm.Character's substituted-U+FFFD
-	// detector can inspect the value (Task 2 report Q4). The value is still
-	// refused and still shape-classified through TERM_MAPPING's funnel; only the
-	// message author moved from rm.Character to jsontext. The JSON-side detector
-	// is retired in Task 7 (ruling R15); this test re-pins to jsontext's text.
+	// The jsontext refusal text still reaches the caller, so the diagnostic is
+	// not lost; only the SDK classification is withheld.
 	if !strings.Contains(err.Error(), "jsontext: invalid surrogate pair") {
 		t.Errorf("err = %v; want the jsontext surrogate refusal to reach the caller", err)
 	}

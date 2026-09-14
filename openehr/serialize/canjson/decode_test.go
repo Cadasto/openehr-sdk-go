@@ -2,6 +2,7 @@ package canjson_test
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"errors"
 	"io"
@@ -155,12 +156,12 @@ func TestDecodeErrorCarriesPath(t *testing.T) {
 //
 // The want fields pin WHICH arm of the documented classification
 // produced each failure, so a later change cannot quietly move the
-// arm. They differ for the syntax row on purpose: Unmarshal sees
-// the whole input and reports *json.SyntaxError, while Decoder.Decode
-// runs out of stream and reports io.ErrUnexpectedEOF. The other
-// stream-level divergences Decode's godoc names — an empty stream and
-// content after the first value — are pinned by
-// TestDecoderDecodeStreamDivergesFromUnmarshal.
+// arm. Under encoding/json/v2 both Unmarshal and Decoder.Decode report
+// a *jsontext.SyntacticError wrapping io.ErrUnexpectedEOF on this
+// truncated input, so the syntax row's want strings both match the same
+// "unexpected EOF" text. The stream-level divergences Decode's godoc
+// names, an empty stream and content after the first value, are pinned
+// by TestDecoderDecodeStreamDivergesFromUnmarshal.
 var shapeErrorInputs = []struct {
 	name string
 	in   string
@@ -185,7 +186,7 @@ var shapeErrorInputs = []struct {
 	{
 		name:               "syntax error: object truncated after the opening brace",
 		in:                 `{`,
-		wantUnmarshalErr:   "unexpected end of JSON input",
+		wantUnmarshalErr:   "unexpected EOF",
 		wantDecodeErr:      "unexpected EOF",
 		wantDecodeSentinel: io.ErrUnexpectedEOF,
 		wantShapeSentinel:  false,
@@ -504,8 +505,8 @@ func TestDecoderDecodeStreamDivergesFromUnmarshal(t *testing.T) {
 		}
 		var uq rm.DVQuantity
 		uerr := canjson.Unmarshal([]byte(""), &uq)
-		if _, ok := errors.AsType[*json.SyntaxError](uerr); !ok {
-			t.Errorf("Unmarshal(\"\") err = %v; want *json.SyntaxError (the divergence this test pins)", uerr)
+		if _, ok := errors.AsType[*jsontext.SyntacticError](uerr); !ok {
+			t.Errorf("Unmarshal(\"\") err = %v; want *jsontext.SyntacticError (the divergence this test pins)", uerr)
 		}
 	})
 
@@ -528,8 +529,8 @@ func TestDecoderDecodeStreamDivergesFromUnmarshal(t *testing.T) {
 		}
 		var uq rm.DVQuantity
 		uerr := canjson.Unmarshal([]byte(in), &uq)
-		if _, ok := errors.AsType[*json.SyntaxError](uerr); !ok {
-			t.Errorf("Unmarshal(two values) err = %v; want *json.SyntaxError (the divergence this test pins)", uerr)
+		if _, ok := errors.AsType[*jsontext.SyntacticError](uerr); !ok {
+			t.Errorf("Unmarshal(two values) err = %v; want *jsontext.SyntacticError (the divergence this test pins)", uerr)
 		}
 	})
 }
@@ -590,4 +591,58 @@ func TestUnmarshalMantissaPrecisionLossInheritedByDVProportion(t *testing.T) {
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; want errors.Is(err, canjson.ErrInvalidShape)", err)
 	}
+}
+
+// TestUnmarshalDuplicateMemberNameWrapsErrInvalidShape pins REQ-052's
+// duplicate-member-name clause: an object carrying the same member name twice
+// is refused, and the refusal wraps canjson.ErrInvalidShape. RFC 8259 § 4 says
+// names SHOULD be unique, and an object with duplicates has no single defined
+// value. jsontext raises jsontext.ErrDuplicateName during tokenisation, before
+// any generated decode runs, so the entry point is where canjson attaches the
+// classification; the operation-specific cause stays reachable.
+//
+// Can-fail controls: (1) thread jsontext.AllowDuplicateNames(true) into the
+// entry-point options and the codec keeps the last value with no error, so the
+// "want a refusal" assertion goes red; (2) delete the classifyDecode wrap in
+// decode.go and the error still occurs but loses the sentinel, so the
+// ErrInvalidShape assertion goes red while the ErrDuplicateName one stays green.
+func TestUnmarshalDuplicateMemberNameWrapsErrInvalidShape(t *testing.T) {
+	// A duplicate "units" inside a DV_QUANTITY: the tokens are valid, the object
+	// is not.
+	in := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg","units":"g"}`)
+	var q rm.DVQuantity
+	err := canjson.Unmarshal(in, &q)
+	if err == nil {
+		t.Fatalf("Unmarshal(%s) = nil; want a duplicate-name refusal", in)
+	}
+	// The shared sentinel, so a caller classifies with errors.Is alone.
+	if !errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; want errors.Is(_, canjson.ErrInvalidShape)", err)
+	}
+	// The operation-specific facet: the duplicate-name cause itself, not merely
+	// the shared sentinel a different shape failure would also carry.
+	if !errors.Is(err, jsontext.ErrDuplicateName) {
+		t.Errorf("err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
+	}
+	assertShapeSentinelDistinct(t, err)
+}
+
+// TestDecoderDecodeDuplicateMemberNameWrapsErrInvalidShape is the streaming
+// twin: Decoder.Decode classifies a duplicate member name the same way
+// Unmarshal does, so the guarantee does not depend on which entry point a
+// caller reaches.
+func TestDecoderDecodeDuplicateMemberNameWrapsErrInvalidShape(t *testing.T) {
+	const in = `{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg","units":"g"}`
+	var q rm.DVQuantity
+	err := canjson.NewDecoder(strings.NewReader(in)).Decode(&q)
+	if err == nil {
+		t.Fatalf("Decode(%s) = nil; want a duplicate-name refusal", in)
+	}
+	if !errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; want errors.Is(_, canjson.ErrInvalidShape)", err)
+	}
+	if !errors.Is(err, jsontext.ErrDuplicateName) {
+		t.Errorf("err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
+	}
+	assertShapeSentinelDistinct(t, err)
 }

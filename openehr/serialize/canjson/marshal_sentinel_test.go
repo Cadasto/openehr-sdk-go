@@ -1,7 +1,7 @@
 package canjson_test
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"testing"
 
@@ -17,7 +17,7 @@ import (
 
 // assertEncodeRefusal pins the whole clause on one returned error:
 // the encode sentinel matches, neither decode sentinel does, and the
-// *json.UnsupportedTypeError underneath is still reachable.
+// *json.SemanticError underneath is still reachable.
 func assertEncodeRefusal(t *testing.T, err error) {
 	t.Helper()
 	if err == nil {
@@ -32,8 +32,8 @@ func assertEncodeRefusal(t *testing.T, err error) {
 	if errors.Is(err, transport.ErrInvalidShape) {
 		t.Errorf("encode failure must not match transport.ErrInvalidShape; got %v", err)
 	}
-	if _, ok := errors.AsType[*json.UnsupportedTypeError](err); !ok {
-		t.Errorf("underlying *json.UnsupportedTypeError must stay reachable; got %v", err)
+	if _, ok := errors.AsType[*json.SemanticError](err); !ok {
+		t.Errorf("underlying *json.SemanticError must stay reachable; got %v", err)
 	}
 }
 
