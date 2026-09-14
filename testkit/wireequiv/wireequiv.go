@@ -17,6 +17,12 @@
 // codec's implementation: were both sides to run on encoding/json/v2, a shared
 // defect could pass unnoticed. v1's decode into a generic value with
 // Decoder.UseNumber is a fixed, second reader of the same wire bytes.
+//
+// Two model limits follow from that v1 decode, and neither is in scope for this
+// oracle: a duplicate object member collapses to the last value (v1 keeps the
+// last), so it cannot witness REQ-052's rule that the codec refuse duplicate
+// names, and only the first JSON value in each document is read, so trailing
+// data after it is ignored. Both are the codec's own tests to make.
 package wireequiv
 
 import (

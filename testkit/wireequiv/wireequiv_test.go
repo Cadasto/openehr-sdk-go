@@ -49,9 +49,13 @@ func TestEquivalent(t *testing.T) {
 			ptr:  "/xs",
 		},
 		{
+			// b carries the six-character JSON escape \u003c (a raw string,
+			// so the backslash reaches the parser), a carries the literal
+			// "<". Both decode to "<", so the case fails if the oracle ever
+			// compares raw bytes instead of decoded values.
 			name: "escaping ignored",
 			a:    `{"match":"<"}`,
-			b:    `{"match":"<"}`,
+			b:    `{"match":"\u003c"}`,
 			want: true,
 		},
 		{
@@ -127,5 +131,10 @@ func TestEquivalentReportsInvalidJSON(t *testing.T) {
 	}
 	if ok, diag := wireequiv.Equivalent([]byte(`{}`), []byte(`]`)); ok || !strings.Contains(diag, "right document is not valid JSON") {
 		t.Fatalf("Equivalent(valid, invalid) = %v, %q; want false naming the right document", ok, diag)
+	}
+	// Empty input (nil or zero length) is not a JSON value; it is reported as
+	// the left document failing (EOF), never a panic.
+	if ok, diag := wireequiv.Equivalent(nil, nil); ok || !strings.Contains(diag, "left document is not valid JSON") {
+		t.Fatalf("Equivalent(nil, nil) = %v, %q; want false naming the left document", ok, diag)
 	}
 }
