@@ -67,10 +67,13 @@
 // (`rm.DVCodedText{…}`). Both forms encode correctly: the canonical-JSON
 // streaming codec (ADR 0022) gives each concrete type a VALUE-receiver
 // `MarshalJSONTo`, so the method is in the method set of both the value and
-// the pointer. encoding/json/v2 dispatches to it whichever way the value was
-// assigned, and the mandatory `_type` discriminator is emitted (ITS-JSON /
-// REQ-052). For these slots callers need not remember to take a pointer to
-// preserve `_type`.
+// the pointer. The value receiver is load-bearing for a v1 entry point, not v2:
+// `encoding/json`'s DefaultOptionsV1 sets `CallMethodsWithLegacySemantics`,
+// which skips a pointer-receiver marshal method on an unaddressable value (an
+// interface or map element), and canjson is v1 in this task while
+// `contribution`, `transport` and `testkit` stay on v1 by design. So the
+// mandatory `_type` discriminator is emitted (ITS-JSON / REQ-052) whichever way
+// the value was assigned, and callers need not remember to take a pointer.
 //
 // The generic bounds of `DV_INTERVAL[T]` (`lower` / `upper`) are served the
 // same way: a value bound in a concrete `DVInterval[DVQuantity]` runs its

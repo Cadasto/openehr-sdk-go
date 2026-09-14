@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // updateAuditFromLike builds the write DTO from any AuditDetailsLike,
@@ -121,7 +122,7 @@ func (v *OriginalVersion[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 		LifecycleState:        o.LifecycleState,
 		Attestations:          o.Attestations,
 		Data:                  o.Data,
-	}, enc.Options())
+	}, typereg.MarshalOptions(enc))
 }
 
 // ImportedVersion is the write-side IMPORTED_VERSION element for a
@@ -175,5 +176,5 @@ func (v *ImportedVersion[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 		Signature:    i.Signature,
 		CommitAudit:  v.CommitAudit,
 		Item:         i.Item,
-	}, enc.Options())
+	}, typereg.MarshalOptions(enc))
 }

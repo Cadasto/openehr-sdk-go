@@ -30,7 +30,10 @@ type polyInterface struct {
 //
 // Returns (nil, nil) when the target has no polymorphic interfaces.
 func RenderJSONHooksFile(plan *Plan) ([]byte, error) {
-	ifaces := polymorphicInterfaces(plan)
+	ifaces, err := polymorphicInterfaces(plan)
+	if err != nil {
+		return nil, err
+	}
 	if len(ifaces) == 0 {
 		return nil, nil
 	}
@@ -72,7 +75,7 @@ func RenderJSONHooksFile(plan *Plan) ([]byte, error) {
 // resolved Go name carries no cross-target qualifier ("rm."); an interface used
 // only from the other target already has its hook generated in that target's
 // package.
-func polymorphicInterfaces(plan *Plan) []polyInterface {
+func polymorphicInterfaces(plan *Plan) ([]polyInterface, error) {
 	seen := map[string]polyInterface{}
 	for _, pc := range plan.ConcreteClasses {
 		sc, ok := pc.Class.(*bmm.SimpleClass)
@@ -81,9 +84,7 @@ func polymorphicInterfaces(plan *Plan) []polyInterface {
 		}
 		fields, err := effectiveFields(plan, pc)
 		if err != nil {
-			// A field-enumeration failure surfaces in the codec renderers;
-			// the hook list is best-effort and must not mask that error here.
-			continue
+			return nil, fmt.Errorf("enumerate polymorphic interfaces for %s: %w", pc.BMMName, err)
 		}
 		for _, ef := range fields {
 			name, narrow, parent, ok := fieldPolyInterface(plan, ef.Owner, sc, ef.Prop)
@@ -98,7 +99,7 @@ func polymorphicInterfaces(plan *Plan) []polyInterface {
 		out = append(out, v)
 	}
 	slices.SortFunc(out, func(a, b polyInterface) int { return cmp.Compare(a.GoName, b.GoName) })
-	return out
+	return out, nil
 }
 
 // fieldPolyInterface resolves a property to the polymorphic interface its decode
