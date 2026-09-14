@@ -92,10 +92,12 @@ func BenchmarkEncodeDVQuantity(b *testing.B) {
 	}
 }
 
-// BenchmarkDecodeDVQuantity is the symmetric leaf-type decode. No
-// generated UnmarshalJSON exists for DV_QUANTITY (no polymorphic
-// fields), so this benchmark measures the encoding/json default
-// path through the generated `_type` tag handling.
+// BenchmarkDecodeDVQuantity is the symmetric leaf-type decode.
+// DV_QUANTITY has a generated UnmarshalJSON but no polymorphic field,
+// so the method decodes into its companion struct and copies the
+// fields across: this benchmark measures the nil-receiver guard, the
+// `_type` check and the shape-error wrapper with no registry dispatch
+// underneath them.
 func BenchmarkDecodeDVQuantity(b *testing.B) {
 	body := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg"}`)
 	b.SetBytes(int64(len(body)))
@@ -118,8 +120,9 @@ const benchCassette = "Demonstration.v1"
 // BenchmarkDecodeCompositionCassette measures decode plus encode of the largest
 // vendored cassette, the baseline the json/v2 migration is measured against
 // (plan 2026-09-14-json-v2-migration.md phase 3.5). b.SetBytes reports against
-// the input document, so the MB/s figure is comparable with
-// BenchmarkDecodeComposition_400.
+// the input document, so the MB/s figure is throughput per input byte over a
+// decode and an encode together. It is not comparable with the MB/s of
+// BenchmarkDecodeComposition_400, which decodes only.
 //
 // The cassette is held out of the round-trip probes (its DV_MULTIMEDIA content
 // is not byte-stable through the profile) but it decodes and encodes cleanly,

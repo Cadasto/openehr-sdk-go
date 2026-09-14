@@ -18,9 +18,9 @@ package canjson_test
 // encoding/json is itself implemented over json/v2, and both packages honour
 // both custom-unmarshaler interfaces: the v1 `UnmarshalJSON([]byte) error` and
 // the v2 `UnmarshalJSONFrom(*jsontext.Decoder) error`. Every type registered in
-// typereg.Default carries a generated UnmarshalJSON today, so for a cassette
-// both sides of the comparison reach the same generated code, and they will
-// again once ADR 0022 replaces those methods with the streaming pair. What this
+// typereg.Default carries one of the two, so for a cassette both sides of the
+// comparison reach the same generated code, and they still will once ADR 0022
+// swaps which of the two methods that is. What this
 // net therefore pins is entry-point parity rather than a contest between two
 // codec implementations: a consumer calling encoding/json.Unmarshal on an RM
 // type must keep getting the value a consumer calling encoding/json/v2.Unmarshal
@@ -106,11 +106,11 @@ func compareCodecs(ctor func() any, raw []byte) parityVerdict {
 	return verdict
 }
 
-func TestDecodeParityV1V2(t *testing.T) {
+func TestCorpusParityV1V2(t *testing.T) {
 	t.Run("corpus", testParityCorpus)
 	t.Run("control_case_mismatch_is_reported", testParityControlCaseMismatch)
 	t.Run("control_two_cassettes_report_a_field", testParityControlDistinctCassettes)
-	t.Run("registry_census", testParityRegistryCensus)
+	t.Run("RegistryCensus", testParityRegistryCensus)
 }
 
 // testParityCorpus walks testkit/cassettes and compares the two packages on
@@ -130,13 +130,17 @@ func TestDecodeParityV1V2(t *testing.T) {
 //     so there is nothing to decode into and nothing to compare. None today;
 //     the class is counted and logged so a newly vendored cassette of an
 //     unsupported type becomes visible rather than silently dropped.
+//   - JSON that will not parse at all. Kept apart from the class above, which
+//     is about well-formed documents of another shape: a cassette that stopped
+//     parsing is a corrupt file rather than a fixture this net has no opinion
+//     on. None today; counted and logged like the class above.
 //
 // HAR recordings live under testkit/recordings, not under testkit/cassettes,
 // so none reaches this walk.
 func testParityCorpus(t *testing.T) {
 	root := fixtures.CassettesRoot()
-	var scanned, compared, refusedByBoth, skippedNoType, skippedUnregistered int
-	var unregistered, divergent []string
+	var scanned, compared, refusedByBoth, skippedNoType, skippedUnregistered, skippedMalformed int
+	var malformed, unregistered, divergent []string
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -151,17 +155,26 @@ func testParityCorpus(t *testing.T) {
 		if readErr != nil {
 			return fmt.Errorf("read %s: %w", rel, readErr)
 		}
-		var head struct {
-			Type string `json:"_type"`
+		var top any
+		if err := v1.Unmarshal(raw, &top); err != nil {
+			skippedMalformed++
+			malformed = append(malformed, fmt.Sprintf("%s (%v)", rel, err))
+			return nil
 		}
-		if err := v1.Unmarshal(raw, &head); err != nil || head.Type == "" {
+		object, isObject := top.(map[string]any)
+		if !isObject {
 			skippedNoType++
 			return nil
 		}
-		ctor, known := typereg.Default.Lookup(head.Type)
+		typeName, _ := object["_type"].(string)
+		if typeName == "" {
+			skippedNoType++
+			return nil
+		}
+		ctor, known := typereg.Default.Lookup(typeName)
 		if !known {
 			skippedUnregistered++
-			unregistered = append(unregistered, fmt.Sprintf("%s (_type %s)", rel, head.Type))
+			unregistered = append(unregistered, fmt.Sprintf("%s (_type %s)", rel, typeName))
 			return nil
 		}
 		switch verdict := compareCodecs(ctor, raw); {
@@ -182,17 +195,20 @@ func testParityCorpus(t *testing.T) {
 		t.Errorf("encoding/json and encoding/json/v2 disagree on %d of the %d cassettes scanned:\n%s",
 			len(divergent), scanned, strings.Join(divergent, "\n"))
 	}
-	if classified := skippedNoType + skippedUnregistered + refusedByBoth + compared + len(divergent); classified != scanned {
+	if classified := skippedMalformed + skippedNoType + skippedUnregistered + refusedByBoth + compared + len(divergent); classified != scanned {
 		t.Errorf("the census does not add up: %d cassettes classified, %d scanned", classified, scanned)
 	}
 	if compared < minParityDocuments {
-		t.Errorf("only %d cassettes were decoded by both packages, want at least %d; the selection rule is skipping documents it should admit (no usable _type %d, unregistered _type %d, refused by both %d)",
-			compared, minParityDocuments, skippedNoType, skippedUnregistered, refusedByBoth)
+		t.Errorf("only %d cassettes were decoded by both packages, want at least %d; the selection rule is skipping documents it should admit (no usable _type %d, unregistered _type %d, unparsable %d, refused by both %d)",
+			compared, minParityDocuments, skippedNoType, skippedUnregistered, skippedMalformed, refusedByBoth)
 	}
-	t.Logf("cassettes scanned %d: compared %d, refused by both packages %d, skipped without a usable _type %d, skipped on an unregistered _type %d",
-		scanned, compared, refusedByBoth, skippedNoType, skippedUnregistered)
+	t.Logf("cassettes scanned %d: compared %d, refused by both packages %d, skipped without a usable _type %d, skipped on an unregistered _type %d, skipped as unparsable JSON %d",
+		scanned, compared, refusedByBoth, skippedNoType, skippedUnregistered, skippedMalformed)
 	if len(unregistered) > 0 {
 		t.Logf("cassettes carrying a _type the registry does not know:\n  %s", strings.Join(unregistered, "\n  "))
+	}
+	if len(malformed) > 0 {
+		t.Logf("cassettes that would not parse as JSON:\n  %s", strings.Join(malformed, "\n  "))
 	}
 }
 
@@ -200,8 +216,8 @@ func testParityCorpus(t *testing.T) {
 // its own, so each package applies its own member-name matching to it. That is
 // what makes the case mismatch in [testParityControlCaseMismatch] observable,
 // and it is why the control cannot be carried by a vendored cassette: every
-// type in typereg.Default has a generated UnmarshalJSON, which both packages
-// call in preference to their own field matching (see
+// type in typereg.Default has a generated unmarshaler method, which both
+// packages call in preference to their own field matching (see
 // [testParityRegistryCensus]).
 type parityControlValue struct {
 	Type      string  `json:"_type"`
@@ -286,17 +302,20 @@ func testParityControlDistinctCassettes(t *testing.T) {
 	}
 }
 
-// testParityRegistryCensus records why the corpus sweep currently compares two
-// paths through the same generated code, and turns red when that stops being
-// true. Every type registered in typereg.Default carries a generated
-// `UnmarshalJSON([]byte) error`, which both encoding/json and encoding/json/v2
-// call in preference to their own struct field matching.
+// testParityRegistryCensus pins the invariant that makes the corpus sweep
+// readable: both packages reach the same generated code. Every type registered
+// in typereg.Default carries a generated unmarshaler method, and on Go 1.27
+// both encoding/json and encoding/json/v2 call either method in preference to
+// their own struct field matching, so each cassette is compared across two
+// entry points into one implementation rather than across two implementations.
 //
-// This is a transitional pin. ADR 0022 replaces those methods with the
-// streaming `UnmarshalJSONFrom` pair, and on the day that lands this subtest is
-// expected to fail and should be retired: its failure is the signal that the
-// sweep above changed meaning, and the moment to re-read the corpus result
-// rather than assume it still says what it said.
+// The assertion is the disjunction on purpose. Today the generated method is
+// the v1 `UnmarshalJSON([]byte) error`; ADR 0022 replaces it with the streaming
+// `UnmarshalJSONFrom(*jsontext.Decoder) error`, and the invariant holds either
+// way. What turns this red is a registered type that has neither, which would
+// leave the two packages doing their own field matching on it, at which point
+// the sweep above starts comparing two implementations and its result has to be
+// re-read rather than assumed.
 func testParityRegistryCensus(t *testing.T) {
 	names := typereg.Default.Names()
 	if len(names) == 0 {
@@ -309,12 +328,15 @@ func testParityRegistryCensus(t *testing.T) {
 			t.Errorf("Names() listed %q but Lookup(%q) missed it", name, name)
 			continue
 		}
-		if _, isUnmarshaler := ctor().(v1.Unmarshaler); !isUnmarshaler {
+		value := ctor()
+		_, hasV1 := value.(v1.Unmarshaler)
+		_, hasV2 := value.(v2.UnmarshalerFrom)
+		if !hasV1 && !hasV2 {
 			without = append(without, name)
 		}
 	}
 	if len(without) > 0 {
-		t.Errorf("%d of %d registered types no longer carry a generated UnmarshalJSON: %s\nThe corpus sweep above is no longer two paths through one method for those types; re-read its result and retire this subtest",
+		t.Errorf("%d of %d registered types carry neither a generated UnmarshalJSON nor a generated UnmarshalJSONFrom: %s\nFor those types the two packages do their own field matching, so the corpus sweep above is comparing two implementations rather than two entry points into one; re-read its result",
 			len(without), len(names), strings.Join(without, ", "))
 	}
 }

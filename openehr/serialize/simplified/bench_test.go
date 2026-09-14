@@ -20,6 +20,15 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
+// minFlatCorpusBodies is a floor on how many FLAT conformance bodies the codec
+// must accept before the corpus sweep is worth measuring. It plays the part
+// minParityDocuments plays for the parity net in openehr/serialize/canjson: the
+// per-operation figure is a cost over a set discovered at setup, so the set has
+// to be prevented from shrinking quietly. 24 of the 34 bodies clear it today,
+// and the floor sits just below that because a drop of even one body moves the
+// number and invalidates the comparison the baseline exists for.
+const minFlatCorpusBodies = 24
+
 // benchFlatBody is the largest body in the FLAT conformance corpus that this
 // SDK's codec accepts end to end (10 164 bytes).
 //
@@ -60,8 +69,12 @@ func benchFlatTarget(b *testing.B) (*webtemplate.WebTemplate, *templatecompile.C
 // Web Template paths, PARTY_PROXY and party sub-structure on the composer, and
 // bare values for EVENT and DV_PROPORTION. The split is discovered here rather
 // than written down, so a codec that learns one of those families widens the
-// sweep on its own. Because the accepted count is part of what one sweep costs,
-// a ns/op figure only compares against another run over the same accepted set.
+// sweep on its own.
+//
+// The accepted count is the denominator of every figure the sweep reports, so
+// it is not left implicit: [minFlatCorpusBodies] fails the benchmark if the set
+// shrinks, and the sweep reports the count as a bodies/op metric so a reader
+// comparing two runs can see at a glance whether they measured the same corpus.
 func benchFlatCorpus(b *testing.B, wt *webtemplate.WebTemplate, compiled *templatecompile.Compiled) (bodies [][]byte, totalBytes int64) {
 	b.Helper()
 	names, err := fixtures.ListFlatConformance()
@@ -86,8 +99,9 @@ func benchFlatCorpus(b *testing.B, wt *webtemplate.WebTemplate, compiled *templa
 		bodies = append(bodies, raw)
 		totalBytes += int64(len(raw))
 	}
-	if len(bodies) == 0 {
-		b.Fatalf("no body in the %d-body FLAT conformance corpus decoded and re-encoded", len(names))
+	if len(bodies) < minFlatCorpusBodies {
+		b.Fatalf("%d of the %d bodies in the FLAT conformance corpus decoded and re-encoded, want at least %d; the sweep below would measure a smaller corpus than the baseline it is compared against",
+			len(bodies), len(names), minFlatCorpusBodies)
 	}
 	return bodies, totalBytes
 }
@@ -112,6 +126,11 @@ func BenchmarkFlatCorpusRoundTrip(b *testing.B) {
 			}
 		}
 	}
+	// The denominator, reported beside ns/op: one operation is one sweep of
+	// this many bodies, and two runs are only comparable at the same count.
+	// Reported after the loop because the first b.Loop() call resets the timer,
+	// which also clears custom metrics registered before it.
+	b.ReportMetric(float64(len(bodies)), "bodies/op")
 }
 
 // BenchmarkUnmarshalFlat measures FLAT decode of a single large body, the
