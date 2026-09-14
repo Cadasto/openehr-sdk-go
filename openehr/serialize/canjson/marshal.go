@@ -5,6 +5,7 @@ import (
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
@@ -14,11 +15,10 @@ import (
 // counterpart of [ErrInvalidShape], which stays decode-only: the two,
 // together with the transport-level transport.ErrInvalidShape, are
 // three distinct sentinels, so `errors.Is` alone tells "this value
-// cannot be encoded" from "these bytes cannot be decoded". The
-// underlying encoder error — a [json.SemanticError] for a value the
-// codec cannot represent (a NaN, a channel), a [jsontext.SyntacticError]
-// for invalid UTF-8 reached on output — stays reachable through
-// unwrapping.
+// cannot be encoded" from "these bytes cannot be decoded". The codec's
+// own error stays reachable through unwrapping (a [json.SemanticError]
+// for a value the codec cannot represent, such as a NaN or a channel,
+// or a [jsontext.SyntacticError] for invalid UTF-8 reached on output).
 var ErrInvalidValue = errors.New("canjson: value cannot be encoded")
 
 // Marshal returns the canonical JSON encoding of v.
@@ -31,7 +31,7 @@ var ErrInvalidValue = errors.New("canjson: value cannot be encoded")
 // and nil-container spellings the generated methods use. `<`, `>` and
 // `&` are emitted literally: v2 does not HTML-escape (REQ-052).
 //
-// A failure wraps [ErrInvalidValue] over the encoder's own error with
+// A failure wraps [ErrInvalidValue] over the codec's own error with
 // `%w: %w`, so both the sentinel and the cause stay reachable
 // (REQ-052). Success returns the encoder's bytes unchanged.
 func Marshal(v any) ([]byte, error) {
@@ -44,13 +44,22 @@ func Marshal(v any) ([]byte, error) {
 
 // MarshalIndent is like [Marshal] but applies prefix and indent to
 // each element, through [jsontext.WithIndentPrefix] and
-// [jsontext.WithIndent]. Use for human inspection only — round-trip
+// [jsontext.WithIndent]. Use for human inspection only; round-trip
 // fidelity is asserted semantically over compact [Marshal] output, not
 // by comparing indented bytes (REQ-052).
 //
-// A failure wraps [ErrInvalidValue] the same way [Marshal] does
-// (REQ-052).
+// One behaviour differs from the v1 codec: encoding/json/v2 accepts only
+// spaces and tabs in prefix and indent, so a prefix or indent carrying
+// any other character is refused with [ErrInvalidValue] rather than
+// passed through. The refusal happens before any option is built, so no
+// panic crosses the package boundary (REQ-025). A failure otherwise
+// wraps [ErrInvalidValue] the same way [Marshal] does (REQ-052).
 func MarshalIndent(v any, prefix, indent string) ([]byte, error) {
+	// The caller's string is not echoed: the sentinel plus a fixed message
+	// classify the failure without leaking the offending input.
+	if strings.Trim(prefix, " \t") != "" || strings.Trim(indent, " \t") != "" {
+		return nil, fmt.Errorf("%w: MarshalIndent: indent and prefix may contain only spaces and tabs", ErrInvalidValue)
+	}
 	b, err := json.Marshal(v, typereg.EncodeOptions(),
 		jsontext.WithIndentPrefix(prefix), jsontext.WithIndent(indent))
 	if err != nil {

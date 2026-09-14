@@ -599,32 +599,45 @@ func TestUnmarshalMantissaPrecisionLossInheritedByDVProportion(t *testing.T) {
 // names SHOULD be unique, and an object with duplicates has no single defined
 // value. jsontext raises jsontext.ErrDuplicateName during tokenisation, before
 // any generated decode runs, so the entry point is where canjson attaches the
-// classification; the operation-specific cause stays reachable.
+// classification; the operation-specific cause stays reachable. The map target
+// is the case where that entry-point attachment is the only thing adding the
+// sentinel, because no generated type's funnel sits on the path.
 //
-// Can-fail controls: (1) thread jsontext.AllowDuplicateNames(true) into the
-// entry-point options and the codec keeps the last value with no error, so the
-// "want a refusal" assertion goes red; (2) delete the classifyDecode wrap in
-// decode.go and the error still occurs but loses the sentinel, so the
-// ErrInvalidShape assertion goes red while the ErrDuplicateName one stays green.
+// Can-fail control: delete the typereg.ClassifyShape wrap in canjson's
+// classifyDecode and the error still occurs but loses the sentinel, so the
+// ErrInvalidShape assertion goes red while the jsontext.ErrDuplicateName one
+// stays green. Threading jsontext.AllowDuplicateNames(true) into the
+// entry-point options does NOT turn the RM-type case red, because
+// typereg.peekType re-validates each subtree with default options and still
+// rejects the duplicate regardless of the entry option.
 func TestUnmarshalDuplicateMemberNameWrapsErrInvalidShape(t *testing.T) {
-	// A duplicate "units" inside a DV_QUANTITY: the tokens are valid, the object
-	// is not.
-	in := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg","units":"g"}`)
-	var q rm.DVQuantity
-	err := canjson.Unmarshal(in, &q)
-	if err == nil {
-		t.Fatalf("Unmarshal(%s) = nil; want a duplicate-name refusal", in)
+	// A duplicate "units": the tokens are valid, the object is not.
+	const in = `{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg","units":"g"}`
+	cases := []struct {
+		name   string
+		target func() any
+	}{
+		{"generated RM type", func() any { return &rm.DVQuantity{} }},
+		{"map[string]any", func() any { return &map[string]any{} }},
 	}
-	// The shared sentinel, so a caller classifies with errors.Is alone.
-	if !errors.Is(err, canjson.ErrInvalidShape) {
-		t.Errorf("err = %v; want errors.Is(_, canjson.ErrInvalidShape)", err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := canjson.Unmarshal([]byte(in), tc.target())
+			if err == nil {
+				t.Fatalf("Unmarshal(%s) = nil; want a duplicate-name refusal", in)
+			}
+			// The shared sentinel, so a caller classifies with errors.Is alone.
+			if !errors.Is(err, canjson.ErrInvalidShape) {
+				t.Errorf("err = %v; want errors.Is(_, canjson.ErrInvalidShape)", err)
+			}
+			// The operation-specific facet: the duplicate-name cause itself, not
+			// merely the shared sentinel a different shape failure would also carry.
+			if !errors.Is(err, jsontext.ErrDuplicateName) {
+				t.Errorf("err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
+			}
+			assertShapeSentinelDistinct(t, err)
+		})
 	}
-	// The operation-specific facet: the duplicate-name cause itself, not merely
-	// the shared sentinel a different shape failure would also carry.
-	if !errors.Is(err, jsontext.ErrDuplicateName) {
-		t.Errorf("err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
-	}
-	assertShapeSentinelDistinct(t, err)
 }
 
 // TestDecoderDecodeDuplicateMemberNameWrapsErrInvalidShape is the streaming
@@ -645,4 +658,34 @@ func TestDecoderDecodeDuplicateMemberNameWrapsErrInvalidShape(t *testing.T) {
 		t.Errorf("err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
 	}
 	assertShapeSentinelDistinct(t, err)
+}
+
+// TestUnmarshalMatchesMemberNamesExactly pins REQ-052's exact-case member
+// matching: canonical-JSON member names match case-sensitively on this codec
+// path (the case-insensitive Extras rule binds only the Definition, System and
+// AQL surfaces, which stay on v1). encoding/json/v2 matches names exactly by
+// default, and canjson sets no case-insensitive option, so a wrongly-cased
+// member does not populate its field. This is a behaviour change from the v1
+// codec, which matched a struct field case-insensitively.
+//
+// Can-fail control: thread jsonv2.MatchCaseInsensitiveNames(true) into the
+// entry-point options and "Magnitude" would populate the field, so the
+// zero-magnitude assertion goes red.
+func TestUnmarshalMatchesMemberNamesExactly(t *testing.T) {
+	// "Magnitude" is mis-cased; "units" is exact. The mis-cased member is an
+	// unknown key the codec ignores (canjson does not reject unknown members),
+	// so it must not reach the lowercase magnitude field.
+	in := []byte(`{"_type":"DV_QUANTITY","Magnitude":1,"units":"kg"}`)
+	var q rm.DVQuantity
+	if err := canjson.Unmarshal(in, &q); err != nil {
+		t.Fatalf("Unmarshal(%s) = %v; want nil (a mis-cased member is ignored, not an error)", in, err)
+	}
+	// The operation-specific facet: the exactly-cased member populated, the
+	// mis-cased one did not.
+	if q.Magnitude != 0 {
+		t.Errorf("q.Magnitude = %v; want 0 — a mis-cased \"Magnitude\" must not match the field", q.Magnitude)
+	}
+	if q.Units != "kg" {
+		t.Errorf("q.Units = %q; want \"kg\" — the exactly-cased member must populate", q.Units)
+	}
 }

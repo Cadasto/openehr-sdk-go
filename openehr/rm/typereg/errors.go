@@ -158,6 +158,26 @@ func WrapShapeError(rmType string, err error) error {
 	return &shapeError{rmType: rmType, cause: err}
 }
 
+// ClassifyShape attaches [ErrInvalidShape] to a failure the codec detects
+// outside a generated type's funnel, such as a duplicate member name the
+// tokenizer refuses before any RM decode runs (REQ-052). It preserves err's
+// message and keeps errors.Unwrap a single step to the cause, exactly as
+// [WrapShapeError] does for an in-funnel shape failure, but adds no
+// `canjson: <rmType>:` prefix because no single RM type owns the failure.
+//
+// A nil err returns nil. An err already carrying a [DecodeError] is returned
+// untouched, so a dispatch failure keeps its classification-free path (the same
+// bypass WrapShapeError applies).
+func ClassifyShape(err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, ok := errors.AsType[*DecodeError](err); ok {
+		return err
+	}
+	return &shapeError{cause: err}
+}
+
 // shapeError is the [ErrInvalidShape]-carrying error [WrapShapeError]
 // returns. It is unexported: consumers classify with errors.Is against
 // the sentinel and reach the cause with errors.As, so the concrete type
@@ -168,8 +188,13 @@ type shapeError struct {
 }
 
 // Error reproduces the `canjson: <RM_TYPE>: <cause>` text the generated
-// methods have always returned.
+// methods have always returned. When no RM type owns the failure (the
+// [ClassifyShape] path for a tokenizer-level refusal), it reproduces the
+// cause's message verbatim, so the classification adds no prefix.
 func (e *shapeError) Error() string {
+	if e.rmType == "" {
+		return e.cause.Error()
+	}
 	return "canjson: " + e.rmType + ": " + e.cause.Error()
 }
 

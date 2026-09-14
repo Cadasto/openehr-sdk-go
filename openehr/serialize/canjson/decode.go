@@ -4,48 +4,47 @@ import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/internal/poly"
 )
 
-// ErrInvalidShape is the canjson sentinel for JSON-level shape errors —
+// ErrInvalidShape is the canjson sentinel for JSON-level shape errors:
 // valid JSON in the wrong shape for the target RM type, such as a type
 // mismatch on a non-polymorphic field or a magnitude out of float64
 // range. It is decode-only: encode failures wrap [ErrInvalidValue]
 // instead (REQ-052).
 //
-// It is wrapped over the underlying codec error, which stays reachable
-// with errors.As, in two situations (REQ-052):
+// The sentinel is attached over the codec's own error, which stays
+// reachable through unwrapping, in two situations (REQ-052):
 //
-//   - A shape failure raised inside a generated RM type's decode — the
-//     `canjson: <RM_TYPE>:` family — where the bytes are valid JSON but
-//     the wrong shape for the target. The cause is a
-//     *encoding/json/v2.SemanticError. When the failure happens inside
+//   - A shape failure raised inside a generated RM type's decode (the
+//     `canjson: <RM_TYPE>:` family), where the bytes are valid JSON but
+//     the wrong shape for the target. The cause is the codec's own error,
+//     a *encoding/json/v2.SemanticError. When the failure happens inside
 //     the concrete type selected at a polymorphic slot the error is ALSO
 //     a [DecodeError] naming that slot, so both classifications hold: the
 //     path from the [DecodeError], the kind from this sentinel.
 //   - A JSON object carrying the same member name twice. jsontext refuses
 //     it (RFC 8259 § 4: names SHOULD be unique, and duplicates leave no
 //     single defined value) before any generated decode runs; the entry
-//     point classifies that refusal with this sentinel. The cause stays
-//     reachable, so errors.Is finds both this sentinel and
+//     point classifies that refusal with this sentinel, preserving the
+//     message, so errors.Is finds both this sentinel and
 //     jsontext.ErrDuplicateName.
 //
 // Two decode failures stay OUTSIDE the sentinel by design (REQ-052) and
 // never acquire it:
 //
 //   - Malformed JSON, which the codec reports before any generated decode
-//     runs. No sentinel: [Unmarshal] and [Decoder.Decode] both return a
-//     *encoding/json/jsontext.SyntacticError, except that [Decoder.Decode]
-//     reports an empty stream as io.EOF. Invalid UTF-8 and a lone
-//     surrogate escape are refused on this same path (jsontext rejects
-//     them before rm.Character sees the bytes), so they too are malformed
-//     input carrying no sentinel — a bare *jsontext.SyntacticError.
-//   - A polymorphic dispatch failure — a missing, unknown or mismatched
-//     `_type`, at a slot or on `/_type` for the whole value — which
+//     runs, as the codec's own syntax or truncated-input error (an
+//     encoding/json/jsontext.SyntacticError). No sentinel: [Unmarshal]
+//     reports it directly, and [Decoder.Decode] reports an empty stream
+//     as io.EOF. Invalid UTF-8 and a lone surrogate escape are refused on
+//     this same path (jsontext rejects them before rm.Character sees the
+//     bytes), so they too are malformed input carrying no sentinel.
+//   - A polymorphic dispatch failure (a missing, unknown or mismatched
+//     `_type`, at a slot or on `/_type` for the whole value), which
 //     arrives as a [DecodeError] carrying the path. No sentinel either,
 //     even when it travels out through an enclosing type's
 //     `canjson: <RM_TYPE>:` prefix. Match it with errors.As for
@@ -94,15 +93,17 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 // decode-side shape classification REQ-052 mandates. jsontext raises
 // [jsontext.ErrDuplicateName] before any generated decode method runs (a
 // well-formed value whose shape is nonetheless rejected), so it reaches
-// the entry point as a bare *jsontext.SyntacticError with no sentinel;
-// this wraps [ErrInvalidShape] over it while keeping the cause reachable
-// through unwrapping. Every other error is returned untouched: a shape
-// failure raised inside a generated type already carries the sentinel
-// from its own funnel, and malformed JSON and dispatch failures MUST NOT
-// acquire it.
+// the entry point as a bare *jsontext.SyntacticError with no sentinel.
+// [typereg.ClassifyShape] attaches [ErrInvalidShape] the same way every
+// in-funnel shape failure is wrapped: the message is preserved and a
+// single errors.Unwrap step still lands on the cause, so errors.Is finds
+// both this sentinel and jsontext.ErrDuplicateName. Every other error is
+// returned untouched: a shape failure raised inside a generated type
+// already carries the sentinel from its own funnel, and malformed JSON
+// and dispatch failures MUST NOT acquire it.
 func classifyDecode(err error) error {
 	if err != nil && errors.Is(err, jsontext.ErrDuplicateName) {
-		return fmt.Errorf("%w: %w", ErrInvalidShape, err)
+		return typereg.ClassifyShape(err)
 	}
 	return err
 }
@@ -155,9 +156,9 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 // v. Errors follow the same classification as [Unmarshal], except
 // where reading a stream rather than a whole input changes the answer.
 // An empty or whitespace-only stream is io.EOF, where [Unmarshal]
-// reports a *encoding/json/jsontext.SyntacticError; and content after
-// the first value is simply the next value in the stream, not an error
-// — `{"a":1}x` fails in [Unmarshal] and succeeds here. A truncated
+// reports the codec's own syntax error; and content after the first
+// value is simply the next value in the stream, not an error, so
+// `{"a":1}x` fails in [Unmarshal] and succeeds here. A truncated
 // value is a *jsontext.SyntacticError wrapping io.ErrUnexpectedEOF in
 // both.
 func (d *Decoder) Decode(v any) error {

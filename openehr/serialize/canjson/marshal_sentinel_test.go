@@ -92,3 +92,52 @@ func TestDecodeFailureDoesNotCarryErrInvalidValue(t *testing.T) {
 		t.Errorf("encode-only sentinel must not appear on a decode path; got %v", err)
 	}
 }
+
+// TestMarshalIndentRefusesNonWhitespaceIndent pins R23: encoding/json/v2's
+// indent options accept only spaces and tabs and panic on anything else, where
+// the v1 codec accepted any character. MarshalIndent refuses a bad prefix or
+// indent with ErrInvalidValue before building any option, so the call returns
+// an error rather than letting a panic cross the package boundary (REQ-025).
+//
+// Can-fail control: drop the strings.Trim guard in MarshalIndent and the
+// newline-prefix and letter-indent cases panic (recovered here as a fatal test
+// failure) instead of returning ErrInvalidValue.
+func TestMarshalIndentRefusesNonWhitespaceIndent(t *testing.T) {
+	cases := []struct {
+		name           string
+		prefix, indent string
+		wantErr        bool
+	}{
+		{"newline prefix", "\n", "  ", true},
+		{"letter indent", "", "x", true},
+		{"spaces and tab accepted", " \t", " \t", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				out []byte
+				err error
+			)
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						t.Fatalf("MarshalIndent panicked on prefix=%q indent=%q: %v; a public entry point must return an error, not panic (REQ-025)", tc.prefix, tc.indent, r)
+					}
+				}()
+				out, err = canjson.MarshalIndent(map[string]int{"a": 1}, tc.prefix, tc.indent)
+			}()
+			if tc.wantErr {
+				if !errors.Is(err, canjson.ErrInvalidValue) {
+					t.Errorf("MarshalIndent(prefix=%q, indent=%q) err = %v; want errors.Is(_, canjson.ErrInvalidValue)", tc.prefix, tc.indent, err)
+				}
+				if out != nil {
+					t.Errorf("no bytes on refusal; got %q", out)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("MarshalIndent(prefix=%q, indent=%q) err = %v; want nil (spaces and tabs are allowed)", tc.prefix, tc.indent, err)
+			}
+		})
+	}
+}
