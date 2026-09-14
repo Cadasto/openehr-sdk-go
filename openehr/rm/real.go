@@ -1,7 +1,7 @@
 package rm
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"strconv"
@@ -102,9 +102,10 @@ var errPrecisionLoss = classifyShape(fmt.Errorf("rm.Real: literal carries more t
 //
 // The two checks run in this order: the literal is PARSED first, into a
 // temporary, and a parse or range failure is returned as it comes —
-// *strconv.NumError from the quoted arm, *json.UnmarshalTypeError from
-// the bare arm, each reachable with errors.As and each staying outside
-// typereg.ErrInvalidShape. Only a literal that parsed is then measured
+// *strconv.NumError from the quoted arm, an encoding/json/v2
+// *json.SemanticError (or a *jsontext.SyntacticError for a malformed
+// literal) from the bare arm, each reachable with errors.As and each
+// staying outside typereg.ErrInvalidShape. Only a literal that parsed is then measured
 // against maxSignificantDigits, and only a literal that passed both is
 // assigned to the receiver. Reversing the order would report
 // "1e400" or "123456789012345678x" as precision loss, which is a

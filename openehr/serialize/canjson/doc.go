@@ -119,8 +119,9 @@
 //     reports an empty stream as io.EOF and a truncated value wraps
 //     io.ErrUnexpectedEOF. Invalid UTF-8 and a lone surrogate escape are
 //     refused on this same path, before rm.Character sees the bytes, so
-//     they too are malformed input carrying no sentinel. Task 7
-//     reconciles rm.Character's own side of the substitution rule.
+//     they too are malformed input carrying no sentinel. rm.Character's
+//     own string arm relies on that same tokenizer refusal and no longer
+//     inspects the raw literal for a substituted U+FFFD (ruling R15).
 //   - A duplicate member name is refused during tokenisation, before any
 //     generated decode method runs. The entry point classifies that
 //     refusal with [ErrInvalidShape], keeping the cause reachable, so
@@ -150,7 +151,7 @@
 //     worth stating per arm. On rm.Character a refusal it raises itself,
 //     applying the one-character rule to a value the tokenizer accepted
 //     (an empty or multi-character string, or a control character, and the
-//     encoding/json type mismatch of its string arm), carries the
+//     encoding/json/v2 type mismatch of its string arm), carries the
 //     sentinel. A lone surrogate or invalid UTF-8 does not reach
 //     rm.Character on this path: the tokenizer refuses it first, so it is
 //     malformed input carrying no sentinel, the same treatment as

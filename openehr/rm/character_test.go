@@ -3,6 +3,7 @@ package rm_test
 import (
 	"bytes"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"strings"
 	"testing"
@@ -161,16 +162,17 @@ func TestCharacterUnmarshalJSONNumber(t *testing.T) {
 // point, so U+FFFD is itself a legal Character and MUST survive every
 // codec; refusing it outright would make a valid character
 // unrepresentable in JSON, text and XML alike. What MUST be refused is a
-// SUBSTITUTED U+FFFD: encoding/json replaces a lone UTF-16 surrogate
-// escape with U+FFFD and reports no error, so a rune count alone would
+// SUBSTITUTED U+FFFD: a lone UTF-16 surrogate escape or a raw invalid
+// UTF-8 byte, which under v1 decoded to U+FFFD with no error and could
 // launder corrupted input into an apparently valid Character.
 //
-// The JSON string arm is the only entry point that can tell the two
-// apart, because only it still holds the raw bytes between the quotes:
-// U+FFFD is genuine there when the literal spells it (three raw bytes or
-// a \uFFFD escape) and substituted otherwise. An invalid raw byte never
-// reaches that decision — the whole input fails the UTF-8 check first
-// (REQ-052; diagnostics value-free per REQ-093).
+// Under encoding/json/v2 the tokenizer refuses both forms while decoding
+// the string (ruling R15), so they never reach the one-rune rule: the
+// refusal is json.Unmarshal's, not a byte inspection rm.Character runs.
+// A U+FFFD written as itself (three raw bytes or a \uFFFD escape) decodes
+// cleanly and is accepted, and a well-formed surrogate PAIR decodes to
+// the astral character it names (REQ-052; diagnostics value-free per
+// REQ-093).
 func TestCharacterRefusesSubstitutedReplacementRune(t *testing.T) {
 	// Every refusal must leave the receiver untouched, so each case starts
 	// from a legal Character rather than the zero value: a decoder that
@@ -194,10 +196,9 @@ func TestCharacterRefusesSubstitutedReplacementRune(t *testing.T) {
 	}
 
 	// The accepted spellings all name U+FFFD (or, for the surrogate-pair
-	// cases, prove a well-formed pair is not caught by the substitution
-	// check) and all re-encode to the literal character — encoding/json
-	// emits `\ufffd` only for bytes that are not valid UTF-8, never for a
-	// genuine U+FFFD rune.
+	// cases, prove a well-formed pair decodes to the astral character it
+	// names) and all re-encode to the literal character: a genuine U+FFFD
+	// rune is valid UTF-8, so the encoder writes it verbatim.
 	acceptedDecodes := []struct {
 		name string
 		in   []byte
@@ -378,8 +379,11 @@ func TestCharacterDecodeRefusalMessageUnchangedByClassification(t *testing.T) {
 	}{
 		{"empty string", []byte(`""`), "rm.Character: must be exactly one character, got 0"},
 		{"two characters", []byte(`"=="`), "rm.Character: must be exactly one character, got 2"},
-		{"raw invalid UTF-8 byte", []byte{'"', 0xff, '"'}, "rm.Character: input is not valid UTF-8"},
-		{"substituted surrogate escape", []byte(`"\uD800"`), "rm.Character: a lone UTF-16 surrogate escape was substituted"},
+		// Under encoding/json/v2 the tokenizer refuses these two forms while
+		// decoding the string, before characterFault runs (ruling R15), so the
+		// message is jsontext's own, still behind rm.Character's prefix.
+		{"raw invalid UTF-8 byte", []byte{'"', 0xff, '"'}, "rm.Character: jsontext: invalid UTF-8 after offset 1"},
+		{"substituted surrogate escape", []byte(`"\uD800"`), "rm.Character: jsontext: invalid surrogate pair `\\uD800\"` in string after offset 1"},
 		{"unusable code point", []byte("0"), "rm.Character: number is not a usable code point"},
 	}
 	for _, tc := range cases {
@@ -398,10 +402,10 @@ func TestCharacterDecodeRefusalMessageUnchangedByClassification(t *testing.T) {
 		})
 	}
 
-	// A pass-through encoding/json error is classified the same way, so
-	// the typed cause stays reachable — the half of the MUST that a
-	// text-only wrap would satisfy and an opaque replacement would not.
-	t.Run("encoding/json pass-through", func(t *testing.T) {
+	// A pass-through codec error is classified the same way, so the typed
+	// cause stays reachable: the half of the MUST that a text-only wrap
+	// would satisfy and an opaque replacement would not.
+	t.Run("codec pass-through", func(t *testing.T) {
 		var c rm.Character
 		err := c.UnmarshalJSON([]byte("true"))
 		if err == nil {
@@ -410,8 +414,8 @@ func TestCharacterDecodeRefusalMessageUnchangedByClassification(t *testing.T) {
 		if !errors.Is(err, typereg.ErrInvalidShape) {
 			t.Errorf("err = %v; want errors.Is(err, typereg.ErrInvalidShape)", err)
 		}
-		if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
-			t.Errorf("err = %v (%T); want errors.AsType[*json.UnmarshalTypeError] to reach the cause", err, err)
+		if _, ok := errors.AsType[*jsonv2.SemanticError](err); !ok {
+			t.Errorf("err = %v (%T); want errors.AsType[*encoding/json/v2.SemanticError] to reach the cause", err, err)
 		}
 		cause := errors.Unwrap(err)
 		if cause == nil {

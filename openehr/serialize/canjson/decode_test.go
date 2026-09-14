@@ -1,7 +1,6 @@
 package canjson_test
 
 import (
-	"encoding/json"
 	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"errors"
@@ -180,7 +179,7 @@ var shapeErrorInputs = []struct {
 	// costs no diagnostic" half of the clause. The two in-type rows fail
 	// on different causes because rm.Real accepts quoted decimals
 	// (ADR 0004): a quoted non-number fails in strconv, an out-of-range
-	// JSON number fails in encoding/json.
+	// JSON number fails in encoding/json/v2 (a *json.SemanticError).
 	assertCause func(t *testing.T, err error)
 }{
 	{
@@ -212,8 +211,8 @@ var shapeErrorInputs = []struct {
 		wantShapeSentinel: true,
 		assertCause: func(t *testing.T, err error) {
 			t.Helper()
-			if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
-				t.Errorf("err = %v; want errors.As to still reach *json.UnmarshalTypeError under the sentinel", err)
+			if _, ok := errors.AsType[*jsonv2.SemanticError](err); !ok {
+				t.Errorf("err = %v; want errors.As to still reach *encoding/json/v2.SemanticError under the sentinel", err)
 			}
 		},
 	},
@@ -539,8 +538,8 @@ func TestDecoderDecodeStreamDivergesFromUnmarshal(t *testing.T) {
 // floating-point clause that IS met: an out-of-range magnitude fails
 // with a typed error a caller can reach by errors.As, even though the
 // generated UnmarshalJSON wraps it behind a `canjson: DV_QUANTITY:`
-// prefix. "Typed error" here is *json.UnmarshalTypeError, not the
-// ErrInvalidShape sentinel — wrapping the sentinel alone would not
+// prefix. "Typed error" here is *encoding/json/v2.SemanticError, not the
+// ErrInvalidShape sentinel: wrapping the sentinel alone would not
 // discharge the clause.
 func TestUnmarshalOverflowIsATypedError(t *testing.T) {
 	var q rm.DVQuantity
@@ -548,8 +547,8 @@ func TestUnmarshalOverflowIsATypedError(t *testing.T) {
 	if err == nil {
 		t.Fatal("Unmarshal(magnitude 1e400) = nil; want a typed range error")
 	}
-	if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
-		t.Errorf("err = %v (%T); want errors.AsType to reach *json.UnmarshalTypeError", err, err)
+	if _, ok := errors.AsType[*jsonv2.SemanticError](err); !ok {
+		t.Errorf("err = %v (%T); want errors.AsType to reach *encoding/json/v2.SemanticError", err, err)
 	}
 }
 
