@@ -6,6 +6,12 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### Follow-ups to the json/v2 migration (2026-09-15)
+
+| Plan | Scope | Covers | Notes |
+|---|---|---|---|
+| [2026-09-15-widen-composition-corpus.md](2026-09-15-widen-composition-corpus.md) | All seven `compositionJSONExcluded` cassettes join the PROBE-030 corpus; four carry RM-floor findings in the vendored content and are held out of the floor leg only, by name | [REQ-052](../specifications/wire.md#req-052) via PROBE-030 | In progress on `test/widen-composition-corpus`; named follow-up (R33) of the archived json/v2 plan |
+
 ### Go 1.27 floor (2026-09-03)
 
 | Plan | Scope | Covers | Notes |
