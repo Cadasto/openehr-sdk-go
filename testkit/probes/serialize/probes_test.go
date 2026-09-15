@@ -82,6 +82,43 @@ func TestProbe030InputsCoverWholeCorpus(t *testing.T) {
 	}
 }
 
+// TestProbe030HeldOutInputsFailFloorButPassFidelity pins that every SkipFloor
+// hold-out is load-bearing: with the floor leg on it fails on the RM floor
+// (REQ-112), and with the hold-out honored it passes on the fidelity legs. A
+// spurious hold-out (one whose cassette already passes the floor) turns the
+// first assertion red; a fidelity regression turns the second red.
+func TestProbe030HeldOutInputsFailFloorButPassFidelity(t *testing.T) {
+	var held int
+	for _, in := range serializeprobes.Probe030Inputs {
+		if !in.SkipFloor {
+			continue
+		}
+		held++
+		t.Run(in.Name, func(t *testing.T) {
+			floorOn, err := serializeprobes.Probe030CanjsonRoundTrip(in.Body, in.Factory)
+			if err != nil {
+				t.Fatalf("floor-on framework error: %v", err)
+			}
+			if floorOn.Status != "fail" {
+				t.Errorf("floor-on status = %q, want fail: a SkipFloor hold-out must genuinely fail the floor", floorOn.Status)
+			}
+			if !strings.Contains(floorOn.Detail, "RM floor") {
+				t.Errorf("floor-on detail = %q, want it to name the RM floor (REQ-112)", floorOn.Detail)
+			}
+			honored, err := serializeprobes.Probe030CanjsonRoundTripInput(in)
+			if err != nil {
+				t.Fatalf("hold-out framework error: %v", err)
+			}
+			if honored.Status != "pass" {
+				t.Errorf("hold-out status = %q (detail: %s), want pass on the fidelity legs", honored.Status, honored.Detail)
+			}
+		})
+	}
+	if held == 0 {
+		t.Fatal("no SkipFloor inputs found; the hold-out guard is asserting nothing")
+	}
+}
+
 // TestProbe038 runs PROBE-038 across the polymorphic-decode fixture
 // set vendored under testkit/cassettes/rm/polymorphic/ and asserts
 // every input decodes + re-marshals with the original `_type`
