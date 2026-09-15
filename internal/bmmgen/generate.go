@@ -340,7 +340,7 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 		}
 	}
 
-	// Polymorphic decode hooks — one file per target, in the target
+	// Polymorphic decode hooks, one file per target, in the target
 	// package (they close over the interface types it declares) and
 	// registered into the shared typereg aggregate at init (ADR 0022).
 	hooksBody, err := RenderJSONHooksFile(plan)

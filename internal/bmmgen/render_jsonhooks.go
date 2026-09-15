@@ -26,7 +26,7 @@ type polyInterface struct {
 // per polymorphic interface owned by the target, registered into the typereg
 // aggregate at init (ADR 0022, ruling R6). Every nested decode threads the
 // aggregate through [typereg.Unmarshalers], so a polymorphic slot resolves from
-// any entry point — including a bare encoding/json/v2 Unmarshal with no options.
+// any entry point, including a bare encoding/json/v2 Unmarshal with no options.
 //
 // Returns (nil, nil) when the target has no polymorphic interfaces.
 func RenderJSONHooksFile(plan *Plan) ([]byte, error) {
@@ -122,7 +122,7 @@ func fieldPolyInterface(plan *Plan, owner, emitting *bmm.SimpleClass, prop bmm.P
 	case polySingleNarrow, polySliceNarrow:
 		return n, true, strings.TrimSuffix(n, "Like"), true
 	case polyNone:
-		// monomorphic — no hook
+		// monomorphic, no hook
 	}
 	return "", false, "", false
 }

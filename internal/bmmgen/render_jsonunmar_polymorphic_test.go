@@ -118,7 +118,7 @@ func TestPolymorphicPropertyRendersTyperegDispatch(t *testing.T) {
 	}
 	// The open bound's polymorphic dispatch is served by the DVOrdered decode
 	// hook. Its absence means the interval bounds would decode as a nil
-	// interface — the failure the old per-field DecodeAs guarded against.
+	// interface, the failure the old per-field DecodeAs guarded against.
 	hooks, err := RenderJSONHooksFile(plan)
 	if err != nil {
 		t.Fatalf("RenderJSONHooksFile: %v", err)

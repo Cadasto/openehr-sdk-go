@@ -14,7 +14,7 @@ import (
 //   - flat wire struct: `_type` must be the FIRST json tag in the chunk.
 //   - alias: the anonymous wrapper's `_type` field must precede the embedded
 //     `*<alias>` (the embed carries no tag, so a tag-order check alone would
-//     miss a reordering — this compares the field positions).
+//     miss a reordering: this compares the field positions).
 //
 // aliasEmbed is "*"+aliasTypeName(GoName) for an alias-shape class, or "" for a
 // flat-shape class.
@@ -44,8 +44,8 @@ func marshalLeadsWithType(chunk, aliasEmbed string) bool {
 // with `_type`, regardless of the class's own field order.
 //
 // Can-fail control: [marshalLeadsWithType] is proved discriminating on a
-// deliberately reordered rendering — one whose `_type` follows the alias embed
-// — so the census is not trivially satisfied. Moving the `_type` field after
+// deliberately reordered rendering, one whose `_type` follows the alias embed,
+// so the census is not trivially satisfied. Moving the `_type` field after
 // the alias in renderMarshalAlias, or after another field in renderMarshalFlat,
 // turns the census red.
 func TestRenderMarshalLeadsWithType(t *testing.T) {
@@ -56,11 +56,11 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 	// shape the witness happens not to exercise.
 	const aliasReordered = "\t}{\n\t\t*rawX\n\t\tType string `json:\"_type\"`\n"
 	if marshalLeadsWithType(aliasReordered, "*rawX") {
-		t.Fatal("marshalLeadsWithType accepted an alias wrapper whose embed precedes `_type` — the alias branch of the witness does not discriminate")
+		t.Fatal("marshalLeadsWithType accepted an alias wrapper whose embed precedes `_type`, the alias branch of the witness does not discriminate")
 	}
-	const flatReordered = "type XJSONWire struct {\n\tValue string `json:\"value\"`\n\tClass string `json:\"_type\"`\n}"
+	const flatReordered = "type jsonWireX struct {\n\tValue string `json:\"value\"`\n\tClass string `json:\"_type\"`\n}"
 	if marshalLeadsWithType(flatReordered, "") {
-		t.Fatal("marshalLeadsWithType accepted a flat wire struct whose `_type` tag follows another tagged field — the flat branch of the witness does not discriminate")
+		t.Fatal("marshalLeadsWithType accepted a flat wire struct whose `_type` tag follows another tagged field, the flat branch of the witness does not discriminate")
 	}
 
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
@@ -79,7 +79,7 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 				aliasEmbed = "*" + aliasTypeName(pc.GoName)
 			}
 			if !marshalLeadsWithType(chunk, aliasEmbed) {
-				t.Errorf("%s marshaller does not lead with `_type` — the discriminator must be the first member (REQ-052)", pc.BMMName)
+				t.Errorf("%s marshaller does not lead with `_type`: the discriminator must be the first member (REQ-052)", pc.BMMName)
 			}
 			checked++
 		}
@@ -93,7 +93,7 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 // control for TestRoundTripStructuralEquivalence
 // (openehr/serialize/canjson/roundtrip_test.go): a flat-shape decode copies
 // every wire field back to the receiver, so dropping one property from the plan
-// drops its copy — the field would then be silently lost on the round trip.
+// drops its copy: the field would then be silently lost on the round trip.
 //
 // DV_CODED_TEXT is flat-shape (it embeds the marshaler-bearing DVText, so it
 // cannot use the zero-copy alias, ruling R19), which is exactly the shape whose
@@ -133,6 +133,6 @@ func TestRenderFlatDecodeDropPropertyLosesCopy(t *testing.T) {
 		t.Fatalf("renderUnmarshalJSON (dropped): %v", err)
 	}
 	if strings.Contains(trimmed, droppedCopy) {
-		t.Errorf("dropping %s from the plan still emitted its copy %q — a lost property would go unnoticed on the round trip", dropped.Prop.PropertyName(), droppedCopy)
+		t.Errorf("dropping %s from the plan still emitted its copy %q: a lost property would go unnoticed on the round trip", dropped.Prop.PropertyName(), droppedCopy)
 	}
 }

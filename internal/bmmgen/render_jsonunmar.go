@@ -23,7 +23,7 @@ import (
 // method-free alias (zero-copy) for most classes, or a flat wire struct copied
 // back field by field for a class that embeds a marshaler-bearing concrete
 // ancestor (see the promotion note at [effectiveFields]). Polymorphic interface
-// fields resolve through the registered hooks — there is no per-field
+// fields resolve through the registered hooks: there is no per-field
 // typereg.DecodeAs dispatch or json.RawMessage staging any more.
 func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	emitting := concreteClassesIn(file)
@@ -57,7 +57,7 @@ func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	body.WriteString(")\n\n")
 
 	if file.PackagePath != "" {
-		fmt.Fprintf(&body, "// BMM package: %s — canonical-JSON UnmarshalJSONFrom companions\n\n", file.PackagePath)
+		fmt.Fprintf(&body, "// BMM package %s: canonical-JSON UnmarshalJSONFrom companions\n\n", file.PackagePath)
 	} else {
 		body.WriteString("// canonical-JSON UnmarshalJSONFrom companions (foundation classes)\n\n")
 	}
@@ -95,7 +95,7 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	b.WriteString("// dereferenced (REQ-025). The shared helper checks the `_type`\n")
 	b.WriteString("// discriminator, threads the polymorphic decode hooks so every nested\n")
 	b.WriteString("// slot resolves, and wraps a whole-value shape failure through\n")
-	b.WriteString("// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and\n")
+	b.WriteString("// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and\n")
 	b.WriteString("// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).\n")
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalJSONFrom(dec *jsontext.Decoder) error {\n", recv, pc.GoName, typeArgs)
 	fmt.Fprintf(&b, "\tif %s == nil {\n", recv)

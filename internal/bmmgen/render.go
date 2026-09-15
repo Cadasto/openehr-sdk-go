@@ -609,8 +609,8 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 	jsonTag := fmt.Sprintf("`json:%q`", name)
 	jsonTagOpt := fmt.Sprintf("`json:%q`", name+",omitempty")
 	// omitzero, not omitempty, on a POINTER field: under encoding/json/v2
-	// omitempty omits any value that encodes empty — including a non-nil
-	// pointer to an empty string — whereas omitzero omits only the nil
+	// omitempty omits any value that encodes empty, including a non-nil
+	// pointer to an empty string, whereas omitzero omits only the nil
 	// pointer, restoring the v1 spelling where a pointer to "" still emits
 	// (REQ-052, Q6). Container fields keep omitempty (their nil/empty
 	// collapse is intended, e.g. DV_TEXT.mappings, wire.md:112).
