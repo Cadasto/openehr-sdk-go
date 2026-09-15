@@ -78,7 +78,7 @@
 //     as over-reporting; >17 is chosen instead as a cheap, deterministic
 //     budget that never reports a short clinical literal. Within that
 //     definition both arms are met: an out-of-range magnitude (e.g.
-//     1e400) fails with a typed error — a *json.UnmarshalTypeError,
+//     1e400) fails with a typed error, a *json.SemanticError,
 //     reachable with errors.As through the generated decode-method
 //     wrapper — and a magnitude past 17 significant decimal digits, such
 //     as 0.1234567890123456789, fails decode wrapping [ErrInvalidShape]

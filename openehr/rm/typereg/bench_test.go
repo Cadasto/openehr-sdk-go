@@ -2,7 +2,7 @@ package typereg_test
 
 // bench_test.go: registry dispatch baselines for the move of the
 // canonical-JSON path to encoding/json/v2
-// (docs/plans/2026-09-14-json-v2-migration.md, phase 3.5).
+// (docs/plans/archive/2026-09-14-json-v2-migration.md, phase 3.5).
 //
 // [Registry.Decode] is where the `_type` peek and the concrete decode meet, and
 // it is the site the migration changes most: today each nested polymorphic slot

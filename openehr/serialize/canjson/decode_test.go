@@ -304,12 +304,12 @@ func TestDecoderDecodeWrapsErrInvalidShape(t *testing.T) {
 // MUST keep its *DecodeError classification without picking up ErrInvalidShape
 // on the way. The sentinel means "JSON-level shape", not "any decode failure".
 //
-// normal_range is a DVInterval[DVQuantity] — a CONCRETE bound under the
+// normal_range is a DVInterval[DVQuantity], a CONCRETE bound under the
 // streaming codec (ADR 0022), not a registry-dispatched slot as it was under
 // the per-field decoder. So an unregistered `_type` on /lower is a mismatch
 // against the bound's own type (expected DV_QUANTITY), which is still a
 // dispatch failure carrying ErrTypeMismatch and staying outside the shape
-// sentinel — the boundary the test guards.
+// sentinel, the boundary the test guards.
 func TestUnmarshalNestedDecodeErrorIsNotShapeTagged(t *testing.T) {
 	const in = `{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg",` +
 		`"normal_range":{"lower":{"_type":"NEVER_REGISTERED_TYPE"}}}`
@@ -344,7 +344,7 @@ func TestUnmarshalNestedDecodeErrorIsNotShapeTagged(t *testing.T) {
 // canjson.ErrInvalidShape. Only the polymorphic *dispatch* failure
 // (missing / unknown / mismatched `_type`) stays outside the sentinel.
 func TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications(t *testing.T) {
-	// ELEMENT.value is declared DATA_VALUE — a genuine polymorphic slot the
+	// ELEMENT.value is declared DATA_VALUE, a genuine polymorphic slot the
 	// streaming codec resolves through the registered DataValue hook. The wire
 	// selects DV_QUANTITY there and gives its `units` a number where the
 	// contract wants a string; a quoted *magnitude* would be tolerated instead
@@ -359,14 +359,14 @@ func TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications(t *testing.T)
 		t.Fatal("Unmarshal(slot-nested wrong-typed units) = nil; want a decode error")
 	}
 	if !strings.Contains(err.Error(), "canjson: ELEMENT:") {
-		t.Fatalf("err = %v; want the text to show it passed through ELEMENT's funnel — otherwise this test no longer covers the nesting case", err)
+		t.Fatalf("err = %v; want the text to show it passed through ELEMENT's funnel, otherwise this test no longer covers the nesting case", err)
 	}
 	de, ok := errors.AsType[*canjson.DecodeError](err)
 	if !ok {
 		t.Fatalf("err = %v (%T); want errors.As to reach *canjson.DecodeError", err, err)
 	}
 	if de.Path != "/value" {
-		t.Errorf("DecodeError.Path = %q, want %q — the slot it failed at, so a consumer keeps the path alongside the kind", de.Path, "/value")
+		t.Errorf("DecodeError.Path = %q, want %q: the slot it failed at, so a consumer keeps the path alongside the kind", de.Path, "/value")
 	}
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; a shape failure raised beneath a polymorphic slot stays a shape failure — a DecodeError must not strip the classification", err)

@@ -10,15 +10,15 @@ import (
 
 // TestOmitzeroPointerFieldsEncode pins the REQ-052 / Q6 ruling that the
 // generator tags a POINTER field `omitzero`, not `omitempty`. Under
-// encoding/json/v2 `omitempty` omits any value that encodes empty — including a
-// non-nil pointer to an empty string or empty map — whereas `omitzero` omits
+// encoding/json/v2 `omitempty` omits any value that encodes empty (including a
+// non-nil pointer to an empty string or empty map), whereas `omitzero` omits
 // only the nil pointer. So a caller who set a pointer to a deliberately empty
 // value (an explicit `""` or `{}`, distinct from "absent") keeps it on the
 // wire, the v1 intent the streaming codec must preserve.
 //
 // No existing fixture carries a pointer to an empty value, so without this test
 // the tag choice is invisible. Can-fail control: flip one pointer field's tag
-// back to `,omitempty` in the generator (renderField) and regenerate — the
+// back to `,omitempty` in the generator (renderField) and regenerate: the
 // non-nil-empty case below then re-encodes without the member and goes red.
 func TestOmitzeroPointerFieldsEncode(t *testing.T) {
 	emptyString := ""

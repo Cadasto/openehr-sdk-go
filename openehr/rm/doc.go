@@ -70,8 +70,8 @@
 // the pointer. The value receiver is load-bearing for a v1 entry point, not v2:
 // `encoding/json`'s DefaultOptionsV1 sets `CallMethodsWithLegacySemantics`,
 // which skips a pointer-receiver marshal method on an unaddressable value (an
-// interface or map element), and canjson is v1 in this task while
-// `contribution`, `transport` and `testkit` stay on v1 by design. So the
+// interface or map element), and `contribution`, `transport` and `testkit`
+// stay on v1 by design while canjson itself now runs on v2. So the
 // mandatory `_type` discriminator is emitted (ITS-JSON / REQ-052) whichever way
 // the value was assigned, and callers need not remember to take a pointer.
 //

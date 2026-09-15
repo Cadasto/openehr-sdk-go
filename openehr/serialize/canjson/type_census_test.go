@@ -19,16 +19,16 @@ import (
 // (the promotion trap the hybrid shape exists to dodge). The generator-level
 // render tests check the emitted source; this checks the built tree.
 //
-// For every registered library type it takes the value-in-interface shape —
-// `reflect.ValueOf(ctor()).Elem().Interface()` held in an `any`, the shape the
-// value-receiver decision turns on — and marshals it twice: through
-// canjson.Marshal (encoding/json v1 today, v2 after Task 5) and through bare
+// For every registered library type it takes the value-in-interface shape
+// (`reflect.ValueOf(ctor()).Elem().Interface()` held in an `any`, the shape the
+// value-receiver decision turns on) and marshals it twice: through
+// canjson.Marshal (now on encoding/json/v2) and through bare
 // encoding/json/v2. Each output MUST lead with `_type` equal to the registered
 // name, and MUST decode back into a fresh instance without error.
 //
 // Can-fail control (recorded in the report): reclassify one of the 14 flat
 // classes into the alias shape (a one-line change to
-// embedsMarshalerBearingConcrete) and regenerate — DVCodedText then marshals as
+// embedsMarshalerBearingConcrete) and regenerate: DVCodedText then marshals as
 // `{"_type":"DV_TEXT",…}` and this census reports the mismatch by name.
 func TestRegisteredTypeCensus(t *testing.T) {
 	const libraryPrefix = "github.com/cadasto/openehr-sdk-go/openehr/"

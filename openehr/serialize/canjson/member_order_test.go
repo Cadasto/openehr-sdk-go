@@ -13,7 +13,7 @@ import (
 )
 
 // REQ-052 § Field order: the decoder MUST accept members in any order,
-// `_type` included — JSON member order carries no meaning (RFC 8259 § 4)
+// `_type` included, because JSON member order carries no meaning (RFC 8259 § 4)
 // and servers differ in the order they emit. A permuted spelling, with
 // `_type` last at every level, decodes to the same value as the canonical
 // spelling and re-encodes to a wire-equivalent document (member order is
@@ -103,7 +103,7 @@ const hashOrderEncodes = 20
 //
 // Can-fail control. The mutation that turns this red is dropping
 // `json.Deterministic(true)` from the generated TRANSLATION_DETAILS marshaler
-// once the canonical-JSON path has moved to encoding/json/v2 (ADR 0022): v2
+// now that the canonical-JSON path is on encoding/json/v2 (ADR 0022): v2
 // writes map members in Go map iteration order unless that option is joined in,
 // and that order is randomised per encode. Eight keys in `author` and seven in
 // `other_details`, encoded [hashOrderEncodes] times with every encode required
@@ -137,12 +137,13 @@ func TestEncodeHashKeysLexicographic(t *testing.T) {
 		if err != nil {
 			t.Fatalf("encode %d of %d: %v", encode+1, hashOrderEncodes, err)
 		}
-		// Also encode through bare encoding/json/v2. This task keeps canjson on
-		// v1, whose DefaultOptionsV1 sorts map keys regardless — so the v1 leg
-		// above cannot see whether the generated MarshalJSONTo joined
-		// json.Deterministic(true). v2's defaults do NOT sort maps, so the join
-		// is the only thing that orders these keys here; dropping it from the
-		// generated method (or from typereg.MarshalOptions) turns this leg red.
+		// Also encode through bare encoding/json/v2. canjson.Marshal joins
+		// json.Deterministic(true) at the entry point too (typereg.EncodeOptions),
+		// so the canjson leg above sorts map keys regardless and cannot see
+		// whether the generated MarshalJSONTo also joined it. v2's defaults do NOT
+		// sort maps, so the join is the only thing that orders these keys here;
+		// dropping it from the generated method (or from typereg.MarshalOptions)
+		// turns this leg red.
 		gotV2, err := jsonv2.Marshal(&v)
 		if err != nil {
 			t.Fatalf("v2 encode %d of %d: %v", encode+1, hashOrderEncodes, err)
@@ -153,19 +154,19 @@ func TestEncodeHashKeysLexicographic(t *testing.T) {
 					encode+1, hashOrderEncodes, want, got)
 			}
 			if !strings.Contains(string(gotV2), want) {
-				t.Fatalf("bare-v2 encode %d of %d: Hash keys are not in lexicographic order — json.Deterministic is not reaching the map:\n want %s\n in   %s",
+				t.Fatalf("bare-v2 encode %d of %d: Hash keys are not in lexicographic order, json.Deterministic is not reaching the map:\n want %s\n in   %s",
 					encode+1, hashOrderEncodes, want, gotV2)
 			}
 		}
 	}
 }
 
-// REQ-052 § Field order: the encoder MUST write the deterministic
-// profile, so two encodes of one value are byte-identical and `_type` is
-// the first key. PROBE-030 pins encode-stability over the cassette corpus
-// (decode → encode → decode → encode, the two encodes byte-identical and
-// never compared against the input); this pins repeat-encode identity and
-// `_type`-first on a small value.
+// REQ-052 § Field order: the encoder writes the deterministic profile
+// (json.Deterministic), so two encodes of one value are byte-identical and
+// `_type` leads. PROBE-030 pins encode-stability over the cassette corpus
+// (decode → encode → decode → encode, the two encodes compared for
+// wire-equivalence and never against the input); this pins repeat-encode
+// identity and `_type`-first on a small value.
 func TestEncodeIsDeterministic(t *testing.T) {
 	v := rm.DVCodedText{
 		Value: "x",

@@ -482,8 +482,8 @@ func TestCharacterRefusalTextCarriesNoSentinelProse(t *testing.T) {
 // substituted-U+FFFD detector can inspect the value (Task 2 report Q4, ruling
 // R15). So canjson refuses the value as malformed input and it carries NO SDK
 // sentinel, the same as any other syntactic refusal (REQ-052: invalid UTF-8
-// and a lone surrogate are malformed input). Task 7 reconciles rm.Character's
-// own side of this.
+// and a lone surrogate are malformed input). The same migration reconciles
+// rm.Character's own side of this.
 func TestTermMappingMatchSubstitutedSurrogateRefusedThroughFunnel(t *testing.T) {
 	in := []byte(`{"_type":"TERM_MAPPING","match":"\uD800","target":{"_type":"CODE_PHRASE",` +
 		`"terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":"x"}}`)

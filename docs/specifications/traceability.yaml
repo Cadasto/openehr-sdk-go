@@ -285,11 +285,10 @@ requirements:
       io.EOF) do not carry over. Canonical XML (REQ-056, PROBE-033) is
       unchanged and keeps its byte assertion. The order relaxation is
       recorded in ADR 0021; the codec adoption itself is ADR 0022. This
-      is a specification-only change (Phase 0 of the migration plan);
-      the code and test/package updates it anticipates (encoding/json/v2
+      requirement was specified first (Phase 0 of the migration plan);
+      the code and test/package updates it anticipated (encoding/json/v2
       adoption, the jsonpoly retirement, the field_order_test.go rename)
-      land in later phases of the same plan, so packages and tests here
-      are unchanged for now.
+      have since landed in the later phases of that plan.
 
   - id: REQ-056
     title: Canonical XML

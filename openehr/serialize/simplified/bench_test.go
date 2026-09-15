@@ -1,7 +1,7 @@
 package simplified_test
 
 // bench_test.go: FLAT codec baselines for the move of the canonical-JSON path
-// to encoding/json/v2 (docs/plans/2026-09-14-json-v2-migration.md, phase 3.5).
+// to encoding/json/v2 (docs/plans/archive/2026-09-14-json-v2-migration.md, phase 3.5).
 //
 // This package stays on encoding/json, so these benchmarks are not measuring a
 // package that changes. They measure what the change reaches indirectly: the

@@ -16,7 +16,7 @@ import (
 // comparable to real CDR traffic (~50 KiB at width≈400). The
 // composer/content polymorphic sites are populated so the dispatch
 // path is exercised — pure-leaf benchmarks would understate
-// generated-UnmarshalJSON cost. For HISTORY/EVENT-bearing inputs see
+// generated-UnmarshalJSONFrom cost. For HISTORY/EVENT-bearing inputs see
 // the cassette round-trip benchmarks (TestRoundTripCassettes
 // fixtures decode through the same code path).
 func benchCompositionPayload(b *testing.B, width int) []byte {
@@ -80,7 +80,7 @@ func BenchmarkDecodeComposition_400(b *testing.B) {
 }
 
 // BenchmarkEncodeDVQuantity isolates leaf-type encode cost so the
-// generator-emitted MarshalJSON overhead per concrete type is
+// generator-emitted MarshalJSONTo overhead per concrete type is
 // visible in profiles.
 func BenchmarkEncodeDVQuantity(b *testing.B) {
 	q := &rm.DVQuantity{Magnitude: 80.5, Units: "kg"}
@@ -93,7 +93,7 @@ func BenchmarkEncodeDVQuantity(b *testing.B) {
 }
 
 // BenchmarkDecodeDVQuantity is the symmetric leaf-type decode.
-// DV_QUANTITY has a generated UnmarshalJSON but no polymorphic field,
+// DV_QUANTITY has a generated UnmarshalJSONFrom but no polymorphic field,
 // so the method decodes into its companion struct and copies the
 // fields across: this benchmark measures the nil-receiver guard, the
 // `_type` check and the shape-error wrapper with no registry dispatch

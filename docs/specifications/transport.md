@@ -264,8 +264,9 @@ representation, the SDK **MUST** return a `*transport.DecodeError`. That error *
 
 **`Error()` stays value-free.** `DecodeError.Error()` **MUST** carry the HTTP method, the route
 template and the classification only, in the REQ-093 discipline. It **MUST NOT** interpolate the
-body, and **MUST NOT** interpolate the wrapped decoder's text — a codec cause may embed the
-offending value (`*strconv.NumError` and `*json.UnmarshalTypeError` both do), so echoing the cause
+body, and **MUST NOT** interpolate the wrapped decoder's text: a codec cause may embed the
+offending value (`*strconv.NumError` does; the v2 codec's own `*json.SemanticError` names the Go
+type and JSON position but not the value), so echoing the cause
 would leak through the string surface what the field deliberately gates. Callers that need the diagnostics unwrap or read `Body`.
 
 **Metadata still arrives.** The `(*T, *Metadata, error)` triple the leaf packages return **MUST**
