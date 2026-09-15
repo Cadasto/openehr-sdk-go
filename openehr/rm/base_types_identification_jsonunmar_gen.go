@@ -24,7 +24,7 @@ func (a *AccessGroupRef) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: ACCESS_GROUP_REF: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireAccessGroupRef
-	if err := typereg.DecodeInto(dec, "ACCESS_GROUP_REF", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "ACCESS_GROUP_REF", &wire, &wire.Class); err != nil {
 		return err
 	}
 	a.Namespace = wire.Namespace
@@ -44,10 +44,11 @@ func (a *ArchetypeID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPE_ID: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ARCHETYPE_ID", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawArchetypeID
-	}{rawArchetypeID: (*rawArchetypeID)(a)})
+	}{rawArchetypeID: (*rawArchetypeID)(a)}
+	return typereg.DecodeInto(dec, "ARCHETYPE_ID", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into GenericID.
@@ -61,10 +62,11 @@ func (g *GenericID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if g == nil {
 		return fmt.Errorf("canjson: GENERIC_ID: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "GENERIC_ID", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawGenericID
-	}{rawGenericID: (*rawGenericID)(g)})
+	}{rawGenericID: (*rawGenericID)(g)}
+	return typereg.DecodeInto(dec, "GENERIC_ID", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into HierObjectID.
@@ -78,10 +80,11 @@ func (h *HierObjectID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if h == nil {
 		return fmt.Errorf("canjson: HIER_OBJECT_ID: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "HIER_OBJECT_ID", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawHierObjectID
-	}{rawHierObjectID: (*rawHierObjectID)(h)})
+	}{rawHierObjectID: (*rawHierObjectID)(h)}
+	return typereg.DecodeInto(dec, "HIER_OBJECT_ID", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ISOOID.
@@ -95,10 +98,11 @@ func (i *ISOOID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ISO_OID: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ISO_OID", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawISOOID
-	}{rawISOOID: (*rawISOOID)(i)})
+	}{rawISOOID: (*rawISOOID)(i)}
+	return typereg.DecodeInto(dec, "ISO_OID", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into InternetID.
@@ -112,10 +116,11 @@ func (i *InternetID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: INTERNET_ID: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "INTERNET_ID", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawInternetID
-	}{rawInternetID: (*rawInternetID)(i)})
+	}{rawInternetID: (*rawInternetID)(i)}
+	return typereg.DecodeInto(dec, "INTERNET_ID", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into LocatableRef.
@@ -130,7 +135,7 @@ func (l *LocatableRef) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: LOCATABLE_REF: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireLocatableRef
-	if err := typereg.DecodeInto(dec, "LOCATABLE_REF", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "LOCATABLE_REF", &wire, &wire.Class); err != nil {
 		return err
 	}
 	l.Namespace = wire.Namespace
@@ -151,10 +156,11 @@ func (o *ObjectRef) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: OBJECT_REF: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "OBJECT_REF", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawObjectRef
-	}{rawObjectRef: (*rawObjectRef)(o)})
+	}{rawObjectRef: (*rawObjectRef)(o)}
+	return typereg.DecodeInto(dec, "OBJECT_REF", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ObjectVersionID.
@@ -168,10 +174,11 @@ func (o *ObjectVersionID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: OBJECT_VERSION_ID: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "OBJECT_VERSION_ID", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawObjectVersionID
-	}{rawObjectVersionID: (*rawObjectVersionID)(o)})
+	}{rawObjectVersionID: (*rawObjectVersionID)(o)}
+	return typereg.DecodeInto(dec, "OBJECT_VERSION_ID", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into PartyRef.
@@ -186,7 +193,7 @@ func (p *PartyRef) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: PARTY_REF: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWirePartyRef
-	if err := typereg.DecodeInto(dec, "PARTY_REF", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "PARTY_REF", &wire, &wire.Class); err != nil {
 		return err
 	}
 	p.Namespace = wire.Namespace
@@ -206,10 +213,11 @@ func (t *TemplateID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if t == nil {
 		return fmt.Errorf("canjson: TEMPLATE_ID: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "TEMPLATE_ID", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawTemplateID
-	}{rawTemplateID: (*rawTemplateID)(t)})
+	}{rawTemplateID: (*rawTemplateID)(t)}
+	return typereg.DecodeInto(dec, "TEMPLATE_ID", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into TerminologyID.
@@ -223,10 +231,11 @@ func (t *TerminologyID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if t == nil {
 		return fmt.Errorf("canjson: TERMINOLOGY_ID: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "TERMINOLOGY_ID", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawTerminologyID
-	}{rawTerminologyID: (*rawTerminologyID)(t)})
+	}{rawTerminologyID: (*rawTerminologyID)(t)}
+	return typereg.DecodeInto(dec, "TERMINOLOGY_ID", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Uuid.
@@ -240,10 +249,11 @@ func (u *Uuid) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if u == nil {
 		return fmt.Errorf("canjson: UUID: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "UUID", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawUuid
-	}{rawUuid: (*rawUuid)(u)})
+	}{rawUuid: (*rawUuid)(u)}
+	return typereg.DecodeInto(dec, "UUID", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into VersionTreeID.
@@ -257,8 +267,9 @@ func (v *VersionTreeID) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if v == nil {
 		return fmt.Errorf("canjson: VERSION_TREE_ID: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "VERSION_TREE_ID", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawVersionTreeID
-	}{rawVersionTreeID: (*rawVersionTreeID)(v)})
+	}{rawVersionTreeID: (*rawVersionTreeID)(v)}
+	return typereg.DecodeInto(dec, "VERSION_TREE_ID", &w, &w.Type)
 }

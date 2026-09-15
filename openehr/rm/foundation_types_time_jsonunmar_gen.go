@@ -23,10 +23,11 @@ func (i *ISO8601Timezone) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: Iso8601_timezone: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "Iso8601_timezone", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawISO8601Timezone
-	}{rawISO8601Timezone: (*rawISO8601Timezone)(i)})
+	}{rawISO8601Timezone: (*rawISO8601Timezone)(i)}
+	return typereg.DecodeInto(dec, "Iso8601_timezone", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into TimeDefinitions.
@@ -40,8 +41,9 @@ func (t *TimeDefinitions) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if t == nil {
 		return fmt.Errorf("canjson: Time_Definitions: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "Time_Definitions", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawTimeDefinitions
-	}{rawTimeDefinitions: (*rawTimeDefinitions)(t)})
+	}{rawTimeDefinitions: (*rawTimeDefinitions)(t)}
+	return typereg.DecodeInto(dec, "Time_Definitions", &w, &w.Type)
 }

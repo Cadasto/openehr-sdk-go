@@ -23,10 +23,11 @@ func (d *DVCount) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_COUNT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_COUNT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVCount
-	}{rawDVCount: (*rawDVCount)(d)})
+	}{rawDVCount: (*rawDVCount)(d)}
+	return typereg.DecodeInto(dec, "DV_COUNT", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVInterval.
@@ -40,10 +41,11 @@ func (d *DVInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_INTERVAL: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_INTERVAL", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVInterval[T]
-	}{rawDVInterval: (*rawDVInterval[T])(d)})
+	}{rawDVInterval: (*rawDVInterval[T])(d)}
+	return typereg.DecodeInto(dec, "DV_INTERVAL", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVOrdinal.
@@ -57,10 +59,11 @@ func (d *DVOrdinal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_ORDINAL: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_ORDINAL", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVOrdinal
-	}{rawDVOrdinal: (*rawDVOrdinal)(d)})
+	}{rawDVOrdinal: (*rawDVOrdinal)(d)}
+	return typereg.DecodeInto(dec, "DV_ORDINAL", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVProportion.
@@ -74,10 +77,11 @@ func (d *DVProportion) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_PROPORTION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_PROPORTION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVProportion
-	}{rawDVProportion: (*rawDVProportion)(d)})
+	}{rawDVProportion: (*rawDVProportion)(d)}
+	return typereg.DecodeInto(dec, "DV_PROPORTION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVQuantity.
@@ -91,10 +95,11 @@ func (d *DVQuantity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_QUANTITY: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_QUANTITY", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVQuantity
-	}{rawDVQuantity: (*rawDVQuantity)(d)})
+	}{rawDVQuantity: (*rawDVQuantity)(d)}
+	return typereg.DecodeInto(dec, "DV_QUANTITY", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVScale.
@@ -108,10 +113,11 @@ func (d *DVScale) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_SCALE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_SCALE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVScale
-	}{rawDVScale: (*rawDVScale)(d)})
+	}{rawDVScale: (*rawDVScale)(d)}
+	return typereg.DecodeInto(dec, "DV_SCALE", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ReferenceRange.
@@ -125,8 +131,9 @@ func (r *ReferenceRange[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: REFERENCE_RANGE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "REFERENCE_RANGE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawReferenceRange[T]
-	}{rawReferenceRange: (*rawReferenceRange[T])(r)})
+	}{rawReferenceRange: (*rawReferenceRange[T])(r)}
+	return typereg.DecodeInto(dec, "REFERENCE_RANGE", &w, &w.Type)
 }

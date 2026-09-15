@@ -23,10 +23,11 @@ func (r *ResourceDescription) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: RESOURCE_DESCRIPTION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "RESOURCE_DESCRIPTION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawResourceDescription
-	}{rawResourceDescription: (*rawResourceDescription)(r)})
+	}{rawResourceDescription: (*rawResourceDescription)(r)}
+	return typereg.DecodeInto(dec, "RESOURCE_DESCRIPTION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ResourceDescriptionItem.
@@ -40,10 +41,11 @@ func (r *ResourceDescriptionItem) UnmarshalJSONFrom(dec *jsontext.Decoder) error
 	if r == nil {
 		return fmt.Errorf("canjson: RESOURCE_DESCRIPTION_ITEM: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "RESOURCE_DESCRIPTION_ITEM", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawResourceDescriptionItem
-	}{rawResourceDescriptionItem: (*rawResourceDescriptionItem)(r)})
+	}{rawResourceDescriptionItem: (*rawResourceDescriptionItem)(r)}
+	return typereg.DecodeInto(dec, "RESOURCE_DESCRIPTION_ITEM", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into TranslationDetails.
@@ -57,8 +59,9 @@ func (t *TranslationDetails) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if t == nil {
 		return fmt.Errorf("canjson: TRANSLATION_DETAILS: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "TRANSLATION_DETAILS", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawTranslationDetails
-	}{rawTranslationDetails: (*rawTranslationDetails)(t)})
+	}{rawTranslationDetails: (*rawTranslationDetails)(t)}
+	return typereg.DecodeInto(dec, "TRANSLATION_DETAILS", &w, &w.Type)
 }

@@ -17,10 +17,12 @@ import (
 // # Strategy (ruling R19)
 //
 // Each method refuses a nil receiver (REQ-025), then hands the decoder to the
-// shared [typereg.DecodeInto] helper, which reads the value, enforces the
-// `_type` discipline, threads the polymorphic decode hooks and classifies a
-// shape failure. The decode target is the receiver viewed through its
-// method-free alias (zero-copy) for most classes, or a flat wire struct copied
+// shared [typereg.DecodeInto] helper, which decodes the value in one pass,
+// enforces the `_type` discipline by reading the discriminator from the
+// wire struct's declared _type field that same decode populated, threads the
+// polymorphic decode hooks and classifies a shape failure. The decode target
+// is the receiver viewed through its method-free alias (zero-copy) for most
+// classes, or a flat wire struct copied
 // back field by field for a class that embeds a marshaler-bearing concrete
 // ancestor (see the promotion note at [effectiveFields]). Polymorphic interface
 // fields resolve through the registered hooks: there is no per-field
@@ -105,7 +107,7 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	if embedsMarshalerBearingConcrete(plan, pc) {
 		wire := flatWireTypeName(pc.GoName)
 		fmt.Fprintf(&b, "\tvar wire %s%s\n", wire, typeArgs)
-		fmt.Fprintf(&b, "\tif err := typereg.DecodeInto(dec, %q, &wire); err != nil {\n", pc.BMMName)
+		fmt.Fprintf(&b, "\tif err := typereg.DecodeInto(dec, %q, &wire, &wire.Class); err != nil {\n", pc.BMMName)
 		b.WriteString("\t\treturn err\n")
 		b.WriteString("\t}\n")
 		for _, ef := range fields {
@@ -115,10 +117,11 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 		b.WriteString("\treturn nil\n")
 	} else {
 		alias := aliasTypeName(pc.GoName)
-		fmt.Fprintf(&b, "\treturn typereg.DecodeInto(dec, %q, &struct {\n", pc.BMMName)
+		b.WriteString("\tw := struct {\n")
 		b.WriteString("\t\tType string `json:\"_type\"`\n")
 		fmt.Fprintf(&b, "\t\t*%s%s\n", alias, typeArgs)
-		fmt.Fprintf(&b, "\t}{%s: (*%s%s)(%s)})\n", alias, alias, typeArgs, recv)
+		fmt.Fprintf(&b, "\t}{%s: (*%s%s)(%s)}\n", alias, alias, typeArgs, recv)
+		fmt.Fprintf(&b, "\treturn typereg.DecodeInto(dec, %q, &w, &w.Type)\n", pc.BMMName)
 	}
 	b.WriteString("}\n")
 	return b.String(), nil

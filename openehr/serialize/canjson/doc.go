@@ -112,8 +112,8 @@
 //
 // What a decode failure looks like depends on where it happens:
 //
-//   - Malformed JSON reaches the caller before any generated decode
-//     method runs, because the codec validates the whole input first.
+//   - Malformed JSON is refused by the tokenizer as the value it
+//     malforms is decoded, not through a separate whole-input pass.
 //     No sentinel: the codec reports its own syntax or truncated-input
 //     error (a *jsontext.SyntacticError), except that [Decoder.Decode]
 //     reports an empty stream as io.EOF and a truncated value wraps
@@ -122,11 +122,10 @@
 //     they too are malformed input carrying no sentinel. rm.Character's
 //     own string arm relies on that same tokenizer refusal and no longer
 //     inspects the raw literal for a substituted U+FFFD (ruling R15).
-//   - A duplicate member name is refused during tokenisation, before any
-//     generated decode method runs. The entry point classifies that
-//     refusal with [ErrInvalidShape], keeping the cause reachable, so
-//     errors.Is finds both the sentinel and jsontext.ErrDuplicateName
-//     (RFC 8259 § 4; REQ-052).
+//   - A duplicate member name is refused during tokenisation. The entry
+//     point classifies that refusal with [ErrInvalidShape], keeping the
+//     cause reachable, so errors.Is finds both the sentinel and
+//     jsontext.ErrDuplicateName (RFC 8259 § 4; REQ-052).
 //   - A polymorphic dispatch failure — a missing, unknown or
 //     mismatched `_type` — arrives as [DecodeError] carrying the path,
 //     either at a slot or on `/_type` where the whole value's `_type`

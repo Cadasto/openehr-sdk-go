@@ -23,10 +23,11 @@ func (i *ItemList) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ITEM_LIST: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ITEM_LIST", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawItemList
-	}{rawItemList: (*rawItemList)(i)})
+	}{rawItemList: (*rawItemList)(i)}
+	return typereg.DecodeInto(dec, "ITEM_LIST", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ItemSingle.
@@ -40,10 +41,11 @@ func (i *ItemSingle) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ITEM_SINGLE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ITEM_SINGLE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawItemSingle
-	}{rawItemSingle: (*rawItemSingle)(i)})
+	}{rawItemSingle: (*rawItemSingle)(i)}
+	return typereg.DecodeInto(dec, "ITEM_SINGLE", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ItemTable.
@@ -57,10 +59,11 @@ func (i *ItemTable) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ITEM_TABLE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ITEM_TABLE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawItemTable
-	}{rawItemTable: (*rawItemTable)(i)})
+	}{rawItemTable: (*rawItemTable)(i)}
+	return typereg.DecodeInto(dec, "ITEM_TABLE", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ItemTree.
@@ -74,8 +77,9 @@ func (i *ItemTree) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ITEM_TREE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ITEM_TREE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawItemTree
-	}{rawItemTree: (*rawItemTree)(i)})
+	}{rawItemTree: (*rawItemTree)(i)}
+	return typereg.DecodeInto(dec, "ITEM_TREE", &w, &w.Type)
 }

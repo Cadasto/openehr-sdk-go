@@ -23,10 +23,11 @@ func (f *Folder) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if f == nil {
 		return fmt.Errorf("canjson: FOLDER: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "FOLDER", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawFolder
-	}{rawFolder: (*rawFolder)(f)})
+	}{rawFolder: (*rawFolder)(f)}
+	return typereg.DecodeInto(dec, "FOLDER", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into VersionedFolder.
@@ -41,7 +42,7 @@ func (v *VersionedFolder) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: VERSIONED_FOLDER: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireVersionedFolder
-	if err := typereg.DecodeInto(dec, "VERSIONED_FOLDER", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "VERSIONED_FOLDER", &wire, &wire.Class); err != nil {
 		return err
 	}
 	v.UID = wire.UID
