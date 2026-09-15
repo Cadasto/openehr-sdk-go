@@ -21,10 +21,11 @@ import (
 // TestBareV2UnmarshalResolvesPolymorphicSlot is ruling R6's pin: the
 // per-interface decode hooks are threaded by the top-level type's
 // UnmarshalJSONFrom through typereg.DecodeInto, so a polymorphic slot resolves
-// from ANY entry point — including a bare encoding/json/v2 Unmarshal with no
-// options and no canjson involvement. That is what makes the streaming pair
-// green in this task, before canjson moves to v2 (Task 5): decoding a
-// COMPOSITION cassette straight through v2 finds the concrete content[0] type.
+// from ANY entry point, including a bare encoding/json/v2 Unmarshal with no
+// options and no canjson involvement. That independence is what lets a slot
+// resolve the same way whether canjson (now itself on v2) or a bare v2 caller
+// drives the decode: decoding a COMPOSITION cassette straight through v2 finds
+// the concrete content[0] type.
 //
 // Can-fail control: the hooks reach the slot only because DecodeInto joins
 // typereg.Unmarshalers() into every nested decode. Drop that join (or the
@@ -45,7 +46,7 @@ func TestBareV2UnmarshalResolvesPolymorphicSlot(t *testing.T) {
 	}
 	obs, ok := comp.Content[0].(*rm.Observation)
 	if !ok {
-		t.Fatalf("content[0] = %T, want *rm.Observation — the ContentItem hook did not fire through a bare v2 Unmarshal with no options", comp.Content[0])
+		t.Fatalf("content[0] = %T, want *rm.Observation: the ContentItem hook did not fire through a bare v2 Unmarshal with no options", comp.Content[0])
 	}
 	if obs == nil {
 		t.Fatal("content[0] is a typed-nil *rm.Observation")
@@ -76,7 +77,7 @@ func findCassette(t *testing.T, name string) fixtures.CompositionJSONRel {
 //
 // Before the fix, decodeOptions joined only the SDK aggregate, and because
 // WithUnmarshalers is single-valued that join replaced the caller's hooks
-// wholesale at every nested decode — so this test was red: the marker never
+// wholesale at every nested decode, so this test was red: the marker never
 // fired and the value decoded through DVText's own UnmarshalJSONFrom.
 func TestCallerUnmarshalersReachNestedSlot(t *testing.T) {
 	var fired bool
@@ -106,7 +107,7 @@ func TestCallerUnmarshalersReachNestedSlot(t *testing.T) {
 		t.Fatalf("bare v2 Unmarshal(ELEMENT) with caller hook: %v", err)
 	}
 	if !fired {
-		t.Fatal("caller hook did not fire — decodeOptions dropped the caller's WithUnmarshalers at the nested DATA_VALUE slot")
+		t.Fatal("caller hook did not fire: decodeOptions dropped the caller's WithUnmarshalers at the nested DATA_VALUE slot")
 	}
 	dv, ok := elem.Value.(*rm.DVText)
 	if !ok {

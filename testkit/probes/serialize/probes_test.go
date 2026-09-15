@@ -60,7 +60,16 @@ func TestProbe030InputsCoverWholeCorpus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list cassettes: %v", err)
 	}
-	const inlineLeaves = 2 // DV_QUANTITY, DV_CODED_TEXT
+	// Count the non-cassette (inline leaf) entries in the input set rather
+	// than hardcoding their number, so adding a leaf does not silently pass a
+	// stale total. The assertion then reduces to: the cassette entries in the
+	// input set equal the cassettes discovered on disk with a factory.
+	inlineLeaves := 0
+	for _, in := range serializeprobes.Probe030Inputs {
+		if !strings.HasPrefix(in.Name, "cassette:") {
+			inlineLeaves++
+		}
+	}
 	want := inlineLeaves
 	for _, rel := range rels {
 		if _, ok := fixtures.FactoryForJSONRel(rel); ok {

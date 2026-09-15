@@ -80,8 +80,15 @@ func TestCorpusRoundTripValidates(t *testing.T) {
 				t.Fatalf("re-decode: %v", err)
 			}
 			if !reflect.DeepEqual(rt, rt2) {
-				_, diff := wireequiv.Equivalent(data, again)
-				t.Errorf("round trip not value-stable (a subtype/bound _type likely dropped): %s", diff)
+				if _, diff := wireequiv.Equivalent(data, again); diff != "" {
+					t.Errorf("round trip not value-stable (a subtype/bound _type likely dropped): %s", diff)
+				} else {
+					// Wire-equivalent yet the typed values differ: the difference
+					// is below the wire (a dropped subtype field that re-encodes
+					// the same), so the diff is empty. Print both encodes so the
+					// failure still diagnoses.
+					t.Errorf("round trip not value-stable (a subtype/bound _type likely dropped); documents wire-equivalent but typed values differ\nfirst encode=%s\nsecond encode=%s", data, again)
+				}
 			}
 
 			// Validation delta (sub-gap B): the round-trip must introduce no
