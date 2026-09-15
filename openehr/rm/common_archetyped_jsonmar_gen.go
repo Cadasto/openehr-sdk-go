@@ -10,7 +10,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.archetyped — canonical-JSON MarshalJSONTo companions
+// BMM package org.openehr.rm.common.archetyped: canonical-JSON MarshalJSONTo companions
 
 // rawArchetyped is the method-free canonical-JSON alias for Archetyped. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
@@ -23,8 +23,8 @@ type rawArchetyped Archetyped
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (a Archetyped) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -43,8 +43,8 @@ type rawFeederAudit FeederAudit
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (f FeederAudit) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -63,8 +63,8 @@ type rawFeederAuditDetails FeederAuditDetails
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (f FeederAuditDetails) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -83,8 +83,8 @@ type rawLink Link
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (l Link) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`

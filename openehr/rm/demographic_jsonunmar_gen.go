@@ -10,14 +10,14 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.demographic — canonical-JSON UnmarshalJSONFrom companions
+// BMM package org.openehr.rm.demographic: canonical-JSON UnmarshalJSONFrom companions
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Address.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (a *Address) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
@@ -34,7 +34,7 @@ func (a *Address) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (a *Agent) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
@@ -51,7 +51,7 @@ func (a *Agent) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (c *Capability) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
@@ -68,7 +68,7 @@ func (c *Capability) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (c *Contact) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
@@ -85,7 +85,7 @@ func (c *Contact) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (g *Group) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if g == nil {
@@ -102,7 +102,7 @@ func (g *Group) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (o *Organisation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
@@ -119,7 +119,7 @@ func (o *Organisation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (p *PartyIdentity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
@@ -136,7 +136,7 @@ func (p *PartyIdentity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (p *PartyRelationship) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
@@ -153,7 +153,7 @@ func (p *PartyRelationship) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (p *Person) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
@@ -170,7 +170,7 @@ func (p *Person) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (r *Role) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
@@ -187,13 +187,13 @@ func (r *Role) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (v *VersionedParty) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if v == nil {
 		return fmt.Errorf("canjson: VERSIONED_PARTY: %w", typereg.ErrNilReceiver)
 	}
-	var wire VersionedPartyJSONWire
+	var wire jsonWireVersionedParty
 	if err := typereg.DecodeInto(dec, "VERSIONED_PARTY", &wire); err != nil {
 		return err
 	}

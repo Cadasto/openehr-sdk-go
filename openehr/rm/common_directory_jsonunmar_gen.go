@@ -10,14 +10,14 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.directory — canonical-JSON UnmarshalJSONFrom companions
+// BMM package org.openehr.rm.common.directory: canonical-JSON UnmarshalJSONFrom companions
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Folder.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (f *Folder) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if f == nil {
@@ -34,13 +34,13 @@ func (f *Folder) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (v *VersionedFolder) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if v == nil {
 		return fmt.Errorf("canjson: VERSIONED_FOLDER: %w", typereg.ErrNilReceiver)
 	}
-	var wire VersionedFolderJSONWire
+	var wire jsonWireVersionedFolder
 	if err := typereg.DecodeInto(dec, "VERSIONED_FOLDER", &wire); err != nil {
 		return err
 	}

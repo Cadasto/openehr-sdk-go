@@ -10,7 +10,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_types.text — canonical-JSON MarshalJSONTo companions
+// BMM package org.openehr.rm.data_types.text: canonical-JSON MarshalJSONTo companions
 
 // rawCodePhrase is the method-free canonical-JSON alias for CodePhrase. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
@@ -23,8 +23,8 @@ type rawCodePhrase CodePhrase
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (c CodePhrase) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -32,11 +32,11 @@ func (c CodePhrase) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}{"CODE_PHRASE", (*rawCodePhrase)(&c)}, typereg.MarshalOptions(enc))
 }
 
-// DVCodedTextJSONWire is the flat canonical-JSON wire struct for DVCodedText. DVCodedText embeds
+// jsonWireDVCodedText is the flat canonical-JSON wire struct for DVCodedText. DVCodedText embeds
 // a marshaler-bearing concrete ancestor, so the zero-copy alias would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
-type DVCodedTextJSONWire struct {
+type jsonWireDVCodedText struct {
 	Class string `json:"_type"`
 	// Value Displayable rendition of the item, regardless of its underlying structure. For `DV_CODED_TEXT`, this is the rubric of the complete term as provided by the terminology service.
 	Value string `json:"value"`
@@ -66,7 +66,7 @@ type DVCodedTextJSONWire struct {
 // (value "DV_CODED_TEXT") as the leading member (REQ-052, Q6). The receiver is a
 // value so a by-value instance in a polymorphic slot keeps its `_type`.
 func (d DVCodedText) MarshalJSONTo(enc *jsontext.Encoder) error {
-	return json.MarshalEncode(enc, &DVCodedTextJSONWire{
+	return json.MarshalEncode(enc, &jsonWireDVCodedText{
 		Class:        "DV_CODED_TEXT",
 		Value:        d.Value,
 		Hyperlink:    d.Hyperlink,
@@ -89,8 +89,8 @@ type rawDVParagraph DVParagraph
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (d DVParagraph) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -109,8 +109,8 @@ type rawDVText DVText
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (d DVText) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -129,8 +129,8 @@ type rawTermMapping TermMapping
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (t TermMapping) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`

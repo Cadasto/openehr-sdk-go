@@ -10,14 +10,14 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.support.terminology — canonical-JSON UnmarshalJSONFrom companions
+// BMM package org.openehr.rm.support.terminology: canonical-JSON UnmarshalJSONFrom companions
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into OpenehrCodeSetIdentifiers.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (o *OpenehrCodeSetIdentifiers) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
@@ -34,7 +34,7 @@ func (o *OpenehrCodeSetIdentifiers) UnmarshalJSONFrom(dec *jsontext.Decoder) err
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (o *OpenehrTerminologyGroupIdentifiers) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
@@ -51,13 +51,13 @@ func (o *OpenehrTerminologyGroupIdentifiers) UnmarshalJSONFrom(dec *jsontext.Dec
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (t *TerminologyService) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if t == nil {
 		return fmt.Errorf("canjson: TERMINOLOGY_SERVICE: %w", typereg.ErrNilReceiver)
 	}
-	var wire TerminologyServiceJSONWire
+	var wire jsonWireTerminologyService
 	if err := typereg.DecodeInto(dec, "TERMINOLOGY_SERVICE", &wire); err != nil {
 		return err
 	}

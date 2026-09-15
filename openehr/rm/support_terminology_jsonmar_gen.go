@@ -10,7 +10,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.support.terminology — canonical-JSON MarshalJSONTo companions
+// BMM package org.openehr.rm.support.terminology: canonical-JSON MarshalJSONTo companions
 
 // rawOpenehrCodeSetIdentifiers is the method-free canonical-JSON alias for OpenehrCodeSetIdentifiers. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
@@ -23,8 +23,8 @@ type rawOpenehrCodeSetIdentifiers OpenehrCodeSetIdentifiers
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (o OpenehrCodeSetIdentifiers) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -43,8 +43,8 @@ type rawOpenehrTerminologyGroupIdentifiers OpenehrTerminologyGroupIdentifiers
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (o OpenehrTerminologyGroupIdentifiers) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -52,11 +52,11 @@ func (o OpenehrTerminologyGroupIdentifiers) MarshalJSONTo(enc *jsontext.Encoder)
 	}{"OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS", (*rawOpenehrTerminologyGroupIdentifiers)(&o)}, typereg.MarshalOptions(enc))
 }
 
-// TerminologyServiceJSONWire is the flat canonical-JSON wire struct for TerminologyService. TerminologyService embeds
+// jsonWireTerminologyService is the flat canonical-JSON wire struct for TerminologyService. TerminologyService embeds
 // a marshaler-bearing concrete ancestor, so the zero-copy alias would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
-type TerminologyServiceJSONWire struct {
+type jsonWireTerminologyService struct {
 	Class string `json:"_type"`
 }
 
@@ -64,7 +64,7 @@ type TerminologyServiceJSONWire struct {
 // (value "TERMINOLOGY_SERVICE") as the leading member (REQ-052, Q6). The receiver is a
 // value so a by-value instance in a polymorphic slot keeps its `_type`.
 func (t TerminologyService) MarshalJSONTo(enc *jsontext.Encoder) error {
-	return json.MarshalEncode(enc, &TerminologyServiceJSONWire{
+	return json.MarshalEncode(enc, &jsonWireTerminologyService{
 		Class: "TERMINOLOGY_SERVICE",
 	}, typereg.MarshalOptions(enc))
 }

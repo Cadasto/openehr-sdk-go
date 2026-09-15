@@ -10,13 +10,13 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.generic — canonical-JSON MarshalJSONTo companions
+// BMM package org.openehr.rm.common.generic: canonical-JSON MarshalJSONTo companions
 
-// AttestationJSONWire is the flat canonical-JSON wire struct for Attestation. Attestation embeds
+// jsonWireAttestation is the flat canonical-JSON wire struct for Attestation. Attestation embeds
 // a marshaler-bearing concrete ancestor, so the zero-copy alias would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
-type AttestationJSONWire struct {
+type jsonWireAttestation struct {
 	Class string `json:"_type"`
 	// SystemID Identifier of the logical EHR system where the change was committed. This is almost always owned by the organisation legally responsible for the EHR, and is distinct from any application, or any hosting infrastructure.
 	SystemID string `json:"system_id"`
@@ -44,7 +44,7 @@ type AttestationJSONWire struct {
 // (value "ATTESTATION") as the leading member (REQ-052, Q6). The receiver is a
 // value so a by-value instance in a polymorphic slot keeps its `_type`.
 func (a Attestation) MarshalJSONTo(enc *jsontext.Encoder) error {
-	return json.MarshalEncode(enc, &AttestationJSONWire{
+	return json.MarshalEncode(enc, &jsonWireAttestation{
 		Class:         "ATTESTATION",
 		SystemID:      a.SystemID,
 		TimeCommitted: a.TimeCommitted,
@@ -70,8 +70,8 @@ type rawAuditDetails AuditDetails
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (a AuditDetails) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -90,8 +90,8 @@ type rawParticipation Participation
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (p Participation) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -110,8 +110,8 @@ type rawPartyIdentified PartyIdentified
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (p PartyIdentified) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -119,11 +119,11 @@ func (p PartyIdentified) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}{"PARTY_IDENTIFIED", (*rawPartyIdentified)(&p)}, typereg.MarshalOptions(enc))
 }
 
-// PartyRelatedJSONWire is the flat canonical-JSON wire struct for PartyRelated. PartyRelated embeds
+// jsonWirePartyRelated is the flat canonical-JSON wire struct for PartyRelated. PartyRelated embeds
 // a marshaler-bearing concrete ancestor, so the zero-copy alias would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
-type PartyRelatedJSONWire struct {
+type jsonWirePartyRelated struct {
 	Class string `json:"_type"`
 	// ExternalRef Optional reference to more detailed demographic or identification information for this party, in an external system.
 	ExternalRef *PartyRef `json:"external_ref,omitzero"`
@@ -139,7 +139,7 @@ type PartyRelatedJSONWire struct {
 // (value "PARTY_RELATED") as the leading member (REQ-052, Q6). The receiver is a
 // value so a by-value instance in a polymorphic slot keeps its `_type`.
 func (p PartyRelated) MarshalJSONTo(enc *jsontext.Encoder) error {
-	return json.MarshalEncode(enc, &PartyRelatedJSONWire{
+	return json.MarshalEncode(enc, &jsonWirePartyRelated{
 		Class:        "PARTY_RELATED",
 		ExternalRef:  p.ExternalRef,
 		Name:         p.Name,
@@ -159,8 +159,8 @@ type rawPartySelf PartySelf
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (p PartySelf) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -179,8 +179,8 @@ type rawRevisionHistory RevisionHistory
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (r RevisionHistory) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -199,8 +199,8 @@ type rawRevisionHistoryItem RevisionHistoryItem
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (r RevisionHistoryItem) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`

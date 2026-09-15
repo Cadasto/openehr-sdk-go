@@ -10,13 +10,13 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_types.uri — canonical-JSON MarshalJSONTo companions
+// BMM package org.openehr.rm.data_types.uri: canonical-JSON MarshalJSONTo companions
 
-// DVEHRURIJSONWire is the flat canonical-JSON wire struct for DVEHRURI. DVEHRURI embeds
+// jsonWireDVEHRURI is the flat canonical-JSON wire struct for DVEHRURI. DVEHRURI embeds
 // a marshaler-bearing concrete ancestor, so the zero-copy alias would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
-type DVEHRURIJSONWire struct {
+type jsonWireDVEHRURI struct {
 	Class string `json:"_type"`
 	// Value Value of URI as a String. 'Plain-text' URIs are allowed, enabling better readability, but must be RFC-3986 encoded in use.
 	Value string `json:"value"`
@@ -26,7 +26,7 @@ type DVEHRURIJSONWire struct {
 // (value "DV_EHR_URI") as the leading member (REQ-052, Q6). The receiver is a
 // value so a by-value instance in a polymorphic slot keeps its `_type`.
 func (d DVEHRURI) MarshalJSONTo(enc *jsontext.Encoder) error {
-	return json.MarshalEncode(enc, &DVEHRURIJSONWire{
+	return json.MarshalEncode(enc, &jsonWireDVEHRURI{
 		Class: "DV_EHR_URI",
 		Value: d.Value,
 	}, typereg.MarshalOptions(enc))
@@ -43,8 +43,8 @@ type rawDVURI DVURI
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (d DVURI) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`

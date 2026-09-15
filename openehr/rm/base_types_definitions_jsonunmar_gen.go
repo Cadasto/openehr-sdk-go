@@ -10,14 +10,14 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.base.base_types.definitions — canonical-JSON UnmarshalJSONFrom companions
+// BMM package org.openehr.base.base_types.definitions: canonical-JSON UnmarshalJSONFrom companions
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into BasicDefinitions.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (b *BasicDefinitions) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if b == nil {
@@ -34,13 +34,13 @@ func (b *BasicDefinitions) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // dereferenced (REQ-025). The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError — keeping the `canjson: <RM_TYPE>:` text and
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
 func (o *OpenehrDefinitions) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: OPENEHR_DEFINITIONS: %w", typereg.ErrNilReceiver)
 	}
-	var wire OpenehrDefinitionsJSONWire
+	var wire jsonWireOpenehrDefinitions
 	if err := typereg.DecodeInto(dec, "OPENEHR_DEFINITIONS", &wire); err != nil {
 		return err
 	}

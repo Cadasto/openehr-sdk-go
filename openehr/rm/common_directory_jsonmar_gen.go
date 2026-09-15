@@ -10,7 +10,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.directory — canonical-JSON MarshalJSONTo companions
+// BMM package org.openehr.rm.common.directory: canonical-JSON MarshalJSONTo companions
 
 // rawFolder is the method-free canonical-JSON alias for Folder. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
@@ -23,8 +23,8 @@ type rawFolder Folder
 // struct declaration; json.Deterministic sorts any Hash keys and the
 // FormatNil* options keep a mandatory nil container's `null` spelling
 // (REQ-052, Q6). The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value — the shape the like-interface
-// accessors admit — still carries its `_type` (REQ-052 substitution).
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
 func (f Folder) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -32,11 +32,11 @@ func (f Folder) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}{"FOLDER", (*rawFolder)(&f)}, typereg.MarshalOptions(enc))
 }
 
-// VersionedFolderJSONWire is the flat canonical-JSON wire struct for VersionedFolder. VersionedFolder embeds
+// jsonWireVersionedFolder is the flat canonical-JSON wire struct for VersionedFolder. VersionedFolder embeds
 // a marshaler-bearing concrete ancestor, so the zero-copy alias would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
-type VersionedFolderJSONWire struct {
+type jsonWireVersionedFolder struct {
 	Class string `json:"_type"`
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
 	UID HierObjectID `json:"uid"`
@@ -50,7 +50,7 @@ type VersionedFolderJSONWire struct {
 // (value "VERSIONED_FOLDER") as the leading member (REQ-052, Q6). The receiver is a
 // value so a by-value instance in a polymorphic slot keeps its `_type`.
 func (v VersionedFolder) MarshalJSONTo(enc *jsontext.Encoder) error {
-	return json.MarshalEncode(enc, &VersionedFolderJSONWire{
+	return json.MarshalEncode(enc, &jsonWireVersionedFolder{
 		Class:       "VERSIONED_FOLDER",
 		UID:         v.UID,
 		OwnerID:     v.OwnerID,
