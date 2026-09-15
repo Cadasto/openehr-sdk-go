@@ -2,11 +2,13 @@ package serializeprobes
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // TestProbe030GuardCatchesDroppedFieldOnReEncode is the can-fail control for
@@ -27,6 +29,29 @@ func TestProbe030GuardCatchesDroppedFieldOnReEncode(t *testing.T) {
 	}
 	if !strings.Contains(r.Detail, "A and B differ") {
 		t.Fatalf("detail = %q; want the typed deep comparison to fire first, so the A-versus-B guard is what caught it", r.Detail)
+	}
+}
+
+// TestProbe030GuardCatchesMissingValidateRM is the can-fail control for
+// PROBE-030's validation.ValidateRM leg (REQ-112). clinical_notes.v0 carries
+// an empty action_archetype_id in vendored content; the fidelity legs still
+// pass, but the RM floor fails. The mutation that turns this red is removing
+// the ValidateRM block in probe030RoundTrip: then this cassette would report
+// Status == "pass" with skipFloor false.
+func TestProbe030GuardCatchesMissingValidateRM(t *testing.T) {
+	body, err := os.ReadFile(fixtures.CompositionJSON("clinical_notes.v0"))
+	if err != nil {
+		t.Fatalf("read clinical_notes.v0: %v", err)
+	}
+	r, err := probe030RoundTrip(body, func() any { return new(rm.Composition) }, canjson.Marshal, false)
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
+	}
+	if r.Status != "fail" {
+		t.Fatalf("status = %q, want fail: clinical_notes.v0 must fail the RM floor leg", r.Status)
+	}
+	if !strings.Contains(r.Detail, "RM floor") {
+		t.Fatalf("detail = %q; want the ValidateRM leg to fire, not a fidelity leg", r.Detail)
 	}
 }
 
