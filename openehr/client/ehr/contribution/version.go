@@ -1,10 +1,12 @@
 package contribution
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"errors"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // updateAuditFromLike builds the write DTO from any AuditDetailsLike,
@@ -57,16 +59,25 @@ func WrapOriginalVersion[T any](v *rm.OriginalVersion[T]) *OriginalVersion[T] {
 // BMMName implements CommitVersion.
 func (v *OriginalVersion[T]) BMMName() string { return "ORIGINAL_VERSION" }
 
-// originalVersionJSON and importedVersionJSON (below) shadow the generated
-// rm.OriginalVersionJSONMarshaller[T] / rm.ImportedVersionJSONMarshaller[T]
-// in openehr/rm/common_change_control_jsonmar_gen.go, replacing the
+// originalVersionJSON and importedVersionJSON (below) shadow the field set of
+// the generated rm.OriginalVersion[T] / rm.ImportedVersion[T] streaming
+// codec in openehr/rm/common_change_control_jsonmar_gen.go, replacing the
 // commit_audit field's type (AuditDetailsLike) with the UpdateAudit write
-// DTO. BMM-BUMP: if bmmgen adds or reorders fields on those generated
-// structs, update these copies in lockstep — `go test ./openehr/client/ehr/contribution/...`.
+// DTO and adding the `_type` member the generated form injects through its
+// anonymous wrapper (ADR 0022). BMM-BUMP: if bmmgen adds or reorders fields on
+// those generated structs, update these copies in lockstep:
+// `go test ./openehr/client/ehr/contribution/...`.
+//
+// The `signature` pointer field carries `omitzero`, not `omitempty`, matching
+// the generated RM structs (ADR 0022, Q6): these shadow DTOs marshal through
+// the caller's own options, which may carry v1 legacy flags, and under
+// `omitempty` a non-nil pointer to an empty string is omitted by a v2 caller
+// but emitted by a v1 one. `omitzero` omits only a nil pointer, the same way
+// from any entry point.
 type originalVersionJSON[T any] struct {
 	Type                  string               `json:"_type"`
 	Contribution          rm.ObjectRefLike     `json:"contribution,omitempty"`
-	Signature             *string              `json:"signature,omitempty"`
+	Signature             *string              `json:"signature,omitzero"`
 	CommitAudit           UpdateAudit          `json:"commit_audit"`
 	UID                   *rm.ObjectVersionID  `json:"uid,omitempty"`
 	PrecedingVersionUID   *rm.ObjectVersionID  `json:"preceding_version_uid,omitempty"`
@@ -98,16 +109,16 @@ func uidOrNil(uid rm.ObjectVersionID) *rm.ObjectVersionID {
 	return &uid
 }
 
-// MarshalJSON emits the canonical ORIGINAL_VERSION wire shape, replacing
-// commit_audit with the [UpdateAudit] write DTO. Marshals by pointer so
-// fields with pointer-receiver MarshalJSON (e.g. rm.DVCodedText,
-// *rm.Composition) emit their `_type` discriminators correctly.
-func (v *OriginalVersion[T]) MarshalJSON() ([]byte, error) {
+// MarshalJSONTo emits the canonical ORIGINAL_VERSION wire shape, replacing
+// commit_audit with the [UpdateAudit] write DTO. The streaming pair carries
+// the `_type` discriminators on nested rm fields (e.g. rm.DVCodedText,
+// *rm.Composition), which now marshal through MarshalJSONTo (ADR 0022, Q7).
+func (v *OriginalVersion[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	o := v.Version
 	if o == nil {
-		return nil, errors.New("contribution.OriginalVersion: Version is nil")
+		return errors.New("contribution.OriginalVersion: Version is nil")
 	}
-	return json.Marshal(&originalVersionJSON[T]{
+	return json.MarshalEncode(enc, &originalVersionJSON[T]{
 		Type:                  "ORIGINAL_VERSION",
 		Contribution:          omitIfAbsent(o.Contribution),
 		Signature:             o.Signature,
@@ -118,7 +129,7 @@ func (v *OriginalVersion[T]) MarshalJSON() ([]byte, error) {
 		LifecycleState:        o.LifecycleState,
 		Attestations:          o.Attestations,
 		Data:                  o.Data,
-	})
+	}, typereg.MarshalOptions(enc))
 }
 
 // ImportedVersion is the write-side IMPORTED_VERSION element for a
@@ -153,24 +164,24 @@ func (v *ImportedVersion[T]) BMMName() string { return "IMPORTED_VERSION" }
 type importedVersionJSON[T any] struct {
 	Type         string                  `json:"_type"`
 	Contribution rm.ObjectRefLike        `json:"contribution,omitempty"`
-	Signature    *string                 `json:"signature,omitempty"`
+	Signature    *string                 `json:"signature,omitzero"`
 	CommitAudit  UpdateAudit             `json:"commit_audit"`
 	Item         rm.OriginalVersion[any] `json:"item"`
 }
 
-// MarshalJSON emits the canonical IMPORTED_VERSION wire shape, replacing
-// commit_audit with the [UpdateAudit] write DTO. Marshals by pointer so
-// fields with pointer-receiver MarshalJSON emit their `_type` discriminators.
-func (v *ImportedVersion[T]) MarshalJSON() ([]byte, error) {
+// MarshalJSONTo emits the canonical IMPORTED_VERSION wire shape, replacing
+// commit_audit with the [UpdateAudit] write DTO. Nested rm fields carry their
+// `_type` discriminators through the streaming pair (ADR 0022, Q7).
+func (v *ImportedVersion[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	i := v.Version
 	if i == nil {
-		return nil, errors.New("contribution.ImportedVersion: Version is nil")
+		return errors.New("contribution.ImportedVersion: Version is nil")
 	}
-	return json.Marshal(&importedVersionJSON[T]{
+	return json.MarshalEncode(enc, &importedVersionJSON[T]{
 		Type:         "IMPORTED_VERSION",
 		Contribution: omitIfAbsent(i.Contribution),
 		Signature:    i.Signature,
 		CommitAudit:  v.CommitAudit,
 		Item:         i.Item,
-	})
+	}, typereg.MarshalOptions(enc))
 }

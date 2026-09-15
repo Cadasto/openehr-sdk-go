@@ -4,154 +4,90 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.change_control — canonical-JSON MarshalJSON companions
+// BMM package org.openehr.rm.common.change_control: canonical-JSON MarshalJSONTo companions
 
-type ContributionJSONMarshaller struct {
-	Class string `json:"_type"`
-	// UID Unique identifier for this Contribution.
-	UID HierObjectID `json:"uid"`
-	// Versions Set of references to Versions causing changes to this EHR. Each contribution contains a list of versions, which may include paths pointing to any number of versionable items, i.e. items of types such as `COMPOSITION` and `FOLDER`.
-	Versions json.RawMessage `json:"versions"`
-	// Audit Audit trail corresponding to the committal of this Contribution.
-	Audit json.RawMessage `json:"audit"`
+// rawContribution is the method-free canonical-JSON alias for Contribution. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawContribution Contribution
+
+// MarshalJSONTo emits canonical openEHR JSON for Contribution with `_type`
+// (value "CONTRIBUTION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c Contribution) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawContribution
+	}{"CONTRIBUTION", (*rawContribution)(&c)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for Contribution with `_type`
-// (value "CONTRIBUTION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *Contribution) MarshalJSON() ([]byte, error) {
-	rawVersions, err := jsonpoly.MarshalSlice(c.Versions)
-	if err != nil {
-		return nil, err
-	}
-	rawAudit, err := jsonpoly.Marshal(c.Audit)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ContributionJSONMarshaller{
-		Class:    "CONTRIBUTION",
-		UID:      c.UID,
-		Versions: rawVersions,
-		Audit:    rawAudit,
-	})
+// rawImportedVersion is the method-free canonical-JSON alias for ImportedVersion. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawImportedVersion[T any] ImportedVersion[T]
+
+// MarshalJSONTo emits canonical openEHR JSON for ImportedVersion with `_type`
+// (value "IMPORTED_VERSION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (i ImportedVersion[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawImportedVersion[T]
+	}{"IMPORTED_VERSION", (*rawImportedVersion[T])(&i)}, typereg.MarshalOptions(enc))
 }
 
-type ImportedVersionJSONMarshaller[T any] struct {
-	Class string `json:"_type"`
-	// Contribution Contribution in which this version was added.
-	Contribution json.RawMessage `json:"contribution"`
-	// Signature OpenPGP digital signature or digest of content committed in this Version.
-	Signature *string `json:"signature,omitempty"`
-	// CommitAudit Audit trail corresponding to the committal of this version to the `VERSIONED_OBJECT`.
-	CommitAudit json.RawMessage `json:"commit_audit"`
-	// Item The `ORIGINAL_VERSION` object that was imported.
-	Item OriginalVersion[any] `json:"item"`
+// rawOriginalVersion is the method-free canonical-JSON alias for OriginalVersion. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawOriginalVersion[T any] OriginalVersion[T]
+
+// MarshalJSONTo emits canonical openEHR JSON for OriginalVersion with `_type`
+// (value "ORIGINAL_VERSION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (o OriginalVersion[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawOriginalVersion[T]
+	}{"ORIGINAL_VERSION", (*rawOriginalVersion[T])(&o)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for ImportedVersion with `_type`
-// (value "IMPORTED_VERSION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (i *ImportedVersion[T]) MarshalJSON() ([]byte, error) {
-	rawContribution, err := jsonpoly.Marshal(i.Contribution)
-	if err != nil {
-		return nil, err
-	}
-	rawCommitAudit, err := jsonpoly.Marshal(i.CommitAudit)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ImportedVersionJSONMarshaller[T]{
-		Class:        "IMPORTED_VERSION",
-		Contribution: rawContribution,
-		Signature:    i.Signature,
-		CommitAudit:  rawCommitAudit,
-		Item:         i.Item,
-	})
-}
+// rawVersionedObject is the method-free canonical-JSON alias for VersionedObject. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawVersionedObject[T any] VersionedObject[T]
 
-type OriginalVersionJSONMarshaller[T any] struct {
-	Class string `json:"_type"`
-	// Contribution Contribution in which this version was added.
-	Contribution json.RawMessage `json:"contribution"`
-	// Signature OpenPGP digital signature or digest of content committed in this Version.
-	Signature *string `json:"signature,omitempty"`
-	// CommitAudit Audit trail corresponding to the committal of this version to the `VERSIONED_OBJECT`.
-	CommitAudit json.RawMessage `json:"commit_audit"`
-	// UID Stored version of inheritance precursor.
-	UID ObjectVersionID `json:"uid"`
-	// PrecedingVersionUID Stored version of inheritance precursor.
-	PrecedingVersionUID *ObjectVersionID `json:"preceding_version_uid,omitempty"`
-	// OtherInputVersionUids Identifiers of other versions whose content was merged into this version, if any.
-	OtherInputVersionUids []ObjectVersionID `json:"other_input_version_uids,omitempty"`
-	// LifecycleState Lifecycle state of the content item in this version; coded by openEHR vocabulary `version lifecycle state`.
-	LifecycleState DVCodedText `json:"lifecycle_state"`
-	// Attestations Set of attestations relating to this version.
-	Attestations []Attestation `json:"attestations,omitempty"`
-	// Data Data content of this Version.
-	Data *T `json:"data,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for OriginalVersion with `_type`
-// (value "ORIGINAL_VERSION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (o *OriginalVersion[T]) MarshalJSON() ([]byte, error) {
-	rawContribution, err := jsonpoly.Marshal(o.Contribution)
-	if err != nil {
-		return nil, err
-	}
-	rawCommitAudit, err := jsonpoly.Marshal(o.CommitAudit)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&OriginalVersionJSONMarshaller[T]{
-		Class:                 "ORIGINAL_VERSION",
-		Contribution:          rawContribution,
-		Signature:             o.Signature,
-		CommitAudit:           rawCommitAudit,
-		UID:                   o.UID,
-		PrecedingVersionUID:   o.PrecedingVersionUID,
-		OtherInputVersionUids: o.OtherInputVersionUids,
-		LifecycleState:        o.LifecycleState,
-		Attestations:          o.Attestations,
-		Data:                  o.Data,
-	})
-}
-
-type VersionedObjectJSONMarshaller[T any] struct {
-	Class string `json:"_type"`
-	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
-	UID HierObjectID `json:"uid"`
-	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID json.RawMessage `json:"owner_id"`
-	// TimeCreated Time of initial creation of this versioned object.
-	TimeCreated DVDateTime `json:"time_created"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for VersionedObject with `_type`
-// (value "VERSIONED_OBJECT") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (v *VersionedObject[T]) MarshalJSON() ([]byte, error) {
-	rawOwnerID, err := jsonpoly.Marshal(v.OwnerID)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&VersionedObjectJSONMarshaller[T]{
-		Class:       "VERSIONED_OBJECT",
-		UID:         v.UID,
-		OwnerID:     rawOwnerID,
-		TimeCreated: v.TimeCreated,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for VersionedObject with `_type`
+// (value "VERSIONED_OBJECT") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (v VersionedObject[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawVersionedObject[T]
+	}{"VERSIONED_OBJECT", (*rawVersionedObject[T])(&v)}, typereg.MarshalOptions(enc))
 }

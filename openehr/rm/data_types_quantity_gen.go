@@ -92,9 +92,9 @@ type DVCount struct {
 	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
 	//
 	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *Real `json:"accuracy,omitempty"`
+	Accuracy *Real `json:"accuracy,omitzero"`
 	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
-	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
+	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitzero"`
 	Magnitude         int64 `json:"magnitude"`
 	// MagnitudeStatus Optional status of magnitude with values:
 	//
@@ -106,11 +106,11 @@ type DVCount struct {
 	// * `"~"`   :   value is approximately magnitude
 	//
 	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
+	MagnitudeStatus *string `json:"magnitude_status,omitzero"`
 	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVCount] `json:"normal_range,omitempty"`
+	NormalRange *DVInterval[DVCount] `json:"normal_range,omitzero"`
 	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
+	NormalStatus *CodePhrase `json:"normal_status,omitzero"`
 	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
 	OtherReferenceRanges []ReferenceRange[DVCount] `json:"other_reference_ranges,omitempty"`
 }
@@ -328,9 +328,9 @@ func (d *DVTime) IsSimple() bool {
 // For scores or scales that include Real numbers (or might in the future, i.e. not fixed for all time, such as Apgar), use `DV_SCALE`. `DV_SCALE` may also be used in future for representing purely Integer-based scales, however, the `DV_ORDINAL` type should continue to be supported in software implementations in order to accommodate existing data that are instances of this type.
 type DVOrdinal struct {
 	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
+	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitzero"`
 	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
+	NormalStatus *CodePhrase `json:"normal_status,omitzero"`
 	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
 	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
 	// Symbol Coded textual representation of this value in the enumeration, which may be strings made from  +  symbols, or other enumerations of terms such as  `mild`, `moderate`, `severe`, or even the same number series as the values, e.g. 1, 2, 3.
@@ -360,9 +360,9 @@ type DVProportion struct {
 	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
 	//
 	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *Real `json:"accuracy,omitempty"`
+	Accuracy *Real `json:"accuracy,omitzero"`
 	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
-	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
+	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitzero"`
 	// Denominator Denominator of ratio.
 	Denominator Real `json:"denominator"`
 	// MagnitudeStatus Optional status of magnitude with values:
@@ -375,17 +375,17 @@ type DVProportion struct {
 	// * `"~"`   :   value is approximately magnitude
 	//
 	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
+	MagnitudeStatus *string `json:"magnitude_status,omitzero"`
 	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVProportion] `json:"normal_range,omitempty"`
+	NormalRange *DVInterval[DVProportion] `json:"normal_range,omitzero"`
 	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
+	NormalStatus *CodePhrase `json:"normal_status,omitzero"`
 	// Numerator Numerator of ratio
 	Numerator Real `json:"numerator"`
 	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
 	OtherReferenceRanges []ReferenceRange[DVProportion] `json:"other_reference_ranges,omitempty"`
 	// Precision Precision  to  which  the  `_numerator_` and `_denominator_` values of  the  proportion are expressed, in terms of number  of decimal places. The value 0 implies an integral quantity. The value -1 implies no limit, i.e. any number of decimal places.
-	Precision *Integer `json:"precision,omitempty"`
+	Precision *Integer `json:"precision,omitzero"`
 	// Type Indicates semantic type of proportion, including percent, unitary etc.
 	Type Integer `json:"type"`
 }
@@ -561,9 +561,9 @@ type DVQuantity struct {
 	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
 	//
 	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *Real `json:"accuracy,omitempty"`
+	Accuracy *Real `json:"accuracy,omitzero"`
 	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
-	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
+	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitzero"`
 	// Magnitude Numeric magnitude of the quantity.
 	Magnitude Real `json:"magnitude"`
 	// MagnitudeStatus Optional status of magnitude with values:
@@ -576,16 +576,16 @@ type DVQuantity struct {
 	// * `"~"`   :   value is approximately magnitude
 	//
 	// If not present, assumed meaning is  `"="` .
-	MagnitudeStatus *string `json:"magnitude_status,omitempty"`
+	MagnitudeStatus *string `json:"magnitude_status,omitzero"`
 	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVQuantity] `json:"normal_range,omitempty"`
+	NormalRange *DVInterval[DVQuantity] `json:"normal_range,omitzero"`
 	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
+	NormalStatus *CodePhrase `json:"normal_status,omitzero"`
 	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
 	OtherReferenceRanges []ReferenceRange[DVQuantity] `json:"other_reference_ranges,omitempty"`
 	// Precision Precision to which the value of the quantity is expressed, in terms of number of decimal places. The value 0 implies an integral quantity.
 	// The value -1 implies no limit, i.e. any number of decimal places.
-	Precision *Integer `json:"precision,omitempty"`
+	Precision *Integer `json:"precision,omitzero"`
 	// Units Quantity units, expressed as a code or syntax string from either UCUM (the default) or the units system specified in `_units_system_`, when set.
 	//
 	// In either case, the value is the code or syntax - normally formed of standard ASCII - which is in principal not the same as the display string, although in simple cases such as 'm' (for meters) it will be.
@@ -599,11 +599,11 @@ type DVQuantity struct {
 	// If not set, the application environment needs to determine the displayable form.
 	//
 	// NOTE: The display name may be language-dependent for various older and non-systematic units. For this reason, it is not recommended to add unit display names to archetypes, only to templates (for localisation purposes).
-	UnitsDisplayName *string `json:"units_display_name,omitempty"`
+	UnitsDisplayName *string `json:"units_display_name,omitzero"`
 	// UnitsSystem Optional field used to specify a units system from which codes in `_units_` are defined. Value is a URI identifying a terminology containing units concepts from the  (https://www.hl7.org/fhir/terminologies-systems.html[HL7 FHIR terminologies list]).
 	//
 	// If not set, the UCUM standard (case-sensitive codes) is assumed as the units system.
-	UnitsSystem *string `json:"units_system,omitempty"`
+	UnitsSystem *string `json:"units_system,omitzero"`
 }
 
 // Add Sum of this `DV_QUANTITY` and `_other_`.
@@ -670,9 +670,9 @@ func (d *DVQuantity) Subtract(other DVQuantity) DVQuantity {
 // For scores that include only Integers, `DV_SCALE` may also be used, but `DV_ORDINAL` should be supported to accommodate existing data instances of that type.
 type DVScale struct {
 	// NormalRange Optional normal range.
-	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitempty"`
+	NormalRange *DVInterval[DVOrdered] `json:"normal_range,omitzero"`
 	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
-	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
+	NormalStatus *CodePhrase `json:"normal_status,omitzero"`
 	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
 	OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
 	// Symbol Coded textual representation of this value in the scale range, which may be strings made from symbols or other enumerations of terms such as  `no breathlessness`, `very very slight`, `slight breathlessness`. Codes come from archetypes.

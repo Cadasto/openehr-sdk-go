@@ -15,88 +15,153 @@
 package serializeprobes
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
+	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
 // Result is the shared probe outcome (REQ-082).
 type Result = probe.Result
 
-// Probe030CanjsonRoundTrip implements PROBE-030: decoding a
-// canonical-JSON RM value, encoding it, then decoding and encoding
-// that output again produces two byte-identical SDK encodes.
+// Probe030CanjsonRoundTrip implements PROBE-030 (REQ-052): a
+// canonical-JSON RM value survives the SDK round trip with its meaning
+// intact. It decodes `body`, encodes it (`b1`), decodes that (`A`),
+// encodes again (`b2`), then decodes that (`B`).
 //
-// The probe asserts byte-stability of the SDK's round-trip pipeline
-// (Decode → Encode → Decode → Encode), not byte equality against an
-// arbitrary upstream serializer. Stability is the load-bearing
-// guarantee for hashing, signing, and diff tooling.
+// A and B MUST be equal by typed deep comparison (reflect.DeepEqual over
+// the decoded RM values, which compares an interface-typed field by its
+// dynamic type and value and so covers every substitutable slot and
+// every DV_INTERVAL[T] bound). B MUST satisfy validation.ValidateRM
+// (REQ-112) with no issues. As a secondary check, b1 and b2 MUST be
+// wire-equivalent (testkit/wireequiv): equal once each is parsed into a
+// generic JSON value, with member order ignored and array order kept.
+//
+// The comparison straddles the second encode, not the first. The first
+// encode may legitimately collapse a container (DV_TEXT.mappings under
+// omitempty, wire.md REQ-052), so A and B are read either side of the
+// re-encode instead. The input is never compared byte-wise: JSON member
+// order carries no meaning (RFC 8259 section 4) and the encoder makes no
+// byte-level promise.
 //
 // `body` MUST be canonical-JSON bytes for a known concrete RM type.
-// `factory` returns a fresh pointer to the target Go type — passed
-// twice during the probe so the probe owns the value lifecycle.
+// `factory` returns a fresh pointer to the target Go type, called three
+// times so the probe owns each value's lifecycle.
 //
-// Errors returned by canjson during the round-trip surface as
+// Errors returned by canjson during the round trip surface as
 // Result{Status: probe.StatusFail}; mechanical failures (e.g. nil factory)
 // return a non-nil error so the harness can distinguish probe
 // failure from probe-framework failure.
 func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) {
+	return probe030RoundTrip(body, factory, canjson.Marshal, false)
+}
+
+// Probe030CanjsonRoundTripInput runs PROBE-030 for one input from
+// [Probe030Inputs], honoring its SkipFloor flag: an input whose vendored
+// content carries an RM-floor finding independent of the round trip runs the
+// fidelity legs (typed deep comparison, wire equivalence) but skips the
+// validation.ValidateRM leg. Use this when iterating the corpus;
+// Probe030CanjsonRoundTrip is the body/factory form with the floor leg always
+// on.
+func Probe030CanjsonRoundTripInput(in Probe030Input) (Result, error) {
+	if in.loadErr != nil {
+		return Result{Probe: "PROBE-030", Status: "fail", Detail: "cassette discovery: " + in.loadErr.Error()}, nil
+	}
+	return probe030RoundTrip(in.Body, in.Factory, canjson.Marshal, in.SkipFloor)
+}
+
+// probe030RoundTrip runs the PROBE-030 pipeline with reEncode as the
+// second encode step. Probe030CanjsonRoundTrip passes the real
+// canjson.Marshal. A can-fail test passes a lossy double to prove the
+// typed deep comparison of A and B catches a field dropped, or a
+// polymorphic slot narrowed, on the re-encode path: each mutation
+// changes B without touching A, so reflect.DeepEqual and the
+// wire-equivalence secondary both flag it (probe_030_guard_internal_test.go).
+//
+// skipFloor drops only the validation.ValidateRM leg, for an input whose
+// vendored content carries an RM-floor finding independent of the round trip
+// (see [Probe030Input.SkipFloor]); the fidelity legs always run.
+func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]byte, error), skipFloor bool) (Result, error) {
 	r := Result{Probe: "PROBE-030"}
 	if factory == nil {
 		return r, errors.New("PROBE-030: factory is nil")
 	}
 	if body == nil {
 		r.Status = "fail"
-		r.Detail = "input body is nil — likely a cassette discovery failure"
+		r.Detail = "input body is nil, likely a cassette discovery failure"
 		return r, nil
 	}
-	v1 := factory()
-	if err := canjson.Unmarshal(body, v1); err != nil {
+	v := factory()
+	if err := canjson.Unmarshal(body, v); err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("first decode: %v", err)
 		return r, nil
 	}
-	b1, err := canjson.Marshal(v1)
+	b1, err := canjson.Marshal(v)
 	if err != nil {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("first encode: %v", err)
+		r.Detail = fmt.Sprintf("first encode (b1): %v", err)
 		return r, nil
 	}
-	v2 := factory()
-	if err := canjson.Unmarshal(b1, v2); err != nil {
+	valueA := factory()
+	if err := canjson.Unmarshal(b1, valueA); err != nil {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("second decode: %v", err)
+		r.Detail = fmt.Sprintf("second decode (A): %v", err)
 		return r, nil
 	}
-	b2, err := canjson.Marshal(v2)
+	b2, err := reEncode(valueA)
 	if err != nil {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("second encode: %v", err)
+		r.Detail = fmt.Sprintf("re-encode (b2): %v", err)
 		return r, nil
 	}
-	if !bytes.Equal(b1, b2) {
+	valueB := factory()
+	if err := canjson.Unmarshal(b2, valueB); err != nil {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("round-trip not byte-stable\nb1=%s\nb2=%s", b1, b2)
+		r.Detail = fmt.Sprintf("third decode (B): %v", err)
+		return r, nil
+	}
+	if !reflect.DeepEqual(valueA, valueB) {
+		r.Status = "fail"
+		r.Detail = fmt.Sprintf("A and B differ across the re-encode (a field or polymorphic slot was lost)\nb1=%s\nb2=%s", b1, b2)
+		return r, nil
+	}
+	if !skipFloor {
+		if vr := validation.ValidateRM(valueB); !vr.OK {
+			r.Status = "fail"
+			r.Detail = "round-tripped value does not satisfy the RM floor (REQ-112): " + firstIssue(vr)
+			return r, nil
+		}
+	}
+	if ok, diff := wireequiv.Equivalent(b1, b2); !ok {
+		r.Status = "fail"
+		r.Detail = "the two SDK encodes are not wire-equivalent: " + diff
 		return r, nil
 	}
 	r.Status = "pass"
 	return r, nil
 }
 
-// Probe030Inputs is the canonical set of inputs exercised by
-// PROBE-030 in sandbox mode. The harness asserts that decode then
-// re-encode produces byte-equal results across this set when fed the
-// vendored cassettes (REQ-080). The set spans leaf RM values and
-// full composition cassettes vendored under
-// `testkit/cassettes/compositions/` and `testkit/cassettes/rm/`. The Event/History polymorphism
-// that initially blocked composition round-trip is resolved in ADR
-// 0003 (docs/adr/0003-rm-event-polymorphism.md).
+// Probe030Inputs is the set of inputs exercised by PROBE-030 in sandbox
+// mode. Each input survives the round trip with its meaning intact
+// (typed deep comparison of A and B, plus wire equivalence, and the RM
+// floor unless the input sets SkipFloor) when fed the vendored cassettes
+// (REQ-080, REQ-112). The set spans leaf RM values and full composition
+// cassettes vendored under `testkit/cassettes/compositions/` and
+// `testkit/cassettes/rm/`. The Event/History polymorphism that initially
+// blocked composition round-trip is resolved in ADR 0003
+// (docs/adr/0003-rm-event-polymorphism.md).
+//
+// Every discovered cassette stays in the set so the fidelity legs run on
+// all of them; an input carrying an RM-floor finding independent of the
+// round trip sets SkipFloor, which drops only the ValidateRM leg.
 //
 // Populated at package init: the leaf entries are inline; cassette
 // entries are discovered from disk so adding a fixture file does not
@@ -135,9 +200,29 @@ type Probe030Input struct {
 	Name    string
 	Body    []byte
 	Factory func() any
-	// loadErr is set when the cassette discovery step failed at init
-	// for this entry; Probe030CanjsonRoundTrip surfaces it as Status=fail.
+	// SkipFloor drops only the validation.ValidateRM leg for this input,
+	// for a cassette whose vendored content carries an RM-floor finding
+	// independent of the round trip. The fidelity legs (typed deep
+	// comparison, wire equivalence) still run. See probe030SkipFloor.
+	SkipFloor bool
+	// loadErr is set when the cassette discovery step failed at init for
+	// this entry; Probe030CanjsonRoundTripInput surfaces it as Status=fail.
 	loadErr error
+}
+
+// probe030SkipFloor names cassettes whose vendored content carries an RM-floor
+// finding that is present before any round trip, so the ValidateRM leg is
+// skipped for them while the fidelity legs still run. Vendored content is not
+// edited.
+//
+// clinical_notes.v0 has an empty string at
+// `/content[2]/activities[0]/action_archetype_id`, a required ACTIVITY
+// attribute, which the RM floor reports as absent. That is a genuine finding in
+// the vendored composition, invariant to the round trip (ValidateRM reports it
+// on the input decode and on the re-encoded value alike), so it is held out of
+// the floor leg only.
+var probe030SkipFloor = map[string]bool{
+	"compositions/clinical_notes.v0.json": true,
 }
 
 // loadCassetteInputs discovers vendored cassettes relative to this
@@ -169,9 +254,10 @@ func loadCassetteInputs() ([]Probe030Input, error) {
 			continue
 		}
 		out = append(out, Probe030Input{
-			Name:    "cassette:" + rel.Rel,
-			Body:    body,
-			Factory: factory,
+			Name:      "cassette:" + rel.Rel,
+			Body:      body,
+			Factory:   factory,
+			SkipFloor: probe030SkipFloor[rel.Rel],
 		})
 	}
 	return out, nil

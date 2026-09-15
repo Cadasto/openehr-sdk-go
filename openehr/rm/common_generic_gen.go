@@ -13,13 +13,13 @@ package rm
 type Attestation struct {
 	AuditDetails
 	// AttestedView Optional visual representation of content attested e.g. screen image.
-	AttestedView *DVMultimedia `json:"attested_view,omitempty"`
+	AttestedView *DVMultimedia `json:"attested_view,omitzero"`
 	// IsPending True if this attestation is outstanding; False means it has been completed.
 	IsPending bool `json:"is_pending"`
 	// Items Items attested, expressed as fully qualified runtime paths to the items in question. Although not recommended, these may include fine-grained items which have been attested in some other system. Otherwise it is assumed to be for the entire VERSION with which it is associated.
 	Items []DVEHRURI `json:"items,omitempty"`
 	// Proof Proof of attestation.
-	Proof *string `json:"proof,omitempty"`
+	Proof *string `json:"proof,omitzero"`
 	// Reason Reason of this attestation. Optionally coded by the openEHR Terminology group  attestation reason ; includes values like  authorisation ,  witness  etc.
 	Reason DVTextLike `json:"reason"`
 }
@@ -45,11 +45,11 @@ type Participation struct {
 	// Function The function of the Party in this participation (note that a given party might participate in more than one way in a particular activity). This attribute should be coded, but cannot be limited to the HL7v3:ParticipationFunction vocabulary, since it is too limited and hospital-oriented.
 	Function DVTextLike `json:"function"`
 	// Mode Optional field for recording the 'mode' of the performer / activity interaction, e.g. present, by telephone, by email etc.
-	Mode *DVCodedText `json:"mode,omitempty"`
+	Mode *DVCodedText `json:"mode,omitzero"`
 	// Performer The id and possibly demographic system link of the party participating in the activity.
 	Performer PartyProxy `json:"performer"`
 	// Time The time interval during which the participation took place, if it is used in an observational context (i.e. recording facts about the past); or the intended time interval of the participation when used in future contexts, such as EHR Instructions.
-	Time *DVInterval[DVDateTime] `json:"time,omitempty"`
+	Time *DVInterval[DVDateTime] `json:"time,omitzero"`
 }
 
 // PartyIdentified Proxy data for an identified party other than the subject of the record, minimally consisting of human-readable identifier(s), such as name, formal (and possibly computable) identifiers such as NHS number, and an optional link to external data. There must be at least one of name, identifier or external_ref present.
@@ -59,11 +59,11 @@ type Participation struct {
 // Should not be used to include patient identifying information.
 type PartyIdentified struct {
 	// ExternalRef Optional reference to more detailed demographic or identification information for this party, in an external system.
-	ExternalRef *PartyRef `json:"external_ref,omitempty"`
+	ExternalRef *PartyRef `json:"external_ref,omitzero"`
 	// Identifiers One or more formal identifiers (possibly computable).
 	Identifiers []DVIdentifier `json:"identifiers,omitempty"`
 	// Name Optional human-readable name (in String form).
-	Name *string `json:"name,omitempty"`
+	Name *string `json:"name,omitzero"`
 }
 
 // PartyProxy Abstract concept of a proxy description of a party, including an optional link to data for this party in a demographic or other identity management system. Sub- typed into `PARTY_IDENTIFIED` and `PARTY_SELF`.
@@ -87,7 +87,7 @@ type PartyRelated struct {
 // PartySelf Party proxy representing the subject of the record. Used to indicate that the party is the owner of the record. May or may not have `_external_ref_` set.
 type PartySelf struct {
 	// ExternalRef Optional reference to more detailed demographic or identification information for this party, in an external system.
-	ExternalRef *PartyRef `json:"external_ref,omitempty"`
+	ExternalRef *PartyRef `json:"external_ref,omitzero"`
 }
 
 // RevisionHistory Purpose Defines the notion of a revision history of audit items, each associated with the version for which that audit was committed. The list is in most-recent-first order.

@@ -75,7 +75,7 @@ type ArchetypeTerm struct {
 	// Code Code of this term.
 	Code string `json:"code"`
 	// Items Hash of keys (“text”, “description” etc) and corresponding values.
-	Items *map[string]string `json:"items,omitempty"`
+	Items *map[string]string `json:"items,omitzero"`
 }
 
 // Keys List of all keys used in this term.

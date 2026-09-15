@@ -12,9 +12,9 @@ type TerminologyCode struct {
 	// TerminologyID The archetype environment namespace identifier used to identify a terminology. Typically a value like `"snomed_ct"` that is mapped elsewhere to the full URI identifying the terminology.
 	TerminologyID string `json:"terminology_id"`
 	// TerminologyVersion Optional string value representing terminology version, typically a date or dotted numeric.
-	TerminologyVersion *string `json:"terminology_version,omitempty"`
+	TerminologyVersion *string `json:"terminology_version,omitzero"`
 	// URI The URI reference that may be used as a concrete key into a notional terminology service for queries that can obtain the term text, definition, and other associated elements.
-	URI *string `json:"uri,omitempty"`
+	URI *string `json:"uri,omitzero"`
 }
 
 // TerminologyTerm Leaf type representing a standalone term from a terminology, which consists of the term text and the code, i.e. a concept reference.

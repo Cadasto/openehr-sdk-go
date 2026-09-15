@@ -4,432 +4,162 @@
 package rm
 
 import (
-	"encoding/json"
-	"errors"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.generic — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.rm.common.generic: canonical-JSON UnmarshalJSONFrom companions
 
-type AttestationJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// SystemID Identifier of the logical EHR system where the change was committed. This is almost always owned by the organisation legally responsible for the EHR, and is distinct from any application, or any hosting infrastructure.
-	SystemID string `json:"system_id"`
-	// TimeCommitted Time of committal of the item.
-	TimeCommitted DVDateTime `json:"time_committed"`
-	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
-	ChangeType  DVCodedText     `json:"change_type"`
-	Description json.RawMessage `json:"description,omitempty"` // polymorphic DVTextLike
-	Committer   json.RawMessage `json:"committer"`             // polymorphic PartyProxy
-	// AttestedView Optional visual representation of content attested e.g. screen image.
-	AttestedView *DVMultimedia `json:"attested_view,omitempty"`
-	// Proof Proof of attestation.
-	Proof *string `json:"proof,omitempty"`
-	// Items Items attested, expressed as fully qualified runtime paths to the items in question. Although not recommended, these may include fine-grained items which have been attested in some other system. Otherwise it is assumed to be for the entire VERSION with which it is associated.
-	Items  []DVEHRURI      `json:"items,omitempty"`
-	Reason json.RawMessage `json:"reason"` // polymorphic DVTextLike
-	// IsPending True if this attestation is outstanding; False means it has been completed.
-	IsPending bool `json:"is_pending"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Attestation.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *Attestation) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Attestation.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *Attestation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ATTESTATION: %w", typereg.ErrNilReceiver)
 	}
-	var aux AttestationJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ATTESTATION", err)
+	var wire jsonWireAttestation
+	if err := typereg.DecodeInto(dec, "ATTESTATION", &wire); err != nil {
+		return err
 	}
-	if aux.Class != "" && aux.Class != "ATTESTATION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ATTESTATION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	a.SystemID = aux.SystemID
-	a.TimeCommitted = aux.TimeCommitted
-	a.ChangeType = aux.ChangeType
-	if len(aux.Description) > 0 && string(aux.Description) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Description)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Description, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/description", Inner: jerr}
-				}
-				a.Description = &def
-			} else {
-				return &typereg.DecodeError{Path: "/description", Inner: err}
-			}
-		} else {
-			a.Description = dv
-		}
-	}
-	if len(aux.Committer) > 0 && string(aux.Committer) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Committer)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/committer", Inner: err}
-		}
-		a.Committer = dv
-	}
-	a.AttestedView = aux.AttestedView
-	a.Proof = aux.Proof
-	a.Items = aux.Items
-	if len(aux.Reason) > 0 && string(aux.Reason) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Reason)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Reason, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/reason", Inner: jerr}
-				}
-				a.Reason = &def
-			} else {
-				return &typereg.DecodeError{Path: "/reason", Inner: err}
-			}
-		} else {
-			a.Reason = dv
-		}
-	}
-	a.IsPending = aux.IsPending
+	a.SystemID = wire.SystemID
+	a.TimeCommitted = wire.TimeCommitted
+	a.ChangeType = wire.ChangeType
+	a.Description = wire.Description
+	a.Committer = wire.Committer
+	a.AttestedView = wire.AttestedView
+	a.Proof = wire.Proof
+	a.Items = wire.Items
+	a.Reason = wire.Reason
+	a.IsPending = wire.IsPending
 	return nil
 }
 
-type AuditDetailsJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// SystemID Identifier of the logical EHR system where the change was committed. This is almost always owned by the organisation legally responsible for the EHR, and is distinct from any application, or any hosting infrastructure.
-	SystemID string `json:"system_id"`
-	// TimeCommitted Time of committal of the item.
-	TimeCommitted DVDateTime `json:"time_committed"`
-	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
-	ChangeType  DVCodedText     `json:"change_type"`
-	Description json.RawMessage `json:"description,omitempty"` // polymorphic DVTextLike
-	Committer   json.RawMessage `json:"committer"`             // polymorphic PartyProxy
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into AuditDetails.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *AuditDetails) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into AuditDetails.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *AuditDetails) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: AUDIT_DETAILS: %w", typereg.ErrNilReceiver)
 	}
-	var aux AuditDetailsJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("AUDIT_DETAILS", err)
-	}
-	if aux.Class != "" && aux.Class != "AUDIT_DETAILS" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "AUDIT_DETAILS", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	a.SystemID = aux.SystemID
-	a.TimeCommitted = aux.TimeCommitted
-	a.ChangeType = aux.ChangeType
-	if len(aux.Description) > 0 && string(aux.Description) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Description)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Description, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/description", Inner: jerr}
-				}
-				a.Description = &def
-			} else {
-				return &typereg.DecodeError{Path: "/description", Inner: err}
-			}
-		} else {
-			a.Description = dv
-		}
-	}
-	if len(aux.Committer) > 0 && string(aux.Committer) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Committer)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/committer", Inner: err}
-		}
-		a.Committer = dv
-	}
-	return nil
+	return typereg.DecodeInto(dec, "AUDIT_DETAILS", &struct {
+		Type string `json:"_type"`
+		*rawAuditDetails
+	}{rawAuditDetails: (*rawAuditDetails)(a)})
 }
 
-type ParticipationJSONUnmarshaller struct {
-	Class    string          `json:"_type"`
-	Function json.RawMessage `json:"function"` // polymorphic DVTextLike
-	// Mode Optional field for recording the 'mode' of the performer / activity interaction, e.g. present, by telephone, by email etc.
-	Mode      *DVCodedText    `json:"mode,omitempty"`
-	Performer json.RawMessage `json:"performer"` // polymorphic PartyProxy
-	// Time The time interval during which the participation took place, if it is used in an observational context (i.e. recording facts about the past); or the intended time interval of the participation when used in future contexts, such as EHR Instructions.
-	Time *DVInterval[DVDateTime] `json:"time,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Participation.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (p *Participation) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Participation.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (p *Participation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: PARTICIPATION: %w", typereg.ErrNilReceiver)
 	}
-	var aux ParticipationJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("PARTICIPATION", err)
-	}
-	if aux.Class != "" && aux.Class != "PARTICIPATION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTICIPATION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Function) > 0 && string(aux.Function) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Function)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Function, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/function", Inner: jerr}
-				}
-				p.Function = &def
-			} else {
-				return &typereg.DecodeError{Path: "/function", Inner: err}
-			}
-		} else {
-			p.Function = dv
-		}
-	}
-	p.Mode = aux.Mode
-	if len(aux.Performer) > 0 && string(aux.Performer) != "null" {
-		dv, err := typereg.DecodeAs[PartyProxy](aux.Performer)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/performer", Inner: err}
-		}
-		p.Performer = dv
-	}
-	p.Time = aux.Time
-	return nil
+	return typereg.DecodeInto(dec, "PARTICIPATION", &struct {
+		Type string `json:"_type"`
+		*rawParticipation
+	}{rawParticipation: (*rawParticipation)(p)})
 }
 
-type PartyIdentifiedJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// ExternalRef Optional reference to more detailed demographic or identification information for this party, in an external system.
-	ExternalRef *PartyRef `json:"external_ref,omitempty"`
-	// Name Optional human-readable name (in String form).
-	Name *string `json:"name,omitempty"`
-	// Identifiers One or more formal identifiers (possibly computable).
-	Identifiers []DVIdentifier `json:"identifiers,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into PartyIdentified.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (p *PartyIdentified) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into PartyIdentified.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (p *PartyIdentified) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: PARTY_IDENTIFIED: %w", typereg.ErrNilReceiver)
 	}
-	var aux PartyIdentifiedJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("PARTY_IDENTIFIED", err)
-	}
-	if aux.Class != "" && aux.Class != "PARTY_IDENTIFIED" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTY_IDENTIFIED", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	p.ExternalRef = aux.ExternalRef
-	p.Name = aux.Name
-	p.Identifiers = aux.Identifiers
-	return nil
+	return typereg.DecodeInto(dec, "PARTY_IDENTIFIED", &struct {
+		Type string `json:"_type"`
+		*rawPartyIdentified
+	}{rawPartyIdentified: (*rawPartyIdentified)(p)})
 }
 
-type PartyRelatedJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// ExternalRef Optional reference to more detailed demographic or identification information for this party, in an external system.
-	ExternalRef *PartyRef `json:"external_ref,omitempty"`
-	// Name Optional human-readable name (in String form).
-	Name *string `json:"name,omitempty"`
-	// Identifiers One or more formal identifiers (possibly computable).
-	Identifiers []DVIdentifier `json:"identifiers,omitempty"`
-	// Relationship Relationship of subject of this ENTRY to the subject of the record. May be coded. If it is the patient, coded as  self.
-	Relationship DVCodedText `json:"relationship"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into PartyRelated.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (p *PartyRelated) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into PartyRelated.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (p *PartyRelated) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: PARTY_RELATED: %w", typereg.ErrNilReceiver)
 	}
-	var aux PartyRelatedJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("PARTY_RELATED", err)
+	var wire jsonWirePartyRelated
+	if err := typereg.DecodeInto(dec, "PARTY_RELATED", &wire); err != nil {
+		return err
 	}
-	if aux.Class != "" && aux.Class != "PARTY_RELATED" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTY_RELATED", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	p.ExternalRef = aux.ExternalRef
-	p.Name = aux.Name
-	p.Identifiers = aux.Identifiers
-	p.Relationship = aux.Relationship
+	p.ExternalRef = wire.ExternalRef
+	p.Name = wire.Name
+	p.Identifiers = wire.Identifiers
+	p.Relationship = wire.Relationship
 	return nil
 }
 
-type PartySelfJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// ExternalRef Optional reference to more detailed demographic or identification information for this party, in an external system.
-	ExternalRef *PartyRef `json:"external_ref,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into PartySelf.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (p *PartySelf) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into PartySelf.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (p *PartySelf) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: PARTY_SELF: %w", typereg.ErrNilReceiver)
 	}
-	var aux PartySelfJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("PARTY_SELF", err)
-	}
-	if aux.Class != "" && aux.Class != "PARTY_SELF" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTY_SELF", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	p.ExternalRef = aux.ExternalRef
-	return nil
+	return typereg.DecodeInto(dec, "PARTY_SELF", &struct {
+		Type string `json:"_type"`
+		*rawPartySelf
+	}{rawPartySelf: (*rawPartySelf)(p)})
 }
 
-type RevisionHistoryJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Items The items in this history in most-recent-last order.
-	Items []RevisionHistoryItem `json:"items"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into RevisionHistory.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (r *RevisionHistory) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into RevisionHistory.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (r *RevisionHistory) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: REVISION_HISTORY: %w", typereg.ErrNilReceiver)
 	}
-	var aux RevisionHistoryJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("REVISION_HISTORY", err)
-	}
-	if aux.Class != "" && aux.Class != "REVISION_HISTORY" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "REVISION_HISTORY", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	r.Items = aux.Items
-	return nil
+	return typereg.DecodeInto(dec, "REVISION_HISTORY", &struct {
+		Type string `json:"_type"`
+		*rawRevisionHistory
+	}{rawRevisionHistory: (*rawRevisionHistory)(r)})
 }
 
-type RevisionHistoryItemJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// VersionID Version identifier for this revision.
-	VersionID ObjectVersionID   `json:"version_id"`
-	Audits    []json.RawMessage `json:"audits"` // polymorphic []AuditDetailsLike
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into RevisionHistoryItem.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (r *RevisionHistoryItem) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into RevisionHistoryItem.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (r *RevisionHistoryItem) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: REVISION_HISTORY_ITEM: %w", typereg.ErrNilReceiver)
 	}
-	var aux RevisionHistoryItemJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("REVISION_HISTORY_ITEM", err)
-	}
-	if aux.Class != "" && aux.Class != "REVISION_HISTORY_ITEM" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "REVISION_HISTORY_ITEM", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	r.VersionID = aux.VersionID
-	if aux.Audits != nil {
-		r.Audits = make([]AuditDetailsLike, len(aux.Audits))
-		for idx, raw := range aux.Audits {
-			if len(raw) == 0 || string(raw) == "null" {
-				continue
-			}
-			dv, err := typereg.DecodeAs[AuditDetailsLike](raw)
-			if err != nil {
-				if errors.Is(err, typereg.ErrMissingType) {
-					var def AuditDetails
-					if jerr := json.Unmarshal(raw, &def); jerr != nil {
-						return &typereg.DecodeError{Path: fmt.Sprintf("/audits/%d", idx), Inner: jerr}
-					}
-					r.Audits[idx] = &def
-				} else {
-					return &typereg.DecodeError{Path: fmt.Sprintf("/audits/%d", idx), Inner: err}
-				}
-			} else {
-				r.Audits[idx] = dv
-			}
-		}
-	}
-	return nil
+	return typereg.DecodeInto(dec, "REVISION_HISTORY_ITEM", &struct {
+		Type string `json:"_type"`
+		*rawRevisionHistoryItem
+	}{rawRevisionHistoryItem: (*rawRevisionHistoryItem)(r)})
 }

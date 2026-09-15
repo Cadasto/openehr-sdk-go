@@ -1,9 +1,8 @@
 package instance_test
 
 import (
-	"bytes"
 	"context"
-	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
 // TestCorpusRoundTripValidates is the REQ-107 dossier acceptance
@@ -19,10 +19,10 @@ import (
 // intact. Two complementary assertions, because the two REQ-052
 // sub-gaps fail differently:
 //
-//   - byte-stability: re-marshalling the decoded tree must reproduce the
-//     original bytes. This catches sub-gap A (a value-in-interface field
+//   - value-stability: re-decoding the re-marshalled tree must reproduce the
+//     same typed value. This catches sub-gap A (a value-in-interface field
 //     dropping its `_type` on the wire) even when the drop never escalates
-//     into a validator issue — which it doesn't on most fixtures, so the
+//     into a validator issue, which it doesn't on most fixtures, so the
 //     delta check alone would miss it.
 //   - validation delta: the decoded tree must validate with no *new* issue
 //     vs the freshly generated tree. This catches sub-gap B (a
@@ -60,20 +60,35 @@ func TestCorpusRoundTripValidates(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Marshal: %v", err)
 			}
-			var rt rm.Composition
+			var rt rm.Composition // A
 			if err := canjson.Unmarshal(data, &rt); err != nil {
 				t.Fatalf("Unmarshal: %v", err)
 			}
 
-			// Byte-stability (sub-gap A): re-marshalling the decoded tree must
-			// reproduce the original bytes. A dropped subtype/bound `_type`
-			// surfaces here even when it never reaches the validator.
+			// Value-stability (sub-gap A): re-marshalling the decoded tree and
+			// decoding it again must reproduce the same typed value. A dropped
+			// subtype/bound `_type` surfaces here (B would hold a different
+			// dynamic type in the slot) even when it never reaches the
+			// validator. Byte equality is not asserted (member order is not a
+			// contract, REQ-052).
 			again, err := canjson.Marshal(&rt)
 			if err != nil {
 				t.Fatalf("re-marshal: %v", err)
 			}
-			if !bytes.Equal(data, again) {
-				t.Errorf("round-trip not byte-stable (a subtype/bound _type likely dropped) %s", firstDiff(data, again))
+			var rt2 rm.Composition // B, straddling the re-encode
+			if err := canjson.Unmarshal(again, &rt2); err != nil {
+				t.Fatalf("re-decode: %v", err)
+			}
+			if !reflect.DeepEqual(rt, rt2) {
+				if _, diff := wireequiv.Equivalent(data, again); diff != "" {
+					t.Errorf("round trip not value-stable (a subtype/bound _type likely dropped): %s", diff)
+				} else {
+					// Wire-equivalent yet the typed values differ: the difference
+					// is below the wire (a dropped subtype field that re-encodes
+					// the same), so the diff is empty. Print both encodes so the
+					// failure still diagnoses.
+					t.Errorf("round trip not value-stable (a subtype/bound _type likely dropped); documents wire-equivalent but typed values differ\nfirst encode=%s\nsecond encode=%s", data, again)
+				}
 			}
 
 			// Validation delta (sub-gap B): the round-trip must introduce no
@@ -86,21 +101,6 @@ func TestCorpusRoundTripValidates(t *testing.T) {
 			}
 		})
 	}
-}
-
-// firstDiff returns a bounded, human-readable description of where two
-// byte slices first diverge, so a byte-stability failure points at the
-// offending key instead of dumping the whole (multi-KB) payload.
-func firstDiff(a, b []byte) string {
-	n := min(len(a), len(b))
-	i := 0
-	for i < n && a[i] == b[i] {
-		i++
-	}
-	window := func(s []byte) string {
-		return string(s[max(i-40, 0):min(i+40, len(s))])
-	}
-	return fmt.Sprintf("at byte %d (len %d vs %d):\n  first:  …%s…\n  second: …%s…", i, len(a), len(b), window(a), window(b))
 }
 
 func issueCounts(issues []validation.Issue) map[string]int {

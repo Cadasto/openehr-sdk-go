@@ -3,36 +3,48 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-// BMM package: org.openehr.base.base_types.definitions — canonical-JSON MarshalJSON companions
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+)
 
-type BasicDefinitionsJSONMarshaller struct {
+// BMM package org.openehr.base.base_types.definitions: canonical-JSON MarshalJSONTo companions
+
+// rawBasicDefinitions is the method-free canonical-JSON alias for BasicDefinitions. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawBasicDefinitions BasicDefinitions
+
+// MarshalJSONTo emits canonical openEHR JSON for BasicDefinitions with `_type`
+// (value "BASIC_DEFINITIONS") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (b BasicDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawBasicDefinitions
+	}{"BASIC_DEFINITIONS", (*rawBasicDefinitions)(&b)}, typereg.MarshalOptions(enc))
+}
+
+// jsonWireOpenehrDefinitions is the flat canonical-JSON wire struct for OpenehrDefinitions. OpenehrDefinitions embeds
+// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// promote that ancestor's methods and emit the wrong `_type`; the flat
+// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+type jsonWireOpenehrDefinitions struct {
 	Class string `json:"_type"`
 }
 
-// MarshalJSON emits canonical openEHR JSON for BasicDefinitions with `_type`
-// (value "BASIC_DEFINITIONS") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (b *BasicDefinitions) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&BasicDefinitionsJSONMarshaller{
-		Class: "BASIC_DEFINITIONS",
-	})
-}
-
-type OpenehrDefinitionsJSONMarshaller struct {
-	Class string `json:"_type"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for OpenehrDefinitions with `_type`
-// (value "OPENEHR_DEFINITIONS") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (o *OpenehrDefinitions) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&OpenehrDefinitionsJSONMarshaller{
+// MarshalJSONTo emits canonical openEHR JSON for OpenehrDefinitions with `_type`
+// (value "OPENEHR_DEFINITIONS") as the leading member (REQ-052, Q6). The receiver is a
+// value so a by-value instance in a polymorphic slot keeps its `_type`.
+func (o OpenehrDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &jsonWireOpenehrDefinitions{
 		Class: "OPENEHR_DEFINITIONS",
-	})
+	}, typereg.MarshalOptions(enc))
 }

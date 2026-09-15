@@ -4,59 +4,30 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.integration — canonical-JSON MarshalJSON companions
+// BMM package org.openehr.rm.integration: canonical-JSON MarshalJSONTo companions
 
-type GenericEntryJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name json.RawMessage `json:"name"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID json.RawMessage `json:"uid,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Data The data from the source message or record. May be recorded in any structural openEHR representation.
-	Data json.RawMessage `json:"data"`
-}
+// rawGenericEntry is the method-free canonical-JSON alias for GenericEntry. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawGenericEntry GenericEntry
 
-// MarshalJSON emits canonical openEHR JSON for GenericEntry with `_type`
-// (value "GENERIC_ENTRY") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (g *GenericEntry) MarshalJSON() ([]byte, error) {
-	rawName, err := jsonpoly.Marshal(g.Name)
-	if err != nil {
-		return nil, err
-	}
-	rawUID, err := jsonpoly.Marshal(g.UID)
-	if err != nil {
-		return nil, err
-	}
-	rawData, err := jsonpoly.Marshal(g.Data)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&GenericEntryJSONMarshaller{
-		Class:            "GENERIC_ENTRY",
-		Name:             rawName,
-		ArchetypeNodeID:  g.ArchetypeNodeID,
-		UID:              rawUID,
-		Links:            g.Links,
-		ArchetypeDetails: g.ArchetypeDetails,
-		FeederAudit:      g.FeederAudit,
-		Data:             rawData,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for GenericEntry with `_type`
+// (value "GENERIC_ENTRY") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (g GenericEntry) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawGenericEntry
+	}{"GENERIC_ENTRY", (*rawGenericEntry)(&g)}, typereg.MarshalOptions(enc))
 }

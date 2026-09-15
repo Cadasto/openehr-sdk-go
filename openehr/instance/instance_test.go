@@ -455,8 +455,10 @@ func TestGenerateUIDCarriesType(t *testing.T) {
 	}
 	// The uid field must carry `_type:"HIER_OBJECT_ID"` so that
 	// canjson.Unmarshal can resolve the polymorphic UIDBasedID
-	// interface. The string-contains assertion is stable against
-	// canjson's field-order convention.
+	// interface. This witnesses the `_type`-first SHOULD at a
+	// substitutable slot (REQ-052): the encoder leads the slot object
+	// with the discriminator, which is what lets a streaming decoder
+	// dispatch. Member order is otherwise not a contract.
 	if !bytes.Contains(b, []byte(`"uid":{"_type":"HIER_OBJECT_ID"`)) {
 		t.Errorf("canjson(Composition).uid missing _type discriminator; got: %s", uidSlice(b))
 	}

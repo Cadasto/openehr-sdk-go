@@ -19,6 +19,8 @@ package typereg_test
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"reflect"
 	"strings"
@@ -68,21 +70,28 @@ func TestNilReceiverUnmarshalJSONCensus(t *testing.T) { // REQ-025
 		}
 		libraryTypes++
 		typedNil := reflect.Zero(reflect.TypeOf(ctor())).Interface()
-		u, ok := typedNil.(json.Unmarshaler)
+		invoke, ok := codecNilGuard(typedNil)
 		if !ok {
 			withoutMethod = append(withoutMethod, name+" ("+rt.PkgPath()+")")
 			continue
 		}
 		t.Run(name, func(t *testing.T) {
-			err := callWithoutPanicking(t, func() error { return u.UnmarshalJSON([]byte(`{}`)) })
+			err := callWithoutPanicking(t, invoke)
 			if !errors.Is(err, typereg.ErrNilReceiver) {
-				t.Fatalf("%s: (nil).UnmarshalJSON({}) = %v, want errors.Is(err, typereg.ErrNilReceiver)", name, err)
+				t.Fatalf("%s: (nil).Unmarshal = %v, want errors.Is(err, typereg.ErrNilReceiver)", name, err)
 			}
 		})
 	}
+	// Can-fail control: a type implementing neither decode interface must read
+	// as unguarded, so the withoutMethod arm is real. Deleting the streaming
+	// pair from a generated class leaves it implementing neither UnmarshalJSON
+	// nor UnmarshalJSONFrom, which this arm then reports by name.
+	if _, ok := codecNilGuard(neitherCodec{}); ok {
+		t.Error("codecNilGuard(neitherCodec) reported a guard; the census could not distinguish a class whose nil-receiver guard was dropped")
+	}
 	if len(withoutMethod) > 0 {
-		t.Errorf("%d of %d library types carry no UnmarshalJSON, so the census could not guard them: %v\n"+
-			"The generator emits one for every registered type; a missing method means a dropped guard.",
+		t.Errorf("%d of %d library types carry neither UnmarshalJSON nor UnmarshalJSONFrom, so the census could not guard them: %v\n"+
+			"The generator emits the streaming pair for every registered type; a missing method means a dropped guard.",
 			len(withoutMethod), libraryTypes, withoutMethod)
 	}
 	if libraryTypes < 100 {
@@ -106,6 +115,31 @@ func TestNilReceiverUnmarshalJSONCensus(t *testing.T) { // REQ-025
 		t.Errorf("rm.Character: (nil).UnmarshalText(x) = %v, want errors.Is(err, typereg.ErrNilReceiver)", err)
 	}
 }
+
+// codecNilGuard reports whether typedNil carries a decode method this census
+// can drive with a nil receiver, and returns a closure invoking it. It is
+// interface-agnostic: the streaming pair (ADR 0022) emits UnmarshalJSONFrom
+// (v2), the hand-written primitives keep UnmarshalJSON (v1), and either method
+// refuses a nil receiver with typereg.ErrNilReceiver as its first statement
+// (REQ-025). A type carrying neither cannot be guarded and fails the census.
+func codecNilGuard(typedNil any) (func() error, bool) {
+	switch u := typedNil.(type) {
+	case jsonv2.UnmarshalerFrom:
+		return func() error {
+			// The nil-receiver check is the method's first statement, before any
+			// read, so the decoder's content is immaterial; it only has to be
+			// non-nil.
+			return u.UnmarshalJSONFrom(jsontext.NewDecoder(strings.NewReader(`{}`)))
+		}, true
+	case json.Unmarshaler:
+		return func() error { return u.UnmarshalJSON([]byte(`{}`)) }, true
+	}
+	return nil, false
+}
+
+// neitherCodec implements neither decode interface, the negative control that
+// proves codecNilGuard reports "unguarded" for a type the census must catch.
+type neitherCodec struct{}
 
 // callWithoutPanicking runs f and converts a panic into a test failure that
 // names it, so a dropped guard reads as "panicked: runtime error: invalid

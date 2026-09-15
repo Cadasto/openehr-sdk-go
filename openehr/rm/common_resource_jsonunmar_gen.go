@@ -4,162 +4,61 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.resource — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.rm.common.resource: canonical-JSON UnmarshalJSONFrom companions
 
-type ResourceDescriptionJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// OriginalAuthor Original author of this resource, with all relevant details, including organisation.
-	OriginalAuthor map[string]string `json:"original_author"`
-	// OtherContributors Other contributors to the resource, probably listed in  `'name <email>'`  form.
-	OtherContributors []string `json:"other_contributors,omitempty"`
-	// LifecycleState Lifecycle state of the resource, typically including states such as: `initial | submitted | experimental | awaiting_approval | approved | superseded | obsolete`.
-	LifecycleState string `json:"lifecycle_state"`
-	// ResourcePackageURI URI of package to which this resource belongs.
-	ResourcePackageURI *string `json:"resource_package_uri,omitempty"`
-	// OtherDetails Additional non language-sensitive resource meta-data, as a list of name/value pairs.
-	OtherDetails   *map[string]string `json:"other_details,omitempty"`
-	ParentResource json.RawMessage    `json:"parent_resource"` // polymorphic AuthoredResource
-	// Details Details of all parts of resource description that are natural language-dependent, keyed by language code.
-	Details map[string]ResourceDescriptionItem `json:"details"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ResourceDescription.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (r *ResourceDescription) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ResourceDescription.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (r *ResourceDescription) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: RESOURCE_DESCRIPTION: %w", typereg.ErrNilReceiver)
 	}
-	var aux ResourceDescriptionJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("RESOURCE_DESCRIPTION", err)
-	}
-	if aux.Class != "" && aux.Class != "RESOURCE_DESCRIPTION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "RESOURCE_DESCRIPTION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	r.OriginalAuthor = aux.OriginalAuthor
-	r.OtherContributors = aux.OtherContributors
-	r.LifecycleState = aux.LifecycleState
-	r.ResourcePackageURI = aux.ResourcePackageURI
-	r.OtherDetails = aux.OtherDetails
-	if len(aux.ParentResource) > 0 && string(aux.ParentResource) != "null" {
-		dv, err := typereg.DecodeAs[AuthoredResource](aux.ParentResource)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/parent_resource", Inner: err}
-		}
-		r.ParentResource = dv
-	}
-	r.Details = aux.Details
-	return nil
+	return typereg.DecodeInto(dec, "RESOURCE_DESCRIPTION", &struct {
+		Type string `json:"_type"`
+		*rawResourceDescription
+	}{rawResourceDescription: (*rawResourceDescription)(r)})
 }
 
-type ResourceDescriptionItemJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Language The localised language in which the items in this description item are written. Coded from openEHR code set `languages`.
-	Language CodePhrase `json:"language"`
-	// Purpose Purpose of the resource.
-	Purpose string `json:"purpose"`
-	// Keywords Keywords which characterise this resource, used e.g. for indexing and searching.
-	Keywords []string `json:"keywords,omitempty"`
-	// Use Description of the uses of the resource, i.e. contexts in which it could be used.
-	Use *string `json:"use,omitempty"`
-	// Misuse Description of any misuses of the resource, i.e. contexts in which it should not be used.
-	Misuse *string `json:"misuse,omitempty"`
-	// Copyright Optional copyright statement for the resource as a knowledge resource.
-	Copyright *string `json:"copyright,omitempty"`
-	// OriginalResourceURI URIs of original clinical document(s) or description of which resource is a formalisation, in the language of this description item; keyed by meaning.
-	OriginalResourceURI *map[string]string `json:"original_resource_uri,omitempty"`
-	// OtherDetails Additional language-sensitive resource metadata, as a list of name/value pairs.
-	OtherDetails *map[string]string `json:"other_details,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ResourceDescriptionItem.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (r *ResourceDescriptionItem) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ResourceDescriptionItem.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (r *ResourceDescriptionItem) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: RESOURCE_DESCRIPTION_ITEM: %w", typereg.ErrNilReceiver)
 	}
-	var aux ResourceDescriptionItemJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("RESOURCE_DESCRIPTION_ITEM", err)
-	}
-	if aux.Class != "" && aux.Class != "RESOURCE_DESCRIPTION_ITEM" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "RESOURCE_DESCRIPTION_ITEM", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	r.Language = aux.Language
-	r.Purpose = aux.Purpose
-	r.Keywords = aux.Keywords
-	r.Use = aux.Use
-	r.Misuse = aux.Misuse
-	r.Copyright = aux.Copyright
-	r.OriginalResourceURI = aux.OriginalResourceURI
-	r.OtherDetails = aux.OtherDetails
-	return nil
+	return typereg.DecodeInto(dec, "RESOURCE_DESCRIPTION_ITEM", &struct {
+		Type string `json:"_type"`
+		*rawResourceDescriptionItem
+	}{rawResourceDescriptionItem: (*rawResourceDescriptionItem)(r)})
 }
 
-type TranslationDetailsJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Language Language of the translation.
-	Language CodePhrase `json:"language"`
-	// Author Translator name and other demographic details.
-	Author map[string]string `json:"author"`
-	// Accreditaton Accreditation of translator, usually a national translator's registration or association membership id.
-	Accreditaton *string `json:"accreditaton,omitempty"`
-	// OtherDetails Any other meta-data.
-	OtherDetails *map[string]string `json:"other_details,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into TranslationDetails.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (t *TranslationDetails) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into TranslationDetails.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (t *TranslationDetails) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if t == nil {
 		return fmt.Errorf("canjson: TRANSLATION_DETAILS: %w", typereg.ErrNilReceiver)
 	}
-	var aux TranslationDetailsJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("TRANSLATION_DETAILS", err)
-	}
-	if aux.Class != "" && aux.Class != "TRANSLATION_DETAILS" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "TRANSLATION_DETAILS", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	t.Language = aux.Language
-	t.Author = aux.Author
-	t.Accreditaton = aux.Accreditaton
-	t.OtherDetails = aux.OtherDetails
-	return nil
+	return typereg.DecodeInto(dec, "TRANSLATION_DETAILS", &struct {
+		Type string `json:"_type"`
+		*rawTranslationDetails
+	}{rawTranslationDetails: (*rawTranslationDetails)(t)})
 }

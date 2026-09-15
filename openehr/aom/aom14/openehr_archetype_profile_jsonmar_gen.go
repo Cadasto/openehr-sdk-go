@@ -4,152 +4,110 @@
 package aom14
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.am.aom14.openehr_archetype_profile — canonical-JSON MarshalJSON companions
+// BMM package org.openehr.am.aom14.openehr_archetype_profile: canonical-JSON MarshalJSONTo companions
 
-type CCodedTextJSONMarshaller struct {
-	Class string `json:"_type"`
-	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitempty"`
-	// RMTypeName Reference model type that this node corresponds to.
-	RMTypeName string `json:"rm_type_name"`
-	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[Integer] `json:"occurrences"`
-	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
-	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
-	NodeID string `json:"node_id"`
-	// Terminology Terminology identifier.
-	Terminology string `json:"terminology"`
-	// CodeList Optional list of codes from the terminology. No list means any code from the terminology is allowed.
-	CodeList  *[]string `json:"code_list,omitempty"`
-	Reference *string   `json:"reference,omitempty"`
+// rawCCodedText is the method-free canonical-JSON alias for CCodedText. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCCodedText CCodedText
+
+// MarshalJSONTo emits canonical openEHR JSON for CCodedText with `_type`
+// (value "C_CODED_TEXT") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CCodedText) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCCodedText
+	}{"C_CODED_TEXT", (*rawCCodedText)(&c)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for CCodedText with `_type`
-// (value "C_CODED_TEXT") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CCodedText) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CCodedTextJSONMarshaller{
-		Class:        "C_CODED_TEXT",
-		AssumedValue: c.AssumedValue,
-		RMTypeName:   c.RMTypeName,
-		Occurrences:  c.Occurrences,
-		NodeID:       c.NodeID,
-		Terminology:  c.Terminology,
-		CodeList:     c.CodeList,
-		Reference:    c.Reference,
-	})
+// rawCOrdinal is the method-free canonical-JSON alias for COrdinal. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCOrdinal COrdinal
+
+// MarshalJSONTo emits canonical openEHR JSON for COrdinal with `_type`
+// (value "C_ORDINAL") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c COrdinal) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCOrdinal
+	}{"C_ORDINAL", (*rawCOrdinal)(&c)}, typereg.MarshalOptions(enc))
 }
 
-type COrdinalJSONMarshaller struct {
-	Class string `json:"_type"`
-	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitempty"`
-	// RMTypeName Reference model type that this node corresponds to.
-	RMTypeName string `json:"rm_type_name"`
-	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[Integer] `json:"occurrences"`
-	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
-	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
-	NodeID string `json:"node_id"`
-	// List Value set of allowed Ordinals in the constraint.
-	List []Ordinal `json:"list,omitempty"`
+// rawCQuantity is the method-free canonical-JSON alias for CQuantity. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCQuantity CQuantity
+
+// MarshalJSONTo emits canonical openEHR JSON for CQuantity with `_type`
+// (value "C_QUANTITY") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CQuantity) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCQuantity
+	}{"C_QUANTITY", (*rawCQuantity)(&c)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for COrdinal with `_type`
-// (value "C_ORDINAL") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *COrdinal) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&COrdinalJSONMarshaller{
-		Class:        "C_ORDINAL",
-		AssumedValue: c.AssumedValue,
-		RMTypeName:   c.RMTypeName,
-		Occurrences:  c.Occurrences,
-		NodeID:       c.NodeID,
-		List:         c.List,
-	})
+// rawCQuantityItem is the method-free canonical-JSON alias for CQuantityItem. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCQuantityItem CQuantityItem
+
+// MarshalJSONTo emits canonical openEHR JSON for CQuantityItem with `_type`
+// (value "C_QUANTITY_ITEM") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CQuantityItem) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCQuantityItem
+	}{"C_QUANTITY_ITEM", (*rawCQuantityItem)(&c)}, typereg.MarshalOptions(enc))
 }
 
-type CQuantityJSONMarshaller struct {
-	Class string `json:"_type"`
-	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitempty"`
-	// RMTypeName Reference model type that this node corresponds to.
-	RMTypeName string `json:"rm_type_name"`
-	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[Integer] `json:"occurrences"`
-	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
-	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
-	NodeID string `json:"node_id"`
-	// Property Name of physical property for Quantities being constrained.
-	Property string `json:"property"`
-	// List Value set of allowed individual Quantity item constraints in this Quantity constraint.
-	List []CQuantityItem `json:"list,omitempty"`
-}
+// rawOrdinal is the method-free canonical-JSON alias for Ordinal. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawOrdinal Ordinal
 
-// MarshalJSON emits canonical openEHR JSON for CQuantity with `_type`
-// (value "C_QUANTITY") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CQuantity) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CQuantityJSONMarshaller{
-		Class:        "C_QUANTITY",
-		AssumedValue: c.AssumedValue,
-		RMTypeName:   c.RMTypeName,
-		Occurrences:  c.Occurrences,
-		NodeID:       c.NodeID,
-		Property:     c.Property,
-		List:         c.List,
-	})
-}
-
-type CQuantityItemJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Magnitude Quantity magnitude constraint.
-	Magnitude rm.Interval[Real] `json:"magnitude"`
-	// Units Optional units constraint.
-	Units *string `json:"units,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for CQuantityItem with `_type`
-// (value "C_QUANTITY_ITEM") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CQuantityItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CQuantityItemJSONMarshaller{
-		Class:     "C_QUANTITY_ITEM",
-		Magnitude: c.Magnitude,
-		Units:     c.Units,
-	})
-}
-
-type OrdinalJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Symbol Terminology code providing the Ordinal's symbol.
-	Symbol rm.CodePhrase `json:"symbol"`
-	// Value Ordinal value.
-	Value Integer `json:"value"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for Ordinal with `_type`
-// (value "ORDINAL") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (o *Ordinal) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&OrdinalJSONMarshaller{
-		Class:  "ORDINAL",
-		Symbol: o.Symbol,
-		Value:  o.Value,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for Ordinal with `_type`
+// (value "ORDINAL") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (o Ordinal) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawOrdinal
+	}{"ORDINAL", (*rawOrdinal)(&o)}, typereg.MarshalOptions(enc))
 }

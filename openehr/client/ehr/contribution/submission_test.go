@@ -2,6 +2,7 @@ package contribution_test
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"strings"
 	"testing"
 
@@ -10,12 +11,14 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
 
-// fakeNonVersion satisfies json.Marshaler + BMMName() but is not a
+// fakeNonVersion satisfies json.MarshalerTo + BMMName() but is not a
 // member of the closed CommitVersion set — Validate must reject it.
 type fakeNonVersion struct{}
 
-func (fakeNonVersion) MarshalJSON() ([]byte, error) { return []byte(`{"_type":"WRONG"}`), nil }
-func (fakeNonVersion) BMMName() string              { return "WRONG_TYPE" }
+func (fakeNonVersion) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return enc.WriteValue([]byte(`{"_type":"WRONG"}`))
+}
+func (fakeNonVersion) BMMName() string { return "WRONG_TYPE" }
 
 // newImportedVersion builds a minimal IMPORTED_VERSION<COMPOSITION> for
 // the closed-set tests. ImportedVersion wraps an OriginalVersion under
@@ -371,5 +374,44 @@ func TestSubmissionMixesVersionable(t *testing.T) {
 	}
 	if !strings.Contains(body, `"_type":"EHR_STATUS"`) {
 		t.Errorf("EHR_STATUS payload missing: %s", body)
+	}
+}
+
+// bmmOnly carries BMMName but no MarshalJSONTo; marshalOnly carries
+// MarshalJSONTo but no BMMName. Neither may satisfy contribution.CommitVersion.
+type bmmOnly struct{}
+
+func (bmmOnly) BMMName() string { return "NO_MARSHAL" }
+
+type marshalOnly struct{}
+
+func (marshalOnly) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return enc.WriteValue([]byte(`{"_type":"NO_BMM"}`))
+}
+
+// TestCommitVersionMethodSet pins CommitVersion's method set to exactly
+// {MarshalJSONTo, BMMName} (R16, ADR 0022 Q7). MarshalJSONTo is the
+// encoding/json/v2 MarshalerTo the write-side wrappers marshal through;
+// BMMName is what Submission.Validate reads in its default arm. Both are
+// load-bearing, so the interface must keep requiring both.
+//
+// Go cannot express a negative compile check (a _test.go that must fail to
+// build is not available), so the refusal is pinned at run time instead. The
+// eight compile-time assertions in submission.go prove the real wrappers
+// satisfy CommitVersion, but not that the interface still demands both
+// methods: the wrappers carry both and so would satisfy any weaker
+// constraint. This test is the can-fail control the assertions cannot be.
+// Drop jsonv2.MarshalerTo from CommitVersion and bmmOnly satisfies it; drop
+// BMMName and marshalOnly does; add a third method and fakeNonVersion stops
+// satisfying it. Any of the three turns a check below red.
+func TestCommitVersionMethodSet(t *testing.T) {
+	if _, ok := any(bmmOnly{}).(contribution.CommitVersion); ok {
+		t.Error("bmmOnly (BMMName, no MarshalJSONTo) satisfies CommitVersion; the interface must still require encoding/json/v2 MarshalerTo")
+	}
+	if _, ok := any(marshalOnly{}).(contribution.CommitVersion); ok {
+		t.Error("marshalOnly (MarshalJSONTo, no BMMName) satisfies CommitVersion; the interface must still require BMMName")
+	}
+	if _, ok := any(fakeNonVersion{}).(contribution.CommitVersion); !ok {
+		t.Error("fakeNonVersion (both methods) does not satisfy CommitVersion; the method set is narrower than {MarshalJSONTo, BMMName}")
 	}
 }

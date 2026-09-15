@@ -1,12 +1,10 @@
 package rm
 
 import (
-	"bytes"
 	"encoding"
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -27,10 +25,10 @@ import (
 //
 // The BASE Character primitive excludes no code point, so U+FFFD (the Unicode
 // replacement character) is itself a legal Character and survives every codec.
-// What is refused is a *substituted* U+FFFD — one encoding/json manufactured
-// from a lone UTF-16 surrogate escape — which only the JSON string arm can
-// detect, because only it still holds the wire bytes; see
-// jsonLiteralSpellsReplacement.
+// A U+FFFD that was manufactured out of corrupted input never reaches this type
+// on the JSON path: encoding/json/v2's tokenizer refuses invalid UTF-8 and a
+// lone UTF-16 surrogate escape while reading the value, so the string arm only
+// ever sees bytes that already decoded cleanly (ruling R15, REQ-052).
 type Character string
 
 // The canonical-XML codec reaches `match` through these two interfaces, so
@@ -50,15 +48,15 @@ var (
 // MarshalText) so the five cannot drift apart. The returned error
 // carries the value-free reason alone (REQ-093); each caller adds its
 // own "rm.Character: " prefix, and only the decode callers classify it
-// with typereg.ErrInvalidShape (see classifyShape).
+// with typereg.ErrInvalidShape (see typereg.ClassifyShape).
 //
 // Every code point passes, U+FFFD included: the BASE Character
 // primitive excludes none, so refusing one here would make a legal
-// character unrepresentable in JSON, text and XML alike. The narrower
-// question — whether a decoded U+FFFD was on the wire or was
-// substituted for corrupted input — needs the wire bytes, which this
-// function does not have; it is answered by
-// jsonLiteralSpellsReplacement, on the one arm that does.
+// character unrepresentable in JSON, text and XML alike. There is no
+// narrower "genuine or substituted" question left to answer on the JSON
+// path: the encoding/json/v2 tokenizer refuses invalid UTF-8 and a lone
+// surrogate escape before the value is decoded, so a U+FFFD that arrives
+// here was written as itself (ruling R15).
 func characterFault(s string) error {
 	if !utf8.ValidString(s) {
 		return errors.New("value is not valid UTF-8")
@@ -69,45 +67,6 @@ func characterFault(s string) error {
 	return nil
 }
 
-// jsonLiteralSpellsReplacement reports whether the raw JSON string
-// literal b — quotes included — spells U+FFFD itself, rather than
-// having had it substituted in. It is only meaningful for a literal that
-// decoded to a single U+FFFD, and its precondition is the caller's: b
-// begins with a quote and json.Unmarshal has already accepted it, so it
-// is a complete string literal.
-//
-// encoding/json performs the substitution silently. A lone UTF-16
-// surrogate escape ("\uD800", "\uDC00") and an invalid UTF-8 byte both
-// decode to U+FFFD with no error reported, so the decoded rune alone
-// cannot say whether a producer wrote a replacement character or whether
-// one was manufactured out of corrupted input — and a rune count would
-// launder the corrupted case into an apparently valid Character.
-//
-// The literal can say. U+FFFD is genuine exactly when the bytes between
-// the quotes are its own UTF-8 encoding (0xEF 0xBF 0xBD) or its
-// six-byte escape (`�`, hex digits in any case); any other literal
-// that decodes to one U+FFFD had it substituted. A well-formed surrogate
-// PAIR is not affected — it decodes to the astral character it names, not
-// to U+FFFD, so it never reaches this question.
-func jsonLiteralSpellsReplacement(b []byte) bool {
-	// json.Unmarshal tolerates trailing whitespace after the closing quote,
-	// and a direct caller may pass it; encoding/json itself never does.
-	b = bytes.TrimRight(b, " \t\r\n")
-	if len(b) < 2 {
-		return false
-	}
-	raw := b[1 : len(b)-1] // between the quotes
-	if len(raw) == 3 && raw[0] == 0xEF && raw[1] == 0xBF && raw[2] == 0xBD {
-		return true // U+FFFD written as itself
-	}
-	if len(raw) != 6 || raw[0] != '\\' || raw[1] != 'u' {
-		return false
-	}
-	// JSON hex digits are ASCII, so a case-insensitive compare is all the
-	// "hex in any case" allowance needs.
-	return strings.EqualFold(string(raw[2:]), "fffd")
-}
-
 // UnmarshalJSON accepts a canonical one-character JSON string. For backward
 // compatibility with the pre-fix encoder — which wrote match as a number — a
 // JSON number is also accepted on decode, but it is never the encoded form
@@ -116,19 +75,20 @@ func jsonLiteralSpellsReplacement(b []byte) bool {
 // ("approximate the behavior of Unmarshal itself"), leaving the receiver
 // unchanged rather than writing the zero value.
 //
-// The string arm runs its checks in this order: the raw bytes must be
-// valid UTF-8; the literal must decode; the decoded value must be one
-// rune (characterFault); and a decoded U+FFFD must be spelled as itself
-// on the wire (jsonLiteralSpellsReplacement) rather than substituted for
-// a lone UTF-16 surrogate escape. A genuine U+FFFD therefore decodes,
-// which is right — the BASE primitive admits it — while the corrupted
-// spelling that decodes to the same rune does not.
+// The string arm runs two checks: the literal must decode, and the
+// decoded value must be one rune (characterFault). It no longer inspects
+// the raw bytes for a substituted U+FFFD: encoding/json/v2's tokenizer
+// refuses invalid UTF-8 and a lone UTF-16 surrogate escape while reading
+// the value (ruling R15), so a corrupted spelling fails at json.Unmarshal
+// and never decodes to a rune this arm could mistake for genuine. A
+// genuine U+FFFD, written as itself, decodes and passes the one-rune rule,
+// which is right: the BASE primitive admits it.
 //
 // Every refusal on this decode path carries typereg.ErrInvalidShape, so a
 // bare-Character decode classifies the way the generated TERM_MAPPING funnel
 // would (REQ-052 § Decode-side shape sentinel). The classification rides on
 // errors.Is and leaves the message and the cause untouched (see
-// classifyShape), so encoding/json's own error stays both readable and
+// typereg.ClassifyShape), so the codec's own error stays both readable and
 // reachable with errors.AsType. The encode direction deliberately stays
 // outside that sentinel — canjson attaches its own encode-only
 // ErrInvalidValue there.
@@ -149,21 +109,15 @@ func (c *Character) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	if b[0] == '"' {
-		// The UTF-8 check goes first, on the raw bytes: json.Unmarshal
-		// replaces an invalid byte with U+FFFD and reports nothing, so
-		// after it there is no invalid input left to see.
-		if !utf8.Valid(b) {
-			return classifyShape(errors.New("rm.Character: input is not valid UTF-8"))
-		}
+		// json.Unmarshal (encoding/json/v2) refuses invalid UTF-8 and a lone
+		// UTF-16 surrogate escape here, so no manufactured U+FFFD survives to
+		// reach characterFault (ruling R15).
 		var s string
 		if err := json.Unmarshal(b, &s); err != nil {
-			return classifyShape(fmt.Errorf("rm.Character: %w", err))
+			return typereg.ClassifyShape(fmt.Errorf("rm.Character: %w", err))
 		}
 		if err := characterFault(s); err != nil {
-			return classifyShape(fmt.Errorf("rm.Character: %w", err))
-		}
-		if r, _ := utf8.DecodeRuneInString(s); r == utf8.RuneError && !jsonLiteralSpellsReplacement(b) {
-			return classifyShape(errors.New("rm.Character: a lone UTF-16 surrogate escape was substituted"))
+			return typereg.ClassifyShape(fmt.Errorf("rm.Character: %w", err))
 		}
 		*c = Character(s)
 		return nil
@@ -178,10 +132,10 @@ func (c *Character) UnmarshalJSON(b []byte) error {
 	// refused rather than silently mapped to U+0000 or U+FFFD.
 	var n rune
 	if err := json.Unmarshal(b, &n); err != nil {
-		return classifyShape(fmt.Errorf("rm.Character: %w", err))
+		return typereg.ClassifyShape(fmt.Errorf("rm.Character: %w", err))
 	}
 	if n == 0 || !utf8.ValidRune(n) {
-		return classifyShape(errors.New("rm.Character: number is not a usable code point"))
+		return typereg.ClassifyShape(errors.New("rm.Character: number is not a usable code point"))
 	}
 	// Past that gate string(n) is one valid UTF-8 rune by construction, so
 	// characterFault has nothing left to add. 65533 is accepted here: a
@@ -226,8 +180,9 @@ func (c Character) MarshalJSON() ([]byte, error) {
 // U+FFFD, and reports no error — so it is indistinguishable here from a
 // genuine U+FFFD. Refusing U+FFFD to close it would make a legal
 // Character unrepresentable in XML, which is the defect this rule
-// exists to avoid; the JSON string arm, which does hold the literal,
-// still refuses its own surrogate escapes.
+// exists to avoid; on the JSON side the encoding/json/v2 tokenizer
+// refuses a lone surrogate escape before this type sees the value, so
+// that channel stays closed there.
 // TestCharacterXMLElementContentValidated pins both halves.
 //
 // There is no numeric back-compat arm here: the pre-fix encoder wrote a

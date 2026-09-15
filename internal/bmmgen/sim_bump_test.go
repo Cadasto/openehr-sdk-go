@@ -73,7 +73,9 @@ func TestSimulatedVersionBump(t *testing.T) {
 	}
 	wantSnippets := []string{
 		"TestProperty",
-		`json:"test_property,omitempty"`,
+		// An optional single String property is a pointer field, so it carries
+		// omitzero, not omitempty, under the streaming codec (REQ-052, Q6).
+		`json:"test_property,omitzero"`,
 	}
 	for _, want := range wantSnippets {
 		if !strings.Contains(string(body), want) {

@@ -4,115 +4,70 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.common.resource — canonical-JSON MarshalJSON companions
+// BMM package org.openehr.rm.common.resource: canonical-JSON MarshalJSONTo companions
 
-type ResourceDescriptionJSONMarshaller struct {
-	Class string `json:"_type"`
-	// OriginalAuthor Original author of this resource, with all relevant details, including organisation.
-	OriginalAuthor map[string]string `json:"original_author"`
-	// OtherContributors Other contributors to the resource, probably listed in  `'name <email>'`  form.
-	OtherContributors []string `json:"other_contributors,omitempty"`
-	// LifecycleState Lifecycle state of the resource, typically including states such as: `initial | submitted | experimental | awaiting_approval | approved | superseded | obsolete`.
-	LifecycleState string `json:"lifecycle_state"`
-	// ResourcePackageURI URI of package to which this resource belongs.
-	ResourcePackageURI *string `json:"resource_package_uri,omitempty"`
-	// OtherDetails Additional non language-sensitive resource meta-data, as a list of name/value pairs.
-	OtherDetails *map[string]string `json:"other_details,omitempty"`
-	// ParentResource Reference to owning resource.
-	ParentResource json.RawMessage `json:"parent_resource"`
-	// Details Details of all parts of resource description that are natural language-dependent, keyed by language code.
-	Details map[string]ResourceDescriptionItem `json:"details"`
+// rawResourceDescription is the method-free canonical-JSON alias for ResourceDescription. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawResourceDescription ResourceDescription
+
+// MarshalJSONTo emits canonical openEHR JSON for ResourceDescription with `_type`
+// (value "RESOURCE_DESCRIPTION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (r ResourceDescription) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawResourceDescription
+	}{"RESOURCE_DESCRIPTION", (*rawResourceDescription)(&r)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for ResourceDescription with `_type`
-// (value "RESOURCE_DESCRIPTION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (r *ResourceDescription) MarshalJSON() ([]byte, error) {
-	rawParentResource, err := jsonpoly.Marshal(r.ParentResource)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&ResourceDescriptionJSONMarshaller{
-		Class:              "RESOURCE_DESCRIPTION",
-		OriginalAuthor:     r.OriginalAuthor,
-		OtherContributors:  r.OtherContributors,
-		LifecycleState:     r.LifecycleState,
-		ResourcePackageURI: r.ResourcePackageURI,
-		OtherDetails:       r.OtherDetails,
-		ParentResource:     rawParentResource,
-		Details:            r.Details,
-	})
+// rawResourceDescriptionItem is the method-free canonical-JSON alias for ResourceDescriptionItem. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawResourceDescriptionItem ResourceDescriptionItem
+
+// MarshalJSONTo emits canonical openEHR JSON for ResourceDescriptionItem with `_type`
+// (value "RESOURCE_DESCRIPTION_ITEM") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (r ResourceDescriptionItem) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawResourceDescriptionItem
+	}{"RESOURCE_DESCRIPTION_ITEM", (*rawResourceDescriptionItem)(&r)}, typereg.MarshalOptions(enc))
 }
 
-type ResourceDescriptionItemJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Language The localised language in which the items in this description item are written. Coded from openEHR code set `languages`.
-	Language CodePhrase `json:"language"`
-	// Purpose Purpose of the resource.
-	Purpose string `json:"purpose"`
-	// Keywords Keywords which characterise this resource, used e.g. for indexing and searching.
-	Keywords []string `json:"keywords,omitempty"`
-	// Use Description of the uses of the resource, i.e. contexts in which it could be used.
-	Use *string `json:"use,omitempty"`
-	// Misuse Description of any misuses of the resource, i.e. contexts in which it should not be used.
-	Misuse *string `json:"misuse,omitempty"`
-	// Copyright Optional copyright statement for the resource as a knowledge resource.
-	Copyright *string `json:"copyright,omitempty"`
-	// OriginalResourceURI URIs of original clinical document(s) or description of which resource is a formalisation, in the language of this description item; keyed by meaning.
-	OriginalResourceURI *map[string]string `json:"original_resource_uri,omitempty"`
-	// OtherDetails Additional language-sensitive resource metadata, as a list of name/value pairs.
-	OtherDetails *map[string]string `json:"other_details,omitempty"`
-}
+// rawTranslationDetails is the method-free canonical-JSON alias for TranslationDetails. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawTranslationDetails TranslationDetails
 
-// MarshalJSON emits canonical openEHR JSON for ResourceDescriptionItem with `_type`
-// (value "RESOURCE_DESCRIPTION_ITEM") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (r *ResourceDescriptionItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ResourceDescriptionItemJSONMarshaller{
-		Class:               "RESOURCE_DESCRIPTION_ITEM",
-		Language:            r.Language,
-		Purpose:             r.Purpose,
-		Keywords:            r.Keywords,
-		Use:                 r.Use,
-		Misuse:              r.Misuse,
-		Copyright:           r.Copyright,
-		OriginalResourceURI: r.OriginalResourceURI,
-		OtherDetails:        r.OtherDetails,
-	})
-}
-
-type TranslationDetailsJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Language Language of the translation.
-	Language CodePhrase `json:"language"`
-	// Author Translator name and other demographic details.
-	Author map[string]string `json:"author"`
-	// Accreditaton Accreditation of translator, usually a national translator's registration or association membership id.
-	Accreditaton *string `json:"accreditaton,omitempty"`
-	// OtherDetails Any other meta-data.
-	OtherDetails *map[string]string `json:"other_details,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for TranslationDetails with `_type`
-// (value "TRANSLATION_DETAILS") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (t *TranslationDetails) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&TranslationDetailsJSONMarshaller{
-		Class:        "TRANSLATION_DETAILS",
-		Language:     t.Language,
-		Author:       t.Author,
-		Accreditaton: t.Accreditaton,
-		OtherDetails: t.OtherDetails,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for TranslationDetails with `_type`
+// (value "TRANSLATION_DETAILS") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (t TranslationDetails) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawTranslationDetails
+	}{"TRANSLATION_DETAILS", (*rawTranslationDetails)(&t)}, typereg.MarshalOptions(enc))
 }

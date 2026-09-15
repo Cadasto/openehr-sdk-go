@@ -3,24 +3,31 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-// BMM package: org.openehr.base.resource — canonical-JSON MarshalJSON companions
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+)
 
-type ResourceAnnotationsJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Documentation Documentary annotations in a multi-level keyed structure.
-	Documentation map[string]any `json:"documentation"`
-}
+// BMM package org.openehr.base.resource: canonical-JSON MarshalJSONTo companions
 
-// MarshalJSON emits canonical openEHR JSON for ResourceAnnotations with `_type`
-// (value "RESOURCE_ANNOTATIONS") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (r *ResourceAnnotations) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ResourceAnnotationsJSONMarshaller{
-		Class:         "RESOURCE_ANNOTATIONS",
-		Documentation: r.Documentation,
-	})
+// rawResourceAnnotations is the method-free canonical-JSON alias for ResourceAnnotations. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawResourceAnnotations ResourceAnnotations
+
+// MarshalJSONTo emits canonical openEHR JSON for ResourceAnnotations with `_type`
+// (value "RESOURCE_ANNOTATIONS") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (r ResourceAnnotations) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawResourceAnnotations
+	}{"RESOURCE_ANNOTATIONS", (*rawResourceAnnotations)(&r)}, typereg.MarshalOptions(enc))
 }

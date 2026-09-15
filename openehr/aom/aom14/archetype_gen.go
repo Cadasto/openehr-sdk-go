@@ -10,9 +10,9 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // Archetype Archetype equivalent to ARCHETYPED class in Common reference model. Defines semantics of identfication, lifecycle, versioning, composition and specialisation.
 type Archetype struct {
 	// AdlVersion ADL version if archetype was read in from an ADL sharable archetype.
-	AdlVersion *string `json:"adl_version,omitempty"`
+	AdlVersion *string `json:"adl_version,omitzero"`
 	// Annotations Annotations on individual items within the resource, keyed by path. The inner table takes the form of a Hash table of String values keyed by String tags.
-	Annotations *rm.ResourceAnnotations `json:"annotations,omitempty"`
+	Annotations *rm.ResourceAnnotations `json:"annotations,omitzero"`
 	// ArchetypeID Multi-axial identifier of this archetype in archetype space.
 	ArchetypeID rm.ArchetypeID `json:"archetype_id"`
 	// Concept The normative meaning of the archetype as a whole, expressed as a local archetype code, typically “at0000”.
@@ -20,21 +20,21 @@ type Archetype struct {
 	// Definition Root node of the definition of this archetype.
 	Definition CComplexObject `json:"definition"`
 	// Description Description and lifecycle information of the resource.
-	Description *rm.ResourceDescription `json:"description,omitempty"`
+	Description *rm.ResourceDescription `json:"description,omitzero"`
 	// Invariants Invariant statements about this object. Statements are expressed in first order predicate logic, and usually refer to at least two attributes.
 	Invariants []Assertion `json:"invariants,omitempty"`
 	// IsControlled True if this resource is under any kind of change control (even file copying), in which case revision history is created.
-	IsControlled *bool `json:"is_controlled,omitempty"`
+	IsControlled *bool `json:"is_controlled,omitzero"`
 	// Ontology The ontology of the archetype.
 	Ontology *ArchetypeOntology `json:"ontology"`
 	// OriginalLanguage Language in which this resource was initially authored. Although there is no language primacy of resources overall, the language of original authoring is required to ensure natural language translations can preserve quality. Language is relevant in both the description and ontology sections.
 	OriginalLanguage rm.TerminologyCode `json:"original_language"`
 	// ParentArchetypeID Identifier of the specialisation parent of this archetype.
-	ParentArchetypeID *rm.ArchetypeID `json:"parent_archetype_id,omitempty"`
+	ParentArchetypeID *rm.ArchetypeID `json:"parent_archetype_id,omitzero"`
 	// Translations List of details for each natural translation made of this resource, keyed by language code. For each translation listed here, there must be corresponding sections in all language-dependent parts of the resource. The `_original_language_` does not appear in this list.
-	Translations *map[string]rm.TranslationDetails `json:"translations,omitempty"`
+	Translations *map[string]rm.TranslationDetails `json:"translations,omitzero"`
 	// UID OID identifier of this archetype.
-	UID *rm.HierObjectID `json:"uid,omitempty"`
+	UID *rm.HierObjectID `json:"uid,omitzero"`
 }
 
 // ConceptName The concept name of the archetype in language a_lang; corresponds to the term definition of the concept attribute in the archetype ontology.

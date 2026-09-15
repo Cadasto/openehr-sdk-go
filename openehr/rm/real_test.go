@@ -1,7 +1,7 @@
 package rm
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"strconv"
 	"strings"
@@ -184,14 +184,14 @@ func TestRealUnmarshalJSONParseBeforeDigitPolicy(t *testing.T) {
 		if err == nil {
 			t.Fatalf("UnmarshalJSON(%s) = nil error, want a range error", lit)
 		}
-		if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
-			t.Errorf("UnmarshalJSON(%s) err = %v (%T); want errors.AsType[*json.UnmarshalTypeError] to reach it", lit, err, err)
+		if _, ok := errors.AsType[*json.SemanticError](err); !ok {
+			t.Errorf("UnmarshalJSON(%s) err = %v (%T); want errors.AsType[*encoding/json/v2.SemanticError] to reach it", lit, err, err)
 		}
 		if errors.Is(err, errPrecisionLoss) {
 			t.Errorf("UnmarshalJSON(%s) err = %v; want the range failure, not the precision refusal", lit, err)
 		}
 		if errors.Is(err, typereg.ErrInvalidShape) {
-			t.Errorf("UnmarshalJSON(%s) err = %v; an encoding/json range failure must not carry typereg.ErrInvalidShape", lit, err)
+			t.Errorf("UnmarshalJSON(%s) err = %v; an encoding/json/v2 range failure must not carry typereg.ErrInvalidShape", lit, err)
 		}
 	})
 
@@ -219,7 +219,7 @@ func TestRealUnmarshalJSONParseBeforeDigitPolicy(t *testing.T) {
 // classification adds a sentinel, not a word of text. The old
 // fmt.Errorf("%w: %w") form spliced the sentinel's own prose
 // ("canjson: invalid JSON shape") into Error(); the sentinel now rides
-// on Is (see shapeClassified).
+// on Is (see typereg.ClassifyShape).
 //
 // The message text is also pinned honest (REQ-052 / REQ-093): the budget
 // counts significant digits, so it may not claim the value is

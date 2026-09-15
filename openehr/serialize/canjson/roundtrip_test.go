@@ -1,14 +1,15 @@
 package canjson_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
 // listCassettes returns vendored composition JSON paths relative to
@@ -31,17 +32,18 @@ func cassetteFactory(t *testing.T, rel fixtures.CompositionJSONRel) func() any {
 	return f
 }
 
-// TestRoundTripStableSimpleValues — decode → encode → decode → encode
-// produces byte-stable output for representative leaf types and a
-// composition shape without history. See [TestRoundTripCassettes]
-// below for the broader cassette-wide round-trip (composition
-// fixtures with history; polymorphic event dispatch settled in
-// docs/adr/0003-rm-event-polymorphism.md).
+// TestRoundTripStableSimpleValues runs decode, encode (b1), decode (A),
+// encode (b2), decode (B) and preserves the value for representative leaf
+// types and a composition shape without history. See
+// [TestRoundTripCassettes] below for the broader cassette-wide round
+// trip (composition fixtures with history; polymorphic event dispatch
+// settled in docs/adr/0003-rm-event-polymorphism.md).
 //
-// Stability is the load-bearing guarantee for hashing / signing /
-// diffing (PROBE-030 sub-property). Byte equality vs an arbitrary
-// upstream serializer is NOT promised — the SDK has its own
-// canonical profile (REQ-052).
+// A and B straddle the second encode and MUST be equal by typed deep
+// comparison; b1 and b2 MUST be wire-equivalent as a secondary check.
+// Byte equality is not asserted: member order is not a contract and the
+// SDK makes no byte-level promise (REQ-052). This is PROBE-030's
+// package-level twin.
 func TestRoundTripStableSimpleValues(t *testing.T) {
 	cases := []struct {
 		name string
@@ -74,24 +76,31 @@ func TestRoundTripStableSimpleValues(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			v1 := tc.into()
-			if err := canjson.Unmarshal(tc.body, v1); err != nil {
+			v := tc.into()
+			if err := canjson.Unmarshal(tc.body, v); err != nil {
 				t.Fatalf("first Unmarshal: %v", err)
 			}
-			b1, err := canjson.Marshal(v1)
+			b1, err := canjson.Marshal(v)
 			if err != nil {
 				t.Fatalf("first Marshal: %v", err)
 			}
-			v2 := tc.into()
-			if err := canjson.Unmarshal(b1, v2); err != nil {
-				t.Fatalf("second Unmarshal: %v\nbody: %s", err, b1)
+			valueA := tc.into()
+			if err := canjson.Unmarshal(b1, valueA); err != nil {
+				t.Fatalf("second Unmarshal (A): %v\nbody: %s", err, b1)
 			}
-			b2, err := canjson.Marshal(v2)
+			b2, err := canjson.Marshal(valueA)
 			if err != nil {
 				t.Fatalf("second Marshal: %v", err)
 			}
-			if !bytes.Equal(b1, b2) {
-				t.Errorf("round-trip not byte-stable:\n--- b1 ---\n%s\n--- b2 ---\n%s", b1, b2)
+			valueB := tc.into()
+			if err := canjson.Unmarshal(b2, valueB); err != nil {
+				t.Fatalf("third Unmarshal (B): %v\nbody: %s", err, b2)
+			}
+			if !reflect.DeepEqual(valueA, valueB) {
+				t.Errorf("round trip not value-stable across the re-encode:\n A %+v\n B %+v", valueA, valueB)
+			}
+			if ok, diff := wireequiv.Equivalent(b1, b2); !ok {
+				t.Errorf("the two SDK encodes are not wire-equivalent: %s", diff)
 			}
 		})
 	}
@@ -134,11 +143,14 @@ func TestRoundTripStructuralEquivalence(t *testing.T) {
 	}
 }
 
-// TestRoundTripCassettes asserts byte-stable decode → encode → decode
-// → encode across every vendored cassette (PROBE-030). The SDK's own
-// cassettes are all COMPOSITION; vendored upstream sets (e.g.
-// ehrbase/) include EHR_STATUS and FOLDER, so the target factory is
-// selected per cassette path.
+// TestRoundTripCassettes is PROBE-030's package-level twin over the
+// whole vendored corpus: decode, encode (b1), decode (A), encode (b2),
+// decode (B). A and B straddle the second encode and MUST be equal by
+// typed deep comparison; b1 and b2 MUST be wire-equivalent as a
+// secondary check. Byte equality is not asserted (member order is not a
+// contract, REQ-052). The SDK's own cassettes are all COMPOSITION;
+// vendored upstream sets (e.g. ehrbase/) include EHR_STATUS and FOLDER,
+// so the target factory is selected per cassette path.
 func TestRoundTripCassettes(t *testing.T) {
 	for _, rel := range listCassettes(t) {
 		t.Run(rel.Rel, func(t *testing.T) {
@@ -147,24 +159,31 @@ func TestRoundTripCassettes(t *testing.T) {
 				t.Fatalf("read cassette: %v", err)
 			}
 			factory := cassetteFactory(t, rel)
-			v1 := factory()
-			if err := canjson.Unmarshal(raw, v1); err != nil {
+			v := factory()
+			if err := canjson.Unmarshal(raw, v); err != nil {
 				t.Fatalf("first Unmarshal: %v", err)
 			}
-			b1, err := canjson.Marshal(v1)
+			b1, err := canjson.Marshal(v)
 			if err != nil {
 				t.Fatalf("first Marshal: %v", err)
 			}
-			v2 := factory()
-			if err := canjson.Unmarshal(b1, v2); err != nil {
-				t.Fatalf("second Unmarshal: %v\nbody: %s", err, b1)
+			valueA := factory()
+			if err := canjson.Unmarshal(b1, valueA); err != nil {
+				t.Fatalf("second Unmarshal (A): %v\nbody: %s", err, b1)
 			}
-			b2, err := canjson.Marshal(v2)
+			b2, err := canjson.Marshal(valueA)
 			if err != nil {
 				t.Fatalf("second Marshal: %v", err)
 			}
-			if !bytes.Equal(b1, b2) {
-				t.Errorf("round-trip not byte-stable for %s:\n--- b1 ---\n%s\n--- b2 ---\n%s", rel.Rel, b1, b2)
+			valueB := factory()
+			if err := canjson.Unmarshal(b2, valueB); err != nil {
+				t.Fatalf("third Unmarshal (B): %v\nbody: %s", err, b2)
+			}
+			if !reflect.DeepEqual(valueA, valueB) {
+				t.Errorf("round trip not value-stable across the re-encode for %s", rel.Rel)
+			}
+			if ok, diff := wireequiv.Equivalent(b1, b2); !ok {
+				t.Errorf("the two SDK encodes are not wire-equivalent for %s: %s", rel.Rel, diff)
 			}
 		})
 	}

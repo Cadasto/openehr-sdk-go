@@ -4,63 +4,30 @@
 package aom14
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.am.aom14.archetype — canonical-JSON MarshalJSON companions
+// BMM package org.openehr.am.aom14.archetype: canonical-JSON MarshalJSONTo companions
 
-type ArchetypeJSONMarshaller struct {
-	Class string `json:"_type"`
-	// OriginalLanguage Language in which this resource was initially authored. Although there is no language primacy of resources overall, the language of original authoring is required to ensure natural language translations can preserve quality. Language is relevant in both the description and ontology sections.
-	OriginalLanguage rm.TerminologyCode `json:"original_language"`
-	// Description Description and lifecycle information of the resource.
-	Description *rm.ResourceDescription `json:"description,omitempty"`
-	// IsControlled True if this resource is under any kind of change control (even file copying), in which case revision history is created.
-	IsControlled *bool `json:"is_controlled,omitempty"`
-	// Annotations Annotations on individual items within the resource, keyed by path. The inner table takes the form of a Hash table of String values keyed by String tags.
-	Annotations *rm.ResourceAnnotations `json:"annotations,omitempty"`
-	// Translations List of details for each natural translation made of this resource, keyed by language code. For each translation listed here, there must be corresponding sections in all language-dependent parts of the resource. The `_original_language_` does not appear in this list.
-	Translations *map[string]rm.TranslationDetails `json:"translations,omitempty"`
-	// Definition Root node of the definition of this archetype.
-	Definition CComplexObject `json:"definition"`
-	// Ontology The ontology of the archetype.
-	Ontology *ArchetypeOntology `json:"ontology"`
-	// AdlVersion ADL version if archetype was read in from an ADL sharable archetype.
-	AdlVersion *string `json:"adl_version,omitempty"`
-	// ArchetypeID Multi-axial identifier of this archetype in archetype space.
-	ArchetypeID rm.ArchetypeID `json:"archetype_id"`
-	// UID OID identifier of this archetype.
-	UID *rm.HierObjectID `json:"uid,omitempty"`
-	// Concept The normative meaning of the archetype as a whole, expressed as a local archetype code, typically “at0000”.
-	Concept string `json:"concept"`
-	// ParentArchetypeID Identifier of the specialisation parent of this archetype.
-	ParentArchetypeID *rm.ArchetypeID `json:"parent_archetype_id,omitempty"`
-	// Invariants Invariant statements about this object. Statements are expressed in first order predicate logic, and usually refer to at least two attributes.
-	Invariants []Assertion `json:"invariants,omitempty"`
-}
+// rawArchetype is the method-free canonical-JSON alias for Archetype. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawArchetype Archetype
 
-// MarshalJSON emits canonical openEHR JSON for Archetype with `_type`
-// (value "ARCHETYPE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (a *Archetype) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ArchetypeJSONMarshaller{
-		Class:             "ARCHETYPE",
-		OriginalLanguage:  a.OriginalLanguage,
-		Description:       a.Description,
-		IsControlled:      a.IsControlled,
-		Annotations:       a.Annotations,
-		Translations:      a.Translations,
-		Definition:        a.Definition,
-		Ontology:          a.Ontology,
-		AdlVersion:        a.AdlVersion,
-		ArchetypeID:       a.ArchetypeID,
-		UID:               a.UID,
-		Concept:           a.Concept,
-		ParentArchetypeID: a.ParentArchetypeID,
-		Invariants:        a.Invariants,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for Archetype with `_type`
+// (value "ARCHETYPE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (a Archetype) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawArchetype
+	}{"ARCHETYPE", (*rawArchetype)(&a)}, typereg.MarshalOptions(enc))
 }

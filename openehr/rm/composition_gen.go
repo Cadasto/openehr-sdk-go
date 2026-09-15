@@ -11,7 +11,7 @@ package rm
 // For example, the `ORIGINAL_VERSION.uid` `87284370-2D4B-4e3d-A3F3-F303D2F4F34B::uk.nhs.ehr1::2` would be copied to the `_uid_` field of the Composition.
 type Composition struct {
 	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -29,9 +29,9 @@ type Composition struct {
 	// Content The content of this Composition.
 	Content []ContentItem `json:"content,omitempty"`
 	// Context The clinical session context of this Composition, i.e. the contextual attributes of the clinical session.
-	Context *EventContext `json:"context,omitempty"`
+	Context *EventContext `json:"context,omitzero"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Language Mandatory indicator of the localised language in which this Composition is written. Coded from openEHR Code Set  `languages`. The language of an Entry if different from the Composition is indicated in `ENTRY._language_`.
 	Language CodePhrase `json:"language"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
@@ -52,11 +52,11 @@ func (c *Composition) IsPersistent() bool {
 // EventContext Documents the context information of a healthcare event involving the subject of care and the health system. The context information recorded here are independent of the attributes recorded in the version audit, which document the  system interaction  context, i.e. the context of a user interacting with the health record system. Healthcare events include patient contacts, and any other business activity, such as pathology investigations which take place on behalf of the patient.
 type EventContext struct {
 	// EndTime Optional end time of the clinical session.
-	EndTime *DVDateTime `json:"end_time,omitempty"`
+	EndTime *DVDateTime `json:"end_time,omitzero"`
 	// HealthCareFacility The health care facility under whose care the event took place. This is the most specific workgroup or delivery unit within a care delivery enterprise that has an official identifier in the health system, and can be used to ensure medico-legal accountability.
 	HealthCareFacility PartyIdentifiedLike `json:"health_care_facility,omitempty"`
 	// Location The actual location where the session occurred, e.g. 'microbiology lab 2', 'home', 'ward A3'  and so on.
-	Location *string `json:"location,omitempty"`
+	Location *string `json:"location,omitzero"`
 	// OtherContext Other optional context which will be archetyped.
 	OtherContext ItemStructure `json:"other_context,omitempty"`
 	// Participations Parties involved in the healthcare event. These would normally include the physician(s) and often the patient (but not the latter if the clinical session is a pathology test for example).

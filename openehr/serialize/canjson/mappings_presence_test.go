@@ -1,6 +1,9 @@
 package canjson_test
 
 import (
+	"encoding/json"
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -25,7 +28,11 @@ import (
 // Locks both halves so a future change to either is a conscious one, not
 // an accident.
 func TestDVTextMappingsDecodePresenceAndEncodeCollapse(t *testing.T) {
-	const wantEncoded = `{"_type":"DV_TEXT","value":"x"}`
+	// wantKeys is the collapsed key set: under omitempty the mappings field
+	// writes no key, `_type` and `value` remain. Asserted as a set, not an
+	// exact spelling, because member order carries no meaning (REQ-052); the
+	// absent `mappings` key is what this pins.
+	wantKeys := []string{"_type", "value"}
 
 	cases := []struct {
 		name string
@@ -55,14 +62,27 @@ func TestDVTextMappingsDecodePresenceAndEncodeCollapse(t *testing.T) {
 				t.Errorf("decoded %s -> len(Mappings) = %d, want 0", tc.in, len(d.Mappings))
 			}
 
-			// Encode side: `omitempty` collapses nil and non-nil empty alike.
+			// Encode side: `omitempty` collapses nil and non-nil empty alike,
+			// so the re-encode carries no `mappings` key. Pin the collapse by
+			// the key set.
 			out, err := canjson.Marshal(&d)
 			if err != nil {
 				t.Fatalf("encode %s: %v", tc.name, err)
 			}
-			if got := string(out); got != wantEncoded {
-				t.Fatalf("%s: re-encoded %s -> %s, want %s (collapse documented in wire.md REQ-052)", tc.name, tc.in, got, wantEncoded)
+			if got := encodedKeys(t, out); !slices.Equal(got, wantKeys) {
+				t.Fatalf("%s: re-encoded %s -> keys %v, want %v (mappings collapses under omitempty; wire.md REQ-052)", tc.name, tc.in, got, wantKeys)
 			}
 		})
 	}
+}
+
+// encodedKeys returns the sorted top-level member names of a JSON object, so a
+// collapse assertion can compare key sets rather than an exact spelling.
+func encodedKeys(t *testing.T, b []byte) []string {
+	t.Helper()
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("decode encoded output for its key set: %v", err)
+	}
+	return slices.Sorted(maps.Keys(m))
 }

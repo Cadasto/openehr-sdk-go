@@ -51,7 +51,7 @@ Both types are emitted by the BMM generator wherever the BMM primitive `Real` / 
 - Vendored CDR cassettes round-trip cleanly through `canjson` (PROBE-030 across `BMI.json`, `body_weight.json`, `clinical_note.json`, `vital_signs.json`).
 - openEHR wire conformance (REQ-080): any conforming client MUST handle quoted magnitudes the same way on decode to keep cassette round-trip semantics identical. Without this ADR a strict-number-only decoder would reject the `"magnitude": "354"` form that real CDRs emit. (The earlier wire-level cross-SDK parity requirement, REQ-081, has since been retired.)
 - Consumers that need strict-number-only decode can wrap `canjson.Unmarshal` with a pre-pass that rejects quoted numerics, but the SDK itself does not offer a strict-decode mode in v1 — the loss of cassette interoperability outweighs the strictness benefit at this stage.
-- The generated `MarshalJSON` for every concrete RM type continues to emit numbers (no behaviour change on the encode side).
+- The generated `MarshalJSONTo` for every concrete RM type continues to emit numbers (no behaviour change on the encode side).
 - Documentation: REQ-046 stays as written — its "fixed mapping" pertains to underlying type only. The Floating-point precision section of REQ-052 references this ADR for decode tolerance. The note that `primitiveGoType` emits the alias type name (not the raw primitive) is captured in [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) § Primitive type mapping.
 
 ## References

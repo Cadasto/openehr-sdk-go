@@ -4,252 +4,170 @@
 package aom14
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.am.aom14.archetype.primitive — canonical-JSON MarshalJSON companions
+// BMM package org.openehr.am.aom14.archetype.primitive: canonical-JSON MarshalJSONTo companions
 
-type CBooleanJSONMarshaller struct {
-	Class string `json:"_type"`
-	// TrueValid True if the value True is allowed.
-	TrueValid bool `json:"true_valid"`
-	// FalseValid True if the value False is allowed.
-	FalseValid bool `json:"false_valid"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *bool `json:"assumed_value,omitempty"`
+// rawCBoolean is the method-free canonical-JSON alias for CBoolean. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCBoolean CBoolean
+
+// MarshalJSONTo emits canonical openEHR JSON for CBoolean with `_type`
+// (value "C_BOOLEAN") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CBoolean) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCBoolean
+	}{"C_BOOLEAN", (*rawCBoolean)(&c)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for CBoolean with `_type`
-// (value "C_BOOLEAN") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CBoolean) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CBooleanJSONMarshaller{
-		Class:        "C_BOOLEAN",
-		TrueValid:    c.TrueValid,
-		FalseValid:   c.FalseValid,
-		AssumedValue: c.AssumedValue,
-	})
+// rawCDate is the method-free canonical-JSON alias for CDate. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCDate CDate
+
+// MarshalJSONTo emits canonical openEHR JSON for CDate with `_type`
+// (value "C_DATE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CDate) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCDate
+	}{"C_DATE", (*rawCDate)(&c)}, typereg.MarshalOptions(enc))
 }
 
-type CDateJSONMarshaller struct {
-	Class string `json:"_type"`
-	// DayValidity Validity of day in constrained date.
-	DayValidity *rm.ValidityKind `json:"day_validity,omitempty"`
-	// MonthValidity Validity of month in constrained date.
-	MonthValidity *rm.ValidityKind `json:"month_validity,omitempty"`
-	// Range Interval of Dates specifying constraint.
-	Range *rm.Interval[string] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
+// rawCDateTime is the method-free canonical-JSON alias for CDateTime. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCDateTime CDateTime
+
+// MarshalJSONTo emits canonical openEHR JSON for CDateTime with `_type`
+// (value "C_DATE_TIME") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CDateTime) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCDateTime
+	}{"C_DATE_TIME", (*rawCDateTime)(&c)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for CDate with `_type`
-// (value "C_DATE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CDate) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CDateJSONMarshaller{
-		Class:         "C_DATE",
-		DayValidity:   c.DayValidity,
-		MonthValidity: c.MonthValidity,
-		Range:         c.Range,
-		AssumedValue:  c.AssumedValue,
-	})
+// rawCDuration is the method-free canonical-JSON alias for CDuration. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCDuration CDuration
+
+// MarshalJSONTo emits canonical openEHR JSON for CDuration with `_type`
+// (value "C_DURATION") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CDuration) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCDuration
+	}{"C_DURATION", (*rawCDuration)(&c)}, typereg.MarshalOptions(enc))
 }
 
-type CDateTimeJSONMarshaller struct {
-	Class string `json:"_type"`
-	// MonthValidity Validity of month in constrained date.
-	MonthValidity *rm.ValidityKind `json:"month_validity,omitempty"`
-	// DayValidity Validity of day in constrained date.
-	DayValidity *rm.ValidityKind `json:"day_validity,omitempty"`
-	// HourValidity Validity of hour in constrained time.
-	HourValidity *rm.ValidityKind `json:"hour_validity,omitempty"`
-	// MinuteValidity Validity of minute in constrained time.
-	MinuteValidity *rm.ValidityKind `json:"minute_validity,omitempty"`
-	// SecondValidity Validity of second in constrained time.
-	SecondValidity *rm.ValidityKind `json:"second_validity,omitempty"`
-	// MillisecondValidity Validity of millisecond in constrained time.
-	MillisecondValidity *rm.ValidityKind `json:"millisecond_validity,omitempty"`
-	// TimezoneValidity Validity of timezone in constrained date.
-	TimezoneValidity *rm.ValidityKind `json:"timezone_validity,omitempty"`
-	// Range Range of Date_times specifying constraint.
-	Range *rm.Interval[string] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
+// rawCInteger is the method-free canonical-JSON alias for CInteger. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCInteger CInteger
+
+// MarshalJSONTo emits canonical openEHR JSON for CInteger with `_type`
+// (value "C_INTEGER") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CInteger) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCInteger
+	}{"C_INTEGER", (*rawCInteger)(&c)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for CDateTime with `_type`
-// (value "C_DATE_TIME") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CDateTime) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CDateTimeJSONMarshaller{
-		Class:               "C_DATE_TIME",
-		MonthValidity:       c.MonthValidity,
-		DayValidity:         c.DayValidity,
-		HourValidity:        c.HourValidity,
-		MinuteValidity:      c.MinuteValidity,
-		SecondValidity:      c.SecondValidity,
-		MillisecondValidity: c.MillisecondValidity,
-		TimezoneValidity:    c.TimezoneValidity,
-		Range:               c.Range,
-		AssumedValue:        c.AssumedValue,
-	})
+// rawCReal is the method-free canonical-JSON alias for CReal. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCReal CReal
+
+// MarshalJSONTo emits canonical openEHR JSON for CReal with `_type`
+// (value "C_REAL") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CReal) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCReal
+	}{"C_REAL", (*rawCReal)(&c)}, typereg.MarshalOptions(enc))
 }
 
-type CDurationJSONMarshaller struct {
-	Class        string `json:"_type"`
-	YearsAllowed *bool  `json:"years_allowed,omitempty"`
-	// MonthsAllowed True if months are allowed in the constrained Duration.
-	MonthsAllowed *bool `json:"months_allowed,omitempty"`
-	WeeksAllowed  *bool `json:"weeks_allowed,omitempty"`
-	// DaysAllowed True if days are allowed in the constrained Duration.
-	DaysAllowed *bool `json:"days_allowed,omitempty"`
-	// HoursAllowed True if hours are allowed in the constrained Duration.
-	HoursAllowed *bool `json:"hours_allowed,omitempty"`
-	// MinutesAllowed True if minutes are allowed in the constrained Duration.
-	MinutesAllowed *bool `json:"minutes_allowed,omitempty"`
-	SecondsAllowed *bool `json:"seconds_allowed,omitempty"`
-	// FractionalSecondsAllowed True if fractional seconds are allowed in the constrained Duration.
-	FractionalSecondsAllowed *bool `json:"fractional_seconds_allowed,omitempty"`
-	// Range Range of Durations specifying constraint.
-	Range *rm.Interval[string] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
+// rawCString is the method-free canonical-JSON alias for CString. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCString CString
+
+// MarshalJSONTo emits canonical openEHR JSON for CString with `_type`
+// (value "C_STRING") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CString) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCString
+	}{"C_STRING", (*rawCString)(&c)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for CDuration with `_type`
-// (value "C_DURATION") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CDuration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CDurationJSONMarshaller{
-		Class:                    "C_DURATION",
-		YearsAllowed:             c.YearsAllowed,
-		MonthsAllowed:            c.MonthsAllowed,
-		WeeksAllowed:             c.WeeksAllowed,
-		DaysAllowed:              c.DaysAllowed,
-		HoursAllowed:             c.HoursAllowed,
-		MinutesAllowed:           c.MinutesAllowed,
-		SecondsAllowed:           c.SecondsAllowed,
-		FractionalSecondsAllowed: c.FractionalSecondsAllowed,
-		Range:                    c.Range,
-		AssumedValue:             c.AssumedValue,
-	})
-}
+// rawCTime is the method-free canonical-JSON alias for CTime. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCTime CTime
 
-type CIntegerJSONMarshaller struct {
-	Class string `json:"_type"`
-	// List Set of Integers specifying constraint.
-	List []Integer `json:"list,omitempty"`
-	// Range Range of Integers specifying constraint.
-	Range *rm.Interval[Integer] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *Integer `json:"assumed_value,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for CInteger with `_type`
-// (value "C_INTEGER") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CInteger) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CIntegerJSONMarshaller{
-		Class:        "C_INTEGER",
-		List:         c.List,
-		Range:        c.Range,
-		AssumedValue: c.AssumedValue,
-	})
-}
-
-type CRealJSONMarshaller struct {
-	Class string `json:"_type"`
-	// List Set of Reals specifying constraint.
-	List []Real `json:"list,omitempty"`
-	// Range Range of Real specifying constraint.
-	Range *rm.Interval[Real] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *Real `json:"assumed_value,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for CReal with `_type`
-// (value "C_REAL") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CReal) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CRealJSONMarshaller{
-		Class:        "C_REAL",
-		List:         c.List,
-		Range:        c.Range,
-		AssumedValue: c.AssumedValue,
-	})
-}
-
-type CStringJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Pattern Regular expression pattern for proposed instances of String to match.
-	Pattern *string `json:"pattern,omitempty"`
-	// List Set of Strings specifying constraint.
-	List []string `json:"list,omitempty"`
-	// ListOpen True if the list is being used to specify the constraint but is not considered exhaustive.
-	ListOpen bool `json:"list_open"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for CString with `_type`
-// (value "C_STRING") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CString) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CStringJSONMarshaller{
-		Class:        "C_STRING",
-		Pattern:      c.Pattern,
-		List:         c.List,
-		ListOpen:     c.ListOpen,
-		AssumedValue: c.AssumedValue,
-	})
-}
-
-type CTimeJSONMarshaller struct {
-	Class string `json:"_type"`
-	// MinuteValidity Validity of minute in constrained time.
-	MinuteValidity *rm.ValidityKind `json:"minute_validity,omitempty"`
-	// SecondValidity Validity of second in constrained time.
-	SecondValidity *rm.ValidityKind `json:"second_validity,omitempty"`
-	// MillisecondValidity Validity of millisecond in constrained time.
-	MillisecondValidity *rm.ValidityKind `json:"millisecond_validity,omitempty"`
-	// TimezoneValidity Validity of timezone in constrained date.
-	TimezoneValidity *rm.ValidityKind `json:"timezone_validity,omitempty"`
-	// Range Interval of Times specifying constraint.
-	Range *rm.Interval[string] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for CTime with `_type`
-// (value "C_TIME") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CTime) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CTimeJSONMarshaller{
-		Class:               "C_TIME",
-		MinuteValidity:      c.MinuteValidity,
-		SecondValidity:      c.SecondValidity,
-		MillisecondValidity: c.MillisecondValidity,
-		TimezoneValidity:    c.TimezoneValidity,
-		Range:               c.Range,
-		AssumedValue:        c.AssumedValue,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for CTime with `_type`
+// (value "C_TIME") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CTime) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCTime
+	}{"C_TIME", (*rawCTime)(&c)}, typereg.MarshalOptions(enc))
 }

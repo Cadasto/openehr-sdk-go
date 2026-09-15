@@ -14,13 +14,13 @@ type Archetyped struct {
 	// RMVersion Version of the openEHR reference model used to create this object. Expressed in terms of the release version string, e.g.  1.0 ,  1.2.4 .
 	RMVersion string `json:"rm_version"`
 	// TemplateID Globally unique template identifier, if a template was active at this point in the structure. Normally, a template would only be used at the top of a top-level structure, but the possibility exists for templates at lower levels.
-	TemplateID *TemplateID `json:"template_id,omitempty"`
+	TemplateID *TemplateID `json:"template_id,omitzero"`
 }
 
 // FeederAudit The `FEEDER_AUDIT` class defines the semantics of an audit trail which is constructed to describe the origin of data that have been transformed into openEHR form and committed to the system.
 type FeederAudit struct {
 	// FeederSystemAudit Any audit information for the information item from the feeder system, if different from the originating system.
-	FeederSystemAudit *FeederAuditDetails `json:"feeder_system_audit,omitempty"`
+	FeederSystemAudit *FeederAuditDetails `json:"feeder_system_audit,omitzero"`
 	// FeederSystemItemIds Identifiers used for the item in the feeder system, where the feeder system is distinct from the originating system.
 	FeederSystemItemIds []DVIdentifier `json:"feeder_system_item_ids,omitempty"`
 	// OriginalContent Optional inline inclusion of or reference to original content corresponding to the openEHR content at this node. Typically a URI reference to a document or message in a persistent store associated with the EHR.
@@ -44,9 +44,9 @@ type FeederAuditDetails struct {
 	// SystemID Identifier of the system which handled the information item. This is the IT system owned by the organisation legally responsible for handling the data, and at which the data were previously created or passed by an earlier system.
 	SystemID string `json:"system_id"`
 	// Time Time of handling the item. For an originating system, this will be time of creation, for an intermediate feeder system, this will be a time of accession or other time of handling, where available.
-	Time *DVDateTime `json:"time,omitempty"`
+	Time *DVDateTime `json:"time,omitzero"`
 	// VersionID Any identifier used in the system such as  "interim" ,  "final" , or numeric versions if available.
-	VersionID *string `json:"version_id,omitempty"`
+	VersionID *string `json:"version_id,omitzero"`
 }
 
 // Link The `LINK` type defines a logical relationship between two items, such as two `ENTRYs` or an `ENTRY` and a `COMPOSITION`. Links can be used across compositions, and across EHRs. Links can potentially be used between interior (i.e. non archetype root) nodes, although this probably should be prevented in archetypes. Multiple `LINKs` can be attached to the root object of any archetyped structure to give the effect of a 1->N link.

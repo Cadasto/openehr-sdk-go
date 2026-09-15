@@ -137,13 +137,13 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md]
+    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/cassettes, testkit/fixtures, testkit/wireequiv]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md, docs/plans/archive/2026-09-14-json-v2-migration.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
-    adrs: [docs/adr/0004-numeric-wire-tolerance.md]
+    adrs: [docs/adr/0004-numeric-wire-tolerance.md, docs/adr/0021-json-member-order-not-a-contract.md, docs/adr/0022-canonical-json-encoding-json-v2.md]
     tests:
       - openehr/rm/quoted_literal_test.go
-      - openehr/serialize/canjson/field_order_test.go
+      - openehr/serialize/canjson/member_order_test.go
       - openehr/serialize/canjson/encode_test.go
       - openehr/serialize/canjson/marshal_sentinel_test.go
       - openehr/serialize/canjson/roundtrip_test.go
@@ -151,7 +151,8 @@ requirements:
       - openehr/serialize/canjson/polymorphic_encode_test.go
       - openehr/serialize/canjson/decode_test.go
       - openehr/rm/typereg/registry_test.go
-      - openehr/internal/jsonpoly/jsonpoly_test.go
+      - openehr/serialize/canjson/omitzero_test.go
+      - openehr/serialize/canjson/bare_v2_decode_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
       - openehr/rm/character_test.go
@@ -159,6 +160,7 @@ requirements:
       - openehr/rm/real_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canjson/multimedia_bytes_test.go
+      - testkit/wireequiv/wireequiv_test.go
     notes: >-
       partial (2026-09-02): the encode-side refusal sentinel clause
       requires canjson.Marshal / MarshalIndent to wrap the encode-only
@@ -255,6 +257,38 @@ requirements:
       members in any order, _type included
       (TestDecodeAcceptsAnyMemberOrder). No order is asserted for other
       implementations' output. No open clause remains.
+      REQ-052 amended (2026-09-14,
+      docs/plans/archive/2026-09-14-json-v2-migration.md): the deterministic
+      field-order MUST is withdrawn. _type first is now a SHOULD; beyond
+      it, member order is unspecified and a consumer MUST NOT rely on
+      it; the decoder still accepts any order. Hash lexicographic order
+      is restated as an encoder-determinism SHOULD, not a
+      consumer-facing order promise. Round-trip fidelity is asserted
+      semantically (typed deep comparison plus validation.ValidateRM,
+      REQ-112) and, where a check on encoded bytes is useful, only as
+      wire-equivalence (conformance.md § Terms); PROBE-030 and PROBE-038
+      are rewritten accordingly and no probe asserts byte equality. A
+      JSON object carrying a duplicate member name MUST now be refused,
+      wrapping canjson.ErrInvalidShape. Canonical-JSON member names
+      match exactly (case-sensitive); the case-insensitive Extras
+      carve-out (§ Unknown response keys) stays scoped to the
+      Definition, System and AQL surfaces, which remain on v1. The
+      escaping and U+FFFD substitution sentences are restated for the
+      codec generically instead of naming encoding/json. The spec now
+      names only SDK sentinels on the decode/encode paths
+      (canjson.ErrInvalidShape, canjson.ErrInvalidValue, the
+      typereg.Err* family, *typereg.DecodeError, *transport.DecodeError)
+      and leaves the concrete standard-library error type unspecified,
+      since the codec moves to encoding/json/v2 (ADR 0022) and the v1
+      types named until now (*json.UnsupportedTypeError,
+      *json.UnmarshalTypeError, *json.SyntaxError, io.ErrUnexpectedEOF,
+      io.EOF) do not carry over. Canonical XML (REQ-056, PROBE-033) is
+      unchanged and keeps its byte assertion. The order relaxation is
+      recorded in ADR 0021; the codec adoption itself is ADR 0022. This
+      requirement was specified first (Phase 0 of the migration plan);
+      the code and test/package updates it anticipated (encoding/json/v2
+      adoption, the jsonpoly retirement, the field_order_test.go rename)
+      have since landed in the later phases of that plan.
 
   - id: REQ-056
     title: Canonical XML

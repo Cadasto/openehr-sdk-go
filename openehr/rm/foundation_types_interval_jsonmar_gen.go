@@ -3,72 +3,51 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-// BMM package: org.openehr.base.foundation_types.interval — canonical-JSON MarshalJSON companions
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+)
 
-type PointIntervalJSONMarshaller[T any] struct {
-	Class string `json:"_type"`
-	// Lower Lower bound.
-	Lower T `json:"lower,omitempty"`
-	// Upper Upper bound.
-	Upper T `json:"upper,omitempty"`
-	// LowerUnbounded Lower boundary open (i.e. = -infinity).
-	LowerUnbounded bool `json:"lower_unbounded"`
-	// UpperUnbounded Upper boundary open (i.e. = +infinity).
-	UpperUnbounded bool `json:"upper_unbounded"`
-	// LowerIncluded Lower boundary value included in range if not `_lower_unbounded_`.
-	LowerIncluded bool `json:"lower_included"`
-	// UpperIncluded Upper boundary value included in range if not `_upper_unbounded_`.
-	UpperIncluded bool `json:"upper_included"`
+// BMM package org.openehr.base.foundation_types.interval: canonical-JSON MarshalJSONTo companions
+
+// rawPointInterval is the method-free canonical-JSON alias for PointInterval. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawPointInterval[T any] PointInterval[T]
+
+// MarshalJSONTo emits canonical openEHR JSON for PointInterval with `_type`
+// (value "Point_interval") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (p PointInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawPointInterval[T]
+	}{"Point_interval", (*rawPointInterval[T])(&p)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for PointInterval with `_type`
-// (value "Point_interval") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (p *PointInterval[T]) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&PointIntervalJSONMarshaller[T]{
-		Class:          "Point_interval",
-		Lower:          p.Lower,
-		Upper:          p.Upper,
-		LowerUnbounded: p.LowerUnbounded,
-		UpperUnbounded: p.UpperUnbounded,
-		LowerIncluded:  p.LowerIncluded,
-		UpperIncluded:  p.UpperIncluded,
-	})
-}
+// rawProperInterval is the method-free canonical-JSON alias for ProperInterval. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawProperInterval[T any] ProperInterval[T]
 
-type ProperIntervalJSONMarshaller[T any] struct {
-	Class string `json:"_type"`
-	// Lower Lower bound.
-	Lower T `json:"lower,omitempty"`
-	// Upper Upper bound.
-	Upper T `json:"upper,omitempty"`
-	// LowerUnbounded True if `_lower_` boundary open (i.e. = `-infinity`).
-	LowerUnbounded bool `json:"lower_unbounded"`
-	// UpperUnbounded True if `_upper_` boundary open (i.e. = `+infinity`).
-	UpperUnbounded bool `json:"upper_unbounded"`
-	// LowerIncluded True if `_lower_` boundary value included in range, if `not _lower_unbounded_`.
-	LowerIncluded bool `json:"lower_included"`
-	// UpperIncluded True if `_upper_` boundary value included in range if `not _upper_unbounded_`.
-	UpperIncluded bool `json:"upper_included"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for ProperInterval with `_type`
-// (value "Proper_interval") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (p *ProperInterval[T]) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&ProperIntervalJSONMarshaller[T]{
-		Class:          "Proper_interval",
-		Lower:          p.Lower,
-		Upper:          p.Upper,
-		LowerUnbounded: p.LowerUnbounded,
-		UpperUnbounded: p.UpperUnbounded,
-		LowerIncluded:  p.LowerIncluded,
-		UpperIncluded:  p.UpperIncluded,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for ProperInterval with `_type`
+// (value "Proper_interval") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (p ProperInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawProperInterval[T]
+	}{"Proper_interval", (*rawProperInterval[T])(&p)}, typereg.MarshalOptions(enc))
 }

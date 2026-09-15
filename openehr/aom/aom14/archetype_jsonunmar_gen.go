@@ -4,80 +4,27 @@
 package aom14
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.am.aom14.archetype — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.am.aom14.archetype: canonical-JSON UnmarshalJSONFrom companions
 
-type ArchetypeJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// OriginalLanguage Language in which this resource was initially authored. Although there is no language primacy of resources overall, the language of original authoring is required to ensure natural language translations can preserve quality. Language is relevant in both the description and ontology sections.
-	OriginalLanguage rm.TerminologyCode `json:"original_language"`
-	// Description Description and lifecycle information of the resource.
-	Description *rm.ResourceDescription `json:"description,omitempty"`
-	// IsControlled True if this resource is under any kind of change control (even file copying), in which case revision history is created.
-	IsControlled *bool `json:"is_controlled,omitempty"`
-	// Annotations Annotations on individual items within the resource, keyed by path. The inner table takes the form of a Hash table of String values keyed by String tags.
-	Annotations *rm.ResourceAnnotations `json:"annotations,omitempty"`
-	// Translations List of details for each natural translation made of this resource, keyed by language code. For each translation listed here, there must be corresponding sections in all language-dependent parts of the resource. The `_original_language_` does not appear in this list.
-	Translations *map[string]rm.TranslationDetails `json:"translations,omitempty"`
-	// Definition Root node of the definition of this archetype.
-	Definition CComplexObject `json:"definition"`
-	// Ontology The ontology of the archetype.
-	Ontology *ArchetypeOntology `json:"ontology"`
-	// AdlVersion ADL version if archetype was read in from an ADL sharable archetype.
-	AdlVersion *string `json:"adl_version,omitempty"`
-	// ArchetypeID Multi-axial identifier of this archetype in archetype space.
-	ArchetypeID rm.ArchetypeID `json:"archetype_id"`
-	// UID OID identifier of this archetype.
-	UID *rm.HierObjectID `json:"uid,omitempty"`
-	// Concept The normative meaning of the archetype as a whole, expressed as a local archetype code, typically “at0000”.
-	Concept string `json:"concept"`
-	// ParentArchetypeID Identifier of the specialisation parent of this archetype.
-	ParentArchetypeID *rm.ArchetypeID `json:"parent_archetype_id,omitempty"`
-	// Invariants Invariant statements about this object. Statements are expressed in first order predicate logic, and usually refer to at least two attributes.
-	Invariants []Assertion `json:"invariants,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Archetype.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *Archetype) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Archetype.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *Archetype) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPE: %w", typereg.ErrNilReceiver)
 	}
-	var aux ArchetypeJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ARCHETYPE", err)
-	}
-	if aux.Class != "" && aux.Class != "ARCHETYPE" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ARCHETYPE", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	a.OriginalLanguage = aux.OriginalLanguage
-	a.Description = aux.Description
-	a.IsControlled = aux.IsControlled
-	a.Annotations = aux.Annotations
-	a.Translations = aux.Translations
-	a.Definition = aux.Definition
-	a.Ontology = aux.Ontology
-	a.AdlVersion = aux.AdlVersion
-	a.ArchetypeID = aux.ArchetypeID
-	a.UID = aux.UID
-	a.Concept = aux.Concept
-	a.ParentArchetypeID = aux.ParentArchetypeID
-	a.Invariants = aux.Invariants
-	return nil
+	return typereg.DecodeInto(dec, "ARCHETYPE", &struct {
+		Type string `json:"_type"`
+		*rawArchetype
+	}{rawArchetype: (*rawArchetype)(a)})
 }
