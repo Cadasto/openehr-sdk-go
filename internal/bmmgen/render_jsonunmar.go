@@ -20,8 +20,9 @@ import (
 // shared [typereg.DecodeInto] helper, which decodes the value in one pass,
 // enforces the `_type` discipline by reading the discriminator from the
 // wire struct's declared _type field that same decode populated, threads the
-// polymorphic decode hooks and classifies a shape failure. The decode target is the receiver viewed through its
-// method-free alias (zero-copy) for most classes, or a flat wire struct copied
+// polymorphic decode hooks and classifies a shape failure. The decode target
+// is the receiver viewed through its method-free alias (zero-copy) for most
+// classes, or a flat wire struct copied
 // back field by field for a class that embeds a marshaler-bearing concrete
 // ancestor (see the promotion note at [effectiveFields]). Polymorphic interface
 // fields resolve through the registered hooks: there is no per-field

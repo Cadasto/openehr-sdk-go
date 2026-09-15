@@ -181,8 +181,8 @@ func ClassifyShape(err error) error {
 
 // ClassifyDuplicate attaches [ErrInvalidShape] to a duplicate-object-member-name
 // refusal and returns every other error untouched. The v2 tokenizer refuses a
-// repeated member name with [jsontext.ErrDuplicateName] before any generated
-// decode method runs (a well-formed value whose shape RFC 8259 section 4
+// repeated member name with [jsontext.ErrDuplicateName] during tokenisation
+// (a well-formed value whose shape RFC 8259 section 4
 // nonetheless rejects), so it reaches a decode entry point as a bare
 // *jsontext.SyntacticError carrying no sentinel. This gate gives that refusal
 // the decode-side shape classification REQ-052 mandates, exactly as
