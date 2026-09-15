@@ -161,10 +161,11 @@ func WrapShapeError(rmType string, err error) error {
 
 // ClassifyShape attaches [ErrInvalidShape] to a failure the codec detects
 // outside a generated type's funnel, such as a duplicate member name the
-// tokenizer refuses before any RM decode runs (REQ-052). It preserves err's
-// message and keeps errors.Unwrap a single step to the cause, exactly as
-// [WrapShapeError] does for an in-funnel shape failure, but adds no
-// `canjson: <rmType>:` prefix because no single RM type owns the failure.
+// tokenizer refuses during tokenisation, while the enclosing RM value is
+// being decoded (REQ-052). It preserves err's message and keeps errors.Unwrap
+// a single step to the cause, exactly as [WrapShapeError] does for an
+// in-funnel shape failure, but adds no `canjson: <rmType>:` prefix because no
+// single RM type owns the failure.
 //
 // A nil err returns nil. An err already carrying a [DecodeError] is returned
 // untouched, so a dispatch failure keeps its classification-free path (the same
@@ -182,8 +183,8 @@ func ClassifyShape(err error) error {
 // ClassifyDuplicate attaches [ErrInvalidShape] to a duplicate-object-member-name
 // refusal and returns every other error untouched. The v2 tokenizer refuses a
 // repeated member name with [jsontext.ErrDuplicateName] during tokenisation
-// (a well-formed value whose shape RFC 8259 section 4
-// nonetheless rejects), so it reaches a decode entry point as a bare
+// (a well-formed value whose shape RFC 8259 section 4 nonetheless rejects),
+// so it reaches a decode entry point as a bare
 // *jsontext.SyntacticError carrying no sentinel. This gate gives that refusal
 // the decode-side shape classification REQ-052 mandates, exactly as
 // [ClassifyShape] does: the message is preserved and a single errors.Unwrap

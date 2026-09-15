@@ -123,10 +123,9 @@
 //     own string arm relies on that same tokenizer refusal and no longer
 //     inspects the raw literal for a substituted U+FFFD (ruling R15).
 //   - A duplicate member name is refused during tokenisation. The entry
-//     point classifies that
-//     refusal with [ErrInvalidShape], keeping the cause reachable, so
-//     errors.Is finds both the sentinel and jsontext.ErrDuplicateName
-//     (RFC 8259 § 4; REQ-052).
+//     point classifies that refusal with [ErrInvalidShape], keeping the
+//     cause reachable, so errors.Is finds both the sentinel and
+//     jsontext.ErrDuplicateName (RFC 8259 § 4; REQ-052).
 //   - A polymorphic dispatch failure — a missing, unknown or
 //     mismatched `_type` — arrives as [DecodeError] carrying the path,
 //     either at a slot or on `/_type` where the whole value's `_type`

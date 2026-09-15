@@ -121,9 +121,10 @@ Canonical-JSON properties:
 
 A JSON object that carries the same member name twice **MUST** be refused, and the refusal **MUST** wrap `canjson.ErrInvalidShape`. RFC 8259 § 4 states that names SHOULD be unique, and an object carrying duplicates has no single defined value. This is distinct from the malformed-JSON exclusion below: the bytes parse, and it is the object's shape that is rejected.
 
-Two decode failures stay **outside** the sentinel by design, and **MUST NOT** acquire it:
+Three decode failures stay **outside** the sentinel by design, and **MUST NOT** acquire it:
 
 - **Malformed JSON**, which the codec reports as an underlying syntax or truncated-input error reachable through unwrapping, carrying no SDK sentinel. The tokenizer refuses it as the value it malforms is decoded, not through a separate whole-input validation pass.
+- **A read error from the underlying reader**, on the streaming decoder entry point. The read error passes through unwrapped and carries no SDK sentinel; the reader's own error stays reachable with `errors.Is`.
 - **A polymorphic dispatch failure** — a missing, unknown, or mismatched `_type` — reported as a `typereg.DecodeError` (re-exported as `canjson.DecodeError`) carrying the path, either at a polymorphic slot or on `/_type` where the whole value's `_type` names a different class than the target. An enclosing type's `canjson: <RM_TYPE>:` funnel **MUST NOT** add the sentinel to a `DecodeError` travelling out through it.
 
 **Slot-nested shape failures.** A `DecodeError` **MUST NOT** strip a shape classification raised beneath it: when the concrete type selected at a polymorphic slot fails on shape, the resulting `DecodeError` names the slot on its path **and** `errors.Is(err, canjson.ErrInvalidShape)` holds, so a consumer keeps both the path and the kind. The sentinel is attached where the shape failure is raised, never by an envelope. `ErrInvalidShape` means "JSON-level shape", not "any decode failure".

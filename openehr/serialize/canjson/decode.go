@@ -32,7 +32,7 @@ import (
 //     message, so errors.Is finds both this sentinel and
 //     jsontext.ErrDuplicateName.
 //
-// Two decode failures stay OUTSIDE the sentinel by design (REQ-052) and
+// Three decode failures stay OUTSIDE the sentinel by design (REQ-052) and
 // never acquire it:
 //
 //   - Malformed JSON, which the codec reports as its own syntax or
@@ -42,6 +42,10 @@ import (
 //     as io.EOF. Invalid UTF-8 and a lone surrogate escape are refused on
 //     this same path (jsontext rejects them before rm.Character sees the
 //     bytes), so they too are malformed input carrying no sentinel.
+//   - A read failure from the underlying reader, on the streaming
+//     [Decoder] entry point: jsontext reports it as its own IO error,
+//     and it passes through unwrapped, carrying no sentinel. The
+//     reader's own error stays reachable with errors.Is.
 //   - A polymorphic dispatch failure (a missing, unknown or mismatched
 //     `_type`, at a slot or on `/_type` for the whole value), which
 //     arrives as a [DecodeError] carrying the path. No sentinel either,
