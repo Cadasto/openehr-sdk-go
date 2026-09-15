@@ -151,4 +151,4 @@ See [`its_rest/README.md`](its_rest/README.md).
 ## Conventions
 
 - Immutable inputs — fix the codec or refresh from upstream, do not patch cassettes to green tests.
-- New template: add `templates/` + `compositions/` files; update this table. If probes should skip, add the id to `compositionJSONExcluded` / `compositionXMLExcluded` / `rmJSONExcluded` in [`discover.go`](../fixtures/discover.go).
+- New template: add `templates/` + `compositions/` files; update this table. A composition is never skipped wholesale to keep probes green: if its vendored content carries a genuine RM-floor finding independent of the round trip, it still joins the corpus and is held out of PROBE-030's `validation.ValidateRM` leg only, named with its finding in `probe030SkipFloor` in [`probe_030_canjson_round_trip.go`](../probes/serialize/probe_030_canjson_round_trip.go). Composition XML the canxml round trip does not exercise goes in `compositionXMLExcluded`, and an alternate-wire or deliberately invalid `rm/` sample in `rmJSONExcluded` / `rmJSONExcludedPrefixes`, both in [`discover.go`](../fixtures/discover.go).

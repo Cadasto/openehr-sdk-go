@@ -18,19 +18,6 @@ type CompositionJSONRel struct {
 	Kind     string // "compositions" or "rm"
 }
 
-// compositionJSONExcluded template ids with OPT + JSON on disk but omitted from
-// [ListCompositionJSON] until canjson round-trip passes.
-var compositionJSONExcluded = map[string]bool{
-	"Address.v2":       true, // ADDRESS / PARTY_IDENTITY DV_CODED_TEXT
-	"Demonstration.v1": true, // DV_MULTIMEDIA in composition
-	"TestPerson.v2":    true, // PERSON / PARTY_IDENTITY DV_CODED_TEXT
-	// Robot / ehrbase Test_dv_interval_* — DV_INTERVAL[T] over DV_ORDERED (REQ-052).
-	"Test_dv_interval_dv_count_lower_upper_constraint.v0":    true,
-	"Test_dv_interval_dv_count_open_constraint.v0":           true,
-	"Test_dv_interval_dv_quantity_lower_upper_constraint.v0": true,
-	"Test_dv_interval_dv_quantity_open_constraint.v0":        true,
-}
-
 // rmJSONExcluded rm/*.json stems omitted from [ListCompositionJSON] (codec or wire gaps).
 var rmJSONExcluded = map[string]bool{
 	"ehr_status_valid_000_ehr_status_ecis": true, // alternate wire (flat subjectId), not canonical JSON
@@ -80,9 +67,6 @@ func collectJSON(dir, kind string, out *[]CompositionJSONRel) error {
 			continue
 		}
 		stem := strings.TrimSuffix(e.Name(), ".json")
-		if kind == "compositions" && compositionJSONExcluded[stem] {
-			continue
-		}
 		if kind == "rm" && excludedRMJSONStem(stem) {
 			continue
 		}
@@ -138,9 +122,6 @@ func TemplateIDsWithCompositionXML() ([]string, error) {
 		}
 		jsonPath := filepath.Join(dir, tid+".json")
 		if _, err := os.Stat(jsonPath); err != nil {
-			continue
-		}
-		if compositionJSONExcluded[tid] {
 			continue
 		}
 		ids = append(ids, tid)

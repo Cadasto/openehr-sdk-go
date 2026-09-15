@@ -6,6 +6,10 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### Follow-ups to the json/v2 migration (2026-09-15)
+
+The corpus-widening plan **landed 2026-09-15 and was archived** ([archive/2026-09-15-widen-composition-corpus.md](archive/2026-09-15-widen-composition-corpus.md)): all seven `compositionJSONExcluded` cassettes joined the PROBE-030 corpus, four held out of the `validation.ValidateRM` leg only by name (REQ-052 stays `landed`, no new id). Enrolling the four interval templates into the constraint-cassette axis is its recorded follow-up.
+
 ### Go 1.27 floor (2026-09-03)
 
 | Plan | Scope | Covers | Notes |
