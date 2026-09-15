@@ -197,11 +197,11 @@ type DecodeError struct {
 
 // Error names the method, the route and the classification only — the REQ-093
 // value-free discipline (REQ-151). It never interpolates Body, and never the
-// wrapped decoder's text: a codec cause may embed the offending value
-// (*strconv.NumError does; the v2 codec's own *json.SemanticError names the Go
-// type and JSON position but not the value), so echoing the cause would leak
-// through the string surface what Body deliberately gates. Callers that need
-// the diagnostics unwrap or read Body.
+// wrapped decoder's text: both causes may embed the offending value
+// (*strconv.NumError always; the v2 codec's own *json.SemanticError when the
+// failing token is a short string or number), which is why Error's own message
+// stays value-free and the cause is reachable only by unwrapping. Callers that
+// need the diagnostics unwrap or read Body.
 //
 // Error answers on a nil receiver instead of panicking: a failed errors.As
 // leaves the caller holding a typed nil, which boxes into a non-nil error

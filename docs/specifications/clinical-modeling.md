@@ -128,7 +128,7 @@ Clinical-modeling and codec entry points **MUST** bound how much untrusted input
 
 ### Polymorphic JSON decode (`openehr/rm/typereg/`)
 
-- **`Registry.Decode`** (the single polymorphic-dispatch chokepoint used by every generated `UnmarshalJSONFrom` and polymorphic hook) **MUST** reject JSON whose nesting depth exceeds **512 levels** before dispatch, returning `typereg.ErrMaxDepthExceeded`. The guard lives in hand-written `registry.go` (not per-type generated decoders) — see [ADR 0002](../adr/0002-bmm-codegen-decisions.md) and REQ-040. `encoding/json`'s own 10 000-level scanner limit remains a backstop; this REQ covers the amplification window below that ceiling.
+- **`Registry.Decode`** (the single polymorphic-dispatch chokepoint used by every generated `UnmarshalJSONFrom` and polymorphic hook) **MUST** reject JSON whose nesting depth exceeds **512 levels** before dispatch, returning `typereg.ErrMaxDepthExceeded`. The guard lives in hand-written `registry.go` (not per-type generated decoders); see [ADR 0002](../adr/0002-bmm-codegen-decisions.md) and REQ-040. `encoding/json`'s own 10 000-level scanner limit remains a backstop; this REQ covers the amplification window below that ceiling.
 
 Constants **MAY** be package-level variables overridable in tests; defaults above are normative for production.
 
