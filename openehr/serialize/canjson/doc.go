@@ -112,8 +112,8 @@
 //
 // What a decode failure looks like depends on where it happens:
 //
-//   - Malformed JSON reaches the caller before any generated decode
-//     method runs, because the codec validates the whole input first.
+//   - Malformed JSON is refused by the tokenizer as the value it
+//     malforms is decoded, not through a separate whole-input pass.
 //     No sentinel: the codec reports its own syntax or truncated-input
 //     error (a *jsontext.SyntacticError), except that [Decoder.Decode]
 //     reports an empty stream as io.EOF and a truncated value wraps
