@@ -127,9 +127,8 @@ const benchCassette = "Demonstration.v1"
 // The cassette now feeds PROBE-030's fidelity legs and is held out of the
 // ValidateRM leg only (its vendored content has inverted DV_INTERVAL bounds);
 // it decodes and encodes cleanly, which is all this benchmark asks of it. The
-// setup decode and encode below are
-// the control: a cassette that stopped decoding would fail here rather than
-// quietly measuring an error path.
+// setup decode and encode below are the control: a cassette that stopped
+// decoding would fail here rather than quietly measuring an error path.
 func BenchmarkDecodeCompositionCassette(b *testing.B) {
 	payload, err := os.ReadFile(fixtures.CompositionJSON(benchCassette))
 	if err != nil {

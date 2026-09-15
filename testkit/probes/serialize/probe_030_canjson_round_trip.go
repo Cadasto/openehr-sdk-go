@@ -226,18 +226,22 @@ var probe030SkipFloor = map[string]bool{
 	"compositions/clinical_notes.v0.json": true,
 	// Demonstration.v1: seven DV_INTERVAL<DV_QUANTITY> bounds are inverted in
 	// the vendored content (lower greater than upper, for example 30 over
-	// 12.25 cm), which the RM floor reports on the input decode and the
-	// re-encoded value alike (REQ-112). Fidelity legs still run.
+	// 12.25 cm at /content[0]/data/events[0]/data/items[1]/items[4]/value),
+	// which the RM floor reports on the input decode and the re-encoded value
+	// alike (REQ-112). Fidelity legs still run.
 	"compositions/Demonstration.v1.json": true,
 	// TestPerson.v2: DV_MULTIMEDIA.media_type is a CODE_PHRASE with a null
-	// code_string in the vendored content, an RM-required non-empty attribute
-	// the floor reports independent of the round trip (REQ-112).
+	// code_string at /details/items[13]/items[5]/value/media_type in the
+	// vendored content, an RM-required non-empty attribute the floor reports
+	// independent of the round trip (REQ-112).
 	"compositions/TestPerson.v2.json": true,
 	// Test_dv_interval_dv_count_open_constraint.v0: a DV_INTERVAL<DV_COUNT>
-	// with inverted bounds (lower 200, upper 100) in the vendored content.
+	// with inverted bounds (lower 200, upper 100) at
+	// /content[0]/data/events[0]/data/items[0]/value in the vendored content.
 	"compositions/Test_dv_interval_dv_count_open_constraint.v0.json": true,
 	// Test_dv_interval_dv_quantity_open_constraint.v0: a DV_INTERVAL<DV_QUANTITY>
-	// with inverted bounds (lower 200, upper 100 mm) in the vendored content.
+	// with inverted bounds (lower 200, upper 100 mm) at
+	// /content[0]/data/events[0]/data/items[0]/value in the vendored content.
 	"compositions/Test_dv_interval_dv_quantity_open_constraint.v0.json": true,
 }
 
