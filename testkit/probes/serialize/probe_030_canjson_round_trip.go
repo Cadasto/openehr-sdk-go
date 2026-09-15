@@ -223,6 +223,21 @@ type Probe030Input struct {
 // the floor leg only.
 var probe030SkipFloor = map[string]bool{
 	"compositions/clinical_notes.v0.json": true,
+	// Demonstration.v1: seven DV_INTERVAL<DV_QUANTITY> bounds are inverted in
+	// the vendored content (lower greater than upper, for example 30 over
+	// 12.25 cm), which the RM floor reports on the input decode and the
+	// re-encoded value alike (REQ-112). Fidelity legs still run.
+	"compositions/Demonstration.v1.json": true,
+	// TestPerson.v2: DV_MULTIMEDIA.media_type is a CODE_PHRASE with a null
+	// code_string in the vendored content, an RM-required non-empty attribute
+	// the floor reports independent of the round trip (REQ-112).
+	"compositions/TestPerson.v2.json": true,
+	// Test_dv_interval_dv_count_open_constraint.v0: a DV_INTERVAL<DV_COUNT>
+	// with inverted bounds (lower 200, upper 100) in the vendored content.
+	"compositions/Test_dv_interval_dv_count_open_constraint.v0.json": true,
+	// Test_dv_interval_dv_quantity_open_constraint.v0: a DV_INTERVAL<DV_QUANTITY>
+	// with inverted bounds (lower 200, upper 100 mm) in the vendored content.
+	"compositions/Test_dv_interval_dv_quantity_open_constraint.v0.json": true,
 }
 
 // loadCassetteInputs discovers vendored cassettes relative to this
