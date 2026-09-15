@@ -19,7 +19,6 @@ import (
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
-	"io"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -51,11 +50,20 @@ func decodeOptions(dec *jsontext.Decoder) json.Options {
 	if caller, ok := json.GetOption(dec.Options(), json.WithUnmarshalers); ok && caller != nil && caller != hooks {
 		hooks = joinCallerUnmarshalers(hooks, caller)
 	}
-	return json.JoinOptions(
-		dec.Options(),
-		json.WithUnmarshalers(hooks),
-		jsonv1.ReportErrorsWithLegacySemantics(false),
-	)
+	unmarshalers, legacySemantics := hookOptions(hooks)
+	return json.JoinOptions(dec.Options(), unmarshalers, legacySemantics)
+}
+
+// hookOptions returns the SDK's two decode options for a resolved interface-hook
+// aggregate: the hooks themselves, and v2 error semantics (so a hook failure
+// carries its JSON position regardless of whether a v1 or v2 caller drove the
+// outermost decode). [decodeOptions] joins them on top of the caller's decoder
+// options in one JoinOptions; [Registry.Decode] passes them straight to the
+// variadic json.Unmarshal, because a []byte decode carries no caller options.
+// Building the pair in one place keeps the two call sites from drifting, and
+// returning them unjoined keeps decodeOptions to a single JoinOptions.
+func hookOptions(hooks *json.Unmarshalers) (unmarshalers, legacySemantics json.Options) {
+	return json.WithUnmarshalers(hooks), jsonv1.ReportErrorsWithLegacySemantics(false)
 }
 
 // joinEntry is one memoised caller-hook join: the aggregate and caller pointers
@@ -177,9 +185,11 @@ func MarshalOptions(enc *jsontext.Encoder) json.Options {
 // so the discriminator is read once rather than by a separate peek. The
 // mismatch carries [ErrTypeMismatch] inside a [DecodeError] on "/_type". A
 // whole-value shape failure goes through [WrapShapeError], keeping the
-// `canjson: <rmType>:` text and gaining [ErrInvalidShape]; a syntactic or IO
-// error passes through unwrapped, because it is malformed input, not a shape
-// failure of this type (REQ-052, ADR 0022).
+// `canjson: <rmType>:` text and gaining [ErrInvalidShape]; an error carrying
+// neither a shape failure (a *json.SemanticError) nor a dispatch failure (a
+// [DecodeError]) passes through unwrapped, because it is malformed input (a
+// syntactic error or a failing reader), not a shape failure of this type
+// (REQ-052, ADR 0022).
 //
 // out is either the receiver viewed through its method-free alias (the
 // zero-copy shape) or a flat wire struct the caller copies back (the shape used
@@ -202,26 +212,29 @@ func DecodeInto(dec *jsontext.Decoder, rmType string, out any, gotType *string) 
 }
 
 // classifyDecode turns the error from a nested decode into the codec's error
-// contract (REQ-052). A syntactic or IO error is malformed input, not a shape
-// failure of this type: it passes through unwrapped, so it keeps no SDK
-// sentinel and no `canjson: <rmType>:` prefix. The json package itself declines
-// to wrap a SyntacticError or IO error returned from an UnmarshalerFrom method
-// (go doc encoding/json/v2.UnmarshalerFrom), so passing it through preserves the
-// contract the old dec.ReadValue() gave for free. A dispatch failure at a
-// polymorphic slot arrives as a [DecodeError] a hook produced with no Path;
-// this fills the Path from the v2 decoder's SemanticError position (the slot
-// relative to the current object) and lets [WrapShapeError] leave it outside the
-// shape sentinel. Any other failure is a whole-value or plain-field shape
-// failure and goes through WrapShapeError, which adds [ErrInvalidShape] and the
-// `canjson: <rmType>:` text.
+// contract (REQ-052). encoding/json/v2 wraps a returned error in a
+// *json.SemanticError unless it is already semantic, syntactic or an IO error
+// (go doc encoding/json/v2.UnmarshalerFrom). So the codec's own shape and
+// dispatch failures are exactly the errors whose chain carries a
+// *json.SemanticError or a [DecodeError]; every other error is malformed input,
+// a jsontext.SyntacticError (bad tokens, a duplicate name, a truncated value) or
+// a failing reader's IO error, and passes through unwrapped so it keeps no SDK
+// sentinel and no `canjson: <rmType>:` prefix. A duplicate member name reaches
+// here as a SyntacticError and is classified later by [ClassifyDuplicate].
+//
+// A dispatch failure at a polymorphic slot arrives as a [DecodeError] a hook
+// produced with no Path; this fills the Path from the v2 decoder's SemanticError
+// position (the slot relative to the current object) and lets [WrapShapeError]
+// leave it outside the shape sentinel. Any other shape failure is a whole-value
+// or plain-field one and goes through WrapShapeError, which adds [ErrInvalidShape]
+// and the `canjson: <rmType>:` text.
 func classifyDecode(rmType string, err error) error {
-	if _, ok := errors.AsType[*jsontext.SyntacticError](err); ok {
+	se, hasSemantic := errors.AsType[*json.SemanticError](err)
+	de, hasDecode := errors.AsType[*DecodeError](err)
+	if (!hasSemantic || se == nil) && (!hasDecode || de == nil) {
 		return err
 	}
-	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-		return err
-	}
-	if de, ok := errors.AsType[*DecodeError](err); ok && de != nil && de.Path == "" {
+	if hasDecode && de != nil && de.Path == "" {
 		if p := slotPointer(err); p != "" {
 			return WrapShapeError(rmType, &DecodeError{Path: p, Type: de.Type, Inner: de.Inner})
 		}
