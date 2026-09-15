@@ -7,10 +7,11 @@ package typereg
 // the deterministic encode options and the shape classification live in one
 // place rather than in 110 generated bodies (ADR 0022, REQ-052).
 //
-// This file imports encoding/json/v2 and encoding/json/jsontext only. It must
-// not import openehr/rm: the generated trees import typereg, so a reverse edge
-// would form a cycle. Everything here works through Default and the sentinels
-// declared in this package.
+// This file imports the encoding/json family: v2 and jsontext for the codec,
+// plus encoding/json (v1) for the one ReportErrorsWithLegacySemantics option. It
+// must not import openehr/rm: the generated trees import typereg, so a reverse
+// edge would form a cycle. Everything here works through Default and the
+// sentinels declared in this package.
 
 import (
 	jsonv1 "encoding/json"
@@ -24,8 +25,8 @@ import (
 )
 
 // decodeOptions are the options every nested decode threads: the caller's own
-// options, the polymorphic interface hooks, and — regardless of whether a v1 or
-// v2 caller drives the outermost decode — v2 error semantics, so a hook failure
+// options, the polymorphic interface hooks, and, regardless of whether a v1 or
+// v2 caller drives the outermost decode, v2 error semantics, so a hook failure
 // carries its JSON position (which [classifyDecode] lifts onto the DecodeError
 // path). A v1 caller's DefaultOptionsV1 sets ReportErrorsWithLegacySemantics,
 // which otherwise returns a hook error position-less; the generated codec is
@@ -36,18 +37,57 @@ import (
 // drop the caller's hooks for every nested value. So the caller's hooks are
 // joined AFTER our aggregate (SDK first: the canonical-JSON polymorphic
 // dispatch wins for the interfaces it covers; the caller's hooks reach every
-// other type, at every depth). The pointer check keeps a nested decode — whose
-// options already carry our aggregate — from re-joining it to itself.
+// other type, at every depth). A nil caller (json.WithUnmarshalers(nil)) is
+// treated as no caller. The pointer check keeps a nested decode, whose options
+// already carry our aggregate, from re-joining it to itself, and the join is
+// memoised per caller (see [joinCallerUnmarshalers]) so it runs once for a whole
+// decode tree rather than once per nested level.
 func decodeOptions(dec *jsontext.Decoder) json.Options {
 	hooks := aggregateUnmarshalers()
-	if caller, ok := json.GetOption(dec.Options(), json.WithUnmarshalers); ok && caller != hooks {
-		hooks = json.JoinUnmarshalers(hooks, caller)
+	if caller, ok := json.GetOption(dec.Options(), json.WithUnmarshalers); ok && caller != nil && caller != hooks {
+		hooks = joinCallerUnmarshalers(hooks, caller)
 	}
 	return json.JoinOptions(
 		dec.Options(),
 		json.WithUnmarshalers(hooks),
 		jsonv1.ReportErrorsWithLegacySemantics(false),
 	)
+}
+
+// callerJoinKey keys the memo below on both the SDK aggregate and the caller
+// pointer, so a late hook registration that swaps the aggregate yields a fresh
+// key rather than a stale join. Registration is init-time only, so in practice
+// the aggregate is stable by the time any decode runs.
+type callerJoinKey struct {
+	hooks  *json.Unmarshalers
+	caller *json.Unmarshalers
+}
+
+// callerJoinCache memoises the aggregate-plus-caller join so a nested decode
+// under one caller-supplied hook set reuses a single joined value instead of
+// re-joining at every level. A caller that reuses its hook set across decodes,
+// the documented pattern, reuses the entry.
+var callerJoinCache sync.Map // callerJoinKey -> *json.Unmarshalers
+
+// callerJoinCount counts the json.JoinUnmarshalers calls [joinCallerUnmarshalers]
+// performs on a cache miss. It exists only so a white-box test can assert the
+// join does not grow with decode depth; it is unexported and read only by that
+// test.
+var callerJoinCount atomic.Int64
+
+// joinCallerUnmarshalers returns the SDK aggregate joined with a caller's hooks,
+// caching the result per (aggregate, caller) pair so a deep decode joins once,
+// not once per nested value. SDK hooks win for the interfaces they cover; the
+// caller's reach every other type at every depth (see [decodeOptions]).
+func joinCallerUnmarshalers(hooks, caller *json.Unmarshalers) *json.Unmarshalers {
+	key := callerJoinKey{hooks: hooks, caller: caller}
+	if v, ok := callerJoinCache.Load(key); ok {
+		return v.(*json.Unmarshalers)
+	}
+	callerJoinCount.Add(1)
+	joined := json.JoinUnmarshalers(hooks, caller)
+	actual, _ := callerJoinCache.LoadOrStore(key, joined)
+	return actual.(*json.Unmarshalers)
 }
 
 // The process-wide aggregate of per-interface decode hooks. The rm and aom14
@@ -169,7 +209,7 @@ func classifyDecode(rmType string, err error) error {
 }
 
 // slotPointer returns the JSON pointer of the outermost SemanticError in the
-// chain — the position, relative to the value the current decode is filling,
+// chain: the position, relative to the value the current decode is filling,
 // where a nested UnmarshalerFrom or hook failed. Empty when no position is
 // available.
 func slotPointer(err error) string {
@@ -230,7 +270,7 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 		// A shape failure inside the concrete type selected at this slot stays a
 		// shape failure (it already carries ErrInvalidShape from the concrete's
 		// own funnel); wrapping it in a DecodeError adds the slot classification
-		// so both hold at once — the path from the envelope (filled by the
+		// so both hold at once: the path from the envelope (filled by the
 		// enclosing DecodeInto), the kind from the sentinel (REQ-052).
 		return &DecodeError{Type: name, Inner: err}
 	}

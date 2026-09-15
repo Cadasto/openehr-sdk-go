@@ -137,7 +137,7 @@ func codecNilGuard(typedNil any) (func() error, bool) {
 	return nil, false
 }
 
-// neitherCodec implements neither decode interface — the negative control that
+// neitherCodec implements neither decode interface, the negative control that
 // proves codecNilGuard reports "unguarded" for a type the census must catch.
 type neitherCodec struct{}
 

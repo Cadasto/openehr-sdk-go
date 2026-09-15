@@ -3,7 +3,6 @@ package canjson
 import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
-	"errors"
 	"io"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -101,11 +100,15 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 // returned untouched: a shape failure raised inside a generated type
 // already carries the sentinel from its own funnel, and malformed JSON
 // and dispatch failures MUST NOT acquire it.
+//
+// The gate itself lives in [typereg.ClassifyDuplicate], shared with the
+// registry decode route ([typereg.Registry.Decode]) so both refuse a
+// duplicate the same way. canjson keeps its own application here because
+// [Unmarshal] and [Decoder.Decode] accept non-RM targets, which never
+// travel through the registry, so the registry gate alone would not cover
+// them.
 func classifyDecode(err error) error {
-	if err != nil && errors.Is(err, jsontext.ErrDuplicateName) {
-		return typereg.ClassifyShape(err)
-	}
-	return err
+	return typereg.ClassifyDuplicate(err)
 }
 
 // Unmarshal parses canonical-JSON-encoded data and stores the result

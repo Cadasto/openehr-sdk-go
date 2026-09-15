@@ -131,13 +131,19 @@ func (r *Registry) Names() []string {
 //   - the "_type" field is missing or not a string,
 //   - no constructor is registered for the discriminator,
 //   - the body fails to decode into the concrete type.
+//
+// A duplicate object member name (which the v2 tokenizer refuses at
+// either failure site) is classified as [ErrInvalidShape] through the
+// shared [ClassifyDuplicate] gate, so every canonical-JSON decode route,
+// this one and the canjson entry points, refuses it the same way
+// (REQ-052).
 func (r *Registry) Decode(data []byte) (any, error) {
 	if d := jsonNestingDepth(data); d > maxDecodeDepth {
 		return nil, fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)
 	}
 	typeName, err := peekType(jsontext.Value(data))
 	if err != nil {
-		return nil, fmt.Errorf("typereg.Decode: read _type: %w", err)
+		return nil, ClassifyDuplicate(fmt.Errorf("typereg.Decode: read _type: %w", err))
 	}
 	if typeName == "" {
 		return nil, fmt.Errorf("typereg.Decode: %w", ErrMissingType)
@@ -154,7 +160,7 @@ func (r *Registry) Decode(data []byte) (any, error) {
 	// the enclosing type it sits inside (REQ-052).
 	dec := jsontext.NewDecoder(bytes.NewReader(data))
 	if err := json.UnmarshalDecode(dec, v, decodeOptions(dec)); err != nil {
-		return nil, fmt.Errorf("typereg.Decode %q: %w", typeName, err)
+		return nil, ClassifyDuplicate(fmt.Errorf("typereg.Decode %q: %w", typeName, err))
 	}
 	return v, nil
 }

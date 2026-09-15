@@ -6,6 +6,7 @@ package typereg
 // DecodeAs live in registry.go.
 
 import (
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 )
@@ -176,6 +177,31 @@ func ClassifyShape(err error) error {
 		return err
 	}
 	return &shapeError{cause: err}
+}
+
+// ClassifyDuplicate attaches [ErrInvalidShape] to a duplicate-object-member-name
+// refusal and returns every other error untouched. The v2 tokenizer refuses a
+// repeated member name with [jsontext.ErrDuplicateName] before any generated
+// decode method runs (a well-formed value whose shape RFC 8259 section 4
+// nonetheless rejects), so it reaches a decode entry point as a bare
+// *jsontext.SyntacticError carrying no sentinel. This gate gives that refusal
+// the decode-side shape classification REQ-052 mandates, exactly as
+// [ClassifyShape] does: the message is preserved and a single errors.Unwrap
+// step still lands on the cause, so errors.Is finds both [ErrInvalidShape] and
+// jsontext.ErrDuplicateName.
+//
+// It is the single gate every canonical-JSON decode route shares:
+// [Registry.Decode] applies it at both of its failure sites and the canjson
+// entry points apply it to their whole-input result, so a duplicate member name
+// is refused as a shape error whichever route decodes the bytes. A caller
+// decoding a non-RM target through canjson never reaches [Registry.Decode], so
+// canjson keeps its own application of this gate rather than delegating the
+// classification to the registry.
+func ClassifyDuplicate(err error) error {
+	if err != nil && errors.Is(err, jsontext.ErrDuplicateName) {
+		return ClassifyShape(err)
+	}
+	return err
 }
 
 // shapeError is the [ErrInvalidShape]-carrying error [WrapShapeError]

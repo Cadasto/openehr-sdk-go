@@ -94,10 +94,14 @@ func TestDecodeNonObjectRefusedAtPeek(t *testing.T) {
 
 // TestDecodeDuplicateTypeRefusedAtPeek pins that a duplicate `_type` member
 // is refused at the peek by the v2 tokenizer, which rejects duplicate object
-// member names (RFC 8259 § 4). The refusal carries jsontext.ErrDuplicateName
-// and, unlike the canjson entry point, NO ErrInvalidShape: the registry does
-// not classify a tokenizer refusal as a shape error. Mutation: drop one of
-// the two `_type` members and the ErrDuplicateName assertion goes red.
+// member names (RFC 8259 § 4). The refusal now carries BOTH
+// jsontext.ErrDuplicateName and ErrInvalidShape: Registry.Decode runs the peek
+// failure through the shared ClassifyDuplicate gate, the same gate the canjson
+// entry points apply, so every canonical-JSON decode route refuses a duplicate
+// as a shape error (REQ-052). Mutation: drop one of the two `_type` members and
+// the ErrDuplicateName assertion goes red; remove the ClassifyDuplicate call at
+// the peek failure site in Registry.Decode and the ErrInvalidShape assertion
+// goes red.
 func TestDecodeDuplicateTypeRefusedAtPeek(t *testing.T) {
 	r := NewRegistry()
 	_, err := r.Decode([]byte(`{"_type":"A","_type":"B"}`))
@@ -107,8 +111,34 @@ func TestDecodeDuplicateTypeRefusedAtPeek(t *testing.T) {
 	if !errors.Is(err, jsontext.ErrDuplicateName) {
 		t.Errorf("err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
 	}
-	if errors.Is(err, ErrInvalidShape) {
-		t.Errorf("err = %v; the registry peek does not classify a tokenizer refusal as a shape error", err)
+	if !errors.Is(err, ErrInvalidShape) {
+		t.Errorf("err = %v; want errors.Is(_, ErrInvalidShape): the registry route classifies a duplicate member name as a shape error (REQ-052)", err)
+	}
+}
+
+// TestDecodeAsNestedDuplicateIsErrInvalidShape pins the same classification for
+// a duplicate member name nested below the top level, reached through DecodeAs.
+// openehr/client/demographic decodes PARTY bodies through DecodeAs, so this is a
+// live consumer route: a duplicate anywhere in the body MUST wrap ErrInvalidShape,
+// not only carry the tokenizer's ErrDuplicateName (REQ-052). The v2 tokenizer
+// catches the nested duplicate while the peek reads past the unknown member, so
+// the refusal travels through the peek failure site. Mutation: remove the
+// ClassifyDuplicate call at that site in Registry.Decode and the ErrInvalidShape
+// assertion goes red.
+func TestDecodeAsNestedDuplicateIsErrInvalidShape(t *testing.T) {
+	const typeName = "FAKE_BOX_NESTED_DUP"
+	if _, ok := Default.Lookup(typeName); !ok {
+		Default.Register(typeName, func() any { return &fakeBox{} })
+	}
+	_, err := DecodeAs[fakeBox]([]byte(`{"_type":"FAKE_BOX_NESTED_DUP","payload":"ok","nested":{"x":1,"x":2}}`))
+	if err == nil {
+		t.Fatal("expected error for a nested duplicate member name")
+	}
+	if !errors.Is(err, jsontext.ErrDuplicateName) {
+		t.Errorf("err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
+	}
+	if !errors.Is(err, ErrInvalidShape) {
+		t.Errorf("err = %v; want errors.Is(_, ErrInvalidShape): a nested duplicate is a shape error on the DecodeAs route (REQ-052)", err)
 	}
 }
 
