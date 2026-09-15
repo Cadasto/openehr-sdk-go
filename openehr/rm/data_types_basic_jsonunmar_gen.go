@@ -23,10 +23,11 @@ func (d *DVBoolean) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_BOOLEAN: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_BOOLEAN", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVBoolean
-	}{rawDVBoolean: (*rawDVBoolean)(d)})
+	}{rawDVBoolean: (*rawDVBoolean)(d)}
+	return typereg.DecodeInto(dec, "DV_BOOLEAN", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVIdentifier.
@@ -40,10 +41,11 @@ func (d *DVIdentifier) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_IDENTIFIER: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_IDENTIFIER", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVIdentifier
-	}{rawDVIdentifier: (*rawDVIdentifier)(d)})
+	}{rawDVIdentifier: (*rawDVIdentifier)(d)}
+	return typereg.DecodeInto(dec, "DV_IDENTIFIER", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVState.
@@ -57,8 +59,9 @@ func (d *DVState) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_STATE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_STATE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVState
-	}{rawDVState: (*rawDVState)(d)})
+	}{rawDVState: (*rawDVState)(d)}
+	return typereg.DecodeInto(dec, "DV_STATE", &w, &w.Type)
 }

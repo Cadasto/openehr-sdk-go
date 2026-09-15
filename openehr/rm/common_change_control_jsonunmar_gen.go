@@ -23,10 +23,11 @@ func (c *Contribution) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: CONTRIBUTION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "CONTRIBUTION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawContribution
-	}{rawContribution: (*rawContribution)(c)})
+	}{rawContribution: (*rawContribution)(c)}
+	return typereg.DecodeInto(dec, "CONTRIBUTION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ImportedVersion.
@@ -40,10 +41,11 @@ func (i *ImportedVersion[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: IMPORTED_VERSION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "IMPORTED_VERSION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawImportedVersion[T]
-	}{rawImportedVersion: (*rawImportedVersion[T])(i)})
+	}{rawImportedVersion: (*rawImportedVersion[T])(i)}
+	return typereg.DecodeInto(dec, "IMPORTED_VERSION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into OriginalVersion.
@@ -57,10 +59,11 @@ func (o *OriginalVersion[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: ORIGINAL_VERSION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ORIGINAL_VERSION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawOriginalVersion[T]
-	}{rawOriginalVersion: (*rawOriginalVersion[T])(o)})
+	}{rawOriginalVersion: (*rawOriginalVersion[T])(o)}
+	return typereg.DecodeInto(dec, "ORIGINAL_VERSION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into VersionedObject.
@@ -74,8 +77,9 @@ func (v *VersionedObject[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if v == nil {
 		return fmt.Errorf("canjson: VERSIONED_OBJECT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "VERSIONED_OBJECT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawVersionedObject[T]
-	}{rawVersionedObject: (*rawVersionedObject[T])(v)})
+	}{rawVersionedObject: (*rawVersionedObject[T])(v)}
+	return typereg.DecodeInto(dec, "VERSIONED_OBJECT", &w, &w.Type)
 }

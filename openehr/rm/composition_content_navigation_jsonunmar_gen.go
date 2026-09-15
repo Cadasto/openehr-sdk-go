@@ -23,8 +23,9 @@ func (s *Section) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if s == nil {
 		return fmt.Errorf("canjson: SECTION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "SECTION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawSection
-	}{rawSection: (*rawSection)(s)})
+	}{rawSection: (*rawSection)(s)}
+	return typereg.DecodeInto(dec, "SECTION", &w, &w.Type)
 }

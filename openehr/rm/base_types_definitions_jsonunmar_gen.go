@@ -23,10 +23,11 @@ func (b *BasicDefinitions) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if b == nil {
 		return fmt.Errorf("canjson: BASIC_DEFINITIONS: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "BASIC_DEFINITIONS", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawBasicDefinitions
-	}{rawBasicDefinitions: (*rawBasicDefinitions)(b)})
+	}{rawBasicDefinitions: (*rawBasicDefinitions)(b)}
+	return typereg.DecodeInto(dec, "BASIC_DEFINITIONS", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into OpenehrDefinitions.
@@ -41,7 +42,7 @@ func (o *OpenehrDefinitions) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: OPENEHR_DEFINITIONS: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireOpenehrDefinitions
-	if err := typereg.DecodeInto(dec, "OPENEHR_DEFINITIONS", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "OPENEHR_DEFINITIONS", &wire, &wire.Class); err != nil {
 		return err
 	}
 	return nil

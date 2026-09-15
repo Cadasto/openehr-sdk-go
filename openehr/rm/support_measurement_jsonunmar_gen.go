@@ -23,8 +23,9 @@ func (m *MeasurementService) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if m == nil {
 		return fmt.Errorf("canjson: MEASUREMENT_SERVICE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "MEASUREMENT_SERVICE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawMeasurementService
-	}{rawMeasurementService: (*rawMeasurementService)(m)})
+	}{rawMeasurementService: (*rawMeasurementService)(m)}
+	return typereg.DecodeInto(dec, "MEASUREMENT_SERVICE", &w, &w.Type)
 }

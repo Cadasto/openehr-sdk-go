@@ -23,10 +23,11 @@ func (a *ArchetypeInternalRef) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPE_INTERNAL_REF: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ARCHETYPE_INTERNAL_REF", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawArchetypeInternalRef
-	}{rawArchetypeInternalRef: (*rawArchetypeInternalRef)(a)})
+	}{rawArchetypeInternalRef: (*rawArchetypeInternalRef)(a)}
+	return typereg.DecodeInto(dec, "ARCHETYPE_INTERNAL_REF", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ArchetypeSlot.
@@ -40,10 +41,11 @@ func (a *ArchetypeSlot) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPE_SLOT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ARCHETYPE_SLOT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawArchetypeSlot
-	}{rawArchetypeSlot: (*rawArchetypeSlot)(a)})
+	}{rawArchetypeSlot: (*rawArchetypeSlot)(a)}
+	return typereg.DecodeInto(dec, "ARCHETYPE_SLOT", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CComplexObject.
@@ -57,10 +59,11 @@ func (c *CComplexObject) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_COMPLEX_OBJECT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_COMPLEX_OBJECT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCComplexObject
-	}{rawCComplexObject: (*rawCComplexObject)(c)})
+	}{rawCComplexObject: (*rawCComplexObject)(c)}
+	return typereg.DecodeInto(dec, "C_COMPLEX_OBJECT", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CMultipleAttribute.
@@ -74,10 +77,11 @@ func (c *CMultipleAttribute) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_MULTIPLE_ATTRIBUTE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_MULTIPLE_ATTRIBUTE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCMultipleAttribute
-	}{rawCMultipleAttribute: (*rawCMultipleAttribute)(c)})
+	}{rawCMultipleAttribute: (*rawCMultipleAttribute)(c)}
+	return typereg.DecodeInto(dec, "C_MULTIPLE_ATTRIBUTE", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CPrimitiveObject.
@@ -91,10 +95,11 @@ func (c *CPrimitiveObject) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_PRIMITIVE_OBJECT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_PRIMITIVE_OBJECT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCPrimitiveObject
-	}{rawCPrimitiveObject: (*rawCPrimitiveObject)(c)})
+	}{rawCPrimitiveObject: (*rawCPrimitiveObject)(c)}
+	return typereg.DecodeInto(dec, "C_PRIMITIVE_OBJECT", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CSingleAttribute.
@@ -108,10 +113,11 @@ func (c *CSingleAttribute) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_SINGLE_ATTRIBUTE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_SINGLE_ATTRIBUTE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCSingleAttribute
-	}{rawCSingleAttribute: (*rawCSingleAttribute)(c)})
+	}{rawCSingleAttribute: (*rawCSingleAttribute)(c)}
+	return typereg.DecodeInto(dec, "C_SINGLE_ATTRIBUTE", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Cardinality.
@@ -125,10 +131,11 @@ func (c *Cardinality) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: CARDINALITY: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "CARDINALITY", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCardinality
-	}{rawCardinality: (*rawCardinality)(c)})
+	}{rawCardinality: (*rawCardinality)(c)}
+	return typereg.DecodeInto(dec, "CARDINALITY", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ConstraintRef.
@@ -142,8 +149,9 @@ func (c *ConstraintRef) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: CONSTRAINT_REF: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "CONSTRAINT_REF", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawConstraintRef
-	}{rawConstraintRef: (*rawConstraintRef)(c)})
+	}{rawConstraintRef: (*rawConstraintRef)(c)}
+	return typereg.DecodeInto(dec, "CONSTRAINT_REF", &w, &w.Type)
 }

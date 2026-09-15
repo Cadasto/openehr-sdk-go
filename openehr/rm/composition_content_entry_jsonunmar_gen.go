@@ -23,10 +23,11 @@ func (a *Action) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ACTION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ACTION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawAction
-	}{rawAction: (*rawAction)(a)})
+	}{rawAction: (*rawAction)(a)}
+	return typereg.DecodeInto(dec, "ACTION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Activity.
@@ -40,10 +41,11 @@ func (a *Activity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ACTIVITY: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ACTIVITY", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawActivity
-	}{rawActivity: (*rawActivity)(a)})
+	}{rawActivity: (*rawActivity)(a)}
+	return typereg.DecodeInto(dec, "ACTIVITY", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into AdminEntry.
@@ -57,10 +59,11 @@ func (a *AdminEntry) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ADMIN_ENTRY: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ADMIN_ENTRY", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawAdminEntry
-	}{rawAdminEntry: (*rawAdminEntry)(a)})
+	}{rawAdminEntry: (*rawAdminEntry)(a)}
+	return typereg.DecodeInto(dec, "ADMIN_ENTRY", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Evaluation.
@@ -74,10 +77,11 @@ func (e *Evaluation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EVALUATION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "EVALUATION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawEvaluation
-	}{rawEvaluation: (*rawEvaluation)(e)})
+	}{rawEvaluation: (*rawEvaluation)(e)}
+	return typereg.DecodeInto(dec, "EVALUATION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Instruction.
@@ -91,10 +95,11 @@ func (i *Instruction) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: INSTRUCTION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "INSTRUCTION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawInstruction
-	}{rawInstruction: (*rawInstruction)(i)})
+	}{rawInstruction: (*rawInstruction)(i)}
+	return typereg.DecodeInto(dec, "INSTRUCTION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into InstructionDetails.
@@ -108,10 +113,11 @@ func (i *InstructionDetails) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: INSTRUCTION_DETAILS: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "INSTRUCTION_DETAILS", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawInstructionDetails
-	}{rawInstructionDetails: (*rawInstructionDetails)(i)})
+	}{rawInstructionDetails: (*rawInstructionDetails)(i)}
+	return typereg.DecodeInto(dec, "INSTRUCTION_DETAILS", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into IsmTransition.
@@ -125,10 +131,11 @@ func (i *IsmTransition) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ISM_TRANSITION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ISM_TRANSITION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawIsmTransition
-	}{rawIsmTransition: (*rawIsmTransition)(i)})
+	}{rawIsmTransition: (*rawIsmTransition)(i)}
+	return typereg.DecodeInto(dec, "ISM_TRANSITION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Observation.
@@ -142,8 +149,9 @@ func (o *Observation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: OBSERVATION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "OBSERVATION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawObservation
-	}{rawObservation: (*rawObservation)(o)})
+	}{rawObservation: (*rawObservation)(o)}
+	return typereg.DecodeInto(dec, "OBSERVATION", &w, &w.Type)
 }

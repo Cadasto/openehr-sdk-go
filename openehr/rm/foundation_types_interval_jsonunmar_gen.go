@@ -23,10 +23,11 @@ func (p *PointInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: Point_interval: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "Point_interval", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawPointInterval[T]
-	}{rawPointInterval: (*rawPointInterval[T])(p)})
+	}{rawPointInterval: (*rawPointInterval[T])(p)}
+	return typereg.DecodeInto(dec, "Point_interval", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ProperInterval.
@@ -40,8 +41,9 @@ func (p *ProperInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: Proper_interval: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "Proper_interval", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawProperInterval[T]
-	}{rawProperInterval: (*rawProperInterval[T])(p)})
+	}{rawProperInterval: (*rawProperInterval[T])(p)}
+	return typereg.DecodeInto(dec, "Proper_interval", &w, &w.Type)
 }

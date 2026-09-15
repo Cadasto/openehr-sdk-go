@@ -23,10 +23,11 @@ func (c *CCodedText) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_CODED_TEXT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_CODED_TEXT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCCodedText
-	}{rawCCodedText: (*rawCCodedText)(c)})
+	}{rawCCodedText: (*rawCCodedText)(c)}
+	return typereg.DecodeInto(dec, "C_CODED_TEXT", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into COrdinal.
@@ -40,10 +41,11 @@ func (c *COrdinal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_ORDINAL: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_ORDINAL", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCOrdinal
-	}{rawCOrdinal: (*rawCOrdinal)(c)})
+	}{rawCOrdinal: (*rawCOrdinal)(c)}
+	return typereg.DecodeInto(dec, "C_ORDINAL", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CQuantity.
@@ -57,10 +59,11 @@ func (c *CQuantity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_QUANTITY: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_QUANTITY", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCQuantity
-	}{rawCQuantity: (*rawCQuantity)(c)})
+	}{rawCQuantity: (*rawCQuantity)(c)}
+	return typereg.DecodeInto(dec, "C_QUANTITY", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CQuantityItem.
@@ -74,10 +77,11 @@ func (c *CQuantityItem) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_QUANTITY_ITEM: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_QUANTITY_ITEM", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCQuantityItem
-	}{rawCQuantityItem: (*rawCQuantityItem)(c)})
+	}{rawCQuantityItem: (*rawCQuantityItem)(c)}
+	return typereg.DecodeInto(dec, "C_QUANTITY_ITEM", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Ordinal.
@@ -91,8 +95,9 @@ func (o *Ordinal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: ORDINAL: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ORDINAL", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawOrdinal
-	}{rawOrdinal: (*rawOrdinal)(o)})
+	}{rawOrdinal: (*rawOrdinal)(o)}
+	return typereg.DecodeInto(dec, "ORDINAL", &w, &w.Type)
 }

@@ -23,10 +23,11 @@ func (a *Archetyped) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPED: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ARCHETYPED", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawArchetyped
-	}{rawArchetyped: (*rawArchetyped)(a)})
+	}{rawArchetyped: (*rawArchetyped)(a)}
+	return typereg.DecodeInto(dec, "ARCHETYPED", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into FeederAudit.
@@ -40,10 +41,11 @@ func (f *FeederAudit) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if f == nil {
 		return fmt.Errorf("canjson: FEEDER_AUDIT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "FEEDER_AUDIT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawFeederAudit
-	}{rawFeederAudit: (*rawFeederAudit)(f)})
+	}{rawFeederAudit: (*rawFeederAudit)(f)}
+	return typereg.DecodeInto(dec, "FEEDER_AUDIT", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into FeederAuditDetails.
@@ -57,10 +59,11 @@ func (f *FeederAuditDetails) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if f == nil {
 		return fmt.Errorf("canjson: FEEDER_AUDIT_DETAILS: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "FEEDER_AUDIT_DETAILS", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawFeederAuditDetails
-	}{rawFeederAuditDetails: (*rawFeederAuditDetails)(f)})
+	}{rawFeederAuditDetails: (*rawFeederAuditDetails)(f)}
+	return typereg.DecodeInto(dec, "FEEDER_AUDIT_DETAILS", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Link.
@@ -74,8 +77,9 @@ func (l *Link) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if l == nil {
 		return fmt.Errorf("canjson: LINK: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "LINK", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawLink
-	}{rawLink: (*rawLink)(l)})
+	}{rawLink: (*rawLink)(l)}
+	return typereg.DecodeInto(dec, "LINK", &w, &w.Type)
 }

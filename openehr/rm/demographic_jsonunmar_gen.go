@@ -23,10 +23,11 @@ func (a *Address) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ADDRESS: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ADDRESS", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawAddress
-	}{rawAddress: (*rawAddress)(a)})
+	}{rawAddress: (*rawAddress)(a)}
+	return typereg.DecodeInto(dec, "ADDRESS", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Agent.
@@ -40,10 +41,11 @@ func (a *Agent) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: AGENT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "AGENT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawAgent
-	}{rawAgent: (*rawAgent)(a)})
+	}{rawAgent: (*rawAgent)(a)}
+	return typereg.DecodeInto(dec, "AGENT", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Capability.
@@ -57,10 +59,11 @@ func (c *Capability) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: CAPABILITY: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "CAPABILITY", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCapability
-	}{rawCapability: (*rawCapability)(c)})
+	}{rawCapability: (*rawCapability)(c)}
+	return typereg.DecodeInto(dec, "CAPABILITY", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Contact.
@@ -74,10 +77,11 @@ func (c *Contact) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: CONTACT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "CONTACT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawContact
-	}{rawContact: (*rawContact)(c)})
+	}{rawContact: (*rawContact)(c)}
+	return typereg.DecodeInto(dec, "CONTACT", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Group.
@@ -91,10 +95,11 @@ func (g *Group) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if g == nil {
 		return fmt.Errorf("canjson: GROUP: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "GROUP", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawGroup
-	}{rawGroup: (*rawGroup)(g)})
+	}{rawGroup: (*rawGroup)(g)}
+	return typereg.DecodeInto(dec, "GROUP", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Organisation.
@@ -108,10 +113,11 @@ func (o *Organisation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: ORGANISATION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ORGANISATION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawOrganisation
-	}{rawOrganisation: (*rawOrganisation)(o)})
+	}{rawOrganisation: (*rawOrganisation)(o)}
+	return typereg.DecodeInto(dec, "ORGANISATION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into PartyIdentity.
@@ -125,10 +131,11 @@ func (p *PartyIdentity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: PARTY_IDENTITY: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "PARTY_IDENTITY", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawPartyIdentity
-	}{rawPartyIdentity: (*rawPartyIdentity)(p)})
+	}{rawPartyIdentity: (*rawPartyIdentity)(p)}
+	return typereg.DecodeInto(dec, "PARTY_IDENTITY", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into PartyRelationship.
@@ -142,10 +149,11 @@ func (p *PartyRelationship) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: PARTY_RELATIONSHIP: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "PARTY_RELATIONSHIP", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawPartyRelationship
-	}{rawPartyRelationship: (*rawPartyRelationship)(p)})
+	}{rawPartyRelationship: (*rawPartyRelationship)(p)}
+	return typereg.DecodeInto(dec, "PARTY_RELATIONSHIP", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Person.
@@ -159,10 +167,11 @@ func (p *Person) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: PERSON: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "PERSON", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawPerson
-	}{rawPerson: (*rawPerson)(p)})
+	}{rawPerson: (*rawPerson)(p)}
+	return typereg.DecodeInto(dec, "PERSON", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Role.
@@ -176,10 +185,11 @@ func (r *Role) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: ROLE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ROLE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawRole
-	}{rawRole: (*rawRole)(r)})
+	}{rawRole: (*rawRole)(r)}
+	return typereg.DecodeInto(dec, "ROLE", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into VersionedParty.
@@ -194,7 +204,7 @@ func (v *VersionedParty) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: VERSIONED_PARTY: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireVersionedParty
-	if err := typereg.DecodeInto(dec, "VERSIONED_PARTY", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "VERSIONED_PARTY", &wire, &wire.Class); err != nil {
 		return err
 	}
 	v.UID = wire.UID

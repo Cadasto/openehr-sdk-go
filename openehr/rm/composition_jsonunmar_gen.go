@@ -23,10 +23,11 @@ func (c *Composition) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: COMPOSITION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "COMPOSITION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawComposition
-	}{rawComposition: (*rawComposition)(c)})
+	}{rawComposition: (*rawComposition)(c)}
+	return typereg.DecodeInto(dec, "COMPOSITION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into EventContext.
@@ -40,8 +41,9 @@ func (e *EventContext) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EVENT_CONTEXT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "EVENT_CONTEXT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawEventContext
-	}{rawEventContext: (*rawEventContext)(e)})
+	}{rawEventContext: (*rawEventContext)(e)}
+	return typereg.DecodeInto(dec, "EVENT_CONTEXT", &w, &w.Type)
 }

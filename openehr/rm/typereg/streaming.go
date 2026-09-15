@@ -19,6 +19,7 @@ import (
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -170,49 +171,56 @@ func MarshalOptions(enc *jsontext.Encoder) json.Options {
 }
 
 // DecodeInto is the shared decode body for a concrete type's
-// UnmarshalJSONFrom. It reads the next value, refuses a _type that names a
-// different concrete type (the mismatch carries [ErrTypeMismatch] inside a
-// [DecodeError] on "/_type"), then decodes the raw bytes into out with the
-// interface hooks threaded in, wrapping any whole-value shape failure through
-// [WrapShapeError] so it keeps the `canjson: <rmType>:` text and gains
-// [ErrInvalidShape] (REQ-052).
+// UnmarshalJSONFrom. It decodes the next value straight into out in one pass,
+// then refuses a _type that names a different concrete type: gotType points at
+// the wrapper's declared _type field, which the same single decode populates,
+// so the discriminator is read once rather than by a separate peek. The
+// mismatch carries [ErrTypeMismatch] inside a [DecodeError] on "/_type". A
+// whole-value shape failure goes through [WrapShapeError], keeping the
+// `canjson: <rmType>:` text and gaining [ErrInvalidShape]; a syntactic or IO
+// error passes through unwrapped, because it is malformed input, not a shape
+// failure of this type (REQ-052, ADR 0022).
 //
 // out is either the receiver viewed through its method-free alias (the
 // zero-copy shape) or a flat wire struct the caller copies back (the shape used
 // for a type that embeds a marshaler-bearing ancestor, whose alias would
-// promote the ancestor's methods). Either way out declares a _type field, so a
-// caller who sets json.RejectUnknownMembers is not tripped by the SDK's own
+// promote the ancestor's methods). Either way out declares the _type field
+// gotType points into, so the guard reads the value this decode populated, and
+// a caller who sets json.RejectUnknownMembers is not tripped by the SDK's own
 // discriminator reaching out (Q5).
-func DecodeInto(dec *jsontext.Decoder, rmType string, out any) error {
-	raw, err := dec.ReadValue()
-	if err != nil {
-		// A syntactic or IO error from the tokenizer is left unwrapped: it is
-		// not a shape failure of this type, and callers classify it by kind.
-		return err
+func DecodeInto(dec *jsontext.Decoder, rmType string, out any, gotType *string) error {
+	if err := json.UnmarshalDecode(dec, out, decodeOptions(dec)); err != nil {
+		return classifyDecode(rmType, err)
 	}
-	if head, err := peekType(raw); err != nil {
-		return WrapShapeError(rmType, err)
-	} else if head != "" && head != rmType {
+	if *gotType != "" && *gotType != rmType {
 		return &DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", rmType, head, ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", rmType, *gotType, ErrTypeMismatch),
 		}
-	}
-	if err := json.Unmarshal(raw, out, decodeOptions(dec)); err != nil {
-		return classifyDecode(rmType, err)
 	}
 	return nil
 }
 
 // classifyDecode turns the error from a nested decode into the codec's error
-// contract (REQ-052). A dispatch failure at a polymorphic slot arrives as a
-// [DecodeError] a hook produced with no Path; this fills the Path from the v2
-// decoder's SemanticError position (the slot relative to the current object)
-// and lets [WrapShapeError] leave it outside the shape sentinel. Any other
-// failure is a whole-value or plain-field shape failure and goes through
-// WrapShapeError, which adds [ErrInvalidShape] and the `canjson: <rmType>:`
-// text.
+// contract (REQ-052). A syntactic or IO error is malformed input, not a shape
+// failure of this type: it passes through unwrapped, so it keeps no SDK
+// sentinel and no `canjson: <rmType>:` prefix. The json package itself declines
+// to wrap a SyntacticError or IO error returned from an UnmarshalerFrom method
+// (go doc encoding/json/v2.UnmarshalerFrom), so passing it through preserves the
+// contract the old dec.ReadValue() gave for free. A dispatch failure at a
+// polymorphic slot arrives as a [DecodeError] a hook produced with no Path;
+// this fills the Path from the v2 decoder's SemanticError position (the slot
+// relative to the current object) and lets [WrapShapeError] leave it outside the
+// shape sentinel. Any other failure is a whole-value or plain-field shape
+// failure and goes through WrapShapeError, which adds [ErrInvalidShape] and the
+// `canjson: <rmType>:` text.
 func classifyDecode(rmType string, err error) error {
+	if _, ok := errors.AsType[*jsontext.SyntacticError](err); ok {
+		return err
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return err
+	}
 	if de, ok := errors.AsType[*DecodeError](err); ok && de != nil && de.Path == "" {
 		if p := slotPointer(err); p != "" {
 			return WrapShapeError(rmType, &DecodeError{Path: p, Type: de.Type, Inner: de.Inner})
