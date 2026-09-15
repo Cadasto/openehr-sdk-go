@@ -96,6 +96,24 @@ func TestProbe030GuardCatchesNarrowedPolymorphicSlot(t *testing.T) {
 	}
 }
 
+// TestProbe030SkipFloorKeysAllMatchAnInput pins that every probe030SkipFloor key
+// names a cassette that is actually in Probe030Inputs. The lookup at
+// loadCassetteInputs is a plain map index that never reports a miss, so a dead
+// key (a typo, or a cassette removed from the corpus) would silently hold
+// nothing out. The count of inputs carrying SkipFloor must equal
+// len(probe030SkipFloor); adding a key that matches no input turns this red.
+func TestProbe030SkipFloorKeysAllMatchAnInput(t *testing.T) {
+	var held int
+	for _, in := range Probe030Inputs {
+		if in.SkipFloor {
+			held++
+		}
+	}
+	if held != len(probe030SkipFloor) {
+		t.Errorf("inputs with SkipFloor = %d, want %d (len(probe030SkipFloor)); a key that matches no cassette is dead and holds nothing out", held, len(probe030SkipFloor))
+	}
+}
+
 // dropMemberReEncoder is a lossy re-encode double: it canjson-encodes the value
 // and then removes one top-level member, standing in for a codec that drops a
 // field on the re-encode path.
