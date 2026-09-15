@@ -65,12 +65,19 @@ func (v *OriginalVersion[T]) BMMName() string { return "ORIGINAL_VERSION" }
 // commit_audit field's type (AuditDetailsLike) with the UpdateAudit write
 // DTO and adding the `_type` member the generated form injects through its
 // anonymous wrapper (ADR 0022). BMM-BUMP: if bmmgen adds or reorders fields on
-// those generated structs, update these copies in lockstep —
+// those generated structs, update these copies in lockstep:
 // `go test ./openehr/client/ehr/contribution/...`.
+//
+// The `signature` pointer field carries `omitzero`, not `omitempty`, matching
+// the generated RM structs (ADR 0022, Q6): these shadow DTOs marshal through
+// the caller's own options, which may carry v1 legacy flags, and under
+// `omitempty` a non-nil pointer to an empty string is omitted by a v2 caller
+// but emitted by a v1 one. `omitzero` omits only a nil pointer, the same way
+// from any entry point.
 type originalVersionJSON[T any] struct {
 	Type                  string               `json:"_type"`
 	Contribution          rm.ObjectRefLike     `json:"contribution,omitempty"`
-	Signature             *string              `json:"signature,omitempty"`
+	Signature             *string              `json:"signature,omitzero"`
 	CommitAudit           UpdateAudit          `json:"commit_audit"`
 	UID                   *rm.ObjectVersionID  `json:"uid,omitempty"`
 	PrecedingVersionUID   *rm.ObjectVersionID  `json:"preceding_version_uid,omitempty"`
@@ -157,7 +164,7 @@ func (v *ImportedVersion[T]) BMMName() string { return "IMPORTED_VERSION" }
 type importedVersionJSON[T any] struct {
 	Type         string                  `json:"_type"`
 	Contribution rm.ObjectRefLike        `json:"contribution,omitempty"`
-	Signature    *string                 `json:"signature,omitempty"`
+	Signature    *string                 `json:"signature,omitzero"`
 	CommitAudit  UpdateAudit             `json:"commit_audit"`
 	Item         rm.OriginalVersion[any] `json:"item"`
 }

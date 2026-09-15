@@ -74,8 +74,8 @@ func TestShadowMarshallersCoverTheGeneratedKeySet(t *testing.T) {
 // jsonKeys returns the JSON key of every field of a struct type, ignoring the
 // tag options (`omitempty` and friends) that the shadows deliberately differ
 // on. A field tagged "-" is skipped. An embedded (anonymous) struct with no
-// json tag is recursed into, so a promoted field set — the streaming codec's
-// alias promotes the embedded Version[T]'s fields onto the wire — is compared
+// json tag is recursed into, so a promoted field set (the streaming codec's
+// alias promotes the embedded Version[T]'s fields onto the wire) is compared
 // flat against the shadow, which spells every key explicitly.
 func jsonKeys(t reflect.Type) []string {
 	var keys []string
