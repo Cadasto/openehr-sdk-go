@@ -8,12 +8,16 @@ import (
 )
 
 // TestDecodeOptionsMemoisesCallerJoin pins that decodeOptions joins a
-// caller-supplied hook set into the SDK aggregate once per caller pointer, not
-// once per nested decode level: callerJoinCache serves every call after the
-// first for the same caller. Without the memo the join would run on every
-// nested value, so a deep tree would re-join once per level (the deferred-minor
-// finding). Mutation: replace the joinCallerUnmarshalers call in decodeOptions
-// with a direct json.JoinUnmarshalers(hooks, caller) and the count becomes 3.
+// caller-supplied hook set into the SDK aggregate once for a run of calls under
+// one caller pointer, not once per call: after the first, lastCallerJoin holds
+// that pair and every repeat reuses its join. This is the property that lets
+// sibling values at one nesting level, and a later decode reusing the same
+// WithUnmarshalers value, cost no extra join.
+//
+// Mutation: replace the joinCallerUnmarshalers call in decodeOptions with a
+// direct json.JoinUnmarshalers(hooks, caller). callerJoinCount lives inside the
+// helper, so bypassing it never increments the counter and the observed count
+// drops to 0 (not 1), which trips the assertion.
 func TestDecodeOptionsMemoisesCallerJoin(t *testing.T) {
 	caller := json.UnmarshalFromFunc(func(dec *jsontext.Decoder, _ *fakeBox) error {
 		return dec.SkipValue()
@@ -41,5 +45,44 @@ func TestDecodeOptionsNilCallerIsNoCaller(t *testing.T) {
 	_ = decodeOptions(dec)
 	if got := callerJoinCount.Load() - before; got != 0 {
 		t.Errorf("decodeOptions joined %d times for a nil caller, want 0: WithUnmarshalers(nil) must be treated as no caller", got)
+	}
+}
+
+// TestDecodeOptionsMemoHoldsOneEntry pins that the caller-hook memo retains only
+// the last (aggregate, caller) pair, never a growing set. Two distinct caller
+// hook sets alternating miss on every call, so each drives a fresh join; the
+// same caller set twice hits on the second call, so it joins once. That is the
+// single-entry memo's defining behaviour: it collapses repeats for one caller
+// (siblings at a level, a later decode reusing the same WithUnmarshalers value)
+// without holding any earlier caller's pointer alive.
+//
+// Mutation: give joinCallerUnmarshalers a map keyed on (hooks, caller) in place
+// of the single-entry lastCallerJoin, and the alternating count drops from 4 to
+// 2, because a map answers the second sighting of each caller from its retained
+// entry. That drop trips the first assertion below.
+func TestDecodeOptionsMemoHoldsOneEntry(t *testing.T) {
+	callerA := json.UnmarshalFromFunc(func(dec *jsontext.Decoder, _ *fakeBox) error {
+		return dec.SkipValue()
+	})
+	callerB := json.UnmarshalFromFunc(func(dec *jsontext.Decoder, _ *fakeBox) error {
+		return dec.SkipValue()
+	})
+	decA := jsontext.NewDecoder(strings.NewReader(`{}`), json.WithUnmarshalers(callerA))
+	decB := jsontext.NewDecoder(strings.NewReader(`{}`), json.WithUnmarshalers(callerB))
+
+	before := callerJoinCount.Load()
+	_ = decodeOptions(decA) // miss: first sight of callerA
+	_ = decodeOptions(decB) // miss: the stored pair is callerA
+	_ = decodeOptions(decA) // miss: the stored pair is callerB
+	_ = decodeOptions(decB) // miss: the stored pair is callerA
+	if got := callerJoinCount.Load() - before; got != 4 {
+		t.Errorf("two distinct callers alternating joined %d times across four calls, want 4: a single-entry memo cannot serve either after the other displaces it", got)
+	}
+
+	before = callerJoinCount.Load()
+	_ = decodeOptions(decA) // miss: the stored pair is callerB
+	_ = decodeOptions(decA) // hit: the stored pair is now callerA
+	if got := callerJoinCount.Load() - before; got != 1 {
+		t.Errorf("the same caller twice in a row joined %d times, want 1: the second call must reuse the memo entry", got)
 	}
 }

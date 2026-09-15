@@ -39,9 +39,12 @@ import (
 // dispatch wins for the interfaces it covers; the caller's hooks reach every
 // other type, at every depth). A nil caller (json.WithUnmarshalers(nil)) is
 // treated as no caller. The pointer check keeps a nested decode, whose options
-// already carry our aggregate, from re-joining it to itself, and the join is
-// memoised per caller (see [joinCallerUnmarshalers]) so it runs once for a whole
-// decode tree rather than once per nested level.
+// already carry our aggregate, from re-joining it to itself. The join is
+// memoised on the last caller hook set seen (see [joinCallerUnmarshalers]): a
+// repeat of that set reuses one join, so sibling values at one nesting level and
+// a later decode reusing the same WithUnmarshalers value cost nothing, but a cold
+// decode still joins once per nesting level, because each level's options carry
+// the previous level's joined pointer as that level's caller.
 func decodeOptions(dec *jsontext.Decoder) json.Options {
 	hooks := aggregateUnmarshalers()
 	if caller, ok := json.GetOption(dec.Options(), json.WithUnmarshalers); ok && caller != nil && caller != hooks {
@@ -54,40 +57,50 @@ func decodeOptions(dec *jsontext.Decoder) json.Options {
 	)
 }
 
-// callerJoinKey keys the memo below on both the SDK aggregate and the caller
-// pointer, so a late hook registration that swaps the aggregate yields a fresh
-// key rather than a stale join. Registration is init-time only, so in practice
-// the aggregate is stable by the time any decode runs.
-type callerJoinKey struct {
+// joinEntry is one memoised caller-hook join: the aggregate and caller pointers
+// that produced joined. It is the whole memo. [joinCallerUnmarshalers] keeps
+// exactly one, published through an atomic.Pointer, so no caller's closures
+// outlive the next distinct caller. The hooks pointer is part of the key so a
+// late hook registration that swaps the aggregate misses rather than reuses a
+// stale join; registration is init-time only, so in practice the aggregate is
+// stable by the time any decode runs.
+type joinEntry struct {
 	hooks  *json.Unmarshalers
 	caller *json.Unmarshalers
+	joined *json.Unmarshalers
 }
 
-// callerJoinCache memoises the aggregate-plus-caller join so a nested decode
-// under one caller-supplied hook set reuses a single joined value instead of
-// re-joining at every level. A caller that reuses its hook set across decodes,
-// the documented pattern, reuses the entry.
-var callerJoinCache sync.Map // callerJoinKey -> *json.Unmarshalers
+// lastCallerJoin holds the most recent (aggregate, caller) join and only that
+// one: a single-entry, last-seen memo. It retains one caller pointer at a time,
+// never a growing set, so a consumer that builds a fresh hook set per decode
+// does not accumulate an entry per call for the process lifetime.
+var lastCallerJoin atomic.Pointer[joinEntry]
 
 // callerJoinCount counts the json.JoinUnmarshalers calls [joinCallerUnmarshalers]
-// performs on a cache miss. It exists only so a white-box test can assert the
-// join does not grow with decode depth; it is unexported and read only by that
-// test.
+// performs on a memo miss. It exists only so a white-box test can assert that a
+// repeat of one caller hook set reuses its join; it is unexported and read only
+// by that test.
 var callerJoinCount atomic.Int64
 
-// joinCallerUnmarshalers returns the SDK aggregate joined with a caller's hooks,
-// caching the result per (aggregate, caller) pair so a deep decode joins once,
-// not once per nested value. SDK hooks win for the interfaces they cover; the
-// caller's reach every other type at every depth (see [decodeOptions]).
+// joinCallerUnmarshalers returns the SDK aggregate joined with a caller's hooks.
+// It memoises only the last (aggregate, caller) pair, in [lastCallerJoin]: a call
+// whose two pointers match the stored pair reuses that join; any other pair
+// recomputes and overwrites. A repeat of one caller hook set therefore reuses a
+// single join (sibling values at one nesting level, and a later decode reusing
+// the same WithUnmarshalers value), while a cold decode still joins once per
+// nesting level, because each level's options carry the previous level's joined
+// pointer as that level's caller. Two concurrent misses may both join; the
+// results are equivalent, so storing either is benign. SDK hooks win for the
+// interfaces they cover; the caller's reach every other type at every depth (see
+// [decodeOptions]).
 func joinCallerUnmarshalers(hooks, caller *json.Unmarshalers) *json.Unmarshalers {
-	key := callerJoinKey{hooks: hooks, caller: caller}
-	if v, ok := callerJoinCache.Load(key); ok {
-		return v.(*json.Unmarshalers)
+	if e := lastCallerJoin.Load(); e != nil && e.hooks == hooks && e.caller == caller {
+		return e.joined
 	}
 	callerJoinCount.Add(1)
 	joined := json.JoinUnmarshalers(hooks, caller)
-	actual, _ := callerJoinCache.LoadOrStore(key, joined)
-	return actual.(*json.Unmarshalers)
+	lastCallerJoin.Store(&joinEntry{hooks: hooks, caller: caller, joined: joined})
+	return joined
 }
 
 // The process-wide aggregate of per-interface decode hooks. The rm and aom14
