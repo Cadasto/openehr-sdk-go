@@ -1,7 +1,7 @@
 # Plan: widen the composition corpus (the seven excluded cassettes)
 
 **Date:** 2026-09-15
-**Status:** in progress (2026-09-15). The one open question (the constraint-axis coupling) is ruled below: decoupled.
+**Status:** landed (2026-09-15). The one open question (the constraint-axis coupling) was ruled below: decoupled; enrolling the four interval templates into the constraint axis is a recorded follow-up (see below).
 **Owner:** SDK maintainers
 **Worktree:** `/src/cadasto/openehr-sdk-go/.claude/worktrees/jsonv2-fixtures`, branch `test/widen-composition-corpus`, from `7a11918e`. The main checkout is never touched.
 **Covers:** [REQ-052](../../specifications/wire.md#req-052) (Canonical JSON, Impl. `landed`, no status change), exercised through [PROBE-030](../../specifications/conformance.md#probe-030--canonical-json-round-trip). No REQ id is allocated and no probe id is allocated.
@@ -297,3 +297,7 @@ This is the core change. The corpus widening and the four floor-leg hold-outs la
 - `ConstraintTemplateIDs` returns the same set as before; `constraint_templates_test.go` is unchanged and green.
 - `conformance.md:148` no longer names a deleted map; `make spec-check` is green; `traceability.yaml` is unchanged.
 - `make ci` is green.
+
+## Follow-ups
+
+- Enrol the four `Test_dv_interval_*` templates into the constraint-cassette axis. Ruling F5 decoupled this from the corpus widening, so it stays a cleanly scoped later change. It flips the prefix pin in `constraint_templates_test.go`, which today asserts `Test_dv_interval_*` absent from `ConstraintTemplateIDs`, and adds two positive `primitive_out_of_range` assertions in `openehr/validation/constraint_cassettes_test.go` for the two `lower_upper` instances, whose operational-template range is `[0..100]` and whose bounds `-10` and `200` genuinely violate it. PROBE-076 already passes on all four interval templates, so the FLAT axis is not the blocker.
