@@ -246,19 +246,6 @@ requirements:
       TERM_MAPPING.match bullet) carry the same canjson.ErrInvalidShape sentinel
       through an Is-only wrapper, with the message left unchanged by the
       classification.
-      REQ-052 landed (2026-09-03): the former field-order SHOULD ("follow
-      the openEHR canonical-JSON specification when one is published")
-      was retired — JSON member order carries no meaning (RFC 8259 § 4)
-      and the openEHR specifications prescribe none, so it deferred to a
-      publication that will not come. § REQ-052 now states the
-      deterministic encode profile as the SDK's own output contract
-      (two successive encodes of a decoded value are byte-identical —
-      PROBE-030, which never compares against the input — and repeat
-      encodes are byte-identical; TestEncodeIsDeterministic,
-      TestEncodeHashKeysLexicographic) and requires the decoder to accept
-      members in any order, _type included
-      (TestDecodeAcceptsAnyMemberOrder). No order is asserted for other
-      implementations' output. No open clause remains.
       REQ-052 amended (2026-09-14,
       docs/plans/archive/2026-09-14-json-v2-migration.md): the deterministic
       field-order MUST is withdrawn. _type first is now a SHOULD; beyond

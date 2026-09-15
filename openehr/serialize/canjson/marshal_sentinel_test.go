@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -40,6 +41,20 @@ func assertEncodeRefusal(t *testing.T, err error) {
 // REQ-052
 func TestMarshalRefusalWrapsErrInvalidValue(t *testing.T) {
 	got, err := canjson.Marshal(make(chan int))
+	if got != nil {
+		t.Errorf("no bytes on refusal; got %q", got)
+	}
+	assertEncodeRefusal(t, err)
+}
+
+// TestMarshalRefusesInvalidUTF8ThroughPublicEntry pins ADR 0022: invalid UTF-8
+// in a Go string reached on encode is refused through canjson.Marshal with
+// ErrInvalidValue, not only when Character.MarshalJSON is called directly
+// (character_test.go). Can-fail control: drop the ErrInvalidValue wrap in
+// Marshal and this test still fails, but only on the direct Character path.
+func TestMarshalRefusesInvalidUTF8ThroughPublicEntry(t *testing.T) {
+	tm := rm.TermMapping{Match: rm.Character(string([]byte{0xff}))}
+	got, err := canjson.Marshal(&tm)
 	if got != nil {
 		t.Errorf("no bytes on refusal; got %q", got)
 	}
