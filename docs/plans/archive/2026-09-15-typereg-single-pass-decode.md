@@ -1,7 +1,7 @@
 # Plan: single-pass concrete decode in typereg (drop the buffer-and-peek on the concrete path)
 
 **Date:** 2026-09-15
-**Status:** in progress (2026-09-15). Scope: the concrete decode path only (ruling F9). The precedence question is ruled below (F8): documented and pinned.
+**Status:** landed (2026-09-15, archived in the implementing PR). Scope: the concrete decode path only (ruling F9). The precedence question is ruled below (F8): documented and pinned by a positive test. The registry path's regression is ruled below (F12): resolved, not deferred.
 **Owner:** SDK maintainers
 **Worktree:** `/src/cadasto/openehr-sdk-go/.claude/worktrees/jsonv2-peek`, branch `perf/typereg-single-pass-decode`, from `7a11918e` (stacked on follow-up A). The main checkout is never touched.
 **Covers:** [REQ-052](../../specifications/wire.md#req-052) (Canonical JSON, Impl. `landed`, no status change; one descriptive clause amended in place, implementation-aligned). No REQ id is allocated and no probe id is allocated. Exercised through [PROBE-030](../../specifications/conformance.md#probe-030--canonical-json-round-trip) and [PROBE-031](../../specifications/conformance.md#probe-031----type-discriminator-decoded-via-registry).
@@ -186,6 +186,15 @@ Binding constraints (maintainer decisions, the amended REQ-052, the ADR 0022 des
 | Malformed classification | let `classifyDecode` `WrapShapeError` everything; or pass syntactic and IO errors through unwrapped | Pass them through. `go doc encoding/json/v2.UnmarshalerFrom` says the json package does not wrap a `SyntacticError` or IO error returned from the method, and `wire.md:126` requires malformed input to keep no sentinel. The `{` case at `decode_test.go:185` makes this a guaranteed red, not a judgment call |
 | Alias-wrapper form | keep the inline anonymous literal; or a named local | Named local. `&w.Type` must be addressable to pass the discriminator pointer; the flat shape already has a named `wire` |
 | Precedence flip | leave it silent; or record it | Record it in ADR 0022 Consequences and amend the one inaccurate descriptive clause in REQ-052. No normative sentence pins the precedence, so no re-pin is owed, but the mechanism prose must stay true |
+| **F8** (controller). Pin the precedence flip | leave it as documented behaviour only; or add a positive test | Both. Documented in ADR 0022 Consequences, and pinned by `TestUnmarshalConcreteTypeMismatchPrecedence` (`decode_test.go:496`): a body both mislabelled and malformed for the target reports `canjson.ErrInvalidShape`; a mislabelled but well-formed body reports `typereg.ErrTypeMismatch` on `/_type`; a body with no `_type` decodes as the concrete target. Cost if wrong: one test to change if the maintainer later prefers the old precedence |
+| **F9** (controller). Scope, reaffirmed | concrete path only; or also widen `DecodePolymorphic` / `Registry.Decode` to a token-scanning peek | Concrete path only, confirming the Scope ruling above. `DecodePolymorphic` and `Registry.Decode` keep their buffer-and-peek in this plan; a token-scanning peek for them is a later plan, only if their benchmarks cross the R26 line |
+| **F12** (controller, fix round 1). `RegistryDecodeDVQuantity` crossed R26 as a side effect | leave `Registry.Decode` unchanged (accept the +33.71 percent regression as a named follow-up); or make it decode from the pooled byte slice while keeping its peek | `Registry.Decode` keeps its `peekType` and depth guard but decodes the value from the byte slice through the pooled `json.Unmarshal` entry, using the same `hookOptions` helper `decodeOptions` builds from, because single-pass `DecodeInto` had driven the old io.Reader-backed decoder's unpooled read buffer onto the registry path. Acceptance met per the fix-round benchstat: `RegistryDecodeDVQuantity` -30.04 percent and `RegistryDecodeElement` -30.80 percent against the v1 baseline |
+
+### Facts recorded in the fix round
+
+- **The positive pass-through rule.** Round 0's `classifyDecode` exempted only a `*jsontext.SyntacticError` and the `io.EOF` family; a failing reader on the streaming entry surfaces as jsontext's own unexported IO error type, neither of those, so it fell through to `WrapShapeError` and wrongly gained `ErrInvalidShape`. `classifyDecode` now passes an error through unwrapped unless its chain carries a `*json.SemanticError` or a `*DecodeError`, the only two shapes `encoding/json/v2` leaves unwrapped from a decode (`go doc encoding/json/v2.UnmarshalerFrom`), so every other malformed-input shape, a syntactic error, a duplicate name, or a failing reader's IO error, keeps no sentinel. Pinned by `TestDecoderDecodeFailingReaderIsNotShapeTagged` (`decode_test.go:816`).
+- **The mutated-receiver consequence**, recorded in ADR 0022 Consequences: after the discriminator guard refuses a whole-value `_type` mismatch, the receiver already holds the foreign body the decode wrote, for the alias shape only (its decode writes into the receiver directly through the type-converted embed). The flat wire-struct shape decodes into a local `wire` value and returns before its field-by-field copy back, so its receiver stays untouched on that failure.
+- **The "during tokenisation" doc sweep.** Six stale "before any generated decode runs" / "validates the whole document before any decode runs" sites were reworded to the mechanism-neutral "during tokenisation": `doc.go:125`, `errors.go:184`, `character_test.go:393,495`, `decode_test.go:152-153,245`. Three remaining hits were checked and left in place, each for a stated reason: `marshal_sentinel_test.go:82` decodes into `map[string]any`, which invokes no generated `UnmarshalJSON`, so the old wording is vacuously true there; this plan's own Findings census (item 3) quotes the old wording as the "before" state it directs the implementer to amend, a historical planning record; and `docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md:16` describes unrelated transport-level pre-decode classification (REQ-094).
 
 ## Definition of Ready
 
@@ -207,9 +216,9 @@ Each task ends green on its named gate. `make test` runs `codegen-verify`, so th
 
 ### Task 1: the runtime helper (red first)
 
-- [ ] Add the two new can-fail controls in `openehr/rm/typereg` (or extend the canjson decode tests). The duplicate-name **message** control (`!strings.Contains(err.Error(), "canjson: DV_QUANTITY:")`) is new; the truncated-`{` no-sentinel control already exists at `decode_test.go:185`. Run them against the current three-pass helper: the message control passes today (no regression yet), the suite is green.
-- [ ] Change `DecodeInto` (`openehr/rm/typereg/streaming.go:186`) to the single-pass body above: add the `gotType *string` parameter, replace `ReadValue`/`peekType`/`json.Unmarshal(raw,...)` with one `json.UnmarshalDecode(dec, out, decodeOptions(dec))`, then the `_type` guard on `*gotType`.
-- [ ] Add the syntactic and IO passthrough to `classifyDecode` (`streaming.go:215`), before the `*DecodeError` arm:
+- [x] Add the two new can-fail controls in `openehr/rm/typereg` (or extend the canjson decode tests). The duplicate-name **message** control (`!strings.Contains(err.Error(), "canjson: DV_QUANTITY:")`) is new; the truncated-`{` no-sentinel control already exists at `decode_test.go:185`. Run them against the current three-pass helper: the message control passes today (no regression yet), the suite is green.
+- [x] Change `DecodeInto` (`openehr/rm/typereg/streaming.go:186`) to the single-pass body above: add the `gotType *string` parameter, replace `ReadValue`/`peekType`/`json.Unmarshal(raw,...)` with one `json.UnmarshalDecode(dec, out, decodeOptions(dec))`, then the `_type` guard on `*gotType`.
+- [x] Add the syntactic and IO passthrough to `classifyDecode` (`streaming.go:215`), before the `*DecodeError` arm:
 
 ```go
 func classifyDecode(rmType string, err error) error {
@@ -234,20 +243,20 @@ func classifyDecode(rmType string, err error) error {
 }
 ```
 
-- [ ] Add `"io"` to the `streaming.go` imports (`jsontext`, `errors`, `json` are already there). `peekType` and `typeDiscriminator` stay: `DecodePolymorphic` and `Registry.Decode` still use them.
-- [ ] Rewrite the `DecodeInto` godoc (`streaming.go:173-185`) for single-pass and the new pointer.
-- [ ] The typereg package will not build until the generated callers pass the fourth argument, so this task compiles together with Task 2's regeneration. Sequence the commit accordingly (helper + generator + `make codegen` in one green step), or land the helper with a temporary shim only if the tree must stay buildable between commits; prefer the single green step.
+- [x] Add `"io"` to the `streaming.go` imports (`jsontext`, `errors`, `json` are already there). `peekType` and `typeDiscriminator` stay: `DecodePolymorphic` and `Registry.Decode` still use them.
+- [x] Rewrite the `DecodeInto` godoc (`streaming.go:173-185`) for single-pass and the new pointer.
+- [x] The typereg package will not build until the generated callers pass the fourth argument, so this task compiles together with Task 2's regeneration. Sequence the commit accordingly (helper + generator + `make codegen` in one green step), or land the helper with a temporary shim only if the tree must stay buildable between commits; prefer the single green step.
 - **Gate:** `go test ./openehr/rm/typereg/ ./openehr/serialize/canjson/`, then the mutation checks by hand-reverting each guard, then `golangci-lint run` on the two packages.
 
 ### Task 2: the generator (both branches) and regeneration
 
-- [ ] In `renderUnmarshalJSON` (`internal/bmmgen/render_jsonunmar.go`), flat branch (`:105-114`): pass the discriminator pointer.
+- [x] In `renderUnmarshalJSON` (`internal/bmmgen/render_jsonunmar.go`), flat branch (`:105-114`): pass the discriminator pointer.
 
 ```go
 fmt.Fprintf(&b, "\tif err := typereg.DecodeInto(dec, %q, &wire, &wire.Class); err != nil {\n", pc.BMMName)
 ```
 
-- [ ] Alias branch (`:116-121`): emit a named local so `&w.Type` is addressable.
+- [x] Alias branch (`:116-121`): emit a named local so `&w.Type` is addressable.
 
 ```go
 alias := aliasTypeName(pc.GoName)
@@ -289,26 +298,41 @@ func (d *DVEHRURI) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 }
 ```
 
-- [ ] Rewrite the generator doc (`render_jsonunmar.go:20`) for single-pass and the discriminator pointer.
-- [ ] `make codegen`. This regenerates the 110 `openehr/rm/*_jsonunmar_gen.go` and 29 `openehr/aom/aom14/*_jsonunmar_gen.go` methods. The base-struct goldens (`internal/bmmgen/testdata/data_types_quantity_gen.go.golden`, `aom14_archetype_gen.go.golden`) carry no `UnmarshalJSONFrom`, so no golden is re-copied. `TestPolymorphicPropertyRendersTyperegDispatch` (`render_jsonunmar_polymorphic_test.go:83`) still matches the `typereg.DecodeInto(dec, "DV_INTERVAL"` prefix.
+- [x] Rewrite the generator doc (`render_jsonunmar.go:20`) for single-pass and the discriminator pointer.
+- [x] `make codegen`. This regenerates the 110 `openehr/rm/*_jsonunmar_gen.go` and 29 `openehr/aom/aom14/*_jsonunmar_gen.go` methods. The base-struct goldens (`internal/bmmgen/testdata/data_types_quantity_gen.go.golden`, `aom14_archetype_gen.go.golden`) carry no `UnmarshalJSONFrom`, so no golden is re-copied. `TestPolymorphicPropertyRendersTyperegDispatch` (`render_jsonunmar_polymorphic_test.go:83`) still matches the `typereg.DecodeInto(dec, "DV_INTERVAL"` prefix.
 - **Gate:** `make codegen-verify` (clean), then `go test ./internal/bmmgen/ ./openehr/rm/... ./openehr/aom/...`.
 
 ### Task 3: the prose and the spec
 
-- [ ] Amend `wire.md:126` and `wire.md:114` with the two rewordings in item 3. REQ-052 stays `landed`.
-- [ ] Add the ADR 0022 Consequences line (item 3).
-- [ ] Correct the godoc at `doc.go:115-116`, `decode.go:30,38,93`. Keep them mechanism-neutral.
+- [x] Amend `wire.md:126` and `wire.md:114` with the two rewordings in item 3. REQ-052 stays `landed`.
+- [x] Add the ADR 0022 Consequences line (item 3).
+- [x] Correct the godoc at `doc.go:115-116`, `decode.go:30,38,93`. Keep them mechanism-neutral.
 - **Gate:** `make spec-check`, `make docs-check`.
 
 ### Task 4: verify and measure
 
-- [ ] `go test ./...` for the touched trees; confirm the full decode-test suite, the census, the bare-v2 test and PROBE-030/031/038 are green with pristine output.
-- [ ] `benchstat -count=10` for `BenchmarkDecodeDVQuantity`, `BenchmarkDecodeCompositionCassette`, `BenchmarkDecodeComposition_400`, `BenchmarkEncodeComposition_400`, `BenchmarkRegistryDecodeDVQuantity`, `BenchmarkRegistryDecodeElement` against `90473f9f`. Record the table in the PR body. Acceptance: DVQuantity within 20 percent of the v1 baseline (p < 0.05), no large-payload benchmark regressing.
-- [ ] `make ci`.
+- [x] `go test ./...` for the touched trees; confirm the full decode-test suite, the census, the bare-v2 test and PROBE-030/031/038 are green with pristine output.
+- [x] `benchstat -count=10` for `BenchmarkDecodeDVQuantity`, `BenchmarkDecodeCompositionCassette`, `BenchmarkDecodeComposition_400`, `BenchmarkEncodeComposition_400`, `BenchmarkRegistryDecodeDVQuantity`, `BenchmarkRegistryDecodeElement` against `90473f9f`. Record the table in the PR body. Acceptance: DVQuantity within 20 percent of the v1 baseline (p < 0.05), no large-payload benchmark regressing.
+- [x] `make ci`.
+
+#### Benchmark results (`benchstat -count=10`, `go1.27.1`, linux/amd64)
+
+The DecodeDVQuantity and large-payload rows are the first measurement (round 0, head `69b8a627`); the two registry rows are the fix-round-1 measurement (head after F12, `18a6416f`), because F12 changed `Registry.Decode` itself. Source: `task-B-report.md`, first section and `## Fix round 1` section.
+
+| Benchmark | v1 `90473f9f` | v2 | sec/op delta | R26 verdict |
+|---|---|---|---|---|
+| `BenchmarkDecodeDVQuantity` | 898.0n / 248 B / 3 allocs | 716.7n / 256 B / 4 allocs | -20.19% (p=0.000, n=10) | NO REGRESSION (the hard gate, within the 20 percent threshold) |
+| `BenchmarkDecodeCompositionCassette` | 5.320m / 3762.8Ki / 6267 allocs | 2.072m / 446.1Ki / 4809 allocs | -61.05% (p=0.000, n=10) | NO REGRESSION (large-payload) |
+| `BenchmarkDecodeComposition_400` | 6.112m / 2703.0Ki / 21.67k allocs | 3.690m / 960.0Ki / 13.25k allocs | -39.62% (p=0.000, n=10) | NO REGRESSION (large-payload) |
+| `BenchmarkEncodeComposition_400` | 2.905m / 3.083Mi / 9280 allocs | 1.513m / 1.323Mi / 16.44k allocs | -47.91% (p=0.000, n=10) | NO REGRESSION (large-payload) |
+| `BenchmarkRegistryDecodeDVQuantity` | 1.656u / 753 B / 9 allocs | 1.159u / 272 B / 5 allocs | -30.04% (p=0.000, n=10) | NO REGRESSION (was +33.71 percent before F12; resolved) |
+| `BenchmarkRegistryDecodeElement` | 5.517u / 2755 B / 29 allocs | 3.818u / 1009 B / 15 allocs | -30.80% (p=0.000, n=10) | NO REGRESSION (was -1.65 percent before F12, unaffected either way) |
+
+**Hard acceptance gate MET.** `BenchmarkDecodeDVQuantity` is 20.19 percent faster than the v1 baseline, and no large-payload benchmark regresses. The registry benchmarks, not part of the hard gate, both land within R26 too once F12 lands.
 
 ### Task 5: close-out
 
-- [ ] Archive this plan under `docs/plans/archive/` per `sdd-archive`, in the implementing PR.
+- [x] Archive this plan under `docs/plans/archive/` per `sdd-archive`, in the implementing PR.
 
 Commit sequence (Conventional, `Assisted-by: Claude Code (claude-opus-4-8[1m])`):
 
@@ -320,3 +344,10 @@ Commit sequence (Conventional, `Assisted-by: Claude Code (claude-opus-4-8[1m])`)
 **Ruling F8 (controller, 2026-09-15):** the precedence flip is accepted as documented behaviour and also pinned by a positive test: a body that is both mislabelled (`_type` names another class) and malformed for the target reports `canjson.ErrInvalidShape`; a mislabelled but well-formed body still reports `typereg.ErrTypeMismatch` on `/_type`; a body with no `_type` behaves as REQ-052 states for a concrete target. The `classifyDecode` pass-through for syntactic and IO errors is part of the same task. Cost if wrong: one test to change if the maintainer later prefers the old precedence. **Ruling F9:** `DecodePolymorphic` and `Registry.Decode` keep their buffer-and-peek in this plan; a token-scanning peek is a later plan only if their benchmarks cross the R26 line.
 
 The precedence flip (a body that is both a wrong whole-value `_type` and a shape failure now reports `ErrInvalidShape`, not `ErrTypeMismatch` on `/_type`) is unpinned by any normative sentence or test, and is recorded only in ADR 0022 Consequences plus the two REQ-052 wording fixes in item 3. Accept that wording, or does the maintainer want the flip pinned by a positive test (a new case asserting the shape failure wins) rather than left as documented behaviour?
+
+## Follow-ups
+
+- A token-scanning peek for `DecodePolymorphic` (and `Registry.Decode`, though F12 already moved it off the io.Reader-backed decoder), only if either one's benchmarks ever cross the R26 line. Neither does today.
+- A test pinning `DecodeError.Path` for a concrete value nested beneath another concrete value with no polymorphic hook between them, so the fuller `JSONPointer` the single-pass change produces there (item 2; the ADR 0022 Consequences second edge) is exercised by the suite rather than only observed in the scratch module.
+- A parity test pinning that `decodeOptions` and `Registry.Decode` build the same option set: both now call the shared `hookOptions` helper (`streaming.go:65`), so a drift between the two call sites would currently pass unnoticed until a decode outcome actually differed.
+- The `_`-discarding `errors.AsType` guards at `errors.go:156` (`WrapShapeError`) and `errors.go:177` (`ClassifyShape`): both check only `ok`, not `ok && v != nil`, unlike the guarded pattern this package uses elsewhere (REQ-025). Pre-existing and unreachable today (`errors.AsType[*DecodeError]` finding a match but a nil pointer would require a caller to box a typed-nil `*DecodeError`, which no producer in this package does), so no test can currently turn either one red; recorded so a future producer of a possibly-nil `*DecodeError` does not reintroduce the axis silently.

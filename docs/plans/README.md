@@ -12,7 +12,7 @@ The corpus-widening plan **landed 2026-09-15 and was archived** ([archive/2026-0
 
 | Plan | Scope | Covers | Notes |
 |---|---|---|---|
-| [2026-09-15-typereg-single-pass-decode.md](2026-09-15-typereg-single-pass-decode.md) | The concrete decode path reads `_type` from the declared wire field after one `json.UnmarshalDecode` instead of buffering, peeking and decoding; polymorphic and registry paths keep their peek | [REQ-052](../specifications/wire.md#req-052), [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) | In progress on `perf/typereg-single-pass-decode`, stacked on the corpus-widening branch; named follow-up (R21, R26) of the archived json/v2 plan |
+| [archive/2026-09-15-typereg-single-pass-decode.md](archive/2026-09-15-typereg-single-pass-decode.md) | **Landed 2026-09-15 and archived**: the concrete decode path reads `_type` from the declared wire field after one `json.UnmarshalDecode` instead of buffering, peeking and decoding, recovering the `BenchmarkDecodeDVQuantity` regression measured against the v1 baseline; polymorphic and registry paths keep their peek, and `Registry.Decode` now decodes from a pooled byte slice rather than an io.Reader-backed one, closing a side-effect regression the change had moved onto it | [REQ-052](../specifications/wire.md#req-052) (`landed`, no status change), [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) | Named follow-up (R21, R26) of the archived json/v2 plan |
 
 ### Go 1.27 floor (2026-09-03)
 
