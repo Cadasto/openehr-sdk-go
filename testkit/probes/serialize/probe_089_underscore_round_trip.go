@@ -5,8 +5,8 @@ package serializeprobes
 // REQ-140 grammar table, recursion and refusals included — four legs:
 //
 //   - (a) **decode** — the body decodes into the typed RM attribute and
-//     re-encodes byte-for-byte, over the *whole* body, so a family cannot be
-//     carried at the cost of a key beside it;
+//     re-encodes to a wire-equivalent document, over the *whole* body, so a
+//     family cannot be carried at the cost of a key beside it;
 //   - (b) **encode** — the decoded composition is taken through canonical JSON
 //     and back, and encoding *that* composition emits exactly the fixture's
 //     family key set: no silent drop, no invented key, and no `|raw` at a base
@@ -29,7 +29,7 @@ package serializeprobes
 // The distinct assertion versus the package tests in
 // openehr/serialize/simplified/rmattr*_test.go is the leg set: those pin one
 // family's shape and its typed RM result from inside the package; this probe
-// asserts the whole-body byte-exactness, the canonical-transit encode, and the
+// asserts the whole-body wire-equivalence, the canonical-transit encode, and the
 // STRUCTURED vocabulary from outside it, over one fixture per grammar row. A
 // family deleted from the codec fails here whether or not its package test
 // survives.
@@ -213,7 +213,7 @@ var Probe089Inputs = []Probe089Case{
 			probe089Count + "/_other_reference_ranges:0/meaning": "high",
 			// A suffixed-bound anchor (DV_ORDINAL) whose upper end is unbounded:
 			// `|upper_unbounded: true` pairs with `|upper_included: false`, the
-			// only spelling under which the corpus round-trips byte-exactly.
+			// only spelling under which the corpus round-trips wire-equivalently.
 			probe089Ordinal + "|code":                                      "at0015",
 			probe089Ordinal + "|value":                                     "value1",
 			probe089Ordinal + "|ordinal":                                   1,
@@ -555,7 +555,7 @@ func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Re
 		return r, fmt.Errorf("PROBE-089: case %q: marshal fixture: %w", c.Name, err)
 	}
 
-	// (a) decode → re-encode, byte-exact over the whole body.
+	// (a) decode → re-encode, wire-equivalent over the whole body.
 	comp, err := simplified.UnmarshalFlat(body, target.Web)
 	if err != nil {
 		r.Status, r.Detail = "fail", "UnmarshalFlat: "+err.Error()
@@ -567,7 +567,7 @@ func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Re
 		return r, nil
 	}
 	if d := flatDiff(body, out); d != "" {
-		r.Status, r.Detail = "fail", "decode → re-encode is not byte-exact: "+d
+		r.Status, r.Detail = "fail", "decode → re-encode is not wire-equivalent: "+d
 		return r, nil
 	}
 
@@ -648,7 +648,7 @@ func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Re
 	}
 
 	r.Status = "pass"
-	r.Detail = fmt.Sprintf("%d keys round-tripped byte-exactly across %d grammar-table row(s): %s",
+	r.Detail = fmt.Sprintf("%d keys round-tripped wire-equivalently across %d grammar-table row(s): %s",
 		len(c.Keys), len(c.Rows), strings.Join(c.Rows, "; "))
 	return r, nil
 }

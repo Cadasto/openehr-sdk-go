@@ -152,8 +152,10 @@ requirements:
       - openehr/serialize/canjson/decode_test.go
       - openehr/rm/typereg/registry_test.go
       - openehr/serialize/canjson/omitzero_test.go
+      - openehr/serialize/canjson/typednil_slot_test.go  # typed-nil in an optional polymorphic slot encodes as absent
       - openehr/serialize/canjson/bare_v2_decode_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
+      - testkit/probes/serialize/probe_030_guard_internal_test.go  # can-fail plants for the fidelity and RM-floor legs
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go

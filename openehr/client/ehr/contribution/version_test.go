@@ -2,6 +2,7 @@ package contribution_test
 
 import (
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"strings"
 	"testing"
 
@@ -76,14 +77,38 @@ func marshalToMap(t *testing.T, v any) map[string]any {
 	return m
 }
 
-// TestOriginalVersionSignatureOmitzero pins the ADR 0022 / Q6 ruling that the
-// contribution shadow DTO tags `signature` `omitzero`, not `omitempty`: a nil
+// signatureMember marshals v with the given marshaler and reports whether the
+// output carries a `signature` member and, if so, its value.
+func signatureMember(t *testing.T, v any, marshal func(any) ([]byte, error)) (any, bool) {
+	t.Helper()
+	b, err := marshal(v)
+	if err != nil {
+		t.Fatalf("Marshal(%T): %v", v, err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	got, present := m["signature"]
+	return got, present
+}
+
+// TestVersionSignatureOmitzero pins the ADR 0022 / Q6 ruling that the
+// contribution shadow DTOs tag `signature` `omitzero`, not `omitempty`: a nil
 // Signature is omitted, but a non-nil pointer to an empty string still emits
-// `"signature":""` — the same spelling from any entry point, where a v1
-// caller's `omitempty` would drop the empty-string pointer. Can-fail control:
-// retag the field `omitempty` in version.go and the empty-string case emits
-// nothing, so its `present == true` assertion goes red.
-func TestOriginalVersionSignatureOmitzero(t *testing.T) {
+// `"signature":""`, the same from any entry point.
+//
+// The discriminating path is encoding/json/v2 (no legacy flags): there v2's
+// `omitempty` would drop a pointer to `""` (it encodes empty) while `omitzero`
+// keeps it. A v1 caller keeps it either way (legacy `omitempty` omits only a
+// nil pointer), so a v1-only test cannot tell the two tags apart. This test
+// asserts the v2 result against expectation AND that the v1 result agrees —
+// the agreement is the property `omitzero` buys.
+//
+// Can-fail control: retag the field `omitempty` in version.go and the
+// empty-string case's v2 marshal drops the member, so its v2 `present` and the
+// v1/v2 agreement assertions go red (the v1 output is unchanged).
+func TestVersionSignatureOmitzero(t *testing.T) {
 	empty := ""
 	sig := "base64sig=="
 	cases := []struct {
@@ -96,19 +121,39 @@ func TestOriginalVersionSignatureOmitzero(t *testing.T) {
 		{"empty string emitted", &empty, true, ""},
 		{"value emitted", &sig, true, sig},
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	wrappers := []struct {
+		name string
+		make func(*string) any
+	}{
+		{"OriginalVersion", func(s *string) any {
 			rmv := buildOriginalVersionRM()
-			rmv.Signature = tc.signature
-			m := marshalToMap(t, contribution.WrapOriginalVersion(rmv))
-			got, present := m["signature"]
-			if present != tc.wantMember {
-				t.Fatalf("signature present = %v, want %v", present, tc.wantMember)
-			}
-			if tc.wantMember && got != tc.wantValue {
-				t.Errorf("signature = %v, want %q", got, tc.wantValue)
-			}
-		})
+			rmv.Signature = s
+			return contribution.WrapOriginalVersion(rmv)
+		}},
+		{"ImportedVersion", func(s *string) any {
+			rmiv := buildImportedVersionRM()
+			rmiv.Signature = s
+			return contribution.WrapImportedVersion(rmiv)
+		}},
+	}
+	for _, w := range wrappers {
+		for _, tc := range cases {
+			t.Run(w.name+"/"+tc.name, func(t *testing.T) {
+				v := w.make(tc.signature)
+				marshalV2 := func(x any) ([]byte, error) { return jsonv2.Marshal(x) }
+				gotV2, presentV2 := signatureMember(t, v, marshalV2)
+				if presentV2 != tc.wantMember {
+					t.Fatalf("v2 signature present = %v, want %v", presentV2, tc.wantMember)
+				}
+				if tc.wantMember && gotV2 != tc.wantValue {
+					t.Errorf("v2 signature = %v, want %q", gotV2, tc.wantValue)
+				}
+				gotV1, presentV1 := signatureMember(t, w.make(tc.signature), json.Marshal)
+				if presentV1 != presentV2 || gotV1 != gotV2 {
+					t.Errorf("v1 (%v,%v) and v2 (%v,%v) disagree — signature spelling must not depend on the entry point", gotV1, presentV1, gotV2, presentV2)
+				}
+			})
+		}
 	}
 }
 
