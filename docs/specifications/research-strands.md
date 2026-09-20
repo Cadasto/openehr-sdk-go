@@ -45,7 +45,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Status:** Partially resolved.
 
-**Question:** The RM modeling rules in [rm-modeling.md](rm-modeling.md) (concrete structs + embedded base + interfaces + central type registry) need validation against the full RM 1.1.0-development surface. And: which JSON codec — `encoding/json`, `sonic`, `easyjson` — is the default?
+**Question:** The RM modeling rules in [rm-modeling.md](rm-modeling.md) (concrete structs + embedded base + interfaces + central type registry) need validation against the full RM 1.1.0-development surface, and the migrated codec path needs to stay within a performance budget. The codec choice itself — once framed as `encoding/json` vs `sonic` vs `easyjson` — is settled: [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) adopts the standard library's `encoding/json/v2`.
 
 ### Resolved sub-questions
 
@@ -53,7 +53,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 |---|---|---|
 | Abstract generic `EVENT` polymorphism (`History.events`) | Promote `EVENT` to a Go interface; `POINT_EVENT` / `INTERVAL_EVENT` concrete; whitelist in generator | [ADR 0003](../adr/0003-rm-event-polymorphism.md) |
 | `Real` / `Integer` wire tolerance (quoted vs numeric JSON) | Strict encode, permissive decode via `rm.Real` / `rm.Integer` defined types | [ADR 0004](../adr/0004-numeric-wire-tolerance.md) |
-| Polymorphic round-trip fidelity (REQ-052/040) | Value-in-interface `_type` on encode via `openehr/internal/jsonpoly`; round-tripped `DV_INTERVAL<T>` validated from its bounds' runtime types; corpus round-trips byte-stable | [archived plan](../plans/archive/2026-06-23-polymorphic-encode-decode.md) |
+| Polymorphic round-trip fidelity (REQ-052/040) | Value-in-interface `_type` on encode via `openehr/internal/jsonpoly`; round-tripped `DV_INTERVAL<T>` validated from its bounds' runtime types; corpus round-trips byte-stable. **Superseded by the row below**: `jsonpoly` is retired and byte-stability withdrawn under [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) | [archived plan](../plans/archive/2026-06-23-polymorphic-encode-decode.md) |
 | `encoding/json/v2` as the canonical-JSON codec; encoded member order is not a contract | Migrate to standard-library v2; retire the generator's per-type `MarshalJSON` / `UnmarshalJSON` and `openehr/internal/jsonpoly`; `_type` first becomes a SHOULD and round-trip fidelity is asserted semantically rather than byte-wise | [ADR 0021](../adr/0021-json-member-order-not-a-contract.md), [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) |
 
 ### Still open
@@ -64,11 +64,12 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Evidence needed (remaining):**
 
-- Benchmark throughput, allocations, and memory residency for codec candidates.
+- Benchmark throughput, allocations, and memory residency for the migrated `encoding/json/v2` path against the retired generated marshalers (`openehr/serialize/canjson/bench_test.go`).
 - Document any remaining abstract-generic classes requiring ADR whitelist (generator policy today: `EVENT` only).
-- `encoding/json/v2` migration evidence: `_type` emission (first-member SHOULD) and the polymorphic `_type` round-trip survive the retirement of the generated marshalers, asserted by PROBE-030 and PROBE-038, whose byte assertions are replaced by typed deep comparison plus [wire-equivalence](conformance.md#terms); the generated and `jsonpoly` line count removed is recorded in the plan's close-out.
 
-**Resolution form (remaining):** ADR choosing the default codec (with tuning-knob notes for swapping). Amends REQ-052, REQ-053, possibly REQ-040 if registry shape needs tweaking. The `encoding/json/v2` resolution additionally touched the codegen policy in [ADR 0002](../adr/0002-bmm-codegen-decisions.md), since it changed what the generator emits.
+The `encoding/json/v2` migration evidence — `_type`-first survival, polymorphic round-trip, generated / `jsonpoly` line count removed — is delivered and recorded in the ADR 0021/0022 sub-question row above and the plan's close-out; PROBE-030 / PROBE-038 assert the round trip semantically (typed deep comparison plus [wire-equivalence](conformance.md#terms)).
+
+**Resolution form (remaining):** the full-inventory and performance sub-questions resolve through plan tasks and benchmarks, not a new ADR. The codec choice is already resolved by [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) (which also touched the codegen policy in [ADR 0002](../adr/0002-bmm-codegen-decisions.md), since it changed what the generator emits); a future codec swap, were it revisited, would amend REQ-052 / REQ-053 and possibly REQ-040.
 
 **Implementation gate:** Phase 1b — affects every read path in `openehr/client/*` and openEHR wire conformance (REQ-080).
 

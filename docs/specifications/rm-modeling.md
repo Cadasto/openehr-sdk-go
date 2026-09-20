@@ -197,4 +197,4 @@ Codecs in `openehr/serialize/` are the consumers of the type registry on the rea
 - **Read:** the codec peeks `_type`, looks up the constructor in the registry, decodes into the concrete struct.
 - **Write:** the codec encodes the concrete struct; `_type` is set by the struct's `MarshalJSONTo` (or a custom encoder), keyed off the struct's known `_type` constant (typically a package-level `const TypeDVQuantity = "DV_QUANTITY"`).
 
-An open research question (STRAND-04) is the choice of underlying JSON library (`encoding/json` vs `sonic` vs `easyjson`). Whatever the choice, the type-registry contract above stays — codecs are pluggable; the registry is not.
+The underlying JSON library is the standard library's `encoding/json/v2` ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md)); the type-registry contract above holds regardless — codecs consult the registry, the registry does not depend on them. STRAND-04's remaining open questions are the full-RM inventory and codec performance, not the codec choice.

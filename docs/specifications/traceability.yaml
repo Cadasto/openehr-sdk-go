@@ -1446,10 +1446,12 @@ requirements:
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/handles_test.go
+      - openehr/validation/rmread/read_test.go  # ACTION time/ism_transition/instruction_details readers the floor relies on (shared with REQ-102)
     plans:
       - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
       - docs/plans/archive/2026-06-29-rm-floor-validation.md
       - docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md
+      - docs/plans/archive/2026-09-14-json-v2-migration.md  # landed the rmread ACTION readers, so the floor stops reporting a populated ACTION's mandatory attributes as missing
     notes: >-
       landed (2026-09-03): the floor gained two TERM_MAPPING /
       DV_TEXT.mappings invariants — match outside {'>','=','<','?'} and
@@ -1462,6 +1464,11 @@ requirements:
       rmread reads mappings / purpose / target, and term_mapping_match
       fires on the node — as a container element, nested under
       purpose.mappings, or as the ValidateRM root.
+      The json/v2 migration (2026-09-14) surfaced and fixed the rmread
+      ACTION readers (time / ism_transition / instruction_details, a
+      REQ-102 reader concern proven by read_test.go's TestReadSingle_Action),
+      so ValidateRM no longer reports a populated ACTION's two mandatory
+      attributes as missing; PROBE-030's RM-floor leg exercises that benefit.
 
   - id: REQ-113
     title: Execution-oriented parsed AQL AST

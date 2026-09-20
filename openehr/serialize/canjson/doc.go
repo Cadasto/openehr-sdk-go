@@ -170,11 +170,13 @@
 // object MUST carry `_type` or the decode fails with
 // [typereg.ErrMissingType] wrapped in [DecodeError].
 //
-// [NewDecoder] accepts [WithRelaxedTypeDispatch] to opt into relaxed
-// dispatch: when the declared abstract field has exactly one concrete
-// descendant in the merged BMM, the decoder instantiates that
-// descendant without `_type`. This is a documented escape hatch for
-// legacy producers; default is OFF.
+// [NewDecoder] accepts [WithRelaxedTypeDispatch]. Relaxed dispatch would,
+// when the declared abstract field has exactly one concrete descendant in
+// the merged BMM, instantiate that descendant without `_type`. The option
+// is reserved: the current generated decoders implement strict dispatch
+// only, so setting it is a no-op for built-in RM types today. It stays on
+// the API surface so a caller does not break when the relaxed path lands;
+// default is OFF.
 //
 // # Polymorphic dispatch
 //

@@ -167,7 +167,7 @@ func validateWriteAudit(index int, a UpdateAudit) error {
 // submissionJSON is the on-the-wire shape — no `_type` envelope because
 // `Contribution_create` is a request schema, not an RM class. Field order
 // mirrors the OpenAPI definition (audit before versions); per-version
-// `_type` discrimination is emitted by each element's own MarshalJSON.
+// `_type` discrimination is emitted by each element's own MarshalJSONTo.
 type submissionJSON struct {
 	Audit    UpdateAudit     `json:"audit"`
 	Versions []CommitVersion `json:"versions"`
