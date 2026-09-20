@@ -10,13 +10,16 @@ import (
 )
 
 // TestMarshalMapValueIncludesType pins ADR 0022: an RM value held as a map
-// value is addressable under encoding/json/v2, so the value-receiver
-// MarshalJSONTo emits `_type` on every entry. Under v1 the same map value was
-// unaddressable and lost its discriminator.
+// value re-encodes with its `_type` on every entry under encoding/json/v2,
+// where under v1 the same map value was unaddressable and lost its
+// discriminator (ruling R19's value-receiver MarshalJSONTo is what also carries
+// it from the v1 entry points).
 //
-// Can-fail control: switch TranslationDetails back to a pointer-receiver-only
-// MarshalJSONTo (or drop the value receiver) and this test fails while ordinary
-// struct-field encodes still pass.
+// Can-fail control: drop TranslationDetails' MarshalJSONTo method entirely and
+// the map value re-encodes as its bare struct fields with no `_type`, while
+// ordinary struct-field encodes on other types still pass. (Switching the
+// method to a pointer receiver is NOT a can-fail here: v2 still calls it on a
+// map value, so `_type` would still be emitted.)
 func TestMarshalMapValueIncludesType(t *testing.T) {
 	translations := map[string]rm.TranslationDetails{
 		"en": {

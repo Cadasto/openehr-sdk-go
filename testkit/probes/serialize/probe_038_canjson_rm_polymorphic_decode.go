@@ -52,8 +52,9 @@ func Probe038CanjsonRMPolymorphicDecode(body []byte, factory func() any) (Result
 
 // probe038PolymorphicDecode runs PROBE-038. Probe038CanjsonRMPolymorphicDecode
 // passes the real canjson.Marshal for the b2 step; can-fail tests pass a lossy
-// double to prove the wire-equivalence fixpoint leg catches a field dropped
-// across the second decode (probe_038_guard_internal_test.go).
+// double that drops a field on the b2 encode, proving the wire-equivalence
+// fixpoint leg catches a field lost across the second decode-and-encode
+// (probe_038_guard_internal_test.go).
 func probe038PolymorphicDecode(body []byte, factory func() any, secondMarshal func(any) ([]byte, error)) (Result, error) {
 	r := Result{Probe: "PROBE-038"}
 	if factory == nil {

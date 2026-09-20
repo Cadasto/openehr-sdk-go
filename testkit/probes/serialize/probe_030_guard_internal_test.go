@@ -114,3 +114,30 @@ func retypeSlotReEncoder(slot string, replacement map[string]any) func(any) ([]b
 		return json.Marshal(m)
 	}
 }
+
+// TestProbe030SkipFloorSetIsLocked pins the membership of probe030SkipFloor,
+// not just that its one entry behaves. The RM-floor leg (REQ-112) is a MUST for
+// every cassette; only a cassette whose vendored content carries a finding
+// invariant to the round trip may be held out, and today that is exactly
+// clinical_notes.v0. Because probe030RoundTrip skips the floor for any key in
+// this map, an entry added here silently drops the floor MUST for that cassette
+// while TestProbe030 and the ValidateRM plant both stay green. This guard fails
+// when the set changes, so a new skip has to be justified in the probe.
+//
+// Can-fail control: add any cassette to probe030SkipFloor and this test reddens.
+func TestProbe030SkipFloorSetIsLocked(t *testing.T) {
+	want := map[string]bool{"compositions/clinical_notes.v0.json": true}
+	if len(probe030SkipFloor) != len(want) {
+		t.Fatalf("probe030SkipFloor has %d entries, want %d: %v", len(probe030SkipFloor), len(want), probe030SkipFloor)
+	}
+	for k := range want {
+		if !probe030SkipFloor[k] {
+			t.Errorf("probe030SkipFloor is missing the expected skip %q", k)
+		}
+	}
+	for k := range probe030SkipFloor {
+		if !want[k] {
+			t.Errorf("probe030SkipFloor holds an unexpected skip %q — a floor-MUST holdout must be justified in the probe, not added silently", k)
+		}
+	}
+}
