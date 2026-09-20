@@ -138,3 +138,21 @@ func TestEquivalentReportsInvalidJSON(t *testing.T) {
 		t.Fatalf("Equivalent(nil, nil) = %v, %q; want false naming the left document", ok, diag)
 	}
 }
+
+// TestEquivalentRejectsTrailingData — a document must be a single JSON value.
+// Content after the first value (a second value or trailing garbage) is a
+// parse failure, so an encoder that appended to a value cannot slip past the
+// oracle by matching only on the first value. Can-fail test: without the EOF
+// check, `{}[]` parses as `{}` and compares equivalent to `{}`, so the first
+// assertion below would report ok == true.
+func TestEquivalentRejectsTrailingData(t *testing.T) {
+	if ok, diag := wireequiv.Equivalent([]byte(`{}`), []byte(`{}[]`)); ok || !strings.Contains(diag, "right document is not valid JSON") {
+		t.Fatalf("Equivalent({}, {}[]) = %v, %q; want false naming the right document", ok, diag)
+	}
+	if ok, diag := wireequiv.Equivalent([]byte(`{}[]`), []byte(`{}`)); ok || !strings.Contains(diag, "left document is not valid JSON") {
+		t.Fatalf("Equivalent({}[], {}) = %v, %q; want false naming the left document", ok, diag)
+	}
+	if ok, diag := wireequiv.Equivalent([]byte(`{"a":1}`), []byte(`{"a":1} garbage`)); ok || !strings.Contains(diag, "right document is not valid JSON") {
+		t.Fatalf("Equivalent(value, value+garbage) = %v, %q; want false naming the right document", ok, diag)
+	}
+}

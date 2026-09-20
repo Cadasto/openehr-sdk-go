@@ -18,17 +18,21 @@
 // defect could pass unnoticed. v1's decode into a generic value with
 // Decoder.UseNumber is a fixed, second reader of the same wire bytes.
 //
-// Two model limits follow from that v1 decode, and neither is in scope for this
+// One model limit follows from that v1 decode, and it is not in scope for this
 // oracle: a duplicate object member collapses to the last value (v1 keeps the
 // last), so it cannot witness REQ-052's rule that the codec refuse duplicate
-// names, and only the first JSON value in each document is read, so trailing
-// data after it is ignored. Both are the codec's own tests to make.
+// names — that is the codec's own test to make. Each document must be a single
+// JSON value: content after the first value (a second value or trailing
+// garbage) is a parse failure here, not silently ignored, so the "not valid
+// JSON" report covers the whole input.
 package wireequiv
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"reflect"
 	"slices"
@@ -59,12 +63,20 @@ func Equivalent(a, b []byte) (bool, string) {
 // decode parses one document into a generic JSON value, keeping every number as
 // its literal text (json.Number) so an integer past 2^53 is not rounded to the
 // nearest float64 on the way in, which would mask exactly the precision the
-// codec promises.
+// codec promises. The document must be a single JSON value: any content after
+// it (a second value or trailing garbage) is reported as an error rather than
+// ignored, so an encoder that appends to a value cannot pass unseen.
 func decode(b []byte) (any, error) {
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.UseNumber()
 	var v any
 	if err := dec.Decode(&v); err != nil {
+		return nil, err
+	}
+	if _, err := dec.Token(); err != io.EOF {
+		if err == nil {
+			return nil, errors.New("unexpected data after top-level JSON value")
+		}
 		return nil, err
 	}
 	return v, nil
