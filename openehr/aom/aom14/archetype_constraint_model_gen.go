@@ -299,7 +299,7 @@ func (c *CSingleAttribute) AnyAllowed() bool {
 // CComplexObject Constraint on complex objects, i.e. any object that consists of other object constraints.
 type CComplexObject struct {
 	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitempty"`
+	AssumedValue *any `json:"assumed_value,omitzero"`
 	// Attributes List of constraints on attributes of the reference model type represented by this object.
 	Attributes []CAttribute `json:"attributes,omitempty"`
 	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
@@ -521,7 +521,7 @@ func (CQuantity) isCObject() {}
 // CPrimitiveObject Constraint on a primitive type.
 type CPrimitiveObject struct {
 	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitempty"`
+	AssumedValue *any `json:"assumed_value,omitzero"`
 	// Item Object actually defining the constraint.
 	Item CPrimitive `json:"item"`
 	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.

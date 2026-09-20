@@ -73,10 +73,13 @@ func TestPolymorphicPropertyEmittingClassNarrowing(t *testing.T) {
 }
 
 // TestPolymorphicPropertyRendersTyperegDispatch is the integration
-// half: regenerate DV_INTERVAL's JSON unmarshaller and confirm the
-// rendered source contains the typereg.DecodeAs[T] dispatch line for
-// both `lower` and `upper` (instead of the pre-Phase-1 direct
-// `d.Lower = aux.Lower` assignment).
+// half under the streaming codec (ADR 0022, ruling R19): DV_INTERVAL is
+// an alias-shape type whose UnmarshalJSONFrom decodes through the shared
+// typereg.DecodeInto helper on the method-free alias, and its open bound's
+// polymorphic dispatch now lives in the generated DVOrdered hook, not in a
+// per-field json.RawMessage / typereg.DecodeAs line (Q1). The bespoke bound
+// router is gone: v2 walks the interval and the one DVOrdered hook, threaded
+// through the decode options, serves the interface bounds.
 func TestPolymorphicPropertyRendersTyperegDispatch(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -98,21 +101,29 @@ func TestPolymorphicPropertyRendersTyperegDispatch(t *testing.T) {
 	}
 	src := string(got)
 	for _, want := range []string{
-		`Lower json.RawMessage`,
-		`Upper json.RawMessage`,
-		`typereg.DecodeAs[T](aux.Lower)`,
-		`typereg.DecodeAs[T](aux.Upper)`,
+		`typereg.DecodeInto(dec, "DV_INTERVAL"`,
+		`*rawDVInterval[T]`,
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("rendered DVInterval unmarshaller missing %q", want)
 		}
 	}
 	for _, banned := range []string{
-		"d.Lower = aux.Lower",
-		"d.Upper = aux.Upper",
+		"json.RawMessage",
+		"typereg.DecodeAs[",
 	} {
 		if strings.Contains(src, banned) {
-			t.Errorf("rendered DVInterval unmarshaller still contains pre-fix line %q", banned)
+			t.Errorf("rendered DVInterval unmarshaller still contains pre-streaming construct %q", banned)
 		}
+	}
+	// The open bound's polymorphic dispatch is served by the DVOrdered decode
+	// hook. Its absence means the interval bounds would decode as a nil
+	// interface, the failure the old per-field DecodeAs guarded against.
+	hooks, err := RenderJSONHooksFile(plan)
+	if err != nil {
+		t.Fatalf("RenderJSONHooksFile: %v", err)
+	}
+	if !strings.Contains(string(hooks), "func(dec *jsontext.Decoder, out *DVOrdered) error") {
+		t.Errorf("rendered rm hooks missing the DVOrdered hook that serves DV_INTERVAL's open bounds")
 	}
 }

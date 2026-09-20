@@ -12,93 +12,69 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
-// jsonpolyImportPath is the leaf helper package used to marshal
-// interface-typed (polymorphic) fields so a concrete value sitting in
-// an interface slot still emits its `_type` discriminator (REQ-052
-// sub-gap A). It depends only on reflect + encoding/json, so the
-// generated marshaller packages can import it without an import cycle.
-const jsonpolyImportPath = "github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+// typeregImportPath is the shared type-registry subpackage. The generated
+// codec companions import it for the streaming decode helper, the encode
+// option join and the nil-receiver sentinel; it never imports back into a
+// generated tree, so no cycle forms.
+const typeregImportPath = "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 
-// RenderMarshalJSONFile renders the canonical-JSON `MarshalJSON`
-// companions for every concrete (non-abstract, non-primitive,
-// non-interface) class in the supplied [PlannedFile].
+// RenderMarshalJSONFile renders the canonical-JSON MarshalJSONTo companions
+// (encoding/json/v2, ADR 0022) for every concrete class in the supplied
+// [PlannedFile]. It also emits the per-class wire type, a method-free alias
+// or a flat wire struct, that the UnmarshalJSONFrom companion in the sibling
+// _jsonunmar_gen.go references.
 //
-// The output is byte-stable per file. Returns (nil, nil) when the
-// file has no concrete classes — the caller should skip writing such
-// files entirely.
+// The output is byte-stable per file. Returns (nil, nil) when the file has no
+// concrete classes.
 //
-// # Emission strategy
+// # Two wire shapes (ADR 0022, ruling R19)
 //
-// For each concrete class C, the file emits:
+// Most classes take the zero-copy shape: a method-free alias `type rawC C`
+// marshalled through an anonymous `struct{ _type; *rawC }`, so no fields are
+// copied. That shape cannot be used for a class that embeds a marshaler-bearing
+// concrete ancestor, because a defined type over such a struct PROMOTES the
+// ancestor's MarshalJSONTo / UnmarshalJSONFrom: encoding/json/v2 would then
+// dispatch to the ancestor and emit its payload under the wrong `_type`,
+// silently (see the promotion note at [effectiveFields]). Those classes,
+// [embedsMarshalerBearingConcrete] finds them, take a flat wire struct that
+// embeds nothing and so cannot promote, with explicit field copies both ways.
 //
-//  1. A package-level wire type `<goName>JSONMarshaller` (generic
-//     when C is generic) — a flat struct whose first field is
-//     `Type string \`json:"_type"\“ followed by every JSON-effective
-//     field of C in encoding/json declaration-emit order (embedded
-//     ancestors' fields first, in struct-declaration order, then C's
-//     own + flattened-from-abstract-non-generic-ancestors fields in
-//     BMM property declaration order).
-//
-//  2. A `MarshalJSON` method on `*C` that constructs the wire struct
-//     by copying each field via Go's embedded-field promotion (so the
-//     wire struct sees the descendant-shadows-ancestor view that the
-//     Go type system already enforces).
-//
-// Field-enumeration avoids the embedded-pointer-alias trick, which
-// breaks whenever the original struct embeds another concrete type
-// that has its own MarshalJSON — encoding/json promotes the inner
-// MarshalJSON via the embedded pointer and emits the inner type's
-// payload instead of the wrapper. With explicit field copies the
-// wire struct embeds nothing and so cannot promote any MarshalJSON.
-//
-// The `_type`-first + BMM-declaration-order rules pinned by REQ-052
-// fall out naturally: `Type` is the first wire-struct field; the
-// remaining fields are emitted in the same order as the original C
-// struct's declaration; nil-pointer / empty-container optionality is
-// preserved via the original `omitempty` tags reused verbatim.
+// Either shape emits `_type` first, joins json.Deterministic(true) plus the
+// FormatNil* options ([typereg.MarshalOptions]), and lets v2 resolve
+// polymorphic interface fields through the registered decode hooks: there is
+// no per-field routing and no json.RawMessage staging any more.
 func RenderMarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	concrete := concreteClassesIn(file)
 	if len(concrete) == 0 {
 		return nil, nil
 	}
 
-	// Pre-render so the import set reflects what the chunks actually
-	// reference: the cross-target rm qualifier (aom14 → rm) and the
-	// jsonpoly helper (only when a polymorphic field is routed).
 	chunks := make([]string, 0, len(concrete))
 	for _, pc := range concrete {
 		chunk, err := renderMarshalJSON(plan, pc)
 		if err != nil {
-			return nil, fmt.Errorf("render MarshalJSON %s: %w", pc.BMMName, err)
+			return nil, fmt.Errorf("render MarshalJSONTo %s: %w", pc.BMMName, err)
 		}
 		chunks = append(chunks, chunk)
 	}
 
 	needExternal := needsExternalImportForJSONMar(plan, chunks)
-	needPoly := slices.ContainsFunc(chunks, func(c string) bool {
-		return strings.Contains(c, "jsonpoly.")
-	})
 
 	var body bytes.Buffer
 	body.WriteString(renderGeneratedHeader(plan))
 	body.WriteString("\n")
-	if needExternal || needPoly {
-		body.WriteString("import (\n")
-		body.WriteString("\t\"encoding/json\"\n\n")
-		if needPoly {
-			fmt.Fprintf(&body, "\t%q\n", jsonpolyImportPath)
-		}
-		if needExternal {
-			fmt.Fprintf(&body, "\t%q\n", plan.Target.ExternalImport)
-		}
-		body.WriteString(")\n\n")
-	} else {
-		body.WriteString("import \"encoding/json\"\n\n")
+	body.WriteString("import (\n")
+	body.WriteString("\t\"encoding/json/jsontext\"\n")
+	body.WriteString("\tjson \"encoding/json/v2\"\n\n")
+	fmt.Fprintf(&body, "\t%q\n", typeregImportPath)
+	if needExternal {
+		fmt.Fprintf(&body, "\t%q\n", plan.Target.ExternalImport)
 	}
+	body.WriteString(")\n\n")
 	if file.PackagePath != "" {
-		fmt.Fprintf(&body, "// BMM package: %s — canonical-JSON MarshalJSON companions\n\n", file.PackagePath)
+		fmt.Fprintf(&body, "// BMM package %s: canonical-JSON MarshalJSONTo companions\n\n", file.PackagePath)
 	} else {
-		body.WriteString("// canonical-JSON MarshalJSON companions (foundation classes)\n\n")
+		body.WriteString("// canonical-JSON MarshalJSONTo companions (foundation classes)\n\n")
 	}
 
 	for _, c := range chunks {
@@ -129,11 +105,11 @@ func qualifierClassRE(qualifier string) *regexp.Regexp {
 	return re
 }
 
-// needsExternalImportForJSONMar reports whether any rendered chunk
-// references the target's external qualifier as a Go identifier
-// (i.e. "rm." followed by an uppercase letter). Differs from the
-// regular needsExternalImport's plain substring check, which trips
-// over BMM doc comments containing words like "term." or "trim.".
+// needsExternalImportForJSONMar reports whether any rendered chunk references
+// the target's external qualifier as a Go identifier (i.e. "rm." followed by
+// an uppercase letter). Differs from the regular needsExternalImport's plain
+// substring check, which trips over BMM doc comments containing words like
+// "term." or "trim.".
 func needsExternalImportForJSONMar(plan *Plan, chunks []string) bool {
 	if plan.Target.ExternalQualifier == "" || plan.Target.ExternalImport == "" {
 		return false
@@ -142,9 +118,9 @@ func needsExternalImportForJSONMar(plan *Plan, chunks []string) bool {
 	return slices.ContainsFunc(chunks, re.MatchString)
 }
 
-// concreteClassesIn returns the subset of file.Classes that should
-// receive a generated MarshalJSON: non-external, non-primitive,
-// non-abstract SimpleClass. Generic classes ARE included.
+// concreteClassesIn returns the subset of file.Classes that should receive a
+// generated codec: non-external, non-primitive, non-abstract SimpleClass.
+// Generic classes ARE included.
 func concreteClassesIn(file *PlannedFile) []*PlannedClass {
 	out := make([]*PlannedClass, 0, len(file.Classes))
 	for _, pc := range file.Classes {
@@ -163,26 +139,95 @@ func concreteClassesIn(file *PlannedFile) []*PlannedClass {
 	return out
 }
 
-// emittedField captures one wire-struct field together with the BMM
-// class where it was originally declared. The owner is used both for
-// rendering the Go field type (via renderField) and for resolving
-// cycle-break pointer overrides (via plan.CyclicSingleProps).
+// emittedField captures one wire-struct field together with the BMM class where
+// it was originally declared.
 type emittedField struct {
 	Prop      bmm.Property
 	Owner     *bmm.SimpleClass
 	OwnerName string
 }
 
-// effectiveFields returns the flat list of JSON-visible fields for a
-// concrete class, in the same order encoding/json would emit them
-// when marshalling an instance of the original struct.
+// embeddedStructAncestors returns the ancestors of cur that appear as Go
+// embedded struct fields: concrete classes, plus abstract-generic classes that
+// are not emitted as codec-facing interfaces. Abstract non-generic ancestors
+// are flattened, not embedded, so they are excluded. The map keys are BMM
+// names; the slice preserves BMM ancestor order. Both [effectiveFields] and
+// [embedsMarshalerBearingConcrete] read this so the flat-field view and the
+// promotion predicate agree on what "embedded" means.
+func embeddedStructAncestors(plan *Plan, cur *PlannedClass) (map[string]bool, []*PlannedClass) {
+	embedded := map[string]bool{}
+	var ancestors []*PlannedClass
+	for _, anc := range cur.Class.Ancestors() {
+		if isPrimitive(anc) || isSkippedPrimitive(anc) {
+			continue
+		}
+		ap, ok := plan.Classes[anc]
+		if !ok {
+			continue
+		}
+		acls, isSimple := ap.Class.(*bmm.SimpleClass)
+		if !isSimple {
+			continue
+		}
+		isStruct := !acls.IsAbstract() || (acls.IsGeneric() && !codecPolymorphicAbstractGeneric(plan, ap))
+		if !isStruct {
+			continue
+		}
+		embedded[anc] = true
+		ancestors = append(ancestors, ap)
+	}
+	return embedded, ancestors
+}
+
+// bearsGeneratedMarshaler reports whether pc is a class the generator equips
+// with the MarshalJSONTo / UnmarshalJSONFrom pair, a non-primitive,
+// non-abstract SimpleClass. An external concrete class counts: it carries the
+// pair in its own package, so embedding it still promotes the methods.
+func bearsGeneratedMarshaler(pc *PlannedClass) bool {
+	if pc.IsPrimitive {
+		return false
+	}
+	sc, ok := pc.Class.(*bmm.SimpleClass)
+	return ok && !sc.IsAbstract()
+}
+
+// embedsMarshalerBearingConcrete reports whether pc embeds, directly or
+// through a chain of embedded ancestors, a concrete class that bears the
+// generated codec pair. Such a class cannot use the zero-copy `type rawC C`
+// alias: the defined type promotes the embedded ancestor's MarshalJSONTo /
+// UnmarshalJSONFrom, so v2 dispatches to the ancestor and emits the wrong
+// `_type` with no compile error (the promotion trap documented at
+// [effectiveFields]). These classes take the flat wire struct instead.
+func embedsMarshalerBearingConcrete(plan *Plan, pc *PlannedClass) bool {
+	_, ancestors := embeddedStructAncestors(plan, pc)
+	for _, ap := range ancestors {
+		if bearsGeneratedMarshaler(ap) {
+			return true
+		}
+		if embedsMarshalerBearingConcrete(plan, ap) {
+			return true
+		}
+	}
+	return false
+}
+
+// effectiveFields returns the flat list of JSON-visible fields for a concrete
+// class, in the same order encoding/json would emit them when marshalling an
+// instance of the original struct.
 //
-// Order: embedded-ancestor fields first (preorder traversal,
-// recursively), then the class's own + flattened-abstract-non-generic
-// properties in BMM declaration order. The descendant shadows an
-// embedded-ancestor property with the same name: at each visit, the
-// `shadowedAbove` set carries the names declared by outer descendants
-// so embedded ancestors skip those when listing their own.
+// Order: embedded-ancestor fields first (preorder traversal, recursively), then
+// the class's own + flattened-abstract-non-generic properties in BMM
+// declaration order. The descendant shadows an embedded-ancestor property with
+// the same name.
+//
+// # Promotion trap
+//
+// A flat field list matters for the flat wire struct: it embeds nothing, so it
+// cannot promote any embedded ancestor's MarshalJSONTo / UnmarshalJSONFrom.
+// encoding/json/v2 promotes a marshaler through an embedded pointer and emits
+// the inner type's payload instead of the wrapper, which is exactly why a
+// class embedding a marshaler-bearing concrete ancestor takes the flat shape
+// rather than the `type rawC C` alias (ADR 0022, ruling R19).
 func effectiveFields(plan *Plan, pc *PlannedClass) ([]emittedField, error) {
 	var result []emittedField
 	seen := map[string]bool{}
@@ -193,29 +238,7 @@ func effectiveFields(plan *Plan, pc *PlannedClass) ([]emittedField, error) {
 		if !ok {
 			return nil
 		}
-		// Compute embedded struct ancestors (concrete or abstract+generic)
-		// in BMM declaration order — same set renderConcreteClass uses.
-		embedded := map[string]bool{}
-		var embeddedAncestors []*PlannedClass
-		for _, anc := range cur.Class.Ancestors() {
-			if isPrimitive(anc) || isSkippedPrimitive(anc) {
-				continue
-			}
-			ap, ok := plan.Classes[anc]
-			if !ok {
-				continue
-			}
-			acls, isSimple := ap.Class.(*bmm.SimpleClass)
-			if !isSimple {
-				continue
-			}
-			isStruct := !acls.IsAbstract() || (acls.IsGeneric() && !codecPolymorphicAbstractGeneric(plan, ap))
-			if !isStruct {
-				continue
-			}
-			embedded[anc] = true
-			embeddedAncestors = append(embeddedAncestors, ap)
-		}
+		embedded, embeddedAncestors := embeddedStructAncestors(plan, cur)
 		// cur's own + flattened-abstract-non-generic properties.
 		curProps := collectFlattenedProperties(plan, sc, embedded)
 		// Propagate the shadowing set: outer-descendants AND cur shadow
@@ -256,56 +279,72 @@ func effectiveFields(plan *Plan, pc *PlannedClass) ([]emittedField, error) {
 	return result, nil
 }
 
-// renderMarshalJSON emits the wire type definition + MarshalJSON
-// method for a single concrete class.
+// renderMarshalJSON emits the wire type + MarshalJSONTo method for a single
+// concrete class, choosing the alias or flat shape per
+// [embedsMarshalerBearingConcrete].
 func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	sc, ok := pc.Class.(*bmm.SimpleClass)
 	if !ok {
 		return "", fmt.Errorf("expected SimpleClass for %s, got %T", pc.BMMName, pc.Class)
 	}
-
-	fields, err := effectiveFields(plan, pc)
-	if err != nil {
-		return "", err
-	}
-
-	wireName := jsonmarWireTypeName(pc.GoName)
 	recv := jsonmarReceiverName(pc.GoName)
-	typeParams := ""
-	typeArgs := ""
+	typeParams, typeArgs := "", ""
 	if sc.IsGeneric() {
 		typeParams = genericClassParamList(plan, sc)
 		typeArgs = genericTypeArgList(sc)
 	}
-
-	// Classify each field for polymorphic marshalling once, so the wire
-	// struct and the method body stay in lockstep.
-	kinds := make([]polyKind, len(fields))
-	for i, ef := range fields {
-		kinds[i] = marshalPolyKind(plan, ef.Owner, sc, ef.Prop)
+	if embedsMarshalerBearingConcrete(plan, pc) {
+		return renderMarshalFlat(plan, pc, recv, typeParams, typeArgs)
 	}
+	return renderMarshalAlias(pc, recv, typeParams, typeArgs), nil
+}
 
+// renderMarshalAlias emits the zero-copy shape: a method-free alias and a
+// MarshalJSONTo that marshals it through an anonymous `struct{ _type; *alias }`.
+func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs string) string {
+	alias := aliasTypeName(pc.GoName)
 	var b strings.Builder
+	fmt.Fprintf(&b, "// %s is the method-free canonical-JSON alias for %s. The alias\n", alias, pc.GoName)
+	b.WriteString("// drops the codec methods so marshalling the anonymous wrapper below\n")
+	b.WriteString("// does not recurse; the class embeds no marshaler-bearing concrete\n")
+	b.WriteString("// ancestor, so nothing is promoted (ADR 0022).\n")
+	fmt.Fprintf(&b, "type %s%s %s%s\n\n", alias, typeParams, pc.GoName, typeArgs)
 
-	// Wire struct definition.
-	fmt.Fprintf(&b, "type %s%s struct {\n", wireName, typeParams)
-	// `Class` is the Go-field name for the openEHR `_type` discriminator.
-	// The JSON tag is what the wire sees; the Go name is generator-internal
-	// and chosen to avoid colliding with the common BMM `type` property
-	// (e.g. DV_PROPORTION.type) which would Pascal-case to `Type`.
+	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
+	fmt.Fprintf(&b, "// (value %q) as the leading member. Field order otherwise follows the\n", pc.BMMName)
+	b.WriteString("// struct declaration; json.Deterministic sorts any Hash keys and the\n")
+	b.WriteString("// FormatNil* options keep a mandatory nil container's `null` spelling\n")
+	b.WriteString("// (REQ-052, Q6). The receiver is a value so a concrete instance sitting\n")
+	b.WriteString("// in a polymorphic interface slot by value, the shape the like-interface\n")
+	b.WriteString("// accessors admit, still carries its `_type` (REQ-052 substitution).\n")
+	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	b.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
+	b.WriteString("\t\tType string `json:\"_type\"`\n")
+	fmt.Fprintf(&b, "\t\t*%s%s\n", alias, typeArgs)
+	fmt.Fprintf(&b, "\t}{%q, (*%s%s)(&%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, typeArgs, recv)
+	b.WriteString("}\n")
+	return b.String()
+}
+
+// renderMarshalFlat emits the flat shape for a class that embeds a
+// marshaler-bearing concrete ancestor: a wire struct that flattens every
+// JSON-visible field (so it embeds nothing) and a MarshalJSONTo that copies
+// each field in.
+func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs string) (string, error) {
+	fields, err := effectiveFields(plan, pc)
+	if err != nil {
+		return "", err
+	}
+	wire := flatWireTypeName(pc.GoName)
+	var b strings.Builder
+	fmt.Fprintf(&b, "// %s is the flat canonical-JSON wire struct for %s. %s embeds\n", wire, pc.GoName, pc.GoName)
+	b.WriteString("// a marshaler-bearing concrete ancestor, so the zero-copy alias would\n")
+	b.WriteString("// promote that ancestor's methods and emit the wrong `_type`; the flat\n")
+	b.WriteString("// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).\n")
+	fmt.Fprintf(&b, "type %s%s struct {\n", wire, typeParams)
 	b.WriteString("\tClass string `json:\"_type\"`\n")
-	for i, ef := range fields {
-		var line string
-		var err error
-		if kinds[i] == polyNone {
-			line, err = renderField(plan, ef.Owner, ef.OwnerName, ef.Prop)
-		} else {
-			// Polymorphic field: pre-marshalled to RawMessage by the
-			// method body via the jsonpoly helper, which injects the
-			// mandatory `_type` even when a concrete value (not pointer)
-			// sits in the interface slot (REQ-052 sub-gap A).
-			line, err = polyWireField(ef.Prop)
-		}
+	for _, ef := range fields {
+		line, err := renderField(plan, ef.Owner, ef.OwnerName, ef.Prop)
 		if err != nil {
 			return "", fmt.Errorf("render wire field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 		}
@@ -313,126 +352,36 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	}
 	b.WriteString("}\n\n")
 
-	// MarshalJSON method.
-	fmt.Fprintf(&b, "// MarshalJSON emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
-	fmt.Fprintf(&b, "// (value %q) as the leading object key. Field order matches the\n", pc.BMMName)
-	b.WriteString("// concrete struct's declaration order — embedded-ancestor fields\n")
-	b.WriteString("// first (in their original order), then own + flattened-abstract\n")
-	b.WriteString("// ancestor fields in BMM property declaration order.\n")
-	fmt.Fprintf(&b, "func (%s *%s%s) MarshalJSON() ([]byte, error) {\n", recv, pc.GoName, typeArgs)
-	// Pre-marshal polymorphic fields through the jsonpoly helper so a
-	// value-in-interface still carries its `_type`. Each `rawX` is a
-	// fresh name, so `:=` is always valid even though `err` repeats.
-	for i, ef := range fields {
-		if kinds[i] == polyNone {
-			continue
-		}
-		fieldName := FieldName(ef.Prop.PropertyName())
-		helper := "Marshal"
-		if kinds[i] == polySlice {
-			helper = "MarshalSlice"
-		}
-		fmt.Fprintf(&b, "\traw%s, err := jsonpoly.%s(%s.%s)\n", fieldName, helper, recv, fieldName)
-		b.WriteString("\tif err != nil {\n\t\treturn nil, err\n\t}\n")
-	}
-	fmt.Fprintf(&b, "\treturn json.Marshal(&%s%s{\n", wireName, typeArgs)
+	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
+	fmt.Fprintf(&b, "// (value %q) as the leading member (REQ-052, Q6). The receiver is a\n", pc.BMMName)
+	b.WriteString("// value so a by-value instance in a polymorphic slot keeps its `_type`.\n")
+	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	fmt.Fprintf(&b, "\treturn json.MarshalEncode(enc, &%s%s{\n", wire, typeArgs)
 	fmt.Fprintf(&b, "\t\tClass: %q,\n", pc.BMMName)
-	for i, ef := range fields {
-		fieldName := FieldName(ef.Prop.PropertyName())
-		if kinds[i] == polyNone {
-			fmt.Fprintf(&b, "\t\t%s: %s.%s,\n", fieldName, recv, fieldName)
-		} else {
-			fmt.Fprintf(&b, "\t\t%s: raw%s,\n", fieldName, fieldName)
-		}
+	for _, ef := range fields {
+		fn := FieldName(ef.Prop.PropertyName())
+		fmt.Fprintf(&b, "\t\t%s: %s.%s,\n", fn, recv, fn)
 	}
-	b.WriteString("\t})\n")
+	b.WriteString("\t}, typereg.MarshalOptions(enc))\n")
 	b.WriteString("}\n")
-
 	return b.String(), nil
 }
 
-// marshalPolyKind classifies a property for canonical-JSON marshalling.
-// It reuses the decoder's polymorphicProperty classifier so encode and
-// decode agree on which non-open fields are polymorphic, then folds the
-// abstract/narrow distinction (irrelevant on encode) into single/slice.
-//
-// SinglePropertyOpen (generic type-parameter bounds such as
-// DV_INTERVAL.lower/upper) is deliberately left direct — unlike the
-// decoder, which routes an open bound resolving to an abstract type
-// through typereg. The bound still emits its `_type` either way it is
-// held: as a value in a concrete instantiation (e.g. DVInterval[DVQuantity])
-// the bound is an addressable struct field, so its pointer-receiver
-// MarshalJSON runs when the wire struct is marshalled by-pointer; as a
-// pointer in the DVInterval[DVOrdered] that typereg rebuilds on decode it
-// emits `_type` directly. So `_type` survives the round-trip in both
-// shapes. The DV_INTERVAL<T> collapse to DVInterval[DVOrdered] is handled
-// validator-side (REQ-052 sub-gap B), not here. (A non-pointer value
-// placed directly in a DVInterval[DVOrdered] bound would drop `_type`;
-// that hand-built case is out of scope for this routing.)
-func marshalPolyKind(plan *Plan, owner, emitting *bmm.SimpleClass, prop bmm.Property) polyKind {
-	if _, isOpen := prop.(*bmm.SinglePropertyOpen); isOpen {
-		return polyNone
-	}
-	_, kind := polymorphicProperty(plan, owner, emitting, prop)
-	switch kind {
-	case polySingle, polySingleNarrow:
-		return polySingle
-	case polySlice, polySliceNarrow:
-		return polySlice
-	case polyNone:
-		// a non-polymorphic property has no kind to collapse
-	}
-	return polyNone
+// aliasTypeName is the method-free alias type identifier for the zero-copy
+// shape. Generator-internal: nothing outside the generated files references it.
+func aliasTypeName(goName string) string {
+	return "raw" + goName
 }
 
-// polyWireField renders the wire-struct line for a polymorphic field:
-// a json.RawMessage carrying the same doc comment and json tag
-// (omitempty preserved) the typed field would have had. The method body
-// fills it via the jsonpoly helper.
-func polyWireField(prop bmm.Property) (string, error) {
-	name := prop.PropertyName()
-	goName := FieldName(name)
-	docLines := propertyDoc(goName, propertyDocText(prop))
-	return docLines + fmt.Sprintf("\t%s json.RawMessage %s\n", goName, polyJSONTag(prop, name)), nil
+// flatWireTypeName is the flat wire struct identifier for the flat shape.
+// Generator-internal and unexported, like [aliasTypeName]: nothing outside the
+// generated files references it, so it stays off openehr/rm's public surface.
+func flatWireTypeName(goName string) string {
+	return "jsonWire" + goName
 }
 
-// polyJSONTag returns the json struct tag for a polymorphic wire field,
-// replicating renderField's omitempty decision per property kind so the
-// emitted key presence/absence is byte-identical to the typed field.
-func polyJSONTag(prop bmm.Property, name string) string {
-	jsonTag := fmt.Sprintf("`json:%q`", name)
-	jsonTagOpt := fmt.Sprintf("`json:%q`", name+",omitempty")
-	switch p := prop.(type) {
-	case *bmm.SingleProperty:
-		if p.IsMandatory {
-			return jsonTag
-		}
-		return jsonTagOpt
-	case *bmm.ContainerProperty:
-		if p.Cardinality == nil || p.Cardinality.Lower == 0 {
-			return jsonTagOpt
-		}
-		return jsonTag
-	case *bmm.GenericProperty:
-		if p.IsMandatory {
-			return jsonTag
-		}
-		return jsonTagOpt
-	}
-	return jsonTag
-}
-
-// jsonmarWireTypeName produces the per-class wire type identifier.
-// Convention: `<goName>JSONMarshaller` — clearly tied to the codec
-// layer and unambiguous against user-defined types. Renaming this is
-// a generator-only concern: nothing outside the generated files
-// references these types.
-func jsonmarWireTypeName(goName string) string {
-	return goName + "JSONMarshaller"
-}
-
-// jsonmarReceiverName returns the single-letter receiver used in the
-// generated MarshalJSON method.
+// jsonmarReceiverName returns the single-letter receiver used in the generated
+// codec methods.
 func jsonmarReceiverName(goName string) string {
 	if goName == "" {
 		return "v"
@@ -440,9 +389,9 @@ func jsonmarReceiverName(goName string) string {
 	return strings.ToLower(goName[:1])
 }
 
-// genericTypeArgList returns "[T, K, ...]" for use as the type
-// argument list when instantiating a generic class with its own
-// declared parameter names (no constraints). Sorted alphabetically.
+// genericTypeArgList returns "[T, K, ...]" for use as the type argument list
+// when instantiating a generic class with its own declared parameter names (no
+// constraints). Sorted alphabetically.
 func genericTypeArgList(sc *bmm.SimpleClass) string {
 	if !sc.IsGeneric() {
 		return ""

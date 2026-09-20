@@ -4,88 +4,50 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_types.encapsulated — canonical-JSON MarshalJSON companions
+// BMM package org.openehr.rm.data_types.encapsulated: canonical-JSON MarshalJSONTo companions
 
-type DVMultimediaJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Charset Name of character encoding scheme in which this value is encoded. Coded from openEHR Code Set  character sets . Unicode is the default assumption in openEHR, with UTF-8 being the assumed encoding. This attribute allows for variations from these assumptions.
-	Charset *CodePhrase `json:"charset,omitempty"`
-	// Language Optional indicator of the localised language in which the data is written, if relevant. Coded from openEHR Code Set `languages`.
-	Language *CodePhrase `json:"language,omitempty"`
-	// AlternateText Text to display in lieu of multimedia display/replay.
-	AlternateText *string `json:"alternate_text,omitempty"`
-	// URI URI reference to electronic information stored outside the record as a file, database entry etc, if supplied as a reference.
-	URI json.RawMessage `json:"uri,omitempty"`
-	// Data The actual data found at `_uri_`, if supplied inline.
-	Data []byte `json:"data,omitempty"`
-	// MediaType Data media type coded from openEHR code set  media types  (interface for the IANA MIME types code set).
-	MediaType CodePhrase `json:"media_type"`
-	// CompressionAlgorithm Compression type, a coded value from the openEHR Integrity check code set. Void means no compression.
-	CompressionAlgorithm *CodePhrase `json:"compression_algorithm,omitempty"`
-	// IntegrityCheck Binary cryptographic integrity checksum.
-	IntegrityCheck []byte `json:"integrity_check,omitempty"`
-	// IntegrityCheckAlgorithm Type of integrity check, a coded value from the openEHR `Integrity check` code set.
-	IntegrityCheckAlgorithm *CodePhrase `json:"integrity_check_algorithm,omitempty"`
-	// Thumbnail The thumbnail for this item, if one exists; mainly for graphics formats.
-	Thumbnail *DVMultimedia `json:"thumbnail,omitempty"`
-	// Size Original size in bytes of unencoded encapsulated data. I.e. encodings such as base64, hexadecimal etc do not change the value of this attribute.
-	Size Integer `json:"size"`
+// rawDVMultimedia is the method-free canonical-JSON alias for DVMultimedia. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVMultimedia DVMultimedia
+
+// MarshalJSONTo emits canonical openEHR JSON for DVMultimedia with `_type`
+// (value "DV_MULTIMEDIA") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (d DVMultimedia) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVMultimedia
+	}{"DV_MULTIMEDIA", (*rawDVMultimedia)(&d)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for DVMultimedia with `_type`
-// (value "DV_MULTIMEDIA") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVMultimedia) MarshalJSON() ([]byte, error) {
-	rawURI, err := jsonpoly.Marshal(d.URI)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&DVMultimediaJSONMarshaller{
-		Class:                   "DV_MULTIMEDIA",
-		Charset:                 d.Charset,
-		Language:                d.Language,
-		AlternateText:           d.AlternateText,
-		URI:                     rawURI,
-		Data:                    d.Data,
-		MediaType:               d.MediaType,
-		CompressionAlgorithm:    d.CompressionAlgorithm,
-		IntegrityCheck:          d.IntegrityCheck,
-		IntegrityCheckAlgorithm: d.IntegrityCheckAlgorithm,
-		Thumbnail:               d.Thumbnail,
-		Size:                    d.Size,
-	})
-}
+// rawDVParsable is the method-free canonical-JSON alias for DVParsable. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVParsable DVParsable
 
-type DVParsableJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Charset Name of character encoding scheme in which this value is encoded. Coded from openEHR Code Set  character sets . Unicode is the default assumption in openEHR, with UTF-8 being the assumed encoding. This attribute allows for variations from these assumptions.
-	Charset *CodePhrase `json:"charset,omitempty"`
-	// Language Optional indicator of the localised language in which the data is written, if relevant. Coded from openEHR Code Set `languages`.
-	Language *CodePhrase `json:"language,omitempty"`
-	// Value The string, which may validly be empty in some syntaxes.
-	Value string `json:"value"`
-	// Formalism Name of the formalism, e.g.  GLIF 1.0 ,  Proforma  etc.
-	Formalism string `json:"formalism"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for DVParsable with `_type`
-// (value "DV_PARSABLE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVParsable) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&DVParsableJSONMarshaller{
-		Class:     "DV_PARSABLE",
-		Charset:   d.Charset,
-		Language:  d.Language,
-		Value:     d.Value,
-		Formalism: d.Formalism,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for DVParsable with `_type`
+// (value "DV_PARSABLE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (d DVParsable) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVParsable
+	}{"DV_PARSABLE", (*rawDVParsable)(&d)}, typereg.MarshalOptions(enc))
 }

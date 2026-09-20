@@ -12,6 +12,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
 // Probe038CanjsonRMPolymorphicDecode implements PROBE-038: canjson
@@ -29,13 +30,22 @@ import (
 //  2. canjson.Marshal of the recovered value succeeds.
 //  3. Every `_type` discriminator the input carried also appears at
 //     least once in the re-marshalled output. Substitution must be
-//     lossless across decode → re-marshal; a silent narrowing
+//     lossless across decode then re-marshal; a silent narrowing
 //     (e.g. DV_CODED_TEXT decoded into a parent DVText struct that
 //     loses defining_code and re-emits as DV_TEXT) is the regression
 //     this assertion guards against.
+//  4. Re-marshalling is a wire-equivalence fixpoint: decoding the
+//     re-marshalled bytes (b1) and encoding again (b2) produces a
+//     document wire-equivalent to b1 (testkit/wireequiv). The catalog
+//     states this leg as "re-marshalling produces a document
+//     wire-equivalent to the same logical content" (conformance.md
+//     PROBE-038 Wire assertion); it catches a subtype or bound field
+//     that survives the first re-marshal but not the second decode,
+//     which the discriminator multiset alone can miss.
 //
 // `body` MUST be canonical-JSON bytes for a known concrete RM type.
-// `factory` returns a fresh pointer to the target Go type.
+// `factory` returns a fresh pointer to the target Go type; it is
+// called twice, so the probe owns each decoded value's lifecycle.
 func Probe038CanjsonRMPolymorphicDecode(body []byte, factory func() any) (Result, error) {
 	r := Result{Probe: "PROBE-038"}
 	if factory == nil {
@@ -66,8 +76,31 @@ func Probe038CanjsonRMPolymorphicDecode(body []byte, factory func() any) (Result
 		r.Detail = fmt.Sprintf("re-marshal lost %d discriminator(s): %v (substitution narrowed; subtype-only fields dropped)", len(missing), missing)
 		return r, nil
 	}
+	// Wire-equivalence leg: the re-marshalled document (b1) must be a
+	// fixpoint under a further decode-and-encode. Decode b1, encode b2,
+	// and compare the two SDK encodes with wire equivalence (member order
+	// ignored, array order kept). A subtype or bound field that b1 still
+	// carried but the second decode drops surfaces here.
+	b1 := out
+	v2 := factory()
+	if err := canjson.Unmarshal(b1, v2); err != nil {
+		r.Status = "fail"
+		r.Detail = fmt.Sprintf("second decode of the re-marshalled document: %v", err)
+		return r, nil
+	}
+	b2, err := canjson.Marshal(v2)
+	if err != nil {
+		r.Status = "fail"
+		r.Detail = fmt.Sprintf("re-marshal (b2): %v", err)
+		return r, nil
+	}
+	if ok, diff := wireequiv.Equivalent(b1, b2); !ok {
+		r.Status = "fail"
+		r.Detail = "the two SDK encodes are not wire-equivalent across the second decode: " + diff
+		return r, nil
+	}
 	r.Status = "pass"
-	r.Detail = fmt.Sprintf("decoded + re-marshalled; %d discriminators preserved", len(wantTypes))
+	r.Detail = fmt.Sprintf("decoded + re-marshalled (wire-equivalent fixpoint); %d discriminators preserved", len(wantTypes))
 	return r, nil
 }
 

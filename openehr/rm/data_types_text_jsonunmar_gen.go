@@ -4,288 +4,103 @@
 package rm
 
 import (
-	"encoding/json"
-	"errors"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_types.text — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.rm.data_types.text: canonical-JSON UnmarshalJSONFrom companions
 
-type CodePhraseJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// TerminologyID Identifier of the distinct terminology from which the code_string (or its elements) was extracted.
-	TerminologyID TerminologyID `json:"terminology_id"`
-	// CodeString The key used by the terminology service to identify a concept or coordination of concepts. This string is most likely parsable inside the terminology service, but nothing can be assumed about its syntax outside that context.
-	CodeString string `json:"code_string"`
-	// PreferredTerm Optional attribute to carry preferred term corresponding to the code or expression in `_code_string_`. Typical use in integration situations which create mappings, and representing data for which both a (non-preferred) actual term and a preferred term are both required.
-	PreferredTerm *string `json:"preferred_term,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CodePhrase.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CodePhrase) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CodePhrase.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CodePhrase) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: CODE_PHRASE: %w", typereg.ErrNilReceiver)
 	}
-	var aux CodePhraseJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("CODE_PHRASE", err)
-	}
-	if aux.Class != "" && aux.Class != "CODE_PHRASE" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "CODE_PHRASE", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.TerminologyID = aux.TerminologyID
-	c.CodeString = aux.CodeString
-	c.PreferredTerm = aux.PreferredTerm
-	return nil
+	return typereg.DecodeInto(dec, "CODE_PHRASE", &struct {
+		Type string `json:"_type"`
+		*rawCodePhrase
+	}{rawCodePhrase: (*rawCodePhrase)(c)})
 }
 
-type DVCodedTextJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value Displayable rendition of the item, regardless of its underlying structure. For `DV_CODED_TEXT`, this is the rubric of the complete term as provided by the terminology service.
-	Value     string          `json:"value"`
-	Hyperlink json.RawMessage `json:"hyperlink,omitempty"` // polymorphic DVURILike
-	// Formatting If set, contains one of the following values:
-	//
-	// * `"plain"`: use for plain text, possibly containing newlines, but otherwise unformatted (same as Void);
-	// * `"plain_no_newlines"`: use for text containing no newlines or other formatting;
-	// * `"markdown"`: use for markdown formatted text, strongly recommended in the format of the CommonMark specification.
-	//
-	// DEPRECATED usage: contains a string of the form `"name:value; name:value..."` , e.g. `"font-weight : bold; font-family : Arial; font-size : 12pt;"`. Values taken from W3C CSS2 properties lists for background and font .
-	Formatting *string `json:"formatting,omitempty"`
-	// Mappings Terms from other terminologies most closely matching this term, typically used where the originator (e.g. pathology lab) of information uses a local terminology but also supplies one or more equivalents from well known terminologies (e.g. LOINC).
-	Mappings []TermMapping `json:"mappings,omitempty"`
-	// Language Optional indicator of the localised language in which the value is written. Coded from openEHR Code Set  languages . Only used when either the text object is in a different language from the enclosing `ENTRY`, or else the text object is being used outside of an `ENTRY` or other enclosing structure which indicates the language.
-	Language *CodePhrase `json:"language,omitempty"`
-	// Encoding Name of character encoding scheme in which this value is encoded. Coded from openEHR Code Set  character sets . Unicode is the default assumption in openEHR, with UTF-8 being the assumed encoding. This attribute allows for variations from these assumptions.
-	Encoding *CodePhrase `json:"encoding,omitempty"`
-	// DefiningCode The term of which the  `_value_` attribute is the textual rendition (i.e. rubric).
-	DefiningCode CodePhrase `json:"defining_code"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVCodedText.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVCodedText) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVCodedText.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVCodedText) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_CODED_TEXT: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVCodedTextJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_CODED_TEXT", err)
+	var wire jsonWireDVCodedText
+	if err := typereg.DecodeInto(dec, "DV_CODED_TEXT", &wire); err != nil {
+		return err
 	}
-	if aux.Class != "" && aux.Class != "DV_CODED_TEXT" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_CODED_TEXT", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.Value = aux.Value
-	if len(aux.Hyperlink) > 0 && string(aux.Hyperlink) != "null" {
-		dv, err := typereg.DecodeAs[DVURILike](aux.Hyperlink)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVURI
-				if jerr := json.Unmarshal(aux.Hyperlink, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/hyperlink", Inner: jerr}
-				}
-				d.Hyperlink = &def
-			} else {
-				return &typereg.DecodeError{Path: "/hyperlink", Inner: err}
-			}
-		} else {
-			d.Hyperlink = dv
-		}
-	}
-	d.Formatting = aux.Formatting
-	d.Mappings = aux.Mappings
-	d.Language = aux.Language
-	d.Encoding = aux.Encoding
-	d.DefiningCode = aux.DefiningCode
+	d.Value = wire.Value
+	d.Hyperlink = wire.Hyperlink
+	d.Formatting = wire.Formatting
+	d.Mappings = wire.Mappings
+	d.Language = wire.Language
+	d.Encoding = wire.Encoding
+	d.DefiningCode = wire.DefiningCode
 	return nil
 }
 
-type DVParagraphJSONUnmarshaller struct {
-	Class string            `json:"_type"`
-	Items []json.RawMessage `json:"items"` // polymorphic []DVTextLike
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVParagraph.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVParagraph) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVParagraph.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVParagraph) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_PARAGRAPH: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVParagraphJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_PARAGRAPH", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_PARAGRAPH" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_PARAGRAPH", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if aux.Items != nil {
-		d.Items = make([]DVTextLike, len(aux.Items))
-		for idx, raw := range aux.Items {
-			if len(raw) == 0 || string(raw) == "null" {
-				continue
-			}
-			dv, err := typereg.DecodeAs[DVTextLike](raw)
-			if err != nil {
-				if errors.Is(err, typereg.ErrMissingType) {
-					var def DVText
-					if jerr := json.Unmarshal(raw, &def); jerr != nil {
-						return &typereg.DecodeError{Path: fmt.Sprintf("/items/%d", idx), Inner: jerr}
-					}
-					d.Items[idx] = &def
-				} else {
-					return &typereg.DecodeError{Path: fmt.Sprintf("/items/%d", idx), Inner: err}
-				}
-			} else {
-				d.Items[idx] = dv
-			}
-		}
-	}
-	return nil
+	return typereg.DecodeInto(dec, "DV_PARAGRAPH", &struct {
+		Type string `json:"_type"`
+		*rawDVParagraph
+	}{rawDVParagraph: (*rawDVParagraph)(d)})
 }
 
-type DVTextJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value Displayable rendition of the item, regardless of its underlying structure. For `DV_CODED_TEXT`, this is the rubric of the complete term as provided by the terminology service.
-	Value     string          `json:"value"`
-	Hyperlink json.RawMessage `json:"hyperlink,omitempty"` // polymorphic DVURILike
-	// Formatting If set, contains one of the following values:
-	//
-	// * `"plain"`: use for plain text, possibly containing newlines, but otherwise unformatted (same as Void);
-	// * `"plain_no_newlines"`: use for text containing no newlines or other formatting;
-	// * `"markdown"`: use for markdown formatted text, strongly recommended in the format of the CommonMark specification.
-	//
-	// DEPRECATED usage: contains a string of the form `"name:value; name:value..."` , e.g. `"font-weight : bold; font-family : Arial; font-size : 12pt;"`. Values taken from W3C CSS2 properties lists for background and font .
-	Formatting *string `json:"formatting,omitempty"`
-	// Mappings Terms from other terminologies most closely matching this term, typically used where the originator (e.g. pathology lab) of information uses a local terminology but also supplies one or more equivalents from well known terminologies (e.g. LOINC).
-	Mappings []TermMapping `json:"mappings,omitempty"`
-	// Language Optional indicator of the localised language in which the value is written. Coded from openEHR Code Set  languages . Only used when either the text object is in a different language from the enclosing `ENTRY`, or else the text object is being used outside of an `ENTRY` or other enclosing structure which indicates the language.
-	Language *CodePhrase `json:"language,omitempty"`
-	// Encoding Name of character encoding scheme in which this value is encoded. Coded from openEHR Code Set  character sets . Unicode is the default assumption in openEHR, with UTF-8 being the assumed encoding. This attribute allows for variations from these assumptions.
-	Encoding *CodePhrase `json:"encoding,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVText.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVText) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVText.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVText) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_TEXT: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVTextJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_TEXT", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_TEXT" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_TEXT", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.Value = aux.Value
-	if len(aux.Hyperlink) > 0 && string(aux.Hyperlink) != "null" {
-		dv, err := typereg.DecodeAs[DVURILike](aux.Hyperlink)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVURI
-				if jerr := json.Unmarshal(aux.Hyperlink, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/hyperlink", Inner: jerr}
-				}
-				d.Hyperlink = &def
-			} else {
-				return &typereg.DecodeError{Path: "/hyperlink", Inner: err}
-			}
-		} else {
-			d.Hyperlink = dv
-		}
-	}
-	d.Formatting = aux.Formatting
-	d.Mappings = aux.Mappings
-	d.Language = aux.Language
-	d.Encoding = aux.Encoding
-	return nil
+	return typereg.DecodeInto(dec, "DV_TEXT", &struct {
+		Type string `json:"_type"`
+		*rawDVText
+	}{rawDVText: (*rawDVText)(d)})
 }
 
-type TermMappingJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Match The relative match of the target term with respect to the mapped text item. Result meanings:
-	//
-	// * `'>'`: the mapping is to a broader term e.g. orginal text =  arbovirus infection , target =  viral infection
-	// * `'='`: the mapping is to a (supposedly) equivalent to the original item
-	// * `'<'`: the mapping is to a narrower term. e.g. original text =  diabetes , mapping =  diabetes mellitus .
-	// * `'?'`: the kind of mapping is unknown.
-	//
-	// The first three values are taken from the ISO standards 2788 ( Guide to Establishment and development of monolingual thesauri) and 5964 (Guide to Establishment and development of multilingual thesauri).
-	Match Character `json:"match"`
-	// Purpose Purpose of the mapping e.g. 'automated data mining', 'billing', 'interoperability'.
-	Purpose *DVCodedText `json:"purpose,omitempty"`
-	// Target The target term of the mapping.
-	Target CodePhrase `json:"target"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into TermMapping.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (t *TermMapping) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into TermMapping.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (t *TermMapping) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if t == nil {
 		return fmt.Errorf("canjson: TERM_MAPPING: %w", typereg.ErrNilReceiver)
 	}
-	var aux TermMappingJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("TERM_MAPPING", err)
-	}
-	if aux.Class != "" && aux.Class != "TERM_MAPPING" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "TERM_MAPPING", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	t.Match = aux.Match
-	t.Purpose = aux.Purpose
-	t.Target = aux.Target
-	return nil
+	return typereg.DecodeInto(dec, "TERM_MAPPING", &struct {
+		Type string `json:"_type"`
+		*rawTermMapping
+	}{rawTermMapping: (*rawTermMapping)(t)})
 }

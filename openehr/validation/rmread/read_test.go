@@ -163,6 +163,39 @@ func TestReadSingle_Observation(t *testing.T) {
 	}
 }
 
+// REQ-102 v2 Phase 1: ACTION carries three attributes beyond the ENTRY
+// set: the RM-mandatory time (DV_DATE_TIME) and ism_transition
+// (ISM_TRANSITION), and the optional instruction_details. Each reads
+// present when structurally populated and absent on a zero ACTION, so the
+// RM floor no longer reports a populated ACTION's time or ism_transition
+// as required-but-absent.
+func TestReadSingle_Action(t *testing.T) {
+	present := &rm.Action{
+		ArchetypeNodeID: "openEHR-EHR-ACTION.minimal.v1",
+		Time:            rm.DVDateTime{Value: "2026-01-01T00:00:00Z"},
+		IsmTransition: rm.IsmTransition{
+			CurrentState: rm.DVCodedText{
+				DVText: rm.DVText{Value: "planned"},
+				DefiningCode: rm.CodePhrase{
+					TerminologyID: rm.TerminologyID{Value: "openehr"},
+					CodeString:    "526",
+				},
+			},
+		},
+		InstructionDetails: &rm.InstructionDetails{},
+	}
+	empty := &rm.Action{}
+
+	for _, attr := range []string{"time", "ism_transition", "instruction_details"} {
+		if _, ok := rmread.ReadSingle(present, "ACTION", attr); !ok {
+			t.Errorf("ReadSingle(populated ACTION, %q) ok=false, want true", attr)
+		}
+		if _, ok := rmread.ReadSingle(empty, "ACTION", attr); ok {
+			t.Errorf("ReadSingle(zero ACTION, %q) ok=true, want false", attr)
+		}
+	}
+}
+
 // REQ-102 v2 Phase 1 — ItemStructure variants each carry a
 // different child-attribute name; ReadMultiple routes correctly.
 func TestReadMultiple_ItemStructureVariants(t *testing.T) {

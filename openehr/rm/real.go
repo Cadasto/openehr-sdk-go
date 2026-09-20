@@ -1,7 +1,7 @@
 package rm
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"strconv"
@@ -86,11 +86,16 @@ func significantDigits(s string) int {
 // The text names the digit budget rather than claiming the value is
 // unrepresentable, because for the budget's documented false positive
 // (2^64) that claim is simply false — see maxSignificantDigits. The
-// sentinel is attached with classifyShape, which leaves the message
+// sentinel is attached with typereg.ClassifyShape, which leaves the message
 // exactly as written: REQ-052 requires the failure's message to be
 // unchanged by the classification, and a fmt.Errorf("%w: %w") wrap would
 // splice the sentinel's own prose into it.
-var errPrecisionLoss = classifyShape(fmt.Errorf("rm.Real: literal carries more than %d significant decimal digits", maxSignificantDigits))
+//
+// This runs at package init across the import edge into typereg. It is
+// safe: typereg's own package-level vars (ErrInvalidShape included)
+// initialise before this rm var, and ClassifyShape reads the sentinel
+// only inside its Is method, never while it builds the wrapper here.
+var errPrecisionLoss = typereg.ClassifyShape(fmt.Errorf("rm.Real: literal carries more than %d significant decimal digits", maxSignificantDigits))
 
 // UnmarshalJSON accepts a JSON number or a decimal string. A literal
 // carrying more than maxSignificantDigits significant digits fails
@@ -102,11 +107,12 @@ var errPrecisionLoss = classifyShape(fmt.Errorf("rm.Real: literal carries more t
 //
 // The two checks run in this order: the literal is PARSED first, into a
 // temporary, and a parse or range failure is returned as it comes —
-// *strconv.NumError from the quoted arm, *json.UnmarshalTypeError from
-// the bare arm, each reachable with errors.As and each staying outside
-// typereg.ErrInvalidShape. Only a literal that parsed is then measured
-// against maxSignificantDigits, and only a literal that passed both is
-// assigned to the receiver. Reversing the order would report
+// *strconv.NumError from the quoted arm, an encoding/json/v2
+// *json.SemanticError (or a *jsontext.SyntacticError for a malformed
+// literal) from the bare arm, each reachable with errors.As and each
+// staying outside typereg.ErrInvalidShape. Only a literal that parsed is
+// then measured against maxSignificantDigits, and only a literal that
+// passed both is assigned to the receiver. Reversing the order would report
 // "1e400" or "123456789012345678x" as precision loss, which is a
 // misdiagnosis: the value never parsed at all.
 //

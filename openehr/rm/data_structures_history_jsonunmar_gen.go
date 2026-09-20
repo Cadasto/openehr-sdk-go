@@ -4,296 +4,61 @@
 package rm
 
 import (
-	"encoding/json"
-	"errors"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_structures.history — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.rm.data_structures.history: canonical-JSON UnmarshalJSONFrom companions
 
-type HistoryJSONUnmarshaller[T ItemStructure] struct {
-	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string          `json:"archetype_node_id"`
-	UID             json.RawMessage `json:"uid,omitempty"` // polymorphic UIDBasedID
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Origin Time origin of this event history. The first event is not necessarily at the origin point.
-	Origin DVDateTime `json:"origin"`
-	// Period Period between samples in this segment if periodic.
-	Period *DVDuration `json:"period,omitempty"`
-	// Duration Duration of the entire History; either corresponds to the duration of all the events, and/or the duration represented by the summary, if it exists.
-	Duration *DVDuration       `json:"duration,omitempty"`
-	Summary  json.RawMessage   `json:"summary,omitempty"` // polymorphic ItemStructure
-	Events   []json.RawMessage `json:"events,omitempty"`  // polymorphic []Event
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into History.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (h *History[T]) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into History.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (h *History[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if h == nil {
 		return fmt.Errorf("canjson: HISTORY: %w", typereg.ErrNilReceiver)
 	}
-	var aux HistoryJSONUnmarshaller[T]
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("HISTORY", err)
-	}
-	if aux.Class != "" && aux.Class != "HISTORY" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "HISTORY", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/name", Inner: jerr}
-				}
-				h.Name = &def
-			} else {
-				return &typereg.DecodeError{Path: "/name", Inner: err}
-			}
-		} else {
-			h.Name = dv
-		}
-	}
-	h.ArchetypeNodeID = aux.ArchetypeNodeID
-	if len(aux.UID) > 0 && string(aux.UID) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/uid", Inner: err}
-		}
-		h.UID = dv
-	}
-	h.Links = aux.Links
-	h.ArchetypeDetails = aux.ArchetypeDetails
-	h.FeederAudit = aux.FeederAudit
-	h.Origin = aux.Origin
-	h.Period = aux.Period
-	h.Duration = aux.Duration
-	if len(aux.Summary) > 0 && string(aux.Summary) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.Summary)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/summary", Inner: err}
-		}
-		h.Summary = dv
-	}
-	if aux.Events != nil {
-		h.Events = make([]Event, len(aux.Events))
-		for idx, raw := range aux.Events {
-			if len(raw) == 0 || string(raw) == "null" {
-				continue
-			}
-			dv, err := typereg.DecodeAs[Event](raw)
-			if err != nil {
-				return &typereg.DecodeError{Path: fmt.Sprintf("/events/%d", idx), Inner: err}
-			}
-			h.Events[idx] = dv
-		}
-	}
-	return nil
+	return typereg.DecodeInto(dec, "HISTORY", &struct {
+		Type string `json:"_type"`
+		*rawHistory[T]
+	}{rawHistory: (*rawHistory[T])(h)})
 }
 
-type IntervalEventJSONUnmarshaller[T ItemStructure] struct {
-	Class string `json:"_type"`
-	// Time Time of this event. If the width is non-zero, it is the time point of the trailing edge of the event.
-	Time  DVDateTime      `json:"time"`
-	State json.RawMessage `json:"state,omitempty"` // polymorphic ItemStructure
-	Data  json.RawMessage `json:"data,omitempty"`  // polymorphic T
-	Name  json.RawMessage `json:"name"`            // polymorphic DVTextLike
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string          `json:"archetype_node_id"`
-	UID             json.RawMessage `json:"uid,omitempty"` // polymorphic UIDBasedID
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Width Duration of the time interval during which the values recorded under `data` are true and, if set, the values recorded under `state` are true. Void if an instantaneous event.
-	Width DVDuration `json:"width"`
-	// SampleCount Optional count of original samples to which this event corresponds.
-	SampleCount *Integer `json:"sample_count,omitempty"`
-	// MathFunction Mathematical function of the data of this event, e.g.  maximum, mean etc. Coded using https://github.com/openEHR/terminology/blob/master/openEHR_RM/en/openehr_terminology.xml[openEHR vocabulary `event math function`]. Default value `640|actual|`, meaning 'actual value'.
-	MathFunction DVCodedText `json:"math_function"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into IntervalEvent.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (i *IntervalEvent[T]) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into IntervalEvent.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (i *IntervalEvent[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: INTERVAL_EVENT: %w", typereg.ErrNilReceiver)
 	}
-	var aux IntervalEventJSONUnmarshaller[T]
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("INTERVAL_EVENT", err)
-	}
-	if aux.Class != "" && aux.Class != "INTERVAL_EVENT" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "INTERVAL_EVENT", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	i.Time = aux.Time
-	if len(aux.State) > 0 && string(aux.State) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.State)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/state", Inner: err}
-		}
-		i.State = dv
-	}
-	if len(aux.Data) > 0 && string(aux.Data) != "null" {
-		dv, err := typereg.DecodeAs[T](aux.Data)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/data", Inner: err}
-		}
-		i.Data = dv
-	}
-	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/name", Inner: jerr}
-				}
-				i.Name = &def
-			} else {
-				return &typereg.DecodeError{Path: "/name", Inner: err}
-			}
-		} else {
-			i.Name = dv
-		}
-	}
-	i.ArchetypeNodeID = aux.ArchetypeNodeID
-	if len(aux.UID) > 0 && string(aux.UID) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/uid", Inner: err}
-		}
-		i.UID = dv
-	}
-	i.Links = aux.Links
-	i.ArchetypeDetails = aux.ArchetypeDetails
-	i.FeederAudit = aux.FeederAudit
-	i.Width = aux.Width
-	i.SampleCount = aux.SampleCount
-	i.MathFunction = aux.MathFunction
-	return nil
+	return typereg.DecodeInto(dec, "INTERVAL_EVENT", &struct {
+		Type string `json:"_type"`
+		*rawIntervalEvent[T]
+	}{rawIntervalEvent: (*rawIntervalEvent[T])(i)})
 }
 
-type PointEventJSONUnmarshaller[T ItemStructure] struct {
-	Class string `json:"_type"`
-	// Time Time of this event. If the width is non-zero, it is the time point of the trailing edge of the event.
-	Time  DVDateTime      `json:"time"`
-	State json.RawMessage `json:"state,omitempty"` // polymorphic ItemStructure
-	Data  json.RawMessage `json:"data,omitempty"`  // polymorphic T
-	Name  json.RawMessage `json:"name"`            // polymorphic DVTextLike
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string          `json:"archetype_node_id"`
-	UID             json.RawMessage `json:"uid,omitempty"` // polymorphic UIDBasedID
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into PointEvent.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (p *PointEvent[T]) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into PointEvent.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (p *PointEvent[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: POINT_EVENT: %w", typereg.ErrNilReceiver)
 	}
-	var aux PointEventJSONUnmarshaller[T]
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("POINT_EVENT", err)
-	}
-	if aux.Class != "" && aux.Class != "POINT_EVENT" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "POINT_EVENT", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	p.Time = aux.Time
-	if len(aux.State) > 0 && string(aux.State) != "null" {
-		dv, err := typereg.DecodeAs[ItemStructure](aux.State)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/state", Inner: err}
-		}
-		p.State = dv
-	}
-	if len(aux.Data) > 0 && string(aux.Data) != "null" {
-		dv, err := typereg.DecodeAs[T](aux.Data)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/data", Inner: err}
-		}
-		p.Data = dv
-	}
-	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVText
-				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/name", Inner: jerr}
-				}
-				p.Name = &def
-			} else {
-				return &typereg.DecodeError{Path: "/name", Inner: err}
-			}
-		} else {
-			p.Name = dv
-		}
-	}
-	p.ArchetypeNodeID = aux.ArchetypeNodeID
-	if len(aux.UID) > 0 && string(aux.UID) != "null" {
-		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/uid", Inner: err}
-		}
-		p.UID = dv
-	}
-	p.Links = aux.Links
-	p.ArchetypeDetails = aux.ArchetypeDetails
-	p.FeederAudit = aux.FeederAudit
-	return nil
+	return typereg.DecodeInto(dec, "POINT_EVENT", &struct {
+		Type string `json:"_type"`
+		*rawPointEvent[T]
+	}{rawPointEvent: (*rawPointEvent[T])(p)})
 }

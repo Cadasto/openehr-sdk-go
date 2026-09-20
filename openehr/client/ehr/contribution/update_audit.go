@@ -60,9 +60,10 @@ type updateAuditJSON struct {
 
 // checkCommitter reports why c cannot serve as a write-side committer, or
 // nil if it can. Bare-nil and typed-nil pointers count as absent. A concrete
-// held by value is rejected because the PartyProxy marshallers use pointer
-// receivers — a value would fall back to reflection encoding and marshal
-// without the `_type` discriminator the abstract committer field requires.
+// held by value is rejected so the committer carries the same shape the
+// decoder yields: the type registry always constructs PartyProxy concretes as
+// pointers (its constructors return `&Concrete{}`), so a committer built by
+// hand and one read back round-trip identically only when both are pointers.
 // Messages name no field path; callers prefix their own.
 func checkCommitter(c rm.PartyProxy) error {
 	if c == nil || rm.IsTypedNil(c) {
@@ -72,7 +73,7 @@ func checkCommitter(c rm.PartyProxy) error {
 	case *rm.PartyIdentified, *rm.PartyRelated, *rm.PartySelf:
 		return nil
 	default:
-		return fmt.Errorf("committer is a non-pointer %T; PartyProxy concretes must be pointers so their _type is emitted", c)
+		return fmt.Errorf("committer is a non-pointer %T; PartyProxy concretes must be pointers, matching the shape the decoder yields", c)
 	}
 }
 

@@ -14,7 +14,7 @@ type ItemTag struct {
 	// Target Identifier of target, which may be a `VERSIONED_OBJECT<T>` or a `VERSION<T>`.
 	Target UIDBasedID `json:"target"`
 	// TargetPath Optional archetype (i.e. AQL) or RM path within `_target_`, used to tag a fine-grained element.
-	TargetPath *string `json:"target_path,omitempty"`
+	TargetPath *string `json:"target_path,omitzero"`
 	// Value The value. If set, may not be empty.
-	Value *string `json:"value,omitempty"`
+	Value *string `json:"value,omitzero"`
 }

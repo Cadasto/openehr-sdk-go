@@ -4,374 +4,146 @@
 package aom14
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.am.aom14.archetype.primitive — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.am.aom14.archetype.primitive: canonical-JSON UnmarshalJSONFrom companions
 
-type CBooleanJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// TrueValid True if the value True is allowed.
-	TrueValid bool `json:"true_valid"`
-	// FalseValid True if the value False is allowed.
-	FalseValid bool `json:"false_valid"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *bool `json:"assumed_value,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CBoolean.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CBoolean) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CBoolean.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CBoolean) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_BOOLEAN: %w", typereg.ErrNilReceiver)
 	}
-	var aux CBooleanJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_BOOLEAN", err)
-	}
-	if aux.Class != "" && aux.Class != "C_BOOLEAN" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_BOOLEAN", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.TrueValid = aux.TrueValid
-	c.FalseValid = aux.FalseValid
-	c.AssumedValue = aux.AssumedValue
-	return nil
+	return typereg.DecodeInto(dec, "C_BOOLEAN", &struct {
+		Type string `json:"_type"`
+		*rawCBoolean
+	}{rawCBoolean: (*rawCBoolean)(c)})
 }
 
-type CDateJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// DayValidity Validity of day in constrained date.
-	DayValidity *rm.ValidityKind `json:"day_validity,omitempty"`
-	// MonthValidity Validity of month in constrained date.
-	MonthValidity *rm.ValidityKind `json:"month_validity,omitempty"`
-	// Range Interval of Dates specifying constraint.
-	Range *rm.Interval[string] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CDate.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CDate) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CDate.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CDate) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_DATE: %w", typereg.ErrNilReceiver)
 	}
-	var aux CDateJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_DATE", err)
-	}
-	if aux.Class != "" && aux.Class != "C_DATE" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_DATE", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.DayValidity = aux.DayValidity
-	c.MonthValidity = aux.MonthValidity
-	c.Range = aux.Range
-	c.AssumedValue = aux.AssumedValue
-	return nil
+	return typereg.DecodeInto(dec, "C_DATE", &struct {
+		Type string `json:"_type"`
+		*rawCDate
+	}{rawCDate: (*rawCDate)(c)})
 }
 
-type CDateTimeJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// MonthValidity Validity of month in constrained date.
-	MonthValidity *rm.ValidityKind `json:"month_validity,omitempty"`
-	// DayValidity Validity of day in constrained date.
-	DayValidity *rm.ValidityKind `json:"day_validity,omitempty"`
-	// HourValidity Validity of hour in constrained time.
-	HourValidity *rm.ValidityKind `json:"hour_validity,omitempty"`
-	// MinuteValidity Validity of minute in constrained time.
-	MinuteValidity *rm.ValidityKind `json:"minute_validity,omitempty"`
-	// SecondValidity Validity of second in constrained time.
-	SecondValidity *rm.ValidityKind `json:"second_validity,omitempty"`
-	// MillisecondValidity Validity of millisecond in constrained time.
-	MillisecondValidity *rm.ValidityKind `json:"millisecond_validity,omitempty"`
-	// TimezoneValidity Validity of timezone in constrained date.
-	TimezoneValidity *rm.ValidityKind `json:"timezone_validity,omitempty"`
-	// Range Range of Date_times specifying constraint.
-	Range *rm.Interval[string] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CDateTime.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CDateTime) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CDateTime.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CDateTime) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_DATE_TIME: %w", typereg.ErrNilReceiver)
 	}
-	var aux CDateTimeJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_DATE_TIME", err)
-	}
-	if aux.Class != "" && aux.Class != "C_DATE_TIME" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_DATE_TIME", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.MonthValidity = aux.MonthValidity
-	c.DayValidity = aux.DayValidity
-	c.HourValidity = aux.HourValidity
-	c.MinuteValidity = aux.MinuteValidity
-	c.SecondValidity = aux.SecondValidity
-	c.MillisecondValidity = aux.MillisecondValidity
-	c.TimezoneValidity = aux.TimezoneValidity
-	c.Range = aux.Range
-	c.AssumedValue = aux.AssumedValue
-	return nil
+	return typereg.DecodeInto(dec, "C_DATE_TIME", &struct {
+		Type string `json:"_type"`
+		*rawCDateTime
+	}{rawCDateTime: (*rawCDateTime)(c)})
 }
 
-type CDurationJSONUnmarshaller struct {
-	Class        string `json:"_type"`
-	YearsAllowed *bool  `json:"years_allowed,omitempty"`
-	// MonthsAllowed True if months are allowed in the constrained Duration.
-	MonthsAllowed *bool `json:"months_allowed,omitempty"`
-	WeeksAllowed  *bool `json:"weeks_allowed,omitempty"`
-	// DaysAllowed True if days are allowed in the constrained Duration.
-	DaysAllowed *bool `json:"days_allowed,omitempty"`
-	// HoursAllowed True if hours are allowed in the constrained Duration.
-	HoursAllowed *bool `json:"hours_allowed,omitempty"`
-	// MinutesAllowed True if minutes are allowed in the constrained Duration.
-	MinutesAllowed *bool `json:"minutes_allowed,omitempty"`
-	SecondsAllowed *bool `json:"seconds_allowed,omitempty"`
-	// FractionalSecondsAllowed True if fractional seconds are allowed in the constrained Duration.
-	FractionalSecondsAllowed *bool `json:"fractional_seconds_allowed,omitempty"`
-	// Range Range of Durations specifying constraint.
-	Range *rm.Interval[string] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CDuration.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CDuration) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CDuration.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CDuration) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_DURATION: %w", typereg.ErrNilReceiver)
 	}
-	var aux CDurationJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_DURATION", err)
-	}
-	if aux.Class != "" && aux.Class != "C_DURATION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_DURATION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.YearsAllowed = aux.YearsAllowed
-	c.MonthsAllowed = aux.MonthsAllowed
-	c.WeeksAllowed = aux.WeeksAllowed
-	c.DaysAllowed = aux.DaysAllowed
-	c.HoursAllowed = aux.HoursAllowed
-	c.MinutesAllowed = aux.MinutesAllowed
-	c.SecondsAllowed = aux.SecondsAllowed
-	c.FractionalSecondsAllowed = aux.FractionalSecondsAllowed
-	c.Range = aux.Range
-	c.AssumedValue = aux.AssumedValue
-	return nil
+	return typereg.DecodeInto(dec, "C_DURATION", &struct {
+		Type string `json:"_type"`
+		*rawCDuration
+	}{rawCDuration: (*rawCDuration)(c)})
 }
 
-type CIntegerJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// List Set of Integers specifying constraint.
-	List []Integer `json:"list,omitempty"`
-	// Range Range of Integers specifying constraint.
-	Range *rm.Interval[Integer] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *Integer `json:"assumed_value,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CInteger.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CInteger) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CInteger.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CInteger) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_INTEGER: %w", typereg.ErrNilReceiver)
 	}
-	var aux CIntegerJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_INTEGER", err)
-	}
-	if aux.Class != "" && aux.Class != "C_INTEGER" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_INTEGER", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.List = aux.List
-	c.Range = aux.Range
-	c.AssumedValue = aux.AssumedValue
-	return nil
+	return typereg.DecodeInto(dec, "C_INTEGER", &struct {
+		Type string `json:"_type"`
+		*rawCInteger
+	}{rawCInteger: (*rawCInteger)(c)})
 }
 
-type CRealJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// List Set of Reals specifying constraint.
-	List []Real `json:"list,omitempty"`
-	// Range Range of Real specifying constraint.
-	Range *rm.Interval[Real] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *Real `json:"assumed_value,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CReal.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CReal) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CReal.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CReal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_REAL: %w", typereg.ErrNilReceiver)
 	}
-	var aux CRealJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_REAL", err)
-	}
-	if aux.Class != "" && aux.Class != "C_REAL" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_REAL", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.List = aux.List
-	c.Range = aux.Range
-	c.AssumedValue = aux.AssumedValue
-	return nil
+	return typereg.DecodeInto(dec, "C_REAL", &struct {
+		Type string `json:"_type"`
+		*rawCReal
+	}{rawCReal: (*rawCReal)(c)})
 }
 
-type CStringJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Pattern Regular expression pattern for proposed instances of String to match.
-	Pattern *string `json:"pattern,omitempty"`
-	// List Set of Strings specifying constraint.
-	List []string `json:"list,omitempty"`
-	// ListOpen True if the list is being used to specify the constraint but is not considered exhaustive.
-	ListOpen bool `json:"list_open"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CString.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CString) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CString.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CString) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_STRING: %w", typereg.ErrNilReceiver)
 	}
-	var aux CStringJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_STRING", err)
-	}
-	if aux.Class != "" && aux.Class != "C_STRING" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_STRING", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.Pattern = aux.Pattern
-	c.List = aux.List
-	c.ListOpen = aux.ListOpen
-	c.AssumedValue = aux.AssumedValue
-	return nil
+	return typereg.DecodeInto(dec, "C_STRING", &struct {
+		Type string `json:"_type"`
+		*rawCString
+	}{rawCString: (*rawCString)(c)})
 }
 
-type CTimeJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// MinuteValidity Validity of minute in constrained time.
-	MinuteValidity *rm.ValidityKind `json:"minute_validity,omitempty"`
-	// SecondValidity Validity of second in constrained time.
-	SecondValidity *rm.ValidityKind `json:"second_validity,omitempty"`
-	// MillisecondValidity Validity of millisecond in constrained time.
-	MillisecondValidity *rm.ValidityKind `json:"millisecond_validity,omitempty"`
-	// TimezoneValidity Validity of timezone in constrained date.
-	TimezoneValidity *rm.ValidityKind `json:"timezone_validity,omitempty"`
-	// Range Interval of Times specifying constraint.
-	Range *rm.Interval[string] `json:"range,omitempty"`
-	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *string `json:"assumed_value,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CTime.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CTime) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CTime.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CTime) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_TIME: %w", typereg.ErrNilReceiver)
 	}
-	var aux CTimeJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_TIME", err)
-	}
-	if aux.Class != "" && aux.Class != "C_TIME" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_TIME", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.MinuteValidity = aux.MinuteValidity
-	c.SecondValidity = aux.SecondValidity
-	c.MillisecondValidity = aux.MillisecondValidity
-	c.TimezoneValidity = aux.TimezoneValidity
-	c.Range = aux.Range
-	c.AssumedValue = aux.AssumedValue
-	return nil
+	return typereg.DecodeInto(dec, "C_TIME", &struct {
+		Type string `json:"_type"`
+		*rawCTime
+	}{rawCTime: (*rawCTime)(c)})
 }

@@ -17,25 +17,25 @@ func (DVParsable) isDVEncapsulated() {}
 // DVMultimedia A specialisation of `DV_ENCAPSULATED` for audiovisual and bio-signal types. Includes further metadata relating to multimedia types which are not applicable to other subtypes of `DV_ENCAPSULATED`.
 type DVMultimedia struct {
 	// AlternateText Text to display in lieu of multimedia display/replay.
-	AlternateText *string `json:"alternate_text,omitempty"`
+	AlternateText *string `json:"alternate_text,omitzero"`
 	// Charset Name of character encoding scheme in which this value is encoded. Coded from openEHR Code Set  character sets . Unicode is the default assumption in openEHR, with UTF-8 being the assumed encoding. This attribute allows for variations from these assumptions.
-	Charset *CodePhrase `json:"charset,omitempty"`
+	Charset *CodePhrase `json:"charset,omitzero"`
 	// CompressionAlgorithm Compression type, a coded value from the openEHR Integrity check code set. Void means no compression.
-	CompressionAlgorithm *CodePhrase `json:"compression_algorithm,omitempty"`
+	CompressionAlgorithm *CodePhrase `json:"compression_algorithm,omitzero"`
 	// Data The actual data found at `_uri_`, if supplied inline.
 	Data []byte `json:"data,omitempty"`
 	// IntegrityCheck Binary cryptographic integrity checksum.
 	IntegrityCheck []byte `json:"integrity_check,omitempty"`
 	// IntegrityCheckAlgorithm Type of integrity check, a coded value from the openEHR `Integrity check` code set.
-	IntegrityCheckAlgorithm *CodePhrase `json:"integrity_check_algorithm,omitempty"`
+	IntegrityCheckAlgorithm *CodePhrase `json:"integrity_check_algorithm,omitzero"`
 	// Language Optional indicator of the localised language in which the data is written, if relevant. Coded from openEHR Code Set `languages`.
-	Language *CodePhrase `json:"language,omitempty"`
+	Language *CodePhrase `json:"language,omitzero"`
 	// MediaType Data media type coded from openEHR code set  media types  (interface for the IANA MIME types code set).
 	MediaType CodePhrase `json:"media_type"`
 	// Size Original size in bytes of unencoded encapsulated data. I.e. encodings such as base64, hexadecimal etc do not change the value of this attribute.
 	Size Integer `json:"size"`
 	// Thumbnail The thumbnail for this item, if one exists; mainly for graphics formats.
-	Thumbnail *DVMultimedia `json:"thumbnail,omitempty"`
+	Thumbnail *DVMultimedia `json:"thumbnail,omitzero"`
 	// URI URI reference to electronic information stored outside the record as a file, database entry etc, if supplied as a reference.
 	URI DVURILike `json:"uri,omitempty"`
 }
@@ -63,11 +63,11 @@ func (d *DVMultimedia) IsInline() bool {
 // DVParsable Encapsulated data expressed as a parsable String. The internal model of the data item is not described in the openEHR model in common with other encapsulated types, but in this case, the form of the data is assumed to be plaintext, rather than compressed or other types of large binary data.
 type DVParsable struct {
 	// Charset Name of character encoding scheme in which this value is encoded. Coded from openEHR Code Set  character sets . Unicode is the default assumption in openEHR, with UTF-8 being the assumed encoding. This attribute allows for variations from these assumptions.
-	Charset *CodePhrase `json:"charset,omitempty"`
+	Charset *CodePhrase `json:"charset,omitzero"`
 	// Formalism Name of the formalism, e.g.  GLIF 1.0 ,  Proforma  etc.
 	Formalism string `json:"formalism"`
 	// Language Optional indicator of the localised language in which the data is written, if relevant. Coded from openEHR Code Set `languages`.
-	Language *CodePhrase `json:"language,omitempty"`
+	Language *CodePhrase `json:"language,omitzero"`
 	// Value The string, which may validly be empty in some syntaxes.
 	Value string `json:"value"`
 }

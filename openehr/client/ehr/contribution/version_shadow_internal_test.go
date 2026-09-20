@@ -27,6 +27,12 @@ import (
 // Reflection is confined to this test. REQ-024 bars it from the library
 // surface, not from a guard that reads two struct definitions at build time.
 func TestShadowMarshallersCoverTheGeneratedKeySet(t *testing.T) {
+	// The generated form is now the streaming codec's alias over the rm struct
+	// (ADR 0022, ruling R19): rm.OriginalVersion[T] / rm.ImportedVersion[T]
+	// carry the field set directly (promoted from their embedded Version[T]),
+	// and the `_type` member is injected by the anonymous marshal wrapper rather
+	// than declared on the struct. So the expected key set is the struct's
+	// promoted json keys plus "_type".
 	cases := []struct {
 		name      string
 		generated any
@@ -34,18 +40,22 @@ func TestShadowMarshallersCoverTheGeneratedKeySet(t *testing.T) {
 	}{
 		{
 			name:      "ORIGINAL_VERSION",
-			generated: rm.OriginalVersionJSONMarshaller[rm.Composition]{},
+			generated: rm.OriginalVersion[rm.Composition]{},
 			shadow:    originalVersionJSON[rm.Composition]{},
 		},
 		{
 			name:      "IMPORTED_VERSION",
-			generated: rm.ImportedVersionJSONMarshaller[rm.Composition]{},
+			generated: rm.ImportedVersion[rm.Composition]{},
 			shadow:    importedVersionJSON[rm.Composition]{},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			want := jsonKeys(reflect.TypeOf(tc.generated))
+			if !slices.Contains(want, "_type") {
+				want = append(want, "_type")
+				slices.Sort(want)
+			}
 			got := jsonKeys(reflect.TypeOf(tc.shadow))
 			for _, k := range want {
 				if !slices.Contains(got, k) {
@@ -63,11 +73,27 @@ func TestShadowMarshallersCoverTheGeneratedKeySet(t *testing.T) {
 
 // jsonKeys returns the JSON key of every field of a struct type, ignoring the
 // tag options (`omitempty` and friends) that the shadows deliberately differ
-// on. A field tagged "-" is skipped.
+// on. A field tagged "-" is skipped. An embedded (anonymous) struct with no
+// json tag is recursed into, so a promoted field set (the streaming codec's
+// alias promotes the embedded Version[T]'s fields onto the wire) is compared
+// flat against the shadow, which spells every key explicitly.
 func jsonKeys(t reflect.Type) []string {
-	keys := make([]string, 0, t.NumField())
+	var keys []string
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
 	for f := range t.Fields() {
 		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if f.Anonymous && name == "" {
+			ft := f.Type
+			for ft.Kind() == reflect.Pointer {
+				ft = ft.Elem()
+			}
+			if ft.Kind() == reflect.Struct {
+				keys = append(keys, jsonKeys(ft)...)
+				continue
+			}
+		}
 		switch name {
 		case "", "-":
 			continue

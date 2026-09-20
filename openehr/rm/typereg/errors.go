@@ -2,10 +2,11 @@ package typereg
 
 // Error surface of the type registry: the sentinels, the DecodeError
 // envelope the canjson and canxml decoders share, and the shape-classification
-// wrapper the generated UnmarshalJSON funnel uses. Registry, Decode and
+// wrapper the generated UnmarshalJSONFrom funnel uses. Registry, Decode and
 // DecodeAs live in registry.go.
 
 import (
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 )
@@ -30,12 +31,13 @@ var (
 	// exhaustion and quadratic re-parsing from a crafted deeply-nested
 	// polymorphic document (e.g. nested CLUSTER/SECTION trees).
 	ErrMaxDepthExceeded = errors.New("typereg: nesting depth exceeds limit")
-	// ErrNilReceiver classifies an UnmarshalJSON / UnmarshalText call on a
-	// nil receiver — caller-constructible misuse (a failed errors.AsType
-	// leaves a typed nil behind; a zero-value struct holds one in a field)
-	// that the no-panic rule (REQ-025, idiom.md § No panics) turns into an
-	// error instead of a dereference. Every generated UnmarshalJSON and the
-	// hand-written primitive codecs (rm.Real, rm.Integer, rm.Character) wrap
+	// ErrNilReceiver classifies an UnmarshalJSONFrom / UnmarshalJSON /
+	// UnmarshalText call on a nil receiver — caller-constructible misuse (a
+	// failed errors.AsType leaves a typed nil behind; a zero-value struct holds
+	// one in a field) that the no-panic rule (REQ-025, idiom.md § No panics)
+	// turns into an error instead of a dereference. Every generated
+	// UnmarshalJSONFrom and the hand-written primitive codecs (rm.Real,
+	// rm.Integer, rm.Character) wrap
 	// it; the nil-receiver census in this package pins the whole registry.
 	ErrNilReceiver = errors.New("typereg: nil receiver")
 	// ErrInvalidShape classifies a JSON-level shape failure — valid JSON
@@ -44,7 +46,7 @@ var (
 	// past its 17-significant-digit budget (a digit count, not a
 	// representability test), rm.Character not exactly one character
 	// (REQ-052). It is usually attached by [WrapShapeError] from inside a
-	// generated UnmarshalJSON method; the hand-written codecs attach it
+	// generated UnmarshalJSONFrom method; the hand-written codecs attach it
 	// directly through their own message-preserving wrapper. Its message names
 	// canjson because canjson is where callers meet it: it is
 	// re-exported as canjson.ErrInvalidShape and lives here only so code
@@ -56,7 +58,7 @@ var (
 // DecodeError is the unified envelope returned by the canjson and
 // canxml decoders at polymorphic-dispatch sites. It lives here in
 // typereg (rather than in a codec-specific package) so the
-// generator-emitted UnmarshalJSON methods on the generated RM types
+// generator-emitted UnmarshalJSONFrom methods on the generated RM types
 // can construct it without forming an `openehr/rm → serialize/...`
 // import cycle.
 //
@@ -124,7 +126,7 @@ func (e *DecodeError) Unwrap() error {
 	return e.Inner
 }
 
-// WrapShapeError builds the error a generated UnmarshalJSON method
+// WrapShapeError builds the error a generated UnmarshalJSONFrom method
 // returns when the whole value fails to decode into its wire struct.
 // rmType is the openEHR class name (e.g. "DV_QUANTITY"); err is the
 // encoding/json failure underneath.
@@ -152,10 +154,60 @@ func WrapShapeError(rmType string, err error) error {
 	if err == nil {
 		return nil
 	}
-	if _, ok := errors.AsType[*DecodeError](err); ok {
+	if de, ok := errors.AsType[*DecodeError](err); ok && de != nil {
 		return fmt.Errorf("canjson: %s: %w", rmType, err)
 	}
 	return &shapeError{rmType: rmType, cause: err}
+}
+
+// ClassifyShape attaches [ErrInvalidShape] to a failure the codec detects
+// outside a generated type's funnel, such as a duplicate member name the
+// tokenizer refuses before any RM decode runs (REQ-052). It preserves err's
+// message and keeps errors.Unwrap a single step to the cause, exactly as
+// [WrapShapeError] does for an in-funnel shape failure, but adds no
+// `canjson: <rmType>:` prefix because no single RM type owns the failure.
+//
+// A nil err returns nil. An err already carrying a non-nil [DecodeError] is
+// returned untouched, so a dispatch failure keeps its classification-free path
+// (the same bypass WrapShapeError applies). The DecodeError must be non-nil: a
+// typed-nil `*DecodeError` in the chain satisfies errors.AsType but is not a
+// real dispatch failure, so it falls through to the shape classification rather
+// than escaping it (REQ-025).
+func ClassifyShape(err error) error {
+	if err == nil {
+		return nil
+	}
+	if de, ok := errors.AsType[*DecodeError](err); ok && de != nil {
+		return err
+	}
+	return &shapeError{cause: err}
+}
+
+// ClassifyDuplicate attaches [ErrInvalidShape] to a duplicate-object-member-name
+// refusal and returns every other error untouched. The v2 tokenizer refuses a
+// repeated member name with [jsontext.ErrDuplicateName] before any generated
+// decode method runs (a well-formed value whose shape RFC 8259 section 4
+// nonetheless rejects), so it reaches a decode entry point as a bare
+// *jsontext.SyntacticError carrying no sentinel. This gate gives that refusal
+// the decode-side shape classification REQ-052 mandates, exactly as
+// [ClassifyShape] does: the message is preserved and a single errors.Unwrap
+// step still lands on the cause, so errors.Is finds both [ErrInvalidShape] and
+// jsontext.ErrDuplicateName.
+//
+// It is the single gate every canonical-JSON decode route shares: the
+// generated decode bodies ([DecodeInto], [DecodePolymorphic]) apply it at their
+// [jsontext.Decoder.ReadValue] site, so a caller driving a generated method
+// through bare encoding/json/v2 still gets the sentinel; [Registry.Decode]
+// applies it at both of its failure sites; and the canjson entry points apply
+// it to their whole-input result, which also covers a non-RM target that never
+// reaches [Registry.Decode]. The `!errors.Is(err, ErrInvalidShape)` guard makes
+// a second application by an outer route a no-op, so the sentinel is attached
+// once however many routes the bytes pass through.
+func ClassifyDuplicate(err error) error {
+	if err != nil && errors.Is(err, jsontext.ErrDuplicateName) && !errors.Is(err, ErrInvalidShape) {
+		return ClassifyShape(err)
+	}
+	return err
 }
 
 // shapeError is the [ErrInvalidShape]-carrying error [WrapShapeError]
@@ -168,8 +220,13 @@ type shapeError struct {
 }
 
 // Error reproduces the `canjson: <RM_TYPE>: <cause>` text the generated
-// methods have always returned.
+// methods have always returned. When no RM type owns the failure (the
+// [ClassifyShape] path for a tokenizer-level refusal), it reproduces the
+// cause's message verbatim, so the classification adds no prefix.
 func (e *shapeError) Error() string {
+	if e.rmType == "" {
+		return e.cause.Error()
+	}
 	return "canjson: " + e.rmType + ": " + e.cause.Error()
 }
 

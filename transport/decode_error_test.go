@@ -9,7 +9,7 @@ package transport_test
 // against the public API exactly as a consumer's own code would.
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"net/http"
@@ -133,9 +133,11 @@ func TestDecodeTypedErrorCarriesBody(t *testing.T) { // REQ-151
 		t.Error("DecodeError.Unwrap() = nil, want the decoder's error — REQ-151 requires the codec diagnostics stay reachable")
 	}
 	// The codec's own typed diagnostic, reached through the DecodeError: proof
-	// the chain is intact rather than merely non-nil.
-	if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
-		t.Errorf("errors.AsType[*json.UnmarshalTypeError] did not reach through the DecodeError (inner = %v)", de.Unwrap())
+	// the chain is intact rather than merely non-nil. canjson decodes through
+	// encoding/json/v2 (ADR 0022), so the array-into-struct mismatch surfaces as
+	// a *encoding/json/v2.SemanticError.
+	if _, ok := errors.AsType[*json.SemanticError](err); !ok {
+		t.Errorf("errors.AsType[*json.SemanticError] did not reach through the DecodeError (inner = %v)", de.Unwrap())
 	}
 
 	if meta == nil {

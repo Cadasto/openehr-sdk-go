@@ -1,10 +1,12 @@
 package canjson_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
 
@@ -113,5 +115,25 @@ func TestDecodeRecursiveFolder(t *testing.T) {
 	}
 	if depth != 9 {
 		t.Errorf("depth = %d; want 9", depth)
+	}
+}
+
+// TestUnmarshalMaxDepthExceeded — a FOLDER tree nested past the decode
+// depth cap (REQ-040) is refused by canjson.Unmarshal, not decoded. The
+// guard lives in the shared generated decode body, so it holds on the
+// canjson entry point and not only on typereg.Registry.Decode. This is a
+// can-fail test: with the guard removed the over-deep document decodes
+// without error and the errors.Is assertion below fails.
+func TestUnmarshalMaxDepthExceeded(t *testing.T) {
+	// Each FOLDER wrapper adds two bracket levels (the object and its
+	// "folders" array), so ~300 wrappers clear the 512 cap with margin.
+	tail := `{"_type":"FOLDER","name":{"_type":"DV_TEXT","value":"leaf"},"archetype_node_id":"at0001"}`
+	for range 300 {
+		tail = `{"_type":"FOLDER","name":{"_type":"DV_TEXT","value":"node"},"archetype_node_id":"at0001","folders":[` + tail + `]}`
+	}
+	var f rm.Folder
+	err := canjson.Unmarshal([]byte(tail), &f)
+	if !errors.Is(err, typereg.ErrMaxDepthExceeded) {
+		t.Errorf("Unmarshal over-deep folder: err = %v; want errors.Is(_, typereg.ErrMaxDepthExceeded)", err)
 	}
 }

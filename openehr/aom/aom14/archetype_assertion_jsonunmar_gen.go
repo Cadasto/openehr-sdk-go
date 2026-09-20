@@ -4,234 +4,95 @@
 package aom14
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.am.aom14.archetype.assertion — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.am.aom14.archetype.assertion: canonical-JSON UnmarshalJSONFrom companions
 
-type AssertionJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Tag Expression tag, used for differentiating multiple assertions.
-	Tag *string `json:"tag,omitempty"`
-	// StringExpression String form of expression, in case an expression evaluator taking String expressions is used for evaluation.
-	StringExpression *string         `json:"string_expression,omitempty"`
-	Expression       json.RawMessage `json:"expression"` // polymorphic ExprItem
-	// Variables Definitions of variables used in the assertion expression.
-	Variables []AssertionVariable `json:"variables,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Assertion.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *Assertion) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Assertion.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *Assertion) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ASSERTION: %w", typereg.ErrNilReceiver)
 	}
-	var aux AssertionJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ASSERTION", err)
-	}
-	if aux.Class != "" && aux.Class != "ASSERTION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ASSERTION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	a.Tag = aux.Tag
-	a.StringExpression = aux.StringExpression
-	if len(aux.Expression) > 0 && string(aux.Expression) != "null" {
-		dv, err := typereg.DecodeAs[ExprItem](aux.Expression)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/expression", Inner: err}
-		}
-		a.Expression = dv
-	}
-	a.Variables = aux.Variables
-	return nil
+	return typereg.DecodeInto(dec, "ASSERTION", &struct {
+		Type string `json:"_type"`
+		*rawAssertion
+	}{rawAssertion: (*rawAssertion)(a)})
 }
 
-type AssertionVariableJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Name Name of variable.
-	Name string `json:"name"`
-	// Definition Formal definition of the variable.
-	Definition string `json:"definition"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into AssertionVariable.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *AssertionVariable) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into AssertionVariable.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *AssertionVariable) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ASSERTION_VARIABLE: %w", typereg.ErrNilReceiver)
 	}
-	var aux AssertionVariableJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ASSERTION_VARIABLE", err)
-	}
-	if aux.Class != "" && aux.Class != "ASSERTION_VARIABLE" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ASSERTION_VARIABLE", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	a.Name = aux.Name
-	a.Definition = aux.Definition
-	return nil
+	return typereg.DecodeInto(dec, "ASSERTION_VARIABLE", &struct {
+		Type string `json:"_type"`
+		*rawAssertionVariable
+	}{rawAssertionVariable: (*rawAssertionVariable)(a)})
 }
 
-type ExprBinaryOperatorJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// PrecedenceOverridden True if the natural precedence of operators is overridden in the expression represented by this node of the expression tree. If True, parentheses should be introduced around the totality of the syntax expression corresponding to this operator node and its operands.
-	PrecedenceOverridden *bool `json:"precedence_overridden,omitempty"`
-	// Operator Code of operator.
-	Operator OperatorKind `json:"operator"`
-	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
-	Type         string          `json:"type"`
-	LeftOperand  json.RawMessage `json:"left_operand"`  // polymorphic ExprItem
-	RightOperand json.RawMessage `json:"right_operand"` // polymorphic ExprItem
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ExprBinaryOperator.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (e *ExprBinaryOperator) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ExprBinaryOperator.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (e *ExprBinaryOperator) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EXPR_BINARY_OPERATOR: %w", typereg.ErrNilReceiver)
 	}
-	var aux ExprBinaryOperatorJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("EXPR_BINARY_OPERATOR", err)
-	}
-	if aux.Class != "" && aux.Class != "EXPR_BINARY_OPERATOR" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EXPR_BINARY_OPERATOR", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	e.PrecedenceOverridden = aux.PrecedenceOverridden
-	e.Operator = aux.Operator
-	e.Type = aux.Type
-	if len(aux.LeftOperand) > 0 && string(aux.LeftOperand) != "null" {
-		dv, err := typereg.DecodeAs[ExprItem](aux.LeftOperand)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/left_operand", Inner: err}
-		}
-		e.LeftOperand = dv
-	}
-	if len(aux.RightOperand) > 0 && string(aux.RightOperand) != "null" {
-		dv, err := typereg.DecodeAs[ExprItem](aux.RightOperand)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/right_operand", Inner: err}
-		}
-		e.RightOperand = dv
-	}
-	return nil
+	return typereg.DecodeInto(dec, "EXPR_BINARY_OPERATOR", &struct {
+		Type string `json:"_type"`
+		*rawExprBinaryOperator
+	}{rawExprBinaryOperator: (*rawExprBinaryOperator)(e)})
 }
 
-type ExprLeafJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
-	Type string `json:"type"`
-	// ReferenceType Type of reference: “constant”, “attribute”, “function”, “constraint”. The first three are used to indicate the referencing mechanism for an operand. The last is used to indicate a constraint operand, as happens in the case of the right-hand operand of the ‘matches’ operator.
-	ReferenceType string `json:"reference_type"`
-	// Item The value referred to; a manifest constant, an attribute path (in the form of a String), or for the right-hand side of a ‘matches’ node, a constraint, often a C_PRIMITIVE_OBJECT.
-	Item any `json:"item"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ExprLeaf.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (e *ExprLeaf) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ExprLeaf.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (e *ExprLeaf) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EXPR_LEAF: %w", typereg.ErrNilReceiver)
 	}
-	var aux ExprLeafJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("EXPR_LEAF", err)
-	}
-	if aux.Class != "" && aux.Class != "EXPR_LEAF" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EXPR_LEAF", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	e.Type = aux.Type
-	e.ReferenceType = aux.ReferenceType
-	e.Item = aux.Item
-	return nil
+	return typereg.DecodeInto(dec, "EXPR_LEAF", &struct {
+		Type string `json:"_type"`
+		*rawExprLeaf
+	}{rawExprLeaf: (*rawExprLeaf)(e)})
 }
 
-type ExprUnaryOperatorJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// PrecedenceOverridden True if the natural precedence of operators is overridden in the expression represented by this node of the expression tree. If True, parentheses should be introduced around the totality of the syntax expression corresponding to this operator node and its operands.
-	PrecedenceOverridden *bool `json:"precedence_overridden,omitempty"`
-	// Operator Code of operator.
-	Operator OperatorKind `json:"operator"`
-	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
-	Type    string          `json:"type"`
-	Operand json.RawMessage `json:"operand"` // polymorphic ExprItem
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ExprUnaryOperator.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (e *ExprUnaryOperator) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ExprUnaryOperator.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (e *ExprUnaryOperator) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EXPR_UNARY_OPERATOR: %w", typereg.ErrNilReceiver)
 	}
-	var aux ExprUnaryOperatorJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("EXPR_UNARY_OPERATOR", err)
-	}
-	if aux.Class != "" && aux.Class != "EXPR_UNARY_OPERATOR" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EXPR_UNARY_OPERATOR", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	e.PrecedenceOverridden = aux.PrecedenceOverridden
-	e.Operator = aux.Operator
-	e.Type = aux.Type
-	if len(aux.Operand) > 0 && string(aux.Operand) != "null" {
-		dv, err := typereg.DecodeAs[ExprItem](aux.Operand)
-		if err != nil {
-			return &typereg.DecodeError{Path: "/operand", Inner: err}
-		}
-		e.Operand = dv
-	}
-	return nil
+	return typereg.DecodeInto(dec, "EXPR_UNARY_OPERATOR", &struct {
+		Type string `json:"_type"`
+		*rawExprUnaryOperator
+	}{rawExprUnaryOperator: (*rawExprUnaryOperator)(e)})
 }

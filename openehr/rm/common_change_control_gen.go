@@ -52,13 +52,13 @@ type OriginalVersion[T any] struct {
 	// Attestations Set of attestations relating to this version.
 	Attestations []Attestation `json:"attestations,omitempty"`
 	// Data Data content of this Version.
-	Data *T `json:"data,omitempty"`
+	Data *T `json:"data,omitzero"`
 	// LifecycleState Lifecycle state of the content item in this version; coded by openEHR vocabulary `version lifecycle state`.
 	LifecycleState DVCodedText `json:"lifecycle_state"`
 	// OtherInputVersionUids Identifiers of other versions whose content was merged into this version, if any.
 	OtherInputVersionUids []ObjectVersionID `json:"other_input_version_uids,omitempty"`
 	// PrecedingVersionUID Stored version of inheritance precursor.
-	PrecedingVersionUID *ObjectVersionID `json:"preceding_version_uid,omitempty"`
+	PrecedingVersionUID *ObjectVersionID `json:"preceding_version_uid,omitzero"`
 	// UID Stored version of inheritance precursor.
 	UID ObjectVersionID `json:"uid"`
 }
@@ -75,7 +75,7 @@ type Version[T any] struct {
 	// Contribution Contribution in which this version was added.
 	Contribution ObjectRefLike `json:"contribution"`
 	// Signature OpenPGP digital signature or digest of content committed in this Version.
-	Signature *string `json:"signature,omitempty"`
+	Signature *string `json:"signature,omitzero"`
 }
 
 // CanonicalForm A canonical serial form of this Version, created by serialising all attributes except signature, suitable for generating reliable hashes and signatures.

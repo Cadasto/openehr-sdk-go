@@ -4,93 +4,44 @@
 package aom14
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.am.aom14.archetype.ontology — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.am.aom14.archetype.ontology: canonical-JSON UnmarshalJSONFrom companions
 
-type ArchetypeOntologyJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// TermCodes List of all term codes in the ontology. Most of these correspond to “at” codes in an ADL archetype, which are the node_ids on C_OBJECT descendants. There may be an extra one, if a different term is used as the overall archetype concept from that used as the node_id of the outermost C_OBJECT in the definition part.
-	TermCodes []string `json:"term_codes"`
-	// ConstraintCodes List of all term codes in the ontology. These correspond to the “ac” codes in an ADL archetype, or equivalently, the CONSTRAINT_REF.reference values in the archetype definition.
-	ConstraintCodes []string `json:"constraint_codes"`
-	// ParentArchetype Archetype which owns this terminology.
-	ParentArchetype *Archetype `json:"parent_archetype"`
-	// TerminologiesAvailable List of terminologies to which term or constraint bindings exist in this terminology.
-	TerminologiesAvailable []string `json:"terminologies_available,omitempty"`
-	// SpecialisationDepth Specialisation depth of this archetype. Unspecialised archetypes have depth 0, with each additional level of specialisation adding 1 to the specialisation_depth.
-	SpecialisationDepth Integer  `json:"specialisation_depth"`
-	TermAttributeNames  []string `json:"term_attribute_names"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ArchetypeOntology.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *ArchetypeOntology) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ArchetypeOntology.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *ArchetypeOntology) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPE_ONTOLOGY: %w", typereg.ErrNilReceiver)
 	}
-	var aux ArchetypeOntologyJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ARCHETYPE_ONTOLOGY", err)
-	}
-	if aux.Class != "" && aux.Class != "ARCHETYPE_ONTOLOGY" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ARCHETYPE_ONTOLOGY", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	a.TermCodes = aux.TermCodes
-	a.ConstraintCodes = aux.ConstraintCodes
-	a.ParentArchetype = aux.ParentArchetype
-	a.TerminologiesAvailable = aux.TerminologiesAvailable
-	a.SpecialisationDepth = aux.SpecialisationDepth
-	a.TermAttributeNames = aux.TermAttributeNames
-	return nil
+	return typereg.DecodeInto(dec, "ARCHETYPE_ONTOLOGY", &struct {
+		Type string `json:"_type"`
+		*rawArchetypeOntology
+	}{rawArchetypeOntology: (*rawArchetypeOntology)(a)})
 }
 
-type ArchetypeTermJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Code Code of this term.
-	Code string `json:"code"`
-	// Items Hash of keys (“text”, “description” etc) and corresponding values.
-	Items *map[string]string `json:"items,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ArchetypeTerm.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (a *ArchetypeTerm) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ArchetypeTerm.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (a *ArchetypeTerm) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPE_TERM: %w", typereg.ErrNilReceiver)
 	}
-	var aux ArchetypeTermJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ARCHETYPE_TERM", err)
-	}
-	if aux.Class != "" && aux.Class != "ARCHETYPE_TERM" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ARCHETYPE_TERM", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	a.Code = aux.Code
-	a.Items = aux.Items
-	return nil
+	return typereg.DecodeInto(dec, "ARCHETYPE_TERM", &struct {
+		Type string `json:"_type"`
+		*rawArchetypeTerm
+	}{rawArchetypeTerm: (*rawArchetypeTerm)(a)})
 }

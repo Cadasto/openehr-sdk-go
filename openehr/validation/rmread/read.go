@@ -617,6 +617,22 @@ func readActionSingle(a *rm.Action, attr string) (any, bool) {
 		return codePhrasePresent(a.Language)
 	case "encoding":
 		return codePhrasePresent(a.Encoding)
+	case "time":
+		// DV_DATE_TIME value type, present when non-empty (as EVENT.time is
+		// read in readPointEventSingle).
+		if a.Time.Value == "" {
+			return a.Time, false
+		}
+		return a.Time, true
+	case "ism_transition":
+		// ISM_TRANSITION value type; presence is judged from its own required
+		// current_state, so an all-zero struct reads as absent.
+		if _, ok := dvCodedTextPresent(a.IsmTransition.CurrentState); !ok {
+			return a.IsmTransition, false
+		}
+		return a.IsmTransition, true
+	case "instruction_details":
+		return ptrPresent(a.InstructionDetails)
 	case "description":
 		return ifacePresent(a.Description)
 	case "protocol":

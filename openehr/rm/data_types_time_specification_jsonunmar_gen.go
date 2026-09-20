@@ -4,76 +4,44 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_types.time_specification — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.rm.data_types.time_specification: canonical-JSON UnmarshalJSONFrom companions
 
-type DVGeneralTimeSpecificationJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value The specification, in the HL7v3 syntax for `PIVL` or `EIVL` types.
-	Value DVParsable `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVGeneralTimeSpecification.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVGeneralTimeSpecification) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVGeneralTimeSpecification.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVGeneralTimeSpecification) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_GENERAL_TIME_SPECIFICATION: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVGeneralTimeSpecificationJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_GENERAL_TIME_SPECIFICATION", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_GENERAL_TIME_SPECIFICATION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_GENERAL_TIME_SPECIFICATION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "DV_GENERAL_TIME_SPECIFICATION", &struct {
+		Type string `json:"_type"`
+		*rawDVGeneralTimeSpecification
+	}{rawDVGeneralTimeSpecification: (*rawDVGeneralTimeSpecification)(d)})
 }
 
-type DVPeriodicTimeSpecificationJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Value The specification, in the HL7v3 syntax for `PIVL` or `EIVL` types.
-	Value DVParsable `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVPeriodicTimeSpecification.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVPeriodicTimeSpecification) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVPeriodicTimeSpecification.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVPeriodicTimeSpecification) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_PERIODIC_TIME_SPECIFICATION: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVPeriodicTimeSpecificationJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_PERIODIC_TIME_SPECIFICATION", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_PERIODIC_TIME_SPECIFICATION" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_PERIODIC_TIME_SPECIFICATION", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "DV_PERIODIC_TIME_SPECIFICATION", &struct {
+		Type string `json:"_type"`
+		*rawDVPeriodicTimeSpecification
+	}{rawDVPeriodicTimeSpecification: (*rawDVPeriodicTimeSpecification)(d)})
 }

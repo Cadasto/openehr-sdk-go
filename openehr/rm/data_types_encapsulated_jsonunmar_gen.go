@@ -4,130 +4,44 @@
 package rm
 
 import (
-	"encoding/json"
-	"errors"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_types.encapsulated — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.rm.data_types.encapsulated: canonical-JSON UnmarshalJSONFrom companions
 
-type DVMultimediaJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Charset Name of character encoding scheme in which this value is encoded. Coded from openEHR Code Set  character sets . Unicode is the default assumption in openEHR, with UTF-8 being the assumed encoding. This attribute allows for variations from these assumptions.
-	Charset *CodePhrase `json:"charset,omitempty"`
-	// Language Optional indicator of the localised language in which the data is written, if relevant. Coded from openEHR Code Set `languages`.
-	Language *CodePhrase `json:"language,omitempty"`
-	// AlternateText Text to display in lieu of multimedia display/replay.
-	AlternateText *string         `json:"alternate_text,omitempty"`
-	URI           json.RawMessage `json:"uri,omitempty"` // polymorphic DVURILike
-	// Data The actual data found at `_uri_`, if supplied inline.
-	Data []byte `json:"data,omitempty"`
-	// MediaType Data media type coded from openEHR code set  media types  (interface for the IANA MIME types code set).
-	MediaType CodePhrase `json:"media_type"`
-	// CompressionAlgorithm Compression type, a coded value from the openEHR Integrity check code set. Void means no compression.
-	CompressionAlgorithm *CodePhrase `json:"compression_algorithm,omitempty"`
-	// IntegrityCheck Binary cryptographic integrity checksum.
-	IntegrityCheck []byte `json:"integrity_check,omitempty"`
-	// IntegrityCheckAlgorithm Type of integrity check, a coded value from the openEHR `Integrity check` code set.
-	IntegrityCheckAlgorithm *CodePhrase `json:"integrity_check_algorithm,omitempty"`
-	// Thumbnail The thumbnail for this item, if one exists; mainly for graphics formats.
-	Thumbnail *DVMultimedia `json:"thumbnail,omitempty"`
-	// Size Original size in bytes of unencoded encapsulated data. I.e. encodings such as base64, hexadecimal etc do not change the value of this attribute.
-	Size Integer `json:"size"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVMultimedia.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVMultimedia) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVMultimedia.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVMultimedia) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_MULTIMEDIA: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVMultimediaJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_MULTIMEDIA", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_MULTIMEDIA" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_MULTIMEDIA", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.Charset = aux.Charset
-	d.Language = aux.Language
-	d.AlternateText = aux.AlternateText
-	if len(aux.URI) > 0 && string(aux.URI) != "null" {
-		dv, err := typereg.DecodeAs[DVURILike](aux.URI)
-		if err != nil {
-			if errors.Is(err, typereg.ErrMissingType) {
-				var def DVURI
-				if jerr := json.Unmarshal(aux.URI, &def); jerr != nil {
-					return &typereg.DecodeError{Path: "/uri", Inner: jerr}
-				}
-				d.URI = &def
-			} else {
-				return &typereg.DecodeError{Path: "/uri", Inner: err}
-			}
-		} else {
-			d.URI = dv
-		}
-	}
-	d.Data = aux.Data
-	d.MediaType = aux.MediaType
-	d.CompressionAlgorithm = aux.CompressionAlgorithm
-	d.IntegrityCheck = aux.IntegrityCheck
-	d.IntegrityCheckAlgorithm = aux.IntegrityCheckAlgorithm
-	d.Thumbnail = aux.Thumbnail
-	d.Size = aux.Size
-	return nil
+	return typereg.DecodeInto(dec, "DV_MULTIMEDIA", &struct {
+		Type string `json:"_type"`
+		*rawDVMultimedia
+	}{rawDVMultimedia: (*rawDVMultimedia)(d)})
 }
 
-type DVParsableJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Charset Name of character encoding scheme in which this value is encoded. Coded from openEHR Code Set  character sets . Unicode is the default assumption in openEHR, with UTF-8 being the assumed encoding. This attribute allows for variations from these assumptions.
-	Charset *CodePhrase `json:"charset,omitempty"`
-	// Language Optional indicator of the localised language in which the data is written, if relevant. Coded from openEHR Code Set `languages`.
-	Language *CodePhrase `json:"language,omitempty"`
-	// Value The string, which may validly be empty in some syntaxes.
-	Value string `json:"value"`
-	// Formalism Name of the formalism, e.g.  GLIF 1.0 ,  Proforma  etc.
-	Formalism string `json:"formalism"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into DVParsable.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (d *DVParsable) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into DVParsable.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (d *DVParsable) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_PARSABLE: %w", typereg.ErrNilReceiver)
 	}
-	var aux DVParsableJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("DV_PARSABLE", err)
-	}
-	if aux.Class != "" && aux.Class != "DV_PARSABLE" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_PARSABLE", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	d.Charset = aux.Charset
-	d.Language = aux.Language
-	d.Value = aux.Value
-	d.Formalism = aux.Formalism
-	return nil
+	return typereg.DecodeInto(dec, "DV_PARSABLE", &struct {
+		Type string `json:"_type"`
+		*rawDVParsable
+	}{rawDVParsable: (*rawDVParsable)(d)})
 }

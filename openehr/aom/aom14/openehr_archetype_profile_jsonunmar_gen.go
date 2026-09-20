@@ -4,229 +4,95 @@
 package aom14
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.am.aom14.openehr_archetype_profile — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.am.aom14.openehr_archetype_profile: canonical-JSON UnmarshalJSONFrom companions
 
-type CCodedTextJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitempty"`
-	// RMTypeName Reference model type that this node corresponds to.
-	RMTypeName string `json:"rm_type_name"`
-	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[Integer] `json:"occurrences"`
-	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
-	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
-	NodeID string `json:"node_id"`
-	// Terminology Terminology identifier.
-	Terminology string `json:"terminology"`
-	// CodeList Optional list of codes from the terminology. No list means any code from the terminology is allowed.
-	CodeList  *[]string `json:"code_list,omitempty"`
-	Reference *string   `json:"reference,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CCodedText.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CCodedText) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CCodedText.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CCodedText) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_CODED_TEXT: %w", typereg.ErrNilReceiver)
 	}
-	var aux CCodedTextJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_CODED_TEXT", err)
-	}
-	if aux.Class != "" && aux.Class != "C_CODED_TEXT" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_CODED_TEXT", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.AssumedValue = aux.AssumedValue
-	c.RMTypeName = aux.RMTypeName
-	c.Occurrences = aux.Occurrences
-	c.NodeID = aux.NodeID
-	c.Terminology = aux.Terminology
-	c.CodeList = aux.CodeList
-	c.Reference = aux.Reference
-	return nil
+	return typereg.DecodeInto(dec, "C_CODED_TEXT", &struct {
+		Type string `json:"_type"`
+		*rawCCodedText
+	}{rawCCodedText: (*rawCCodedText)(c)})
 }
 
-type COrdinalJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitempty"`
-	// RMTypeName Reference model type that this node corresponds to.
-	RMTypeName string `json:"rm_type_name"`
-	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[Integer] `json:"occurrences"`
-	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
-	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
-	NodeID string `json:"node_id"`
-	// List Value set of allowed Ordinals in the constraint.
-	List []Ordinal `json:"list,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into COrdinal.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *COrdinal) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into COrdinal.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *COrdinal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_ORDINAL: %w", typereg.ErrNilReceiver)
 	}
-	var aux COrdinalJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_ORDINAL", err)
-	}
-	if aux.Class != "" && aux.Class != "C_ORDINAL" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_ORDINAL", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.AssumedValue = aux.AssumedValue
-	c.RMTypeName = aux.RMTypeName
-	c.Occurrences = aux.Occurrences
-	c.NodeID = aux.NodeID
-	c.List = aux.List
-	return nil
+	return typereg.DecodeInto(dec, "C_ORDINAL", &struct {
+		Type string `json:"_type"`
+		*rawCOrdinal
+	}{rawCOrdinal: (*rawCOrdinal)(c)})
 }
 
-type CQuantityJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// AssumedValue Value to be assumed if none sent in data.
-	AssumedValue *any `json:"assumed_value,omitempty"`
-	// RMTypeName Reference model type that this node corresponds to.
-	RMTypeName string `json:"rm_type_name"`
-	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[Integer] `json:"occurrences"`
-	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
-	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
-	NodeID string `json:"node_id"`
-	// Property Name of physical property for Quantities being constrained.
-	Property string `json:"property"`
-	// List Value set of allowed individual Quantity item constraints in this Quantity constraint.
-	List []CQuantityItem `json:"list,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CQuantity.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CQuantity) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CQuantity.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CQuantity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_QUANTITY: %w", typereg.ErrNilReceiver)
 	}
-	var aux CQuantityJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_QUANTITY", err)
-	}
-	if aux.Class != "" && aux.Class != "C_QUANTITY" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_QUANTITY", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.AssumedValue = aux.AssumedValue
-	c.RMTypeName = aux.RMTypeName
-	c.Occurrences = aux.Occurrences
-	c.NodeID = aux.NodeID
-	c.Property = aux.Property
-	c.List = aux.List
-	return nil
+	return typereg.DecodeInto(dec, "C_QUANTITY", &struct {
+		Type string `json:"_type"`
+		*rawCQuantity
+	}{rawCQuantity: (*rawCQuantity)(c)})
 }
 
-type CQuantityItemJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Magnitude Quantity magnitude constraint.
-	Magnitude rm.Interval[Real] `json:"magnitude"`
-	// Units Optional units constraint.
-	Units *string `json:"units,omitempty"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into CQuantityItem.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (c *CQuantityItem) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into CQuantityItem.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (c *CQuantityItem) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_QUANTITY_ITEM: %w", typereg.ErrNilReceiver)
 	}
-	var aux CQuantityItemJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("C_QUANTITY_ITEM", err)
-	}
-	if aux.Class != "" && aux.Class != "C_QUANTITY_ITEM" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_QUANTITY_ITEM", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	c.Magnitude = aux.Magnitude
-	c.Units = aux.Units
-	return nil
+	return typereg.DecodeInto(dec, "C_QUANTITY_ITEM", &struct {
+		Type string `json:"_type"`
+		*rawCQuantityItem
+	}{rawCQuantityItem: (*rawCQuantityItem)(c)})
 }
 
-type OrdinalJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Symbol Terminology code providing the Ordinal's symbol.
-	Symbol rm.CodePhrase `json:"symbol"`
-	// Value Ordinal value.
-	Value Integer `json:"value"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into Ordinal.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (o *Ordinal) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Ordinal.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (o *Ordinal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if o == nil {
 		return fmt.Errorf("canjson: ORDINAL: %w", typereg.ErrNilReceiver)
 	}
-	var aux OrdinalJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("ORDINAL", err)
-	}
-	if aux.Class != "" && aux.Class != "ORDINAL" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ORDINAL", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	o.Symbol = aux.Symbol
-	o.Value = aux.Value
-	return nil
+	return typereg.DecodeInto(dec, "ORDINAL", &struct {
+		Type string `json:"_type"`
+		*rawOrdinal
+	}{rawOrdinal: (*rawOrdinal)(o)})
 }

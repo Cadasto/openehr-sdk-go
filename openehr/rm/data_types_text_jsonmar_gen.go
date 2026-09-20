@@ -4,45 +4,46 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.rm.data_types.text — canonical-JSON MarshalJSON companions
+// BMM package org.openehr.rm.data_types.text: canonical-JSON MarshalJSONTo companions
 
-type CodePhraseJSONMarshaller struct {
-	Class string `json:"_type"`
-	// TerminologyID Identifier of the distinct terminology from which the code_string (or its elements) was extracted.
-	TerminologyID TerminologyID `json:"terminology_id"`
-	// CodeString The key used by the terminology service to identify a concept or coordination of concepts. This string is most likely parsable inside the terminology service, but nothing can be assumed about its syntax outside that context.
-	CodeString string `json:"code_string"`
-	// PreferredTerm Optional attribute to carry preferred term corresponding to the code or expression in `_code_string_`. Typical use in integration situations which create mappings, and representing data for which both a (non-preferred) actual term and a preferred term are both required.
-	PreferredTerm *string `json:"preferred_term,omitempty"`
+// rawCodePhrase is the method-free canonical-JSON alias for CodePhrase. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawCodePhrase CodePhrase
+
+// MarshalJSONTo emits canonical openEHR JSON for CodePhrase with `_type`
+// (value "CODE_PHRASE") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (c CodePhrase) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawCodePhrase
+	}{"CODE_PHRASE", (*rawCodePhrase)(&c)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for CodePhrase with `_type`
-// (value "CODE_PHRASE") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (c *CodePhrase) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&CodePhraseJSONMarshaller{
-		Class:         "CODE_PHRASE",
-		TerminologyID: c.TerminologyID,
-		CodeString:    c.CodeString,
-		PreferredTerm: c.PreferredTerm,
-	})
-}
-
-type DVCodedTextJSONMarshaller struct {
+// jsonWireDVCodedText is the flat canonical-JSON wire struct for DVCodedText. DVCodedText embeds
+// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// promote that ancestor's methods and emit the wrong `_type`; the flat
+// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+type jsonWireDVCodedText struct {
 	Class string `json:"_type"`
 	// Value Displayable rendition of the item, regardless of its underlying structure. For `DV_CODED_TEXT`, this is the rubric of the complete term as provided by the terminology service.
 	Value string `json:"value"`
 	// Hyperlink DEPRECATED: this field is deprecated; use markdown link/text in the `_value_` attribute, and `"markdown"` as the value of the `_formatting_` field.
 	//
 	// Original usage, prior to RM Release 1.0.4: Optional link sitting behind a section of plain text or coded term item.
-	Hyperlink json.RawMessage `json:"hyperlink,omitempty"`
+	Hyperlink DVURILike `json:"hyperlink,omitempty"`
 	// Formatting If set, contains one of the following values:
 	//
 	// * `"plain"`: use for plain text, possibly containing newlines, but otherwise unformatted (same as Void);
@@ -50,133 +51,89 @@ type DVCodedTextJSONMarshaller struct {
 	// * `"markdown"`: use for markdown formatted text, strongly recommended in the format of the CommonMark specification.
 	//
 	// DEPRECATED usage: contains a string of the form `"name:value; name:value..."` , e.g. `"font-weight : bold; font-family : Arial; font-size : 12pt;"`. Values taken from W3C CSS2 properties lists for background and font .
-	Formatting *string `json:"formatting,omitempty"`
+	Formatting *string `json:"formatting,omitzero"`
 	// Mappings Terms from other terminologies most closely matching this term, typically used where the originator (e.g. pathology lab) of information uses a local terminology but also supplies one or more equivalents from well known terminologies (e.g. LOINC).
 	Mappings []TermMapping `json:"mappings,omitempty"`
 	// Language Optional indicator of the localised language in which the value is written. Coded from openEHR Code Set  languages . Only used when either the text object is in a different language from the enclosing `ENTRY`, or else the text object is being used outside of an `ENTRY` or other enclosing structure which indicates the language.
-	Language *CodePhrase `json:"language,omitempty"`
+	Language *CodePhrase `json:"language,omitzero"`
 	// Encoding Name of character encoding scheme in which this value is encoded. Coded from openEHR Code Set  character sets . Unicode is the default assumption in openEHR, with UTF-8 being the assumed encoding. This attribute allows for variations from these assumptions.
-	Encoding *CodePhrase `json:"encoding,omitempty"`
+	Encoding *CodePhrase `json:"encoding,omitzero"`
 	// DefiningCode The term of which the  `_value_` attribute is the textual rendition (i.e. rubric).
 	DefiningCode CodePhrase `json:"defining_code"`
 }
 
-// MarshalJSON emits canonical openEHR JSON for DVCodedText with `_type`
-// (value "DV_CODED_TEXT") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVCodedText) MarshalJSON() ([]byte, error) {
-	rawHyperlink, err := jsonpoly.Marshal(d.Hyperlink)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&DVCodedTextJSONMarshaller{
+// MarshalJSONTo emits canonical openEHR JSON for DVCodedText with `_type`
+// (value "DV_CODED_TEXT") as the leading member (REQ-052, Q6). The receiver is a
+// value so a by-value instance in a polymorphic slot keeps its `_type`.
+func (d DVCodedText) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &jsonWireDVCodedText{
 		Class:        "DV_CODED_TEXT",
 		Value:        d.Value,
-		Hyperlink:    rawHyperlink,
+		Hyperlink:    d.Hyperlink,
 		Formatting:   d.Formatting,
 		Mappings:     d.Mappings,
 		Language:     d.Language,
 		Encoding:     d.Encoding,
 		DefiningCode: d.DefiningCode,
-	})
+	}, typereg.MarshalOptions(enc))
 }
 
-type DVParagraphJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Items Items making up the paragraph, each of which is a text item (which may have its own formatting, and/or have hyperlinks).
-	Items json.RawMessage `json:"items"`
+// rawDVParagraph is the method-free canonical-JSON alias for DVParagraph. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVParagraph DVParagraph
+
+// MarshalJSONTo emits canonical openEHR JSON for DVParagraph with `_type`
+// (value "DV_PARAGRAPH") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (d DVParagraph) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVParagraph
+	}{"DV_PARAGRAPH", (*rawDVParagraph)(&d)}, typereg.MarshalOptions(enc))
 }
 
-// MarshalJSON emits canonical openEHR JSON for DVParagraph with `_type`
-// (value "DV_PARAGRAPH") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVParagraph) MarshalJSON() ([]byte, error) {
-	rawItems, err := jsonpoly.MarshalSlice(d.Items)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&DVParagraphJSONMarshaller{
-		Class: "DV_PARAGRAPH",
-		Items: rawItems,
-	})
+// rawDVText is the method-free canonical-JSON alias for DVText. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawDVText DVText
+
+// MarshalJSONTo emits canonical openEHR JSON for DVText with `_type`
+// (value "DV_TEXT") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (d DVText) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawDVText
+	}{"DV_TEXT", (*rawDVText)(&d)}, typereg.MarshalOptions(enc))
 }
 
-type DVTextJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Value Displayable rendition of the item, regardless of its underlying structure. For `DV_CODED_TEXT`, this is the rubric of the complete term as provided by the terminology service.
-	Value string `json:"value"`
-	// Hyperlink DEPRECATED: this field is deprecated; use markdown link/text in the `_value_` attribute, and `"markdown"` as the value of the `_formatting_` field.
-	//
-	// Original usage, prior to RM Release 1.0.4: Optional link sitting behind a section of plain text or coded term item.
-	Hyperlink json.RawMessage `json:"hyperlink,omitempty"`
-	// Formatting If set, contains one of the following values:
-	//
-	// * `"plain"`: use for plain text, possibly containing newlines, but otherwise unformatted (same as Void);
-	// * `"plain_no_newlines"`: use for text containing no newlines or other formatting;
-	// * `"markdown"`: use for markdown formatted text, strongly recommended in the format of the CommonMark specification.
-	//
-	// DEPRECATED usage: contains a string of the form `"name:value; name:value..."` , e.g. `"font-weight : bold; font-family : Arial; font-size : 12pt;"`. Values taken from W3C CSS2 properties lists for background and font .
-	Formatting *string `json:"formatting,omitempty"`
-	// Mappings Terms from other terminologies most closely matching this term, typically used where the originator (e.g. pathology lab) of information uses a local terminology but also supplies one or more equivalents from well known terminologies (e.g. LOINC).
-	Mappings []TermMapping `json:"mappings,omitempty"`
-	// Language Optional indicator of the localised language in which the value is written. Coded from openEHR Code Set  languages . Only used when either the text object is in a different language from the enclosing `ENTRY`, or else the text object is being used outside of an `ENTRY` or other enclosing structure which indicates the language.
-	Language *CodePhrase `json:"language,omitempty"`
-	// Encoding Name of character encoding scheme in which this value is encoded. Coded from openEHR Code Set  character sets . Unicode is the default assumption in openEHR, with UTF-8 being the assumed encoding. This attribute allows for variations from these assumptions.
-	Encoding *CodePhrase `json:"encoding,omitempty"`
-}
+// rawTermMapping is the method-free canonical-JSON alias for TermMapping. The alias
+// drops the codec methods so marshalling the anonymous wrapper below
+// does not recurse; the class embeds no marshaler-bearing concrete
+// ancestor, so nothing is promoted (ADR 0022).
+type rawTermMapping TermMapping
 
-// MarshalJSON emits canonical openEHR JSON for DVText with `_type`
-// (value "DV_TEXT") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (d *DVText) MarshalJSON() ([]byte, error) {
-	rawHyperlink, err := jsonpoly.Marshal(d.Hyperlink)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(&DVTextJSONMarshaller{
-		Class:      "DV_TEXT",
-		Value:      d.Value,
-		Hyperlink:  rawHyperlink,
-		Formatting: d.Formatting,
-		Mappings:   d.Mappings,
-		Language:   d.Language,
-		Encoding:   d.Encoding,
-	})
-}
-
-type TermMappingJSONMarshaller struct {
-	Class string `json:"_type"`
-	// Match The relative match of the target term with respect to the mapped text item. Result meanings:
-	//
-	// * `'>'`: the mapping is to a broader term e.g. orginal text =  arbovirus infection , target =  viral infection
-	// * `'='`: the mapping is to a (supposedly) equivalent to the original item
-	// * `'<'`: the mapping is to a narrower term. e.g. original text =  diabetes , mapping =  diabetes mellitus .
-	// * `'?'`: the kind of mapping is unknown.
-	//
-	// The first three values are taken from the ISO standards 2788 ( Guide to Establishment and development of monolingual thesauri) and 5964 (Guide to Establishment and development of multilingual thesauri).
-	Match Character `json:"match"`
-	// Purpose Purpose of the mapping e.g. 'automated data mining', 'billing', 'interoperability'.
-	Purpose *DVCodedText `json:"purpose,omitempty"`
-	// Target The target term of the mapping.
-	Target CodePhrase `json:"target"`
-}
-
-// MarshalJSON emits canonical openEHR JSON for TermMapping with `_type`
-// (value "TERM_MAPPING") as the leading object key. Field order matches the
-// concrete struct's declaration order — embedded-ancestor fields
-// first (in their original order), then own + flattened-abstract
-// ancestor fields in BMM property declaration order.
-func (t *TermMapping) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&TermMappingJSONMarshaller{
-		Class:   "TERM_MAPPING",
-		Match:   t.Match,
-		Purpose: t.Purpose,
-		Target:  t.Target,
-	})
+// MarshalJSONTo emits canonical openEHR JSON for TermMapping with `_type`
+// (value "TERM_MAPPING") as the leading member. Field order otherwise follows the
+// struct declaration; json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling
+// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// in a polymorphic interface slot by value, the shape the like-interface
+// accessors admit, still carries its `_type` (REQ-052 substitution).
+func (t TermMapping) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		*rawTermMapping
+	}{"TERM_MAPPING", (*rawTermMapping)(&t)}, typereg.MarshalOptions(enc))
 }

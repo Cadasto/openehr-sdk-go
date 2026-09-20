@@ -4,43 +4,27 @@
 package rm
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// BMM package: org.openehr.base.resource — canonical-JSON UnmarshalJSON companions
+// BMM package org.openehr.base.resource: canonical-JSON UnmarshalJSONFrom companions
 
-type ResourceAnnotationsJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Documentation Documentary annotations in a multi-level keyed structure.
-	Documentation map[string]any `json:"documentation"`
-}
-
-// UnmarshalJSON decodes canonical openEHR JSON into ResourceAnnotations.
-// Polymorphic fields are routed through typereg.DecodeAs so the
-// concrete type is selected by `_type` at each polymorphic site.
-// Missing/unknown/type-mismatch dispatch failures wrap typereg
-// sentinels inside *typereg.DecodeError for errors.Is / errors.As.
-// A whole-value shape failure goes through typereg.WrapShapeError,
-// which keeps the `canjson: <RM_TYPE>:` text and adds
-// typereg.ErrInvalidShape (REQ-052). A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced (REQ-025).
-func (r *ResourceAnnotations) UnmarshalJSON(data []byte) error {
+// UnmarshalJSONFrom decodes canonical openEHR JSON into ResourceAnnotations.
+// A nil receiver is refused with typereg.ErrNilReceiver rather than
+// dereferenced (REQ-025). The shared helper checks the `_type`
+// discriminator, threads the polymorphic decode hooks so every nested
+// slot resolves, and wraps a whole-value shape failure through
+// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
+// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+func (r *ResourceAnnotations) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: RESOURCE_ANNOTATIONS: %w", typereg.ErrNilReceiver)
 	}
-	var aux ResourceAnnotationsJSONUnmarshaller
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return typereg.WrapShapeError("RESOURCE_ANNOTATIONS", err)
-	}
-	if aux.Class != "" && aux.Class != "RESOURCE_ANNOTATIONS" {
-		return &typereg.DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "RESOURCE_ANNOTATIONS", aux.Class, typereg.ErrTypeMismatch),
-		}
-	}
-	r.Documentation = aux.Documentation
-	return nil
+	return typereg.DecodeInto(dec, "RESOURCE_ANNOTATIONS", &struct {
+		Type string `json:"_type"`
+		*rawResourceAnnotations
+	}{rawResourceAnnotations: (*rawResourceAnnotations)(r)})
 }

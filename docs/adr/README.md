@@ -7,7 +7,7 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | # | Title | Status |
 |---|---|---|
 | [0001](0001-bmm-version-bump-runbook.md) | BMM version-bump runbook | Accepted (2026-05-16) |
-| [0002](0002-bmm-codegen-decisions.md) | BMM code generator structural decisions (D1–D7) | Accepted (2026-05-16) |
+| [0002](0002-bmm-codegen-decisions.md) | BMM code generator structural decisions (D1–D8) | Accepted (2026-05-16) |
 | [0003](0003-rm-event-polymorphism.md) | Codec polymorphism for abstract generic RM classes (EVENT, …) | Accepted (2026-05-16) |
 | [0004](0004-numeric-wire-tolerance.md) | Strict-encode, permissive-decode for BMM `Real` and `Integer` | Accepted (2026-05-16) |
 | [0005](0005-compiled-template-foundation.md) | Compiled OPT foundation (`rminfo` + `internal/templatecompile`) | Accepted (2026-05-22) |
@@ -26,5 +26,7 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | [0018](0018-raw-bytes-on-decode-error.md) | Raw response bytes on the typed 2xx decode error | Accepted (2026-08-30) |
 | [0019](0019-definition-timestamp-tolerance.md) | Definition metadata timestamps: a closed tolerant layout set on decode, RFC 3339 on encode | Accepted (2026-08-30) |
 | [0020](0020-cassette-recording-har.md) | Cassette recordings are HTTP Archive 1.2 | Accepted (2026-09-07) |
+| [0021](0021-json-member-order-not-a-contract.md) | Encoded JSON member order is not part of the canonical JSON contract | Accepted (2026-09-14) |
+| [0022](0022-canonical-json-encoding-json-v2.md) | Canonical JSON is encoded by `encoding/json/v2` | Accepted (2026-09-14) |
 
 See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.
