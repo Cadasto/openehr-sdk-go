@@ -73,14 +73,15 @@ func TestDecodePolymorphicSlotWithTypeLast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	// The full slot spelling, `_type` leading: an encoder that wrote the
-	// discriminator anywhere but first inside the slot would fail here. Byte
-	// equality of the two re-encodes is not asserted (member order is not a
-	// contract, REQ-052); what this pins is the `_type`-first SHOULD witness at
-	// a substitutable slot.
-	const slot = `"value":{"_type":"DV_QUANTITY","magnitude":120,"units":"mm[Hg]"}`
-	if !strings.Contains(string(eb), slot) {
-		t.Fatalf("the slot is not the canonical `_type`-first spelling:\n %s", eb)
+	// The slot value leads with its `_type`: an encoder that wrote the
+	// discriminator anywhere but first inside the slot would fail here. Only
+	// the `_type`-first SHOULD is pinned; the order of the remaining members
+	// (magnitude, units) is unspecified (member order is not a contract,
+	// REQ-052), and their values are already verified through the decoded a/b
+	// above, so this asserts the discriminator position alone.
+	const slotHead = `"value":{"_type":"DV_QUANTITY"`
+	if !strings.Contains(string(eb), slotHead) {
+		t.Fatalf("the slot value does not lead with its `_type` discriminator:\n %s", eb)
 	}
 }
 

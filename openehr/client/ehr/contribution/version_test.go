@@ -76,6 +76,42 @@ func marshalToMap(t *testing.T, v any) map[string]any {
 	return m
 }
 
+// TestOriginalVersionSignatureOmitzero pins the ADR 0022 / Q6 ruling that the
+// contribution shadow DTO tags `signature` `omitzero`, not `omitempty`: a nil
+// Signature is omitted, but a non-nil pointer to an empty string still emits
+// `"signature":""` — the same spelling from any entry point, where a v1
+// caller's `omitempty` would drop the empty-string pointer. Can-fail control:
+// retag the field `omitempty` in version.go and the empty-string case emits
+// nothing, so its `present == true` assertion goes red.
+func TestOriginalVersionSignatureOmitzero(t *testing.T) {
+	empty := ""
+	sig := "base64sig=="
+	cases := []struct {
+		name       string
+		signature  *string
+		wantMember bool
+		wantValue  string
+	}{
+		{"nil omitted", nil, false, ""},
+		{"empty string emitted", &empty, true, ""},
+		{"value emitted", &sig, true, sig},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rmv := buildOriginalVersionRM()
+			rmv.Signature = tc.signature
+			m := marshalToMap(t, contribution.WrapOriginalVersion(rmv))
+			got, present := m["signature"]
+			if present != tc.wantMember {
+				t.Fatalf("signature present = %v, want %v", present, tc.wantMember)
+			}
+			if tc.wantMember && got != tc.wantValue {
+				t.Errorf("signature = %v, want %q", got, tc.wantValue)
+			}
+		})
+	}
+}
+
 // TestOriginalVersionBMMName verifies the BMMName marker.
 func TestOriginalVersionBMMName(t *testing.T) {
 	ov := contribution.WrapOriginalVersion(buildOriginalVersionRM())
