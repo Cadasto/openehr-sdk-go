@@ -12,6 +12,7 @@ package typereg_test
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -113,5 +114,25 @@ func TestDecodeErrorToleratesAnUnguardedNilInner(t *testing.T) {
 	withCause := &typereg.DecodeError{Path: "/composition/content", Type: "OBSERVATION", Inner: errors.New("boom")}
 	if got, want := withCause.Error(), "decode /composition/content (_type=\"OBSERVATION\"): boom"; got != want {
 		t.Errorf("Error() with a withCause Inner = %q, want %q", got, want)
+	}
+}
+
+// TestShapeClassifiersGuardTypedNilDecodeError pins the same REQ-025 axis on the
+// two shape classifiers: a chain carrying a typed-nil *DecodeError satisfies
+// errors.AsType[*DecodeError] but is NOT a real dispatch failure, so both
+// WrapShapeError and ClassifyShape must still classify it as a shape error
+// (ErrInvalidShape) rather than bypass the sentinel. Can-fail control: drop the
+// `&& de != nil` guard in either classifier and its assertion below goes red —
+// the typed nil is then mistaken for a dispatch failure and returned untouched.
+func TestShapeClassifiersGuardTypedNilDecodeError(t *testing.T) {
+	var de *typereg.DecodeError // typed nil: no dispatch actually failed
+	boxed := error(de)          // non-nil interface carrying the typed nil
+	err := fmt.Errorf("boxed: %w", boxed)
+
+	if got := typereg.ClassifyShape(err); !errors.Is(got, typereg.ErrInvalidShape) {
+		t.Errorf("ClassifyShape(typed-nil DecodeError) = %v; want errors.Is(_, ErrInvalidShape)", got)
+	}
+	if got := typereg.WrapShapeError("DV_TEXT", err); !errors.Is(got, typereg.ErrInvalidShape) {
+		t.Errorf("WrapShapeError(typed-nil DecodeError) = %v; want errors.Is(_, ErrInvalidShape)", got)
 	}
 }

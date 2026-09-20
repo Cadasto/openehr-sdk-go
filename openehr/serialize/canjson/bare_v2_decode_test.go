@@ -72,19 +72,29 @@ func findCassette(t *testing.T, name string) fixtures.CompositionJSONRel {
 
 // TestCallerUnmarshalersReachNestedSlot pins Important 2: a caller-supplied
 // json.WithUnmarshalers must reach every value the SDK decodes, not just the
-// outermost. A caller hook for *rm.DVText fires when a DVText decodes inside the
-// polymorphic ELEMENT.value slot.
+// outermost. A caller hook for *rm.DVText must run both at ELEMENT.name (a
+// direct DVText field) and inside the polymorphic ELEMENT.value slot.
 //
 // Before the fix, decodeOptions joined only the SDK aggregate, and because
 // WithUnmarshalers is single-valued that join replaced the caller's hooks
-// wholesale at every nested decode, so this test was red: the marker never
-// fired and the value decoded through DVText's own UnmarshalJSONFrom.
+// wholesale at every nested decode, so the caller's hook never reached the
+// nested value.
+//
+// The hook tags each value it decodes with a unique marker, and the test
+// asserts the marker on BOTH decoded values. That is what makes this a real
+// control rather than a tautology: the SDK's own DVText.UnmarshalJSONFrom
+// produces "hello" (no marker), so a bare `dv.Value == "hello"` check would
+// pass even if the caller hook never reached the nested slot. Requiring the
+// marker on ELEMENT.value proves the caller hook, not the SDK's, decoded it;
+// requiring it on ELEMENT.name proves the hook is not merely firing once at the
+// top. Can-fail control: drop the caller-join in decodeOptions and the nested
+// value loses its marker.
 func TestCallerUnmarshalersReachNestedSlot(t *testing.T) {
-	var fired bool
+	const marker = "::caller-hook::"
 	mine := jsonv2.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *rm.DVText) error {
-		fired = true
 		// Decode the value into a shadow struct (no _type, no RM methods) so the
-		// hook does not re-invoke itself; then populate the receiver.
+		// hook does not re-invoke itself; then populate the receiver, tagging the
+		// value so the assertions can tell a caller-hook decode from an SDK one.
 		var shadow struct {
 			Value string `json:"value"`
 		}
@@ -95,7 +105,7 @@ func TestCallerUnmarshalersReachNestedSlot(t *testing.T) {
 		if err := jsonv2.Unmarshal(raw, &shadow); err != nil {
 			return err
 		}
-		out.Value = shadow.Value
+		out.Value = shadow.Value + marker
 		return nil
 	})
 
@@ -106,15 +116,15 @@ func TestCallerUnmarshalersReachNestedSlot(t *testing.T) {
 	if err := jsonv2.Unmarshal([]byte(in), &elem, jsonv2.WithUnmarshalers(mine)); err != nil {
 		t.Fatalf("bare v2 Unmarshal(ELEMENT) with caller hook: %v", err)
 	}
-	if !fired {
-		t.Fatal("caller hook did not fire: decodeOptions dropped the caller's WithUnmarshalers at the nested DATA_VALUE slot")
+	if elem.Name == nil || elem.Name.GetValue() != "n"+marker {
+		t.Errorf("elem.Name = %v, want a DVText with value %q — the caller hook did not decode the ELEMENT.name field", elem.Name, "n"+marker)
 	}
 	dv, ok := elem.Value.(*rm.DVText)
 	if !ok {
 		t.Fatalf("elem.Value = %T, want *rm.DVText decoded through the caller's hook", elem.Value)
 	}
-	if dv.Value != "hello" {
-		t.Errorf("elem.Value.Value = %q, want %q", dv.Value, "hello")
+	if dv.Value != "hello"+marker {
+		t.Errorf("elem.Value.Value = %q, want %q — the caller hook did not decode the nested ELEMENT.value slot (decodeOptions dropped its WithUnmarshalers there)", dv.Value, "hello"+marker)
 	}
 }
 
@@ -138,5 +148,40 @@ func TestMalformedPolymorphicSlotErrorIsClean(t *testing.T) {
 	}
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; want errors.Is(_, canjson.ErrInvalidShape)", err)
+	}
+}
+
+// TestBareV2DecodeDuplicateMemberWrapsErrInvalidShape pins that a caller
+// driving a generated UnmarshalJSONFrom through bare encoding/json/v2 — with no
+// canjson entry point and no options — gets the same duplicate-member
+// classification a canjson caller does (REQ-052): the refusal wraps
+// ErrInvalidShape and stays reachable as jsontext.ErrDuplicateName. The
+// classification lives at typereg.DecodeInto's ReadValue site, so it holds both
+// at the top level and for a duplicate nested inside the value (ReadValue
+// validates the whole value it reads).
+//
+// Can-fail control: revert DecodeInto's `return ClassifyDuplicate(err)` to
+// `return err` and the ErrInvalidShape assertions go red while the
+// ErrDuplicateName ones stay green — the tokenizer still refuses the duplicate,
+// only the SDK sentinel is lost.
+func TestBareV2DecodeDuplicateMemberWrapsErrInvalidShape(t *testing.T) {
+	cases := []struct {
+		name string
+		data string
+		into func() any
+	}{
+		{"top-level DV_TEXT", `{"_type":"DV_TEXT","value":"a","value":"b"}`, func() any { return new(rm.DVText) }},
+		{"nested in ELEMENT", `{"_type":"ELEMENT","archetype_node_id":"at0","name":{"_type":"DV_TEXT","value":"a","value":"b"}}`, func() any { return new(rm.Element) }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := jsonv2.Unmarshal([]byte(tc.data), tc.into())
+			if !errors.Is(err, canjson.ErrInvalidShape) {
+				t.Errorf("bare v2 Unmarshal(duplicate) err = %v; want errors.Is(_, canjson.ErrInvalidShape)", err)
+			}
+			if !errors.Is(err, jsontext.ErrDuplicateName) {
+				t.Errorf("bare v2 Unmarshal(duplicate) err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
+			}
+		})
 	}
 }

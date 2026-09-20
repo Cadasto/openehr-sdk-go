@@ -186,9 +186,25 @@ func MarshalOptions(enc *jsontext.Encoder) json.Options {
 func DecodeInto(dec *jsontext.Decoder, rmType string, out any) error {
 	raw, err := dec.ReadValue()
 	if err != nil {
-		// A syntactic or IO error from the tokenizer is left unwrapped: it is
-		// not a shape failure of this type, and callers classify it by kind.
-		return err
+		// A duplicate object member name is a shape refusal (REQ-052), so it is
+		// classified here: a caller driving this generated method through
+		// encoding/json/v2 directly then gets ErrInvalidShape just as a canjson
+		// entry point does, and the canjson and registry routes re-apply the
+		// same gate idempotently. Any other syntactic or IO error from the
+		// tokenizer is left unwrapped: it is not a shape failure of this type,
+		// and callers classify it by kind.
+		return ClassifyDuplicate(err)
+	}
+	// Bound recursion the same way [Registry.Decode] and [DecodePolymorphic]
+	// do (REQ-040). This is the shared body of every generated
+	// UnmarshalJSONFrom, so the check reaches every canonical-JSON decode
+	// route — canjson.Unmarshal, canjson.Decoder.Decode and a bare v2/v1
+	// caller — not only the registry path. At the outermost type raw is the
+	// whole document, so the top-level call rejects an over-deep value before
+	// it recurses; nested calls re-measure their own subtree, a redundancy the
+	// single-pass decode follow-up can fold away.
+	if d := jsonNestingDepth(raw); d > maxDecodeDepth {
+		return &DecodeError{Inner: fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)}
 	}
 	if head, err := peekType(raw); err != nil {
 		return WrapShapeError(rmType, err)
@@ -247,7 +263,10 @@ func slotPointer(err error) string {
 func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any) error {
 	raw, err := dec.ReadValue()
 	if err != nil {
-		return err
+		// Same rule as [DecodeInto]: a duplicate member name is a shape refusal
+		// (REQ-052); any other tokenizer error is left for the caller to
+		// classify by kind.
+		return ClassifyDuplicate(err)
 	}
 	if string(raw) == "null" {
 		// A JSON null leaves the interface slot at its zero value (nil): the
