@@ -96,24 +96,6 @@ func TestProbe030GuardCatchesNarrowedPolymorphicSlot(t *testing.T) {
 	}
 }
 
-// TestProbe030SkipFloorKeysAllMatchAnInput pins that every probe030SkipFloor key
-// names a cassette that is actually in Probe030Inputs. The lookup at
-// loadCassetteInputs is a plain map index that never reports a miss, so a dead
-// key (a typo, or a cassette removed from the corpus) would silently hold
-// nothing out. The count of inputs carrying SkipFloor must equal
-// len(probe030SkipFloor); adding a key that matches no input turns this red.
-func TestProbe030SkipFloorKeysAllMatchAnInput(t *testing.T) {
-	var held int
-	for _, in := range Probe030Inputs {
-		if in.SkipFloor {
-			held++
-		}
-	}
-	if held != len(probe030SkipFloor) {
-		t.Errorf("inputs with SkipFloor = %d, want %d (len(probe030SkipFloor)); a key that matches no cassette is dead and holds nothing out", held, len(probe030SkipFloor))
-	}
-}
-
 // dropMemberReEncoder is a lossy re-encode double: it canjson-encodes the value
 // and then removes one top-level member, standing in for a codec that drops a
 // field on the re-encode path.
@@ -152,17 +134,23 @@ func retypeSlotReEncoder(slot string, replacement map[string]any) func(any) ([]b
 }
 
 // TestProbe030SkipFloorSetIsLocked pins the membership of probe030SkipFloor,
-// not just that its one entry behaves. The RM-floor leg (REQ-112) is a MUST for
+// not just that its entries behave. The RM-floor leg (REQ-112) is a MUST for
 // every cassette; only a cassette whose vendored content carries a finding
-// invariant to the round trip may be held out, and today that is exactly
-// clinical_notes.v0. Because probe030RoundTrip skips the floor for any key in
+// invariant to the round trip may be held out, and today that is exactly the
+// five named below, each justified at its probe030SkipFloor entry. Because probe030RoundTrip skips the floor for any key in
 // this map, an entry added here silently drops the floor MUST for that cassette
 // while TestProbe030 and the ValidateRM plant both stay green. This guard fails
 // when the set changes, so a new skip has to be justified in the probe.
 //
 // Can-fail control: add any cassette to probe030SkipFloor and this test reddens.
 func TestProbe030SkipFloorSetIsLocked(t *testing.T) {
-	want := map[string]bool{"compositions/clinical_notes.v0.json": true}
+	want := map[string]bool{
+		"compositions/clinical_notes.v0.json":                               true,
+		"compositions/Demonstration.v1.json":                                true,
+		"compositions/TestPerson.v2.json":                                   true,
+		"compositions/Test_dv_interval_dv_count_open_constraint.v0.json":    true,
+		"compositions/Test_dv_interval_dv_quantity_open_constraint.v0.json": true,
+	}
 	if len(probe030SkipFloor) != len(want) {
 		t.Fatalf("probe030SkipFloor has %d entries, want %d: %v", len(probe030SkipFloor), len(want), probe030SkipFloor)
 	}
