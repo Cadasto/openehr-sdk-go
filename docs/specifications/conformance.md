@@ -546,16 +546,16 @@ client scenarios to SDK coverage:
 - **Preconditions:** Vendored RM cassettes covering the required-set breaches and the four named leaf invariants (CODE_PHRASE, DV_QUANTITY, DV_INTERVAL, OBJECT_REF-family) documented in [clinical-modeling.md § REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor).
 - **Wire assertion:** Not yet defined at cassette granularity — the unit-test cassette matrix in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go) carries first-cycle coverage (required-set absences, the four named invariants, the unbounded-skip negative, and the nil-guard contract) inline, ahead of a dedicated vendored-cassette probe.
 - **Modes:** Sandbox (planned); Cassette, Live not yet scoped.
-- **Status:** Deferred — REQ-112 is landed and unit-covered; the dedicated PROBE-077 vendored-cassette matrix is deferred to a follow-up cycle (tracked in [roadmap.md](../roadmap.md)).
+- **Status:** Deferred. REQ-112's shipped floor is unit-covered; the dedicated PROBE-077 vendored-cassette matrix is deferred to a follow-up cycle (tracked in [roadmap.md](../roadmap.md)).
 - **Satisfies:** REQ-112.
 
 #### PROBE-081 — EHR_STATUS value-typed mandatory presence (subject)
 
-- **Title:** `validation.ValidateRMEHRStatusBytes(data)` flags an omitted RM-mandatory `subject` (typed `rm.PartySelf`, a value struct) from JSON-key presence, without false-positiving on a valid bare `PARTY_SELF`.
+- **Title:** `validation.ValidateRMEHRStatusBytes(data)` decides value-typed mandatory presence from JSON-key presence: it flags an omitted RM-mandatory `subject` (typed `rm.PartySelf`, a value struct) without false-positiving on a valid bare `PARTY_SELF` (implemented), with the ARCHETYPED root arm (`archetype_details.archetype_id` / `rm_version`) planned.
 - **Preconditions:** Canonical-JSON EHR_STATUS bodies — one omitting the `subject` key; one supplying `subject` as a bare `{"_type":"PARTY_SELF"}` (no external_ref); one omitting the interface-typed `name`.
-- **Wire assertion:** In-repo property — an EHR_STATUS whose top-level `subject` key is absent (or present but JSON `null`) MUST surface `required` at `/subject`; a present non-null subject (even the bare `PARTY_SELF` that decodes to the Go zero value) MUST NOT; the interface-typed mandatory `name`, when absent, MUST still surface `required` at `/name` (no regression). A non-object / malformed input surfaces a single `invalid_shape` at `/`.
+- **Wire assertion:** In-repo property. An EHR_STATUS whose top-level `subject` key is absent (or present but JSON `null`) MUST surface `required` at `/subject`; a present non-null subject (even the bare `PARTY_SELF` that decodes to the Go zero value) MUST NOT; the interface-typed mandatory `name`, when absent, MUST still surface `required` at `/name` (no regression). A non-object / malformed input surfaces a single `invalid_shape` at `/`. Planned ARCHETYPED arm: when `archetype_details` is present on the root EHR_STATUS, an absent or `null` `archetype_details.archetype_id` MUST surface `required` at `/archetype_details/archetype_id`, and an absent or `null` `archetype_details.rm_version` MUST surface `required` at `/archetype_details/rm_version`, at the root node only.
 - **Modes:** In-repo (unit-level property; no backend).
-- **Status:** Implemented (inline) — see [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go).
+- **Status:** Implemented (inline) for `subject`; ARCHETYPED arm planned ([plan 2026-09-24](../plans/2026-09-24-rm-floor-archetype-roots.md)). See [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go).
 - **Satisfies:** REQ-112.
 
 #### PROBE-086 — Upstream FLAT serialisation parity
