@@ -39,7 +39,7 @@ composition: archetype_node_id=openEHR-EHR-COMPOSITION.encounter.v1
 OK: canonical-JSON Composition decoded from body_weight.json
 ```
 
-To use it in your own project — the SDK is pre-1.0, so pin an exact tag; a minor release can change the public API:
+To use it in your own project, pin an exact tag. The SDK is pre-1.0, so a minor release can change the public API:
 
 ```bash
 go get github.com/cadasto/openehr-sdk-go@latest   # pre-1.0: then pin the exact tag it resolves to
@@ -61,18 +61,18 @@ If you only need one piece (RM modeling, a codec, validation, AQL string constru
 
 ## What's in it
 
-The definitive landed-vs-planned status, with REQ and PROBE identifiers, is in the [roadmap](docs/roadmap.md) and the [REQ registry](docs/specifications/REQ.md).
+The [roadmap](docs/roadmap.md) and the [REQ registry](docs/specifications/REQ.md) hold the authoritative landed-vs-planned status, with REQ and PROBE identifiers.
 
-- **openEHR REST client** — System, EHR, EHR_STATUS, Composition, Directory, Contribution, Query, Definition (stored AQL), Demographic, and Admin, over a versioned transport. [wire](docs/specifications/wire.md), [transport](docs/specifications/transport.md)
-- **Reference Model** — typed RM structs and a central type registry, generated from pinned BMM dictionaries, plus hand-written identifier, temporal, and locatable-path helpers. [rm-modeling](docs/specifications/rm-modeling.md)
-- **Serialization** — canonical JSON and XML round-trips, and bidirectional FLAT / STRUCTURED simplified-format codecs driven by a Web Template. [wire](docs/specifications/wire.md)
-- **Templates (ADL 1.4 OPT)** — operational-template parsing with typed primitive constraints, a compiled-template foundation, and WebTemplate JSON export for form generation. [rm-modeling](docs/specifications/rm-modeling.md)
-- **Compositions** — an OPT-driven builder, template-driven validation, and RM-instance synthesis from a template. [wire](docs/specifications/wire.md)
-- **AQL** — literal AQL wire models and result sets, fluent struct and verb builders, and static parse-and-lint. [wire](docs/specifications/wire.md)
-- **Authentication** — SMART-on-openEHR (PKCE), client credentials, JWT bearer, and basic token sources, all over one injected `TokenSource`. [auth](docs/specifications/auth.md)
-- **Service discovery** — a multi-backend service catalog with per-node spec pinning. [service-discovery](docs/specifications/service-discovery.md)
-- **Cadasto platform extras** — mostly on the roadmap: Datamap, MPI, an Extra API, and Care aggregates are **planned**, and the Cadasto admin package has health probes today (the rest is **partial**). They live in the same module behind a `cadasto/` cut line, so they can be split out later as a subtree move rather than a rewrite. [module-layout](docs/specifications/module-layout.md)
-- **Conformance** — an openEHR wire-conformance probe suite covering round-trip byte-stability and spec-correct envelopes. [conformance](docs/specifications/conformance.md)
+- **openEHR REST client**: System, EHR, EHR_STATUS, Composition, Directory, Contribution, Query, Definition (stored AQL), Demographic, and Admin, over a versioned transport. [wire](docs/specifications/wire.md), [transport](docs/specifications/transport.md)
+- **Reference Model**: typed RM structs and a central type registry, generated from pinned BMM dictionaries, plus hand-written identifier, temporal, and locatable-path helpers. [rm-modeling](docs/specifications/rm-modeling.md)
+- **Serialization**: canonical JSON and XML round-trips, and bidirectional FLAT / STRUCTURED simplified-format codecs driven by a Web Template. [wire](docs/specifications/wire.md)
+- **Templates (ADL 1.4 OPT)**: operational-template parsing with typed primitive constraints, a compiled-template foundation, and WebTemplate JSON export for form generation. [rm-modeling](docs/specifications/rm-modeling.md)
+- **Compositions**: an OPT-driven builder, template-driven validation, and RM-instance synthesis from a template. [wire](docs/specifications/wire.md)
+- **AQL**: literal AQL wire models and result sets, fluent struct and verb builders, and static parse-and-lint. [wire](docs/specifications/wire.md)
+- **Authentication**: SMART-on-openEHR (PKCE), client credentials, JWT bearer, and basic token sources, all over one injected `TokenSource`. [auth](docs/specifications/auth.md)
+- **Service discovery**: a multi-backend service catalog with per-node spec pinning. [service-discovery](docs/specifications/service-discovery.md)
+- **Cadasto platform extras**: mostly still on the roadmap. Datamap, MPI, an Extra API, and Care aggregates are **planned**. The Cadasto admin package has health probes today, and the rest of it is **partial**. These packages live in the same module behind a `cadasto/` cut line, so they can later move out as a subtree instead of being rewritten. [module-layout](docs/specifications/module-layout.md)
+- **Conformance**: an openEHR wire-conformance probe suite covering round-trip byte-stability and spec-correct envelopes. [conformance](docs/specifications/conformance.md)
 
 ## Getting started
 
@@ -82,7 +82,7 @@ If you're working on the SDK itself, `make help` lists the grouped targets and [
 
 ## AI-assisted development
 
-Much of this codebase and its documentation was written with AI coding assistants such as Claude Code and Cursor. The written specification is what keeps that honest: every change is measured against the specs in this repository, has to pass the [`make ci` gate](docs/ci.md), and is reviewed before a maintainer merges it. How the assistants are set up, and what they must look up rather than guess, is in [ai-workflow.md](docs/ai-workflow.md). The rules for contributing with AI help, including the `Assisted-by:` commit trailer, are in [CONTRIBUTING.md](CONTRIBUTING.md#ai-assisted-contributions).
+Much of this codebase and its documentation was written with AI coding assistants such as Claude Code and Cursor. The written specification is what keeps that honest: every change is measured against the specs in this repository and has to pass the [`make ci` gate](docs/ci.md). Each change is also reviewed before a maintainer merges it. How the assistants are set up, and what they must look up rather than guess, is in [ai-workflow.md](docs/ai-workflow.md). The rules for contributing with AI help, including the `Assisted-by:` commit trailer, are in [CONTRIBUTING.md](CONTRIBUTING.md#ai-assisted-contributions).
 
 ## Documentation
 
@@ -92,7 +92,7 @@ The normative source of truth and the design that realises it. When code and spe
 
 | Doc | Scope |
 |---|---|
-| [docs/specifications/](docs/specifications/) | **Normative specs** — REQ / PROBE / STRAND topic specs |
+| [docs/specifications/](docs/specifications/) | **Normative specs**: REQ / PROBE / STRAND topic specs |
 | [docs/specifications/REQ.md](docs/specifications/REQ.md) | Requirement registry (index → canonical topic spec) |
 | [docs/specifications/traceability.yaml](docs/specifications/traceability.yaml) | Machine-readable REQ → package / probe / test map |
 | [docs/architecture.md](docs/architecture.md) | Design narrative + dependency mermaid |
@@ -117,6 +117,6 @@ Open research strands live in [research-strands.md](docs/specifications/research
 
 ## License
 
-The SDK is MIT — see [LICENSE](LICENSE).
+The SDK is released under the MIT licence. See [LICENSE](LICENSE).
 
 Vendored third-party artefacts (test fixtures, openEHR specification pins, the AQL grammar) keep their upstream licences. The inventory is [LICENSING.md](LICENSING.md).

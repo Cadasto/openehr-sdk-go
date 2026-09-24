@@ -4,13 +4,13 @@ How `github.com/cadasto/openehr-sdk-go` is versioned, tagged, and announced. Qua
 
 ## Versioning
 
-[SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) ([REQ-004](specifications/packaging.md#req-004--semantic-versioning)). The **git tag** (`vX.Y.Z`) is the single authoritative version — `go.mod` carries only the Go language version, never the SDK's own semver, and there is no runtime `version` package. Consumers pin:
+[SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) ([REQ-004](specifications/packaging.md#req-004--semantic-versioning)). The **git tag** (`vX.Y.Z`) is the single authoritative version. `go.mod` carries only the Go language version, never the SDK's own semver, and there is no runtime `version` package. Consumers pin:
 
 ```bash
 go get github.com/cadasto/openehr-sdk-go@vX.Y.Z
 ```
 
-Standard SemVer applies (breaking → major, additive → minor, fix → patch). The cases worth spelling out because they're specific to this SDK:
+Standard SemVer applies (breaking → major, additive → minor, fix → patch). These cases are specific to this SDK:
 
 | Change | Bump |
 |---|---|
@@ -21,7 +21,7 @@ Standard SemVer applies (breaking → major, additive → minor, fix → patch).
 
 ### Four version concepts
 
-The repo pins four versions independently; the git tag tracks only the first. The rest ship as a compatibility table in each release's notes, auto-generated from `go.mod`, `resources/bmm/`, and the git SHA by [`scripts/release-notes.sh`](../scripts/release-notes.sh) — so nothing here needs hand-updating.
+The repo pins four versions independently, and the git tag tracks only the first. The rest ship as a compatibility table in each release's notes. [`scripts/release-notes.sh`](../scripts/release-notes.sh) generates that table from `go.mod`, `resources/bmm/`, and the git SHA, so nothing here needs updating by hand.
 
 | Concept | Pin location | Bumps when |
 |---|---|---|
@@ -32,53 +32,53 @@ The repo pins four versions independently; the git tag tracks only the first. Th
 
 ### Pre-1.0
 
-While on `v0.x`: **minor** bumps may break the public API (release notes list every break); **patch** bumps stay compatible. Pin an exact tag and read the notes before upgrading a minor.
+While on `v0.x`, **minor** bumps may break the public API (release notes list every break) and **patch** bumps stay compatible. Pin an exact tag and read the notes before upgrading a minor.
 
 ### `v1.0.0` gate
 
 Cut when all three hold ([`module-layout.md` § Versioning](specifications/module-layout.md#versioning)):
 
-1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed` or `deprecated` — no `partial`, no `planned`. (`deprecated` is terminal: REQ-081 and REQ-097 carry no active requirement and will never land, so a gate demanding `landed` for every row could not be met.)
+1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed` or `deprecated`, with no `partial` and no `planned`. (`deprecated` is terminal: REQ-081 and REQ-097 carry no active requirement and will never land, so a gate demanding `landed` for every row could not be met.)
 2. The openEHR wire-conformance probe suite passes ([REQ-080](specifications/conformance.md#req-080--openehr-wire-conformance)).
 3. A reference openEHR deployment passes the live probe suite ([REQ-082](specifications/conformance.md#req-082--runnability)).
 
-Promoting each spec file `Status: Draft → Stable` is then part of the `v1.0.0` cut, not a fourth precondition — `Status:` is a per-**file** stability promise ([README.md § Status header](specifications/README.md#status-header)), whereas whether a requirement is *built* is the per-REQ `Impl.` column condition 1 gates on.
+Promoting each spec file `Status: Draft → Stable` then happens as part of the `v1.0.0` cut. It is not a fourth precondition. `Status:` is a per-**file** stability promise ([README.md § Status header](specifications/README.md#status-header)). Whether a requirement is *built* is recorded in the per-REQ `Impl.` column, which condition 1 checks.
 
-Until then we ship `v0.x` adopter slices; current progress is in [`docs/roadmap.md`](roadmap.md).
+Until then the project ships `v0.x` adopter slices. Current progress is in [`docs/roadmap.md`](roadmap.md).
 
 ## Release process
 
 ### Tag checklist
 
-1. **CI green on `main`** — `make ci` (the same gate as [`ci.yml`](../.github/workflows/ci.yml)).
-2. **CHANGELOG** — rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`; open a fresh `## [Unreleased]` above it. Keep it terse — one-sentence bullets and a one-sentence summary per the [CHANGELOG brevity rule](../AGENTS.md#code-style-and-conventions); notes are generated verbatim from this block, so trim *here*, not in the GitHub draft. Commit this (with step 3) **directly to `main`** — no branch or PR for a release bump (see [Branch & tag policy](#branch--tag-policy)). The same commit bumps the `go get …@vX.Y.Z` line on [`pages/install.md`](../pages/install.md) and [`pages/index.md`](../pages/index.md): `make docs-check` reads the release straight out of this CHANGELOG heading and fails until both site pages name it.
-3. **Roadmap** — bump [`docs/roadmap.md`](roadmap.md) if the release crosses a milestone.
-4. **Annotated tag from `main`** and push:
+1. **CI green on `main`.** Run `make ci` (the same gate as [`ci.yml`](../.github/workflows/ci.yml)).
+2. **CHANGELOG.** Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and open a fresh `## [Unreleased]` above it. Keep it terse: one-sentence bullets and a one-sentence summary, per the [CHANGELOG brevity rule](../AGENTS.md#code-style-and-conventions). The release notes are copied verbatim from this block, so trim *here*, not in the GitHub draft. Commit this (with step 3) **directly to `main`**, with no branch or PR for a release bump (see [Branch & tag policy](#branch--tag-policy)). The same commit bumps the `go get …@vX.Y.Z` line on [`pages/install.md`](../pages/install.md) and [`pages/index.md`](../pages/index.md): `make docs-check` reads the release straight out of this CHANGELOG heading and fails until both site pages name it.
+3. **Roadmap.** Bump [`docs/roadmap.md`](roadmap.md) if the release crosses a milestone.
+4. **Annotated tag from `main`.** Create it and push:
    ```bash
    git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z
    ```
-5. **Release workflow** — [`release.yml`](../.github/workflows/release.yml) fires on the `v*` tag: re-runs `make ci` on the tagged commit, regenerates notes via [`scripts/release-notes.sh`](../scripts/release-notes.sh) (CHANGELOG block + auto compatibility table), and creates a **draft** Release. It never auto-publishes; if CI fails, no draft is created.
-6. **Publish** — review the draft on the [Releases page](https://github.com/Cadasto/openehr-sdk-go/releases), edit if needed, click **Publish release**.
+5. **Release workflow.** [`release.yml`](../.github/workflows/release.yml) fires on the `v*` tag. It re-runs `make ci` on the tagged commit, regenerates notes via [`scripts/release-notes.sh`](../scripts/release-notes.sh) (CHANGELOG block + auto compatibility table), and creates a **draft** Release. It never publishes on its own, and if CI fails it creates no draft.
+6. **Publish.** Review the draft on the [Releases page](https://github.com/Cadasto/openehr-sdk-go/releases), edit if needed, and click **Publish release**.
 
 Preview notes locally without side effects: `bash scripts/release-notes.sh X.Y.Z`, or the workflow's `workflow_dispatch` dry-run.
 
 ### Pre-releases & hotfixes
 
 - **Pre-release:** optional `vX.Y.Z-rc.N` tag; `go get @vX.Y.Z-rc.1` selects it explicitly.
-- **Hotfix:** patch from `main` if releasable; otherwise cherry-pick to a `release/v0.x` branch — pre-1.0 support is best-effort, and long-lived `release/*` branches are a `v1.x` concern.
+- **Hotfix:** patch from `main` if releasable; otherwise cherry-pick to a `release/v0.x` branch. Pre-1.0 support is best-effort, and long-lived `release/*` branches are a `v1.x` concern.
 - **Cadence:** `v0.x` is on-demand, milestone-driven.
 
 ## Branch & tag policy
 
-- `main` is always releasable after CI; tag **only** from `main` (or a `release/v0.x` hotfix branch).
-- Tags are pushed by maintainers only; branch protection on `main` is the enforcement.
-- **Substantive work** (features, fixes, docs of record) lands via branch + PR. **Mechanical release bookkeeping** — the version-bump CHANGELOG cut (steps 2–3 above) and any milestone roadmap bump — is committed **directly to `main`** by a maintainer; no branch or PR detour. If a direct push is ever rejected by branch protection, stop and surface it rather than silently routing the bump through a PR.
+- `main` is always releasable after CI. Tag **only** from `main` (or a `release/v0.x` hotfix branch).
+- Only maintainers push tags, and branch protection on `main` enforces this.
+- **Substantive work** (features, fixes, docs of record) lands via branch + PR. A maintainer commits **mechanical release bookkeeping** directly to `main`, with no branch or PR. That covers the version-bump CHANGELOG cut (steps 2–3 above) and any milestone roadmap bump. If branch protection ever rejects a direct push, stop and report it. Do not quietly route the bump through a PR instead.
 
 ## References
 
-- [REQ-004](specifications/packaging.md#req-004--semantic-versioning) — semantic versioning
-- [`module-layout.md` § Versioning](specifications/module-layout.md#versioning) — bump matrix + `v1.0.0` gates
-- [ADR 0001](adr/0001-bmm-version-bump-runbook.md) — BMM bumps vs codegen
-- [`docs/ci.md`](ci.md) — quality gate before tag
+- [REQ-004](specifications/packaging.md#req-004--semantic-versioning): semantic versioning
+- [`module-layout.md` § Versioning](specifications/module-layout.md#versioning): bump matrix + `v1.0.0` gates
+- [ADR 0001](adr/0001-bmm-version-bump-runbook.md): BMM bumps vs codegen
+- [`docs/ci.md`](ci.md): quality gate before tag
 - [versioning-strategy plan](plans/archive/2026-05-25-versioning-strategy.md) (archived)
 - Go modules: [version numbering](https://go.dev/doc/modules/version-numbers)

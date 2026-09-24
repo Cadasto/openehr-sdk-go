@@ -1,8 +1,8 @@
 # testkit/cassettes
 
-Vendored **fixture documents** — OPTs, compositions, RM samples, wire bodies, and reference goldens for codec, validation, and probe tests. Checked in so CI does not require a sibling clone. Licences and provenance: [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md); repository-wide inventory: [`LICENSING.md`](../../LICENSING.md).
+Vendored **fixture documents** for codec, validation, and probe tests: OPTs, compositions, RM samples, wire bodies, and reference goldens. They are checked in so CI does not need a sibling clone. Licences and provenance: [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md); repository-wide inventory: [`LICENSING.md`](../../LICENSING.md).
 
-**These are not REQ-082 Cassette-mode recordings.** Everything here is a request or response *body*: it carries no method, URL, header, or status code, so none of it can be replayed as an HTTP exchange. The Cassette mode that [REQ-082](../../docs/specifications/conformance.md#req-082--runnability) mandates records whole exchanges and lands under `testkit/recordings/`. The directory name predates that distinction; the fixtures are addressed through [`testkit/fixtures`](../fixtures/paths.go), so it is kept rather than renamed.
+**These are not REQ-082 Cassette-mode recordings.** Everything here is a request or response *body*: it carries no method, URL, header, or status code, so none of it can be replayed as an HTTP exchange. The Cassette mode that [REQ-082](../../docs/specifications/conformance.md#req-082--runnability) mandates records whole exchanges and lands under `testkit/recordings/`. The directory name predates that distinction. Code reaches the fixtures through [`testkit/fixtures`](../fixtures/paths.go), so the name is kept.
 
 ## Layout
 
@@ -28,28 +28,28 @@ cassettes/
 ```
 
 **Pinned subtree.** Everything under `flat-conformance/` is machine-synced from
-upstream at a recorded commit — do not hand-edit it. Refresh with
-`make flat-conformance-sync`; verify integrity with `make flat-conformance-verify`
-(offline `sha256`, the gate `make ci` runs). `make flat-conformance-check` adds an
-upstream-drift report (needs network; dev helper, not a gate). Resolve paths via
+upstream at a recorded commit, so do not hand-edit it. Refresh with
+`make flat-conformance-sync` and verify integrity with `make flat-conformance-verify`
+(an offline `sha256` check that `make ci` runs as a gate). `make flat-conformance-check`
+adds an upstream-drift report; it needs network and is a dev helper, not a gate. Resolve paths via
 [`fixtures.FlatConformanceOpt`](../fixtures/paths.go) /
 `fixtures.FlatConformanceFlat` / `fixtures.ListFlatConformance`. The rest of
-this directory is curated by hand and is not covered by that manifest; the
+this directory is curated by hand and is not covered by that manifest. The
 EHRbase Robot integration-test subset records the upstream commit it was
-ingested from in [`ROBOT_SOURCE.txt`](ROBOT_SOURCE.txt) (a provenance pin, not
-a per-file `sha256` lock).
+ingested from in [`ROBOT_SOURCE.txt`](ROBOT_SOURCE.txt). That file is a
+provenance pin, not a per-file `sha256` lock.
 
-`aql/conformance/` is a second pinned subtree — also do not hand-edit it. Its
+`aql/conformance/` is a second pinned subtree; do not hand-edit it either. Its
 CSVs are byte copies of the upstream files, so its pin
-([`AQL_SOURCE.txt`](aql/conformance/AQL_SOURCE.txt)) determines their content
-outright; refresh with [`scripts/ingest-robot-aql.sh`](../../scripts/ingest-robot-aql.sh),
+([`AQL_SOURCE.txt`](aql/conformance/AQL_SOURCE.txt)) fully determines their
+content. Refresh with [`scripts/ingest-robot-aql.sh`](../../scripts/ingest-robot-aql.sh),
 which also regenerates `EXCLUDED.txt`.
 
 Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`, `WebTemplateOpt`, `WebTemplateReference`).
 
 Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
-**Probe vs on-disk.** Every vendored `*.json` under `compositions/` is in [`ListCompositionJSON`](../fixtures/discover.go) and PROBE-030; one whose content carries a genuine RM-floor finding is held out of the `validation.ValidateRM` leg only (see Conventions). Vendored `*.xml` may be omitted from [`ListRMXML`](../fixtures/discover.go) via `compositionXMLExcluded` when canxml cannot round-trip it yet; the file stays for template and instance work.
+**Probe vs on-disk.** Every vendored `*.json` under `compositions/` is in [`ListCompositionJSON`](../fixtures/discover.go) and PROBE-030. A file whose content carries a genuine RM-floor finding is held out of the `validation.ValidateRM` leg only (see Conventions). Vendored `*.xml` may be omitted from [`ListRMXML`](../fixtures/discover.go) via `compositionXMLExcluded` when canxml cannot round-trip it yet; the file stays for template and instance work.
 
 ## Index by vendor
 
@@ -101,15 +101,15 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 | `IDCR - Laboratory Test Report.v0` | yes | — | yes | XML round-trip |
 | `IDCR -  Adverse Reaction List.v1` | yes | — | yes | XML round-trip (upstream double space in id) |
 
-**WebTemplate oracles** (`webtemplate/`, pinned at commit `e57511c6aca27ed501d31d663762c37c3491e74e` — OPT beside its reference WebTemplate golden, stems match `template_id`):
+**WebTemplate oracles** (`webtemplate/`, pinned at commit `e57511c6aca27ed501d31d663762c37c3491e74e`; each OPT sits beside its reference WebTemplate golden, and file stems match `template_id`):
 
 | Template id | Role | Size (OPT + golden) |
 |---|---|---|
-| `constrain_test` | PROBE-075 parity oracle (104/104) — pins **no** node name, so its golden carries **0** name predicates | 444 KB + 139 KB |
-| `Corona_Anamnese` | REQ-116 oracle — was the loud mode (`Build` → `ErrIDCollision`: four `SECTION.adhoc.v1` siblings; eight reused screening OBSERVATIONs under Symptome); golden carries 350 name-predicate segments over 213 `aqlPath`s. Since REQ-116 Phase 4 it builds and holds **230/230** structural parity | 1.2 MB + 230 KB |
-| `GECCO_Diagnose` | REQ-116 oracle — silent mode: always built, but its golden carries 30 name-predicate segments over 24 `aqlPath`s (its three `/content` children have **distinct** archetype ids and are all predicated) it emitted bare. Since REQ-116 Phase 4: **34/34** structural parity; residuals are the golden's own `min=1` outlier (14 nodes) and 1 input delta, both documented | 210 KB + 73 KB |
+| `constrain_test` | PROBE-075 parity oracle (104/104). Pins **no** node name, so its golden carries **0** name predicates | 444 KB + 139 KB |
+| `Corona_Anamnese` | REQ-116 oracle. It was the loud mode (`Build` → `ErrIDCollision`: four `SECTION.adhoc.v1` siblings; eight reused screening OBSERVATIONs under Symptome). Its golden carries 350 name-predicate segments over 213 `aqlPath`s. Since REQ-116 Phase 4 it builds and holds **230/230** structural parity | 1.2 MB + 230 KB |
+| `GECCO_Diagnose` | REQ-116 oracle, silent mode. It always built, but it emitted bare paths where its golden carries 30 name-predicate segments over 24 `aqlPath`s (its three `/content` children have **distinct** archetype ids and are all predicated). Since REQ-116 Phase 4: **34/34** structural parity. The residuals are the golden's own `min=1` outlier (14 nodes) and 1 input delta, both documented | 210 KB + 73 KB |
 
-The Corona pair is the largest cassette in the repo — the size is the cost of guarding the archetype-reuse-under-slot class with the real reference fixture rather than a synthetic cut-down.
+The Corona pair is the largest cassette in the repo. That size is the cost of guarding the archetype-reuse-under-slot class with the real reference fixture instead of a synthetic cut-down.
 
 ### ehrbase (Robot integration-tests)
 
@@ -133,9 +133,9 @@ The Corona pair is the largest cassette in the repo — the size is the cost of 
 
 **RM JSON** (`rm/`, flat names): 8 `ehr_status_valid_*` in PROBE-030/033 (excludes ECIS alternate wire); 12 `ehr_status_invalid_*` on disk for client/validation work but excluded from probe discovery (`ehr_status_invalid_*` prefix); 14 `folder_*` including `folder_update_*`.
 
-**Submissions** ([`submissions/`](submissions/README.md)): 47 CONTRIBUTION create payloads from `contributions/` (bulk `create_multiple_compositions` omitted) — use `contribution.Submission`, not `rm.Contribution` decode.
+**Submissions** ([`submissions/`](submissions/README.md)): 47 CONTRIBUTION create payloads from `contributions/` (bulk `create_multiple_compositions` omitted). Decode them with `contribution.Submission`, not `rm.Contribution`.
 
-**AQL conformance corpus** ([`aql/conformance/`](aql/conformance/)): 12 FROM-family combination CSVs from `aql/fields_and_results/from/combinations/`, copied byte-exact and filed under the Robot suite family that consumes each one (`AND_OR`, `CONTAINS_A_D`, `EHR_STATUS`, `PREDICATE_A_D`, `USABLE_RM_TYPES_A_D`) — a row is a FROM/CONTAINS shape, and the family names the suite holding the query template it goes into (PROBE-100). Vendored by its own ingest, [`scripts/ingest-robot-aql.sh`](../../scripts/ingest-robot-aql.sh), on its own cadence, so it carries its own pin: [`AQL_SOURCE.txt`](aql/conformance/AQL_SOURCE.txt), authoritative for the bytes rather than best-effort like `ROBOT_SOURCE.txt` above. [`EXCLUDED.txt`](aql/conformance/EXCLUDED.txt) is generated beside it and names all 1124 upstream files the corpus does not carry, each with a reason tag (`execution-semantics`, `non-from-family`, `unconsumed-by-suite`). Both files are generated — do not hand-edit.
+**AQL conformance corpus** ([`aql/conformance/`](aql/conformance/)): 12 FROM-family combination CSVs from `aql/fields_and_results/from/combinations/`, copied byte-exact and filed under the Robot suite family that consumes each one (`AND_OR`, `CONTAINS_A_D`, `EHR_STATUS`, `PREDICATE_A_D`, `USABLE_RM_TYPES_A_D`). Each row is a FROM/CONTAINS shape, and the family names the suite holding the query template it goes into (PROBE-100). Its own ingest, [`scripts/ingest-robot-aql.sh`](../../scripts/ingest-robot-aql.sh), vendors it on its own cadence, so it carries its own pin: [`AQL_SOURCE.txt`](aql/conformance/AQL_SOURCE.txt). That pin is authoritative for the bytes, where `ROBOT_SOURCE.txt` above is best-effort. [`EXCLUDED.txt`](aql/conformance/EXCLUDED.txt) is generated beside it and names all 1124 upstream files the corpus does not carry, each with a reason tag (`execution-semantics`, `non-from-family`, `unconsumed-by-suite`). Both files are generated; do not hand-edit them.
 
 ### SDK (`rm/`)
 
@@ -150,5 +150,5 @@ See [`its_rest/README.md`](its_rest/README.md).
 
 ## Conventions
 
-- Immutable inputs — fix the codec or refresh from upstream, do not patch cassettes to green tests.
-- New template: add `templates/` + `compositions/` files; update this table. A composition is never skipped wholesale to keep probes green: if its vendored content carries a genuine RM-floor finding independent of the round trip, it still joins the corpus and is held out of PROBE-030's `validation.ValidateRM` leg only, named with its finding in `probe030SkipFloor` in [`probe_030_canjson_round_trip.go`](../probes/serialize/probe_030_canjson_round_trip.go). Composition XML the canxml round trip does not exercise goes in `compositionXMLExcluded`, and an alternate-wire or deliberately invalid `rm/` sample in `rmJSONExcluded` / `rmJSONExcludedPrefixes`, both in [`discover.go`](../fixtures/discover.go).
+- Cassettes are immutable inputs. Fix the codec or refresh from upstream; do not patch cassettes to make tests pass.
+- New template: add `templates/` + `compositions/` files; update this table. A composition is never skipped wholesale to keep probes green. If its vendored content carries a genuine RM-floor finding independent of the round trip, it still joins the corpus. It is held out of PROBE-030's `validation.ValidateRM` leg only, and named with its finding in `probe030SkipFloor` in [`probe_030_canjson_round_trip.go`](../probes/serialize/probe_030_canjson_round_trip.go). Composition XML the canxml round trip does not exercise goes in `compositionXMLExcluded`, and an alternate-wire or deliberately invalid `rm/` sample in `rmJSONExcluded` / `rmJSONExcludedPrefixes`, both in [`discover.go`](../fixtures/discover.go).

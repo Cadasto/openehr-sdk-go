@@ -1,8 +1,8 @@
 # testkit/cassettes/its_rest
 
-Vendored fixtures for openEHR REST 1.1.0-development (REQ-050, REQ-095) and the SMART discovery contract (REQ-070..072). Checked in so CI does not require a live deployment.
+Vendored fixtures for openEHR REST 1.1.0-development (REQ-050, REQ-095) and the SMART discovery contract (REQ-070..072). They are checked in so CI does not need a live deployment.
 
-These are request and response **bodies**, not REQ-082 Cassette-mode recordings — see the [parent README](../README.md).
+These are request and response **bodies**, not REQ-082 Cassette-mode recordings; see the [parent README](../README.md).
 
 ## Authoritative source
 
@@ -12,7 +12,7 @@ Endpoint shapes track the upstream OpenAPI YAML (REQ-095):
 https://github.com/openEHR/specifications-ITS-REST/tree/master/computable/OAS
 ```
 
-Pinned commit: `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04, ITS-REST 1.1.0-development WIP). Update this line — and the affected cassettes — when bumping the pin.
+Pinned commit: `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04, ITS-REST 1.1.0-development WIP). Update this line, and the affected cassettes, when bumping the pin.
 
 ## Layout
 
@@ -26,7 +26,7 @@ Pinned commit: `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04, ITS-REST 1.1
 | `query/` | openEHR REST Query API RESULT_SET response | `openehr/client/query/` tests read `result_set.json` |
 | `demographic/` | openEHR REST Demographic API PARTY CRUD + VERSIONED_PARTY responses | `openehr/client/demographic/` tests read the party files |
 
-Composition GET responses (Phase 3 reads) are exercised against the canonical-JSON cassettes vendored under [`../compositions/`](../compositions/) and [`../rm/`](../rm/) — those carry full COMPOSITION shapes and are reused here without duplication. Resolve paths via [`../../fixtures/`](../../fixtures/). ADL 2 source-form templates are **deferred** until their leaf client lands in a later phase of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/archive/2026-05-15-rest-api-client.md); AQL already has a vendored RESULT_SET body (`query/result_set.json`), and stored-query metadata bodies are a separate, already-landed-client gap named in the Coverage table below, not a leaf-client deferral.
+Tests exercise Composition GET responses (Phase 3 reads) against the canonical-JSON cassettes vendored under [`../compositions/`](../compositions/) and [`../rm/`](../rm/). Those carry full COMPOSITION shapes and are reused here instead of being duplicated. Resolve paths via [`../../fixtures/`](../../fixtures/). ADL 2 source-form templates are **deferred** until their leaf client lands in a later phase of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/archive/2026-05-15-rest-api-client.md). AQL already has a vendored RESULT_SET body (`query/result_set.json`). Stored-query metadata bodies are a separate gap, named in the Coverage table below: their client has already landed, so it is not a leaf-client deferral.
 
 ## Provenance
 
@@ -48,7 +48,7 @@ The envelopes are deliberately small and language-agnostic openEHR wire records 
 
 ### `system/`
 
-Hand-crafted capabilities response matching the openEHR REST 1.1.0-development System API shape (REQ-095). Fields populated to exercise `ServiceCapabilities` decode including the `Extras` forward-compat path (`support_email`, `documentation_url`, `supported_formats` are deployment-specific and land in `Extras` rather than the typed fields).
+Hand-crafted capabilities response matching the openEHR REST 1.1.0-development System API shape (REQ-095). Its fields exercise `ServiceCapabilities` decode, including the `Extras` forward-compat path: `support_email`, `documentation_url` and `supported_formats` are deployment-specific, so they land in `Extras` instead of the typed fields.
 
 | File | Notes |
 |---|---|
@@ -56,11 +56,11 @@ Hand-crafted capabilities response matching the openEHR REST 1.1.0-development S
 
 ### `definition/`
 
-Hand-crafted Definition API fixtures for the ADL 1.4 template lifecycle (Phase 6). ADL 2 source-form fixtures will land alongside their leaf-client implementation; stored-query metadata bodies are a separate gap — their leaf client has already landed (`openehr/client/definition`), but no vendored `StoredQueryMetadata` body exists yet (see the Coverage table).
+Hand-crafted Definition API fixtures for the ADL 1.4 template lifecycle (Phase 6). ADL 2 source-form fixtures will land with their leaf-client implementation. Stored-query metadata bodies are a separate gap: their leaf client has already landed (`openehr/client/definition`), but no vendored `StoredQueryMetadata` body exists yet (see the Coverage table).
 
 | File | Format | Notes |
 |---|---|---|
-| `body_weight.opt` | OPT XML | Minimal OPT — exercises the upload/get round-trip without depending on a full template-parser implementation. |
+| `body_weight.opt` | OPT XML | Minimal OPT. Exercises the upload/get round-trip without depending on a full template-parser implementation. |
 | `template_metadata.json` | JSON | Single-template metadata (typed + a deployment-specific `uri` Extras key). |
 | `template_list.json` | JSON | Two-template listing response. |
 
@@ -81,7 +81,7 @@ Hand-crafted SMART configuration document that satisfies the openEHR SMART disco
 | File | Notes |
 |---|---|
 | `smart-configuration.json` | Reference SMART config advertising `org.openehr.rest` at spec_version `1.1.0-development`. |
-| `smart-configuration-mismatch.json` | Variant advertising `1.0.3` — exercises PROBE-003 (spec-version mismatch fails fast at discovery). |
+| `smart-configuration-mismatch.json` | Variant advertising `1.0.3`. Exercises PROBE-003 (spec-version mismatch fails fast at discovery). |
 | `jwks.json` | Reference JWKS document with two RS256 keys; used to exercise JWKS rotation (PROBE-006). |
 
 ### `query/`
@@ -118,10 +118,10 @@ What `openehr/client/*` decodes today, and whether a vendored body under this di
 | COMPOSITION reads and writes | yes | [`../compositions/`](../compositions/), [`../rm/`](../rm/) |
 | CONTRIBUTION submission (request bodies) | yes | [`../submissions/`](../submissions/) |
 | CONTRIBUTION read (`GET …/contribution/{uid}`) | **gap** | decoded from a hand-built body in `openehr/client/ehr/contribution/contribution_test.go`; no upstream-authored persisted CONTRIBUTION response |
-| Definition — template list, metadata, OPT | yes | `definition/` |
-| Definition — stored-query metadata and list | **gap** | hand-built in `openehr/client/definition/stored_query_test.go`; no vendored `StoredQueryMetadata` body |
-| Query — RESULT_SET | yes | `query/result_set.json` |
-| Demographic — five party kinds, ORIGINAL_VERSION, REVISION_HISTORY | yes | `demographic/` |
+| Definition: template list, metadata, OPT | yes | `definition/` |
+| Definition: stored-query metadata and list | **gap** | hand-built in `openehr/client/definition/stored_query_test.go`; no vendored `StoredQueryMetadata` body |
+| Query: RESULT_SET | yes | `query/result_set.json` |
+| Demographic: five party kinds, ORIGINAL_VERSION, REVISION_HISTORY | yes | `demographic/` |
 | ITEM_TAG | **gap** | header-carried today (REQ-059 `partial`); no tag bodies until the dedicated endpoints land |
 | `Identifier` write response (`{"uid": …}`, `Prefer: return=identifier`) | **gap** | decoded by `openehr/client/ehr/identifier.go` `ResolveIdentifierBody`; hand-built in tests only, e.g. `openehr/client/ehr/composition/composition_test.go`; no vendored body |
 | Admin | n/a | `204` by contract, no bodies |
@@ -131,6 +131,6 @@ What `openehr/client/*` decodes today, and whether a vendored body under this di
 
 ## Conventions
 
-- Cassettes are immutable inputs. Never hand-edit a vendored cassette to make a test pass — fix the codec or open a follow-up to refresh from upstream.
+- Cassettes are immutable inputs. Never hand-edit a vendored cassette to make a test pass. Fix the codec, or open a follow-up to refresh from upstream.
 - New cassette directories require a row in the Layout table and a Provenance subsection.
 - Cassettes that exercise SDK-emitted bytes (e.g. round-trip outputs) live next to their test as `testdata/`, not here.

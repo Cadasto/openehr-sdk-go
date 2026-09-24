@@ -1,8 +1,8 @@
 # Quick start
 
-Get from zero to a working import in a few minutes. This guide targets **application developers** integrating the SDK — not contributors editing normative specs. For the full contract and package map, see [architecture.md](architecture.md) and [specifications/](specifications/).
+Get from zero to a working import in a few minutes. This guide is for **application developers** integrating the SDK. Contributors editing the normative specs should start with [CONTRIBUTING.md](../CONTRIBUTING.md). For the full contract and package map, see [architecture.md](architecture.md) and [specifications/](specifications/).
 
-> **Version:** the SDK is pre-1.0 — pin an exact tag; minors may break public API. See [releases.md](releases.md).
+> **Version:** the SDK is pre-1.0. Pin an exact tag, because a minor release may break the public API. See [releases.md](releases.md).
 
 ## Prerequisites
 
@@ -30,7 +30,7 @@ make doctor   # host Go vs Docker fallback
 
 ## Two integration paths
 
-The SDK deliberately splits **clinical building blocks** from **HTTP clients**. You can import one package without pulling in auth or transport.
+The SDK keeps **clinical building blocks** separate from **HTTP clients**, so you can import one package without pulling in auth or transport.
 
 ```text
 Building blocks (no HTTP)          REST client path
@@ -42,7 +42,7 @@ openehr/validation
 openehr/instance
 ```
 
-**Pick building blocks** when you validate compositions in CI, parse OPT files, or transform canonical JSON — no CDR required.
+**Pick building blocks** when you validate compositions in CI, parse OPT files, or transform canonical JSON. You do not need a clinical data repository (CDR).
 
 **Pick the REST path** when you create EHRs, submit compositions, or run AQL against a live openEHR REST API.
 
@@ -52,7 +52,7 @@ Runnable walkthroughs for both paths live in [examples.md](examples.md).
 
 ## Path A — Building blocks (no network)
 
-Decode canonical JSON into typed RM structs. This is the smallest useful program:
+This is the smallest useful program. It decodes canonical JSON into typed Reference Model (RM) structs:
 
 ```go
 package main
@@ -78,7 +78,7 @@ func main() {
 }
 ```
 
-From a clone of this repo, run the equivalent example (uses a vendored cassette — no file setup needed):
+From a clone of this repo, run the equivalent example. It reads a vendored cassette, so there is no file to set up:
 
 ```bash
 go run ./cmd/examples/canonical_json
@@ -88,7 +88,7 @@ Expected output includes the composition archetype id, language, and `OK: canoni
 
 ### Validate against a template
 
-Typical CI pipeline: **bytes → RM → compiled OPT → validation issues**.
+A typical CI pipeline runs **bytes → RM → compiled OPT → validation issues**.
 
 ```bash
 go run ./cmd/examples/validate-from-json
@@ -102,13 +102,13 @@ This decodes `testdata/minimal_blood_pressure.json`, compiles `vital_signs.opt`,
 
 Every REST call flows through three layers:
 
-1. **Service catalog** — where the openEHR REST base URL lives (`smart/discovery`).
-2. **Transport client** — injects your `*http.Client`, attaches auth, handles retries and OTel (`transport`).
-3. **Leaf client** — typed methods per REST resource (`openehr/client/ehr`, `query`, `definition`, …).
+1. **Service catalog** (`smart/discovery`) says where the openEHR REST base URL lives.
+2. **Transport client** (`transport`) injects your `*http.Client`, attaches auth, and handles retries and OpenTelemetry (OTel) tracing.
+3. **Leaf client** gives typed methods per REST resource (`openehr/client/ehr`, `query`, `definition`, …).
 
 ### Minimal wiring (in-process sandbox)
 
-[`sandbox.Backend`](../sandbox/doc.go) is an in-memory openEHR REST backend that implements `http.RoundTripper` — no listener, no credentials. Inject it as the client's Transport:
+[`sandbox.Backend`](../sandbox/doc.go) is an in-memory openEHR REST backend that implements `http.RoundTripper`. It needs no listener and no credentials. Inject it as the client's Transport:
 
 ```go
 b := sandbox.New()
@@ -131,7 +131,7 @@ if err != nil {
 ehr, meta, err := openehrclient.Create(ctx, c)
 ```
 
-The [`ehr_create`](../cmd/examples/ehr_create/main.go) example is the same call against a throwaway handler if you want to run it without importing `sandbox/`:
+To run the same call without importing `sandbox/`, use the [`ehr_create`](../cmd/examples/ehr_create/main.go) example. It targets a throwaway handler:
 
 ```bash
 go run ./cmd/examples/ehr_create
@@ -164,7 +164,7 @@ For SMART-on-openEHR launches, use `auth/smart` and the application-level helper
 
 ### Per-request auth (MCP, multi-tenant)
 
-Attach a different token per call via context — useful when one process serves many users:
+When one process serves many users, attach a different token to each call through the context:
 
 ```go
 ctx = auth.WithTokenSource(ctx, perRequestTokenSource)
@@ -175,13 +175,13 @@ ehr, meta, err := openehrclient.Create(ctx, c)
 
 ## Idioms to remember
 
-These rules show up in every public API. Breaking them usually means fighting the SDK rather than using it.
+Every public API follows these rules. Code that breaks them usually ends up working against the SDK.
 
 | Rule | Why |
 |---|---|
 | `context.Context` is always the first parameter on I/O methods | Cancellation, deadlines, per-request auth. |
-| Inject `*http.Client` — the SDK never allocates one | Connection pooling and TLS stay under your control. |
-| Use functional options (`transport.WithHTTPClient`, …) | No giant config structs; options compose cleanly. |
+| Inject `*http.Client`; the SDK never allocates one | Connection pooling and TLS stay under your control. |
+| Use functional options (`transport.WithHTTPClient`, …) | No large config structs, and options combine freely. |
 | Prefer package-level functions over repository structs | Repositories exist as injection seams, not the primary surface. |
 | Import building blocks without `transport/` when you can | Keeps CLI tools and validators lightweight. |
 
@@ -191,7 +191,7 @@ Full normative list: [specifications/idiom.md](specifications/idiom.md).
 
 ## If you don't have host Go
 
-The Makefile routes every target through a Docker dev image when host Go 1.27.x is missing: run `make image-dev` once, then use `make` as normal. `make doctor` tells you which toolchain is active. Contributor targets and the PR gate are covered in [ci.md](ci.md) and [CONTRIBUTING.md](../CONTRIBUTING.md), not here.
+When host Go 1.27.x is missing, the Makefile routes every target through a Docker dev image. Run `make image-dev` once, then use `make` as normal. `make doctor` tells you which toolchain is active. [ci.md](ci.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) cover the contributor targets and the PR gate.
 
 ---
 

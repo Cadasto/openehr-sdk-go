@@ -8,7 +8,7 @@ description: >-
 # Workflow
 
 Compile a template, validate a Composition, and encode it without touching the
-network; reach for the REST client only when you have somewhere to send the
+network. Reach for the REST client only when you have somewhere to send the
 result. This page walks one path from a modelling tool to a clinical data
 repository (CDR) and marks which steps the SDK covers.
 
@@ -113,7 +113,7 @@ several versions through a contribution. Point the service catalog at your
 CDR.
 
 In tests you have two ways to avoid a real CDR. Inject `sandbox.Backend` as the
-client's `http.RoundTripper` and requests are answered in memory, with no
+client's `http.RoundTripper` and it answers requests in memory, with no
 server at all. The examples take the other route and start a loopback
 `httptest` server, which needs no credentials.
 
@@ -139,8 +139,8 @@ objects decode as RM types.
 ## Which CDR {#which-cdr}
 
 The REST client follows the ITS-REST Release-1.1.0 OpenAPI files kept in this
-repository, not any vendor's own SDK, so it can point at any CDR implementing
-that contract. Wider interoperability work is still under way, and we publish
+repository rather than any vendor's own SDK. It can therefore point at any CDR
+that implements that contract. Wider interoperability work is still under way, and we publish
 no compatibility matrix.
 
 `make test` never dials a CDR. The Live probes skip unless you set the
@@ -151,9 +151,9 @@ tracks the status of each target; this table says how to point the SDK at one.
 
 | Deployment | Notes |
 |---|---|
-| **openEHR REST** | The client is written against the ITS-REST Release-1.1.0 OpenAPI files in [`resources/its-rest/`](https://github.com/cadasto/openehr-sdk-go/blob/main/resources/its-rest/README.md). The SDK's pinned contract version is `1.1.0-development` ([REQ-050](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/specifications/wire.md#req-050)): by default the discovery resolver rejects a required service that advertises a different `spec_version`, and `discovery.WithAcceptedSpecVersions` widens the accepted set. |
+| **openEHR REST** | The client is written against the ITS-REST Release-1.1.0 OpenAPI files in [`resources/its-rest/`](https://github.com/cadasto/openehr-sdk-go/blob/main/resources/its-rest/README.md). The SDK's pinned contract version is `1.1.0-development` ([REQ-050](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/specifications/wire.md#req-050)). By default the discovery resolver rejects a required service that advertises a different `spec_version`; `discovery.WithAcceptedSpecVersions` widens the accepted set. |
 | **Cadasto** | Cadasto B.V. writes this SDK. Point the client at a Cadasto CDR the same way as any other ITS-REST base. The extra APIs under `cadasto/` are listed on [Packages](packages.md#cadasto-extras). |
-| **EHRbase** | Web Template export and the FLAT codec follow the EHRbase reference implementation ([ADR 0014](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/adr/0014-webtemplate-reference-implementation-lock.md)). Set `OPENEHR_LIVE_EHRBASE` to run the Live probes against an instance; we have run the opt-in Live snapshots against EHRbase 2.35.1 locally, and they are not part of CI. |
+| **EHRbase** | Web Template export and the FLAT codec follow the EHRbase reference implementation ([ADR 0014](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/adr/0014-webtemplate-reference-implementation-lock.md)). Set `OPENEHR_LIVE_EHRBASE` to run the Live probes against an instance. We have run the opt-in Live snapshots against EHRbase 2.35.1 locally; they are not part of CI. |
 | **FerroEHR** | Set `OPENEHR_LIVE_FERROEHR` to name the deployment and `OPENEHR_LIVE_FERROEHR_BASIC` to carry its `user:pass` credential, then run the Live probes. They are not part of CI. |
 | **Better Platform** | There is no Live probe yet. Web Template export emits EHRbase ids (`blood_pressure`) rather than Better camelCase ids (`bloodPressure`). See [ADR 0014](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/adr/0014-webtemplate-reference-implementation-lock.md). |
 

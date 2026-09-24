@@ -24,14 +24,14 @@ make ci
 
 `make doctor` reports which toolchain the Makefile will use: Go 1.27.x on the
 host when you have it, the Docker dev image otherwise. `make ci` is the
-pull-request gate, and runs formatting, `go mod tidy`, vet, unit tests, lint,
+pull-request gate. It runs formatting, `go mod tidy`, vet, unit tests, lint,
 spec traceability, fixture integrity for the FLAT corpus and the terminology
 tables, and a compile-all. It needs Docker for the AQL parser codegen check.
 `make help` lists the grouped targets.
 
 ## Specification-driven changes
 
-New behaviour is specified before it is written. The loop:
+Specify new behaviour before you write it. The loop:
 
 1. Run `make spec-context REQ=NNN` for the registry row, the traceability
    block, and the canonical excerpt.
@@ -50,8 +50,8 @@ ADR settles them.
 `make docs-serve` previews the site on `http://127.0.0.1:8000`.
 `make docs-check` runs the strict build plus the output assertions, and is the
 gate CI applies to every pull request. `docs-site.yml` deploys the site from
-`main` once the repository's Pages source is set to GitHub Actions, which is
-not enabled yet (as of 2026-09-10).
+`main` once the repository's Pages source is set to GitHub Actions. That setting
+is not enabled yet (as of 2026-09-10).
 
 ```bash
 make docs-serve

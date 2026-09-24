@@ -1,8 +1,8 @@
 # Examples
 
-**New here?** Run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline — the REST ones use an in-process `httptest` backend, so nothing needs a CDR.
+**New here?** Run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline: the REST ones use an in-process `httptest` backend, so nothing needs a CDR.
 
-The 17 runnable programs under [`cmd/examples/`](../cmd/examples/) demonstrate each major SDK surface. They are **reference shapes** — production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note, which is the part worth reading if you are here to build something.
+The 17 runnable programs under [`cmd/examples/`](../cmd/examples/) demonstrate each major SDK surface. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
 
 Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<name>` works from **any working directory** inside a clone. Build them all with `make build` (or `go build ./cmd/examples/...`).
 
@@ -36,7 +36,7 @@ Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<na
 
 ### canonical_json
 
-**Purpose:** Smallest end-to-end decode — prove canonical JSON round-trips into Go RM types without HTTP, auth, or discovery.
+**Purpose:** The smallest end-to-end decode. It proves canonical JSON round-trips into Go RM types without HTTP, auth, or discovery.
 
 ```bash
 go run ./cmd/examples/canonical_json
@@ -97,7 +97,7 @@ go run ./cmd/examples/opt-parse path/to/your-template.opt
 
 ### primitive-validate
 
-**Purpose:** Validate individual primitive values (e.g. `DV_QUANTITY` magnitude and units) against OPT leaf constraints — no full composition walker.
+**Purpose:** Validate individual primitive values (e.g. `DV_QUANTITY` magnitude and units) against OPT leaf constraints, without running the full composition walker.
 
 ```bash
 go run ./cmd/examples/primitive-validate
@@ -105,7 +105,7 @@ go run ./cmd/examples/primitive-validate
 
 **Packages:** `openehr/template`, `openehr/template/constraints`
 
-Uses an embedded minimal OPT. Expects some demo cases to **fail** validation intentionally.
+Uses an embedded minimal OPT. Some demo cases **fail** validation on purpose.
 
 ---
 
@@ -121,7 +121,7 @@ go run ./cmd/examples/validate-composition -invalid   # demo a required-field fa
 
 **Packages:** `openehr/template`, `openehr/validation`, `internal/templatecompile`
 
-**Note:** this example calls the internal `templatecompile.Compile` directly (it lives in-repo). External modules use the public `openehr/templatecompile.Compile` bridge instead — see [compile-build-validate](#compile-build-validate) ([ADR 0010](adr/0010-public-compiled-template-bridge.md)).
+**Note:** this example calls the internal `templatecompile.Compile` directly (it lives in-repo). External modules use the public `openehr/templatecompile.Compile` bridge instead, as [compile-build-validate](#compile-build-validate) shows ([ADR 0010](adr/0010-public-compiled-template-bridge.md)).
 
 **Default fixture:** hand-built vital-signs composition matching `vital_signs.opt`.
 
@@ -129,7 +129,7 @@ go run ./cmd/examples/validate-composition -invalid   # demo a required-field fa
 
 ### validate-from-json
 
-**Purpose:** The pipeline most CI validators use — read canonical JSON from disk, decode, compile OPT, validate.
+**Purpose:** The offline pipeline a CI check would run: read canonical JSON from disk, decode it, compile the OPT, and validate.
 
 ```bash
 go run ./cmd/examples/validate-from-json
@@ -151,7 +151,7 @@ go run ./cmd/examples/validate-from-json comp.json tmpl.opt # custom paths
 
 ### generate-example
 
-**Purpose:** Synthesise an RM instance graph from a compiled OPT and emit canonical JSON to stdout — useful for seeders and fixture generation.
+**Purpose:** Synthesise an RM instance graph from a compiled OPT and emit canonical JSON to stdout. Seeders and fixture generators use this shape.
 
 ```bash
 go run ./cmd/examples/generate-example
@@ -173,7 +173,7 @@ go run ./cmd/examples/generate-example \
 
 **Packages:** `openehr/template`, `openehr/instance`, `openehr/serialize/canjson`, `internal/templatecompile`
 
-Pipe output to a file or pipe into `validate-from-json`:
+Pipe the output to a file or into `validate-from-json`:
 
 ```bash
 go run ./cmd/examples/generate-example --policy minimal > /tmp/generated.json
@@ -186,7 +186,7 @@ go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/cassettes/t
 
 **Purpose:** Build the same logical AQL query two ways, the struct-builder and the verb-functions, and prove both emit the same canonical string on the wire. Pure building block: no transport, no auth; the executor lives at `openehr/client/query`.
 
-The program then goes further. A third query demonstrates the containment algebra (`aql.Class` / `Contains` / `NotContains` / `ContainsOr`) and opt-in in-text paging (`LimitInline` / `OffsetInline`). A fourth pair shows the opt-in RM-semantics gate (`Builder.VerifyContainment`), a question `Build` deliberately leaves unanswered, run over a clean containment tree and over one that is grammatically valid but RM-impossible.
+The program then goes further. A third query demonstrates the containment algebra (`aql.Class` / `Contains` / `NotContains` / `ContainsOr`) and opt-in in-text paging (`LimitInline` / `OffsetInline`). A fourth pair shows the opt-in RM-semantics gate (`Builder.VerifyContainment`), which answers a question `Build` deliberately leaves open. It runs over a clean containment tree and over one that is grammatically valid but RM-impossible.
 
 ```bash
 go run ./cmd/examples/aql-build
@@ -218,11 +218,11 @@ containment verification (REQ-162) — opt-in; Build never runs it:
     no containment route under the pinned RM connects OBSERVATION to EVALUATION, so this CONTAINS can never match
 ```
 
-**What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`. Keep paging on **one** channel — the envelope (`Limit`/`Offset`) by default, the in-text form only when the bound must survive stored-query registration; requesting both is a build-time error. `VerifyContainment` is opt-in and answers the RM question, not the shape one — dispatch on `contain.Finding.Code`; a nil relation uses the default, and a `contain.Default().WithOverlay(...)` copy accounts for a dialect that admits more.
+**What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`. Keep paging on **one** channel: the envelope (`Limit`/`Offset`) by default, or the in-text form only when the bound must survive stored-query registration. Requesting both is a build-time error. `VerifyContainment` is opt-in and checks the query against the RM, which `Build` never does. Dispatch on `contain.Finding.Code`. A nil relation uses the default, and a `contain.Default().WithOverlay(...)` copy accounts for a dialect that admits more.
 
 ### aql-parse-structured
 
-**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2), the read-side mirror of `aql.Builder`, and emit it back to canonical text via `Query.Emit()`. The catalogue covers the whole SDK grammar profile, including the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause; the residual `aql.ErrIncompleteAST` is a numeric literal the AST cannot represent, surfaced by `ParseQuery` rather than silently dropping a clause. Pure building block: no transport, no auth.
+**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2), the read-side mirror of `aql.Builder`, and emit it back to canonical text via `Query.Emit()`. The catalogue covers the whole SDK grammar profile, including the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause; the one remaining `aql.ErrIncompleteAST` case is a numeric literal the AST cannot represent. `ParseQuery` reports it rather than silently dropping a clause. Pure building block: no transport, no auth.
 
 With no argument the program walks three queries: the representative one below, a query exercising the closed catalogue shapes, and a query showing the `TOP` carrier alongside two literals whose **source text** differs from their canonical rendering (`1.50` → `1.5`, `"quoted"` → `'quoted'`). The openEHR result schema names an unaliased column by its expression text, so `parse.LiteralExpr.Raw` keeps what was written while emission stays canonical.
 
@@ -306,13 +306,13 @@ canonical emission:
   SELECT TOP 5 BACKWARD c/uid/value, 1.5, 'quoted' FROM COMPOSITION c ORDER BY c/uid/value DESC
 ```
 
-**What to copy into your app:** use `parse.ParseQuery(src)` when you need to introspect a caller-supplied query (highlight paths, swap a comparison value, audit alias bindings), and `errors.Is(err, aql.ErrIncompleteAST)` to branch on catalogue gaps; `Query.Emit()` round-trips the AST back to AQL for execution. Type-switch over `parse.SelectExpr` / `aql.WhereExpr` / `aql.Value` and treat an unrecognised case as out-of-catalogue — those sets grow additively. Check `From.Junction` before `From.Root`: a FROM-root junction leaves `Root` zero.
+**What to copy into your app:** use `parse.ParseQuery(src)` when you need to introspect a caller-supplied query (highlight paths, swap a comparison value, audit alias bindings), and `errors.Is(err, aql.ErrIncompleteAST)` to branch on catalogue gaps. `Query.Emit()` round-trips the AST back to AQL for execution. Type-switch over `parse.SelectExpr` / `aql.WhereExpr` / `aql.Value` and treat an unrecognised case as out-of-catalogue, because those sets grow additively. Check `From.Junction` before `From.Root`: a FROM-root junction leaves `Root` zero.
 
 ### lint-aql
 
 **Purpose:** Statically lint AQL before it reaches the CDR. The program parses against the SDK grammar profile, then runs the lint layers: syntax; shape (alias binding, parameter binding); RM containment and portability semantics against the pinned BMM (always on, no template needed); path-shape and paging advisories over the query text plus the pinned BMM (likewise always on); and template-aware archetype and path checks against a compiled OPT.
 
-Shown via `validation.ValidateAQL`; the building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. Lint-clean is **not** spec-conformance and not execute-success; the CDR remains the path authority.
+The program calls `validation.ValidateAQL`; the underlying building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. A lint-clean query is **not** proven spec-conformant, nor guaranteed to execute. The CDR remains the authority on paths.
 
 ```bash
 go run ./cmd/examples/lint-aql
@@ -352,20 +352,20 @@ result   : OK — no errors, 3 advisories
   [warning] aql_select_no_alias (c): SELECT item 1 carries no AS alias; the result column's name is then engine-defined, and a stored-query contract depends on a stable one
 ```
 
-**What to copy into your app:** for CI / pre-flight checks call `lint.LintString(q, nil)` (Layers 1–2, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or `validation.ValidateAQL`) to add archetype / path checks. Dispatch on `Issue.Code`; treat only `Error`-severity issues as hard failures — but read `Result.Issues`, not just `Result.OK`: OK means *no errors*, not *no issues*, and most of the portability and all of the path-shape codes are advisory (the last block above).
+**What to copy into your app:** for CI / pre-flight checks call `lint.LintString(q, nil)` (Layers 1–2, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or `validation.ValidateAQL`) to add archetype / path checks. Dispatch on `Issue.Code` and treat only `Error`-severity issues as hard failures. Still read `Result.Issues`, not only `Result.OK`: OK means *no errors*, not *no issues*. Most of the portability codes and all of the path-shape codes are advisory (the last block above).
 
 ---
 
 ### compile-build-validate
 
-**Purpose:** Drive the whole clinical pipeline through **public packages only** — the shape an external module uses. Parse an OPT, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the builder, serialise to canonical JSON, round-trip it, and validate. Before this bridge existed, the compiled template was only constructable inside the SDK module, so this exact program could not be written downstream.
+**Purpose:** Drive the whole clinical pipeline through **public packages only**, as an external module would. Parse an OPT, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the builder, serialise to canonical JSON, round-trip it, and validate. Before this bridge existed, the compiled template was only constructable inside the SDK module, so this exact program could not be written downstream.
 
 ```bash
 go run ./cmd/examples/compile-build-validate
 go run ./cmd/examples/compile-build-validate path/to/template.opt
 ```
 
-**Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/composition`, `openehr/serialize/canjson`, `openehr/validation`, `openehr/rm` — **no `internal/` import.**
+**Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/composition`, `openehr/serialize/canjson`, `openehr/validation`, `openehr/rm`. **No `internal/` import.**
 
 **Sample output:**
 
@@ -382,14 +382,14 @@ ehr_status : ValidateEHRStatus callable — 6 issue(s), root type mismatch as ex
 
 ### template-explore
 
-**Purpose:** Introspect a compiled OPT through the public node-level types — the building block for a form generator or a path-discovery tool. Walks the `templatecompile.CompiledNode` tree to print the template structure (RM type, pinned archetype id / at-code, cardinality + required, term label, slot / primitive markers), then lists the addressable primitive-leaf paths — the canonical `composition.Builder.Set` targets.
+**Purpose:** Introspect a compiled OPT through the public node-level types. This is the building block for a form generator or a path-discovery tool. It walks the `templatecompile.CompiledNode` tree to print the template structure (RM type, pinned archetype id / at-code, cardinality + required, term label, slot / primitive markers), then lists the addressable primitive-leaf paths, which are the canonical `composition.Builder.Set` targets.
 
 ```bash
 go run ./cmd/examples/template-explore
 go run ./cmd/examples/template-explore path/to/template.opt
 ```
 
-**Packages:** `openehr/template`, `openehr/templatecompile` — **no `internal/` import.**
+**Packages:** `openehr/template`, `openehr/templatecompile`. **No `internal/` import.**
 
 **Sample output (abridged):**
 
@@ -417,7 +417,7 @@ addressable primitive-leaf paths (6) — Builder.Set targets:
 
 ### webtemplate-export
 
-**Purpose:** Export a compiled OPT as EHRbase `openEHR_SDK` v2.3 **WebTemplate JSON** — the lossy, UI-oriented projection form renderers and FLAT-path mappers consume. Prints the form-oriented tree (FLAT-path `id`, RM type, occurrences, input widgets), then the deterministic document; `-json` dumps the full indented WebTemplate instead.
+**Purpose:** Export a compiled OPT as EHRbase `openEHR_SDK` v2.3 **WebTemplate JSON**: the lossy, UI-oriented projection that form renderers and FLAT-path mappers consume. Prints the form-oriented tree (FLAT-path `id`, RM type, occurrences, input widgets), then the deterministic document; `-json` dumps the full indented WebTemplate instead.
 
 ```bash
 go run ./cmd/examples/webtemplate-export
@@ -425,7 +425,7 @@ go run ./cmd/examples/webtemplate-export path/to/template.opt
 go run ./cmd/examples/webtemplate-export -json path/to/template.opt
 ```
 
-**Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/template/webtemplate` — **no `internal/` import.**
+**Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/template/webtemplate`. **No `internal/` import.**
 
 **Sample output (abridged):**
 
@@ -446,19 +446,19 @@ encounter [COMPOSITION] 1..1
   ...
 ```
 
-**What to copy into your app:** `webtemplate.Marshal(compiled)` for the bytes (`application/openehr.wt+json`), or `webtemplate.Build(compiled)` when you post-process the typed tree first — each `Node.ID` is the FLAT-path segment consumers bind to, and each leaf's `Inputs` (`suffix`/`type`/`list`/`validation`) drives the widget. Both fail loudly (`ErrEmptyTemplate` / `ErrNoDefaultLanguage` / `ErrIDCollision`) rather than emit ambiguous output; accepted reference deltas are documented in the package's `deviations.md`.
+**What to copy into your app:** `webtemplate.Marshal(compiled)` for the bytes (`application/openehr.wt+json`), or `webtemplate.Build(compiled)` when you post-process the typed tree first. Each `Node.ID` is the FLAT-path segment consumers bind to, and each leaf's `Inputs` (`suffix`/`type`/`list`/`validation`) drives the widget. Both fail loudly (`ErrEmptyTemplate` / `ErrNoDefaultLanguage` / `ErrIDCollision`) instead of emitting ambiguous output. The package's `deviations.md` lists the accepted reference deltas.
 
 ---
 
 ### flat-roundtrip
 
-**Purpose:** Convert a canonical `COMPOSITION` to the **FLAT** and **STRUCTURED** Simplified Formats and back, driven by the composition's Web Template. Shows the encode/decode entry points, the OPT-free `FlatToStructured`, the `COMPOSITION → FLAT → COMPOSITION → FLAT` round-trip, and the **conformant decode** (`WithTemplate`) whose result validates against the OPT — with no transport or auth.
+**Purpose:** Convert a canonical `COMPOSITION` to the **FLAT** and **STRUCTURED** Simplified Formats and back, driven by the composition's Web Template. Shows the encode/decode entry points, the OPT-free `FlatToStructured`, the `COMPOSITION → FLAT → COMPOSITION → FLAT` round-trip, and the **conformant decode** (`WithTemplate`) whose result validates against the OPT. No transport or auth is involved.
 
 ```bash
 go run ./cmd/examples/flat-roundtrip
 ```
 
-**Packages:** `openehr/serialize/simplified`, `openehr/template/webtemplate`, `openehr/templatecompile`, `openehr/serialize/canjson`, `openehr/validation` — **no `internal/` import.**
+**Packages:** `openehr/serialize/simplified`, `openehr/template/webtemplate`, `openehr/templatecompile`, `openehr/serialize/canjson`, `openehr/validation`. **No `internal/` import.**
 
 **Sample output (abridged, keys sorted):**
 
@@ -479,7 +479,7 @@ OK: FLAT -> COMPOSITION -> FLAT round-trips for Test_dv_quantity_open_constraint
 OK: WithTemplate decode validates against the OPT
 ```
 
-**What to copy into your app:** build the Web Template once (`templatecompile.Compile` + `webtemplate.Build`), then `simplified.MarshalFlat(comp, wt)` / `UnmarshalFlat(data, wt)` (and the `…Structured` pair) for OPT-driven conversion, or `FlatToStructured` / `StructuredToFlat` for OPT-free interconversion. Pass `simplified.WithTemplate(compiled)` to `Unmarshal*` when you need an OPT-validatable composition (names + RM-mandatory attributes repopulated) rather than a format-idempotent one. Composition-level metadata rides `ctx/`; decorated or exotic datatypes ride `|raw`. The codec is strict on decode (unknown paths/suffixes, wrong-typed ctx values, index games, and malformed input error rather than drop data) — see the package's `deviations.md`.
+**What to copy into your app:** build the Web Template once (`templatecompile.Compile` + `webtemplate.Build`), then `simplified.MarshalFlat(comp, wt)` / `UnmarshalFlat(data, wt)` (and the `…Structured` pair) for OPT-driven conversion, or `FlatToStructured` / `StructuredToFlat` for OPT-free interconversion. Pass `simplified.WithTemplate(compiled)` to `Unmarshal*` when you need an OPT-validatable composition (names + RM-mandatory attributes repopulated) rather than a format-idempotent one. Composition-level metadata rides `ctx/`; decorated or exotic datatypes ride `|raw`. The codec is strict on decode: unknown paths or suffixes, wrong-typed ctx values, index games, and malformed input return an error instead of dropping data. See the package's `deviations.md`.
 
 ---
 
@@ -487,7 +487,7 @@ OK: WithTemplate decode validates against the OPT
 
 ### ehr_create
 
-**Purpose:** End-to-end EHR creation — static service catalog → transport client → typed `ehr.Create`, backed by an in-process `httptest` server (no external CDR).
+**Purpose:** End-to-end EHR creation (static service catalog → transport client → typed `ehr.Create`), backed by an in-process `httptest` server instead of an external CDR.
 
 ```bash
 go run ./cmd/examples/ehr_create
@@ -516,7 +516,7 @@ To hit a real backend, swap the catalog base URL and add `transport.WithTokenSou
 
 ### contribution-build
 
-**Purpose:** Assemble a multi-version CONTRIBUTION with `contribution.Builder` — two vendored canonical compositions committed in one batch, one as a first version and one as an amendment — and print the `Contribution_create` body. `-commit` additionally POSTs it through `contribution.Commit` to an in-process fake CDR and asserts the captured request is byte-identical to what was built.
+**Purpose:** Assemble a multi-version CONTRIBUTION with `contribution.Builder` and print the `Contribution_create` body. The batch holds two vendored canonical compositions, one as a first version and one as an amendment. `-commit` additionally POSTs it through `contribution.Commit` to an in-process fake CDR and asserts the captured request is byte-identical to what was built.
 
 ```bash
 go run ./cmd/examples/contribution-build
@@ -535,9 +535,9 @@ versions[1]: ORIGINAL_VERSION<COMPOSITION> change_type=amendment/250 lifecycle_s
 
 **What to copy into your app:**
 
-1. `contribution.NewBuilder()`, then declare the batch audit once — committer, system id, and the batch `change_type` (which is *never* derived from the versions).
+1. `contribution.NewBuilder()`, then declare the batch audit once: committer, system id, and the batch `change_type` (which is *never* derived from the versions).
 2. Accumulate one `Change` per version: `contribution.Creation(payload)`, or `Amendment` / `Modification` / `Deletion` with the preceding version uid. Each is generic over the four versionable RM types, so a wrong payload type is a compile error.
-3. `Build()` once — it returns a `*contribution.Submission` that has already passed `Validate`, or every accumulated error joined.
+3. `Build()` once. It returns a `*contribution.Submission` that has already passed `Validate`, or every accumulated error joined.
 4. `contribution.Commit(ctx, client, ehrID, submission)`.
 
 Per-version overrides (`WithLifecycleState`, `WithVersionCommitter`, `WithVersionDescription`, `WithVersionSystemID`, `WithVersionUID`) refine what a version would otherwise inherit from the batch audit.
@@ -546,9 +546,9 @@ Per-version overrides (`WithLifecycleState`, `WithVersionCommitter`, `WithVersio
 
 ### smart-launch
 
-**Purpose:** Demonstrate the full **standalone SMART-on-openEHR authorization-code + PKCE flow** for a public client (no client secret), backed by an in-process `httptest`-style stub server — no external network, no secrets, works offline.
+**Purpose:** Demonstrate the full **standalone SMART-on-openEHR authorization-code + PKCE flow** for a public client (no client secret), backed by an in-process `httptest`-style stub server. It needs no external network and no secrets.
 
-The key teaching point is the **state + PKCE code_verifier persistence** across the redirect: `auth/smart.AuthorizationRequest` (returned by `BeginAuthorization`) must be stored server-side between the initial redirect and the callback, then retrieved by `state` and passed unchanged to `ExchangeAuthorizationCode`.
+The main lesson is the **state + PKCE code_verifier persistence** across the redirect. Your app must store the `auth/smart.AuthorizationRequest` that `BeginAuthorization` returns server-side between the initial redirect and the callback. It then retrieves it by `state` and passes it unchanged to `ExchangeAuthorizationCode`.
 
 ```bash
 go run ./cmd/examples/smart-launch
@@ -603,7 +603,7 @@ Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf co
 
 ## Fixtures and testkit
 
-Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and cassettes under `testkit/cassettes/`. These are stable, checked-in artefacts — not generated at runtime (except `validate-from-json/testdata/`, produced once via `gen_fixture.go`).
+Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and cassettes under `testkit/cassettes/`. These are stable, checked-in artefacts, not generated at runtime. The exception is `validate-from-json/testdata/`, produced once via `gen_fixture.go`.
 
 When writing your own tests, prefer importing fixtures from `testkit` rather than copying paths by hand.
 
@@ -613,7 +613,7 @@ When writing your own tests, prefer importing fixtures from `testkit` rather tha
 
 Agents and contributors: when you add or materially change an example under `cmd/examples/`, update this file, [`cmd/examples/doc.go`](../cmd/examples/doc.go), and [`quick-start.md`](quick-start.md) (if onboarding changes) in the **same PR**. Checklist: [ai-workflow.md § Examples](ai-workflow.md#examples).
 
-The **Sample output:** blocks named in the allowlist of [`cmd/examples/transcripts_test.go`](../cmd/examples/transcripts_test.go) are verified mechanically against real program runs — that allowlist is the sole authority on which ones, and its exclusion census accounts for every other example. A deliberate output change therefore means regenerating the block verbatim from `go run ./cmd/examples/<name>`, not editing it by hand.
+[`cmd/examples/transcripts_test.go`](../cmd/examples/transcripts_test.go) checks the **Sample output:** blocks named in its allowlist against real program runs. That allowlist alone decides which blocks are checked, and its exclusion census accounts for every other example. A deliberate output change therefore means regenerating the block verbatim from `go run ./cmd/examples/<name>`, not editing it by hand.
 
 An example that **gains** a verbatim sample-output block must be added to that allowlist in the same PR. `TestSampleMarkerCensus` fails the build if a section publishes a bare sample-output marker without an allowlist entry, so an unlisted block is caught rather than left silently unverified. The one recorded exception is **smart-launch**, whose PKCE state, verifier, and `expires_at` differ every run: `bareMarkerException` in that test names it, and the test also fails if that exception ever outlives the marker it excuses.
 
@@ -621,7 +621,7 @@ An example that **gains** a verbatim sample-output block must be added to that a
 
 ## Related documentation
 
-- [quick-start.md](quick-start.md) — install, idioms, REST wiring
-- [architecture.md](architecture.md) — package map and dependency rules
-- [specifications/use-cases.md](specifications/use-cases.md) — benchmark, seeder, MCP, federator consumers
-- [roadmap.md](roadmap.md) — what is landed vs planned
+- [quick-start.md](quick-start.md): install, idioms, REST wiring
+- [architecture.md](architecture.md): package map and dependency rules
+- [specifications/use-cases.md](specifications/use-cases.md): benchmark, seeder, MCP, federator consumers
+- [roadmap.md](roadmap.md): what is landed vs planned

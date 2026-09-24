@@ -10,13 +10,13 @@ for the full plan.
 
 | Path | Role |
 |---|---|
-| `baseline/` | Frozen copy of the official openEHR `AqlLexer.g4` / `AqlParser.g4` + `PIN` (provenance). **Read-only** — changes only on a QUERY release bump. |
+| `baseline/` | Frozen copy of the official openEHR `AqlLexer.g4` / `AqlParser.g4` + `PIN` (provenance). **Read-only**: changes only on a QUERY release bump. |
 | `active/` | What `make aqlgen` consumes: `baseline/` + the deltas in `DIVERGENCES.md`. |
 | `DIVERGENCES.md` | One `SDK-AQL-NNN` row per delta between `baseline/` and `active/`. |
 
 The generated Go parser is committed under
 [`../../../openehr/aql/parse/gen/`](../../../openehr/aql/parse/gen/). `make ci`,
-`go build`, and `go test` never run the generator — they compile the committed
+`go build`, and `go test` never run the generator. They compile the committed
 parser against the pure-Go runtime.
 
 ## Regenerate (maintainer-only; needs Docker, not a host JRE)
@@ -28,7 +28,7 @@ make aqlgen-verify   # fail if the committed parser drifts from active/
 
 The generator is the ANTLR Java tool, confined to the `antlr` Docker stage; the
 runtime (`github.com/antlr4-go/antlr/v4`) is pure Go. **Bump the tool and runtime
-versions together** (see `baseline/PIN`) — they are released in lockstep.
+versions together** (see `baseline/PIN`), because they are released in lockstep.
 
 ## Rebasing onto a new QUERY release
 
