@@ -1415,8 +1415,6 @@ requirements:
     # Driver is a second walker alongside
     # REQ-102/110; closed-RM-set helpers (rmTypeInfo / rmread) are shared
     # across REQ-102/110/112.
-    # Archetype-root + ARCHETYPED catalogue rows (2026-09-24) are spec-first;
-    # plan docs/plans/2026-09-24-rm-floor-archetype-roots.md.
     implementation: partial
     packages:
       - openehr/validation
@@ -1441,11 +1439,17 @@ requirements:
       - openehr/validation/rmread/handles_test.go
       - openehr/validation/rmread/read_test.go  # ACTION time/ism_transition/instruction_details readers the floor relies on (shared with REQ-102)
     plans:
+      - docs/plans/2026-09-24-rm-floor-archetype-roots.md
       - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
       - docs/plans/archive/2026-06-29-rm-floor-validation.md
       - docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md
       - docs/plans/archive/2026-09-14-json-v2-migration.md  # landed the rmread ACTION readers, so the floor stops reporting a populated ACTION's mandatory attributes as missing
     notes: >-
+      partial (2026-09-24, docs/plans/2026-09-24-rm-floor-archetype-roots.md):
+      the archetype-root and ARCHETYPED catalogue rows are spec-first; the
+      shipped floor (required-set walk plus the leaf-invariant catalogue) is
+      landed, and these two rows await code.
+
       landed (2026-09-03): the floor gained two TERM_MAPPING /
       DV_TEXT.mappings invariants — match outside {'>','=','<','?'} and
       a present-but-empty mappings (Mappings_valid) — raised from
