@@ -1415,7 +1415,9 @@ requirements:
     # Driver is a second walker alongside
     # REQ-102/110; closed-RM-set helpers (rmTypeInfo / rmread) are shared
     # across REQ-102/110/112.
-    implementation: landed
+    # Archetype-root + ARCHETYPED catalogue rows (2026-09-24) are spec-first;
+    # plan docs/plans/2026-09-24-rm-floor-archetype-roots.md.
+    implementation: partial
     packages:
       - openehr/validation
       - openehr/rm/rminfo  # AttributeNames added to Lookup

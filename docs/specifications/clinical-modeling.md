@@ -844,6 +844,26 @@ The catalogue is intentionally small; the value is in the structural required-se
 - **DV_TEXT / DV_CODED_TEXT** — the floor **MUST** report a present-but-empty `mappings` (`Mappings_valid`) as an invariant violation; DV_CODED_TEXT inherits `mappings` from DV_TEXT via embedding, so both dispatch through the same evaluator. The floor cannot distinguish an absent `mappings` key from an explicit JSON `null` — canjson decodes both to a nil slice — so only a decoded literal `"mappings":[]` (a non-nil empty slice) is flagged; null and absent are indistinguishable and both valid. `mappings` is a walked container: each element is a TERM_MAPPING node of its own, checked by the entry below wherever it sits.
 - **TERM_MAPPING** — the floor **MUST** report a `match` outside `{'>', '=', '<', '?'}` (`term_mapping_match`) as an invariant violation on the mapping node itself, so the check fires for a mapping under a DV_TEXT / DV_CODED_TEXT `mappings` container, for one nested under a mapping's own `purpose`, and for a TERM_MAPPING handed to `ValidateRM` as the root. The RM-mandatory `match` and `target` (CODE_PHRASE) fall under the required-set walk, and `target`'s and `purpose`'s own invariants apply inside each mapping; an empty `match` therefore reports both `required` and `term_mapping_match` at the same path.
 
+- **Archetype roots (`Is_archetype_root`)** — for every class whose BMM declares the `Is_archetype_root`
+  invariant (COMPOSITION, EHR_STATUS, EHR_ACCESS, and PARTY with its descendants PERSON / ORGANISATION / GROUP /
+  AGENT / ROLE), `LOCATABLE.Archetyped_valid` (`is_archetype_root xor archetype_details = Void`) makes
+  `archetype_details` mandatory even though LOCATABLE declares it 0..1. The floor **MUST** report an absent or
+  `null` `archetype_details` on such a node as `is_archetype_root` at that node's `…/archetype_details`. Classes that
+  declare no `Is_archetype_root` (FOLDER, PARTY_RELATIONSHIP, the data-structure and entry classes) **MUST NOT** be
+  reported: there the attribute is optional. This is a class invariant of the object, not a storage rule, so it holds
+  for a detached object exactly as for a persisted one. Rules that need stored history
+  (`VERSIONED_COMPOSITION.Archetype_node_id_valid`) and requiring `ARCHETYPED.template_id` (0..1 in the RM) stay out
+  of scope.
+- **ARCHETYPED** — wherever an `archetype_details` node is present, on any LOCATABLE, the floor **MUST** report:
+  `archetype_id` absent or `null` → `required` at `…/archetype_details/archetype_id`; `archetype_id.value` absent,
+  `null` or empty → `required` at `…/archetype_details/archetype_id/value`; `rm_version` absent or `null` →
+  `required` at `…/archetype_details/rm_version`; `rm_version` present but empty → `rm_version_valid`
+  (`Rm_version_valid: not rm_version.is_empty`) at the same path. `archetype_id` (`ARCHETYPE_ID`) and `rm_version`
+  (`String`) are **value-typed** mandatories, so the value-based walk cannot tell absent from empty (see
+  *Value-typed mandatory presence* below): the value-based entries report an empty `archetype_id.value` as `required`
+  and an empty `rm_version` as `rm_version_valid`, and the `…Bytes` entries decide presence from the source JSON key
+  set so an absent key reports `required`. Validating the `ARCHETYPE_ID` grammar is out of scope for this catalogue.
+
 **Known gap — `EVENT_CONTEXT.setting` (`Setting_valid`).** The RM constrains `setting.defining_code` to a member of the
 openEHR terminology's `setting` group (`Terminology(Terminology_id_openehr).has_code_for_group_id(Group_id_setting, …)`).
 The floor does **not** evaluate it, because doing so needs the openEHR terminology group tables, which the floor
@@ -854,7 +874,7 @@ and is deferred to a follow-up cycle; until then `Setting_valid` is enforced onl
 ([wire.md § REQ-053](wire.md#req-053)), and REQ-107's generator pins an `openehr`-coded default so the SDK cannot
 originate the invalid shape.
 
-Catalogue additions follow [ADR 0001](../adr/0001-bmm-version-bump-runbook.md) — adding a new BMM concrete that needs a leaf invariant requires editing the closed switch in `rmfloor_adapters.go` and adding the evaluator. Most invariants emit `Issue.Code = "rm_invariant"`; the term-mapping checks are the exception (`mappings_valid` on DV_TEXT / DV_CODED_TEXT, `term_mapping_match` on TERM_MAPPING), carrying their own stable codes so consumers can dispatch on the specific violation without parsing `Detail`.
+Catalogue additions follow [ADR 0001](../adr/0001-bmm-version-bump-runbook.md) — adding a new BMM concrete that needs a leaf invariant requires editing the closed switch in `rmfloor_adapters.go` and adding the evaluator. Most invariants emit `Issue.Code = "rm_invariant"`; the term-mapping checks are the exception (`mappings_valid` on DV_TEXT / DV_CODED_TEXT, `term_mapping_match` on TERM_MAPPING), as are the archetype-root checks (`is_archetype_root`, `rm_version_valid`), carrying their own stable codes so consumers can dispatch on the specific violation without parsing `Detail`.
 
 ### Trust model
 
