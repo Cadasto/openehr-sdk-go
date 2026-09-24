@@ -1,10 +1,12 @@
 package canjson_test
 
 import (
+	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -44,6 +46,48 @@ func TestMarshalRefusalWrapsErrInvalidValue(t *testing.T) {
 		t.Errorf("no bytes on refusal; got %q", got)
 	}
 	assertEncodeRefusal(t, err)
+}
+
+// TestMarshalRefusesInvalidUTF8StringThroughPublicEntry pins the REQ-052 / ADR 0022
+// encode-refusal path for a plain Go string reached on output: invalid UTF-8 in
+// a DV_TEXT.Value is refused by jsontext as it writes the value, surfaced
+// through canjson.Marshal as ErrInvalidValue over a *jsontext.SyntacticError.
+// This is the path ADR 0022 describes — distinct from rm.Character, whose own
+// MarshalJSON faults before jsontext ever sees the bytes (a *json.SemanticError
+// with no SyntacticError underneath; see TestMarshalRefusesCharacterInvalidUTF8
+// below and character_test.go).
+//
+// Can-fail control: the SyntacticError assertion is what pins the jsontext leg.
+// Setting jsontext.AllowInvalidUTF8(true) in typereg.EncodeOptions stops
+// jsontext validating output UTF-8, so this refusal disappears entirely and the
+// test goes red — while the Character fixture would stay green, which is why it
+// cannot stand in for this path.
+func TestMarshalRefusesInvalidUTF8StringThroughPublicEntry(t *testing.T) {
+	got, err := canjson.Marshal(&rm.DVText{Value: string([]byte{0xff})})
+	if got != nil {
+		t.Errorf("no bytes on refusal; got %q", got)
+	}
+	assertEncodeRefusal(t, err)
+	if _, ok := errors.AsType[*jsontext.SyntacticError](err); !ok {
+		t.Errorf("invalid UTF-8 in a Go string must be refused by jsontext on output (a *jsontext.SyntacticError reachable); got %v", err)
+	}
+}
+
+// TestMarshalRefusesCharacterInvalidUTF8 pins the other REQ-052 refusal path through the
+// public entry: rm.Character validates in its own MarshalJSON, so canjson.Marshal
+// propagates that as ErrInvalidValue. It is NOT the jsontext-on-output path
+// (there is no *jsontext.SyntacticError underneath — the value never reaches
+// jsontext), so it does not stand in for the ADR 0022 string path above.
+func TestMarshalRefusesCharacterInvalidUTF8(t *testing.T) {
+	tm := rm.TermMapping{Match: rm.Character(string([]byte{0xff}))}
+	got, err := canjson.Marshal(&tm)
+	if got != nil {
+		t.Errorf("no bytes on refusal; got %q", got)
+	}
+	assertEncodeRefusal(t, err)
+	if _, ok := errors.AsType[*jsontext.SyntacticError](err); ok {
+		t.Errorf("the Character path refuses before jsontext; no *jsontext.SyntacticError should be reachable; got %v", err)
+	}
 }
 
 // REQ-052

@@ -153,10 +153,12 @@ requirements:
       - openehr/rm/typereg/registry_test.go
       - openehr/serialize/canjson/omitzero_test.go
       - openehr/serialize/canjson/typednil_slot_test.go  # typed-nil in an optional polymorphic slot encodes as absent
+      - openehr/serialize/canjson/map_value_type_test.go  # a map-held RM value carries _type on every entry (ADR 0022)
       - openehr/serialize/canjson/bare_v2_decode_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go  # can-fail plants for the fidelity and RM-floor legs
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
+      - testkit/probes/serialize/probe_038_guard_internal_test.go  # can-fail plant for the wire-equivalence fixpoint leg
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/real_test.go
@@ -218,8 +220,8 @@ requirements:
       (2026-09-03,
       docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md): the
       OUT-OF-RANGE arm as before (1e400 fails with a typed
-      *json.UnmarshalTypeError, reachable by errors.As through the
-      generated UnmarshalJSON wrapper — TestUnmarshalOverflowIsATypedError),
+      *json.SemanticError, reachable by errors.AsType through the
+      generated UnmarshalJSONFrom wrapper — TestUnmarshalOverflowIsATypedError),
       and the MANTISSA arm, previously open, is now closed for literals
       past 17 significant digits — rm.significantDigits
       (openehr/rm/real.go) counts a decimal literal's significant digits
@@ -246,19 +248,6 @@ requirements:
       TERM_MAPPING.match bullet) carry the same canjson.ErrInvalidShape sentinel
       through an Is-only wrapper, with the message left unchanged by the
       classification.
-      REQ-052 landed (2026-09-03): the former field-order SHOULD ("follow
-      the openEHR canonical-JSON specification when one is published")
-      was retired — JSON member order carries no meaning (RFC 8259 § 4)
-      and the openEHR specifications prescribe none, so it deferred to a
-      publication that will not come. § REQ-052 now states the
-      deterministic encode profile as the SDK's own output contract
-      (two successive encodes of a decoded value are byte-identical —
-      PROBE-030, which never compares against the input — and repeat
-      encodes are byte-identical; TestEncodeIsDeterministic,
-      TestEncodeHashKeysLexicographic) and requires the decoder to accept
-      members in any order, _type included
-      (TestDecodeAcceptsAnyMemberOrder). No order is asserted for other
-      implementations' output. No open clause remains.
       REQ-052 amended (2026-09-14,
       docs/plans/archive/2026-09-14-json-v2-migration.md): the deterministic
       field-order MUST is withdrawn. _type first is now a SHOULD; beyond

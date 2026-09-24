@@ -215,12 +215,13 @@ type Probe030Input struct {
 // skipped for them while the fidelity legs still run. Vendored content is not
 // edited.
 //
-// clinical_notes.v0 has an empty string at
-// `/content[2]/activities[0]/action_archetype_id`, a required ACTIVITY
-// attribute, which the RM floor reports as absent. That is a genuine finding in
-// the vendored composition, invariant to the round trip (ValidateRM reports it
-// on the input decode and on the re-encoded value alike), so it is held out of
-// the floor leg only.
+// clinical_notes.v0 leaves required RM attributes absent or empty, for example
+// the empty string at `/content[2]/activities[0]/action_archetype_id`; the RM
+// floor reports nine `required` findings. They are genuine findings in the
+// vendored composition, invariant to the round trip (ValidateRM reports the
+// same set on the input decode and on the round-tripped value,
+// TestProbe030SkipFloorFindingsAreInvariantToTheRoundTrip), so the cassette is
+// held out of the floor leg only.
 var probe030SkipFloor = map[string]bool{
 	"compositions/clinical_notes.v0.json": true,
 }
