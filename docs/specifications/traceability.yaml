@@ -220,7 +220,7 @@ requirements:
       (2026-09-03,
       docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md): the
       OUT-OF-RANGE arm as before (1e400 fails with a typed
-      *json.SemanticError, reachable by errors.As through the
+      *json.SemanticError, reachable by errors.AsType through the
       generated UnmarshalJSONFrom wrapper — TestUnmarshalOverflowIsATypedError),
       and the MANTISSA arm, previously open, is now closed for literals
       past 17 significant digits — rm.significantDigits

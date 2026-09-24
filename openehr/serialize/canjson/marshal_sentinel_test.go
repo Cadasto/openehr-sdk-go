@@ -48,7 +48,7 @@ func TestMarshalRefusalWrapsErrInvalidValue(t *testing.T) {
 	assertEncodeRefusal(t, err)
 }
 
-// TestMarshalRefusesInvalidUTF8StringThroughPublicEntry pins the ADR 0022
+// TestMarshalRefusesInvalidUTF8StringThroughPublicEntry pins the REQ-052 / ADR 0022
 // encode-refusal path for a plain Go string reached on output: invalid UTF-8 in
 // a DV_TEXT.Value is refused by jsontext as it writes the value, surfaced
 // through canjson.Marshal as ErrInvalidValue over a *jsontext.SyntacticError.
@@ -73,7 +73,7 @@ func TestMarshalRefusesInvalidUTF8StringThroughPublicEntry(t *testing.T) {
 	}
 }
 
-// TestMarshalRefusesCharacterInvalidUTF8 pins the other refusal path through the
+// TestMarshalRefusesCharacterInvalidUTF8 pins the other REQ-052 refusal path through the
 // public entry: rm.Character validates in its own MarshalJSON, so canjson.Marshal
 // propagates that as ErrInvalidValue. It is NOT the jsontext-on-output path
 // (there is no *jsontext.SyntacticError underneath — the value never reaches

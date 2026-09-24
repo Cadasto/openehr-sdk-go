@@ -53,7 +53,9 @@ func Probe038CanjsonRMPolymorphicDecode(body []byte, factory func() any) (Result
 // probe038PolymorphicDecode runs PROBE-038. Probe038CanjsonRMPolymorphicDecode
 // passes the real canjson.Marshal for the b2 step; can-fail tests pass a lossy
 // double that drops a field on the b2 encode, proving the wire-equivalence
-// fixpoint leg catches a field lost across the second decode-and-encode
+// fixpoint leg fails whenever b2 is not wire-equivalent to b1. The double
+// replaces the encode because the decode step has no seam; the leg compares
+// the two encodes, so it catches a field lost at either step
 // (probe_038_guard_internal_test.go).
 func probe038PolymorphicDecode(body []byte, factory func() any, secondMarshal func(any) ([]byte, error)) (Result, error) {
 	r := Result{Probe: "PROBE-038"}

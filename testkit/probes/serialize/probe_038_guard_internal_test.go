@@ -12,8 +12,9 @@ import (
 // `units` on the b2 encode only, so the discriminator multiset from the first
 // re-marshal still matches the input while b1 and b2 are not wire-equivalent.
 // The mutation that turns this red is removing the wireequiv check in
-// probe038PolymorphicDecode: then a field lost across the second decode would
-// slip through with Status == "pass".
+// probe038PolymorphicDecode: then a b2 that is not wire-equivalent to b1 would
+// slip through with Status == "pass". The detail match is "not wire-equivalent"
+// because the pass detail also says "wire-equivalent".
 func TestProbe038GuardCatchesWireEquivFixpointBreak(t *testing.T) {
 	body := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg"}`)
 	r, err := probe038PolymorphicDecode(body, func() any { return new(rm.DVQuantity) }, dropMemberReEncoder("units"))
@@ -23,7 +24,7 @@ func TestProbe038GuardCatchesWireEquivFixpointBreak(t *testing.T) {
 	if r.Status != "fail" {
 		t.Fatalf("status = %q, want fail: dropping units on the second encode must break the wire-equivalence fixpoint", r.Status)
 	}
-	if !strings.Contains(r.Detail, "wire-equivalent") {
+	if !strings.Contains(r.Detail, "not wire-equivalent") {
 		t.Fatalf("detail = %q; want the wire-equivalence fixpoint leg to fire after the discriminator multiset passes", r.Detail)
 	}
 }
