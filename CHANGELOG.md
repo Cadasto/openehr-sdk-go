@@ -8,12 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-09-25
+
+Twenty-eighth `v0.x` minor: canonical JSON moves to `encoding/json/v2`, stricter and faster on decode, and the vendored ITS-REST contract is pinned to a tagged release. One source break: the generated RM and AOM types drop their v1 JSON methods.
+
 ### Added
 
 - **Canonical JSON moves to `encoding/json/v2` (REQ-052, ADR 0021/0022).** Decode is stricter (duplicate members and invalid UTF-8 refused, names case-sensitive) and faster than the v1 codec; member order is no longer a contract, and `<`/`>`/`&` are left unescaped.
 - **Generated RM and AOM types implement `encoding/json/v2`'s `MarshalerTo`/`UnmarshalerFrom` (ADR 0002 D8, ADR 0022).** Their v1 `MarshalJSON`/`UnmarshalJSON` pair and exported wire types are gone and `contribution.CommitVersion` now requires `json.MarshalerTo` (full surface delta in ADR 0022).
 - **RM floor validation reads `ACTION.time`, `ism_transition` and `instruction_details` (REQ-112).** `ValidateRM` no longer reports the two mandatory ACTION attributes as missing on a well-formed composition.
-- **Vendored openEHR REST API (ITS-REST) OpenAPI specs pinned to `Release-1.1.0`.** `resources/its-rest/` moves from the `master` branch tip to the tagged `Release-1.1.0` release (commit `2405899`), so the vendored contract is pinned to a reproducible release rather than a moving branch. The only content delta is the upstream amendment record in `overview-validation.openapi.yaml`; every schema, path, header and status code is byte-identical, so no client behaviour changes.
+- **Vendored openEHR REST API (ITS-REST) specs pinned to `Release-1.1.0`.** `resources/its-rest/` moves from the `master` tip to the tagged release (commit `2405899`), and only the upstream amendment record differs, so no client behaviour changes.
+- **Auth dependencies upgraded to `go-jose/v4` v4.1.5 and `golang.org/x/oauth2` v0.37.0.** Routine upstream releases for the `auth/` and `smart/` layers, with no SDK API change.
+- **Public documentation site (MkDocs).** `pages/` builds an install, packages, examples and workflow site on the pinned `Cadasto/docs-theme` brand layer (v0.4.0), and `make docs-check` gates its output.
 
 ## [0.27.0] - 2026-09-09
 
