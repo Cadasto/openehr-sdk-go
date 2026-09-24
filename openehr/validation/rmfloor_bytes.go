@@ -11,7 +11,8 @@ package validation
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
@@ -33,25 +34,31 @@ import (
 // Attributes the value-based floor already catches — the interface- /
 // pointer- / slice-typed mandatories (e.g. `name`, typed rm.DVTextLike) —
 // remain flagged when absent; the per-RM-type invariant catalogue is
-// unchanged. Input that is not a JSON object (malformed, array, scalar,
-// or null), or that fails EHR_STATUS decode, surfaces a single
+// unchanged. Input that is not a well-formed JSON object (malformed, array,
+// scalar, null, or an object repeating a member name), or that fails
+// EHR_STATUS decode, surfaces a single
 // `invalid_shape` issue at `/` and a not-OK [Result].
 //
-// The decode uses the standard library rather than
-// openehr/serialize/canjson: the RM types carry their own UnmarshalJSON
-// (canjson.Unmarshal is a thin encoding/json wrapper), and REQ-013
-// forbids openehr/validation from importing the wire-codec layer.
+// The decode uses encoding/json/v2 directly rather than
+// openehr/serialize/canjson, which REQ-013 forbids openehr/validation from
+// importing: the generated UnmarshalJSONFrom methods on the RM types carry
+// the codec, and typereg threads the polymorphic decode hooks, so no codec
+// entry point is needed. v2's defaults refuse a duplicate member name and
+// match member names case-sensitively, as the canonical-JSON contract
+// requires (REQ-052); a duplicate therefore surfaces as `invalid_shape` at
+// `/` like any other failed decode.
 func ValidateRMEHRStatusBytes(data []byte) Result {
 	// Top-level key presence — the only signal that separates an omitted
 	// `subject` from a supplied bare PARTY_SELF. A non-object input
-	// (array/scalar/null/malformed) fails to unmarshal into the map (or
-	// yields a nil map for `null`) and is reported as an invalid shape.
-	var keys map[string]json.RawMessage
+	// (array/scalar/null/malformed, or a repeated member name) fails to
+	// unmarshal into the map (or yields a nil map for `null`) and is
+	// reported as an invalid shape.
+	var keys map[string]jsontext.Value
 	if err := json.Unmarshal(data, &keys); err != nil || keys == nil {
 		return resultFromIssues([]Issue{{
 			Path:     "/",
 			Code:     "invalid_shape",
-			Detail:   "ValidateRMEHRStatusBytes: input is not a JSON object",
+			Detail:   "ValidateRMEHRStatusBytes: input is not a well-formed JSON object",
 			Severity: Error,
 		}})
 	}
@@ -86,6 +93,6 @@ func ValidateRMEHRStatusBytes(data []byte) Result {
 
 // isJSONNull reports whether a raw JSON value is the literal `null` token
 // (tolerating surrounding whitespace).
-func isJSONNull(raw json.RawMessage) bool {
+func isJSONNull(raw jsontext.Value) bool {
 	return bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
 }

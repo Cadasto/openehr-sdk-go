@@ -136,3 +136,46 @@ func TestRenderFlatDecodeDropPropertyLosesCopy(t *testing.T) {
 		t.Errorf("dropping %s from the plan still emitted its copy %q: a lost property would go unnoticed on the round trip", dropped.Prop.PropertyName(), droppedCopy)
 	}
 }
+
+// TestRenderUnmarshalPassesDeclaredTypeField pins, on every concrete class the
+// RM plan emits, that the rendered UnmarshalJSONFrom hands typereg.DecodeInto
+// the wire value's own declared `_type` field as gotType (REQ-052, ADR 0022):
+// `&wire.Class` on the flat shape and `&w.Type` on the alias shape. The
+// whole-value `_type` guard reads that field after the single decode, so any
+// other pointer (a fresh `new(string)`, say) would leave it reading an empty
+// discriminator and accept a mislabelled body silently. The runtime twin is
+// TestUnmarshalTypeMismatchCensus in openehr/serialize/canjson.
+func TestRenderUnmarshalPassesDeclaredTypeField(t *testing.T) {
+	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlan: %v", err)
+	}
+	var checked, concrete int
+	for _, file := range plan.Files {
+		classes := concreteClassesIn(file)
+		concrete += len(classes)
+		for _, pc := range classes {
+			fields, err := effectiveFields(plan, pc)
+			if err != nil {
+				t.Fatalf("effectiveFields %s: %v", pc.BMMName, err)
+			}
+			chunk, err := renderUnmarshalJSON(plan, pc, fields)
+			if err != nil {
+				t.Fatalf("renderUnmarshalJSON %s: %v", pc.BMMName, err)
+			}
+			shape, want := "alias", `typereg.DecodeInto(dec, "`+pc.BMMName+`", &w, &w.Type)`
+			if embedsMarshalerBearingConcrete(plan, pc) {
+				shape, want = "flat", `typereg.DecodeInto(dec, "`+pc.BMMName+`", &wire, &wire.Class)`
+			}
+			if !strings.Contains(chunk, want) {
+				t.Errorf("%s (%s shape) decoder does not contain %s: the `_type` guard must read the wire value's declared field", pc.BMMName, shape, want)
+			}
+			checked++
+		}
+	}
+	// Every earlier failure is fatal, so checked == concrete holds by
+	// construction; the floor is what catches a plan that silently shrank.
+	if concrete < 100 || checked != concrete {
+		t.Errorf("census rendered %d of the %d concrete classes the plan yields; want all of them, and the full RM inventory (at least 100)", checked, concrete)
+	}
+}

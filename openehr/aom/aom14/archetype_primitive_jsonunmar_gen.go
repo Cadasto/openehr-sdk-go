@@ -23,10 +23,11 @@ func (c *CBoolean) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_BOOLEAN: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_BOOLEAN", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCBoolean
-	}{rawCBoolean: (*rawCBoolean)(c)})
+	}{rawCBoolean: (*rawCBoolean)(c)}
+	return typereg.DecodeInto(dec, "C_BOOLEAN", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CDate.
@@ -40,10 +41,11 @@ func (c *CDate) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_DATE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_DATE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCDate
-	}{rawCDate: (*rawCDate)(c)})
+	}{rawCDate: (*rawCDate)(c)}
+	return typereg.DecodeInto(dec, "C_DATE", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CDateTime.
@@ -57,10 +59,11 @@ func (c *CDateTime) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_DATE_TIME: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_DATE_TIME", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCDateTime
-	}{rawCDateTime: (*rawCDateTime)(c)})
+	}{rawCDateTime: (*rawCDateTime)(c)}
+	return typereg.DecodeInto(dec, "C_DATE_TIME", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CDuration.
@@ -74,10 +77,11 @@ func (c *CDuration) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_DURATION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_DURATION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCDuration
-	}{rawCDuration: (*rawCDuration)(c)})
+	}{rawCDuration: (*rawCDuration)(c)}
+	return typereg.DecodeInto(dec, "C_DURATION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CInteger.
@@ -91,10 +95,11 @@ func (c *CInteger) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_INTEGER: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_INTEGER", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCInteger
-	}{rawCInteger: (*rawCInteger)(c)})
+	}{rawCInteger: (*rawCInteger)(c)}
+	return typereg.DecodeInto(dec, "C_INTEGER", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CReal.
@@ -108,10 +113,11 @@ func (c *CReal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_REAL: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_REAL", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCReal
-	}{rawCReal: (*rawCReal)(c)})
+	}{rawCReal: (*rawCReal)(c)}
+	return typereg.DecodeInto(dec, "C_REAL", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CString.
@@ -125,10 +131,11 @@ func (c *CString) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_STRING: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_STRING", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCString
-	}{rawCString: (*rawCString)(c)})
+	}{rawCString: (*rawCString)(c)}
+	return typereg.DecodeInto(dec, "C_STRING", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CTime.
@@ -142,8 +149,9 @@ func (c *CTime) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_TIME: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "C_TIME", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCTime
-	}{rawCTime: (*rawCTime)(c)})
+	}{rawCTime: (*rawCTime)(c)}
+	return typereg.DecodeInto(dec, "C_TIME", &w, &w.Type)
 }

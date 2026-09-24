@@ -23,8 +23,9 @@ func (g *GenericEntry) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if g == nil {
 		return fmt.Errorf("canjson: GENERIC_ENTRY: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "GENERIC_ENTRY", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawGenericEntry
-	}{rawGenericEntry: (*rawGenericEntry)(g)})
+	}{rawGenericEntry: (*rawGenericEntry)(g)}
+	return typereg.DecodeInto(dec, "GENERIC_ENTRY", &w, &w.Type)
 }

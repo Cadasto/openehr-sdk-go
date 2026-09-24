@@ -138,7 +138,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/cassettes, testkit/fixtures, testkit/wireequiv]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md, docs/plans/archive/2026-09-14-json-v2-migration.md, docs/plans/archive/2026-09-15-widen-composition-corpus.md]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md, docs/plans/archive/2026-09-14-json-v2-migration.md, docs/plans/archive/2026-09-15-widen-composition-corpus.md, docs/plans/archive/2026-09-15-typereg-single-pass-decode.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md, docs/adr/0021-json-member-order-not-a-contract.md, docs/adr/0022-canonical-json-encoding-json-v2.md]
     tests:
@@ -155,6 +155,13 @@ requirements:
       - openehr/serialize/canjson/typednil_slot_test.go  # typed-nil in an optional polymorphic slot encodes as absent
       - openehr/serialize/canjson/map_value_type_test.go  # a map-held RM value carries _type on every entry (ADR 0022)
       - openehr/serialize/canjson/bare_v2_decode_test.go
+      - openehr/serialize/canjson/edgecases_test.go  # decode edge cases, the depth refusal among them
+      - openehr/serialize/canjson/type_census_test.go  # registered-type census, TestUnmarshalTypeMismatchCensus among it
+      - openehr/rm/typereg/streaming_test.go  # nil-argument refusals; listed under REQ-025 too
+      - openehr/validation/rmfloor_bytes_test.go  # the EHR_STATUS byte validator under v2 decode semantics
+      - openehr/client/demographic/versioned_test.go  # the demographic version read under v2 decode semantics
+      - internal/v1_rm_decode_guard_test.go  # no v1 encoding/json decode into an RM value in non-test code
+      - internal/bmmgen/render_streaming_test.go  # the generated decode passes the declared _type field
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go  # can-fail plants for the fidelity and RM-floor legs
       - testkit/probes/serialize/probes_test.go  # PROBE-030 over the whole corpus; every discovered cassette is an input
@@ -282,6 +289,19 @@ requirements:
       the code and test/package updates it anticipated (encoding/json/v2
       adoption, the jsonpoly retirement, the field_order_test.go rename)
       have since landed in the later phases of that plan.
+      REQ-052 amended (2026-09-24, PR 174,
+      docs/plans/archive/2026-09-15-typereg-single-pass-decode.md,
+      post-review section; facts in wire.md § REQ-052 and ADR 0022):
+      TestUnmarshalFirstFailureInDocumentOrderWins,
+      TestUnmarshalTypeMismatchLeavesReceiverAsDocumented,
+      TestUnmarshalMaxDepthAcrossPolymorphicSlots,
+      TestUnmarshalMaxDepthBoundary, TestUnmarshalTypeMismatchCensus,
+      TestRenderUnmarshalPassesDeclaredTypeField, TestDecodeIntoNilArguments.
+      Second review round (2026-09-24): a bare v1 caller's decode options
+      govern polymorphic slots too, and non-test code is held off v1 RM
+      decodes by a source scan: TestBareV1CallerOptionsGovernPolymorphicSlots,
+      TestValidateRMEHRStatusBytes_V2DecodeSemantics,
+      TestGetVersionCaseVariantMemberIsUnknown, TestNoV1DecodeIntoRMValues.
 
   - id: REQ-056
     title: Canonical XML
@@ -1123,12 +1143,27 @@ requirements:
       - openehr/bmm
       - openehr/client/definition
       - openehr/rm/typereg
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
+      - openehr/serialize/canjson
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-09-15-typereg-single-pass-decode.md]
     tests:
       - openehr/template/parse_cap_test.go
       - openehr/template/parse_depth_test.go
       - openehr/bmm/load_test.go
       - openehr/rm/typereg/registry_test.go
+      - openehr/serialize/canjson/edgecases_test.go
+    notes: >-
+      Amended 2026-09-24 (PR 174, implementation-aligned): the 512-level
+      bound applies on every canonical-JSON decode route, at three
+      typereg sites (Registry.Decode, DecodePolymorphic, DecodeInto), and
+      measures RM nesting from the document root across polymorphic
+      slots; how each site counts is stated in clinical-modeling.md
+      § REQ-108 (descriptive). Pinned by
+      TestUnmarshalMaxDepthAcrossPolymorphicSlots,
+      TestUnmarshalMaxDepthBoundary and
+      TestUnmarshalUndeclaredNestingDependsOnBuffering. Second review round
+      (2026-09-24): the depth and order tests gain Registry.Decode and bare
+      v1 arms, and a declared array at bracket depth 513 decodes through
+      canjson.Unmarshal but is refused by Registry.Decode.
 
   - id: REQ-109
     title: AQL static lint
@@ -2243,7 +2278,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, auth, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, openehr/rm, openehr/aom/aom14, internal, internal/bmmgen]
-    plans: [docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md]
+    plans: [docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md, docs/plans/archive/2026-09-15-typereg-single-pass-decode.md]
     tests:
       - openehr/rm/typereg/nilreceiver_census_test.go
       - openehr/client/ehr/contribution/version_test.go
@@ -2267,6 +2302,7 @@ requirements:
       - openehr/client/ehr/ehr_test.go
       - openehr/client/ehr/resource_test.go
       - internal/option_guard_test.go
+      - openehr/rm/typereg/streaming_test.go  # nil-argument refusals wrap typereg.ErrNilArgument
     notes: >-
       The no-panic clause is enforced across the caller-constructible axis, not
       only at the contribution constructors: a typed-nil PartyProxy committer is
@@ -2323,6 +2359,10 @@ requirements:
       one, and parse's syntaxErrorPosition and lint's syntaxDetail report such
       a position as ABSENT (ok=false / no "L:C:" prefix) so no consumer
       diagnostic invents a 0:0 coordinate.
+      2026-09-24 (PR 174): typereg.DecodeInto and DecodePolymorphic refuse a
+      nil decoder and a nil target, and DecodeInto a nil gotType, with a
+      DecodeError wrapping the new sentinel typereg.ErrNilArgument
+      (TestDecodeIntoNilArguments, TestDecodePolymorphicNilArguments; ADR 0022).
 
   - id: REQ-026
     title: Goroutine-safe clients

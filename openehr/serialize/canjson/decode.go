@@ -27,21 +27,25 @@ import (
 //     path from the [DecodeError], the kind from this sentinel.
 //   - A JSON object carrying the same member name twice. jsontext refuses
 //     it (RFC 8259 § 4: names SHOULD be unique, and duplicates leave no
-//     single defined value) before any generated decode runs; the entry
+//     single defined value) during tokenisation; the entry
 //     point classifies that refusal with this sentinel, preserving the
 //     message, so errors.Is finds both this sentinel and
 //     jsontext.ErrDuplicateName.
 //
-// Two decode failures stay OUTSIDE the sentinel by design (REQ-052) and
+// Four decode failures stay OUTSIDE the sentinel by design (REQ-052) and
 // never acquire it:
 //
-//   - Malformed JSON, which the codec reports before any generated decode
-//     runs, as the codec's own syntax or truncated-input error (an
-//     encoding/json/jsontext.SyntacticError). No sentinel: [Unmarshal]
+//   - Malformed JSON, which the codec reports as its own syntax or
+//     truncated-input error (an encoding/json/jsontext.SyntacticError).
+//     No sentinel: [Unmarshal]
 //     reports it directly, and [Decoder.Decode] reports an empty stream
 //     as io.EOF. Invalid UTF-8 and a lone surrogate escape are refused on
 //     this same path (jsontext rejects them before rm.Character sees the
 //     bytes), so they too are malformed input carrying no sentinel.
+//   - A read failure from the underlying reader, on the streaming
+//     [Decoder] entry point: jsontext reports it as its own IO error,
+//     and it passes through unwrapped, carrying no sentinel. The
+//     reader's own error stays reachable with errors.Is.
 //   - A polymorphic dispatch failure (a missing, unknown or mismatched
 //     `_type`, at a slot or on `/_type` for the whole value), which
 //     arrives as a [DecodeError] carrying the path. No sentinel either,
@@ -49,6 +53,11 @@ import (
 //     `canjson: <RM_TYPE>:` prefix. Match it with errors.As for
 //     [DecodeError], or errors.Is against [typereg.ErrMissingType] /
 //     [typereg.ErrUnknownType] / [typereg.ErrTypeMismatch].
+//   - A nesting-depth refusal: [typereg.ErrMaxDepthExceeded] inside a
+//     [DecodeError], raised when a value opens past the 512-level bound
+//     (REQ-108). It passes through the enclosing values unchanged, so no
+//     `canjson: <RM_TYPE>:` funnel adds the sentinel to it. Match it with
+//     errors.Is against [typereg.ErrMaxDepthExceeded].
 //
 // The value lives in [typereg] so generated code under openehr/rm can
 // attach it without forming an `openehr/rm → openehr/serialize` import
@@ -90,7 +99,7 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 
 // classifyDecode gives a duplicate-object-member-name refusal the
 // decode-side shape classification REQ-052 mandates. jsontext raises
-// [jsontext.ErrDuplicateName] before any generated decode method runs (a
+// [jsontext.ErrDuplicateName] during tokenisation (a
 // well-formed value whose shape is nonetheless rejected), so it reaches
 // the entry point as a bare *jsontext.SyntacticError with no sentinel.
 // [typereg.ClassifyShape] attaches [ErrInvalidShape] the same way every
@@ -130,6 +139,9 @@ func classifyDecode(err error) error {
 // prefix. A shape failure beneath a polymorphic slot carries both the
 // sentinel and a [DecodeError]. See the sentinel's own documentation for
 // where the lines fall.
+//
+// The value v points to is unspecified after an error: a failed decode may
+// leave it partly written.
 func Unmarshal(data []byte, v any) error {
 	return classifyDecode(json.Unmarshal(data, v, typereg.Unmarshalers()))
 }
@@ -164,6 +176,9 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 // `{"a":1}x` fails in [Unmarshal] and succeeds here. A truncated
 // value is a *jsontext.SyntacticError wrapping io.ErrUnexpectedEOF in
 // both.
+//
+// The value v points to is unspecified after an error: a failed decode may
+// leave it partly written.
 func (d *Decoder) Decode(v any) error {
 	return classifyDecode(json.UnmarshalDecode(d.dec, v, typereg.Unmarshalers()))
 }

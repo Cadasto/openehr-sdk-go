@@ -10,7 +10,6 @@
 package typereg
 
 import (
-	"bytes"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"fmt"
@@ -19,10 +18,11 @@ import (
 	"sync"
 )
 
-// maxDecodeDepth bounds the JSON nesting depth Decode accepts. jsontext caps
-// nesting near 10000; this far lower bound reflects real RM data, which nests
-// only a few dozen levels (COMPOSITION > SECTION > … > CLUSTER > ELEMENT),
-// while still bounding the recursive polymorphic decode path.
+// maxDecodeDepth bounds the JSON nesting depth Decode accepts (REQ-108).
+// jsontext caps nesting near 10000; this far lower bound reflects real RM
+// data, which nests only a few dozen levels (COMPOSITION > SECTION > … >
+// CLUSTER > ELEMENT), while still bounding the recursive polymorphic decode
+// path.
 const maxDecodeDepth = 512
 
 // jsonNestingDepth returns the maximum bracket/brace nesting depth in
@@ -127,6 +127,8 @@ func (r *Registry) Names() []string {
 //
 // Returns an error if:
 //
+//   - data nests deeper than the 512-level bound, counting every bracket
+//     ([ErrMaxDepthExceeded], REQ-108),
 //   - data is not a JSON object,
 //   - the "_type" field is missing or not a string,
 //   - no constructor is registered for the discriminator,
@@ -153,13 +155,21 @@ func (r *Registry) Decode(data []byte) (any, error) {
 		return nil, fmt.Errorf("typereg.Decode %q: %w", typeName, ErrUnknownType)
 	}
 	v := ctor()
-	// Decode the concrete type through encoding/json/v2 with the same joined
-	// option set every generated decoder threads (decodeOptions): the caller's
-	// options, the polymorphic interface hooks, and v2 error semantics. A nested
-	// value therefore decodes under the same matching, escaping and hook rules as
-	// the enclosing type it sits inside (REQ-052).
-	dec := jsontext.NewDecoder(bytes.NewReader(data))
-	if err := json.UnmarshalDecode(dec, v, decodeOptions(dec)); err != nil {
+	// Decode the concrete type through the pooled byte-slice entry (json.Unmarshal)
+	// rather than an io.Reader-backed decoder, whose unpooled read buffer the
+	// single-pass DecodeInto would otherwise pay on this path (F12). The options
+	// are the SDK interface hooks plus v2 error semantics, built through the same
+	// hookOptions helper the generated decoders reach via decodeOptions. The
+	// shared set keeps the two sites from drifting when an option or hook is
+	// added; today the difference between building the set here and taking it
+	// from decodeOptions is visible only in the benchmarks (ruling P6). The
+	// aggregate pointer is the same one a nested decode sees
+	// as its caller, so decodeOptions' memo check short-circuits rather than
+	// re-joining. The peek above and the depth guard keep their buffer-and-peek
+	// role; json.Unmarshal refuses trailing content, which the peek already refused
+	// (REQ-052, F12).
+	unmarshalers, legacySemantics := hookOptions(aggregateUnmarshalers())
+	if err := json.Unmarshal(data, v, unmarshalers, legacySemantics); err != nil {
 		return nil, ClassifyDuplicate(fmt.Errorf("typereg.Decode %q: %w", typeName, err))
 	}
 	return v, nil

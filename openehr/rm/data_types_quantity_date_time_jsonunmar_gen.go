@@ -23,10 +23,11 @@ func (d *DVDate) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_DATE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_DATE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVDate
-	}{rawDVDate: (*rawDVDate)(d)})
+	}{rawDVDate: (*rawDVDate)(d)}
+	return typereg.DecodeInto(dec, "DV_DATE", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVDateTime.
@@ -40,10 +41,11 @@ func (d *DVDateTime) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_DATE_TIME: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_DATE_TIME", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVDateTime
-	}{rawDVDateTime: (*rawDVDateTime)(d)})
+	}{rawDVDateTime: (*rawDVDateTime)(d)}
+	return typereg.DecodeInto(dec, "DV_DATE_TIME", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVDuration.
@@ -57,10 +59,11 @@ func (d *DVDuration) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_DURATION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_DURATION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVDuration
-	}{rawDVDuration: (*rawDVDuration)(d)})
+	}{rawDVDuration: (*rawDVDuration)(d)}
+	return typereg.DecodeInto(dec, "DV_DURATION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVTime.
@@ -74,8 +77,9 @@ func (d *DVTime) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_TIME: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_TIME", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVTime
-	}{rawDVTime: (*rawDVTime)(d)})
+	}{rawDVTime: (*rawDVTime)(d)}
+	return typereg.DecodeInto(dec, "DV_TIME", &w, &w.Type)
 }

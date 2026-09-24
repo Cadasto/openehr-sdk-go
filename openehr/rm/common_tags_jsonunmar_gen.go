@@ -23,8 +23,9 @@ func (i *ItemTag) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ITEM_TAG: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ITEM_TAG", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawItemTag
-	}{rawItemTag: (*rawItemTag)(i)})
+	}{rawItemTag: (*rawItemTag)(i)}
+	return typereg.DecodeInto(dec, "ITEM_TAG", &w, &w.Type)
 }

@@ -23,8 +23,9 @@ func (r *ResourceAnnotations) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: RESOURCE_ANNOTATIONS: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "RESOURCE_ANNOTATIONS", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawResourceAnnotations
-	}{rawResourceAnnotations: (*rawResourceAnnotations)(r)})
+	}{rawResourceAnnotations: (*rawResourceAnnotations)(r)}
+	return typereg.DecodeInto(dec, "RESOURCE_ANNOTATIONS", &w, &w.Type)
 }

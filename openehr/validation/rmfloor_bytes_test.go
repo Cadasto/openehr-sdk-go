@@ -144,3 +144,101 @@ func TestValidateRMEHRStatusBytes_InvalidShape(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateRMEHRStatusBytes_DuplicateMemberName pins the canonical-JSON
+// refusal of a repeated member name on the presence-aware floor entry
+// (REQ-052, REQ-112). encoding/json/v2 refuses a duplicate name by default, so
+// an EHR_STATUS that states is_queryable twice, with two different values, has
+// no single defined value and is not OK: one invalid_shape issue at "/". This
+// is a can-fail control for the v2 decode: on the v1 encoding/json decode the
+// last duplicate wins silently and the result is OK.
+func TestValidateRMEHRStatusBytes_DuplicateMemberName(t *testing.T) {
+	const data = `{
+	"_type": "EHR_STATUS",
+	"name": {"_type": "DV_TEXT", "value": "EHR Status"},
+	"archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+	"subject": {"_type": "PARTY_SELF"},
+	"is_modifiable": true,
+	"is_queryable": true,
+	"is_queryable": false
+}`
+	r := validation.ValidateRMEHRStatusBytes([]byte(data))
+	if r.OK {
+		t.Errorf("ValidateRMEHRStatusBytes(duplicate is_queryable) OK = true; want not OK, got issues %+v", r.Issues)
+	}
+	if !containsIssue(r.Issues, "/", "invalid_shape") {
+		t.Errorf("ValidateRMEHRStatusBytes(duplicate is_queryable): want invalid_shape @ /, got %+v", r.Issues)
+	}
+}
+
+// TestValidateRMEHRStatusBytes_V2DecodeSemantics pins what the move to
+// encoding/json/v2 changed at this entry (REQ-052, REQ-112). There are two
+// decodes: the top-level key map (map[string]jsontext.Value) and the body
+// (rm.EHRStatus).
+//
+// The case-variant "Name" pins the body decode. v2 matches member names
+// exactly, so "Name" is an unknown member, the decoded EHR_STATUS has no name,
+// and the value floor reports `required` at /name. Can-fail (checked with go
+// test -overlay on a copy of rmfloor_bytes.go whose body decode is v1
+// encoding/json.Unmarshal): v1 matches "Name" case-insensitively, populates
+// name, and the result turns OK, so this case goes red. A duplicate member
+// cannot pin the body decode: the key-map decode runs first under v2 and, while
+// it reads each value as a jsontext.Value, refuses a repeated name at every
+// nesting level (a nested duplicate reports `within "/name"`), so the body
+// decode is never reached.
+//
+// The other two cases, invalid UTF-8 even inside a member EHR_STATUS does not
+// declare, and a repeated `subject` whose second value is null, are refused by
+// both v2 decodes, the key map's and the body's, and either refusal is enough:
+// relaxing only the key-map decode (AllowDuplicateNames, AllowInvalidUTF8)
+// leaves them green, so they go red only when both decodes fall back to v1's
+// options, that is on a full revert to v1. The duplicate rule wins over the
+// presence rule: the input is refused as `invalid_shape` at / before the null
+// `subject` could be read as absent.
+func TestValidateRMEHRStatusBytes_V2DecodeSemantics(t *testing.T) {
+	const tail = `"archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+		"is_modifiable": true,
+		"is_queryable": true
+	}`
+	cases := []struct {
+		name, data, path, code string
+	}{
+		{
+			name: "case-variant Name is an unknown member",
+			data: `{"_type": "EHR_STATUS",
+		"Name": {"_type": "DV_TEXT", "value": "EHR Status"},
+		"subject": {"_type": "PARTY_SELF"},
+		` + tail,
+			path: "/name", code: "required",
+		},
+		{
+			name: "invalid UTF-8 inside an unknown member",
+			data: `{"_type": "EHR_STATUS",
+		"name": {"_type": "DV_TEXT", "value": "EHR Status"},
+		"subject": {"_type": "PARTY_SELF"},
+		"x_note": "a` + "\xff" + `b",
+		` + tail,
+			path: "/", code: "invalid_shape",
+		},
+		{
+			name: "subject twice, the second null",
+			data: `{"_type": "EHR_STATUS",
+		"name": {"_type": "DV_TEXT", "value": "EHR Status"},
+		"subject": {"_type": "PARTY_SELF"},
+		"subject": null,
+		` + tail,
+			path: "/", code: "invalid_shape",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validation.ValidateRMEHRStatusBytes([]byte(tc.data))
+			if r.OK {
+				t.Errorf("ValidateRMEHRStatusBytes(%s) OK = true; want not OK with %s @ %s (issues %+v)", tc.name, tc.code, tc.path, r.Issues)
+			}
+			if !containsIssue(r.Issues, tc.path, tc.code) {
+				t.Errorf("ValidateRMEHRStatusBytes(%s): want %s @ %s, got %+v", tc.name, tc.code, tc.path, r.Issues)
+			}
+		})
+	}
+}

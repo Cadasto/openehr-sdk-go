@@ -2,7 +2,8 @@ package demographic
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -172,7 +173,7 @@ func getVersion(ctx context.Context, c *transport.Client, req *transport.Request
 		}
 		return nil, meta, fmt.Errorf("demographic: %w: %d response with empty or null body", transport.ErrInvalidShape, resp.StatusCode)
 	}
-	var env rm.OriginalVersion[json.RawMessage]
+	var env rm.OriginalVersion[jsontext.Value]
 	if err := json.Unmarshal(resp.Body, &env); err != nil {
 		return nil, meta, fmt.Errorf("demographic: ORIGINAL_VERSION envelope: %w", &transport.DecodeError{
 			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,

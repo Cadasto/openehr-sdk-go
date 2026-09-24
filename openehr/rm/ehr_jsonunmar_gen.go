@@ -23,10 +23,11 @@ func (e *EHR) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EHR: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "EHR", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawEHR
-	}{rawEHR: (*rawEHR)(e)})
+	}{rawEHR: (*rawEHR)(e)}
+	return typereg.DecodeInto(dec, "EHR", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into EHRAccess.
@@ -40,10 +41,11 @@ func (e *EHRAccess) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EHR_ACCESS: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "EHR_ACCESS", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawEHRAccess
-	}{rawEHRAccess: (*rawEHRAccess)(e)})
+	}{rawEHRAccess: (*rawEHRAccess)(e)}
+	return typereg.DecodeInto(dec, "EHR_ACCESS", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into EHRStatus.
@@ -57,10 +59,11 @@ func (e *EHRStatus) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EHR_STATUS: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "EHR_STATUS", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawEHRStatus
-	}{rawEHRStatus: (*rawEHRStatus)(e)})
+	}{rawEHRStatus: (*rawEHRStatus)(e)}
+	return typereg.DecodeInto(dec, "EHR_STATUS", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into VersionedComposition.
@@ -75,7 +78,7 @@ func (v *VersionedComposition) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: VERSIONED_COMPOSITION: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireVersionedComposition
-	if err := typereg.DecodeInto(dec, "VERSIONED_COMPOSITION", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "VERSIONED_COMPOSITION", &wire, &wire.Class); err != nil {
 		return err
 	}
 	v.UID = wire.UID
@@ -96,7 +99,7 @@ func (v *VersionedEHRAccess) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: VERSIONED_EHR_ACCESS: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireVersionedEHRAccess
-	if err := typereg.DecodeInto(dec, "VERSIONED_EHR_ACCESS", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "VERSIONED_EHR_ACCESS", &wire, &wire.Class); err != nil {
 		return err
 	}
 	v.UID = wire.UID
@@ -117,7 +120,7 @@ func (v *VersionedEHRStatus) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: VERSIONED_EHR_STATUS: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireVersionedEHRStatus
-	if err := typereg.DecodeInto(dec, "VERSIONED_EHR_STATUS", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "VERSIONED_EHR_STATUS", &wire, &wire.Class); err != nil {
 		return err
 	}
 	v.UID = wire.UID

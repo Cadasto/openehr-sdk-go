@@ -23,8 +23,9 @@ func (a *Archetype) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ARCHETYPE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawArchetype
-	}{rawArchetype: (*rawArchetype)(a)})
+	}{rawArchetype: (*rawArchetype)(a)}
+	return typereg.DecodeInto(dec, "ARCHETYPE", &w, &w.Type)
 }
