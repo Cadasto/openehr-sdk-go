@@ -23,10 +23,11 @@ func (c *CodePhrase) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: CODE_PHRASE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "CODE_PHRASE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCodePhrase
-	}{rawCodePhrase: (*rawCodePhrase)(c)})
+	}{rawCodePhrase: (*rawCodePhrase)(c)}
+	return typereg.DecodeInto(dec, "CODE_PHRASE", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVCodedText.
@@ -41,7 +42,7 @@ func (d *DVCodedText) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: DV_CODED_TEXT: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireDVCodedText
-	if err := typereg.DecodeInto(dec, "DV_CODED_TEXT", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "DV_CODED_TEXT", &wire, &wire.Class); err != nil {
 		return err
 	}
 	d.Value = wire.Value
@@ -65,10 +66,11 @@ func (d *DVParagraph) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_PARAGRAPH: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_PARAGRAPH", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVParagraph
-	}{rawDVParagraph: (*rawDVParagraph)(d)})
+	}{rawDVParagraph: (*rawDVParagraph)(d)}
+	return typereg.DecodeInto(dec, "DV_PARAGRAPH", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVText.
@@ -82,10 +84,11 @@ func (d *DVText) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_TEXT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_TEXT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVText
-	}{rawDVText: (*rawDVText)(d)})
+	}{rawDVText: (*rawDVText)(d)}
+	return typereg.DecodeInto(dec, "DV_TEXT", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into TermMapping.
@@ -99,8 +102,9 @@ func (t *TermMapping) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if t == nil {
 		return fmt.Errorf("canjson: TERM_MAPPING: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "TERM_MAPPING", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawTermMapping
-	}{rawTermMapping: (*rawTermMapping)(t)})
+	}{rawTermMapping: (*rawTermMapping)(t)}
+	return typereg.DecodeInto(dec, "TERM_MAPPING", &w, &w.Type)
 }

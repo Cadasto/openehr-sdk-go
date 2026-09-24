@@ -23,10 +23,11 @@ func (d *DVGeneralTimeSpecification) UnmarshalJSONFrom(dec *jsontext.Decoder) er
 	if d == nil {
 		return fmt.Errorf("canjson: DV_GENERAL_TIME_SPECIFICATION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_GENERAL_TIME_SPECIFICATION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVGeneralTimeSpecification
-	}{rawDVGeneralTimeSpecification: (*rawDVGeneralTimeSpecification)(d)})
+	}{rawDVGeneralTimeSpecification: (*rawDVGeneralTimeSpecification)(d)}
+	return typereg.DecodeInto(dec, "DV_GENERAL_TIME_SPECIFICATION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVPeriodicTimeSpecification.
@@ -40,8 +41,9 @@ func (d *DVPeriodicTimeSpecification) UnmarshalJSONFrom(dec *jsontext.Decoder) e
 	if d == nil {
 		return fmt.Errorf("canjson: DV_PERIODIC_TIME_SPECIFICATION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_PERIODIC_TIME_SPECIFICATION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVPeriodicTimeSpecification
-	}{rawDVPeriodicTimeSpecification: (*rawDVPeriodicTimeSpecification)(d)})
+	}{rawDVPeriodicTimeSpecification: (*rawDVPeriodicTimeSpecification)(d)}
+	return typereg.DecodeInto(dec, "DV_PERIODIC_TIME_SPECIFICATION", &w, &w.Type)
 }

@@ -11,7 +11,8 @@ import (
 	"fmt"
 )
 
-// Sentinel errors returned by [Registry.Decode] and [DecodeAs]. They
+// Sentinel errors returned by [Registry.Decode], [DecodeAs] and the decode
+// helpers the generated codec calls ([DecodeInto], [DecodePolymorphic]). They
 // are unwrap-compatible (errors.Is) so call sites such as the canjson
 // codec can wrap them in a richer [DecodeError] without losing the
 // classification. PROBE-031 asserts ErrUnknownType.
@@ -24,12 +25,19 @@ var (
 	ErrUnknownType = errors.New("typereg: _type not in registry")
 	// ErrTypeMismatch signals that the decoded concrete value does
 	// not satisfy the target interface or type parameter T at a
-	// [DecodeAs] call site.
+	// [DecodeAs] call site, or when the concrete value selected at a
+	// polymorphic slot does not satisfy the slot's interface
+	// ([DecodePolymorphic]). [DecodeInto] also raises it, inside a
+	// [DecodeError] on "/_type", when a whole value's `_type` names a
+	// different concrete type than the one being decoded.
 	ErrTypeMismatch = errors.New("typereg: decoded type does not satisfy target")
-	// ErrMaxDepthExceeded signals that the JSON nesting depth of a value
-	// handed to Decode exceeds maxDecodeDepth — a guard against stack
-	// exhaustion and quadratic re-parsing from a crafted deeply-nested
-	// polymorphic document (e.g. nested CLUSTER/SECTION trees).
+	// ErrMaxDepthExceeded signals that nesting depth, measured from the
+	// document root, exceeds the 512-level bound (REQ-108). It is raised by
+	// [Registry.Decode] and [DecodePolymorphic], which count every bracket
+	// of the value they buffer, and by [DecodeInto], which checks the
+	// decoder's stack depth where an RM value opens; together they are a guard
+	// against stack exhaustion and quadratic re-parsing from a crafted
+	// deeply-nested document (e.g. nested CLUSTER/SECTION trees).
 	ErrMaxDepthExceeded = errors.New("typereg: nesting depth exceeds limit")
 	// ErrNilReceiver classifies an UnmarshalJSONFrom / UnmarshalJSON /
 	// UnmarshalText call on a nil receiver — caller-constructible misuse (a
@@ -40,6 +48,14 @@ var (
 	// rm.Integer, rm.Character) wrap
 	// it; the nil-receiver census in this package pins the whole registry.
 	ErrNilReceiver = errors.New("typereg: nil receiver")
+	// ErrNilArgument classifies a nil argument that an exported decode helper
+	// would otherwise dereference: a nil *jsontext.Decoder, a nil out, or a
+	// nil gotType handed to [DecodeInto], and a nil *jsontext.Decoder or nil
+	// out handed to [DecodePolymorphic]. It is caller misuse (no generated
+	// body passes one), refused before any decode with a [DecodeError] whose
+	// Inner wraps this sentinel and names the argument, so a caller can match
+	// it with errors.Is instead of recovering a panic (REQ-025).
+	ErrNilArgument = errors.New("typereg: nil argument")
 	// ErrInvalidShape classifies a JSON-level shape failure — valid JSON
 	// that is the wrong shape for the target type — or a hand-written
 	// primitive codec's refusal of a value it will not accept: rm.Real
@@ -56,11 +72,14 @@ var (
 )
 
 // DecodeError is the unified envelope returned by the canjson and
-// canxml decoders at polymorphic-dispatch sites. It lives here in
-// typereg (rather than in a codec-specific package) so the
-// generator-emitted UnmarshalJSONFrom methods on the generated RM types
-// can construct it without forming an `openehr/rm → serialize/...`
-// import cycle.
+// canxml decoders at polymorphic-dispatch sites. [DecodeInto] also
+// returns it for a whole-value `_type` mismatch on "/_type", for a depth
+// refusal ([ErrMaxDepthExceeded]) and for a nil argument
+// ([ErrNilArgument]), as does [DecodePolymorphic] for the last two.
+// It lives here in typereg (rather than in a codec-specific package) so
+// the generator-emitted UnmarshalJSONFrom methods on the generated RM
+// types can construct it without forming an `openehr/rm →
+// serialize/...` import cycle.
 //
 // Path is a JSON-pointer-ish or XPath-ish string describing the
 // failed node; Type is the observed discriminator (may be empty when
@@ -162,10 +181,11 @@ func WrapShapeError(rmType string, err error) error {
 
 // ClassifyShape attaches [ErrInvalidShape] to a failure the codec detects
 // outside a generated type's funnel, such as a duplicate member name the
-// tokenizer refuses before any RM decode runs (REQ-052). It preserves err's
-// message and keeps errors.Unwrap a single step to the cause, exactly as
-// [WrapShapeError] does for an in-funnel shape failure, but adds no
-// `canjson: <rmType>:` prefix because no single RM type owns the failure.
+// tokenizer refuses during tokenisation, while the enclosing RM value is
+// being decoded (REQ-052). It preserves err's message and keeps errors.Unwrap
+// a single step to the cause, exactly as [WrapShapeError] does for an
+// in-funnel shape failure, but adds no `canjson: <rmType>:` prefix because no
+// single RM type owns the failure.
 //
 // A nil err returns nil. An err already carrying a non-nil [DecodeError] is
 // returned untouched, so a dispatch failure keeps its classification-free path
@@ -185,9 +205,9 @@ func ClassifyShape(err error) error {
 
 // ClassifyDuplicate attaches [ErrInvalidShape] to a duplicate-object-member-name
 // refusal and returns every other error untouched. The v2 tokenizer refuses a
-// repeated member name with [jsontext.ErrDuplicateName] before any generated
-// decode method runs (a well-formed value whose shape RFC 8259 section 4
-// nonetheless rejects), so it reaches a decode entry point as a bare
+// repeated member name with [jsontext.ErrDuplicateName] during tokenisation
+// (a well-formed value whose shape RFC 8259 section 4 nonetheless rejects),
+// so it reaches a decode entry point as a bare
 // *jsontext.SyntacticError carrying no sentinel. This gate gives that refusal
 // the decode-side shape classification REQ-052 mandates, exactly as
 // [ClassifyShape] does: the message is preserved and a single errors.Unwrap
@@ -195,7 +215,8 @@ func ClassifyShape(err error) error {
 // jsontext.ErrDuplicateName.
 //
 // It is the single gate every canonical-JSON decode route shares: the
-// generated decode bodies ([DecodeInto], [DecodePolymorphic]) apply it at their
+// generated decode bodies apply it, [DecodeInto] in classifyDecode after its
+// single json.UnmarshalDecode and [DecodePolymorphic] at its
 // [jsontext.Decoder.ReadValue] site, so a caller driving a generated method
 // through bare encoding/json/v2 still gets the sentinel; [Registry.Decode]
 // applies it at both of its failure sites; and the canjson entry points apply

@@ -24,7 +24,7 @@ func (a *Attestation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: ATTESTATION: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireAttestation
-	if err := typereg.DecodeInto(dec, "ATTESTATION", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "ATTESTATION", &wire, &wire.Class); err != nil {
 		return err
 	}
 	a.SystemID = wire.SystemID
@@ -51,10 +51,11 @@ func (a *AuditDetails) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: AUDIT_DETAILS: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "AUDIT_DETAILS", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawAuditDetails
-	}{rawAuditDetails: (*rawAuditDetails)(a)})
+	}{rawAuditDetails: (*rawAuditDetails)(a)}
+	return typereg.DecodeInto(dec, "AUDIT_DETAILS", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Participation.
@@ -68,10 +69,11 @@ func (p *Participation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: PARTICIPATION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "PARTICIPATION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawParticipation
-	}{rawParticipation: (*rawParticipation)(p)})
+	}{rawParticipation: (*rawParticipation)(p)}
+	return typereg.DecodeInto(dec, "PARTICIPATION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into PartyIdentified.
@@ -85,10 +87,11 @@ func (p *PartyIdentified) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: PARTY_IDENTIFIED: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "PARTY_IDENTIFIED", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawPartyIdentified
-	}{rawPartyIdentified: (*rawPartyIdentified)(p)})
+	}{rawPartyIdentified: (*rawPartyIdentified)(p)}
+	return typereg.DecodeInto(dec, "PARTY_IDENTIFIED", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into PartyRelated.
@@ -103,7 +106,7 @@ func (p *PartyRelated) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: PARTY_RELATED: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWirePartyRelated
-	if err := typereg.DecodeInto(dec, "PARTY_RELATED", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "PARTY_RELATED", &wire, &wire.Class); err != nil {
 		return err
 	}
 	p.ExternalRef = wire.ExternalRef
@@ -124,10 +127,11 @@ func (p *PartySelf) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: PARTY_SELF: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "PARTY_SELF", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawPartySelf
-	}{rawPartySelf: (*rawPartySelf)(p)})
+	}{rawPartySelf: (*rawPartySelf)(p)}
+	return typereg.DecodeInto(dec, "PARTY_SELF", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into RevisionHistory.
@@ -141,10 +145,11 @@ func (r *RevisionHistory) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: REVISION_HISTORY: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "REVISION_HISTORY", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawRevisionHistory
-	}{rawRevisionHistory: (*rawRevisionHistory)(r)})
+	}{rawRevisionHistory: (*rawRevisionHistory)(r)}
+	return typereg.DecodeInto(dec, "REVISION_HISTORY", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into RevisionHistoryItem.
@@ -158,8 +163,9 @@ func (r *RevisionHistoryItem) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: REVISION_HISTORY_ITEM: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "REVISION_HISTORY_ITEM", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawRevisionHistoryItem
-	}{rawRevisionHistoryItem: (*rawRevisionHistoryItem)(r)})
+	}{rawRevisionHistoryItem: (*rawRevisionHistoryItem)(r)}
+	return typereg.DecodeInto(dec, "REVISION_HISTORY_ITEM", &w, &w.Type)
 }

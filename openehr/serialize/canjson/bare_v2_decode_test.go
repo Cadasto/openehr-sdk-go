@@ -9,13 +9,9 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
-
-	// Register the RM types (and their decode hooks) into the shared typereg
-	// aggregate. The blank import is what a bare v2 caller would rely on for
-	// the polymorphic slot to resolve.
-	_ "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // TestBareV2UnmarshalResolvesPolymorphicSlot is ruling R6's pin: the
@@ -155,27 +151,46 @@ func TestMalformedPolymorphicSlotErrorIsClean(t *testing.T) {
 // driving a generated UnmarshalJSONFrom through bare encoding/json/v2 — with no
 // canjson entry point and no options — gets the same duplicate-member
 // classification a canjson caller does (REQ-052): the refusal wraps
-// ErrInvalidShape and stays reachable as jsontext.ErrDuplicateName. The
-// classification lives at typereg.DecodeInto's ReadValue site, so it holds both
-// at the top level and for a duplicate nested inside the value (ReadValue
-// validates the whole value it reads).
+// ErrInvalidShape and stays reachable as jsontext.ErrDuplicateName. The decode
+// is a single pass: the tokenizer refuses the duplicate as the value holding it
+// is decoded, and the generated body decoding that value attaches the
+// sentinel. For a concrete value (the top-level DV_TEXT, or the CODE_PHRASE
+// nested in a DV_CODED_TEXT) that is typereg.classifyDecode at that level; for
+// a value in a polymorphic slot (the ELEMENT's name) it is
+// typereg.DecodePolymorphic's ReadValue, which applies the same gate.
 //
-// Can-fail control: revert DecodeInto's `return ClassifyDuplicate(err)` to
-// `return err` and the ErrInvalidShape assertions go red while the
-// ErrDuplicateName ones stay green — the tokenizer still refuses the duplicate,
-// only the SDK sentinel is lost.
+// Each case isolates a gate, or deliberately does not. The CODE_PHRASE case
+// isolates the concrete gate (classifyDecode): the duplicate sits in a concrete
+// value no slot buffers. The top-level interface case (a bare rm.DataValue
+// decoded with typereg.Unmarshalers()) isolates the slot gate: the hook's
+// DecodePolymorphic reads the value with ReadValue, which refuses the duplicate
+// before any concrete decode runs. The ELEMENT case is guarded by either gate:
+// the slot's ReadValue refuses the duplicate inside name, and the concrete
+// classifyDecode at the enclosing ELEMENT would classify it too, so it
+// survives either single mutation.
+//
+// Can-fail controls (checked with go test -overlay on patched copies of
+// streaming.go): revert classifyDecode's `return ClassifyDuplicate(err)` to
+// `return err` and the ErrInvalidShape assertions go red for the top-level
+// DV_TEXT and the nested CODE_PHRASE while the ErrDuplicateName ones stay green
+// (the tokenizer still refuses the duplicate, only the SDK sentinel is lost).
+// Revert DecodePolymorphic's `return ClassifyDuplicate(err)` at its ReadValue
+// to `return err` and exactly the top-level interface case goes red.
 func TestBareV2DecodeDuplicateMemberWrapsErrInvalidShape(t *testing.T) {
 	cases := []struct {
 		name string
 		data string
 		into func() any
+		opts []jsonv2.Options
 	}{
-		{"top-level DV_TEXT", `{"_type":"DV_TEXT","value":"a","value":"b"}`, func() any { return new(rm.DVText) }},
-		{"nested in ELEMENT", `{"_type":"ELEMENT","archetype_node_id":"at0","name":{"_type":"DV_TEXT","value":"a","value":"b"}}`, func() any { return new(rm.Element) }},
+		{"top-level DV_TEXT", `{"_type":"DV_TEXT","value":"a","value":"b"}`, func() any { return new(rm.DVText) }, nil},
+		{"nested concrete CODE_PHRASE in DV_CODED_TEXT", `{"_type":"DV_CODED_TEXT","value":"a","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":"at1","code_string":"at2"}}`, func() any { return new(rm.DVCodedText) }, nil},
+		{"nested in ELEMENT", `{"_type":"ELEMENT","archetype_node_id":"at0","name":{"_type":"DV_TEXT","value":"a","value":"b"}}`, func() any { return new(rm.Element) }, nil},
+		{"top-level interface rm.DataValue", `{"_type":"DV_TEXT","value":"a","value":"b"}`, func() any { return new(rm.DataValue) }, []jsonv2.Options{typereg.Unmarshalers()}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := jsonv2.Unmarshal([]byte(tc.data), tc.into())
+			err := jsonv2.Unmarshal([]byte(tc.data), tc.into(), tc.opts...)
 			if !errors.Is(err, canjson.ErrInvalidShape) {
 				t.Errorf("bare v2 Unmarshal(duplicate) err = %v; want errors.Is(_, canjson.ErrInvalidShape)", err)
 			}

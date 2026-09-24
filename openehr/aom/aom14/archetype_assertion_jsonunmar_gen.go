@@ -23,10 +23,11 @@ func (a *Assertion) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ASSERTION: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ASSERTION", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawAssertion
-	}{rawAssertion: (*rawAssertion)(a)})
+	}{rawAssertion: (*rawAssertion)(a)}
+	return typereg.DecodeInto(dec, "ASSERTION", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into AssertionVariable.
@@ -40,10 +41,11 @@ func (a *AssertionVariable) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ASSERTION_VARIABLE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ASSERTION_VARIABLE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawAssertionVariable
-	}{rawAssertionVariable: (*rawAssertionVariable)(a)})
+	}{rawAssertionVariable: (*rawAssertionVariable)(a)}
+	return typereg.DecodeInto(dec, "ASSERTION_VARIABLE", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ExprBinaryOperator.
@@ -57,10 +59,11 @@ func (e *ExprBinaryOperator) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EXPR_BINARY_OPERATOR: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "EXPR_BINARY_OPERATOR", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawExprBinaryOperator
-	}{rawExprBinaryOperator: (*rawExprBinaryOperator)(e)})
+	}{rawExprBinaryOperator: (*rawExprBinaryOperator)(e)}
+	return typereg.DecodeInto(dec, "EXPR_BINARY_OPERATOR", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ExprLeaf.
@@ -74,10 +77,11 @@ func (e *ExprLeaf) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EXPR_LEAF: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "EXPR_LEAF", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawExprLeaf
-	}{rawExprLeaf: (*rawExprLeaf)(e)})
+	}{rawExprLeaf: (*rawExprLeaf)(e)}
+	return typereg.DecodeInto(dec, "EXPR_LEAF", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ExprUnaryOperator.
@@ -91,8 +95,9 @@ func (e *ExprUnaryOperator) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: EXPR_UNARY_OPERATOR: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "EXPR_UNARY_OPERATOR", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawExprUnaryOperator
-	}{rawExprUnaryOperator: (*rawExprUnaryOperator)(e)})
+	}{rawExprUnaryOperator: (*rawExprUnaryOperator)(e)}
+	return typereg.DecodeInto(dec, "EXPR_UNARY_OPERATOR", &w, &w.Type)
 }

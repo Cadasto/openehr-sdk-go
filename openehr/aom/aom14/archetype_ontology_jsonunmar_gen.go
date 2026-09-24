@@ -23,10 +23,11 @@ func (a *ArchetypeOntology) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPE_ONTOLOGY: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ARCHETYPE_ONTOLOGY", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawArchetypeOntology
-	}{rawArchetypeOntology: (*rawArchetypeOntology)(a)})
+	}{rawArchetypeOntology: (*rawArchetypeOntology)(a)}
+	return typereg.DecodeInto(dec, "ARCHETYPE_ONTOLOGY", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ArchetypeTerm.
@@ -40,8 +41,9 @@ func (a *ArchetypeTerm) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPE_TERM: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ARCHETYPE_TERM", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawArchetypeTerm
-	}{rawArchetypeTerm: (*rawArchetypeTerm)(a)})
+	}{rawArchetypeTerm: (*rawArchetypeTerm)(a)}
+	return typereg.DecodeInto(dec, "ARCHETYPE_TERM", &w, &w.Type)
 }

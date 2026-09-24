@@ -23,10 +23,11 @@ func (d *DVMultimedia) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_MULTIMEDIA: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_MULTIMEDIA", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVMultimedia
-	}{rawDVMultimedia: (*rawDVMultimedia)(d)})
+	}{rawDVMultimedia: (*rawDVMultimedia)(d)}
+	return typereg.DecodeInto(dec, "DV_MULTIMEDIA", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVParsable.
@@ -40,8 +41,9 @@ func (d *DVParsable) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_PARSABLE: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_PARSABLE", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVParsable
-	}{rawDVParsable: (*rawDVParsable)(d)})
+	}{rawDVParsable: (*rawDVParsable)(d)}
+	return typereg.DecodeInto(dec, "DV_PARSABLE", &w, &w.Type)
 }

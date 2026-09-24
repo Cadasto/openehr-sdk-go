@@ -23,10 +23,11 @@ func (h *History[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if h == nil {
 		return fmt.Errorf("canjson: HISTORY: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "HISTORY", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawHistory[T]
-	}{rawHistory: (*rawHistory[T])(h)})
+	}{rawHistory: (*rawHistory[T])(h)}
+	return typereg.DecodeInto(dec, "HISTORY", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into IntervalEvent.
@@ -40,10 +41,11 @@ func (i *IntervalEvent[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: INTERVAL_EVENT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "INTERVAL_EVENT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawIntervalEvent[T]
-	}{rawIntervalEvent: (*rawIntervalEvent[T])(i)})
+	}{rawIntervalEvent: (*rawIntervalEvent[T])(i)}
+	return typereg.DecodeInto(dec, "INTERVAL_EVENT", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into PointEvent.
@@ -57,8 +59,9 @@ func (p *PointEvent[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: POINT_EVENT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "POINT_EVENT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawPointEvent[T]
-	}{rawPointEvent: (*rawPointEvent[T])(p)})
+	}{rawPointEvent: (*rawPointEvent[T])(p)}
+	return typereg.DecodeInto(dec, "POINT_EVENT", &w, &w.Type)
 }

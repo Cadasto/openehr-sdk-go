@@ -1,6 +1,7 @@
 package canjson_test
 
 import (
+	jsonv1 "encoding/json"
 	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"errors"
@@ -149,9 +150,9 @@ func TestDecodeErrorCarriesPath(t *testing.T) {
 // REQ-052 (wire.md) discusses under canjson.ErrInvalidShape: a syntax
 // error, a type mismatch on a non-polymorphic field, and a numeric
 // magnitude out of float64 range. Only the last two are raised inside
-// a generated UnmarshalJSON and so carry the sentinel; encoding/json
-// rejects the syntax error before any UnmarshalJSON method runs, so
-// that one reaches the caller unclassified.
+// a generated UnmarshalJSON and so carry the sentinel; the tokenizer
+// refuses the syntax error during tokenisation, so that one reaches the
+// caller unclassified.
 //
 // The want fields pin WHICH arm of the documented classification
 // produced each failure, so a later change cannot quietly move the
@@ -242,8 +243,8 @@ func assertShapeSentinelDistinct(t *testing.T, err error) {
 // TestUnmarshalWrapsErrInvalidShape pins REQ-052's decode-side shape
 // sentinel: a shape failure raised inside a generated UnmarshalJSON —
 // the `canjson: <RM_TYPE>:` family — matches errors.Is against
-// canjson.ErrInvalidShape, while malformed JSON, which never reaches a
-// generated UnmarshalJSON, does not. The classification costs nothing:
+// canjson.ErrInvalidShape, while malformed JSON, which the tokenizer
+// refuses during tokenisation, does not. The classification costs nothing:
 // the error text is unchanged and the encoding/json cause stays
 // reachable with errors.As.
 func TestUnmarshalWrapsErrInvalidShape(t *testing.T) {
@@ -483,6 +484,208 @@ func TestUnmarshalWholeValueTypeMismatchIsNotShapeTagged(t *testing.T) {
 	assertShapeSentinelDistinct(t, err)
 }
 
+// TestUnmarshalConcreteTypeMismatchPrecedence pins the precedence of the
+// single-pass concrete decode (REQ-052, ADR 0022, ruling F8). The helper
+// decodes the whole value first and reads the declared `_type` field only
+// afterwards, so when a body is BOTH mislabelled (its `_type` names another
+// class) AND fails the target's shape, the shape failure is reported, not the
+// `_type` mismatch. This is the one observable behaviour change from the old
+// buffer-and-peek, which checked `_type` before it decoded the body and so
+// reported the mismatch first. Reverting the helper to peek `_type` before
+// decoding turns the "mislabelled and failing the target's shape" case red (it
+// would report typereg.ErrTypeMismatch on /_type instead of the shape failure).
+func TestUnmarshalConcreteTypeMismatchPrecedence(t *testing.T) {
+	t.Run("mislabelled and failing the target's shape reports the shape failure, not the mismatch", func(t *testing.T) {
+		// _type names DV_TEXT (wrong for DVQuantity) and magnitude is a
+		// non-number (which fails the target's shape). The single decode fails
+		// on magnitude before the discriminator guard runs.
+		const in = `{"_type":"DV_TEXT","magnitude":"not-a-number","units":"kg"}`
+		var q rm.DVQuantity
+		err := canjson.Unmarshal([]byte(in), &q)
+		if err == nil {
+			t.Fatalf("Unmarshal(%s) = nil; want the shape failure to win", in)
+		}
+		if !errors.Is(err, canjson.ErrInvalidShape) {
+			t.Errorf("err = %v; a body that fails the target's shape reports the shape failure (ErrInvalidShape), the discriminator is read only after a clean decode", err)
+		}
+		if errors.Is(err, typereg.ErrTypeMismatch) {
+			t.Errorf("err = %v; the shape failure precedes the _type check, so ErrTypeMismatch must not win here (the precedence flip)", err)
+		}
+		// The message shows it passed through DV_QUANTITY's own shape funnel.
+		if !strings.Contains(err.Error(), "canjson: DV_QUANTITY:") {
+			t.Errorf("err = %v; want the DV_QUANTITY shape funnel prefix", err)
+		}
+	})
+
+	t.Run("mislabelled but well-formed reports the mismatch on /_type", func(t *testing.T) {
+		// _type names DV_TEXT (wrong) but the body is a clean DV_TEXT; the decode
+		// succeeds and the discriminator guard then refuses the mismatch.
+		const in = `{"_type":"DV_TEXT","value":"hello"}`
+		var q rm.DVQuantity
+		err := canjson.Unmarshal([]byte(in), &q)
+		if err == nil {
+			t.Fatalf("Unmarshal(%s) = nil; want a _type mismatch", in)
+		}
+		de, ok := errors.AsType[*canjson.DecodeError](err)
+		if !ok {
+			t.Fatalf("err = %v (%T); want errors.As to reach *canjson.DecodeError", err, err)
+		}
+		if de.Path != "/_type" {
+			t.Errorf("DecodeError.Path = %q; want %q", de.Path, "/_type")
+		}
+		if !errors.Is(err, typereg.ErrTypeMismatch) {
+			t.Errorf("err = %v; want errors.Is(_, typereg.ErrTypeMismatch)", err)
+		}
+		if errors.Is(err, canjson.ErrInvalidShape) {
+			t.Errorf("err = %v; a well-formed mislabelled body is a mismatch, not a shape failure", err)
+		}
+	})
+
+	t.Run("no _type on a concrete target decodes as that target", func(t *testing.T) {
+		// A concrete target admits an absent _type (REQ-052): the discriminator
+		// stays empty and the guard passes.
+		const in = `{"magnitude":80.5,"units":"kg"}`
+		var q rm.DVQuantity
+		if err := canjson.Unmarshal([]byte(in), &q); err != nil {
+			t.Fatalf("Unmarshal(%s) = %v; want a concrete target to accept an absent _type", in, err)
+		}
+		if q.Magnitude != 80.5 || q.Units != "kg" {
+			t.Errorf("got Magnitude=%v Units=%q; want 80.5 kg", q.Magnitude, q.Units)
+		}
+	})
+}
+
+// TestUnmarshalFirstFailureInDocumentOrderWins pins the precedence between a
+// shape failure and malformed bytes on the single-pass decode (REQ-052, ADR
+// 0022): the first failure in document order wins. The tokenizer refuses
+// malformed bytes as the value they malform is decoded, and a shape failure
+// earlier in the value stops the decode before the later bytes are read. So a
+// member that fails the target's shape ahead of the malformed bytes reports the
+// shape failure, and malformed bytes ahead of that member report the syntax
+// error. Both entry points are driven, since they reach the bytes differently
+// (a whole input and a stream).
+//
+// Can-fail (checked with go test -overlay on a patched copy of streaming.go):
+// making DecodeInto read the whole value with dec.ReadValue before decoding
+// it, the old buffer-first shape, turns both "shape failure before malformed
+// bytes" cases red on both entry points, because the tokenizer then refuses
+// the later bytes before the shape failure is reached.
+func TestUnmarshalFirstFailureInDocumentOrderWins(t *testing.T) {
+	entries := []struct {
+		name   string
+		decode func([]byte, any) error
+	}{
+		{"Unmarshal", canjson.Unmarshal},
+		{"Decoder.Decode", func(b []byte, v any) error {
+			return canjson.NewDecoder(strings.NewReader(string(b))).Decode(v)
+		}},
+	}
+	shapeFirst := []struct{ name, in string }{
+		// magnitude fails the target's shape before the stray `x` is read.
+		{"stray byte", `{"_type":"DV_QUANTITY","magnitude":"abc","units":"kg" x}`},
+		// magnitude fails the target's shape before the missing closing brace
+		// is reached.
+		{"truncated", `{"_type":"DV_QUANTITY","magnitude":true,"units":"kg"`},
+	}
+	const malformedFirst = `{"_type":"DV_QUANTITY","units":"kg" x,"magnitude":"abc"}`
+
+	for _, e := range entries {
+		for _, tc := range shapeFirst {
+			in := tc.in
+			t.Run(e.name+"/shape failure before malformed bytes/"+tc.name, func(t *testing.T) {
+				var q rm.DVQuantity
+				err := e.decode([]byte(in), &q)
+				if !errors.Is(err, canjson.ErrInvalidShape) {
+					t.Fatalf("%s(%s) err = %v; want errors.Is(_, canjson.ErrInvalidShape): the member that fails the target's shape comes first", e.name, in, err)
+				}
+				if se, ok := errors.AsType[*jsontext.SyntacticError](err); ok && se != nil {
+					t.Errorf("%s(%s) err = %v; want no *jsontext.SyntacticError in the chain, the malformed bytes are never read", e.name, in, err)
+				}
+				if !strings.Contains(err.Error(), "canjson: DV_QUANTITY:") {
+					t.Errorf("%s(%s) err = %v; want the DV_QUANTITY shape funnel prefix %q", e.name, in, err, "canjson: DV_QUANTITY:")
+				}
+			})
+		}
+		t.Run(e.name+"/malformed bytes before shape failure", func(t *testing.T) {
+			var q rm.DVQuantity
+			err := e.decode([]byte(malformedFirst), &q)
+			if se, ok := errors.AsType[*jsontext.SyntacticError](err); !ok || se == nil {
+				t.Fatalf("%s(%s) err = %v (%T); want a *jsontext.SyntacticError: the malformed bytes come first", e.name, malformedFirst, err, err)
+			}
+			if errors.Is(err, canjson.ErrInvalidShape) {
+				t.Errorf("%s(%s) err = %v; malformed input must not carry canjson.ErrInvalidShape", e.name, malformedFirst, err)
+			}
+		})
+	}
+
+	// The slot exception REQ-052 states: a polymorphic slot is read whole
+	// (DecodePolymorphic's ReadValue) before it is decoded, so malformed bytes
+	// anywhere inside the slot value are reported ahead of a shape failure
+	// earlier in that same value. The DV_QUANTITY below is the shape-first body
+	// that reports ErrInvalidShape at top level; inside ELEMENT.value it
+	// reports the syntax error instead.
+	t.Run("Unmarshal/polymorphic slot is read whole before it is decoded", func(t *testing.T) {
+		const in = `{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"n"},` +
+			`"value":{"_type":"DV_QUANTITY","magnitude":"abc","units":"kg" x}}`
+		var el rm.Element
+		err := canjson.Unmarshal([]byte(in), &el)
+		if se, ok := errors.AsType[*jsontext.SyntacticError](err); !ok || se == nil {
+			t.Fatalf("Unmarshal(%s) err = %v (%T); want a *jsontext.SyntacticError: the slot value is read whole, so its malformed bytes win", in, err, err)
+		}
+		if errors.Is(err, canjson.ErrInvalidShape) {
+			t.Errorf("Unmarshal(%s) err = %v; malformed bytes inside a slot must not carry canjson.ErrInvalidShape", in, err)
+		}
+	})
+
+	// typereg.Default.Decode buffers its input and peeks `_type` over the
+	// whole of it before the concrete decode, so the stray byte is refused
+	// first even though magnitude fails DV_QUANTITY's shape earlier in the
+	// document.
+	t.Run("Registry.Decode/buffers and peeks first", func(t *testing.T) {
+		in := shapeFirst[0].in
+		_, err := typereg.Default.Decode([]byte(in))
+		if se, ok := errors.AsType[*jsontext.SyntacticError](err); !ok || se == nil {
+			t.Fatalf("typereg.Default.Decode(%s) err = %v (%T); want a *jsontext.SyntacticError: the registry reads the whole input before it decodes", in, err, err)
+		}
+		if errors.Is(err, canjson.ErrInvalidShape) {
+			t.Errorf("typereg.Default.Decode(%s) err = %v; malformed input must not carry canjson.ErrInvalidShape", in, err)
+		}
+	})
+}
+
+// TestUnmarshalTypeMismatchLeavesReceiverAsDocumented pins what a whole-value
+// `_type` mismatch leaves in the receiver on each of the two generated wire
+// shapes, as ADR 0022 documents (REQ-052). The codec promises nothing about
+// the receiver after an error; this test records the shape difference so a
+// change to it is a conscious one. The alias shape decodes in place, so the
+// receiver already holds the decoded members when the guard refuses the
+// discriminator. The flat shape decodes into a separate wire struct and
+// returns before its field copies, so the receiver is untouched.
+func TestUnmarshalTypeMismatchLeavesReceiverAsDocumented(t *testing.T) {
+	t.Run("alias shape decodes in place", func(t *testing.T) {
+		const in = `{"_type":"DV_CODED_TEXT","value":"foreign","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":"at0001"}}`
+		v := rm.DVText{Value: "orig"}
+		err := canjson.Unmarshal([]byte(in), &v)
+		if !errors.Is(err, typereg.ErrTypeMismatch) {
+			t.Fatalf("Unmarshal(%s) into rm.DVText err = %v; want errors.Is(_, typereg.ErrTypeMismatch)", in, err)
+		}
+		if v.Value != "foreign" {
+			t.Errorf("after the mismatch DVText.Value = %q; want %q (the alias shape decodes in place; if intentional, update ADR 0022)", v.Value, "foreign")
+		}
+	})
+	t.Run("flat shape returns before its field copies", func(t *testing.T) {
+		const in = `{"_type":"DV_TEXT","value":"foreign"}`
+		v := rm.DVCodedText{Value: "orig"}
+		err := canjson.Unmarshal([]byte(in), &v)
+		if !errors.Is(err, typereg.ErrTypeMismatch) {
+			t.Fatalf("Unmarshal(%s) into rm.DVCodedText err = %v; want errors.Is(_, typereg.ErrTypeMismatch)", in, err)
+		}
+		if v.Value != "orig" {
+			t.Errorf("after the mismatch DVCodedText.Value = %q; want %q (the flat shape returns before its field copies; if intentional, update ADR 0022)", v.Value, "orig")
+		}
+	})
+}
+
 // TestDecoderDecodeStreamDivergesFromUnmarshal pins the two divergences
 // Decode's godoc names beyond the truncated-value one: reading a stream
 // rather than a whole input changes the answer for an empty input and
@@ -606,9 +809,9 @@ func TestUnmarshalMantissaPrecisionLossInheritedByDVProportion(t *testing.T) {
 // classifyDecode and the error still occurs but loses the sentinel, so the
 // ErrInvalidShape assertion goes red while the jsontext.ErrDuplicateName one
 // stays green. Threading jsontext.AllowDuplicateNames(true) into the
-// entry-point options does NOT turn the RM-type case red, because
-// typereg.peekType re-validates each subtree with default options and still
-// rejects the duplicate regardless of the entry option.
+// entry-point options turns both cases red (checked by overlay): the concrete
+// decode and the slot peek both run under the caller's options, so nothing
+// re-validates the value with v2 defaults.
 func TestUnmarshalDuplicateMemberNameWrapsErrInvalidShape(t *testing.T) {
 	// A duplicate "units": the tokens are valid, the object is not.
 	const in = `{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg","units":"g"}`
@@ -634,6 +837,17 @@ func TestUnmarshalDuplicateMemberNameWrapsErrInvalidShape(t *testing.T) {
 			if !errors.Is(err, jsontext.ErrDuplicateName) {
 				t.Errorf("err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
 			}
+			// Message control for the single-pass concrete decode (REQ-052): a
+			// duplicate-name refusal is a *jsontext.SyntacticError the typereg
+			// helper passes through unwrapped, so it never picks up a generated
+			// type's `canjson: <RM_TYPE>:` funnel prefix. Can-fail: route that
+			// syntactic error through typereg.WrapShapeError in typereg's
+			// classifyDecode and the generated-RM-type case gains
+			// `canjson: DV_QUANTITY:`, turning this red (the map case has no
+			// funnel on its path, so it cannot gain a prefix and stays green).
+			if strings.Contains(err.Error(), "canjson: DV_QUANTITY:") {
+				t.Errorf("err = %v; a duplicate-name refusal must not gain the DV_QUANTITY funnel prefix", err)
+			}
 			assertShapeSentinelDistinct(t, err)
 		})
 	}
@@ -655,6 +869,14 @@ func TestDecoderDecodeDuplicateMemberNameWrapsErrInvalidShape(t *testing.T) {
 	}
 	if !errors.Is(err, jsontext.ErrDuplicateName) {
 		t.Errorf("err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
+	}
+	// Message control for the single-pass concrete decode (REQ-052): the
+	// duplicate-name refusal is a *jsontext.SyntacticError the typereg helper
+	// passes through unwrapped, so DV_QUANTITY's funnel prefix stays off it.
+	// Can-fail: route that syntactic error through typereg.WrapShapeError in
+	// typereg's classifyDecode and the message gains `canjson: DV_QUANTITY:`.
+	if strings.Contains(err.Error(), "canjson: DV_QUANTITY:") {
+		t.Errorf("err = %v; a duplicate-name refusal must not gain the DV_QUANTITY funnel prefix", err)
 	}
 	assertShapeSentinelDistinct(t, err)
 }
@@ -687,4 +909,180 @@ func TestUnmarshalMatchesMemberNamesExactly(t *testing.T) {
 	if q.Units != "kg" {
 		t.Errorf("q.Units = %q; want \"kg\": the exactly-cased member must populate", q.Units)
 	}
+}
+
+// errBoom is a distinct reader failure the failing-reader control below finds
+// with errors.Is, proving the reader's own error survives the classification.
+var errBoom = errors.New("boom")
+
+// prefixThenErrReader serves prefix, then returns err on the next Read, so a
+// reader failure lands partway through a valid value on the streaming entry.
+type prefixThenErrReader struct {
+	prefix []byte
+	off    int
+	err    error
+}
+
+func (r *prefixThenErrReader) Read(p []byte) (int, error) {
+	if r.off < len(r.prefix) {
+		n := copy(p, r.prefix[r.off:])
+		r.off += n
+		return n, nil
+	}
+	return 0, r.err
+}
+
+// TestDecoderDecodeFailingReaderIsNotShapeTagged pins that a reader failing
+// partway through a valid body is malformed input, not a JSON shape failure
+// (REQ-052). jsontext returns the reader's error as its own IO error type, which
+// is neither a *jsontext.SyntacticError nor errors.Is-equal to io.EOF, so an
+// EOF-only pass-through would wrap it as canjson.ErrInvalidShape. typereg's
+// classifyDecode passes through any error whose chain carries neither a
+// *json.SemanticError nor a *DecodeError, so the reader failure keeps no
+// sentinel and its own error stays reachable.
+//
+// Can-fail control: narrow the pass-through in typereg.classifyDecode back to
+// the EOF-only form (return err only for a *jsontext.SyntacticError or
+// io.EOF/io.ErrUnexpectedEOF) and this reader error acquires
+// canjson.ErrInvalidShape, turning the sentinel assertion red.
+func TestDecoderDecodeFailingReaderIsNotShapeTagged(t *testing.T) {
+	// A prefix of a valid DV_QUANTITY body, cut mid-token so the decode is still
+	// in progress when the reader fails.
+	r := &prefixThenErrReader{prefix: []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"un`), err: errBoom}
+	var q rm.DVQuantity
+	err := canjson.NewDecoder(r).Decode(&q)
+	if err == nil {
+		t.Fatal("Decode(failing reader) = nil; want the reader's error")
+	}
+	if errors.Is(err, canjson.ErrInvalidShape) {
+		t.Errorf("err = %v; a failing reader is malformed input, not a JSON shape failure, so it must not carry ErrInvalidShape", err)
+	}
+	if !errors.Is(err, errBoom) {
+		t.Errorf("err = %v; want the reader's own error to stay reachable with errors.Is", err)
+	}
+	assertShapeSentinelDistinct(t, err)
+}
+
+// TestBareV1CallerOptionsGovernPolymorphicSlots pins ruling P17 (REQ-052): the
+// caller's decoder options govern the whole decode, polymorphic slots included.
+// DecodePolymorphic reads a slot with the caller's decoder and then peeks its
+// `_type` under the same options, so a bare v1 encoding/json caller inherits
+// v1's leniencies inside ELEMENT.name exactly as it does at top level, while
+// canjson (encoding/json/v2 defaults) refuses the same bytes, each refusal
+// classified as REQ-052 requires.
+//
+// Can-fail (checked with go test -overlay on a copy of streaming.go whose
+// DecodePolymorphic calls peekType(raw) with no options): the v1 "invalid
+// UTF-8" and "duplicate name" cases turn red, because the v2-default peek
+// refuses what the v1 tokenizer accepted and the refusal gains ErrInvalidShape
+// through WrapShapeError. The v1 "_TYPE" case turns red as well: the
+// exact-matching peek does not see `_TYPE`, so the narrow slot falls back to
+// DV_TEXT while v1's concrete decode would have matched it.
+func TestBareV1CallerOptionsGovernPolymorphicSlots(t *testing.T) {
+	const head = `{"_type":"ELEMENT","archetype_node_id":"at0001","name":`
+	cases := []struct {
+		name string
+		in   string
+	}{
+		// 0xff is never valid UTF-8.
+		{"invalid UTF-8 in name.value", head + "{\"_type\":\"DV_TEXT\",\"value\":\"a\xffb\"}}"},
+		{"duplicate value in name", head + `{"_type":"DV_TEXT","value":"first","value":"last"}}`},
+		{"_TYPE in capitals in name", head + `{"_TYPE":"DV_CODED_TEXT","value":"n","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":"at0001"}}}`},
+	}
+
+	t.Run("bare v1", func(t *testing.T) {
+		t.Run(cases[0].name, func(t *testing.T) {
+			var e rm.Element
+			if err := jsonv1.Unmarshal([]byte(cases[0].in), &e); err != nil {
+				t.Fatalf("jsonv1.Unmarshal(%q) = %v; want nil: a v1 caller accepts invalid UTF-8 inside a slot as at top level", cases[0].in, err)
+			}
+			name, ok := e.Name.(*rm.DVText)
+			if !ok {
+				t.Fatalf("Element.Name is %T; want *rm.DVText", e.Name)
+			}
+			if !strings.ContainsRune(name.Value, '�') {
+				t.Errorf("Element.Name.Value = %q; want it to contain U+FFFD (v1 substitutes invalid UTF-8)", name.Value)
+			}
+		})
+		t.Run(cases[1].name, func(t *testing.T) {
+			var e rm.Element
+			if err := jsonv1.Unmarshal([]byte(cases[1].in), &e); err != nil {
+				t.Fatalf("jsonv1.Unmarshal(%s) = %v; want nil: a v1 caller accepts a duplicate name inside a slot as at top level", cases[1].in, err)
+			}
+			name, ok := e.Name.(*rm.DVText)
+			if !ok {
+				t.Fatalf("Element.Name is %T; want *rm.DVText", e.Name)
+			}
+			if name.Value != "last" {
+				t.Errorf("Element.Name.Value = %q; want %q (v1 keeps the last duplicate)", name.Value, "last")
+			}
+		})
+		t.Run(cases[2].name, func(t *testing.T) {
+			var e rm.Element
+			if err := jsonv1.Unmarshal([]byte(cases[2].in), &e); err != nil {
+				t.Fatalf("jsonv1.Unmarshal(%s) = %v; want nil", cases[2].in, err)
+			}
+			if _, ok := e.Name.(*rm.DVCodedText); !ok {
+				t.Errorf("Element.Name is %T; want *rm.DVCodedText: v1 matches `_TYPE` case-insensitively, so the slot dispatches on it", e.Name)
+			}
+		})
+		// The fourth leniency the canjson doc bullet lists: v1 validates the
+		// whole input before it decodes, so a stray byte after a member that
+		// fails the target's shape is reported as a syntax error first.
+		t.Run("malformed bytes after a shape failure", func(t *testing.T) {
+			const in = `{"_type":"DV_QUANTITY","magnitude":"abc","units":"kg" x}`
+			var q rm.DVQuantity
+			err := jsonv1.Unmarshal([]byte(in), &q)
+			if se, ok := errors.AsType[*jsonv1.SyntaxError](err); !ok || se == nil {
+				t.Fatalf("jsonv1.Unmarshal(%s) err = %v (%T); want a *json.SyntaxError: v1 reports malformed bytes ahead of a shape failure", in, err, err)
+			}
+			if errors.Is(err, canjson.ErrInvalidShape) {
+				t.Errorf("jsonv1.Unmarshal(%s) err = %v; malformed input must not carry canjson.ErrInvalidShape", in, err)
+			}
+		})
+	})
+
+	t.Run("canjson", func(t *testing.T) {
+		t.Run(cases[0].name, func(t *testing.T) {
+			var e rm.Element
+			err := canjson.Unmarshal([]byte(cases[0].in), &e)
+			if se, ok := errors.AsType[*jsontext.SyntacticError](err); !ok || se == nil {
+				t.Fatalf("canjson.Unmarshal(%q) err = %v (%T); want a *jsontext.SyntacticError for invalid UTF-8", cases[0].in, err, err)
+			}
+			if errors.Is(err, canjson.ErrInvalidShape) {
+				t.Errorf("canjson.Unmarshal(%q) err = %v; invalid UTF-8 is malformed input and must not carry canjson.ErrInvalidShape", cases[0].in, err)
+			}
+		})
+		t.Run(cases[1].name, func(t *testing.T) {
+			var e rm.Element
+			err := canjson.Unmarshal([]byte(cases[1].in), &e)
+			if !errors.Is(err, canjson.ErrInvalidShape) || !errors.Is(err, jsontext.ErrDuplicateName) {
+				t.Errorf("canjson.Unmarshal(%s) err = %v; want errors.Is for both canjson.ErrInvalidShape and jsontext.ErrDuplicateName", cases[1].in, err)
+			}
+		})
+		t.Run(cases[2].name, func(t *testing.T) {
+			// ELEMENT.name is a narrow slot (DV_TEXT is its declared parent), so a
+			// `_TYPE` that exact matching does not see is a missing `_type`, and
+			// the slot falls back to DV_TEXT rather than refusing.
+			var e rm.Element
+			if err := canjson.Unmarshal([]byte(cases[2].in), &e); err != nil {
+				t.Fatalf("canjson.Unmarshal(%s) = %v; want the narrow-slot fallback to DV_TEXT", cases[2].in, err)
+			}
+			if _, ok := e.Name.(*rm.DVText); !ok {
+				t.Errorf("Element.Name is %T; want *rm.DVText: canjson matches names exactly, so `_TYPE` is not the discriminator and the narrow slot falls back to its parent", e.Name)
+			}
+		})
+	})
+
+	// A caller's RejectUnknownMembers binds the concrete decode, not the
+	// `_type` peek, whose head struct declares only `_type`. Can-fail: drop the
+	// RejectUnknownMembers(false) override in typereg.peekType and the peek
+	// refuses `value` inside name, turning this red.
+	t.Run("bare v2 RejectUnknownMembers does not reach the peek", func(t *testing.T) {
+		in := head + `{"_type":"DV_TEXT","value":"n"}}`
+		var e rm.Element
+		if err := jsonv2.Unmarshal([]byte(in), &e, typereg.Unmarshalers(), jsonv2.RejectUnknownMembers(true)); err != nil {
+			t.Fatalf("jsonv2.Unmarshal(%s, RejectUnknownMembers(true)) = %v; want nil: every member is declared", in, err)
+		}
+	})
 }

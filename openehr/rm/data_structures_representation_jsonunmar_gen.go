@@ -23,10 +23,11 @@ func (c *Cluster) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: CLUSTER: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "CLUSTER", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawCluster
-	}{rawCluster: (*rawCluster)(c)})
+	}{rawCluster: (*rawCluster)(c)}
+	return typereg.DecodeInto(dec, "CLUSTER", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Element.
@@ -40,8 +41,9 @@ func (e *Element) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if e == nil {
 		return fmt.Errorf("canjson: ELEMENT: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "ELEMENT", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawElement
-	}{rawElement: (*rawElement)(e)})
+	}{rawElement: (*rawElement)(e)}
+	return typereg.DecodeInto(dec, "ELEMENT", &w, &w.Type)
 }

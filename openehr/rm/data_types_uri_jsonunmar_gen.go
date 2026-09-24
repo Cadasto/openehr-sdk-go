@@ -24,7 +24,7 @@ func (d *DVEHRURI) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: DV_EHR_URI: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireDVEHRURI
-	if err := typereg.DecodeInto(dec, "DV_EHR_URI", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "DV_EHR_URI", &wire, &wire.Class); err != nil {
 		return err
 	}
 	d.Value = wire.Value
@@ -42,8 +42,9 @@ func (d *DVURI) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_URI: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "DV_URI", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawDVURI
-	}{rawDVURI: (*rawDVURI)(d)})
+	}{rawDVURI: (*rawDVURI)(d)}
+	return typereg.DecodeInto(dec, "DV_URI", &w, &w.Type)
 }

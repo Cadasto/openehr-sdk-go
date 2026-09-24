@@ -42,6 +42,21 @@
 //     Extras rule (wire.md § Unknown response keys) binds only the
 //     Definition, System and AQL surfaces, which stay on v1 (REQ-052).
 //
+//   - A caller driving the generated methods through bare v1
+//     encoding/json inherits v1's decode options, and they govern the
+//     whole decode, polymorphic slots included (the slot's `_type` is
+//     peeked under the caller's options too). The caller therefore
+//     inherits v1's leniencies: a duplicate member name is accepted (the
+//     last one wins), member names match case-insensitively (`_TYPE`
+//     dispatches like `_type`), invalid UTF-8 is accepted (replaced with
+//     U+FFFD), and malformed bytes anywhere in the input are reported
+//     ahead of a shape failure. These leniencies are v1's, not SDK
+//     promises. The canonical-JSON guarantees bind the canjson entry
+//     points and bare encoding/json/v2 with its default options; a v2
+//     caller's own options (json.MatchCaseInsensitiveNames,
+//     jsontext.AllowDuplicateNames, …) govern the whole decode the same
+//     way, slots included (REQ-052).
+//
 //   - `<`, `>` and `&` are emitted literally: encoding/json/v2 does not
 //     HTML-escape (REQ-052).
 //
@@ -112,8 +127,11 @@
 //
 // What a decode failure looks like depends on where it happens:
 //
-//   - Malformed JSON reaches the caller before any generated decode
-//     method runs, because the codec validates the whole input first.
+//   - Malformed JSON is refused by the tokenizer as the value it
+//     malforms is decoded, except where a value is buffered first: a
+//     polymorphic slot is read whole before it is decoded, so malformed
+//     bytes anywhere inside it are reported ahead of a shape failure
+//     inside it (REQ-052).
 //     No sentinel: the codec reports its own syntax or truncated-input
 //     error (a *jsontext.SyntacticError), except that [Decoder.Decode]
 //     reports an empty stream as io.EOF and a truncated value wraps
@@ -122,11 +140,10 @@
 //     they too are malformed input carrying no sentinel. rm.Character's
 //     own string arm relies on that same tokenizer refusal and no longer
 //     inspects the raw literal for a substituted U+FFFD (ruling R15).
-//   - A duplicate member name is refused during tokenisation, before any
-//     generated decode method runs. The entry point classifies that
-//     refusal with [ErrInvalidShape], keeping the cause reachable, so
-//     errors.Is finds both the sentinel and jsontext.ErrDuplicateName
-//     (RFC 8259 § 4; REQ-052).
+//   - A duplicate member name is refused during tokenisation. The entry
+//     point classifies that refusal with [ErrInvalidShape], keeping the
+//     cause reachable, so errors.Is finds both the sentinel and
+//     jsontext.ErrDuplicateName (RFC 8259 § 4; REQ-052).
 //   - A polymorphic dispatch failure — a missing, unknown or
 //     mismatched `_type` — arrives as [DecodeError] carrying the path,
 //     either at a slot or on `/_type` where the whole value's `_type`

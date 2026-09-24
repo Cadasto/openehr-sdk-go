@@ -23,10 +23,11 @@ func (o *OpenehrCodeSetIdentifiers) UnmarshalJSONFrom(dec *jsontext.Decoder) err
 	if o == nil {
 		return fmt.Errorf("canjson: OPENEHR_CODE_SET_IDENTIFIERS: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "OPENEHR_CODE_SET_IDENTIFIERS", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawOpenehrCodeSetIdentifiers
-	}{rawOpenehrCodeSetIdentifiers: (*rawOpenehrCodeSetIdentifiers)(o)})
+	}{rawOpenehrCodeSetIdentifiers: (*rawOpenehrCodeSetIdentifiers)(o)}
+	return typereg.DecodeInto(dec, "OPENEHR_CODE_SET_IDENTIFIERS", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into OpenehrTerminologyGroupIdentifiers.
@@ -40,10 +41,11 @@ func (o *OpenehrTerminologyGroupIdentifiers) UnmarshalJSONFrom(dec *jsontext.Dec
 	if o == nil {
 		return fmt.Errorf("canjson: OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS: %w", typereg.ErrNilReceiver)
 	}
-	return typereg.DecodeInto(dec, "OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS", &struct {
+	w := struct {
 		Type string `json:"_type"`
 		*rawOpenehrTerminologyGroupIdentifiers
-	}{rawOpenehrTerminologyGroupIdentifiers: (*rawOpenehrTerminologyGroupIdentifiers)(o)})
+	}{rawOpenehrTerminologyGroupIdentifiers: (*rawOpenehrTerminologyGroupIdentifiers)(o)}
+	return typereg.DecodeInto(dec, "OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS", &w, &w.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into TerminologyService.
@@ -58,7 +60,7 @@ func (t *TerminologyService) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: TERMINOLOGY_SERVICE: %w", typereg.ErrNilReceiver)
 	}
 	var wire jsonWireTerminologyService
-	if err := typereg.DecodeInto(dec, "TERMINOLOGY_SERVICE", &wire); err != nil {
+	if err := typereg.DecodeInto(dec, "TERMINOLOGY_SERVICE", &wire, &wire.Class); err != nil {
 		return err
 	}
 	return nil

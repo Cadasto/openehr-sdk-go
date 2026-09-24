@@ -390,7 +390,7 @@ func TestCharacterDecodeRefusalMessageUnchangedByClassification(t *testing.T) {
 		// message is jsontext's own, still behind rm.Character's prefix.
 		// TestTermMappingMatchSubstitutedSurrogateRefusedThroughFunnel pins the
 		// same bytes through the canjson funnel, where they carry NO sentinel:
-		// there the codec validates the whole document before any decode runs,
+		// there the tokenizer refuses the bytes during tokenisation,
 		// while on this direct call the tokenizer runs inside rm.Character,
 		// whose string arm classifies the refusal, so the two tests answer the
 		// ErrInvalidShape question oppositely and both correctly.
@@ -492,8 +492,8 @@ func TestTermMappingMatchSubstitutedSurrogateRefusedThroughFunnel(t *testing.T) 
 	if err == nil {
 		t.Fatalf("Unmarshal(%s) = nil error, want a refusal; match = %q", in, string(tm.Match))
 	}
-	// A lone surrogate is malformed input jsontext refuses before any generated
-	// decode runs, so it does NOT acquire the decode-side shape sentinel.
+	// A lone surrogate is malformed input jsontext refuses during tokenisation,
+	// so it does NOT acquire the decode-side shape sentinel.
 	if errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; a lone surrogate is malformed input and must not carry canjson.ErrInvalidShape", err)
 	}

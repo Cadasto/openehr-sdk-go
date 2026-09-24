@@ -50,11 +50,20 @@ func decodeOptions(dec *jsontext.Decoder) json.Options {
 	if caller, ok := json.GetOption(dec.Options(), json.WithUnmarshalers); ok && caller != nil && caller != hooks {
 		hooks = joinCallerUnmarshalers(hooks, caller)
 	}
-	return json.JoinOptions(
-		dec.Options(),
-		json.WithUnmarshalers(hooks),
-		jsonv1.ReportErrorsWithLegacySemantics(false),
-	)
+	unmarshalers, legacySemantics := hookOptions(hooks)
+	return json.JoinOptions(dec.Options(), unmarshalers, legacySemantics)
+}
+
+// hookOptions returns the SDK's two decode options for a resolved interface-hook
+// aggregate: the hooks themselves, and v2 error semantics (so a hook failure
+// carries its JSON position regardless of whether a v1 or v2 caller drove the
+// outermost decode). [decodeOptions] joins them on top of the caller's decoder
+// options in one JoinOptions; [Registry.Decode] passes them straight to the
+// variadic json.Unmarshal, because a []byte decode carries no caller options.
+// Building the pair in one place keeps the two call sites from drifting, and
+// returning them unjoined keeps decodeOptions to a single JoinOptions.
+func hookOptions(hooks *json.Unmarshalers) (unmarshalers, legacySemantics json.Options) {
+	return json.WithUnmarshalers(hooks), jsonv1.ReportErrorsWithLegacySemantics(false)
 }
 
 // joinEntry is one memoised caller-hook join: the aggregate and caller pointers
@@ -170,66 +179,115 @@ func MarshalOptions(enc *jsontext.Encoder) json.Options {
 }
 
 // DecodeInto is the shared decode body for a concrete type's
-// UnmarshalJSONFrom. It reads the next value, refuses a _type that names a
-// different concrete type (the mismatch carries [ErrTypeMismatch] inside a
-// [DecodeError] on "/_type"), then decodes the raw bytes into out with the
-// interface hooks threaded in, wrapping any whole-value shape failure through
-// [WrapShapeError] so it keeps the `canjson: <rmType>:` text and gains
-// [ErrInvalidShape] (REQ-052).
+// UnmarshalJSONFrom. It decodes the next value straight into out in one pass,
+// then refuses a _type that names a different concrete type: gotType points at
+// the wrapper's declared _type field, which the same single decode populates,
+// so the discriminator is read once rather than by a separate peek. The
+// mismatch carries [ErrTypeMismatch] inside a [DecodeError] on "/_type". A
+// whole-value shape failure goes through [WrapShapeError], keeping the
+// `canjson: <rmType>:` text and gaining [ErrInvalidShape]; an error carrying
+// neither a shape failure (a *json.SemanticError) nor a dispatch failure (a
+// [DecodeError]) passes through unwrapped, because it is malformed input (a
+// syntactic error or a failing reader), not a shape failure of this type
+// (REQ-052, ADR 0022). Two errors are exceptions to that rule. A duplicate
+// member name is a syntactic error that is nonetheless a shape refusal, so it
+// gains [ErrInvalidShape] through [ClassifyDuplicate] (without the
+// `canjson: <rmType>:` text). A depth refusal ([ErrMaxDepthExceeded], REQ-108)
+// from a nested value passes through unwrapped and does not gain the shape
+// sentinel.
 //
 // out is either the receiver viewed through its method-free alias (the
 // zero-copy shape) or a flat wire struct the caller copies back (the shape used
 // for a type that embeds a marshaler-bearing ancestor, whose alias would
-// promote the ancestor's methods). Either way out declares a _type field, so a
-// caller who sets json.RejectUnknownMembers is not tripped by the SDK's own
+// promote the ancestor's methods). Either way out declares the _type field
+// gotType points into, so the guard reads the value this decode populated, and
+// a caller who sets json.RejectUnknownMembers is not tripped by the SDK's own
 // discriminator reaching out (Q5).
-func DecodeInto(dec *jsontext.Decoder, rmType string, out any) error {
-	raw, err := dec.ReadValue()
-	if err != nil {
-		// A duplicate object member name is a shape refusal (REQ-052), so it is
-		// classified here: a caller driving this generated method through
-		// encoding/json/v2 directly then gets ErrInvalidShape just as a canjson
-		// entry point does, and the canjson and registry routes re-apply the
-		// same gate idempotently. Any other syntactic or IO error from the
-		// tokenizer is left unwrapped: it is not a shape failure of this type,
-		// and callers classify it by kind.
-		return ClassifyDuplicate(err)
+//
+// A nil dec, a nil out (the interface itself, not a typed nil inside it) or a
+// nil gotType is caller misuse (no generated body passes one); each is refused
+// before any decode with a [DecodeError] wrapping [ErrNilArgument] that names
+// the argument, rather than dereferenced (REQ-025). A typed nil inside out
+// reaches the decode and is reported by encoding/json/v2 as a shape failure.
+func DecodeInto(dec *jsontext.Decoder, rmType string, out any, gotType *string) error {
+	switch {
+	case dec == nil:
+		return nilArgument("DecodeInto", "dec", rmType)
+	case out == nil:
+		return nilArgument("DecodeInto", "out", rmType)
+	case gotType == nil:
+		return nilArgument("DecodeInto", "gotType", rmType)
 	}
 	// Bound recursion the same way [Registry.Decode] and [DecodePolymorphic]
-	// do (REQ-040). This is the shared body of every generated
+	// do (REQ-108). This is the shared body of every generated
 	// UnmarshalJSONFrom, so the check reaches every canonical-JSON decode
-	// route — canjson.Unmarshal, canjson.Decoder.Decode and a bare v2/v1
-	// caller — not only the registry path. At the outermost type raw is the
-	// whole document, so the top-level call rejects an over-deep value before
-	// it recurses; nested calls re-measure their own subtree, a redundancy the
-	// single-pass decode follow-up can fold away.
-	if d := jsonNestingDepth(raw); d > maxDecodeDepth {
+	// route, a bare v2/v1 caller included. With no buffered value to measure,
+	// the decoder's own stack depth says where this value opens in the
+	// document, and each nested RM value re-checks on entry. A buffered
+	// polymorphic slot is decoded on a fresh decoder, so [DecodePolymorphic]
+	// adds the slot's own nesting to the enclosing depth before it dispatches.
+	// Members the target type does not declare are skipped by the tokenizer
+	// without reaching this check; outside a buffered value they are bounded
+	// only by jsontext's own nesting limit, while inside a polymorphic slot
+	// [DecodePolymorphic]'s bracket count over the buffered slot includes them
+	// (REQ-108).
+	if d := dec.StackDepth() + 1; d > maxDecodeDepth {
 		return &DecodeError{Inner: fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)}
 	}
-	if head, err := peekType(raw); err != nil {
-		return WrapShapeError(rmType, err)
-	} else if head != "" && head != rmType {
+	if err := json.UnmarshalDecode(dec, out, decodeOptions(dec)); err != nil {
+		return classifyDecode(rmType, err)
+	}
+	if *gotType != "" && *gotType != rmType {
 		return &DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", rmType, head, ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", rmType, *gotType, ErrTypeMismatch),
 		}
-	}
-	if err := json.Unmarshal(raw, out, decodeOptions(dec)); err != nil {
-		return classifyDecode(rmType, err)
 	}
 	return nil
 }
 
+// nilArgument builds the [ErrNilArgument] refusal for a nil argument to fn,
+// naming the argument and the type being decoded.
+func nilArgument(fn, arg, typeName string) error {
+	return &DecodeError{Inner: fmt.Errorf("typereg.%s: %w: %s for %s", fn, ErrNilArgument, arg, typeName)}
+}
+
 // classifyDecode turns the error from a nested decode into the codec's error
-// contract (REQ-052). A dispatch failure at a polymorphic slot arrives as a
-// [DecodeError] a hook produced with no Path; this fills the Path from the v2
-// decoder's SemanticError position (the slot relative to the current object)
-// and lets [WrapShapeError] leave it outside the shape sentinel. Any other
-// failure is a whole-value or plain-field shape failure and goes through
-// WrapShapeError, which adds [ErrInvalidShape] and the `canjson: <rmType>:`
-// text.
+// contract (REQ-052). encoding/json/v2 wraps a returned error in a
+// *json.SemanticError unless it is already semantic, syntactic or an IO error
+// (go doc encoding/json/v2.UnmarshalerFrom). So the codec's own shape and
+// dispatch failures are exactly the errors whose chain carries a
+// *json.SemanticError or a [DecodeError]; every other error is malformed input,
+// a jsontext.SyntacticError (bad tokens, a duplicate name, a truncated value) or
+// a failing reader's IO error, and passes through unwrapped so it keeps no SDK
+// sentinel and no `canjson: <rmType>:` prefix. Two errors are exceptions. A
+// duplicate member name reaches here as a SyntacticError but is a shape refusal
+// (REQ-052), so it goes through [ClassifyDuplicate] here, where a caller driving
+// a generated method through bare encoding/json/v2 still sees it. A depth
+// refusal ([ErrMaxDepthExceeded], REQ-108) from a nested value passes through
+// as it is: it is not a shape failure of this type, and re-wrapping it at every
+// enclosing level would repeat the path per level, growing the message with
+// the square of the depth.
+//
+// A dispatch failure at a polymorphic slot arrives as a [DecodeError] a hook
+// produced with no Path; this fills the Path from the v2 decoder's SemanticError
+// position (the slot relative to the current object) and lets [WrapShapeError]
+// leave it outside the shape sentinel. Any other shape failure is a whole-value
+// or plain-field one and goes through WrapShapeError, which adds [ErrInvalidShape]
+// and the `canjson: <rmType>:` text.
 func classifyDecode(rmType string, err error) error {
-	if de, ok := errors.AsType[*DecodeError](err); ok && de != nil && de.Path == "" {
+	if errors.Is(err, jsontext.ErrDuplicateName) {
+		return ClassifyDuplicate(err)
+	}
+	if errors.Is(err, ErrMaxDepthExceeded) {
+		return err
+	}
+	se, hasSemantic := errors.AsType[*json.SemanticError](err)
+	de, hasDecode := errors.AsType[*DecodeError](err)
+	if (!hasSemantic || se == nil) && (!hasDecode || de == nil) {
+		return err
+	}
+	if hasDecode && de != nil && de.Path == "" {
 		if p := slotPointer(err); p != "" {
 			return WrapShapeError(rmType, &DecodeError{Path: p, Type: de.Type, Inner: de.Inner})
 		}
@@ -260,12 +318,22 @@ func slotPointer(err error) string {
 // [DecodeError] wrapping the matching sentinel, so errors.Is finds the kind and
 // errors.As finds the envelope; the JSON position is supplied by the v2
 // decoder's own SemanticError wrapper around this return (REQ-052, Q2).
+//
+// A nil dec or a nil out is caller misuse (no generated hook passes one),
+// refused before any read with a [DecodeError] wrapping [ErrNilArgument]
+// (REQ-025).
 func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any) error {
+	switch {
+	case dec == nil:
+		return nilArgument("DecodePolymorphic", "dec", reflect.TypeFor[T]().Name())
+	case out == nil:
+		return nilArgument("DecodePolymorphic", "out", reflect.TypeFor[T]().Name())
+	}
 	raw, err := dec.ReadValue()
 	if err != nil {
-		// Same rule as [DecodeInto]: a duplicate member name is a shape refusal
-		// (REQ-052); any other tokenizer error is left for the caller to
-		// classify by kind.
+		// Same rule as [classifyDecode]: a duplicate member name is a shape
+		// refusal (REQ-052); any other tokenizer error is left for the caller
+		// to classify by kind.
 		return ClassifyDuplicate(err)
 	}
 	if string(raw) == "null" {
@@ -275,14 +343,29 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 		// break round-trip stability (an absent value re-encoding as `{}`).
 		return nil
 	}
-	if d := jsonNestingDepth(raw); d > maxDecodeDepth {
+	// Bound recursion from the document root, not from the slot (REQ-108).
+	// The slot's value is decoded below on a fresh decoder over raw, whose
+	// stack depth starts again at zero, so the concrete values inside it
+	// measure their depth from the slot. Adding the enclosing decoder's stack
+	// depth to the slot's own nesting keeps a chain of polymorphic slots, each
+	// shallow on its own, from nesting past the cap in total.
+	if d := dec.StackDepth() + jsonNestingDepth(raw); d > maxDecodeDepth {
 		return &DecodeError{Inner: fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)}
 	}
-	name, err := peekType(raw)
+	// The peek honours the caller's decoder options (REQ-052): ReadValue above
+	// already tokenised the slot under them, so a v1 caller's leniencies
+	// (duplicate names last-wins, invalid UTF-8 accepted, case-insensitive
+	// `_type`) hold inside the slot exactly as they do at top level, and the
+	// peek and the concrete decode below agree on which member is `_type`.
+	// Because the peek can no longer be stricter than the tokenizer that
+	// accepted raw, a peek failure here is a slot value that is not a JSON
+	// object (e.g. an array where an RM value is expected), whose `_type`
+	// is not a string, or whose `_type` a caller-registered unmarshal hook
+	// refused: a shape failure in each case. Name the interface being
+	// filled so the message reads
+	// `canjson: <Interface>:` rather than a bare colon.
+	name, err := peekType(raw, dec.Options())
 	if err != nil {
-		// The slot value is not a JSON object (e.g. an array where an RM value
-		// is expected): a shape failure. Name the interface being filled so the
-		// message reads `canjson: <Interface>:` rather than a bare colon.
 		return WrapShapeError(reflect.TypeFor[T]().Name(), err)
 	}
 	var v any
@@ -325,10 +408,26 @@ type typeDiscriminator struct {
 // peekType reads the _type discriminator from a raw JSON object without
 // decoding the whole value. An empty string means the member is absent; a
 // non-object or malformed value returns the decode error for the caller to
-// classify as a shape failure.
-func peekType(raw jsontext.Value) (string, error) {
+// classify. opts are the decoder options the peek runs under: [DecodePolymorphic]
+// passes the enclosing decoder's own, so the peek tokenises the slot exactly as
+// the caller's decode did; [Registry.Decode] passes none, keeping its
+// encoding/json/v2 default strictness. RejectUnknownMembers is switched off on
+// top of opts, because the head struct declares only _type and every other
+// member of an RM value is unknown to it (a caller's RejectUnknownMembers is
+// meant for the concrete decode, not for this head). The override is joined
+// only when the caller set the option, so the common path adds no allocation.
+// Running under the caller's options also means any unmarshal hook the caller
+// registered for string values runs on the `_type` member during the peek, and
+// again during the concrete decode.
+func peekType(raw jsontext.Value, opts ...json.Options) (string, error) {
 	var head typeDiscriminator
-	if err := json.Unmarshal(raw, &head); err != nil {
+	for _, o := range opts {
+		if reject, ok := json.GetOption(o, json.RejectUnknownMembers); ok && reject {
+			opts = append(opts, json.RejectUnknownMembers(false))
+			break
+		}
+	}
+	if err := json.Unmarshal(raw, &head, opts...); err != nil {
 		return "", err
 	}
 	return head.Type, nil
