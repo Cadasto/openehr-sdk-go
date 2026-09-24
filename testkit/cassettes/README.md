@@ -49,7 +49,7 @@ Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `Compositio
 
 Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
-**Probe vs on-disk.** Vendored `*.json` / `*.xml` under `compositions/` may be omitted from [`ListCompositionJSON`](../fixtures/discover.go) / [`ListRMXML`](../fixtures/discover.go) when canjson/canxml cannot round-trip yet; files remain for template and instance work via `fixtures.CompositionJSON(id)`.
+**Probe vs on-disk.** Every vendored `*.json` under `compositions/` is in [`ListCompositionJSON`](../fixtures/discover.go) and PROBE-030; one whose content carries a genuine RM-floor finding is held out of the `validation.ValidateRM` leg only (see Conventions). Vendored `*.xml` may be omitted from [`ListRMXML`](../fixtures/discover.go) via `compositionXMLExcluded` when canxml cannot round-trip it yet; the file stays for template and instance work.
 
 ## Index by vendor
 
@@ -72,9 +72,9 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 | `test_template_rename_node` | yes | yes | yes | round-trip |
 | `test_template_rename_node_2` | yes | yes | yes | round-trip |
 | `Episode.v2` | yes | yes | yes | round-trip |
-| `Address.v2` | yes | yes | yes | JSON/XML on disk; probes skip (codec) |
-| `Demonstration.v1` | yes | yes | yes | probes skip |
-| `TestPerson.v2` | yes | yes | yes | probes skip |
+| `Address.v2` | yes | yes | yes | round-trip |
+| `Demonstration.v1` | yes | yes | yes | JSON round-trip, RM floor held out (inverted `DV_INTERVAL` bounds); XML not exercised |
+| `TestPerson.v2` | yes | yes | yes | JSON round-trip, RM floor held out (null `CODE_PHRASE.code_string`); XML not exercised |
 
 ### ehrbase (openEHR_SDK)
 
@@ -127,7 +127,7 @@ The Corona pair is the largest cassette in the repo — the size is the cost of 
 
 **Persistent:** `persistent_minimal.en.v1` (OPT + JSON + XML, round-trip).
 
-**Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip); `Test_dv_*` (24 OPT+JSON pairs, round-trip except four `Test_dv_interval_*` — probes skip; see PROBE-038). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
+**Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip); `Test_dv_*` (24 OPT+JSON pairs, all round-trip in PROBE-030; the two `Test_dv_interval_*_open_constraint` samples have the RM floor held out for inverted bounds, and all four `Test_dv_interval_*` stay out of the constraint-cassette axis). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
 
 **Added at the `b4625fc` pin** (valid OPT + canonical JSON only): `family_history.v.1.2.3`, `my_spanish_template_v0`, `terminology_test.ehrbase.org.v1`, `terminology_test2.ehrbase.org.v1`.
 

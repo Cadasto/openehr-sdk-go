@@ -138,7 +138,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/cassettes, testkit/fixtures, testkit/wireequiv]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md, docs/plans/archive/2026-09-14-json-v2-migration.md]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md, docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md, docs/plans/archive/2026-09-14-json-v2-migration.md, docs/plans/archive/2026-09-15-widen-composition-corpus.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md, docs/adr/0021-json-member-order-not-a-contract.md, docs/adr/0022-canonical-json-encoding-json-v2.md]
     tests:
@@ -157,6 +157,8 @@ requirements:
       - openehr/serialize/canjson/bare_v2_decode_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go  # can-fail plants for the fidelity and RM-floor legs
+      - testkit/probes/serialize/probes_test.go  # PROBE-030 over the whole corpus; every discovered cassette is an input
+      - testkit/fixtures/discover_test.go  # the seven former hold-outs stay in ListCompositionJSON
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
       - testkit/probes/serialize/probe_038_guard_internal_test.go  # can-fail plant for the wire-equivalence fixpoint leg
       - openehr/rm/character_test.go
@@ -1438,11 +1440,14 @@ requirements:
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/handles_test.go
       - openehr/validation/rmread/read_test.go  # ACTION time/ism_transition/instruction_details readers the floor relies on (shared with REQ-102)
+      - testkit/probes/serialize/probe_030_guard_internal_test.go  # PROBE-030 RM-floor leg: locked hold-outs, each with its findings pinned
+      - testkit/probes/serialize/probes_test.go  # PROBE-030 hold-outs fail the floor and pass the fidelity legs
     plans:
       - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
       - docs/plans/archive/2026-06-29-rm-floor-validation.md
       - docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md
       - docs/plans/archive/2026-09-14-json-v2-migration.md  # landed the rmread ACTION readers, so the floor stops reporting a populated ACTION's mandatory attributes as missing
+      - docs/plans/archive/2026-09-15-widen-composition-corpus.md  # PROBE-030 floor-leg hold-outs for four vendored cassettes
     notes: >-
       landed (2026-09-03): the floor gained two TERM_MAPPING /
       DV_TEXT.mappings invariants — match outside {'>','=','<','?'} and

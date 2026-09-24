@@ -1,13 +1,13 @@
 # Plan: widen the composition corpus (the seven excluded cassettes)
 
 **Date:** 2026-09-15
-**Status:** landed (2026-09-15). The one open question (the constraint-axis coupling) was ruled below: decoupled; enrolling the four interval templates into the constraint axis is a recorded follow-up (see below).
+**Status:** landed (2026-09-15; reconciled with PR #172 and hardened in review on 2026-09-24, see "As built" below). The one open question (the constraint-axis coupling) was ruled below: decoupled.
 **Owner:** SDK maintainers
-**Worktree:** `/src/cadasto/openehr-sdk-go/.claude/worktrees/jsonv2-fixtures`, branch `test/widen-composition-corpus`, from `7a11918e`. The main checkout is never touched.
 **Covers:** [REQ-052](../../specifications/wire.md#req-052) (Canonical JSON, Impl. `landed`, no status change), exercised through [PROBE-030](../../specifications/conformance.md#probe-030--canonical-json-round-trip). No REQ id is allocated and no probe id is allocated.
 **Probes:** PROBE-030 gains four `SkipFloor` hold-out entries. The PROBE-030 catalog entry already sanctions the floor-leg hold-out mechanism (`conformance.md:581` block), so no catalog wording changes and no guarded census or all-three-modes count moves.
-**Implementation:** test-corpus widening. No production code path changes: only fixture discovery, one probe input list, test assertions, and prose.
+**Implementation:** landed. Test-corpus widening only: fixture discovery, one probe input list, test assertions and prose; no production code path changes.
 **Depends on:** the landed json/v2 semantic round trip on this branch (PROBE-030 is now decode/encode/decode/encode/decode with `reflect.DeepEqual` across the second encode, `validation.ValidateRM`, and `testkit/wireequiv.Equivalent`), and ruling R33 of `docs/plans/archive/2026-09-14-json-v2-migration.md:698,708`, which withdrew the byte-stability rationale the exclusion cited.
+**Defers:** enrolling the four `Test_dv_interval_*` templates into the constraint-cassette axis (ruling F5); the scope is in "Follow-ups".
 
 ## Goal
 
@@ -101,9 +101,9 @@ Binding constraints: plain English, no em dashes, no second person, no bare `#N`
 
 ### Task 1: correct the conformance prose that names the deleted map
 
-- [ ] Edit `docs/specifications/conformance.md:148`: in the sentence "Templates with JSON or XML on disk but known codec gaps MAY be listed in `compositionJSONExcluded`, `compositionXMLExcluded`, or `rmJSONExcluded` in that package so probes stay green while the files remain available for template and validation work", drop `compositionJSONExcluded` (the round-trip corpus no longer excludes any template), leaving `compositionXMLExcluded` (canxml pairing) and `rmJSONExcluded` (deliberately invalid or alternate-wire rm samples). Keep the sentence otherwise intact and free of em dashes.
-- [ ] Run `make spec-check`. Expected: `spec-check: OK` (the guarded counts do not involve this sentence; the run confirms no regression).
-- [ ] Commit, explicit pathspec `docs/specifications/conformance.md`:
+- [x] Edit `docs/specifications/conformance.md:148`: in the sentence "Templates with JSON or XML on disk but known codec gaps MAY be listed in `compositionJSONExcluded`, `compositionXMLExcluded`, or `rmJSONExcluded` in that package so probes stay green while the files remain available for template and validation work", drop `compositionJSONExcluded` (the round-trip corpus no longer excludes any template), leaving `compositionXMLExcluded` (canxml pairing) and `rmJSONExcluded` (deliberately invalid or alternate-wire rm samples). Keep the sentence otherwise intact and free of em dashes.
+- [x] Run `make spec-check`. Expected: `spec-check: OK` (the guarded counts do not involve this sentence; the run confirms no regression).
+- [x] Commit, explicit pathspec `docs/specifications/conformance.md`:
 
   ```
   docs(conformance): drop compositionJSONExcluded from the discovery note
@@ -121,7 +121,7 @@ This is the core change. The corpus widening and the four floor-leg hold-outs la
 
 **Test first (the corpus-membership guard).**
 
-- [ ] In `testkit/fixtures/discover_test.go`, add a test that fails while the seven are excluded and passes once they are listed. It is a can-fail control: deleting any one stem from the corpus turns it red.
+- [x] In `testkit/fixtures/discover_test.go`, add a test that fails while the seven are excluded and passes once they are listed. It is a can-fail control: deleting any one stem from the corpus turns it red.
 
   ```go
   // TestListCompositionJSON_includesFormerlyExcludedCompositions pins that the
@@ -153,12 +153,12 @@ This is the core change. The corpus widening and the four floor-leg hold-outs la
   }
   ```
 
-- [ ] Run `go test ./testkit/fixtures/ -run TestListCompositionJSON_includesFormerlyExcludedCompositions`. Expected red: the seven are still excluded, so every stem reports missing.
+- [x] Run `go test ./testkit/fixtures/ -run TestListCompositionJSON_includesFormerlyExcludedCompositions`. Expected red: the seven are still excluded, so every stem reports missing.
 
 **Decouple discovery from the shared map.**
 
-- [ ] In `testkit/fixtures/discover.go`, delete the `compositionJSONExcluded` map (`:21-32`) and both reads of it: the `kind == "compositions"` branch in `collectJSON` (`:83-85`) and the guard in `TemplateIDsWithCompositionXML` (`:143-145`). Leave `compositionXMLExcluded`, `rmJSONExcluded`, `rmJSONExcludedPrefixes`, and `excludedRMJSONStem` unchanged.
-- [ ] In `testkit/fixtures/constraint_templates.go`, remove the `if compositionJSONExcluded[id] { continue }` guard (`:29-31`) and keep the interval templates out of the constraint axis with a dedicated, documented rule in `isConstraintTemplateID` (`:42-44`):
+- [x] In `testkit/fixtures/discover.go`, delete the `compositionJSONExcluded` map (`:21-32`) and both reads of it: the `kind == "compositions"` branch in `collectJSON` (`:83-85`) and the guard in `TemplateIDsWithCompositionXML` (`:143-145`). Leave `compositionXMLExcluded`, `rmJSONExcluded`, `rmJSONExcludedPrefixes`, and `excludedRMJSONStem` unchanged.
+- [x] In `testkit/fixtures/constraint_templates.go`, remove the `if compositionJSONExcluded[id] { continue }` guard (`:29-31`) and keep the interval templates out of the constraint axis with a dedicated, documented rule in `isConstraintTemplateID` (`:42-44`):
 
   ```go
   func isConstraintTemplateID(id string) bool {
@@ -178,7 +178,7 @@ This is the core change. The corpus widening and the four floor-leg hold-outs la
 
 **Hold the four floor-failing cassettes out of the floor leg only.**
 
-- [ ] In `testkit/probes/serialize/probe_030_canjson_round_trip.go`, extend `probe030SkipFloor` (`:224-226`) to name the four, each with its finding in the comment above, in the same style as the existing `clinical_notes.v0` entry:
+- [x] In `testkit/probes/serialize/probe_030_canjson_round_trip.go`, extend `probe030SkipFloor` (`:224-226`) to name the four, each with its finding in the comment above, in the same style as the existing `clinical_notes.v0` entry:
 
   ```go
   var probe030SkipFloor = map[string]bool{
@@ -203,7 +203,7 @@ This is the core change. The corpus widening and the four floor-leg hold-outs la
 
 **Test the hold-outs are load-bearing (the discriminating control).**
 
-- [ ] In `testkit/probes/serialize/probes_test.go`, add a test that proves each held-out input genuinely fails the floor and passes the fidelity legs. It reads `SkipFloor` off `Probe030Inputs` (exported), so it needs no access to the unexported map. The mutation it catches: adding a `SkipFloor` entry for a cassette that actually passes the floor (a hold-out masking nothing, or hiding a real regression) turns the floor-on assertion red; a codec regression that breaks a held-out cassette's fidelity turns the second assertion red.
+- [x] In `testkit/probes/serialize/probes_test.go`, add a test that proves each held-out input genuinely fails the floor and passes the fidelity legs. It reads `SkipFloor` off `Probe030Inputs` (exported), so it needs no access to the unexported map. The mutation it catches: adding a `SkipFloor` entry for a cassette that actually passes the floor (a hold-out masking nothing, or hiding a real regression) turns the floor-on assertion red; a codec regression that breaks a held-out cassette's fidelity turns the second assertion red.
 
   ```go
   // TestProbe030HeldOutInputsFailFloorButPassFidelity pins that every SkipFloor
@@ -248,18 +248,18 @@ This is the core change. The corpus widening and the four floor-leg hold-outs la
 
 **Reword the stale benchmark comment.**
 
-- [ ] In `openehr/serialize/canjson/bench_test.go:127-128`, replace the parenthetical claim so it reads that the cassette now feeds PROBE-030's fidelity legs and is held out of the ValidateRM leg only, for its inverted DV_INTERVAL bounds. Keep the rest of the comment (the decode-and-encode-cleanly control) intact and free of em dashes. For example: "The cassette now feeds PROBE-030's fidelity legs and is held out of the ValidateRM leg only (its vendored content has inverted DV_INTERVAL bounds); it decodes and encodes cleanly, which is all this benchmark asks of it."
+- [x] In `openehr/serialize/canjson/bench_test.go:127-128`, replace the parenthetical claim so it reads that the cassette now feeds PROBE-030's fidelity legs and is held out of the ValidateRM leg only, for its inverted DV_INTERVAL bounds. Keep the rest of the comment (the decode-and-encode-cleanly control) intact and free of em dashes. For example: "The cassette now feeds PROBE-030's fidelity legs and is held out of the ValidateRM leg only (its vendored content has inverted DV_INTERVAL bounds); it decodes and encodes cleanly, which is all this benchmark asks of it."
 
 **Green.**
 
-- [ ] Run, in order:
+- [x] Run, in order:
   - `go test ./testkit/fixtures/ -run TestListCompositionJSON_includesFormerlyExcludedCompositions` (now green).
   - `go test ./testkit/fixtures/` (the decoupling regression guard `TestConstraintTemplateIDs_includesTestDvAndClinical` still green).
   - `go test ./testkit/probes/serialize/` (`TestProbe030`, `TestProbe030InputsCoverWholeCorpus`, `TestProbe076`, and the new hold-out guard all green).
   - `go test ./openehr/serialize/canjson/ ./openehr/serialize/canxml/ ./openehr/validation/ ./testkit/probes/template/` (the corpus-wide round trip, cross-format, and constraint-cassette tests all green).
   - `go vet ./...` and `golangci-lint run` on the touched packages.
   Expected: all `ok`, no vet or lint finding.
-- [ ] Commit, explicit pathspecs `testkit/fixtures/discover.go testkit/fixtures/discover_test.go testkit/fixtures/constraint_templates.go testkit/probes/serialize/probe_030_canjson_round_trip.go testkit/probes/serialize/probes_test.go openehr/serialize/canjson/bench_test.go`:
+- [x] Commit, explicit pathspecs `testkit/fixtures/discover.go testkit/fixtures/discover_test.go testkit/fixtures/constraint_templates.go testkit/probes/serialize/probe_030_canjson_round_trip.go testkit/probes/serialize/probes_test.go openehr/serialize/canjson/bench_test.go`:
 
   ```
   test(fixtures): widen the composition corpus to the seven former hold-outs
@@ -287,8 +287,8 @@ This is the core change. The corpus widening and the four floor-leg hold-outs la
 
 ### Task 3: whole-tree gate before the plan is done
 
-- [ ] Run `make ci` (fmt-check, mod-tidy-check, vet, test, lint, spec-check, and the rest). Expected: green. The race detector is main-only in CI and needs cgo locally; this change touches no shared state, so a local run without `-race` is sufficient and that fact is stated in the PR body.
-- [ ] Confirm `git status` shows only the intended files across the two commits and nothing else.
+- [x] Run `make ci` (fmt-check, mod-tidy-check, vet, test, lint, spec-check, and the rest). Expected: green. The race detector is main-only in CI and needs cgo locally; this change touches no shared state, so a local run without `-race` is sufficient and that fact is stated in the PR body.
+- [x] Confirm `git status` shows only the intended files across the two commits and nothing else.
 
 ## Definition of done
 
@@ -301,3 +301,11 @@ This is the core change. The corpus widening and the four floor-leg hold-outs la
 ## Follow-ups
 
 - Enrol the four `Test_dv_interval_*` templates into the constraint-cassette axis. Ruling F5 decoupled this from the corpus widening, so it stays a cleanly scoped later change. It flips the prefix pin in `constraint_templates_test.go`, which today asserts `Test_dv_interval_*` absent from `ConstraintTemplateIDs`, and adds two positive `primitive_out_of_range` assertions in `openehr/validation/constraint_cassettes_test.go` for the two `lower_upper` instances, whose operational-template range is `[0..100]` and whose bounds `-10` and `200` genuinely violate it. PROBE-076 already passes on all four interval templates, so the FLAT axis is not the blocker.
+
+## As built (2026-09-24)
+
+This branch was rebased onto `main` after PR #172 merged. PR #172 had added a lock on `probe030SkipFloor` (then one entry), a wiring test and a round-trip invariance test. The reconciliation and the review on this PR changed three things against the tasks above:
+
+- `probe030SkipFloor` is a `map[string][]string`: each hold-out lists the exact `validation.ValidateRM` findings (code and path) it hides. `TestProbe030SkipFloorFindingsArePinned` asserts the input decode and the round-tripped value both report exactly that list, so a decode that loses a required attribute on a held-out cassette still fails. The lock (`TestProbe030SkipFloorSetIsLocked`) names all five hold-outs.
+- The dead-key guard from Task 5 (`TestProbe030SkipFloorKeysAllMatchAnInput`) was dropped: PR #172's `TestProbe030InputsSkipFloorFollowsTheLockedSet` already fails on a key that matches no input.
+- `TestProbe030InputsCoverWholeCorpus` checks every discovered cassette by name and fails on one whose root type has no factory, instead of leaving it out of the expected count.
