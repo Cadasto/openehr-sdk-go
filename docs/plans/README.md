@@ -10,7 +10,7 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 | Plan | Scope | Covers | Notes |
 |---|---|---|---|
-| [2026-09-24-rm-floor-archetype-roots.md](2026-09-24-rm-floor-archetype-roots.md) | The template-less floor reports `is_archetype_root` for a COMPOSITION / EHR_STATUS / EHR_ACCESS / PARTY without `archetype_details`, and `required` / `rm_version_valid` for an incomplete `ARCHETYPED` on any LOCATABLE | REQ-112 (no new id; `partial` until landed) | Spec-first; reported by the consuming CDR project |
+| [2026-09-24-rm-floor-archetype-roots.md](2026-09-24-rm-floor-archetype-roots.md) | The template-less floor reports `is_archetype_root` for a COMPOSITION / EHR_STATUS / EHR_ACCESS / PARTY / ENTRY without `archetype_details`, and `required` / `rm_version_valid` for an incomplete `ARCHETYPED` on any LOCATABLE | REQ-112 (no new id; `partial` until landed) | Spec-first; reported by the consuming CDR project |
 
 ### Go 1.27 floor (2026-09-03)
 

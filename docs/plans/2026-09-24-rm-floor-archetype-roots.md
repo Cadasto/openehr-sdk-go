@@ -11,7 +11,7 @@
 
 ## Goal
 
-The template-less floor reports no finding for an EHR_STATUS (or COMPOSITION, EHR_ACCESS, PARTY) without
+The template-less floor reports no finding for a COMPOSITION, EHR_STATUS, EHR_ACCESS, PARTY or ENTRY without
 `archetype_details`, nor for an `archetype_details` missing `archetype_id` or with an empty `rm_version`. Measured at
 v0.27.0, every one of these passes `ValidateRMEHRStatusBytes` clean:
 
@@ -50,19 +50,54 @@ lands.
 ### Phase 1 — the catalogue rows
 
 **Tasks:**
-- Evaluate `Is_archetype_root` for the classes whose BMM declares it. Derive the set from the BMM class invariants if
-  `rminfo` can expose them; otherwise a closed list with a test pinning it against the BMM, so a BMM bump that adds a
-  root class fails loudly (ADR 0001).
+- Evaluate `Is_archetype_root` as a closed list of the five BMM declarers (COMPOSITION, EHR_ACCESS, EHR_STATUS, PARTY,
+  ENTRY) with their concrete descendants, pinned by a test against the vendored BMM's `Is_archetype_root` declarations
+  so a BMM bump that adds a root class fails loudly (ADR 0001). `rminfo` exposes no invariants, so deriving the set
+  from it is not an option (that would be REQ-048/049 surface).
+- Surface `archetype_details` from the readers: today no `rmread` reader returns it and `rmread.Handles` omits
+  `rm.Archetyped`, which is why the floor never descends there. Add the reader and the `Handles` entry beside the
+  evaluators.
 - Walk `archetype_details` on every LOCATABLE where present: `archetype_id` / `archetype_id.value` / `rm_version`, with
   the codes and paths the spec rows fix.
 - `…Bytes` entries decide `archetype_id` / `rm_version` presence from the JSON key set (the PROBE-081 mechanism);
   value-based entries report empties as the spec says.
-- SHOULD: implement `LOCATABLE.is_archetype_root` so the generated methods in `openehr/rm/common_archetyped_gen.go`
-  stop panicking.
 
 **Definition of done:** every row of the Goal table produces the spec's finding; a complete `archetype_details`
-produces none; a FOLDER without `archetype_details` produces none; a nested LOCATABLE with an incomplete `ARCHETYPED`
-is reported at its own path; removing either evaluator fails a named test.
+produces none; a FOLDER without `archetype_details` produces none; an ENTRY (for example an EVALUATION or OBSERVATION)
+nested in a COMPOSITION with no `archetype_details` is reported at its own path; a nested LOCATABLE with an incomplete
+`ARCHETYPED` is reported at its own path; removing either evaluator fails a named test.
+
+## Vendored content
+
+The rule matches the RM and is not weakened. Some EHRbase-origin samples under `testkit/cassettes/rm/` omit
+`archetype_details` on a root or on a nested entry, so they gain a floor finding once this lands. Counted with a
+throwaway walk over `testkit/cassettes/rm/**` and `testkit/cassettes/compositions/*.json`: the root `_type` for the
+top-level rows, a recursive `_type` scan for nested entries, and a sample counts when the `archetype_details` key is
+absent or `null`.
+
+| Sample set | Count | Runs through PROBE-030's floor leg |
+|---|---|---|
+| Top-level EHR_STATUS with no `archetype_details` | 19 | 9 (the eight `ehr_status_valid_*` plus `ehr_status_other_details_simple.json`); the ten `ehr_status_invalid_*` are excluded from PROBE-030 as API-validation payloads |
+| Top-level COMPOSITION with no `archetype_details` | 3 | 0 (all under `rm/polymorphic/`, a subdirectory PROBE-030 does not walk) |
+| Nested EVALUATION with no `archetype_details` | 2 | 2 (`minimal_evaluation.json` and `compo_with_nested_party_related.json`, both loaded as COMPOSITIONs) |
+| Nested OBSERVATION with no `archetype_details` | 3 | 0 (three under `rm/polymorphic/`, not walked) |
+
+So 11 samples run through PROBE-030's `ValidateRM` floor leg and would carry a new finding. No vendored sample has an
+incomplete ARCHETYPED (a missing `archetype_id`, an empty value, or a missing or empty `rm_version`), so no
+ARCHETYPED-arm hold-out is needed.
+
+Handling, at implementation, with no fixture content edited:
+
+- The affected cassettes become named `SkipFloor` hold-outs carrying the finding, the mechanism PROBE-030's catalog
+  entry already sanctions.
+- `TestValidateRMEHRStatusBytes_BareSubjectOK` moves to a fixture that carries `archetype_details`, since its facet is
+  the subject, not the root.
+
+## Not in this plan
+
+The generated `IsArchetypeRoot()` methods on the RM types (`openehr/rm/common_archetyped_gen.go`) panic today and
+nothing calls them. Implementing `LOCATABLE.is_archetype_root` so they stop panicking belongs to the RM
+behavioural-functions surface (REQ-120 to REQ-123), an optional follow-up there rather than a task of this plan.
 
 ## Mapping to specs
 
