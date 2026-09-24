@@ -1,6 +1,7 @@
 package demographic_test
 
 import (
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"net/http"
@@ -176,6 +177,67 @@ func TestGetVersionUnknownDataType(t *testing.T) {
 	_, _, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
 	if !errors.Is(err, typereg.ErrUnknownType) {
 		t.Fatalf("err = %v, want typereg.ErrUnknownType", err)
+	}
+}
+
+// TestGetVersionDuplicateMemberName pins the canonical-JSON refusal of a
+// repeated member name on the ORIGINAL_VERSION envelope decode (REQ-052,
+// REQ-151). The envelope is decoded with encoding/json/v2, whose default
+// refuses a duplicate name, so an envelope stating lifecycle_state twice fails
+// with a *transport.DecodeError wrapping jsontext.ErrDuplicateName. This is a
+// can-fail control for the v2 decode: on the v1 encoding/json decode the last
+// duplicate wins silently and the read succeeds.
+func TestGetVersionDuplicateMemberName(t *testing.T) {
+	body := fmt.Appendf(
+		nil,
+		`{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"%s::cdr::1"},`+
+			`"lifecycle_state":{"_type":"DV_CODED_TEXT","value":"complete","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"532"}},`+
+			`"lifecycle_state":{"_type":"DV_CODED_TEXT","value":"deleted","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"523"}},`+
+			`"data":%s}`,
+		personVOID, cassette(t, "person.json"),
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	pv, _, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
+	if err == nil {
+		t.Fatalf("GetVersion(duplicate lifecycle_state) = %+v, nil; want a decode error", pv)
+	}
+	if de, ok := errors.AsType[*transport.DecodeError](err); !ok || de == nil {
+		t.Errorf("GetVersion(duplicate lifecycle_state) err = %v (%T); want a *transport.DecodeError", err, err)
+	}
+	if !errors.Is(err, jsontext.ErrDuplicateName) {
+		t.Errorf("GetVersion(duplicate lifecycle_state) err = %v; want errors.Is(_, jsontext.ErrDuplicateName)", err)
+	}
+}
+
+// TestGetVersionCaseVariantMemberIsUnknown pins the other half of what the
+// encoding/json/v2 envelope decode changed (REQ-052, ADR 0022): member names
+// match exactly, so an envelope spelling "UID" and "Data" in capitals decodes
+// without error but leaves both fields unset. The v1 decode matched them
+// case-insensitively and populated UID and Party.
+func TestGetVersionCaseVariantMemberIsUnknown(t *testing.T) {
+	body := fmt.Appendf(
+		nil,
+		`{"_type":"ORIGINAL_VERSION","UID":{"_type":"OBJECT_VERSION_ID","value":"%s::cdr::1"},"Data":%s}`,
+		personVOID, cassette(t, "person.json"),
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	pv, _, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
+	if err != nil {
+		t.Fatalf("GetVersion(envelope with \"UID\" and \"Data\") = %v; want nil: a wrongly-cased member is skipped, not refused (if this changes on purpose, update ADR 0022 Consequences)", err)
+	}
+	if pv.UID.Value != "" {
+		t.Errorf("GetVersion(envelope with \"UID\") UID = %q; want empty: v2 matches member names exactly (if this changes on purpose, update ADR 0022 Consequences)", pv.UID.Value)
+	}
+	if pv.Party != nil {
+		t.Errorf("GetVersion(envelope with \"Data\") Party = %T; want nil: v2 matches member names exactly (if this changes on purpose, update ADR 0022 Consequences)", pv.Party)
 	}
 }
 
