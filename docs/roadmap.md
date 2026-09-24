@@ -30,7 +30,7 @@ Each stage groups several deliverables; a stage is only as done as its weakest r
 | | Benchmark harness | **Deferred** |
 | **2 — Clinical building blocks** | ADL 1.4 OPT parser + compiled-template foundation | **Landed** |
 | | Composition builder | **Landed** |
-| | Validation — template-driven, non-COMPOSITION roots, RM floor | **Landed** |
+| | Validation — template-driven, non-COMPOSITION roots, RM floor | **Landed** (RM floor archetype-root and ARCHETYPED rows: partial) |
 | | OPT → RM instance synthesis | **Landed** (`medium` detail level open) |
 | | AQL — builders, parsed AST, static lint | **Landed** |
 | | Simplified formats (FLAT / STRUCTURED) + WebTemplate export | **Landed** |

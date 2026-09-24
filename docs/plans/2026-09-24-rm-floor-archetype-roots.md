@@ -59,8 +59,9 @@ lands.
   evaluators.
 - Walk `archetype_details` on every LOCATABLE where present: `archetype_id` / `archetype_id.value` / `rm_version`, with
   the codes and paths the spec rows fix.
-- `…Bytes` entries decide `archetype_id` / `rm_version` presence from the JSON key set (the PROBE-081 mechanism);
-  value-based entries report empties as the spec says.
+- `ValidateRMEHRStatusBytes` decides `archetype_id` / `rm_version` key presence for the root EHR_STATUS only (its
+  existing `subject` scope), reporting an absent or `null` key as `required` at the attribute path and replacing the
+  value walk's finding at that same path; value-based entries report empties as the spec says.
 
 **Definition of done:** every row of the Goal table produces the spec's finding; a complete `archetype_details`
 produces none; a FOLDER without `archetype_details` produces none; an ENTRY (for example an EVALUATION or OBSERVATION)
@@ -90,8 +91,10 @@ Handling, at implementation, with no fixture content edited:
 
 - The affected cassettes become named `SkipFloor` hold-outs carrying the finding, the mechanism PROBE-030's catalog
   entry already sanctions.
-- `TestValidateRMEHRStatusBytes_BareSubjectOK` moves to a fixture that carries `archetype_details`, since its facet is
-  the subject, not the root.
+- The OK-asserting root-class unit fixtures gain `archetype_details` at implementation:
+  `TestValidateRMEHRStatusBytes_BareSubjectOK` and `TestValidateRMEHRStatus_MinimallyValid`
+  (`openehr/validation/rmfloor_test.go`) both assert OK on an EHR_STATUS with no `archetype_details`, and no floor test
+  fixture sets it today; their facet is the subject, not the root.
 
 ## Not in this plan
 
