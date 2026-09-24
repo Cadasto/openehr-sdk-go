@@ -26,9 +26,6 @@ func ConstraintTemplateIDs() ([]string, error) {
 		if !isConstraintTemplateID(id) {
 			continue
 		}
-		if compositionJSONExcluded[id] {
-			continue
-		}
 		jsonPath := filepath.Join(compositionsDir(), id+".json")
 		if _, err := os.Stat(jsonPath); err != nil {
 			continue
@@ -40,6 +37,14 @@ func ConstraintTemplateIDs() ([]string, error) {
 }
 
 func isConstraintTemplateID(id string) bool {
+	// Test_dv_interval_* templates carry deliberately out-of-range and
+	// inverted-bound instances (REQ-052 round-trip inputs), not primitive-
+	// constraint conformance inputs, so they stay out of the constraint axis;
+	// constraint_templates_test.go pins that. Their JSON round trip is covered
+	// by PROBE-030 via ListCompositionJSON.
+	if strings.HasPrefix(id, "Test_dv_interval_") {
+		return false
+	}
 	return id == "clinical_content_validation" || strings.HasPrefix(id, "Test_dv_")
 }
 

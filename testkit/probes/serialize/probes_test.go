@@ -50,11 +50,12 @@ func TestProbe030(t *testing.T) {
 	}
 }
 
-// TestProbe030InputsCoverWholeCorpus pins the input-set size to every leaf entry
-// plus every discoverable cassette with a factory. A cassette carrying an
-// RM-floor finding independent of the round trip is held out of the ValidateRM
-// leg by SkipFloor, never removed from the input set, so this fails if a future
-// hold-out silently shrinks the probe.
+// TestProbe030InputsCoverWholeCorpus pins that every discovered cassette is in
+// the input set, by name, next to the inline leaf entries. A cassette carrying
+// an RM-floor finding independent of the round trip is held out of the
+// ValidateRM leg by SkipFloor, never removed from the input set, so this fails
+// if a future hold-out silently shrinks the probe; it also fails on a cassette
+// whose root type has no factory, which discovery would otherwise skip.
 func TestProbe030InputsCoverWholeCorpus(t *testing.T) {
 	rels, err := fixtures.ListCompositionJSON()
 	if err != nil {
@@ -62,23 +63,70 @@ func TestProbe030InputsCoverWholeCorpus(t *testing.T) {
 	}
 	// Count the non-cassette (inline leaf) entries in the input set rather
 	// than hardcoding their number, so adding a leaf does not silently pass a
-	// stale total. The assertion then reduces to: the cassette entries in the
-	// input set equal the cassettes discovered on disk with a factory.
+	// stale total.
 	inlineLeaves := 0
 	for _, in := range serializeprobes.Probe030Inputs {
 		if !strings.HasPrefix(in.Name, "cassette:") {
 			inlineLeaves++
 		}
 	}
-	want := inlineLeaves
+	// Every discovered cassette must reach the input set by name. A cassette
+	// whose root type has no factory is skipped by the probe's discovery, so
+	// it is a failure here rather than a smaller expected count.
+	names := make(map[string]bool, len(serializeprobes.Probe030Inputs))
+	for _, in := range serializeprobes.Probe030Inputs {
+		names[in.Name] = true
+	}
 	for _, rel := range rels {
-		if _, ok := fixtures.FactoryForJSONRel(rel); ok {
-			want++
+		if _, ok := fixtures.FactoryForJSONRel(rel); !ok {
+			t.Errorf("cassette %s has no factory, so PROBE-030 skips it silently: add its root type to fixtures.FactoryForRootType", rel.Rel)
+			continue
+		}
+		if !names["cassette:"+rel.Rel] {
+			t.Errorf("cassette %s is on disk but not in Probe030Inputs; a hold-out must keep the cassette in the input set and use SkipFloor", rel.Rel)
 		}
 	}
-	if got := len(serializeprobes.Probe030Inputs); got != want {
-		t.Errorf("Probe030Inputs has %d entries, want %d (%d inline leaves + %d discoverable cassettes); a hold-out must keep the cassette in the input set and use SkipFloor",
-			got, want, inlineLeaves, want-inlineLeaves)
+	if got, want := len(serializeprobes.Probe030Inputs), inlineLeaves+len(rels); got != want {
+		t.Errorf("Probe030Inputs has %d entries, want %d (%d inline leaves + %d cassettes on disk)", got, want, inlineLeaves, len(rels))
+	}
+}
+
+// TestProbe030HeldOutInputsFailFloorButPassFidelity pins that every SkipFloor
+// hold-out is load-bearing: with the floor leg on it fails on the RM floor
+// (REQ-112), and with the hold-out honored it passes on the fidelity legs. A
+// spurious hold-out (one whose cassette already passes the floor) turns the
+// first assertion red; a fidelity regression turns the second red. It drives
+// the two public entry points from outside the package; the exact findings each
+// hold-out hides are pinned by TestProbe030SkipFloorFindingsArePinned.
+func TestProbe030HeldOutInputsFailFloorButPassFidelity(t *testing.T) {
+	var held int
+	for _, in := range serializeprobes.Probe030Inputs {
+		if !in.SkipFloor {
+			continue
+		}
+		held++
+		t.Run(in.Name, func(t *testing.T) {
+			floorOn, err := serializeprobes.Probe030CanjsonRoundTrip(in.Body, in.Factory)
+			if err != nil {
+				t.Fatalf("floor-on framework error: %v", err)
+			}
+			if floorOn.Status != "fail" {
+				t.Errorf("floor-on status = %q, want fail: a SkipFloor hold-out must genuinely fail the floor", floorOn.Status)
+			}
+			if !strings.Contains(floorOn.Detail, "RM floor") {
+				t.Errorf("floor-on detail = %q, want it to name the RM floor (REQ-112)", floorOn.Detail)
+			}
+			honored, err := serializeprobes.Probe030CanjsonRoundTripInput(in)
+			if err != nil {
+				t.Fatalf("hold-out framework error: %v", err)
+			}
+			if honored.Status != "pass" {
+				t.Errorf("hold-out status = %q (detail: %s), want pass on the fidelity legs", honored.Status, honored.Detail)
+			}
+		})
+	}
+	if held == 0 {
+		t.Fatal("no SkipFloor inputs found; the hold-out guard is asserting nothing")
 	}
 }
 

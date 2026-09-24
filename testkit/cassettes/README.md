@@ -49,7 +49,7 @@ Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `Compositio
 
 Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
-**Probe vs on-disk.** Vendored `*.json` / `*.xml` under `compositions/` may be omitted from [`ListCompositionJSON`](../fixtures/discover.go) / [`ListRMXML`](../fixtures/discover.go) when canjson/canxml cannot round-trip yet; files remain for template and instance work via `fixtures.CompositionJSON(id)`.
+**Probe vs on-disk.** Every vendored `*.json` under `compositions/` is in [`ListCompositionJSON`](../fixtures/discover.go) and PROBE-030; one whose content carries a genuine RM-floor finding is held out of the `validation.ValidateRM` leg only (see Conventions). Vendored `*.xml` may be omitted from [`ListRMXML`](../fixtures/discover.go) via `compositionXMLExcluded` when canxml cannot round-trip it yet; the file stays for template and instance work.
 
 ## Index by vendor
 
@@ -72,9 +72,9 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 | `test_template_rename_node` | yes | yes | yes | round-trip |
 | `test_template_rename_node_2` | yes | yes | yes | round-trip |
 | `Episode.v2` | yes | yes | yes | round-trip |
-| `Address.v2` | yes | yes | yes | JSON/XML on disk; probes skip (codec) |
-| `Demonstration.v1` | yes | yes | yes | probes skip |
-| `TestPerson.v2` | yes | yes | yes | probes skip |
+| `Address.v2` | yes | yes | yes | round-trip |
+| `Demonstration.v1` | yes | yes | yes | JSON round-trip, RM floor held out (inverted `DV_INTERVAL` bounds); XML not exercised |
+| `TestPerson.v2` | yes | yes | yes | JSON round-trip, RM floor held out (null `CODE_PHRASE.code_string`); XML not exercised |
 
 ### ehrbase (openEHR_SDK)
 
@@ -127,7 +127,7 @@ The Corona pair is the largest cassette in the repo — the size is the cost of 
 
 **Persistent:** `persistent_minimal.en.v1` (OPT + JSON + XML, round-trip).
 
-**Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip); `Test_dv_*` (24 OPT+JSON pairs, round-trip except four `Test_dv_interval_*` — probes skip; see PROBE-038). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
+**Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip); `Test_dv_*` (24 OPT+JSON pairs, all round-trip in PROBE-030; the two `Test_dv_interval_*_open_constraint` samples have the RM floor held out for inverted bounds, and all four `Test_dv_interval_*` stay out of the constraint-cassette axis). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
 
 **Added at the `b4625fc` pin** (valid OPT + canonical JSON only): `family_history.v.1.2.3`, `my_spanish_template_v0`, `terminology_test.ehrbase.org.v1`, `terminology_test2.ehrbase.org.v1`.
 
@@ -151,4 +151,4 @@ See [`its_rest/README.md`](its_rest/README.md).
 ## Conventions
 
 - Immutable inputs — fix the codec or refresh from upstream, do not patch cassettes to green tests.
-- New template: add `templates/` + `compositions/` files; update this table. If probes should skip, add the id to `compositionJSONExcluded` / `compositionXMLExcluded` / `rmJSONExcluded` in [`discover.go`](../fixtures/discover.go).
+- New template: add `templates/` + `compositions/` files; update this table. A composition is never skipped wholesale to keep probes green: if its vendored content carries a genuine RM-floor finding independent of the round trip, it still joins the corpus and is held out of PROBE-030's `validation.ValidateRM` leg only, named with its finding in `probe030SkipFloor` in [`probe_030_canjson_round_trip.go`](../probes/serialize/probe_030_canjson_round_trip.go). Composition XML the canxml round trip does not exercise goes in `compositionXMLExcluded`, and an alternate-wire or deliberately invalid `rm/` sample in `rmJSONExcluded` / `rmJSONExcludedPrefixes`, both in [`discover.go`](../fixtures/discover.go).

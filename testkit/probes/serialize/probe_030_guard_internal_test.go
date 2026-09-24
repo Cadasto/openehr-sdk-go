@@ -2,6 +2,7 @@ package serializeprobes
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -134,45 +135,44 @@ func retypeSlotReEncoder(slot string, replacement map[string]any) func(any) ([]b
 }
 
 // TestProbe030SkipFloorSetIsLocked pins the membership of probe030SkipFloor,
-// not just that its one entry behaves. The RM-floor leg (REQ-112) is a MUST for
-// every cassette; only a cassette whose vendored content carries a finding
-// invariant to the round trip may be held out, and today that is exactly
-// clinical_notes.v0. Because probe030RoundTrip skips the floor for any key in
-// this map, an entry added here silently drops the floor MUST for that cassette
-// while TestProbe030 and the ValidateRM plant both stay green. This guard fails
-// when the set changes, so a new skip has to be justified in the probe.
+// not just that its entries behave. The RM-floor leg (REQ-112) is a MUST for
+// every cassette; only a cassette whose vendored content carries findings
+// invariant to the round trip may be held out, and today that is exactly the
+// five named below, each justified at its probe030SkipFloor entry. Because
+// probe030RoundTrip skips the floor for any key in this map, an entry added
+// here silently drops the floor MUST for that cassette while TestProbe030 and
+// the ValidateRM plant both stay green. This guard fails when the set changes,
+// so a new skip has to be justified in the probe.
 //
 // Can-fail control: add any cassette to probe030SkipFloor and this test reddens.
 func TestProbe030SkipFloorSetIsLocked(t *testing.T) {
-	want := map[string]bool{"compositions/clinical_notes.v0.json": true}
-	if len(probe030SkipFloor) != len(want) {
-		t.Fatalf("probe030SkipFloor has %d entries, want %d: %v", len(probe030SkipFloor), len(want), probe030SkipFloor)
+	want := []string{
+		"compositions/Demonstration.v1.json",
+		"compositions/TestPerson.v2.json",
+		"compositions/Test_dv_interval_dv_count_open_constraint.v0.json",
+		"compositions/Test_dv_interval_dv_quantity_open_constraint.v0.json",
+		"compositions/clinical_notes.v0.json",
 	}
-	for k := range want {
-		if !probe030SkipFloor[k] {
-			t.Errorf("probe030SkipFloor is missing the expected skip %q", k)
-		}
-	}
-	for k := range probe030SkipFloor {
-		if !want[k] {
-			t.Errorf("probe030SkipFloor holds an unexpected skip %q — a floor-MUST holdout must be justified in the probe, not added silently", k)
-		}
+	if got := slices.Sorted(maps.Keys(probe030SkipFloor)); !slices.Equal(got, want) {
+		t.Fatalf("probe030SkipFloor holds %v, want %v: a floor-MUST holdout must be justified in the probe, not added or dropped silently", got, want)
 	}
 }
 
 // TestProbe030InputsSkipFloorFollowsTheLockedSet pins the wiring between
 // probe030SkipFloor and Probe030Inputs (REQ-112): an input skips the RM floor
 // if and only if it is a cassette named in the locked set. The lock above pins
-// the set's membership; this pins that nothing else sets SkipFloor.
+// the set's membership; this pins that nothing else sets SkipFloor, and that
+// every key matches an input.
 //
 // Can-fail control: set SkipFloor to true for every cassette in
-// loadCassetteInputs (or on a leaf entry) and this test reddens, while the
-// set lock stays green.
+// loadCassetteInputs (or on a leaf entry), or add a key that names no
+// cassette, and this test reddens, while the set lock stays green.
 func TestProbe030InputsSkipFloorFollowsTheLockedSet(t *testing.T) {
 	skipped := 0
 	for _, in := range Probe030Inputs {
 		rel, isCassette := strings.CutPrefix(in.Name, "cassette:")
-		want := isCassette && probe030SkipFloor[rel]
+		_, held := probe030SkipFloor[rel]
+		want := isCassette && held
 		if in.SkipFloor != want {
 			t.Errorf("%s: SkipFloor = %v, want %v (only cassettes in probe030SkipFloor may skip the RM floor)", in.Name, in.SkipFloor, want)
 		}
@@ -181,25 +181,31 @@ func TestProbe030InputsSkipFloorFollowsTheLockedSet(t *testing.T) {
 		}
 	}
 	if skipped != len(probe030SkipFloor) {
-		t.Errorf("%d inputs skip the RM floor, want %d (one per probe030SkipFloor entry; a missing cassette leaves a stale skip)", skipped, len(probe030SkipFloor))
+		t.Errorf("%d inputs skip the RM floor, want %d (one per probe030SkipFloor entry; a key that names no cassette, or names none, is dead)", skipped, len(probe030SkipFloor))
 	}
 }
 
-// TestProbe030SkipFloorFindingsAreInvariantToTheRoundTrip pins the premise that
-// justifies each probe030SkipFloor holdout (REQ-112): the RM-floor findings on
-// the input decode and on the round-tripped value B are the same set, so the
-// round trip adds none. Without it the skip would hide any new floor violation
-// the round trip introduced for that cassette.
+// TestProbe030SkipFloorFindingsArePinned pins what each probe030SkipFloor
+// holdout hides (REQ-112): validation.ValidateRM on the input decode and on the
+// round-tripped value B reports exactly the findings the entry lists, in order.
+// Comparing the two decodes with each other is not enough: a decode that lost
+// a required attribute would add the same finding to both sides. Pinning the
+// list catches that, catches a finding the round trip adds to B only, and keeps
+// the list from drifting from the vendored content it names.
 //
-// Can-fail control: a round-trip regression that drops a required attribute
-// on the encode path adds a finding to B only, and this test reddens.
-func TestProbe030SkipFloorFindingsAreInvariantToTheRoundTrip(t *testing.T) {
+// Can-fail control: a decode or encode regression that drops a required
+// attribute adds a finding the list does not name, and this test reddens.
+func TestProbe030SkipFloorFindingsArePinned(t *testing.T) {
 	for _, in := range Probe030Inputs {
 		rel, isCassette := strings.CutPrefix(in.Name, "cassette:")
-		if !isCassette || !probe030SkipFloor[rel] {
+		want, held := probe030SkipFloor[rel]
+		if !isCassette || !held {
 			continue
 		}
 		t.Run(rel, func(t *testing.T) {
+			if len(want) == 0 {
+				t.Fatal("the holdout lists no findings: name the findings it hides, or remove it")
+			}
 			first := in.Factory()
 			if err := canjson.Unmarshal(in.Body, first); err != nil {
 				t.Fatalf("first decode: %v", err)
@@ -215,12 +221,13 @@ func TestProbe030SkipFloorFindingsAreInvariantToTheRoundTrip(t *testing.T) {
 					t.Fatalf("decode %d: %v", i+2, err)
 				}
 			}
-			before, after := floorFindings(validation.ValidateRM(first)), floorFindings(validation.ValidateRM(b))
-			if len(before) == 0 {
-				t.Fatalf("no RM-floor findings on the input decode: the holdout is stale, remove it from probe030SkipFloor")
-			}
-			if !slices.Equal(before, after) {
-				t.Fatalf("the round trip changed the RM-floor findings:\ninput decode: %v\nround-tripped: %v", before, after)
+			for _, side := range []struct {
+				name string
+				v    any
+			}{{"input decode", first}, {"round-tripped value", b}} {
+				if got := floorFindings(validation.ValidateRM(side.v)); !slices.Equal(got, want) {
+					t.Errorf("%s: RM-floor findings differ from the pinned list\ngot:  %q\nwant: %q", side.name, got, want)
+				}
 			}
 		})
 	}
