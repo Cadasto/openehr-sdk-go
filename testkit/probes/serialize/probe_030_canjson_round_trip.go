@@ -210,39 +210,59 @@ type Probe030Input struct {
 	loadErr error
 }
 
-// probe030SkipFloor names cassettes whose vendored content carries an RM-floor
-// finding that is present before any round trip, so the ValidateRM leg is
+// probe030SkipFloor names cassettes whose vendored content carries RM-floor
+// findings that are present before any round trip, so the ValidateRM leg is
 // skipped for them while the fidelity legs still run. Vendored content is not
 // edited.
 //
-// clinical_notes.v0 leaves required RM attributes absent or empty, for example
-// the empty string at `/content[2]/activities[0]/action_archetype_id`; the RM
-// floor reports nine `required` findings. They are genuine findings in the
-// vendored composition, invariant to the round trip (ValidateRM reports the
-// same set on the input decode and on the round-tripped value,
-// TestProbe030SkipFloorFindingsAreInvariantToTheRoundTrip), so the cassette is
-// held out of the floor leg only.
-var probe030SkipFloor = map[string]bool{
-	"compositions/clinical_notes.v0.json": true,
-	// Demonstration.v1: seven DV_INTERVAL<DV_QUANTITY> bounds are inverted in
-	// the vendored content (lower greater than upper, for example 30 over
-	// 12.25 cm at /content[0]/data/events[0]/data/items[1]/items[4]/value),
-	// which the RM floor reports on the input decode and the re-encoded value
-	// alike (REQ-112). Fidelity legs still run.
-	"compositions/Demonstration.v1.json": true,
-	// TestPerson.v2: DV_MULTIMEDIA.media_type is a CODE_PHRASE with a null
-	// code_string at /details/items[13]/items[5]/value/media_type in the
-	// vendored content, an RM-required non-empty attribute the floor reports
-	// independent of the round trip (REQ-112).
-	"compositions/TestPerson.v2.json": true,
+// Each entry lists the exact findings (Issue.Code, a space, Issue.Path) that
+// validation.ValidateRM reports for the cassette. A guard test asserts that the
+// input decode and the round-tripped value both report exactly this list, so a
+// regression that adds a floor finding to a held-out cassette still fails, and
+// the list cannot drift from the content it names
+// (TestProbe030SkipFloorFindingsArePinned).
+var probe030SkipFloor = map[string][]string{
+	// clinical_notes.v0 leaves required RM attributes absent or empty, for
+	// example the empty string at action_archetype_id.
+	"compositions/clinical_notes.v0.json": {
+		"required /content[0]/data/origin",
+		"required /content[0]/data/events[0]/time",
+		"required /content[2]/narrative",
+		"required /content[2]/activities[0]/timing/value",
+		"required /content[2]/activities[0]/timing/formalism",
+		"required /content[2]/activities[0]/action_archetype_id",
+		"required /content[2]/activities[0]/description/items[2]/items[0]/value/value",
+		"required /content[2]/activities[0]/description/items[2]/items[1]/value/value",
+		"required /content[2]/activities[0]/description/items[2]/items[2]/value/value",
+	},
+	// Demonstration.v1: seven DV_INTERVAL values (DV_QUANTITY and DV_COUNT
+	// bounds) have lower greater than upper, for example 30 over 12.25 cm.
+	"compositions/Demonstration.v1.json": {
+		"rm_invariant /content[0]/data/events[0]/data/items[1]/items[4]/value",
+		"rm_invariant /content[0]/data/events[0]/data/items[1]/items[6]/value",
+		"rm_invariant /content[0]/data/events[1]/data/items[1]/items[4]/value",
+		"rm_invariant /content[0]/data/events[1]/data/items[1]/items[6]/value",
+		"rm_invariant /content[0]/data/events[2]/data/items[1]/items[6]/value",
+		"rm_invariant /content[0]/data/events[3]/data/items[1]/items[4]/value",
+		"rm_invariant /content[0]/data/events[3]/data/items[2]/items[4]/value",
+	},
+	// TestPerson.v2: DV_MULTIMEDIA.media_type is a CODE_PHRASE whose
+	// code_string is null, which the floor reports both as an empty
+	// CODE_PHRASE and as an absent mandatory attribute.
+	"compositions/TestPerson.v2.json": {
+		"rm_invariant /details/items[13]/items[5]/value/media_type",
+		"required /details/items[13]/items[5]/value/media_type/code_string",
+	},
 	// Test_dv_interval_dv_count_open_constraint.v0: a DV_INTERVAL<DV_COUNT>
-	// with inverted bounds (lower 200, upper 100) at
-	// /content[0]/data/events[0]/data/items[0]/value in the vendored content.
-	"compositions/Test_dv_interval_dv_count_open_constraint.v0.json": true,
-	// Test_dv_interval_dv_quantity_open_constraint.v0: a DV_INTERVAL<DV_QUANTITY>
-	// with inverted bounds (lower 200, upper 100 mm) at
-	// /content[0]/data/events[0]/data/items[0]/value in the vendored content.
-	"compositions/Test_dv_interval_dv_quantity_open_constraint.v0.json": true,
+	// with lower 200 over upper 100.
+	"compositions/Test_dv_interval_dv_count_open_constraint.v0.json": {
+		"rm_invariant /content[0]/data/events[0]/data/items[0]/value",
+	},
+	// Test_dv_interval_dv_quantity_open_constraint.v0: a
+	// DV_INTERVAL<DV_QUANTITY> with lower 200 mm over upper 100 mm.
+	"compositions/Test_dv_interval_dv_quantity_open_constraint.v0.json": {
+		"rm_invariant /content[0]/data/events[0]/data/items[0]/value",
+	},
 }
 
 // loadCassetteInputs discovers vendored cassettes relative to this
@@ -277,7 +297,7 @@ func loadCassetteInputs() ([]Probe030Input, error) {
 			Name:      "cassette:" + rel.Rel,
 			Body:      body,
 			Factory:   factory,
-			SkipFloor: probe030SkipFloor[rel.Rel],
+			SkipFloor: len(probe030SkipFloor[rel.Rel]) > 0,
 		})
 	}
 	return out, nil
