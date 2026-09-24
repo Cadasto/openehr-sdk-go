@@ -1,8 +1,8 @@
 # Development process
 
-How work flows in this repository. This is deliberately a thin map: it draws the ladder a change climbs and links to the one place each rule lives, instead of repeating the rule here.
+How work flows in this repository. This page is a thin map on purpose. It draws the ladder a change climbs and links to the one place each rule lives, without repeating the rule.
 
-Who wins when spec and code disagree during a PR is defined in [specifications/README.md § Source of truth](specifications/README.md#source-of-truth). In short: for new capability the spec leads (spec-first); for hardening code that has already shipped, the code leads until the topic spec and `traceability.yaml` catch up in the same PR (implementation-aligned). `make spec-check` measures the drift either way.
+[specifications/README.md § Source of truth](specifications/README.md#source-of-truth) defines who wins when spec and code disagree during a PR. In short, the spec leads for new capability (spec-first). When hardening code that has already shipped, the code leads until the topic spec and `traceability.yaml` catch up in the same PR (implementation-aligned). `make spec-check` measures the drift either way.
 
 The machine-readable side of these conventions (identifier style, document paths, build targets, the `PROBE`/`STRAND` toggles, the ground-truth source) is [`.sdd.yaml`](.sdd.yaml). The `sdd-*` skills read it first, so they never hard-code a path or guess an identifier format.
 
@@ -18,7 +18,7 @@ REQ  (capability + acceptance)                  [gate: worth doing]
                      └─ update REQ.md Impl.; archive plan    [gate: Definition of Done]
 ```
 
-The rules at each rung live elsewhere; read them there:
+The rules for each rung live elsewhere:
 
 - **Document kinds, RFC-2119 force, the two source-of-truth modes, the traceability chain, the identifier scheme** → [specifications/README.md](specifications/README.md).
 - **Definition of Ready / Definition of Done and the plan header (`**Covers:**`)** → [plans/_template.md](plans/_template.md).
@@ -29,17 +29,17 @@ There is no `SDK-GAP` identifier. `REQ`/`PROBE` is the feature register, and a n
 
 ## superpowers + SDD
 
-When the **superpowers** engineering loop runs alongside these `sdd-*` skills, the split is clean: SDD owns
-the **specification and its traceability**; superpowers owns the **build / verify / branch** loop
+When the **superpowers** engineering loop runs alongside these `sdd-*` skills, each owns a separate part.
+SDD owns the **specification and its traceability**. The superpowers skills own the **build / verify / branch** loop
 (brainstorming, planning, TDD, execution, generic verification, code review, branch-finishing). The one
-integration that needs care is **paths** — superpowers writes artefacts under a `docs/superpowers/` tree,
+point that needs care is **paths**. The superpowers skills write artefacts under a `docs/superpowers/` tree,
 and that tree must never become a second source of truth.
 
 | superpowers output | Treat it as | Canonical home (authoritative) |
 |---|---|---|
 | `brainstorming` design doc | narrative **input** that feeds `sdd-specify` | normative statements extracted into [specifications/](specifications/) as a `REQ` row + canonical `SPEC §`; the narrative may live in [architecture.md](architecture.md) |
-| `writing-plans` plan | a delivery plan | [`docs/plans/YYYY-MM-DD-<slug>.md`](plans/) with the `**Covers:**` header + DoR/DoD — never left stranded under `docs/superpowers/plans/` |
+| `writing-plans` plan | a delivery plan | [`docs/plans/YYYY-MM-DD-<slug>.md`](plans/) with the `**Covers:**` header + DoR/DoD, never left stranded under `docs/superpowers/plans/` |
 
 Rule of thumb: **superpowers acts on code and process; SDD acts on the specification and its
-traceability.** A design doc is input, not truth — the canonical spec wins. Never settle an open question
+traceability.** A design doc is input, and the canonical spec wins over it. Never settle an open question
 silently in a PR: raise a [STRAND](specifications/research-strands.md), land an [ADR](adr/), or ask.

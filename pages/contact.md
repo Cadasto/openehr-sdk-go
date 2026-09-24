@@ -38,8 +38,7 @@ Comeniusstraat 2d, 1817 MS Alkmaar, The Netherlands.
 
 Chamber of Commerce 98762893. VAT number NL868632867B01.
 
-These details are maintained on
-[cadasto.com/contact](https://www.cadasto.com/contact/), which stays the
-authoritative copy. Cadasto's
+The authoritative copy of these details is on
+[cadasto.com/contact](https://www.cadasto.com/contact/). Cadasto's
 [privacy and cookie statement](https://www.cadasto.com/privacy-and-cookie-statement/)
 applies.

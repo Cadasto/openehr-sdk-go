@@ -13,9 +13,10 @@ API detail is on [pkg.go.dev](https://pkg.go.dev/github.com/cadasto/openehr-sdk-
 
 These tables name the packages a consumer imports directly. Internal
 packages and a few narrower helpers are left out; the layout document has the
-full tree. Which parts have landed and which are planned, with their `REQ`
-identifiers, is in the
-[roadmap](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/roadmap.md).
+full tree. The
+[roadmap](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/roadmap.md)
+records which parts have landed and which are planned, with their `REQ`
+identifiers.
 
 ## Building blocks (no HTTP)
 

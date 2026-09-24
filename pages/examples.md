@@ -13,10 +13,10 @@ end to end (decode, parse, compile, validate, synthesise, encode, and AQL),
 plus the smallest REST create and a SMART launch. The REST examples talk to an
 in-process mock, so none of them needs a clinical data repository (CDR).
 
-The catalogue with flags, fixtures, and notes on what to copy into your own
-application is
-[docs/examples.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md)
-in the repository. This page covers four of them in detail.
+The full catalogue in the repository,
+[docs/examples.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md),
+lists each program's flags and fixtures, with notes on what to copy into your
+own application. This page covers four of them in detail.
 
 Fixture paths resolve relative to the source file, so each `go run` works from
 any working directory inside a clone.
@@ -106,7 +106,7 @@ Build every example:
 go build ./cmd/examples/...
 ```
 
-If you are new to the SDK, this order works well:
+If you are new to the SDK, try them in this order:
 
 1. Decode canonical JSON
 2. Validate JSON against a template

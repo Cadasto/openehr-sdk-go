@@ -64,7 +64,7 @@ implements them.
 
 ### Who it is for
 
-Go developers meeting openEHR, and openEHR developers meeting Go. It was
+Go developers new to openEHR, and openEHR developers new to Go. It was
 written with a few kinds of consumer in mind: benchmark and load tools running
 high-concurrency CRUD, synthetic data seeders that drive bulk Compositions from
 a template, MCP servers that forward the caller's token, federative clients

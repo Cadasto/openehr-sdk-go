@@ -5,7 +5,7 @@ Recorded request/response wire records for the Cadasto-platform extras
 Cadasto admin surface).
 
 These surfaces have **no openEHR spec**; their conformance authority is the
-**Cadasto platform API** — its OpenAPI document where one exists, otherwise the
+**Cadasto platform API**: its OpenAPI document where one exists, otherwise the
 behaviour of a reference Cadasto deployment. `cadasto/*` conformance probes
 assert the SDK's wire shape against these fixtures (REQ-083), not against any
 other SDK. See [`docs/specifications/conformance.md` § REQ-083](../../../docs/specifications/conformance.md#req-083--cadasto-platform-api-conformance).

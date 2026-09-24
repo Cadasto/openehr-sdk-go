@@ -48,10 +48,10 @@ an injected `*http.Client` on `transport`, and the client packages under
 `openehr/client/`. Take this path to create EHRs, commit Compositions, or run
 AQL against an openEHR REST API.
 
-The shortest program on each path is on [Examples](examples.md). The longer
-walkthrough in the repository, which also shows how to wire authentication for
-a live CDR, is
-[docs/quick-start.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/quick-start.md).
+The shortest program on each path is on [Examples](examples.md). For a longer
+walkthrough, including how to wire authentication for a live CDR, see
+[docs/quick-start.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/quick-start.md)
+in the repository.
 [Workflow](workflow.md#which-cdr) lists the CDRs this client has been run
 against.
 

@@ -1,6 +1,6 @@
 # Continuous integration
 
-How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks locally. CI is **operational process** — it is not part of the normative `docs/specifications/` contract (wire semantics and conformance probes live there).
+How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks locally. CI is **operational process**. It is not part of the normative `docs/specifications/` contract, which holds the wire semantics and conformance probes.
 
 ## Workflows
 
@@ -22,7 +22,7 @@ Jobs run in parallel. All use Go **1.27.x** (`actions/setup-go@v7` with module c
 | **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `aqlgen-verify`, `termgen-verify`, `vet`, `spec-check`, `flat-conformance-verify`, `terminology-verify`, `build` | Static checks and compile-all without running tests |
 | **Test** | `test` | Unit tests; `test` already depends on `codegen-verify`, `aqlgen-verify` and `termgen-verify` |
 | **Lint** | (via `golangci-lint-action` v2.13.2, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
-| **Race** | `test-race` | **Push to `main` only** — `-race` is slower; catches data races in `typereg` and codecs |
+| **Race** | `test-race` | **Push to `main` only**, because `-race` is slower. Catches data races in `typereg` and codecs |
 
 PRs do not run the **Race** job. Merge to `main` triggers it on the post-merge push.
 
@@ -36,7 +36,7 @@ An in-repo advanced workflow was tried and dropped: an advanced configuration an
 
 The weekly workflow re-runs `make codegen-verify` on a clean checkout. On failure it opens or comments on a single tracking issue labelled `bmm-drift`, then fails the workflow run. Follow [ADR 0001 — BMM version-bump runbook](adr/0001-bmm-version-bump-runbook.md) when triaging.
 
-This complements PR CI: it catches generator-template drift between human-driven PRs.
+It complements PR CI by catching generator-template drift between human-driven PRs.
 
 ## Local reproduction
 
@@ -92,7 +92,7 @@ Run `make help` for the full grouped list. Common targets:
 
 ## See also
 
-- [docs/releases.md](releases.md) — version policy, tag checklist, `v1.0.0` gate
-- [docs/ai-workflow.md](ai-workflow.md) — agent pre-merge checklist
-- [resources/README.md](../resources/README.md) — BMM pin and update procedure
-- [docs/specifications/conformance.md](../docs/specifications/conformance.md) — PROBE-NNN definitions (tests run via `make test` today)
+- [docs/releases.md](releases.md): version policy, tag checklist, `v1.0.0` gate
+- [docs/ai-workflow.md](ai-workflow.md): agent pre-merge checklist
+- [resources/README.md](../resources/README.md): BMM pin and update procedure
+- [docs/specifications/conformance.md](../docs/specifications/conformance.md): PROBE-NNN definitions (tests run via `make test` today)
