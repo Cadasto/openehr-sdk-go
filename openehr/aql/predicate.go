@@ -52,31 +52,31 @@ import (
 // carry, returning an error wrapping [ErrInvalidQuery].
 //
 // The position is `VERSION variable=IDENTIFIER? ('[' versionPredicate ']')?`
-// and `versionPredicate : LATEST_VERSION | ALL_VERSIONS | standardPredicate` —
+// and `versionPredicate : LATEST_VERSION | ALL_VERSIONS | standardPredicate`:
 // three alternatives, none of them a node predicate. `VERSION v[at0001]` is
-// therefore text the SDK's own parser rejects, which the REQ-119 closure
-// property forbids emitting.
+// therefore text the SDK's own parser rejects, and the SDK never emits text
+// its parser rejects.
 //
-// The keyword test is case-INSENSITIVE because the lexer builds both keywords
+// The keyword test is case-insensitive because the lexer builds both keywords
 // out of case-insensitive letter fragments (`LATEST_VERSION : L A T E S T '_'
 // V E R S I O N`), so `latest_version` is the same token. The fragments are
-// ASCII (`S : [sS]`), so the fold is held to that alphabet — see
-// [asciiKeyword] for the spelling Unicode folding wrongly admitted.
+// ASCII (`S : [sS]`), so the fold is limited to that alphabet; Unicode case
+// folding would admit spellings the lexer does not.
 //
-// This position is held to its whole PRODUCTION rather than to a necessary
-// condition, and is the one place REQ-119 refuses a LOUD malformation: the
-// three alternatives are two keywords and one comparison, so what the position
-// admits STRUCTURALLY is decidable in a single pass and the closure clause
-// governs. `standardPredicate : objectPath COMPARISON_OPERATOR
-// pathPredicateOperand` is therefore checked as exactly ONE top-level
-// comparison operator with a non-blank operand on each side — `= 1` and
+// This position is checked against its whole production, not just a
+// necessary condition, and it is the one place the SDK refuses a malformation
+// the parser would itself report: the three alternatives are two keywords and
+// one comparison, so what the position admits structurally is decidable in a
+// single pass. `standardPredicate : objectPath COMPARISON_OPERATOR
+// pathPredicateOperand` is therefore checked as exactly one top-level
+// comparison operator with a non-blank operand on each side; `= 1` and
 // `a/b = 1 b = 2` are shapes no `versionPredicate` has.
 //
-// Its OPERANDS are a different matter and stay loud. `objectPath` recurses —
-// `pathPart : IDENTIFIER pathPredicate?` reaches `nodePredicate`, which reaches
-// `objectPath` again — so deciding whether `NOT a/b` is a legal left operand
-// costs the sub-grammar parser § The class predicate positions refuses to
-// build. The SHAPE is decided here; the operands are left to the parser.
+// Operands are a different matter. `objectPath` recurses
+// (`pathPart : IDENTIFIER pathPredicate?` reaches `nodePredicate`, which
+// reaches `objectPath` again), so deciding whether `NOT a/b` is a legal left
+// operand would need a sub-grammar parser. The shape is decided here; the
+// operands are left to the parser.
 func ValidateVersionPredicate(text string) error {
 	if err := ValidatePathPredicate(text); err != nil {
 		return err
@@ -109,49 +109,47 @@ func ValidateVersionPredicate(text string) error {
 	return nil
 }
 
-// ValidatePathPredicate refuses bracket text that can ESCAPE the brackets the
+// ValidatePathPredicate refuses bracket text that can escape the brackets the
 // emitter writes around it, returning an error wrapping [ErrInvalidQuery].
 //
-// Left unguarded, a caller string that closes the bracket early re-parses as a
-// different query with err == nil — REQ-119's silent-substitution class:
+// Unguarded, a caller string that closes the bracket early would re-parse as a
+// different query with err == nil:
 //
 //	Predicate: "a/b='c'] CONTAINS OBSERVATION o[d/e='f'"
 //	  -> FROM COMPOSITION c[a/b='c'] CONTAINS OBSERVATION o[d/e='f']
 //
-// FIVE states make a character not the delimiter it looks like, and the scan
-// tracks each so the guard neither miscounts nor refuses legal text. The list
-// is over THAT property rather than over "states in which a bracket is
-// content": stated the narrower way it licensed a real defect, because a region
-// can be transparent to a quote while opaque to a bracket.
+// Five lexer states make a character not the delimiter it looks like, and the
+// scan tracks each so the guard neither miscounts nor refuses legal text. The
+// list is of states in which a character loses its delimiter meaning, which is
+// wider than states in which a bracket is content: a region can be
+// transparent to a quote while opaque to a bracket.
 //
 //   - A string literal. `[` and `]` inside `'…'` / `"…"` are content. An
-//     UNTERMINATED one is refused, because the emitter's own `]` would fall
-//     inside it and the literal would run on into the following clause — a
-//     silent substitution rather than a loud error.
+//     unterminated one is refused, because the emitter's own `]` would fall
+//     inside it and the literal would run on into the following clause.
 //   - A contained regex. `SLASH_REGEX_CHAR : ~[/\n\r] | ESCAPE_SEQ | '\\/'`
 //     admits both brackets freely, so `a/b MATCHES {/[0-9]+/}` must not be
-//     counted. It is matched as a WHOLE token or not at all, and as the LONGEST
-//     one — see [skipContainedRegex]. A body still OPEN at the end of the text
-//     is refused for the same reason an unterminated literal is: `]` is an
-//     ordinary body character, so the run swallows the emitter's own `]` and
-//     closes on a later `/` … `}` in the emitted query.
-//   - A comment. `COMMENT` is SKIPPED rather than channelled, so it survives
-//     into the source text and a `]` inside one is not a delimiter. One that no
-//     newline closes INSIDE the text is refused — see [commentRun].
+//     counted. It is matched as a whole token or not at all, and as the
+//     longest one. A body still open at the end of the text is refused for the
+//     same reason as an unterminated literal: `]` is an ordinary body
+//     character, so the run swallows the emitter's own `]` and closes on a
+//     later `/` … `}` in the emitted query.
+//   - A comment. `COMMENT` is skipped by the lexer, not channelled, so it
+//     survives into the source text and a `]` inside one is not a delimiter. A
+//     comment that no newline closes inside the text is refused.
 //   - A `TERM_CODE` display name. `('|' ~[|[\]]+ '|')?` excludes the brackets
-//     and NOTHING else, so it is transparent to quotes, braces and dashes and
+//     and nothing else, so it is transparent to quotes, braces and dashes and
 //     must be stepped over whole: reading the apostrophe in
 //     `at0001,SNOMED-CT::22298006|Barrett's oesophagus|` as a string delimiter
-//     refused a query ParseQuery had just produced. `TERM_CODE_CHAR` admits
-//     `-`, so a `--` inside a term code is likewise not a comment.
-//   - A nested path predicate. `objectPath` is `pathPart (‘/’ pathPart)*` and
+//     would refuse a query ParseQuery produces. `TERM_CODE_CHAR` admits `-`,
+//     so a `--` inside a term code is not a comment either.
+//   - A nested path predicate. `objectPath` is `pathPart ('/' pathPart)*` and
 //     `pathPart : IDENTIFIER pathPredicate?`, so `a[at0001]/b='c'` is a legal
-//     predicate carrying a BALANCED bracket pair.
+//     predicate carrying a balanced bracket pair.
 //
-// Balance must hold in both directions. A trailing unclosed `[` is not merely a
-// loud error: the emitter's `]` closes the INNER bracket and the outer one then
-// swallows text up to whatever `]` appears later in the query, which is a
-// substitution again.
+// Balance must hold in both directions. A trailing unclosed `[` would let the
+// emitter's `]` close the inner bracket while the outer one swallows text up
+// to whatever `]` appears later in the query.
 func ValidatePathPredicate(text string) error {
 	sc := scanPredicate(text)
 	switch {
@@ -623,46 +621,42 @@ func commentRun(s string, i int) (int, bool) {
 	}
 }
 
-// RedactPredicateValues renders predicate bracket text for a DIAGNOSTIC, with
+// RedactPredicateValues renders predicate bracket text for a diagnostic, with
 // the content of every opaque region replaced by an ellipsis and all of the
 // structure kept:
 //
 //	ehr_id/value='9d3d…6666' AND x/y='   ->   ehr_id/value='…' AND x/y='…
 //
-// A refused predicate has to be named or the caller cannot tell WHICH one a
-// builder assembling several was refused. But the class standing predicate is
-// where openEHR carries the identifiable root — `[ehr_id/value='…']`,
-// `[uid/value='…']`, `[subject/external_ref/id/value='…']` — and these errors
-// are the return value of `Build` and `(*parse.Query).Emit`, i.e. the thing a
-// consuming CDR logs and ships to an error tracker. Reproducing the body
-// verbatim moved a patient identifier out of the request and into the log
-// stream, where retention and access are a different question. Structure alone
-// diagnoses the defect: every rule these guards enforce is about delimiters.
+// A refused predicate has to be named, or a caller assembling several cannot
+// tell which one was refused. But the class standing predicate is where
+// openEHR carries the identifiable root (`[ehr_id/value='…']`,
+// `[uid/value='…']`, `[subject/external_ref/id/value='…']`), and these errors
+// are what `Build` and `(*parse.Query).Emit` return, which an application
+// typically logs and ships to an error tracker. Reproducing the body verbatim
+// would move a patient identifier out of the request and into the log stream.
+// Structure alone diagnoses the defect: every rule these guards enforce is
+// about delimiters.
 //
 // The elided regions are exactly the states [ValidatePathPredicate]'s scan
-// already tracks as CONTENT rather than as delimiters — a string literal, a
-// contained regex, a comment body and a `TERM_CODE` display name — minus the
-// nested bracket, which IS structure. Deriving the list that way rather than
-// writing a second one is deliberate: a region the scan learns to step over is
-// a region a caller's data can sit in, so the two lists cannot drift apart.
-// Paths, operators, node codes, term codes and numeric literals are structure
-// and ride through unchanged.
+// treats as content: a string literal, a contained regex, a comment body and a
+// `TERM_CODE` display name (the nested bracket is structure and is kept). Both
+// functions share one list, so a region the scan learns to step over is also
+// redacted. Paths, operators, node codes, term codes and numeric literals are
+// structure and pass through unchanged.
 //
-// An UNTERMINATED region — the commonest refusal — elides to the end of the
+// An unterminated region, the most common refusal, elides to the end of the
 // text and keeps its opening delimiter, so the diagnostic still shows what was
-// left open. A display name is elided whether or not its closing `|` ever
-// arrived: a `]` inside `|…` means the section never became a token and the
-// scan treats the bytes as ordinary — but they are still the display name the
-// caller MEANT, and rendering them verbatim is the leak this function exists
-// to prevent.
+// left open. A display name is elided whether or not its closing `|` arrived:
+// a `]` inside `|…` means the section never became a token and the scan
+// treats the bytes as ordinary, but they are still the display name the
+// caller meant, and rendering them verbatim would leak it.
 //
-// It cannot decide what a VALUE is for every reader: it treats a numeric
-// literal as structure, and a disclosure rule that counts a bare magnitude as a
-// value cannot adopt it. Where [PathSegment.Parsed] is populated (REQ-113
-// § Structured node predicates), each component is individually addressable and
-// a reader applies its OWN policy per component rather than accepting this
-// function's. This stays for consumers holding predicate text, and it is what
-// the write-side guards use for their own diagnostics.
+// It cannot decide what a value is for every reader: it treats a numeric
+// literal as structure, so a disclosure rule that counts a bare magnitude as a
+// value cannot adopt it. Where [PathSegment.Parsed] is populated, each
+// component is individually addressable and a reader can apply its own
+// policy per component. This function serves consumers holding predicate
+// text, and the write-side guards use it for their own diagnostics.
 func RedactPredicateValues(text string) string {
 	var b strings.Builder
 	for i := 0; i < len(text); {
@@ -761,41 +755,40 @@ func elideRegion(b *strings.Builder, region string, lead, tail int) {
 	b.WriteString(region[len(region)-tail:])
 }
 
-// StripPredicateTrivia normalises what the lexer SKIPS out of predicate
-// bracket text — `WS`, `COMMENT` and `UNICODE_BOM` — so that a comparison
-// against the text sees what the PARSER sees. `LATEST_VERSION -- note\n` is
-// the same token stream as `LATEST_VERSION`, and trimming whitespace alone
-// refused it.
+// StripPredicateTrivia normalises what the lexer skips out of predicate
+// bracket text (`WS`, `COMMENT` and `UNICODE_BOM`), so that a comparison
+// against the text sees what the parser sees. `LATEST_VERSION -- note\n` is
+// the same token stream as `LATEST_VERSION`, which trimming whitespace alone
+// would not recognise.
 //
-// Each interior trivia RUN — whitespace, comments and BOMs together — becomes
-// ONE space, because skipped trivia still separates the tokens around it;
+// Each interior trivia run (whitespace, comments and BOMs together) becomes
+// one space, because skipped trivia still separates the tokens around it;
 // leading and trailing runs are dropped. So `a/b =\n\t 1` and `a/b = 1` are
-// the same text, and what this function returns never carries a raw line
-// break, an AQL comment or a BOM that the lexer would have skipped — the
-// canonical path suffix `openehr/aql/lint` renders rests on exactly that.
+// the same text, and the result never carries a raw line break, an AQL
+// comment or a BOM that the lexer would have skipped. The canonical path
+// suffix that `openehr/aql/lint` renders relies on that.
 //
-// The walk is lexer-state-AWARE, over the same regions [ValidatePathPredicate]'s
-// scan steps over: a string literal, a contained regex token, a term code and
-// its display name ride through VERBATIM, because inside those regions the
-// lexer skips nothing — a `-- note\n` inside `'…'` is string CONTENT, and
-// rewriting it would alter the value the predicate carries, not its trivia. A
-// region left open at the end of the text (an unterminated literal, an open
-// regex body) is content to the end for the same reason.
+// The walk is aware of lexer state, over the same regions
+// [ValidatePathPredicate]'s scan steps over: a string literal, a contained
+// regex token, a term code and its display name pass through verbatim,
+// because inside those regions the lexer skips nothing. A `-- note\n` inside
+// `'…'` is string content, and rewriting it would alter the value the
+// predicate carries. A region left open at the end of the text (an
+// unterminated literal, an open regex body) is content to the end for the
+// same reason.
 //
-// It is exported because the read side now reports predicate text VERBATIM
-// (REQ-119 § The emission closure property), so every consumer that COMPARES
-// that text against something — rather than re-emitting it — needs the same
-// trivia model. `openehr/aql/lint`'s template resolution is the case in force:
-// it matches a segment predicate against a compiled OPT node id, and a
-// `[ at0001 ]` that once arrived whitespace-collapsed now does not. Modelling
-// trivia a second time in the consumer is what this export exists to prevent.
+// The read side reports predicate text verbatim, so every consumer that
+// compares that text against something (instead of re-emitting it) needs the
+// same trivia model. `openehr/aql/lint`'s template resolution is one such
+// consumer: it matches a segment predicate against a compiled OPT node id, so
+// `[ at0001 ]` must match `at0001`. Use this function instead of modelling
+// trivia again in the consumer.
 //
-// PREFER [PathSegment.Parsed] where it is available: REQ-113 § Structured node
-// predicates types each component of a segment predicate trivia-free and
-// delimiter-free, so a reader comparing an at-code or a name has nothing to
-// strip. This function stays for consumers holding predicate TEXT — the class
-// position, a predicate assembled by hand, a form a future grammar leaves
-// unstructured.
+// Prefer [PathSegment.Parsed] where it is available: it types each component
+// of a segment predicate free of trivia and delimiters, so a reader comparing
+// an at-code or a name has nothing to strip. This function serves consumers
+// holding predicate text: the class position, a predicate assembled by hand,
+// or a form the parser leaves unstructured.
 func StripPredicateTrivia(text string) string {
 	var b strings.Builder
 	pending := false // an interior trivia run collapses to one space

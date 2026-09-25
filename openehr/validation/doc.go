@@ -1,48 +1,48 @@
 // Package validation checks in-memory openEHR Reference Model
 // artefacts against a compiled OPT and reports every issue in one
-// pass — REQ-102 (COMPOSITION) and REQ-110 (any archetypeable root).
-// REQ-112 adds a template-less floor — [ValidateRM] and its typed
-// sugars — for resources that bind to no operational template (FOLDER,
+// pass, for COMPOSITION and for any other archetypeable root.
+// A template-less floor, [ValidateRM] and its typed wrappers, covers
+// resources that bind to no operational template (FOLDER,
 // EHR_STATUS, EHR_ACCESS, untemplated demographic PARTY).
 //
-// AQL query TEXT is validated here too, not only RM data:
-// [ValidateAQL] and [ValidateAQLWithTypeRelation] bridge the
-// openehr/aql/lint layers into this same [Issue] / [Result] model
-// (REQ-109), so a caller already using [ValidateComposition] gets one
-// uniform result shape for both kinds of artefact. Their own doc
-// comments carry which lint layers a nil template drops and how the
-// REQ-160 containment relation is supplied.
+// The package also validates AQL query text:
+// [ValidateAQL] and [ValidateAQLWithTypeRelation] run the
+// openehr/aql/lint layers and report through the same [Issue] /
+// [Result] model, so a caller already using [ValidateComposition] gets
+// one uniform result shape for both kinds of artefact. Their doc
+// comments describe which lint layers a nil template drops and how
+// to supply the RM containment relation.
 //
 // Public entry:
 //
 //	r := validation.ValidateComposition(comp, compiled)
 //	if !r.OK {
 //	    for _, issue := range r.Issues {
-//	        log.Printf("%s: %s — %s", issue.Path, issue.Code, issue.Detail)
+//	        log.Printf("%s: %s: %s", issue.Path, issue.Code, issue.Detail)
 //	    }
 //	}
 //
-// The walker is value-source-generic: [Validate] runs it over any RM
-// root the closed RM set recognises, and the typed wrappers
+// The walker works over any value source: [Validate] runs it over any
+// RM root the closed RM set recognises, and the typed wrappers
 // [ValidateComposition], [ValidateDemographic] (PERSON / ORGANISATION /
 // GROUP / AGENT / ROLE), [ValidateFolder], and [ValidateEHRStatus]
-// delegate to it (REQ-110). PARTY sub-components (ADDRESS, CONTACT,
+// delegate to it. PARTY sub-components (ADDRESS, CONTACT,
 // PARTY_IDENTITY, PARTY_RELATIONSHIP, CAPABILITY) validate in place
 // during a PARTY walk or as roots via [Validate].
 //
 // # Trust model
 //
-// The template-driven entries ([ValidateComposition], [Validate], the
-// REQ-110 typed wrappers) are **template-driven**: the compiled OPT is
-// the authoritative driver and the composition is the value source.
-// For each compiled OPT node the walker reads the corresponding RM
-// property via [github.com/cadasto/openehr-sdk-go/openehr/validation/rmread],
+// The template-driven entries ([ValidateComposition], [Validate], and
+// the typed wrappers) treat the compiled OPT as the authoritative driver
+// and the composition as the value source. For each compiled OPT node
+// the walker reads the corresponding RM property via
+// [github.com/cadasto/openehr-sdk-go/openehr/validation/rmread],
 // enforces existence / cardinality / alternatives / RM-type match /
 // archetype-id identity, and recurses into matched RM children.
 //
-// The REQ-112 floor ([ValidateRM] + typed sugars) is the **RM-only**
+// The RM floor ([ValidateRM] and its typed wrappers) is the RM-only
 // layer beneath that: a second driver that walks any RM root with
-// rminfo as the sole structural source — no OPT — and enforces
+// rminfo as the sole structural source (no OPT) and enforces
 // RM-mandatory attribute presence plus a small per-RM-type invariant
 // catalogue (CODE_PHRASE, DV_QUANTITY precision, DV_PROPORTION
 // precision, DV_INTERVAL numeric bounds, OBJECT_REF
@@ -60,32 +60,28 @@
 // attribute names; the RM-side archetype_node_id of each matched
 // child contributes the bracket predicate. Composition-supplied
 // predicates therefore appear in the path only on RM nodes the
-// walker has bound to an OPT child — a composition missing an
+// walker has bound to an OPT child. A composition missing an
 // OPT-required node is flagged at the parent attribute's path
-// (no descent), rather than silently bypassed.
-//
-// See [docs/plans/archive/2026-05-24-composition-validation-template-driven.md]
-// for the migration's phase split.
+// (no descent) rather than silently bypassed.
 //
 // # Collect-all
 //
 // Every failing clause emits one [Issue]; the walk never
-// short-circuits. UIs and CI runners need the full list.
+// short-circuits, so UIs and CI runners get the full list.
 //
-// # REQ-013 building-block independence
+// # Dependencies
 //
-// The validator MUST be importable without `transport/`, `auth/`,
-// `openehr/client/*`, or `openehr/serialize/`. The forbidden-import
-// set is enforced by `TestValidationForbiddenImports`.
+// The package is importable without `transport/`, `auth/`,
+// `openehr/client/*`, or `openehr/serialize/`.
 //
-// # External callability (REQ-111)
+// # Compiled templates
 //
 // The `c` argument is the compiled template. Construct it from a parsed
-// OPT with the public bridge
-// [github.com/cadasto/openehr-sdk-go/openehr/templatecompile.Compile];
-// the exported signatures here reference that public type, so external
+// OPT with
+// [github.com/cadasto/openehr-sdk-go/openehr/templatecompile.Compile].
+// The exported signatures here reference that public type, so external
 // modules can call [Validate] / [ValidateComposition] / siblings without
-// importing any internal/ package. The bridge lives in a sibling package
-// rather than openehr/template to avoid an import cycle and REQ-100's
-// stdlib-only contract — see docs/adr/0010-public-compiled-template-bridge.md.
+// importing any internal/ package. The constructor lives in its own
+// package rather than openehr/template to avoid an import cycle and to
+// keep openehr/template stdlib-only.
 package validation

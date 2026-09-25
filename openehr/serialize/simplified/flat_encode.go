@@ -20,7 +20,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
-// MarshalFlat encodes comp as FLAT JSON using wt (REQ-053).
+// MarshalFlat encodes comp as FLAT JSON using wt.
 func MarshalFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byte, error) {
 	m, err := encodeFlat(comp, wt)
 	if err != nil {

@@ -1,6 +1,6 @@
 // Package rmread reads RM attribute values by name without
-// reflection. It is the lookup half of the REQ-102 v2
-// template-driven validator: the template walker drives traversal
+// reflection. It is the lookup half of the template-driven
+// validator: the template walker drives traversal
 // by walking the compiled OPT tree and asks this package "give me
 // the RM value(s) at attribute `name` on this parent RM object".
 //
@@ -10,10 +10,10 @@
 //	ReadMultiple(parent any, parentType, attrName string) (items []any, ok bool)
 //
 // Both functions dispatch on the concrete Go type of `parent` via
-// a closed switch (REQ-024 — no reflection). `parentType` is the
-// OPT-declared RM class name (e.g. "OBSERVATION", "DV_CODED_TEXT");
-// it is currently unused for routing — type assertion on `parent`
-// is authoritative — but is accepted as a parameter so callers
+// a closed switch, with no reflection. `parentType` is the
+// OPT-declared RM class name (e.g. "OBSERVATION", "DV_CODED_TEXT").
+// It is currently unused for routing (type assertion on `parent`
+// is authoritative), but is accepted as a parameter so callers
 // constructing transient parent values from generic interfaces
 // (e.g. `ContentItem`) can pass through the compiled type without
 // re-flattening it.
@@ -49,16 +49,16 @@
 // # Coverage
 //
 // Rows cover every (RMType, attr) pair reachable from COMPOSITION
-// through the Phase 1 content-type closed set (Observation,
+// through the supported content types (Observation,
 // Evaluation, Instruction, Action, AdminEntry, Section,
-// GenericEntry) plus History / Event / ItemStructure / Item /
-// DataValue paths the v1 walker exercised. The closed taxonomy is
+// GenericEntry) plus the History / Event / ItemStructure / Item /
+// DataValue paths below them. The closed taxonomy is
 // asserted by table-driven tests in this package.
 //
-// # REQ-013 building-block independence
+// # Dependencies
 //
 // This package imports only the standard library and openehr/rm.
-// It does NOT import openehr/template, internal/templatecompile,
-// or any other validation-side package — the table is a pure
+// It does not import openehr/template, internal/templatecompile,
+// or any other validation-side package; the table is a pure
 // lookup over RM values.
 package rmread

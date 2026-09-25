@@ -9,30 +9,30 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
-// TypeRelation is the containment admissibility relation over RM TYPE NAMES
-// (REQ-160): the set of ordered pairs (ancestor, descendant) an AQL CONTAINS
-// can connect, and whether the route is by-value or by-reference. "Relation"
-// is the mathematical sense — a set of ordered pairs — and the RM type is what
-// it relates; it holds no archetype, template, or instance data, and answers
-// nothing about whether a query will return rows.
+// TypeRelation is the containment admissibility relation over RM type names:
+// the set of ordered pairs (ancestor, descendant) an AQL CONTAINS can
+// connect, and whether the route is by-value or by-reference. "Relation" is
+// meant in the mathematical sense, a set of ordered pairs, and the RM type is
+// what it relates. It holds no archetype, template, or instance data, and
+// answers nothing about whether a query will return rows.
 //
 // Most of it is derived from the pinned BMM's by-value composition graph, but
-// three families of fact are carried as cited overlay data because the BMM
-// cannot express them: the version tier (VERSION.data is generic, so no
+// three families of fact are carried as overlay data because the BMM cannot
+// express them: the version tier (VERSION.data is generic, so no
 // introspection pairs a VERSIONED_X with its payload X), the EHR's references
 // to its versioned objects, and reference hops an engine resolves such as
-// FOLDER.items. See § Overlay edges.
+// FOLDER.items. See [Edge] and [Default].
 //
 // Obtain the default relation with [Default]; extend it with
 // [TypeRelation.WithOverlay]. A TypeRelation is immutable after construction
 // (the internal verdict memo is concurrency-safe) and safe for concurrent use.
 //
-// A nil *TypeRelation is the default relation, on the receiver as well as at
-// every seam that takes one (REQ-160 § Nil and zero relations): each method
-// below answers what [Default] would answer rather than panicking, so a caller
-// can hold a nil relation meaning "the default" and still extend or query it.
-// The ZERO TypeRelation is a different thing — a real relation that knows no
-// classes and answers UnknownClass for every one.
+// A nil *TypeRelation is the default relation, on the receiver as well as
+// wherever an API takes one: each method below answers what [Default] would
+// answer instead of panicking, so a caller can hold a nil relation meaning
+// "the default" and still extend or query it. The zero TypeRelation is
+// different: a real relation that knows no classes and answers UnknownClass
+// for every one.
 type TypeRelation struct {
 	h  rminfo.Hierarchy
 	lk rminfo.Lookup
@@ -60,8 +60,8 @@ var defaultRel = sync.OnceValue(func() *TypeRelation {
 	return build(rminfo.Default, defaultOverlays())
 })
 
-// Default returns the default relation — the pinned RM's by-value graph plus
-// the REQ-160 overlay edges. It is built once and memoized; there is no
+// Default returns the default relation: the pinned RM's by-value graph plus
+// the built-in overlay edges. It is built once and memoized; there is no
 // exported mutator, so the returned value cannot be altered.
 func Default() *TypeRelation {
 	return defaultRel()
@@ -82,11 +82,11 @@ func (r *TypeRelation) orDefault() *TypeRelation {
 	return r
 }
 
-// WithOverlay returns a copy of r extended with the given overlay edges
-// (REQ-160 § Extensibility). r is unchanged, and a nil r extends the default
-// relation. Endpoints are canonicalised; a BMM-known endpoint matches by
-// conformance, an unknown one by exact name. An edge with an empty endpoint
-// names nothing and is ignored. The result is never nil.
+// WithOverlay returns a copy of r extended with the given overlay edges. r is
+// unchanged, and a nil r extends the default relation. Endpoints are
+// canonicalised; a BMM-known endpoint matches by conformance, an unknown one
+// by exact name. An edge with an empty endpoint names nothing and is ignored.
+// The result is never nil.
 func (r *TypeRelation) WithOverlay(edges ...Edge) *TypeRelation {
 	r = r.orDefault()
 	if len(edges) == 0 {
@@ -110,11 +110,11 @@ func (r *TypeRelation) WithOverlay(edges ...Edge) *TypeRelation {
 	return cp
 }
 
-// Containable reports whether rmType is a legal CONTAINS operand at all
-// (REQ-160 § Containable operands): Admissible for a class conforming to
-// LOCATABLE / VERSIONED_OBJECT / VERSION, for EHR, or for any overlay-edge
-// endpoint of this relation; Never for a known non-containable class (a DV_*
-// among them); UnknownClass for a class the relation does not know.
+// Containable reports whether rmType is a legal CONTAINS operand at all:
+// Admissible for a class conforming to LOCATABLE / VERSIONED_OBJECT /
+// VERSION, for EHR, or for any overlay-edge endpoint of this relation; Never
+// for a known non-containable class (a DV_* among them); UnknownClass for a
+// class the relation does not know.
 func (r *TypeRelation) Containable(rmType string) Verdict {
 	r = r.orDefault()
 	return r.containable(r.resolve(rmType))
@@ -133,10 +133,10 @@ func (r *TypeRelation) containable(c string, isKnown bool) Verdict {
 	return Never
 }
 
-// CanContain reports the pair verdict for ancestor CONTAINS descendant
-// (REQ-160 § Verdicts, § Reachability semantics). The pair question is total:
-// UnknownClass if either operand is unknown; otherwise Never if either
-// operand's containability is Never; otherwise the route verdict.
+// CanContain reports the pair verdict for ancestor CONTAINS descendant. The
+// pair question is total: UnknownClass if either operand is unknown;
+// otherwise Never if either operand's containability is Never; otherwise the
+// route verdict.
 func (r *TypeRelation) CanContain(ancestor, descendant string) Verdict {
 	r = r.orDefault()
 	a, aKnown := r.resolve(ancestor)
@@ -152,15 +152,14 @@ func (r *TypeRelation) CanContain(ancestor, descendant string) Verdict {
 }
 
 // ArchetypeMatches reports whether a literal archetype predicate's HRID type
-// segment conforms to the declared class (REQ-160 § Archetype/class
-// conformance): Admissible when it conforms, Never on a genuine mismatch, and
-// UnknownClass when the HRID is unparseable or either the declared class or the
-// HRID type segment is not a class the relation knows — a mismatch is only ever
-// asserted between two known classes. "Knows" here means the pinned BMM:
-// overlay-named classes count as unknown, since conformance cannot be answered
-// for them and UnknownClass is the conservative verdict (never a false
-// mismatch). HRID decomposition delegates to REQ-120's canonical
-// [rm.ParseArchetypeID].
+// segment conforms to the declared class: Admissible when it conforms, Never
+// on a genuine mismatch, and UnknownClass when the HRID is unparseable or
+// either the declared class or the HRID type segment is not a class the
+// relation knows. A mismatch is only ever asserted between two known classes.
+// "Knows" here means the pinned BMM: overlay-named classes count as unknown,
+// since conformance cannot be answered for them and UnknownClass is the
+// conservative verdict (never a false mismatch). HRID decomposition delegates
+// to [rm.ParseArchetypeID].
 func (r *TypeRelation) ArchetypeMatches(rmType, archetypeID string) Verdict {
 	r = r.orDefault()
 	aid, err := rm.ParseArchetypeID(archetypeID)
@@ -182,47 +181,45 @@ func (r *TypeRelation) ArchetypeMatches(rmType, archetypeID string) Verdict {
 	return Never
 }
 
-// Unavoidable reports whether EVERY containment route from ancestor to
-// descendant passes through via — the relation's reachability recomputed with
-// one intermediate class excluded. REQ-164 § The redundant-step ruling names
-// this query; REQ-160 § Reachability semantics owns the route vocabulary it is
-// asked in, and adds no verdict of its own for it (the answer is a proof or
-// the absence of one, not a fourth verdict).
+// Unavoidable reports whether every containment route from ancestor to
+// descendant passes through via, by recomputing the relation's reachability
+// with one intermediate class excluded. The answer is a proof or the absence
+// of one, not a further [Verdict].
 //
-// True is a PROOF that `ancestor a CONTAINS via v CONTAINS descendant d`
-// selects exactly what `ancestor a CONTAINS descendant d` selects, so the via
-// step narrows nothing — the RM fact lint's aql_contains_redundant_step rests
-// on (REQ-164 § Path-shape checks).
+// True proves that `ancestor a CONTAINS via v CONTAINS descendant d` selects
+// exactly what `ancestor a CONTAINS descendant d` selects, so the via step
+// narrows nothing; the linter's aql_contains_redundant_step check relies on
+// this.
 // Unavoidable("EHR", "COMPOSITION", "OBSERVATION") is true: every route from an
 // EHR down to an OBSERVATION passes a COMPOSITION.
 // Unavoidable("EHR", "SECTION", "OBSERVATION") is false: an observation sitting
 // directly in a composition's content is reached without any section, so
 // dropping the section step widens the result.
 //
-// Every failure to prove answers FALSE, which is the silent direction for the
-// consumer (REQ-164 § Path-shape checks — where a fact is not provable the
-// check stays silent rather than guessing). Four of them:
+// Every failure to prove answers false, which is the silent direction for the
+// consumer: where a fact is not provable the check stays silent instead of
+// guessing. There are four such cases:
 //
 //   - a class this relation does not know, in any of the three positions;
-//   - a class it knows but does not admit as a CONTAINS operand
-//     (§ Containable operands) — a DV_* among them;
+//   - a class it knows but does not admit as a CONTAINS operand (see
+//     [TypeRelation.Containable]), a DV_* among them;
 //   - a via standing for the ancestor's or the descendant's own kinds:
-//     excluding it would remove an ENDPOINT of the very question, which is not
-//     the question "is there a way round it";
+//     excluding it would remove an endpoint of the question itself, which is
+//     not the question "is there a way round it";
 //   - a pair no route connects at all. Nothing is proved by a step that changes
 //     an empty result into an empty result, and an impossible containment is
-//     REQ-161's aql_impossible_containment to report, never a redundant step.
+//     reported as aql_impossible_containment, never as a redundant step.
 //
-// Routes are read at their WIDEST — ByReference edges included — on both halves
+// Routes are read at their widest, ByReference edges included, on both halves
 // of the question. A bypass crossing a reference hop is still a bypass on an
-// engine that resolves the hop (REQ-160 § Overlay edges), so counting it keeps
-// this method from proving a step redundant that such an engine can see is not.
+// engine that resolves the hop, so counting it keeps this method from proving
+// a step redundant that such an engine can see is not.
 //
 // Abstract classes stand for their concrete kinds throughout, exactly as they
 // do for [TypeRelation.CanContain]: excluding via excludes every concrete class
 // conforming to it.
 //
-// A nil receiver answers as [Default] does (REQ-160 § Nil and zero relations).
+// A nil receiver answers as [Default] does.
 func (r *TypeRelation) Unavoidable(ancestor, via, descendant string) bool {
 	r = r.orDefault()
 	a, aKnown := r.resolve(ancestor)

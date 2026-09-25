@@ -10,19 +10,18 @@ import (
 
 // MarshalAuditDetails encodes an openEHR AUDIT_DETAILS into the
 // `openehr-audit-details` request-header value defined by openEHR REST
-// 1.1.0-development (REQ-059): a comma-separated list of dotted-attribute
-// assignments — e.g.
+// 1.1.0-development: a comma-separated list of dotted-attribute
+// assignments, e.g.
 //
 //	change_type.code_string="249",committer.name="Alice",committer.external_ref.id="…",system_id="…"
 //
-// It is NOT a JSON object. Canonical-JSON / canonical-XML serialisation of
-// AUDIT_DETAILS applies only to the contribution request *body* (the
-// commit_audit / UpdateAudit field, REQ-057), never to this header.
+// It is not a JSON object. Canonical-JSON / canonical-XML serialisation of
+// AUDIT_DETAILS applies only to the contribution request body (the
+// commit_audit / UpdateAudit field), never to this header.
 //
-// The grammar and worked examples are normative in the upstream contract —
-// resources/its-rest/overview-validation.openapi.yaml, the
-// "openehr-version and openehr-audit-details" section. Per REQ-095 that
-// OpenAPI contract is authoritative.
+// The grammar and worked examples are defined by the ITS-REST OpenAPI
+// contract, in the "openehr-version and openehr-audit-details" section of
+// the overview.
 //
 // Returns "" for a nil input. Values containing control characters are
 // rejected (header-injection guard, as for openehr-item-tag).

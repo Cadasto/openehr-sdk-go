@@ -1,23 +1,22 @@
 // Package rmnames carries the wire-parameterised RM type names that
-// the bare registry names (rm.RMTypeName, ADR 0013) deliberately do
-// not encode. ITS-JSON names generic instantiations with their bound
+// the bare registry names (rm.RMTypeName) do not encode. ITS-JSON
+// names generic instantiations with their bound
 // (`DV_INTERVAL<DV_QUANTITY>`); the registry registers and reverses
 // the bare class name (`DV_INTERVAL`). Validation diagnostics and
-// builder type-checks need the parameterised form — this package is
-// its single canonical home (previously two divergent hand-written
-// switches; one had drifted three instantiations behind).
+// builder type checks need the parameterised form, and this package is
+// the one place that maps it.
 package rmnames
 
 import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
 // TypedIntervalName returns the ITS-JSON parameterised RM type name
 // for a typed DV_INTERVAL instantiation, in value or pointer form.
-// The closed set is the DVOrdered concrete closure — keep in lock-step
+// The closed set is the concrete DVOrdered descendants; keep it in step
 // with the generator's DVOrdered descendant enumeration (a new
 // DV_ORDERED descendant in the BMM adds an instantiation here).
-// The bare DVInterval[DVOrdered] form is NOT parameterised — it maps
+// The bare DVInterval[DVOrdered] form is not parameterised: it maps
 // to plain "DV_INTERVAL" via rm.RMTypeName and returns ("", false)
-// here. REQ-024: no reflection.
+// here. It uses no reflection.
 func TypedIntervalName(v any) (string, bool) {
 	switch v.(type) {
 	case *rm.DVInterval[rm.DVCount], rm.DVInterval[rm.DVCount]:

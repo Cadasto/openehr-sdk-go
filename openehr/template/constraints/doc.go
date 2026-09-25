@@ -1,9 +1,8 @@
 // Package constraints carries the typed primitive constraint values
-// REQ-103 attaches to leaf OPT nodes. The package is a sibling
-// sub-package of [github.com/cadasto/openehr-sdk-go/openehr/template]
-// kept separate so the wire decoder, the compiled-template foundation
-// (`internal/templatecompile`), and downstream validators can all
-// share one closed-set primitive vocabulary without dragging in the
+// attached to leaf OPT nodes. It is a separate sub-package of
+// [github.com/cadasto/openehr-sdk-go/openehr/template] so the wire
+// decoder, the template compiler, and downstream validators can all
+// share one closed-set primitive vocabulary without pulling in the
 // rest of the template surface.
 //
 // The taxonomy mirrors the ADL 1.4 OPT XSD primitive `xsi:type`
@@ -33,12 +32,12 @@
 //
 // Each constraint exposes Validate(value any) []Violation. A nil
 // (empty) result means the value satisfies every clause; a non-empty
-// slice lists every clause that failed. Validators are pure functions
-// — they do not consult terminology services, time zones, or any
+// slice lists every clause that failed. Validators are pure functions.
+// They do not consult terminology services, time zones, or any
 // external state, so the result depends only on the constraint
 // values and the input.
 //
-// The package is stdlib-only by REQ-013 — primitive constraint shapes
-// must be usable from any consumer (composition builder, validator,
-// codegen) without dragging in transport, auth, or rm types.
+// The package is stdlib-only, so primitive constraint shapes are usable
+// from any consumer (composition builder, validator, codegen) without
+// pulling in transport, auth, or rm types.
 package constraints

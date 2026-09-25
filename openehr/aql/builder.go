@@ -7,25 +7,24 @@ import (
 	"strings"
 )
 
-// Builder composes an [Query] from typed clauses (the struct-builder style of
-// REQ-055). Methods are chainable and mutate the receiver; call [Builder.Build]
-// to emit the canonical query. The verb-functions style (Select, From, …)
-// shares the same internal emitter, so both produce byte-identical AQL for the
-// same logical query (PROBE-020).
+// Builder composes a [Query] from typed clauses (the struct-builder style).
+// Methods are chainable and mutate the receiver; call [Builder.Build] to emit
+// the canonical query. The verb-functions style (Select, From, …) shares the
+// same internal emitter, so both produce byte-identical AQL for the same
+// logical query.
 //
-// Obtain one from [NewBuilder]. A nil *Builder is a PROGRAMMER ERROR and not an
-// input to validate (REQ-025): every setter here mutates the receiver and
-// returns it for chaining, so a nil one has nothing to record into and no error
-// channel to report through, and the setters — [Builder.Build] with them —
-// dereference it and panic rather than returning a builder that silently drops
-// what it was told. [Builder.VerifyContainment] is the one deliberate
-// exception, and says so: it is a diagnostic a caller may reach for on a value
-// it did not construct.
+// Obtain one from [NewBuilder]. A nil *Builder is a programmer error, not an
+// input to validate: every setter mutates the receiver and returns it for
+// chaining, so a nil one has nothing to record into and no error channel to
+// report through. The setters, and [Builder.Build] with them, dereference it
+// and panic instead of returning a builder that silently drops what it was
+// told. [Builder.VerifyContainment] is the one deliberate exception: it is a
+// diagnostic a caller may reach for on a value it did not construct.
 //
-// Injection: caller-supplied data MUST flow through [Param] (or a literal
+// Injection: caller-supplied data must flow through [Param] (or a literal
 // constructor), which the emitter binds or escapes. Path, alias, and archetype
 // arguments (to [Col], [Eq], [Archetype], [Builder.OrderBy], …) are openEHR
-// identifiers emitted verbatim — author them as constants, never from
+// identifiers emitted verbatim; author them as constants, never from
 // untrusted input.
 type Builder struct {
 	ast ast
@@ -42,14 +41,15 @@ func (b *Builder) Select(cols ...SelectField) *Builder {
 	return b
 }
 
-// Distinct sets the clause-level `SELECT DISTINCT` flag (REQ-163), emitted
-// directly after `SELECT` and BEFORE the deprecated TOP clause — the grammar's
-// `selectClause : SELECT DISTINCT? top? selectExpr …`.
+// Distinct sets the clause-level `SELECT DISTINCT` flag, emitted directly
+// after `SELECT` and before the deprecated TOP clause (the grammar's
+// `selectClause : SELECT DISTINCT? top? selectExpr …`).
 //
-// The flag is a property of the CLAUSE, not of an item: the parser consumes the
+// The flag belongs to the clause, not to an item: the parser consumes the
 // keyword before the first projection, so it applies to the whole row. This is
-// the only route to it — a `Col` whose text merely begins with the keyword sets
-// a flag the builder never recorded, and [Builder.Build] refuses it (see [Col]).
+// the only way to set it. A `Col` whose text merely begins with the keyword
+// sets a flag the builder never recorded, and [Builder.Build] refuses it (see
+// [Col]).
 //
 // Calling it twice is the same as calling it once; there is no unset.
 func (b *Builder) Distinct() *Builder {
@@ -92,19 +92,18 @@ func (b *Builder) FromEHR(alias string, id Value) *Builder {
 // chain (`… CONTAINS A CONTAINS B`), matching the grammar's right-greedy
 // `CONTAINS containsExpr`.
 //
-// Since REQ-117 the argument may be a whole containment expression — a nested
-// chain ([Containment.Contains] / [Containment.NotContains]) or a sibling
-// junction ([ContainsAnd] / [ContainsOr]) — not only a single class. A single
-// class emits exactly as it did before.
+// The argument may be a whole containment expression: a single class, a
+// nested chain ([Containment.Contains] / [Containment.NotContains]) or a
+// sibling junction ([ContainsAnd] / [ContainsOr]).
 func (b *Builder) Contains(c Containment) *Builder {
 	c.negated = false
 	b.ast.contains = append(b.ast.contains, c)
 	return b
 }
 
-// NotContains appends a containment connected by NOT CONTAINS — the grammar's
-// `classExprOperand NOT CONTAINS containsExpr` (REQ-117), i.e. the absence of
-// c below the preceding term. Otherwise identical to [Builder.Contains].
+// NotContains appends a containment connected by NOT CONTAINS, the grammar's
+// `classExprOperand NOT CONTAINS containsExpr`: the absence of c below the
+// preceding term. Otherwise identical to [Builder.Contains].
 func (b *Builder) NotContains(c Containment) *Builder {
 	c.negated = true
 	b.ast.contains = append(b.ast.contains, c)
@@ -128,7 +127,7 @@ func (b *Builder) OrderBy(path string, dir Direction) *Builder {
 }
 
 // Offset sets the row offset. It populates [Query.Offset] (the request
-// envelope), not the AQL string — the envelope is the default paging channel.
+// envelope), not the AQL string; the envelope is the default paging channel.
 // Use [Builder.OffsetInline] for the opt-in in-text form.
 func (b *Builder) Offset(n int) *Builder {
 	b.ast.offset = n
@@ -143,73 +142,71 @@ func (b *Builder) Limit(n int) *Builder {
 	return b
 }
 
-// LimitInline sets an IN-TEXT `LIMIT n`, emitted into the AQL string after
-// ORDER BY instead of travelling in the request envelope (REQ-117). Reach for
-// it when the bound must survive stored-query registration — the string is
-// what the server stores — or when the query text is handed to another
-// engine; the envelope channel ([Builder.Limit] / [Builder.Offset]) remains
-// the default.
+// LimitInline sets an in-text `LIMIT n`, emitted into the AQL string after
+// ORDER BY instead of travelling in the request envelope. Use it when the
+// bound must survive stored-query registration (the string is what the server
+// stores) or when the query text is handed to another engine. The envelope
+// channel ([Builder.Limit] / [Builder.Offset]) remains the default.
 //
 // The two channels are mutually exclusive: setting both makes [Builder.Build]
-// return an error wrapping [ErrInvalidQuery] rather than silently combining
-// them. A negative n is likewise refused (the grammar's `limitValue` is a
-// non-negative INTEGER). Later calls replace earlier ones.
+// return an error wrapping [ErrInvalidQuery] instead of combining them. A
+// negative n is also refused (the grammar's `limitValue` is a non-negative
+// INTEGER). Later calls replace earlier ones.
 func (b *Builder) LimitInline(n int) *Builder {
 	b.ast.limitInline = Int(int64(n))
 	return b
 }
 
-// LimitInlineParam sets an in-text `LIMIT $name` — the grammar's
-// parameter-valued limit, bound by the server at execution time (REQ-117).
-// A leading `$` in name is stripped, as in [Param]. Same channel-exclusivity
-// rule as [Builder.LimitInline].
+// LimitInlineParam sets an in-text `LIMIT $name`, the grammar's
+// parameter-valued limit, bound by the server at execution time. A leading `$`
+// in name is stripped, as in [Param]. The same channel-exclusivity rule as
+// [Builder.LimitInline] applies.
 func (b *Builder) LimitInlineParam(name string) *Builder {
 	b.ast.limitInline = Param(name)
 	return b
 }
 
-// OffsetInline sets an in-text `OFFSET n`, emitted after the in-text LIMIT
-// (REQ-117). The grammar admits OFFSET only after LIMIT
-// (`LIMIT limitValue (OFFSET limitValue)?`), so an in-text OFFSET without an
-// in-text LIMIT is refused by [Builder.Build] rather than emitted as text the
-// parser would reject.
+// OffsetInline sets an in-text `OFFSET n`, emitted after the in-text LIMIT.
+// The grammar admits OFFSET only after LIMIT
+// (`LIMIT limitValue (OFFSET limitValue)?`), so [Builder.Build] refuses an
+// in-text OFFSET without an in-text LIMIT instead of emitting text the parser
+// would reject.
 func (b *Builder) OffsetInline(n int) *Builder {
 	b.ast.offsetInline = Int(int64(n))
 	return b
 }
 
-// OffsetInlineParam sets an in-text `OFFSET $name` (REQ-117). Same rules as
-// [Builder.OffsetInline] and [Builder.LimitInlineParam].
+// OffsetInlineParam sets an in-text `OFFSET $name`. The same rules as
+// [Builder.OffsetInline] and [Builder.LimitInlineParam] apply.
 func (b *Builder) OffsetInlineParam(name string) *Builder {
 	b.ast.offsetInline = Param(name)
 	return b
 }
 
-// Top sets the DEPRECATED in-text `SELECT TOP n` row limit (REQ-118),
-// emitted between `SELECT`/`DISTINCT` and the projection list.
+// Top sets the deprecated in-text `SELECT TOP n` row limit, emitted between
+// `SELECT`/`DISTINCT` and the projection list.
 //
 // Prefer [Builder.LimitInline] or the envelope [Builder.Limit]: openEHR QUERY
 // Release-1.1.0 § 4.4.3 deprecates `TOP` in favour of `LIMIT` with `ORDER BY`
-// and announces its removal in a future major release. It is offered so the
-// SDK can author the deprecated shape a client, a stored query, or a
-// conformance corpus may still legitimately carry.
+// and announces its removal in a future major release. Top exists so the SDK
+// can author the deprecated shape that a client, a stored query, or a
+// conformance corpus may still carry.
 //
-// § 4.4.3 also forbids `TOP` and `LIMIT` in one query, and a `TOP` is itself
-// an in-text row bound — so setting it alongside EITHER row-limit channel
-// (in-text or envelope) makes [Builder.Build] return an error wrapping
-// [ErrInvalidQuery], never a silently combined emission. A negative n is
-// likewise refused (the grammar's `top` production admits no sign). Later
-// calls replace earlier ones.
+// QUERY § 4.4.3 also forbids `TOP` and `LIMIT` in one query, and a `TOP` is
+// itself an in-text row bound. Setting it alongside either row-limit channel
+// (in-text or envelope) therefore makes [Builder.Build] return an error
+// wrapping [ErrInvalidQuery]. A negative n is also refused (the grammar's
+// `top` production admits no sign). Later calls replace earlier ones.
 func (b *Builder) Top(n int) *Builder {
 	b.ast.top = &TopClause{N: n}
 	return b
 }
 
-// TopDirected sets the deprecated `SELECT TOP n FORWARD|BACKWARD` row limit
-// (REQ-118). [TopDirUnspecified] emits no direction keyword, making it
-// equivalent to [Builder.Top]; a direction outside the vocabulary is refused
-// at [Builder.Build] rather than emitted as text the parser would reject. Same
-// deprecation notice and channel-exclusivity rule as [Builder.Top].
+// TopDirected sets the deprecated `SELECT TOP n FORWARD|BACKWARD` row limit.
+// [TopDirUnspecified] emits no direction keyword, making it equivalent to
+// [Builder.Top]; [Builder.Build] refuses a direction outside the vocabulary
+// instead of emitting text the parser would reject. The same deprecation
+// notice and channel-exclusivity rule as [Builder.Top] apply.
 func (b *Builder) TopDirected(n int, dir TopDir) *Builder {
 	b.ast.top = &TopClause{N: n, Dir: dir}
 	return b
@@ -218,11 +215,10 @@ func (b *Builder) TopDirected(n int, dir TopDir) *Builder {
 // Bind supplies a value for a named placeholder introduced via [Param]; it
 // populates [Query.Parameters] on the built query. A leading `$` in name is
 // stripped, as in [Param], so `Bind("$id", …)` and `Bind("id", …)` address the
-// SAME key — a later call with the same effective name replaces the earlier
-// value. Binding is optional — the emitted string carries `$name` regardless —
-// but a bind whose stripped name is empty is refused at [Builder.Build]
-// (REQ-055 rule 4): no placeholder can ever match it, so the value could
-// only be shipped dead.
+// same key, and a later call with the same effective name replaces the
+// earlier value. Binding is optional (the emitted string carries `$name`
+// regardless), but [Builder.Build] refuses a bind whose stripped name is
+// empty: no placeholder can match it, so the value would never be used.
 func (b *Builder) Bind(name string, value any) *Builder {
 	name = strings.TrimPrefix(name, "$")
 	if b.ast.params == nil {
@@ -233,12 +229,12 @@ func (b *Builder) Bind(name string, value any) *Builder {
 }
 
 // Build emits the canonical [Query], or an error wrapping [ErrInvalidQuery].
-// Every write-side rule this package states is reported HERE, at one seam,
-// rather than by each setter — among them: no projection and no source; an
-// emitted SELECT clause that does not read back as the projection recorded here,
-// split into more items, spilled into another clause, or carrying a clause-level
-// flag the builder never set (REQ-163 § `Build()` verifies what it emitted); and
-// a [Bind] name that is empty after stripping a leading `$` (REQ-055 rule 4).
+// Every write-side rule this package states is reported here, in one place,
+// instead of by each setter. Among them: no projection and no source; an
+// emitted SELECT clause that does not read back as the projection recorded
+// here (split into more items, spilled into another clause, or carrying a
+// clause-level flag the builder never set); and a [Bind] name that is empty
+// after stripping a leading `$`.
 func (b *Builder) Build() (Query, error) { return b.ast.build() }
 
 // Direction is an ORDER BY sort direction.

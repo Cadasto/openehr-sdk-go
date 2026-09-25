@@ -15,11 +15,9 @@ type Integer int32
 
 // UnmarshalJSON accepts a JSON number or a decimal integer string.
 //
-// A nil receiver is refused rather than dereferenced (REQ-025, idiom.md
-// § No panics): the method assigns through the pointer, and a nil
-// pointer is caller-constructible input reachable through the documented
-// API. That refusal carries typereg.ErrNilReceiver, not typereg.ErrInvalidShape —
-// caller misuse is not a wire-shape problem.
+// A nil receiver is refused with an error rather than dereferenced. That
+// refusal carries typereg.ErrNilReceiver, not typereg.ErrInvalidShape,
+// because caller misuse is not a wire-shape problem.
 func (i *Integer) UnmarshalJSON(b []byte) error {
 	if i == nil {
 		return fmt.Errorf("rm.Integer: %w", typereg.ErrNilReceiver)

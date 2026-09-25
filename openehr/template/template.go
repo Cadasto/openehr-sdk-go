@@ -21,8 +21,7 @@ type OperationalTemplate struct {
 }
 
 // TemplateID returns the value of <template_id>/<value> from the OPT
-// (e.g. "vital_signs"). Required by REQ-100; non-empty after a
-// successful parse.
+// (e.g. "vital_signs"). It is non-empty after a successful parse.
 func (t *OperationalTemplate) TemplateID() string { return t.templateID }
 
 // Concept returns the value of <concept> from the OPT (the
@@ -39,8 +38,8 @@ func (t *OperationalTemplate) Language() string { return t.language }
 
 // Description returns the parsed top-level <description> block, or
 // nil when the OPT omits it (or carries only empty sub-elements).
-// The returned pointer is owned by the OperationalTemplate — callers
-// MUST NOT mutate the map values it exposes.
+// The returned pointer is owned by the OperationalTemplate; callers
+// must not mutate the map values it exposes.
 func (t *OperationalTemplate) Description() *Description { return t.description }
 
 // Annotations returns the parsed <annotations path="..."> blocks,
@@ -56,7 +55,7 @@ func (t *OperationalTemplate) Annotations() map[string][]Annotation {
 // Annotation is one <items id="..."> entry inside an <annotations>
 // block. Annotations carry UI / editor hints in the OPT and are
 // addressable by path (an AQL-style locator string). The format is
-// open-ended in the OPT XSD — consumers interpret IDs by convention.
+// open-ended in the OPT XSD; consumers interpret IDs by convention.
 type Annotation struct {
 	// ID is the items/@id attribute (e.g. "name", "comment", "ui-hint").
 	ID string
@@ -66,9 +65,9 @@ type Annotation struct {
 }
 
 // Description is the parsed top-level <description> block. The OPT
-// XSD models it as a RESOURCE_DESCRIPTION, of which v1 captures the
-// most frequently consumed fields. Translations and per-language
-// details are deferred to a later REQ.
+// XSD models it as a RESOURCE_DESCRIPTION, of which this package
+// captures the most frequently consumed fields. Translations and
+// per-language details are not captured.
 type Description struct {
 	lifecycleState  string
 	originalAuthors map[string]string
@@ -120,7 +119,7 @@ func (t *OperationalTemplate) Root() Node { return t.root }
 // Node is the sealed root interface for OPT definition-tree nodes.
 // Implementations are *ComplexObject, *ArchetypeRoot, *Attribute, and
 // *Slot. The interface is closed; new concrete types may appear in a
-// future REQ but only within this package.
+// future release but only within this package.
 //
 // Callers that walk the tree and need to distinguish descendable
 // objects from attribute carriers should match against ObjectNode
@@ -129,8 +128,8 @@ func (t *OperationalTemplate) Root() Node { return t.root }
 type Node interface {
 	// RMTypeName returns the openEHR Reference Model class name this
 	// node constrains (e.g. "COMPOSITION", "DV_QUANTITY"). For an
-	// *Attribute node it returns the empty string — attributes are
-	// not RM-typed.
+	// *Attribute node it returns the empty string, because attributes
+	// are not RM-typed.
 	RMTypeName() string
 
 	// NodeID returns the archetype node id (e.g. "at0001") when one
@@ -141,11 +140,11 @@ type Node interface {
 	isNode()
 }
 
-// ObjectNode is the supertype of the two descendable OPT node kinds
-// — *ComplexObject and *ArchetypeRoot. Walker code that does not
+// ObjectNode is the supertype of the two descendable OPT node kinds,
+// *ComplexObject and *ArchetypeRoot. Walker code that does not
 // need to discriminate between archetype-root and bare complex-object
 // should type-switch on ObjectNode instead of listing the two
-// concrete types separately. *Slot and *Attribute are NOT
+// concrete types separately. *Slot and *Attribute are not
 // ObjectNodes (a slot is a leaf with opaque slot-fill semantics; an
 // attribute holds an RM attribute name and its children rather than
 // being a typed object).
@@ -158,18 +157,18 @@ type ObjectNode interface {
 	// Occurrences returns the parsed occurrences interval, or nil
 	// when the OPT did not declare one for this node.
 	Occurrences() *Multiplicity
-	// NodeName returns the template-level node name (REQ-116), or ""
+	// NodeName returns the template-level node name, or ""
 	// when the node pins no fixed name; see ComplexObject.NodeName.
-	// On the interface so ObjectNode walkers (the compile carry,
-	// REQ-111) read it without asserting the concrete type — a
+	// It is on the interface so ObjectNode walkers (such as the template
+	// compiler) read it without asserting the concrete type; a
 	// *ComplexObject assertion would silently miss *ArchetypeRoot.
 	NodeName() string
 }
 
 // Multiplicity is the min/max interval that OPT uses for both
 // existence and occurrences blocks. Fields are unexported to keep
-// parsed intervals immutable from outside the package — construct
-// values only via the parser (no public constructor exists in v1).
+// parsed intervals immutable from outside the package; only the
+// parser constructs values (there is no public constructor).
 type Multiplicity struct {
 	lower          int
 	upper          int
@@ -225,7 +224,7 @@ func (c Cardinality) IsValid() bool {
 // also the embedded payload of *ArchetypeRoot. It is used for both
 // internal nodes (with child attributes) and leaf primitive
 // constraints (e.g. CODE_PHRASE, DV_QUANTITY); for the latter, the
-// typed constraint surface is on [PrimitiveConstraint] (REQ-103).
+// typed constraint surface is on [PrimitiveConstraint].
 type ComplexObject struct {
 	rmTypeName  string
 	nodeID      string
@@ -241,15 +240,15 @@ func (c *ComplexObject) RMTypeName() string { return c.rmTypeName }
 // NodeID implements Node.
 func (c *ComplexObject) NodeID() string { return c.nodeID }
 
-// NodeName returns the template-level node name — the runtime
+// NodeName returns the template-level node name: the runtime
 // LOCATABLE.name the OPT pins on this node by constraining its name
 // attribute to a fixed C_STRING (name → value → single-entry list,
 // e.g. <item xsi:type="C_STRING"><list>Husten</list></item>).
-// Returns "" when the node pins no fixed name; per REQ-116 the
-// archetype concept term is never substituted. Distinct sibling
-// names are what disambiguate a reused archetype under one slot —
-// the reference WebTemplate derives node ids from this name and
-// name-predicates the AQL paths of colliding siblings.
+// Returns "" when the node pins no fixed name; the archetype concept
+// term is never substituted. Distinct sibling names are what
+// disambiguate a reused archetype under one slot: the reference
+// WebTemplate derives node ids from this name and name-predicates
+// the AQL paths of colliding siblings.
 func (c *ComplexObject) NodeName() string { return c.nodeName }
 
 // Occurrences returns the parsed occurrences block, or nil when the
@@ -261,7 +260,7 @@ func (c *ComplexObject) Occurrences() *Multiplicity { return c.occurrences }
 // the *Attribute pointers themselves are still shared with the OPT.
 func (c *ComplexObject) Attributes() []*Attribute { return slices.Clone(c.attributes) }
 
-// PrimitiveConstraint returns the typed REQ-103 constraint payload
+// PrimitiveConstraint returns the typed constraint payload
 // when the wire xsi:type was a primitive (C_BOOLEAN, C_INTEGER,
 // C_REAL, C_STRING, C_DATE, C_TIME, C_DATE_TIME, C_DURATION,
 // C_CODE_PHRASE, C_DV_QUANTITY, C_DV_ORDINAL). Returns nil for
@@ -269,14 +268,14 @@ func (c *ComplexObject) Attributes() []*Attribute { return slices.Clone(c.attrib
 // slots, attribute containers).
 //
 // The returned value is one of the concrete types in the
-// [constraints] package — pattern-match on it via a type switch.
+// [constraints] package; pattern-match on it via a type switch.
 func (c *ComplexObject) PrimitiveConstraint() constraints.PrimitiveConstraint {
 	return c.primitive
 }
 
 func (c *ComplexObject) isNode() {}
 
-// ArchetypeRoot is xsi:type="C_ARCHETYPE_ROOT" in the OPT XML — a
+// ArchetypeRoot is xsi:type="C_ARCHETYPE_ROOT" in the OPT XML: a
 // ComplexObject decorated with an archetype id. The archetype id is
 // the slot fill within the template (e.g.
 // "openEHR-EHR-OBSERVATION.blood_pressure.v1").
@@ -329,14 +328,13 @@ func (a *ArchetypeRoot) isNode() {}
 // id="...">value</items></term_definitions> record from an
 // archetype root. Items are open-keyed by id (typical keys: "text",
 // "description", "comment"). The OPT carries a single canonical
-// language per document; multi-language ontology is deferred to
-// REQ-105.
+// language per document; multi-language ontology is not supported yet.
 type ArchetypeTerm struct {
 	// Code is the at-code this definition applies to (e.g. "at0000").
 	Code string
 	// Items maps the items/@id attribute (e.g. "text") to its
-	// character-data value. Defensive-copy on every accessor read —
-	// callers may mutate the returned map.
+	// character-data value. Every accessor read returns a defensive copy,
+	// so callers may mutate the returned map.
 	Items map[string]string
 }
 
@@ -349,7 +347,7 @@ type TermBinding struct {
 	// Terminology is the value of the terminology attribute on the
 	// containing <term_bindings> block (e.g. "SNOMED-CT", "LOINC").
 	Terminology string
-	// NodeOrPath is the items/@code attribute — either an at-code
+	// NodeOrPath is the items/@code attribute: either an at-code
 	// or an AQL-like locator path.
 	NodeOrPath string
 	// Target is the bound external terminology code.
@@ -357,9 +355,9 @@ type TermBinding struct {
 }
 
 // CodedTermRef is the openEHR CODE_PHRASE shape used inside
-// term_bindings: a terminology id + a code string. Captured as a
-// flat record here rather than dragged through the rm package — the
-// template package is stdlib-only.
+// term_bindings: a terminology id + a code string. It is a flat record
+// here rather than the rm type, because the template package is
+// stdlib-only.
 type CodedTermRef struct {
 	TerminologyID string
 	CodeString    string
@@ -385,7 +383,7 @@ func (a *Attribute) Cardinality() Cardinality { return a.cardinality }
 
 // Existence returns the parsed existence block, or nil when the OPT
 // did not declare one. Existence answers "must this attribute be
-// filled with at least one value?" — i.e. a constraint on the
+// filled with at least one value?", i.e. a constraint on the
 // attribute as a whole. For child-count bounds on a multi-valued
 // attribute, see [Attribute.ChildMultiplicity].
 func (a *Attribute) Existence() *Multiplicity { return a.existence }
@@ -406,14 +404,14 @@ func (a *Attribute) ChildMultiplicity() *Multiplicity { return a.childMultiplici
 // the OPT.
 //
 // Children are constrained by the OPT tree shape to be one of
-// *ComplexObject, *ArchetypeRoot, or *Slot — never another
+// *ComplexObject, *ArchetypeRoot, or *Slot, never another
 // *Attribute. Walker code that needs to descend may type-switch on
 // ObjectNode (covers ComplexObject + ArchetypeRoot) and treat *Slot
 // as a leaf.
 func (a *Attribute) Children() []Node { return slices.Clone(a.children) }
 
-// RMTypeName implements Node and always returns the empty string —
-// attributes are not RM-typed.
+// RMTypeName implements Node and always returns the empty string,
+// because attributes are not RM-typed.
 func (*Attribute) RMTypeName() string { return "" }
 
 // NodeID implements Node and always returns the empty string.
@@ -422,8 +420,8 @@ func (*Attribute) NodeID() string { return "" }
 func (a *Attribute) isNode() {}
 
 // Slot is xsi:type="ARCHETYPE_SLOT". Includes and Excludes carry the
-// archetype-id assertion strings as raw text from the OPT. REQ-104
-// additionally parses the `archetype_id matches {regex}` subset
+// archetype-id assertion strings as raw text from the OPT. The parser
+// also compiles the `archetype_id matches {regex}` subset
 // (and the OPT XML expression shape) into [constraints.SlotAssertion]
 // values at parse time.
 type Slot struct {
@@ -435,7 +433,7 @@ type Slot struct {
 	parsedExcludes []constraints.SlotAssertion
 }
 
-// RMTypeName implements Node — typically the slot-constrained RM
+// RMTypeName implements Node. It is typically the slot-constrained RM
 // class name (e.g. "OBSERVATION", "SECTION").
 func (s *Slot) RMTypeName() string { return s.rmTypeName }
 
@@ -444,7 +442,7 @@ func (s *Slot) NodeID() string { return s.nodeID }
 
 // Includes returns a defensive copy of the raw (unparsed) archetype-id
 // include assertion blobs as written in the OPT. For the structured
-// REQ-104 form use [Slot.ParsedIncludes].
+// form use [Slot.ParsedIncludes].
 func (s *Slot) Includes() []string { return slices.Clone(s.includes) }
 
 // Excludes returns a defensive copy of the raw (unparsed) archetype-id
@@ -452,30 +450,30 @@ func (s *Slot) Includes() []string { return slices.Clone(s.includes) }
 // [Slot.ParsedExcludes].
 func (s *Slot) Excludes() []string { return slices.Clone(s.excludes) }
 
-// ParsedIncludes returns the REQ-104 compiled include assertions.
+// ParsedIncludes returns the compiled include assertions.
 // Empty when the OPT carried no parseable include expressions.
 func (s *Slot) ParsedIncludes() []constraints.SlotAssertion {
 	return slices.Clone(s.parsedIncludes)
 }
 
-// ParsedExcludes returns the REQ-104 compiled exclude assertions.
+// ParsedExcludes returns the compiled exclude assertions.
 func (s *Slot) ParsedExcludes() []constraints.SlotAssertion {
 	return slices.Clone(s.parsedExcludes)
 }
 
 // AllowsRMType reports whether archetypeID satisfies the RM-type-
-// prefix fallback (openEHR-EHR-<this slot's RMTypeName>.). REQ-104.
+// prefix fallback (openEHR-EHR-<this slot's RMTypeName>.).
 func (s *Slot) AllowsRMType(archetypeID string) bool {
 	return s.slotRules().AllowsRMTypePrefix(archetypeID)
 }
 
-// SlotRules returns the parsed REQ-104 assertion rules for this slot.
+// SlotRules returns the parsed assertion rules for this slot.
 // The returned rule slices are defensive copies.
 func (s *Slot) SlotRules() constraints.SlotRules { return s.slotRules() }
 
 // AllowsArchetypeID reports whether archetypeID satisfies parsed
 // include / exclude rules, falling back to [Slot.AllowsRMType] when
-// no include assertions were parsed. REQ-104.
+// no include assertions were parsed.
 func (s *Slot) AllowsArchetypeID(archetypeID string) bool {
 	return s.slotRules().AllowsArchetypeID(archetypeID)
 }

@@ -13,9 +13,9 @@ import (
 //
 //	{"uid": "<version_uid>"}
 //
-// It is a bespoke ITS-REST wrapper — no `_type` discriminator, and not
-// an RM `OBJECT_VERSION_ID` — distinct from the full-representation arm
-// of the response body `oneOf` (REQ-094). The `uid` is the same version
+// It is a bespoke ITS-REST wrapper (no `_type` discriminator, and not
+// an RM `OBJECT_VERSION_ID`), distinct from the full-representation arm
+// of the response body `oneOf`. The `uid` is the same version
 // identifier the server also exposes in the `Location` path segment and
 // the `ETag`.
 type Identifier struct {
@@ -27,18 +27,17 @@ type Identifier struct {
 // ResolveIdentifierBody decodes an ITS-REST [Identifier] write-response
 // body (sent when `Prefer: return=identifier` is honoured) and, when
 // VersionUID was not already parsed from the Location header, populates
-// it from the body's uid. Location stays canonical (REQ-094); the body
+// it from the body's uid. Location stays canonical; the body
 // is the documented fallback noted on [VersionMetadata].
 //
-// It enforces the REQ-094 "MUST NOT silently downgrade" rule for the
-// identifier mode: a non-empty body that does not decode to an
+// It never silently downgrades the identifier mode: a non-empty body that does not decode to an
 // Identifier carrying a uid is returned as a [transport.ErrInvalidShape]
-// error rather than silently discarded. An empty body is not an error —
+// error rather than silently discarded. An empty body is not an error;
 // the identifier remains available via Location/ETag → VersionUID.
 //
-// No-op (returns nil) when m is nil or the body carries no representation
-// — zero bytes, whitespace, or JSON `null`, as [transport.IsNoRepresentationBody]
-// defines empty for every 2xx arm (REQ-094, REQ-151). A server honouring
+// No-op (returns nil) when m is nil or the body carries no representation:
+// zero bytes, whitespace, or JSON `null`, as [transport.IsNoRepresentationBody]
+// defines empty for every 2xx response. A server honouring
 // `Prefer: return=identifier` with `null` sent no identifier rather than a
 // malformed one, so Location/ETag stays the identifier of record.
 func (m *VersionMetadata) ResolveIdentifierBody(body []byte) error {

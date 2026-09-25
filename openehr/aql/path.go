@@ -10,28 +10,26 @@ package aql
 // Clause / source-Position fields), so existing consumers are unchanged.
 
 // PathSegment is one step of an identified path: an attribute name and an
-// optional predicate (the raw text inside `[...]`, brackets stripped —
+// optional predicate (the raw text inside `[...]`, brackets stripped,
 // e.g. "at0001" or "name/value='Systolic'").
 type PathSegment struct {
 	Name      string
 	Predicate string
-	// Parsed is the typed form of Predicate — REQ-113 § Structured node
-	// predicates. It is a READ-SIDE derivation: no write path reads it, so
-	// mutating it cannot change what the emitter produces, and Predicate
-	// stays authoritative for emission (REQ-119's verbatim round trip).
+	// Parsed is the typed form of Predicate. It is a read-side derivation: no
+	// write path reads it, so mutating it cannot change what the emitter
+	// produces, and Predicate stays authoritative for emission (the verbatim
+	// round trip).
 	//
-	// nil means the SDK does not structure this form, and that is a
-	// STATEMENT, not an accident: a reader may fail closed on it. There is
-	// no partial structure — a Parsed that is non-nil is complete for its
-	// kind. When Predicate is "" the segment carries no predicate at all;
-	// when Predicate is populated and Parsed is nil, the predicate is one of
-	// the ENUMERATED unstructured forms (REQ-113 § Structured node
-	// predicates): a comparison whose right-hand operand the value
-	// vocabulary does not carry — an object path, a node code, or an
-	// out-of-range numeric — or a junction containing one.
+	// nil means the SDK does not structure this form, and a reader may rely on
+	// that and fail closed on it. There is no partial structure: a non-nil
+	// Parsed is complete for its kind. When Predicate is "" the segment carries
+	// no predicate at all. When Predicate is populated and Parsed is nil, the
+	// predicate is one of the enumerated unstructured forms: a comparison whose
+	// right-hand operand the value vocabulary does not carry (an object path, a
+	// node code, or an out-of-range numeric), or a junction containing one.
 	//
-	// NOT `==`-comparable and not a map key — see [SegmentPredicate]
-	// § Comparability. Compare with [EqualPredicates].
+	// Not `==`-comparable and not usable as a map key; see the Comparability
+	// section of [SegmentPredicate]. Compare with [EqualPredicates].
 	Parsed SegmentPredicate
 }
 
@@ -46,7 +44,7 @@ type PathSegment struct {
 // parser) sets all fields consistently from one source node; a consumer
 // mutating one without the others desynchronizes the value.
 type IdentifiedPath struct {
-	// Alias is the root binding (e.g. "o"); for a WHERE path it MUST
+	// Alias is the root binding (e.g. "o"); for a WHERE path it must
 	// resolve to a FROM / CONTAINS class alias. "" when the path is
 	// anonymous / relative.
 	Alias string
@@ -55,11 +53,10 @@ type IdentifiedPath struct {
 	Predicate string
 	// Segments are the path steps after the alias, in order.
 	Segments []PathSegment
-	// Raw is the VERBATIM source text of the whole path, whitespace
-	// included. It was once whitespace-collapsed, which broke REQ-119
-	// round-trip closure for any path carrying a predicate the grammar
-	// separates with a keyword: `o/items[a/b='c' AND d/e='f']` collapsed to
-	// `…'c'ANDd/e=…`, where `ANDd` re-lexes as one IDENTIFIER and the
-	// emitted query no longer parses.
+	// Raw is the verbatim source text of the whole path, whitespace included.
+	// Collapsing whitespace would break the round trip for any path carrying a
+	// predicate the grammar separates with a keyword: `o/items[a/b='c' AND d/e='f']`
+	// would become `…'c'ANDd/e=…`, where `ANDd` re-lexes as one IDENTIFIER and
+	// the emitted query no longer parses.
 	Raw string
 }

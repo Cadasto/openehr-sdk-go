@@ -98,29 +98,26 @@ func significantDigits(s string) int {
 var errPrecisionLoss = typereg.ClassifyShape(fmt.Errorf("rm.Real: literal carries more than %d significant decimal digits", maxSignificantDigits))
 
 // UnmarshalJSON accepts a JSON number or a decimal string. A literal
-// carrying more than maxSignificantDigits significant digits fails
-// rather than silently rounding (REQ-052); the error is value-free
-// (REQ-093). A JSON null is a no-op per the encoding/json convention
-// for Unmarshaler ("approximate the behavior of Unmarshal itself"),
-// leaving the receiver unchanged rather than writing the zero value —
-// mirroring rm.Character.
+// carrying more than 17 significant digits fails rather than silently
+// rounding; the error message does not echo the value. A JSON null is a
+// no-op per the encoding/json convention for Unmarshaler ("approximate
+// the behavior of Unmarshal itself"), leaving the receiver unchanged
+// rather than writing the zero value, as rm.Character does.
 //
-// The two checks run in this order: the literal is PARSED first, into a
-// temporary, and a parse or range failure is returned as it comes —
+// The two checks run in this order. The literal is parsed first, into a
+// temporary, and a parse or range failure is returned as it comes:
 // *strconv.NumError from the quoted arm, an encoding/json/v2
 // *json.SemanticError (or a *jsontext.SyntacticError for a malformed
 // literal) from the bare arm, each reachable with errors.As and each
 // staying outside typereg.ErrInvalidShape. Only a literal that parsed is
-// then measured against maxSignificantDigits, and only a literal that
+// then measured against the 17-digit limit, and only a literal that
 // passed both is assigned to the receiver. Reversing the order would report
 // "1e400" or "123456789012345678x" as precision loss, which is a
 // misdiagnosis: the value never parsed at all.
 //
-// A nil receiver is refused rather than dereferenced (REQ-025, idiom.md
-// § No panics): the method assigns through the pointer, and a nil
-// pointer is caller-constructible input reachable through the documented
-// API. That refusal carries typereg.ErrNilReceiver, not typereg.ErrInvalidShape —
-// caller misuse is not a wire-shape problem.
+// A nil receiver is refused with an error rather than dereferenced. That
+// refusal carries typereg.ErrNilReceiver, not typereg.ErrInvalidShape,
+// because caller misuse is not a wire-shape problem.
 func (r *Real) UnmarshalJSON(b []byte) error {
 	if r == nil {
 		return fmt.Errorf("rm.Real: %w", typereg.ErrNilReceiver)
@@ -160,7 +157,7 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON emits a JSON number per REQ-052.
+// MarshalJSON emits a JSON number.
 func (r Real) MarshalJSON() ([]byte, error) {
 	return json.Marshal(float64(r))
 }

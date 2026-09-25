@@ -17,12 +17,12 @@ import (
 )
 
 // Generate synthesises an RM instance for the compiled template's
-// root type per REQ-107.
+// root type.
 //
 // The walk is template-driven: the compiled OPT drives traversal,
 // rmwrite materialises RM values, and primitive leaves call
 // PrimitiveConstraint.ExampleValue. The returned root is typed as
-// any — use [AsComposition], [AsObservation], etc. for the concrete
+// any; use [AsComposition], [AsObservation], etc. for the concrete
 // access path.
 func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error) {
 	if err := ctx.Err(); err != nil {

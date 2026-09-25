@@ -18,8 +18,7 @@ import (
 
 // TemplateFormat selects between the ADL 1.4 Operational-Template
 // shape and the ADL 2 source-form shape on the wire. Only
-// [FormatADL14] is supported in v1; ADL 2 follows in a later commit
-// per docs/plans/2026-05-15-rest-api-client.md.
+// [FormatADL14] is supported in v1; ADL 2 is not yet implemented.
 //
 // The string value is the URL-path segment under
 // `/definition/template/...` and the value the deployment expects.
@@ -58,7 +57,7 @@ func (f TemplateFormat) IsValid() bool {
 // TemplateMetadata is the typed listing/upload response shape per the
 // openEHR REST Definition API. Documented fields are typed and
 // deployment-specific fields are preserved verbatim in Extras for
-// forward-compatibility — mirrors the pattern in
+// forward-compatibility, following the same pattern as
 // [github.com/cadasto/openehr-sdk-go/openehr/client/system.ServiceCapabilities].
 type TemplateMetadata struct {
 	// TemplateID is the deployment-assigned template identifier
@@ -79,15 +78,14 @@ type TemplateMetadata struct {
 	// Description is an optional free-text description.
 	Description string `json:"description,omitempty"`
 	// Extras preserves deployment-specific fields not in the standard
-	// metadata shape. [TemplateMetadata.MarshalJSON] re-emits them
-	// (REQ-144).
+	// metadata shape. [TemplateMetadata.MarshalJSON] re-emits them.
 	//
 	// Extras keys are matched against the documented field names
 	// case-sensitively, while encoding/json decodes those field names
 	// case-insensitively. A wire key differing from a documented field
 	// only by case ("Template_ID") therefore populates the documented
 	// field and is also preserved here verbatim, so encode emits both
-	// keys when the documented field emits one at all — `template_id` is
+	// keys when the documented field emits one at all. `template_id` is
 	// omitempty, so an empty TemplateID emits only the preserved key.
 	Extras map[string]json.RawMessage `json:"-"`
 }
@@ -105,7 +103,7 @@ var knownTemplateMetadataFields = map[string]struct{}{
 //
 // created_timestamp is shadowed as a json.RawMessage over the alias so the
 // strict RFC 3339-only time.Time decoder never sees it; it is parsed
-// afterwards across the accepted layout set (REQ-144).
+// afterwards across the accepted layout set.
 func (m *TemplateMetadata) UnmarshalJSON(data []byte) error {
 	type alias TemplateMetadata
 	var a alias
@@ -148,9 +146,9 @@ func (m *TemplateMetadata) UnmarshalJSON(data []byte) error {
 // zero), so the emitted key set is not guaranteed to be identical to the
 // wire body a value was decoded from. Neither is its spelling:
 // encoding/json compacts insignificant whitespace and escapes `<`, `>`
-// and `&` as `\u003c`, `\u003e` and `\u0026` inside a preserved value —
-// the escaped spelling decodes to the identical value — and key order is
-// not part of the contract (REQ-144).
+// and `&` as `\u003c`, `\u003e` and `\u0026` inside a preserved value
+// (the escaped spelling decodes to the identical value), and key order is
+// not part of the contract.
 func (m TemplateMetadata) MarshalJSON() ([]byte, error) {
 	type alias TemplateMetadata
 	known, err := json.Marshal(alias(m))
@@ -198,23 +196,23 @@ func WithUploadVersion(v string) UploadOption {
 }
 
 // UploadTemplate uploads the body (a serialised template in the given
-// format) to the deployment. For [FormatADL14] the body MUST be an
+// format) to the deployment. For [FormatADL14] the body must be an
 // OPT XML document; the Content-Type header is set to
 // `application/xml` automatically. ADL 2 source-form upload (Content-
 // Type `text/plain`) is not yet implemented.
 //
 // The request accepts both `application/json` and `application/xml`. The
 // ITS-REST 201 response may carry the created template as a JSON
-// TemplateIdentifier, an XML OperationalTemplate, or an empty body — the
+// TemplateIdentifier, an XML OperationalTemplate, or an empty body, the
 // last when the server applies its `return=minimal` default, since this
 // call sends no `Prefer` header. A deployment that serves the ADL 1.4
 // template surface only as XML (EHRbase among them) answers `406 Not
-// Acceptable` to an `application/json`-only Accept, so accepting both is
-// what keeps the upload interoperable. A JSON object body is decoded into
+// Acceptable` to an `application/json`-only Accept, so the call accepts
+// both to stay interoperable. A JSON object body is decoded into
 // the returned [*TemplateMetadata]; an empty or XML body yields a minimal
 // record whose TemplateID is the trailing segment of the Location header.
 // A response that carries neither a JSON `template_id` nor a Location
-// header is an error ([transport.ErrInvalidShape]) — the caller never
+// header is an error ([transport.ErrInvalidShape]), so the caller never
 // receives an empty id.
 //
 // Wire: POST /definition/template/{format}. The decoded
@@ -300,7 +298,7 @@ func UploadTemplate(ctx context.Context, c *transport.Client, format TemplateFor
 }
 
 // GetTemplate fetches the raw OPT bytes for templateID under the
-// given format. Returns the bytes verbatim — consumers are expected
+// given format. It returns the bytes verbatim; consumers are expected
 // to parse the XML themselves (or pass it to a template parser
 // downstream).
 //
@@ -333,21 +331,20 @@ func GetTemplate(ctx context.Context, c *transport.Client, templateID string, fo
 }
 
 // ListTemplates returns the deployment's catalog of templates for
-// the given format, optionally filtered (REQ-143).
+// the given format, optionally filtered.
 //
-// Filters are the ITS-REST list query parameters — see [WithTemplateID],
-// [WithConcept], [WithVersion], [WithOffset], and [WithFetch]. An unset
-// option contributes no query key, so a call with no options is byte-wise
-// the request this function has always issued. Filtering is applied by the
+// Filters are the ITS-REST list query parameters: see [WithTemplateID],
+// [WithConcept], [WithVersion], [WithOffset] and [WithFetch]. An unset
+// option contributes no query key, so a call with no options sends no
+// query parameters. Filtering is applied by the
 // server; the SDK only emits the parameters.
 //
 // An empty 2xx response body comes back as a non-nil zero-length slice with
 // a nil error, so re-serialising the result yields [] rather than JSON null;
 // a JSON [] body decodes non-nil through encoding/json by construction.
-// "Empty" is the definition § REQ-144 takes from § REQ-094, implemented by
-// [transport.IsNoRepresentationBody] and classified ahead of decode, so a
-// null body takes this same arm and yields the non-nil empty slice rather
-// than the nil one encoding/json would otherwise produce.
+// [transport.IsNoRepresentationBody] decides what counts as empty, and the
+// check runs before decode, so a null body also yields the non-nil empty
+// slice rather than the nil one encoding/json would otherwise produce.
 //
 // Wire: GET /definition/template/{format}.
 func ListTemplates(ctx context.Context, c *transport.Client, format TemplateFormat, opts ...ListOption) ([]TemplateMetadata, *transport.Metadata, error) {
@@ -392,7 +389,7 @@ func ListTemplates(ctx context.Context, c *transport.Client, format TemplateForm
 // to preserve referential integrity for compositions already stored
 // against the template). A `405 Method Not Allowed` or `403
 // Forbidden` from the wire surfaces as a typed
-// [transport.WireError]; consumers SHOULD treat delete as a
+// [transport.WireError]; consumers should treat delete as a
 // best-effort operation guarded by deployment policy.
 //
 // Wire: DELETE /definition/template/{format}/{template_id}.
@@ -421,7 +418,7 @@ func DeleteTemplate(ctx context.Context, c *transport.Client, templateID string,
 // ExampleType selects the kind of example the deployment synthesises:
 // ExampleTypeInput (ready to submit to the repository) or
 // ExampleTypeOutput (as it would appear when retrieved). Maps to the
-// `type` query parameter; when unset the spec default ("input") applies.
+// `type` query parameter; when unset the ITS-REST default ("input") applies.
 type ExampleType string
 
 const (
@@ -432,7 +429,7 @@ const (
 )
 
 // ExampleDetailLevel selects how complete the generated example is. Maps
-// to the `detail_level` query parameter; when unset the spec default
+// to the `detail_level` query parameter; when unset the ITS-REST default
 // ("required") applies.
 type ExampleDetailLevel string
 
@@ -445,7 +442,7 @@ const (
 	ExampleDetailComplete ExampleDetailLevel = "complete"
 )
 
-// IsValid reports whether t is one of the spec's `type` enum values.
+// IsValid reports whether t is one of the ITS-REST `type` enum values.
 func (t ExampleType) IsValid() bool {
 	switch t {
 	case ExampleTypeInput, ExampleTypeOutput:
@@ -455,7 +452,7 @@ func (t ExampleType) IsValid() bool {
 	}
 }
 
-// IsValid reports whether l is one of the spec's `detail_level` enum values.
+// IsValid reports whether l is one of the ITS-REST `detail_level` enum values.
 func (l ExampleDetailLevel) IsValid() bool {
 	switch l {
 	case ExampleDetailRequired, ExampleDetailMedium, ExampleDetailComplete:
@@ -475,14 +472,15 @@ type exampleConfig struct {
 type ExampleOption func(*exampleConfig)
 
 // WithExampleType sets the `type` query parameter (input or output).
-// Omitted by default — the deployment applies the spec default "input".
+// Omitted by default, in which case the deployment applies the ITS-REST
+// default "input".
 func WithExampleType(t ExampleType) ExampleOption {
 	return func(c *exampleConfig) { c.exampleType = t }
 }
 
 // WithExampleDetailLevel sets the `detail_level` query parameter
-// (required, medium, or complete). Omitted by default — the deployment
-// applies the spec default "required".
+// (required, medium, or complete). Omitted by default, in which case the
+// deployment applies the ITS-REST default "required".
 func WithExampleDetailLevel(l ExampleDetailLevel) ExampleOption {
 	return func(c *exampleConfig) { c.detailLevel = l }
 }
@@ -493,8 +491,7 @@ func WithExampleDetailLevel(l ExampleDetailLevel) ExampleOption {
 //
 // Wire: GET /definition/template/{format}/{template_id}/example with the
 // optional `type` and `detail_level` query parameters (operationId
-// definition_template_adl1.4_example_get —
-// resources/its-rest/definition-validation.openapi.yaml line 225). Decodes
+// definition_template_adl1.4_example_get). Decodes
 // the canonical-JSON response body into a [*rm.Composition]; flat /
 // structured / XML negotiation is not reachable through this typed entry
 // point (drop to transport.Client.Do for those).
@@ -554,8 +551,8 @@ func extractLastPathSegment(p string) string {
 	return p
 }
 
-// Repository mirrors the package-level Definition functions for DI
-// seams (REQ-023).
+// Repository mirrors the package-level Definition functions as a
+// dependency-injection seam.
 type Repository interface {
 	UploadTemplate(ctx context.Context, format TemplateFormat, body io.Reader, opts ...UploadOption) (*TemplateMetadata, *transport.Metadata, error)
 	GetTemplate(ctx context.Context, templateID string, format TemplateFormat) ([]byte, *transport.Metadata, error)

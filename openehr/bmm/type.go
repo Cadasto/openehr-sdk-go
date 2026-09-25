@@ -13,7 +13,7 @@ type Type interface {
 	isType()
 }
 
-// SimpleType represents P_BMM_SIMPLE_TYPE — a reference to a named type
+// SimpleType represents P_BMM_SIMPLE_TYPE: a reference to a named type
 // (a class, an enumeration, a primitive, or an open generic parameter
 // when the parent property is the *_OPEN variant).
 type SimpleType struct {
@@ -35,15 +35,15 @@ func (s *SimpleType) MarshalJSON() ([]byte, error) {
 	}{TypeP_BMM_SIMPLE_TYPE, s.TypeName})
 }
 
-// GenericType represents P_BMM_GENERIC_TYPE — a root type with generic
+// GenericType represents P_BMM_GENERIC_TYPE: a root type with generic
 // parameter bindings.
 //
 // Three on-wire shapes for the parameter slot are observed:
 //
 //  1. "generic_parameters": ["String","CODE_PHRASE"]      // bare names
 //  2. "generic_parameters": [..., {"_type":"P_BMM_GENERIC_TYPE", ...}, ...]
-//     — i.e. a mixed array where some entries are nested type objects
-//  3. "generic_parameter_defs": { "K": {...Type...}, "V": {...} } — a
+//     (a mixed array where some entries are nested type objects)
+//  3. "generic_parameter_defs": { "K": {...Type...}, "V": {...} }: a
 //     keyed map (named parameters), used at class-level generic defs and
 //     also in some property type_defs.
 //
@@ -123,7 +123,7 @@ func marshalGenericParameters(buf *bytes.Buffer, ps []Type) error {
 	return nil
 }
 
-// ContainerType represents P_BMM_CONTAINER_TYPE — a container kind
+// ContainerType represents P_BMM_CONTAINER_TYPE: a container kind
 // (List|Set|Array|Hash) wrapping an inner type.
 //
 // Two on-wire shapes are observed:

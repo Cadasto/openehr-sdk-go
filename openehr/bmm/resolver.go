@@ -15,7 +15,7 @@ import (
 // "openehr_base_1.3.0". Implementations are stateless from the
 // loader's perspective; they may consult network, disk, or memory.
 //
-// On miss, implementations MUST return an error satisfying
+// On a miss, implementations must return an error satisfying
 // errors.Is(err, ErrSchemaNotFound).
 type Resolver interface {
 	Resolve(ctx context.Context, schemaID string) (io.ReadCloser, error)

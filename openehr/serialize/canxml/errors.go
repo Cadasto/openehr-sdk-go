@@ -24,18 +24,18 @@ var ErrInvalidShape = errors.New("canxml: invalid XML shape")
 
 // ErrNamespace is the canxml-local sentinel reserved for foreign-
 // namespace rejection: an element decoded outside the openEHR
-// canonical default namespace at a position the spec pins to it.
+// canonical default namespace at a position where canonical XML
+// requires it.
 //
-// NOTE: the decoder does not currently return it — the generated
+// The decoder does not currently return it: the generated
 // UnmarshalXML methods match children by local name and skip
 // unrecognised elements, so foreign namespaces are tolerated rather
-// than rejected. The sentinel is retained as a released public symbol
-// (shipped since v0.1.0) for source compatibility and for a future
-// strict-namespace decode path.
+// than rejected. The sentinel stays exported for source compatibility
+// and for a future strict-namespace decode path.
 var ErrNamespace = errors.New("canxml: foreign XML namespace")
 
 // DecodeError is the unified error returned by the decoder at
 // polymorphic dispatch sites. Re-exported from the internal poly
 // helper so consumers can `errors.As` against a stable type without
-// importing internal packages — same envelope shape as canjson.
+// importing internal packages. It has the same shape as canjson's.
 type DecodeError = poly.DecodeError

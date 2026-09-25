@@ -13,7 +13,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-// Execute runs an ad-hoc AQL query via POST /query/aql (REQ-055).
+// Execute runs an ad-hoc AQL query via POST /query/aql.
 func Execute(ctx context.Context, c *transport.Client, q aql.Query, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
 	if err := q.Validate(); err != nil {
 		return nil, nil, fmt.Errorf("query.Execute: %w: %w", ErrInvalidConfig, err)
@@ -52,9 +52,9 @@ func Execute(ctx context.Context, c *transport.Client, q aql.Query, opts ...Exec
 	return doResultSet(ctx, c, req)
 }
 
-// ExecuteString is an escape hatch for raw AQL. aqlText MUST be a
+// ExecuteString is an escape hatch for raw AQL. aqlText must be a
 // static or programmatically validated statement; never interpolate
-// caller-supplied values into it — pass them via params, which the CDR
+// caller-supplied values into it. Pass them via params, which the CDR
 // binds as named placeholders. String-built AQL is injectable.
 func ExecuteString(ctx context.Context, c *transport.Client, aqlText string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
 	q := aql.NewQuery(aqlText)
@@ -63,7 +63,7 @@ func ExecuteString(ctx context.Context, c *transport.Client, aqlText string, par
 }
 
 // RunStored executes a stored query at the latest version via POST
-// /query/{qualified_query_name} (REQ-057).
+// /query/{qualified_query_name}.
 func RunStored(ctx context.Context, c *transport.Client, qualifiedName string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
 	return runStoredAtVersion(ctx, c, "query.RunStored", qualifiedName, "", params, opts...)
 }
@@ -76,7 +76,7 @@ func RunStored(ctx context.Context, c *transport.Client, qualifiedName string, p
 // [ErrInvalidConfig]): the versioned and unversioned routes execute
 // different query logic, so falling back to the latest version would run
 // something the caller did not ask for. Use [RunStored] for the latest
-// version — it omits the /{version} segment by design (REQ-057).
+// version; it omits the /{version} segment.
 func RunStoredVersion(ctx context.Context, c *transport.Client, qualifiedName, version string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
 	// REQ-057: the refusal belongs to the EXPLICIT-version entry point.
 	// RunStored passes an empty version internally to mean "latest", which
@@ -309,7 +309,7 @@ func doResultSet(ctx context.Context, c *transport.Client, req *transport.Reques
 	return out, meta, nil
 }
 
-// Repository mirrors package-level query functions (REQ-023).
+// Repository mirrors package-level query functions.
 type Repository interface {
 	Execute(ctx context.Context, q aql.Query, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error)
 	ExecuteString(ctx context.Context, aqlText string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error)

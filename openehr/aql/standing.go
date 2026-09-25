@@ -32,72 +32,67 @@ import (
 	"strings"
 )
 
-// Predicated returns c carrying a class-position STANDING predicate — the
-// `standardPredicate` alternative of the class bracket (REQ-163), one
+// Predicated returns c carrying a class-position standing predicate: the
+// `standardPredicate` alternative of the class bracket, one
 // `<path> <op> <value>` comparison:
 //
 //	Class("VERSIONED_COMPOSITION", "vo").Predicated("uid/value", OpEq, Param("vo"))
 //	// -> VERSIONED_COMPOSITION vo[uid/value = $vo]
 //
-// The path is RELATIVE to the class expression and binds no FROM alias, so it
+// The path is relative to the class expression and binds no FROM alias, so it
 // is written without one; the value renders through the same canonical
-// spellings a WHERE comparison uses. As everywhere in the containment algebra c
-// itself is not modified — the result is a new value.
+// spellings a WHERE comparison uses. As everywhere in the containment
+// algebra, c itself is not modified; the result is a new value.
 //
-// Exactly ONE comparison per node. FOUR misuses have no valid tree to return,
-// so each is recorded on the node and surfaced by [Builder.Build] as an error
-// wrapping [ErrInvalidQuery] — the `invalid` route [Containment.withChild]
-// already uses, never absorbed into a shape that means something else:
+// Exactly one comparison per node. Four misuses have no valid tree to return,
+// so each is recorded on the node and reported by [Builder.Build] as an error
+// wrapping [ErrInvalidQuery], never absorbed into a shape that means
+// something else:
 //
-//   - a JUNCTION receiver. A junction carries no class of its own, so it has no
-//     bracket position at all; the predicate belongs on the operand it
-//     constrains.
-//   - a node that already carries an ARCHETYPE predicate. The archetype and
-//     standing forms are two mutually exclusive spellings of the ONE `[…]`
-//     position, so emitting whichever the renderer reaches first would silently
-//     DROP the other — and the dropped one is a row filter, so the query comes
-//     back with more rows than the caller asked for.
-//   - a SECOND standing predicate on a node already predicated. One bracket
+//   - A junction receiver. A junction carries no class of its own, so it has
+//     no bracket position; the predicate belongs on the operand it constrains.
+//   - A node that already carries an archetype predicate. The archetype and
+//     standing forms are two mutually exclusive spellings of the one `[…]`
+//     position, so emitting whichever the renderer reaches first would
+//     silently drop the other. The dropped one is a row filter, so the query
+//     would return more rows than the caller asked for.
+//   - A second standing predicate on a node already predicated. One bracket
 //     renders one predicate and `standardPredicate` has no conjunction of its
 //     own, so the first comparison would be dropped the same way. Join the
 //     conditions in WHERE.
-//   - a VERSION-spelled node. A comparison on a VERSION node is legal AQL, but
+//   - A VERSION-spelled node. A comparison on a VERSION node is legal AQL, but
 //     it is a different grammar position with a different accept set, and it
-//     has its own carrier: write
-//     `Version(alias, VersionCompare(path, op, value))`. See
-//     [VersionCompare]. Routing the call there silently instead would change
-//     the caller's accept set under them with no diagnostic, which is the
-//     failure this one-carrier-per-position rule exists to prevent.
+//     has its own carrier: write `Version(alias, VersionCompare(path, op,
+//     value))` (see [VersionCompare]). Rerouting the call there silently
+//     would change what the caller's query accepts with no diagnostic.
 //
-// A malformed comparison — an unknown operator, an empty path, a nil value, an
-// operand outside `pathPredicateOperand` — and bracket text that could ESCAPE
-// the emitter's own brackets are refused at [Builder.Build] too, by
-// [Comparison.validate], [validatePredicateOperand] and [ValidatePathPredicate]
-// respectively (see [Containment.validateStandingPredicate]).
+// [Builder.Build] also refuses a malformed comparison (an unknown operator,
+// an empty path, a nil value, an operand outside `pathPredicateOperand`) and
+// bracket text that could escape the emitter's own brackets (see
+// [ValidatePathPredicate]).
 //
-// Edge whitespace is TRIMMED off path, as at [Col], [ColAs], [Builder.From] and
-// [Builder.OrderBy]: the canonical bracket carries no padding (REQ-163
-// § Canonical spellings), so storing it verbatim would emit a spelling the read
-// side does not emit back and the identity round trip would fail.
+// Edge whitespace is trimmed off path, as at [Col], [ColAs], [Builder.From]
+// and [Builder.OrderBy]: the canonical bracket carries no padding, so storing
+// it verbatim would emit a spelling the read side does not emit back and the
+// identity round trip would fail.
 //
 // # One tolerated asymmetry
 //
-// path is not scanned for a JUNCTION, so `Predicated("uid/value = 1 AND x", OpEq,
-// Int(2))` emits `c[uid/value = 1 AND x = 2]` — a two-condition bracket from a
-// carrier that recorded one comparison. The VERSION side refuses the same shape,
-// because [ValidateVersionPredicate] has an explicit junction check that
-// [ValidatePathPredicate] does not: `nodePredicate`, the bracket's third
-// alternative, IS defined over AND / OR, so a junction here is legal AQL at a
-// position the builder has no carrier for (REQ-163 § Out of scope) rather than
-// text the parser rejects. That puts it in the same class as [Col]'s leniency —
-// loud, ordinary AQL that says what the caller wrote — and it is left tolerated
-// on REQ-119's own rule that refusal is reserved for the silent-substitution
-// mode. Written down here so it stops being rediscovered as a defect.
+// path is not scanned for a junction, so `Predicated("uid/value = 1 AND x",
+// OpEq, Int(2))` emits `c[uid/value = 1 AND x = 2]`, a two-condition bracket
+// from a carrier that recorded one comparison. The VERSION side refuses the
+// same shape, because [ValidateVersionPredicate] has an explicit junction
+// check that [ValidatePathPredicate] does not. `nodePredicate`, the bracket's
+// third alternative, is defined over AND / OR, so a junction here is legal
+// AQL at a position the builder has no carrier for, not text the parser
+// rejects. Like [Col]'s leniency, it is ordinary AQL that says what the
+// caller wrote, and refusal is kept for text that would silently change the
+// query's meaning. This is intended behaviour.
 //
-// The bracket's other alternatives — a node id, a name slot, a regex match, an
-// AND / OR node predicate — are legal AQL that no builder carrier spells; they
-// are out of scope for this REQ, so the write vocabulary here is bounded by the
-// `standardPredicate` and `archetypePredicate` alternatives.
+// The bracket's other alternatives (a node id, a name slot, a regex match, an
+// AND / OR node predicate) are legal AQL that no builder carrier spells, so
+// the write vocabulary here covers only the `standardPredicate` and
+// `archetypePredicate` alternatives.
 func (c Containment) Predicated(path string, op Operator, v Value) Containment {
 	if err := c.standingRefusal(); err != nil {
 		// The FIRST defect wins, matching [Containment.validateTree], which

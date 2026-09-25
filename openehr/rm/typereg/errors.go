@@ -15,7 +15,7 @@ import (
 // helpers the generated codec calls ([DecodeInto], [DecodePolymorphic]). They
 // are unwrap-compatible (errors.Is) so call sites such as the canjson
 // codec can wrap them in a richer [DecodeError] without losing the
-// classification. PROBE-031 asserts ErrUnknownType.
+// classification.
 var (
 	// ErrMissingType signals that the input JSON object lacks the
 	// `_type` discriminator required at a polymorphic site.
@@ -32,21 +32,20 @@ var (
 	// different concrete type than the one being decoded.
 	ErrTypeMismatch = errors.New("typereg: decoded type does not satisfy target")
 	// ErrMaxDepthExceeded signals that nesting depth, measured from the
-	// document root, exceeds the 512-level bound (REQ-108). It is raised by
+	// document root, exceeds the 512-level bound. It is raised by
 	// [Registry.Decode] and [DecodePolymorphic], which count every bracket
 	// of the value they buffer, and by [DecodeInto], which checks the
-	// decoder's stack depth where an RM value opens; together they are a guard
+	// decoder's stack depth where an RM value opens. Together they guard
 	// against stack exhaustion and quadratic re-parsing from a crafted
 	// deeply-nested document (e.g. nested CLUSTER/SECTION trees).
 	ErrMaxDepthExceeded = errors.New("typereg: nesting depth exceeds limit")
 	// ErrNilReceiver classifies an UnmarshalJSONFrom / UnmarshalJSON /
-	// UnmarshalText call on a nil receiver — caller-constructible misuse (a
-	// failed errors.AsType leaves a typed nil behind; a zero-value struct holds
-	// one in a field) that the no-panic rule (REQ-025, idiom.md § No panics)
-	// turns into an error instead of a dereference. Every generated
-	// UnmarshalJSONFrom and the hand-written primitive codecs (rm.Real,
-	// rm.Integer, rm.Character) wrap
-	// it; the nil-receiver census in this package pins the whole registry.
+	// UnmarshalText call on a nil receiver. That is caller misuse that is easy
+	// to construct (a failed errors.AsType leaves a typed nil behind; a
+	// zero-value struct holds one in a field), and it is returned as an error
+	// instead of panicking on a dereference. Every generated UnmarshalJSONFrom
+	// and the hand-written primitive codecs (rm.Real, rm.Integer, rm.Character)
+	// wrap it.
 	ErrNilReceiver = errors.New("typereg: nil receiver")
 	// ErrNilArgument classifies a nil argument that an exported decode helper
 	// would otherwise dereference: a nil *jsontext.Decoder, a nil out, or a
@@ -54,14 +53,14 @@ var (
 	// out handed to [DecodePolymorphic]. It is caller misuse (no generated
 	// body passes one), refused before any decode with a [DecodeError] whose
 	// Inner wraps this sentinel and names the argument, so a caller can match
-	// it with errors.Is instead of recovering a panic (REQ-025).
+	// it with errors.Is instead of recovering a panic.
 	ErrNilArgument = errors.New("typereg: nil argument")
-	// ErrInvalidShape classifies a JSON-level shape failure — valid JSON
-	// that is the wrong shape for the target type — or a hand-written
+	// ErrInvalidShape classifies a JSON-level shape failure (valid JSON
+	// that is the wrong shape for the target type) or a hand-written
 	// primitive codec's refusal of a value it will not accept: rm.Real
 	// past its 17-significant-digit budget (a digit count, not a
-	// representability test), rm.Character not exactly one character
-	// (REQ-052). It is usually attached by [WrapShapeError] from inside a
+	// representability test), rm.Character not exactly one character.
+	// It is usually attached by [WrapShapeError] from inside a
 	// generated UnmarshalJSONFrom method; the hand-written codecs attach it
 	// directly through their own message-preserving wrapper. Its message names
 	// canjson because canjson is where callers meet it: it is
@@ -87,13 +86,13 @@ var (
 // typereg sentinels (or a codec-defined shape error).
 //
 // The envelope is classification-neutral in both directions: it never
-// adds [ErrInvalidShape] to what it wraps, and — because Unwrap exposes
-// Inner — it never strips one raised beneath it. So a dispatch failure
+// adds [ErrInvalidShape] to what it wraps, and, because Unwrap exposes
+// Inner, it never strips one raised beneath it. So a dispatch failure
 // (missing / unknown / mismatched `_type`) stays outside the shape
 // sentinel, while a shape failure inside the concrete type selected at
 // a slot answers true to both errors.AsType[*DecodeError] and
 // errors.Is(_, ErrInvalidShape): the path from this type, the kind from
-// the sentinel (REQ-052).
+// the sentinel.
 type DecodeError struct {
 	Path  string
 	Type  string
@@ -101,12 +100,11 @@ type DecodeError struct {
 }
 
 // Error names the failed node and the wrapped cause. A nil receiver
-// answers with the zero DecodeError's text rather than dereferencing
-// (REQ-025 nil-receiver axis). This type is the documented errors.As /
-// errors.AsType out-parameter for both codecs — it is re-exported as
-// canjson.DecodeError and canxml.DecodeError — so a failed match leaves
-// a typed nil in consumer hands on the most-travelled decode route in
-// the SDK.
+// answers with the zero DecodeError's text rather than dereferencing.
+// This type is the documented errors.As / errors.AsType out-parameter
+// for both codecs (it is re-exported as canjson.DecodeError and
+// canxml.DecodeError), so a failed match can leave a typed nil in
+// caller hands.
 func (e *DecodeError) Error() string {
 	if e == nil {
 		return (&DecodeError{}).Error()
@@ -136,8 +134,7 @@ func (e *DecodeError) Error() string {
 }
 
 // Unwrap returns the wrapped error so errors.Is / errors.As reach the
-// underlying sentinel. A nil receiver unwraps to nil (REQ-025
-// nil-receiver axis).
+// underlying sentinel. A nil receiver unwraps to nil.
 func (e *DecodeError) Unwrap() error {
 	if e == nil {
 		return nil
@@ -152,17 +149,17 @@ func (e *DecodeError) Unwrap() error {
 //
 // The message is exactly `canjson: <rmType>: <err>`, and err stays
 // reachable through errors.As, so the classification costs no
-// diagnostic. What it adds is [ErrInvalidShape] under errors.Is —
-// except when err already carries a [DecodeError]: this arm does not
-// add the sentinel to it, and whatever classification that DecodeError
-// already carries — its dispatch sentinel, or a shape classification
-// raised beneath it — is kept as is (REQ-052).
+// diagnostic. What it adds is [ErrInvalidShape] under errors.Is, except
+// when err already carries a [DecodeError]. In that case the sentinel is
+// not added, and whatever classification that DecodeError already
+// carries (its dispatch sentinel, or a shape classification raised
+// beneath it) is kept as is.
 //
 // The bypass is one-directional: it withholds a classification the
 // enclosing funnel would otherwise add, never removes one raised
 // further down. So a shape failure inside the concrete type selected
 // at a polymorphic slot keeps ErrInvalidShape while the DecodeError
-// keeps the path — both true of the same error — whereas a dispatch
+// keeps the path (both true of the same error), whereas a dispatch
 // failure (missing, unknown or mismatched `_type`) stays outside the
 // sentinel, because ErrInvalidShape means "JSON-level shape", not "any
 // decode failure".
@@ -182,7 +179,7 @@ func WrapShapeError(rmType string, err error) error {
 // ClassifyShape attaches [ErrInvalidShape] to a failure the codec detects
 // outside a generated type's funnel, such as a duplicate member name the
 // tokenizer refuses during tokenisation, while the enclosing RM value is
-// being decoded (REQ-052). It preserves err's message and keeps errors.Unwrap
+// being decoded. It preserves err's message and keeps errors.Unwrap
 // a single step to the cause, exactly as [WrapShapeError] does for an
 // in-funnel shape failure, but adds no `canjson: <rmType>:` prefix because no
 // single RM type owns the failure.
@@ -192,7 +189,7 @@ func WrapShapeError(rmType string, err error) error {
 // (the same bypass WrapShapeError applies). The DecodeError must be non-nil: a
 // typed-nil `*DecodeError` in the chain satisfies errors.AsType but is not a
 // real dispatch failure, so it falls through to the shape classification rather
-// than escaping it (REQ-025).
+// than escaping it.
 func ClassifyShape(err error) error {
 	if err == nil {
 		return nil
@@ -209,7 +206,7 @@ func ClassifyShape(err error) error {
 // (a well-formed value whose shape RFC 8259 section 4 nonetheless rejects),
 // so it reaches a decode entry point as a bare
 // *jsontext.SyntacticError carrying no sentinel. This gate gives that refusal
-// the decode-side shape classification REQ-052 mandates, exactly as
+// the decode-side shape classification, exactly as
 // [ClassifyShape] does: the message is preserved and a single errors.Unwrap
 // step still lands on the cause, so errors.Is finds both [ErrInvalidShape] and
 // jsontext.ErrDuplicateName.

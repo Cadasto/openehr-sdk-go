@@ -2,7 +2,7 @@ package itemtags
 
 import "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 
-// Tag is an ITEM_TAG wire value (REQ-059). Alias of [ehr.ItemTag].
+// Tag is an ITEM_TAG wire value. Alias of [ehr.ItemTag].
 type Tag = ehr.ItemTag
 
 // FormatHeader encodes tags into the ITS-REST header shape.

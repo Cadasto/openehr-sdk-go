@@ -9,7 +9,7 @@ import (
 // uses for primitive numeric constraints (C_INTEGER / C_REAL ranges,
 // DV_QUANTITY magnitude / precision ranges).
 //
-// The zero value represents an "any value accepted" range — both
+// The zero value represents an "any value accepted" range: both
 // sides unbounded, which [Contains] returns true for.
 type NumericRange struct {
 	// Lower / Upper are the numeric bounds. Float64 covers both
@@ -22,16 +22,16 @@ type NumericRange struct {
 	// true.
 	LowerInclusive, UpperInclusive bool
 
-	// LowerUnbounded / UpperUnbounded mark the side as "no constraint"
-	// — Lower / Upper are then ignored. Mirrors the
+	// LowerUnbounded / UpperUnbounded mark the side as "no constraint";
+	// Lower / Upper are then ignored. Mirrors the
 	// <lower_unbounded> / <upper_unbounded> wire booleans.
 	LowerUnbounded, UpperUnbounded bool
 }
 
 // IsBounded reports whether the range carries any constraint at all.
-// Returns false for the zero value (no fields set — treated as
+// It returns false for the zero value (no fields set, treated as
 // "any value accepted") and for ranges with both sides explicitly
-// unbounded. Used by validators to short-circuit the
+// unbounded. Validators use it to short-circuit the
 // no-op-validation case.
 func (r NumericRange) IsBounded() bool {
 	if r == (NumericRange{}) {
@@ -40,7 +40,7 @@ func (r NumericRange) IsBounded() bool {
 	return !r.LowerUnbounded || !r.UpperUnbounded
 }
 
-// IsValid reports whether the range is internally consistent — the
+// IsValid reports whether the range is internally consistent: the
 // lower bound is less than (or equal to, when both sides are
 // inclusive) the upper bound. Unbounded sides are skipped.
 func (r NumericRange) IsValid() bool {
@@ -81,7 +81,7 @@ func (r NumericRange) Contains(v float64) bool {
 	return true
 }
 
-// String renders the range in standard interval notation — `[a..b]`
+// String renders the range in standard interval notation: `[a..b]`
 // for fully-closed, `(a..b)` for open, `[a..*)` for half-unbounded,
 // etc. Convenient for Violation.Detail messages.
 func (r NumericRange) String() string {

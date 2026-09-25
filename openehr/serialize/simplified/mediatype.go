@@ -6,8 +6,7 @@ import (
 	"mime"
 )
 
-// Format identifies which of the two Simplified Formats a media type names
-// (REQ-053).
+// Format identifies which of the two Simplified Formats a media type names.
 type Format int
 
 const (
@@ -28,7 +27,7 @@ const (
 )
 
 // ErrUnknownMediaType is returned by [ParseMediaType] for a value that names
-// neither Simplified Format — a different media type, an unparseable header
+// neither Simplified Format: a different media type, an unparseable header
 // value, or the WebTemplate resource type, which is not a composition format.
 var ErrUnknownMediaType = errors.New("simplified: unknown media type")
 
@@ -46,10 +45,10 @@ func (f Format) String() string {
 	}
 }
 
-// MediaType returns the canonical media type for f (REQ-053): the SDK emits
-// the two Simplified Formats strings only, never the deprecated
-// `.schema`-suffixed variants (retired from the specification, still served by
-// EHRbase). FormatUnknown and any out-of-range value yield "".
+// MediaType returns the canonical media type for f. The SDK emits only the
+// two Simplified Formats strings, never the deprecated `.schema`-suffixed
+// variants (retired from the specification, still served by EHRbase).
+// FormatUnknown and any out-of-range value yield "".
 func (f Format) MediaType() string {
 	switch f {
 	case FormatFlat:
@@ -75,19 +74,19 @@ var acceptedMediaTypes = map[string]Format{
 	"application/openehr.wt.structured.schema+json": FormatStructured,
 }
 
-// ParseMediaType classifies one media-type token as FLAT or STRUCTURED — a
+// ParseMediaType classifies one media-type token as FLAT or STRUCTURED: a
 // Content-Type value, or a single media range already picked out of an Accept
 // list. A comma-separated Accept list is not accepted: split it upstream and
 // call this once per range. The type is matched case-insensitively (RFC 2045),
 // and well-formed parameters are ignored whether or not this package
-// recognises them — `q` included, so a `q=0` range still classifies, because
+// recognises them, `q` included, so a `q=0` range still classifies, because
 // this call does no Accept negotiation. A value whose type part or parameters
 // do not parse is refused; a comma-separated list is one such value, and
 // refusing it is what stops a whole Accept list from being read as its first
-// range. Anything naming neither format — including the WebTemplate resource
-// type `application/openehr.wt+json`, which is a template projection rather
-// than a composition format — fails with [ErrUnknownMediaType]. It never
-// panics on any input (REQ-025).
+// range. Anything naming neither format, including the WebTemplate resource
+// type `application/openehr.wt+json` (a template projection rather than a
+// composition format), fails with [ErrUnknownMediaType]. It never panics on
+// any input.
 //
 // The codecs themselves take bytes; this is the one call a consumer makes
 // before them to decide which codec a negotiated body belongs to.

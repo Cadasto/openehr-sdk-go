@@ -18,7 +18,7 @@ var maxBMMBytes int64 = 32 << 20
 // every polymorphic node (properties, types, function parameters,
 // classes) and validates the presence of required fields.
 //
-// Load does NOT resolve `includes` — to merge an ancestor schema in,
+// Load does not resolve `includes`. To merge an ancestor schema in,
 // use [LoadAll] with a [Resolver].
 func Load(r io.Reader) (*Schema, error) {
 	if r == nil {

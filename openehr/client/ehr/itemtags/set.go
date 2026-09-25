@@ -19,7 +19,7 @@ type SetCompositionOptions struct {
 
 // SetComposition replaces ITEM_TAG headers on a Composition update (PUT).
 // The composition body is sent unchanged aside from tag headers; ifMatch
-// is required (REQ-054).
+// is required.
 func SetComposition(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opt SetCompositionOptions) (*openehrclient.VersionMetadata, error) {
 	if comp == nil {
 		return nil, fmt.Errorf("itemtags.SetComposition: %w: nil Composition", transport.ErrInvalidConfig)

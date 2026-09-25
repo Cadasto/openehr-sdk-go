@@ -18,21 +18,21 @@ import (
 )
 
 // ValidateRMEHRStatusBytes validates a canonical-JSON EHR_STATUS against
-// the template-less RM floor (REQ-112), consulting JSON-key presence so
-// the value-typed mandatory `subject` is checked correctly (PROBE-081).
+// the template-less RM floor, consulting JSON-key presence so
+// the value-typed mandatory `subject` is checked correctly.
 //
 // It decodes data into a *rm.EHRStatus, runs the value-based
 // [ValidateRMEHRStatus] floor, and additionally emits `required` at
-// `/subject` when the top-level `subject` key is absent from the JSON —
-// the one signal the Go value cannot carry (a valid bare
+// `/subject` when the top-level `subject` key is absent from the JSON.
+// That is the one signal the Go value cannot carry: a valid bare
 // `{"_type":"PARTY_SELF"}` and an omitted subject both decode to the zero
-// rm.PartySelf). A present-but-null `subject` (`"subject": null`) is
+// rm.PartySelf. A present-but-null `subject` (`"subject": null`) is
 // treated as absent: a null does not satisfy the mandatory attribute and
 // decodes to the same zero rm.PartySelf. A supplied subject, even the bare
 // form, yields no spurious `required`.
 //
-// Attributes the value-based floor already catches — the interface- /
-// pointer- / slice-typed mandatories (e.g. `name`, typed rm.DVTextLike) —
+// Attributes the value-based floor already catches (the interface-,
+// pointer- and slice-typed mandatories, e.g. `name`, typed rm.DVTextLike)
 // remain flagged when absent; the per-RM-type invariant catalogue is
 // unchanged. Input that is not a well-formed JSON object (malformed, array,
 // scalar, null, or an object repeating a member name), or that fails
@@ -40,13 +40,13 @@ import (
 // `invalid_shape` issue at `/` and a not-OK [Result].
 //
 // The decode uses encoding/json/v2 directly rather than
-// openehr/serialize/canjson, which REQ-013 forbids openehr/validation from
-// importing: the generated UnmarshalJSONFrom methods on the RM types carry
-// the codec, and typereg threads the polymorphic decode hooks, so no codec
+// openehr/serialize/canjson, which openehr/validation does not import:
+// the generated UnmarshalJSONFrom methods on the RM types carry the
+// codec, and typereg threads the polymorphic decode hooks, so no codec
 // entry point is needed. v2's defaults refuse a duplicate member name and
-// match member names case-sensitively, as the canonical-JSON contract
-// requires (REQ-052); a duplicate therefore surfaces as `invalid_shape` at
-// `/` like any other failed decode.
+// match member names case-sensitively, as canonical JSON requires; a
+// duplicate therefore surfaces as `invalid_shape` at `/` like any other
+// failed decode.
 func ValidateRMEHRStatusBytes(data []byte) Result {
 	// Top-level key presence — the only signal that separates an omitted
 	// `subject` from a supplied bare PARTY_SELF. A non-object input

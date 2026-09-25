@@ -30,29 +30,29 @@ type ServiceCapabilities struct {
 	// Vendor is the deployment's vendor identifier.
 	Vendor string `json:"vendor,omitempty"`
 	// RESTAPISpecsVersion is the declared ITS-REST contract version.
-	// Compared against the SDK pin at discovery time (REQ-072); this
+	// Compared against the ITS-REST version the SDK targets at discovery
+	// time; this
 	// field exposes the raw value for diagnostic display.
 	RESTAPISpecsVersion string `json:"restapi_specs_version,omitempty"`
 	// ConformanceProfile names the deployment's claimed conformance
 	// profile (typically "default" or a deployment-specific label).
 	ConformanceProfile string `json:"conformance_profile,omitempty"`
 	// Endpoints lists the REST paths the deployment advertises. The
-	// SDK does NOT use this for routing — service-catalog entries
-	// (REQ-070) are the authoritative source — but it surfaces the
+	// SDK does not use this for routing (service-catalog entries
+	// are the authoritative source), but it surfaces the
 	// list for diagnostic and feature-detection use.
 	Endpoints []string `json:"endpoints,omitempty"`
 	// Extras preserves deployment-specific fields not in the
 	// documented capabilities shape.
-	// [ServiceCapabilities.MarshalJSON] re-emits them. Preserved under
-	// the § REQ-144 unknown-response-keys rule, which § REQ-050 extends
-	// to this descriptor.
+	// [ServiceCapabilities.MarshalJSON] re-emits them, as for the other
+	// response descriptors that preserve unknown keys.
 	//
 	// Extras keys are matched against the documented field names
 	// case-sensitively, while encoding/json decodes those field names
 	// case-insensitively. A wire key differing from a documented field
 	// only by case ("Solution") therefore populates the documented field
 	// and is also preserved here verbatim, so encode emits both keys when
-	// the documented field emits one at all — `solution` is omitempty, so
+	// the documented field emits one at all. `solution` is omitempty, so
 	// an empty Solution emits only the preserved key.
 	Extras map[string]json.RawMessage `json:"-"`
 }
@@ -106,10 +106,10 @@ func (s *ServiceCapabilities) UnmarshalJSON(data []byte) error {
 // not guaranteed to be identical to the wire body a value was decoded
 // from. Neither is its spelling: encoding/json compacts insignificant
 // whitespace and escapes `<`, `>` and `&` as `\u003c`, `\u003e` and
-// `\u0026` inside a preserved value — the escaped spelling decodes to
-// the identical value. Key order is not part of the contract either (a
+// `\u0026` inside a preserved value (the escaped spelling decodes to
+// the identical value). Key order is not part of the contract either: a
 // non-empty Extras path marshals a map, and encoding/json sorts a map's
-// keys — documented fields are not emitted first there).
+// keys, so documented fields are not emitted first there.
 func (s ServiceCapabilities) MarshalJSON() ([]byte, error) {
 	type alias ServiceCapabilities
 	known, err := json.Marshal(alias(s))
@@ -161,11 +161,10 @@ const (
 // and returns the typed service capabilities response.
 //
 // openEHR REST 1.1.0-development defines the System API's single operation
-// as `OPTIONS /` (operationId `options`) — see
-// resources/its-rest/system-validation.openapi.yaml line 52. Consumers
-// SHOULD call this once at startup to confirm the deployment's declared
-// spec version matches the SDK's pinned target. Capabilities respects the
-// transport's configured auth path — anonymous calls are possible by
+// as `OPTIONS /` (operationId `options`). Call this once at startup to
+// confirm the deployment's declared spec version matches the ITS-REST
+// version the SDK targets. Capabilities respects the transport's
+// configured auth path; anonymous calls are possible by
 // constructing a separate transport.Client with auth.AnonymousTokenSource.
 func Capabilities(ctx context.Context, c *transport.Client) (*ServiceCapabilities, *transport.Metadata, error) {
 	req := &transport.Request{
@@ -195,7 +194,7 @@ func Capabilities(ctx context.Context, c *transport.Client) (*ServiceCapabilitie
 // Version returns the deployment's declared ITS-REST specification
 // version as a convenience over the full [Capabilities] call. The
 // returned string is the raw value advertised by the deployment;
-// callers SHOULD compare against constants from smart/discovery
+// callers should compare against constants from smart/discovery
 // rather than literal strings.
 func Version(ctx context.Context, c *transport.Client) (string, error) {
 	caps, _, err := Capabilities(ctx, c)
@@ -212,9 +211,9 @@ func Version(ctx context.Context, c *transport.Client) (string, error) {
 // cancellation pre-response) returns a non-nil error.
 //
 // Health issues an anonymous `OPTIONS /` request (the System API's only
-// operation) — a misconfigured TokenSource MUST NOT skew the health
-// signal, since monitoring tools commonly run without credentials.
-// Deployments exposing a dedicated /health path SHOULD wire that up via a
+// operation), so a misconfigured TokenSource cannot skew the health
+// signal; monitoring tools commonly run without credentials.
+// Deployments exposing a dedicated /health path should wire that up via a
 // Cadasto-platform Extra rather than this method; the SDK targets the
 // standard ITS-REST capabilities endpoint here for portability.
 func Health(ctx context.Context, c *transport.Client) (*HealthStatus, error) {
@@ -246,7 +245,7 @@ func Health(ctx context.Context, c *transport.Client) (*HealthStatus, error) {
 
 // Repository mirrors the package-level System functions as a method
 // set bound to a single *transport.Client. Useful for dependency-
-// injection seams (REQ-023); the package-level functions remain the
+// injection seams; the package-level functions remain the
 // primary call surface.
 type Repository interface {
 	Capabilities(ctx context.Context) (*ServiceCapabilities, *transport.Metadata, error)

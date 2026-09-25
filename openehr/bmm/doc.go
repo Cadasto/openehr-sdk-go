@@ -1,11 +1,11 @@
-// Package bmm loads openEHR Basic Meta-Model (BMM) schemas — the
-// P_BMM JSON files pinned under resources/bmm/ — into an in-memory model.
+// Package bmm loads openEHR Basic Meta-Model (BMM) schemas (the
+// P_BMM JSON files pinned under resources/bmm/) into an in-memory model.
 //
-// # Building-block use (REQ-013, REQ-045)
+// # Standalone use
 //
 // Consumers can import this package alone to introspect the openEHR
-// domain model — class hierarchy, property cardinality, generic
-// parameters, function signatures, documentation — without
+// domain model (class hierarchy, property cardinality, generic
+// parameters, function signatures, documentation) without
 // instantiating transport/, auth/, or any HTTP client. Validators,
 // archetype tools, custom code generators and BMM-aware diff tools
 // are the expected consumers. The package depends only on the
@@ -18,20 +18,20 @@
 //   - [Load] parses one P_BMM JSON document from an io.Reader into a
 //     [*Schema]. It dispatches on the per-object _type discriminator
 //     for every polymorphic node (properties, types, function
-//     parameters, classes) via a small table of decoder functions —
-//     no reflection-based polymorphism (per REQ-040 spirit). Required
+//     parameters, classes) via a small table of decoder functions, with
+//     no reflection-based polymorphism. Required
 //     fields are validated and missing/unknown values are surfaced as
 //     wrapped sentinel errors ([ErrUnknownType], [ErrMissingField],
 //     [ErrInvalidShape]).
 //
 //   - [LoadAll] resolves a schema's transitive `includes` via a
 //     [Resolver] and merges the result. Descendant entries shadow
-//     ancestor entries with the same name (matching observed openEHR
-//     practice — e.g. RM refines TRANSLATION_DETAILS from BASE).
+//     ancestor entries with the same name, matching observed openEHR
+//     practice (e.g. RM refines TRANSLATION_DETAILS from BASE).
 //     Sibling-ancestor name collisions return [ErrSchemaConflict].
 //     Cycles return [ErrCircularIncludes].
 //
-// # Type registry (REQ-040)
+// # Type registry
 //
 // The decoder uses a switch statement (not reflection) on the
 // _type string. The 14 known P_BMM discriminators are:
@@ -61,10 +61,9 @@
 //
 // # Scope
 //
-// This package does NOT generate code. The code generator that emits
+// This package does not generate code. The code generator that emits
 // openehr/rm/ and openehr/aom/aom14/ lives in internal/bmmgen and
 // cmd/bmmgen and consumes the types declared here.
 //
-// See docs/specifications/bmm-conformance.md for the conformance contract and
-// resources/bmm/README.md for the pinned BMM file inventory.
+// See resources/bmm/README.md for the pinned BMM file inventory.
 package bmm

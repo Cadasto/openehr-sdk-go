@@ -11,7 +11,7 @@ import (
 // this package mirrors (REQ-106, ADR-0014).
 const defaultVersion = "2.3"
 
-// WebTemplate is the root of the exported document (REQ-106).
+// WebTemplate is the root of the exported document.
 type WebTemplate struct {
 	TemplateID      string   `json:"templateId"`
 	Version         string   `json:"version"`
@@ -20,7 +20,7 @@ type WebTemplate struct {
 	Tree            *Node    `json:"tree"`
 }
 
-// Node is one element of the WebTemplate tree (REQ-106). A max of -1
+// Node is one element of the WebTemplate tree. A max of -1
 // denotes an unbounded upper occurrence.
 type Node struct {
 	ID                    string            `json:"id"`
@@ -37,7 +37,7 @@ type Node struct {
 	Children              []*Node           `json:"children,omitempty"`
 }
 
-// Input is one logical form input under a leaf Node (REQ-106).
+// Input is one logical form input under a leaf Node.
 type Input struct {
 	Suffix      string          `json:"suffix,omitempty"`
 	Type        string          `json:"type"`
@@ -75,28 +75,28 @@ type config struct {
 	languages       []string
 }
 
-// Option customises Build and Marshal. No options are defined in the
-// current slice — the compiled template is single-language, so language
-// overrides would relabel text without retranslating it, and the version
-// is fixed to the schema this package implements. The type is kept so
-// future overrides land without a signature break.
+// Option customises Build and Marshal. No options are defined yet:
+// the compiled template is single-language, so language overrides
+// would relabel text without retranslating it, and the version is
+// fixed to the schema this package implements. The type exists so
+// future overrides can be added without a signature break.
 type Option func(*config)
 
 // ErrEmptyTemplate is returned when the compiled template has no root.
 var ErrEmptyTemplate = errors.New("webtemplate: compiled template has no root")
 
 // ErrNoDefaultLanguage is returned when the compiled template carries no
-// resolvable default language (REQ-106: never emit "defaultLanguage": "").
+// resolvable default language. Build never emits "defaultLanguage": "".
 var ErrNoDefaultLanguage = errors.New("webtemplate: compiled template has no default language")
 
 // ErrIDCollision is returned when two sibling nodes still share an id
-// after disambiguation — the pinned template-level name (REQ-116) and the
-// next-free ordinal fallback make that unreachable from template input, so
-// it signals a builder bug. Failing loudly protects FLAT-path uniqueness,
-// the id's load-bearing property (ADR 0014).
+// after disambiguation. The pinned template-level name and the
+// next-free ordinal fallback make that unreachable from template input,
+// so it signals a builder bug. Build fails rather than emit duplicate
+// ids, because ids must be unique for FLAT paths to be unambiguous.
 var ErrIDCollision = errors.New("webtemplate: duplicate sibling id")
 
-// Marshal builds and JSON-encodes the WebTemplate (REQ-106).
+// Marshal builds and JSON-encodes the WebTemplate.
 func Marshal(c *templatecompile.Compiled, opts ...Option) ([]byte, error) {
 	wt, err := Build(c, opts...)
 	if err != nil {

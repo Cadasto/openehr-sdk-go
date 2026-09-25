@@ -74,9 +74,9 @@ func UIDValue(u UID) string {
 // ObjectIDValue returns the raw string value carried by any concrete
 // OBJECT_ID, and whether id was a recognised, non-nil type. Unlike
 // UIDValue, callers can distinguish "" as an actual empty value from ""
-// meaning "could not be read" (a nil or unrecognised id) — silently
+// meaning "could not be read" (a nil or unrecognised id); silently
 // treating the latter as an empty value risks emitting an unencodable
-// or misleading reference. REQ-120.
+// or misleading reference.
 func ObjectIDValue(id ObjectID) (value string, ok bool) {
 	switch v := id.(type) {
 	case HierObjectID:
@@ -142,27 +142,26 @@ func uidBasedExtension(value string) string {
 	return ext
 }
 
-// Root returns the namespace identifier — the part left of the first
-// "::" separator, or the whole value when absent. REQ-120.
+// Root returns the namespace identifier: the part left of the first
+// "::" separator, or the whole value when absent.
 func (h *HierObjectID) Root() UID { return uidBasedRoot(h.Value) }
 
-// Extension returns the local identifier — the part right of the first
-// "::" separator, or "" when absent. REQ-120.
+// Extension returns the local identifier: the part right of the first
+// "::" separator, or "" when absent.
 func (h *HierObjectID) Extension() string { return uidBasedExtension(h.Value) }
 
-// HasExtension reports whether an extension part is present. REQ-120.
+// HasExtension reports whether an extension part is present.
 func (h *HierObjectID) HasExtension() bool { return uidBasedExtension(h.Value) != "" }
 
-// Root returns the namespace identifier — for an OBJECT_VERSION_ID this
-// equals object_id (the part left of the first "::"). REQ-120.
+// Root returns the namespace identifier. For an OBJECT_VERSION_ID this
+// equals object_id (the part left of the first "::").
 func (o *ObjectVersionID) Root() UID { return uidBasedRoot(o.Value) }
 
-// Extension returns the part right of the first "::" — for a full
+// Extension returns the part right of the first "::". For a full
 // OBJECT_VERSION_ID this is "creating_system_id::version_tree_id".
-// REQ-120.
 func (o *ObjectVersionID) Extension() string { return uidBasedExtension(o.Value) }
 
-// HasExtension reports whether an extension part is present. REQ-120.
+// HasExtension reports whether an extension part is present.
 func (o *ObjectVersionID) HasExtension() bool { return uidBasedExtension(o.Value) != "" }
 
 // --- OBJECT_VERSION_ID (object_id '::' creating_system_id '::' version_tree_id) ---
@@ -178,29 +177,29 @@ func objectVersionParts(value string) (objectID, creatingSystemID, versionTreeID
 	return objectID, creatingSystemID, versionTreeID
 }
 
-// ObjectID returns the logical object identifier — the part before the
-// first "::". REQ-120.
+// ObjectID returns the logical object identifier: the part before the
+// first "::".
 func (o *ObjectVersionID) ObjectID() UID {
 	id, _, _ := objectVersionParts(o.Value)
 	return detectUID(id)
 }
 
 // CreatingSystemID returns the identifier of the system that created
-// this version — the part between the two "::" separators. REQ-120.
+// this version: the part between the two "::" separators.
 func (o *ObjectVersionID) CreatingSystemID() UID {
 	_, sys, _ := objectVersionParts(o.Value)
 	return detectUID(sys)
 }
 
-// VersionTreeID returns the version-tree identifier — the part after the
-// last "::". REQ-120.
+// VersionTreeID returns the version-tree identifier: the part after the
+// last "::".
 func (o *ObjectVersionID) VersionTreeID() VersionTreeID {
 	_, _, v := objectVersionParts(o.Value)
 	return VersionTreeID{Value: v}
 }
 
 // IsBranch reports whether this version identifier denotes a branch
-// (i.e. its version_tree_id is a 3-part branch form). REQ-120.
+// (i.e. its version_tree_id is a 3-part branch form).
 func (o *ObjectVersionID) IsBranch() bool {
 	v := o.VersionTreeID()
 	return v.IsBranch()
@@ -229,15 +228,14 @@ func ParseObjectVersionID(s string) (ObjectVersionID, error) {
 
 // --- VERSION_TREE_ID (trunk_version [ '.' branch_number '.' branch_version ]) ---
 
-// TrunkVersion returns the trunk version number — the first dot-segment.
-// REQ-120.
+// TrunkVersion returns the trunk version number: the first dot-segment.
 func (v *VersionTreeID) TrunkVersion() string {
 	trunk, _, _ := strings.Cut(v.Value, ".")
 	return trunk
 }
 
 // BranchNumber returns the branch number, or "" for a trunk-only id
-// (openEHR Void). REQ-120.
+// (openEHR Void).
 func (v *VersionTreeID) BranchNumber() string {
 	if p := strings.Split(v.Value, "."); len(p) == 3 {
 		return p[1]
@@ -246,7 +244,7 @@ func (v *VersionTreeID) BranchNumber() string {
 }
 
 // BranchVersion returns the branch version, or "" for a trunk-only id
-// (openEHR Void). REQ-120.
+// (openEHR Void).
 func (v *VersionTreeID) BranchVersion() string {
 	if p := strings.Split(v.Value, "."); len(p) == 3 {
 		return p[2]
@@ -257,13 +255,13 @@ func (v *VersionTreeID) BranchVersion() string {
 // IsBranch reports whether this is a 3-part branch identifier. Like the
 // other derivation methods it is purely lexical and best-effort (it does
 // not validate that the parts are integers ≥ 1); use ParseVersionTreeID
-// for well-formedness. REQ-120.
+// for well-formedness.
 func (v *VersionTreeID) IsBranch() bool {
 	return strings.Count(v.Value, ".") == 2
 }
 
 // IsFirst reports whether this identifies the first version
-// (trunk_version == "1"). REQ-120.
+// (trunk_version == "1").
 func (v *VersionTreeID) IsFirst() bool {
 	return v.TrunkVersion() == "1"
 }
@@ -299,34 +297,33 @@ func archetypeFields(value string) (qualified, domain, version string, ok bool) 
 	return value[:first], value[first+1 : last], value[last+1:], true
 }
 
-// QualifiedRMEntity returns `rm_originator-rm_name-rm_entity`. REQ-120.
+// QualifiedRMEntity returns `rm_originator-rm_name-rm_entity`.
 func (a *ArchetypeID) QualifiedRMEntity() string {
 	q, _, _, _ := archetypeFields(a.Value)
 	return q
 }
 
 // DomainConcept returns the concept including any specialisation chain,
-// e.g. "lab_result-cholesterol". REQ-120.
+// e.g. "lab_result-cholesterol".
 func (a *ArchetypeID) DomainConcept() string {
 	_, d, _, _ := archetypeFields(a.Value)
 	return d
 }
 
 // VersionID returns the major version, e.g. "1" for a trailing ".v1".
-// REQ-120.
 func (a *ArchetypeID) VersionID() string {
 	_, _, v, _ := archetypeFields(a.Value)
 	return strings.TrimPrefix(v, "v")
 }
 
 // RMOriginator returns the first hyphen-segment of qualified_rm_entity,
-// e.g. "openEHR". REQ-120.
+// e.g. "openEHR".
 func (a *ArchetypeID) RMOriginator() string { return archetypeQualifiedPart(a.Value, 0) }
 
-// RMName returns the second hyphen-segment, e.g. "EHR". REQ-120.
+// RMName returns the second hyphen-segment, e.g. "EHR".
 func (a *ArchetypeID) RMName() string { return archetypeQualifiedPart(a.Value, 1) }
 
-// RMEntity returns the third hyphen-segment, e.g. "OBSERVATION". REQ-120.
+// RMEntity returns the third hyphen-segment, e.g. "OBSERVATION".
 func (a *ArchetypeID) RMEntity() string { return archetypeQualifiedPart(a.Value, 2) }
 
 func archetypeQualifiedPart(value string, i int) string {
@@ -342,7 +339,7 @@ func archetypeQualifiedPart(value string, i int) string {
 }
 
 // Specialisation returns the last specialisation segment of the domain
-// concept, or "" when the concept is unspecialised. REQ-120.
+// concept, or "" when the concept is unspecialised.
 func (a *ArchetypeID) Specialisation() string {
 	d := a.DomainConcept()
 	_, after, found := strings.CutLast(d, "-")
@@ -370,8 +367,8 @@ func ParseArchetypeID(s string) (ArchetypeID, error) {
 
 // --- TERMINOLOGY_ID (name [ '(' version ')' ]) --------------------------
 
-// Name returns the terminology name — the part before "(" when a
-// parenthesised version is present, else the whole value. REQ-120.
+// Name returns the terminology name: the part before "(" when a
+// parenthesised version is present, else the whole value.
 func (t *TerminologyID) Name() string {
 	name, ver, ok := strings.Cut(t.Value, "(")
 	if ok && strings.HasSuffix(ver, ")") {
@@ -381,7 +378,7 @@ func (t *TerminologyID) Name() string {
 }
 
 // VersionID returns the version inside the parentheses, or "" when no
-// "(version)" is present. REQ-120.
+// "(version)" is present.
 func (t *TerminologyID) VersionID() string {
 	_, ver, ok := strings.Cut(t.Value, "(")
 	if !ok {
@@ -411,7 +408,7 @@ func ParseTerminologyID(s string) (TerminologyID, error) {
 // AsURI builds the URI form of the reference: the namespace as scheme,
 // then the id value, then "/" + path when the path is non-empty (a path
 // that already begins with "/" is appended verbatim to avoid a double
-// slash). REQ-120.
+// slash).
 func (l *LocatableRef) AsURI() string {
 	var b strings.Builder
 	b.WriteString(l.Namespace)

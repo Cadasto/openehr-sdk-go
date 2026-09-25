@@ -8,9 +8,9 @@ import (
 
 // CDate constrains an RM ISO_DATE value (C_DATE). Pattern is the
 // AOM 1.4 partial-date pattern (e.g. "yyyy-mm-dd", "yyyy-??-??");
-// v1 preserves it verbatim for callers that need stricter
+// it is preserved verbatim for callers that need stricter
 // enforcement than [Validate] performs. Validate accepts any
-// well-formed ISO 8601 date — full ("2026-05-24"), year-month
+// well-formed ISO 8601 date: full ("2026-05-24"), year-month
 // ("2026-05"), or year ("2026").
 type CDate struct {
 	Pattern string
@@ -18,15 +18,15 @@ type CDate struct {
 
 func (CDate) isPrimitive() {}
 
-// ExampleValue returns "2020-01-01" — the documented sentinel
-// satisfying the ISO 8601 full-date shape Validate accepts. REQ-107.
-// AOM partial-pattern enforcement is deferred per REQ-103.
+// ExampleValue returns "2020-01-01", the documented sentinel
+// satisfying the ISO 8601 full-date shape Validate accepts.
+// The AOM partial-date pattern is not enforced.
 func (CDate) ExampleValue() any { return "2020-01-01" }
 
-// Validate accepts a Go string. The value MUST parse as an ISO 8601
+// Validate accepts a Go string. The value must parse as an ISO 8601
 // date in one of the three partial shapes (yyyy-mm-dd, yyyy-mm,
-// yyyy). Pattern enforcement against AOM partial-date syntax is
-// deferred — callers that need it pre-validate before calling.
+// yyyy). The AOM partial-date pattern is not enforced; callers that
+// need it pre-validate before calling.
 func (c CDate) Validate(value any) []Violation {
 	s, ok := value.(string)
 	if !ok {
@@ -48,12 +48,12 @@ type CTime struct {
 
 func (CTime) isPrimitive() {}
 
-// ExampleValue returns "12:00:00" — the documented sentinel
-// satisfying the ISO 8601 hh:mm:ss shape Validate accepts. REQ-107.
+// ExampleValue returns "12:00:00", the documented sentinel
+// satisfying the ISO 8601 hh:mm:ss shape Validate accepts.
 func (CTime) ExampleValue() any { return "12:00:00" }
 
 // Validate accepts a Go string parsing as ISO 8601 time, optionally
-// with trailing fractional seconds. Pattern enforcement deferred.
+// with trailing fractional seconds. The AOM pattern is not enforced.
 func (c CTime) Validate(value any) []Violation {
 	s, ok := value.(string)
 	if !ok {
@@ -75,13 +75,13 @@ type CDateTime struct {
 
 func (CDateTime) isPrimitive() {}
 
-// ExampleValue returns "2020-01-01T12:00:00Z" — the documented
-// sentinel satisfying the RFC 3339 shape Validate accepts. REQ-107.
+// ExampleValue returns "2020-01-01T12:00:00Z", the documented
+// sentinel satisfying the RFC 3339 shape Validate accepts.
 func (CDateTime) ExampleValue() any { return "2020-01-01T12:00:00Z" }
 
 // Validate accepts a Go string that parses under RFC 3339 (the ISO
-// 8601 superset openEHR mandates) or its date-only / partial-time
-// shortcuts. Pattern enforcement deferred.
+// 8601 profile openEHR uses) or its date-only / partial-time
+// shortcuts. The AOM pattern is not enforced.
 func (c CDateTime) Validate(value any) []Violation {
 	s, ok := value.(string)
 	if !ok {
@@ -96,19 +96,19 @@ func (c CDateTime) Validate(value any) []Violation {
 }
 
 // CDuration constrains an RM ISO_DURATION value (C_DURATION).
-// Validate accepts the ISO 8601 PnYnMnDTnHnMnS shape. Numeric-range
-// bounds on durations (e.g. "between PT1H and PT24H") are deferred
-// — converting partial years / months to seconds requires calendar
-// reasoning out of scope for a stdlib-only validator. AOM-pattern
-// enforcement is similarly deferred.
+// Validate accepts the ISO 8601 PnYnMnDTnHnMnS shape. It does not
+// enforce numeric-range bounds on durations (e.g. "between PT1H and
+// PT24H"): converting partial years / months to seconds needs calendar
+// reasoning that a stdlib-only validator does not do. The AOM pattern
+// is not enforced either.
 type CDuration struct {
 	Pattern string
 }
 
 func (CDuration) isPrimitive() {}
 
-// ExampleValue returns "P0D" — the documented sentinel satisfying
-// the ISO 8601 duration shape Validate accepts. REQ-107.
+// ExampleValue returns "P0D", the documented sentinel satisfying
+// the ISO 8601 duration shape Validate accepts.
 func (CDuration) ExampleValue() any { return "P0D" }
 
 var durationRe = regexp.MustCompile(`^P(?:\d+Y)?(?:\d+M)?(?:\d+W)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?$`)

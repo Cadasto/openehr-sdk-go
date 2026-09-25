@@ -9,35 +9,32 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// Submission is the request-side payload for POST /ehr/{ehr_id}/contribution
-// — the ITS-REST `Contribution_create` schema. It is distinct from
+// Submission is the request-side payload for POST /ehr/{ehr_id}/contribution,
+// the ITS-REST `Contribution_create` schema. It is distinct from
 // [rm.Contribution] (the persisted/response shape) because each versions[]
 // element carries the resource payload inline under `data`, not a stub
 // [rm.ObjectRef].
 //
 // At submission time the OBJECT_REFs in the persisted shape would point
-// at versions that do not yet exist, so a spec-conformant CDR rejects
-// the persisted shape on the write path. This shape is symmetric to the
-// REQ-094 fix on `composition.Save / Update` (response-side bare
-// COMPOSITION) — see [docs/specifications/conformance.md] PROBE-071 /
-// PROBE-072.
-//
-// REQ-050/095. Plan: docs/plans/archive/2026-05-26-contribution-submission-shape.md.
+// at versions that do not yet exist, so a conformant CDR rejects
+// the persisted shape on the write path. The same request/response split
+// applies to `composition.Save / Update`, whose response is a bare
+// COMPOSITION.
 type Submission struct {
 	// Audit is the write-side commit-audit applied to the whole batch
-	// (REQ-059 / SPECITS-95 / ITS-REST PR 131). Carried inside the body
-	// — there is no separate `openehr-audit-details` header on this
+	// (SPECITS-95 / ITS-REST PR 131). It is carried inside the body;
+	// there is no separate `openehr-audit-details` header on this
 	// endpoint. Uses [UpdateAudit] (not [rm.AuditDetails]) so that
 	// server-assigned time_committed is never emitted; _type defaults to
-	// "AUDIT_DETAILS" (accepted by conformant CDRs) — see [UpdateAudit.Type]
+	// "AUDIT_DETAILS" (accepted by conformant CDRs); see [UpdateAudit.Type]
 	// to fall back to "UPDATE_AUDIT" for non-conformant servers.
 	Audit UpdateAudit
 	// Versions is the closed type-set of inline-data versions to commit.
-	// Each element MUST be an *[OriginalVersion][T] or *[ImportedVersion][T]
+	// Each element must be an *[OriginalVersion][T] or *[ImportedVersion][T]
 	// for T in {rm.Composition, rm.EHRStatus, rm.Folder, rm.EHRAccess}.
 	// Construct elements with [WrapOriginalVersion] / [WrapImportedVersion].
 	// Validate enforces this via an explicit type-switch over the 8 concrete
-	// generic instantiations (no reflection per REQ-024); it also rejects an
+	// generic instantiations (no reflection); it also rejects an
 	// empty slice, a nil or typed-nil element, a nil wrapped Version, and a
 	// commit_audit whose Committer is absent or held by value.
 	Versions []CommitVersion
@@ -49,10 +46,10 @@ type Submission struct {
 // (json.MarshalerTo + BMMName() string) are detected at Submission.Validate
 // via the BMMName check.
 //
-// The write-side wrappers marshal through the encoding/json/v2 streaming pair
-// (ADR 0022), so the constraint is [jsonv2.MarshalerTo], not the v1
-// json.Marshaler. The assertions below fail the build if any of the eight
-// committed instantiations stops satisfying it (R16, Q7).
+// The write-side wrappers marshal through the encoding/json/v2 streaming
+// pair, so the constraint is [jsonv2.MarshalerTo], not the v1
+// json.Marshaler. All eight instantiations are checked against it at
+// compile time.
 type CommitVersion interface {
 	jsonv2.MarshalerTo
 	BMMName() string
@@ -72,23 +69,23 @@ var (
 // Validate enforces the documented closed type-set: each
 // Submission.Versions[i] must be an *[OriginalVersion][T] or
 // *[ImportedVersion][T] for T ∈ {rm.Composition, rm.EHRStatus,
-// rm.Folder, rm.EHRAccess} — the four versionable types in the
+// rm.Folder, rm.EHRAccess}, the four versionable types in the
 // ITS-REST `Contribution_create` schema. A non-empty Versions slice is
-// also required (the spec rejects an empty contribution), and a nil or
+// also required (ITS-REST rejects an empty contribution), and a nil or
 // typed-nil element is rejected outright. Submission.Audit and each
-// version commit_audit MUST carry a populated Committer: bare-nil and
+// version commit_audit must carry a populated Committer: bare-nil and
 // typed-nil PartyProxy count as absent, and a concrete held by value is
 // rejected because it cannot emit its `_type` discriminator. A wrapped
-// version whose Version is nil is likewise rejected — the empty wrapper
+// version whose Version is nil is likewise rejected: the empty wrapper
 // and empty UpdateAudit [WrapOriginalVersion] / [WrapImportedVersion]
 // produce for nil caller input surface here as errors rather than as
-// panics (REQ-025).
+// panics.
 //
 // Implemented as an explicit type-switch over the 8 concrete generic
-// instantiations (no reflection per REQ-024). Other types satisfying
+// instantiations, with no reflection. Other types satisfying
 // the CommitVersion method set are rejected with a typed error naming
 // the BMMName for caller diagnostics. Called automatically by
-// MarshalJSON; callers MAY invoke it earlier to surface a typed error
+// MarshalJSON; callers may invoke it earlier to surface a typed error
 // without paying for marshalling.
 func (s *Submission) Validate() error {
 	if len(s.Versions) == 0 {

@@ -1,9 +1,9 @@
 // Package instance synthesises an RM object graph from a compiled
-// operational template (REQ-107). It is the inverse of
-// openehr/validation: where validation walks an OPT and an existing
-// RM tree in lockstep emitting issues, this package walks an OPT
-// and CONSTRUCTS the RM tree, materialising primitive example
-// values from REQ-103 constraints at leaf nodes.
+// operational template. It is the inverse of openehr/validation:
+// where validation walks an OPT and an existing RM tree in lockstep
+// emitting issues, this package walks an OPT and constructs the RM
+// tree, materialising primitive example values from the template's
+// primitive constraints at leaf nodes.
 //
 // The public entry point is [Generate]:
 //
@@ -20,12 +20,12 @@
 //
 // # Policies
 //
-//   - Minimal — only attributes with existence lower ≥ 1 (and
+//   - Minimal: only attributes with existence lower ≥ 1 (and
 //     BMM-mandatory implicits). Smallest valid tree; primitive leaves
 //     still receive [constraints.PrimitiveConstraint.ExampleValue]
 //     so the result is structurally complete.
-//   - Example — Minimal plus every primitive leaf populated with its
-//     ExampleValue. Default for fixtures / demos.
+//   - Example: Minimal plus every primitive leaf populated with its
+//     ExampleValue. Useful for fixtures and demos.
 //
 // # Trust model
 //
@@ -36,16 +36,15 @@
 // archetype_details) here in the instance package. rmwrite stays
 // focused on the inverse-of-rmread attribute setter contract.
 //
-// # REQ-013 building-block independence
+// # Dependencies
 //
 // The exported Generate signature takes the public compiled template
-// openehr/templatecompile.Compiled (REQ-111); this package also imports
+// openehr/templatecompile.Compiled; this package also imports
 // openehr/rm, openehr/rm/typereg, openehr/rm/rminfo, openehr/template,
 // openehr/template/constraints, internal/templatecompile (engine node
 // types), internal/templatecompile/walk, and
-// internal/templateinstance/rmwrite — same building-block universe
-// as openehr/validation. It does NOT import openehr/serialize,
-// openehr/client, transport, auth, openehr/composition (REQ-101
-// consumes this engine, not the reverse), or openehr/validation
-// (validation depends on instance only via cross-package probes).
+// internal/templateinstance/rmwrite, the same set as
+// openehr/validation. It does not import openehr/serialize,
+// openehr/client, transport, auth, openehr/composition (which uses
+// this package, not the reverse), or openehr/validation.
 package instance

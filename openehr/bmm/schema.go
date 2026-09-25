@@ -28,7 +28,7 @@ type IncludeRef struct {
 	ID string `json:"id"`
 }
 
-// SchemaID returns the canonical id string used as a Resolver key —
+// SchemaID returns the canonical id string used as a Resolver key:
 // the same form that appears in the BMM "includes" map and as the
 // resources/bmm/<id>.bmm.json filename stem. The id is composed as
 // "<rm_publisher>_<schema_name>_<rm_release>" (e.g. "openehr_base_1.3.0").
@@ -73,7 +73,7 @@ type Package struct {
 	Packages map[string]*Package `json:"packages,omitempty"`
 }
 
-// MarshalJSON for Schema — emits polymorphic Class values with their
+// MarshalJSON for Schema emits polymorphic Class values with their
 // _type discriminators by relying on each concrete type's MarshalJSON.
 func (s *Schema) MarshalJSON() ([]byte, error) {
 	// Use a buffer-based emitter for stable key ordering on the

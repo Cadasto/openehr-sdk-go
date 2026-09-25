@@ -31,9 +31,8 @@ type getConfig struct {
 type GetOption func(*getConfig)
 
 // WithPath restricts the GET to the sub-FOLDER at the given path within the
-// directory tree, via the `path` query parameter
-// (resources/its-rest/ehr-validation.openapi.yaml). Empty fetches the whole
-// directory.
+// directory tree, via the ITS-REST `path` query parameter. Empty fetches
+// the whole directory.
 func WithPath(p string) GetOption {
 	return func(c *getConfig) { c.path = p }
 }
@@ -127,20 +126,20 @@ type writeConfig struct {
 // WriteOption mutates the request shape for [Save] and [Update].
 type WriteOption func(*writeConfig)
 
-// WithPrefer overrides the response-shape preference (REQ-094).
-// Default [transport.PreferMinimal] per the spec.
+// WithPrefer overrides the response-shape preference.
+// Default [transport.PreferMinimal], the ITS-REST default.
 func WithPrefer(p transport.Prefer) WriteOption {
 	return func(c *writeConfig) { c.Prefer = p }
 }
 
 // WithAuditDetails attaches the commit-time audit envelope via the
-// `openehr-audit-details` header (REQ-059). Nil omits the header.
+// `openehr-audit-details` header. Nil omits the header.
 func WithAuditDetails(a *rm.AuditDetails) WriteOption {
 	return func(c *writeConfig) { c.AuditDetails = a }
 }
 
 // WithLifecycleState sets the committed VERSION's lifecycle_state via the
-// `openehr-version` header (REQ-059). Empty omits the header; an
+// `openehr-version` header. Empty omits the header; an
 // unrecognised code fails the write with [transport.ErrInvalidConfig].
 func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
 	return func(c *writeConfig) { c.LifecycleState = s }
@@ -155,7 +154,7 @@ type deleteConfig struct {
 type DeleteOption func(*deleteConfig)
 
 // WithDeleteAudit attaches the commit-time audit envelope on a
-// delete (REQ-059).
+// delete.
 func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 	return func(c *deleteConfig) { c.auditDetails = a }
 }
@@ -165,14 +164,14 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // (typically 409). Use [Update] to modify an existing Directory.
 //
 // Wire: POST /ehr/{ehr_id}/directory. The response shape follows the
-// Prefer option (REQ-094): `PreferRepresentation` returns a bare `Folder`
-// (REQ-094, ITS-REST `201_directory`); `PreferIdentifier` returns the
+// Prefer option: `PreferRepresentation` returns a bare `Folder`
+// (ITS-REST `201_directory`); `PreferIdentifier` returns the
 // ITS-REST `Identifier` body, resolved into the metadata `VersionUID`;
-// `PreferMinimal` (the spec default) returns an empty body with only
+// `PreferMinimal` (the ITS-REST default) returns an empty body with only
 // metadata (`ETag` → `VersionUID`) populated. The zero resource on a
-// successful minimal/identifier write is a nil pointer — `== nil` is a
+// successful minimal/identifier write is a nil pointer, so `== nil` is a
 // correct test for this concrete return; [openehrclient.HasResource] is
-// the uniform presence test across write leaves (REQ-094). After 2xx +
+// the uniform presence test across write leaves. After 2xx +
 // PreferRepresentation, an empty or undecodable body is a
 // [*openehrclient.NoRepresentationError] carrying commit metadata.
 func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
@@ -212,12 +211,13 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, f
 	return openehrclient.WriteResult(ctx, c, req, "directory", decodeFolder)
 }
 
-// Update modifies the Directory under ehrID, requiring `ifMatch` per
-// REQ-054. Errors map per REQ-093.
+// Update modifies the Directory under ehrID, requiring `ifMatch` as the
+// If-Match header. HTTP errors map to the standard [transport] sentinels
+// (e.g. 412 → [transport.ErrPreconditionFailed]).
 //
 // Wire: PUT /ehr/{ehr_id}/directory with If-Match. Response shape
 // matches [Save]: bare `*rm.Folder` per the ITS-REST OpenAPI
-// `200_FOLDER_retrieved` (REQ-094).
+// `200_FOLDER_retrieved`.
 func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.Update: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -260,10 +260,10 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 }
 
 // Delete logically deletes the Directory addressed by versionUID,
-// requiring `ifMatch` per REQ-054.
+// requiring `ifMatch` as the If-Match header.
 //
 // Wire: DELETE /ehr/{ehr_id}/directory with If-Match. Some deployments
-// require the version UID in the path — the openEHR REST spec leaves
+// require the version UID in the path; the openEHR REST spec leaves
 // the canonical path slightly under-specified; this binding follows
 // the base-path form. If a deployment requires `/directory/{vuid}`,
 // use [transport.Client.Do] with a custom request to override.

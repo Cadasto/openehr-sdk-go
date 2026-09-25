@@ -6,7 +6,7 @@ import (
 )
 
 // CBoolean constrains an RM Boolean value (C_BOOLEAN). At least one
-// of TrueValid / FalseValid is true in a well-formed OPT — both
+// of TrueValid / FalseValid is true in a well-formed OPT. Both
 // false would constrain the attribute to no legal value, which the
 // XSD allows but readers should reject as a modelling error.
 type CBoolean struct {
@@ -19,10 +19,10 @@ type CBoolean struct {
 
 func (CBoolean) isPrimitive() {}
 
-// ExampleValue returns the bool the constraint admits. REQ-107.
-// Prefers true when allowed; falls back to false otherwise (the
-// pathological both-false OPT still yields a value Validate accepts
-// at most one of — c.TrueValid wins by convention).
+// ExampleValue returns the bool the constraint admits.
+// It returns true when true is allowed and false otherwise. A
+// pathological both-false OPT admits no value, so Validate rejects
+// the example.
 func (c CBoolean) ExampleValue() any {
 	return c.TrueValid
 }
@@ -44,8 +44,8 @@ func (c CBoolean) Validate(value any) []Violation {
 
 // CInteger constrains an RM Integer value (C_INTEGER). Range is the
 // allowed numeric interval; List is the optional closed enumeration
-// (when non-empty, the value MUST appear in it). When both are set,
-// the value MUST satisfy both.
+// (when non-empty, the value must appear in it). When both are set,
+// the value must satisfy both.
 type CInteger struct {
 	Range NumericRange
 	List  []int64
@@ -56,14 +56,14 @@ type CInteger struct {
 
 func (CInteger) isPrimitive() {}
 
-// ExampleValue returns a minimal-valid int64 example. REQ-107.
-// When List is non-empty AND Range is bounded, the example is the
-// first list entry inside the range — validate requires both list
-// membership AND range containment, so picking a list member outside
-// the range would surface as out_of_range. When the list and range
-// disagree on every list entry, falls through to a range-only example.
-// Else the range's lower bound when bounded (adjusted by one when the
-// lower side is exclusive); else int64(0) as the unbounded sentinel.
+// ExampleValue returns a minimal-valid int64 example.
+// When List is non-empty and Range is bounded, the example is the
+// first list entry inside the range: Validate requires both list
+// membership and range containment, so a list member outside
+// the range would surface as out_of_range. When no list entry lies
+// inside the range, it falls through to a range-only example:
+// the range's lower bound when bounded (adjusted by one when the
+// lower side is exclusive), else int64(0) as the unbounded sentinel.
 func (c CInteger) ExampleValue() any {
 	if len(c.List) > 0 {
 		if !c.Range.IsBounded() {
@@ -96,7 +96,7 @@ func (c CInteger) ExampleValue() any {
 
 // Validate accepts int / int8..int64 / uint / uint8..uint32. Larger
 // uints (uint64 above MaxInt64) return CodeWrongType to avoid silent
-// overflow. Float types are rejected — use [CReal] for fractional
+// overflow. Float types are rejected; use [CReal] for fractional
 // values.
 func (c CInteger) Validate(value any) []Violation {
 	n, ok := toInt64(value)
@@ -132,13 +132,13 @@ type CReal struct {
 
 func (CReal) isPrimitive() {}
 
-// ExampleValue returns a minimal-valid float64 example. REQ-107.
-// When List is non-empty AND Range is bounded, picks the first list
+// ExampleValue returns a minimal-valid float64 example.
+// When List is non-empty and Range is bounded, it picks the first list
 // entry inside the range (Validate requires both list membership and
-// range containment). When the list and range disagree on every list
-// entry, falls through to a range-only example. Else the range's
-// lower bound when bounded (adjusted to mid-range when the lower
-// side is exclusive); else float64(0).
+// range containment). When no list entry lies inside the range, it
+// falls through to a range-only example: the range's lower bound when
+// bounded (adjusted to mid-range when the lower side is exclusive),
+// else float64(0).
 func (c CReal) ExampleValue() any {
 	if len(c.List) > 0 {
 		if !c.Range.IsBounded() {

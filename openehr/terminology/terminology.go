@@ -6,7 +6,7 @@ import (
 )
 
 // ID is the TERMINOLOGY_ID.value every group and code set in this package is
-// defined in — the openEHR Terminology's own identifier. A DV_CODED_TEXT the
+// defined in: the openEHR Terminology's own identifier. A DV_CODED_TEXT the
 // SDK builds from one of these codes carries it as its terminology id.
 const ID = "openehr"
 
@@ -16,12 +16,14 @@ type Concept struct {
 	Rubric string
 }
 
-// Group is one closed, source-ordered openEHR terminology group — the value
+// Group is one closed, source-ordered openEHR terminology group: the value
 // set an RM invariant such as EVENT_CONTEXT.Setting_valid names. Every group
-// is a package-level variable generated from the pin (see openehr_gen.go);
-// a nil pointer is inert, with every method reporting absence (REQ-025).
+// is a package-level variable generated from the pinned terminology file
+// (see openehr_gen.go); a nil pointer is inert, with every method reporting
+// absence.
 //
-// A code's rubric is a property of the group, not of the code: the pin gives
+// A code's rubric is a property of the group, not of the code: the openEHR
+// terminology gives
 // 532 the rubric "complete" in version lifecycle state and "completed" in
 // instruction states. Look codes up on the group that governs them.
 type Group struct {
@@ -76,8 +78,8 @@ func (g *Group) Len() int {
 	return len(g.concepts)
 }
 
-// All yields the group's concepts in source order — the order the pin lists
-// them in. A nil group yields nothing.
+// All yields the group's concepts in the order the pinned file
+// lists them. A nil group yields nothing.
 func (g *Group) All() iter.Seq[Concept] {
 	if g == nil {
 		return func(func(Concept) bool) {}
@@ -121,11 +123,11 @@ func (g *Group) Code(rubric string) (string, bool) {
 	return g.concepts[i].Code, true
 }
 
-// CodeSet is one closed, source-ordered openEHR code set — a value set whose
+// CodeSet is one closed, source-ordered openEHR code set: a value set whose
 // members are bare codes with no rubric, such as the normal statuses
 // DV_ORDERED.Normal_status_validity names. Every code set is a package-level
-// variable generated from the pin (see openehr_gen.go); a nil pointer is
-// inert, with every method reporting absence (REQ-025).
+// variable generated from the pinned terminology file (see openehr_gen.go);
+// a nil pointer is inert, with every method reporting absence.
 type CodeSet struct {
 	id, name string
 	codes    []string
@@ -171,8 +173,8 @@ func (s *CodeSet) Len() int {
 	return len(s.codes)
 }
 
-// All yields the code set's codes in source order — the order the pin lists
-// them in. A nil code set yields nothing.
+// All yields the code set's codes in the order the pinned file
+// lists them. A nil code set yields nothing.
 func (s *CodeSet) All() iter.Seq[string] {
 	if s == nil {
 		return func(func(string) bool) {}
@@ -199,8 +201,8 @@ func CodeSets() iter.Seq[*CodeSet] {
 	return slices.Values(codeSets)
 }
 
-// GroupByID returns the group whose openehr_id is id — the identifier the
-// RM's has_code_for_group_id invariants name — and false when the pinned
+// GroupByID returns the group whose openehr_id is id (the identifier the
+// RM's has_code_for_group_id invariants name), and false when the pinned
 // terminology has no such group.
 func GroupByID(id string) (*Group, bool) {
 	for _, g := range groups {

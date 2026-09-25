@@ -6,26 +6,26 @@ import (
 )
 
 // Severity is the typed severity attached to every [Issue]. [ValidateComposition]
-// emits [Error] only in v1. [ValidateAQL] may also emit [Warning] for REQ-109
+// emits only [Error]. [ValidateAQL] may also emit [Warning] for lint
 // advisories (e.g. aql_from_archetype, aql_select_star; the lint codes pass
-// through verbatim, so the full set is REQ-109's Layer-2/3 catalogue).
+// through verbatim, so the full set is the openehr/aql/lint advisory catalogue).
 type Severity int
 
 const (
-	// Error means the composition violates a normative constraint.
-	// Callers SHOULD treat any Error-severity issue as a hard fail.
+	// Error means the composition violates a constraint.
+	// Callers should treat any Error-severity issue as a hard fail.
 	Error Severity = iota
 
-	// Warning is an advisory issue that does NOT make a [Result]
-	// not-OK. [ValidateAQL] emits it for REQ-109 advisories (e.g.
-	// aql_from_archetype, aql_select_star — the full set is REQ-109's
-	// catalogue); [ValidateComposition] emits only [Error] in v1.
+	// Warning is an advisory issue that does not make a [Result]
+	// not-OK. [ValidateAQL] emits it for lint advisories (e.g.
+	// aql_from_archetype, aql_select_star; the full set is the
+	// openehr/aql/lint catalogue); [ValidateComposition] emits only [Error].
 	Warning
 )
 
 // String returns "error" / "warning"; out-of-range values render as
-// `severity(N)` with the numeric form for diagnostic readability —
-// callers logging issues see both the name and the wire value.
+// `severity(N)` with the numeric form, so callers logging issues see
+// both the name and the wire value.
 func (s Severity) String() string {
 	switch s {
 	case Error:
@@ -47,7 +47,7 @@ type Issue struct {
 
 	// Code is a stable programmatic identifier (e.g. "required",
 	// "cardinality", "rm_type_mismatch", "slot_fill",
-	// "primitive_out_of_range"). Consumers SHOULD dispatch on Code
+	// "primitive_out_of_range"). Consumers should dispatch on Code
 	// rather than parse Detail.
 	Code string
 
@@ -61,8 +61,7 @@ type Issue struct {
 }
 
 // Err returns the typed sentinel matching this Issue's Code, or
-// nil when no sentinel maps. The mapping is the inverse of the
-// REQ-102 § Sentinels table:
+// nil when no sentinel maps. The mapping is:
 //
 //   - "required"                                          → [ErrRequired]
 //   - "cardinality"                                       → [ErrCardinality]
@@ -73,10 +72,10 @@ type Issue struct {
 //   - "aql_syntax" / "aql_empty"                          → [ErrAQLSyntax]
 //
 // Global guard codes (`nil_composition`, `nil_template`, and the
-// REQ-110 root guards `nil_root` / `nil_party` / `nil_folder` /
-// `nil_ehr_status`) return nil — those represent caller-side argument
-// errors rather than validation failures. Callers wanting `errors.Is`
-// dispatch wrap via this method:
+// root guards `nil_root` / `nil_party` / `nil_folder` /
+// `nil_ehr_status`) return nil, because they represent caller-side
+// argument errors rather than validation failures. Callers wanting
+// `errors.Is` dispatch go through this method:
 //
 //	for _, i := range r.Issues {
 //	    if errors.Is(i.Err(), validation.ErrRequired) { ... }
@@ -106,13 +105,13 @@ func (i Issue) Err() error {
 }
 
 // Result aggregates every [Issue] from a single validator call.
-// OK is the convenience boolean — true exactly when no Error-severity
+// OK is the convenience boolean: true exactly when no Error-severity
 // issue is present.
 type Result struct {
 	// OK is true when the validator found no [Error]-severity issue.
 	// [Warning]-severity advisories (emitted by [ValidateAQL], e.g.
-	// aql_from_archetype) do NOT make OK false — treat OK as the
-	// pass/fail gate and inspect Severity for advisories. For
+	// aql_from_archetype) do not make OK false. Treat OK as the
+	// pass/fail result and inspect Severity for advisories. For
 	// [ValidateComposition], which emits only Error issues, OK is
 	// equivalent to len(r.Issues) == 0.
 	OK bool

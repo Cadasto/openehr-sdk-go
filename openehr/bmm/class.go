@@ -7,7 +7,7 @@ import (
 
 // Class is the abstract category for all class-like entries in a BMM
 // schema's class_definitions or primitive_types map. The four concrete
-// variants are: SimpleClass (the default — struct-like; may also be a
+// variants are: SimpleClass (the default: struct-like; may also be a
 // "generic class" if it carries generic parameter defs), Enumeration
 // (string or integer item codes), and Interface.
 type Class interface {
@@ -25,7 +25,7 @@ type Class interface {
 
 // GenericParameterDef is a class-level open generic parameter
 // (e.g. K, V on Hash<K, V>). conforms_to_type is the optional upper
-// bound — a class or primitive name the parameter must conform to.
+// bound: a class or primitive name the parameter must conform to.
 type GenericParameterDef struct {
 	Name           string `json:"name"`
 	ConformsToType string `json:"conforms_to_type,omitempty"`
@@ -82,7 +82,7 @@ func (s *SimpleClass) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// Interface is P_BMM_INTERFACE — structurally similar to SimpleClass
+// Interface is P_BMM_INTERFACE: structurally similar to SimpleClass
 // but rendered as a Go interface (its functions become method
 // signatures).
 type Interface struct {
@@ -109,11 +109,11 @@ func (i *Interface) MarshalJSON() ([]byte, error) {
 
 // Enumeration is the common shape behind both P_BMM_ENUMERATION_STRING
 // and P_BMM_ENUMERATION_INTEGER. The item codes are stored as a slice
-// of either string (P_BMM_ENUMERATION_STRING — codes = item_names) or
-// int64 (P_BMM_ENUMERATION_INTEGER — codes = item_values).
+// of either string (P_BMM_ENUMERATION_STRING, codes = item_names) or
+// int64 (P_BMM_ENUMERATION_INTEGER, codes = item_values).
 //
 // EnumKind discriminates the two variants on emit; the actual values
-// live in either ItemValuesString or ItemValuesInt — whichever matches.
+// live in either ItemValuesString or ItemValuesInt, whichever matches.
 type Enumeration struct {
 	classCommon
 	// EnumKind is either TypeP_BMM_ENUMERATION_STRING or

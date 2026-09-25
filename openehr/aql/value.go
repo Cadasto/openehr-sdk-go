@@ -8,71 +8,68 @@ import (
 	"unicode/utf8"
 )
 
-// Value is a value position in a query — a bound parameter, a literal, an
+// Value is a value position in a query: a bound parameter, a literal, an
 // identified path, or a function call over those. The interface is sealed;
 // construct values with [Param], [String], [Int], [Real], [Bool], [Null],
-// [Path], [Func], or [Terminology]. Caller-supplied data MUST flow through
+// [Path], [Func], or [Terminology]. Caller-supplied data must flow through
 // [Param] (or a literal constructor), never by interpolating into a path
-// string — this is the AQL injection guard (REQ-055).
+// string; this is the AQL injection guard.
 //
 // Parsed queries populate the same concrete types ([ParamValue] /
 // [StringValue] / [IntValue] / [RealValue] / [BoolValue] / [NullValue] /
-// [PathValue] / [FuncCall]) — the read AST and the write AST share one
-// vocabulary (REQ-113, REQ-117). Concrete-type fields are intended for
-// read access; mutating a value already embedded in a [WhereExpr] passed
-// to [FormatWhere] / [Builder.Build] is undefined.
+// [PathValue] / [FuncCall]), so the read AST and the write AST share one
+// vocabulary. Concrete-type fields are intended for read access; mutating a
+// value already embedded in a [WhereExpr] passed to [FormatWhere] /
+// [Builder.Build] is undefined.
 //
-// The set grows ADDITIVELY as the structured-AST catalogue closes further
-// grammar positions (REQ-117), so a consumer type-switching over it MUST
-// treat an unrecognised case as out-of-catalogue — refuse, skip, or
-// report — and MUST NOT panic on it.
+// The set grows as the structured-AST catalogue covers further grammar
+// positions, so a consumer type-switching over it must treat an unrecognised
+// case as out-of-catalogue (refuse, skip, or report) and must not panic on it.
 //
-// Every shape has a POINTER twin: token has a value receiver, so `*FuncCall`
+// Every shape has a pointer twin: token has a value receiver, so `*FuncCall`
 // and friends satisfy Value too, and [MatchesExpr.Terminology] is itself a
-// `*FuncCall`. A consumer type-switching over Value MUST therefore normalise
-// first with [DerefValue] — or, failing that, handle `case *aql.FuncCall:`
-// alongside `case aql.FuncCall:` or route through [EqualValues] / the
-// validating emitters, which normalise for it. [DerefWhere] is the same tool
-// for the [WhereExpr] vocabulary.
+// `*FuncCall`. A consumer type-switching over Value must therefore normalise
+// first with [DerefValue], or handle `case *aql.FuncCall:` alongside
+// `case aql.FuncCall:`, or route through [EqualValues] / the validating
+// emitters, which normalise for it. [DerefWhere] is the same tool for the
+// [WhereExpr] vocabulary.
 //
 // # Comparability
 //
-// A Value is NOT safe to compare with `==`, and MUST NOT be used as a map
+// A Value is not safe to compare with `==`, and must not be used as a map
 // key. [PathValue] (through IdentifiedPath.Segments) and [FuncCall] (through
-// Args) carry slices, so `==` on one — or on any [WhereExpr] holding one, such
-// as a [Comparison] or [LikeExpr] — panics with "comparing uncomparable type",
-// and hashing one panics the same way. Both types became uncomparable in
-// v0.18.0 when REQ-117 added the slice fields; unlike the [Containment] change
-// released alongside it, this one is invisible to the compiler, which is why
-// it is called out here. Use [EqualValues] instead.
+// Args) carry slices, so `==` on one, or on any [WhereExpr] holding one such
+// as a [Comparison] or [LikeExpr], panics with "comparing uncomparable type",
+// and hashing one panics the same way. The compiler does not catch this. Use
+// [EqualValues] instead.
 type Value interface {
 	// token is the canonical wire form: `$name` for a parameter, an escaped
 	// literal otherwise.
 	token() string
 }
 
-// EqualValues reports whether two values occupy the same value position — the
-// replacement for `==` on a [Value] (see § Comparability), panic-free over every
-// value and pointer shape of the catalogue, including a typed-nil pointer.
+// EqualValues reports whether two values occupy the same value position. Use
+// it instead of `==` on a [Value] (see the Comparability section there); it
+// does not panic on any value or pointer shape of the catalogue, including a
+// typed-nil pointer.
 //
-// Two values are equal when they have the same shape and the same canonical wire
-// form. Defining it through the emitted token rather than field-by-field keeps
-// one rule for all eight shapes and ties equality to what actually reaches the
-// server: values that emit identical AQL are identical to the query. Three
-// consequences are worth naming — an [IntValue] never equals the numerically
-// equal [RealValue] (they emit `1` and `1.0`, and AQL types them differently);
-// two [PathValue]s agree on their Raw text alone, so a parsed path equals the
-// hand-built one that emits the same text even though only the parsed one
-// carries decomposed segments; and a [FuncCall] whose Args carry a nil element
-// equals the same call without it, because [FuncCall.token] skips a nil argument
-// (the emitters refuse one outright, so this arises only for a value that never
-// passed validation).
+// Two values are equal when they have the same shape and the same canonical
+// wire form. Defining equality through the emitted token keeps one rule for
+// all eight shapes and ties it to what reaches the server: values that emit
+// identical AQL are identical to the query. Three consequences follow: an
+// [IntValue] never equals the numerically equal [RealValue] (they emit `1`
+// and `1.0`, and AQL types them differently); two [PathValue]s agree on their
+// Raw text alone, so a parsed path equals the hand-built one that emits the
+// same text even though only the parsed one carries decomposed segments; and
+// a [FuncCall] whose Args carry a nil element equals the same call without
+// it, because a nil argument emits nothing (the emitters refuse one
+// outright, so this arises only for a value that never passed validation).
 //
-// A pointer is compared as the shape it points at, so `&FuncCall{…}` equals the
-// equivalent `FuncCall{…}`; a nil value — untyped, or a typed-nil pointer —
-// equals only another nil value. The shape check is [sameShape]: the type
-// comparison must be explicit because tokens alone conflate shapes
-// (`PathValue{Raw: "true"}` and `BoolValue{B: true}` both spell `true`).
+// A pointer is compared as the shape it points at, so `&FuncCall{…}` equals
+// the equivalent `FuncCall{…}`; a nil value (untyped, or a typed-nil pointer)
+// equals only another nil value. The shape comparison is explicit because
+// tokens alone conflate shapes (`PathValue{Raw: "true"}` and
+// `BoolValue{B: true}` both spell `true`).
 func EqualValues(a, b Value) bool {
 	av, aok := derefValue(a)
 	bv, bok := derefValue(b)
@@ -194,7 +191,7 @@ type ParamValue struct {
 func (p ParamValue) token() string { return "$" + p.Name }
 
 // Param constructs a [ParamValue] for the named placeholder. A leading
-// `$` in name is stripped — `Param("$ehr_id")` and `Param("ehr_id")`
+// `$` in name is stripped: `Param("$ehr_id")` and `Param("ehr_id")`
 // produce the same value. The name must spell the grammar's PARAMETER token
 // (see [ValidateValue]); it is checked at validate time, not here, so the
 // diagnostic names the query position the placeholder sits in.
@@ -322,7 +319,7 @@ func (v IntValue) token() string { return strconv.FormatInt(v.N, 10) }
 func Int(n int64) Value { return IntValue{N: n} }
 
 // RealValue is a floating-point literal. The emitter uses decimal ('f')
-// notation — never scientific ('g'/'e') — since the latter is not
+// notation, never scientific ('g'/'e'), since the latter is not
 // universally accepted as an AQL REAL literal by all backends.
 type RealValue struct {
 	F float64
@@ -367,7 +364,7 @@ func (v BoolValue) token() string { return strconv.FormatBool(v.B) }
 func Bool(b bool) Value { return BoolValue{B: b} }
 
 // NullValue is the AQL `NULL` literal. The token form is the bare keyword
-// (no quoting) — distinguishing it from a [StringValue] carrying "NULL".
+// (no quoting), distinguishing it from a [StringValue] carrying "NULL".
 type NullValue struct{}
 
 func (NullValue) token() string { return "NULL" }
@@ -375,15 +372,14 @@ func (NullValue) token() string { return "NULL" }
 // Null is the AQL NULL literal as a [Value].
 func Null() Value { return NullValue{} }
 
-// PathValue is an identified path in a VALUE position (REQ-117): the right
-// operand of a path-vs-path comparison (`WHERE a/x = b/y`) or an argument
-// of a [FuncCall]. It embeds the shared [IdentifiedPath], so the read side
-// exposes alias + segments without re-splitting the text; Raw is the
-// emission source.
+// PathValue is an identified path in a value position: the right operand of
+// a path-vs-path comparison (`WHERE a/x = b/y`) or an argument of a
+// [FuncCall]. It embeds the shared [IdentifiedPath], so the read side exposes
+// alias + segments without re-splitting the text; Raw is the emission source.
 //
-// The write-side constructor [Path] sets only Raw — decomposing a path
-// string is the parser's job, mirroring how [Comparison.ParsedPath] is nil
-// on the write side.
+// The write-side constructor [Path] sets only Raw. Decomposing a path string
+// is the parser's job, just as [Comparison.ParsedPath] is nil on the write
+// side.
 type PathValue struct {
 	IdentifiedPath
 }
@@ -392,20 +388,20 @@ func (p PathValue) token() string { return p.Raw }
 
 // Path constructs a [PathValue] for an alias-qualified path used as a
 // value (a path-vs-path comparison operand or a function argument). The
-// path is emitted VERBATIM — it is an openEHR identifier, never
+// path is emitted verbatim: it is an openEHR identifier, never
 // caller-supplied data; route caller data through [Param].
 func Path(raw string) Value {
 	return PathValue{Raw: strings.TrimSpace(raw)}
 }
 
-// FuncCall is an AQL function call in a value position (REQ-117) — either
-// operand of a comparison (`LENGTH(o/name/value) > 5`, `o/x = LENGTH(o/y)`),
-// a nested function argument, or the `TERMINOLOGY(op, api, params)` operand
-// of a MATCHES predicate ([MatchesExpr.Terminology]).
+// FuncCall is an AQL function call in a value position: either operand of a
+// comparison (`LENGTH(o/name/value) > 5`, `o/x = LENGTH(o/y)`), a nested
+// function argument, or the `TERMINOLOGY(op, api, params)` operand of a
+// MATCHES predicate ([MatchesExpr.Terminology]).
 //
 // Name is the function name; emission upper-cases it so canonical AQL is
 // produced regardless of source casing. Args are the operands in source
-// order — any [Value], which is exactly the grammar's `terminal :
+// order: any [Value], which is exactly the grammar's `terminal :
 // primitive | PARAMETER | identifiedPath | functionCall` set (literal,
 // [ParamValue], [PathValue], nested [FuncCall]).
 //
@@ -440,8 +436,8 @@ func (f FuncCall) token() string {
 }
 
 // Func constructs a [FuncCall] with the given (ASCII case-insensitive) name
-// and argument list. The name is canonicalised to upper case at intake — the
-// constructor twin of [Param] stripping `$` — but only over ASCII letters: a
+// and argument list. The name is canonicalised to upper case at intake (as [Param]
+// strips `$`), but only over ASCII letters: a
 // name outside the identifier alphabet is stored as written and refused at
 // validate time, never respelled into a legal-looking one.
 func Func(name string, args ...Value) Value {
@@ -468,7 +464,7 @@ func asciiUpper(s string) string {
 const TerminologyFunc = "TERMINOLOGY"
 
 // Terminology constructs the AQL `TERMINOLOGY(operation, api, params)`
-// function call as a [Value] — the grammar's `terminologyFunction`, usable
+// function call as a [Value], the grammar's `terminologyFunction`, usable
 // as a comparison operand, a MATCHES value-list item, or (via
 // [MatchesTerminology]) a bare MATCHES operand. The three arguments are
 // string literals in grammar order.
@@ -479,29 +475,29 @@ func Terminology(operation, api, params string) Value {
 	}
 }
 
-// ValidateValue reports a structurally unusable [Value] — one whose token form
-// would emit syntactically invalid AQL (REQ-117, REQ-119). It complements the
-// per-[WhereExpr] validate methods, which own the clause-level rules.
+// ValidateValue reports a structurally unusable [Value]: one whose token form
+// would emit syntactically invalid AQL. It complements the per-[WhereExpr]
+// validate methods, which own the clause-level rules.
 //
 // [FormatWhere] and [Builder.Build] call it for you. It is exported so a write
-// path outside this package — notably
+// path outside this package, notably
 // [github.com/cadasto/openehr-sdk-go/openehr/aql/parse.Query.Emit], which
-// carries values in SELECT positions this package does not model — can hold the
-// same line, and so a consumer assembling a value by hand can check it before
-// handing it to the unvalidated [FormatValue].
+// carries values in SELECT positions this package does not model, can apply
+// the same check, and so a consumer assembling a value by hand can check it
+// before handing it to the unvalidated [FormatValue].
 func ValidateValue(v Value) error { return validateValue(v) }
 
 // DerefValue normalises a [Value] to the value shape it denotes, reporting
-// false when it denotes none — an untyped nil, or a nil pointer.
+// false when it denotes none (an untyped nil, or a nil pointer).
 //
-// It is the sanctioned way to answer "which shape is this?" about a Value.
-// token has a value receiver, so `*FuncCall` satisfies Value alongside
-// `FuncCall`, and a bare type switch that lists only the value shapes silently
-// misses every pointer twin — which is reachable without anyone writing `&`,
-// since [MatchesExpr.Terminology] is itself a `*FuncCall`. Any code deciding
-// behaviour from a Value's concrete type MUST normalise first, whether it lives
-// in this package or in a write path outside it, or the same rule will bind one
-// carrier and not the other (REQ-119).
+// Use it to answer "which shape is this?" about a Value. token has a value
+// receiver, so `*FuncCall` satisfies Value alongside `FuncCall`, and a bare
+// type switch that lists only the value shapes silently misses every pointer
+// twin. That case is reachable without anyone writing `&`, since
+// [MatchesExpr.Terminology] is itself a `*FuncCall`. Any code deciding
+// behaviour from a Value's concrete type must normalise first, whether it
+// lives in this package or in a write path outside it, or a rule will apply
+// to one form and not the other.
 //
 //	if s, ok := aql.DerefValue(v); ok {
 //	    if lit, isString := s.(aql.StringValue); isString { … }
@@ -624,10 +620,10 @@ var aggregateFuncWords = map[string]bool{
 }
 
 // IsAggregateFunc reports whether name (ASCII case-insensitively) is one of
-// the grammar's `aggregateFunctionCall` names — COUNT, MIN, MAX, SUM, AVG.
-// These are admissible in SELECT alone, and their argument SHAPE is fixed by
-// that rule rather than by the general `functionCall`; the parse-side emitter
-// uses this to hold a projected aggregate to its own rule (REQ-119) without
+// the grammar's `aggregateFunctionCall` names: COUNT, MIN, MAX, SUM, AVG.
+// These are admissible in SELECT alone, and their argument shape is fixed by
+// that rule instead of the general `functionCall`; the parse-side emitter
+// uses this to check a projected aggregate against its own rule without
 // duplicating the name set.
 func IsAggregateFunc(name string) bool {
 	return aggregateFuncWords[asciiUpper(strings.TrimSpace(name))]
@@ -651,9 +647,9 @@ func wordChar(c byte) bool {
 func validateFuncName(name string) error { return checkFuncName(name, false) }
 
 // ValidateSelectFuncName refuses a name the grammar cannot lex as a projected
-// function call. It is [validateFuncName]'s SELECT-side sibling and differs in
-// exactly one way: the aggregates are admitted, because `aggregateFunctionCall`
-// is reachable from `columnExpr` (REQ-119).
+// function call. It differs from the check applied to WHERE-side function
+// names in exactly one way: the aggregates are admitted, because
+// `aggregateFunctionCall` is reachable from `columnExpr`.
 //
 // Exported for [github.com/cadasto/openehr-sdk-go/openehr/aql/parse], which
 // models a projected call as its own type and cannot reach the unexported form.

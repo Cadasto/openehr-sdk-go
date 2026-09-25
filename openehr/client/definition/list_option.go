@@ -23,31 +23,28 @@ type listConfig struct {
 }
 
 // ListOption filters [ListTemplates] through the ITS-REST list query
-// parameters of `definition_template_adl1.4_list` (REQ-143).
+// parameters of `definition_template_adl1.4_list`.
 //
 // For the three string filters, an explicit empty value is the same as
-// unset: the key is omitted. That is deliberate and deliberately unlike
-// the paging options, where an explicit zero IS sent — an empty wildcard
-// pattern has no wire meaning, while offset=0 and fetch=0 do. Do not
-// "align" the two behaviours.
+// unset: the key is omitted. The paging options behave differently and
+// send an explicit zero, because an empty wildcard pattern has no wire
+// meaning while offset=0 and fetch=0 do.
 //
-// These options carry unqualified names — WithVersion, WithOffset,
-// WithFetch — where the rest of this package names options after their
-// operation (WithUploadVersion, WithExampleType, WithQueryType). That is
-// deliberate: REQ-143 pins the names, and ListOption is a distinct type
-// from UploadOption, StoreOption, and ExampleOption, so passing an upload
-// option to a list call is a compile error rather than a silent no-op. A
-// second paged list endpoint in this package would need qualified names;
-// the template catalog is the only one today.
+// These options carry unqualified names (WithVersion, WithOffset,
+// WithFetch), where the rest of this package names options after their
+// operation (WithUploadVersion, WithExampleType, WithQueryType).
+// ListOption is a distinct type from UploadOption, StoreOption and
+// ExampleOption, so passing an upload option to a list call is a compile
+// error rather than a silent no-op.
 type ListOption func(*listConfig)
 
-// WithTemplateID filters the catalog by template id. The pin specifies a
+// WithTemplateID filters the catalog by template id. ITS-REST specifies a
 // wildcard pattern (`vital*`), matched by the server, not the SDK.
 func WithTemplateID(id string) ListOption {
 	return func(c *listConfig) { c.templateID = id }
 }
 
-// WithConcept filters the catalog by concept name. The pin specifies a
+// WithConcept filters the catalog by concept name. ITS-REST specifies a
 // wildcard pattern (`*signs*`), matched by the server, not the SDK.
 func WithConcept(concept string) ListOption {
 	return func(c *listConfig) { c.concept = concept }
@@ -67,18 +64,17 @@ func WithVersion(version string) ListOption {
 // WithOffset(0) is honoured and sent on the wire, not treated as unset.
 //
 // A negative offset is refused by [ListTemplates] with
-// [transport.ErrInvalidConfig] and issues no request. That is an SDK floor,
-// not a wire rule: the pin gives offset no negative semantics and declares
-// no minimum. It deliberately diverges from query.WithOffset, which accepts
-// a negative and forwards it — do not "align" the two without changing
-// REQ-143.
+// [transport.ErrInvalidConfig] and issues no request. This check is the
+// SDK's own: ITS-REST gives offset no negative semantics and declares no
+// minimum. It differs from query.WithOffset, which accepts a negative and
+// forwards it.
 func WithOffset(n int) ListOption {
 	return func(c *listConfig) { c.offset = n; c.offsetSet = true }
 }
 
 // WithFetch limits the number of rows returned. An explicit WithFetch(0)
 // requests zero rows; when unset the server applies its implementation-
-// defined default (the pin declares none).
+// defined default (ITS-REST declares none).
 //
 // A negative fetch is refused on the same terms as [WithOffset].
 func WithFetch(n int) ListOption {

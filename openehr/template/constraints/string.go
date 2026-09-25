@@ -9,7 +9,7 @@ import (
 // CString constrains an RM String value (C_STRING). Pattern is an
 // optional POSIX-flavoured regex (compiled by [regexp.Compile] at
 // validation time); List is an optional closed enumeration. When
-// both are set, the value MUST satisfy both.
+// both are set, the value must satisfy both.
 //
 // Default carries the OPT <assumed_value>; empty when omitted.
 type CString struct {
@@ -22,11 +22,11 @@ type CString struct {
 
 // NewCString builds a CString and pre-compiles pattern so repeated
 // Validate calls reuse the compiled regexp instead of recompiling. An
-// invalid pattern is not reported here — it is left uncompiled and
-// surfaces as CodeInvalidValue on Validate, preserving the
-// "value-violation vs unparseable-OPT-regex" distinction. pattern, list,
-// and assumed (the C_STRING <assumed_value> default) map to the struct
-// fields.
+// invalid pattern is not reported here. It is left uncompiled and
+// surfaces as CodeInvalidValue on Validate, which keeps a value
+// violation distinguishable from an unparseable OPT regex. pattern,
+// list, and assumed (the C_STRING <assumed_value> default) map to the
+// struct fields.
 func NewCString(pattern string, list []string, assumed string) CString {
 	c := CString{Pattern: pattern, List: list, Default: assumed}
 	if pattern != "" {
@@ -39,12 +39,12 @@ func NewCString(pattern string, list []string, assumed string) CString {
 
 func (CString) isPrimitive() {}
 
-// ExampleValue returns a minimal-valid string example. REQ-107.
-// First entry of List wins when non-empty so closed enumerations
-// produce a member; else the literal "example" — Validate without a
-// pattern accepts any string, and pattern-only constraints fall
-// outside the bounded-guarantee contract (callers needing pattern
-// satisfaction supply their own example).
+// ExampleValue returns a minimal-valid string example.
+// The first entry of List wins when non-empty so closed enumerations
+// produce a member; otherwise it returns the literal "example". Validate
+// without a pattern accepts any string. Pattern-only constraints are
+// not covered by the bounded-constraint guarantee, so callers that need
+// a value satisfying the pattern supply their own example.
 func (c CString) ExampleValue() any {
 	if len(c.List) > 0 {
 		return c.List[0]

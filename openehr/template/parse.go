@@ -15,7 +15,6 @@ import (
 // ParseOPT parses one ADL 1.4 operational template from r. It accepts
 // an optional UTF-8 BOM and the standard openEHR OPT XSD element
 // shape (root <template> in namespace http://schemas.openehr.org/v1).
-// REQ-100.
 //
 // Returns ErrInvalidOPT (wrapped) for malformed XML or missing
 // required wrapper fields (template_id, definition). In default
@@ -29,25 +28,25 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 
 // ParseOPTStrict is like ParseOPT but rejects any <children>
 // xsi:type value the parser does not recognise when it carries
-// nested <attributes> — those are values the lenient mode would
-// admit as a leaf and silently drop the subtree. Use for production
-// validators that need to fail loudly on shapes outside the v1
+// nested <attributes>. Lenient mode would admit such a value as a
+// leaf and silently drop the subtree. Use it for production
+// validators that need to fail loudly on shapes outside the supported
 // taxonomy (e.g. AOM 2 / ADL 2 inputs, primitive constraint trees).
-// Returns ErrUnsupportedNode (wrapped) on first such occurrence.
+// Returns ErrUnsupportedNode (wrapped) on the first such occurrence.
 func ParseOPTStrict(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, true)
 }
 
-// ParseFile reads an .opt file from disk. The path suffix MUST be
-// .opt (case-insensitive) per REQ-100; other extensions return
+// ParseFile reads an .opt file from disk. The path suffix must be
+// .opt (case-insensitive); other extensions return
 // ErrNotOPTFile without opening the file.
 func ParseFile(path string) (*OperationalTemplate, error) {
 	return parseFile(path, false)
 }
 
 // ParseFileStrict is the strict-mode counterpart to ParseFile.
-// Equivalent to ParseFile + ParseOPTStrict — see ParseOPTStrict for
-// the strict-mode contract.
+// It is equivalent to ParseFile + ParseOPTStrict; see ParseOPTStrict
+// for the strict-mode contract.
 func ParseFileStrict(path string) (*OperationalTemplate, error) {
 	return parseFile(path, true)
 }

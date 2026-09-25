@@ -23,7 +23,7 @@ type functionParameterCommon struct {
 // FunctionParameterName implements FunctionParameter.
 func (p functionParameterCommon) FunctionParameterName() string { return p.Name }
 
-// SingleFunctionParameter is P_BMM_SINGLE_FUNCTION_PARAMETER —
+// SingleFunctionParameter is P_BMM_SINGLE_FUNCTION_PARAMETER,
 // structurally like SingleProperty.
 type SingleFunctionParameter struct {
 	functionParameterCommon
@@ -44,7 +44,7 @@ func (s *SingleFunctionParameter) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// SingleFunctionParameterOpen is P_BMM_SINGLE_FUNCTION_PARAMETER_OPEN —
+// SingleFunctionParameterOpen is P_BMM_SINGLE_FUNCTION_PARAMETER_OPEN,
 // parallels SinglePropertyOpen.
 type SingleFunctionParameterOpen struct {
 	functionParameterCommon
@@ -65,7 +65,7 @@ func (s *SingleFunctionParameterOpen) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// ContainerFunctionParameter is P_BMM_CONTAINER_FUNCTION_PARAMETER —
+// ContainerFunctionParameter is P_BMM_CONTAINER_FUNCTION_PARAMETER,
 // parallels ContainerProperty.
 type ContainerFunctionParameter struct {
 	functionParameterCommon
@@ -92,7 +92,7 @@ func (c *ContainerFunctionParameter) MarshalJSON() ([]byte, error) {
 	return marshalDiscriminated(TypeP_BMM_CONTAINER_FUNCTION_PARAMETER, c.functionParameterCommon, extra)
 }
 
-// GenericFunctionParameter is P_BMM_GENERIC_FUNCTION_PARAMETER —
+// GenericFunctionParameter is P_BMM_GENERIC_FUNCTION_PARAMETER,
 // parallels GenericProperty.
 type GenericFunctionParameter struct {
 	functionParameterCommon
@@ -133,8 +133,8 @@ type Function struct {
 // MarshalJSON serialises Function so the polymorphic Parameters values
 // and Result emit their _type discriminators (relying on the concrete
 // MarshalJSON methods). Output is stable: encoding/json sorts map keys,
-// so the assembled object's keys — and the nested parameters/condition
-// map keys — emit in lexicographic order on every call.
+// so the assembled object's keys, and the nested parameters/condition
+// map keys, emit in lexicographic order on every call.
 func (f *Function) MarshalJSON() ([]byte, error) {
 	m := map[string]any{
 		"name": f.Name,

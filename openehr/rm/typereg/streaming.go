@@ -154,14 +154,13 @@ func Unmarshalers() json.Options {
 
 // EncodeOptions returns the encoder-independent canonical-JSON encode option
 // set: json.Deterministic(true) so a map (openEHR Hash) emits its keys in
-// lexicographic order (REQ-052), and FormatNilSliceAsNull / FormatNilMapAsNull
+// lexicographic order, and FormatNilSliceAsNull / FormatNilMapAsNull
 // so a mandatory nil container keeps its "null" spelling instead of v2's
-// default "[]" / "{}" (Q6). It is the single home for these three options: an
+// default "[]" / "{}". It is the single home for these three options: an
 // entry point with no encoder in hand (canjson.Marshal / MarshalIndent) joins
 // it directly, and [MarshalOptions] joins it on top of an encoder's own
 // options. The set is rebuilt afresh on every call so the spelling holds no
-// matter which package (v1 or v2, canonical or a stay-on-v1 caller) drives the
-// encode.
+// matter which package (encoding/json v1 or v2) drives the encode.
 func EncodeOptions() json.Options {
 	return json.JoinOptions(
 		json.Deterministic(true),
@@ -188,11 +187,11 @@ func MarshalOptions(enc *jsontext.Encoder) json.Options {
 // `canjson: <rmType>:` text and gaining [ErrInvalidShape]; an error carrying
 // neither a shape failure (a *json.SemanticError) nor a dispatch failure (a
 // [DecodeError]) passes through unwrapped, because it is malformed input (a
-// syntactic error or a failing reader), not a shape failure of this type
-// (REQ-052, ADR 0022). Two errors are exceptions to that rule. A duplicate
-// member name is a syntactic error that is nonetheless a shape refusal, so it
-// gains [ErrInvalidShape] through [ClassifyDuplicate] (without the
-// `canjson: <rmType>:` text). A depth refusal ([ErrMaxDepthExceeded], REQ-108)
+// syntactic error or a failing reader), not a shape failure of this type.
+// Two errors are exceptions to that rule. A duplicate member name is a
+// syntactic error that is nonetheless a shape refusal, so it gains
+// [ErrInvalidShape] through [ClassifyDuplicate] (without the
+// `canjson: <rmType>:` text). A depth refusal ([ErrMaxDepthExceeded])
 // from a nested value passes through unwrapped and does not gain the shape
 // sentinel.
 //
@@ -202,12 +201,12 @@ func MarshalOptions(enc *jsontext.Encoder) json.Options {
 // promote the ancestor's methods). Either way out declares the _type field
 // gotType points into, so the guard reads the value this decode populated, and
 // a caller who sets json.RejectUnknownMembers is not tripped by the SDK's own
-// discriminator reaching out (Q5).
+// discriminator reaching out.
 //
 // A nil dec, a nil out (the interface itself, not a typed nil inside it) or a
 // nil gotType is caller misuse (no generated body passes one); each is refused
 // before any decode with a [DecodeError] wrapping [ErrNilArgument] that names
-// the argument, rather than dereferenced (REQ-025). A typed nil inside out
+// the argument, rather than dereferenced. A typed nil inside out
 // reaches the decode and is reported by encoding/json/v2 as a shape failure.
 func DecodeInto(dec *jsontext.Decoder, rmType string, out any, gotType *string) error {
 	switch {
@@ -311,17 +310,16 @@ func slotPointer(err error) string {
 // [Default], decodes into a fresh instance (threading the interface hooks so a
 // nested polymorphic slot resolves too), and stores it in out. A missing _type
 // falls back to fallback when the interface is narrow (the parent concrete type
-// is the natural default at a concrete-typed slot, wire.md:147); an abstract
+// is the natural default at a concrete-typed slot); an abstract
 // interface passes a nil fallback and refuses the missing discriminator.
 //
 // Dispatch failures (missing / unknown / mismatched _type) return a
 // [DecodeError] wrapping the matching sentinel, so errors.Is finds the kind and
 // errors.As finds the envelope; the JSON position is supplied by the v2
-// decoder's own SemanticError wrapper around this return (REQ-052, Q2).
+// decoder's own SemanticError wrapper around this return.
 //
 // A nil dec or a nil out is caller misuse (no generated hook passes one),
-// refused before any read with a [DecodeError] wrapping [ErrNilArgument]
-// (REQ-025).
+// refused before any read with a [DecodeError] wrapping [ErrNilArgument].
 func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any) error {
 	switch {
 	case dec == nil:

@@ -27,7 +27,7 @@ import (
 )
 
 // ErrTemporalConversion is returned (wrapped) by ToTime / ToDuration
-// when a value cannot map cleanly to a Go time.Time / time.Duration —
+// when a value cannot map cleanly to a Go time.Time / time.Duration:
 // it is malformed, partial, or carries calendar-nominal components.
 // Detect with errors.Is(err, rm.ErrTemporalConversion).
 var ErrTemporalConversion = errors.New("rm: temporal value not convertible")
@@ -62,31 +62,28 @@ type durationParts struct {
 
 // --- DV_DATE ------------------------------------------------------------
 
-// Year returns the year component (0 when unparseable). REQ-123.
+// Year returns the year component (0 when unparseable).
 func (d *DVDate) Year() int { p, _ := parseDate(d.Value); return p.year }
 
-// Month returns the month component, or 0 when month-unknown. REQ-123.
+// Month returns the month component, or 0 when month-unknown.
 func (d *DVDate) Month() int { p, _ := parseDate(d.Value); return p.month }
 
-// Day returns the day component, or 0 when day-unknown. REQ-123.
+// Day returns the day component, or 0 when day-unknown.
 func (d *DVDate) Day() int { p, _ := parseDate(d.Value); return p.day }
 
 // MonthUnknown reports whether the date omits the month (e.g. "2024").
-// REQ-123.
 func (d *DVDate) MonthUnknown() bool { p, _ := parseDate(d.Value); return !p.monthKnown }
 
 // DayUnknown reports whether the date omits the day (e.g. "2024-03").
-// REQ-123.
 func (d *DVDate) DayUnknown() bool { p, _ := parseDate(d.Value); return !p.dayKnown }
 
 // IsPartial reports whether the date is reduced (day or more missing).
-// REQ-123.
 func (d *DVDate) IsPartial() bool { return d.DayUnknown() }
 
 // Magnitude returns the number of days since the calendar origin
 // 0001-01-01 (a legitimately-partial value counts unknown month/day as
 // 1). A malformed value returns 0 rather than a fabricated magnitude, so
-// Compare does not silently mis-order garbage. REQ-123.
+// Compare does not silently mis-order garbage.
 func (d *DVDate) Magnitude() Integer {
 	p, err := parseDate(d.Value)
 	if err != nil {
@@ -96,18 +93,16 @@ func (d *DVDate) Magnitude() Integer {
 }
 
 // Compare orders this date against other by magnitude (-1 / 0 / +1).
-// REQ-123.
 func (d *DVDate) Compare(other DVDate) int { return cmpInt(int(d.Magnitude()), int(other.Magnitude())) }
 
 // LessThan reports whether this date precedes other (by magnitude).
-// REQ-123.
 func (d *DVDate) LessThan(other DVDate) bool { return d.Compare(other) < 0 }
 
-// IsStrictlyComparableTo is true for any two dates. REQ-123.
+// IsStrictlyComparableTo is true for any two dates.
 func (d *DVDate) IsStrictlyComparableTo(other DVDate) bool { return true }
 
 // ToTime converts a full date to a time.Time at midnight UTC, or returns
-// ErrTemporalConversion for a partial/malformed value. REQ-123.
+// ErrTemporalConversion for a partial/malformed value.
 func (d *DVDate) ToTime() (time.Time, error) {
 	p, err := parseDate(d.Value)
 	if err != nil {
@@ -121,32 +116,31 @@ func (d *DVDate) ToTime() (time.Time, error) {
 
 // --- DV_TIME ------------------------------------------------------------
 
-// Hour returns the hour component (0 when unparseable). REQ-123.
+// Hour returns the hour component (0 when unparseable).
 func (d *DVTime) Hour() int { p, _ := parseTime(d.Value); return p.hour }
 
-// Minute returns the minute component, or 0 when minute-unknown. REQ-123.
+// Minute returns the minute component, or 0 when minute-unknown.
 func (d *DVTime) Minute() int { p, _ := parseTime(d.Value); return p.minute }
 
-// Second returns the second component, or 0 when second-unknown. REQ-123.
+// Second returns the second component, or 0 when second-unknown.
 func (d *DVTime) Second() int { p, _ := parseTime(d.Value); return p.second }
 
 // FractionalSecond returns the fractional-second component (0 when
-// absent). REQ-123.
+// absent).
 func (d *DVTime) FractionalSecond() float64 { p, _ := parseTime(d.Value); return p.frac }
 
 // Timezone returns the timezone designator (e.g. "Z", "+02:00"), or ""
-// when none is present. REQ-123.
+// when none is present.
 func (d *DVTime) Timezone() string { p, _ := parseTime(d.Value); return p.tz }
 
 // IsPartial reports whether the time is reduced (second or more missing).
-// REQ-123.
 func (d *DVTime) IsPartial() bool { p, _ := parseTime(d.Value); return !p.secondKnown }
 
 // Magnitude returns the number of seconds since the start of day. The
-// value is clock-local — the timezone offset is not normalized away (per
+// value is clock-local: the timezone offset is not normalized away (per
 // the openEHR DV_TIME.magnitude definition), so two instants equal in
 // UTC but stated in different zones do not compare equal. A malformed
-// value returns 0. REQ-123.
+// value returns 0.
 func (d *DVTime) Magnitude() Real {
 	p, err := parseTime(d.Value)
 	if err != nil {
@@ -156,21 +150,19 @@ func (d *DVTime) Magnitude() Real {
 }
 
 // Compare orders this time against other by magnitude (-1 / 0 / +1).
-// REQ-123.
 func (d *DVTime) Compare(other DVTime) int {
 	return cmpFloat(float64(d.Magnitude()), float64(other.Magnitude()))
 }
 
 // LessThan reports whether this time precedes other (by magnitude).
-// REQ-123.
 func (d *DVTime) LessThan(other DVTime) bool { return d.Compare(other) < 0 }
 
-// IsStrictlyComparableTo is true for any two times. REQ-123.
+// IsStrictlyComparableTo is true for any two times.
 func (d *DVTime) IsStrictlyComparableTo(other DVTime) bool { return true }
 
 // ToTime converts a full time-of-day to a time.Time on the reference
 // date 0000-01-01, or returns ErrTemporalConversion for a
-// partial/malformed value. REQ-123.
+// partial/malformed value.
 func (d *DVTime) ToTime() (time.Time, error) {
 	p, err := parseTime(d.Value)
 	if err != nil {
@@ -201,38 +193,38 @@ func (d *DVDateTime) split() (dateParts, timeParts, error) {
 	return dp, tp, terr
 }
 
-// Year returns the year component. REQ-123.
+// Year returns the year component.
 func (d *DVDateTime) Year() int { dp, _, _ := d.split(); return dp.year }
 
-// Month returns the month component, or 0 when unknown. REQ-123.
+// Month returns the month component, or 0 when unknown.
 func (d *DVDateTime) Month() int { dp, _, _ := d.split(); return dp.month }
 
-// Day returns the day component, or 0 when unknown. REQ-123.
+// Day returns the day component, or 0 when unknown.
 func (d *DVDateTime) Day() int { dp, _, _ := d.split(); return dp.day }
 
-// Hour returns the hour component. REQ-123.
+// Hour returns the hour component.
 func (d *DVDateTime) Hour() int { _, tp, _ := d.split(); return tp.hour }
 
-// Minute returns the minute component. REQ-123.
+// Minute returns the minute component.
 func (d *DVDateTime) Minute() int { _, tp, _ := d.split(); return tp.minute }
 
-// Second returns the second component. REQ-123.
+// Second returns the second component.
 func (d *DVDateTime) Second() int { _, tp, _ := d.split(); return tp.second }
 
-// FractionalSecond returns the fractional-second component. REQ-123.
+// FractionalSecond returns the fractional-second component.
 func (d *DVDateTime) FractionalSecond() float64 { _, tp, _ := d.split(); return tp.frac }
 
-// Timezone returns the timezone designator, or "" when none. REQ-123.
+// Timezone returns the timezone designator, or "" when none.
 func (d *DVDateTime) Timezone() string { _, tp, _ := d.split(); return tp.tz }
 
-// MonthUnknown reports whether the date side omits the month. REQ-123.
+// MonthUnknown reports whether the date side omits the month.
 func (d *DVDateTime) MonthUnknown() bool { dp, _, _ := d.split(); return !dp.monthKnown }
 
-// DayUnknown reports whether the date side omits the day. REQ-123.
+// DayUnknown reports whether the date side omits the day.
 func (d *DVDateTime) DayUnknown() bool { dp, _, _ := d.split(); return !dp.dayKnown }
 
 // IsPartial reports whether the date-time is reduced (second or more
-// missing — including a missing time part entirely). REQ-123.
+// missing, including a missing time part entirely).
 func (d *DVDateTime) IsPartial() bool {
 	dp, tp, _ := d.split()
 	return !dp.dayKnown || !tp.secondKnown
@@ -241,7 +233,7 @@ func (d *DVDateTime) IsPartial() bool {
 // Magnitude returns the number of seconds since the calendar origin
 // 0001-01-01T00:00:00. The value is clock-local (the timezone offset is
 // not normalized away, per the openEHR definition). A malformed value
-// returns 0. REQ-123.
+// returns 0.
 func (d *DVDateTime) Magnitude() float64 {
 	dp, tp, err := d.split()
 	if err != nil {
@@ -250,18 +242,18 @@ func (d *DVDateTime) Magnitude() float64 {
 	return float64(dateMagnitudeDays(dp))*secondsPerDay + float64(tp.hour*3600+tp.minute*60+tp.second) + tp.frac
 }
 
-// Compare orders this date-time against other by magnitude. REQ-123.
+// Compare orders this date-time against other by magnitude.
 func (d *DVDateTime) Compare(other DVDateTime) int { return cmpFloat(d.Magnitude(), other.Magnitude()) }
 
-// LessThan reports whether this date-time precedes other. REQ-123.
+// LessThan reports whether this date-time precedes other.
 func (d *DVDateTime) LessThan(other DVDateTime) bool { return d.Compare(other) < 0 }
 
-// IsStrictlyComparableTo is true for any two date-times. REQ-123.
+// IsStrictlyComparableTo is true for any two date-times.
 func (d *DVDateTime) IsStrictlyComparableTo(other DVDateTime) bool { return true }
 
 // ToTime converts a full date-time to a time.Time (UTC when no timezone
 // is present), or returns ErrTemporalConversion for a partial/malformed
-// value. REQ-123.
+// value.
 func (d *DVDateTime) ToTime() (time.Time, error) {
 	dp, tp, err := d.split()
 	if err != nil {
@@ -279,38 +271,37 @@ func (d *DVDateTime) ToTime() (time.Time, error) {
 
 // --- DV_DURATION --------------------------------------------------------
 
-// Years returns the years component. REQ-123.
+// Years returns the years component.
 func (d *DVDuration) Years() int { p, _ := parseDuration(d.Value); return p.years }
 
-// Months returns the months component. REQ-123.
+// Months returns the months component.
 func (d *DVDuration) Months() int { p, _ := parseDuration(d.Value); return p.months }
 
-// Weeks returns the weeks component. REQ-123.
+// Weeks returns the weeks component.
 func (d *DVDuration) Weeks() int { p, _ := parseDuration(d.Value); return p.weeks }
 
-// Days returns the days component. REQ-123.
+// Days returns the days component.
 func (d *DVDuration) Days() int { p, _ := parseDuration(d.Value); return p.days }
 
-// Hours returns the hours component. REQ-123.
+// Hours returns the hours component.
 func (d *DVDuration) Hours() int { p, _ := parseDuration(d.Value); return p.hours }
 
-// Minutes returns the minutes component. REQ-123.
+// Minutes returns the minutes component.
 func (d *DVDuration) Minutes() int { p, _ := parseDuration(d.Value); return p.minutes }
 
-// Seconds returns the whole-seconds component. REQ-123.
+// Seconds returns the whole-seconds component.
 func (d *DVDuration) Seconds() int { p, _ := parseDuration(d.Value); return p.seconds }
 
-// FractionalSeconds returns the fractional-second component. REQ-123.
+// FractionalSeconds returns the fractional-second component.
 func (d *DVDuration) FractionalSeconds() float64 { p, _ := parseDuration(d.Value); return p.frac }
 
 // IsNegative reports whether the duration carries a leading minus sign
-// (openEHR deviation from ISO 8601). REQ-123.
+// (openEHR deviation from ISO 8601).
 func (d *DVDuration) IsNegative() bool { p, _ := parseDuration(d.Value); return p.neg }
 
 // Magnitude returns the duration as a number of seconds, using the
 // openEHR nominal year (365.24 d) and month (30.42 d) averages for the
 // calendar-nominal components. Negative when the duration is negative.
-// REQ-123.
 func (d *DVDuration) Magnitude() float64 {
 	p, err := parseDuration(d.Value)
 	if err != nil {
@@ -327,19 +318,19 @@ func (d *DVDuration) Magnitude() float64 {
 	return secs
 }
 
-// Compare orders this duration against other by magnitude. REQ-123.
+// Compare orders this duration against other by magnitude.
 func (d *DVDuration) Compare(other DVDuration) int { return cmpFloat(d.Magnitude(), other.Magnitude()) }
 
-// LessThan reports whether this duration is shorter than other. REQ-123.
+// LessThan reports whether this duration is shorter than other.
 func (d *DVDuration) LessThan(other DVDuration) bool { return d.Compare(other) < 0 }
 
-// IsStrictlyComparableTo is true for any two durations. REQ-123.
+// IsStrictlyComparableTo is true for any two durations.
 func (d *DVDuration) IsStrictlyComparableTo(other DVDuration) bool { return true }
 
 // ToDuration converts a definite duration to a time.Duration, or returns
 // ErrTemporalConversion when it is malformed or carries calendar-nominal
 // years/months (which have no fixed length). Weeks and days are treated
-// as definite (7 d, 24 h). REQ-123.
+// as definite (7 d, 24 h).
 func (d *DVDuration) ToDuration() (time.Duration, error) {
 	p, err := parseDuration(d.Value)
 	if err != nil {

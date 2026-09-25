@@ -24,10 +24,10 @@ type scripted struct {
 // first match wins.
 //
 // An empty method matches any method; an empty path matches any
-// request path, so Handle("", "", h) is a catch-all — the
-// planted-backend shape probe tests use instead of httptest.NewServer
-// (REQ-082). A non-empty path matches the request's full URL path or
-// its resource-stripped form (see resourcePath) exactly; a path
+// request path, so Handle("", "", h) is a catch-all: the
+// planted-backend shape probe tests use instead of httptest.NewServer.
+// A non-empty path matches the request's full URL path, or that path
+// with the deployment's REST base cut away, exactly; a path
 // ending in "/" additionally matches any request whose full or
 // resource-stripped path starts with it, i.e. that subtree. The match
 // is anchored: a route "/ehr/x" answers "/ehr/x" and its base-prefixed
@@ -36,10 +36,9 @@ type scripted struct {
 //
 // h == nil is not silently dropped: it registers a route that fails
 // closed, answering every matching request with 500 and a body naming
-// the method and path it was registered for. REQ-025 forbids treating
-// caller input as a silent no-op — a dropped nil handler would look
-// like "this route never fired" to a test asserting on it, rather
-// than the caller mistake it is.
+// the method and path it was registered for. A dropped nil handler
+// would look like "this route never fired" to a test asserting on it,
+// hiding the caller mistake.
 func (b *Backend) Handle(method, path string, h http.Handler) {
 	if h == nil {
 		h = nilHandler(method, path)
@@ -51,8 +50,7 @@ func (b *Backend) Handle(method, path string, h http.Handler) {
 
 // HandleFunc registers a scripted route (see [Backend.Handle]).
 // fn == nil behaves as in [Backend.Handle]: the route fails closed
-// rather than being
-// dropped.
+// rather than being dropped.
 func (b *Backend) HandleFunc(method, path string, fn func(http.ResponseWriter, *http.Request)) {
 	if fn == nil {
 		b.Handle(method, path, nil)
@@ -73,7 +71,7 @@ func nilHandler(method, path string) http.Handler {
 
 // Scripted returns a Backend whose only behaviour is fn. Probe tests
 // use this in place of httptest.NewServer so planted and hostile
-// backends stay listener-free (REQ-082). fn == nil is not a caller
+// backends stay listener-free. fn == nil is not a caller
 // error: every request gets a 500 naming the registration (see
 // [Backend.Handle]).
 func Scripted(fn func(http.ResponseWriter, *http.Request)) *Backend {

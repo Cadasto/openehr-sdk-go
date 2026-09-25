@@ -14,12 +14,12 @@ import (
 )
 
 // Severity classifies a lint [Issue]. Error means the query is (statically)
-// wrong; Warning is advisory — the query may still execute, and the SDK
+// wrong; Warning is advisory: the query may still execute, and the SDK
 // grammar profile / CDR may admit it.
 type Severity int
 
 const (
-	// Error means a static defect a strict consumer SHOULD reject.
+	// Error means a static defect a strict consumer should reject.
 	Error Severity = iota
 	// Warning is advisory; it does not make a [Result] not-OK.
 	Warning
@@ -36,11 +36,10 @@ func (s Severity) String() string {
 	return fmt.Sprintf("severity(%d)", int(s))
 }
 
-// Span is where in the query an [Issue] applies — the SAME type the parser
-// records a dropped construct with ([parse.Span]), re-exported rather than
-// redefined, so a consumer correlating a lint issue with a
-// [parse.DroppedConstruct] compares spans instead of converting between two
-// structurally-identical types (REQ-109 § Value-free lint diagnostics).
+// Span is where in the query an [Issue] applies. It is the same type the
+// parser records a dropped construct with ([parse.Span]), re-exported instead
+// of redefined, so a consumer correlating a lint issue with a
+// [parse.DroppedConstruct] compares spans directly.
 type Span = parse.Span
 
 // spanOfText is the span a construct of the given text occupies starting at
@@ -77,44 +76,43 @@ func advance(p parse.Position, text string) parse.Position {
 // not fail-fast). The zero value is not meaningful.
 type Issue struct {
 	// Code is a stable programmatic identifier (e.g. "aql_syntax",
-	// "aql_archetype_not_in_template"). Consumers SHOULD dispatch on Code.
+	// "aql_archetype_not_in_template"). Consumers should dispatch on Code.
 	//
-	// VALUE-FREE: never carries source text.
+	// Value-free: never carries source text.
 	Code string
 	// Path is the AQL path or class the issue concerns; "" when not
 	// localised.
 	//
-	// VALUE-BEARING: a path spelling carries its own predicates, so
-	// `o/data[at0001, 'Systolic']` is a path AND a value. A disclosure
-	// boundary MUST treat this as query text despite its looking structural.
+	// Value-bearing: a path spelling carries its own predicates, so
+	// `o/data[at0001, 'Systolic']` is a path and a value. A disclosure
+	// boundary must treat this as query text even though it looks structural.
 	Path string
 	// Detail is a human-readable message (carries ANTLR line/col for
 	// syntax errors).
 	//
-	// VALUE-BEARING: may quote any part of the query.
+	// Value-bearing: may quote any part of the query.
 	Detail string
 	// Severity classifies the issue.
 	//
-	// VALUE-FREE: never carries source text.
+	// Value-free: never carries source text.
 	Severity Severity
 	// Span locates the issue in the query text handed to [LintString] (or to
 	// [parse.Parse] for [Lint]). The zero Span means the issue is not
 	// attributable to a position; it never falls back to embedding source
-	// text (REQ-109 § Value-free lint diagnostics).
+	// text.
 	//
-	// VALUE-FREE: line and column numbers only.
+	// Value-free: line and column numbers only.
 	Span Span
 }
 
 // Result aggregates every [Issue] from one [Lint] / [LintString] call.
 type Result struct {
 	// Issues is the full list of findings in a stable, deterministic
-	// order: by layer, then document order within a layer (aql_unused_param
-	// is sorted by parameter key, since unreferenced params have no
-	// document position; and Layer 2 orders by CHECK GROUP first — shape,
-	// then the REQ-161 semantic group in its own fixed sequence, then the
-	// REQ-164 path-shape group — so a later-in-the-query semantic finding
-	// can precede an earlier shape one).
+	// order: by layer, then document order within a layer. aql_unused_param
+	// is sorted by parameter key, since unreferenced params have no document
+	// position, and Layer 2 orders by check group first (shape, then the
+	// semantic group in its own fixed sequence, then the path-shape group), so a
+	// later-in-the-query semantic finding can precede an earlier shape one.
 	// Never nil after a lint call (zero-length when clean).
 	Issues []Issue
 }
@@ -126,10 +124,10 @@ func (r Result) OK() bool {
 }
 
 // Options tunes a lint pass. The zero value (or nil) runs the AST-shape
-// checks AND the whole REQ-161 Layer-2 semantic group (which is ungated and
-// can raise Error-severity issues that flip [Result.OK] — see Relation);
-// Layer 3 needs Compiled, and the Layer-2 checks that judge the query against
-// its request envelope need Query.
+// checks and the whole Layer-2 semantic group (which always runs and can
+// raise Error-severity issues that flip [Result.OK]; see Relation). Layer 3
+// needs Compiled, and the Layer-2 checks that judge the query against its
+// request envelope need Query.
 type Options struct {
 	// Compiled, when non-nil, enables Layer 3 (archetype / path checks
 	// against a compiled OPT).
@@ -137,37 +135,36 @@ type Options struct {
 	// Query, when non-nil, is the request envelope the AQL will execute
 	// under. It enables the parameter-binding checks (aql_unbound_param /
 	// aql_unused_param) against its Parameters map, and lets the TOP group
-	// see the envelope's row limit (aql_top_with_fetch, REQ-118).
+	// see the envelope's row limit (aql_top_with_fetch).
 	Query *aql.Query
-	// Relation is the REQ-160 containment relation the Layer-2 semantic
-	// checks judge FROM/CONTAINS shapes against (REQ-161 § Relation supply).
+	// Relation is the containment relation the Layer-2 semantic checks judge
+	// FROM/CONTAINS shapes against.
 	//
-	// Unlike Compiled and Query it does not GATE its checks: nil means the
-	// REQ-160 default relation ([contain.Default]), so the semantic group
+	// Unlike Compiled and Query it does not switch its checks on or off: nil
+	// means the default relation ([contain.Default]), so the semantic group
 	// always runs. Supply a relation extended with dialect overlay edges
 	// ([contain.TypeRelation.WithOverlay]) to lint a deployment whose containment
 	// facts go beyond the pinned RM without drawing false findings.
 	//
 	// It governs the five containment-pair codes only. The three portability
-	// codes — aql_version_no_predicate, aql_versioned_object_unreferenced and
-	// aql_fanout_row_grain — ignore it: the first two put a CLASS question to
-	// the pinned RM (rminfo.Default) rather than a containment one, and the
+	// codes (aql_version_no_predicate, aql_versioned_object_unreferenced and
+	// aql_fanout_row_grain) ignore it: the first two put a class question to
+	// the pinned RM (rminfo.Default) instead of a containment one, and the
 	// third reads the query's own SELECT / CONTAINS shape and consults no RM
 	// facts at all. An overlay therefore cannot retire those three.
 	//
-	// Of the five REQ-164 path-shape codes it governs exactly ONE:
-	// aql_contains_redundant_step, whose whole question is whether a
-	// containment ROUTE goes round the step — precisely the kind of fact an
-	// overlay edge states, so the relation in use must answer it or a dialect
-	// deployment draws a false finding on a step its own edges make
-	// load-bearing (REQ-160 § Extensibility). The other four ignore it, in two
-	// pairs: aql_path_repeating_unpredicated and aql_fanout_path_grain — the
-	// two codes the segment walk feeds — ask CLASS questions, attribute typing
-	// and multiplicity, which no caller-supplied containment relation may
-	// answer differently (REQ-164 § The conservative segment walk); while
-	// aql_paging_no_order_by and aql_select_no_alias are parse-only and consult
-	// no RM fact at all. No REQ-164 code is GATED by this field either way: nil
-	// selects the default here as it does everywhere.
+	// Of the five path-shape codes it governs exactly one:
+	// aql_contains_redundant_step, whose whole question is whether a containment
+	// route goes round the step. That is the kind of fact an overlay edge
+	// states, so the relation in use must answer it, or a dialect deployment
+	// draws a false finding on a step its own edges make necessary. The other
+	// four ignore it, in two pairs: aql_path_repeating_unpredicated and
+	// aql_fanout_path_grain (the two codes the segment walk feeds) ask class
+	// questions, attribute typing and multiplicity, which no caller-supplied
+	// containment relation may answer differently; while aql_paging_no_order_by
+	// and aql_select_no_alias are parse-only and consult no RM fact at all. None
+	// of the path-shape codes is switched off by this field: nil selects the
+	// default here as it does everywhere.
 	Relation *contain.TypeRelation
 }
 

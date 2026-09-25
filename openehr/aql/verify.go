@@ -5,74 +5,69 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/internal/semcheck"
 )
 
-// VerifyContainment reports the REQ-161 containment findings of the FROM root
-// and containment algebra this builder has accumulated — the OPT-IN RM-semantics
-// gate of REQ-162 § Contract, for a caller that wants to check a query it has
-// just constructed before submitting it.
+// VerifyContainment reports the containment findings of the FROM root and
+// containment algebra this builder has accumulated. It is the opt-in
+// RM-semantics check, for a caller that wants to check a query it has just
+// constructed before submitting it.
 //
-// It walks the builder's OWN tree: no emission, no re-parse, so it needs neither
-// a built [Query] nor the parser. r is the REQ-160 containment relation to judge
-// against; nil means the REQ-160 default relation, so a caller with no dialect
+// It walks the builder's own tree: no emission, no re-parse, so it needs
+// neither a built [Query] nor the parser. r is the containment relation to
+// judge against; nil means the default relation, so a caller with no dialect
 // overlay edges passes nil. A relation from [contain.TypeRelation.WithOverlay]
-// retires the findings that deployment's extra containment routes make false.
+// retires the findings that a deployment's extra containment routes make
+// false.
 //
-// FIVE codes can come back — the containment subset of the REQ-161 catalogue.
-// Three are static defects PROVABLE from the relation, and REQ-161 § Checks
-// classifies them as Errors:
+// Five codes can come back, the containment subset of the lint catalogue.
+// Three are static defects provable from the relation, and lint reports them
+// as errors:
 //
-//   - aql_impossible_containment — no containment route connects the pair.
-//   - aql_contains_not_containable — a CONTAINS names a class that is no
+//   - aql_impossible_containment: no containment route connects the pair.
+//   - aql_contains_not_containable: a CONTAINS names a class that is no
 //     containment target at all.
-//   - aql_archetype_class_mismatch — the archetype HRID's type segment does not
+//   - aql_archetype_class_mismatch: the archetype HRID's type segment does not
 //     conform to the class it is attached to.
 //
-// The other two are advisory, and REQ-161 § Checks classifies them as Warnings —
-// unknown is not wrong, and a reference hop is engine-specific:
+// The other two are advisory, and lint reports them as warnings (unknown is
+// not wrong, and a reference hop is engine-specific):
 //
-//   - aql_unknown_rm_class — the relation does not know the class.
-//   - aql_containment_by_reference — the pair resolves only across a reference
+//   - aql_unknown_rm_class: the relation does not know the class.
+//   - aql_containment_by_reference: the pair resolves only across a reference
 //     hop.
 //
-// REQ-161 § Checks is the normative home of both the severities and the firing
-// rules; the split is repeated here only because a [contain.Finding] carries no
-// severity field to look one up from. REQ-161 § Flagging policy governs when they
-// change, and this method adds none.
+// The severities are listed here because a [contain.Finding] carries no
+// severity field to look one up from; this method adds none.
 //
-// REQ-161's three PORTABILITY advisories
-// (aql_version_no_predicate, aql_versioned_object_unreferenced,
-// aql_fanout_row_grain) are read-side only and never appear here: they are
-// advisories about how a CDR may READ a legal query, scoped by REQ-162
-// § Contract to the read side (PROBE-097 § parity).
+// The three portability advisories (aql_version_no_predicate,
+// aql_versioned_object_unreferenced, aql_fanout_row_grain) are read-side only
+// and never appear here: they concern how a CDR may read a legal query, and
+// only the linter reports them.
 //
 // The returned [contain.Finding]s carry a value-free Code and a value-bearing
-// Detail, and deliberately no Span, Path, or severity: a builder tree has no
-// source text to point into, and each code's severity is fixed once, in
-// REQ-161's catalogue. Dispatch on Code.
+// Detail, and no Span, Path, or severity: a builder tree has no source text to
+// point into, and each code's severity is fixed in the lint catalogue.
+// Dispatch on Code.
 //
-// Three things this method is NOT:
+// What this method is not:
 //
 //   - It is not part of [Builder.Build]. Build's validation set, its error
-//     texts, and its emitted bytes are unchanged by REQ-162 — a query carrying
-//     an RM-impossible containment still builds and still emits the same string
-//     it emitted before this method existed. Verification never runs implicitly;
-//     the SDK does not decide for a caller that a Never pair is a defect rather
-//     than a deliberate probe.
-//   - It is not a grammar check. Build answers the SHAPE question (is this
+//     texts, and its emitted bytes do not depend on it: a query carrying an
+//     RM-impossible containment still builds and emits. Verification never
+//     runs implicitly; the SDK does not decide for a caller that a Never pair
+//     is a defect and not a deliberate probe.
+//   - It is not a grammar check. Build answers the shape question (is this
 //     representable AQL?); this answers the RM question (can these classes
-//     actually contain one another?). The two are independent: a query can pass
+//     contain one another?). The two are independent: a query can pass
 //     either and fail the other, and this method judges whatever tree it is
 //     given without re-running any of Build's refusals.
-//   - It is not a rule of its own. Every verdict→code decision, the suppression
-//     rule between the operand codes and the pair codes, the `$param` archetype
-//     skip, and the role-assignment rule all live in
-//     openehr/aql/internal/semcheck, shared verbatim with the read-side lint
-//     adapter. REQ-162 § Contract makes an IDENTICAL code multiset across the
-//     two a MUST, and that only holds because neither side classifies anything
-//     itself (pinned by TestReadWriteParity).
+//   - It has no rules of its own. Every verdict-to-code decision, the
+//     suppression rule between the operand codes and the pair codes, the
+//     `$param` archetype skip, and the role-assignment rule live in one
+//     engine shared with the read-side linter, so an equivalent query yields
+//     an identical multiset of codes from both.
 //
-// A nil *Builder reports nothing rather than panicking: there is no tree to
-// verify, which is a clean answer, and library code must not panic on caller
-// input (REQ-025).
+// A nil *Builder reports nothing instead of panicking: there is no tree to
+// verify, which is a clean answer, and library code does not panic on caller
+// input.
 func (b *Builder) VerifyContainment(r *contain.TypeRelation) []contain.Finding {
 	if b == nil {
 		return nil

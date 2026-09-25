@@ -38,14 +38,14 @@ package rm
 
 // --- DVTextLike -----------------------------------------------------
 
-// DVTextLike is the REQ-052 narrow polymorphic interface for DV_TEXT.
+// DVTextLike is the narrow polymorphic interface for DV_TEXT.
 // Concrete-typed RM slots declared as DV_TEXT (LOCATABLE.name,
 // LOCATABLE.null_reason, …) admit Liskov substitution by any descendant
 // per the openEHR RM; the wire decoder dispatches via typereg using
 // this interface so subtype payloads survive the decode → re-marshal
 // round-trip without field loss.
 //
-// Members today: DVText, DVCodedText. Accessors expose the parent
+// Members: DVText, DVCodedText. Accessors expose the parent
 // `value` rendition and the optional `defining_code` (present iff the
 // runtime concrete type is DVCodedText).
 type DVTextLike interface {
@@ -78,11 +78,11 @@ func (d DVCodedText) GetDefiningCode() (CodePhrase, bool) { return d.DefiningCod
 
 // --- DVURILike ------------------------------------------------------
 
-// DVURILike is the REQ-052 narrow polymorphic interface for DV_URI.
+// DVURILike is the narrow polymorphic interface for DV_URI.
 // Concrete-typed RM slots declared as DV_URI admit Liskov substitution
 // by DV_EHR_URI on the wire.
 //
-// Members today: DVURI, DVEHRURI. The single accessor exposes the
+// Members: DVURI, DVEHRURI. The single accessor exposes the
 // URI string carried by both.
 type DVURILike interface {
 	isDVURILike()
@@ -103,13 +103,13 @@ func (d DVEHRURI) GetValue() string { return d.Value }
 
 // --- AuditDetailsLike -----------------------------------------------
 
-// AuditDetailsLike is the REQ-052 narrow polymorphic interface for
+// AuditDetailsLike is the narrow polymorphic interface for
 // AUDIT_DETAILS. Concrete-typed RM slots declared as AUDIT_DETAILS
 // (Version.commit_audit, Contribution.audit, …) admit Liskov
 // substitution by ATTESTATION on the wire.
 //
-// Members today: AuditDetails, Attestation. Accessors mirror the
-// AUDIT_DETAILS parent's structurally-required fields — callers
+// Members: AuditDetails, Attestation. Accessors mirror the
+// AUDIT_DETAILS parent's structurally-required fields; callers
 // reaching into Attestation-only fields (Reason, IsPending, Proof, …)
 // type-assert to *Attestation as usual.
 type AuditDetailsLike interface {
@@ -174,13 +174,13 @@ func (a Attestation) GetDescription() (DVTextLike, bool) {
 
 // --- PartyIdentifiedLike --------------------------------------------
 
-// PartyIdentifiedLike is the REQ-052 narrow polymorphic interface
+// PartyIdentifiedLike is the narrow polymorphic interface
 // for PARTY_IDENTIFIED. Concrete-typed RM slots declared as
 // PARTY_IDENTIFIED (EVENT_CONTEXT.health_care_facility,
 // Participation.performer, …) admit Liskov substitution by
 // PARTY_RELATED on the wire.
 //
-// Members today: PartyIdentified, PartyRelated. Accessors expose the
+// Members: PartyIdentified, PartyRelated. Accessors expose the
 // PARTY_IDENTIFIED parent's structurally-relevant fields. PARTY_RELATED
 // adds `Relationship`, which callers type-assert for.
 type PartyIdentifiedLike interface {
@@ -189,7 +189,7 @@ type PartyIdentifiedLike interface {
 	// return is false when the field is nil.
 	GetName() (string, bool)
 	// GetIdentifiers returns the (possibly empty) formal identifier
-	// list — nil and empty are equivalent at the call site.
+	// list; nil and empty are equivalent at the call site.
 	GetIdentifiers() []DVIdentifier
 	// GetExternalRef returns the optional reference to external
 	// demographic detail; second return is false when nil.
@@ -240,12 +240,12 @@ func (p PartyRelated) GetExternalRef() (*PartyRef, bool) {
 
 // --- ObjectRefLike --------------------------------------------------
 
-// ObjectRefLike is the REQ-052 narrow polymorphic interface for
+// ObjectRefLike is the narrow polymorphic interface for
 // OBJECT_REF. Concrete-typed RM slots declared as OBJECT_REF admit
 // Liskov substitution by ACCESS_GROUP_REF, LOCATABLE_REF, or PARTY_REF
 // on the wire.
 //
-// Members today: ObjectRef, AccessGroupRef, LocatableRef, PartyRef.
+// Members: ObjectRef, AccessGroupRef, LocatableRef, PartyRef.
 // Accessors expose the OBJECT_REF parent's structurally-required
 // fields. LOCATABLE_REF adds `Path` (and a typed UIDBasedID id);
 // callers reaching for subtype-specific fields type-assert as usual.
@@ -287,9 +287,9 @@ func (l LocatableRef) isObjectRefLike() {}
 // GetID implements ObjectRefLike.
 //
 // LocatableRef shadows ObjectRef.ID with its own typed UIDBasedID id.
-// The generated UnmarshalJSON populates the shadow `l.ID` (NOT the
+// The generated UnmarshalJSON populates the shadow `l.ID` (not the
 // embedded `l.ObjectRef.ID`), so GetID prefers the shadow when it is
-// set — lifting UIDBasedID → ObjectID via type assertion (every
+// set, lifting UIDBasedID → ObjectID via type assertion (every
 // concrete UIDBasedID also implements ObjectID). Falls back to the
 // embedded ObjectRef.ID for hand-constructed values that set only
 // the parent. Callers who specifically want the UIDBasedID-typed id
