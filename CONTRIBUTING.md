@@ -100,4 +100,4 @@ The standard one: be respectful, focus on the technical issue, no harassment. Ma
 
 ## Questions
 
-Open a [discussion](https://github.com/Cadasto/openehr-sdk-go/discussions) or an issue.
+Open an [issue](https://github.com/Cadasto/openehr-sdk-go/issues/new/choose). A blank issue is fine for a question or design feedback.
