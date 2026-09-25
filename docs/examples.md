@@ -1,10 +1,10 @@
 # Examples
 
-**New here?** Run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline: the REST ones use an in-process `httptest` backend, so nothing needs a CDR.
+If you are new to the SDK, run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline: the REST ones use an in-process `httptest` backend, so nothing needs a CDR.
 
 The 17 runnable programs under [`cmd/examples/`](../cmd/examples/) demonstrate each major SDK surface. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
 
-Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<name>` works from **any working directory** inside a clone. Build them all with `make build` (or `go build ./cmd/examples/...`).
+Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<name>` works from any working directory inside a clone. Build them all with `make build` (or `go build ./cmd/examples/...`).
 
 ---
 
@@ -105,7 +105,7 @@ go run ./cmd/examples/primitive-validate
 
 **Packages:** `openehr/template`, `openehr/template/constraints`
 
-Uses an embedded minimal OPT. Some demo cases **fail** validation on purpose.
+Uses an embedded minimal OPT. Some demo cases fail validation on purpose.
 
 ---
 
@@ -184,9 +184,9 @@ go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/cassettes/t
 
 ### aql-build
 
-**Purpose:** Build the same logical AQL query two ways, the struct-builder and the verb-functions, and prove both emit the same canonical string on the wire. Pure building block: no transport, no auth; the executor lives at `openehr/client/query`.
+**Purpose:** Build the same logical AQL query two ways, the struct-builder and the verb-functions, and prove both emit the same canonical string on the wire. It is a pure building block with no transport or auth; the executor lives at `openehr/client/query`.
 
-The program then goes further. A third query demonstrates the containment algebra (`aql.Class` / `Contains` / `NotContains` / `ContainsOr`) and opt-in in-text paging (`LimitInline` / `OffsetInline`). A fourth pair shows the opt-in RM-semantics gate (`Builder.VerifyContainment`), which answers a question `Build` deliberately leaves open. It runs over a clean containment tree and over one that is grammatically valid but RM-impossible.
+A third query demonstrates the containment algebra (`aql.Class` / `Contains` / `NotContains` / `ContainsOr`) and opt-in in-text paging (`LimitInline` / `OffsetInline`). A fourth pair shows the opt-in RM-semantics gate (`Builder.VerifyContainment`), which answers a question `Build` deliberately leaves open. The gate runs over a clean containment tree and over one that is grammatically valid but RM-impossible.
 
 ```bash
 go run ./cmd/examples/aql-build
@@ -218,13 +218,13 @@ containment verification (REQ-162) — opt-in; Build never runs it:
     no containment route under the pinned RM connects OBSERVATION to EVALUATION, so this CONTAINS can never match
 ```
 
-**What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`. Keep paging on **one** channel: the envelope (`Limit`/`Offset`) by default, or the in-text form only when the bound must survive stored-query registration. Requesting both is a build-time error. `VerifyContainment` is opt-in and checks the query against the RM, which `Build` never does. Dispatch on `contain.Finding.Code`. A nil relation uses the default, and a `contain.Default().WithOverlay(...)` copy accounts for a dialect that admits more.
+**What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`. Keep paging on one channel: the envelope (`Limit`/`Offset`) by default, or the in-text form only when the bound must survive stored-query registration. Requesting both is a build-time error. `VerifyContainment` is opt-in and checks the query against the RM, which `Build` never does. Dispatch on `contain.Finding.Code`. A nil relation uses the default, and a `contain.Default().WithOverlay(...)` copy accounts for a dialect that admits more.
 
 ### aql-parse-structured
 
-**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2), the read-side mirror of `aql.Builder`, and emit it back to canonical text via `Query.Emit()`. The catalogue covers the whole SDK grammar profile, including the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause; the one remaining `aql.ErrIncompleteAST` case is a numeric literal the AST cannot represent. `ParseQuery` reports it rather than silently dropping a clause. Pure building block: no transport, no auth.
+**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2), the read-side mirror of `aql.Builder`, and emit it back to canonical text via `Query.Emit()`. The catalogue covers the whole SDK grammar profile, including the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause. The one remaining `aql.ErrIncompleteAST` case is a numeric literal the AST cannot represent, and `ParseQuery` reports it rather than silently dropping a clause. It is likewise a pure building block with no transport or auth.
 
-With no argument the program walks three queries: the representative one below, a query exercising the closed catalogue shapes, and a query showing the `TOP` carrier alongside two literals whose **source text** differs from their canonical rendering (`1.50` → `1.5`, `"quoted"` → `'quoted'`). The openEHR result schema names an unaliased column by its expression text, so `parse.LiteralExpr.Raw` keeps what was written while emission stays canonical.
+With no argument the program walks three queries: the representative one below, a query exercising the closed catalogue shapes, and a query showing the `TOP` carrier alongside two literals whose source text differs from their canonical rendering (`1.50` → `1.5`, `"quoted"` → `'quoted'`). The openEHR result schema names an unaliased column by its expression text, so `parse.LiteralExpr.Raw` keeps what was written while emission stays canonical.
 
 ```bash
 go run ./cmd/examples/aql-parse-structured
@@ -312,7 +312,7 @@ canonical emission:
 
 **Purpose:** Statically lint AQL before it reaches the CDR. The program parses against the SDK grammar profile, then runs the lint layers: syntax; shape (alias binding, parameter binding); RM containment and portability semantics against the pinned BMM (always on, no template needed); path-shape and paging advisories over the query text plus the pinned BMM (likewise always on); and template-aware archetype and path checks against a compiled OPT.
 
-The program calls `validation.ValidateAQL`; the underlying building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. A lint-clean query is **not** proven spec-conformant, nor guaranteed to execute. The CDR remains the authority on paths.
+The program calls `validation.ValidateAQL`; the underlying building block is `openehr/aql/lint` (`LintString` / `Lint`), which has no transport or auth. A lint-clean query is **not** proven spec-conformant, nor guaranteed to execute. The CDR remains the authority on paths.
 
 ```bash
 go run ./cmd/examples/lint-aql
@@ -358,7 +358,7 @@ result   : OK — no errors, 3 advisories
 
 ### compile-build-validate
 
-**Purpose:** Drive the whole clinical pipeline through **public packages only**, as an external module would. Parse an OPT, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the builder, serialise to canonical JSON, round-trip it, and validate. Before this bridge existed, the compiled template was only constructable inside the SDK module, so this exact program could not be written downstream.
+**Purpose:** Drive the whole clinical pipeline through public packages only, as an external module would. Parse an OPT, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the builder, serialise to canonical JSON, round-trip it, and validate. Without this bridge the compiled template would be constructable only inside the SDK module, and this exact program could not be written downstream.
 
 ```bash
 go run ./cmd/examples/compile-build-validate
@@ -382,7 +382,7 @@ ehr_status : ValidateEHRStatus callable — 6 issue(s), root type mismatch as ex
 
 ### template-explore
 
-**Purpose:** Introspect a compiled OPT through the public node-level types. This is the building block for a form generator or a path-discovery tool. It walks the `templatecompile.CompiledNode` tree to print the template structure (RM type, pinned archetype id / at-code, cardinality + required, term label, slot / primitive markers), then lists the addressable primitive-leaf paths, which are the canonical `composition.Builder.Set` targets.
+**Purpose:** Introspect a compiled OPT through the public node-level types. This is the building block for a form generator or a path-discovery tool. It walks the `templatecompile.CompiledNode` tree to print the template structure (RM type, pinned archetype id / at-code, cardinality + required, term label, slot / primitive markers). It then lists the addressable primitive-leaf paths, which are the canonical `composition.Builder.Set` targets.
 
 ```bash
 go run ./cmd/examples/template-explore
@@ -411,13 +411,13 @@ addressable primitive-leaf paths (6) — Builder.Set targets:
   ...
 ```
 
-**What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker; `node.RMTypeName()` + `attr.Cardinality()`/`Required()` drive widget choice and required-markers, `node.Term(code, "")` gives the label, `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path.
+**What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker. `node.RMTypeName()` + `attr.Cardinality()`/`Required()` drive widget choice and required-markers, and `node.Term(code, "")` gives the label. `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path.
 
 ---
 
 ### webtemplate-export
 
-**Purpose:** Export a compiled OPT as EHRbase `openEHR_SDK` v2.3 **WebTemplate JSON**: the lossy, UI-oriented projection that form renderers and FLAT-path mappers consume. Prints the form-oriented tree (FLAT-path `id`, RM type, occurrences, input widgets), then the deterministic document; `-json` dumps the full indented WebTemplate instead.
+**Purpose:** Export a compiled OPT as EHRbase `openEHR_SDK` v2.3 WebTemplate JSON, the lossy, UI-oriented projection that form renderers and FLAT-path mappers consume. The program prints the form-oriented tree (FLAT-path `id`, RM type, occurrences, input widgets), then the deterministic document; `-json` dumps the full indented WebTemplate instead.
 
 ```bash
 go run ./cmd/examples/webtemplate-export
@@ -452,7 +452,7 @@ encounter [COMPOSITION] 1..1
 
 ### flat-roundtrip
 
-**Purpose:** Convert a canonical `COMPOSITION` to the **FLAT** and **STRUCTURED** Simplified Formats and back, driven by the composition's Web Template. Shows the encode/decode entry points, the OPT-free `FlatToStructured`, the `COMPOSITION → FLAT → COMPOSITION → FLAT` round-trip, and the **conformant decode** (`WithTemplate`) whose result validates against the OPT. No transport or auth is involved.
+**Purpose:** Convert a canonical `COMPOSITION` to the FLAT and STRUCTURED Simplified Formats and back, driven by the composition's Web Template. The program shows the encode/decode entry points, the OPT-free `FlatToStructured`, the `COMPOSITION → FLAT → COMPOSITION → FLAT` round-trip, and the conformant decode (`WithTemplate`) whose result validates against the OPT. No transport or auth is involved.
 
 ```bash
 go run ./cmd/examples/flat-roundtrip
@@ -546,9 +546,9 @@ Per-version overrides (`WithLifecycleState`, `WithVersionCommitter`, `WithVersio
 
 ### smart-launch
 
-**Purpose:** Demonstrate the full **standalone SMART-on-openEHR authorization-code + PKCE flow** for a public client (no client secret), backed by an in-process `httptest`-style stub server. It needs no external network and no secrets.
+**Purpose:** Demonstrate the full standalone SMART-on-openEHR authorization-code + PKCE flow for a public client (no client secret), backed by an in-process `httptest`-style stub server. It needs no external network and no secrets.
 
-The main lesson is the **state + PKCE code_verifier persistence** across the redirect. Your app must store the `auth/smart.AuthorizationRequest` that `BeginAuthorization` returns server-side between the initial redirect and the callback. It then retrieves it by `state` and passes it unchanged to `ExchangeAuthorizationCode`.
+The main lesson is how the state and PKCE code_verifier persist across the redirect. Between the initial redirect and the callback, your app must keep the `auth/smart.AuthorizationRequest` that `BeginAuthorization` returns in server-side storage. On the callback it retrieves the request by `state` and passes it unchanged to `ExchangeAuthorizationCode`.
 
 ```bash
 go run ./cmd/examples/smart-launch
@@ -615,7 +615,7 @@ Agents and contributors: when you add or materially change an example under `cmd
 
 [`cmd/examples/transcripts_test.go`](../cmd/examples/transcripts_test.go) checks the **Sample output:** blocks named in its allowlist against real program runs. That allowlist alone decides which blocks are checked, and its exclusion census accounts for every other example. A deliberate output change therefore means regenerating the block verbatim from `go run ./cmd/examples/<name>`, not editing it by hand.
 
-An example that **gains** a verbatim sample-output block must be added to that allowlist in the same PR. `TestSampleMarkerCensus` fails the build if a section publishes a bare sample-output marker without an allowlist entry, so an unlisted block is caught rather than left silently unverified. The one recorded exception is **smart-launch**, whose PKCE state, verifier, and `expires_at` differ every run: `bareMarkerException` in that test names it, and the test also fails if that exception ever outlives the marker it excuses.
+An example that gains a verbatim sample-output block must be added to that allowlist in the same PR. `TestSampleMarkerCensus` fails the build if a section publishes a bare sample-output marker without an allowlist entry, so an unlisted block cannot go unverified. The one recorded exception is smart-launch, whose PKCE state, verifier, and `expires_at` differ every run: `bareMarkerException` in that test names it, and the test also fails if that exception ever outlives the marker it excuses.
 
 ---
 

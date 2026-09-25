@@ -1,6 +1,6 @@
 # Contributing
 
-`openehr-sdk-go` is the first-party Go SDK for openEHR. Contributions are welcome. This file is the short version; how work actually flows here (the spec-first ladder and its gates) is in [`docs/development-process.md`](docs/development-process.md), and [`AGENTS.md`](AGENTS.md) is the entry point shared with coding agents.
+`openehr-sdk-go` is the first-party Go SDK for openEHR. Contributions are welcome. This file is the short version. How work actually flows here (the spec-first ladder and its gates) is in [`docs/development-process.md`](docs/development-process.md), and [`AGENTS.md`](AGENTS.md) is the entry point shared with coding agents.
 
 ## Before you start
 
@@ -19,7 +19,7 @@
 ### Proposing a feature
 
 1. Check [`docs/roadmap.md`](docs/roadmap.md) and [`docs/plans/`](docs/plans/). Your feature may already be planned or explicitly deferred.
-2. If the feature touches normative wire behaviour, propose a REQ in [`docs/specifications/`](docs/specifications/) FIRST. The spec comes first and the code follows it.
+2. If the feature touches normative wire behaviour, propose a REQ in [`docs/specifications/`](docs/specifications/) FIRST; the code follows the spec.
 3. Open an issue describing the feature and how it interacts with the existing REQ catalog. For non-trivial scope, write a plan in [`docs/plans/`](docs/plans/) before any code (copy [`_template.md`](docs/plans/_template.md)).
 
 ### Sending a pull request
@@ -46,11 +46,11 @@ Write the subject in the imperative mood. The body explains *why*; the diff alre
 
 ## AI-assisted contributions
 
-AI coding assistants are a normal part of how this project is built. The tooling is described in [`docs/ai-workflow.md`](docs/ai-workflow.md). Using one is fine. The rules:
+AI coding assistants are a normal part of how this project is built. The tooling is described in [`docs/ai-workflow.md`](docs/ai-workflow.md). Using one is fine, under these rules:
 
 - **You are the author.** An assistant is a tool, not a co-author. You are accountable for every line you submit and should be able to explain any of it in review. A change you can't explain isn't ready.
 - **Say so.** Add an `Assisted-by:` git trailer to each commit an assistant helped with (format below).
-- **Same bar, no exceptions.** A REQ in the spec first for new behaviour, tests that fail if the guard is removed, `make ci` green, review.
+- **Same bar, no exceptions.** New behaviour needs a REQ in the spec first, tests that fail if the guard is removed, a green `make ci`, and review.
 - **Look it up; don't take the model's word.** For openEHR facts (RM paths, terminology codes, wire shapes) use the ground-truth lookups in [`docs/ai-workflow.md` § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). An assistant's recollection of a spec is not a source.
 - **Keep private things out of the prompt.** No credentials, tokens, patient or personal data, or content from private repositories in an assistant's context.
 - **Licence provenance is on you.** Don't accept generated code that reproduces third-party code under a licence incompatible with MIT. In-tree third-party material is inventoried in [`docs/licensing.md`](docs/licensing.md).
@@ -62,7 +62,7 @@ Assisted-by: Claude Code (claude-opus-4-8)
 Assisted-by: Cursor
 ```
 
-Use `Assisted-by:`, not `Co-authored-by:`. A `Co-authored-by:` line names a person and carries authorship. If a tool inserts a `Co-authored-by:` line for itself, change it to `Assisted-by:`. Reviewers may use assistants as well; a review is still a maintainer's call.
+Use `Assisted-by:`, not `Co-authored-by:`, because a `Co-authored-by:` line names a person and carries authorship. If a tool inserts a `Co-authored-by:` line for itself, change it to `Assisted-by:`. Reviewers may use assistants as well; a review is still a maintainer's call.
 
 ## Local development
 
@@ -82,13 +82,13 @@ Nothing runs on commit, so run `make lint` yourself before opening a PR. If you 
 
 ## Code style
 
-The detailed, normative idiom spec is [`docs/specifications/idiom.md`](docs/specifications/idiom.md). It covers context propagation, `*http.Client` injection, functional options, generics-no-reflection, error wrapping / typed errors, concurrency, imports & naming, and public-API stability. Formatting, lint, and commit conventions are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions). Read those first. These are the points that trip up most PRs:
+The detailed, normative idiom spec is [`docs/specifications/idiom.md`](docs/specifications/idiom.md). It covers context propagation, `*http.Client` injection, functional options, generics-no-reflection, error wrapping / typed errors, concurrency, imports & naming, and public-API stability. Formatting, lint, and commit conventions are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions). Read those first. The points below trip up most PRs:
 
 - **Building-block independence (REQ-013)**: the openEHR building-block packages and the AQL blocks MUST be usable standalone, with no `transport/` or `auth/` import. The exact package set and the per-package import guards are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions) and [`docs/specifications/module-layout.md`](docs/specifications/module-layout.md).
 - **No reflection** (REQ-024): RM polymorphism uses closed type-switches only. Generics are fine; `reflect.Value` is not.
 - **Strict-encode / permissive-decode** numerics per [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md).
 - **Comments**: explain WHY, not WHAT; identifiers carry the WHAT. Cite REQ-NNN / PROBE-NNN where relevant; do NOT cite issue numbers or commit SHAs (those rot). One short line per non-obvious choice; no multi-paragraph docstrings except package-level `doc.go`.
-- **Test contexts**: in the I/O-bearing test packages (`transport/`, `auth/`, `smart/`, `openehr/client/*`) use `t.Context()` (Go 1.24+) for request-scoped contexts. It is cancelled at test cleanup, so leaks surface. Don't reintroduce `context.Background()` there; derive timeouts/cancellation from `t.Context()`. Pure-compute test packages are unaffected.
+- **Test contexts**: in the I/O-bearing test packages (`transport/`, `auth/`, `smart/`, `openehr/client/*`) use `t.Context()` (Go 1.24+) for request-scoped contexts. Because it is cancelled at test cleanup, leaks surface. Don't reintroduce `context.Background()` there; derive timeouts/cancellation from `t.Context()`. Pure-compute test packages are unaffected.
 
 ## Releases
 

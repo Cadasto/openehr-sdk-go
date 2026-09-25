@@ -1,10 +1,10 @@
 # AI workflow
 
-How AI assistants (Claude Code, Cursor, Copilot, Codex, …) work in this repo. Ground truth lives in [AGENTS.md](../AGENTS.md) and [architecture.md](architecture.md), so read those first. This file adds only the AI-specific layer: recommended tooling, openEHR ground-truth lookups, and the loop to follow. It does **not** restate the idiom, boundary, or spec rules. Those have their canonical homes elsewhere, linked below. The public disclosure that this project is built with AI assistance is in the [README](../README.md#ai-assisted-development); the contributor rules, including the `Assisted-by:` commit trailer, are in [CONTRIBUTING.md](../CONTRIBUTING.md#ai-assisted-contributions).
+How AI assistants (Claude Code, Cursor, Copilot, Codex, …) work in this repo. Ground truth lives in [AGENTS.md](../AGENTS.md) and [architecture.md](architecture.md), so read those first. This file adds only the AI-specific layer: recommended tooling, openEHR ground-truth lookups, and the loop to follow. It does not restate the idiom, boundary, or spec rules, which have their canonical homes elsewhere (linked below). The public disclosure that this project is built with AI assistance is in the [README](../README.md#ai-assisted-development); the contributor rules, including the `Assisted-by:` commit trailer, are in [CONTRIBUTING.md](../CONTRIBUTING.md#ai-assisted-contributions).
 
 ## Recommended tooling (Claude Code / Cursor)
 
-**Binding for Go work:** the **[go-coding plugin](https://github.com/Cadasto/go-coding-plugin)** (`go-coding@cadasto`, Claude Code and Cursor). It encodes idiomatic-Go judgment and ties its advice to the deterministic toolchain (gofumpt, `go vet`, golangci-lint v2 + `modernize`, `go test -race`), the same tools the [Makefile](../Makefile) runs. Before writing or reviewing Go, load `go-coding:go-coding` and then the focused skill that matches the diff. Loading the router alone doesn't count.
+**Binding for Go work:** the [go-coding plugin](https://github.com/Cadasto/go-coding-plugin) (`go-coding@cadasto`, Claude Code and Cursor). It encodes idiomatic-Go judgment and ties its advice to the deterministic toolchain (gofumpt, `go vet`, golangci-lint v2 + `modernize`, `go test -race`), the same tools the [Makefile](../Makefile) runs. Before writing or reviewing Go, load `go-coding:go-coding` and then the focused skill that matches the diff. Loading the router alone doesn't count.
 
 **Which skill for which change:**
 
@@ -26,17 +26,17 @@ How AI assistants (Claude Code, Cursor, Copilot, Codex, …) work in this repo. 
 - Reviewer brief: load them before reviewing and cite the rule a finding rests on.
 - A reviewer seat that already exists (the SDD subagent-driven loop's own reviewer) applies the skills itself instead of spawning `go-reviewer`.
 
-Pair with the **gopls-lsp** plugin for code intelligence (defs/refs/rename/vulncheck). Run the deterministic tool instead of working a rule out by hand. That is what the plugin is for.
+Pair with the gopls-lsp plugin for code intelligence (defs/refs/rename/vulncheck). The plugin is there so you run the deterministic tool instead of working a rule out by hand.
 
-For **code exploration, call-chain tracing, and impact analysis**, query the **codebase-memory-mcp** knowledge graph (or the `codebase-memory` skill) before grepping the whole tree: `search_graph` (find functions / types / routes), `trace_path` (call chains and data flow), `get_code_snippet` (exact symbol source), `get_architecture` (structure overview). Run `index_repository` once if the project isn't indexed yet. Use it to answer "who calls this?" before a refactor, or to map an unfamiliar subsystem.
+For code exploration, call-chain tracing, and impact analysis, query the codebase-memory-mcp knowledge graph (or the `codebase-memory` skill) before grepping the whole tree: `search_graph` (find functions / types / routes), `trace_path` (call chains and data flow), `get_code_snippet` (exact symbol source), `get_architecture` (structure overview). Run `index_repository` once if the project isn't indexed yet. Use it to answer "who calls this?" before a refactor, or to map an unfamiliar subsystem.
 
 ## openEHR ground truth (MCP / skills)
 
-This repo is an openEHR workspace. Before guessing an RM path, terminology code, or ITS-JSON shape, look it up with the **openehr-assistant** plugin. Load its skills with the Skill tool (`openehr-assistant:<name>`) and type its commands as `/<name>`:
+This repo is an openEHR workspace. Before guessing an RM path, terminology code, or ITS-JSON shape, look it up with the openehr-assistant plugin. Load its skills with the Skill tool (`openehr-assistant:<name>`) and type its commands as `/<name>`:
 
 | Skill / command | Use when |
 |---|---|
-| `/openehr-explain` | **start here for any lookup**: RM/AM/BASE type, RM structural concept, archetype, template, ADL idiom, AQL keyword, or terminology code |
+| `/openehr-explain` | start here for any lookup: RM/AM/BASE type, RM structural concept, archetype, template, ADL idiom, AQL keyword, or terminology code |
 | `openehr-assistant` | routing + the guide corpus: spec-lookup methodology (`howto/spec-lookup`), ITS-REST envelopes, simplified formats |
 | `aql-authoring` | write, optimize, or review AQL for `openehr/aql/` |
 | `composition-builder` | build or check a Composition instance |
@@ -49,14 +49,14 @@ For an exact attribute list, invariant, or signature, call the MCP tool `type_sp
 
 ## The loop
 
-0. **Assemble context in one shot:** `make spec-context REQ=094`. It bundles the registry row, the `traceability.yaml` block (packages, probes, tests, plans), the canonical spec excerpt, and any research strands that touch the REQ. Start here. It points you to the canonical sources, so you don't have to grep for them.
+0. **Assemble context in one shot:** `make spec-context REQ=094`. It bundles the registry row, the `traceability.yaml` block (packages, probes, tests, plans), the canonical spec excerpt, and any research strands that touch the REQ. Start here: the bundle points you to the canonical sources, so you don't have to grep for them.
 1. **Locate** your task's REQ via the [REQ registry](specifications/REQ.md), then follow the row to its **canonical** topic spec (don't read prose out of `REQ.md` itself).
 2. **Inspect ground truth before editing.** Check RM shapes with MCP `type_specification_get` and terminology with `terminology_resolve`. Never hardcode a path or numeric literal without verifying it. Before writing the Go itself, load the matching go-coding skill (§ Recommended tooling above).
 3. **Cite identifiers.** Tests and `doc.go` reference REQ-NNN / PROBE-NNN. Update [traceability.yaml](specifications/traceability.yaml) when landing packages or probes, and never renumber published IDs.
 4. **Don't decide open questions in code.** Don't silently resolve a [research strand](specifications/research-strands.md), and don't add a normative MUST/SHOULD/MAY without a REQ to anchor it. Raise it or draft an [ADR](adr/).
 5. **Verify.** Run `make ci` (includes `make spec-check`) before claiming done. See [ci.md](ci.md). **For wire/client changes, green tests aren't enough.** Read the `probes:` on the REQ's traceability entry (or `make spec-context`) and open each `#### PROBE-NNN` in [conformance.md](specifications/conformance.md). The task is done only when each probe is **Implemented (Sandbox)** or explicitly deferred in the plan. `make probe-status` lists each probe's status and whether its test file exists.
 
-The full editing rules (idiomatic surface, the `cadasto/` boundary contract, and the do-not-touch list) are canonical in [AGENTS.md](../AGENTS.md) and [specifications/idiom.md](specifications/idiom.md). Follow those. This file does not repeat them.
+The full editing rules (idiomatic surface, the `cadasto/` boundary contract, and the do-not-touch list) are canonical in [AGENTS.md](../AGENTS.md) and [specifications/idiom.md](specifications/idiom.md). Follow those; this file does not repeat them.
 
 ## Examples
 

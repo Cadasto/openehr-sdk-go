@@ -29,4 +29,4 @@ Some vendored OPTs embed clinical models (CKM / IDCR / GECCO and similar) whose 
 
 Runtime Go dependencies (OpenTelemetry, ANTLR, `x/oauth2`, go-oidc, go-jose) stay in `go.mod`. They are not vendored as source in this tree.
 
-EHRbase's own OpenAPI documents are **not** pinned here. The REST contract is [`resources/its-rest/`](../resources/its-rest/). EHRbase-specific deployment extensions that the SDK still calls (for example `PurgeTemplates` → `DELETE /admin/template/all`) are documented on the function and in [REQ-099](specifications/module-layout.md#req-099--its-rest-admin-client-surface), not by a second OpenAPI pin.
+EHRbase's own OpenAPI documents are **not** pinned here. The REST contract is [`resources/its-rest/`](../resources/its-rest/). EHRbase-specific deployment extensions that the SDK still calls (for example `PurgeTemplates` → `DELETE /admin/template/all`) are documented on the function and in [REQ-099](specifications/module-layout.md#req-099--its-rest-admin-client-surface). There is no second OpenAPI pin for them.

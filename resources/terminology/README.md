@@ -8,8 +8,8 @@ invariants reference them: `AUDIT_DETAILS.Change_type_valid`, `EVENT_CONTEXT.Set
 `PARTICIPATION.Mode_valid`, `DV_ORDERED.Normal_status_validity`, and their siblings.
 
 The terminology is small, closed, and versioned with the specifications. The SDK carries it
-the way it carries the BMM: pinned in-tree and used as a generator input. It is **not**
-fetched at build time and **not** looked up in a terminology service at run time. Contract:
+the way it carries the BMM: pinned in-tree and used as a generator input. It is not
+fetched at build time and not looked up in a terminology service at run time. Contract:
 [`../../docs/specifications/rm-modeling.md § openEHR terminology vocabulary (REQ-034)`](../../docs/specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034).
 
 > **For AI agents and contributors:** this XML is the source of truth for openEHR codes
@@ -27,19 +27,19 @@ fetched at build time and **not** looked up in a terminology service at run time
 | TERM release | `Release-3.0.0`; root attributes `name="openehr" language="en" version="3.0.0" date="2023-03-05"` |
 | Contents | **17** groups · **3** code sets · **249** concepts · **19** code-set codes |
 
-**Pin + integrity:** the exact upstream commit, the file's `sha256` and the fetch
-timestamp are recorded in [`MANIFEST.txt`](MANIFEST.txt), and nowhere else. The sync
+The exact upstream commit, the file's `sha256` and the fetch timestamp are
+recorded in [`MANIFEST.txt`](MANIFEST.txt), and nowhere else. The sync
 script generates it, so do not edit it by hand. Regenerate with `make terminology-sync`; verify
 with `make terminology-verify` (see [the sync script](../../scripts/sync-terminology.sh)).
 
 ## Provenance
 
 - **Source:** [`openEHR/specifications-TERM`](https://github.com/openEHR/specifications-TERM), file `computable/XML/en/openehr_terminology.xml`.
-- **Copy fidelity:** a **byte-identical** copy of the file at the pinned commit. `sync`
+- **Copy fidelity:** a byte-identical copy of the file at the pinned commit. `sync`
   resolves the ref to a concrete commit sha and downloads at that sha, so two syncs of the
   same ref produce the same bytes.
 - **Language:** the `en` variant only. The sibling translations upstream (`es`, `ja`, `pt`)
-  carry the same code structure with localised rubrics and are intentionally **not** vendored.
+  carry the same code structure with localised rubrics and are intentionally not vendored.
 
 It lives in-tree rather than behind an upstream URL for the same three reasons the
 [BMM pins](../bmm/README.md) do:
@@ -72,8 +72,8 @@ generated tables follow the pin. A bump is one explicit, reviewable commit:
 
 1. Run the sync at the new release tag.
 2. Review both diffs: the XML and the regenerated tables. A code or rubric that changed
-   meaning, or a group that lost a member, is a behaviour change and needs to be treated as one.
-3. Update **the pin table in this README** (release tag, byte size, root attributes, counts) and
+   meaning, or a group that lost a member, is a behaviour change; treat it as one.
+3. Update the pin table in this README (release tag, byte size, root attributes, counts) and
    the release tag in the [`resources/README.md`](../README.md) inventory row. The manifest
    cannot update either of them.
 4. Add a short CHANGELOG bullet under `## [Unreleased]`.

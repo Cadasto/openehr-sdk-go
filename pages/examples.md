@@ -23,7 +23,7 @@ any working directory inside a clone.
 
 ## Decode canonical JSON {#canonical_json}
 
-The smallest building-block program in the repository. It decodes a
+This is the smallest building-block program in the repository. It decodes a
 canonical-JSON Composition from the fixtures into a typed `rm.Composition`,
 without importing transport or auth.
 

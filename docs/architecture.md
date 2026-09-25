@@ -1,6 +1,6 @@
 # Architecture
 
-**Narrative companion to [`docs/specifications/`](../docs/specifications/).** This document describes the SDK's structure as prose and diagrams; the normative `MUST / SHOULD / MAY` statements live in [`docs/specifications/`](../docs/specifications/). When the two disagree, `docs/specifications/` wins and this document is the one to update.
+This document is the narrative companion to [`docs/specifications/`](../docs/specifications/). It describes the SDK's structure as prose and diagrams; the normative `MUST / SHOULD / MAY` statements live in [`docs/specifications/`](../docs/specifications/). When the two disagree, `docs/specifications/` wins and this document is the one to update.
 
 > **Status: early implementation, pre-1.0.** What has landed and what is still open is tracked in [`roadmap.md`](roadmap.md); this document does not keep its own copy of that list.
 
@@ -99,7 +99,7 @@ flowchart TD
 
 ## Dependencies
 
-Runtime dependencies are kept few and auditable, and adding one needs a reason. Here is the current set, each confined to the package it serves:
+Runtime dependencies are kept few and auditable, and adding one needs a reason. The table lists the current set; each one is confined to the package it serves:
 
 | Dependency | Scope | Rationale |
 |---|---|---|
@@ -138,7 +138,7 @@ The first cut keeps a future module split possible. The second makes the SDK eas
 
 ### Idiomatic Go
 
-The API is designed for Go: package-level functions, typed errors, `context.Context` first, an injected `*http.Client`, and functional options. Correctness is defined at the **wire** (the HTTP bytes, the AQL string) against the openEHR spec, independent of any particular source shape.
+The API is designed for Go: package-level functions, typed errors, `context.Context` first, an injected `*http.Client`, and functional options. Correctness is defined at the wire (the HTTP bytes, the AQL string) against the openEHR spec, independent of any particular source shape.
 
 ### Type registry, not reflection
 
@@ -154,7 +154,7 @@ Anything under `internal/` is excluded from backward-compatibility (BC) promises
 
 ## Code generation
 
-The RM and AOM 1.4 types are generated from the pinned BMM corpus. This is the one part of the build with real machinery behind it. The full landed inventory across every package is in [`roadmap.md`](roadmap.md). The table lists the codegen inputs and outputs:
+The RM and AOM 1.4 types are generated from the pinned BMM corpus, the one part of the build with real machinery behind it. The table lists the codegen inputs and outputs; the full landed inventory across every package is in [`roadmap.md`](roadmap.md).
 
 | Area | Location | Notes |
 |---|---|---|
@@ -185,7 +185,7 @@ flowchart LR
   Gen --> JSON
 ```
 
-Load-bearing structural choices (flat packages, merge policy, typereg placement, abstract flattening, AOM→RM import, function stubs) are recorded in [ADR 0002 — BMM codegen decisions](adr/0002-bmm-codegen-decisions.md). Per [ADR 0013](adr/0013-generated-locatable-identity-surface.md), the generator also emits the LOCATABLE identity surface, which replaced the hand-maintained lock-step identity switches. That surface is the `Get*/Set*` accessors widening the sealed `rm.Locatable` plus `rm.MutableLocatable`, and the reverse registry `rm.RMTypeName` / `rm.IsTypedNil`. Normative conformance rules are in [`docs/specifications/bmm-conformance.md`](../docs/specifications/bmm-conformance.md).
+Load-bearing structural choices (flat packages, merge policy, typereg placement, abstract flattening, AOM→RM import, function stubs) are recorded in [ADR 0002 (BMM codegen decisions)](adr/0002-bmm-codegen-decisions.md). Per [ADR 0013](adr/0013-generated-locatable-identity-surface.md), the generator also emits the LOCATABLE identity surface, which replaced the hand-maintained lock-step identity switches. That surface is the `Get*/Set*` accessors widening the sealed `rm.Locatable` plus `rm.MutableLocatable`, and the reverse registry `rm.RMTypeName` / `rm.IsTypedNil`. Normative conformance rules are in [`docs/specifications/bmm-conformance.md`](../docs/specifications/bmm-conformance.md).
 
 ## Versioning
 

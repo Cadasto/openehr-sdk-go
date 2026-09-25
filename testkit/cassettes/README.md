@@ -1,6 +1,6 @@
 # testkit/cassettes
 
-Vendored **fixture documents** for codec, validation, and probe tests: OPTs, compositions, RM samples, wire bodies, and reference goldens. They are checked in so CI does not need a sibling clone. Licences and provenance: [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md); repository-wide inventory: [`docs/licensing.md`](../../docs/licensing.md).
+Vendored fixture documents for codec, validation, and probe tests: OPTs, compositions, RM samples, wire bodies, and reference goldens. They are checked in so CI does not need a sibling clone. Licences and provenance: [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md); repository-wide inventory: [`docs/licensing.md`](../../docs/licensing.md).
 
 **These are not REQ-082 Cassette-mode recordings.** Everything here is a request or response *body*: it carries no method, URL, header, or status code, so none of it can be replayed as an HTTP exchange. The Cassette mode that [REQ-082](../../docs/specifications/conformance.md#req-082--runnability) mandates records whole exchanges and lands under `testkit/recordings/`. The directory name predates that distinction. Code reaches the fixtures through [`testkit/fixtures`](../fixtures/paths.go), so the name is kept.
 
@@ -27,7 +27,7 @@ cassettes/
     {FAMILY}/{name}.csv               #   per consuming Robot suite family
 ```
 
-**Pinned subtree.** Everything under `flat-conformance/` is machine-synced from
+Everything under `flat-conformance/` is a pinned subtree, machine-synced from
 upstream at a recorded commit, so do not hand-edit it. Refresh with
 `make flat-conformance-sync` and verify integrity with `make flat-conformance-verify`
 (an offline `sha256` check that `make ci` runs as a gate). `make flat-conformance-check`

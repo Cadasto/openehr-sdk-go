@@ -157,8 +157,8 @@ request.
 :material-cube-outline:
 
 ### Building blocks
-Decode canonical JSON, parse an OPT, validate a Composition, build or lint AQL.
-None of it goes near the network.
+Decode canonical JSON, parse an OPT, validate a Composition, and build or lint
+AQL, all without going near the network.
 
 [See the packages](packages.md){ .md-button }
 

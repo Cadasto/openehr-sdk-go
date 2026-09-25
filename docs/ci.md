@@ -1,6 +1,6 @@
 # Continuous integration
 
-How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks locally. CI is **operational process**. It is not part of the normative `docs/specifications/` contract, which holds the wire semantics and conformance probes.
+How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks locally. CI is operational process. It is not part of the normative `docs/specifications/` contract, which holds the wire semantics and conformance probes.
 
 ## Workflows
 
@@ -15,7 +15,7 @@ How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks loca
 
 ### CI jobs (`ci.yml`)
 
-Jobs run in parallel. All use Go **1.27.x** (`actions/setup-go@v7` with module cache).
+Jobs run in parallel. All use Go 1.27.x (`actions/setup-go@v7` with module cache).
 
 | Job | Makefile targets | Purpose |
 |---|---|---|
@@ -34,9 +34,7 @@ An in-repo advanced workflow was tried and dropped: an advanced configuration an
 
 ### Codegen drift bot
 
-The weekly workflow re-runs `make codegen-verify` on a clean checkout. On failure it opens or comments on a single tracking issue labelled `bmm-drift`, then fails the workflow run. Follow [ADR 0001 — BMM version-bump runbook](adr/0001-bmm-version-bump-runbook.md) when triaging.
-
-It complements PR CI by catching generator-template drift between human-driven PRs.
+The weekly workflow re-runs `make codegen-verify` on a clean checkout. On failure it opens or comments on a single tracking issue labelled `bmm-drift`, then fails the workflow run. Follow [ADR 0001 (BMM version-bump runbook)](adr/0001-bmm-version-bump-runbook.md) when triaging. The workflow complements PR CI by catching generator-template drift between human-driven PRs.
 
 ## Local reproduction
 
