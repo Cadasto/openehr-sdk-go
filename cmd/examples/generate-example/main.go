@@ -1,7 +1,6 @@
-// Example: synthesise an RM instance from a compiled OPT and emit
-// the canonical JSON to stdout. Demonstrates REQ-107 end-to-end —
-// no transport, no auth, no client; just bytes → typed tree →
-// instance graph → canonical JSON.
+// Example: synthesise an RM instance from a compiled OPT and emit the
+// canonical JSON to stdout. There is no transport, auth or client; the path
+// is bytes → typed tree → instance graph → canonical JSON.
 //
 // Surfaces shown:
 //   - openehr/template.ParseFile (lenient parse)

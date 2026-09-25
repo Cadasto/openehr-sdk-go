@@ -1,6 +1,6 @@
 // Package bmmdiff computes a structured, human-readable diff between
 // two loaded BMM schemas. Distinct from a textual `git diff` because
-// the comparison understands the BMM shape — added/removed classes,
+// the comparison understands the BMM shape: added/removed classes,
 // per-class property additions/removals/changes, cardinality changes,
 // function changes, primitive additions/removals.
 //
@@ -120,8 +120,8 @@ type CardinalityChange struct {
 }
 
 // Diff computes a Report comparing oldS (the older schema) with newS
-// (the newer schema). Both arguments MUST be non-nil. The function
-// is total — it never returns an error; malformed values render as
+// (the newer schema). Both arguments must be non-nil. The function
+// is total and never returns an error; malformed values render as
 // best-effort strings.
 func Diff(oldS, newS *bmm.Schema) *Report {
 	if oldS == nil || newS == nil {

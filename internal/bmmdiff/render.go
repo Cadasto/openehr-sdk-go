@@ -10,8 +10,7 @@ import (
 // with no entries are omitted. When the report has zero changes,
 // returns "no semantic changes".
 //
-// Section headings mirror the format described in the Phase 5
-// architecture notes (cmd/bmmdiff). The first line is always a
+// Section headings follow the cmd/bmmdiff output format. The first line is always a
 // schema-id banner so the consumer can confirm what was compared.
 func Format(r *Report) string {
 	var b strings.Builder

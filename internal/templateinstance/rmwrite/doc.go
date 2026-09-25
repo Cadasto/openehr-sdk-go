@@ -11,20 +11,20 @@
 //	NewRM(rmTypeName string) (any, error)
 //
 // All three are pure structural setters. Dispatch is a closed type
-// switch on the Go concrete type of `parent` (REQ-024 — no
-// reflection). `parentType` is the OPT-declared RM class name
-// (e.g. "OBSERVATION", "ITEM_LIST"); v1 ignores it for routing but
-// the parameter is retained so a future string-keyed dispatch can
-// land without an API break — mirror of the rmread.ReadSingle
+// switch on the Go concrete type of `parent`, with no reflection.
+// `parentType` is the OPT-declared RM class name
+// (e.g. "OBSERVATION", "ITEM_LIST"); it is currently ignored for
+// routing, but the parameter is kept so a future string-keyed dispatch
+// can land without an API break, mirroring the rmread.ReadSingle
 // signature.
 //
 // # Scope
 //
-// rmwrite is a LOW-LEVEL setter. It does NOT set LOCATABLE
+// rmwrite is a low-level setter. It does not set LOCATABLE
 // bookkeeping (`archetype_node_id`, `name`, `uid`,
-// `archetype_details`) — that is the caller's (`openehr/instance/`)
-// responsibility. rmwrite focuses on one thing: bind one RM value
-// into one named slot on a parent RM value. Higher-level identity,
+// `archetype_details`); that is the caller's (`openehr/instance/`)
+// responsibility. rmwrite binds one RM value into one named slot on
+// a parent RM value. Higher-level identity,
 // terminology, and template-id wiring live in the instance
 // generator above.
 //
@@ -35,13 +35,13 @@
 // access. The closed taxonomy is asserted by table-driven tests in
 // this package.
 //
-// # REQ-013 building-block independence
+// # Dependencies
 //
 // This package imports only the standard library, openehr/rm, and
-// openehr/rm/typereg. It does NOT import openehr/template,
+// openehr/rm/typereg. It does not import openehr/template,
 // internal/templatecompile, openehr/validation, or any wire / auth /
-// transport layer — rmwrite is shared infrastructure with
-// validation, not a dependant. Adding a new RM type means adding
+// transport layer; rmwrite is infrastructure shared with validation
+// and does not depend on it. Adding a new RM type means adding
 // one switch case in each of the three exports and one rmread row
 // in parallel.
 package rmwrite

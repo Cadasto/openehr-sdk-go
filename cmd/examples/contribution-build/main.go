@@ -1,8 +1,8 @@
 // Example: assemble a multi-version CONTRIBUTION with
-// `contribution.Builder` (REQ-130) and print the `Contribution_create`
+// `contribution.Builder` and print the `Contribution_create`
 // body it produces. Two canonical compositions from the vendored
-// cassettes go in — one as a first version, one as an amendment of an
-// existing version — and the builder sets each version's change-type
+// cassettes go in, one as a first version and one as an amendment of an
+// existing version, and the builder sets each version's change-type
 // code, lifecycle state, and commit audit.
 //
 // Run: `go run ./cmd/examples/contribution-build` from any directory.

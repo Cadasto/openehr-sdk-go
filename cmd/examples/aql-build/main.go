@@ -1,16 +1,16 @@
-// Example: build an AQL query two ways — the struct-builder and the
-// verb-functions — and show that both emit byte-identical, canonical AQL
-// (REQ-055, PROBE-020). Pure building block (REQ-013): no transport, no auth,
-// no client. The executor lives at openehr/client/query.
+// Example: build an AQL query two ways, with the struct builder and with the
+// verb functions, and show that both emit byte-identical canonical AQL. The
+// builder is a pure building block with no transport, auth or client; the
+// executor lives at openehr/client/query.
 //
 // Surfaces shown:
 //   - aql.NewBuilder() struct style with Select / FromEHR / Contains / Where
 //   - aql.Select(...) verb style producing the same wire string
 //   - aql.Param for safe placeholders (never interpolate caller data)
 //   - WHERE composition with aql.And / aql.Gt / comparison helpers
-//   - the REQ-117 containment algebra (aql.Class / Contains / NotContains /
+//   - the containment algebra (aql.Class / Contains / NotContains /
 //     ContainsOr) and opt-in in-text paging (LimitInline / OffsetInline)
-//   - the REQ-162 opt-in RM-semantics gate (Builder.VerifyContainment), which
+//   - the opt-in RM-semantics check (Builder.VerifyContainment), which
 //     answers a question Build deliberately does not
 //
 // Run:

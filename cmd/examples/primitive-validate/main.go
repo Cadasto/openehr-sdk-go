@@ -1,14 +1,13 @@
 // Example: parse a minimal OPT with a DV_QUANTITY primitive constraint,
-// resolve a path, and call PrimitiveConstraint.Validate (REQ-103).
-// Demonstrates the smallest clinical-modeling constraint path — no
-// compiled template, no validation walker, no RM composition fixture.
+// resolve a path, and call PrimitiveConstraint.Validate. This is the smallest
+// clinical-modelling constraint path: no compiled template, no validation
+// walker, no RM composition fixture.
 //
 // Run:
 //
 //	go run ./cmd/examples/primitive-validate
 //
-// The embedded OPT is the same shape as PROBE-024's synthetic fixture
-// (magnitude 0..300, units mm[Hg] only).
+// The embedded OPT constrains magnitude to 0..300 and units to mm[Hg] only.
 package main
 
 import (

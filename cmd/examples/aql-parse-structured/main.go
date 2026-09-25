@@ -1,9 +1,9 @@
-// Example: parse an AQL query into the REQ-113 Tier-2 structured
-// AST (parse.Query) and walk its shape.
+// Example: parse an AQL query into the structured AST (parse.Query) and walk
+// its shape.
 //
 // Demonstrates the read-side mirror of aql.Builder: SELECT items / FROM
 // containment tree / WHERE expression tree / ORDER BY / LIMIT / OFFSET,
-// all readable WITHOUT importing openehr/aql/parse/gen or any internal/
+// all readable without importing openehr/aql/parse/gen or any internal/
 // package. The unified WhereExpr / Value vocabulary (aql.Comparison /
 // aql.Junction / aql.NotExpr / aql.ExistsExpr / aql.LikeExpr /
 // aql.MatchesExpr / aql.ParamValue / aql.StringValue / aql.IntValue /
@@ -15,14 +15,13 @@
 //	go run ./cmd/examples/aql-parse-structured
 //	go run ./cmd/examples/aql-parse-structured "SELECT c FROM EHR e CONTAINS COMPOSITION c WHERE c/uid/value = \$id"
 //
-// With no argument it walks three built-in queries: a representative one
-// exercising SELECT projection, CONTAINS chain, WHERE comparison, ORDER BY
-// DESC and LIMIT/OFFSET; a REQ-117 query exercising the catalogue closures the
-// v1 extractor refused — a mixed `SELECT *, col` list with a primitive
-// literal, a function-call WHERE left operand, a path-vs-path comparison, and
-// a containment junction at the FROM root; and a REQ-118 query exercising the
-// deprecated `SELECT TOP` carrier plus a projected literal whose source text
-// differs from its canonical rendering.
+// With no argument it walks three built-in queries. The first exercises
+// SELECT projection, a CONTAINS chain, a WHERE comparison, ORDER BY DESC and
+// LIMIT/OFFSET. The second exercises a mixed `SELECT *, col` list with a
+// primitive literal, a function-call WHERE left operand, a path-vs-path
+// comparison, and a containment junction at the FROM root. The third
+// exercises the deprecated `SELECT TOP` form plus a projected literal whose
+// source text differs from its canonical rendering.
 package main
 
 import (

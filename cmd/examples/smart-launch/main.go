@@ -2,7 +2,7 @@
 //
 // Demonstrates the #1 integration gotcha: the [auth/smart.AuthorizationRequest]
 // (which carries both the CSRF state and the PKCE code_verifier) must be
-// persisted across the HTTP redirect — between [Source.BeginAuthorization] /
+// persisted across the HTTP redirect, between [Source.BeginAuthorization] /
 // [Source.AuthorizeURL] and the redirect callback that handles [Source.ExchangeAuthorizationCode].
 //
 // The example is self-contained: it spins up an in-process SMART stub server

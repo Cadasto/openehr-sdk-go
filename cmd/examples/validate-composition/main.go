@@ -1,13 +1,13 @@
 // Example: parse an OPT, compile it, and validate an in-memory
-// *rm.Composition with openehr/validation (REQ-102). Demonstrates
-// the clinical building-block path — no transport, no auth, no
-// serialize on the validation path: template → compiled OPT → RM
-// instance → Issue list.
+// *rm.Composition with openehr/validation. This is the clinical
+// building-block path, with no transport, no auth, and no serialize
+// on the validation path: template → compiled OPT → RM instance →
+// Issue list.
 //
 // Note: this example calls the internal templatecompile.Compile
-// directly (it lives in the SDK module). External modules use the
-// public openehr/templatecompile.Compile bridge instead (REQ-111) —
-// see cmd/examples/compile-build-validate and ADR 0010.
+// directly because it lives in the SDK module. Programs in other modules
+// use the public openehr/templatecompile.Compile bridge instead; see
+// cmd/examples/compile-build-validate.
 //
 // Run:
 //

@@ -1,8 +1,8 @@
 // Example: convert an openEHR COMPOSITION to the FLAT and STRUCTURED
-// Simplified Formats and back, driven by the composition's Web Template
-// (REQ-053 + REQ-106). Demonstrates the building-block path (REQ-013) — no
-// transport, no auth, no discovery: an OPT + a canonical composition in, FLAT /
-// STRUCTURED out, and a round-trip back to a composition.
+// Simplified Formats and back, driven by the composition's Web Template.
+// This is a building-block path with no transport, auth or discovery: an OPT
+// and a canonical composition go in, FLAT and STRUCTURED come out, and both
+// round-trip back to a composition.
 //
 // Run: `go run ./cmd/examples/flat-roundtrip` from any directory.
 package main

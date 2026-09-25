@@ -1,12 +1,11 @@
-// Command probe-record captures live openEHR REST exchanges into REQ-082
-// Cassette recordings (HAR 1.2, ADR 0020). It drives a named scenario through
-// a [probe.Recorder] against a live CDR, then gates the result three ways
+// Command probe-record captures live openEHR REST exchanges into Cassette
+// recordings (HAR 1.2). It drives a named scenario through a
+// [probe.Recorder] against a live CDR, then checks the result three ways
 // before publishing <out>/<scenario>.har:
 //
 //   - [probe.HAR.Validate] judges the captured document in memory, so a
-//     capture carrying a credential is refused before any of it is written —
-//     REQ-082 requires that credentials never reach disk, not that they be
-//     deleted afterwards.
+//     capture carrying a credential is refused before any of it is written.
+//     Credentials never reach disk, so there is nothing to delete afterwards.
 //   - the capture is replayed through a [probe.Replayer] against a different
 //     base URL, driving the same scenario a probe would, so a recording that
 //     validates but cannot actually be replayed fails here rather than inside
@@ -16,8 +15,8 @@
 //     exactly as it was.
 //
 // Capturing needs a reachable deployment: a recording is a conformance witness
-// only because it came from a real CDR (testkit/recordings/README.md). Replay,
-// by contrast, is offline — that is what CI runs.
+// only because it came from a real CDR (testkit/recordings/README.md). Replay
+// is offline, and that is what CI runs.
 //
 // Usage:
 //
@@ -26,7 +25,7 @@
 //	  -deployment "EHRbase 2.35.1" \
 //	  -scenario ehr-lifecycle
 //
-// A mutating scenario writes to the target CDR — point it at a disposable
+// A mutating scenario writes to the target CDR, so point it at a disposable
 // deployment. Credentials stay on the wire but never reach the recording
 // (capture-time redaction, verified before publication).
 //

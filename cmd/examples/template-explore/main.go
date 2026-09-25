@@ -1,11 +1,11 @@
-// Example: introspect a compiled operational template through the
-// public REQ-111 surface — walk the [templatecompile.CompiledNode] tree
+// Example: introspect a compiled operational template through the public
+// templatecompile API. It walks the [templatecompile.CompiledNode] tree
 // to print the template structure (the seed of a form generator) and
-// the addressable primitive-leaf paths (the seed of path discovery /
+// the addressable primitive-leaf paths (the seed of path discovery and
 // Builder.Set targets).
 //
-// Like cmd/examples/compile-build-validate, this uses PUBLIC packages
-// only (openehr/template, openehr/templatecompile) — no internal/
+// Like cmd/examples/compile-build-validate, this uses public packages
+// only (openehr/template, openehr/templatecompile) and no internal/
 // import. It exercises the node-level introspection types
 // (CompiledNode / CompiledAttribute) that an external form generator or
 // mapping layer would hold and navigate.

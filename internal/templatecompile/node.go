@@ -14,7 +14,7 @@ import (
 // BMM-typed primitive attributes (e.g. DV_DURATION.value). Shared by
 // the validator and the instance synthesiser so both agree on which
 // leaves carry a primitive constraint rather than an RM wrapper.
-// REQ-024: closed switch, no reflection.
+// It is a closed switch and uses no reflection.
 func IsAOMPrimitiveShortName(s string) bool {
 	switch s {
 	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION", "INTEGER", "REAL":
@@ -27,7 +27,7 @@ func IsAOMPrimitiveShortName(s string) bool {
 // CompiledNode is one node in the compiled OPT tree. Mirrors the
 // OPT's [template.Node] taxonomy (ComplexObject / ArchetypeRoot /
 // Slot) collapsed into a single struct because walker code rarely
-// cares about the wire-side discrimination — it cares about
+// cares about the wire-side discrimination; it asks
 // "what's the AQL path of this thing, what does it constrain, and
 // can I descend".
 //
@@ -73,13 +73,13 @@ func (n *CompiledNode) RMTypeName() string { return n.rmTypeName }
 // "" when none is set on the wire.
 func (n *CompiledNode) NodeID() string { return n.nodeID }
 
-// NodeName returns the template-level node name — the fixed C_STRING
-// the OPT pins on this node's name attribute — or "" when the node
-// pins no fixed name. Per REQ-116 the archetype concept term is never
+// NodeName returns the template-level node name (the fixed C_STRING
+// the OPT pins on this node's name attribute), or "" when the node
+// pins no fixed name. The archetype concept term is never
 // substituted: distinct sibling names are what disambiguate a reused
 // archetype under one slot, and the reference WebTemplate derives its
 // node ids and name-predicated paths from this value. Carried
-// verbatim from [template.ObjectNode.NodeName] (REQ-111).
+// verbatim from [template.ObjectNode.NodeName].
 func (n *CompiledNode) NodeName() string { return n.nodeName }
 
 // ArchetypeID returns the slot-fill archetype id when this node was
@@ -126,13 +126,13 @@ func (n *CompiledNode) SlotIncludes() []string { return slices.Clone(n.slotInclu
 // archetype-id exclude assertion strings. Empty for non-slot nodes.
 func (n *CompiledNode) SlotExcludes() []string { return slices.Clone(n.slotExcludes) }
 
-// SlotRules returns the parsed REQ-104 assertion rules for this
+// SlotRules returns the parsed archetype-slot assertion rules for this
 // slot. Zero value for non-slot nodes. The returned rule slices are
 // defensive copies.
 func (n *CompiledNode) SlotRules() constraints.SlotRules { return n.slotRules.Clone() }
 
 // AllowsArchetypeID reports whether archetypeID satisfies this
-// slot's include / exclude rules (REQ-104), including the
+// slot's include / exclude rules, including the
 // RM-type-prefix fallback when no includes were parsed. False for
 // non-slot nodes.
 func (n *CompiledNode) AllowsArchetypeID(archetypeID string) bool {
@@ -153,10 +153,10 @@ func (n *CompiledNode) ExampleSlotFillArchetypeID() string {
 	return n.slotRules.ExampleArchetypeID()
 }
 
-// PrimitiveConstraint returns the typed REQ-103 constraint value for
+// PrimitiveConstraint returns the typed primitive constraint value for
 // this node, or nil when the wire xsi:type was not a primitive in
-// the closed set. Mirrors [template.ComplexObject.PrimitiveConstraint]
-// — the compile step copies the value through without modification.
+// the closed set. Mirrors [template.ComplexObject.PrimitiveConstraint];
+// the compile step copies the value through without modification.
 func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 	return n.primitive
 }
@@ -170,7 +170,7 @@ func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 // The lang parameter is accepted for forward compatibility but is
 // currently ignored: an ADL 1.4 OPT carries a single document
 // language ([Compiled.Language]), so there is only one set of term
-// definitions to return. Per REQ-105 a future multi-language OPT
+// definitions to return. A future multi-language OPT
 // would select lang and fall back to the document language when the
 // requested translation is absent; until then every lang resolves
 // to the document-language term.
@@ -215,7 +215,7 @@ func (a *CompiledAttribute) Cardinality() template.Cardinality { return a.cardin
 // [CompiledAttribute.ChildMultiplicity].
 func (a *CompiledAttribute) Existence() *template.Multiplicity { return a.existence }
 
-// ChildMultiplicity returns the AOM 1.4 CARDINALITY interval — the
+// ChildMultiplicity returns the AOM 1.4 CARDINALITY interval, the
 // min/max number of child objects under a C_MULTIPLE_ATTRIBUTE.
 // Returns nil for single attributes (no such block) and for
 // multi-valued attributes whose OPT omitted <cardinality>. Walkers
@@ -227,19 +227,19 @@ func (a *CompiledAttribute) ChildMultiplicity() *template.Multiplicity {
 
 // RMTypeName returns the BMM-declared RM type of this attribute
 // (the element type for containers). Empty when rminfo did not
-// resolve the parent class (rare — only when the parent type is
+// resolve the parent class (rare: only when the parent type is
 // outside the known RM universe).
 func (a *CompiledAttribute) RMTypeName() string { return a.rmTypeName }
 
 // Implicit reports whether this attribute was injected by the
 // compile step because the BMM declares it mandatory and the OPT
-// omitted it. Implicit attributes carry no children — downstream
+// omitted it. Implicit attributes carry no children; downstream
 // composition builders fill them with RM defaults.
 func (a *CompiledAttribute) Implicit() bool { return a.implicit }
 
 // Required reports whether the BMM declares this attribute as
 // mandatory on the parent type. True implies the composition
-// builder MUST emit a value at this attribute's RM path.
+// builder must emit a value at this attribute's RM path.
 func (a *CompiledAttribute) Required() bool { return a.required }
 
 // Children returns a defensive copy of the child nodes. Empty for

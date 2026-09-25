@@ -9,8 +9,8 @@ import (
 
 // NewRM constructs a fresh zero-value RM instance via the central
 // typereg registry. Returns ErrUnknownRMType if the registry has no
-// entry — the openehr/rm init() registers every concrete RM type
-// the SDK knows about (REQ-040).
+// entry. The openehr/rm init() registers every concrete RM type
+// the SDK knows about.
 func NewRM(rmTypeName string) (any, error) {
 	ctor, ok := typereg.Default.Lookup(rmTypeName)
 	if !ok {
@@ -21,7 +21,7 @@ func NewRM(rmTypeName string) (any, error) {
 
 // EnsureSingle sets the single-valued attribute named `attrName` on
 // `parent` to `child`. The `parentType` string is retained for
-// forward compatibility with a future string-keyed dispatch; v1
+// forward compatibility with a future string-keyed dispatch; today
 // dispatch is purely on the Go concrete type of `parent`.
 //
 // Returns ErrUnknownAttribute for unaddressable (parent, attrName)

@@ -16,11 +16,9 @@ import (
 // property add/remove/change counts). If there are no changes,
 // returns an empty string.
 //
-// The suggestion is intentionally compact — see
-// `AGENTS.md § Code style and conventions` for the "short and
-// high-level" CHANGELOG bullet rule. The companion runbook
-// (docs/adr/0001-...) tells the maintainer to drop the suggestion
-// into `## [Unreleased]` under the appropriate sub-section
+// The suggestion is intentionally compact, matching the project's
+// short, high-level CHANGELOG bullets. It is meant to be dropped into
+// `## [Unreleased]` under the appropriate sub-section
 // (Added/Changed/Removed).
 func SuggestChangelogEntry(r *Report) string {
 	if r == nil || !r.HasChanges() {
