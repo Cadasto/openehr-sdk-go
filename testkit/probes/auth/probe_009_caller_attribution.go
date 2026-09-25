@@ -17,12 +17,12 @@ import (
 )
 
 // Probe009CallerAttributionOptIn implements PROBE-009: when caller
-// attribution is configured (REQ-066), the SDK emits the configured header
+// attribution is configured, the SDK emits the configured header
 // and the caller.agent_id OTel attribute; when not configured, neither
-// appears on the wire (REQ-066).
+// appears on the wire.
 //
 // The probe runs two transport clients against the same in-process
-// openEHR endpoint — one with WithCallerAttribution, one without — and
+// openEHR endpoint (one with WithCallerAttribution, one without) and
 // captures the request header at the server plus the span attributes via
 // an in-memory TracerProvider. To avoid taking a hard dependency on the
 // OTel SDK in the probe tree, the recorder implements the otel/trace API

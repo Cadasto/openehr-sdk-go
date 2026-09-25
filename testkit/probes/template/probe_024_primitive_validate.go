@@ -16,10 +16,10 @@ import (
 // and checks the returned [constraints.Violation] codes match the
 // case's expectations.
 //
-// ExpectNoConstraint flips the expectation: the addressed node MUST
-// NOT carry a primitive constraint (e.g. a non-primitive COMPLEX_OBJECT
-// or an ARCHETYPE_SLOT). Used to negatively assert REQ-103's
-// "only primitive xsi:type values carry a constraint" contract.
+// ExpectNoConstraint flips the expectation: the addressed node must
+// not carry a primitive constraint (e.g. a non-primitive COMPLEX_OBJECT
+// or an ARCHETYPE_SLOT). Used to negatively assert the rule that only
+// primitive xsi:type values carry a constraint.
 type ValidateCase struct {
 	// Path is the openEHR path string addressing a leaf node. Must
 	// resolve via OperationalTemplate.NodeAt; otherwise the probe
@@ -27,8 +27,8 @@ type ValidateCase struct {
 	Path string
 
 	// Value is the input passed to PrimitiveConstraint.Validate.
-	// Accepted Go types per constraint kind — see the constraints
-	// package docs.
+	// Accepted Go types per constraint kind are listed in the
+	// constraints package docs.
 	Value any
 
 	// WantCodes is the multiset of violation codes the case expects.
@@ -43,11 +43,11 @@ type ValidateCase struct {
 
 // Probe024PrimitiveValidate implements PROBE-024: parse the OPT body
 // and exercise its primitive-constraint surface against a
-// fixture-supplied list of validate cases. Sandbox-only — no
+// fixture-supplied list of validate cases. Sandbox-only, with no
 // transport involvement.
 //
 // The probe is invariant under any backend / generator that produces
-// the same primitive xsi:type values; consumers SHOULD include
+// the same primitive xsi:type values; consumers should include
 // at least one positive (no violations) and one negative
 // (CodeOutOfRange / CodeNotInList / …) case per primitive kind they
 // rely on.

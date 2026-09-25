@@ -23,16 +23,16 @@ const sandboxBaseURL = "https://sandbox.local/openehr/v1"
 
 // Sentinel refusals the runner returns instead of a green summary.
 // Each one is pinned by a named test that must fail if the guard is
-// removed (REQ-082).
+// removed.
 var (
 	// ErrUnsatisfiableMode is returned when the invocation asked for a
-	// mode the selected probes cannot run in — Cassette with no
+	// mode the selected probes cannot run in: Cassette with no
 	// recording, Cassette with a recording that is malformed or whose
 	// provenance and redaction cannot be attested (see [ValidateHAR]),
 	// Live with no endpoint, in-repo mode for a backend-facing probe, a
 	// probe whose declared Modes exclude the requested one, or a backend
 	// wiring that would silently swap one mode's backend for another's.
-	// The runner must not fall back to another mode.
+	// The runner never falls back to another mode.
 	ErrUnsatisfiableMode = errors.New("probe: mode cannot be satisfied")
 
 	// ErrAllSkipped is returned when every selected probe reported
@@ -41,14 +41,14 @@ var (
 
 	// ErrMutatingNotOptedIn is returned when Live mode would execute a
 	// mutating (or unclassified) probe without the per-invocation
-	// opt-in REQ-082 requires.
+	// opt-in ([Config.AllowMutating]).
 	ErrMutatingNotOptedIn = errors.New("probe: mutating live run requires opt-in")
 
 	// ErrEmptySelection is returned when there is nothing to run: no
 	// entries handed to [Run], or no ids handed to [Select]. An empty
-	// selection is a caller mistake, not a green run and not an
-	// all-skipped one — a computed filter that matched nothing must
-	// never widen into the whole catalog.
+	// selection is a caller mistake, neither a green run nor an
+	// all-skipped one: a computed filter that matched nothing never
+	// widens into the whole catalog.
 	ErrEmptySelection = errors.New("probe: empty selection")
 
 	// ErrUnknownProbe is returned by [Select] when a requested id is
@@ -58,7 +58,7 @@ var (
 	// ErrInvalidEntry is returned when a catalog entry cannot be run
 	// as written: no Run function, no id, an id another entry already
 	// uses, or an InRepo flag its declared Modes contradict. The
-	// runner refuses the entry rather than panicking on it (REQ-025).
+	// runner refuses the entry instead of panicking on it.
 	ErrInvalidEntry = errors.New("probe: invalid catalog entry")
 )
 
@@ -72,8 +72,8 @@ type Entry struct {
 	// only the mode's own backend requirements. An in-repo probe may
 	// declare ModeInRepo and nothing else.
 	Modes []Mode
-	// InRepo is true when the probe reaches no backend (REQ-082's
-	// declared class). An in-repo probe needs no client and no
+	// InRepo is true when the probe reaches no backend (the declared
+	// in-repo class). An in-repo probe needs no client and no
 	// recording, and runs under every mode.
 	InRepo bool
 	// Run executes the probe. c is nil for an in-repo probe. The
@@ -93,19 +93,19 @@ type Config struct {
 	// once the recording has been validated, and optionally in Live
 	// mode. The runner validates the recording and then hands this
 	// client to the probes as given; whether it replays that recording
-	// is the caller's responsibility. It must be nil in Sandbox mode —
+	// is the caller's responsibility. It must be nil in Sandbox mode;
 	// set Sandbox instead.
 	Client *transport.Client
 
 	// Sandbox is the in-memory backend a Sandbox-mode run serves from.
 	// Nil is the isolating default: the runner creates a fresh backend
 	// for each probe, so no probe can observe another's writes. Setting
-	// it is the opt-in for probes that are meant to share state — the
-	// whole run then serves from this one backend (REQ-082).
+	// it is the opt-in for probes that are meant to share state: the
+	// whole run then serves from this one backend.
 	Sandbox *sandbox.Backend
 
 	// HTTPClient is the injected transport a Live-mode run uses when
-	// Client is nil (REQ-021: the SDK never creates one implicitly).
+	// Client is nil. The SDK never creates one implicitly.
 	HTTPClient *http.Client
 
 	// TokenSource authenticates a Live-mode run built from Endpoint.
@@ -129,7 +129,7 @@ type Config struct {
 }
 
 // Summary is the runner's aggregation. Passes, skips, and failures
-// are counted separately so a skip cannot read as a pass (REQ-082).
+// are counted separately so a skip cannot read as a pass.
 type Summary struct {
 	Mode     Mode
 	Results  []Result
@@ -200,8 +200,8 @@ func Select(catalog []Entry, ids ...string) ([]Entry, error) {
 	return out, nil
 }
 
-// Run executes exactly the entries it is given, in order — the whole
-// catalog is spelled Run(ctx, cfg, catalog), a subset is
+// Run executes exactly the entries it is given, in order. The whole
+// catalog is spelled Run(ctx, cfg, catalog), and a subset is
 // [Select]'s output. An empty entries list returns
 // [ErrEmptySelection]: it is neither green nor all-skipped.
 //
@@ -210,9 +210,9 @@ func Select(catalog []Entry, ids ...string) ([]Entry, error) {
 // ([ErrUnsatisfiableMode], [ErrMutatingNotOptedIn]) without running
 // anything. It then wires the backend every entry reaches, still
 // before the first probe runs. Sandbox mode hands each probe a fresh
-// backend of its own, so two probes cannot observe each other's writes
-// (REQ-082); a caller that sets cfg.Sandbox has asked for the
-// opposite, and the whole run then serves from that one backend. Live
+// backend of its own, so two probes cannot observe each other's writes.
+// A caller that sets cfg.Sandbox has asked for the opposite, and the
+// whole run then serves from that one backend. Live
 // and Cassette mode build one client for the whole run, and a Live or
 // Cassette client that turns out to be sandbox-backed is refused.
 //

@@ -11,12 +11,12 @@ import (
 
 // Probe034TyperegXSIUnknown implements PROBE-034: an `xsi:type` not
 // in the type registry decodes to a typed error wrapping
-// [typereg.ErrUnknownType], NOT silently to an untyped fallback.
-// Sibling of PROBE-031 for the XML wire.
+// [typereg.ErrUnknownType], never silently to an untyped fallback.
+// It is the XML-wire counterpart of [Probe031TyperegUnknownType].
 //
 // The probe runs against a Composition input whose `composer` field
 // carries an intentionally unregistered `xsi:type` so the polymorphic
-// dispatch path is exercised. The Go SDK MUST surface the failure
+// dispatch path is exercised. The Go SDK must surface the failure
 // such that `errors.Is(err, typereg.ErrUnknownType)` is true.
 func Probe034TyperegXSIUnknown() (Result, error) {
 	r := Result{Probe: "PROBE-034"}

@@ -16,9 +16,9 @@ import (
 // [transport.ErrPreconditionRequired].
 //
 // The probe uses [ehrstatus.Put] with an empty ifMatch and asserts
-// that the SDK refuses to issue the request — short-circuiting with
-// [transport.ErrInvalidConfig] BEFORE any network call. The wire-
-// level 428 path is asserted by [Probe011PutStaleIfMatch] via a fake
+// that the SDK refuses to issue the request, short-circuiting with
+// [transport.ErrInvalidConfig] before any network call. The
+// wire-level 428 path is asserted by [Probe011PutStaleIfMatch] via a fake
 // server, since the SDK guards correct usage at compile/runtime time.
 func Probe010PutWithoutIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (Result, error) {
 	r := Result{Probe: "PROBE-010"}

@@ -14,23 +14,22 @@ import (
 
 // Probe092ContributionGet implements PROBE-092: the contribution read
 // leaf issues `GET /ehr/{ehr_id}/contribution/{contribution_uid}` and
-// decodes the 200 body as the persisted CONTRIBUTION (REQ-142).
+// decodes the 200 body as the persisted CONTRIBUTION.
 //
 // Version metadata is deliberately not asserted: the vendored pin
 // defines only `Content-Type` on `200_CONTRIBUTION` (`ETag` / `Location`
 // belong to `201_CONTRIBUTION`), so a conformant server may send none.
 //
-// Per REQ-080 the fail-closed legs assert behaviour, not sentinel
-// identity — an empty id issues no request and a 404 returns a non-nil
-// error. That `errors.Is` holds for transport.ErrInvalidConfig and
+// The fail-closed legs assert behaviour, not sentinel identity: an
+// empty id issues no request and a 404 returns a non-nil error. That `errors.Is` holds for transport.ErrInvalidConfig and
 // transport.ErrNotFound is pinned by the contribution package's unit
 // tests, which own the sentinel contract.
 //
 // Inputs:
 //   - captured accumulates every request the backend receives, in order.
-//     The caller wires it up (a `sandbox.Backend` scripted route in Sandbox mode); the
-//     probe reads length deltas to count requests, so it MUST NOT be
-//     reset between legs.
+//     The caller wires it up (a `sandbox.Backend` scripted route in Sandbox
+//     mode); the probe reads length deltas to count requests, so it must
+//     not be reset between legs.
 //   - presentUID is a uid the backend answers 200 for with a canonical
 //     contribution body; missingUID is one it answers 404 for.
 func Probe092ContributionGet(ctx context.Context, c *transport.Client, captured *[]*http.Request, ehrID openehrclient.EHRID, presentUID, missingUID string) (Result, error) {

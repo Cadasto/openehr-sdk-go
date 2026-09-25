@@ -12,11 +12,11 @@ import (
 
 // NewClient builds a [transport.Client] against baseURL (the openEHR
 // REST service entry, including the /openehr/v1 suffix). httpClient
-// is required (REQ-021). tokenSrc may be nil (anonymous). baseURL is
-// parsed rather than handed to [discovery.MustParseURL], which panics
-// on a malformed value — a base URL sourced from an environment
-// variable (as Live-mode invocations do) must fail as an error, not
-// crash the process.
+// is required; the SDK never allocates one for you. tokenSrc may be nil
+// (anonymous). baseURL is parsed instead of being handed to
+// [discovery.MustParseURL], which panics on a malformed value: a base
+// URL sourced from an environment variable (as Live-mode invocations
+// do) fails with an error instead of crashing the process.
 func NewClient(baseURL string, httpClient *http.Client, tokenSrc auth.TokenSource) (*transport.Client, error) {
 	if baseURL == "" {
 		return nil, fmt.Errorf("probe.NewClient: %w: empty base URL", transport.ErrInvalidConfig)

@@ -50,25 +50,25 @@ var pathShapeCodesAll = []string{
 // contract.
 func pathShapeCodes() []string { return pathShapeCodesAll }
 
-// PathShapeFireRow names one firing row the PROBE-099 wire assertion requires
-// BY NAME (conformance.md § PROBE-099, arm (a)) — the two queries an
-// audit verified silent on the shipped v0.22.0 linter and which MUST now warn,
-// and the clause-scope witness REQ-164 § Acceptance names beside them. A
-// [PathShapeFireCase] tagged with one counts towards that requirement, and
-// [Probe099PathShapeLint] fails a corpus in which any is unclaimed.
+// PathShapeFireRow names one firing row PROBE-099 requires by name in its
+// firing-and-silence arm (arm (a)): the two queries an audit found silent on
+// earlier linter releases, which must now warn, and the clause-scope witness
+// beside them. A [PathShapeFireCase] tagged with one counts towards that
+// requirement, and [Probe099PathShapeLint] fails a corpus in which any is
+// unclaimed.
 //
 // A firing row that merely exercises a code carries no tag: the per-code
 // coverage guard already demands one row per code, and these three are the rows
-// the wire assertion names on top of that.
+// the probe names on top of that.
 type PathShapeFireRow string
 
 const (
-	// FireAuditRepeatingSegment — the audit's unpredicated repeating-segment
+	// FireAuditRepeatingSegment is the audit's unpredicated repeating-segment
 	// projection.
 	FireAuditRepeatingSegment PathShapeFireRow = "audit: the unpredicated repeating-segment projection"
-	// FireAuditRowBound — the audit's LIMIT-without-ORDER BY query.
+	// FireAuditRowBound is the audit's LIMIT-without-ORDER BY query.
 	FireAuditRowBound PathShapeFireRow = "audit: the LIMIT-without-ORDER BY query"
-	// FireClauseScopeWhereOnly — a repeating segment reached only through
+	// FireClauseScopeWhereOnly is a repeating segment reached only through
 	// WHERE, which an implementation narrowed to the projection would miss.
 	FireClauseScopeWhereOnly PathShapeFireRow = "clause scope: a WHERE-only offending path"
 )
@@ -80,57 +80,57 @@ var mandatoryFireRowsAll = []PathShapeFireRow{
 	FireAuditRepeatingSegment, FireAuditRowBound, FireClauseScopeWhereOnly,
 }
 
-// PathShapeNegative names one of the negative near misses the PROBE-099 wire
-// assertion requires BY NAME (conformance.md § PROBE-099, arm (a)) — the eleven
-// per-rule near misses and the conservative walk's four silent stops. A
+// PathShapeNegative names one of the negative near misses PROBE-099 requires
+// by name in arm (a): the eleven per-rule near misses and the conservative
+// walk's four silent stops. A
 // [PathShapeSilentCase] tagged with one counts towards that requirement, and
 // [Probe099PathShapeLint] fails a corpus in which any is unclaimed.
 type PathShapeNegative string
 
 const (
-	// NegPredicatedSegment — any predicate on a multi-valued segment
+	// NegPredicatedSegment means any predicate on a multi-valued segment
 	// suppresses aql_path_repeating_unpredicated.
 	NegPredicatedSegment PathShapeNegative = "predicated repeating segment"
-	// NegOrderByPresent — a total order beside a row bound silences
+	// NegOrderByPresent means a total order beside a row bound silences
 	// aql_paging_no_order_by.
 	NegOrderByPresent PathShapeNegative = "ORDER BY beside a row bound"
-	// NegNilEnvelope — with no Options.Query the envelope arm cannot fire.
+	// NegNilEnvelope means with no Options.Query the envelope arm cannot fire.
 	NegNilEnvelope PathShapeNegative = "nil Options.Query"
-	// NegTopOnlyBound — a query whose only row bound is the deprecated TOP
+	// NegTopOnlyBound means a query whose only row bound is the deprecated TOP
 	// keeps aql_deprecated_top and does not also collect the paging code.
 	NegTopOnlyBound PathShapeNegative = "TOP-only row bound"
-	// NegAliasedProjection — an item that names its column raises nothing.
+	// NegAliasedProjection means an item that names its column raises nothing.
 	NegAliasedProjection PathShapeNegative = "aliased projection item"
-	// NegStarItem — a `*` item has nothing to alias; that shape is REQ-109's
-	// aql_select_star.
+	// NegStarItem means a `*` item has nothing to alias; that shape is the shape
+	// check's aql_select_star.
 	NegStarItem PathShapeNegative = "star projection item"
-	// NegSharedRepeatingPrefix — two projected paths whose multi-valued
+	// NegSharedRepeatingPrefix means two projected paths whose multi-valued
 	// segments are all in their common prefix are one repeating scope, not a
 	// product.
 	NegSharedRepeatingPrefix PathShapeNegative = "repeating segments in the common prefix"
-	// NegDifferentAliases — two projected paths on different aliases are the
-	// junction question, aql_fanout_row_grain (REQ-161).
+	// NegDifferentAliases means two projected paths on different aliases are the
+	// junction question, the semantic group's aql_fanout_row_grain.
 	NegDifferentAliases PathShapeNegative = "projected paths on different aliases"
-	// NegAvoidableIntermediate — an avoidable unreferenced intermediate
+	// NegAvoidableIntermediate means an avoidable unreferenced intermediate
 	// narrows the result, so it is not redundant.
 	NegAvoidableIntermediate PathShapeNegative = "avoidable unreferenced intermediate"
-	// NegUnreferencedLeaf — an unreferenced leaf is an existence filter and
+	// NegUnreferencedLeaf means an unreferenced leaf is an existence filter and
 	// does work.
 	NegUnreferencedLeaf PathShapeNegative = "unreferenced leaf"
-	// NegVersionedObjectOperand — a VERSIONED_OBJECT-conforming operand keeps
-	// REQ-161's aql_versioned_object_unreferenced (REQ-164 § No
-	// double-reporting).
+	// NegVersionedObjectOperand means a VERSIONED_OBJECT-conforming operand keeps
+	// the semantic group's aql_versioned_object_unreferenced (no code is
+	// reported twice).
 	NegVersionedObjectOperand PathShapeNegative = "VERSIONED_OBJECT-conforming operand"
-	// NegWalkStopUnknownClass — the walk cannot start on a class the pin does
+	// NegWalkStopUnknownClass means the walk cannot start on a class the pin does
 	// not know.
 	NegWalkStopUnknownClass PathShapeNegative = "walk stop: unknown class"
-	// NegWalkStopUndeclaredAttribute — the pin declares no such attribute on
+	// NegWalkStopUndeclaredAttribute means the pin declares no such attribute on
 	// the current class.
 	NegWalkStopUndeclaredAttribute PathShapeNegative = "walk stop: undeclared attribute"
-	// NegWalkStopGenericParameter — the segment types to a BMM generic
+	// NegWalkStopGenericParameter means the segment types to a BMM generic
 	// parameter (`EVENT.data` is literally typed `T`).
 	NegWalkStopGenericParameter PathShapeNegative = "walk stop: generic-parameter type"
-	// NegWalkStopParamArchetype — a `$param` archetype scope, whose extent the
+	// NegWalkStopParamArchetype is a `$param` archetype scope, whose extent the
 	// CDR resolves at execution.
 	NegWalkStopParamArchetype PathShapeNegative = "walk stop: $param archetype scope"
 )
@@ -145,17 +145,18 @@ var pathShapeNegativesAll = []PathShapeNegative{
 	NegWalkStopGenericParameter, NegWalkStopParamArchetype,
 }
 
-// PathShapeFireCase is one PROBE-099 arm-(a) firing row: Query MUST raise the
-// REQ-164 code multiset Want — which MUST include Code, the code the row exists
-// for — with Code carried at Severity and spanned as SpanText / SpanNth say.
+// PathShapeFireCase is one PROBE-099 arm-(a) firing row: Query must raise the
+// path-shape code multiset Want, which must include Code (the code the row
+// exists for), with Code carried at Severity and spanned as SpanText /
+// SpanNth say.
 //
-// Want is the WHOLE REQ-164 multiset rather than the single code PROBE-097's
-// firing rows demand, because several REQ-164 codes legitimately co-occur: the
-// fan-out advisory's PREMISE is two unpredicated repeating segments, so its
-// witness carries aql_path_repeating_unpredicated twice by construction (REQ-164
-// § No double-reporting gives neither code ownership of the other). Naming the
-// multiset in full keeps the row an assertion about the whole result rather than
-// about the code it happens to look at.
+// Want is the whole path-shape multiset instead of the single code the
+// [SemanticFireCase] rows demand, because several path-shape codes
+// legitimately co-occur: the fan-out advisory's premise is two unpredicated
+// repeating segments, so its witness carries aql_path_repeating_unpredicated
+// twice by construction (neither code owns the other). Naming the multiset in
+// full keeps the row an assertion about the whole result, not only about the
+// code it happens to look at.
 type PathShapeFireCase struct {
 	// Name labels the case for diagnostic output.
 	Name string
@@ -163,48 +164,48 @@ type PathShapeFireCase struct {
 	// computation does not handle multi-line queries).
 	Query string
 	// Fetch and Offset, when either is non-zero, supply the request envelope
-	// on [lint.Options.Query] — the second channel aql_paging_no_order_by
+	// on [lint.Options.Query], the second channel aql_paging_no_order_by
 	// reads. Both zero means no envelope is supplied at all.
 	Fetch, Offset int
-	// Relation, when non-nil, is the REQ-160 relation the run supplies on
-	// [lint.Options.Relation], as on [PathShapeSilentCase]. The redundant-step
-	// check is the one REQ-164 code a supplied relation governs; a fire row
-	// carrying one pins that the group answers over the SUPPLIED relation —
-	// supplying is not muting (REQ-161 § Relation supply).
+	// Relation, when non-nil, is the containment type relation the run
+	// supplies on [lint.Options.Relation], as on [PathShapeSilentCase]. The
+	// redundant-step check is the one path-shape code a supplied relation
+	// governs; a fire row carrying one pins that the group answers over the
+	// supplied relation (supplying a relation does not mute the group).
 	Relation *contain.TypeRelation
-	// Code is the REQ-164 issue code this row exists for.
+	// Code is the path-shape issue code this row exists for.
 	Code string
-	// Want is the exact REQ-164 code multiset Query MUST raise (order
-	// irrelevant; duplicates count). It MUST contain Code.
+	// Want is the exact path-shape code multiset Query must raise (order
+	// irrelevant; duplicates count). It must contain Code.
 	Want []string
-	// Severity is Code's REQ-164 catalogue severity — Warning for all five,
-	// asserted per row rather than assumed so a promotion cannot ship quietly.
+	// Severity is Code's catalogue severity (Warning for all five),
+	// asserted per row instead of assumed so a promotion cannot ship quietly.
 	Severity lint.Severity
-	// SpanText is the source text the issue's Span MUST cover — a segment
+	// SpanText is the source text the issue's Span must cover: a segment
 	// name, a whole identified path, a projection item or a class token,
-	// depending on the code. EMPTY requires the ZERO Span instead, which is
+	// depending on the code. Empty requires the zero Span instead, which is
 	// aql_paging_no_order_by's honest answer: neither of its channels has a
 	// position in the query text to point at.
 	SpanText string
-	// SpanNth is the 1-based occurrence of SpanText in Query the Span MUST
+	// SpanNth is the 1-based occurrence of SpanText in Query the Span must
 	// land on. Ignored when SpanText is empty.
 	SpanNth int
-	// Mandatory, when set, declares this row as one of the firing rows the
-	// PROBE-099 wire assertion names explicitly. Each of [PathShapeFireRow]'s
-	// constants MUST be claimed by at least one row.
+	// Mandatory, when set, declares this row as one of the firing rows
+	// PROBE-099 names explicitly. Each of [PathShapeFireRow]'s constants must
+	// be claimed by at least one row.
 	Mandatory PathShapeFireRow
 }
 
-// PathShapeSilentCase is one PROBE-099 arm-(a) silence row: Query MUST reach the
-// REQ-164 checks at all, and MUST then raise exactly the REQ-164 code multiset
-// in Want — nil for a plain near miss.
+// PathShapeSilentCase is one PROBE-099 arm-(a) silence row: Query must reach
+// the path-shape checks at all, and must then raise exactly the path-shape
+// code multiset in Want (nil for a plain near miss).
 //
-// Keeps is what makes a YIELDING near miss non-vacuous. Three of the negatives
-// are not "nothing fires" but "another code owns this shape" (REQ-164 § No
-// double-reporting): the TOP-only bound keeps aql_deprecated_top, the star item
-// keeps aql_select_star, and the VERSIONED_OBJECT operand keeps REQ-161's
-// aql_versioned_object_unreferenced. Without Keeps those rows would pass just as
-// well on a query that had stopped being linted at all.
+// Keeps is what makes a yielding near miss non-vacuous. For three of the
+// negatives the expectation is that another code owns this shape, so that
+// nothing is reported twice: the TOP-only bound keeps aql_deprecated_top, the
+// star item keeps aql_select_star, and the VERSIONED_OBJECT operand keeps the
+// semantic group's aql_versioned_object_unreferenced. Without Keeps those rows
+// would pass just as well on a query that had stopped being linted at all.
 type PathShapeSilentCase struct {
 	// Name labels the case for diagnostic output.
 	Name string
@@ -213,52 +214,53 @@ type PathShapeSilentCase struct {
 	// Fetch and Offset supply the request envelope, as on
 	// [PathShapeFireCase].
 	Fetch, Offset int
-	// Relation, when non-nil, is the REQ-160 relation the run supplies on
-	// [lint.Options.Relation]. Two negatives need one: the VERSIONED_OBJECT
-	// negative (on the default relation no VERSIONED_* class is ever
-	// unavoidable, so a skip tested there alone would pass with the guard
-	// deleted), and the discriminating supplied-relation redundant-step
+	// Relation, when non-nil, is the containment type relation the run
+	// supplies on [lint.Options.Relation]. Two negatives need one: the
+	// VERSIONED_OBJECT negative (on the default relation no VERSIONED_* class
+	// is ever unavoidable, so a skip tested there alone would pass with the
+	// guard deleted), and the discriminating supplied-relation redundant-step
 	// negative (an overlay that opens a bypass route around the witness's
 	// otherwise-unavoidable step, so dropping Relation flips the verdict
 	// back to firing). Nil selects the default relation, which is not the
-	// same as switching a check off (REQ-161 § Relation supply).
+	// same as switching a check off.
 	Relation *contain.TypeRelation
-	// Want is the exact REQ-164 code multiset Query MUST raise (order
+	// Want is the exact path-shape code multiset Query must raise (order
 	// irrelevant; nil means none).
 	Want []string
-	// Keeps are codes OUTSIDE the REQ-164 group that Query MUST still carry —
-	// the code this near miss yields the shape to.
+	// Keeps are codes outside the path-shape group that Query must still
+	// carry: the code this near miss yields the shape to.
 	Keeps []string
-	// ForCode, when set, declares which REQ-164 code's silence this row
-	// guards. Every code in [pathShapeCodes] MUST be claimed by at least one
-	// row — conformance.md § PROBE-099 arm (a) requires, per code, a firing row
-	// AND a negative near miss that stays silent.
+	// ForCode, when set, declares which path-shape code's silence this row
+	// guards. Every code in [pathShapeCodes] must be claimed by at least one
+	// row: arm (a) requires, per code, a firing row and a negative near miss
+	// that stays silent.
 	ForCode string
-	// Negative, when set, declares this row as one of the near misses the
-	// PROBE-099 wire assertion names explicitly. Each of [PathShapeNegative]'s
-	// constants MUST be claimed by at least one row.
+	// Negative, when set, declares this row as one of the near misses
+	// PROBE-099 names explicitly. Each of [PathShapeNegative]'s constants
+	// must be claimed by at least one row.
 	Negative PathShapeNegative
 }
 
 // PathShapeCorpus is the whole PROBE-099 corpus: three fields across two
-// wire-assertion arms — Fire and Silent are the two halves of arm (a), the
-// firing rows and the near misses that must stay silent. All three are required.
+// arms. Fire and Silent are the two halves of arm (a), the firing rows and
+// the near misses that must stay silent; Additivity is arm (b). All three are
+// required.
 //
 // Additivity reuses [LintCase] (probe_028_aql_lint.go, same package) exactly as
-// PROBE-097 arm (b) does: arm (b) is PROBE-028's own corpus re-run under the
-// completed REQ-164 linter, not a corpus of its own.
+// [SemanticCorpus] does: arm (b) is the [Probe028AQLLint] corpus re-run under
+// the full path-shape linter, with no corpus of its own.
 type PathShapeCorpus struct {
-	// Fire is arm (a)'s firing rows — one per REQ-164 code, minimum, plus the
-	// three the wire assertion names.
+	// Fire is arm (a)'s firing rows: at least one per path-shape code, plus
+	// the three [PathShapeFireRow] names.
 	Fire []PathShapeFireCase
 	// Silent is arm (a)'s near-miss rows.
 	Silent []PathShapeSilentCase
-	// Additivity is arm (b): the PROBE-028 corpus, re-run.
+	// Additivity is arm (b): the [Probe028AQLLint] corpus, re-run.
 	Additivity []LintCase
 }
 
 // Probe099PathShapeLint runs every row of both arms and aggregates all failures
-// into one [Result] (collect-all, like [Probe097SemanticLint] — a single early
+// into one [Result] (collect-all, like [Probe097SemanticLint]: a single early
 // failure would hide the rest of the corpus from the report).
 func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) {
 	r := Result{Probe: "PROBE-099"}

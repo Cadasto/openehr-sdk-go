@@ -13,10 +13,10 @@ import (
 
 // RootCase describes one fixture tuple for the non-COMPOSITION
 // validation probe (PROBE-074): an OPT body, an in-memory RM root from
-// outside the COMPOSITION content set — the demographic PARTY hierarchy
-// (PERSON / ORGANISATION / GROUP / AGENT / ROLE and the archetypeable
+// outside the COMPOSITION content set (the demographic PARTY hierarchy
+// PERSON / ORGANISATION / GROUP / AGENT / ROLE and the archetypeable
 // sub-components ADDRESS / CONTACT / PARTY_IDENTITY / PARTY_RELATIONSHIP
-// / CAPABILITY) or the EHR-IM roots FOLDER / EHR_STATUS — and the
+// / CAPABILITY, or the EHR-IM roots FOLDER / EHR_STATUS), and the
 // expected issue-code multiset.
 type RootCase struct {
 	// Name labels the case for diagnostic output.
@@ -37,10 +37,10 @@ type RootCase struct {
 
 // Probe074NonCompositionValidate runs each [RootCase] through
 // [validation.Validate] and asserts the resulting issue-code multiset
-// matches WantCodes — REQ-110. Any conformant implementation that
+// matches WantCodes (PROBE-074). Any conformant implementation that
 // extends template-driven validation beyond COMPOSITION to the
 // demographic PARTY hierarchy and the EHR-IM roots (FOLDER /
-// EHR_STATUS) MUST produce the same multiset for the same OPT + root
+// EHR_STATUS) must produce the same multiset for the same OPT + root
 // shape.
 func Probe074NonCompositionValidate(cases []RootCase) (Result, error) {
 	r := Result{Probe: "PROBE-074"}

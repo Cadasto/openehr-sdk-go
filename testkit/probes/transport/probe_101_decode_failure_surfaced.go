@@ -12,40 +12,40 @@ import (
 
 // Probe101DecodeFailureSurfaced implements PROBE-101: a 2xx response whose
 // body cannot be decoded as the requested representation fails the call
-// rather than returning a silently zero-valued result, on the shared
+// instead of returning a silently zero-valued result, on the shared
 // transport decode and on a hand-rolled Definition list decode alike, while
-// a non-2xx on the same route keeps failing as it always did (REQ-151).
+// a non-2xx on the same route keeps failing as before.
 //
 // Three arms, in the catalog's order:
 //
-//   - (a) ehr.Get — a read through the shared transport.Decode, served a 200
-//     whose body cannot decode as an EHR. It MUST fail, and MUST NOT hand
+//   - (a) ehr.Get: a read through the shared transport.Decode, served a 200
+//     whose body cannot decode as an EHR. It must fail, and must not hand
 //     back a resource: a zero-valued success paired with a nil error is the
 //     exact defect this probe exists to catch.
-//   - (b) ehr.Get on the same route, served a 404. It MUST keep failing —
-//     REQ-151 changes nothing about a wire failure.
-//   - (c) definition.ListTemplates — a hand-rolled list decode, served a JSON
-//     object where an array is expected. It MUST fail, and MUST NOT report an
-//     empty catalog: an empty *body* is a successful empty catalog under
-//     REQ-151's keyed exclusion, but a non-empty body that will not decode is
-//     never one.
+//   - (b) ehr.Get on the same route, served a 404. It must keep failing;
+//     decode-failure handling changes nothing about a wire failure.
+//   - (c) definition.ListTemplates: a hand-rolled list decode, served a JSON
+//     object where an array is expected. It must fail, and must not report an
+//     empty catalog. An empty body is a successful empty catalog (a keyed
+//     exception for list endpoints), but a non-empty body that will not
+//     decode never is.
 //
 // Every arm is held to exactly one request. Without that, a leaf that refused
-// the call before it reached the wire — an id guard, a config refusal —
+// the call before it reached the wire (an id guard, a config refusal)
 // would credit the probe with a failure the server never provoked, and the
 // probe would pass on an SDK that never decodes anything at all.
 //
-// Per REQ-080 the assertions stay at observable-behaviour level: whether the
+// The assertions stay at the level of observable behaviour: whether the
 // failure is a *transport.DecodeError rather than a *transport.WireError,
 // what its Body carries, and what its Error() is allowed to say are pinned by
 // transport/decode_error_test.go and the leaf packages' own
 // decode_error_test.go files, never here.
 //
 // Inputs:
-//   - captured returns the ESCAPED path of every request the backend has
+//   - captured returns the escaped path of every request the backend has
 //     received so far, in order. The caller wires it up (a `sandbox.Backend`
-//     scripted route in Sandbox mode). The probe reads length deltas to count requests per
-//     arm, so it MUST NOT be reset between arms.
+//     scripted route in Sandbox mode). The probe reads length deltas to count
+//     requests per arm, so it must not be reset between arms.
 //   - undecodableID is an EHR id the backend answers 200 for with a body that
 //     cannot decode as an EHR; missingID is one it answers 404 for. The
 //     Definition list route (GET /definition/template/adl1.4) answers 200

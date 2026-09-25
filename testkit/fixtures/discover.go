@@ -81,7 +81,7 @@ func collectJSON(dir, kind string, out *[]CompositionJSONRel) error {
 
 // ListSubmissionJSON returns the absolute path of every *.json under
 // submissions/, sorted. The corpus mixes deliberately valid and invalid
-// records — a caller asserting conformance filters on the file name, one
+// records: a caller asserting conformance filters on the file name, one
 // asserting a shape the wire is known to carry uses them all.
 func ListSubmissionJSON() ([]string, error) {
 	entries, err := os.ReadDir(submissionsDir())

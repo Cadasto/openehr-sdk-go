@@ -18,7 +18,7 @@ import (
 // expiry-based half): an expired access token with a valid refresh token
 // is refreshed silently before the next token acquisition. The token
 // endpoint receives a `grant_type=refresh_token` exchange on the wire and
-// the SDK's TokenSource returns the newly issued access token (REQ-063).
+// the SDK's TokenSource returns the newly issued access token.
 //
 // This complements the transport half (Probe007TransportTokenRefresh,
 // wire 401 -> Reauth -> retry). Here the trigger is the proactive

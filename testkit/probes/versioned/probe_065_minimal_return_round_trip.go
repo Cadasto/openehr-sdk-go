@@ -14,11 +14,11 @@ import (
 // Probe065MinimalReturnRoundTrip implements PROBE-065: a Composition write
 // under the SDK's default `Prefer: return=minimal` returns an empty body and a
 // Location header, so the SDK surfaces only the version metadata (a nil
-// Composition), and a follow-up GET returns the full Composition (REQ-094).
+// Composition), and a follow-up GET returns the full Composition.
 //
 // It pins two facts a deployment must satisfy on the minimal path: the write's
-// Location is recovered into the VersionUID — a write that names nothing leaves
-// the caller unable to read what it just committed — and that committed version
+// Location is recovered into the VersionUID (a write that names nothing leaves
+// the caller unable to read what it just committed), and that committed version
 // reads back in full. The "surfaces only metadata" half is the SDK's own
 // contract (a minimal write never decodes a body); asserting it here catches a
 // regression that started decoding one.

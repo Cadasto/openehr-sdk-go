@@ -14,13 +14,12 @@ import (
 // Probe027GeneratedValidates asserts that the canonical
 // generator → validator round-trip passes cleanly for the supplied
 // compiled OPT. The probe is sandbox-only (no transport
-// dependency); openEHR conformance: another implementation of
-// REQ-107 + REQ-102 v2 against the same fixtures MUST produce the
-// same OK outcome.
+// dependency). For openEHR conformance, another implementation of
+// the generator and validator against the same fixtures must produce
+// the same OK outcome.
 //
-// Currently scoped to COMPOSITION roots — that is what the v2
-// validator (ValidateComposition) supports. Non-COMPOSITION roots
-// land when validation v3 grows a generic ValidateLocatable.
+// It is scoped to COMPOSITION roots, the roots ValidateComposition
+// supports.
 func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled, opts instance.Options) (Result, error) {
 	r := Result{Probe: "PROBE-027"}
 	if c == nil || c.Root() == nil {

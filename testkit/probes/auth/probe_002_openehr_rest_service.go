@@ -9,8 +9,8 @@ import (
 )
 
 // Probe002OpenEHRRestService implements PROBE-002: the resolved service
-// catalog MUST contain an entry with id "org.openehr.rest", a parseable
-// base URL, and a declared spec_version (REQ-070, REQ-072).
+// catalog must contain an entry with id "org.openehr.rest", a parseable
+// base URL, and a declared spec_version.
 //
 // Pass conditions:
 //  1. Resolve succeeds.

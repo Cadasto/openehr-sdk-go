@@ -12,8 +12,8 @@ import (
 )
 
 // Probe071CompositionWriteResponseShape implements PROBE-071: a
-// Composition write under `Prefer: return=representation` — whether
-// POST (Save) or PUT (Update) — decodes its response body as a bare
+// Composition write under `Prefer: return=representation`, whether
+// POST (Save) or PUT (Update), decodes its response body as a bare
 // `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` /
 // `200_COMPOSITION_updated` schemas, not as an
 // `ORIGINAL_VERSION<COMPOSITION>` envelope. The full version envelope
@@ -21,12 +21,12 @@ import (
 // `GET /versioned_composition/{vo_uid}/version/{version_uid}`
 // (`UVersionOfComposition`).
 //
-// Pins REQ-094. A deployment that returns ORIGINAL_VERSION on
+// A deployment that returns ORIGINAL_VERSION on
 // these paths is non-conformant; the SDK surfaces the mismatch as a
 // decode error (strict-against-spec). The probe exercises both halves:
 // POST then PUT, each with a fresh round-trip. When `voID` or `ifMatch`
 // is empty, the PUT arm is skipped and the probe still passes on the
-// POST arm — preconditions reflect deployments that don't expose a
+// POST arm; these preconditions reflect deployments that don't expose a
 // preconfigured family for the test caller. A pass requires the POST
 // arm at minimum; when both inputs are present, both arms must succeed.
 func Probe071CompositionWriteResponseShape(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition) (Result, error) {

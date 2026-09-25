@@ -9,7 +9,7 @@ import (
 )
 
 // ConstraintTemplateIDs returns template ids with vendored OPT + composition JSON
-// used for REQ-103 primitive-constraint and REQ-102 validation cassette tests
+// used for the primitive-constraint and validation cassette tests
 // (ehrbase Robot Test_dv_* and clinical_content_validation).
 func ConstraintTemplateIDs() ([]string, error) {
 	dir := templatesDir()
@@ -49,7 +49,8 @@ func isConstraintTemplateID(id string) bool {
 }
 
 // ConstraintExampleValueExcluded reports whether an OPT id is skipped in
-// ExampleValue walk tests (REQ-107 gap on pattern subfields).
+// ExampleValue walk tests (example values do not yet satisfy pattern
+// subfields).
 func ConstraintExampleValueExcluded(id string) bool {
 	return constraintExampleValueExcluded[id]
 }

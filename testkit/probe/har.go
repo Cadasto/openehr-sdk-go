@@ -8,16 +8,15 @@ import (
 	"strings"
 )
 
-// HAR is an HTTP Archive 1.2 recording (ADR 0020). Cassette mode
-// reads this shape; a recording that fails [ValidateHAR] MUST be
-// discarded rather than replayed (REQ-082).
+// HAR is an HTTP Archive 1.2 recording. Cassette mode reads this
+// shape; a recording that fails [ValidateHAR] is discarded, never
+// replayed.
 type HAR struct {
 	Log HARLog `json:"log"`
 }
 
-// HARLog is the HAR 1.2 log object. Provenance and redaction live on
-// [_req082] as a custom field — HAR has no native slot for them
-// (ADR 0020).
+// HARLog is the HAR 1.2 log object. Provenance and redaction live in
+// the custom _req082 field, because HAR has no native slot for them.
 type HARLog struct {
 	Version string      `json:"version"`
 	Creator *HARCreator `json:"creator,omitempty"`
@@ -26,9 +25,9 @@ type HARLog struct {
 	Entries []HAREntry  `json:"entries"`
 }
 
-// HARReq082 is the REQ-082 attestation carried on every Cassette
-// recording. Removing either required field must fail
-// TestHARRejectsMissingAttestation in har_test.go.
+// HARReq082 is the provenance and redaction attestation carried on every
+// Cassette recording, under the _req082 key. Removing either required
+// field must fail TestHARRejectsMissingAttestation in har_test.go.
 type HARReq082 struct {
 	Provenance HARProvenance `json:"provenance"`
 	Redaction  HARRedaction  `json:"redaction"`
@@ -187,10 +186,9 @@ var authSchemes = []string{"bearer ", "basic "}
 const credentialRunMin = 16
 
 // ValidateHAR reads the HAR 1.2 recording at path and refuses one that
-// must not be replayed (REQ-082): unreadable or malformed bytes, or
-// anything [HAR.Validate] refuses. Every refusal wraps
-// [ErrUnsatisfiableMode], so a caller can discard the recording on the
-// sentinel alone.
+// cannot be replayed safely: unreadable or malformed bytes, or anything
+// [HAR.Validate] refuses. Every refusal wraps [ErrUnsatisfiableMode], so
+// a caller can discard the recording on the sentinel alone.
 func ValidateHAR(path string) (HAR, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -206,22 +204,21 @@ func ValidateHAR(path string) (HAR, error) {
 	return rec, nil
 }
 
-// Validate refuses a recording that must not be replayed (REQ-082):
-// the wrong log version, a missing or incomplete ADR 0020 attestation,
-// provenance whose base URL carries a credential, an empty entries
-// list, an entry replay could not use, or a credential the
-// capture-time redaction left behind. Every refusal wraps
-// [ErrUnsatisfiableMode].
+// Validate refuses a recording that cannot be replayed safely: the wrong
+// log version, a missing or incomplete _req082 attestation, provenance
+// whose base URL carries a credential, an empty entries list, an entry
+// replay could not use, or a credential the capture-time redaction left
+// behind. Every refusal wraps [ErrUnsatisfiableMode].
 //
 // It is separate from [ValidateHAR] so a capture tool can judge the
-// document it holds in memory, before any of it is written: REQ-082
-// requires that a credential never reach disk, and a validator that
-// only reads files can be asked that question only after it already
-// has (cmd/probe-record).
+// document it holds in memory before any of it is written. A credential
+// must never reach disk, and a validator that only reads files could
+// answer that question only after the credential had already been
+// written (cmd/probe-record).
 //
-// A refusal names the offending entry and the channel — the header,
-// the query key, the URL's userinfo, the body marker — and never the
-// value or any recorded payload text (REQ-093). Removing the _req082
+// A refusal names the offending entry and the channel (the header,
+// the query key, the URL's userinfo, the body marker) and never the
+// value or any recorded payload text. Removing the _req082
 // check must fail TestHARRejectsMissingAttestation in har_test.go;
 // removing the provenance URL scan must fail
 // TestHARRejectsCredentialInProvenanceBaseURL; removing the
@@ -259,12 +256,11 @@ func (h HAR) Validate() error {
 	return refuseUnredacted(h)
 }
 
-// CredentialInURL reports the credential channel rawURL carries — the
-// name of the offending query key, or "userinfo" — and never the value
-// (REQ-093). It is exported so a capture tool refuses a
-// credential-bearing base URL against the same set this validator
-// scans, instead of keeping a second copy that drifts out of step
-// (cmd/probe-record).
+// CredentialInURL reports the credential channel rawURL carries (the
+// name of the offending query key, or "userinfo") and never the value.
+// It is exported so a capture tool refuses a credential-bearing base URL
+// against the same set this validator scans, instead of keeping a second
+// copy that drifts out of step (cmd/probe-record).
 func CredentialInURL(rawURL string) (string, bool) {
 	if rawURL == "" {
 		return "", false

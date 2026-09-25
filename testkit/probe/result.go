@@ -7,11 +7,11 @@ import (
 
 // Mode is the backend the runner selected for a probe invocation.
 // A backend-facing probe must not read this; the runner stamps it
-// onto [Result] after the probe returns (REQ-082).
+// onto [Result] after the probe returns.
 type Mode string
 
 // The four modes the runner can select. Sandbox, Cassette, and Live
-// are the three backends REQ-082 requires of a backend-facing probe;
+// are the three backends every backend-facing probe supports;
 // ModeInRepo is the declared class for a probe that reaches no server.
 const (
 	// ModeSandbox serves probes from the in-memory sandbox backend.
@@ -26,7 +26,7 @@ const (
 	ModeInRepo Mode = "in-repo"
 )
 
-// Status is the closed set a probe may report (REQ-082).
+// Status is the closed set of outcomes a probe may report.
 type Status string
 
 // The closed status vocabulary. Anything else a probe reports is
@@ -42,7 +42,7 @@ const (
 	StatusSkip Status = "skip"
 )
 
-// Effect is the write posture of a backend-facing probe (REQ-082).
+// Effect is the write posture of a backend-facing probe.
 // An unclassified probe is treated as [EffectMutating] so it cannot
 // reach a live deployment by default.
 type Effect string
@@ -58,7 +58,7 @@ const (
 )
 
 // ResolveEffect returns e when it is a classified effect, and
-// [EffectMutating] for any other value — including the zero value.
+// [EffectMutating] for any other value, including the zero value.
 // Removing this default must fail [TestUnclassifiedEffectIsMutating].
 func ResolveEffect(e Effect) Effect {
 	if e == EffectReadOnly {
@@ -81,7 +81,7 @@ type Result struct {
 // names, in order. Parenthetical notes and trailing dash clauses are
 // stripped first, so "Sandbox, Cassette, Live.", "In-repo (unit-level;
 // no backend)" and "Sandbox, Cassette, Live (planned)." all parse. An
-// empty line — once that stripping leaves nothing — returns (nil,
+// empty line (once that stripping leaves nothing) returns (nil,
 // nil): there is nothing to parse, which is not an error.
 //
 // A token that survives stripping but names none of the four modes

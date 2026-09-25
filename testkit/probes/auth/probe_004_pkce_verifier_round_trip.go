@@ -111,14 +111,14 @@ func runPKCEFlow(ctx context.Context, scopes []string, launch string) (*pkceFlow
 // Probe004PKCEVerifierRoundTrip implements PROBE-004: a SMART launch using
 // S256 PKCE carries code_challenge + code_challenge_method=S256 on the
 // authorization request and code_verifier on the token exchange, and the
-// token response is a 200 carrying an access_token (REQ-061).
+// token response is a 200 carrying an access_token.
 //
-// G-7 PKCE parity: the probe additionally asserts the SDK's verifier
+// PKCE parity: the probe additionally asserts the SDK's verifier
 // matches RFC 7636 / golang.org/x/oauth2 properties:
 //   - the decoded verifier has >= 32 bytes of entropy;
 //   - the verifier is base64.RawURLEncoding (URL-safe alphabet, no padding);
-//   - challenge == base64url(SHA256(verifier)) — cross-checked against
-//     x/oauth2.S256ChallengeFromVerifier — with method S256.
+//   - challenge == base64url(SHA256(verifier)), cross-checked against
+//     x/oauth2.S256ChallengeFromVerifier, with method S256.
 func Probe004PKCEVerifierRoundTrip(ctx context.Context) (Result, error) { // PROBE-004 (REQ-061)
 	r := Result{Probe: "PROBE-004"}
 	capture, err := runPKCEFlow(ctx, []string{"patient/COMPOSITION.read"}, "")

@@ -15,9 +15,9 @@ import (
 
 // ValidateCase describes one fixture tuple consumed by the
 // composition-validate probes. The probes assert the issue
-// code MULTISET produced by ValidateComposition — not the exact
-// Detail text, not the path strings — so the assertion stays at the
-// observable-behaviour level.
+// code multiset produced by ValidateComposition (not the exact
+// Detail text, not the path strings), so the assertion stays at the
+// level of observable behaviour.
 type ValidateCase struct {
 	// Name labels the case for diagnostic output.
 	Name string
@@ -36,9 +36,9 @@ type ValidateCase struct {
 
 // Probe025CompositionValidate runs each fixture tuple through
 // ValidateComposition and asserts the resulting issue codes match
-// the case's WantCodes multiset — a stable openEHR-conformance
-// assertion: any implementation of REQ-102 with the same OPT +
-// composition shape MUST produce the same multiset.
+// the case's WantCodes multiset. This is a stable openEHR-conformance
+// assertion: any implementation of template-driven validation with the
+// same OPT + composition shape must produce the same multiset.
 func Probe025CompositionValidate(cases []ValidateCase) (Result, error) {
 	r := Result{Probe: "PROBE-025"}
 	if len(cases) == 0 {
@@ -59,8 +59,9 @@ func Probe025CompositionValidate(cases []ValidateCase) (Result, error) {
 	return r, nil
 }
 
-// Probe026MissingNodes is the v2 negative-case probe — same shape
-// as PROBE-025 but the cases focus on structural completion:
+// Probe026MissingNodes implements PROBE-026, the negative-case probe.
+// It has the same shape as [Probe025CompositionValidate], but the cases
+// focus on structural completion:
 // missing required nodes, cardinality violations,
 // alternative_mismatch, RM-type mismatch. Code multiset
 // expectations are stable across conformant implementations.

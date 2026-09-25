@@ -11,19 +11,20 @@ import (
 
 // PathAssertion describes one expected path → node match for
 // PROBE-022. Any combination of WantRMType, WantNodeID, and
-// WantArchetypeID may be set; every non-empty Want* field MUST
+// WantArchetypeID may be set; every non-empty Want* field must
 // match the resolved node. Leaving all Want* fields empty asserts
-// only that the path resolves successfully (or fails — see
+// only that the path resolves successfully (or fails; see
 // ExpectNotFound).
 type PathAssertion struct {
-	// Path is the openEHR path string (REQ-100 § Path syntax subset).
+	// Path is the openEHR path string, in the path-syntax subset that
+	// OperationalTemplate.NodeAt resolves.
 	Path string
 
-	// WantRMType, when non-empty, MUST equal the resolved node's
+	// WantRMType, when non-empty, must equal the resolved node's
 	// RMTypeName().
 	WantRMType string
 
-	// WantNodeID, when non-empty, MUST equal the resolved node's
+	// WantNodeID, when non-empty, must equal the resolved node's
 	// NodeID().
 	WantNodeID string
 
@@ -31,7 +32,7 @@ type PathAssertion struct {
 	// be an *ArchetypeRoot whose ArchetypeID() matches exactly.
 	WantArchetypeID string
 
-	// ExpectNotFound flips the expectation: NodeAt MUST return
+	// ExpectNotFound flips the expectation: NodeAt must return
 	// ErrPathNotFound (wrapped). Used to negatively assert that
 	// unknown attributes or predicates fail cleanly.
 	ExpectNotFound bool
@@ -40,12 +41,12 @@ type PathAssertion struct {
 // Probe022OPTPathResolution implements PROBE-022: parse an OPT body
 // and resolve a fixture-defined list of paths, verifying each one
 // returns the expected node shape (or ErrPathNotFound for negative
-// cases). Sandbox-only — no transport involvement.
+// cases). Sandbox-only, with no transport involvement.
 //
 // The probe is invariant under reformatting that preserves OPT XML
 // semantics; backends or generators that reorder children may
 // change predicate-less first-match outcomes, in which case the
-// assertion list MUST use explicit at-code or archetype-id
+// assertion list must use explicit at-code or archetype-id
 // predicates to disambiguate.
 func Probe022OPTPathResolution(opt []byte, assertions []PathAssertion) (Result, error) {
 	r := Result{Probe: "PROBE-022"}

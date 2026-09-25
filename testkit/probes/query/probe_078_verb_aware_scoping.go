@@ -18,16 +18,16 @@ import (
 const scopeAQL = "SELECT e/ehr_id/value FROM EHR e"
 
 // Probe078VerbAwareScoping implements PROBE-078: an EHR-scoped AQL execution
-// carries the scope on the mechanism the ITS-REST OAS defines for the verb —
-// the `openehr-ehr-id` request header on the POST operations, the `ehr_id`
-// query parameter on the GET operations — and never any other one (REQ-055).
+// carries the scope on the mechanism the ITS-REST OAS defines for the verb
+// (the `openehr-ehr-id` request header on the POST operations, the `ehr_id`
+// query parameter on the GET operations) and never on any other one.
 //
 // A server that only honoured the header would run a POST query that lacked it
 // population-wide, so the probe catches the SDK regression that scoped a POST
 // via the query parameter (or a GET via the header) instead. It drives all
-// three query endpoints — ad-hoc `/query/aql`, stored
+// three query endpoints (ad-hoc `/query/aql`, stored
 // `/query/{qualified_query_name}` and stored-versioned
-// `/query/{qualified_query_name}/{version}` — over both verbs: six calls in
+// `/query/{qualified_query_name}/{version}`) over both verbs: six calls in
 // all, each asserted for the verb-appropriate scope channel and the absence of
 // the others. On a POST that third channel is the request body: the ITS-REST
 // POST schemas declare no `ehr_id` field, so a body carrying one would be an
@@ -35,7 +35,7 @@ const scopeAQL = "SELECT e/ehr_id/value FROM EHR e"
 //
 // captured returns every request the backend has received, in order; the probe
 // reads the newest entry after each call. The caller wires it to a sandbox
-// scripted route, and the recorder MUST buffer each request body: the probe
+// scripted route, and the recorder must buffer each request body: the probe
 // reads Body on the POST arms, while the sandbox closes the live request body
 // once the exchange is served, so a recorder that stored the live request
 // would hand back an unreadable one.

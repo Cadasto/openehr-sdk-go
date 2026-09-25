@@ -8,7 +8,7 @@ import (
 
 // Probe020BuilderStability asserts that the struct-builder and the
 // verb-functions emit byte-identical AQL for the reference query, and that the
-// shared output equals the supplied golden string (REQ-055, PROBE-020).
+// shared output equals the supplied golden string (PROBE-020).
 //
 // The reference query is "all OBSERVATIONs of archetype body_temperature for a
 // given EHR". golden is the checked-in canonical form from

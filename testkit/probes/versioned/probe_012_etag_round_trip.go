@@ -16,8 +16,8 @@ import (
 // returns a fresh version identifier distinct from the input.
 //
 // The probe exercises the [openehrclient.VersionMetadata] round-trip
-// contract — Location-derived VersionUID on read becomes If-Match on
-// the follow-up write without consumer-side string surgery. Closes
+// contract: the Location-derived VersionUID on read becomes If-Match on
+// the follow-up write without consumer-side string surgery. It closes
 // the read-modify-write loop that every leaf client in
 // `openehr/client/ehr/*` is shaped around.
 //

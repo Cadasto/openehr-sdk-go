@@ -14,7 +14,7 @@ import (
 // Probe102SystemCapabilities implements PROBE-102: the System API's single
 // operation is `OPTIONS /` (ITS-REST *Options and Conformance*), and its
 // response decodes into the typed service capabilities with a declared
-// `restapi_specs_version` (REQ-095).
+// `restapi_specs_version`.
 //
 // The verb is the point: a deployment that answered a `GET` here, or the SDK
 // issuing one, would miss the operation the spec defines. The route is the

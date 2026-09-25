@@ -16,7 +16,7 @@ import (
 //
 // The probe runs against a Composition input whose `composer` field
 // carries an intentionally unregistered `_type` so the polymorphic
-// dispatch path is exercised. The Go SDK MUST surface the failure
+// dispatch path is exercised. The Go SDK must surface the failure
 // such that `errors.Is(err, typereg.ErrUnknownType)` is true.
 func Probe031TyperegUnknownType() (Result, error) {
 	r := Result{Probe: "PROBE-031"}

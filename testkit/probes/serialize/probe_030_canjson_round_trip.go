@@ -1,7 +1,7 @@
 // Package serializeprobes hosts the openEHR conformance probes
-// for the openEHR serialization codecs. Each probe corresponds to a
-// PROBE-NNN entry in docs/specifications/conformance.md and is implemented in both
-// any openEHR-conformant implementation against shared cassettes (REQ-080).
+// for the openEHR serialization codecs. Each probe implements one
+// numbered conformance probe (PROBE-NNN) that any openEHR-conformant
+// implementation can run against the same shared cassettes.
 //
 // Probes are plain Go functions returning (Result, error) and are
 // designed to be invocable from:
@@ -28,30 +28,30 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
-// Result is the shared probe outcome (REQ-082).
+// Result is the shared probe outcome, an alias of [probe.Result].
 type Result = probe.Result
 
-// Probe030CanjsonRoundTrip implements PROBE-030 (REQ-052): a
+// Probe030CanjsonRoundTrip implements PROBE-030: a
 // canonical-JSON RM value survives the SDK round trip with its meaning
 // intact. It decodes `body`, encodes it (`b1`), decodes that (`A`),
 // encodes again (`b2`), then decodes that (`B`).
 //
-// A and B MUST be equal by typed deep comparison (reflect.DeepEqual over
+// A and B must be equal by typed deep comparison (reflect.DeepEqual over
 // the decoded RM values, which compares an interface-typed field by its
 // dynamic type and value and so covers every substitutable slot and
-// every DV_INTERVAL[T] bound). B MUST satisfy validation.ValidateRM
-// (REQ-112) with no issues. As a secondary check, b1 and b2 MUST be
+// every DV_INTERVAL[T] bound). B must satisfy validation.ValidateRM
+// with no issues. As a secondary check, b1 and b2 must be
 // wire-equivalent (testkit/wireequiv): equal once each is parsed into a
 // generic JSON value, with member order ignored and array order kept.
 //
 // The comparison straddles the second encode, not the first. The first
-// encode may legitimately collapse a container (DV_TEXT.mappings under
-// omitempty, wire.md REQ-052), so A and B are read either side of the
+// encode may legitimately collapse a container (an empty DV_TEXT.mappings
+// is omitted), so A and B are read either side of the
 // re-encode instead. The input is never compared byte-wise: JSON member
 // order carries no meaning (RFC 8259 section 4) and the encoder makes no
 // byte-level promise.
 //
-// `body` MUST be canonical-JSON bytes for a known concrete RM type.
+// `body` must be canonical-JSON bytes for a known concrete RM type.
 // `factory` returns a fresh pointer to the target Go type, called three
 // times so the probe owns each value's lifecycle.
 //
@@ -152,12 +152,9 @@ func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]by
 // Probe030Inputs is the set of inputs exercised by PROBE-030 in sandbox
 // mode. Each input survives the round trip with its meaning intact
 // (typed deep comparison of A and B, plus wire equivalence, and the RM
-// floor unless the input sets SkipFloor) when fed the vendored cassettes
-// (REQ-080, REQ-112). The set spans leaf RM values and full composition
-// cassettes vendored under `testkit/cassettes/compositions/` and
-// `testkit/cassettes/rm/`. The Event/History polymorphism that initially
-// blocked composition round-trip is resolved in ADR 0003
-// (docs/adr/0003-rm-event-polymorphism.md).
+// floor unless the input sets SkipFloor) when fed the vendored cassettes.
+// The set spans leaf RM values and full composition cassettes vendored
+// under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/`.
 //
 // Every discovered cassette stays in the set so the fidelity legs run on
 // all of them; an input carrying an RM-floor finding independent of the

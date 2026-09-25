@@ -29,7 +29,7 @@ import (
 // its own — this is belt and braces, and a breach is reported, not ignored).
 const maxRefusals = 400
 
-// Target is the compiled corpus template plus its Web Template — built once
+// Target is the compiled corpus template plus its Web Template, built once
 // and shared by every case, since the whole corpus instantiates one OPT.
 type Target struct {
 	Compiled *templatecompile.Compiled
@@ -88,12 +88,12 @@ type Report struct {
 	// Compared is how many upstream keys survived into the comparison.
 	Compared int
 
-	// Missing are surviving upstream keys the re-encode did not produce — a
+	// Missing are surviving upstream keys the re-encode did not produce: a
 	// leaf this SDK decoded and then dropped. Failure, not skip: there is no
 	// tolerated-drop bucket, deliberately (see case.go).
 	Missing []string
 	// Extra are keys the re-encode produced that upstream does not have,
-	// composition metadata aside (see [IsCompositionMeta]) — a path this SDK
+	// composition metadata aside (see [IsCompositionMeta]): a path this SDK
 	// spells differently. Failure, not skip.
 	Extra []string
 	// Mismatched are keys present on both sides with differing values,
@@ -108,7 +108,7 @@ func (r Report) Clean() bool {
 
 // Run round-trips one case against the target and returns its report. It
 // returns an error only for a harness fault (unreadable or malformed
-// fixture, a decode that cannot be reduced, a re-encode failure) — codec
+// fixture, a decode that cannot be reduced, a re-encode failure). Codec
 // gaps are data in the Report, not errors.
 func Run(t *Target, c Case) (Report, error) {
 	if t == nil {

@@ -43,7 +43,7 @@ const (
 // Probe091PathSegmentValidation implements PROBE-091: a path parameter
 // that is `.` or `..`, is empty, or carries `/`, `\`, or a control
 // character is refused before any HTTP request is issued, on every
-// path-interpolating leaf package (REQ-150).
+// path-interpolating leaf package.
 //
 // Driven calls, at least one per `openehr/client` package that builds
 // its own transport.Request:
@@ -63,25 +63,27 @@ const (
 // Not driven, deliberately: `itemtags` builds no transport.Request of its
 // own (it delegates wholly to composition / ehrstatus / directory, so
 // probing it re-probes three leaves already here), and `system`'s only
-// path is the fixed service root — which this probe covers as the
-// POSITIVE case below rather than as an interpolation site, since REQ-150
-// requires `OPTIONS /` to keep working.
+// path is the fixed service root, which this probe covers as the
+// positive case below instead of as an interpolation site, since
+// `OPTIONS /` must keep working.
 //
 // Each leaf is driven with all four hostile ids. Two change the path's
-// segment count and two preserve it, so the probe exercises BOTH halves of
-// REQ-150 independently — an arity-only implementation fails the dot-dot
-// and control-character legs, and a segment-only implementation fails the
-// smuggled-separator leg. Per REQ-080 the assertion is
-// fail-closed behaviour only — a non-nil error and zero captured requests.
+// segment count and two preserve it, so the probe exercises both halves of
+// the rule (segment count and segment content) independently: an
+// arity-only implementation fails the dot-dot and control-character legs,
+// and a segment-only implementation fails the smuggled-separator leg. The
+// assertion is fail-closed behaviour only: a non-nil error and zero
+// captured requests.
 // Sentinel identity (ErrInvalidPathSegment / ErrInvalidConfig) is pinned
 // by transport/path_test.go and the leaf unit tests, never here.
 //
 // Inputs:
-//   - captured returns the ESCAPED path of every request the backend has
+//   - captured returns the escaped path of every request the backend has
 //     received so far, in order. The caller wires it up (a `sandbox.Backend`
 //     scripted route in Sandbox mode). The probe reads length deltas to count
-//     requests and inspects the last entry to check encode-once (REQ-095),
-//     so it MUST NOT be reset between legs.
+//     requests and inspects the last entry to check that the path is
+//     percent-encoded exactly once (a space arrives as %20, never %2520),
+//     so it must not be reset between legs.
 func Probe091PathSegmentValidation(ctx context.Context, c *transport.Client, captured func() []string) (Result, error) {
 	r := Result{Probe: "PROBE-091"}
 	if c == nil {

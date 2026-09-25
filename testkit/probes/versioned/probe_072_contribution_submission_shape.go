@@ -12,14 +12,13 @@ import (
 )
 
 // Probe072ContributionSubmissionShape implements PROBE-072: a
-// Contribution submission body MUST be the ITS-REST `Contribution_create`
-// schema — `versions[i]` is an inline `ORIGINAL_VERSION<T>` (or
-// `IMPORTED_VERSION<T>`) with the payload under `data`, NOT the
+// Contribution submission body must be the ITS-REST `Contribution_create`
+// schema: `versions[i]` is an inline `ORIGINAL_VERSION<T>` (or
+// `IMPORTED_VERSION<T>`) with the payload under `data`, never the
 // persisted `rm.Contribution` shape where `versions[]` is `[]OBJECT_REF`.
 //
-// Pins REQ-050/095. The persisted shape carries OBJECT_REFs pointing
-// at versions that do not yet exist at submission time, so a spec-
-// conformant CDR rejects it. The probe inspects the captured request
+// The persisted shape carries OBJECT_REFs pointing at versions that do
+// not yet exist at submission time, so a spec-conformant CDR rejects it. The probe inspects the captured request
 // body (Sandbox mode; the caller supplies a transport.Client wired to
 // a `sandbox.Backend` scripted route) and asserts:
 //
@@ -28,15 +27,15 @@ import (
 //   - `versions[i]._type` ≠ "OBJECT_REF" (the regression)
 //   - the batch `audit` and each `versions[i].commit_audit` carry no
 //     server-assigned `time_committed` and a `DV_CODED_TEXT`-shaped
-//     `change_type` (SPECITS-95 / ITS-REST PR 131) — see [auditWriteShapeIssue]
+//     `change_type` (SPECITS-95 / ITS-REST PR 131); see [auditWriteShapeIssue]
 //
-// Symmetric to [Probe071CompositionWriteResponseShape] — both pin
+// It is symmetric to [Probe071CompositionWriteResponseShape]: both pin
 // request/response shape asymmetries that the persisted RM shape would
 // otherwise leak onto the wire.
 //
 // The caller supplies a non-nil Submission; the probe uses
 // `Prefer: return=minimal` (the default) so the server's response shape
-// is not part of this assertion — it's purely a request-body check.
+// is not part of this assertion. It is purely a request-body check.
 func Probe072ContributionSubmissionShape(ctx context.Context, c *transport.Client, capturedBody *[]byte, ehrID openehrclient.EHRID, sub *contribution.Submission) (Result, error) {
 	r := Result{Probe: "PROBE-072"}
 	if c == nil || ehrID == "" || sub == nil || capturedBody == nil {

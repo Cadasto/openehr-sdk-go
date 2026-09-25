@@ -25,7 +25,7 @@ import (
 //
 // The probe issues [composition.Update] with the stale If-Match and
 // asserts the returned error is wireable as either
-// [transport.ErrPreconditionFailed] OR [transport.ErrVersionConflict].
+// [transport.ErrPreconditionFailed] or [transport.ErrVersionConflict].
 func Probe011PutStaleIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, staleIfMatch string, comp *rm.Composition) (Result, error) {
 	r := Result{Probe: "PROBE-011"}
 	if c == nil || ehrID == "" || voID == "" || staleIfMatch == "" || comp == nil {

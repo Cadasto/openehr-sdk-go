@@ -15,8 +15,8 @@ import (
 
 // Probe103AdminBulkDelete implements PROBE-103: the Admin bulk-delete surface is
 // `DELETE /admin/ehr/all`, and a subset delete restricts to the named EHRs via
-// the repeatable `ehr_id` query parameter — not a request body and not a path
-// segment per id (REQ-099).
+// the repeatable `ehr_id` query parameter, never a request body or a path
+// segment per id.
 //
 // captured returns the requests the backend received; the probe reads the
 // newest to confirm the verb, the exact `/admin/ehr/all` path, the absence of
