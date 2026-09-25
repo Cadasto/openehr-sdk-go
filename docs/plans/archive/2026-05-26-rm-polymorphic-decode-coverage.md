@@ -28,7 +28,7 @@ canjson: COMPOSITION: decode /other_context: ... decode /items/0: typereg.Decode
 
 The error trace points at the **`name`** field of an `ELEMENT` / `CLUSTER`, not its `value`. Per the BMM ([`openehr_rm_1.2.0.bmm.json`](../../../resources/bmm/)), `LOCATABLE.name: DV_TEXT`. Per the openEHR RM spec, `DV_TEXT` admits Liskov substitution by any subtype; today the only direct subtype is `DV_CODED_TEXT` (concrete).
 
-`ELEMENT.value` itself is already correctly typed as `DataValue` (abstract) and routed through `typereg.DecodeAs[DataValue]` in [`openehr/rm/data_structures_representation_jsonunmar_gen.go:129`](../../../openehr/rm/data_structures_representation_jsonunmar_gen.go#L129) — the inbound gap report's surface read was off; the actual gap is on every `LOCATABLE`-descended class's `name` (and on any other concrete-typed slot that admits substitution per BMM ancestry).
+`ELEMENT.value` itself is already correctly typed as `DataValue` (abstract) and routed through `typereg.DecodeAs[DataValue]` in [`openehr/rm/data_structures_representation_jsonunmar_gen.go:129`](../../../openehr/rm/data_structures_representation_jsonunmar_gen.go#L129) — the first surface read of the gap was off; the actual gap is on every `LOCATABLE`-descended class's `name` (and on any other concrete-typed slot that admits substitution per BMM ancestry).
 
 The root cause is the **strict class-equality check** every generated `UnmarshalJSON` emits today (e.g. [`data_types_text_jsonunmar_gen.go:159`](../../../openehr/rm/data_types_text_jsonunmar_gen.go#L159)):
 
@@ -38,7 +38,7 @@ if aux.Class != "" && aux.Class != "DV_TEXT" {
 }
 ```
 
-Even if the check were softened to "DV_TEXT or any subtype", decoding `DV_CODED_TEXT` bytes into a `DVText` *struct* still loses `defining_code` — and the cdr-bench round-trip (decode → re-marshal → POST) needs to be lossless. **Data loss isn't acceptable** because `composition.Save` re-marshals the typed value before sending; subtype-only fields dropped on decode would silently disappear from the wire body.
+Even if the check were softened to "DV_TEXT or any subtype", decoding `DV_CODED_TEXT` bytes into a `DVText` *struct* still loses `defining_code` — and a benchmark round-trip (decode → re-marshal → POST) needs to be lossless. **Data loss isn't acceptable** because `composition.Save` re-marshals the typed value before sending; subtype-only fields dropped on decode would silently disappear from the wire body.
 
 ### Issue B — Generic over an abstract type parameter
 
@@ -130,7 +130,7 @@ A narrow interface (e.g. `DVTextLike` = `DV_TEXT | DV_CODED_TEXT`) constrains th
 
 ### Phase 4 — Archive plan + close GAP
 
-**Outcome:** Plan moved to `docs/plans/archive/`; CHANGELOG entry; roadmap row updated; consumer's pre-flight workaround can be dropped.
+**Outcome:** Plan moved to `docs/plans/archive/`; CHANGELOG entry; roadmap row updated; callers' pre-flight workarounds can be dropped.
 
 **Tasks:**
 
@@ -140,7 +140,7 @@ A narrow interface (e.g. `DVTextLike` = `DV_TEXT | DV_CODED_TEXT`) constrains th
 
 ## Cross-references
 
-- **REQ-052/040 / PROBE-038** — this decode-side polymorphism gap; consumer report kept private (concept only — naming and source consumer kept anonymous in this plan).
+- **REQ-052/040 / PROBE-038** — this decode-side polymorphism gap.
 - **REQ-094 (+052) / PROBE-061/071** — response-side bare-decode contract (closed in PR #17).
 - **REQ-050/095 / PROBE-072** — request-side `contribution.Commit` shape (closed in PR #22).
 - [`internal/bmmgen/render_jsonunmar.go`](../../../internal/bmmgen/render_jsonunmar.go) — current generator for JSON unmarshallers; `polymorphicProperty` is the entry point.

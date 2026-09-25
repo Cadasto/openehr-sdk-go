@@ -10,7 +10,7 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 | Plan | Scope | Covers | Notes |
 |---|---|---|---|
-| [2026-09-24-rm-floor-archetype-roots.md](2026-09-24-rm-floor-archetype-roots.md) | The template-less floor reports `is_archetype_root` for a COMPOSITION / EHR_STATUS / EHR_ACCESS / PARTY / ENTRY without `archetype_details`, and `required` / `rm_version_valid` for an incomplete `ARCHETYPED` on any LOCATABLE | REQ-112 (no new id; `partial` until landed) | Spec-first; reported by the consuming CDR project |
+| [2026-09-24-rm-floor-archetype-roots.md](2026-09-24-rm-floor-archetype-roots.md) | The template-less floor reports `is_archetype_root` for a COMPOSITION / EHR_STATUS / EHR_ACCESS / PARTY / ENTRY without `archetype_details`, and `required` / `rm_version_valid` for an incomplete `ARCHETYPED` on any LOCATABLE | REQ-112 (no new id; `partial` until landed) | Spec-first |
 
 ### Go 1.27 floor (2026-09-03)
 
@@ -24,7 +24,7 @@ Five plans from a consumer→SDK gap survey plus the review-round follow-ups tha
 
 | Plan | Scope | Covers | Notes |
 |---|---|---|---|
-| [archive/2026-09-01-rm-canonical-json-fidelity.md](archive/2026-09-01-rm-canonical-json-fidelity.md) | **Landed 2026-09-03 and archived**: `TERM_MAPPING.match` is a canonical single-character `Character` named primitive, `DV_TEXT.mappings`'s re-encode collapse is documented and pinned (decode preserves `[]` versus `null`/absent), the RM floor enforces `match`'s value set and `Mappings_valid`, a `DV_MULTIMEDIA` base64 round-trip is pinned, and `Real` now refuses a literal past the 17-significant-digit budget instead of rounding silently | REQ-046 / 052 / 112 (no new id; REQ-052 `partial` at landing, `landed` since 2026-09-03) | Reported by the consuming CDR project |
+| [archive/2026-09-01-rm-canonical-json-fidelity.md](archive/2026-09-01-rm-canonical-json-fidelity.md) | **Landed 2026-09-03 and archived**: `TERM_MAPPING.match` is a canonical single-character `Character` named primitive, `DV_TEXT.mappings`'s re-encode collapse is documented and pinned (decode preserves `[]` versus `null`/absent), the RM floor enforces `match`'s value set and `Mappings_valid`, a `DV_MULTIMEDIA` base64 round-trip is pinned, and `Real` now refuses a literal past the 17-significant-digit budget instead of rounding silently | REQ-046 / 052 / 112 (no new id; REQ-052 `partial` at landing, `landed` since 2026-09-03) | — |
 | [2026-09-01-rm-function-deferred-stubs.md](2026-09-01-rm-function-deferred-stubs.md) | Realise the two `rm-functions` panic-stub clusters — `DV_AMOUNT` arithmetic, and reference accessors + inverse navigation | proposed REQ-124 / 125 | **Parked** behind a YAGNI/DoR gate — no consumer need yet; `parent`/`path_of_item` needs an ADR |
 | [archive/2026-09-02-decode-error-surface-typing.md](archive/2026-09-02-decode-error-surface-typing.md) | **Landed 2026-09-02 and archived**: the decode-only `canjson.ErrInvalidShape` gained a producer — every generated RM/AOM `UnmarshalJSON` now classifies its JSON-shape failures with it, text and cause unchanged — and `transport`'s error strings stop falling back to `Request.Path`, rendering the stable `(unrouted)` placeholder when the caller set no route template | REQ-052 (`partial` then, `landed` since 2026-09-03) / REQ-093 (no new id) | The Extras re-encode candidate was verified already fixed and dropped |
 
@@ -71,8 +71,7 @@ deployment evidence rather than pre-emption.
 
 ### AQL alignment audit follow-ups (2026-08-26)
 
-Four plans from the 2026-08-26 AQL alignment audit (maintainer's knowledge base, ecosystem
-fit-gap report Part 2, findings AQL-FIT-01..10), one per audit group. Each plan authors its
+Four plans from the 2026-08-26 AQL alignment audit, one per audit group. Each plan authors its
 spec deltas in a Phase 0 (via `sdd-specify`) before implementation; the two new requirement ids
 continue the AQL semantics band (160–169). The plans are mutually independent; the corpus plan
 noted a soft sequencing preference (land it before further relation extensions). All four have
@@ -119,9 +118,9 @@ Phase 0 (the REQ-082 normative prose — mode selection, the probe result contra
 
 All three plans in this group **landed 2026-08-19 and were archived**. The two AQL plans ([archive/2026-08-18-aql-structured-node-predicates.md](archive/2026-08-18-aql-structured-node-predicates.md), [archive/2026-08-18-aql-value-free-diagnostics.md](archive/2026-08-18-aql-value-free-diagnostics.md)) allocated no new requirement ids: each extended the landed requirement that already owned its surface ([REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast), [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint)), and PROBE-095 / PROBE-096 are implemented inline. The grounding story — four plan errors caught by checking the vendored grammar and the extractor before writing code, a fifth caught by a test, and the review round that closed the operand-level gap — is recorded in the archived plans and the [archive README](archive/README.md). The `rminfo` class-hierarchy plan landed as **REQ-048** (PROBE-094, STRAND-12/13) and is [archived](archive/2026-08-18-rminfo-class-hierarchy.md).
 
-### Ecosystem fit-gap delivery (2026-07-16)
+### Peer-SDK comparison delivery (2026-07-16)
 
-Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ spec prose (Phase 0, via `sdd-specify`) before implementation starts. The proposed REQ IDs follow the [numbering policy](../specifications/REQ.md#numbering-policy) topic bands — the two authoring validators land in the clinical-modeling headroom (110–119) next to REQ-109/110; the contribution builder opened the "SDK authoring & client tooling" band (130–139) because the wire band (050–059) is exhausted.
+Prioritised from a comparison with peer openEHR SDKs. Each plan authors its REQ spec prose (Phase 0, via `sdd-specify`) before implementation starts. The proposed REQ IDs follow the [numbering policy](../specifications/REQ.md#numbering-policy) topic bands — the two authoring validators land in the clinical-modeling headroom (110–119) next to REQ-109/110; the contribution builder opened the "SDK authoring & client tooling" band (130–139) because the wire band (050–059) is exhausted.
 
 | Plan | Scope | Covers (proposed) | Probe |
 |---|---|---|---|

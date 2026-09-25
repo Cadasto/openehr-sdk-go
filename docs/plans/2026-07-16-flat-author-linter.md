@@ -14,7 +14,7 @@
 
 Ship a **building-block** FLAT composition linter that validates a raw FLAT map (JSON object or `path|suffix: value` lines) against a Web Template **before** decode or CDR submission. Consumers: integrators hand-authoring FLAT, CI pipelines, format-data tooling, and the synthetic seeder when emitting FLAT directly.
 
-It mirrors the lint/issue model already landed for AQL (REQ-109) and complements landed `UnmarshalFlat` + `ValidateComposition` (the post-RM path) without replacing them. Motivation: the FLAT-validator gap identified in the peer-SDK ecosystem fit-gap review.
+It mirrors the lint/issue model already landed for AQL (REQ-109) and complements landed `UnmarshalFlat` + `ValidateComposition` (the post-RM path) without replacing them. Motivation: peer openEHR SDKs ship a FLAT validator and this SDK did not.
 
 ## Architecture
 
@@ -143,6 +143,6 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ rather
 
 ## References
 
-- A peer Python openEHR SDK's FLAT validator (path checker + required-field checks) — the pattern this adapts; see the peer-SDK ecosystem fit-gap review for the P-priority.
+- A peer Python openEHR SDK's FLAT validator (path checker + required-field checks) — the pattern this adapts.
 - Cadasto: `openehr/serialize/simplified/`, `cmd/examples/flat-roundtrip/`, REQ-109 AQL lint (issue model).
 - EHRbase corpus: `testkit/cassettes/compositions/`, the PROBE-076 fixtures.

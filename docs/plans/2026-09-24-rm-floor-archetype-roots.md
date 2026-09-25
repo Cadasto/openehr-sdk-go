@@ -24,9 +24,7 @@ v0.27.0, every one of these passes `ValidateRMEHRStatusBytes` clean:
 | `rm_version` `""` | OK |
 
 The RM forbids all five (`Is_archetype_root` + `LOCATABLE.Archetyped_valid`; `ARCHETYPED` 1..1 attributes and
-`Rm_version_valid`). They are invariants of the object itself, so the floor is the right layer. Reported by the
-consuming CDR project, which carries a local check with the same codes and paths meanwhile and deletes it when this
-lands.
+`Rm_version_valid`). They are invariants of the object itself, so the floor is the right layer.
 
 ## Definition of Ready
 

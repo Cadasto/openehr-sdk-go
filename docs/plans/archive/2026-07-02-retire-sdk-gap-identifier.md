@@ -13,7 +13,7 @@
 
 ## Goal
 
-Remove `SDK-GAP-NN` as a live identifier from the entire mutable tree (docs, `CHANGELOG.md`, and code), after first **promoting the three content-carrying gaps** (16, 14, 07) into the normative REQ layer so nothing is lost. Git history is never rewritten; ADR 0012's crosswalk is the permanent decoder. Delivered as two PRs on branch `chore/retire-sdk-gap-identifier` in worktree `/src/cadasto/openehr-sdk-go-retire-gap`.
+Remove `SDK-GAP-NN` as a live identifier from the entire mutable tree (docs, `CHANGELOG.md`, and code), after first **promoting the three content-carrying gaps** (16, 14, 07) into the normative REQ layer so nothing is lost. Git history is never rewritten; ADR 0012's crosswalk is the permanent decoder. Delivered as two PRs on branch `chore/retire-sdk-gap-identifier` in worktree `<worktree>`.
 
 ## Architecture
 
@@ -21,7 +21,7 @@ Two PRs. **PR1** (small, judgment-heavy) promotes the three durable facts into `
 
 ## Global Constraints
 
-- **Worktree only.** All edits happen in `/src/cadasto/openehr-sdk-go-retire-gap` on `chore/retire-sdk-gap-identifier`. Never touch the shared tree at `/src/cadasto/openehr-sdk-go`.
+- **Worktree only.** All edits happen in `<worktree>` on `chore/retire-sdk-gap-identifier`. Never touch the main checkout.
 - **Never rewrite git history.** Commit messages retain their tokens by design.
 - **Authoritative mapping.** Every GAP→REQ/PROBE replacement uses the crosswalk table in [ADR 0012](../../adr/0012-retire-sdk-gap-identifier.md#crosswalk--sdk-gap-nn--req--probe-permanent-decoder). Do not invent mappings.
 - **Replace, don't delete, in code.** A stripped `(SDK-GAP-NN)` in a code comment becomes its governing `(REQ-NNN)` / `(PROBE-NNN)` — traceability is preserved.
@@ -88,7 +88,7 @@ Two PRs. **PR1** (small, judgment-heavy) promotes the three durable facts into `
 
 - [ ] **Step 4: Verify**
 
-Run: `cd /src/cadasto/openehr-sdk-go-retire-gap && make spec-check`
+Run: `cd <worktree> && make spec-check`
 Expected: PASS (no new orphan REQ/PROBE; REQ-055/057 still resolve).
 
 - [ ] **Step 5: Commit**
@@ -232,7 +232,7 @@ Open PR1 (`gh pr create`) titled `docs: retire SDK-GAP — promote gap-16/14/07 
 - [ ] **Step 1: git mv all six.**
 
 ```bash
-cd /src/cadasto/openehr-sdk-go-retire-gap/docs/plans/archive
+cd <worktree>/docs/plans/archive
 git mv 2026-06-19-sdk-gap-12-newskeleton.md 2026-06-19-realworld-opt-synthesis.md
 git mv 2026-06-23-sdk-gap-13-polymorphic-encode-decode.md 2026-06-23-polymorphic-encode-decode.md
 git mv 2026-06-23-sdk-gap-14-seeded-synthetic-generation.md 2026-06-23-seeded-synthetic-generation.md
@@ -243,7 +243,7 @@ git mv 2026-06-29-sdk-gap-17-aql-execution-ast.md 2026-06-29-aql-execution-ast.m
 
 - [ ] **Step 2: Find every inbound link to the old names.**
 
-Run: `cd /src/cadasto/openehr-sdk-go-retire-gap && grep -rIn 'sdk-gap-1[234567]' docs/ --include='*.md' --include='*.yaml'`
+Run: `cd <worktree> && grep -rIn 'sdk-gap-1[234567]' docs/ --include='*.md' --include='*.yaml'`
 This lists the ~15 links in `docs/roadmap.md`, `docs/specifications/traceability.yaml`, `docs/plans/README.md`, `docs/plans/archive/README.md`, and any spec cross-links. Update each path to its new name (drop the `sdk-gap-NN-` infix per the map above).
 
 - [ ] **Step 3: Strip GAP tokens from ALL archived plan bodies** (`docs/plans/archive/*.md`) — not only the six renamed ones. The non-gap-named archived plans also cite SDK-GAP in prose: `2026-05-26-rm-polymorphic-decode-coverage.md`, `2026-05-26-contribution-submission-shape.md`, `2026-05-25-req094-prefer-followups.md`, `2026-05-27-rm-like-interface-ergonomics.md`, `2026-05-15-rest-api-client.md`, `2026-06-11-contribution-update-audit-dv-coded-text.md` (and the archived-plan `README.md`). Replace each token with its governing REQ/PROBE per the ADR crosswalk. For the renamed six, that includes the title line (`# Plan — SDK-GAP-NN: …` → `# Plan — REQ-NNN: …`; `Covers:` already carries the REQ). Read each body in context so narrative sentences stay grammatical (e.g. "SDK-GAP-16 finding A" → "the verb-aware-scoping fix (REQ-055)"). These are frozen delivery records: change only the identifier tokens, not the substance.
@@ -285,7 +285,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - [ ] **Step 2: Rename identifiers.** For each identifier above run a scoped replace and confirm no stragglers, e.g.:
 
 ```bash
-cd /src/cadasto/openehr-sdk-go-retire-gap
+cd <worktree>
 grep -rln 'compileGAP12Fixture' --include='*.go' | xargs sed -i 's/compileGAP12Fixture/compileRealWorldFixture/g'
 grep -rln 'gap14CounterUID'      --include='*.go' | xargs sed -i 's/gap14CounterUID/counterUID/g'
 # …repeat per identifier; then verify none remain:
@@ -409,7 +409,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - [ ] **Step 1: The one grep that must come back clean** (only the retirement-describing residual survives):
 
 ```bash
-cd /src/cadasto/openehr-sdk-go-retire-gap
+cd <worktree>
 grep -rInE 'SDK-GAP|sdk-gap|GAP[0-9]|gap[0-9]' . \
   --include='*.go' --include='*.md' --include='*.yaml' --include='*.yml' \
   | grep -vE '/\.git/'

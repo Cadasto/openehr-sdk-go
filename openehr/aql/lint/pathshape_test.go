@@ -55,7 +55,7 @@ const (
 	aliasCode  = "aql_select_no_alias"
 )
 
-// auditQuery is the AQL-FIT-04 audit's verified-silent projection: an
+// auditQuery is the audit's verified-silent projection: an
 // unpredicated repeating-segment path over an OBSERVATION alias, which the
 // shipped v0.22.0 linter answered clean (REQ-164 § Acceptance).
 const auditQuery = "SELECT o/data/events/data/items/value/magnitude " +

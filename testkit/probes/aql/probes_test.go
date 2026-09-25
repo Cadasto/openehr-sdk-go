@@ -1006,7 +1006,7 @@ func TestProbe097RequiresEveryCorpusArm(t *testing.T) {
 // Arm (a): each of the five REQ-164 codes fires on a corpus query built to carry
 // exactly that defect, with Warning severity and a span on the offending
 // construct — and stays silent on a near miss. The three firing rows the wire
-// assertion names are claimed by name (the AQL-FIT-04 audit's two
+// assertion names are claimed by name (the audit's two
 // verified-silent queries, which MUST now warn, and the WHERE-only clause-scope
 // witness), as are the fifteen negatives it names.
 //

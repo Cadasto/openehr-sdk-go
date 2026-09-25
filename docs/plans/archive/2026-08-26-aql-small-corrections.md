@@ -11,13 +11,12 @@
 
 ## Goal
 
-Close audit findings **AQL-FIT-06, -07, -08, -10** (AQL alignment audit, 2026-08-26 —
-maintainer's knowledge base, fit-gap report Part 2). Four small, unrelated defects, grouped only
+Close four findings of the AQL alignment audit (2026-08-26). Four small, unrelated defects, grouped only
 because each is too small to carry a plan alone: a missing error sentinel, two wrong sentences in
 the normative spec plus an unguarded routing collision, a Build/Lint asymmetry on a rule the SDK
 already enforces on one side, and a documented caveat sitting where `go doc` cannot show it.
 
-## Phase 1 — The 501 capability sentinel (AQL-FIT-06)
+## Phase 1 — The 501 capability sentinel
 
 **The ruling this implements (maintainer, 2026-08-26).** The SDK follows the spec-correct
 status contract, not any particular engine's: **501 means a capability gap** — the query is
@@ -55,7 +54,7 @@ with no typed handle.
 **Definition of done:** `errors.Is(err, aql.ErrEngineCapability)` distinguishes a capability gap
 from bad AQL in the executor's public contract; `make ci` green.
 
-## Phase 2 — Stored-query prose and the reserved name (AQL-FIT-07)
+## Phase 2 — Stored-query prose and the reserved name
 
 **Today:** the **code is right** ([`execute.go`](../../../openehr/client/query/execute.go) posts
 ad-hoc to `/query/aql`, builds `"/query/" + name [+ "/" + version]` for stored, routes
@@ -94,7 +93,7 @@ routing rule the SDK itself creates by concatenation.
 **Definition of done:** the normative document agrees with its own vendored contract and its own
 code; the guard is pinned; `make spec-check` and `make ci` green.
 
-## Phase 3 — `TOP` versus the envelope `fetch`, on the read side (AQL-FIT-08)
+## Phase 3 — `TOP` versus the envelope `fetch`, on the read side
 
 **Today:** `Builder.Build()` refuses `Top(n)` with the in-text `LIMIT` **and** with the envelope
 row limit, with distinct errors — exactly right. The linter flags only the in-text pairing
@@ -121,7 +120,7 @@ meets a modern caller's `fetch`.
 
 **Definition of done:** Build and Lint agree on the `TOP`+`LIMIT` and `TOP`+`fetch` pairings; the envelope-`Offset` arm `Build()` refuses stays undiagnosed by design — the OAS states no exclusion for `offset`; `make ci` green.
 
-## Phase 4 — The `PredicateComparison` caveat moves to where callers read (AQL-FIT-10)
+## Phase 4 — The `PredicateComparison` caveat moves to where callers read
 
 **Today:** `parse.ClassExpr.PredicateComparison` is populated on the Tier-2 structured AST and
 left nil on the flat lint view (`parse.Parse` → `Document.Classes`) for the same source — a

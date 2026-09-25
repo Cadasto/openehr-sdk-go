@@ -12,7 +12,7 @@
 
 ## Goal
 
-Provide a **fluent builder** that assembles a spec-conformant `Contribution_create` body (`contribution.Submission`) without hand-wiring `ORIGINAL_VERSION` wrappers, change-type codes, and write-side audit fields. Named explicitly in [use-cases.md](../../specifications/use-cases.md) as SDK-provided for the synthetic data seeder; closes an ergonomics gap flagged (against peer openEHR SDKs) in the peer-SDK ecosystem fit-gap review.
+Provide a **fluent builder** that assembles a spec-conformant `Contribution_create` body (`contribution.Submission`) without hand-wiring `ORIGINAL_VERSION` wrappers, change-type codes, and write-side audit fields. Named explicitly in [use-cases.md](../../specifications/use-cases.md) as SDK-provided for the synthetic data seeder; closes an ergonomics gap against peer openEHR SDKs.
 
 ## Architecture
 
@@ -174,5 +174,5 @@ func (b *Builder) Add(changes ...Change) *Builder
 
 ## References
 
-- Peer openEHR SDKs' contribution builders (a Python peer SDK; the EHRbase Java SDK `ContributionBuilder`) — the pattern this adapts; see the peer-SDK ecosystem fit-gap review.
+- Peer openEHR SDKs' contribution builders (a Python peer SDK; the EHRbase Java SDK `ContributionBuilder`) — the pattern this adapts.
 - Existing: `submission.go`, `version.go`, `contribution.go`.

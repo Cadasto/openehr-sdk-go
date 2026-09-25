@@ -8,7 +8,7 @@
 **Implementation:** landed — both tiers (Tier-1 `Document.Tree()` interim accessor + Tier-2 `parse.Query` structured AST) shipped in PR #58; out-of-catalogue shapes surface as `aql.ErrIncompleteAST` per review feedback.
 **Depends on:** REQ-109 parse infrastructure landed (`openehr/aql/parse/parse.go`, `parse/gen/`); REQ-055 Builder + `WhereExpr`/`Value` landed (`openehr/aql/`).
 **Defers:** execution / planning semantics (the consumer's job); archetype/template path resolution against an OPT; semantic validation beyond the grammar (PROBE-021 already disclaims this).
-**Source (inbound):** a consuming CDR project — filed against v0.11.0 by a consumer building an AQL execution engine that today recurses the SDK's generated `parse/gen` ANTLR tree behind a single isolated seam; the request was a stable, generated-type-free read AST that mirrors the existing write-side Builder.
+**Source:** as of v0.11.0, an AQL execution engine built on the SDK recurses the SDK's generated `parse/gen` ANTLR tree behind a single isolated seam; the request was a stable, generated-type-free read AST that mirrors the existing write-side Builder.
 
 ## Goal
 

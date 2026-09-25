@@ -9,11 +9,11 @@
 **Probes:** **PROBE-086** (upstream FLAT serialisation parity) — **Implemented (Sandbox)** 2026-08-01: harness Phase 1, wiring Phase 2
 **Implementation:** landed — Phases 0–3 done. REQ-080 itself stays `partial`: this plan delivers one Sandbox slice of wire conformance, not ratification.
 **Depends on:** landed FLAT/STRUCTURED codecs (REQ-053), Web Template export (REQ-106), PROBE-075 structural parity. **Blocked by:** ~~the sibling web-`id` derivation gap~~ — **cleared 2026-07-31** by [REQ-116](../../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) ([its plan](2026-07-29-template-node-naming.md), landed). `webtemplate.Build(conformance-ehrbase.de.v0)` now succeeds: its two ACTION ELEMENTs that both sanitise to `dv_text` take the reference's ordinal fallback (`dv_text`, `dv_text2`) — the spelling the upstream FLAT bodies use — guarded by `TestBuild_FlatConformanceOPTUsesOrdinalFallback`. Phase 1 landed 2026-08-01.
-**Defers:** Running the upstream Java suite verbatim (the adapter asserts against vendored fixtures instead); Cassette/Live modes for PROBE-086; Better-platform dialect corpora and STRUCTURED goldens (Better `web-template` `compatibility/`), deferred per the fit-gap review's "Better not a target" recommendation and [ADR 0014](../../adr/0014-webtemplate-reference-implementation-lock.md)
+**Defers:** Running the upstream Java suite verbatim (the adapter asserts against vendored fixtures instead); Cassette/Live modes for PROBE-086; Better-platform dialect corpora and STRUCTURED goldens (Better `web-template` `compatibility/`), deferred because Better is not a target ([ADR 0014](../../adr/0014-webtemplate-reference-implementation-lock.md)
 
 ## Goal
 
-Catch FLAT/STRUCTURED/WebTemplate drift against an **upstream-authored** conformance corpus in CI, without requiring Java on the default `make test` path. Closes the P2 gap from the peer-SDK ecosystem fit-gap review and fills the upstream-byte-conformance follow-up that [PROBE-076](../../specifications/conformance.md#probe-076--flat--structured-composition-round-trip) names in its own scope limit: PROBE-076's input is the SDK's *own* FLAT output, so it cannot catch a path the SDK never emits, a suffix it names differently, or a leaf it drops symmetrically. PROBE-086 fixes that by feeding in FLAT this SDK did not write.
+Catch FLAT/STRUCTURED/WebTemplate drift against an **upstream-authored** conformance corpus in CI, without requiring Java on the default `make test` path. Fills the upstream-byte-conformance follow-up that [PROBE-076](../../specifications/conformance.md#probe-076--flat--structured-composition-round-trip) names in its own scope limit: PROBE-076's input is the SDK's *own* FLAT output, so it cannot catch a path the SDK never emits, a suffix it names differently, or a leaf it drops symmetrically. PROBE-086 fixes that by feeding in FLAT this SDK did not write.
 
 ## Re-scope (2026-07-29)
 
@@ -142,4 +142,4 @@ Expected entries for `SKIPPED.md`, to be confirmed once the runner executes:
 - Corpus: EHRbase `openEHR_SDK` `test-data/src/main/resources/composition/flat/simSDT/conformance/` — pin in [`MANIFEST.txt`](../../../testkit/cassettes/flat-conformance/MANIFEST.txt).
 - Reference WebTemplate goldens (14 upstream, incl. `corona_anamnese`, `multi_occurrence`, `AlternativeEvents`) — the oracles for the blocking feature.
 - Cadasto: `openehr/serialize/simplified/roundtrip_test.go`, PROBE-075, PROBE-076.
-- Motivation: peer-SDK ecosystem fit-gap review, § Wire `web-template-tests`.
+- Motivation: the upstream `web-template-tests` conformance corpus.

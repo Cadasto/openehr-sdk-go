@@ -396,7 +396,7 @@ git commit -m "feat(simplified): ctx, _-attrs, |raw, |other handling (REQ-053)"
 - Test: `openehr/serialize/simplified/conformance_test.go`
 
 - [ ] **Step 1: Register PROBE-076** in `conformance.md` (heading `#### PROBE-076 — FLAT/STRUCTURED composition round-trip`, Status: Implemented, pointing at the conformance test) and add it to the clinical-modeling/wire probe index row. (Run `make spec-check` after Task in Phase 8 wires traceability.)
-- [ ] **Step 2: Vendor a matched trio.** Prefer EHRbase `openEHR_SDK` `corona_anamnese` (OPT + webtemplate + `composition/flat/simSDT` + a canonical) at the `openehr-kb`-pinned commit `22b01e0c…`, or the Better `Vital Signs` trio. If `templatecompile` rejects the OPT (archetype-reuse-under-slot, per ADR-0014), fall back to a simpler upstream trio (e.g. a single-observation template) and record the substitution. Append provenance/license to `THIRD_PARTY_LICENSES.md`.
+- [ ] **Step 2: Vendor a matched trio.** Prefer EHRbase `openEHR_SDK` `corona_anamnese` (OPT + webtemplate + `composition/flat/simSDT` + a canonical) at the pinned commit `22b01e0c…`, or the Better `Vital Signs` trio. If `templatecompile` rejects the OPT (archetype-reuse-under-slot, per ADR-0014), fall back to a simpler upstream trio (e.g. a single-observation template) and record the substitution. Append provenance/license to `THIRD_PARTY_LICENSES.md`.
 - [ ] **Step 3: Write the conformance test (RED/skip-aware)** — load the trio; assert `MarshalFlat(canonical, wt)` structurally equals the vendored FLAT (modulo `deviations.md`); same for STRUCTURED; and `UnmarshalFlat(vendored flat, wt)` canonically equals the vendored canonical.
 - [ ] **Step 4: Iterate to green** — triage each diff: genuine bug → fix; accepted incidental (context form, field ordering, exotic `|raw`) → add to `deviations.md`.
 - [ ] **Step 5: Commit.**
@@ -441,4 +441,4 @@ git commit -m "docs(simplified): land REQ-053/PROBE-076 traceability + statuses"
 - [ADR-0014](../../adr/0014-webtemplate-reference-implementation-lock.md) — reference-impl & id-generation lock (reused).
 - conformance.md § PROBE-076 — round-trip conformance probe (registered in Task 7).
 - [simplified-formats umbrella](../2026-06-23-simplified-formats.md) — Phase 3 of the umbrella.
-- Ground truth: openEHR ITS-REST *Simplified Formats* (STABLE) — vendored twin in `openehr-kb/specs/ITS-REST/simplified_formats.md`; §RM Mappings drives the per-datatype coverage.
+- Ground truth: openEHR ITS-REST *Simplified Formats* (STABLE); §RM Mappings drives the per-datatype coverage.

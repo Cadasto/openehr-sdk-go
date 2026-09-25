@@ -100,4 +100,4 @@ The standard one: be respectful, focus on the technical issue, no harassment. Ma
 
 ## Questions
 
-Open a [discussion](https://github.com/Cadasto/openehr-sdk-go/discussions) or an issue. For Cadasto-internal alignment, coordinate via your usual private channels. Gap reports and consumer drafts are not linked from this public repository.
+Open a [discussion](https://github.com/Cadasto/openehr-sdk-go/discussions) or an issue.

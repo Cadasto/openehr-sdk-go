@@ -8,7 +8,7 @@
 **Implementation:** landed
 **Depends on:** REQ-110 walker generalisation already landed (`openehr/validation/validate.go`, `walk_composition.go`, `rmread/`); REQ-120..123 RM behavioural helpers landed in v0.10.0.
 **Defers:** terminology / external-code validation; archetype-level constraints (already owned by REQ-102/110); consumer-side gating and the HTTP 422 surface.
-**Source (inbound):** a consuming CDR project — filed against v0.11.0 for RM-structural validation of non-template-bound writes (FOLDER, EHR_STATUS, EHR_ACCESS, untemplated demographic PARTY) where the consumer had been running on a strict-canjson-decode proxy that catches type-shape but not RM invariants.
+**Source:** RM-structural validation of non-template-bound writes (FOLDER, EHR_STATUS, EHR_ACCESS, untemplated demographic PARTY), needed as of v0.11.0 by a caller running on a strict-canjson-decode proxy that catches type-shape but not RM invariants.
 
 ## Goal
 
@@ -105,7 +105,7 @@ Each evaluator returns `[]Issue` with the standard path + code; codes reuse the 
 
 - Terminology binding / external-code validation (separate concern, future REQ).
 - Archetype-level constraints — already covered by the template-driven path.
-- Consumer-side gating (the `TEMPLATE_VALIDATION` posture and HTTP 422 mapping live in the consumer).
+- Consumer-side gating (a validation posture and HTTP 422 mapping live with the caller).
 
 ## Risks / open questions
 

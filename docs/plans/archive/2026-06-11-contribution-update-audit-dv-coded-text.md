@@ -39,7 +39,7 @@ PR 131 fixes the source schemas:
 - Test helpers and [`testkit/cassettes/submissions/`](../../../testkit/cassettes/submissions) already use **`DV_CODED_TEXT`-shaped** `change_type` (nested `defining_code.terminology_id.value`) — aligned with PR 131's fix, not with the erroneous 1.0.3 `TERMINOLOGY_CODE` schema.
 - RM-generated types already model `change_type` as `rm.DVCodedText` on `AUDIT_DETAILS` — the mismatch is **REST DTO semantics** (`UPDATE_AUDIT` vs `AUDIT_DETAILS`, optional/forbidden server fields, `_type` discriminator), not RM codegen.
 
-**Consumers:** reference CDR load harness, seeder tools, MCP servers posting contributions; PROBE-072 conformance consumers.
+**Consumers:** load harnesses, seeder tools, MCP servers posting contributions; PROBE-072 conformance consumers.
 
 ## Implementation checklist
 
@@ -127,7 +127,7 @@ PR 131 fixes the source schemas:
 - [ ] Audit [`testkit/cassettes/submissions/*.json`](../../../testkit/cassettes/submissions) — most already use DV_CODED_TEXT `change_type`; update any that emit wrong `_type` or server-only fields to match PR 131 examples.
 - [ ] Update [`testkit/cassettes/submissions/README.md`](../../../testkit/cassettes/submissions/README.md) with `UPDATE_AUDIT` note + link to this plan.
 - [ ] Migrate [`contribution_test.go`](../../../openehr/client/ehr/contribution/contribution_test.go) helpers (`newAudit`) to `UpdateAudit` builders.
-- [ ] Coordinate private reference CDR harness if it constructs `Submission` with `rm.AuditDetails` (out-of-tree — note in PR).
+- [ ] Note in the PR that out-of-tree callers constructing `Submission` with `rm.AuditDetails` must migrate.
 
 **Definition of done:** `go test ./openehr/client/ehr/contribution/...` + probe tests green; cassette README accurate.
 

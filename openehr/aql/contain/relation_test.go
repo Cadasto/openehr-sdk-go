@@ -148,9 +148,7 @@ func TestEHRbaseCompatibilityGuard(t *testing.T) {
 // TestEHRbaseDocumentedDifferences asserts this relation's verdict on each
 // pair where observed EHRbase behaviour differs, so the boundary is executable
 // documentation (REQ-160 § Acceptance, closing note). Differences are neutral
-// observations of engine behaviour, never anyone's defect. Survey: maintainer's
-// knowledge base, openehr-kb/notes/ecosystem/ehrbase-aql.md §4.1.2 and
-// openehr-kb/notes/aql-language-reference.md §6.1a.
+// observations of engine behaviour, never anyone's defect.
 func TestEHRbaseDocumentedDifferences(t *testing.T) {
 	r := contain.Default()
 

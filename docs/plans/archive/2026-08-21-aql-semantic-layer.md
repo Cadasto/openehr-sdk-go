@@ -29,12 +29,11 @@ return rows. `OBSERVATION o CONTAINS COMPOSITION c` is upside-down;
 `COMPOSITION c CONTAINS OBSERVATION o CONTAINS SECTION s` is structurally impossible.
 Server-side validation of RM structural legality is not common practice today — EHRbase, for
 example, checks containment at storage-root granularity, so such queries are accepted and
-return zero rows (observed behaviour; kb `notes/ecosystem/ehrbase-aql.md` §4.1.2). The
+return zero rows (observed behaviour). The
 consequence is engine-independent: an empty result set cannot be told apart from an impossible
 query, and in a clinical system "no data found" reads as a clinical fact. Client-side static
 analysis is therefore the natural place to catch this class of defect. The EHRbase Java SDK
-keeps its AQL front-end deliberately syntactic (kb `notes/ecosystem/ehrbase-sdk.md`
-§5a.1/§5a.3); this layer adds the semantic tier above the same kind of neutral AST.
+keeps its AQL front-end deliberately syntactic; this layer adds the semantic tier above the same kind of neutral AST.
 
 **The raw material already exists in this repo.** `openehr/rm/rminfo` (REQ-048) ships the
 BMM-derived class graph — attribute RM types, abstractness, `ConformsTo`,
@@ -58,14 +57,11 @@ subtly broken layer):
    do not hard-code any such set.
 3. **The relation cannot be a closed table.** The RM links some things by *reference*, not
   containment — `EHR → COMPOSITION` (universal AQL practice), `VERSION` wrappers,
-   `FOLDER → COMPOSITION` (engine-specific) — and dialects extend it: Cadasto's own PHP
-   platform ships demographic containment (`FROM PERSON p CONTAINS … AND EHR e CONTAINS …`,
-   kb `notes/aql-spec-change-proposals.md` AQL-C-010). The core must be BMM-derived and the
+   `FOLDER → COMPOSITION` (engine-specific) — and dialects extend it: some engines ship demographic containment (`FROM PERSON p CONTAINS … AND EHR e CONTAINS …`). The core must be BMM-derived and the
    exceptions must be **overlay data**, so a consumer can extend the relation without forking it.
 
 **Why severities are what they are.** The openEHR QUERY spec is *silent* on whether an engine
-must reject RM-impossible containment — that silence is a registered spec gap
-(kb `notes/aql-spec-change-proposals.md` **AQL-C-009(d)**). So an Error here is the SDK taking
+must reject RM-impossible containment — that silence is an open spec gap. So an Error here is the SDK taking
 a documented position on an open working-group question, not enforcing spec text — the REQ
 prose says so explicitly, and this implementation doubles as implementation experience for the
 WG proposal. Three diagnostic categories, fixed in ADR-0017:
@@ -80,7 +76,7 @@ WG proposal. Three diagnostic categories, fixed in ADR-0017:
 
 **What this layer must never do:** adjudicate **row semantics**. What a row *is* when sibling
 containments multiply (the "cartesian product problem") has been unresolved for seventeen
-years and engines still diverge (kb `notes/aql-containment-row-semantics.md`). The SDK may
+years and engines still diverge. The SDK may
 *warn* that row grain is engine-defined (one advisory check below); it must never pick an
 answer, dedupe, zip, or refuse. Structural admissibility — this plan — is decidable; row
 semantics is not ours.
@@ -89,8 +85,8 @@ semantics is not ours.
 § Deferred follow-ups for the honest status of each): possible later consumers of the same
 relation include typed result columns (unproven value — only if a concrete consumer asks),
 an experimental template-derived FROM builder (approach with scepticism — AQL scopes by
-archetype, not template; see the deferral entry), and the consuming CDR's plan/lower stage,
-which already plans over `openehr/aql/parse`. Build the relation so such consumers *could*
+archetype, not template; see the deferral entry), and a CDR query planner's plan/lower stage
+over `openehr/aql/parse`. Build the relation so such consumers *could*
 exist; do not build any of them now.
 
 ## Goal
@@ -100,7 +96,7 @@ into the existing AQL linter as new Layer-2 semantic checks plus spec-gap portab
 (REQ-161), and expose an opt-in verification entry point on the builder (REQ-162) — while the
 parser stays permissive and `Builder.Build` keeps its exact current contract. Consumers:
 integrators linting hand-written or stored AQL, programs verifying built queries before
-submission, CI pipelines, and (later) the consuming CDR's lowering stage.
+submission, CI pipelines, and (later) a CDR's query-lowering stage.
 
 ## Architecture
 
@@ -130,8 +126,7 @@ imports).
 ## Guard-rails (anti-hallucination — binding for every task)
 
 - **Look it up, never guess** (AGENTS.md ground truth): RM structure comes from
-`resources/bmm/` via `rminfo`; overlay/exception facts come from the kb citations given per
-task and are fixed in REQ-160 prose during Phase 0. If a containment fact is not derivable
+`resources/bmm/` via `rminfo`; overlay/exception facts are fixed in REQ-160 prose during Phase 0. If a containment fact is not derivable
 from `rminfo` and not in the REQ prose, it does not go in the code.
 - **Engine neutrality — EHRbase is a first-class target.** This SDK must keep working against
 EHRbase and any other conformant CDR. The default relation and default lint severities express
@@ -170,17 +165,16 @@ citations; every phase re-runs `make spec-check`.
 | Fact                                                         | Source                                                                   |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | RM class graph, attribute types, conformance                 | `openehr/rm/rminfo` (generated from `resources/bmm/`)                    |
-| Semantic containment tree + rules table                      | kb `/src/cadasto/openehr-kb/notes/aql-language-reference.md` §6.1a       |
-| EHRbase admissibility matrix (test oracle + observed-difference list) | kb `notes/ecosystem/ehrbase-aql.md` §4.1.2                               |
-| Spec gaps this layer takes positions on                      | kb `notes/aql-spec-change-proposals.md` AQL-C-009, AQL-C-010; SPECPR-481 |
-| Row-semantics no-go zone                                     | kb `notes/aql-containment-row-semantics.md` (§2, §16.3)                  |
-| VERSION portability guidance written for this SDK            | kb `notes/aql-versioning-patterns.md` §5                                 |
+| Semantic containment tree + rules table                      | REQ-160 prose (fixed in Phase 0)                                         |
+| EHRbase admissibility matrix (test oracle + observed-difference list) | Observed EHRbase behaviour, recorded in REQ-160 prose                     |
+| Spec gaps this layer takes positions on                      | SPECPR-481; REQ-160 / REQ-161 prose                                      |
+| Row-semantics no-go zone                                     | REQ-161 prose                                                            |
+| VERSION portability guidance written for this SDK            | REQ-161 prose                                                            |
 | Existing lint layers, severity model, false-positive policy  | `openehr/aql/lint/lint.go`, `lint/resolve.go`, REQ-109 §                 |
 
 
-The kb tree is read-only background; **normative content is copied into REQ prose in Phase 0**
-so the spec tree stays self-contained (implementation agents work from the spec, with kb as
-context).
+**Normative content is copied into REQ prose in Phase 0** so the spec tree stays
+self-contained (implementation agents work from the spec).
 
 ## Definition of Ready
 
@@ -249,9 +243,9 @@ entry); `docs/roadmap.md` updated; `make spec-check` + `make ci` green; plan arc
 1. **ADR-0017 — AQL semantic layer architecture.** Records, with rationale and alternatives:
   (a) relation derived at runtime from `rminfo` (no new codegen; bmmgen table generation is
    the rejected alternative — revisit only if init cost measurably matters); (b) BMM core +
-   overlay edges + extensibility for dialects (AQL-C-010 is the forcing example);
+   overlay edges + extensibility for dialects (demographic containment is the forcing example);
    (c) the three diagnostic categories and their severities, incl. the explicit statement that
-   Error-on-impossible is an SDK position on open gap AQL-C-009(d);
+   Error-on-impossible is an SDK position on an open spec gap;
    (d) row semantics declared out of scope (advisory warning only);
    (e) builder stays permissive — verification is opt-in, `Build()` unchanged.
 2. **REQ-160 — containment admissibility relation** (clinical-modeling.md, band opener).
@@ -307,14 +301,14 @@ type Finding struct { Code string; Detail string; /* value-bearing; exact fields
   parser — write no lexical logic), `ConformsTo` against the declared class; unparseable
    HRID or unknown class/segment → `UnknownClass` (REQ-160 § Archetype/class conformance).
 4. **Oracle tests:** (a) exhaustive table tests straight from the REQ-160 acceptance table
-  (the kb §6.1a rules: `EHR CONTAINS OBSERVATION` ✅, `OBSERVATION CONTAINS COMPOSITION` ❌,
+  (the REQ-160 rules: `EHR CONTAINS OBSERVATION` ✅, `OBSERVATION CONTAINS COMPOSITION` ❌,
    `COMPOSITION CONTAINS ELEMENT` ✅ depth-skip, entries never contain entries,
    `INSTRUCTION CONTAINS ACTIVITY` ✅, `CLUSTER CONTAINS CLUSTER` ✅, `SECTION CONTAINS  SECTION` ✅, `CONTAINS DV_TEXT` ❌-not-containable, abstract `ENTRY` expansion ✅, …);
    (b) a **documented-difference test** against the EHRbase admissibility matrix, in neutral
    observed-behaviour terms: pairs this relation marks Never that EHRbase admits
    (RM-impossible pairs sharing a storage root) and pairs the RM permits that EHRbase
    restricts for engine-specific reasons (`EHR CONTAINS ELEMENT` root disambiguation,
-   standalone `FROM CLUSTER`) — each difference asserted and commented with its kb citation,
+   standalone `FROM CLUSTER`) — each difference asserted and commented as observed behaviour,
    so the boundary is executable documentation. This test doubles as the
    **EHRbase-compatibility guard**: an RM-valid pair that EHRbase admits must never verdict
    `Never`.
@@ -336,7 +330,7 @@ update `cmd/examples/lint-aql` output; update the lint package doc.
 
 **Interfaces:** consumes Phase 1's `contain.Default()`, `CanContain`, `Containable`,
 `ArchetypeMatches`. New `lint.Options` field for a caller-supplied `*contain.Relation`
-(nil → `contain.Default()`), so dialect users (AQL-C-010) can lint without false Errors.
+(nil → `contain.Default()`), so dialect users can lint without false Errors.
 
 **Tasks:**
 
@@ -351,8 +345,7 @@ update `cmd/examples/lint-aql` output; update the lint package doc.
   predicates — PROBE-021 territory, same skip reason as `resolve.go`).
 3. VERSION portability checks (pure `parse.Document` walks, no `contain` needed):
   `aql_version_no_predicate`, `aql_versioned_object_unreferenced` (VERSIONED_OBJECT alias
-   never referenced in SELECT/WHERE/ORDER BY — Frankel's redundancy rule, kb
-   `aql-versioning-patterns.md` §3.3/§5).
+   never referenced in SELECT/WHERE/ORDER BY — Frankel's redundancy rule).
 4. `aql_fanout_row_grain` advisory — fire ONLY on the high-confidence shape REQ-161 defines
   (sibling junction class operands whose aliases are both projected as leaf paths); Detail
    states row grain is engine-defined. No other heuristics.
@@ -415,10 +408,10 @@ listed there; run `/sdd-trace`; archive this plan via sdd-archive **in the imple
 | --- | --- |
 | **Typed result columns** | *Optional — value unproven, no confirmed demand.* Resolved SELECT paths know their leaf DV type, which *could* type `aql.ResultCell` consumers (`openehr/client/query`). Pick up only if a concrete consumer asks for it, or if it falls out of other work nearly free. |
 | **Template-derived FROM builder** | *Exploratory experiment — approach with scepticism.* AQL scopes by **archetype** predicates and is usually template-agnostic: the same archetype aggregates data persisted under several different templates, so a containment chain derived from one `templatecompile.Compiled` risks over-fitting the query to that template. Template identity belongs in a `WHERE …/archetype_details/template_id/value` condition, not in containment. If prototyped: emit an archetype-scoped chain (template-agnostic by default), add the template_id condition only as an explicit opt-in, and treat the prototype as a feasibility probe — curiosity-driven, not committed. |
-| **Engine-capability profiles** | Per-engine lint category for valid AQL a given engine does not implement (e.g. EHRbase: `NOT CONTAINS`, `EXISTS`, standalone ambiguous roots) — neutral, observed-behaviour data from the kb admissibility matrices. Also the vehicle for "will this query run on engine X" portability reports. |
-| **Demographic overlay data**                       | AQL-C-010 dialect edges (`PERSON`→`EHR` by-reference…) as a shipped overlay; mechanism lands now, data waits for the dialect spec.                           |
+| **Engine-capability profiles** | Per-engine lint category for valid AQL a given engine does not implement (e.g. EHRbase: `NOT CONTAINS`, `EXISTS`, standalone ambiguous roots) — neutral, observed-behaviour data from engine admissibility matrices. Also the vehicle for "will this query run on engine X" portability reports. |
+| **Demographic overlay data**                       | Demographic dialect edges (`PERSON`→`EHR` by-reference…) as a shipped overlay; mechanism lands now, data waits for the dialect spec.                           |
 | **RM-path shape lint**                             | Template-free SELECT/WHERE path checking against `rminfo` attribute walks (`rmpath` precedent) — a Layer-2.5 between shape and template checks.              |
-| **Full semantic resolver / CDR lower-stage reuse** | One resolution pass producing a typed query model consumed by lint, builder, executor, and the consuming CDR's plan/lower stage.                             |
+| **Full semantic resolver / CDR lower-stage reuse** | One resolution pass producing a typed query model consumed by lint, builder, executor, and a CDR's plan/lower stage.                             |
 | **Non-containable FROM root** | *Deferred — spec-sanctioned silence, not an oversight.* `aql_contains_not_containable` fires only on a `CONTAINS` operand; a non-containable FROM root (e.g. `FROM DV_TEXT t …`) raises no *containability* code today, in either spelling — other role-orthogonal codes (`aql_archetype_class_mismatch`, `aql_unknown_rm_class`) are unaffected and still fire on the root as usual. Widening the containability code to the anchor position needs its own REQ/spec sentence, not a silent code change. |
 
 

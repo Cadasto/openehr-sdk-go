@@ -1,9 +1,8 @@
 // Package examples hosts worked, runnable example programs for each
 // named SDK use case (benchmark, seeder, MCP server, federator).
 //
-// Production consumers (the reference CDR load harness, the
-// soon-to-exist federator, etc.) live in their own repos — examples
-// here are reference shapes only.
+// Production tools (load harnesses, federators, etc.) live in their
+// own repositories; the examples here are reference shapes only.
 //
 // Developer docs: docs/examples.md (catalog) and docs/quick-start.md
 // (onboarding). When adding or materially changing an example, update
