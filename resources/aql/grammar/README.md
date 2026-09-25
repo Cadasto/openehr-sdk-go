@@ -43,4 +43,4 @@ versions together** (see `baseline/PIN`), because they are released in lockstep.
 The openEHR grammars are **CC-BY-SA 4.0**, © openEHR Foundation. The SDK's deltas
 in `active/` are a documented derivative work under the same terms. Attribution
 is retained in the grammar file headers. Repository-wide inventory:
-[`LICENSING.md`](../../../LICENSING.md).
+[`docs/licensing.md`](../../../docs/licensing.md).

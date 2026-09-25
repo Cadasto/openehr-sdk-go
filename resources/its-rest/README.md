@@ -63,4 +63,4 @@ the same commit.
 
 Each file declares **Creative Commons Attribution-NoDerivs 3.0 Unported**
 (© openEHR Foundation) on `info.license`. They are vendored unmodified.
-Repository-wide inventory: [`LICENSING.md`](../../LICENSING.md).
+Repository-wide inventory: [`docs/licensing.md`](../../docs/licensing.md).
