@@ -12,7 +12,7 @@
 
 ## Goal
 
-Validate **authored** OPT 1.4 files before CDR upload — complementary to `ParseOPT` / `ParseOPTStrict` (structural parse) and composition validation (REQ-102). Surfaces **actionable issue codes** for template authors and CI, including FLAT-path-impact analysis via Web Template export. It follows the lint/issue model already landed for AQL (REQ-109); motivation is the OPT-validator gap identified in the peer-SDK ecosystem fit-gap review.
+Validate **authored** OPT 1.4 files before CDR upload — complementary to `ParseOPT` / `ParseOPTStrict` (structural parse) and composition validation (REQ-102). Surfaces **actionable issue codes** for template authors and CI, including FLAT-path-impact analysis via Web Template export. It follows the lint/issue model already landed for AQL (REQ-109); motivation: peer openEHR SDKs ship an OPT validator and this SDK did not.
 
 ## Architecture
 
@@ -154,5 +154,5 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ. The t
 
 ## References
 
-- A peer Python openEHR SDK's OPT validator + issue-code catalogue — the pattern this adapts; see the peer-SDK ecosystem fit-gap review.
+- A peer Python openEHR SDK's OPT validator + issue-code catalogue — the pattern this adapts.
 - Cadasto: `openehr/template/`, `cmd/examples/opt-parse/`, REQ-109 AQL lint (issue model).

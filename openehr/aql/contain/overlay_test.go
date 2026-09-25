@@ -10,7 +10,7 @@ import (
 
 // TestWithOverlayIsImmutable — WithOverlay returns an extended copy and MUST NOT
 // alter the default relation (REQ-160 § Extensibility). The demographic
-// containment example (AQL-C-010): PERSON CONTAINS EHR is Never by default (any
+// containment example: PERSON CONTAINS EHR is Never by default (any
 // class CONTAINS EHR is Never), and a consumer edge makes it Admissible on the
 // copy only.
 func TestWithOverlayIsImmutable(t *testing.T) {

@@ -3,7 +3,7 @@
 **Date:** 2026-09-15
 **Status:** landed (2026-09-15, archived in the implementing PR). Scope: the concrete decode path only (ruling F9). The precedence question is ruled below (F8): documented and pinned by a positive test. The registry path's regression is ruled below (F12): resolved, not deferred.
 **Owner:** SDK maintainers
-**Worktree:** `/src/cadasto/openehr-sdk-go/.claude/worktrees/jsonv2-peek`, branch `perf/typereg-single-pass-decode`, from `7a11918e` (stacked on follow-up A at planning time). The branch was later rebased onto `main` at `f1c88e8d` after PR 173 merged, and PR 174 targets `main`. The main checkout is never touched.
+**Worktree:** `<worktree>`, branch `perf/typereg-single-pass-decode`, from `7a11918e` (stacked on follow-up A at planning time). The branch was later rebased onto `main` at `f1c88e8d` after PR 173 merged, and PR 174 targets `main`. The main checkout is never touched.
 **Covers:** [REQ-052](../../specifications/wire.md#req-052) (Canonical JSON, Impl. `landed`, no status change; two descriptive clauses amended in place, implementation-aligned). [REQ-108](../../specifications/clinical-modeling.md#req-108--untrusted-document-bounds) (Untrusted document bounds, no status change; the polymorphic-decode depth bullet amended in place, implementation-aligned) and [REQ-025](../../specifications/idiom.md#errors-req-025) (Error wrapping, no status change; the nil-argument guard) through the post-review amendments. No REQ id is allocated and no probe id is allocated. Exercised through [PROBE-030](../../specifications/conformance.md#probe-030--canonical-json-round-trip) and [PROBE-031](../../specifications/conformance.md#probe-031----type-discriminator-decoded-via-registry).
 **Probes:** none rewritten. PROBE-030 (round trip) and PROBE-038 (polymorphic decode) exercise the changed path and stay green; PROBE-031 (unknown `_type` via `Registry.Decode`) is untouched because the registry keeps its peek.
 **Implementation:** one runtime helper signature, one generator template (both branches), a regeneration (`make codegen`), three godoc rewrites, two spec clause amendments, one ADR consequences line.
@@ -18,7 +18,7 @@ The generated decode targets already declare `_type`: the zero-copy alias wrappe
 
 ## How the evidence was produced
 
-Read-only. Two scratch artifacts outside the worktree, under `/tmp/claude-1000/.../scratchpad/peek/`:
+Read-only. Two scratch artifacts outside the worktree, under a local scratch directory `<scratch>/peek/`:
 
 - `peek/`: a standalone module confirming the `encoding/json/v2` semantics the design rests on (discriminator population, single-value consumption and decoder positioning, the error types for malformed / shape / wrong-type, `RejectUnknownMembers`, and the `SemanticError.JSONPointer` root). Eight tests, all pass.
 - `peek/benchmod/`: a module with a `replace` directive into the worktree, so both benchmark arms decode into the real `rm.DVQuantity` and differ only in the `DecodeInto` shape. `benchstat` over `-count=12`.
@@ -176,7 +176,7 @@ New can-fail controls the plan adds:
 
 ## Global constraints
 
-Binding constraints (maintainer decisions, the amended REQ-052, the ADR 0022 design, the process rules), and its "Follow-ups after PR 171" section (worktree, the maintainer decision for B, the gates). The specification wins over this plan; the maintainer's decisions win over both. No reflection (AGENTS.md). Prose is plain English, no em dashes, no second person, no bare `#N` ordinals; the consuming CDR project is never named. Commits are Conventional with an `Assisted-by: Claude Code (claude-opus-4-8[1m])` trailer, staged with explicit pathspecs, no `git add -A`, no branch switching, no other worktree.
+Binding constraints (maintainer decisions, the amended REQ-052, the ADR 0022 design, the process rules), and its "Follow-ups after PR 171" section (worktree, the maintainer decision for B, the gates). The specification wins over this plan; the maintainer's decisions win over both. No reflection (AGENTS.md). Prose is plain English, no em dashes, no second person, no bare `#N` ordinals. Commits are Conventional with an `Assisted-by: Claude Code (claude-opus-4-8[1m])` trailer, staged with explicit pathspecs, no `git add -A`, no branch switching, no other worktree.
 
 ## Rulings where the analysis had to choose
 

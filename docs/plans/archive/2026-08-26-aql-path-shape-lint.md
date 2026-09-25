@@ -11,8 +11,7 @@
 
 ## Goal
 
-Close audit findings **AQL-FIT-04 and -05** (AQL alignment audit, 2026-08-26 — maintainer's
-knowledge base, fit-gap report Part 2): the linter's coverage is thorough on containment,
+Close the path-shape and path fan-out findings of the AQL alignment audit (2026-08-26): the linter's coverage is thorough on containment,
 parameters, template membership and the three spec-gap advisories, but **path shape** is an axis
 it does not cover at all outside the OPT-gated Layer 3. Four rules that the guidance corpus
 states as rules — each checkable from the query text plus the pinned BMM, no OPT, no CDR —
@@ -65,7 +64,7 @@ impossibility; the conservative-flagging policy of REQ-161 § Flagging policy ca
   `contain.TypeRelation.Unavoidable` with the working name unchanged, and the resolved fork is
   recorded in REQ-164 § The redundant-step ruling rather than erased.
 
-**The fan-out path axis (AQL-FIT-05).** The landed `aql_fanout_row_grain` covers one of the two
+**The fan-out path axis.** The landed `aql_fanout_row_grain` covers one of the two
 documented sources of engine-defined row multiplicity (sibling `AND`-junction operands,
 SPECQUERY-9). The second — multiple projected paths descending through **different** repeating
 scopes — becomes checkable once the Phase-1 walker exists. New sibling code (additive; the landed
@@ -78,7 +77,7 @@ code's rule and Detail text stay byte-stable per REQ-161 § Additivity):
 Phase 0 also adds one sentence to the REQ-161 `aql_fanout_row_grain` catalogue row naming the
 scope boundary ("covers the junction source; the path source is `aql_fanout_path_grain`,
 REQ-164") so the boundary is recorded rather than inferred — the immediately-honest half of
-AQL-FIT-05, useful even if later phases slip.
+the fan-out finding, useful even if later phases slip.
 
 ## Definition of Ready
 
@@ -105,7 +104,7 @@ AQL-FIT-05, useful even if later phases slip.
   spec-mandated zero Span (neither of its channels has a source position; REQ-109's
   zero-when-unattributable rule)); every code has a negative near-miss (predicated
   segment; ORDER BY present; aliased projection; an *avoidable* intermediate staying silent);
-  the audit's two verified-silent queries from AQL-FIT-04 are corpus rows and now warn.
+  the audit's two verified-silent queries from the path-shape finding are corpus rows and now warn.
 - PROBE-028's re-baseline recorded in the catalogue entry, per the additivity guard: `valid.aql`
   and `missing_archetype.aql` each gained exactly `aql_select_no_alias`, `bad_syntax.aql` nothing.
 - The four guidance rules and the two row-multiplication sources are each covered by exactly

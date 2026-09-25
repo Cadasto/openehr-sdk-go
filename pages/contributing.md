@@ -31,7 +31,7 @@ tables, and a compile-all. It needs Docker for the AQL parser codegen check.
 
 ## Specification-driven changes
 
-Specify new behaviour before you write it. The loop:
+Specify new behaviour before you write it, in this loop:
 
 1. Run `make spec-context REQ=NNN` for the registry row, the traceability
    block, and the canonical excerpt.

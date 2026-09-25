@@ -80,9 +80,9 @@ Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this or
 
 1. **Amend [`docs/specifications/wire.md`](../../specifications/wire.md) REQ-052** — replace the lexicographic default with BMM declaration order + `_type` first + lexicographic `Hash` keys (per § Canonical ordering above). One CHANGELOG bullet under `## [Unreleased]`.
 2. **Vendor golden fixtures** into this repo (REQ-082 cassette independence):
-   - Copy a minimal set of canonical JSON compositions from the reference CDR harness into `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (or `openehr/serialize/canjson/testdata/`).
+   - Copy a minimal set of canonical JSON compositions from an external reference corpus into `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (or `openehr/serialize/canjson/testdata/`).
    - Record provenance in `testkit/cassettes/README.md` (source commit, refresh command).
-   - CI MUST NOT depend on the sibling repo being cloned.
+   - CI MUST NOT depend on any external checkout.
 3. **Add `openehr/serialize/internal/poly`** — unexported helpers:
    - `ResolveType(name string) (func() any, error)` → `typereg.Default.Lookup`
    - Shared `DecodeError` with `Path`, `Type`, `Inner`, `Unwrap() error`
@@ -224,7 +224,7 @@ Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this or
 | Risk | Mitigation |
 |---|---|
 | `wire.md` lexicographic default conflicts with BMM order | Phase 0 amends `wire.md`; probes document SDK ordering |
-| Sibling-repo fixtures missing in CI | Phase 0 vendors cassettes in-repo |
+| External fixtures missing in CI | Phase 0 vendors cassettes in-repo |
 | `MarshalJSON` recursion / wrong key order | Wire-struct pattern; `_type` as first struct field |
 | Duplicate `DecodeAs` APIs | `typereg.DecodeAs[T]` only; `canjson.DecodeSliceAs` composes it |
 | Map key order vs struct field order | Document: Hash keys always lexicographic |

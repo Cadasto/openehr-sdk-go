@@ -16,7 +16,7 @@ It's written the way Go code usually is: every I/O call takes a `context.Context
 
 ## Try it
 
-This decodes a canonical-JSON Composition into a typed struct and reads a few fields. No network, no CDR:
+This decodes a canonical-JSON Composition into a typed struct and reads a few fields, with no network and no CDR involved:
 
 ```go
 var c rm.Composition
@@ -49,7 +49,7 @@ The version policy is in [releases.md](docs/releases.md), and the [roadmap](docs
 
 ## Who it's for
 
-It was built with a few kinds of consumer in mind:
+It was built with these kinds of consumer in mind:
 
 1. **Benchmark and load tools** running high-concurrency CRUD against the openEHR REST API.
 2. **Synthetic data seeders** that use an OPT to drive bulk Compositions and demographic records.
@@ -82,7 +82,7 @@ If you're working on the SDK itself, `make help` lists the grouped targets and [
 
 ## AI-assisted development
 
-Much of this codebase and its documentation was written with AI coding assistants such as Claude Code and Cursor. The written specification is what keeps that honest: every change is measured against the specs in this repository and has to pass the [`make ci` gate](docs/ci.md). Each change is also reviewed before a maintainer merges it. How the assistants are set up, and what they must look up rather than guess, is in [ai-workflow.md](docs/ai-workflow.md). The rules for contributing with AI help, including the `Assisted-by:` commit trailer, are in [CONTRIBUTING.md](CONTRIBUTING.md#ai-assisted-contributions).
+Much of this codebase and its documentation was written with AI coding assistants such as Claude Code and Cursor. The written specification keeps that work honest. Every change is measured against the specs in this repository and has to pass the [`make ci` gate](docs/ci.md). Each change is also reviewed before a maintainer merges it. [ai-workflow.md](docs/ai-workflow.md) explains how the assistants are set up and what they must look up rather than guess. The rules for contributing with AI help, including the `Assisted-by:` commit trailer, are in [CONTRIBUTING.md](CONTRIBUTING.md#ai-assisted-contributions).
 
 ## Documentation
 
@@ -119,4 +119,4 @@ Open research strands live in [research-strands.md](docs/specifications/research
 
 The SDK is released under the MIT licence. See [LICENSE](LICENSE).
 
-Vendored third-party artefacts (test fixtures, openEHR specification pins, the AQL grammar) keep their upstream licences. The inventory is [LICENSING.md](LICENSING.md).
+Vendored third-party artefacts (test fixtures, openEHR specification pins, the AQL grammar) keep their upstream licences. The inventory is [docs/licensing.md](docs/licensing.md).

@@ -1,6 +1,6 @@
 # Quick start
 
-Get from zero to a working import in a few minutes. This guide is for **application developers** integrating the SDK. Contributors editing the normative specs should start with [CONTRIBUTING.md](../CONTRIBUTING.md). For the full contract and package map, see [architecture.md](architecture.md) and [specifications/](specifications/).
+Get from zero to a working import in a few minutes. This guide is for application developers integrating the SDK. Contributors editing the normative specs should start with [CONTRIBUTING.md](../CONTRIBUTING.md). For the full contract and package map, see [architecture.md](architecture.md) and [specifications/](specifications/).
 
 > **Version:** the SDK is pre-1.0. Pin an exact tag, because a minor release may break the public API. See [releases.md](releases.md).
 
@@ -30,7 +30,7 @@ make doctor   # host Go vs Docker fallback
 
 ## Two integration paths
 
-The SDK keeps **clinical building blocks** separate from **HTTP clients**, so you can import one package without pulling in auth or transport.
+The SDK keeps clinical building blocks separate from HTTP clients, so you can import one package without pulling in auth or transport.
 
 ```text
 Building blocks (no HTTP)          REST client path
@@ -42,9 +42,9 @@ openehr/validation
 openehr/instance
 ```
 
-**Pick building blocks** when you validate compositions in CI, parse OPT files, or transform canonical JSON. You do not need a clinical data repository (CDR).
+Pick building blocks when you validate compositions in CI, parse OPT files, or transform canonical JSON. You do not need a clinical data repository (CDR).
 
-**Pick the REST path** when you create EHRs, submit compositions, or run AQL against a live openEHR REST API.
+Pick the REST path when you create EHRs, submit compositions, or run AQL against a live openEHR REST API.
 
 Runnable walkthroughs for both paths live in [examples.md](examples.md).
 
@@ -88,7 +88,7 @@ Expected output includes the composition archetype id, language, and `OK: canoni
 
 ### Validate against a template
 
-A typical CI pipeline runs **bytes → RM → compiled OPT → validation issues**.
+A typical CI pipeline runs bytes → RM → compiled OPT → validation issues.
 
 ```bash
 go run ./cmd/examples/validate-from-json
@@ -175,7 +175,7 @@ ehr, meta, err := openehrclient.Create(ctx, c)
 
 ## Idioms to remember
 
-Every public API follows these rules. Code that breaks them usually ends up working against the SDK.
+Every public API follows these rules, and code that breaks them usually ends up working against the SDK.
 
 | Rule | Why |
 |---|---|

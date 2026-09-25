@@ -11,8 +11,7 @@
 
 ## Goal
 
-Close audit findings **AQL-FIT-01, -02, -03** (AQL alignment audit, 2026-08-26 — maintainer's
-knowledge base, ecosystem fit-gap report Part 2): give `openehr/aql`'s write side the three
+Close three findings of the AQL alignment audit (2026-08-26): give `openehr/aql`'s write side the three
 carriers its own read side already models, so the whole version-query family stops being
 string-only. Consumers are builder callers who today must abandon the typed builder for any
 query with a `VERSION` predicate, a standing class predicate, or a typed projection

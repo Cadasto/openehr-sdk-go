@@ -6,8 +6,8 @@
 **Covers:** [REQ-052](../../specifications/wire.md#req-052), [REQ-040](../../specifications/rm-modeling.md#type-registry-req-040), [REQ-102](../../specifications/clinical-modeling.md#req-102--composition-validation), [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator)
 **Implementation:** landed
 **Relates:** the decode-side polymorphism fix (REQ-052/040 — landed; [archive/2026-05-26-rm-polymorphic-decode-coverage.md](2026-05-26-rm-polymorphic-decode-coverage.md)) and the `*Like` ergonomics note ([archive/2026-05-27-rm-like-interface-ergonomics.md](2026-05-27-rm-like-interface-ergonomics.md)); the real-world OPT `NewSkeleton` coverage (REQ-102/107/110 — [archive/2026-06-19-realworld-opt-synthesis.md](2026-06-19-realworld-opt-synthesis.md))
-**Source (inbound):** a consuming CDR project — write-time template validation + benchmark; observed ~13% of the `NewSkeleton` corpus fails round-trip template validation (`Referral Request.v1`, `Demonstration.v1`), forcing its template validation to permissive (warn) mode instead of strict (reject).
-**Reframe vs the inbound draft:** the draft treats this as one "encode-side `_type`" gap. Investigation (below) shows it is **two distinct defects with different fixes** — only the first is an encode bug; the second is decode/validator and the wire is already correct.
+**Source:** write-time template validation + benchmark; observed ~13% of the `NewSkeleton` corpus fails round-trip template validation (`Referral Request.v1`, `Demonstration.v1`), forcing template validation to permissive (warn) mode instead of strict (reject).
+**Reframe:** the problem first looked like one "encode-side `_type`" gap. Investigation (below) shows it is **two distinct defects with different fixes** — only the first is an encode bug; the second is decode/validator and the wire is already correct.
 
 ## Definition of Ready (analysis gate)
 
@@ -34,7 +34,7 @@ Root cause re-confirmed: `MarshalJSON` is a pointer-receiver, and `rmwrite` stor
 
 ### Not chosen / deferred
 
-- A1 value-receiver regeneration (correct but a much larger, higher-risk diff); A2 producer-side pointers (no wire-level guarantee). B2 decode reconstruction (only needed if a consumer reads the concrete Go generic type post-decode — the reporting CDR validates, it does not).
+- A1 value-receiver regeneration (correct but a much larger, higher-risk diff); A2 producer-side pointers (no wire-level guarantee). B2 decode reconstruction (only needed if a consumer reads the concrete Go generic type post-decode — a validating caller does not).
 
 ## Goal
 
@@ -84,7 +84,7 @@ Reproduced (`&DVInterval[DVQuantity]` in `Element.Value DataValue`, throwaway te
 
 So nothing is lost on the wire or in the bounds — only the *container's* static `T` collapses `DVQuantity → DVOrdered`. The in-memory `NewSkeleton` instance is `DVInterval[DVQuantity]` (validates OK); the round-tripped value is `DVInterval[DVOrdered]`, and `validation.ValidateComposition` keys off that, reporting `DV_INTERVAL does not satisfy DV_INTERVAL<DV_QUANTITY>`.
 
-**Layer:** 2/3 (decode reconstruction + validator), **not** encode. This is a different defect from sub-gap A; the inbound draft conflates them.
+**Layer:** 2/3 (decode reconstruction + validator), **not** encode. This is a different defect from sub-gap A.
 
 ## What is explicitly NOT a defect (do not "fix")
 
@@ -110,19 +110,19 @@ So nothing is lost on the wire or in the bounds — only the *container's* stati
 ## Open decisions (for the maintainer / brainstorm before any code)
 
 1. Sub-gap A: codec-level (A1) vs producer-side (A2) vs both — and whether A1 belongs in the `bmmgen` marshal template or a shared runtime helper.
-2. Sub-gap B: validator-side (B1) vs decode-side (B2). Confirm whether any consumer relies on the concrete `DVInterval[T]` Go type after decode (the reporting CDR project does not — it validates).
+2. Sub-gap B: validator-side (B1) vs decode-side (B2). Confirm whether any consumer relies on the concrete `DVInterval[T]` Go type after decode (a validating caller does not).
 3. Whether to split this into two separate plans/REQs on landing (the fixes touch different packages and can ship independently).
 
-## Acceptance (from the consuming CDR project)
+## Acceptance
 
-For every corpus OPT, `canjson.Unmarshal(canjson.Marshal(NewSkeleton(…)))` yields a COMPOSITION that `validation.ValidateComposition` reports `OK` (round-trip-stable). On landing: the consuming project returns its benchmark stack to strict (reject) validation and drops its pointer workarounds.
+For every corpus OPT, `canjson.Unmarshal(canjson.Marshal(NewSkeleton(…)))` yields a COMPOSITION that `validation.ValidateComposition` reports `OK` (round-trip-stable), so template validation can run strict (reject) with no pointer workarounds.
 
 ## Out of scope
 
-- The decode-side polymorphic *coverage* (REQ-052/040, landed) and the CDR-side defaults / `/validation` dry-run endpoint (consumer decisions).
+- The decode-side polymorphic *coverage* (REQ-052/040, landed) and server-side defaults / a `/validation` dry-run endpoint.
 - FLAT/STRUCTURED formats.
 
 ## Notes
 
 - Reproductions in this dossier were throwaway tests under `openehr/serialize/canjson/` (not committed). They can be promoted to permanent round-trip tests (`canjson` + a `testkit/probes` round-trip-stability probe) as part of whichever fix lands.
-- The consuming CDR project's inbound draft should be updated to reflect the A/B split (its interval section attributes the failure to missing encode-side `_type`, which the repro disproves — the interval wire form is correct).
+- The interval failure is not caused by a missing encode-side `_type`; the repro disproves that, and the interval wire form is correct.

@@ -16,11 +16,11 @@
 - Ids that legitimately contain a literal `/` (would need `RawPath`) — openEHR ids (template ids, archetype ids, qualified query names) do not contain `/`, so the minimal decoded-path contract round-trips correctly.
 - Alias resolution / binding the relative class-predicate path to a concrete RM type — the consumer's job.
 
-## Source (inbound)
+## Source
 
-Two gaps filed by the consuming CDR project against SDK v0.14.0:
-- Double-encoding: a recurring `GET /definition/template/{}` → 404 on OPT ids with spaces (`Referral Request.v1`, `Weird Types 1`); the consumer works around it by building the raw decoded path itself instead of calling `definition.GetTemplate`.
-- Class-predicate ParsedPath: the residual raw-text split left after the structured standing-predicate work landed; the CDR still splits `ehr_id/value` from `Comparison.Path` because `ParsedPath` is nil for a class predicate.
+Two gaps against SDK v0.14.0:
+- Double-encoding: a recurring `GET /definition/template/{}` → 404 on OPT ids with spaces (`Referral Request.v1`, `Weird Types 1`); a caller can work around it only by building the raw decoded path itself instead of calling `definition.GetTemplate`.
+- Class-predicate ParsedPath: the residual raw-text split left after the structured standing-predicate work landed; a caller still splits `ehr_id/value` from `Comparison.Path` because `ParsedPath` is nil for a class predicate.
 
 ## Root cause (encoding)
 

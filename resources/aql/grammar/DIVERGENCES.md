@@ -71,7 +71,7 @@ Regression fixtures live under
 - **Class:** correction
 - **Upstream:** QUERY Release-1.1.0 `AqlLexer.g4`, `COMMENT`
 - **Symptom:** `COMMENT` is routed to `COMMENT_CHANNEL`. The SDK lint has no use
-  for comment tokens, so the channel is machinery with no benefit.
+  for comment tokens, so the channel adds nothing.
 - **Fix:** `COMMENT -> skip`; drop the now-unused `channels { COMMENT_CHANNEL }`
   block.
 - **Regression:** `comment.aql` (parses with a trailing `--` comment skipped)

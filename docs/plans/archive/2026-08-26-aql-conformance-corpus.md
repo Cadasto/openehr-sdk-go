@@ -6,13 +6,12 @@
 **Covers:** no new REQ id — this puts the **evidence base** of landed [REQ-160](../../specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation) under CI; REQ-160's prose gains one evidence sentence (implementation-aligned amendment) pointing at the new probe
 **Probes:** [PROBE-100](../../specifications/conformance.md#probe-100--upstream-aql-admissibility-corpus-ratchet) — *Upstream AQL admissibility corpus ratchet*, In-repo, **Implemented (inline)**. PROBE-021's Cassette/Live ratification stays pending a reference deployment — unchanged by this plan, recorded here because the audit filed it beside this finding
 **Implementation:** landed
-**Depends on:** the sibling clone `/src/ehrbase/integration-tests` at the pinned commit `206ee8c` (the same clone and pin discipline [`testkit/cassettes/ROBOT_SOURCE.txt`](../../../testkit/cassettes/ROBOT_SOURCE.txt) already records); landed REQ-160/161/162 and the compatibility-guard tests in [`openehr/aql/contain/relation_test.go`](../../../openehr/aql/contain/relation_test.go)
+**Depends on:** a local clone of the public `ehrbase/integration-tests` repository at the pinned commit `206ee8c` (the same clone and pin discipline [`testkit/cassettes/ROBOT_SOURCE.txt`](../../../testkit/cassettes/ROBOT_SOURCE.txt) already records); landed REQ-160/161/162 and the compatibility-guard tests in [`openehr/aql/contain/relation_test.go`](../../../openehr/aql/contain/relation_test.go)
 **Defers:** replaying the suites' *result expectations* (expected-JSON comparison, row counts) — those are engine-behaviour tests against seeded data, out of an admissibility relation's scope; executing anything against a live engine (that is REQ-082 Phase 4 territory)
 
 ## Goal
 
-Close audit finding **AQL-FIT-09** (AQL alignment audit, 2026-08-26 — maintainer's knowledge
-base, fit-gap report Part 2): the EHRbase AQL conformance suites are cited as evidence in
+Close the conformance-corpus finding of the AQL alignment audit (2026-08-26): the EHRbase AQL conformance suites are cited as evidence in
 REQ-160's derivation (the level-skipping rule points at the `FROM/CONTAINS_A_D` chaining suite),
 but **nothing under `docs/` or `resources/` references the corpus and no test executes it** —
 the relation's evidence is tested only against hand-written cases. A position derived from a

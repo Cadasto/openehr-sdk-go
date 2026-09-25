@@ -28,7 +28,7 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 | 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) | Implementation plans and landed-vs-planned checklist |
 | 6 | [CHANGELOG.md](CHANGELOG.md) + [docs/releases.md](docs/releases.md) | Release log and version policy |
 | 7 | [CONTRIBUTING.md](CONTRIBUTING.md) + [SECURITY.md](SECURITY.md) | Contributor flow and vulnerability reporting |
-| 8 | [LICENSING.md](LICENSING.md) | MIT grant plus in-tree third-party inventory |
+| 8 | [docs/licensing.md](docs/licensing.md) | MIT grant plus in-tree third-party inventory |
 
 ### Spec-driven workflow (agents)
 
@@ -39,9 +39,7 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 - **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. A GAP-style label may appear only as an ephemeral in-flight plan filename — never in `traceability.yaml`, test names, `doc.go`, or normative prose ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
 - Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program — checklist in [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
 
-**Descriptor & process.** Machine-readable conventions (REQ style, document paths, `make` targets, `PROBE`/`STRAND` toggles, ground-truth source) live in [`docs/.sdd.yaml`](docs/.sdd.yaml) — the descriptor the `sdd-*` skills read first. The end-to-end loop and the Definition of Ready / Done are mapped in [`docs/development-process.md`](docs/development-process.md).
-
-**superpowers + SDD.** SDD owns the spec/traceability layer; the superpowers loop owns build/verify/branch. Brainstorming design docs are *narrative input* that feeds the canonical specs (not a normative source), and plans belong in [`docs/plans/`](docs/plans/) with the `**Covers:**` header + DoR/DoD — never a parallel `docs/superpowers/` tree. Full redirect: [development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd).
+**Descriptor & process.** The `sdd-*` skills read [`docs/.sdd.yaml`](docs/.sdd.yaml) first; the loop, Definition of Ready / Done, and the SDD-vs-superpowers split are in [`docs/development-process.md`](docs/development-process.md#superpowers--sdd). Plans go in [`docs/plans/`](docs/plans/) with the `**Covers:**` header — never a parallel `docs/superpowers/` tree; brainstorming docs are narrative input, not a normative source.
 
 ## Module layout & boundaries
 
@@ -60,6 +58,7 @@ The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md
 - **Format / lint:** `make fmt` (gofumpt + goimports via `golangci-lint fmt`) and `make lint` (golangci-lint v2 + `modernize` / `errorlint`), both pinned in the [Makefile](Makefile); `make ci` gates them.
 - **Idioms:** `context.Context` first on every I/O method; inject `*http.Client` (never allocate one); functional options; package-level functions as the primary surface; generics only to remove a reflection hop; **no reflection** and no inheritance emulation (concrete structs + `typereg` for `_type` decoding).
 - **Errors:** wrap with `fmt.Errorf("…: %w", err)`; typed sentinels at boundaries; no panics in library code.
+- **JSON:** non-test code decodes RM and AOM 1.4 values with `encoding/json/v2` (or `canjson`), never v1 — v1's lenient options (duplicate names, case-insensitive matching, invalid UTF-8) would reach the generated decoders (REQ-052). `internal/v1_rm_decode_guard_test.go` scans for it.
 - **Tests:** stdlib `testing` only — no assertion libraries — plus helpers in [`testkit/`](testkit/); behaviour tests for a public surface belong in the external `_test` package, so they exercise what consumers can reach. Guards carry the bar their spec sets — typically *removing the guard MUST fail a named test*.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) — scope is the touched area (`auth`, `rm`, `transport`, `client/ehr`, `docs`, `build`, …). AI-assisted commits carry an `Assisted-by:` trailer — see [CONTRIBUTING § AI-assisted contributions](CONTRIBUTING.md#ai-assisted-contributions).
 - **Skills:** before writing or reviewing Go, load `go-coding:go-coding` then the focused skill matching the diff — `go-errors` for error paths, `go-testing` for any `_test.go`, `go-idioms` when modernizing or touching loops/maps/strings, `go-concurrency` for goroutines, channels, or context lifetimes, `go-layout` for a new package or exported API; the router alone doesn't count. An orchestrator dispatching implementer or reviewer subagents MUST carry this instruction in every brief — subagents don't inherit the session's skills. Detail: [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
@@ -85,12 +84,16 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
 | FLAT corpus integrity | `make flat-conformance-verify` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `…-check` adds a network drift report (dev helper, not a gate) |
 | Build Docker dev image | `make image-dev` (only when host Go is missing) |
+| Docs site | `make docs-check` builds the site from `pages/` and asserts its output; `make docs-serve` previews it. The docs-theme brand layer is pinned by commit + sha256 in `sources.json` (bump recipe in its `$comment`) |
 
 **Gotchas worth the reading:**
 
 - **Never hand-edit a vendored fixture** under `resources/` or `testkit/cassettes/` — being byte-identical to upstream is its whole value. Re-sync instead.
 - `make probe-status` prints `MISSING` for any probe covered inline or in a sibling's file. That is the filename heuristic, **not** drift — `make spec-check` is the real gate.
-- **`make ci` cannot complete without Docker** — `test` → `aqlgen-verify` → `antlr-image` is the only *unconditional* Docker link. The rest reaches for Docker only when host tooling is missing: `vet`/`build`/`test` need host Go `1.27.x`, `fmt-check`/`lint` a host `golangci-lint` **built with Go 1.27** (routing: [ci.md](docs/ci.md)). With those installed, run `fmt-check`, `vet`, `spec-check`, `flat-conformance-verify`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
+- **`make ci` cannot complete without Docker:** `test` → `aqlgen-verify` → `antlr-image` always needs it. Everything else uses Docker only when host tooling is missing (host Go `1.27.x`; a host `golangci-lint` **built with Go 1.27**; routing in [ci.md](docs/ci.md)).
+  Without Docker, run `fmt-check`, `vet`, `spec-check`, `flat-conformance-verify`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
+- After `git worktree remove`, run `golangci-lint cache clean`; otherwise lint reports phantom issues under the removed `.worktrees/` path.
+- **Public docs never name downstream consuming projects.** Describe what a consumer needs, not who the consumer is.
 
 **Runtime dependencies** are deliberately minimal and reviewed — adding one is a decision, not a convenience. The current set, each confined to the package it serves:
 
@@ -103,7 +106,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 Rationale and the wider picture: [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
 
-**Agent tooling:** for Go, load `go-coding:go-coding` then the matching focused skill (§ Code style and conventions above). A review of a Go diff goes through the plugin's `go-reviewer` agent, or the reviewer loads the same focused skills itself when the workflow already provides a single reviewer seat (the SDD subagent-driven loop does). `/go-explain <topic>` is the one-shot idiom lookup for a Go question; `go-lint-setup` is never needed here — golangci-lint v2 is already pinned (`make lint`). Also: **gopls-lsp** (code intelligence) and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
+**Agent tooling:** a review of a Go diff goes through the plugin's `go-reviewer` agent, or the reviewer loads the same focused skills itself when the workflow already provides a single reviewer seat (the SDD subagent-driven loop does). `/go-explain <topic>` is the one-shot idiom lookup for a Go question; `go-lint-setup` is never needed here — golangci-lint v2 is already pinned (`make lint`). Also: **gopls-lsp** (code intelligence) and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
 
 **Local agent config:** personal permission grants belong in the gitignored `.claude/settings.local.json` — never add a `permissions` block to the checked-in `.claude/settings.json` (shared hook/plugin config only).
 
@@ -111,12 +114,11 @@ Rationale and the wider picture: [architecture.md § Dependencies](docs/architec
 
 Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
 
-**REST API schema.** For any endpoint path, request/response body, header, or status code, read the vendored OpenAPI pin in [`resources/its-rest/`](resources/its-rest/README.md) (`*-validation.openapi.yaml`) rather than guessing — it is the machine-readable contract. Refresh/verify with `make its-rest-sync` / `make its-rest-check`. EHRbase-specific deployment extensions that a call still uses (for example `PurgeTemplates`) are documented on that call and in REQ-099, not by a second OpenAPI pin. In-tree third-party licences are inventoried in [`LICENSING.md`](LICENSING.md).
+**REST API schema.** For any endpoint path, request/response body, header, or status code, read the vendored OpenAPI pin in [`resources/its-rest/`](resources/its-rest/README.md) (`*-validation.openapi.yaml`) rather than guessing — it is the machine-readable contract. Refresh/verify with `make its-rest-sync` / `make its-rest-check`. EHRbase-specific deployment extensions that a call still uses (for example `PurgeTemplates`) are documented on that call and in REQ-099, not by a second OpenAPI pin. In-tree third-party licences are inventoried in [`docs/licensing.md`](docs/licensing.md).
 
 ## Do not touch (yet)
 
 - Promoting new numbered ADRs without updating [`docs/adr/README.md`](docs/adr/README.md), [`REQ.md`](docs/specifications/REQ.md), and [`traceability.yaml`](docs/specifications/traceability.yaml). Open decisions stay as [research strands](docs/specifications/research-strands.md) until an ADR lands.
-- Duplicating normative REQ prose in `REQ.md` — the registry is index-only; canonical text lives in the topic specs.
 - `internal/bmmgen` and `internal/bmmdiff` — generator tooling, not public API; structural changes need rationale in [architecture.md](docs/architecture.md) and [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md).
 - Module path — locked at `github.com/cadasto/openehr-sdk-go` (REQ-001).
 - The `go.mod` `go` directive — the minor line's `.0` patch, never the toolchain patch you happen to run (REQ-002): a mid-line floor makes every consumer and CI image on an earlier patch fetch a new toolchain, breaking air-gapped builds. Dev-image pins ([Dockerfile](Dockerfile)) move independently.

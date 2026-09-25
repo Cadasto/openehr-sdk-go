@@ -8,7 +8,7 @@
 **Implementation:** landed
 **Depends on:** nothing new — both fixes are local to [`openehr/client/query/execute.go`](../../../openehr/client/query/execute.go) and [`openehr/client/definition/stored_query.go`](../../../openehr/client/definition/stored_query.go) and the vendored OAS under [`resources/ehrbase/`](../../../resources/ehrbase/).
 **Defers:** the `DeleteStoredQuery` operation (intentional EHRbase-aligned extension, explicitly *not* in scope per the dossier); server-side query execution semantics.
-**Source (inbound):** a consuming CDR project — cross-check of the SDK client against the canonical openEHR ITS-REST OAS surfaced both wire-level deviations (header scoping on POST execution; `Location`-only stored-query store response) that would fail interop against a strict-spec third-party server.
+**Source:** a cross-check of the SDK client against the canonical openEHR ITS-REST OAS surfaced both wire-level deviations (header scoping on POST execution; `Location`-only stored-query store response) that would fail interop against a strict-spec third-party server.
 
 ## Goal
 
@@ -21,7 +21,7 @@ Both are additive on the SDK callsite (existing callers keep working unchanged) 
 
 ## Problem
 
-Today the client diverges from the canonical OAS in two places — both consumer-confirmed.
+Today the client diverges from the canonical OAS in two places.
 
 ### Finding A — `applyEHRScope` always sets the query parameter, never the header
 

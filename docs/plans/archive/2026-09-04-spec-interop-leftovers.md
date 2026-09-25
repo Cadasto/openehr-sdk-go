@@ -399,7 +399,7 @@ func transitiveAncestors(lookup func(string) (bmm.Class, bool), name string) []s
 - **Keep them separate and document the composition.** No behaviour change; callers who want both call both, and REQ-112 says so. Against it: the gap stays reachable by default, and the plan-text defect that opened this strand shows how easily the two are assumed to chain.
 - **Opt-in chaining** (a `WithRMFloor()` option on the template-driven entry points). Additive and reversible. Against it: two code paths to keep in agreement, and an option nobody sets is the second option wearing a hat.
 
-**Evidence needed:** how often a template-valid, RM-invalid composition reaches a consumer in practice (the consuming CDR project's validation pipeline is the first place to ask); the duplicate-issue rate if the floor is chained over the vendored composition corpus; the cost of a second walk on the benchmark harness's composition sizes.
+**Evidence needed:** how often a template-valid, RM-invalid composition reaches a consumer in practice; the duplicate-issue rate if the floor is chained over the vendored composition corpus; the cost of a second walk on the benchmark harness's composition sizes.
 
 **Resolution form:** ADR-NNNN; amends REQ-102 / REQ-110 (if chaining) and REQ-112's composition sentence either way. Until then § REQ-112 states the current behaviour and points here.
 

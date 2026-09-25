@@ -6,7 +6,7 @@
 **Covers:** [REQ-103](../../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection), [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-101](../../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder)
 **Implementation:** landed (value-fill + seed); `medium` detail_level deferred
 **Relates:** the real-world OPT `NewSkeleton` coverage (REQ-102/107/110 — landed; [2026-06-19-realworld-opt-synthesis.md](2026-06-19-realworld-opt-synthesis.md)); the polymorphic encode/decode round-trip fix (REQ-052/040/102/107 — landed; [2026-06-23-polymorphic-encode-decode.md](2026-06-23-polymorphic-encode-decode.md); [STRAND-04](../../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance))
-**Source (inbound):** a consuming CDR project — its template `/example` endpoint and a write benchmark need a *diverse* corpus of template-valid COMPOSITIONs (so persisted data is realistic enough to exercise AQL range / code-equality / aggregation retrieval), not byte-identical leaves.
+**Source:** a template `/example` endpoint and a write benchmark need a *diverse* corpus of template-valid COMPOSITIONs (so persisted data is realistic enough to exercise AQL range / code-equality / aggregation retrieval), not byte-identical leaves.
 **Severity:** medium — no production write-path impact. Today every generated COMPOSITION for a given OPT carries byte-identical clinical leaves (only consumer-stamped uid/time/composer vary), so a CDR cannot self-seed a realistic corpus and AQL value-predicate testing has no signal.
 
 ## Definition of Ready (analysis gate)
@@ -47,7 +47,7 @@ The openEHR ITS-REST `GET /definition/template/adl1.4/{template_id}/example` end
 
 **Feasibility — the constraint data needed for an in-constraint sampler is already on the compiled OPT.** The `constraints` types carry ranges / lists / value-sets and a self-check `Validate(value any)`: `CInteger{Range NumericRange; List []int64}`, `CodePhrase{CodeList []string}`, and the sibling `CReal` / `CString` / `CDvOrdinal` / `DvQuantity` / `CDate*` types ([openehr/template/constraints/](../../../openehr/template/constraints/)). So a "random point in constraint" fill is reachable today without new OPT plumbing.
 
-## The asks (from the inbound report)
+## The asks
 
 1. **Value-fill mode** — every materialised leaf filled with a value valid against its `C_*` constraint and RM data-type invariants (in-range magnitudes, valid units, value-set-member codes, regex/enumeration-satisfying strings), which can vary between invocations.
 2. **Seedable randomness** — a seedable source on `instance.Options` (mirroring `UIDSource`); fixed seed ⇒ byte-reproducible output, no seed ⇒ successive calls differ in leaf values.
@@ -69,7 +69,7 @@ The openEHR ITS-REST `GET /definition/template/adl1.4/{template_id}/example` end
 4. Exact semantics of `medium` (which optional nodes/occurrences it includes) — the only genuinely new structural behaviour; needs a crisp, testable rule.
 5. Whether this lands as one plan or splits "value-fill + seed" (REQ-107/103) from "`detail_level`/`medium`" (REQ-107) — they're independently useful.
 
-## Acceptance (from the consuming CDR project)
+## Acceptance
 
 For every corpus OPT, calling the synthetic generator N times yields N COMPOSITIONs that (a) each pass `validation.ValidateComposition`, and (b) **differ in their primitive leaf values** (not only uid/time/composer). With a fixed seed, output is byte-reproducible.
 

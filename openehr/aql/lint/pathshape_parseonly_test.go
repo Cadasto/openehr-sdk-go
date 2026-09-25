@@ -27,7 +27,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
 )
 
-// pagedQuery is the AQL-FIT-04 audit's second verified-silent query: a row
+// pagedQuery is the audit's second verified-silent query: a row
 // bound with no total order, which the shipped v0.22.0 linter answered clean
 // (REQ-164 § Acceptance). The projection is aliased so the row is about the
 // paging code alone.

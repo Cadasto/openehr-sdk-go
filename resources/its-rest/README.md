@@ -18,7 +18,7 @@ schemas of every REST resource.
 - **Source:** [`openEHR/specifications-ITS-REST`](https://github.com/openEHR/specifications-ITS-REST), files `computable/OAS/*-validation.openapi.yaml`.
 - **Flavour:** the `*-validation` variant (canonical, vendor-extension-light). The
   sibling `*-codegen` / `*-html` flavours carry the same schema with tooling-specific
-  extensions and are intentionally **not** vendored.
+  extensions and are intentionally not vendored.
 - **Pin + integrity:** the exact upstream commit and a per-file `sha256` are recorded
   in [`MANIFEST.txt`](MANIFEST.txt). Regenerate with `make its-rest-sync`; verify with
   `make its-rest-check` (see [the sync script](../../scripts/sync-its-rest-specs.sh)).
@@ -63,4 +63,4 @@ the same commit.
 
 Each file declares **Creative Commons Attribution-NoDerivs 3.0 Unported**
 (© openEHR Foundation) on `info.license`. They are vendored unmodified.
-Repository-wide inventory: [`LICENSING.md`](../../LICENSING.md).
+Repository-wide inventory: [`docs/licensing.md`](../../docs/licensing.md).

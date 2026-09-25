@@ -1,8 +1,8 @@
 # `resources/bmm/` — pinned openEHR BMM schemas
 
-Machine-readable openEHR meta-model schemas (BMM) in their canonical `P_BMM` JSON form. The SDK's domain types in `openehr/rm/`, `openehr/aom/aom14/`, and related packages are **derived** from these files (see [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md)).
+Machine-readable openEHR meta-model schemas (BMM) in their canonical `P_BMM` JSON form. The SDK's domain types in `openehr/rm/`, `openehr/aom/aom14/`, and related packages are derived from these files (see [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md)).
 
-These files are **the SDK's source of truth** for the openEHR Reference Model, Archetype Object Model, base types, language types, and terminology service interface. The SDK pins them as in-tree assets so that:
+These files are the SDK's source of truth for the openEHR Reference Model, Archetype Object Model, base types, language types, and terminology service interface. The SDK pins them as in-tree assets so that:
 
 1. Builds are reproducible: nothing is fetched over the network at build time.
 2. Generated code can be re-emitted byte-for-byte, which CI uses to detect drift.
@@ -33,15 +33,15 @@ base 1.3.0  (foundation)
 
 ## Provenance
 
-These BMM files are published by the openEHR Foundation as the computable form of the corresponding openEHR specification documents. The on-disk format is **`P_BMM`**, the persistence binding of the abstract BMM meta-model defined in the openEHR LANG specification (`bmm` and `bmm_persistence`).
+These BMM files are published by the openEHR Foundation as the computable form of the corresponding openEHR specification documents. The on-disk format is `P_BMM`, the persistence binding of the abstract BMM meta-model defined in the openEHR LANG specification (`bmm` and `bmm_persistence`).
 
-The files in this directory are **byte-identical copies** of the upstream releases. They are stored here, not fetched at build time, for the reasons listed above. When upstream publishes a newer version, follow § Updating below.
+The files in this directory are byte-identical copies of the upstream releases. They are stored here, not fetched at build time, for the reasons listed above. When upstream publishes a newer version, follow § Updating below.
 
-All six pins were verified byte-identical to [`openEHR/BMM-publisher`](https://github.com/openEHR/BMM-publisher) `resources/` on **2026-06-12**. At that time `openehr_lang_1.1.0` was re-synced to the canonical modular publisher form, replacing a flattened variant. The other five matched. To re-audit, fetch each `resources/<file>` from the publisher and compare its `sha256sum` with the pin.
+All six pins were verified byte-identical to [`openEHR/BMM-publisher`](https://github.com/openEHR/BMM-publisher) `resources/` on 2026-06-12. At that time `openehr_lang_1.1.0` was re-synced to the canonical modular publisher form, replacing a flattened variant. The other five matched. To re-audit, fetch each `resources/<file>` from the publisher and compare its `sha256sum` with the pin.
 
 ## Updating
 
-A BMM version bump is **never accidental**. The canonical procedure is **[ADR 0001: BMM version-bump runbook](../../docs/adr/0001-bmm-version-bump-runbook.md)**. The short form:
+A BMM version bump is always deliberate and follows [ADR 0001: BMM version-bump runbook](../../docs/adr/0001-bmm-version-bump-runbook.md), the canonical procedure. In outline:
 
 1. Drop the new file alongside the old (e.g. `openehr_rm_1.2.1.bmm.json` next to `openehr_rm_1.2.0.bmm.json`). Do **not** overwrite the old file.
 2. Run `make codegen` then `make codegen-verify`. Optionally inspect the semantic diff with `go run ./cmd/bmmdiff <old> <new>`.
@@ -51,7 +51,7 @@ A BMM version bump is **never accidental**. The canonical procedure is **[ADR 00
 
 See ADR 0001 for the full procedure, roles, and tooling notes. The weekly drift bot ([`.github/workflows/codegen-drift.yml`](../../.github/workflows/codegen-drift.yml)) catches accidental hand-edits or generator-template changes between bumps.
 
-Mid-version evolution (`openehr_rm_1.2.0` → `openehr_rm_1.2.0.2`, i.e. a `schema_revision` change without a `rm_release` change) is recorded by replacing the file and noting it in the CHANGELOG; no code regeneration is required if no semantic content changed.
+Mid-version evolution (`openehr_rm_1.2.0` → `openehr_rm_1.2.0.2`, i.e. a `schema_revision` change without a `rm_release` change) is recorded by replacing the file and noting it in the CHANGELOG. If no semantic content changed, no code regeneration is required.
 
 ## Integrity
 

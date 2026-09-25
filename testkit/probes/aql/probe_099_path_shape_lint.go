@@ -51,7 +51,7 @@ var pathShapeCodesAll = []string{
 func pathShapeCodes() []string { return pathShapeCodesAll }
 
 // PathShapeFireRow names one firing row the PROBE-099 wire assertion requires
-// BY NAME (conformance.md § PROBE-099, arm (a)) — the two queries the AQL-FIT-04
+// BY NAME (conformance.md § PROBE-099, arm (a)) — the two queries an
 // audit verified silent on the shipped v0.22.0 linter and which MUST now warn,
 // and the clause-scope witness REQ-164 § Acceptance names beside them. A
 // [PathShapeFireCase] tagged with one counts towards that requirement, and

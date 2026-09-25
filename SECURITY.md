@@ -26,7 +26,7 @@ Out of scope — report upstream, or not an SDK vulnerability:
 - The openEHR specification itself → [openEHR editors](https://specifications.openehr.org/).
 - Third-party CDR implementations → the CDR vendor.
 - Misconfiguration in consumer applications (happy to advise).
-- Hardening suggestions without a concrete vulnerability → open a public issue or discussion.
+- Hardening suggestions without a concrete vulnerability → open a public issue.
 
 ## Supported versions
 

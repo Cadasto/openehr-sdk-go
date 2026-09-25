@@ -14,11 +14,9 @@ The SDK's AQL surface is syntactically complete (REQ-109/113/117/119) but carrie
 Model knowledge: `OBSERVATION o CONTAINS COMPOSITION c` parses, lints clean, and builds, yet can
 never match data under the RM. Server-side validation of RM structural legality is not common
 practice in current engines — EHRbase, for example, checks containment at storage-root
-granularity, so such queries are accepted and return zero rows (observed behaviour;
-maintainer's knowledge base, `openehr-kb/notes/ecosystem/ehrbase-aql.md` §4.1.2) — which makes
+granularity, so such queries are accepted and return zero rows (observed behaviour) — which makes
 an empty result set indistinguishable from an impossible query. The QUERY specification is silent on whether an
-engine must reject an RM-impossible containment (registered gap AQL-C-009(d) in the maintainer's
-knowledge base), on the `VERSION` default predicate (SPECPR-481), and on row semantics for
+engine must reject an RM-impossible containment, on the `VERSION` default predicate (SPECPR-481), and on row semantics for
 sibling multiplicity (SPECQUERY-9, open since 2018).
 
 `openehr/rm/rminfo` (REQ-048) already ships the BMM-derived class graph — attribute RM types,
@@ -26,8 +24,8 @@ abstractness, conformance, concrete descendants — with AQL CONTAINS conformanc
 intended consumer. The question is how to wire that knowledge to the AQL surface without
 breaking the permissive parser (ADR 0007), the builder's contract, or portability to EHRbase
 and other conformant CDRs. Dialects also extend containment beyond the RM — reference-hop
-containments such as `FOLDER CONTAINS COMPOSITION`, and Cadasto's demographic extension
-(`FROM PERSON … AND EHR e CONTAINS …`, AQL-C-010) — so a closed rule table would misjudge
+containments such as `FOLDER CONTAINS COMPOSITION`, and demographic containment
+(`FROM PERSON … AND EHR e CONTAINS …`) — so a closed rule table would misjudge
 queries that are meaningful on some targets.
 
 ## Decision
@@ -52,8 +50,8 @@ contract unchanged.**
 - **Three diagnostic categories, three forces** (REQ-161): RM-impossible, provable from the
   pinned BMM → **Error**; spec-gap portability hazard, citing the open specification question or community
   source where one exists → **Warning**; engine-capability difference → out of scope for the default checks, deferred to
-  per-engine profiles. Error-on-impossible is a documented SDK position on the open gap
-  AQL-C-009(d), not enforcement of spec text; the flagging policy is conservative and owned by
+  per-engine profiles. Error-on-impossible is a documented SDK position on that open
+  specification gap, not enforcement of spec text; the flagging policy is conservative and owned by
   REQ-161 § Flagging policy — an unknown name raises the `aql_unknown_rm_class` Warning, never
   silence and never an Error.
 - **Row semantics stay out of scope.** The result-shape question for sibling multiplicity is

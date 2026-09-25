@@ -6,9 +6,7 @@
 **Covers:** [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-101](../../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder), [REQ-103](../../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection) (interval leaves), [REQ-110](../../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition) (soundness contract)  
 **Probes:** [PROBE-027](../../specifications/conformance.md#probe-027--generated-instance-validates-clean) — extend corpus after fixes  
 **Implementation:** landed  
-**Depends on:** v0.9.0 public `templatecompile.Compile` bridge (landed)  
-**Consumer:** a consuming CDR project — `TestNewSkeleton_CorpusCoverage` tripwire; closes when `newSkeletonGaps` allow-list shrinks to empty  
-**External reference:** the consuming CDR project's real-world OPT coverage draft (tracked in that project).
+**Depends on:** v0.9.0 public `templatecompile.Compile` bridge (landed)
 
 ## Goal
 
@@ -18,15 +16,15 @@
 
 Corpus coverage lives in `testkit/probes/instance/probes_test.go` (`TestProbe027_RealWorldCorpus`).
 
-| Fixture | Phase | Observed error (matches the consumer's draft) |
+| Fixture | Phase | Observed error |
 |---|---|---|
 | `Referral Request.v1.opt` | `NewSkeleton` | `attach ELEMENT.name: rmwrite: unknown attribute on parent: *rm.Element has no single attr "name"` |
 | `Demonstration.v1.opt` | `NewSkeleton` | `makeChild DV_INTERVAL<DV_QUANTITY>: rmwrite: unknown RM type: "DV_INTERVAL<DV_QUANTITY>"` |
 | `social.opt` | `ValidateComposition` | `rm_type_mismatch: RM type EVALUATION does not satisfy template RM type OBSERVATION at /content[at0000]` |
 
-`Demonstration.v1.opt` is already vendored under `testkit/cassettes/templates/`. The other two OPTs live in the consuming CDR project's benchmark corpus; vendoring them (or minimal extracted slices) is part of Task 5.
+`Demonstration.v1.opt` is already vendored under `testkit/cassettes/templates/`. The other two OPTs are not yet in this repo; vendoring them (or minimal extracted slices) is part of Task 5.
 
-**Note:** `social.opt` uses root `<OPERATIONAL_TEMPLATE>` (NightShift export). The SDK parser expects `<template>` per `openehr/template/parse.go` — the consumer normalises via tag rewrite before `ParseOPT`. Consider a small **out-of-scope** follow-up to accept both roots natively (REQ-100); this plan only needs the normaliser in tests until then.
+**Note:** `social.opt` uses root `<OPERATIONAL_TEMPLATE>` (NightShift export). The SDK parser expects `<template>` per `openehr/template/parse.go` — a caller can normalise via tag rewrite before `ParseOPT`. Consider a small **out-of-scope** follow-up to accept both roots natively (REQ-100); this plan only needs the normaliser in tests until then.
 
 ## Architecture
 
@@ -107,21 +105,20 @@ flowchart TD
 - Modify: `testkit/probes/instance/probes_test.go` (or new `realworld_corpus_test.go` in same package)
 - Modify: `docs/specifications/traceability.yaml` if new test files added
 
-- [x] **Step 1: Add corpus helpers** — `parseOPTBytes` normaliser (OPERATIONAL_TEMPLATE → template) in `testkit/fixtures` if reused; avoid duplicating the consumer's private helper.
+- [x] **Step 1: Add corpus helpers** — `parseOPTBytes` normaliser (OPERATIONAL_TEMPLATE → template) in `testkit/fixtures` if reused.
 - [x] **Step 2: Extend PROBE-027** — run `Probe027GeneratedValidates` on `Referral Request.v1`, `Demonstration.v1`, `social` with stable composer/territory.
 - [x] **Step 3: Run** — `go test ./testkit/probes/instance/...`
 
-### Task 5: Docs & consumer handshake
+### Task 5: Docs
 
 - [x] **Step 1:** Add brief note under REQ-107 in `docs/specifications/clinical-modeling.md` — generator MUST respect attribute cardinality upper under Minimal policy; generic OPT RM types MUST resolve.
 - [ ] **Step 2:** `CHANGELOG.md` — one bullet under `### Added` / `### Fixed` (on release request only).
-- [ ] **Step 3:** Notify the consumer — after SDK release, the consumer's `newSkeletonGaps` allow-list shrinks; consumer re-runs `TestNewSkeleton_CorpusCoverage`.
-- [x] **Step 4:** `make spec-check` + `make ci` in worktree.
+- [x] **Step 3:** `make spec-check` + `make ci`.
 
 ## Verification
 
 ```bash
-# From worktree root
+# From the repo root
 go test ./internal/templateinstance/rmwrite/... ./openehr/instance/... ./openehr/composition/... ./testkit/probes/instance/...
 make ci   # full gate when Docker available
 ```
@@ -130,7 +127,7 @@ make ci   # full gate when Docker available
 
 ## Out of scope
 
-- **Payload realism** — Minimal policy skeletons stay smaller than the consumer's curated fixtures; benchmark adoption is a consumer decision.
+- **Payload realism** — Minimal policy skeletons stay smaller than curated real-world fixtures.
 - **Native `<OPERATIONAL_TEMPLATE>` root parsing** — test normaliser only; optional REQ-100 follow-up.
 - **`Example` policy** emitting all optional sections — only Minimal behaviour changes for cardinality.
 

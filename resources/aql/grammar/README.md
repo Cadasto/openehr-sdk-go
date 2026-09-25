@@ -1,7 +1,7 @@
 # AQL grammar profile
 
-The SDK parses AQL with an ANTLR grammar maintained here: the **official openEHR
-grammar** plus a small, documented set of deltas (the *SDK grammar profile*,
+The SDK parses AQL with an ANTLR grammar maintained here: the official openEHR
+grammar plus a small, documented set of deltas (the *SDK grammar profile*,
 REQ-109). See [ADR 0007](../../../docs/adr/0007-aql-antlr-grammar-profile.md) for
 the strategy and [`../../../docs/plans/archive/2026-06-15-aql-lint.md`](../../../docs/plans/archive/2026-06-15-aql-lint.md)
 for the full plan.
@@ -43,4 +43,4 @@ versions together** (see `baseline/PIN`), because they are released in lockstep.
 The openEHR grammars are **CC-BY-SA 4.0**, © openEHR Foundation. The SDK's deltas
 in `active/` are a documented derivative work under the same terms. Attribution
 is retained in the grammar file headers. Repository-wide inventory:
-[`LICENSING.md`](../../../LICENSING.md).
+[`docs/licensing.md`](../../../docs/licensing.md).

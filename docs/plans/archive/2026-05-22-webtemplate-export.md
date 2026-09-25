@@ -273,7 +273,7 @@ Parity-anchored (ADR-0014): the reference is the oracle. **If the fetch is block
 - Modify: `testkit/cassettes/THIRD_PARTY_LICENSES.md`
 - Test: `openehr/template/webtemplate/parity_test.go` (loader only in this task)
 
-- [ ] **Step 1: Fetch the pinned EHRbase artefacts.** From the `openehr-kb` note's pinned commit `22b01e0c99b53669394e56da29c2410838b5cf7e`:
+- [ ] **Step 1: Fetch the pinned EHRbase artefacts.** From the pinned EHRbase `openEHR_SDK` commit `22b01e0c99b53669394e56da29c2410838b5cf7e`:
 
 ```bash
 BASE=https://raw.githubusercontent.com/ehrbase/openEHR_SDK/22b01e0c99b53669394e56da29c2410838b5cf7e/test-data/src/main/resources
@@ -720,7 +720,7 @@ func TestIDParityAgainstReference(t *testing.T) {
 - [ ] **Step 2: Run it — expect FAIL (collisions produce duplicate ids) or SKIP (fixture absent).**
 
 Run: `go test ./openehr/template/webtemplate/ -run TestIDParityAgainstReference -v`
-Expected: FAIL listing mismatches (or SKIP — then implement the rule from the openehr-kb note and defer the assertion).
+Expected: FAIL listing mismatches (or SKIP — then implement the rule as documented by EHRbase and defer the assertion).
 
 - [ ] **Step 3: Implement sibling disambiguation.** In `buildNode`, after building a node's children, assign ids in a second pass that tracks seen ids among siblings and applies the reference's collision suffix (observe the exact suffix in the mismatch output / reference JSON — e.g. a trailing `_<n>` or a parent-qualified form — and encode it). Keep it a pure function of the sibling set so output stays deterministic.
 

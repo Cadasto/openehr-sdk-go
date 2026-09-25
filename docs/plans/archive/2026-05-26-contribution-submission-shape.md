@@ -113,7 +113,7 @@ The CDR rejects this — at submission time the OBJECT_REFs point to versions th
 
 ### Phase 3 — Consumer alignment + survey
 
-**Outcome:** SDK consumers (reference CDR load harness, integration tests) migrated; spec ambiguity caveat resolved.
+**Outcome:** SDK consumers (load harnesses, integration tests) migrated; spec ambiguity caveat resolved.
 
 **Tasks:**
 

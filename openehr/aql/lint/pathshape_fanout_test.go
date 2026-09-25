@@ -117,7 +117,7 @@ func TestFanoutPathGrainFiresOnTheSpecWitness(t *testing.T) {
 // TestFanoutPathGrainCountsSegmentsTypedBeforeAWalkStop pins REQ-164 § The
 // conservative segment walk's bounded-reach ruling: a walk that stopped still
 // contributes the segments it typed BEFORE the stop. The first path here is the
-// AQL-FIT-04 audit projection, whose walk ends at `EVENT.data`'s generic `T` —
+// audited projection, whose walk ends at `EVENT.data`'s generic `T` —
 // and its already-typed `HISTORY.events` is what makes the pair.
 //
 // The `items` below that stop is a container on every class that declares it,

@@ -253,7 +253,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 - **Keep them separate and document the composition.** No behaviour change; callers who want both call both, and § REQ-112 says so. Against it: the gap stays reachable by default, and the plan-text defect that opened this strand shows how easily the two are assumed to chain.
 - **Opt-in chaining** — an option on the template-driven entry points. Additive and reversible. Against it: two code paths to keep in agreement, and an option nobody sets is the second option under another name.
 
-**Evidence needed:** how often a template-valid, RM-invalid composition reaches a consumer in practice (the consuming CDR project's validation pipeline is the first place to ask); the duplicate-issue rate if the floor is chained over the vendored composition corpus; the cost of a second walk at the benchmark harness's composition sizes.
+**Evidence needed:** how often a template-valid, RM-invalid composition reaches a consumer in practice (a consuming CDR's validation pipeline is the first place to ask); the duplicate-issue rate if the floor is chained over the vendored composition corpus; the cost of a second walk at the benchmark harness's composition sizes.
 
 **Resolution form:** ADR-NNNN; amends REQ-102 / REQ-110 (if chaining) and REQ-112's composition sentence either way. Until then § REQ-112 states the current behaviour and points here, and the answer **MUST NOT** be pre-empted in code.
 

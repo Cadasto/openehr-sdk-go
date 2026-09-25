@@ -4,7 +4,7 @@ How `github.com/cadasto/openehr-sdk-go` is versioned, tagged, and announced. Qua
 
 ## Versioning
 
-[SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) ([REQ-004](specifications/packaging.md#req-004--semantic-versioning)). The **git tag** (`vX.Y.Z`) is the single authoritative version. `go.mod` carries only the Go language version, never the SDK's own semver, and there is no runtime `version` package. Consumers pin:
+[SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) ([REQ-004](specifications/packaging.md#req-004--semantic-versioning)). The git tag (`vX.Y.Z`) is the single authoritative version. `go.mod` carries only the Go language version, never the SDK's own semver, and there is no runtime `version` package. Consumers pin:
 
 ```bash
 go get github.com/cadasto/openehr-sdk-go@vX.Y.Z
@@ -32,7 +32,7 @@ The repo pins four versions independently, and the git tag tracks only the first
 
 ### Pre-1.0
 
-While on `v0.x`, **minor** bumps may break the public API (release notes list every break) and **patch** bumps stay compatible. Pin an exact tag and read the notes before upgrading a minor.
+While on `v0.x`, minor bumps may break the public API (release notes list every break) and patch bumps stay compatible. Pin an exact tag and read the notes before upgrading a minor.
 
 ### `v1.0.0` gate
 
@@ -51,7 +51,7 @@ Until then the project ships `v0.x` adopter slices. Current progress is in [`doc
 ### Tag checklist
 
 1. **CI green on `main`.** Run `make ci` (the same gate as [`ci.yml`](../.github/workflows/ci.yml)).
-2. **CHANGELOG.** Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and open a fresh `## [Unreleased]` above it. Keep it terse: one-sentence bullets and a one-sentence summary, per the [CHANGELOG brevity rule](../AGENTS.md#code-style-and-conventions). The release notes are copied verbatim from this block, so trim *here*, not in the GitHub draft. Commit this (with step 3) **directly to `main`**, with no branch or PR for a release bump (see [Branch & tag policy](#branch--tag-policy)). The same commit bumps the `go get …@vX.Y.Z` line on [`pages/install.md`](../pages/install.md) and [`pages/index.md`](../pages/index.md): `make docs-check` reads the release straight out of this CHANGELOG heading and fails until both site pages name it.
+2. **CHANGELOG.** Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and open a fresh `## [Unreleased]` above it. Keep it terse: one-sentence bullets and a one-sentence summary, per the [CHANGELOG brevity rule](../AGENTS.md#code-style-and-conventions). The release notes are copied verbatim from this block, so trim *here*, not in the GitHub draft. Commit this (with step 3) **directly to `main`**, with no branch or PR for a release bump (see [Branch & tag policy](#branch--tag-policy)). The same commit bumps the `go get …@vX.Y.Z` line on [`pages/install.md`](../pages/install.md) and [`pages/index.md`](../pages/index.md). `make docs-check` reads the release straight out of this CHANGELOG heading and fails until both site pages name it.
 3. **Roadmap.** Bump [`docs/roadmap.md`](roadmap.md) if the release crosses a milestone.
 4. **Annotated tag from `main`.** Create it and push:
    ```bash
@@ -72,7 +72,7 @@ Preview notes locally without side effects: `bash scripts/release-notes.sh X.Y.Z
 
 - `main` is always releasable after CI. Tag **only** from `main` (or a `release/v0.x` hotfix branch).
 - Only maintainers push tags, and branch protection on `main` enforces this.
-- **Substantive work** (features, fixes, docs of record) lands via branch + PR. A maintainer commits **mechanical release bookkeeping** directly to `main`, with no branch or PR. That covers the version-bump CHANGELOG cut (steps 2–3 above) and any milestone roadmap bump. If branch protection ever rejects a direct push, stop and report it. Do not quietly route the bump through a PR instead.
+- **Substantive work** (features, fixes, docs of record) lands via branch + PR. A maintainer commits **mechanical release bookkeeping** directly to `main`, with no branch or PR. That covers the version-bump CHANGELOG cut (steps 2 and 3 above) and any milestone roadmap bump. If branch protection ever rejects a direct push, stop and report it. Do not quietly route the bump through a PR instead.
 
 ## References
 
