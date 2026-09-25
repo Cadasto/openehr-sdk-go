@@ -14,7 +14,7 @@ import (
 
 const defaultJWKSTTL = 5 * time.Minute
 
-// JWKS holds a cached JSON Web Key Set (REQ-062).
+// JWKS holds a cached JSON Web Key Set.
 type JWKS struct {
 	HTTPClient *http.Client
 	URI        string
@@ -51,7 +51,7 @@ func NewJWKS(httpClient *http.Client, uri string) (*JWKS, error) {
 }
 
 // Key returns the JWK document for kid. On cache miss the JWKS document
-// is refreshed once before failing (REQ-062).
+// is refreshed once before failing.
 func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
 	if kid == "" {
 		return nil, fmt.Errorf("%w: empty kid", auth.ErrJWKSValidationFailed)

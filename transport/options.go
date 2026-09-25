@@ -40,16 +40,15 @@ type config struct {
 // Option mutates the transport configuration. Apply via transport.New.
 type Option func(*config)
 
-// WithHTTPClient injects the *http.Client used for outgoing requests
-// per REQ-021. Required — there is no built-in default; transport.New
+// WithHTTPClient injects the *http.Client used for outgoing requests.
+// It is required: there is no built-in default, and transport.New
 // returns ErrInvalidConfig when the option is omitted.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *config) { cfg.httpClient = c }
 }
 
 // WithTokenSource sets the client-default auth.TokenSource. Per-request
-// overrides via auth.WithTokenSource(ctx, ts) take precedence (REQ-060,
-// PROBE-064). Default is auth.AnonymousTokenSource (no Authorization
+// overrides via auth.WithTokenSource(ctx, ts) take precedence. Default is auth.AnonymousTokenSource (no Authorization
 // header emitted).
 func WithTokenSource(ts auth.TokenSource) Option {
 	return func(cfg *config) { cfg.tokenSrc = ts }
@@ -62,34 +61,33 @@ func WithUserAgent(ua string) Option {
 }
 
 // WithSpecVersion pins the spec version emitted on the optional
-// Cadasto-OpenEhr-Spec-Version header (REQ-051). Effective only when
+// Cadasto-OpenEhr-Spec-Version header. Effective only when
 // WithCadastoSpecVersionHeader(true) is also set.
 func WithSpecVersion(v string) Option {
 	return func(cfg *config) { cfg.specVersion = v }
 }
 
 // WithCadastoSpecVersionHeader toggles emission of the
-// Cadasto-OpenEhr-Spec-Version header (REQ-051). Default off; turn on
+// Cadasto-OpenEhr-Spec-Version header. Default off; turn on
 // only when the catalog or deployment indicates a Cadasto backend.
 func WithCadastoSpecVersionHeader(on bool) Option {
 	return func(cfg *config) { cfg.sendCadastoHeader = on }
 }
 
-// WithRetry installs a retry policy (REQ-091). Default: no retries.
+// WithRetry installs a retry policy. Default: no retries.
 func WithRetry(p RetryPolicy) Option {
 	return func(cfg *config) { cfg.retry = p }
 }
 
 // WithCallerAttribution attaches a client-default CallerAttribution
-// emitted on every outgoing request (REQ-066). Per-request overrides
+// emitted on every outgoing request. Per-request overrides
 // via WithCallerAttributionCtx take precedence.
 func WithCallerAttribution(a CallerAttribution) Option {
 	return func(cfg *config) { cfg.callerAttribution = a }
 }
 
 // WithCallerAttributionHeader overrides the header name used to carry
-// caller attribution. Default "X-Cadasto-Caller-Attribution" per
-// REQ-066.
+// caller attribution. Default "X-Cadasto-Caller-Attribution".
 func WithCallerAttributionHeader(name string) Option {
 	return func(cfg *config) { cfg.callerAttributionHeader = name }
 }
@@ -100,7 +98,7 @@ func WithLogger(l *slog.Logger) Option {
 	return func(cfg *config) { cfg.logger = l }
 }
 
-// WithObserver installs an Observer (REQ-098). The observer fires
+// WithObserver installs an Observer. The observer fires
 // exactly once per logical Client.Do call after retries settle. A nil
 // observer is treated as a no-op (safe to pass through configuration
 // layers that don't know whether the consumer wants observability).
@@ -125,28 +123,28 @@ const DefaultMaxResponseBody int64 = 64 << 20
 // request, guarding against memory exhaustion from a misbehaving or
 // hostile server. The default is DefaultMaxResponseBody (64 MiB). A
 // value of 0 selects the default; a negative value disables the limit
-// (unbounded read). Large responses — e.g. bulk EHR exports — may
+// (unbounded read). Large responses, such as bulk EHR exports, may
 // require a higher cap via WithMaxResponseBody(n) or an unbounded read
 // via WithMaxResponseBody(-1).
 func WithMaxResponseBody(n int64) Option {
 	return func(cfg *config) { cfg.maxResponseBody = n }
 }
 
-// WithReauthOn401 installs an opt-in 401→reauth safety net (REQ-063).
+// WithReauthOn401 installs an opt-in 401→reauth safety net.
 // When a wire 401 is received and the Reauther has not yet been invoked
 // for the current Do call, transport calls r.Reauth(ctx) once and retries
 // the request one time with the freshly acquired token. On a second 401
 // (or when Reauth returns an error) the error is surfaced to the caller.
 //
-// When this option is not set, the no-reauther path is unchanged:
-// a wire 401 returns ErrUnauthorized immediately (existing contract).
+// When this option is not set, a wire 401 returns ErrUnauthorized
+// immediately.
 //
-// This is a complementary safety net — proactive expiry-based refresh
-// in TokenSource.Token is the primary mechanism.
+// Proactive expiry-based refresh in TokenSource.Token is the primary
+// mechanism; this option is a fallback for tokens that expire anyway.
 //
 // All HTTP methods are retried, including non-idempotent writes (POST/PUT).
 // This is safe because a 401 means the request was rejected at the
-// authentication layer and therefore NOT processed by the resource — re-driving
+// authentication layer and therefore not processed by the resource, so re-driving
 // it once after refreshing the credential cannot double-apply a write. Note,
 // however, that a 401 may also indicate insufficient scope rather than an
 // expired token; in that case the reauth-and-retry simply 401s again and the
@@ -155,7 +153,7 @@ func WithMaxResponseBody(n int64) Option {
 // distinguishes expiry (401) from authorization (403), this targets the former.
 //
 // A discovery-catalog-refresh closure can satisfy the interface via
-// auth.ReautherFunc (REQ-071 bullet 3).
+// auth.ReautherFunc.
 func WithReauthOn401(r auth.Reauther) Option {
 	return func(cfg *config) { cfg.reauther = r }
 }

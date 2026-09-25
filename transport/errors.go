@@ -9,8 +9,8 @@ import (
 
 // Sentinel transport errors. Detect classes with errors.Is.
 //
-// Wire-status mappings track [docs/specifications/wire.md § Error envelope] REQ-093.
-// Additional sentinels for non-wire failures (discovery, configuration)
+// The wire-status sentinels map HTTP status codes of the openEHR REST
+// error envelope. Additional sentinels for non-wire failures (discovery, configuration)
 // live in their owning packages.
 var (
 	// ErrNotFound maps a wire 404.
@@ -23,12 +23,12 @@ var (
 	ErrVersionConflict = errors.New("transport: version conflict")
 	// ErrPreconditionFailed maps a wire 412.
 	ErrPreconditionFailed = errors.New("transport: precondition failed")
-	// ErrUnprocessable maps a wire 422 — a well-formed request that
-	// failed semantic / template validation (REQ-093).
+	// ErrUnprocessable maps a wire 422: a well-formed request that
+	// failed semantic or template validation.
 	ErrUnprocessable = errors.New("transport: unprocessable entity")
 	// ErrPreconditionRequired maps a wire 428. Note: openEHR signals a
-	// missing-but-expected If-Match as 400, not 428 — this sentinel is
-	// retained only as a defensive mapping for non-conformant servers.
+	// missing-but-expected If-Match as 400, not 428; this sentinel exists
+	// only as a defensive mapping for non-conformant servers.
 	ErrPreconditionRequired = errors.New("transport: precondition required")
 	// ErrServerError maps any 5xx.
 	ErrServerError = errors.New("transport: server error")
@@ -43,20 +43,20 @@ var (
 	ErrInvalidShape = errors.New("transport: invalid response shape")
 	// ErrInvalidPathSegment indicates a decoded Request.Path segment is
 	// empty, is `.` or `..`, carries `\` or a control character, or (for
-	// [ValidatePathSegment]) carries `/` — or that the path's segment
-	// count contradicts its Route template, which is how a separator
-	// smuggled inside one parameter shows up (REQ-150).
+	// [ValidatePathSegment]) carries `/`. It also reports a path whose
+	// segment count contradicts its Route template, which is how a
+	// separator smuggled inside one parameter shows up.
 	//
 	// Returned errors wrap ErrInvalidConfig as well, so
 	// errors.Is(err, ErrInvalidConfig) still means "the request never
-	// left the process". The two sentinels are independent values —
-	// errors.Is(ErrInvalidPathSegment, ErrInvalidConfig) is false; only
-	// the returned chain carries both.
+	// left the process". The two sentinels are independent values:
+	// errors.Is(ErrInvalidPathSegment, ErrInvalidConfig) is false, and
+	// only the returned chain carries both.
 	ErrInvalidPathSegment = errors.New("transport: invalid path segment")
 )
 
-// OpenEHRErrorDetail is the parsed openEHR REST error envelope per
-// REQ-093. Nil when the response body did not match the envelope shape.
+// OpenEHRErrorDetail is the parsed openEHR REST error envelope. It is
+// nil when the response body did not match the envelope shape.
 type OpenEHRErrorDetail struct {
 	// Message is the human-readable description from the server.
 	// May contain PHI (patient identifiers, composition UUIDs, etc.).
@@ -65,7 +65,8 @@ type OpenEHRErrorDetail struct {
 	// Extract via errors.As when needed; do not include in log lines.
 	Message string `json:"message"`
 	// Code is the openEHR error code (e.g. "VALIDATION_FAILED").
-	// Coded terminology identifier — treated as non-PHI; always preserved.
+	// It is a coded terminology identifier, treated as non-PHI and always
+	// preserved.
 	Code string `json:"code"`
 	// CodedText optionally enumerates terminology-coded error tags.
 	CodedText []CodedTextItem `json:"coded_text,omitempty"`
@@ -87,11 +88,11 @@ type WireError struct {
 	StatusCode int
 	// Method, URL, and Route are the captured request identifiers.
 	// Route is the path template (e.g. "/ehr/{ehr_id}") when known, or the
-	// stable "(unrouted)" placeholder when the request carried no Route
-	// (REQ-093: never the expanded Path, which may hold a caller-supplied
-	// identifier). URL is the resolved URL with parameters substituted.
+	// stable "(unrouted)" placeholder when the request carried no Route.
+	// It is never the expanded Path, which may hold a caller-supplied
+	// identifier. URL is the resolved URL with parameters substituted.
 	Method, URL, Route string
-	// OpenEHR is the parsed openEHR error envelope (REQ-093). Nil when
+	// OpenEHR is the parsed openEHR error envelope. Nil when
 	// the body could not be parsed as such. OpenEHR.Message may contain
 	// PHI and is only populated when the client is built with
 	// WithRawErrorBodies(true). OpenEHR.Code is always present.
@@ -105,17 +106,16 @@ type WireError struct {
 }
 
 // Error implements error. The returned string includes the HTTP status,
-// the openEHR error code, and the request route — all non-PHI fields.
+// the openEHR error code, and the request route, all of which are
+// non-PHI fields.
 // The server message and raw body are deliberately omitted so WireError
 // values are safe to include in logs, traces, and observer callbacks.
 // Callers that need the message (e.g. for user-facing error reporting in
 // a controlled environment) should use errors.As to extract the full
 // WireError after opting in via WithRawErrorBodies.
 //
-// A nil receiver answers with the zero WireError's Error text rather
-// than panicking (REQ-025 nil-receiver axis). It delegates to the zero
-// value rather than repeating its text, so nil and zero cannot drift
-// apart.
+// A nil receiver returns the zero WireError's Error text instead of
+// panicking.
 func (e *WireError) Error() string {
 	if e == nil {
 		return (&WireError{}).Error()
@@ -145,8 +145,8 @@ func (e *WireError) Error() string {
 }
 
 // Unwrap exposes the sentinel for errors.Is. A nil receiver unwraps to
-// nil (REQ-025 nil-receiver axis): a failed errors.As / errors.AsType
-// leaves a typed nil that must answer rather than panic.
+// nil, so the typed nil a failed errors.As or errors.AsType leaves behind
+// does not panic.
 func (e *WireError) Unwrap() error {
 	if e == nil {
 		return nil
@@ -155,35 +155,33 @@ func (e *WireError) Unwrap() error {
 }
 
 // DecodeError reports a 2xx response whose body could not be decoded as the
-// requested representation (REQ-151) — a failure distinct both from a wire
-// failure ([WireError]) and from an absent body ([ErrInvalidShape], which the
-// empty-2xx arm keeps). Extract it with
-// errors.AsType[*transport.DecodeError](err); a leaf package's operation-name
-// wrap is presentation, not a barrier.
+// requested representation. It is distinct from a wire failure
+// ([WireError]) and from an absent body, which fails with
+// [ErrInvalidShape]. Extract it with
+// errors.AsType[*transport.DecodeError](err); the operation-name wrap a
+// leaf package adds does not hide it.
 type DecodeError struct {
 	// Method is the HTTP method of the request.
 	Method string
-	// Route is the route template (e.g. "/ehr/{ehr_id}"), not the
-	// expanded URL — or the stable "(unrouted)" placeholder when the
-	// request carried no Route (REQ-093: never the expanded Path, which
-	// may hold a caller-supplied identifier).
+	// Route is the route template (e.g. "/ehr/{ehr_id}"), or the stable
+	// "(unrouted)" placeholder when the request carried no Route. It is
+	// never the expanded URL or Path, which may hold a caller-supplied
+	// identifier.
 	Route string
 	// Body is the raw response body as delivered by the injected
-	// [http.Client] — after any transparent content decoding that client
+	// [http.Client], after any transparent content decoding that client
 	// performs, so a gzipped response yields the decompressed bytes
-	// rather than the wire form. It is populated unconditionally: no
-	// option gates it, and WithRawErrorBodies (which governs non-2xx
-	// bodies) does not apply (ADR 0018). Body inherits whatever ceiling
-	// the caller's [WithMaxResponseBody] configuration imposes on this
-	// client — the 64 MiB default, an explicit positive limit, or no
-	// ceiling at all where the caller disabled the cap with a negative
-	// value; it adds no ceiling of its own.
+	// rather than the wire form. It is always populated: no option
+	// controls it, and WithRawErrorBodies (which governs non-2xx bodies)
+	// does not apply. Body is limited only by the client's
+	// [WithMaxResponseBody] setting: the 64 MiB default, an explicit
+	// positive limit, or no limit when the caller disabled the cap with a
+	// negative value.
 	//
 	// The slice is the response buffer itself, not a copy. A custom
 	// UnmarshalJSON that mutates the bytes handed to it violates the
-	// encoding/json unmarshaler contract, and corrupts these diagnostics
-	// as a consequence; the SDK does not defensively copy to insure
-	// against that.
+	// encoding/json unmarshaler contract and corrupts these diagnostics;
+	// the SDK does not make a defensive copy.
 	//
 	// May contain PHI: it is the caller's own requested representation,
 	// so for a clinical resource it is patient data. Error never
@@ -195,17 +193,15 @@ type DecodeError struct {
 	Inner error
 }
 
-// Error names the method, the route and the classification only — the REQ-093
-// value-free discipline (REQ-151). It never interpolates Body, and never the
-// wrapped decoder's text: both causes may embed the offending value
-// (*strconv.NumError always; the v2 codec's own *json.SemanticError when the
-// failing token is a short string or number), which is why Error's own message
-// stays value-free and the cause is reachable only by unwrapping. Callers that
-// need the diagnostics unwrap or read Body.
+// Error names the method, the route and the classification only, so the
+// message carries no payload values. It never includes Body or the
+// wrapped decoder's text, because either may embed the offending value
+// (*strconv.NumError always does; the v2 codec's *json.SemanticError does
+// when the failing token is a short string or number). Callers that need
+// the diagnostics unwrap the error or read Body.
 //
-// Error answers on a nil receiver instead of panicking: a failed errors.As
-// leaves the caller holding a typed nil, which boxes into a non-nil error
-// (REQ-025 § No panics, nil-receiver axis).
+// Error works on a nil receiver instead of panicking, so the typed nil a
+// failed errors.As leaves behind is safe to print.
 func (e *DecodeError) Error() string {
 	if e == nil {
 		return "transport: decode: response body does not match the requested type"
@@ -220,7 +216,7 @@ func (e *DecodeError) Error() string {
 
 // Unwrap exposes the decoder's error, so errors.Is and errors.AsType still
 // reach the codec's own typed diagnostics (path, type, offset) unchanged. It
-// answers nil on a nil receiver (REQ-025 nil-receiver axis).
+// returns nil on a nil receiver.
 func (e *DecodeError) Unwrap() error {
 	if e == nil {
 		return nil

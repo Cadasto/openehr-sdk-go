@@ -10,9 +10,9 @@ import (
 	"github.com/cadasto/openehr-sdk-go/auth"
 )
 
-// TokenResponse is the SMART token-endpoint payload (REQ-061). The
-// application-level smart/ package maps this into LaunchContext
-// (REQ-064) after optional ID-token validation.
+// TokenResponse is the SMART token-endpoint payload. The
+// application-level smart/ package maps this into LaunchContext after
+// optional ID-token validation.
 type TokenResponse struct {
 	AccessToken  string
 	TokenType    string
@@ -24,7 +24,7 @@ type TokenResponse struct {
 	Patient   string
 	Encounter string
 	FHIRUser  string
-	// openEHR-native launch-context claims (REQ-064).
+	// openEHR-native launch-context claims.
 	// EHRID is the EHR identifier conveyed via the "ehrId" token claim,
 	// requested via the "launch/patient" scope in the openEHR SMART spec
 	// (https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html).
@@ -38,7 +38,7 @@ type TokenResponse struct {
 	// SMARTStyleURL is the optional "smart_style_url" launch-context parameter (SMART v2).
 	SMARTStyleURL string
 	// NeedPatientBanner is the optional "need_patient_banner" launch-context parameter
-	// (SMART v2). nil means the server did not express a preference — the caller should
+	// (SMART v2). nil means the server did not express a preference, and the caller should
 	// apply the SMART default of showing the patient banner. Non-nil points to the
 	// server's explicit value.
 	NeedPatientBanner *bool

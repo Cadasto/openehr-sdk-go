@@ -7,12 +7,10 @@
 // [Source.ExchangeAuthorizationCode] (returns [TokenResponse] for
 // smart/); the Source does not store per-launch handshake state.
 // [Source.LastTokenResponse] holds the latest token-endpoint SMART
-// fields, including after [Source.Token] refresh — re-derive
+// fields, including after a [Source.Token] refresh; re-derive
 // smart.LaunchContext when launch context may have changed.
 //
 // The application-level SMART launch context (patient, user, encounter,
-// scopes) lives in the top-level smart/ package — this package only
+// scopes) lives in the top-level smart/ package. This package only
 // covers the OAuth2/PKCE wire flow.
-//
-// See the SDK Specification proposal — SMART-on-openEHR auth library strand.
 package smart

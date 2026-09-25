@@ -4,8 +4,8 @@ import "context"
 
 type launchContextKey struct{}
 
-// LaunchContext is the application-level SMART launch surface
-// (REQ-064, REQ-067). Populated from a token-endpoint response via
+// LaunchContext is the application-level SMART launch surface,
+// populated from a token-endpoint response via
 // [LaunchContextFromTokenResponse].
 type LaunchContext struct {
 	// FHIR-compat launch-context claims.
@@ -16,7 +16,7 @@ type LaunchContext struct {
 	IDToken   *IDTokenClaims
 	Issuer    string
 	Principal *PrincipalIdentity
-	// openEHR-native launch-context claims (REQ-064).
+	// openEHR-native launch-context claims.
 	// EHRID is the EHR identifier conveyed via the "ehrId" token claim,
 	// requested via the "launch/patient" scope in the openEHR SMART spec
 	// (https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html).
@@ -30,7 +30,7 @@ type LaunchContext struct {
 	// SMARTStyleURL is the optional "smart_style_url" launch-context parameter (SMART v2).
 	SMARTStyleURL string
 	// NeedPatientBanner is the optional "need_patient_banner" launch-context parameter
-	// (SMART v2). nil means the server did not express a preference — the caller should
+	// (SMART v2). nil means the server did not express a preference, and the caller should
 	// apply the SMART default of showing the patient banner. Non-nil points to the
 	// server's explicit value.
 	NeedPatientBanner *bool

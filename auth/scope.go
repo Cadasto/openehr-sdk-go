@@ -9,9 +9,8 @@ import "strings"
 // and in the openEHR SMART App Launch specification
 // (https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html).
 //
-// All constants are purely lexical — the SDK does NOT enforce their presence or
-// absence; the deployment is authoritative (consistent with the BuildScope note
-// below). [REQ-061]
+// All constants are purely lexical: the SDK does not enforce their presence or
+// absence, and the deployment decides (as with BuildScope below).
 const (
 	ScopeOpenID        = "openid"         // required for ID-token issuance
 	ScopeProfile       = "profile"        // request standard profile claims
@@ -26,14 +25,14 @@ const (
 // BuildScope composes an openEHR-formatted scope from its three parts
 // per the SMART-on-openEHR convention: <compartment>/<resource>.<permission>.
 //
-// Empty parts collapse to omitted segments — BuildScope("", "COMPOSITION", "read")
-// returns "COMPOSITION.read". BuildScope is purely lexical and does NOT
-// validate the parts against any scope grammar; the deployment is
-// authoritative on which scopes it accepts (docs/specifications/auth.md § Scope handling).
+// Empty parts collapse to omitted segments: BuildScope("", "COMPOSITION", "read")
+// returns "COMPOSITION.read". BuildScope is purely lexical and does not
+// validate the parts against any scope grammar; the deployment decides
+// which scopes it accepts.
 //
-// The helper exists so consumers do not template scope strings by hand
-// in the most common case; consumers MAY pass raw scopes to providers
-// when they need shapes BuildScope does not cover.
+// The helper saves callers from templating scope strings by hand in the
+// most common case; callers can pass raw scopes to providers when they
+// need shapes BuildScope does not cover.
 func BuildScope(compartment, resource, permission string) string {
 	resource = strings.TrimSpace(resource)
 	permission = strings.TrimSpace(permission)

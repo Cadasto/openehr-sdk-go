@@ -39,7 +39,7 @@ type clientAssertionKey struct {
 	kid    string
 }
 
-// Config carries SMART-on-openEHR OAuth2 settings (REQ-061–063).
+// Config carries SMART-on-openEHR OAuth2 settings.
 type Config struct {
 	HTTPClient       *http.Client
 	ClientID         string
@@ -69,7 +69,7 @@ type Config struct {
 // Option mutates Config during construction.
 type Option func(*Config)
 
-// WithHTTPClient injects the client for token and JWKS calls (REQ-021).
+// WithHTTPClient injects the client for token and JWKS calls.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *Config) { cfg.HTTPClient = c }
 }
@@ -82,12 +82,12 @@ func WithClientSecret(secret string) Option {
 }
 
 // WithClientAssertionKey enables confidential-client token exchange using
-// private_key_jwt (RFC 7523 / SMART client-confidential-asymmetric, REQ-068).
+// private_key_jwt (RFC 7523 / SMART client-confidential-asymmetric).
 // The signed client_assertion authenticates the client at the token endpoint
 // in place of an HTTP Basic header. alg is the JOSE algorithm (RS384 default
 // per SMART; RS256/ES256/ES384 also supported by jwtbearer.ClaimsSigner); kid,
 // when set, is emitted as the JWS "kid" header. Mutually exclusive with
-// WithClientSecret — configuring both is rejected at construction.
+// WithClientSecret; configuring both is rejected at construction.
 // signer must be non-nil; a nil signer is rejected at construction with
 // [auth.ErrInvalidConfig].
 func WithClientAssertionKey(signer crypto.Signer, alg, kid string) Option {
@@ -270,10 +270,10 @@ type AuthorizationRequest struct {
 // If state is empty, a cryptographically random state value is generated
 // (stateLen bytes of entropy, base64url-encoded) and returned in
 // [AuthorizationRequest].State. If state is non-empty it is used
-// verbatim — the caller takes responsibility for its strength and
+// verbatim, and the caller takes responsibility for its strength and
 // session binding.
 //
-// Callers MUST retain the returned [AuthorizationRequest] and pass it
+// Callers must retain the returned [AuthorizationRequest] and pass it
 // unchanged to [Source.ExchangeAuthorizationCode], which compares the
 // state received at the redirect URI against req.State. A Source supports
 // many concurrent launches when each flow keeps its own request value.
@@ -292,7 +292,7 @@ func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) 
 	return AuthorizationRequest{State: state, PKCE: pkce}, nil
 }
 
-// AuthorizeURL builds the SMART authorization redirect URL (REQ-061).
+// AuthorizeURL builds the SMART authorization redirect URL.
 func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {
 		return "", fmt.Errorf("%w: call BeginAuthorization first or supply State and PKCE", auth.ErrInvalidConfig)
@@ -319,13 +319,13 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	return u.String(), nil
 }
 
-// ExchangeAuthorizationCode completes the PKCE flow (REQ-061). req MUST be
+// ExchangeAuthorizationCode completes the PKCE flow. req must be
 // the [AuthorizationRequest] returned by [Source.BeginAuthorization] for this
 // launch. callbackState is the state query parameter received at the redirect
 // URI; it is compared against req.State and [ErrLaunchInvalidState] is
 // returned on mismatch before any network call is made, defending against
-// CSRF (REQ-061). The returned [TokenResponse] carries SMART launch
-// parameters for smart/ (REQ-064).
+// CSRF. The returned [TokenResponse] carries SMART launch parameters for
+// smart/.
 func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, callbackState string, req AuthorizationRequest) (auth.Token, TokenResponse, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {
 		return auth.Token{}, TokenResponse{}, fmt.Errorf("%w: AuthorizationRequest from BeginAuthorization is required", auth.ErrInvalidConfig)
@@ -363,7 +363,7 @@ func (s *Source) SetTokens(access auth.Token, refresh string) {
 	s.mu.Unlock()
 }
 
-// Token returns a valid access token, refreshing when near expiry (REQ-063).
+// Token returns a valid access token, refreshing when near expiry.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	if err := ctx.Err(); err != nil {
 		return auth.Token{}, err
@@ -445,7 +445,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 // RefreshIfNeeded refreshes the access token only when it is within the
 // configured threshold (i.e. stale) and a refresh token is present. It is a
 // no-op returning nil when the current token is still fresh. On failure it
-// returns the same error contract as Token (REQ-063).
+// returns the same error contract as Token.
 func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 	s.mu.Lock()
 	if !s.staleLocked() || s.refresh == "" {
@@ -461,15 +461,16 @@ func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 // refresh on the next token acquisition, even when the token has not yet crossed
 // the proactive-refresh threshold. Use it to recover from a wire 401. If a
 // refresh is already in flight (e.g. concurrent 401 recovery), Reauth coalesces
-// onto it rather than issuing a duplicate request (single-flight, REQ-026). On a
+// onto it rather than issuing a duplicate request. On a
 // terminal refresh failure it clears the refresh token and returns
 // ErrReauthRequired.
 //
 // When no refresh_token is available there is nothing to exchange, so Reauth
-// does NOT discard the cached access token (a wire 401 may be scope-related
+// does not discard the cached access token (a wire 401 may be scope-related
 // rather than an expiry, and a public client has no other credential to fall
 // back on). It returns ErrReauthRequired, clearing the cached token only when
-// it is already past ExpiresAt — which MUST NOT be used silently (REQ-063).
+// it is already past ExpiresAt, because an expired token is never returned
+// silently.
 func (s *Source) Reauth(ctx context.Context) error {
 	s.mu.Lock()
 	if s.refresh == "" {
@@ -596,5 +597,5 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 	return tok, parsed, refresh, nil
 }
 
-// JWKS returns the JWKS helper when configured (REQ-062).
+// JWKS returns the JWKS helper when configured.
 func (s *Source) JWKS() *JWKS { return s.cfg.JWKS }

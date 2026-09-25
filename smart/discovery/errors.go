@@ -20,7 +20,7 @@ const (
 	ReasonMissingService DiscoveryErrorReason = "missing_service"
 	// ReasonSpecVersionMismatch indicates a required service's declared
 	// spec_version does not match the SDK's pinned target or accepted
-	// set (REQ-072, PROBE-003).
+	// set.
 	ReasonSpecVersionMismatch DiscoveryErrorReason = "spec_version_mismatch"
 	// ReasonMalformedURL indicates a URL field (BaseURL,
 	// AuthorizationEndpoint, etc.) failed parsing.
@@ -28,15 +28,15 @@ const (
 	// ReasonAuthEndpointsMissing indicates the authorization or token
 	// endpoint URL is absent from a SMART config that requires them.
 	ReasonAuthEndpointsMissing DiscoveryErrorReason = "auth_endpoints_missing"
-	// ReasonInsecureURL indicates a non-https URL was rejected — either
+	// ReasonInsecureURL indicates a non-https URL was rejected: either
 	// the issuer fetch or a catalog auth endpoint URL in the discovery
-	// document (REQ-092). Override with WithAllowInsecure to opt into
+	// document. Override with WithAllowInsecure to opt into
 	// plaintext URLs in development.
 	ReasonInsecureURL DiscoveryErrorReason = "insecure_url"
 	// ReasonIssuerMismatch indicates the discovery document's "issuer"
 	// field does not equal the URL used to fetch it. Per OIDC Discovery
-	// §4.3 this is a hard validation failure — accepting a mismatched
-	// issuer would let a hostile server impersonate another identity
+	// §4.3 this is a hard validation failure, because accepting a
+	// mismatched issuer would let a hostile server impersonate another identity
 	// provider downstream.
 	ReasonIssuerMismatch DiscoveryErrorReason = "issuer_mismatch"
 )
@@ -58,11 +58,9 @@ type DiscoveryError struct {
 	Inner error
 }
 
-// Error implements error. A nil receiver answers with the zero
-// DiscoveryError's text rather than dereferencing (REQ-025 nil-receiver
-// axis): a failed errors.As / errors.AsType leaves a typed nil behind,
-// and a caller that passes it onward boxes it into a non-nil error
-// interface that fmt and the errors package then call methods on.
+// Error implements error. A nil receiver returns the zero
+// DiscoveryError's text instead of panicking, so the typed nil a failed
+// errors.As or errors.AsType leaves behind is safe to print.
 func (e *DiscoveryError) Error() string {
 	if e == nil {
 		return (&DiscoveryError{}).Error()
@@ -98,7 +96,7 @@ func (e *DiscoveryError) Error() string {
 }
 
 // Unwrap exposes the inner cause to errors.Is / errors.As. A nil
-// receiver unwraps to nil (REQ-025 nil-receiver axis).
+// receiver unwraps to nil.
 func (e *DiscoveryError) Unwrap() error {
 	if e == nil {
 		return nil

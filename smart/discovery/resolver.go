@@ -16,21 +16,20 @@ import (
 	"time"
 )
 
-// SpecVersionPin is the SDK's pinned openEHR REST contract version
-// (REQ-050). The Resolver requires the discovery document to advertise
+// SpecVersionPin is the SDK's pinned openEHR REST contract version.
+// The Resolver requires the discovery document to advertise
 // this version on every required service unless the caller widens the
 // accepted set via WithAcceptedSpecVersions.
 const SpecVersionPin = "1.1.0-development"
 
 // WellKnownPath is the standard SMART configuration path appended to
-// the issuer URL. Per SMART App Launch §4.1; some deployments expose
-// it under a different prefix — callers may override via the Resolver's
-// configuration document URL when constructing.
+// the issuer URL, per SMART App Launch §4.1. Some deployments expose
+// it under a different prefix; callers can override it with
+// WithWellKnownPath when constructing the Resolver.
 const WellKnownPath = "/.well-known/smart-configuration"
 
 // DefaultTTL is applied when the discovery document does not advertise
-// an explicit Cache-Control max-age. Tracks REQ-071's documented
-// default.
+// an explicit Cache-Control max-age.
 const DefaultTTL = 15 * time.Minute
 
 // Resolver fetches, validates, caches, and refreshes SMART
@@ -38,7 +37,7 @@ const DefaultTTL = 15 * time.Minute
 //
 // A single Resolver instance is safe for concurrent use across many
 // goroutines; concurrent Resolve()/Refresh() calls for the same issuer
-// coalesce around one in-flight fetch (REQ-026).
+// coalesce around one in-flight fetch.
 type Resolver struct {
 	cfg   resolverConfig
 	cache Cache
@@ -68,12 +67,12 @@ type resolverConfig struct {
 type Option func(*resolverConfig)
 
 // WithHTTPClient injects the *http.Client used for discovery fetches.
-// Required per REQ-021.
+// Required.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *resolverConfig) { cfg.httpClient = c }
 }
 
-// WithRequiredServices configures which service IDs MUST be present in
+// WithRequiredServices configures which service IDs must be present in
 // every resolved catalog. Default is ["org.openehr.rest"].
 func WithRequiredServices(ids ...string) Option {
 	return func(cfg *resolverConfig) {
@@ -83,9 +82,9 @@ func WithRequiredServices(ids ...string) Option {
 
 // WithAcceptedSpecVersions widens the version set the resolver accepts
 // on a required service. Default is {SpecVersionPin} (strict).
-// Calling this option marks the accepted set as explicitly locked — the
-// per-service spec_version check will be enforced even when the advertised
-// version is empty (ADR 0008, version-gate softening).
+// Without this option, a required service that advertises no spec_version
+// is accepted. Calling it makes the check strict: an empty advertised
+// version is then rejected unless it is in the accepted set.
 func WithAcceptedSpecVersions(versions ...string) Option {
 	return func(cfg *resolverConfig) {
 		cfg.acceptedVersions = map[string]struct{}{}
@@ -103,7 +102,7 @@ func WithDefaultTTL(d time.Duration) Option {
 }
 
 // WithAllowInsecure permits http:// issuers and base URLs. Default is
-// to refuse plaintext (REQ-092). Use only for local development.
+// to refuse plaintext. Use only for local development.
 func WithAllowInsecure() Option {
 	return func(cfg *resolverConfig) { cfg.allowInsecure = true }
 }
@@ -151,8 +150,8 @@ func NewResolver(cache Cache, opts ...Option) (*Resolver, error) {
 }
 
 // Resolve returns the cached catalog for issuer when fresh, or fetches
-// and caches a new one. Concurrent calls coalesce — exactly one fetch
-// happens per (issuer, in-flight window).
+// and caches a new one. Concurrent calls coalesce, so exactly one fetch
+// happens per issuer while a fetch is in flight.
 func (r *Resolver) Resolve(ctx context.Context, issuer string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

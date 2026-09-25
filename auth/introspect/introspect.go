@@ -21,7 +21,7 @@ type Client struct {
 }
 
 // New constructs an introspection Client for the given endpoint URL.
-// httpClient is required (REQ-021); a nil value returns [auth.ErrInvalidConfig].
+// httpClient is required; a nil value returns [auth.ErrInvalidConfig].
 // endpoint must be a non-empty, parseable absolute URL with scheme "https"
 // or "http"; other values return [auth.ErrInvalidConfig].
 func New(endpoint string, httpClient *http.Client) (*Client, error) {
@@ -103,12 +103,12 @@ type Result struct {
 	FHIRUser string
 
 	// EHRID is the openEHR-native EHR identifier, conveyed via the
-	// "ehrId" token claim (REQ-064). Absent when not surfaced by the
+	// "ehrId" token claim. Absent when not surfaced by the
 	// deployment.
 	EHRID string
 
 	// EpisodeID is the openEHR-native episode identifier, conveyed via
-	// the "episodeId" token claim (REQ-064, experimental). Absent when
+	// the "episodeId" token claim (experimental). Absent when
 	// not surfaced by the deployment.
 	EpisodeID string
 
@@ -144,9 +144,9 @@ type introspectionResponse struct {
 // token used to authenticate to the introspection endpoint (carried as
 // "Authorization: Bearer <bearer>").
 //
-// ctx is threaded to the HTTP request (REQ-020).
+// ctx is passed to the HTTP request.
 //
-// A response with active:false is a SUCCESSFUL introspection and is
+// A response with active:false is a successful introspection and is
 // returned as (Result{Active:false}, nil). Only non-2xx HTTP responses
 // or transport / parse failures are returned as errors.
 func (c *Client) Introspect(ctx context.Context, token string, bearer string) (Result, error) {

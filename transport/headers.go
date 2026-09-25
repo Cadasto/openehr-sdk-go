@@ -6,12 +6,12 @@ import (
 	"strings"
 )
 
-// Prefer is the typed enum for HTTP Prefer return-mode negotiation per
-// REQ-094. The zero value (PreferDefault) suppresses the header.
+// Prefer is the typed enum for HTTP Prefer return-mode negotiation.
+// The zero value (PreferDefault) suppresses the header.
 type Prefer string
 
 const (
-	// PreferDefault sends no Prefer header — server applies its own
+	// PreferDefault sends no Prefer header; the server applies its own
 	// default for the endpoint (typically "representation" on reads,
 	// "minimal" on writes).
 	PreferDefault Prefer = ""
@@ -28,11 +28,11 @@ const (
 func (p Prefer) HeaderValue() string { return string(p) }
 
 // CallerAttribution carries opt-in AI-mediated-provenance metadata
-// emitted as an HTTP header and OTel attributes (REQ-066).
+// emitted as an HTTP header and OTel attributes.
 //
-// Construct one and attach via WithCallerAttribution (client default)
-// or WithCallerAttributionCtx (per-request). PII MUST NOT be placed in
-// Attributes — user identity flows through the auth path, not here.
+// Construct one and attach it with WithCallerAttribution (client
+// default) or WithCallerAttributionCtx (per request). Do not put PII in
+// Attributes; user identity travels through the auth path.
 type CallerAttribution struct {
 	// AgentID identifies the agent surface emitting the request,
 	// e.g. "mcp-claude-code/1.2.0".

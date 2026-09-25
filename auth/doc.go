@@ -6,9 +6,5 @@
 // sub-packages: auth/smart (SMART-on-openEHR), auth/clientcreds
 // (Client Credentials), auth/jwtbearer (JWT Bearer), auth/basic
 // (HTTP Basic on openEHR REST). Further providers (plain OIDC,
-// session-cookie) MAY be added without disturbing the TokenSource contract.
-//
-// Implements REQ-060, REQ-066, REQ-068 (partial: clientcreds, jwtbearer),
-// and REQ-069 (auth/basic) per docs/specifications/auth.md. SMART PKCE (REQ-061..064)
-// lives in auth/smart (planned).
+// session cookies) can be added without changing the TokenSource contract.
 package auth

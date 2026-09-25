@@ -2,10 +2,10 @@ package smart
 
 import "maps"
 
-// PrincipalType is a platform-issued principal category (REQ-067).
+// PrincipalType is a platform-issued principal category.
 type PrincipalType string
 
-// The platform-issued principal categories carried on the ID token (REQ-067).
+// The platform-issued principal categories carried on the ID token.
 const (
 	PrincipalTypePerson  PrincipalType = "PERSON"
 	PrincipalTypeAgent   PrincipalType = "AGENT"
@@ -13,7 +13,7 @@ const (
 )
 
 // PrincipalIdentity carries tenant-scoped principal claims when the
-// deployment issues them on the ID token (REQ-067).
+// deployment issues them on the ID token.
 type PrincipalIdentity struct {
 	UID  string
 	Type PrincipalType

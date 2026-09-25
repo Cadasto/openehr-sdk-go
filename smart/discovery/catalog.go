@@ -6,8 +6,8 @@ import (
 )
 
 // ServiceCatalog is the resolved set of service base URLs for a
-// SMART-on-openEHR deployment, plus metadata for caching and refresh
-// (REQ-070). Pass by pointer; treat as immutable after Resolver
+// SMART-on-openEHR deployment, plus metadata for caching and refresh.
+// Pass by pointer; treat as immutable after Resolver
 // produces it.
 type ServiceCatalog struct {
 	// Issuer is the deployment's authoritative issuer URL.
@@ -23,7 +23,7 @@ type ServiceCatalog struct {
 	// catalogs (NewStaticCatalog) this is the constructor call time.
 	ResolvedAt time.Time
 	// ExpiresAt is the catalog's TTL deadline. The zero value means
-	// "no TTL declared by source" — callers MAY apply a default.
+	// "no TTL declared by source"; callers can apply a default.
 	ExpiresAt time.Time
 	// ETag is the source's ETag for conditional refresh; empty when
 	// the source did not advertise one.
@@ -49,9 +49,9 @@ func (c *ServiceCatalog) OpenEHRRest() (ServiceEntry, bool) {
 }
 
 // Stale reports whether c is past its declared expiry. Catalogs
-// without an ExpiresAt are never stale by this measure — TTL is the
-// authoritative trigger; consumers MAY trigger refresh on other signals
-// (401/403) independently.
+// without an ExpiresAt are never stale by this measure. Stale checks the
+// TTL only; callers can trigger a refresh on other signals (401/403)
+// independently.
 func (c *ServiceCatalog) Stale(now time.Time) bool {
 	if c == nil {
 		return true
@@ -70,7 +70,7 @@ type ServiceEntry struct {
 	// Always absolute; transport/ joins paths onto this URL.
 	BaseURL *url.URL
 	// SpecVersion is the declared spec version (e.g. "1.1.0-development").
-	// Validated against the SDK's pin at resolution time (REQ-072).
+	// Validated against the SDK's pinned spec version at resolution time.
 	SpecVersion string
 	// Capabilities is an optional capability flag list the deployment
 	// advertised. Opaque to the SDK; consumers may inspect it.
@@ -85,8 +85,8 @@ type AuthEndpoints struct {
 	JWKSURI               *url.URL
 	RegistrationEndpoint  *url.URL
 	// IntrospectionEndpoint is the RFC 7662 token-introspection endpoint
-	// advertised by the authorization server. Nil when absent. Consumed by
-	// Phase 5b introspection client (REQ-062).
+	// advertised by the authorization server. Nil when absent. Pass it to
+	// the auth/introspect client.
 	IntrospectionEndpoint *url.URL
 	// RevocationEndpoint is the RFC 7009 token-revocation endpoint. Nil when
 	// absent.
@@ -101,16 +101,18 @@ type AuthEndpoints struct {
 	GrantTypesSupported           []string
 	// TokenEndpointAuthMethodsSupported lists the client-authentication methods
 	// the authorization server accepts (e.g. "private_key_jwt",
-	// "client_secret_basic"). Used by Phase 3b G-3 method selection.
+	// "client_secret_basic"). auth/smart checks the configured client
+	// credential against this list when it is non-empty.
 	TokenEndpointAuthMethodsSupported []string
 	// TokenEndpointAuthSigningAlgValuesSupported lists the JWS algorithms
 	// accepted for client-assertion JWTs at the token endpoint
-	// (e.g. "RS384", "ES384"). Feeds Phase 3b alg selection. Surface-only
-	// in this release; no selection logic is wired here (REQ-062).
+	// (e.g. "RS384", "ES384"). The SDK exposes it but does not use it to
+	// select an algorithm.
 	TokenEndpointAuthSigningAlgValuesSupported []string
 	// IDTokenSigningAlgValuesSupported lists the JWS algorithms used to sign
-	// ID tokens (e.g. "RS256", "ES384"). Feeds Phase 3e id-token verify
-	// allowlist. Surface-only in this release (REQ-062).
+	// ID tokens (e.g. "RS256", "ES384"). The SDK does not apply it
+	// automatically; pass it to smart.WithIDTokenSigningAlgs to constrain
+	// ID-token verification.
 	IDTokenSigningAlgValuesSupported []string
 	Capabilities                     []string
 }
@@ -130,10 +132,9 @@ const (
 // by the canonical openEHR SMART App Launch specification
 // (https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html).
 //
-// Consumers MAY inspect ServiceCatalog.Auth.Capabilities or
+// Callers can inspect ServiceCatalog.Auth.Capabilities or
 // ServiceEntry.Capabilities to branch on these strings. The SDK itself
-// does not enforce or select behaviour based on them in this release;
-// that is deferred to later phases.
+// does not enforce or select behaviour based on them.
 const (
 	// CapabilityContextOpenEHREHR indicates the server can return an openEHR
 	// EHR context parameter on launch.
