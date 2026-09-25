@@ -14,11 +14,11 @@ import (
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CBoolean.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced (REQ-025). The shared helper checks the `_type`
+// dereferenced. The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+// adding typereg.ErrInvalidShape.
 func (c *CBoolean) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_BOOLEAN: %w", typereg.ErrNilReceiver)
@@ -32,11 +32,11 @@ func (c *CBoolean) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CDate.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced (REQ-025). The shared helper checks the `_type`
+// dereferenced. The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+// adding typereg.ErrInvalidShape.
 func (c *CDate) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_DATE: %w", typereg.ErrNilReceiver)
@@ -50,11 +50,11 @@ func (c *CDate) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CDateTime.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced (REQ-025). The shared helper checks the `_type`
+// dereferenced. The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+// adding typereg.ErrInvalidShape.
 func (c *CDateTime) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_DATE_TIME: %w", typereg.ErrNilReceiver)
@@ -68,11 +68,11 @@ func (c *CDateTime) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CDuration.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced (REQ-025). The shared helper checks the `_type`
+// dereferenced. The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+// adding typereg.ErrInvalidShape.
 func (c *CDuration) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_DURATION: %w", typereg.ErrNilReceiver)
@@ -86,11 +86,11 @@ func (c *CDuration) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CInteger.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced (REQ-025). The shared helper checks the `_type`
+// dereferenced. The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+// adding typereg.ErrInvalidShape.
 func (c *CInteger) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_INTEGER: %w", typereg.ErrNilReceiver)
@@ -104,11 +104,11 @@ func (c *CInteger) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CReal.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced (REQ-025). The shared helper checks the `_type`
+// dereferenced. The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+// adding typereg.ErrInvalidShape.
 func (c *CReal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_REAL: %w", typereg.ErrNilReceiver)
@@ -122,11 +122,11 @@ func (c *CReal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CString.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced (REQ-025). The shared helper checks the `_type`
+// dereferenced. The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+// adding typereg.ErrInvalidShape.
 func (c *CString) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_STRING: %w", typereg.ErrNilReceiver)
@@ -140,11 +140,11 @@ func (c *CString) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into CTime.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced (REQ-025). The shared helper checks the `_type`
+// dereferenced. The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+// adding typereg.ErrInvalidShape.
 func (c *CTime) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if c == nil {
 		return fmt.Errorf("canjson: C_TIME: %w", typereg.ErrNilReceiver)

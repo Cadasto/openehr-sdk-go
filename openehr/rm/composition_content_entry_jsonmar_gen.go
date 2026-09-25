@@ -15,16 +15,16 @@ import (
 // rawAction is the method-free canonical-JSON alias for Action. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawAction Action
 
 // MarshalJSONTo emits canonical openEHR JSON for Action with `_type`
 // (value "ACTION") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (a Action) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -35,16 +35,16 @@ func (a Action) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawActivity is the method-free canonical-JSON alias for Activity. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawActivity Activity
 
 // MarshalJSONTo emits canonical openEHR JSON for Activity with `_type`
 // (value "ACTIVITY") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (a Activity) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -55,16 +55,16 @@ func (a Activity) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawAdminEntry is the method-free canonical-JSON alias for AdminEntry. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawAdminEntry AdminEntry
 
 // MarshalJSONTo emits canonical openEHR JSON for AdminEntry with `_type`
 // (value "ADMIN_ENTRY") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (a AdminEntry) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -75,16 +75,16 @@ func (a AdminEntry) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawEvaluation is the method-free canonical-JSON alias for Evaluation. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawEvaluation Evaluation
 
 // MarshalJSONTo emits canonical openEHR JSON for Evaluation with `_type`
 // (value "EVALUATION") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (e Evaluation) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -95,16 +95,16 @@ func (e Evaluation) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawInstruction is the method-free canonical-JSON alias for Instruction. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawInstruction Instruction
 
 // MarshalJSONTo emits canonical openEHR JSON for Instruction with `_type`
 // (value "INSTRUCTION") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (i Instruction) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -115,16 +115,16 @@ func (i Instruction) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawInstructionDetails is the method-free canonical-JSON alias for InstructionDetails. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawInstructionDetails InstructionDetails
 
 // MarshalJSONTo emits canonical openEHR JSON for InstructionDetails with `_type`
 // (value "INSTRUCTION_DETAILS") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (i InstructionDetails) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -135,16 +135,16 @@ func (i InstructionDetails) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawIsmTransition is the method-free canonical-JSON alias for IsmTransition. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawIsmTransition IsmTransition
 
 // MarshalJSONTo emits canonical openEHR JSON for IsmTransition with `_type`
 // (value "ISM_TRANSITION") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (i IsmTransition) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -155,16 +155,16 @@ func (i IsmTransition) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawObservation is the method-free canonical-JSON alias for Observation. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawObservation Observation
 
 // MarshalJSONTo emits canonical openEHR JSON for Observation with `_type`
 // (value "OBSERVATION") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (o Observation) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`

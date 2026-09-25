@@ -14,11 +14,11 @@ import (
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Archetype.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced (REQ-025). The shared helper checks the `_type`
+// dereferenced. The shared helper checks the `_type`
 // discriminator, threads the polymorphic decode hooks so every nested
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).
+// adding typereg.ErrInvalidShape.
 func (a *Archetype) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if a == nil {
 		return fmt.Errorf("canjson: ARCHETYPE: %w", typereg.ErrNilReceiver)

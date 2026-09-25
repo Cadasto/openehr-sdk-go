@@ -15,16 +15,16 @@ import (
 // rawArchetypeOntology is the method-free canonical-JSON alias for ArchetypeOntology. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawArchetypeOntology ArchetypeOntology
 
 // MarshalJSONTo emits canonical openEHR JSON for ArchetypeOntology with `_type`
 // (value "ARCHETYPE_ONTOLOGY") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (a ArchetypeOntology) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -35,16 +35,16 @@ func (a ArchetypeOntology) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawArchetypeTerm is the method-free canonical-JSON alias for ArchetypeTerm. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawArchetypeTerm ArchetypeTerm
 
 // MarshalJSONTo emits canonical openEHR JSON for ArchetypeTerm with `_type`
 // (value "ARCHETYPE_TERM") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (a ArchetypeTerm) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`

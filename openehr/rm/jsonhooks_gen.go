@@ -14,7 +14,7 @@ import (
 // package into the shared typereg aggregate. Each hook resolves the
 // concrete type from `_type` through typereg.DecodePolymorphic; a narrow
 // interface falls back to its parent concrete type when the wire omits
-// the discriminator (REQ-052, wire.md:147).
+// the discriminator.
 func init() {
 	typereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *AccessControlSettings) error {
 		return typereg.DecodePolymorphic(dec, out, nil)

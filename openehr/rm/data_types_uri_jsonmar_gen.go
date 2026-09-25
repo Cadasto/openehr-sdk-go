@@ -15,7 +15,7 @@ import (
 // jsonWireDVEHRURI is the flat canonical-JSON wire struct for DVEHRURI. DVEHRURI embeds
 // a marshaler-bearing concrete ancestor, so the zero-copy alias would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
-// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+// struct embeds nothing and so cannot promote.
 type jsonWireDVEHRURI struct {
 	Class string `json:"_type"`
 	// Value Value of URI as a String. 'Plain-text' URIs are allowed, enabling better readability, but must be RFC-3986 encoded in use.
@@ -23,7 +23,7 @@ type jsonWireDVEHRURI struct {
 }
 
 // MarshalJSONTo emits canonical openEHR JSON for DVEHRURI with `_type`
-// (value "DV_EHR_URI") as the leading member (REQ-052, Q6). The receiver is a
+// (value "DV_EHR_URI") as the leading member. The receiver is a
 // value so a by-value instance in a polymorphic slot keeps its `_type`.
 func (d DVEHRURI) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &jsonWireDVEHRURI{
@@ -35,16 +35,16 @@ func (d DVEHRURI) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawDVURI is the method-free canonical-JSON alias for DVURI. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawDVURI DVURI
 
 // MarshalJSONTo emits canonical openEHR JSON for DVURI with `_type`
 // (value "DV_URI") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (d DVURI) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`

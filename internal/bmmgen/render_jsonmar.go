@@ -19,7 +19,7 @@ import (
 const typeregImportPath = "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 
 // RenderMarshalJSONFile renders the canonical-JSON MarshalJSONTo companions
-// (encoding/json/v2, ADR 0022) for every concrete class in the supplied
+// (encoding/json/v2) for every concrete class in the supplied
 // [PlannedFile]. It also emits the per-class wire type, a method-free alias
 // or a flat wire struct, that the UnmarshalJSONFrom companion in the sibling
 // _jsonunmar_gen.go references.
@@ -27,7 +27,7 @@ const typeregImportPath = "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 // The output is byte-stable per file. Returns (nil, nil) when the file has no
 // concrete classes.
 //
-// # Two wire shapes (ADR 0022, ruling R19)
+// # Two wire shapes
 //
 // Most classes take the zero-copy shape: a method-free alias `type rawC C`
 // marshalled through an anonymous `struct{ _type; *rawC }`, so no fields are
@@ -307,16 +307,16 @@ func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs string) str
 	fmt.Fprintf(&b, "// %s is the method-free canonical-JSON alias for %s. The alias\n", alias, pc.GoName)
 	b.WriteString("// drops the codec methods so marshalling the anonymous wrapper below\n")
 	b.WriteString("// does not recurse; the class embeds no marshaler-bearing concrete\n")
-	b.WriteString("// ancestor, so nothing is promoted (ADR 0022).\n")
+	b.WriteString("// ancestor, so nothing is promoted.\n")
 	fmt.Fprintf(&b, "type %s%s %s%s\n\n", alias, typeParams, pc.GoName, typeArgs)
 
 	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
 	fmt.Fprintf(&b, "// (value %q) as the leading member. Field order otherwise follows the\n", pc.BMMName)
 	b.WriteString("// struct declaration; json.Deterministic sorts any Hash keys and the\n")
-	b.WriteString("// FormatNil* options keep a mandatory nil container's `null` spelling\n")
-	b.WriteString("// (REQ-052, Q6). The receiver is a value so a concrete instance sitting\n")
+	b.WriteString("// FormatNil* options keep a mandatory nil container's `null` spelling.\n")
+	b.WriteString("// The receiver is a value so a concrete instance sitting\n")
 	b.WriteString("// in a polymorphic interface slot by value, the shape the like-interface\n")
-	b.WriteString("// accessors admit, still carries its `_type` (REQ-052 substitution).\n")
+	b.WriteString("// accessors admit, still carries its `_type`.\n")
 	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
 	b.WriteString("\t\tType string `json:\"_type\"`\n")
@@ -340,7 +340,7 @@ func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs 
 	fmt.Fprintf(&b, "// %s is the flat canonical-JSON wire struct for %s. %s embeds\n", wire, pc.GoName, pc.GoName)
 	b.WriteString("// a marshaler-bearing concrete ancestor, so the zero-copy alias would\n")
 	b.WriteString("// promote that ancestor's methods and emit the wrong `_type`; the flat\n")
-	b.WriteString("// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).\n")
+	b.WriteString("// struct embeds nothing and so cannot promote.\n")
 	fmt.Fprintf(&b, "type %s%s struct {\n", wire, typeParams)
 	b.WriteString("\tClass string `json:\"_type\"`\n")
 	for _, ef := range fields {
@@ -353,7 +353,7 @@ func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs 
 	b.WriteString("}\n\n")
 
 	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
-	fmt.Fprintf(&b, "// (value %q) as the leading member (REQ-052, Q6). The receiver is a\n", pc.BMMName)
+	fmt.Fprintf(&b, "// (value %q) as the leading member. The receiver is a\n", pc.BMMName)
 	b.WriteString("// value so a by-value instance in a polymorphic slot keeps its `_type`.\n")
 	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	fmt.Fprintf(&b, "\treturn json.MarshalEncode(enc, &%s%s{\n", wire, typeArgs)

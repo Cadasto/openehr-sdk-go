@@ -51,8 +51,8 @@ type Result struct {
 
 // Run reads <ResourcesDir>/openehr_terminology.xml and the `ref:` line of
 // <ResourcesDir>/MANIFEST.txt, renders openehr_gen.go under
-// <OutDir>/openehr/terminology/, and either writes it atomically or — with
-// Verify — compares it with the file on disk, reporting Drift / Missing
+// <OutDir>/openehr/terminology/, and either writes it atomically or, with
+// Verify, compares it with the file on disk, reporting Drift / Missing
 // without writing anything.
 //
 // The sha256 the generated file carries is computed here, over the very bytes

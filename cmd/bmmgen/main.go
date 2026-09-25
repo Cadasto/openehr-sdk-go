@@ -7,7 +7,7 @@
 //	  -out string         output module root (default ".")
 //	  -target string      comma-separated targets: "rm", "aom14", "all"
 //	                      (default "all")
-//	  -root string        legacy single-target override (Phase 2 compat);
+//	  -root string        legacy single-target override;
 //	                      overrides only the FIRST target's RootID
 //	  -verify             do not write; instead diff against existing
 //	                      files; exit 1 on drift
@@ -15,9 +15,8 @@
 //
 // The generator reads the pinned BMM JSON files under resources/bmm/ and
 // emits Go source under <out>/openehr/rm/ and/or
-// <out>/openehr/aom/aom14/ depending on -target. See
-// docs/plans/2026-05-15-bmm-codegen.md for the contract and
-// internal/bmmgen for the implementation.
+// <out>/openehr/aom/aom14/ depending on -target. The implementation
+// lives in internal/bmmgen.
 package main
 
 import (

@@ -118,11 +118,12 @@ func init() {
 	typereg.Default.Register("VERSION_TREE_ID", func() any { return &VersionTreeID{} })
 }
 
-// RMTypeName returns the RM class name for v's concrete Go type —
-// the reverse of the typereg registration above (ADR 0013). Generic
+// RMTypeName returns the RM class name for v's concrete Go type,
+// the reverse of the typereg registration above. Generic
 // instantiations map to the bare class name (e.g. DVInterval[DVQuantity]
 // → "DV_INTERVAL"). A nil interface, a typed-nil pointer, or a non-RM
-// value reports ("", false). REQ-024: no reflection.
+// value reports ("", false). The lookup is a type switch and uses
+// no reflection.
 func RMTypeName(v any) (string, bool) {
 	switch x := v.(type) {
 	case *AccessGroupRef:
@@ -1110,10 +1111,11 @@ func RMTypeName(v any) (string, bool) {
 }
 
 // IsTypedNil reports whether v is an interface value carrying a
-// typed-nil pointer to a registered RM concrete (ADR 0013). Bare nil
+// typed-nil pointer to a registered RM concrete. Bare nil
 // interfaces and value-typed structs report false. Consumers use it
 // as the guard before calling Locatable getters (a getter on a
-// typed-nil *T panics). REQ-024: no reflection.
+// typed-nil *T panics). The check is a type switch and uses no
+// reflection.
 func IsTypedNil(v any) bool {
 	switch x := v.(type) {
 	case *AccessGroupRef:

@@ -15,16 +15,16 @@ import (
 // rawBasicDefinitions is the method-free canonical-JSON alias for BasicDefinitions. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawBasicDefinitions BasicDefinitions
 
 // MarshalJSONTo emits canonical openEHR JSON for BasicDefinitions with `_type`
 // (value "BASIC_DEFINITIONS") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (b BasicDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -35,13 +35,13 @@ func (b BasicDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
 // jsonWireOpenehrDefinitions is the flat canonical-JSON wire struct for OpenehrDefinitions. OpenehrDefinitions embeds
 // a marshaler-bearing concrete ancestor, so the zero-copy alias would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
-// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+// struct embeds nothing and so cannot promote.
 type jsonWireOpenehrDefinitions struct {
 	Class string `json:"_type"`
 }
 
 // MarshalJSONTo emits canonical openEHR JSON for OpenehrDefinitions with `_type`
-// (value "OPENEHR_DEFINITIONS") as the leading member (REQ-052, Q6). The receiver is a
+// (value "OPENEHR_DEFINITIONS") as the leading member. The receiver is a
 // value so a by-value instance in a polymorphic slot keeps its `_type`.
 func (o OpenehrDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &jsonWireOpenehrDefinitions{

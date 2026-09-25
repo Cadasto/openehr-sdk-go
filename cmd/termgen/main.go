@@ -12,11 +12,11 @@
 //
 // The generator reads <resources>/openehr_terminology.xml and the `ref:` line
 // of <resources>/MANIFEST.txt and emits
-// <out>/openehr/terminology/openehr_gen.go — one variable per terminology
-// group and code set, plus the release version and the pin's sha256.
-// `make termgen` regenerates it; `make termgen-verify` fails the build when
-// it drifts from the pin. See docs/specifications/rm-modeling.md § REQ-034
-// for the contract and internal/termgen for the implementation.
+// <out>/openehr/terminology/openehr_gen.go, with one variable per
+// terminology group and code set, plus the release version and the pin's
+// sha256. `make termgen` regenerates it; `make termgen-verify` fails the
+// build when it drifts from the pin. The implementation lives in
+// internal/termgen.
 package main
 
 import (

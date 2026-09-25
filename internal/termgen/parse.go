@@ -1,9 +1,9 @@
 // Package termgen generates the openehr/terminology tables from the pinned
-// openEHR Terminology XML under resources/terminology/ (REQ-034).
+// openEHR Terminology XML under resources/terminology/.
 //
 // It is the terminology counterpart of internal/bmmgen: [Parse] decodes and
 // validates the pin, [Render] emits one gofmt-clean openehr_gen.go, and [Run]
-// either writes that file or — in verify mode — reports how it drifts from
+// either writes that file or, in verify mode, reports how it drifts from
 // the pin without touching it. cmd/termgen is the CLI; `make termgen` and
 // `make termgen-verify` are the entry points.
 package termgen
@@ -38,7 +38,7 @@ type Terminology struct {
 	Groups   []GroupDef
 }
 
-// CodeSetDef is one <codeset> of the pin — a value set of bare codes with no
+// CodeSetDef is one <codeset> of the pin: a value set of bare codes with no
 // rubrics, such as the normal statuses.
 type CodeSetDef struct {
 	ID    string
@@ -46,7 +46,7 @@ type CodeSetDef struct {
 	Codes []string
 }
 
-// GroupDef is one <group> of the pin — a value set of coded concepts, each
+// GroupDef is one <group> of the pin: a value set of coded concepts, each
 // with an English rubric.
 type GroupDef struct {
 	ID       string
@@ -104,7 +104,7 @@ type xmlConcept struct {
 // empty, and every openehr_id is lower-case snake_case and mangles to a Go
 // name no other id claims.
 //
-// Every breach comes back as an error naming the offending id — the pin is
+// Every breach comes back as an error naming the offending id. The pin is
 // vendored from upstream, so a bad table is a version-bump surprise the
 // maintainer has to read, not a programmer error to panic on.
 func Parse(r io.Reader) (*Terminology, error) {

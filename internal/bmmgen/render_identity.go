@@ -68,8 +68,8 @@ func emitLocatableGetterSignatures(b *strings.Builder, plan *Plan, pc *PlannedCl
 	if err != nil {
 		return err
 	}
-	b.WriteString("\n\t// Generated identity accessors (ADR 0013): Get<Field> returns\n")
-	b.WriteString("\t// the flattened LOCATABLE field verbatim. Value receivers — both\n")
+	b.WriteString("\n\t// Generated identity accessors: Get<Field> returns\n")
+	b.WriteString("\t// the flattened LOCATABLE field verbatim. Value receivers: both\n")
 	b.WriteString("\t// T and *T satisfy Locatable; calling a getter on a typed-nil *T\n")
 	b.WriteString("\t// panics, so guard with IsTypedNil first (see rm.IsTypedNil).\n")
 	for _, name := range identityProps {
@@ -90,7 +90,7 @@ func emitLocatableIdentity(b *strings.Builder, plan *Plan, pc *PlannedClass) err
 	// MutableLocatable — sealed by the same marker; pointer-receiver
 	// setters mean only *T satisfies it.
 	b.WriteString("\n// MutableLocatable is the write half of the generated LOCATABLE\n")
-	b.WriteString("// identity surface (ADR 0013). Setters use pointer receivers, so the\n")
+	b.WriteString("// identity surface. Setters use pointer receivers, so the\n")
 	b.WriteString("// interface is satisfied by *T only; it shares Locatable's unexported\n")
 	b.WriteString("// marker and cannot be implemented outside this package.\n")
 	b.WriteString("type MutableLocatable interface {\n")
@@ -184,11 +184,11 @@ func reverseRegistryArms(plan *Plan, pc *PlannedClass) ([]string, error) {
 // IsTypedNil reports whether v is an interface value carrying a
 // typed-nil pointer to any registered concrete.
 func emitReverseRegistry(b *bytes.Buffer, plan *Plan, concrete []*PlannedClass) error {
-	b.WriteString("\n// RMTypeName returns the RM class name for v's concrete Go type —\n")
-	b.WriteString("// the reverse of the typereg registration above (ADR 0013). Generic\n")
+	b.WriteString("\n// RMTypeName returns the RM class name for v's concrete Go type,\n")
+	b.WriteString("// the reverse of the typereg registration above. Generic\n")
 	b.WriteString("// instantiations map to the bare class name (e.g. DVInterval[DVQuantity]\n")
 	b.WriteString("// → \"DV_INTERVAL\"). A nil interface, a typed-nil pointer, or a non-RM\n")
-	b.WriteString("// value reports (\"\", false). REQ-024: no reflection.\n")
+	b.WriteString("// value reports (\"\", false). The lookup is a type switch and uses\n// no reflection.\n")
 	b.WriteString("func RMTypeName(v any) (string, bool) {\n")
 	b.WriteString("\tswitch x := v.(type) {\n")
 	for _, pc := range concrete {
@@ -204,10 +204,10 @@ func emitReverseRegistry(b *bytes.Buffer, plan *Plan, concrete []*PlannedClass) 
 	b.WriteString("\t}\n\treturn \"\", false\n}\n")
 
 	b.WriteString("\n// IsTypedNil reports whether v is an interface value carrying a\n")
-	b.WriteString("// typed-nil pointer to a registered RM concrete (ADR 0013). Bare nil\n")
+	b.WriteString("// typed-nil pointer to a registered RM concrete. Bare nil\n")
 	b.WriteString("// interfaces and value-typed structs report false. Consumers use it\n")
 	b.WriteString("// as the guard before calling Locatable getters (a getter on a\n")
-	b.WriteString("// typed-nil *T panics). REQ-024: no reflection.\n")
+	b.WriteString("// typed-nil *T panics). The check is a type switch and uses no\n// reflection.\n")
 	b.WriteString("func IsTypedNil(v any) bool {\n")
 	b.WriteString("\tswitch x := v.(type) {\n")
 	for _, pc := range concrete {

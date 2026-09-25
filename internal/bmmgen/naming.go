@@ -34,8 +34,8 @@ var acronyms = map[string]bool{
 
 // PascalCase converts a BMM class or other identifier name to its Go
 // PascalCase equivalent. ALL_CAPS, snake_case, and mixed-case inputs
-// are all supported. Common acronyms (see [acronyms]) are preserved
-// uppercase per § Naming.
+// are all supported. Common acronyms (see [acronyms]) are kept
+// uppercase.
 //
 // Examples:
 //
@@ -143,7 +143,7 @@ func isAllUpper(seg string) bool {
 
 // FieldName converts a BMM property name (snake_case) to a Go
 // PascalCase struct-field name. JSON tags preserve the original
-// snake_case name verbatim — the caller emits it separately.
+// snake_case name verbatim; the caller emits it separately.
 func FieldName(name string) string {
 	return PascalCase(name)
 }
