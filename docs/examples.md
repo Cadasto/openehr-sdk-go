@@ -12,25 +12,27 @@ A few openEHR terms recur throughout. A **COMPOSITION** is the top-level clinica
 
 ## At a glance
 
+The Packages column lists the SDK packages each program imports, by short name (`canjson` is `openehr/serialize/canjson`, `discovery` is `smart/discovery`); each section below gives the full import paths. The `testkit/fixtures` helper that locates the bundled files is left out.
+
 | Example | Network | Packages | Demonstrates |
 |---|---|---|---|
 | [canonical_json](#canonical_json) | No | `rm`, `canjson` | Decode canonical JSON → typed `Composition` |
 | [canxml_roundtrip](#canxml_roundtrip) | No | `rm`, `canjson`, `canxml` | JSON ↔ XML cross-format round-trip |
 | [opt-parse](#opt-parse) | No | `template` | Parse an ADL 1.4 OPT, walk paths |
 | [primitive-validate](#primitive-validate) | No | `template`, `constraints` | Single values against one OPT leaf constraint |
-| [validate-composition](#validate-composition) | No | `template`, `templatecompile`, `validation` | In-memory composition vs OPT |
-| [validate-from-json](#validate-from-json) | No | `canjson`, `template`, `templatecompile`, `validation` | Wire bytes → validate |
-| [generate-example](#generate-example) | No | `template`, `templatecompile`, `instance`, `canjson` | OPT → generated RM instance → JSON |
+| [validate-composition](#validate-composition) | No | `template`, `templatecompile`, `validation`, `rm`, `terminology` | In-memory composition vs OPT |
+| [validate-from-json](#validate-from-json) | No | `canjson`, `template`, `templatecompile`, `validation`, `rm` | Wire bytes → validate |
+| [generate-example](#generate-example) | No | `template`, `templatecompile`, `instance`, `canjson`, `rm` | OPT → generated RM instance → JSON |
 | [aql-build](#aql-build) | No | `aql`, `aql/contain` | Struct + verb builders → byte-identical AQL; nested CONTAINS + in-text paging; opt-in RM containment check |
 | [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured tree, print each clause, emit canonical text back |
 | [lint-aql](#lint-aql) | No | `aql`, `template`, `templatecompile`, `validation` | AQL lint through `ValidateAQL`: syntax, shape, RM, template |
-| [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Compile → build → round-trip → validate, public imports only |
+| [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson`, `rm` | Compile → build → round-trip → validate, public imports only |
 | [template-explore](#template-explore) | No | `template`, `templatecompile` | Walk a compiled OPT: structure tree + leaf paths |
 | [webtemplate-export](#webtemplate-export) | No | `template`, `templatecompile`, `template/webtemplate` | Compiled OPT → Web Template JSON |
-| [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template`, `template/webtemplate`, `templatecompile`, `canjson`, `validation` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + template-aware `WithTemplate` decode |
+| [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template`, `template/webtemplate`, `templatecompile`, `canjson`, `validation`, `rm` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + template-aware `WithTemplate` decode |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
-| [contribution-build](#contribution-build) | Optional mock (`-commit`) | `client/ehr/contribution`, `client/ehr`, `canjson` | Multi-version `Contribution_create` assembly, optionally committed |
-| [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth` | Standalone PKCE launch; **state + verifier persistence** across the redirect |
+| [contribution-build](#contribution-build) | Optional mock (`-commit`) | `client/ehr/contribution`, `client/ehr`, `canjson`, `rm`, `discovery`, `transport` | Multi-version `Contribution_create` assembly, optionally committed |
+| [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth`, `discovery` | Standalone PKCE launch; **state + verifier persistence** across the redirect |
 
 ---
 
@@ -107,7 +109,7 @@ go run ./cmd/examples/opt-parse path/to/template.opt
 
 **Surfaces shown:**
 
-- `ParseFileStrict`, which rejects node types the parser does not know, and the lenient `ParseFile`, which admits them as opaque leaves (the better fit for templates from newer tooling)
+- `ParseFileStrict`, which rejects an unknown node type that has attributes under it, and the lenient `ParseFile`, which keeps such a node as a leaf and silently drops everything beneath it (an unknown node with no attributes under it is a leaf in both modes)
 - `TemplateID`, `Concept`, `UID`, `Language`, `Description`, `Annotations`
 - `Root`, the `ObjectNode` interface a tree walker dispatches on, and `Attributes`
 - `ParsePath`, `ValidatePath`, `NodeAt`, `WithStrictPaths`, `ErrAmbiguousPath`
@@ -134,7 +136,7 @@ strict       : /content is ambiguous (multiple children) — add an [archetype-i
 
 The root is the COMPOSITION archetype the template is built on. `content` is the attribute that holds its clinical entries and has four child nodes here. `NodeAt(/content)` in the default (lenient) mode picks the first child; in strict mode the same lookup returns `ErrAmbiguousPath`, and the caller adds a predicate such as `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]` to say which child it means.
 
-**What to copy into your app:** `template.ParseFileStrict` for templates you control, `ParseFile` for ones from newer tooling. Call `opt.ParsePath` once per path, then `ValidatePath` for a precondition check or `NodeAt` for the node itself. Validators and code generators should pass `template.WithStrictPaths()` and handle `template.ErrAmbiguousPath` with `errors.Is`, so a path never silently resolves to the wrong child.
+**What to copy into your app:** `template.ParseFileStrict` in a validator that must fail loudly on a template shape the parser does not support; `ParseFile` when forward compatibility matters more, knowing that it drops the subtree under such a node. Call `opt.ParsePath` once per path, then `ValidatePath` for a precondition check or `NodeAt` for the node itself. Validators and code generators should pass `template.WithStrictPaths()` and handle `template.ErrAmbiguousPath` with `errors.Is`, so a path never silently resolves to the wrong child.
 
 ---
 
@@ -555,7 +557,7 @@ Each line is one node as a form renderer reads it: the `id` is the segment a FLA
 
 ### flat-roundtrip
 
-**Purpose:** Convert a canonical COMPOSITION to the FLAT and STRUCTURED simplified formats and back. These formats address values by short Web Template ids instead of full RM paths, so every conversion needs the composition's Web Template. The program builds that from the OPT, encodes a vendored composition as FLAT, restructures it as STRUCTURED (no template needed for that step), decodes the FLAT back into a composition, and finally shows the template-aware decode (`WithTemplate`) whose result validates against the OPT. No transport or auth is involved.
+**Purpose:** Convert a canonical COMPOSITION to the FLAT and STRUCTURED simplified formats and back. These formats address values by short Web Template ids instead of full RM paths, so converting between a COMPOSITION and FLAT or STRUCTURED needs the composition's Web Template. The program builds that from the OPT, encodes a vendored composition as FLAT, restructures it as STRUCTURED (no template needed for that step), decodes the FLAT back into a composition, and finally shows the template-aware decode (`WithTemplate`) whose result validates against the OPT. No transport or auth is involved.
 
 ```bash
 go run ./cmd/examples/flat-roundtrip
@@ -582,9 +584,9 @@ OK: FLAT -> COMPOSITION -> FLAT round-trips for Test_dv_quantity_open_constraint
 OK: WithTemplate decode validates against the OPT
 ```
 
-Every FLAT key is a path of Web Template ids, with an optional `|suffix` naming the part of a value it carries (`|magnitude`, `|unit`, `|code`); composition-level metadata sits under `ctx/`. Without a compiled template the decode keeps exactly what the format carries, so encoding the result reproduces the first document key for key. The formats carry no node names and omit attributes the Reference Model requires (HISTORY.origin, EVENT.time, ...); `WithTemplate` fills those in from the compiled template, which is why only that decode validates against the OPT.
+Every FLAT key is a path of Web Template ids, with an optional `|suffix` naming the part of a value it carries (`|magnitude`, `|unit`, `|code`); composition-level metadata sits under `ctx/`. Without a compiled template the decode keeps exactly what the format carries, so encoding the result reproduces the first document key for key. The formats carry no node names and omit attributes the Reference Model requires (HISTORY.origin, EVENT.time, ...); `WithTemplate` restores the names from the compiled template and fills the other required attributes with synthesised defaults (from `ctx/` values and RM conventions, not recovered data), which is why only that decode validates against the OPT. It needs `ctx/time` in the input when the template has HISTORY or EVENT nodes; this fixture carries it.
 
-**What to copy into your app:** build the Web Template once (`templatecompile.Compile` plus `webtemplate.Build`), then `simplified.MarshalFlat(comp, wt)` / `UnmarshalFlat(data, wt)` (and the `…Structured` pair) for template-driven conversion, or `FlatToStructured` / `StructuredToFlat` for template-free interconversion. Pass `simplified.WithTemplate(compiled)` to `Unmarshal*` when you need an OPT-validatable composition (names and RM-mandatory attributes repopulated) rather than a format-idempotent one. Composition-level metadata rides `ctx/`; decorated or exotic datatypes ride `|raw`. The codec is strict on decode: unknown paths or suffixes, wrong-typed ctx values, index games, and malformed input return an error instead of dropping data. See the package's `deviations.md`.
+**What to copy into your app:** build the Web Template once (`templatecompile.Compile` plus `webtemplate.Build`), then `simplified.MarshalFlat(comp, wt)` / `UnmarshalFlat(data, wt)` (and the `…Structured` pair) for template-driven conversion, or `FlatToStructured` / `StructuredToFlat` for template-free interconversion. Pass `simplified.WithTemplate(compiled)` to `Unmarshal*` when you need an OPT-validatable composition (names restored from the template, other RM-mandatory attributes synthesised as defaults) rather than a format-idempotent one. Composition-level metadata rides `ctx/`; decorated or exotic datatypes ride `|raw`. The codec is strict on decode: unknown paths or suffixes, wrong-typed ctx values, index games, and malformed input return an error instead of dropping data. See the package's `deviations.md`.
 
 ---
 

@@ -1,11 +1,12 @@
 // Example: convert a composition to the FLAT and STRUCTURED simplified
 // formats and back. These formats address values by short Web Template ids
-// instead of full Reference Model paths, so every conversion needs the
-// composition's Web Template. The program builds that from the OPT, encodes a
-// vendored composition as FLAT, restructures it as STRUCTURED, decodes the
-// FLAT back into a composition, and finally shows the template-aware decode
-// whose result validates against the OPT. Nothing here imports an internal/
-// package.
+// instead of full Reference Model paths, so converting between a composition
+// and FLAT or STRUCTURED needs the composition's Web Template; converting
+// FLAT to STRUCTURED does not. The program builds the Web Template from the
+// OPT, encodes a vendored composition as FLAT, restructures it as
+// STRUCTURED, decodes the FLAT back into a composition, and finally shows the
+// template-aware decode whose result validates against the OPT. Nothing here
+// imports an internal/ package.
 //
 // Runs offline on the vendored Test_dv_quantity_open_constraint.v0 fixtures:
 //
