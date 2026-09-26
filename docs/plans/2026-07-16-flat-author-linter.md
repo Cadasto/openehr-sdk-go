@@ -1,9 +1,10 @@
 # Plan — FLAT author linter (pre-submit path validation)
 
 **Date:** 2026-07-16
-**Status:** Draft
+**Status:** Draft — not started
 **Owner:** SDK maintainers
-**Covers:** **REQ-115** (FLAT author linter) — proposed; canonical home to be authored at [clinical-modeling.md § REQ-115](../specifications/clinical-modeling.md#req-115--flat-author-linter) in Phase 0, next to the REQ-109 (AQL static lint) / REQ-110 (template-driven validation) tooling. Numbered in the clinical-modeling headroom (110–119), not the wire band (050–059, exhausted).
+**Covers:** **REQ-115** (FLAT author linter) — proposed; canonical home to be authored at [clinical-modeling.md § REQ-115](../specifications/clinical-modeling.md#req-115--flat-author-linter) in Phase 0. The number is reserved in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy).
+**Related:** sits next to the REQ-109 (AQL static lint) and REQ-110 (template-driven validation) tooling.
 **Verifies / builds on:** landed [REQ-053](../specifications/wire.md#req-053) (FLAT codec), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (Web Template export), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) (compiled-template bridge)
 **Probes:** **PROBE-083** (FLAT author linter corpus)
 **Implementation:** planned
@@ -41,7 +42,7 @@ lint.Result { Issues[] with path, code, severity, suggestion }
 Implementation (Phase 1+) may start once **Phase 0 has landed REQ-115**:
 
 - `Covers:` names the REQ this plan implements (REQ-115) and the landed REQs it builds on (REQ-053/106/111).
-- Canonical normative prose for REQ-115 exists — a `clinical-modeling.md § REQ-115` section + a `REQ.md` registry row — authored via `sdd-specify` (Phase 0 below). Until then this DoR item is **pending**, not satisfied.
+- Canonical normative prose for REQ-115 exists — a `clinical-modeling.md § REQ-115` section + a `traceability.yaml` entry — authored via `sdd-specify` (Phase 0 below). Until then this DoR item is **pending**, not satisfied.
 - The required-field set and the issue-code catalogue are defined **once**, in REQ-115 (not duplicated in this plan).
 - Each phase names its verification command (`make spec-check`, `make ci`, `go test …`).
 
@@ -50,14 +51,14 @@ Implementation (Phase 1+) may start once **Phase 0 has landed REQ-115**:
 - `openehr/serialize/simplified/lint` landed with `// REQ-115` citations.
 - `cmd/examples/lint-flat/` worked example.
 - PROBE-083 passes on vendored FLAT fixtures + negative cases.
-- `traceability.yaml` + the REQ.md **Impl.** column (REQ-115 `planned → landed`), `roadmap.md`, `docs/examples.md` updated.
-- `make spec-check` + `make ci` green; plan archived (or **Status:** complete).
+- `traceability.yaml` (REQ-115 `planned → landed`, then `make spec-gen`), `roadmap.md`, `docs/examples.md` updated.
+- `make spec-check` + `make ci` green; plan **Status:** `Done`.
 
 ## Implementation checklist
 
 | Step | Status |
 |---|---|
-| REQ-115 § + registry row (`clinical-modeling.md`, `REQ.md`) | |
+| REQ-115 § + map entry (`clinical-modeling.md`, `traceability.yaml`) | |
 | PROBE-083 defined in `conformance.md` (Draft) | |
 | Linter package + code | |
 | Tests with `// REQ-115` / `// PROBE-083` comments | |
@@ -81,7 +82,7 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ rather
    - info-level hints for empty optional branches;
    - no CDR or canonical composition required — Web Template + FLAT only;
    - the **stable issue-code catalogue** (e.g. `flat.unknown_path`, `flat.missing_required`, `flat.malformed_suffix`) and severity rules — durable identifiers, so they live in the spec.
-2. Add the `REQ.md` registry row (**Impl.:** `planned`; the spec section's stability **Status:** `Draft`).
+2. Add the `traceability.yaml` entry (`implementation: planned`; the spec section's stability **Status:** `Draft`) and run `make spec-gen`.
 3. Define PROBE-083 in `conformance.md` (status Draft) + add the `traceability.yaml` row.
 
 **Definition of done:** `make spec-check` passes with the new rows.
@@ -128,8 +129,8 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ rather
    - Positive: known-good FLAT from the EHRbase `Test_dv_*` corpus.
    - Negative: inject an unknown path, assert the issue code.
 2. Confirm the probe is wired in the `conformance.md` catalog (defined in Phase 0) + `traceability.yaml`.
-3. Update `roadmap.md` and flip the REQ.md **Impl.** column for REQ-115 to `landed`.
-4. Set plan **Status:** complete → archive.
+3. Update `roadmap.md` and set REQ-115 to `landed` in `traceability.yaml`; run `make spec-gen`.
+4. Set plan **Status:** `Done`.
 
 **Definition of done:** PROBE-083 in `make test`; REQ-115 **Impl.** = `landed`; `make spec-check` green.
 

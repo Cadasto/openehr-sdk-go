@@ -34,7 +34,7 @@ A malformed identifier string **MUST NOT** panic: the error-returning `Parse…`
 
 **Acceptance:** for canonical and malformed sample strings of each form, `Parse…` round-trips the input and derived components equal the spec's lexical decomposition; malformed input yields an error from `Parse…` (no panic); best-effort methods never panic; the client version-uid helper produces identical results to the canonical parser.
 
-**Out of scope:** validity *checking* of the embedded `UID` syntax beyond decomposition; generation of new identifiers (covered for instance synthesis by REQ-107). The `OBJECT_REF` / `PARTY_REF` / `PARTY_PROXY` convenience accessors are **SHOULD**-level and **deferred** to a follow-up (only `LOCATABLE_REF.as_uri` is realised in this band); the underlying fields are already directly accessible on the generated structs.
+**Out of scope:** validity *checking* of the embedded `UID` syntax beyond decomposition; generation of new identifiers (covered for instance synthesis by REQ-107). The `OBJECT_REF` / `PARTY_REF` / `PARTY_PROXY` convenience accessors are **SHOULD**-level and **deferred** to a follow-up (only `LOCATABLE_REF.as_uri` is realised by REQ-120–123); the underlying fields are already directly accessible on the generated structs.
 
 ## REQ-121 — Locatable path read access
 
@@ -86,4 +86,4 @@ Malformed input **MUST NOT** panic: component accessors and `magnitude()` are be
 
 ## Editing rules
 
-New behavioural functions get a new REQ in the 120–129 band; identifiers are stable once published. When code lands, set the registry `Impl.` column in [REQ.md](REQ.md) and the `implementation:` field in [traceability.yaml](traceability.yaml), and link each REQ section to its implementing package(s).
+New behavioural functions get a new REQ ([REQ.md § Numbering policy](REQ.md#numbering-policy)); identifiers are stable once published. When code lands, set the `implementation:` field in [traceability.yaml](traceability.yaml), run `make spec-gen`, and link each REQ section to its implementing package(s).

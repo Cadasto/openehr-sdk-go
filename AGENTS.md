@@ -6,7 +6,7 @@
 
 A first-party **Go SDK for openEHR** — `github.com/cadasto/openehr-sdk-go`, MIT. **openEHR-first**: openEHR REST `1.1.0-development`, the Reference Model, AQL, ADL 1.4 OPT, and SMART-on-openEHR auth are the normative scope. Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care) ship in the same module for v1, behind a clean `cadasto/` cut line so later extraction is a subtree move, not a rewrite.
 
-Go `1.27.x`, module floor `1.27.0` ([REQ-002](docs/specifications/packaging.md#req-002--go-version)). **Early implementation, pre-1.0** — landed-vs-planned in [docs/roadmap.md](docs/roadmap.md).
+Go `1.27.x`, module floor `1.27.0` ([REQ-002](docs/specifications/packaging.md#req-002--go-version)). **Early implementation, pre-1.0** — status per REQ in [REQ.md](docs/specifications/REQ.md), open work in [docs/roadmap.md](docs/roadmap.md).
 
 ## Source of truth
 
@@ -21,11 +21,11 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 | # | Doc | Scope |
 |---|---|---|
 | 0 | [docs/quick-start.md](docs/quick-start.md) · [docs/examples.md](docs/examples.md) | **Developer onboarding** — install, integration paths, runnable `cmd/examples/` catalog |
-| 1 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ/PROBE/STRAND in [REQ.md](docs/specifications/REQ.md); machine map in [traceability.yaml](docs/specifications/traceability.yaml); process + descriptor in [development-process.md](docs/development-process.md) / [.sdd.yaml](docs/.sdd.yaml) |
+| 1 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ index in [REQ.md](docs/specifications/REQ.md), PROBE in [conformance.md](docs/specifications/conformance.md), STRAND in [research-strands.md](docs/specifications/research-strands.md); machine map in [traceability.yaml](docs/specifications/traceability.yaml); process + descriptor in [development-process.md](docs/development-process.md) / [.sdd.yaml](docs/.sdd.yaml) |
 | 2 | [docs/architecture.md](docs/architecture.md) | Design narrative — package organization, dependencies, integration, mermaid diagrams |
 | 3 | [docs/ai-workflow.md](docs/ai-workflow.md) | **AI conventions** — the working loop, recommended plugins/skills, openEHR ground-truth lookups, hooks |
 | 4 | [docs/adr/](docs/adr/) | Closed architectural decisions |
-| 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) | Implementation plans and landed-vs-planned checklist |
+| 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) | Implementation plans, and the open-work roadmap |
 | 6 | [CHANGELOG.md](CHANGELOG.md) + [docs/releases.md](docs/releases.md) | Release log and version policy |
 | 7 | [CONTRIBUTING.md](CONTRIBUTING.md) + [SECURITY.md](SECURITY.md) | Contributor flow and vulnerability reporting |
 | 8 | [docs/licensing.md](docs/licensing.md) | MIT grant plus in-tree third-party inventory |
@@ -34,13 +34,14 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 
 **Start with `make spec-context REQ=NNN`** — one bundle with the registry row, traceability block, canonical excerpt, and touching strands. **Finish with `make spec-check`** (`make ci` includes it). The step-by-step loop lives in [ai-workflow.md § The loop](docs/ai-workflow.md#the-loop); the rules that bind regardless of how you got there:
 
-- New normative text goes in the **canonical topic spec** first, then the REQ registry row — never as duplicate prose in `REQ.md`, and never as a rule that exists only in code.
-- Cite `REQ-NNN` / `PROBE-NNN` in tests and maintainer comments (function bodies, unexported code); update `traceability.yaml` in the same change that lands the code.
+- New normative text goes in the **canonical topic spec** first, then its `traceability.yaml` entry (`make spec-gen` writes the registry row) — never as duplicate prose in `REQ.md`, and never as a rule that exists only in code.
+- Cite `REQ-NNN` / `PROBE-NNN` in tests and maintainer comments (function bodies, unexported code); update `traceability.yaml` in the same change that lands the code, then `make spec-gen`. The REQ.md registry and the plan index are generated — never edit them by hand — and the map is a pure index: no notes, no comments.
+- **Two lanes.** A change that alters no normative statement (refactor, move, perf, tooling, a fix that restores the spec'd behaviour) owes no spec, registry or plan edits — green `make ci` and one PR-body line. See [development-process.md § Two lanes](docs/development-process.md#two-lanes).
 - **Godoc is for SDK users.** Package docs and doc comments on exported identifiers carry no spec-process identifiers (REQ, ADR, STRAND, plan or spec paths) and no RFC-2119 capitals. State the behaviour a caller needs in plain English. A probe's own `PROBE-NNN` id and public openEHR specification citations are fine.
-- **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. A GAP-style label may appear only as an ephemeral in-flight plan filename — never in `traceability.yaml`, test names, `doc.go`, or normative prose ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
+- **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. No GAP-style label appears anywhere — not in plan filenames, `traceability.yaml`, test names, `doc.go`, or normative prose ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
 - Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program — checklist in [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
 
-**Descriptor & process.** The `sdd-*` skills read [`docs/.sdd.yaml`](docs/.sdd.yaml) first; the loop, Definition of Ready / Done, and the SDD-vs-superpowers split are in [`docs/development-process.md`](docs/development-process.md#superpowers--sdd). Plans go in [`docs/plans/`](docs/plans/) with the `**Covers:**` header — never a parallel `docs/superpowers/` tree; brainstorming docs are narrative input, not a normative source.
+**Descriptor & process.** The `sdd-*` skills read [`docs/.sdd.yaml`](docs/.sdd.yaml) first; the lanes and the ladder are in [`docs/development-process.md`](docs/development-process.md), Definition of Ready / Done in [`docs/plans/_template.md`](docs/plans/_template.md), and the SDD-vs-superpowers split in [development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd). Plans go in [`docs/plans/`](docs/plans/) with the `**Status:**` / `**Covers:**` header and are finished in place (`Status: Done`, never moved) — never a parallel `docs/superpowers/` tree; brainstorming docs are narrative input, not a normative source.
 
 ## Module layout & boundaries
 
@@ -81,6 +82,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | BMM codegen verify | `make codegen-verify` |
 | AQL parser codegen verify | `make aqlgen-verify` — fails if `openehr/aql/parse/gen/` drifts from the `active/` grammar (needs Docker, not a host JRE); regenerate with `make aqlgen` |
 | Spec traceability | `make spec-check` |
+| Regenerate spec indexes | `make spec-gen` — the REQ.md registry from `traceability.yaml`, the plan index from the plans' headers |
 | Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
 | FLAT corpus integrity | `make flat-conformance-verify` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `…-check` adds a network drift report (dev helper, not a gate) |
@@ -119,7 +121,7 @@ Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-J
 
 ## Do not touch (yet)
 
-- Promoting new numbered ADRs without updating [`docs/adr/README.md`](docs/adr/README.md), [`REQ.md`](docs/specifications/REQ.md), and [`traceability.yaml`](docs/specifications/traceability.yaml). Open decisions stay as [research strands](docs/specifications/research-strands.md) until an ADR lands.
+- Promoting new numbered ADRs without updating [`docs/adr/README.md`](docs/adr/README.md) and [`traceability.yaml`](docs/specifications/traceability.yaml). Open decisions stay as [research strands](docs/specifications/research-strands.md) until an ADR lands.
 - `internal/bmmgen` and `internal/bmmdiff` — generator tooling, not public API; structural changes need rationale in [architecture.md](docs/architecture.md) and [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md).
 - Module path — locked at `github.com/cadasto/openehr-sdk-go` (REQ-001).
 - The `go.mod` `go` directive — the minor line's `.0` patch, never the toolchain patch you happen to run (REQ-002): a mid-line floor makes every consumer and CI image on an earlier patch fetch a new toolchain, breaking air-gapped builds. Dev-image pins ([Dockerfile](Dockerfile)) move independently.

@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers), REQ-095 (OpenAPI authoritative source), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-142 (contribution read), REQ-143 (template list filters), and REQ-144 (Definition metadata decoding). The wire-extension band 140–149 continues the exhausted 050–059 band; the SDK authoring & client-tooling band 130–139 opens here with REQ-130. Transport hygiene (REQ-090–094, REQ-150) lives in [transport.md](transport.md).
+The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers), REQ-095 (OpenAPI authoritative source), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-142 (contribution read), REQ-143 (template list filters), and REQ-144 (Definition metadata decoding). Transport hygiene (REQ-090–094, REQ-150) lives in [transport.md](transport.md).
 
 The premise: correctness is wire-level (REQ-080). The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
 
@@ -443,7 +443,7 @@ The set is closed: decode **MUST NOT** accept a **non-empty** value outside it (
 
 ### REQ-130 — Contribution builder
 
-The contribution leaf **MUST** expose a builder that assembles a `Contribution_create` body — a [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) — from caller payloads without hand-wiring version wrappers, change-type codes, or write-side audit fields. It is the first allocation in the **SDK authoring & client tooling** band (130–139) and is named as SDK-provided by [use-cases.md § Synthetic data seeder](use-cases.md#synthetic-data-seeder).
+The contribution leaf **MUST** expose a builder that assembles a `Contribution_create` body — a [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) — from caller payloads without hand-wiring version wrappers, change-type codes, or write-side audit fields. It is named as SDK-provided by [use-cases.md § Synthetic data seeder](use-cases.md#synthetic-data-seeder).
 
 The builder is an authoring surface over the landed submission shape (REQ-050/095, [PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)) and introduces no new wire shape: anything it emits, a caller **MUST** be able to hand-wire. Where the two could disagree, the builder **MUST** defer to the submission shape.
 

@@ -1,13 +1,13 @@
-# RM function deferred stubs (arithmetic + refs/inverse-navigation) Implementation Plan
+# Plan — RM function deferred stubs (arithmetic + refs/inverse-navigation)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
 >
 > **⚠ YAGNI / DoR gate — read first.** Both clusters below are `Out of scope` in [rm-functions.md](../specifications/rm-functions.md) **because no consumer needs them yet**, and neither has a REQ. This plan exists so the work is *ready*, not as a signal to start. **Do not execute** until a real consumer need appears; when it does, run Phase 0 (`sdd-specify`) first — code-first here would violate the SDD no-code-first guardrail.
 
 **Date:** 2026-09-01
-**Status:** Draft (parked — awaiting consumer need)
+**Status:** Parked — awaiting a consumer need
 **Owner:** SDK maintainers
-**Covers:** proposed **REQ-124** (data-value arithmetic) and proposed **REQ-125** (reference accessors + inverse navigation) — both to be authored in the 120–129 band per [rm-functions.md § Editing rules](../specifications/rm-functions.md#editing-rules). No id is allocated until Phase 0.
+**Covers:** proposed **REQ-124** (data-value arithmetic) and proposed **REQ-125** (reference accessors + inverse navigation) — both to be authored in [rm-functions.md](../specifications/rm-functions.md). Both numbers are reserved in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy).
 **Probes:** TBD at Phase 0 (behavioural — unit-covered).
 **Implementation:** planned
 **Depends on:** landed REQ-120 (identifiers), REQ-121 (path read access), REQ-123 (temporal helpers); [ADR 0011](../adr/0011-rm-behavioural-functions-surface.md) (behavioural-function surface).
@@ -34,8 +34,8 @@
 
 - Every named `panic("not implemented …")` stub is replaced by a real method in a `_funcs.go` file, with `// REQ-124`/`// REQ-125` citations.
 - Malformed/edge inputs return errors or zero values — proven by tests — never panic.
-- rm-functions.md `Out of scope` note for that cluster is removed and the REQ section says `landed`; REQ.md `Impl.` + `traceability.yaml` updated; numbering band table updated (new id consumed).
-- `make spec-check` / `make ci` pass. Plan archived.
+- rm-functions.md `Out of scope` note for that cluster is removed and `traceability.yaml` says `landed` (then `make spec-gen`).
+- `make spec-check` / `make ci` pass. Plan **Status:** `Done`.
 
 ## Phases
 

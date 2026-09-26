@@ -1,7 +1,7 @@
 # Plan — Probe runnability: the sandbox transport and the three-mode runner
 
 **Date:** 2026-08-18
-**Status:** Phases 0–2 landed (Phase 0 2026-08-18; Phases 1–2 2026-09-08); Phase 3 partial — the Cassette recorder, replayer, `cmd/probe-record` capture harness and the `ehr-create` / `ehr-lifecycle` recordings are in, the rest of the corpus is open; Phase 4 partial — the runner's Live path with `TestLiveCreateEHR`, the `TestLiveCoreSnapshot` core-EHR snapshot, the `TestLiveCompositionSnapshot` template/composition snapshot and the `TestLiveStoredQuerySnapshot` stored-AQL snapshot (PROBE-079 + PROBE-066) are in, catalog-wide Live runnability is the open work
+**Status:** Active — phases 0–2 landed; phase 3 (the Cassette corpus) and phase 4 (catalog-wide Live runs) are partial
 **Owner:** SDK maintainers
 **Covers:** [REQ-082](../specifications/conformance.md#req-082--runnability) (Runnability, **Impl. `partial`**); unblocks the deferred wire-level probes named under [REQ-080](../specifications/conformance.md#req-080--openehr-wire-conformance)
 **Probes:** the runnability phases add no new `PROBE-NNN` — they give the existing catalog its missing execution modes. It has promoted **PROBE-078** (a Sandbox request-capture probe under `testkit/probes/query/`) and **PROBE-079** (witnessed on the Live snapshot) out of `Status: Deferred`, and **PROBE-065** out of `Status: Draft` to `Implemented (Sandbox)` under `testkit/probes/versioned/`; **PROBE-077** is still `Deferred` — a landed, unit-covered requirement whose dedicated wire probe is unwritten. Resolving [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1 (the four `testkit/probes/rest/*` probes) did add three new catalog ids — **PROBE-102** (System `OPTIONS`), **PROBE-103** (Admin bulk-delete), **PROBE-104** (Definition `/example`) — for wire surfaces that had no probe, alongside **PROBE-062** (audit-details) and **PROBE-060** (EHR creation) promoted from `Draft`.
@@ -40,7 +40,7 @@ Scoped to phases 1–2 (what is reachable now):
   - selecting a mode the invocation cannot satisfy fails loudly rather than falling back to another mode;
   - a `skip` is never counted as a pass in the summary;
   - a probe with no **Effect** declaration is treated as `mutating` (so it cannot reach a live deployment by default).
-- [`traceability.yaml`](../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect what landed. REQ-082 stays **`partial`** until phases 3–4 — Sandbox alone does not satisfy a three-mode requirement, and marking it `landed` early is the drift this column exists to prevent.
+- [`traceability.yaml`](../specifications/traceability.yaml) (and so the generated REQ.md registry) reflects what landed. REQ-082 stays **`partial`** until phases 3–4 — Sandbox alone does not satisfy a three-mode requirement, and marking it `landed` early is the drift this column exists to prevent.
 - `make spec-check` and `make ci` pass.
 
 ## Implementation checklist

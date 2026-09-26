@@ -2,8 +2,10 @@
 # Verify docs/specifications/traceability.yaml against the working tree.
 #
 # Fail (exit 1):
-#   - REQ.md registry <-> traceability.yaml membership (both directions)
-#   - REQ.md Impl. column agrees with traceability implementation
+#   - the generated blocks (REQ.md registry, plans/README.md index) are stale
+#     (scripts/spec-gen.sh --check)
+#   - a row carries a key outside the index schema (no `notes:`), the same key
+#     twice, or a comment — the map is an index, history lives in git
 #   - landed/partial REQs cite existing packages/tests/plans and catalogued probes
 #   - landed/partial REQs do not cite a probe with Status: Draft in conformance.md
 #   - canonical: anchors resolve to a real heading in the target spec file
@@ -14,7 +16,6 @@
 # Warn only (exit 0 unless other errors):
 #   - planned REQs with missing artefacts
 #   - missing canonical: link in traceability.yaml
-#   - yaml REQ ids absent from REQ.md registry
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -28,6 +29,12 @@ declare -A trace_impl       # REQ id -> implementation, captured from traceabili
 declare -A trace_canonical  # REQ id -> canonical "path#anchor"
 declare -A anchor_set       # "relpath#slug" -> 1 (GitHub heading anchors, built lazily)
 declare -A anchors_built    # relpath -> 1 (files whose anchors have been extracted)
+declare -A row_keys         # key -> 1 for the row being read (duplicate detection)
+declare -A seen_ids         # REQ id -> 1 (a row id may appear once)
+
+# The keys a traceability.yaml row may carry. Anything else — a `notes:` memoir
+# above all — is refused: the map is an index, and history lives in git.
+ROW_KEYS=" id title canonical status implementation packages tests probes plans adrs fixtures "
 
 die() { echo "spec-check: error: $*" >&2; fail=1; }
 warn_msg() { echo "spec-check: warning: $*" >&2; warn=$((warn + 1)); }
@@ -146,6 +153,7 @@ flush_req() {
   probe_ids=()
   test_paths=()
   plan_paths=()
+  row_keys=()
   reset_collectors
 }
 
@@ -154,12 +162,35 @@ probe_ids=()
 test_paths=()
 plan_paths=()
 
+in_rows=0
 while IFS= read -r line || [[ -n "$line" ]]; do
+  line="${line%$'\r'}"
+  [[ "$line" == "requirements:" ]] && in_rows=1
+  # Comments are allowed in the file header only; `#` never occurs in a path,
+  # an id or a canonical link except as the anchor separator, which has no
+  # space before it.
+  # A title is free text, so only a full-line comment counts there.
+  if [[ $in_rows -eq 1 && ( "$line" =~ ^[[:space:]]*# \
+        || ( ! "$line" =~ ^[[:space:]]{4}title: && "$line" =~ [[:space:]]#([[:space:]]|$) ) ) ]]; then
+    die "${current_id:-traceability.yaml}: comment in a row — the map is an index; put the fact in its canonical spec"
+    continue
+  fi
+  if [[ -n "$current_id" && "$line" =~ ^[[:space:]]{4}([a-z_]+): ]]; then
+    _key="${BASH_REMATCH[1]}"
+    [[ "$ROW_KEYS" == *" ${_key} "* ]] \
+      || die "${current_id}: key '${_key}:' is not part of the index schema (allowed:${ROW_KEYS% })"
+    [[ -z "${row_keys[$_key]:-}" ]] \
+      || die "${current_id}: key '${_key}:' appears twice — a YAML parser keeps only the last"
+    row_keys[$_key]=1
+  fi
   if [[ "$line" =~ ^[[:space:]]*-[[:space:]]*id:[[:space:]]*(REQ-[0-9]+) ]]; then
     # Capture before flush_req: its internal `[[ =~ ]]` tests clobber BASH_REMATCH.
     _next_id="${BASH_REMATCH[1]}"
     flush_req
     current_id="$_next_id"
+    [[ -z "${seen_ids[$current_id]:-}" ]] || die "${current_id}: appears in more than one row"
+    seen_ids[$current_id]=1
+    row_keys[id]=1
     continue
   fi
   if [[ -n "$current_id" && "$line" =~ ^[[:space:]]*implementation:[[:space:]]*([A-Za-z-]+) ]]; then
@@ -284,31 +315,30 @@ for id in $(printf '%s\n' "${!trace_canonical[@]}" | sort); do
     || die "${id}: canonical anchor '#${anchor}' does not resolve to a heading in ${rel}"
 done
 
-# Registry mentions every yaml id
-while IFS= read -r id; do
-  [[ -z "$id" ]] && continue
-  grep -qF "| ${id} |" "$REQ_REG" || warn_msg "${id} in traceability.yaml but not in REQ.md registry"
-done < <(grep -E '^[[:space:]]*-[[:space:]]*id:[[:space:]]*REQ-' "$YAML" | sed -E 's/.*id:[[:space:]]*//')
+# The generated blocks (REQ.md registry, plans/README.md index) match their
+# sources. The registry is generated from this map, so membership and
+# implementation status cannot drift from it while this check is green.
+# A registry-shaped row outside the generated block would read as a real
+# registry entry to a human reader (spec-context reads only inside the markers).
+stray="$(awk '
+  index($0, "<!-- BEGIN GENERATED: registry ") == 1 { inside = 1; next }
+  index($0, "<!-- END GENERATED: registry ") == 1 { inside = 0; next }
+  !inside && /^\| REQ-[0-9]+ \|.*\| (landed|partial|planned|deprecated) \|$/ { print NR }
+' "$REQ_REG")"
+[[ -z "$stray" ]] || die "REQ.md: registry row(s) outside the generated block at line(s) $(echo $stray) — edit traceability.yaml and run make spec-gen"
 
-# Every REQ.md registry id has a traceability.yaml entry (completeness — no silent gaps)
-while IFS= read -r id; do
-  [[ -z "$id" ]] && continue
-  grep -qE "^[[:space:]]*-[[:space:]]*id:[[:space:]]*${id}([[:space:]]|$)" "$YAML" \
-    || die "${id} in REQ.md registry but missing from traceability.yaml"
-done < <(grep -E '^\| REQ-[0-9]{3} ' "$REQ_REG" | sed -E 's/^\| (REQ-[0-9]{3}) .*/\1/')
-
-# REQ.md Impl. column must agree with traceability.yaml implementation (no drift)
-while read -r id impl; do
-  ti="${trace_impl[$id]:-}"
-  [[ -z "$ti" ]] && continue   # missing entry already reported by the completeness check
-  [[ "$impl" == "$ti" ]] || die "${id}: REQ.md Impl '${impl}' disagrees with traceability implementation '${ti}'"
-done < <(awk -F'|' '/^\| REQ-[0-9]{3} /{id=$2; impl=$(NF-1); gsub(/ /,"",id); gsub(/ /,"",impl); print id, impl}' "$REQ_REG")
+if [[ -f "${ROOT}/scripts/spec-gen.sh" ]]; then
+  bash "${ROOT}/scripts/spec-gen.sh" --check || die "generated blocks are stale — run make spec-gen"
+else
+  die "missing scripts/spec-gen.sh"
+fi
 
 # --- prose counts that restate the tree ------------------------------------
 #
 # A sentence that repeats a number the tree can produce rots quietly: the
 # probe census below was wrong in two consecutive PRs, and roadmap.md's
-# example tally sat a program behind cmd/examples/. Each guard derives the
+# example tally sat a program behind cmd/examples/ (that guard went with the
+# roadmap's per-feature tables). Each guard derives the
 # number from the tree and compares it with the one sentence stating it.
 # A guard whose sentence no longer matches DIES rather than skipping — a
 # guard that silently matches nothing is the drift it was added to catch.
@@ -345,7 +375,6 @@ count_must_match() {
 
 CONF_REL="docs/specifications/conformance.md"
 EXAMPLES="${ROOT}/docs/examples.md"
-ROADMAP="${ROOT}/docs/roadmap.md"
 
 if [[ -f "$CONF" ]]; then
   probe_total="$(count_matches "$CONF" '^#### PROBE-')"
@@ -398,13 +427,6 @@ ex_re='The [0-9]+ runnable programs'
 if sole_line "$EXAMPLES" "$ex_re" 'runnable-example count'; then
   count_must_match "docs/examples.md" 'runnable-example count' \
     "$(printf '%s' "$SOLE_LINE" | grep -oE "$ex_re" | sed -E 's/^The ([0-9]+) .*/\1/')" \
-    "$example_count" 'cmd/examples/*/main.go'
-fi
-
-road_re='[0-9]+ runnable programs'
-if sole_line "$ROADMAP" "$road_re" 'runnable-example count'; then
-  count_must_match "docs/roadmap.md" 'runnable-example count' \
-    "$(printf '%s' "$SOLE_LINE" | grep -oE "$road_re" | sed -E 's/^([0-9]+) .*/\1/')" \
     "$example_count" 'cmd/examples/*/main.go'
 fi
 

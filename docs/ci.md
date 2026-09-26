@@ -58,7 +58,8 @@ Run `make help` for the full grouped list. Common targets:
 | Codegen | `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
 | Codegen | `make aqlgen-verify` | Committed AQL parser matches `resources/aql/grammar/active/` (needs Docker) |
 | Codegen | `make termgen-verify` | `openehr/terminology/openehr_gen.go` matches the pinned `resources/terminology/openehr_terminology.xml`; regenerate with `make termgen` |
-| Specs | `make spec-check` | `docs/specifications/traceability.yaml` paths and probes match the tree |
+| Specs | `make spec-check` | `docs/specifications/traceability.yaml` paths and probes match the tree, and the generated REQ.md registry and plan index are current |
+| Specs | `make spec-gen` | Regenerate the REQ.md registry and the plan index (not a gate; `spec-check` fails until it is run) |
 | Docs | `make docs-check` | Strict MkDocs build plus published-output assertions (needs Docker; fetches docs-theme). The `go get` tag it asserts on the install and landing pages is read from the first release heading in [`CHANGELOG.md`](../CHANGELOG.md); `DOCS_SYNC=docs-sync-offline` builds from the cached brand layer instead of refetching |
 | Docs | `make docs-serve` | Live preview on `http://127.0.0.1:8000` |
 | Fixtures | `make flat-conformance-verify` | Offline `sha256` integrity of the pinned upstream FLAT corpus against its `MANIFEST.txt`; no network and no `curl`/`jq` needed, so it is safe in the gate. Catches a hand-edit to a vendored fixture whose whole value is being byte-identical to upstream |

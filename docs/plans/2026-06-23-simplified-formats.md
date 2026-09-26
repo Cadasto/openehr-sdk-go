@@ -1,11 +1,11 @@
 # Plan — Simplified formats (WebTemplate export + FLAT/STRUCTURED) — umbrella
 
 **Date:** 2026-06-23
-**Status:** Draft (proposed umbrella — planned; not yet approved for implementation)
+**Status:** Parked — phases 2 and 3 landed; the shared model (phase 1) and the § Residual scope items wait for a consumer need
 **Owner:** SDK maintainers
-**Covers:** [REQ-053](../specifications/wire.md#req-053) (FLAT / STRUCTURED composition codecs); **proposed REQ-106** (WebTemplate JSON export — child plan [`2026-05-22-webtemplate-export.md`](archive/2026-05-22-webtemplate-export.md)). Cross-links the landed compiled-template foundation ([REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge)), [REQ-103](../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection) primitives, [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) instance synthesis, [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) validation.
+**Covers:** [REQ-053](../specifications/wire.md#req-053) (FLAT / STRUCTURED composition codecs); [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (WebTemplate JSON export — child plan [`2026-05-22-webtemplate-export.md`](archive/2026-05-22-webtemplate-export.md)).
+**Related:** the landed compiled-template foundation ([REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge)), [REQ-103](../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection) primitives, [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) instance synthesis, [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) validation.
 **Probes:** PROBE-075 (WebTemplate export structural conformance), PROBE-076 (FLAT/STRUCTURED composition round-trip) — **reserved** (next free after PROBE-074).
-**Implementation:** planned
 **Depends on:** landed compiled-template foundation — `openehr/template/` + the public bridge `openehr/templatecompile/` (REQ-111), REQ-103 primitive constraints, REQ-107 `instance.Generate`. All shipped; no new prerequisites.
 **Defers:** round-trip WebTemplate JSON → OPT; ADL2 `.opt2` / `.oet` / `.t.json` *authoring*-template parsing (the SDK consumes the flattened `.opt`); byte-exact parity with any single reference implementation; multi-version WebTemplate output.
 
@@ -57,7 +57,7 @@ The **shared simplified-template model** (Phase 1) also stays deferred: REQ-106 
 - **Reference implementation:** target **EHRbase `openEHR_SDK`** (Java, actively maintained, `version "2.3"`) over Better `web-template` (Kotlin; frozen 2021, build-rot reports). Record as an [ADR](../adr/) if it forks behaviour.
 - **Pin the WebTemplate `version`** we emit (EHRbase emits `"2.3"`).
 - **`id`-generation algorithm** is load-bearing (consumers' FLAT paths depend on it). It is now **normatively specified** in the STABLE *Simplified Formats* spec (§Node ID Generation Rules: character-normalisation → underscore-consolidation → lowercase → trim → empty→`id` → digit-prefix→`a` → sibling-uniqueness suffix), so **target the spec algorithm**; use EHRbase `openEHR_SDK` as the conforming reference implementation and record an ADR only where it deviates.
-- **Author the specs:** REQ-106 has **no registry row yet** — add canonical prose to `docs/specifications/clinical-modeling.md` + a `REQ.md` row; flesh `REQ-053` in `wire.md`. Do **not** implement against an unregistered REQ.
+- **Author the specs:** done — REQ-106 is in `clinical-modeling.md` and REQ-053 in `wire.md`.
 - **Media types:** the *Simplified Formats* spec standardises exactly **two** strings — the FLAT/STRUCTURED **composition** types `application/openehr.wt.flat+json` / `application/openehr.wt.structured+json`. The WebTemplate resource type `application/openehr.wt+json` is **not** a Simplified-Formats media type — "Web Template as a resource" is explicitly out of that spec's scope; it belongs to the ITS-REST DEFINITION API / EHRbase de-facto usage. Emit all three canonical strings; treat the deprecated `.schema`-suffixed variants — retired from the specification but still served by EHRbase — as an accepted tolerance (be liberal on input only).
 
 ## Conformance corpus (for PROBE-075/076)
@@ -78,21 +78,21 @@ Matched **OPT → WebTemplate → FLAT/STRUCTURED** fixture sets exist upstream 
 
 ## Definition of Ready
 
-- REQ-053 and proposed REQ-106 each have canonical spec prose + a `REQ.md` registry row.
+- REQ-053 and REQ-106 each have canonical spec prose + a `traceability.yaml` entry.
 - Reference implementation + WebTemplate `version` + `id`-algorithm choices recorded (ADR where a fork is irreversible).
 - Phase child plans list concrete tasks and the verification command (`make ci`, probes).
 
 ## Definition of Done
 
 - Phase 1 model + Phase 2 (REQ-106) and/or Phase 3 (REQ-053) land with `// REQ-` / `// PROBE-` citations.
-- `traceability.yaml` + `REQ.md` **Impl.** reflect what shipped; canonical spec prose updated in the same PR.
+- `traceability.yaml` reflects what shipped (`make spec-gen` refreshes the registry); canonical spec prose updated in the same PR.
 - PROBE-075/076 pass against the conformance corpus (modulo the documented-deviations list).
 - `make spec-check` + `make ci` green.
 
 ## Mapping to specs
 
 - [`docs/specifications/wire.md` § REQ-053](../../docs/specifications/wire.md#req-053) — FLAT/STRUCTURED contract (to be fleshed)
-- proposed **REQ-106** — `docs/specifications/clinical-modeling.md` + `REQ.md` row (to author)
+- **REQ-106** — `docs/specifications/clinical-modeling.md`
 - [`docs/specifications/REQ.md`](../../docs/specifications/REQ.md) — registry
 - [`docs/roadmap.md`](../roadmap.md) — FLAT/STRUCTURED row (REQ-053, Planned)
 

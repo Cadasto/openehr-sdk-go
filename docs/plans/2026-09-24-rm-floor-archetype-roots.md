@@ -1,7 +1,7 @@
 # Plan — RM floor: archetype roots and ARCHETYPED
 
 **Date:** 2026-09-24
-**Status:** Draft
+**Status:** Active — the spec delta landed; the implementation is next
 **Owner:** SDK maintainers
 **Covers:** REQ-112 ([clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor), *Per-RM-type invariant catalogue*: the *Archetype roots* and *ARCHETYPED* rows) — no new id
 **Probes:** PROBE-081 extended (value-typed presence now also covers `ARCHETYPED.archetype_id` / `rm_version`)
@@ -37,7 +37,7 @@ The RM forbids all five (`Is_archetype_root` + `LOCATABLE.Archetyped_valid`; `AR
 | Step | Status |
 |---|---|
 | Spec / registry updated (`traceability.yaml`, REQ.md row) | done (this PR) |
-| Indexes `spec-check` misses (`roadmap.md` row; no new REQ id, so no band change) | at landing |
+| `roadmap.md` open-work row removed | at landing |
 | Code | |
 | Tests with `// REQ-112` / `// PROBE-081` comments | |
 | `make spec-check` | |

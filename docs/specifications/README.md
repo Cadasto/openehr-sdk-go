@@ -29,24 +29,20 @@ The repo uses several document kinds, each with a distinct role and boundary:
 | **Plan** | What exact work implements a slice? | No (delivery tasks) | [`docs/plans/`](../plans/) |
 | **Guide** | How do I work in this repo safely? | No | [`docs/architecture.md`](../architecture.md), [`docs/development-process.md`](../development-process.md), [`docs/ai-workflow.md`](../ai-workflow.md), [`docs/ci.md`](../ci.md) |
 | **Descriptor** | Machine-readable SDD conventions for tooling | Config (not prose) | [`docs/.sdd.yaml`](../.sdd.yaml) — REQ style, paths, build targets, PROBE/STRAND toggles; read by `sdd-*` skills |
-| **Roadmap** | What has landed and what hasn't? | No (status snapshot) | [`docs/roadmap.md`](../roadmap.md) |
+| **Roadmap** | What is still open, and which deployments are targeted? | No (status snapshot) | [`docs/roadmap.md`](../roadmap.md) |
 
 **Boundaries between kinds:**
 
 - **Topic specs** carry RFC 2119 prose only — no checkbox task lists, no implementation file paths, no PR-style summaries (use a plan for those).
-- **`REQ.md`** is registry-only — one row per REQ-NNN — canonical prose lives in the topic spec linked from each row.
+- **`REQ.md`** is registry-only — one row per REQ-NNN, generated from `traceability.yaml` by `make spec-gen` — canonical prose lives in the topic spec linked from each row.
+- **`traceability.yaml`** is an index only: ids, links and paths, with no notes or comments (`make spec-check` refuses them). A fact worth keeping goes in its canonical spec; history stays in git, plans and ADRs.
 - **Plans** MUST cite the REQ-NNN / STRAND-NN identifiers they implement in the header `**Covers:**` line.
 - **ADRs** cover one decision each — long flows or invariants stay in the topic spec; ADRs cite the STRAND-NN they resolve plus any REQ-NNN they amend.
 - **Guides** describe how we work — they're informative, not normative; when a guide disagrees with a spec, the spec wins and the guide is updated.
 
 ## Source of truth
 
-| Mode | When | Order |
-|------|------|-------|
-| **Spec-first** | New capability, new wire surface, new identifier | REQ row → canonical topic spec (Draft) → ADR if irreversible fork → Plan → Code → spec status update → REQ `Impl.` column |
-| **Implementation-aligned** | Hardening, fix-up, perf, behaviour clarification on shipped code | Code change → update topic spec section + `traceability.yaml` in the same PR |
-
-For implementation-aligned PRs, **code wins until the spec is updated in the same PR**.
+When code and a spec disagree, the spec wins. Which changes owe spec edits, and in what order, is [development-process.md § Two lanes](../development-process.md#two-lanes) and [§ The ladder](../development-process.md#the-ladder-full-lane).
 
 ## Status header
 
@@ -65,9 +61,9 @@ Every spec file starts with a `Status:` line:
 The chain that drift detection works against:
 
 ```
-docs/specifications/REQ.md (registry index — one row per REQ-NNN)
+docs/specifications/traceability.yaml (the one hand-edited index: packages, probes, tests, plans, status)
+    ├─→ docs/specifications/REQ.md (registry, generated from the map)
     └─→ canonical topic spec (packaging.md, wire.md, transport.md, …)
-            └─→ docs/specifications/traceability.yaml (packages, probes, tests, plans)
                     └─→ docs/plans/YYYY-MM-DD-*.md
                             └─→ code (Go package)
                                     └─→ tests (*_test.go)
@@ -78,13 +74,12 @@ docs/specifications/REQ.md (registry index — one row per REQ-NNN)
 
 Cite identifiers when crossing the chain:
 
-- Every plan in `docs/plans/` MUST list the REQ-IDs it implements.
-- Every public package's `doc.go` SHOULD reference the REQ-IDs and/or spec sections it covers.
-- Every test that exercises a normative requirement SHOULD cite the REQ-ID and (if applicable) PROBE-ID in a comment.
+- Every plan in `docs/plans/` MUST list the REQ-IDs it implements on its `**Covers:**` line.
+- Every test that exercises a normative requirement SHOULD cite the REQ-ID and (if applicable) PROBE-ID in a comment. Maintainer comments may cite them too; godoc on exported API does not (it is written for SDK users — see [AGENTS.md](../../AGENTS.md#spec-driven-workflow-agents)).
 - Every ADR in `docs/adr/` MUST cite the STRAND-ID it resolves (from `research-strands.md`) and any REQ-IDs it amends.
-- When landing code or probes, update [`traceability.yaml`](traceability.yaml) and the registry `Impl.` column in [REQ.md](REQ.md).
+- When landing code or probes, update [`traceability.yaml`](traceability.yaml) and run `make spec-gen`.
 
-A requirement with no plan, a plan with no code, code with no test, or a conformance probe with no test — each is a mechanically detectable drift signal. Run `make spec-check` to catch registry rot.
+`make spec-check` catches the drift a machine can see: a cited path, probe or anchor that does not exist, a landed requirement with no packages or tests, and a generated block that no longer matches its source.
 
 ## Identifier scheme
 
@@ -95,16 +90,16 @@ A requirement with no plan, a plan with no code, code with no test, or a conform
 | `STRAND-NN` | Open research strand | `research-strands.md` |
 | `ADR-NNN` | Resolved architectural decision | `../docs/adr/` |
 
-Identifiers MUST be stable once published — they are referenced from outside the file (commit messages, PR titles, code comments, test names). Renumbering is a major doc-version bump.
+Identifiers MUST be stable once published — they are referenced from outside the file (commit messages, PR titles, code comments, test names). Renumbering and reuse are prohibited ([REQ.md § Numbering policy](REQ.md#numbering-policy)).
 
 ## Index
 
 | File | Scope |
 |---|---|
-| [REQ.md](REQ.md) | Requirement registry (index) — links to canonical topic specs |
+| [REQ.md](REQ.md) | Requirement registry (generated index) — links to canonical topic specs |
 | [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test / plan map |
 | [../.sdd.yaml](../.sdd.yaml) | SDD project descriptor — identifier style, document paths, `make` targets (read by `sdd-*` skills) |
-| [../development-process.md](../development-process.md) | SDD constitution — the delivery loop, DoR/DoD pointers, superpowers boundary |
+| [../development-process.md](../development-process.md) | The two lanes, the delivery ladder, the superpowers boundary |
 | [packaging.md](packaging.md) | Module identity REQ-001–005 |
 | [transport.md](transport.md) | Transport layer REQ-090–094, 096–098, 150 |
 | [glossary.md](glossary.md) | openEHR, SMART, Cadasto, and SDK-internal terms |
@@ -124,7 +119,8 @@ Identifiers MUST be stable once published — they are referenced from outside t
 
 ## Editing rules
 
-- New normative statements get a new `REQ-NNN`/`PROBE-NNN` — do not silently re-letter existing ones.
+- New normative statements get a new `REQ-NNN`/`PROBE-NNN` — take the next free number ([REQ.md § Numbering policy](REQ.md#numbering-policy)); do not silently re-letter existing ones.
+- A spec section states the current contract. When and how it got there belongs in git, the plan or an ADR, not in the spec.
 - A spec file MUST link out to the code package(s) it constrains once they exist.
 - Status transitions (`Draft` → `Stable`) MUST be accompanied by a CHANGELOG entry under `## [Unreleased]`.
 - Removing a normative statement (deprecation) MUST go through a documented cycle: mark `Status: Deprecated` first, then remove in the next major version.
