@@ -37,9 +37,14 @@ Specify new behaviour before you write it, in this loop:
    block, and the canonical excerpt.
 2. Change the topic specification under `docs/specifications/`, then the code
    and the tests.
-3. Cite `REQ-NNN` and `PROBE-NNN` in the tests and in `doc.go`, and update
-   `docs/specifications/traceability.yaml` in the same change.
+3. Cite `REQ-NNN` and `PROBE-NNN` in the tests, update
+   `docs/specifications/traceability.yaml` in the same change, and run
+   `make spec-gen` to refresh the generated registry.
 4. Run `make spec-check`, which `make ci` includes anyway.
+
+A refactor or a bug fix that brings the code back in line with the existing
+specification needs none of this: a green `make ci` and the pull-request line
+`Lane: maintenance, no normative change` are enough.
 
 When the code and a specification disagree, the specification wins. Open
 research questions stay in `docs/specifications/research-strands.md` until an
