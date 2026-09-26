@@ -161,7 +161,7 @@ func render(v any) string {
 
 // sortedUnionKeys returns the union of a's and b's keys in sorted order.
 func sortedUnionKeys(a, b map[string]any) []string {
-	set := make(map[string]struct{}, len(a)+len(b))
+	set := make(map[string]struct{}, max(len(a), len(b)))
 	for k := range a {
 		set[k] = struct{}{}
 	}
