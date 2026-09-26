@@ -54,7 +54,7 @@ The SDK adopts three new runtime dependencies, scoped to `auth/` and `smart/`:
 
 - Hand-rolling JWS signing misses alg-confusion guards (e.g. RSA key used with ES* alg), ECDSA `r‖s` byte-padding edge cases, and JWK type dispatch.
 - Hand-rolling ID-token verification misses `alg:none` rejection, key-type/alg mismatch enforcement, and subtle clock-skew / claim-order issues.
-- RS256-only signing limited the SDK to a sub-baseline profile; SMART mandates RS384/ES384 as the `client-confidential-asymmetric` SHALL baseline.
+- RS256-only signing limited the SDK to a sub-baseline profile; SMART makes RS384/ES384 the mandatory baseline of the `client-confidential-asymmetric` profile.
 
 `go-jose/v4` and `go-oidc/v3` are widely deployed, receive regular security audits, and are the de-facto Go substrate for JOSE/OIDC. The supply-chain cost (three additional direct deps plus their transitive closure) is accepted in exchange for crypto correctness. The previous OTel-only rule was a heuristic, not a hard constraint — it served early development when auth was minimal. At SMART-on-openEHR scope, maintaining that heuristic would require writing and owning security-sensitive crypto code the ecosystem already provides correctly.
 

@@ -33,10 +33,7 @@ and the consumer sees *no* templates rather than n−1. A template catalog that 
 listed is a catalog that cannot be used, and the SDK cannot fix a remote server's
 formatting.
 
-**The zone-less forms are not obviously wrong, either.** The pinned REST overview says:
-
-> Timezone SHOULD be only supplied when needed, otherwise the local timezone is assumed.
-> — [`resources/its-rest/overview-validation.openapi.yaml:675`](../../resources/its-rest/overview-validation.openapi.yaml), the *Datetime format* note
+**The zone-less forms are not obviously wrong, either.** The *Datetime format* note of the pinned REST overview ([`resources/its-rest/overview-validation.openapi.yaml:675`](../../resources/its-rest/overview-validation.openapi.yaml)) recommends (`SHOULD`) supplying a timezone only when needed, and says the local timezone is assumed otherwise.
 
 A server omitting the zone is following that `SHOULD`. The overview then tells the reader
 to assume the *local* timezone — which is well defined for a human reading a catalog on

@@ -19,7 +19,7 @@ We need a deterministic, reviewable procedure so that any maintainer (or AI-driv
 
 ## Decision
 
-A BMM version bump MUST follow the numbered procedure below. CI enforces the deterministic-output invariant via `make codegen-verify`; the weekly drift bot (`.github/workflows/codegen-drift.yml`) catches both accidental hand-edits and generator-template changes that would silently break the next bump.
+A BMM version bump follows the numbered procedure below. CI enforces the deterministic-output invariant via `make codegen-verify`; the weekly drift bot (`.github/workflows/codegen-drift.yml`) catches both accidental hand-edits and generator-template changes that would silently break the next bump.
 
 ### Procedure
 
@@ -39,7 +39,7 @@ A BMM version bump MUST follow the numbered procedure below. CI enforces the det
    make codegen-verify
    ```
 
-   On a freshly-regenerated tree this MUST exit 0. If it does not, re-run step 2 and investigate — a non-deterministic generator is a bug, not a "bump consequence".
+   On a freshly-regenerated tree this exits 0. If it does not, re-run step 2 and investigate — a non-deterministic generator is a bug, not a "bump consequence".
 
 4. **(Optional but recommended) Inspect the semantic diff.** Run:
 
@@ -63,7 +63,7 @@ A BMM version bump MUST follow the numbered procedure below. CI enforces the det
    - **Changed** — type changes, cardinality changes, ancestor-chain changes.
    - **Removed** — class or property deletions.
 
-   The `bmmdiff -suggest-changelog` output is a good starting point but MUST be reviewed by a human; it favours brevity over editorial polish. Keep the bullet **short and high-level** per [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) — one line, one artefact class.
+   The `bmmdiff -suggest-changelog` output is a good starting point, but a human reviews it before it lands; it favours brevity over editorial polish. Keep the bullet **short and high-level** per [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) — one line, one artefact class.
 
 9. **Remove the old BMM file in the same commit.** Never leave both versions in `resources/bmm/` — the SDK pins exactly one version per schema id at a time. The paired add/remove makes the rename reviewable.
 

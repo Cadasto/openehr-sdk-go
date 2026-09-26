@@ -16,7 +16,7 @@ At implementation time the lockstep machinery proved tightly coupled to validati
 
 ## Decision
 
-The lockstep composition validator **MUST** live in `openehr/validation/` (`walk_composition.go` and related files), **not** in `internal/templatecompile/walk/`.
+The lockstep composition validator **lives** in `openehr/validation/` (`walk_composition.go` and related files), **not** in `internal/templatecompile/walk/`.
 
 - `internal/templatecompile/walk/` stays **OPT-only** — compile-time traversal, debug dumps, future tooling that does not import validation semantics ([ADR 0005](0005-compiled-template-foundation.md) Phase 5).
 - `WalkComposition` on the internal OPT walker remains **deferred** (`internal/templatecompile/walk/doc.go`) until a second consumer needs shared lockstep machinery.

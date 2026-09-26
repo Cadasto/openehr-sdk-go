@@ -23,7 +23,7 @@ REQ-102 §C2's own wording — *"re-export"* and *"externally callable without c
 
 ## Decision
 
-The public compiled-template bridge **MUST** live in the sibling package `openehr/templatecompile`, **not** in `openehr/template`. It re-exports the engine by **type alias**:
+The public compiled-template bridge **lives** in the sibling package `openehr/templatecompile`, **not** in `openehr/template`. It re-exports the engine by **type alias**:
 
 - `type Compiled = <internal>.Compiled` — a public alias, so `Compile` output is accepted as-is by composition / instance / validation / aql/lint with no conversion and no behavioural change.
 - `func Compile(opt *template.OperationalTemplate, opts ...Option) (*Compiled, error)` delegating to the engine, with functional `Option`s (`WithRMInfo`, `WithoutImplicitAttributes`) that keep the engine's option struct out of the public surface.

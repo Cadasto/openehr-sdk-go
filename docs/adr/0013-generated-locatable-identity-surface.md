@@ -70,7 +70,7 @@ surface** in `*_gen.go` (ADR 0002 D6: the generator never touches non-`_gen.go` 
    Two consequences follow and are accepted: a getter call through the interface copies the
    receiver (auto-deref; vs. today's direct pointer field read), and a getter invoked on a
    **typed-nil `*T` panics** — so the existing guard-before-read ordering in every consumer
-   (`nodeIDOf` checks `isNilPointer` first) is load-bearing and MUST be preserved, using the
+   (`nodeIDOf` checks `isNilPointer` first) is load-bearing and is kept, using the
    generated predicate from decision 3. These are SDK-idiom additions, not BMM functions —
    they do not pass through the D6 panic-stub / D7 skip-set machinery. One acknowledged
    wart: package `rm` will carry `GetName()` with two signatures — `(string, bool)` on the
