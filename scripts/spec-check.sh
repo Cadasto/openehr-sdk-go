@@ -319,7 +319,7 @@ done
 # sources. The registry is generated from this map, so membership and
 # implementation status cannot drift from it while this check is green.
 # A registry-shaped row outside the generated block would read as a real
-# registry entry to a human and to spec-context.
+# registry entry to a human reader (spec-context reads only inside the markers).
 stray="$(awk '
   index($0, "<!-- BEGIN GENERATED: registry ") == 1 { inside = 1; next }
   index($0, "<!-- END GENERATED: registry ") == 1 { inside = 0; next }

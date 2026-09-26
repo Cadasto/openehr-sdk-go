@@ -277,8 +277,26 @@ sed -i 's/$/\r/' "$r/docs/specifications/traceability.yaml"
 sed -i 's|^      - pkg/good\r$|      - pkg/good  # why\r|' "$r/docs/specifications/traceability.yaml"
 check title-text-crlf "$r" fail "comment in a row"
 
+# 25 — a missing BEGIN marker must be refused; without it the splice is a
+#      no-op and --check would report the block as current.
+r="$(new_case begin-marker-gone)"
+sed -i '/BEGIN GENERATED: registry/d' "$r/docs/specifications/REQ.md"
+check begin-marker-gone "$r" fail "no BEGIN GENERATED: registry marker"
+
+# 26 — nonexistent path in a block-form tests list (the row also lists
+#      packages, so only the tests collector can catch it).
+r="$(new_case block-test)"
+sed -i 's|^      - pkg/good/good_test.go$|&\n      - pkg/good/absent_test.go|' "$r/docs/specifications/traceability.yaml"
+check block-test "$r" fail "missing test path pkg/good/absent_test.go"
+
+# 27 — without the generator the stale-block check cannot run; that must
+#      fail, not skip.
+r="$(new_case spec-gen-missing)"
+rm "$r/scripts/spec-gen.sh"
+check spec-gen-missing "$r" fail "missing scripts/spec-gen.sh"
+
 if [[ $fail -ne 0 ]]; then
   echo "spec-check-selftest: FAILED" >&2
   exit 1
 fi
-echo "spec-check-selftest: OK (24 cases)"
+echo "spec-check-selftest: OK (27 cases)"
