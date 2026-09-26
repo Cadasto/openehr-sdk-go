@@ -1,13 +1,12 @@
-// Example: parse a minimal OPT with a DV_QUANTITY primitive constraint,
-// resolve a path, and call PrimitiveConstraint.Validate. This is the smallest
-// clinical-modelling constraint path: no compiled template, no validation
-// walker, no RM composition fixture.
+// Example: validate single values against one leaf constraint of an
+// operational template (OPT), without compiling the template or building a
+// composition. The embedded OPT constrains a DV_QUANTITY to a magnitude of
+// 0..300 in mm[Hg]; the program resolves that leaf by path and checks three
+// values against it, two of which fail on purpose.
 //
-// Run:
+// Runs offline and needs no fixture; the template is embedded below:
 //
 //	go run ./cmd/examples/primitive-validate
-//
-// The embedded OPT constrains magnitude to 0..300 and units to mm[Hg] only.
 package main
 
 import (
@@ -19,7 +18,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
-// minimalQuantityOPT is a tiny OPT with one C_DV_QUANTITY leaf at /content.
+// minimalQuantityOPT is the smallest OPT with one primitive leaf: a
+// C_DV_QUANTITY directly under the COMPOSITION's content attribute. Real
+// templates nest such leaves many levels deep, but the constraint itself has
+// the same shape.
 const minimalQuantityOPT = `<?xml version="1.0" encoding="UTF-8"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <template_id><value>example_primitive</value></template_id>
@@ -49,30 +51,30 @@ const minimalQuantityOPT = `<?xml version="1.0" encoding="UTF-8"?>
 </template>`
 
 func main() {
-	tmpl, err := template.ParseOPT(strings.NewReader(minimalQuantityOPT))
-	if err != nil {
-		log.Fatalf("ParseOPT: %v", err)
+	if err := run(); err != nil {
+		log.Fatal(err)
 	}
-	fmt.Printf("template_id : %s\n", tmpl.TemplateID())
+}
 
-	p, err := tmpl.ParsePath("/content")
+func run() error {
+	// Step 1: parse the template. ParseOPT reads from any io.Reader; ParseFile
+	// is the convenience for a path on disk.
+	opt, err := template.ParseOPT(strings.NewReader(minimalQuantityOPT))
 	if err != nil {
-		log.Fatalf("ParsePath(/content): %v", err)
+		return fmt.Errorf("parse OPT: %w", err)
 	}
-	node, err := tmpl.NodeAt(p)
-	if err != nil {
-		log.Fatalf("NodeAt(/content): %v", err)
-	}
-	co, ok := node.(*template.ComplexObject)
-	if !ok {
-		log.Fatalf("node at /content: want *ComplexObject, got %T", node)
-	}
-	primitive := co.PrimitiveConstraint()
-	if primitive == nil {
-		log.Fatal("PrimitiveConstraint is nil at /content")
-	}
-	fmt.Printf("constraint  : %T at /content\n", primitive)
+	fmt.Printf("template_id : %s\n", opt.TemplateID())
 
+	// Step 2: find the leaf and its typed constraint.
+	constraint, err := primitiveConstraintAt(opt, "/content")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("constraint  : %T at /content\n", constraint)
+
+	// Step 3: check values. QuantityValue is the small value shape the
+	// constraint accepts, so a caller can check one number without building
+	// an rm.DVQuantity first.
 	cases := []struct {
 		label string
 		value constraints.QuantityValue
@@ -81,23 +83,54 @@ func main() {
 		{"out-of-range magnitude", constraints.QuantityValue{Magnitude: 500, Units: "mm[Hg]"}},
 		{"unknown unit", constraints.QuantityValue{Magnitude: 50, Units: "psi"}},
 	}
-
 	var failures int
-	for _, c := range cases {
-		vs := primitive.Validate(c.value)
-		if len(vs) == 0 {
-			fmt.Printf("  %-22s OK\n", c.label)
+	for _, tc := range cases {
+		// Validate returns nil when the value satisfies every clause, and
+		// otherwise one Violation per clause that failed.
+		violations := constraint.Validate(tc.value)
+		if len(violations) == 0 {
+			fmt.Printf("  %-22s OK\n", tc.label)
 			continue
 		}
 		failures++
-		fmt.Printf("  %-22s %d violation(s)\n", c.label, len(vs))
-		for _, v := range vs {
-			fmt.Printf("    [%s] %s\n", v.Code, v.Detail)
+		fmt.Printf("  %-22s %d violation(s)\n", tc.label, len(violations))
+		for _, violation := range violations {
+			// Code is the stable identifier a program branches on; Detail
+			// is the explanation for people.
+			fmt.Printf("    [%s] %s\n", violation.Code, violation.Detail)
 		}
 	}
 	if failures > 0 {
 		fmt.Printf("summary     : %d/%d cases failed validation (expected for demo)\n", failures, len(cases))
-		return
+		return nil
 	}
 	fmt.Println("summary     : all cases passed")
+	return nil
+}
+
+// primitiveConstraintAt resolves a template path to its node and returns the
+// typed value constraint on it. Only leaf nodes such as DV_QUANTITY or
+// CODE_PHRASE carry one; on a structural node PrimitiveConstraint is nil.
+func primitiveConstraintAt(opt *template.OperationalTemplate, path string) (constraints.PrimitiveConstraint, error) {
+	// ParsePath checks the path syntax once; NodeAt then walks the tree.
+	parsed, err := opt.ParsePath(path)
+	if err != nil {
+		return nil, fmt.Errorf("parse path %s: %w", path, err)
+	}
+	node, err := opt.NodeAt(parsed)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s: %w", path, err)
+	}
+
+	// NodeAt returns the tree's Node interface. The value constraint lives on
+	// *template.ComplexObject, the node kind that stands for an RM object.
+	object, ok := node.(*template.ComplexObject)
+	if !ok {
+		return nil, fmt.Errorf("node at %s is %T, want *template.ComplexObject", path, node)
+	}
+	constraint := object.PrimitiveConstraint()
+	if constraint == nil {
+		return nil, fmt.Errorf("node at %s carries no primitive constraint", path)
+	}
+	return constraint, nil
 }

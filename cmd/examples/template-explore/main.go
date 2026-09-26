@@ -1,21 +1,15 @@
-// Example: introspect a compiled operational template through the public
-// templatecompile API. It walks the [templatecompile.CompiledNode] tree
-// to print the template structure (the seed of a form generator) and
-// the addressable primitive-leaf paths (the seed of path discovery and
-// Builder.Set targets).
+// Example: walk a compiled operational template (OPT) through its public
+// introspection tree and print two views of it. The first is the node
+// structure a form generator would render: RM type, archetype id or at-code,
+// attribute cardinality, whether the Reference Model requires the attribute,
+// the human label, and slot and primitive markers. The second is the list of
+// primitive-leaf paths a composition builder can assign values to. Nothing
+// here imports an internal/ package.
 //
-// Like cmd/examples/compile-build-validate, this uses public packages
-// only (openehr/template, openehr/templatecompile) and no internal/
-// import. It exercises the node-level introspection types
-// (CompiledNode / CompiledAttribute) that an external form generator or
-// mapping layer would hold and navigate.
-//
-// Run:
+// Runs offline. With no argument it uses the vendored vital_signs.opt fixture:
 //
 //	go run ./cmd/examples/template-explore
 //	go run ./cmd/examples/template-explore path/to/template.opt
-//
-// With no argument it uses the vendored vital_signs.opt fixture.
 package main
 
 import (
@@ -31,101 +25,126 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	optPath := fixtures.TemplateOptForName("vital_signs")
 	if args := os.Args[1:]; len(args) > 0 {
 		optPath = args[0]
 	}
 
+	// Step 1: parse and compile. The compiled tree is what the composition
+	// builder and the validator work from; it is public so your own tooling
+	// can walk it too.
 	opt, err := template.ParseFile(optPath)
 	if err != nil {
-		log.Fatalf("ParseFile %q: %v", optPath, err)
+		return fmt.Errorf("parse OPT %s: %w", optPath, err)
 	}
-	c, err := templatecompile.Compile(opt)
+	compiled, err := templatecompile.Compile(opt)
 	if err != nil {
-		log.Fatalf("Compile: %v", err)
+		return fmt.Errorf("compile template: %w", err)
 	}
-
 	fmt.Printf("template : %s (%s)\n", opt.TemplateID(), filepath.Base(optPath))
-	fmt.Printf("root     : %s\n\n", c.Root().RMTypeName())
+	fmt.Printf("root     : %s\n\n", compiled.Root().RMTypeName())
 
+	// Step 2: the structure, one node per line with its attributes indented
+	// under it and their child nodes under those.
 	fmt.Println("structure (node → attribute → child node):")
-	printNode(c.Root(), 0)
+	printNode(compiled.Root(), 0)
 
-	var leaves []string
-	collectLeafPaths(c.Root(), &leaves)
-	fmt.Printf("\naddressable primitive-leaf paths (%d) — Builder.Set targets:\n", len(leaves))
-	for _, p := range leaves {
-		fmt.Printf("  %s\n", p)
+	// Step 3: the leaves a builder can set. Each path is the argument that
+	// composition.Builder.Set (or SetText / SetQuantity / SetCodedText) takes;
+	// the compile-build-validate example uses the second one below.
+	paths := leafPaths(compiled.Root())
+	fmt.Printf("\naddressable primitive-leaf paths (%d) — Builder.Set targets:\n", len(paths))
+	for _, path := range paths {
+		fmt.Printf("  %s\n", path)
 	}
+	return nil
 }
 
-// printNode walks one CompiledNode: the node line (RM type, pinned id,
-// slot/primitive marker, term label), then each CompiledAttribute
-// (name, cardinality, required), recursing into its children.
-func printNode(n *templatecompile.CompiledNode, depth int) {
-	ind := strings.Repeat("  ", depth)
-	fmt.Printf("%s%s%s%s\n", ind, n.RMTypeName(), pinnedID(n), nodeMarker(n))
-	for _, attr := range n.Attributes() {
-		card := "1"
+// printNode prints one node and recurses through its attributes. A
+// CompiledNode is an RM object the template constrains (COMPOSITION,
+// OBSERVATION, ELEMENT, DV_QUANTITY, ...); each CompiledAttribute under it is
+// one RM attribute (content, data, value, ...) together with the child nodes
+// allowed there. In the output, [1] marks a single-valued attribute and [*] a
+// multi-valued one; "required" means the Reference Model makes the attribute
+// mandatory on that type, so a composition must carry a value there.
+func printNode(node *templatecompile.CompiledNode, depth int) {
+	indent := strings.Repeat("  ", depth)
+	fmt.Printf("%s%s%s%s\n", indent, node.RMTypeName(), pinnedID(node), nodeMarker(node))
+	for _, attr := range node.Attributes() {
+		cardinality := "1"
 		if attr.Cardinality() == template.Multiple {
-			card = "*"
+			cardinality = "*"
 		}
-		req := ""
+		required := ""
 		if attr.Required() {
-			req = " required"
+			required = " required"
 		}
-		fmt.Printf("%s  .%s [%s]%s\n", ind, attr.Name(), card, req)
+		fmt.Printf("%s  .%s [%s]%s\n", indent, attr.Name(), cardinality, required)
 		for _, child := range attr.Children() {
 			printNode(child, depth+2)
 		}
 	}
 }
 
-// pinnedID renders the OPT-pinned identity of a node: the archetype id
-// for archetype roots, else the at-code, else nothing.
-func pinnedID(n *templatecompile.CompiledNode) string {
-	if a := n.ArchetypeID(); a != "" {
-		return " [" + a + "]"
+// pinnedID renders the identity the template pins on a node: the archetype
+// id where an archetype is plugged in (an archetype root), otherwise the
+// at-code from the archetype's own definition, otherwise nothing (an
+// unconstrained data value such as DV_QUANTITY has neither).
+func pinnedID(node *templatecompile.CompiledNode) string {
+	if archetypeID := node.ArchetypeID(); archetypeID != "" {
+		return " [" + archetypeID + "]"
 	}
-	if id := n.NodeID(); id != "" {
-		return " [" + id + "]"
+	if nodeID := node.NodeID(); nodeID != "" {
+		return " [" + nodeID + "]"
 	}
 	return ""
 }
 
-// nodeMarker annotates slots, primitive leaves, and (where the OPT
-// defines a term) the human-readable label.
-func nodeMarker(n *templatecompile.CompiledNode) string {
-	var b strings.Builder
+// nodeMarker annotates a node with what a form generator would key on: a
+// slot is an opaque fill point another archetype plugs into, and a primitive
+// node carries a value constraint (the editable leaf). When the archetype
+// defines a term for the node's at-code, its text is the human label.
+func nodeMarker(node *templatecompile.CompiledNode) string {
+	var marker strings.Builder
 	switch {
-	case n.IsSlot():
-		b.WriteString("  (slot)")
-	case n.PrimitiveConstraint() != nil:
-		b.WriteString("  ·primitive")
+	case node.IsSlot():
+		marker.WriteString("  (slot)")
+	case node.PrimitiveConstraint() != nil:
+		marker.WriteString("  ·primitive")
 	}
-	if id := n.NodeID(); id != "" {
-		if t, ok := n.Term(id, ""); ok {
-			if txt := t.Items["text"]; txt != "" {
-				b.WriteString("  \"")
-				b.WriteString(txt)
-				b.WriteString("\"")
+	if nodeID := node.NodeID(); nodeID != "" {
+		// Term looks the at-code up in the enclosing archetype's term
+		// definitions. The language argument is reserved; an ADL 1.4 OPT
+		// carries one language, so the empty string means that one.
+		if term, ok := node.Term(nodeID, ""); ok {
+			if text := term.Items["text"]; text != "" {
+				marker.WriteString("  \"")
+				marker.WriteString(text)
+				marker.WriteString("\"")
 			}
 		}
 	}
-	return b.String()
+	return marker.String()
 }
 
-// collectLeafPaths gathers the canonical AQL paths of every
-// primitive-constrained node — the leaves a composition builder fills
-// via Set / SetText / SetQuantity. Demonstrates path discovery driven
-// purely by the public introspection tree.
-func collectLeafPaths(n *templatecompile.CompiledNode, out *[]string) {
-	if n.PrimitiveConstraint() != nil {
-		*out = append(*out, n.AQLPath())
+// leafPaths gathers the canonical path of every node that carries a primitive
+// value constraint, in tree order. These are the leaves a composition builder
+// fills; everything above them is structure the builder creates by itself.
+func leafPaths(node *templatecompile.CompiledNode) []string {
+	var paths []string
+	if node.PrimitiveConstraint() != nil {
+		paths = append(paths, node.AQLPath())
 	}
-	for _, attr := range n.Attributes() {
+	for _, attr := range node.Attributes() {
 		for _, child := range attr.Children() {
-			collectLeafPaths(child, out)
+			paths = append(paths, leafPaths(child)...)
 		}
 	}
+	return paths
 }

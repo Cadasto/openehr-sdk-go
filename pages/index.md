@@ -17,9 +17,9 @@ template: home.html
 # openEHR Go SDK
 
 <p class="home-tagline">
-Typed compositions, checkable templates,<br>
-and AQL builder and validator.<br>
-Imported like any other Go package.
+Go packages for openEHR:<br>
+typed compositions, checkable templates,<br>
+and an AQL builder and validator.
 </p>
 
 <div class="home-cta" markdown="1">
@@ -30,7 +30,7 @@ Imported like any other Go package.
 </div>
 
 <p class="home-reassure" markdown="1">
-No backend needed to start. Going live adds a base URL and a token source.
+Decoding, validation and the AQL tools run offline. Only the REST clients need a CDR.
 </p>
 
 </div>

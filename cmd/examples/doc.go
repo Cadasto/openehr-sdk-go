@@ -1,29 +1,35 @@
-// Package examples hosts worked, runnable example programs for each
-// named SDK use case (benchmark, seeder, MCP server, federator).
+// Package examples holds the runnable example programs that show how to use
+// the SDK, one directory per program. They are short reference shapes to copy
+// from, not production tools. Every one of them runs offline: the REST ones
+// talk to an in-process test server, so none needs a clinical data repository.
 //
-// Production tools (load harnesses, federators, etc.) live in their
-// own repositories; the examples here are reference shapes only.
+// The catalogue in docs/examples.md describes each program (what it shows,
+// how to run it, what the output means, and what to copy into your own
+// application); docs/quick-start.md walks through the first few.
 //
-// The catalog in docs/examples.md and the walkthrough in
-// docs/quick-start.md describe each program in more detail.
+// Run any of them from the repository root with `go run ./cmd/examples/<name>`:
 //
-// Runnable programs (from repo root):
-//
-//   - cmd/examples/canonical_json: canjson decode
-//   - cmd/examples/canxml_roundtrip: canjson to canxml and back
-//   - cmd/examples/opt-parse: OPT parse and paths
-//   - cmd/examples/validate-composition: validate a composition against an OPT
-//   - cmd/examples/validate-from-json: canjson decode, then OPT validation
-//   - cmd/examples/primitive-validate: primitive constraints
-//   - cmd/examples/ehr_create: REST EHR create (transport and client)
-//   - cmd/examples/contribution-build: fluent multi-version Contribution_create assembly
-//   - cmd/examples/generate-example: synthesise an RM instance from an OPT
-//   - cmd/examples/aql-build: AQL struct and verb builders, containment algebra and in-text paging
-//   - cmd/examples/aql-parse-structured: AQL to a parse.Query AST and back through Emit
-//   - cmd/examples/lint-aql: AQL static lint and ValidateAQL
-//   - cmd/examples/compile-build-validate: compile, build and validate using public imports only
-//   - cmd/examples/template-explore: introspect a compiled OPT (structure and leaf paths)
-//   - cmd/examples/webtemplate-export: compiled OPT to EHRbase v2.3 WebTemplate JSON
-//   - cmd/examples/flat-roundtrip: COMPOSITION to and from the FLAT and STRUCTURED simplified formats
-//   - cmd/examples/smart-launch: standalone SMART PKCE launch with state and verifier persistence
+//   - canonical_json: decode a canonical-JSON COMPOSITION into typed RM structs
+//   - canxml_roundtrip: one COMPOSITION through canonical JSON and XML and back
+//   - opt-parse: parse an operational template (OPT) and resolve paths in it
+//   - primitive-validate: check single values against one OPT leaf constraint
+//   - validate-composition: validate an in-memory composition against an OPT
+//   - validate-from-json: decode canonical JSON, then validate it against an OPT
+//   - generate-example: generate an RM instance from an OPT and print it as JSON
+//   - aql-build: build AQL with the struct and verb builders, nested CONTAINS
+//     with in-text paging, and the opt-in RM containment check
+//   - aql-parse-structured: parse AQL into the structured tree and emit it back
+//   - lint-aql: lint AQL against the grammar, the RM and a compiled template
+//   - compile-build-validate: compile an OPT, build a composition, round-trip
+//     it through canonical JSON and validate it, through public packages only
+//   - template-explore: walk a compiled OPT: structure tree and leaf paths
+//   - webtemplate-export: export a compiled OPT as Web Template JSON
+//   - flat-roundtrip: a COMPOSITION to and from the FLAT and STRUCTURED
+//     simplified formats
+//   - ehr_create: create an EHR through the REST client path, against an
+//     in-process server
+//   - contribution-build: assemble a multi-version CONTRIBUTION and, with
+//     -commit, POST it to an in-process fake CDR
+//   - smart-launch: a standalone SMART-on-openEHR PKCE launch, with the
+//     AuthorizationRequest stored across the redirect
 package examples

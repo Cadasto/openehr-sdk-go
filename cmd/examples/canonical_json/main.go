@@ -1,8 +1,11 @@
-// Example: decode a canonical-JSON Composition cassette and print a few
-// fields. This is the smallest building-block path: no transport, no auth, no
-// discovery, just RM types and canjson against bytes.
+// Decode an openEHR COMPOSITION from canonical JSON into the SDK's typed
+// Reference Model (RM) structs and print a few of its fields. This is the
+// smallest useful program in the SDK: no HTTP, no auth, no discovery, just
+// bytes in and Go structs out.
 //
-// Run: `go run ./cmd/examples/canonical_json` from any directory.
+// It runs offline against the vendored body_weight.json cassette:
+//
+//	go run ./cmd/examples/canonical_json
 package main
 
 import (
@@ -17,31 +20,39 @@ import (
 )
 
 func main() {
-	body := loadCassette()
-	var c rm.Composition
-	if err := canjson.Unmarshal(body, &c); err != nil {
-		log.Fatalf("canjson decode: %v", err)
+	if err := run(); err != nil {
+		log.Fatal(err)
 	}
-	fmt.Printf("composition: archetype_node_id=%s\n", c.ArchetypeNodeID)
-	fmt.Printf("  name=%q\n", c.Name.GetValue())
-	fmt.Printf("  language=%s (terminology=%s)\n", c.Language.CodeString, c.Language.TerminologyID.Value)
-	fmt.Printf("  territory=%s\n", c.Territory.CodeString)
-	fmt.Printf("  category=%s\n", c.Category.Value)
-	fmt.Printf("  content items=%d\n", len(c.Content))
-	fmt.Println("OK: canonical-JSON Composition decoded from", filepath.Base(cassettePath()))
 }
 
-// cassettePath resolves body_weight.json relative to THIS source
-// file so `go run ./cmd/examples/canonical_json` works regardless of
-// CWD. Mirror of the pattern in canjson/roundtrip_test.go.
-func cassettePath() string {
-	return fixtures.CompositionJSON("body_weight")
-}
-
-func loadCassette() []byte {
-	b, err := os.ReadFile(cassettePath())
+func run() error {
+	// testkit/fixtures resolves the vendored cassettes relative to the module,
+	// so the path is right whatever the working directory is.
+	path := fixtures.CompositionJSON("body_weight")
+	body, err := os.ReadFile(path)
 	if err != nil {
-		log.Fatalf("read cassette: %v", err)
+		return fmt.Errorf("read cassette: %w", err)
 	}
-	return b
+
+	// A COMPOSITION is the top-level clinical document in openEHR. canjson is
+	// the canonical JSON codec: it reads the "_type" discriminator on every
+	// object and fills the matching rm struct, polymorphic children included.
+	var composition rm.Composition
+	if err := canjson.Unmarshal(body, &composition); err != nil {
+		return fmt.Errorf("decode canonical JSON: %w", err)
+	}
+
+	// The archetype node id names the archetype the document is built on.
+	// Language and territory are CODE_PHRASE values: a code plus the
+	// terminology it comes from. Content holds the entries (observations,
+	// evaluations, ...) the document carries.
+	fmt.Printf("composition: archetype_node_id=%s\n", composition.ArchetypeNodeID)
+	fmt.Printf("  name=%q\n", composition.Name.GetValue())
+	fmt.Printf("  language=%s (terminology=%s)\n",
+		composition.Language.CodeString, composition.Language.TerminologyID.Value)
+	fmt.Printf("  territory=%s\n", composition.Territory.CodeString)
+	fmt.Printf("  category=%s\n", composition.Category.Value)
+	fmt.Printf("  content items=%d\n", len(composition.Content))
+	fmt.Println("OK: canonical-JSON Composition decoded from", filepath.Base(path))
+	return nil
 }

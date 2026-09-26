@@ -1,23 +1,21 @@
-// Example: synthesise an RM instance from a compiled OPT and emit the
-// canonical JSON to stdout. There is no transport, auth or client; the path
-// is bytes → typed tree → instance graph → canonical JSON.
+// Generate an RM instance from an operational template (OPT) and print it as
+// canonical JSON. The template alone decides the shape of the document; the
+// SDK creates every node the template requires and fills the leaves with
+// placeholder values. Seeders and fixture generators use this shape. No HTTP
+// is involved.
 //
-// Surfaces shown:
-//   - openehr/template.ParseFile (lenient parse)
-//   - internal/templatecompile.Compile (compiled walker-friendly tree)
-//   - openehr/instance.Generate with Minimal / Example policy
-//   - serialize/canjson.Marshal (example imports serialize; library does not)
+// With no flags it uses the vendored vital_signs.opt, so it runs offline from
+// any directory. Every flag has a default:
 //
-// Run:
-//
+//	go run ./cmd/examples/generate-example
 //	go run ./cmd/examples/generate-example \
 //	    --opt testkit/cassettes/templates/vital_signs.opt \
 //	    --territory NL \
 //	    --composer-name "Test Composer" \
 //	    --policy example
 //
-// With no --opt, the example defaults to the vendored vital_signs
-// fixture so the demo works from any working directory.
+// The output is one line of JSON; pipe it to a file or into validate-from-json.
+// Each run gets fresh uids and a wall-clock context start time.
 package main
 
 import (
@@ -27,75 +25,89 @@ import (
 	"log"
 	"os"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func main() {
-	optFlag := flag.String("opt", "", "path to an ADL 1.4 operational template (defaults to vendored vital_signs.opt)")
-	policyFlag := flag.String("policy", "example", "generation policy: 'minimal' or 'example'")
-	territoryFlag := flag.String("territory", "NL", "ISO 3166-1 territory code (required for COMPOSITION roots)")
-	composerFlag := flag.String("composer-name", "Example Composer", "PartyIdentified name for the COMPOSITION composer")
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	optFlag := flag.String("opt", "", "path to an ADL 1.4 operational template (default: the vendored vital_signs.opt)")
+	policyFlag := flag.String("policy", "example", "how much to fill in: 'minimal' or 'example'")
+	territoryFlag := flag.String("territory", "NL", "ISO 3166-1 territory code; a COMPOSITION root requires one")
+	composerFlag := flag.String("composer-name", "Example Composer", "name recorded as the composition's composer")
 	flag.Parse()
 
 	optPath := *optFlag
 	if optPath == "" {
-		optPath = defaultOPTPath()
+		optPath = fixtures.TemplateOptForName("vital_signs")
 	}
-
 	policy, err := parsePolicy(*policyFlag)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
+	// Step 1: parse and compile the OPT. An operational template is the
+	// deployable form of an openEHR template: every archetype it uses,
+	// flattened into one XML file with the template's constraints applied.
+	// Compile turns it into the driver the generator walks; the same compiled
+	// value feeds the validator and the composition builder.
 	opt, err := template.ParseFile(optPath)
 	if err != nil {
-		log.Fatalf("ParseFile %q: %v", optPath, err)
+		return fmt.Errorf("parse OPT %q: %w", optPath, err)
 	}
-	c, err := templatecompile.Compile(opt)
+	compiled, err := templatecompile.Compile(opt)
 	if err != nil {
-		log.Fatalf("Compile %q: %v", optPath, err)
+		return fmt.Errorf("compile OPT %q: %w", optPath, err)
 	}
 
-	composer := &rm.PartyIdentified{Name: composerFlag}
-
-	out, err := instance.Generate(context.Background(), c, instance.Options{
+	// Step 2: generate. A COMPOSITION root needs two facts the template does
+	// not carry: the territory the document belongs to and who composed it.
+	// Optional RM strings are pointers, hence new(...) for the composer name.
+	generated, err := instance.Generate(context.Background(), compiled, instance.Options{
 		Policy:    policy,
 		Territory: *territoryFlag,
-		Composer:  composer,
+		Composer:  &rm.PartyIdentified{Name: new(*composerFlag)},
 	})
 	if err != nil {
-		log.Fatalf("Generate: %v", err)
+		return fmt.Errorf("generate instance: %w", err)
 	}
 
-	buf, err := canjson.Marshal(out)
+	// Step 3: print. Generate returns the root as `any` because a template can
+	// be rooted on any archetypeable type; canjson encodes it without knowing
+	// the concrete type. Code that needs the typed value casts it with
+	// instance.AsComposition and friends.
+	encoded, err := canjson.Marshal(generated)
 	if err != nil {
-		log.Fatalf("canjson.Marshal: %v", err)
+		return fmt.Errorf("encode canonical JSON: %w", err)
 	}
-	if _, err := os.Stdout.Write(buf); err != nil {
-		log.Fatalf("write stdout: %v", err)
+	if _, err := os.Stdout.Write(encoded); err != nil {
+		return fmt.Errorf("write stdout: %w", err)
 	}
 	fmt.Println()
+	return nil
 }
 
-// parsePolicy maps the CLI string to the instance.Policy constant.
-// Returns an error for unknown values rather than silently
-// defaulting — surfaces typos at the command line.
-func parsePolicy(s string) (instance.Policy, error) {
-	switch s {
+// parsePolicy maps the flag text onto the two generation policies. Minimal
+// creates only the nodes the template requires, the smallest valid tree;
+// Example also populates every primitive leaf with its example value. An
+// unknown value is an error, so a typo on the command line does not silently
+// pick a default.
+func parsePolicy(name string) (instance.Policy, error) {
+	switch name {
 	case "minimal":
 		return instance.Minimal, nil
 	case "example":
 		return instance.Example, nil
+	default:
+		return 0, fmt.Errorf("unknown --policy %q (want 'minimal' or 'example')", name)
 	}
-	return 0, fmt.Errorf("unknown --policy %q (want 'minimal' or 'example')", s)
-}
-
-// defaultOPTPath resolves the vendored vital_signs template fixture.
-func defaultOPTPath() string {
-	return fixtures.TemplateOptForName("vital_signs")
 }

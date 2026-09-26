@@ -58,9 +58,14 @@ var transcripts = []transcript{
 	{program: "aql-build", section: "aql-build"},
 	{program: "aql-parse-structured", section: "aql-parse-structured"},
 	{program: "canonical_json", section: "canonical_json"},
+	{program: "canxml_roundtrip", section: "canxml_roundtrip"},
 	{program: "compile-build-validate", section: "compile-build-validate"},
 	{program: "ehr_create", section: "ehr_create"},
 	{program: "lint-aql", section: "lint-aql"},
+	{program: "opt-parse", section: "opt-parse"},
+	{program: "primitive-validate", section: "primitive-validate"},
+	{program: "validate-composition", section: "validate-composition"},
+	{program: "validate-from-json", section: "validate-from-json"},
 }
 
 // exclusions names every example that is deliberately NOT transcript-verified,
@@ -72,17 +77,12 @@ var transcripts = []transcript{
 // The abridged blocks could still be verified on their verbatim head, up to the
 // first elision line — recorded follow-up, not yet built.
 var exclusions = map[string]string{
-	"canxml_roundtrip":     "no sample-output block in the catalog",
-	"opt-parse":            "no sample-output block",
-	"primitive-validate":   "no sample-output block",
-	"validate-composition": "no sample-output block",
-	"validate-from-json":   "no sample-output block",
-	"generate-example":     "no sample-output block, and the output is nondeterministic anyway: fresh UUIDs per run and a wall-clock context start_time",
-	"template-explore":     `block is labelled "(abridged)": the node tree is deliberately elided down to one branch`,
-	"webtemplate-export":   `block is labelled "(abridged)": the form tree is deliberately elided`,
-	"flat-roundtrip":       `block is labelled "(abridged, keys sorted)"`,
-	"contribution-build":   `block is labelled "(body elided)": the printed Contribution_create JSON body is left out`,
-	"smart-launch":         "nondeterministic: a random PKCE state and verifier per run, plus a wall-clock expires_at",
+	"generate-example":   "no sample-output block, and the output is nondeterministic anyway: fresh UUIDs per run and a wall-clock context start_time",
+	"template-explore":   `block is labelled "(abridged)": the node tree is deliberately elided down to one branch`,
+	"webtemplate-export": `block is labelled "(abridged)": the form tree is deliberately elided`,
+	"flat-roundtrip":     `block is labelled "(abridged, keys sorted)"`,
+	"contribution-build": `block is labelled "(body elided)": the printed Contribution_create JSON body is left out`,
+	"smart-launch":       "nondeterministic: a random PKCE state and verifier per run, plus a wall-clock expires_at",
 }
 
 // bareMarkerException is the one section that publishes a bare

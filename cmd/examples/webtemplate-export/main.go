@@ -1,21 +1,15 @@
-// Example: export a compiled operational template as EHRbase
-// openEHR_SDK v2.3 WebTemplate JSON, the lossy, UI-oriented
-// projection a form renderer or FLAT-path mapper consumes.
+// Example: export a compiled operational template (OPT) as a Web Template,
+// the JSON form that EHRbase-style form renderers and FLAT-format mappers
+// consume. The program prints a summary and the form tree (each node's
+// FLAT-path id, RM type, occurrences, and the input widgets a data-entry
+// client draws), or with -json the whole indented document. Nothing here
+// imports an internal/ package.
 //
-// Like cmd/examples/template-explore, this uses public packages only
-// (openehr/template, openehr/templatecompile, openehr/template/webtemplate)
-// and no internal/ import. It prints the form-oriented tree view (node id,
-// RM type, occurrences, inputs) that consumers bind FLAT paths to, then
-// the deterministic JSON document itself.
-//
-// Run:
+// Runs offline. With no path it uses the vendored vital_signs.opt fixture:
 //
 //	go run ./cmd/examples/webtemplate-export
 //	go run ./cmd/examples/webtemplate-export path/to/template.opt
 //	go run ./cmd/examples/webtemplate-export -json path/to/template.opt
-//
-// With no argument it uses the vendored vital_signs.opt fixture; -json
-// dumps the full indented WebTemplate document instead of the summary.
 package main
 
 import (
@@ -35,85 +29,106 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	dumpJSON := flag.Bool("json", false, "print the full indented WebTemplate JSON document")
 	flag.Parse()
-
 	optPath := fixtures.TemplateOptForName("vital_signs")
 	if args := flag.Args(); len(args) > 0 {
 		optPath = args[0]
 	}
 
+	// Step 1: parse and compile the OPT. The Web Template is derived from the
+	// compiled form, so the template has to be compiled first.
 	opt, err := template.ParseFile(optPath)
 	if err != nil {
-		log.Fatalf("ParseFile %q: %v", optPath, err)
+		return fmt.Errorf("parse OPT %s: %w", optPath, err)
 	}
-	c, err := templatecompile.Compile(opt)
+	compiled, err := templatecompile.Compile(opt)
 	if err != nil {
-		log.Fatalf("Compile: %v", err)
+		return fmt.Errorf("compile template: %w", err)
 	}
 
-	// Build once for the typed tree; encode with the same json.Marshal path
-	// webtemplate.Marshal uses (deterministic struct field order).
-	wt, err := webtemplate.Build(c)
+	// Step 2: project the compiled template into the Web Template tree. Build
+	// returns the typed tree; webtemplate.Marshal would return the JSON bytes
+	// in one call. This program needs both, so it builds once and encodes the
+	// tree with the same encoding/json call Marshal uses, which keeps the byte
+	// count equal to what Marshal would return.
+	wt, err := webtemplate.Build(compiled)
 	if err != nil {
-		log.Fatalf("Build: %v", err)
+		return fmt.Errorf("build web template: %w", err)
 	}
-	data, err := json.Marshal(wt)
+	document, err := json.Marshal(wt)
 	if err != nil {
-		log.Fatalf("Marshal: %v", err)
+		return fmt.Errorf("encode web template: %w", err)
 	}
 
 	if *dumpJSON {
-		var pretty bytes.Buffer
-		if err := json.Indent(&pretty, data, "", "  "); err != nil {
-			log.Fatalf("indent: %v", err)
-		}
-		pretty.WriteByte('\n')
-		fmt.Print(pretty.String())
-		return
+		return printIndented(document)
 	}
 
+	// Step 3: the summary and the form tree.
 	fmt.Printf("template : %s (%s)\n", wt.TemplateID, filepath.Base(optPath))
 	fmt.Printf("version  : %s   defaultLanguage: %s\n", wt.Version, wt.DefaultLanguage)
-	fmt.Printf("document : %d bytes deterministic JSON (application/openehr.wt+json)\n\n", len(data))
+	fmt.Printf("document : %d bytes deterministic JSON (application/openehr.wt+json)\n\n", len(document))
 
 	fmt.Println("form tree (id [rmType] occurrences — inputs):")
 	printNode(wt.Tree, 0)
 
+	// The hint goes to stderr so stdout stays the summary alone.
 	fmt.Fprintln(os.Stderr, "\nrerun with -json for the full document")
+	return nil
 }
 
-// printNode renders one WebTemplate node the way a form renderer reads
-// it: the FLAT-path id, the RM type, min..max occurrences, and the input
-// widgets (suffix:type) a data-entry client must draw for the leaf.
-func printNode(n *webtemplate.Node, depth int) {
-	occ := fmt.Sprintf("%d..%d", n.Min, n.Max)
-	if n.Max == -1 {
-		occ = fmt.Sprintf("%d..*", n.Min)
+// printIndented re-indents the compact document so a person can read it.
+func printIndented(document []byte) error {
+	var pretty bytes.Buffer
+	if err := json.Indent(&pretty, document, "", "  "); err != nil {
+		return fmt.Errorf("indent web template JSON: %w", err)
 	}
-	line := fmt.Sprintf("%s%s [%s] %s", strings.Repeat("  ", depth), n.ID, n.RMType, occ)
-	if sig := inputSig(n.Inputs); sig != "" {
-		line += " — " + sig
+	pretty.WriteByte('\n')
+	fmt.Print(pretty.String())
+	return nil
+}
+
+// printNode prints one Web Template node the way a form renderer reads it:
+// the id (the segment a FLAT path is built from), the RM type, the min..max
+// occurrences, and the inputs a data-entry client must draw for a leaf. A
+// Max of -1 means unbounded, printed as "*".
+func printNode(node *webtemplate.Node, depth int) {
+	occurrences := fmt.Sprintf("%d..%d", node.Min, node.Max)
+	if node.Max == -1 {
+		occurrences = fmt.Sprintf("%d..*", node.Min)
+	}
+	line := fmt.Sprintf("%s%s [%s] %s", strings.Repeat("  ", depth), node.ID, node.RMType, occurrences)
+	if inputs := describeInputs(node.Inputs); inputs != "" {
+		line += " — " + inputs
 	}
 	fmt.Println(line)
-	for _, ch := range n.Children {
-		printNode(ch, depth+1)
+	for _, child := range node.Children {
+		printNode(child, depth+1)
 	}
 }
 
-// inputSig summarises a leaf's inputs as "suffix:type" pairs — the same
-// signature PROBE-075 pins against the EHRbase reference.
-func inputSig(inputs []webtemplate.Input) string {
+// describeInputs summarises a leaf's inputs as "suffix:type" pairs. The
+// suffix is the FLAT-path suffix the input's value is posted under
+// (|magnitude, |unit, |code), and a coded input also reports how many codes
+// its list offers.
+func describeInputs(inputs []webtemplate.Input) string {
 	parts := make([]string, 0, len(inputs))
-	for _, in := range inputs {
-		p := in.Type
-		if in.Suffix != "" {
-			p = in.Suffix + ":" + in.Type
+	for _, input := range inputs {
+		part := input.Type
+		if input.Suffix != "" {
+			part = input.Suffix + ":" + input.Type
 		}
-		if len(in.List) > 0 {
-			p += fmt.Sprintf("(%d codes)", len(in.List))
+		if len(input.List) > 0 {
+			part += fmt.Sprintf("(%d codes)", len(input.List))
 		}
-		parts = append(parts, p)
+		parts = append(parts, part)
 	}
 	return strings.Join(parts, ", ")
 }

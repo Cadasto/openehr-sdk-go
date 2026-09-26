@@ -16,7 +16,7 @@ It's written the way Go code usually is: every I/O call takes a `context.Context
 
 ## Try it
 
-This decodes a canonical-JSON Composition into a typed struct and reads a few fields, with no network and no CDR involved:
+A COMPOSITION is the openEHR clinical document, and canonical JSON is how the REST API carries it. This decodes one into a typed struct and reads a few fields, with no network and no CDR involved:
 
 ```go
 var c rm.Composition
@@ -26,7 +26,7 @@ if err := canjson.Unmarshal(body, &c); err != nil {
 fmt.Println(c.ArchetypeNodeID, c.Category.Value, len(c.Content))
 ```
 
-The runnable version uses a fixture bundled with the repo, so it works straight from a clone:
+The runnable version, [`cmd/examples/canonical_json`](cmd/examples/canonical_json/main.go), does the same against a fixture bundled with the repo, so it works straight from a clone:
 
 ```console
 $ go run ./cmd/examples/canonical_json
@@ -38,6 +38,8 @@ composition: archetype_node_id=openEHR-EHR-COMPOSITION.encounter.v1
   content items=1
 OK: canonical-JSON Composition decoded from body_weight.json
 ```
+
+`archetype_node_id` names the archetype the document is built on, `language` and `territory` are codes with the terminology they come from, `category` is the composition category, and `content items` counts the entries the document carries. The [examples catalogue](docs/examples.md) has a program of this size for each SDK surface (validate a composition against a template, build and lint AQL, create an EHR through the REST client, run a SMART launch), each with a note on what to copy into your own application.
 
 To use it in your own project, pin an exact tag. The SDK is pre-1.0, so a minor release can change the public API:
 
