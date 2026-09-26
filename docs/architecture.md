@@ -154,7 +154,7 @@ Anything under `internal/` is excluded from backward-compatibility (BC) promises
 
 ## Code generation
 
-The RM and AOM 1.4 types are generated from the pinned BMM corpus, the one part of the build with real machinery behind it. The table lists the codegen inputs and outputs; the full landed inventory across every package is in [`roadmap.md`](roadmap.md).
+The RM and AOM 1.4 types are generated from the pinned BMM corpus, the one part of the build with real machinery behind it. The table lists the codegen inputs and outputs; per-requirement status is in the [requirements registry](specifications/REQ.md), and what is still open is in [`roadmap.md`](roadmap.md).
 
 | Area | Location | Notes |
 |---|---|---|

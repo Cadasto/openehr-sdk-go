@@ -99,7 +99,7 @@ The normative source of truth and the design that realises it. When code and spe
 | [docs/specifications/traceability.yaml](docs/specifications/traceability.yaml) | Machine-readable REQ → package / probe / test map |
 | [docs/architecture.md](docs/architecture.md) | Design narrative + dependency mermaid |
 | [docs/adr/](docs/adr/) | Closed architectural decisions |
-| [docs/roadmap.md](docs/roadmap.md) | Landed-vs-planned matrix |
+| [docs/roadmap.md](docs/roadmap.md) | Delivery stages and the work not yet finished |
 
 Open research strands live in [research-strands.md](docs/specifications/research-strands.md) until promoted ADRs land in [docs/adr/](docs/adr/).
 

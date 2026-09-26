@@ -1,8 +1,6 @@
-# SDK roadmap — landed vs planned
+# SDK roadmap — what is not finished
 
-This file is a living checklist of implementation reality, so you can tell at a glance what you can build on today. The normative contract lives in [`docs/specifications/`](specifications/). When this file and the specs disagree, **the specs win** and this file is the one to fix.
-
-Related entry points: requirement index → [`REQ.md`](specifications/REQ.md) · machine-readable traceability → [`traceability.yaml`](specifications/traceability.yaml) · sequenced delivery → [`plans/`](plans/) · getting started → [`quick-start.md`](quick-start.md).
+What you can build on today, and what is still open. Per-requirement status is in the [requirements registry](specifications/REQ.md), generated from [`traceability.yaml`](specifications/traceability.yaml); this page adds only the delivery stages, the work that is not finished, and the deployment targets. When this page and the specs disagree, **the specs win** and this page is the one to fix.
 
 ## Legend
 
@@ -17,7 +15,7 @@ Related entry points: requirement index → [`REQ.md`](specifications/REQ.md) ·
 
 ## Delivery stages
 
-Each stage groups several deliverables, and a stage is only as done as its weakest row. The tables that follow give per-area detail.
+Each stage groups several deliverables, and a stage is only as done as its weakest row. The Open work table below names what is left in each.
 
 | Stage | Deliverable | Status |
 |---|---|---|
@@ -43,100 +41,33 @@ Each stage groups several deliverables, and a stage is only as done as its weake
 | **5 — Conformance ratification** | Sandbox transport + probe runner | **Partial** |
 | | Cassette / Live probe ratification against a real CDR | **Partial** |
 
-Stage 2's per-REQ delivery history is in its [archived phase plan](plans/archive/2026-05-21-phase-2-clinical-building-blocks.md); the tables below carry the current state.
-
 ---
 
-## Core openEHR building blocks
+## Open work
 
-| Feature | Status | Package / REQ | Notes |
-|---------|--------|---------------|-------|
-| BMM loader | **Landed** | `openehr/bmm/` REQ-045 | |
-| RM types (generated) | **Landed** | `openehr/rm/` REQ-030–033, 041–047 | From pinned `resources/bmm/` |
-| Type registry | **Landed** | `openehr/rm/typereg/` REQ-040 | |
-| AOM 1.4 (generated) | **Landed** | `openehr/aom/aom14/` | |
-| AOM 2.4 | **Deferred** | — | BMM pinned in `resources/bmm/`; no codegen and no package yet (stage 4) |
-| Canonical JSON | **Landed** | `openehr/serialize/canjson/` REQ-052 | Encoded and decoded by `encoding/json/v2`. Emitting `_type` first is a recommendation, not a rule. Decode accepts members in any order. Round-trip fidelity is asserted semantically (typed deep comparison plus the REQ-112 validation floor, PROBE-030/031/038) rather than by byte comparison. `Real.UnmarshalJSON` refuses a literal past 17 significant digits instead of rounding silently, though a shorter binary-inexact literal (`0.1`, or an integer past 2^53) is still accepted unreported by design ([§ Floating-point precision](specifications/wire.md#floating-point-precision); [fidelity plan](plans/archive/2026-09-01-rm-canonical-json-fidelity.md), [polymorphic-decode plan](plans/archive/2026-06-23-polymorphic-encode-decode.md), [json/v2 migration plan](plans/archive/2026-09-14-json-v2-migration.md)) |
-| Canonical XML | **Landed** | `openehr/serialize/canxml/` REQ-056 | PROBE-033/034 |
-| FLAT / STRUCTURED | **Landed** | `openehr/serialize/simplified/` REQ-053, REQ-140 | Bidirectional FLAT + STRUCTURED codecs plus OPT-free interconversion, driven by the REQ-106 Web Template; `Unmarshal*(…, WithTemplate(compiled))` yields a composition that validates against the OPT. REQ-140's underscore-prefixed RM attribute grammar took upstream EHRbase corpus parity to 80.4% (PROBE-086, PROBE-089); refusals and projection losses are listed in the package's `deviations.md` ([ADR 0015](adr/0015-flat-metadata-spelling.md), [plan](plans/archive/2026-07-14-flat-structured-codecs.md)) |
-| WebTemplate JSON export | **Landed** | `openehr/template/webtemplate/` REQ-106 | Compiled OPT → EHRbase `openEHR_SDK` v2.3 WebTemplate JSON. Structural and input parity against three vendored references (PROBE-075); archetype-reuse-under-slot landed via REQ-116 ([ADR 0014](adr/0014-webtemplate-reference-implementation-lock.md), [plan](plans/archive/2026-05-22-webtemplate-export.md)) |
-| Template-level node naming | **Landed** | `openehr/template/`, `openehr/template/webtemplate/` REQ-116 | The `C_STRING` an OPT pins on a node's `name` is parsed, exposed (`NodeName()`), emitted as the `[archetype_id,'Name']` predicate, and preferred for the WebTemplate `id`, so a template reusing one archetype among siblings is addressable. Paths through unnamed nodes are unchanged ([plan](plans/archive/2026-07-29-template-node-naming.md)) |
-| OPT parser (ADL 1.4 `.opt`) | **Landed** | `openehr/template/` REQ-100 | Parse + path utilities + PROBE-022; strict-mode parse, `WithStrictPaths`, `ValidatePath`, `Description()`/`Annotations()`. OET out of scope ([plan](plans/archive/2026-05-22-template-req100-followups.md)) |
-| Primitive constraint introspection | **Landed** | `openehr/template/constraints/` REQ-103 | Closed-set `PrimitiveConstraint` types with typed `Violation` payloads and a pure `Validate(value any)`; PROBE-024. AOM partial-pattern enforcement deferred |
-| Slot assertion grammar | **Landed** | `openehr/template/constraints/`, `openehr/validation/`, `openehr/instance/` REQ-104 | `SlotAssertion`/`SlotRules` parse anchored `archetype_id matches {regex}` from OPT includes/excludes; validator and generator enforce slot-fit; PROBE-027 |
-| Terminology bindings | **Landed** | `openehr/template/` REQ-105 | `Terms()`/`TermBindings()` accessors surface OPT term definitions and external bindings. External terminology lookup deferred |
-| RM structural lookup | **Landed** | `openehr/rm/rminfo/` | BMM-derived `Lookup` (`RequiredAttributes`, `AttributeRMType`, `IsContainer`, `KnownRMTypes`); stdlib-only, no runtime BMM ([ADR 0005](adr/0005-compiled-template-foundation.md)) |
-| RM meta-model introspection | **Landed** | `openehr/rm/rminfo/` REQ-048 | The RM class graph (abstractness, parents, ancestors, conformance, concrete-descendant expansion, declaration site) on an optional `Hierarchy` interface, compiled-in only. PROBE-094 checks it against an independent reduction of the pinned BMM ([plan](plans/archive/2026-08-18-rminfo-class-hierarchy.md)) |
-| RM class-universe absence reasons | **Landed** | `openehr/rm/rminfo/` REQ-049 | Why a name is *not* in the class universe (undeclared, excluded package or class, primitive, enumeration) as a closed `AbsenceReason` on an optional `AbsenceReporter`, compiled-in only. PROBE-098 checks it against an independent reduction of the pinned BMM ([spec](specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons), [plan](plans/archive/2026-08-26-rminfo-absence-reason.md)) |
-| openEHR terminology vocabulary | **Landed** | `openehr/terminology/` REQ-034 | The openEHR Terminology (TERM Release-3.0.0) pinned under `resources/terminology/` and generated into a stdlib-only accessor (`termgen`, drift-detected in `make test`); lifecycle-state, audit-change-type, participation-mode and `ctx/` default codes read it ([spec](specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034), [plan](plans/archive/2026-09-07-terminology-vocabulary.md)) |
-| RM behavioural functions | **Landed** | `openehr/rm/`, `openehr/rm/rmpath/` REQ-120–123 | Identifier parsing/derivation, `VERSION.is_branch`, temporal `DV_*` compare/convert, and locatable path read access (`ItemAtPath`, `PathExists`, …) over a reflection-free walker. Arithmetic, `parent`, and VERSIONED_OBJECT container ops deferred ([ADR 0011](adr/0011-rm-behavioural-functions-surface.md), [plan](plans/archive/2026-06-19-rm-functions.md)) |
-| Compiled OPT foundation | **Landed (internal)** | `internal/templatecompile/` | Walker-friendly tree with cached AQL paths, implicit RM-attribute injection, per-archetype-root term scope. Engine stays internal; public access is the REQ-111 bridge ([ADR 0005](adr/0005-compiled-template-foundation.md)) |
-| Public compiled-template bridge | **Landed** | `openehr/templatecompile/` REQ-111 | `Compile(opt)` re-exports the compiled form so external modules reach the builder, synthesiser, validator, and AQL lint through public packages ([ADR 0010](adr/0010-public-compiled-template-bridge.md)) |
-| Composition vs OPT validation | **Landed** | `openehr/validation/` REQ-102 | Template-driven `ValidateComposition`; PROBE-025/026 |
-| Validation beyond COMPOSITION | **Landed** | `openehr/validation/` REQ-110 | Generic `Validate(root, c)` plus typed `ValidateDemographic` (PARTY hierarchy), `ValidateFolder`, `ValidateEHRStatus`; PROBE-074 |
-| Template-less RM validation floor | **Partial** | `openehr/validation/`, `openehr/validation/rmread/` REQ-112 | `ValidateRM` and typed sugars walk any RM root with `rminfo` as sole driver (no template required), checking RM-mandatory absences and a per-type invariant catalogue, including `TERM_MAPPING.match`'s value set and `DV_TEXT.mappings`'s `Mappings_valid` ([plan](plans/archive/2026-09-01-rm-canonical-json-fidelity.md)). The archetype-root and ARCHETYPED catalogue rows are spec-first and await code ([plan](plans/2026-09-24-rm-floor-archetype-roots.md)). PROBE-077 deferred ([plan](plans/archive/2026-06-29-rm-floor-validation.md)) |
-| AQL static lint | **Landed** | `openehr/aql/lint/`, `openehr/validation/` REQ-109 | Parse against the SDK grammar profile ([ADR 0007](adr/0007-aql-antlr-grammar-profile.md)) → 3-layer lint → `validation.ValidateAQL` bridge; PROBE-028 |
-| AQL wire models + builders | **Landed** | `openehr/aql/` REQ-055 | Literal AQL + ResultSet; struct-builder and verb-functions emit byte-identical canonical AQL (PROBE-020); `ErrPathResolution` mapping (PROBE-021) |
-| Parsed AQL AST + round-trip emitter | **Landed** | `openehr/aql/parse/`, `openehr/aql/` REQ-113 | `parse.Query` is the read-side mirror of `aql.Builder`, sharing one `WhereExpr`/`Value` vocabulary, and `(*Query).Emit` closes the round-trip; out-of-catalogue shapes surface `aql.ErrIncompleteAST` rather than dropping a clause. Findings are reported value-free (PROBE-096) and every bracketed predicate is typed (PROBE-095) |
-| AQL expression-catalogue completion | **Landed** | `openehr/aql/` REQ-117 | The AST covers the whole SDK grammar profile: mixed-star SELECT, function calls, path operands, `MATCHES TERMINOLOGY(…)`/`{uri}`, and FROM-root junctions (PROBE-087). Builder gains the containment algebra and opt-in in-text paging (PROBE-088) |
-| AQL `SELECT TOP` + literal source text | **Landed** | `openehr/aql/` REQ-118 | The deprecated `SELECT TOP n [FORWARD\|BACKWARD]` is carried on both sides, so a query the SDK did not author round-trips. `LiteralExpr.Raw` keeps a literal's source text (the result schema names unaliased columns by it) while emission stays canonical; `TOP` with `LIMIT` is refused |
-| Re-parseable canonical AQL emission | **Landed** | `openehr/aql/` REQ-119 | Every validating write path guards the value positions (string escaping, real fractional part, `MATCHES {uri}`, function name and arity), and `Emit` re-parses its own output. **Wire-visible:** a literal carrying `'` or `\` and a whole-valued real (`2` → `2.0`) emit differently, and predicate text is re-emitted verbatim; normalise with `aql.StripPredicateTrivia` when comparing (PROBE-090) |
-| AQL containment admissibility relation | **Landed** | `openehr/aql/contain/` REQ-160 | `Default().CanContain` / `Containable` / `ArchetypeMatches` answer Admissible / Never / ByReference / UnknownClass from the pinned BMM plus a cited overlay table, extensible per deployment via `WithOverlay`. Its evidence base runs under CI against the vendored upstream FROM/CONTAINS corpus ([ADR 0017](adr/0017-aql-semantic-layer.md); PROBE-097, PROBE-100) |
-| AQL semantic and portability lint | **Landed** | `openehr/aql/lint/` REQ-161 | Additive REQ-109 Layer-2 checks on the REQ-160 relation (impossible containment, non-containable target, archetype/class mismatch, unknown class, by-reference hop) plus three portability advisories. `lint.Options` takes a relation for dialect overlays, surfaced as `ValidateAQLWithTypeRelation` ([ADR 0017](adr/0017-aql-semantic-layer.md); PROBE-097) |
-| AQL builder containment verification | **Landed** | `openehr/aql/` REQ-162 | `(*Builder).VerifyContainment` walks the builder's own FROM root and containment algebra, opt-in, at parity with the linter; it never runs inside `Build()` and changes no emitted byte ([ADR 0017](adr/0017-aql-semantic-layer.md); PROBE-097) |
-| AQL write-side expressivity parity | **Landed** | `openehr/aql/` REQ-163 | The builder spells the class- and projection-position vocabularies the read side already modelled: `aql.Version`, `Containment.Predicated`, and a typed projection (`DISTINCT`, `AS`, aggregates, function calls, literals, star). `Build()` verifies the `SELECT` it emitted. **Wire-visible:** unchanged programs emit the same bytes, but a `Col` that splits the projection or smuggles a clause-level flag is refused, and `aql.SelectField` is no longer usefully `==`-comparable ([spec](specifications/clinical-modeling.md#req-163--aql-write-side-expressivity-parity), [plan](plans/archive/2026-08-26-aql-write-side-parity.md); PROBE-088, PROBE-097) |
-| AQL path-shape and paging lint | **Landed** | `openehr/aql/lint/` REQ-164 | A third additive REQ-109 Layer-2 group: five Warning codes over the query text plus the pinned BMM (`aql_path_repeating_unpredicated`, `aql_paging_no_order_by`, `aql_select_no_alias`, `aql_fanout_path_grain`, `aql_contains_redundant_step`), with no OPT or CDR needed. **Visible to CI consumers:** unchanged queries gain new Warnings, none flips `Result.OK()`, and the per-code filter is the opt-out ([spec](specifications/clinical-modeling.md#req-164--aql-path-shape-and-paging-lint), [plan](plans/archive/2026-08-26-aql-path-shape-lint.md); PROBE-099) |
-| OPT → RM instance synthesis | **Landed** | `openehr/instance/` REQ-107 | `Generate(ctx, c, opts)` with closed-root accessors, a `UIDSource` test seam, and seeded synthetic value fill; PROBE-027 over `vital_signs.opt`, `clinical_note.opt`, and a real-world corpus ([plan](plans/archive/2026-05-24-template-instance-example-generator.md)) |
-| Synthesis `medium`/`detail_level` level | **Planned** | `openehr/instance/` REQ-107 | Representative optional-subset fill between `Minimal` and full population |
-| Composition builder | **Landed** | `openehr/composition/` REQ-101 | `NewSkeleton` + `Builder.Set/SetText/SetQuantity/SetCodedText/Build`; PROBE-023 full unmarshal round-trip |
-| LANG / TERM BMM | **Deferred** | `resources/bmm/` | Reference pins only |
-| EHR Extract RM | **Deferred** | — | Out of v1 scope |
+Everything below is `Partial`, `Planned` or `Deferred`. Anything not listed has landed; see the [registry](specifications/REQ.md).
 
----
-
-## Auth and transport
-
-| Feature | Status | Package / REQ | Notes |
-|---------|--------|---------------|-------|
-| `TokenSource` + per-request ctx | **Landed** | `auth/` REQ-060 | |
-| Client credentials | **Landed** | `auth/clientcreds/` REQ-068 | Symmetric `client_secret` + SMART Backend Services asymmetric (`WithClientAssertion`) |
-| JWT Bearer | **Landed** | `auth/jwtbearer/` REQ-068 | RS384 default + ES384/RS256/ES256; `private_key_jwt` and SMART Backend Services |
-| HTTP Basic on openEHR REST | **Landed** | `auth/basic/` REQ-069 | |
-| Caller attribution | **Landed** | `transport/` REQ-066 | PROBE-009: opt-in header + `caller.agent_id` OTel attribute |
-| SMART PKCE + launch | **Landed** | `auth/smart/` REQ-061–063 | PKCE, code exchange, refresh, JWKS cache; PROBE-001/004/005 |
-| Application launch context | **Landed** | `smart/` REQ-064, REQ-067 | LaunchContext, ID-token validation, principal claims (PROBE-008); openEHR-native `ehrId`/`episodeId` |
-| JWKS rotation | **Landed** | `auth/smart/` REQ-062 | Cache + refresh-on-miss; PROBE-006 |
-| Token refresh (SMART provider) | **Landed** | `auth/smart/` REQ-063 | Proactive expiry refresh + transport 401→reauth; PROBE-007 covers both halves |
-| SMART flows + launch modes | **Landed** | `auth/smart/`, `auth/clientcreds/`, `auth/jwtbearer/` REQ-068 | All 4 flows × 3 launch modes probe-covered in Sandbox; Inferno STU2.2 cross-check recorded in [conformance.md](specifications/conformance.md). Cassette/Live ratification deferred |
-| Transport (HTTP, retry, OTel, errors) | **Landed** | `transport/` REQ-090–093, REQ-096, REQ-098 | `WireError` maps the non-2xx openEHR error envelope; a 2xx body that will not decode is typed separately, under REQ-151 |
-| `Prefer` negotiation | **Landed** | `transport/`, `openehr/client/ehr/*` REQ-094 | All three write-path modes: `return=representation` bare-body decode (PROBE-061/071), `return=identifier` slot population, and a 2xx representation with an empty body → `NoRepresentationError` wrapping `ErrInvalidShape` (undecodable body wraps the decoder's error). PROBE-065 `minimal`→GET round-trip implemented (Sandbox) under `testkit/probes/versioned/` |
-| Path-parameter segment validation | **Landed** | `transport/`, `openehr/client/*` REQ-150 | Refuses `.`/`..`/empty/`\`/control-character segments and a path whose segment count contradicts its `Route` template, and fails closed without sending a request. Service root exempt; PROBE-091 across ten leaves, with an AST tripwire holding every leaf to setting `Route` ([plan](plans/archive/2026-08-18-path-segment-validation.md)) |
-| Typed 2xx decode failure | **Landed** | `transport/`, `openehr/client/*` REQ-151 | A 2xx body that will not decode fails with `*transport.DecodeError` (raw bytes, method, route template, wrapping the codec's own error) with a value-free `Error()` ([ADR 0018](adr/0018-raw-bytes-on-decode-error.md)). A non-2xx stays `WireError`, an empty body stays `ErrInvalidShape`, and the REQ-094 write funnel keeps `NoRepresentationError` (PROBE-101; [plan](plans/archive/2026-08-30-read-path-decode-taxonomy.md)) |
-| Transport `NoRetry` / `Disabled` | **Landed** | `transport/` REQ-096 | Bench-friendly retry opt-out |
-| Transport observer hook | **Landed** | `transport/` REQ-098 | `WithObserver` + `WithObservationTag` |
-| Service discovery | **Landed** | `smart/discovery/` REQ-070–072 | `services` wire-shape fix plus endpoint/alg metadata ([ADR 0008](adr/0008-smart-discovery-services-shape.md), [plan](plans/archive/2026-06-16-auth-smart-conformance-audit.md)) |
-
----
-
-## REST clients (`openehr/client/*`)
-
-| API area | Status | Package | Notes |
-|----------|--------|---------|-------|
-| System | **Landed** | `openehr/client/system/` | Capabilities, version |
-| EHR (create, get, delete) | **Landed** | `openehr/client/ehr/` | |
-| EHR_STATUS | **Landed** | `openehr/client/ehr/ehrstatus/` | |
-| Composition CRUD | **Landed** | `openehr/client/ehr/composition/` | REQ-054 If-Match; PROBE-071 representation decode; REQ-094 `Prefer` write path complete |
-| Directory | **Landed** | `openehr/client/ehr/directory/` | Same REQ-094 / PROBE-071 notes as composition |
-| Contribution | **Landed** | `openehr/client/ehr/contribution/` | **Write:** `Contribution_create` body, persisted `rm.Contribution` response, commit audit without the server-assigned `time_committed` (PROBE-072). **Read (REQ-142):** `Get` on `GET /ehr/{ehr_id}/contribution/{contribution_uid}`; empty ids refused before any request, 404 → `ErrNotFound` (PROBE-092). **Authoring (REQ-130):** `Builder` + `Creation`/`Amendment`/`Modification`/`Deletion` assemble the batch with per-operation change-type codes (PROBE-084) |
-| ItemTags | **Partial** | `openehr/client/ehr/itemtags/` | REQ-059 is **partial** overall (PROBE-062 implemented (Sandbox) under `testkit/probes/rest/`; dedicated ITEM_TAG endpoints still deferred); header codec + composition/ehrstatus/directory GET and composition PUT are landed |
-| Query (AQL execute) | **Landed** | `openehr/client/query/` | Ad-hoc + stored execute; REQ-055 verb-aware `openehr-ehr-id` POST scoping. PROBE-078 implemented (Sandbox) under `testkit/probes/query/` |
-| Definition — ADL 1.4 templates | **Landed** | `openehr/client/definition/` | Upload/list/get/delete + example composition; list filters `template_id`/`concept`/`version`/`offset`/`fetch` (REQ-143, PROBE-093). REQ-144 metadata decode: `created_timestamp` accepts a closed tolerant layout set (ADR 0019) and an empty 2xx body yields a non-nil empty slice |
-| Definition — stored AQL | **Landed** | `openehr/client/definition/` | Put/get/list/delete; REQ-057 `PutStoredQuery` recovers `{name, version}` from the `Location` header on a body-less reply, and REQ-144 covers `saved` decode and the non-nil empty list. PROBE-079 witnessed Live (snapshot) by `testkit/probe/livestoredquery_test.go`; dedicated Sandbox probe planned |
-| Definition — ADL 2 | **Deferred** | — | `FormatADL14` is the only registered format (stage 4) |
-| Demographic | **Landed** | `openehr/client/demographic/` | PARTY hierarchy CRUD (five typed resources) + read-only `versioned_party`; polymorphic decode via `typereg.DecodeAs[rm.Party]`; PROBE-073 |
-| Admin (ITS-REST) | **Landed** | `openehr/client/admin/` | `DeleteEHR`, `DeleteAllEHRs`, `PurgeTemplates` (REQ-099) |
-
-[STRAND-09](specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) tracks the deferred Tier-3 gaps: dedicated ITEM_TAG endpoints, `VERSIONED_*` read families, and content negotiation. Its REST-probe item is resolved and its stored-query `fetch` item is open. Delivery history: [REST client](plans/archive/2026-05-15-rest-api-client.md) · [demographic](plans/archive/2026-06-14-demographic-rest-client.md) · [ITS-REST remediation](plans/archive/2026-06-19-its-rest-conformance-remediation.md).
+| Area | Feature | Status | Package / REQ | Notes |
+|---|---|---|---|---|
+| Core | AOM 2.4 | **Deferred** | — | BMM pinned in `resources/bmm/`; no codegen and no package yet (stage 4) |
+| Core | Template-less RM validation floor | **Partial** | `openehr/validation/`, `openehr/validation/rmread/` REQ-112 | `ValidateRM` and typed sugars walk any RM root with `rminfo` as sole driver (no template required), checking RM-mandatory absences and a per-type invariant catalogue, including `TERM_MAPPING.match`'s value set and `DV_TEXT.mappings`'s `Mappings_valid` ([plan](plans/archive/2026-09-01-rm-canonical-json-fidelity.md)). The archetype-root and ARCHETYPED catalogue rows are spec-first and await code ([plan](plans/2026-09-24-rm-floor-archetype-roots.md)). PROBE-077 deferred ([plan](plans/archive/2026-06-29-rm-floor-validation.md)) |
+| Core | Synthesis `medium`/`detail_level` level | **Planned** | `openehr/instance/` REQ-107 | Representative optional-subset fill between `Minimal` and full population |
+| Core | LANG / TERM BMM | **Deferred** | `resources/bmm/` | Reference pins only |
+| Core | EHR Extract RM | **Deferred** | — | Out of v1 scope |
+| REST clients | ItemTags | **Partial** | `openehr/client/ehr/itemtags/` | REQ-059 is **partial** overall (PROBE-062 implemented (Sandbox) under `testkit/probes/rest/`; dedicated ITEM_TAG endpoints still deferred); header codec + composition/ehrstatus/directory GET and composition PUT are landed |
+| REST clients | Definition — ADL 2 | **Deferred** | — | `FormatADL14` is the only registered format (stage 4) |
+| SMART / Cadasto | AppContext / launch helpers | **Partial** | `smart/` | LaunchContext + ID-token validation (REQ-064/067) landed; App Registration open ([STRAND-05](specifications/research-strands.md)) |
+| SMART / Cadasto | Cadasto Extra API | **Planned** | `cadasto/extra/` |  |
+| SMART / Cadasto | Datamap V2 | **Planned** | `cadasto/datamap/` REQ-058 |  |
+| SMART / Cadasto | MPI preview | **Planned** | `cadasto/mpi/` |  |
+| SMART / Cadasto | Cadasto admin | **Partial** | `cadasto/admin/` | Health probes (`Live`, `Ready`) landed per REQ-083; tenant/env/system-info planned. Distinct from the ITS Admin client |
+| SMART / Cadasto | Care aggregates | **Planned** | `cadasto/care/` |  |
+| Conformance | Auth / REST probes | **Partial** | `testkit/probes/auth/`, `testkit/probes/rest/` | PROBE-001…009 all implemented (Sandbox) plus launch-mode coverage; of the REST-binding probes, PROBE-060 / 061 / 062 / 065 / 067 and PROBE-102…104 are implemented (Sandbox), PROBE-066 / 079 are witnessed Live, and PROBE-063 / 064 / 068 remain Draft |
+| Conformance | Sandbox transport | **Partial** | `sandbox/` | In-memory backend (`backend.go`, `script.go`) landed, covering EHR create/get/head plus scripted routes. Versioned, definition, demographic, and transport probes run on it instead of hand-written `httptest` servers. Auth/discovery probes still stand up `httptest` identity servers (OIDC/JWKS, not CDR). Phase 2 of the [runnability plan](plans/2026-08-18-probe-runnability.md) |
+| Conformance | Testkit helpers + probe runner | **Partial** | `testkit/` | The runner (`testkit/probe/run.go`) executes the catalog, a subset, or one probe; the per-package `Result` types under `testkit/probes/*` are `type Result = probe.Result` aliases, not duplicates. REQ-082 specifies the modes and result contract. The recording format is settled ([ADR 0020](adr/0020-cassette-recording-har.md); [STRAND-11](specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) resolved). The Cassette recorder, replayer, the `cmd/probe-record` capture harness and two corpus recordings (`ehr-create`, `ehr-lifecycle`) have landed. What remains of the [runnability plan](plans/2026-08-18-probe-runnability.md) is Cassette coverage beyond those two, the full REQ-082 replay key, and Live runs against a reachable CDR |
+| Conformance | openEHR conformance ratification | **Partial** | `testkit/conformance/webtemplate/` | REQ-080/082. PROBE-086 round-trips the pinned upstream EHRbase FLAT corpus (34 bodies this SDK did not write) exact on the modelled subset: **1466 of 1824 keys (80.4%)**; remaining refusals are censused in [SKIPPED.md](../testkit/conformance/webtemplate/SKIPPED.md). Live-CDR ratification and the Cassette/Live modes remain open |
+| Conformance | Cadasto API conformance | **Planned** | `testkit/cassettes/cadasto/` | REQ-083, anchored to the Cadasto platform API contract (stage 4) |
+| Conformance | OpenAPI cassettes | **Partial** | `testkit/cassettes/` REQ-095 | Coverage table in [`testkit/cassettes/its_rest/README.md`](../testkit/cassettes/its_rest/README.md). The named gaps are stored-query metadata bodies, a persisted CONTRIBUTION response, ITEM_TAG bodies, and the `Identifier` write-response body |
 
 ---
 
@@ -152,58 +83,6 @@ Stage 2's per-REQ delivery history is in its [archived phase plan](plans/archive
 
 ---
 
-## Application SMART and Cadasto
+## Updating this page
 
-| Feature | Status | Package | Notes |
-|---------|--------|---------|-------|
-| Discovery resolver + cache | **Landed** | `smart/discovery/` | |
-| AppContext / launch helpers | **Partial** | `smart/` | LaunchContext + ID-token validation (REQ-064/067) landed; App Registration open ([STRAND-05](specifications/research-strands.md)) |
-| Cadasto Extra API | **Planned** | `cadasto/extra/` | |
-| Datamap V2 | **Planned** | `cadasto/datamap/` REQ-058 | |
-| MPI preview | **Planned** | `cadasto/mpi/` | |
-| Cadasto admin | **Partial** | `cadasto/admin/` | Health probes (`Live`, `Ready`) landed per REQ-083; tenant/env/system-info planned. Distinct from the ITS Admin client |
-| Care aggregates | **Planned** | `cadasto/care/` | |
-
----
-
-## Test infrastructure and conformance
-
-| Feature | Status | Location | Notes |
-|---------|--------|----------|-------|
-| Serialize probes | **Landed** | `testkit/probes/serialize/` | PROBE-030/031, 033/034 |
-| Versioned-write probes | **Landed** | `testkit/probes/versioned/` | PROBE-010–013, 071, 092 |
-| Validation probes | **Landed** | `testkit/probes/validation/` | PROBE-025/026 |
-| Instance synthesis probe | **Landed** | `testkit/probes/instance/` | PROBE-027 |
-| Composition builder probe | **Landed** | `testkit/probes/composition/` | PROBE-023: full marshal → unmarshal → re-marshal round-trip |
-| AQL probes | **Landed** | `testkit/probes/aql/` | PROBE-020 (struct vs verb byte-identical), PROBE-028, PROBE-088, PROBE-097, PROBE-099, PROBE-100 |
-| Definition probes | **Landed** | `testkit/probes/definition/` | PROBE-067, PROBE-093 |
-| Discovery probes | **Landed** | `testkit/probes/discovery/` | PROBE-040/041 |
-| Transport probes | **Landed** | `testkit/probes/transport/` | PROBE-091, PROBE-101 |
-| Auth / REST probes | **Partial** | `testkit/probes/auth/`, `testkit/probes/rest/` | PROBE-001…009 all implemented (Sandbox) plus launch-mode coverage; of the REST-binding probes, PROBE-060 / 061 / 062 / 065 / 067 and PROBE-102…104 are implemented (Sandbox), PROBE-066 / 079 are witnessed Live, and PROBE-063 / 064 / 068 remain Draft |
-| Sandbox transport | **Partial** | `sandbox/` | In-memory backend (`backend.go`, `script.go`) landed, covering EHR create/get/head plus scripted routes. Versioned, definition, demographic, and transport probes run on it instead of hand-written `httptest` servers. Auth/discovery probes still stand up `httptest` identity servers (OIDC/JWKS, not CDR). Phase 2 of the [runnability plan](plans/2026-08-18-probe-runnability.md) |
-| Testkit helpers + probe runner | **Partial** | `testkit/` | The runner (`testkit/probe/run.go`) executes the catalog, a subset, or one probe; the per-package `Result` types under `testkit/probes/*` are `type Result = probe.Result` aliases, not duplicates. REQ-082 specifies the modes and result contract. The recording format is settled ([ADR 0020](adr/0020-cassette-recording-har.md); [STRAND-11](specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) resolved). The Cassette recorder, replayer, the `cmd/probe-record` capture harness and two corpus recordings (`ehr-create`, `ehr-lifecycle`) have landed. What remains of the [runnability plan](plans/2026-08-18-probe-runnability.md) is Cassette coverage beyond those two, the full REQ-082 replay key, and Live runs against a reachable CDR |
-| openEHR conformance ratification | **Partial** | `testkit/conformance/webtemplate/` | REQ-080/082. PROBE-086 round-trips the pinned upstream EHRbase FLAT corpus (34 bodies this SDK did not write) exact on the modelled subset: **1466 of 1824 keys (80.4%)**; remaining refusals are censused in [SKIPPED.md](../testkit/conformance/webtemplate/SKIPPED.md). Live-CDR ratification and the Cassette/Live modes remain open |
-| Cadasto API conformance | **Planned** | `testkit/cassettes/cadasto/` | REQ-083, anchored to the Cadasto platform API contract (stage 4) |
-| OpenAPI cassettes | **Partial** | `testkit/cassettes/` REQ-095 | Coverage table in [`testkit/cassettes/its_rest/README.md`](../testkit/cassettes/its_rest/README.md). The named gaps are stored-query metadata bodies, a persisted CONTRIBUTION response, ITEM_TAG bodies, and the `Identifier` write-response body |
-
----
-
-## Tooling, docs and examples
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| `make ci` + grouped `make help` | **Landed** | Gate detail in [ci.md](ci.md) |
-| `make spec-check` | **Landed** | Traceability subset only |
-| Release / semver strategy | **Landed** | Tag-driven [`release.yml`](../.github/workflows/release.yml); policy in [releases.md](releases.md) |
-| `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | Codegen and BMM-corpus diff tooling |
-| Developer onboarding | **Landed** | [quick-start.md](quick-start.md): install, two integration paths, REST wiring |
-| Worked examples | **Landed** | [`cmd/examples/`](../cmd/examples/) — 17 runnable programs, catalogued in [examples.md](examples.md) (the single list) |
-| Documentation website | **Landed** | Material for MkDocs site under [`pages/`](../pages/). `make docs-check` builds it and gates it on every pull request ([`docs-ci.yml`](../.github/workflows/docs-ci.yml)). [`docs-site.yml`](../.github/workflows/docs-site.yml) deploys it to GitHub Pages from `main` once the repository's Pages source is set to GitHub Actions; that is not enabled yet (as of 2026-09-10). The repository's `docs/` stays the canonical source and the site links into it |
-
----
-
-## How to update this file
-
-1. **After landing a feature:** flip the status here, set `Impl. landed` in [`REQ.md`](specifications/REQ.md), and add the paths to [`traceability.yaml`](specifications/traceability.yaml).
-2. **After closing a plan phase:** update the plan's progress table **and** the stage row above.
-3. **Keep it a checklist, not a spec.** Do not duplicate normative REQ prose or per-release history here. Link to `docs/specifications/` and the archived plan instead. A Notes cell that outgrows a couple of sentences belongs in the plan it links to.
+Update a row here in the PR that changes it: remove it when the feature lands, add it when new open work is accepted. Keep notes to a sentence or two and link to the plan or spec for detail. Per-requirement status belongs in `traceability.yaml`, not here.
