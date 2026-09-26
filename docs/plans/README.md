@@ -4,7 +4,7 @@ A plan turns one or more normative REQs into sequenced delivery work. It cites t
 
 **Lifecycle.** A plan stays where it is written. Its **Status:** line says where it stands (`Draft`, `Active`, `Parked` or `Done`), and the implementing PR sets it to `Done`. Nothing is moved and no index is edited by hand: the tables below are generated from each plan's **Status:** and **Covers:** lines by `make spec-gen`, and `make spec-check` fails when they are stale.
 
-Plans that landed before this rule are in [`archive/`](archive/README.md); that folder is frozen. What has landed overall: [`../roadmap.md`](../roadmap.md) and the [requirements registry](../specifications/REQ.md).
+Plans that landed before this rule are in [`archive/`](archive/README.md); that folder is frozen. Per-requirement status is in the [requirements registry](../specifications/REQ.md); what is still open is in [`../roadmap.md`](../roadmap.md).
 
 ## Index
 

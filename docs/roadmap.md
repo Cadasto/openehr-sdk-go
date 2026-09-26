@@ -45,10 +45,11 @@ Each stage groups several deliverables, and a stage is only as done as its weake
 
 ## Open work
 
-Everything below is `Partial`, `Planned` or `Deferred`. Anything not listed has landed; see the [registry](specifications/REQ.md).
+Everything below is `Partial`, `Planned` or `Deferred`. Gaps that belong to a deployment rather than a feature (EHRbase, Better Platform) are under [Deployment targets](#deployment-targets). Anything in neither table has landed; see the [registry](specifications/REQ.md).
 
 | Area | Feature | Status | Package / REQ | Notes |
 |---|---|---|---|---|
+| Core | Benchmark harness | **Deferred** | — | A few packages carry `go test -bench` benchmarks; there is no shared harness (stage 1) |
 | Core | AOM 2.4 | **Deferred** | — | BMM pinned in `resources/bmm/`; no codegen and no package yet (stage 4) |
 | Core | Template-less RM validation floor | **Partial** | `openehr/validation/`, `openehr/validation/rmread/` REQ-112 | `ValidateRM` and typed sugars walk any RM root with `rminfo` as sole driver (no template required), checking RM-mandatory absences and a per-type invariant catalogue, including `TERM_MAPPING.match`'s value set and `DV_TEXT.mappings`'s `Mappings_valid` ([plan](plans/archive/2026-09-01-rm-canonical-json-fidelity.md)). The archetype-root and ARCHETYPED catalogue rows are spec-first and await code ([plan](plans/2026-09-24-rm-floor-archetype-roots.md)). PROBE-077 deferred ([plan](plans/archive/2026-06-29-rm-floor-validation.md)) |
 | Core | Synthesis `medium`/`detail_level` level | **Planned** | `openehr/instance/` REQ-107 | Representative optional-subset fill between `Minimal` and full population |

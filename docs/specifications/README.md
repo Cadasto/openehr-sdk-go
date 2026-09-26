@@ -29,7 +29,7 @@ The repo uses several document kinds, each with a distinct role and boundary:
 | **Plan** | What exact work implements a slice? | No (delivery tasks) | [`docs/plans/`](../plans/) |
 | **Guide** | How do I work in this repo safely? | No | [`docs/architecture.md`](../architecture.md), [`docs/development-process.md`](../development-process.md), [`docs/ai-workflow.md`](../ai-workflow.md), [`docs/ci.md`](../ci.md) |
 | **Descriptor** | Machine-readable SDD conventions for tooling | Config (not prose) | [`docs/.sdd.yaml`](../.sdd.yaml) — REQ style, paths, build targets, PROBE/STRAND toggles; read by `sdd-*` skills |
-| **Roadmap** | What has landed and what hasn't? | No (status snapshot) | [`docs/roadmap.md`](../roadmap.md) |
+| **Roadmap** | What is still open, and which deployments are targeted? | No (status snapshot) | [`docs/roadmap.md`](../roadmap.md) |
 
 **Boundaries between kinds:**
 

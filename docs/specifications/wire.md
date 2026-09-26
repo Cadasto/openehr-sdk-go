@@ -35,8 +35,6 @@ When the OpenAPI files and any in-repo prose disagree, the OpenAPI wins; the pro
 
 **Path-parameter encoding.** A request path **MUST** conform to the OAS path template — each path parameter is percent-encoded **exactly once** on the wire. The transport is the **single canonical path encoder**: [`transport.Request.Path`](../../transport/request.go) is a **decoded** path (`url.URL.Path` semantics) that `url.URL.String()` encodes once on the way out. Leaf clients (`openehr/client/*`) **MUST** interpolate the **raw**, decoded id into `Request.Path` and **MUST NOT** pre-escape it with `url.PathEscape` — a pre-escaped parameter is encoded twice (a template id `Referral Request.v1` → `%20` → `%2520`), which a strict server unescapes to a literal `%20` and answers `404`. Segment legality is a separate question from encoding: a path parameter containing `/` — or any other content [REQ-150](transport.md#req-150--path-parameter-segment-validation) forbids — is governed by that requirement, the transport's segment validator — which also forbids honouring `url.URL.RawPath` (the encoded hint), so there is no encoding-level escape hatch for a separator-bearing value; the MUST NOT lives there, not here. Decoding a server-supplied value (e.g. the `Location` header via `url.PathUnescape`) is unaffected — the rule is about **forming** the request path, not reading a response.
 
-**Coverage of vendored bodies.** Not every decoded surface has an upstream-shaped body under `testkit/cassettes/its_rest/` yet; tests build the rest by hand. The open list is [`testkit/cassettes/its_rest/README.md` § Coverage against the client surface](../../testkit/cassettes/its_rest/README.md#coverage-against-the-client-surface).
-
 ## REST version pin
 
 ### REQ-050

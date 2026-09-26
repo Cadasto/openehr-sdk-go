@@ -13,7 +13,7 @@
 ## Spec / probes
 
 <!-- REQ-NNN, PROBE-NNN, plan link — or, for a change that alters no normative statement:
-     "Lane: maintenance — no normative change" (docs/development-process.md § Two lanes). -->
+     "Lane: maintenance (no normative change)" (docs/development-process.md § Two lanes). -->
 
 ## Test plan
 

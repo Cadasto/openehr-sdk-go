@@ -43,8 +43,8 @@ Specify new behaviour before you write it, in this loop:
 4. Run `make spec-check`, which `make ci` includes anyway.
 
 A refactor or a bug fix that brings the code back in line with the existing
-specification needs none of this: a green `make ci` and the pull-request line
-`Lane: maintenance, no normative change` are enough.
+specification needs none of this. That is the maintenance lane, described in
+[development-process.md § Two lanes](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/development-process.md#two-lanes).
 
 When the code and a specification disagree, the specification wins. Open
 research questions stay in `docs/specifications/research-strands.md` until an

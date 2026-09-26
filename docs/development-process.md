@@ -15,7 +15,7 @@ Ask one question of every change: **does it alter a normative statement?** That 
 | Plan | A plan in [`plans/`](plans/) when the work spans several PRs | None |
 | `traceability.yaml` | Updated to the landed packages, tests and probes | Only the rows `make spec-check` names, when paths moved |
 | Gate | `make ci` | `make ci` |
-| PR body | The REQ / PROBE ids touched | One line: `Lane: maintenance — no normative change` |
+| PR body | The REQ / PROBE ids touched | One line: `Lane: maintenance (no normative change)` |
 
 `make spec-check` runs in both lanes, so the map cannot rot whichever lane a PR claims. A reviewer who finds a normative change in a maintenance-lane PR moves it to the full lane; that is a finding against the PR, not against the process.
 
