@@ -4,10 +4,10 @@
 # Do NOT switch req_style once published — it would renumber stable IDs (a major doc event).
 sdd:
   req_style: flat-numeric           # flat-numeric (REQ-NNN) — leaner for a library
-  req_gap: 10                       # decadal, topic-banded: 001-005 packaging, 010-014 layout,
-                                    # 020-026 idiom, 030-033 rm, 040-047 bmm, 050-059 wire,
-                                    # 060-064 auth, … — assign the next ID in the topic's band.
-                                    # See docs/specifications/REQ.md § Numbering policy.
+  req_gap: 1                        # sequential: a new REQ takes the next free number above the
+                                    # highest registered one. The old decadal topic bands are
+                                    # historical and no longer allocated from; reservations and
+                                    # retired numbers are listed in REQ.md § Numbering policy.
 
   paths:
     # Requirements use a REGISTRY model, not per-REQ files: the REQ-NNN index lives in
@@ -18,13 +18,22 @@ sdd:
     specifications: docs/specifications
     adr: docs/adr
     plans: docs/plans
-    plans_archive: docs/plans/archive
+    plans_archive: docs/plans/archive   # FROZEN: plans that landed before 2026-09-26. New plans are
+                                        # finished in place (Status: Done) and never moved.
+
+  # Single sources and what is generated from them (`make spec-gen`; `make spec-check` fails
+  # when a generated block is stale). Edit the source, never the generated table.
+  #   traceability.yaml        -> docs/specifications/REQ.md registry table
+  #   plans' Status/Covers     -> docs/plans/README.md index
+  # traceability.yaml is a pure index: no notes, no comments in rows (spec-check refuses them).
 
   traceability: docs/specifications/traceability.yaml
 
   build_entrypoint: make            # single entry point — extend the Makefile, no ad-hoc scripts
   ci_target: ci                     # full PR gate: `make ci` (includes spec-check)
   spec_check_target: spec-check     # traceability drift gate: `make spec-check`
+  # Also: `make spec-gen` (regenerate the indexes). Two lanes — a change that alters no
+  # normative statement owes no spec/plan edits: docs/development-process.md § Two lanes.
   # Also available: `make spec-context REQ=NNN` (one-shot bundle) and `make probe-status`.
 
   use_probes: true                  # PROBE-NNN conformance probes — catalog in docs/specifications/conformance.md

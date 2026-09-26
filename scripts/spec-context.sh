@@ -30,7 +30,11 @@ echo
 # --- 1) Registry row -------------------------------------------------------
 echo "## Registry (REQ.md)"
 echo
-row="$(grep -E "^\| ${REQ} \|" "$REQ_REG" 2>/dev/null || true)"
+row="$(awk -v id="$REQ" '
+  index($0, "<!-- BEGIN GENERATED: registry ") == 1 { inside = 1; next }
+  index($0, "<!-- END GENERATED: registry ") == 1 { inside = 0 }
+  inside && index($0, "| " id " |") == 1
+' "$REQ_REG" 2>/dev/null || true)"
 if [[ -n "$row" ]]; then
   printf '| ID | Title | Canonical | Impl. |\n|---|---|---|---|\n%s\n' "$row"
 else
@@ -50,7 +54,7 @@ if [[ -n "$block" ]]; then printf '```yaml\n%s\n```\n' "$block"; else echo "_no 
 echo
 
 # --- 3) Canonical spec excerpt ---------------------------------------------
-canon="$(printf '%s' "$row" | grep -oE '\]\([^)]+\)' | tail -1 | sed -E 's/^\]\(//; s/\)$//')"
+canon="$(printf '%s' "$row" | grep -oE '\]\([^)]+\)' | tail -1 | sed -E 's/^\]\(//; s/\)$//' || true)"
 echo "## Canonical spec"
 echo
 if [[ -n "$canon" ]]; then
@@ -84,7 +88,8 @@ if [[ -n "$plans" ]]; then
     [[ -z "$p" ]] && continue
     case "$p" in
       */archive/*) echo "- ${p} _(archived)_" ;;
-      *)           echo "- **${p}** _(active)_" ;;
+      *)           st="$(grep -m1 -E '^\*\*Status:\*\*' "${ROOT}/${p}" 2>/dev/null | sed -E 's/^\*\*Status:\*\*[[:space:]]*//; s/[^A-Za-z].*$//' || true)"
+                   echo "- **${p}** _(${st:-no status})_" ;;
     esac
   done <<< "$plans"
 else

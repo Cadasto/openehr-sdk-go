@@ -1,13 +1,13 @@
 # Plan — &lt;short title&gt;
 
 **Date:** YYYY-MM-DD
-**Status:** Draft
-**Owner:** SDK maintainers
-**Covers:** REQ-xxx, REQ-yyy (link to canonical spec sections only — no duplicate normative prose)
+**Status:** Draft — &lt;one clause of detail, optional&gt;
+**Covers:** REQ-xxx, REQ-yyy (link to the canonical spec sections; no normative prose here)
 **Probes:** PROBE-xxx (if applicable)
-**Implementation:** planned | partial | landed
 **Depends on:** &lt;other plans or landed packages&gt;
 **Defers:** &lt;out of scope for this plan&gt;
+
+The first word of **Status:** is one of `Draft` (not started), `Active` (under way), `Parked` (on hold, with the reason) or `Done`. The [plan index](README.md) is generated from it and from **Covers:**, so keep both on one line. A plan never moves: when it lands, set **Status:** to `Done` in the implementing PR and run `make spec-gen`.
 
 ## Goal
 
@@ -17,32 +17,20 @@ One paragraph: what ships and who consumes it.
 
 Implementation may start when:
 
-- **`**Covers:**`** lists every REQ-NNN (and STRAND-NN / ADR if applicable) this plan implements.
-- Canonical normative prose exists for each covered REQ (topic spec section + registry row in [REQ.md](../specifications/REQ.md)).
+- **Covers:** lists every REQ-NNN (and STRAND-NN or ADR, if any) this plan implements.
+- Canonical normative text exists for each covered REQ, in its topic spec, with a `traceability.yaml` entry.
 - Any irreversible fork has an **Accepted** [ADR](../adr/).
+- The inputs and states the change must refuse, and how it fails on them, are cited from the canonical spec.
 - Phases list concrete tasks and name the verification command (`make ci`, `make spec-check`, probes).
 
 ## Definition of Done
 
-The plan is complete when:
+All in the implementing PR:
 
-- Code and tests land with `// REQ-` / `// PROBE-` citations.
-- [`traceability.yaml`](../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the implementation.
-- **The two indexes `make spec-check` cannot see** — a row in [`roadmap.md`](../roadmap.md) for anything that landed, and, when this plan allocated a new REQ id, the band table in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy) (headroom consumed, band marked exhausted). Neither is machine-checked, so both are easy to miss.
-- Canonical spec prose / **Status:** updated in the same PR when behaviour changed.
-- `make spec-check` and `make ci` pass.
-- Plan archived under [`docs/plans/archive/`](archive/) (or **Status:** set to complete).
-
-## Implementation checklist
-
-| Step | Status |
-|---|---|
-| Spec / registry updated (`traceability.yaml`, REQ.md row) | |
-| Indexes `spec-check` misses (`roadmap.md` row, REQ.md numbering band) | |
-| Code | |
-| Tests with `// REQ-` / `// PROBE-` comments | |
-| `make spec-check` | |
-| `make ci` | |
+- Code and tests land; tests cite the `REQ-` / `PROBE-` they pin.
+- The canonical spec text is current, and `traceability.yaml` lists the landed packages, tests and probes.
+- **Status:** is `Done`, and `make spec-gen` has refreshed the generated indexes.
+- `make ci` passes (it includes `make spec-check`).
 
 ## Phases
 
@@ -51,8 +39,3 @@ The plan is complete when:
 **Tasks:** …
 
 **Definition of done:** …
-
-## Mapping to specs
-
-- [docs/specifications/&lt;canonical&gt;.md § REQ-xxx](../../docs/specifications/&lt;file&gt;.md#req-xxx) — normative contract
-- [docs/specifications/REQ.md](../../docs/specifications/REQ.md) — registry row

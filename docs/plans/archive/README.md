@@ -1,8 +1,8 @@
 # Archived implementation plans
 
-Plans moved here when **implementation is landed** or the document is **superseded** by a narrower follow-up plan. Normative contracts remain in [`../../specifications/`](../../specifications/); this folder is historical delivery detail.
+**This folder is frozen.** Plans that landed or were superseded before 2026-09-26 were moved here; since then a plan is finished in place in the parent directory (`Status: Done`) and nothing new is added here. Normative contracts remain in [`../../specifications/`](../../specifications/); this folder is historical delivery detail.
 
-**Active plans** live in the parent directory: [`../README.md`](../README.md).
+The current plan index is [`../README.md`](../README.md).
 
 | Archived plan | Reason |
 |---|---|
