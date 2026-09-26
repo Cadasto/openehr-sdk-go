@@ -2,7 +2,7 @@ package ehr
 
 import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
-// HasResource reports whether a write returned a usable resource (REQ-094).
+// HasResource reports whether a write returned a usable resource.
 // False for a bare-nil interface, a typed-nil REGISTERED RM pointer, and an
 // interface holding one; true otherwise. The contract is scoped to the RM
 // registry: [rm.IsTypedNil] is a generated closed type switch whose default

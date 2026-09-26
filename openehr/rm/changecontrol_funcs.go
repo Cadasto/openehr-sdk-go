@@ -15,14 +15,14 @@ package rm
 // See docs/specifications/rm-functions.md § REQ-122 and ADR 0011.
 
 // IsBranch reports whether this version represents a branch, derived
-// from its uid's version_tree_id. REQ-122.
+// from its uid's version_tree_id.
 func (o *OriginalVersion[T]) IsBranch() bool {
 	vt := o.UID.VersionTreeID()
 	return vt.IsBranch()
 }
 
 // IsBranch reports whether this imported version represents a branch,
-// derived from the wrapped original version's uid. REQ-122.
+// derived from the wrapped original version's uid.
 func (i *ImportedVersion[T]) IsBranch() bool {
 	vt := i.Item.UID.VersionTreeID()
 	return vt.IsBranch()

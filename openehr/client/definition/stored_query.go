@@ -13,8 +13,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-// StoredQueryMetadata is the Definition API stored-query descriptor
-// (REQ-057).
+// StoredQueryMetadata is the Definition API stored-query descriptor.
 type StoredQueryMetadata struct {
 	Name    string    `json:"name"`
 	Type    string    `json:"type"`
@@ -23,7 +22,7 @@ type StoredQueryMetadata struct {
 	Q       string    `json:"q"`
 	// Extras preserves deployment-specific fields not in the standard
 	// stored-query descriptor shape.
-	// [StoredQueryMetadata.MarshalJSON] re-emits them (REQ-144).
+	// [StoredQueryMetadata.MarshalJSON] re-emits them.
 	//
 	// Extras keys are matched against the documented field names
 	// case-sensitively, while encoding/json decodes those field names
@@ -41,7 +40,7 @@ var knownStoredQueryFields = map[string]struct{}{
 //
 // saved is shadowed as a json.RawMessage over the alias so the strict
 // RFC 3339-only time.Time decoder never sees it; it is parsed afterwards
-// across the accepted layout set (REQ-144).
+// across the accepted layout set.
 func (m *StoredQueryMetadata) UnmarshalJSON(data []byte) error {
 	type alias StoredQueryMetadata
 	var a alias
@@ -84,9 +83,9 @@ func (m *StoredQueryMetadata) UnmarshalJSON(data []byte) error {
 // key set is not guaranteed to be identical to the wire body a value was
 // decoded from. Neither is its spelling: encoding/json compacts
 // insignificant whitespace and escapes `<`, `>` and `&` as `\u003c`,
-// `\u003e` and `\u0026` inside a preserved value — the escaped spelling
-// decodes to the identical value — and key order is not part of the
-// contract (REQ-144).
+// `\u003e` and `\u0026` inside a preserved value (the escaped spelling
+// decodes to the identical value), and key order is not part of the
+// contract.
 func (m StoredQueryMetadata) MarshalJSON() ([]byte, error) {
 	type alias StoredQueryMetadata
 	known, err := json.Marshal(alias(m))
@@ -123,7 +122,7 @@ type StoreOption func(*storeConfig)
 // QueryTypeAQL is the standard `query_type` value and the SDK default.
 // The Definition API's QueryType is an open string (the spec defines no
 // closed enum, only the default "AQL"), so [WithQueryType] does not
-// restrict the value — a deployment supporting another formalism can pass
+// restrict the value; a deployment supporting another formalism can pass
 // its own.
 const QueryTypeAQL = "AQL"
 
@@ -137,7 +136,7 @@ func WithQueryType(t string) StoreOption {
 // unversioned resource (the deployment assigns the next version).
 //
 // Wire: PUT /definition/query/{qualified_query_name} with
-// Content-Type text/plain body (REQ-057).
+// Content-Type text/plain body.
 func PutStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error) {
 	name := strings.TrimSpace(qualifiedName)
 	if name == "" {
@@ -156,7 +155,7 @@ func PutStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, aql
 // explicit version.
 //
 // Wire: PUT /definition/query/{qualified_query_name}/{version} with
-// Content-Type text/plain body (REQ-057). A 409 (the version already
+// Content-Type text/plain body. A 409 (the version already
 // exists with different content) surfaces as transport.ErrVersionConflict.
 func PutStoredQueryVersion(ctx context.Context, c *transport.Client, qualifiedName, version, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error) {
 	name := strings.TrimSpace(qualifiedName)
@@ -344,10 +343,9 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 // An empty 2xx response body comes back as a non-nil zero-length slice with
 // a nil error, so re-serialising the result yields [] rather than JSON null;
 // a JSON [] body decodes non-nil through encoding/json by construction.
-// "Empty" is the definition § REQ-144 takes from § REQ-094, implemented by
-// [transport.IsNoRepresentationBody] and classified ahead of decode, so a
-// null body takes this same arm and yields the non-nil empty slice rather
-// than the nil one encoding/json would otherwise produce.
+// [transport.IsNoRepresentationBody] decides what counts as empty, and the
+// check runs before decode, so a null body also yields the non-nil empty
+// slice rather than the nil one encoding/json would otherwise produce.
 //
 // Wire: GET /definition/query/{qualified_query_name}.
 func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern string) ([]StoredQueryMetadata, *transport.Metadata, error) {

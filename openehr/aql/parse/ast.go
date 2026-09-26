@@ -16,7 +16,7 @@ import (
 type Clause int
 
 const (
-	// ClauseUnknown is the zero value — a path whose enclosing clause could
+	// ClauseUnknown is the zero value: a path whose enclosing clause could
 	// not be determined (should not occur for a well-formed query).
 	ClauseUnknown Clause = iota
 	// ClauseSelect is the SELECT projection list.
@@ -25,18 +25,17 @@ const (
 	ClauseWhere
 	// ClauseOrderBy is the ORDER BY list.
 	ClauseOrderBy
-	// ClauseFrom is the FROM / CONTAINS tree. Appended after ClauseOrderBy
-	// rather than inserted in clause order: the members above are published
-	// and their numeric values MUST stay put (REQ-113 § The clause axis
-	// reuses the landed enum).
+	// ClauseFrom is the FROM / CONTAINS tree. It is appended after ClauseOrderBy
+	// instead of inserted in clause order, so the numeric values of the members
+	// above stay stable.
 	ClauseFrom
 	// ClauseLimit is the LIMIT value.
 	ClauseLimit
 	// ClauseOffset is the OFFSET value.
 	ClauseOffset
-	// ClauseTop is the deprecated SELECT TOP clause (REQ-118) — distinct from
-	// ClauseSelect so a diagnostic can name the row-count position rather
-	// than the whole projection.
+	// ClauseTop is the deprecated SELECT TOP clause, distinct from ClauseSelect
+	// so a diagnostic can name the row-count position instead of the whole
+	// projection.
 	ClauseTop
 )
 
@@ -124,9 +123,9 @@ func boundedSpan(start, end Position) Span {
 
 // ClassExpr is one class expression bound in the FROM / CONTAINS tree
 // (e.g. `OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]`). The
-// containment tree is flattened to document order; nesting is not retained
-// because the lint contract (REQ-109) reasons over the set of bound classes,
-// not their containment shape.
+// containment tree is flattened to document order; nesting is not kept
+// because the linter reasons over the set of bound classes, not their
+// containment shape.
 type ClassExpr struct {
 	// RMType is the reference-model class name (e.g. "OBSERVATION",
 	// "COMPOSITION", "EHR"), or "VERSION" for a VERSION class expression.
@@ -136,67 +135,66 @@ type ClassExpr struct {
 	// Archetype is the literal archetype HRID from a containment predicate
 	// (e.g. "openEHR-EHR-OBSERVATION.blood_pressure.v1"), the `$param`
 	// placeholder text when ParamArchetype is true (e.g. "$arch"), or ""
-	// when the class carries no archetype predicate. Callers MUST consult
+	// when the class carries no archetype predicate. Callers must consult
 	// ParamArchetype before treating Archetype as a literal HRID.
 	Archetype string
 	// ParamArchetype is true when the archetype predicate is a $param
-	// placeholder (`[$arch]`) rather than a literal HRID — identifiable
-	// scope deferred to bind time. When true, Archetype still carries the
+	// placeholder (`[$arch]`) rather than a literal HRID; the
+	// identifiable scope is deferred to bind time. When true, Archetype still carries the
 	// placeholder text (not "").
 	ParamArchetype bool
 	// Version is true for a VERSION class expression (version machinery,
 	// distinct from a clinical RM class).
 	Version bool
 	// HasPredicate is true when the class carries any path predicate
-	// (`[...]`) — an archetype, a standing predicate like `[ehr_id/value=$x]`,
+	// (`[...]`): an archetype, a standing predicate like `[ehr_id/value=$x]`,
 	// or a version predicate. Distinguishes an identifiable EHR/VERSION root
 	// from a bare one.
 	HasPredicate bool
 	// Predicate is the raw text inside the class predicate brackets when
-	// HasPredicate is true and the predicate is NOT a literal archetype HRID
+	// HasPredicate is true and the predicate is not a literal archetype HRID
 	// (which lives on [ClassExpr.Archetype]) or a `$param` archetype
 	// (signalled by [ClassExpr.ParamArchetype]). Carries standing predicates
-	// such as `ehr_id/value=$x` so the emitter can round-trip them —
-	// brackets stripped, content verbatim from the source.
+	// such as `ehr_id/value=$x` so the emitter can round-trip them, with
+	// brackets stripped and content verbatim from the source.
 	Predicate string
 	// PredicateComparison is the standing class predicate parsed as a
 	// `{path, operator, value}` comparison (e.g. `ehr_id/value = $x`),
-	// reusing the shared [aql.Comparison] / [aql.Value] vocabulary
-	// (REQ-113). Non-nil only when the predicate is a simple comparison;
-	// nil for an archetype HRID (see [ClassExpr.Archetype]), a version
-	// predicate, a non-scalar / complex standing predicate, or a comparison
-	// whose literal the value vocabulary cannot represent (an out-of-range
-	// numeric) — the verbatim [ClassExpr.Predicate] text stays authoritative
-	// in every nil case, so emission is lossless regardless.
+	// reusing the shared [aql.Comparison] / [aql.Value] vocabulary. Non-nil
+	// only when the predicate is a simple comparison; nil for an archetype
+	// HRID (see [ClassExpr.Archetype]), a version predicate, a non-scalar /
+	// complex standing predicate, or a comparison whose literal the value
+	// vocabulary cannot represent (an out-of-range numeric). The verbatim
+	// [ClassExpr.Predicate] text stays authoritative in every nil case, so
+	// emission is lossless regardless.
 	//
-	// A fifth nil case turns on WHICH VIEW the [ClassExpr] was read from
-	// rather than on the predicate's shape: this field is always nil in the
-	// flat lint view ([Parse] → [Document.Classes]), and is populated only by
-	// the Tier-2 structured extraction ([ParseQuery] / [Document.Query]). The
-	// flat view omits it deliberately, so the lint gate does not pay for the
-	// structured parse; the verbatim [ClassExpr.Predicate] text is
-	// authoritative there too, and is populated identically in both views.
+	// A fifth nil case depends on which view the [ClassExpr] was read from,
+	// not on the predicate's shape: this field is always nil in the flat lint
+	// view ([Parse] → [Document.Classes]), and is populated only by the
+	// structured extraction ([ParseQuery] / [Document.Query]). The flat view
+	// omits it on purpose, so linting does not pay for the structured parse;
+	// the verbatim [ClassExpr.Predicate] text is authoritative there too, and
+	// is populated identically in both views.
 	//
 	// The comparison's Path is the relative object path as written, and its
 	// ParsedPath carries the same path's structured Segments with an empty
-	// Alias (a relative predicate path binds no FROM alias) — the WHERE-side
-	// symmetry for the class-predicate left-hand side.
+	// Alias (a relative predicate path binds no FROM alias), matching the
+	// WHERE side for the class-predicate left-hand side.
 	PredicateComparison *aql.Comparison
 	// Pos is the source position of the class expression.
 	Pos Position
 }
 
-// PathSegment is one step of an identified path — re-exported from
-// [aql.PathSegment], the shared path vocabulary (REQ-113).
+// PathSegment is one step of an identified path, re-exported from
+// [aql.PathSegment], the shared path vocabulary.
 type PathSegment = aql.PathSegment
 
 // IdentifiedPath is an alias-qualified path referenced in SELECT, WHERE, or
 // ORDER BY (e.g. `o/data[at0001]/events[at0006]/value/magnitude`). It embeds
-// the shared [aql.IdentifiedPath] (Alias / Predicate / Segments / Raw) — the
+// the shared [aql.IdentifiedPath] (Alias / Predicate / Segments / Raw), the
 // same structured type an [aql.Comparison] carries on the WHERE side, without
-// a package cycle (REQ-113) — and adds the parse-only Clause and source
-// Position. The embedded fields (Alias, Segments, …) are promoted, so
-// existing field access is unchanged.
+// a package cycle, and adds the parse-only Clause and source Position. The
+// embedded fields (Alias, Segments, …) are promoted.
 type IdentifiedPath struct {
 	aql.IdentifiedPath
 	// Clause is the enclosing top-level clause.

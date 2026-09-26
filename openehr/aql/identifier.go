@@ -51,23 +51,24 @@ var funcIDWords = map[string]bool{
 // `IDENTIFIER` token, returning an error wrapping [ErrInvalidQuery].
 //
 // It guards the positions the emitters splice verbatim: a SELECT `AS` alias, a
-// class alias, and an RM type. Left unguarded, `Alias: "x, c/y"` emitted
-// `SELECT c/x AS x, c/y FROM …` with err == nil, which re-parses as TWO
-// projections — REQ-119's silent-substitution class.
+// class alias, and an RM type. Unguarded, `Alias: "x, c/y"` would emit
+// `SELECT c/x AS x, c/y FROM …` with err == nil, which re-parses as two
+// projections.
 //
-// Three things an alphabet check alone gets wrong, all of them observed against
-// the real lexer rather than reasoned about:
+// Three cases an alphabet check alone gets wrong, all checked against the
+// real lexer:
 //
 //   - A reserved word passes the alphabet and then lexes as its own token.
-//     Shadowing turns on DECLARATION ORDER, so the set is every keyword declared
-//     before IDENTIFIER — which includes the function-name tokens ([funcIDWords])
-//     that a function name MAY be spelled with and an identifier may not.
-//   - `true` / `false` are NOT reserved here. BOOLEAN is declared at :232, after
-//     IDENTIFIER, so they lex as identifiers and refusing them would reject an
+//     Shadowing depends on declaration order in the grammar, so the set is
+//     every keyword declared before IDENTIFIER. That includes the function-name
+//     tokens, which a function name may be spelled with and an identifier may
+//     not.
+//   - `true` / `false` are not reserved here. BOOLEAN is declared after
+//     IDENTIFIER, so they lex as identifiers, and refusing them would reject an
 //     alias `ParseQuery` itself produces.
-//   - `at0001` and `id123` lex as AT_CODE / ID_CODE (:124-125), so they are
-//     refused — but the prefixes there are LOWERCASE literals, unlike the
-//     case-insensitive keyword fragments, so `AT0001` is a perfectly good alias.
+//   - `at0001` and `id123` lex as AT_CODE / ID_CODE, so they are refused. The
+//     prefixes there are lowercase literals, unlike the case-insensitive
+//     keyword fragments, so `AT0001` is a valid alias.
 func ValidateIdentifier(name string) error {
 	if name == "" {
 		return fmt.Errorf("%w: empty identifier", ErrInvalidQuery)
@@ -153,18 +154,19 @@ func isCodeToken(s string) bool {
 // ValidateArchetypeID refuses a string that does not lex as exactly one
 // `ARCHETYPE_HRID` token, returning an error wrapping [ErrInvalidQuery].
 //
-// The containment predicate is the fourth verbatim position and the same defect
-// class: `Archetype: "openEHR-EHR-COMPOSITION.x.v1] CONTAINS OBSERVATION[…"`
-// emitted a whole extra CONTAINS term that re-parses cleanly. `archetypePredicate
-// : ARCHETYPE_HRID | PARAMETER` is one token per alternative, so the exact guard
-// is writable here exactly as it is for an identifier — use [ValidateValue] on a
-// [ParamValue] for the `$param` alternative.
+// The containment predicate is the fourth position the emitters splice
+// verbatim, with the same risk: unguarded,
+// `Archetype: "openEHR-EHR-COMPOSITION.x.v1] CONTAINS OBSERVATION[…"` would
+// emit a whole extra CONTAINS term that re-parses cleanly. `archetypePredicate
+// : ARCHETYPE_HRID | PARAMETER` is one token per alternative, so the exact
+// guard can be written here just as for an identifier. Use [ValidateValue] on
+// a [ParamValue] for the `$param` alternative.
 //
 // The shape is
 //
 //	(NAMESPACE '::')? ID '-' ID '-' ID '.' CONCEPT '.v' VERSION_ID
 //
-// Keyword shadowing does NOT apply inside it: the pieces are lexer FRAGMENTS,
+// Keyword shadowing does not apply inside it: the pieces are lexer fragments,
 // not the IDENTIFIER token, so the whole string lexes as one ARCHETYPE_HRID and
 // a segment spelled like a keyword is unremarkable.
 func ValidateArchetypeID(id string) error {

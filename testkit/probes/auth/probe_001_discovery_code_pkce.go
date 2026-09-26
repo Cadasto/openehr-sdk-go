@@ -12,14 +12,14 @@ import (
 )
 
 // Probe001DiscoveryCodePKCE implements PROBE-001: the SMART configuration
-// document MUST declare the "code" response type and the "S256" PKCE
-// challenge method (REQ-061). The probe serves the SMART configuration
+// document must declare the "code" response type and the "S256" PKCE
+// challenge method. The probe serves the SMART configuration
 // cassette from an in-process server, resolves it through the real
 // discovery.Resolver, and asserts both lists on the resolved
 // AuthEndpoints.
 //
 // `cassetteBody` is the SMART configuration JSON the upstream server
-// returns — typically the vendored
+// returns, typically the vendored
 // testkit/cassettes/its_rest/discovery/smart-configuration.json read by
 // the caller.
 //

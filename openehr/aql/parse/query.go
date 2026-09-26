@@ -72,12 +72,12 @@ type Query struct {
 }
 
 // LimitExpr is the sealed type of a LIMIT / OFFSET value. Concrete shapes
-// are [IntLimit] (integer literal) and [ParamLimit] (parameter-bound limit
-// — the AQL `LIMIT $n` form). Consumers dispatch via type assertion.
+// are [IntLimit] (integer literal) and [ParamLimit] (parameter-bound limit,
+// the AQL `LIMIT $n` form). Consumers dispatch via type assertion.
 //
-// The set grows ADDITIVELY (REQ-117), so a consumer type-switching over it
-// MUST treat an unrecognised case as out-of-catalogue — refuse, skip, or
-// report — and MUST NOT panic on it.
+// The set may grow, so a consumer type-switching over it must treat an
+// unrecognised case as out-of-catalogue (refuse, skip, or report) and must
+// not panic on it.
 type LimitExpr interface {
 	isLimitExpr()
 	// token is the canonical wire form: an integer literal for [IntLimit],
@@ -96,8 +96,8 @@ func (l IntLimit) token() string { return strconv.Itoa(l.N) }
 // ParamLimit is a parameter-bound LIMIT / OFFSET value (`LIMIT $n`).
 // Name carries the placeholder identifier WITHOUT the leading `$`.
 type ParamLimit struct {
-	// Name is the placeholder identifier WITHOUT the leading `$`, as in
-	// [aql.ParamValue.Name] — token re-attaches the dollar on the wire, so a
+	// Name is the placeholder identifier without the leading `$`, as in
+	// [aql.ParamValue.Name]. Emission re-attaches the dollar on the wire, so a
 	// name that carries one emits `$$n` and is refused rather than corrected.
 	Name string
 }
@@ -108,44 +108,43 @@ func (l ParamLimit) token() string { return "$" + l.Name }
 // SelectClause is the SELECT projection list.
 //
 // `Distinct` mirrors the `SELECT DISTINCT` keyword; `Star` is true when
-// the projection carries a `*` (SDK-AQL-002 relaxation). For the BARE
-// `SELECT *` form `Items` is empty — the flag alone carries the
+// the projection carries a `*` (SDK-AQL-002 relaxation). For the bare
+// `SELECT *` form `Items` is empty and the flag alone carries the
 // projection. Otherwise `Items` carries one entry per projected
 // expression in source order, including a [StarExpr] at the star's
 // position when a star is mixed with column projections
-// (`SELECT *, c/uid/value` — REQ-117).
+// (`SELECT *, c/uid/value`).
 type SelectClause struct {
 	Distinct bool
 	Star     bool
 	Items    []SelectItem
 
 	// Top is the row limit from a `SELECT TOP n [FORWARD|BACKWARD]` clause,
-	// nil when the source declared none — so `TOP 0` (a real bound) never
-	// collapses into "unbounded" (REQ-118).
+	// nil when the source declared none, so `TOP 0` (a real bound) never
+	// collapses into "unbounded".
 	//
-	// The clause is DEPRECATED upstream (openEHR QUERY Release-1.1.0
-	// § 4.4.3, in favour of `LIMIT` with `ORDER BY`) and is modelled so a
-	// consumer can read and re-emit a query it did not author; see
-	// [aql.TopClause].
+	// openEHR QUERY Release-1.1.0 § 4.4.3 deprecates the clause in favour of
+	// `LIMIT` with `ORDER BY`. It is modelled so a consumer can read and
+	// re-emit a query it did not author; see [aql.TopClause].
 	//
-	// Top and [Query.Limit] are reported INDEPENDENTLY, exactly as the
-	// source wrote them: § 4.4.3 forbids the combination, so the parser
-	// neither normalises one into the other nor picks a winner — the lint
-	// gate diagnoses it (`aql_top_with_limit`) and [aql.Builder] refuses to
+	// Top and [Query.Limit] are reported independently, exactly as the
+	// source wrote them: QUERY § 4.4.3 forbids the combination, so the parser
+	// neither normalises one into the other nor picks a winner. The linter
+	// diagnoses it (`aql_top_with_limit`) and [aql.Builder] refuses to
 	// construct it.
 	Top *aql.TopClause
 }
 
-// TopClause is the deprecated `SELECT TOP` row limit — re-exported from
-// [aql.TopClause], the shared SELECT-clause vocabulary (REQ-118).
+// TopClause is the deprecated `SELECT TOP` row limit, re-exported from
+// [aql.TopClause], the shared SELECT-clause vocabulary.
 type TopClause = aql.TopClause
 
-// TopDir is a [TopClause] direction — re-exported from [aql.TopDir]
-// (REQ-118). Use [aql.TopForward] / [aql.TopBackward].
+// TopDir is a [TopClause] direction, re-exported from [aql.TopDir].
+// Use [aql.TopForward] / [aql.TopBackward].
 type TopDir = aql.TopDir
 
 // SelectItem is one projected expression in a SELECT list. `Expr` is one
-// of the [SelectExpr] shapes — a [PathExpr] (a bare alias-qualified
+// of the [SelectExpr] shapes: a [PathExpr] (a bare alias-qualified
 // path), a [FunctionCall] (an aggregate or function wrapper), a
 // [LiteralExpr] (a primitive or parameter literal), or a [StarExpr].
 // `Alias` is the AS alias when the source used `<expr> AS <name>`; empty
@@ -159,11 +158,9 @@ type SelectItem struct {
 // shapes are [PathExpr], [FunctionCall], [LiteralExpr], and [StarExpr];
 // consumers dispatch via type assertion.
 //
-// The set grows ADDITIVELY as the catalogue closes further grammar
-// positions (REQ-117), so a consumer type-switching over it MUST treat
-// an unrecognised case as out-of-catalogue — refuse, skip, or report —
-// and MUST NOT panic on it. Adding a new shape lands here, in the
-// extractor, and in the emitter at the same time.
+// The set grows as the catalogue covers further grammar positions, so a
+// consumer type-switching over it must treat an unrecognised case as
+// out-of-catalogue (refuse, skip, or report) and must not panic on it.
 type SelectExpr interface {
 	isSelectExpr()
 }
@@ -176,21 +173,18 @@ type PathExpr struct {
 func (PathExpr) isSelectExpr() {}
 
 // LiteralExpr is a primitive or parameter literal projected from a
-// SELECT — `SELECT 1, e/ehr_id/value FROM …` — or supplied as a
+// SELECT (`SELECT 1, e/ehr_id/value FROM …`) or supplied as a
 // function-call argument (`CONCAT('a', $p, …)`). Value carries the
 // shared [aql.Value] vocabulary the WHERE side uses, so a consumer
-// reads a projected literal and a compared literal through one model
-// (REQ-117).
+// reads a projected literal and a compared literal through one model.
 //
-// Raw is the literal's SOURCE TEXT as written, which the openEHR result
+// Raw is the literal's source text as written, which the openEHR result
 // schema needs as the column name when a projection carries neither an
-// `AS` alias nor a path to fall back on (REQ-118). It is read-side
-// fidelity only:
+// `AS` alias nor a path to fall back on. It is read-side fidelity only:
 //
-//   - it is populated by [ParseQuery], and is EMPTY on a LiteralExpr a
-//     caller constructed, so it MUST NOT be treated as required;
-//   - emission renders Value in canonical form, never Raw — the canonical
-//     write form is normative (REQ-055).
+//   - it is populated by [ParseQuery], and is empty on a LiteralExpr a
+//     caller constructed, so it must not be treated as required;
+//   - emission renders Value in canonical form, never Raw.
 //
 // The two therefore differ whenever the source was not already canonical:
 // `1.50` yields Value `aql.RealValue{1.5}` with Raw `1.50`, and a
@@ -205,16 +199,15 @@ func (LiteralExpr) isSelectExpr() {}
 
 // StarExpr is an explicit `*` projection item. It appears in
 // [SelectClause.Items] only when the star is mixed with column
-// projections (`SELECT *, c/uid/value`), so the item list stays
-// order-preserving; the bare `SELECT *` form leaves Items empty and is
-// carried by [SelectClause.Star] alone (REQ-117). Star is true in both
-// cases.
+// projections (`SELECT *, c/uid/value`), so the item list keeps its
+// order; the bare `SELECT *` form leaves Items empty and is carried by
+// [SelectClause.Star] alone. Star is true in both cases.
 type StarExpr struct{}
 
 func (StarExpr) isSelectExpr() {}
 
 // FunctionCall is an aggregate or function wrapping one or more SELECT
-// operands — `COUNT(o)`, `MAX(o/data[at0001]/value/magnitude)`,
+// operands: `COUNT(o)`, `MAX(o/data[at0001]/value/magnitude)`,
 // `CONCAT(p/given_name, ' ', p/family_name)`, etc. `Name` is the
 // upper-cased function name as it appears in the source; `Args` is
 // the ordered operand list.
@@ -239,14 +232,13 @@ func (FunctionCall) isSelectExpr() {}
 // `EHR e[ehr_id/value=$x]`). `Contains` is the optional CONTAINS
 // expression rooted at the FROM root; nil when no CONTAINS appears.
 //
-// `Junction` carries a boolean junction AT the FROM root
-// (`FROM COMPOSITION c1 OR COMPOSITION c2`, incl. AND and grouping) —
-// the same [Containment] tree the nested side already uses (REQ-117).
-// It is nil for the ordinary single-root FROM, so `Root` keeps working
-// unchanged there. When Junction is non-nil the clause has NO single
-// root class, so `Root` and `Contains` are left ZERO: a consumer that
-// only reads `Root` sees an empty FROM (and its own validation refuses)
-// rather than a silently truncated one.
+// `Junction` carries a boolean junction at the FROM root
+// (`FROM COMPOSITION c1 OR COMPOSITION c2`, including AND and grouping),
+// using the same [Containment] tree the nested side uses. It is nil for
+// the ordinary single-root FROM, where `Root` applies. When Junction is
+// non-nil the clause has no single root class, so `Root` and `Contains`
+// are left zero: a consumer that only reads `Root` sees an empty FROM (and
+// its own validation refuses it) instead of a silently truncated one.
 type FromClause struct {
 	Root     ClassExpr
 	Contains *Containment
@@ -274,18 +266,18 @@ type Containment struct {
 	// value when the node is a pure boolean grouping (Children only).
 	Class ClassExpr
 
-	// Children's meaning depends on the node KIND. On a JUNCTION node (zero
-	// Class), they are the boolean operands joined by ChildJoin. On a CLASS
-	// node, they are the flattened CONTAINS chain below it, in order — each
+	// Children's meaning depends on the node kind. On a junction node (zero
+	// Class), they are the boolean operands joined by ChildJoin. On a class
+	// node, they are the flattened CONTAINS chain below it, in order: each
 	// child follows the previous with a CONTAINS keyword, so `[o, ev]` under
-	// `s` emits `s CONTAINS o CONTAINS ev`, NOT a junction. (Note the chain
-	// SHAPE is not stable under re-parse: the parser nests a linear chain as
-	// single children — `s→[o→[ev]]` — while emission flattens; the TEXT is
-	// identical either way, which is what Emit guarantees.)
+	// `s` emits `s CONTAINS o CONTAINS ev`, not a junction. The chain shape
+	// is not stable under re-parse: the parser nests a linear chain as single
+	// children (`s→[o→[ev]]`) while emission flattens. The text is identical
+	// either way, which is what Emit guarantees.
 	Children []Containment
 
 	// ChildJoin is the boolean combinator across a JUNCTION node's Children.
-	// Defaults to [ContainsAnd]. On a class node it must be zero — a join
+	// Defaults to [ContainsAnd]. On a class node it must be zero: a join
 	// there has no emittable spelling, and Emit refuses it.
 	ChildJoin ContainsJoin
 
@@ -339,54 +331,50 @@ func (d OrderDir) String() string {
 	return "ASC"
 }
 
-// Emit renders the structured [Query] back to canonical AQL text — the
+// Emit renders the structured [Query] back to canonical AQL text, the
 // round-trip mirror of [ParseQuery]. The WHERE predicate is rendered
 // via [aql.FormatWhere], the same renderer the construction-side
-// [aql.Builder] consumes — so a parsed-then-emitted predicate matches
-// a builder-built one byte-for-byte. SELECT / FROM / CONTAINS /
-// ORDER BY / LIMIT clauses are emitted by this package's helpers;
-// the canonical form across both entry points is pinned by PROBE-020
-// (Builder) and the round-trip suites here (parse).
+// [aql.Builder] uses, so a parsed-then-emitted predicate matches a
+// builder-built one byte-for-byte. SELECT / FROM / CONTAINS /
+// ORDER BY / LIMIT clauses are emitted by this package's helpers.
 //
-// Emit VERIFIES its own output before returning it (REQ-119, issue #103): the
-// text is re-parsed and compared against q on an encoding-independent skeleton,
-// so emitted AQL that does not parse, or that parses as a DIFFERENT query, is
-// refused rather than returned. This costs one extra parse per call and is the
-// one guard that reaches a token boundary depending on text no single position
-// contains — see [Query.verifyEmitted]. Note that text idempotence alone does
-// NOT imply it: a bracket that terminates early absorbs the text it swallowed
-// verbatim, so re-emitting reproduces the identical string.
+// Emit verifies its own output before returning it: the text is re-parsed
+// and compared against q on an encoding-independent skeleton, so emitted
+// AQL that does not parse, or that parses as a different query, is refused
+// instead of returned. This costs one extra parse per call and is the one
+// guard that catches a token boundary depending on text no single position
+// contains. Text idempotence alone does not imply it: a bracket that
+// terminates early absorbs the text it swallowed verbatim, so re-emitting
+// reproduces the identical string.
 //
 // Idempotence property: ParseQuery(Emit(q)).Emit() == q.Emit() for any
-// q produced by [ParseQuery] — since REQ-117 (and REQ-118, which added the
-// deprecated `SELECT TOP` carrier) the catalogue is the whole SDK grammar
+// q produced by [ParseQuery]. The catalogue covers the whole SDK grammar
 // profile (see [aql.ErrIncompleteAST] for the residual numeric-literal
-// refusal). A source shape the extractor cannot model
-// produces a PARTIAL Query — clauses that extracted cleanly are
-// populated, dropped clauses are left zero-value — plus an
-// [aql.ErrIncompleteAST] error from [ParseQuery]. Emit on a partial
-// AST refuses with the same error so a caller who ignored the parse
-// return cannot accidentally emit semantically wrong AQL.
+// refusal). A source shape the extractor cannot model produces a partial
+// Query (clauses that extracted cleanly are populated, dropped clauses are
+// left zero-value) plus an [aql.ErrIncompleteAST] error from [ParseQuery].
+// Emit on a partial AST refuses with the same error, so a caller who
+// ignored the parse error cannot accidentally emit semantically wrong AQL.
 //
-// Canonical form for the constructs REQ-117 added: function names
-// upper-cased, arguments joined by `, `, `TERMINOLOGY(a, b, c)` as a bare
-// MATCHES operand (no braces) and `{uri}` for the URI form, and
-// containment junctions parenthesised only where the grouping is
-// load-bearing (see [emitContainmentOperands]).
+// Canonical form for function calls, MATCHES operands and containment
+// junctions: function names upper-cased, arguments joined by `, `,
+// `TERMINOLOGY(a, b, c)` as a bare MATCHES operand (no braces) and `{uri}`
+// for the URI form, and containment junctions parenthesised only where the
+// grouping changes the meaning.
 //
 // Returns an error wrapping [aql.ErrInvalidQuery] when the AST carries
 // a malformed sub-expression (a nil WHERE comparison value, an empty
 // SELECT projection, an OFFSET without LIMIT, a duplicate alias …), or
-// [aql.ErrIncompleteAST] when the AST came from an extractor-
-// incomplete parse.
+// [aql.ErrIncompleteAST] when the AST came from an incomplete extraction.
 //
 // The verification step adds two more, both also wrapping
 // [aql.ErrInvalidQuery] so a caller's existing branch still catches them:
-// [aql.ErrSyntax] rides along when the emitted text does not re-parse (the
-// parser's own message is deliberately NOT wrapped — it echoes the offending
-// source text), and [aql.ErrIncompleteAST] rides along when the emitted text
-// re-parses into an AST the extractor cannot fully model. In both cases
-// [aql.ErrInvalidQuery] is the dominant sentinel: the emission was refused.
+// [aql.ErrSyntax] is added when the emitted text does not re-parse (the
+// parser's own message is deliberately not wrapped, because it echoes the
+// offending source text), and [aql.ErrIncompleteAST] is added when the
+// emitted text re-parses into an AST the extractor cannot fully model. In
+// both cases [aql.ErrInvalidQuery] is the dominant sentinel: the emission
+// was refused.
 func (q *Query) Emit() (string, error) {
 	if q == nil {
 		return "", fmt.Errorf("%w: nil query", aql.ErrInvalidQuery)

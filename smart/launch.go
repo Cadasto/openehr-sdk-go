@@ -12,7 +12,7 @@ import (
 )
 
 // ValidateConfig controls ID-token validation when building a
-// [LaunchContext] (REQ-064).
+// [LaunchContext].
 type ValidateConfig struct {
 	JWKS            *authsmart.JWKS
 	Issuer          string
@@ -21,7 +21,7 @@ type ValidateConfig struct {
 	PrincipalClaims PrincipalClaimNames
 	Now             time.Time
 	// AllowedIDTokenAlgs constrains the accepted id_token signature
-	// algorithms (REQ-062, REQ-064). Set it to the authorization server's
+	// algorithms. Set it to the authorization server's
 	// id_token_signing_alg_values_supported from discovery. When empty the
 	// SDK default set (RS256/RS384/ES256/ES384) applies.
 	AllowedIDTokenAlgs []string
@@ -30,7 +30,7 @@ type ValidateConfig struct {
 // ValidateOption mutates [ValidateConfig].
 type ValidateOption func(*ValidateConfig)
 
-// WithJWKS sets the JWKS used to validate id_token signatures (REQ-062).
+// WithJWKS sets the JWKS used to validate id_token signatures.
 func WithJWKS(jwks *authsmart.JWKS) ValidateOption {
 	return func(c *ValidateConfig) { c.JWKS = jwks }
 }
@@ -51,8 +51,8 @@ func WithExpectedNonce(nonce string) ValidateOption {
 }
 
 // WithIDTokenSigningAlgs constrains the id_token signature algorithms to the
-// authorization server's advertised id_token_signing_alg_values_supported
-// (REQ-062, REQ-064). When unset or empty the SDK default set applies
+// authorization server's advertised id_token_signing_alg_values_supported.
+// When unset or empty the SDK default set applies
 // (RS256/RS384/ES256/ES384).
 func WithIDTokenSigningAlgs(algs []string) ValidateOption {
 	return func(c *ValidateConfig) { c.AllowedIDTokenAlgs = algs }
@@ -69,7 +69,7 @@ func WithValidationTime(t time.Time) ValidateOption {
 }
 
 // LaunchContextFromTokenResponse maps a SMART token-endpoint payload into
-// a typed [LaunchContext] (REQ-064, REQ-067).
+// a typed [LaunchContext].
 func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenResponse, opts ...ValidateOption) (*LaunchContext, error) {
 	cfg := ValidateConfig{}
 	for _, o := range opts {

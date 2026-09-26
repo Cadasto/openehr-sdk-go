@@ -5,9 +5,9 @@ import (
 )
 
 // QuantityValue is the runtime value shape accepted by
-// [DvQuantity.Validate] and [CDvOrdinal.Validate]. Construct directly
-// — the constraints package keeps it minimal so callers needn't
-// import the rm package to validate a single value.
+// [DvQuantity.Validate] and [CDvOrdinal.Validate]. Construct it directly.
+// It is kept minimal so callers need not import the rm package to
+// validate a single value.
 type QuantityValue struct {
 	Magnitude float64
 	Units     string
@@ -26,10 +26,10 @@ type QuantityUnit struct {
 
 // DvQuantity constrains an RM DV_QUANTITY value (C_DV_QUANTITY).
 // Units enumerates the allowed (units, range) combinations; the
-// value MUST match one of them on units and lie inside that entry's
+// value must match one of them on units and lie inside that entry's
 // magnitude range. Property is the optional terminology binding for
-// the measured quantity (e.g. "blood pressure"); v1 surfaces it for
-// inspection but does not enforce it during Validate.
+// the measured quantity (e.g. "blood pressure"); it is exposed for
+// inspection but Validate does not enforce it.
 type DvQuantity struct {
 	Units    []QuantityUnit
 	Property *CodedTermRef
@@ -37,11 +37,11 @@ type DvQuantity struct {
 
 func (DvQuantity) isPrimitive() {}
 
-// ExampleValue returns a minimal-valid [QuantityValue]. REQ-107.
-// First entry of Units drives the example: magnitude derived from the
-// entry's range (lower bound when set; midpoint or zero otherwise),
-// units copied verbatim. Falls back to QuantityValue{0, "1"} when the
-// constraint is open-ended (any units / any magnitude).
+// ExampleValue returns a minimal-valid [QuantityValue].
+// The first entry of Units drives the example: the magnitude comes from
+// the entry's range (lower bound when set; midpoint or zero otherwise)
+// and the units are copied verbatim. It falls back to QuantityValue{0, "1"}
+// when the constraint is open-ended (any units / any magnitude).
 func (c DvQuantity) ExampleValue() any {
 	if len(c.Units) == 0 {
 		return QuantityValue{Magnitude: 0, Units: "1", Precision: -1}
@@ -80,7 +80,7 @@ func exampleMagnitude(r NumericRange) float64 {
 
 // Validate accepts a [QuantityValue]. Anything else returns
 // CodeWrongType. When Units is empty the constraint accepts any
-// units / magnitude — the OPT may have omitted a list to mark the
+// units / magnitude: the OPT may have omitted a list to mark the
 // node "DV_QUANTITY without further constraint".
 func (c DvQuantity) Validate(value any) []Violation {
 	q, ok := value.(QuantityValue)
@@ -133,7 +133,7 @@ type OrdinalSymbol struct {
 
 // CDvOrdinal constrains an RM DV_ORDINAL value (C_DV_ORDINAL). The
 // constraint enumerates a closed list of (value, symbol) pairs; an
-// incoming ordinal value MUST match one of them.
+// incoming ordinal value must match one of them.
 type CDvOrdinal struct {
 	Values []OrdinalSymbol
 }
@@ -141,8 +141,8 @@ type CDvOrdinal struct {
 func (CDvOrdinal) isPrimitive() {}
 
 // ExampleValue returns the first ordinal value when the constraint
-// enumerates a closed list; 0 otherwise. REQ-107. Validate accepts
-// int (the ordinal value), which matches the example shape — pair
+// enumerates a closed list; 0 otherwise. Validate accepts
+// int (the ordinal value), which matches the example shape; pair
 // matching against OrdinalSymbol is the caller's choice.
 func (c CDvOrdinal) ExampleValue() any {
 	if len(c.Values) > 0 {
@@ -153,7 +153,7 @@ func (c CDvOrdinal) ExampleValue() any {
 
 // Validate accepts either an int (the ordinal value) or a full
 // [OrdinalSymbol] (value + symbol). For [OrdinalSymbol] inputs both
-// the value AND the symbol MUST match an entry in Values.
+// the value and the symbol must match an entry in Values.
 func (c CDvOrdinal) Validate(value any) []Violation {
 	switch v := value.(type) {
 	case int:

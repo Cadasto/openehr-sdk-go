@@ -79,21 +79,21 @@ const (
 type Probe089Case struct {
 	// Name identifies the case in reports and sub-tests.
 	Name string
-	// Rows names the REQ-140 grammar-table rows this fixture covers, so a
-	// reader can check the table against the fixture set.
+	// Rows names the rows of the FLAT underscore-attribute grammar table this
+	// fixture covers, so a reader can check the table against the fixture set.
 	Rows []string
-	// Keys is the fixture's own key set — the assertion surface. It is merged
+	// Keys is the fixture's own key set, the assertion surface. It is merged
 	// with the shared scaffolding (see [Probe089Case.Body]) to make one
-	// complete, decodable FLAT body, and every key in it MUST survive all four
+	// complete, decodable FLAT body, and every key in it must survive all four
 	// legs.
 	Keys map[string]any
 }
 
 // Body is the complete FLAT payload: the minimal decodable scaffolding every
-// fixture shares — the mandatory `ctx/` context plus the OBSERVATION's own
-// in-context leaves — merged with the fixture's own keys. The scaffolding
-// carries no clinical leaf value deliberately: `_null_flavour` has to stand
-// beside an **absent** one.
+// fixture shares (the mandatory `ctx/` context plus the OBSERVATION's own
+// in-context leaves) merged with the fixture's own keys. The scaffolding
+// deliberately carries no clinical leaf value: `_null_flavour` has to stand
+// beside an absent one.
 func (c Probe089Case) Body() map[string]any {
 	body := map[string]any{
 		"ctx/language":  "en",
@@ -115,7 +115,8 @@ func (c Probe089Case) Body() map[string]any {
 	return body
 }
 
-// Probe089Inputs is one fixture per row of the REQ-140 grammar table, including
+// Probe089Inputs is one fixture per row of the FLAT underscore-attribute
+// grammar table, including
 // the recursive shapes (`_feeder_audit/…/provider/_identifier:N`,
 // `dv_multimedia/_thumbnail`) and `_null_flavour` beside an absent bare value.
 // Values are copied from the pinned corpus bodies wherever the corpus writes
@@ -438,24 +439,26 @@ var Probe089Inputs = []Probe089Case{
 	},
 }
 
-// Probe089Refusal is one deliberately-refused key set: REQ-140's boundary,
-// asserted as a typed error naming the key rather than as a census tally.
+// Probe089Refusal is one deliberately refused key set at the boundary of the
+// underscore-attribute grammar, asserted as a typed error naming the key
+// instead of as a census tally.
 type Probe089Refusal struct {
 	// Name identifies the case in reports and sub-tests.
 	Name string
-	// Keys are added to a decodable body; the decode MUST fail.
+	// Keys are added to a decodable body; the decode must fail.
 	Keys map[string]any
-	// Want is the sentinel the error MUST match under errors.Is.
+	// Want is the sentinel the error must match under errors.Is.
 	Want error
-	// Names are substrings the message MUST carry — the offending FLAT key, so
-	// the PROBE-086 census can scope the exclusion to it, plus the citation
-	// that says *why* it is refused where a boundary decision owns it.
+	// Names are substrings the message must carry: the offending FLAT key, so
+	// the [Probe086UpstreamFlatParity] census can scope the exclusion to it, plus
+	// the citation that says why it is refused where a boundary decision owns
+	// it.
 	Names []string
 }
 
-// Probe089Refusals are REQ-140's deliberate exclusions. Each one MUST fail on
-// decode: a decode-and-drop would satisfy no assertion here, which is the
-// point — these are the shapes a permissive codec loses silently.
+// Probe089Refusals are the grammar's deliberate exclusions. Each one must fail
+// on decode, so a decode-and-drop satisfies no assertion here: these are the
+// shapes a permissive codec loses silently.
 var Probe089Refusals = []Probe089Refusal{
 	{
 		// ADR 0015: no `ctx/` short form can carry the composer's external_ref,
@@ -521,9 +524,9 @@ var Probe089Refusals = []Probe089Refusal{
 }
 
 // NewProbe089Target compiles and exports the corpus OPT once, for reuse across
-// every fixture in a run. It is the same vendored template PROBE-086 measures,
-// which is what makes the census movement and this probe two views of one
-// landing.
+// every fixture in a run. It is the same vendored template
+// [Probe086UpstreamFlatParity] measures, so that census and this probe observe
+// the same template.
 func NewProbe089Target() (*conformance.Target, error) {
 	return conformance.NewTarget()
 }
@@ -535,7 +538,7 @@ func NewProbe089Target() (*conformance.Target, error) {
 // a non-nil error, so a harness can tell "could not run" from "the codec is
 // wrong". There is no "skip": every fixture here is authored against a
 // vendored template this SDK builds, so an unmodelled shape is a failure.
-func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Result, error) {
+func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Result, error) { // PROBE-089 (REQ-053, REQ-080, REQ-140)
 	r := Result{Probe: "PROBE-089"}
 	if target == nil || target.Web == nil {
 		return r, errors.New("PROBE-089: nil target")
@@ -654,10 +657,10 @@ func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Re
 }
 
 // Probe089RefusedFamilies runs leg (c) for one deliberate refusal: the body
-// MUST fail to decode, with the sentinel the boundary declares and a message
+// must fail to decode, with the sentinel the boundary declares and a message
 // naming the offending key. A successful decode is a failure however faithful
-// the rest of the body is — that is the decode-and-drop this REQ forbids.
-func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (Result, error) {
+// the rest of the body is, because that is the forbidden decode-and-drop.
+func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (Result, error) { // PROBE-089 (REQ-053, REQ-080, REQ-140)
 	r := Result{Probe: "PROBE-089"}
 	if target == nil || target.Web == nil {
 		return r, errors.New("PROBE-089: nil target")

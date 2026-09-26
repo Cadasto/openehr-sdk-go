@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-// StaticConfig is the input to NewStaticCatalog — a hand-built catalog
-// for non-discovering openEHR backends.
+// StaticConfig is the input to NewStaticCatalog, a hand-built catalog
+// for openEHR backends that do not publish a discovery document.
 type StaticConfig struct {
 	Issuer   string
 	Services map[string]ServiceEntry
@@ -22,8 +22,8 @@ type StaticConfig struct {
 
 // NewStaticCatalog builds a ServiceCatalog without a network round
 // trip. Used for static EHRbase deployments, local development, and
-// tests. Validates that every Services entry has a parseable BaseURL —
-// callers SHOULD pre-parse URLs when possible.
+// tests. It validates that every Services entry has a parseable BaseURL;
+// callers should pre-parse URLs when possible.
 //
 // Hand-built catalogs are exempt from spec-version validation at
 // construction (callers are presumed to know what they configured);

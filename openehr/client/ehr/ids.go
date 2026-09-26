@@ -10,7 +10,7 @@ import (
 // EHRID identifies an EHR root. Distinct type from the openEHR
 // HierObjectID it wraps so call sites cannot accidentally mix it with
 // VersionedObjectID / VersionUID. The string form is the UID value
-// (typically a UUID) — not the full HierObjectID JSON envelope.
+// (typically a UUID), not the full HierObjectID JSON envelope.
 type EHRID string
 
 // String returns the EHRID as a plain string for URL-path composition.
@@ -33,11 +33,11 @@ type VersionUID string
 func (v VersionUID) String() string { return string(v) }
 
 // VersionedObjectID returns the versioned-object family this VersionUID
-// belongs to — the object_id segment of the underlying ObjectVersionID.
+// belongs to: the object_id segment of the underlying ObjectVersionID.
 // Empty when the VersionUID is not a well-formed object_version_id.
 //
 // Delegates to the canonical parser [rm.ParseObjectVersionID] so the
-// "::"-splitting lexical logic has a single home (REQ-120).
+// "::"-splitting lexical logic has a single home.
 func (v VersionUID) VersionedObjectID() VersionedObjectID {
 	ovID, err := rm.ParseObjectVersionID(string(v))
 	if err != nil {
@@ -48,7 +48,7 @@ func (v VersionUID) VersionedObjectID() VersionedObjectID {
 
 // CreatingSystemID returns the creating-system segment of the
 // VersionUID. Empty when the VersionUID is not a well-formed
-// object_version_id. Delegates to [rm.ParseObjectVersionID] (REQ-120).
+// object_version_id. Delegates to [rm.ParseObjectVersionID].
 func (v VersionUID) CreatingSystemID() string {
 	ovID, err := rm.ParseObjectVersionID(string(v))
 	if err != nil {
@@ -59,7 +59,7 @@ func (v VersionUID) CreatingSystemID() string {
 
 // VersionNumber returns the version-tree segment of the VersionUID.
 // Empty when the VersionUID is not a well-formed object_version_id.
-// Delegates to [rm.ParseObjectVersionID] (REQ-120).
+// Delegates to [rm.ParseObjectVersionID].
 func (v VersionUID) VersionNumber() string {
 	ovID, err := rm.ParseObjectVersionID(string(v))
 	if err != nil {

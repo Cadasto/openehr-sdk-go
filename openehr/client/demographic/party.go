@@ -65,7 +65,7 @@ func basePath(t Type) string { return "/demographic/" + string(t) }
 // [ehr.LatestAtTime](voID, t) for the as-of-time variant, or
 // [ehr.VersionOf](uid) for a specific version. The returned value is the
 // concrete type ([*rm.Person] etc.) behind the [rm.Party] interface, decoded
-// polymorphically by its `_type` discriminator (REQ-040).
+// polymorphically by its `_type` discriminator.
 //
 // Wire: GET /demographic/{type}/{uid_based_id} [?version_at_time=...]. A 204
 // (no version at the requested time) yields a nil Party and nil error; any
@@ -102,20 +102,20 @@ type writeConfig struct {
 // WriteOption mutates the request shape for [Create] and [Update].
 type WriteOption func(*writeConfig)
 
-// WithPrefer overrides the response-shape preference (REQ-094). The default
-// is [transport.PreferMinimal] per the spec's write-path rule.
+// WithPrefer overrides the response-shape preference. The default
+// is [transport.PreferMinimal].
 func WithPrefer(p transport.Prefer) WriteOption {
 	return func(c *writeConfig) { c.Prefer = p }
 }
 
 // WithAuditDetails attaches the commit-time audit envelope via the
-// `openehr-audit-details` header (REQ-059). Nil omits the header.
+// `openehr-audit-details` header. Nil omits the header.
 func WithAuditDetails(a *rm.AuditDetails) WriteOption {
 	return func(c *writeConfig) { c.AuditDetails = a }
 }
 
 // WithLifecycleState sets the committed VERSION's lifecycle_state via the
-// `openehr-version` header (REQ-059). Empty omits the header; an
+// `openehr-version` header. Empty omits the header; an
 // unrecognised code fails the write with [transport.ErrInvalidConfig].
 func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
 	return func(c *writeConfig) { c.LifecycleState = s }
@@ -125,7 +125,7 @@ func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
 // concrete type ([*rm.Person] → /demographic/person, etc.).
 //
 // Wire: POST /demographic/{type}. The response shape follows the Prefer
-// option (REQ-094): minimal (default) returns no body — the new version's id
+// option: minimal (default) returns no body, the new version's id
 // is in the Location / ETag headers and the returned Party is nil;
 // representation returns the created PARTY body; identifier returns the
 // ITS-REST Identifier body, resolved into the metadata VersionUID.
@@ -175,10 +175,10 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 }
 
 // Update modifies the PARTY family identified by voID, attaching `ifMatch` as
-// the required If-Match header (REQ-054) — the preceding version's id,
-// typically the prior [openehrclient.VersionMetadata.VersionUID] / ETag.
+// the required If-Match header: the preceding version's id, typically the
+// prior [openehrclient.VersionMetadata.VersionUID] / ETag.
 //
-// Wire: PUT /demographic/{type}/{voID} with If-Match. Errors per REQ-093:
+// Wire: PUT /demographic/{type}/{voID} with If-Match. Errors:
 // 412 → [transport.ErrPreconditionFailed]. Status→sentinel mapping is
 // endpoint-agnostic, so a 409 (should the deployment emit one) still maps to
 // [transport.ErrVersionConflict]. Forgetting ifMatch returns
@@ -239,13 +239,13 @@ type deleteConfig struct {
 type DeleteOption func(*deleteConfig)
 
 // WithDeleteAudit attaches the commit-time audit envelope as the
-// `openehr-audit-details` header on a logical delete (REQ-059). Nil omits it.
+// `openehr-audit-details` header on a logical delete. Nil omits it.
 func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 	return func(c *deleteConfig) { c.auditDetails = a }
 }
 
 // Delete logically deletes the PARTY version addressed by versionUID,
-// attaching the preceding version's id as If-Match (REQ-054). The server
+// attaching the preceding version's id as If-Match. The server
 // responds 204 No Content on success. Forgetting ifMatch returns
 // [transport.ErrInvalidConfig] without issuing a request.
 //
@@ -326,14 +326,15 @@ func decodeParty(body []byte) (rm.Party, error) {
 	return party, nil
 }
 
-// Repository mirrors the package-level functions for DI seams (REQ-023).
+// Repository mirrors the package-level functions as a dependency-injection
+// seam.
 type Repository interface {
 	Get(ctx context.Context, t Type, ref openehrclient.Ref) (rm.Party, *openehrclient.VersionMetadata, error)
 	Create(ctx context.Context, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error)
 	Update(ctx context.Context, t Type, voID openehrclient.VersionedObjectID, ifMatch string, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error)
 	Delete(ctx context.Context, t Type, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
 
-	// Versioned-resource reads (Phase 2).
+	// Versioned-resource reads.
 	GetVersionedParty(ctx context.Context, voUID openehrclient.VersionedObjectID) (*rm.VersionedParty, *openehrclient.VersionMetadata, error)
 	GetRevisionHistory(ctx context.Context, voUID openehrclient.VersionedObjectID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error)
 	GetVersion(ctx context.Context, voUID openehrclient.VersionedObjectID) (*PartyVersion, *openehrclient.VersionMetadata, error)

@@ -7,8 +7,8 @@ import (
 
 // Path is a parsed openEHR path. The zero value renders as "/" and
 // resolves to the template root when passed to
-// [OperationalTemplate.NodeAt]. A Path is decoupled from any
-// particular template — the same Path can be applied to multiple
+// [OperationalTemplate.NodeAt]. A Path is not bound to any
+// particular template; the same Path can be applied to multiple
 // OperationalTemplates. Construct non-root paths via
 // [OperationalTemplate.ParsePath].
 type Path struct {
@@ -43,8 +43,8 @@ func (p Path) String() string {
 // IsRoot reports whether the path points to the template root.
 func (p Path) IsRoot() bool { return len(p.segments) == 0 }
 
-// ParsePath parses an openEHR path string against the grammar subset
-// REQ-100 § Path syntax defines. Accepts:
+// ParsePath parses an openEHR path string against the supported
+// path grammar. It accepts:
 //
 //   - Absolute paths starting with '/'
 //   - Segments naming RM attributes ("/content", "/data/events")
@@ -55,7 +55,7 @@ func (p Path) IsRoot() bool { return len(p.segments) == 0 }
 // empty segments, multi-predicate constructs, AQL projection syntax
 // (predicates with name= / @ / quoted values).
 //
-// ParsePath validates grammar only — it does not check that segment
+// ParsePath validates grammar only; it does not check that segment
 // names or predicates resolve against any OPT. The template receiver
 // is retained for API symmetry with NodeAt; the grammar itself is
 // template-independent. For tree-aware validation use
@@ -147,9 +147,9 @@ type resolveOpts struct {
 // WithStrictPaths enables strict-mode path resolution: a
 // predicate-less segment that matches an attribute with multiple
 // candidate children returns ErrAmbiguousPath instead of silently
-// picking the first child (REQ-100's documented default). Use this
-// in validators and code generators that must surface ambiguity to
-// the caller rather than guess.
+// picking the first child (the default). Use this in validators and
+// code generators that must surface ambiguity to the caller rather
+// than guess.
 func WithStrictPaths() ResolveOption {
 	return func(o *resolveOpts) { o.strictPaths = true }
 }
@@ -187,10 +187,10 @@ func (t *OperationalTemplate) NodeAt(p Path, opts ...ResolveOption) (Node, error
 	return walkPath(t.root, p.segments, &o, 0)
 }
 
-// ValidatePath reports whether p resolves against the OPT — a
-// composed shorthand for [OperationalTemplate.NodeAt] that discards
-// the resolved node. Returns the same sentinels as NodeAt
-// (ErrPathNotFound; ErrAmbiguousPath when strict). Convenience for
+// ValidatePath reports whether p resolves against the OPT. It is a
+// shorthand for [OperationalTemplate.NodeAt] that discards
+// the resolved node and returns the same sentinels as NodeAt
+// (ErrPathNotFound; ErrAmbiguousPath when strict). Use it for
 // code-generator preconditions and call-site assertions that do not
 // need the resolved node.
 func (t *OperationalTemplate) ValidatePath(p Path, opts ...ResolveOption) error {

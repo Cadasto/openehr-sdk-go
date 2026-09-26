@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Canonical XML namespaces — pinned per docs/specifications/wire.md § Canonical XML.
+// Canonical XML namespaces.
 const (
 	// NSDefault is the openEHR canonical-XML default namespace.
 	NSDefault = "http://schemas.openehr.org/v1"
@@ -36,8 +36,8 @@ func XSINamespaceDecl() xml.Attr {
 
 // BMMNamer is implemented by every concrete generated RM type. It
 // returns the BMM class name used as the `xsi:type` value at
-// polymorphic boundaries — the same identifier the type registry
-// uses (REQ-040).
+// polymorphic boundaries, the same identifier the type registry
+// uses.
 //
 // Generated code asserts this interface inline at polymorphic
 // emission sites; consumers rarely call it directly.
@@ -46,8 +46,8 @@ type BMMNamer interface {
 }
 
 // BMMNameOf extracts the BMM class discriminator from a value.
-// Returns ("", false) when the value does not implement [BMMNamer]
-// — i.e. it is not a generated RM type. Used by the encoder at
+// It returns ("", false) when the value does not implement [BMMNamer],
+// i.e. it is not a generated RM type. The encoder uses it at
 // polymorphic boundaries to construct the `xsi:type` attribute.
 func BMMNameOf(v any) (string, bool) {
 	if v == nil {
@@ -60,15 +60,15 @@ func BMMNameOf(v any) (string, bool) {
 	return n.BMMName(), true
 }
 
-// Marshal returns the canonical XML encoding of v. v MUST be a
+// Marshal returns the canonical XML encoding of v. v must be a
 // pointer to a generated RM type that implements [xml.Marshaler]
 // (every concrete RM class generated under openehr/rm/ does so).
 //
 // Output is compact (no insignificant whitespace) so byte-equality
 // tests are stable. Use [MarshalIndent] for human inspection only;
-// indented output is NOT a round-trip-stable form.
+// indented output is not a round-trip-stable form.
 //
-// At the root, the encoder does not emit `xsi:type` — the caller
+// At the root, the encoder does not emit `xsi:type`, because the caller
 // already knows the concrete type. Polymorphic descendants carry
 // `xsi:type` at every concrete value boundary inside the document.
 func Marshal(v any) ([]byte, error) {
@@ -92,7 +92,7 @@ func Marshal(v any) ([]byte, error) {
 }
 
 // MarshalIndent is like [Marshal] but applies prefix and indent to
-// each element. Use for human inspection only — byte-stability tests
+// each element. Use it for human inspection only; byte-stability tests
 // compare against compact [Marshal] output.
 func MarshalIndent(v any, prefix, indent string) ([]byte, error) {
 	if v == nil {
@@ -144,23 +144,23 @@ func rootStartElement(v any) xml.StartElement {
 // ElementName converts a BMM class or property name to its canonical
 // XML element local name. BMM class names are upper-snake_case
 // (DV_QUANTITY); property names are already lower-snake_case
-// (magnitude_status). Both lower-case verbatim — the snake_case
-// shape is identical to canjson JSON keys per docs/specifications/wire.md.
+// (magnitude_status). Both are lower-cased verbatim, so the snake_case
+// shape is identical to canjson JSON keys.
 func ElementName(bmmName string) string {
 	return strings.ToLower(bmmName)
 }
 
 // EncodePoly writes one polymorphic child element to e. The element
 // is wrapped under local name `name`, with `xsi:type="<BMMName>"`
-// as its FIRST attribute, then v's [xml.Marshaler] body. v MUST
+// as its first attribute, then v's [xml.Marshaler] body. v must
 // implement both [BMMNamer] (every concrete generated RM type does)
 // and [xml.Marshaler].
 //
 // Generator-emitted MarshalXML methods call this at every
 // polymorphic field boundary; consumers rarely need it. Nil values
-// are emitted as ABSENT (no element written). A nil-interface that
+// are emitted as absent (no element written). A nil-interface that
 // boxes a typed-nil pointer (`var p *T = nil; var i I = p`) is also
-// treated as ABSENT.
+// treated as absent.
 func EncodePoly(e *xml.Encoder, name string, v any) error {
 	if isNilValue(v) {
 		return nil

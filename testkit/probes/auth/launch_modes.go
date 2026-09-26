@@ -19,8 +19,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
 
-// LaunchModeStandalone proves the SMART standalone launch mode (REQ-068):
-// the SDK initiates the launch by building an authorization URL with NO
+// LaunchModeStandalone proves the SMART standalone launch mode:
+// the SDK initiates the launch by building an authorization URL with no
 // EHR-side `launch` parameter, while still carrying response_type=code and
 // the PKCE challenge.
 func LaunchModeStandalone(_ context.Context) (Result, error) { // REQ-068
@@ -50,8 +50,8 @@ func LaunchModeStandalone(_ context.Context) (Result, error) { // REQ-068
 	return r, nil
 }
 
-// LaunchModeEmbedded proves the SMART embedded (EHR) launch mode
-// (REQ-068): an EHR-supplied `launch` parameter is forwarded verbatim to
+// LaunchModeEmbedded proves the SMART embedded (EHR) launch mode:
+// an EHR-supplied `launch` parameter is forwarded verbatim to
 // the authorization endpoint.
 func LaunchModeEmbedded(_ context.Context) (Result, error) { // REQ-068
 	r := Result{Probe: "LAUNCH-embedded"}
@@ -105,15 +105,15 @@ func authorizeURLForLaunch(launch string) (*url.URL, error) {
 	return url.Parse(raw)
 }
 
-// LaunchModeBackend proves the SMART backend-service launch mode
-// (REQ-068): no user interaction, no launch context. It exercises three
+// LaunchModeBackend proves the SMART backend-service launch mode:
+// no user interaction, no launch context. It exercises three
 // confidential backend flows and asserts the token request each produces
 // on the wire:
 //
 //   - client_credentials + client_secret (symmetric, HTTP Basic)
 //   - client_credentials + private_key_jwt (asymmetric, SMART Backend
-//     Services — signed client_assertion, no Basic, no client_secret)
-//   - JWT Bearer grant (RFC 7523 — the JWT is the authorization grant)
+//     Services: signed client_assertion, no Basic, no client_secret)
+//   - JWT Bearer grant (RFC 7523: the JWT is the authorization grant)
 func LaunchModeBackend(ctx context.Context) (Result, error) { // REQ-068
 	r := Result{Probe: "LAUNCH-backend"}
 

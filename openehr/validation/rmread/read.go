@@ -4,23 +4,22 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
 // ReadSingle returns the RM value at `attrName` on `parent`.
 // The second (named-blank) parameter is the OPT-declared RM
-// class name; v1 dispatch is purely on the Go concrete type of
+// class name. Dispatch is purely on the Go concrete type of
 // `parent`, but the parameter is retained so callers boxing an
-// RM value through an interface (e.g. a future `any`-typed
-// builder harness) can pass through the compiled RM type
-// without re-flattening — the contract stays open for a future
-// dispatch table that wants the string key.
+// RM value through an interface can pass through the compiled RM
+// type without re-flattening, and so a future dispatch table can
+// key on the string.
 //
 // `ok` is false when the attribute is absent (nil pointer, nil
-// interface, typed-nil pointer behind an interface — see
-// [IsTypedNilPointer] — structurally-empty CodePhrase / DVText /
+// interface, typed-nil pointer behind an interface (see
+// [IsTypedNilPointer]), structurally-empty CodePhrase / DVText /
 // DVCodedText, empty string for the locatable archetype_node_id /
 // name primary channels). Pointer attrs with non-nil but zero-value
-// report `ok=true` — the structural walker uses pointer presence
+// report `ok=true`: the structural walker uses pointer presence
 // as the absent/present signal.
 //
 // Returns `(nil, false)` for unknown (parent, attrName) pairs;
-// callers SHOULD treat that as "not addressable" rather than an
+// callers should treat that as "not addressable" rather than an
 // error.
 func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	switch p := parent.(type) {
@@ -300,18 +299,19 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 }
 
 // Handles reports whether rmread models parent's RM type for attribute
-// reading — i.e. whether [ReadSingle] / [ReadMultiple] dispatch to a typed
+// reading, i.e. whether [ReadSingle] / [ReadMultiple] dispatch to a typed
 // reader rather than falling through to (nil, false). A BMM-driven walker
-// (e.g. the REQ-112 RM-floor validator) uses this to avoid descending into
-// or required-checking the attributes of a type rmread does not model
-// (OBJECT_REF, PARTICIPATION, LINK, …): those are opaque leaves here and
-// must be validated by their own evaluators, not by reading their members
-// (which would all read back as absent and fabricate `required`).
+// (e.g. the RM-floor validator, validation.ValidateRM) uses this to avoid
+// descending into or required-checking the attributes of a type rmread
+// does not model (OBJECT_REF, PARTICIPATION, LINK, …): those are opaque
+// leaves here and must be validated by their own evaluators, not by
+// reading their members (which would all read back as absent and
+// fabricate `required`).
 //
-// MUST track the type set of ReadSingle/ReadMultiple above. A type added
-// there but omitted here is treated as a leaf — its RM-mandatory attributes
-// go unchecked (a missed check, never a false positive), so erring toward
-// omission is the safe failure mode.
+// Handles tracks the type set of ReadSingle/ReadMultiple. A type added
+// there but omitted here is treated as a leaf: its RM-mandatory
+// attributes go unchecked (a missed check, never a false positive), so
+// erring toward omission is the safe failure mode.
 func Handles(parent any) bool {
 	switch parent.(type) {
 	case *rm.Composition, rm.Composition,
@@ -378,7 +378,7 @@ func Handles(parent any) bool {
 // element boxed as `any`. `ok` is true when the parent type
 // carries the attribute (the returned slice may still be empty);
 // it is false for unknown (parentType, attrName) pairs. Callers
-// distinguish "absent" from "empty" via `len(items) == 0` — the
+// distinguish "absent" from "empty" via `len(items) == 0`; the
 // cardinality check at the call site needs both signals.
 func ReadMultiple(parent any, _ /* parentType */, attrName string) ([]any, bool) {
 	switch p := parent.(type) {
@@ -1423,15 +1423,9 @@ func ifacePresent(v any) (any, bool) {
 // a typed-nil pointer (e.g. Element.Value = (*rm.DVQuantity)(nil)).
 // Bare nil interfaces and value-typed structs return false.
 //
-// Delegates to the generated rm.IsTypedNil (ADR 0013), which covers
-// every registered RM concrete. The previous hand-written switch was
-// deliberately narrow (only types pointer-stored behind an RM
-// interface); the generated predicate is a strict superset — the
-// additional types either never occur as typed-nils behind the
-// interfaces this package descends, or, where they can (e.g. a
-// typed-nil root handed to the validator), were latent panics that
-// now report correctly. Exported so openehr/validation's rmTypeInfo
-// shares the same guard. REQ-024 compliant — no reflection.
+// It delegates to the generated rm.IsTypedNil, which covers every
+// registered RM concrete type and uses no reflection. It is exported
+// so openehr/validation shares the same guard.
 func IsTypedNilPointer(v any) bool {
 	return rm.IsTypedNil(v)
 }

@@ -24,7 +24,7 @@ type polyInterface struct {
 
 // RenderJSONHooksFile renders <pkg>/jsonhooks_gen.go: one json.UnmarshalFromFunc
 // per polymorphic interface owned by the target, registered into the typereg
-// aggregate at init (ADR 0022, ruling R6). Every nested decode threads the
+// aggregate at init. Every nested decode threads the
 // aggregate through [typereg.Unmarshalers], so a polymorphic slot resolves from
 // any entry point, including a bare encoding/json/v2 Unmarshal with no options.
 //
@@ -50,7 +50,7 @@ func RenderJSONHooksFile(plan *Plan) ([]byte, error) {
 	b.WriteString("// package into the shared typereg aggregate. Each hook resolves the\n")
 	b.WriteString("// concrete type from `_type` through typereg.DecodePolymorphic; a narrow\n")
 	b.WriteString("// interface falls back to its parent concrete type when the wire omits\n")
-	b.WriteString("// the discriminator (REQ-052, wire.md:147).\n")
+	b.WriteString("// the discriminator.\n")
 	b.WriteString("func init() {\n")
 	for _, pi := range ifaces {
 		fmt.Fprintf(&b, "\ttypereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *%s) error {\n", pi.GoName)

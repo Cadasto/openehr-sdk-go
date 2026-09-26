@@ -1,13 +1,13 @@
 // Example: decode canonical-JSON Composition bytes with canjson,
-// compile vital_signs.opt, and validate (REQ-052 + REQ-102). Shows the
+// compile vital_signs.opt, and validate. Shows the
 // wire-bytes → RM → validation path without HTTP.
 //
 // Default fixture testdata/minimal_blood_pressure.json is a
-// single–blood-pressure composition that validates cleanly against
+// single blood-pressure composition that validates cleanly against
 // vital_signs.opt (generated via gen_fixture.go). The vendored
 // testkit/cassettes/compositions/vital_signs.json cassette does
-// not validate cleanly against that OPT (demo data / constraint
-// mismatches) — use -cassette to see that outcome.
+// not validate cleanly against that OPT (demo data and constraint
+// mismatches); use -cassette to see that outcome.
 //
 // Run:
 //

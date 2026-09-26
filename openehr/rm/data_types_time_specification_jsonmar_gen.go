@@ -15,16 +15,16 @@ import (
 // rawDVGeneralTimeSpecification is the method-free canonical-JSON alias for DVGeneralTimeSpecification. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawDVGeneralTimeSpecification DVGeneralTimeSpecification
 
 // MarshalJSONTo emits canonical openEHR JSON for DVGeneralTimeSpecification with `_type`
 // (value "DV_GENERAL_TIME_SPECIFICATION") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (d DVGeneralTimeSpecification) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -35,16 +35,16 @@ func (d DVGeneralTimeSpecification) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawDVPeriodicTimeSpecification is the method-free canonical-JSON alias for DVPeriodicTimeSpecification. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawDVPeriodicTimeSpecification DVPeriodicTimeSpecification
 
 // MarshalJSONTo emits canonical openEHR JSON for DVPeriodicTimeSpecification with `_type`
 // (value "DV_PERIODIC_TIME_SPECIFICATION") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (d DVPeriodicTimeSpecification) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`

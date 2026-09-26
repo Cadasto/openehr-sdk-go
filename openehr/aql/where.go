@@ -9,19 +9,18 @@ import (
 // WhereExpr is a boolean expression in a WHERE clause. The interface is sealed;
 // construct expressions with the comparison helpers ([Eq], [Ne], [Gt], [Ge],
 // [Lt], [Le]) and combine them with [And] / [Or]. Parsed queries populate the
-// same concrete types ([Comparison] / [Junction]) — the read AST and the
-// write AST share one vocabulary (REQ-113). Concrete-type
-// fields are intended for read access; mutating an expression already
-// passed to [FormatWhere] / [Builder.Build] is undefined (both validate and
-// then emit as two steps, so a mutation between them emits unvalidated text).
+// same concrete types ([Comparison] / [Junction]), so the read AST and the
+// write AST share one vocabulary. Concrete-type fields are intended for read
+// access; mutating an expression already passed to [FormatWhere] /
+// [Builder.Build] is undefined (both validate and then emit as two steps, so
+// a mutation between them emits unvalidated text).
 //
 // Use [FormatWhere] to render a [WhereExpr] to canonical AQL text (e.g.
 // when emitting a parsed [parse.Query] back to a string).
 //
-// The set grows ADDITIVELY as the structured-AST catalogue closes further
-// grammar positions (REQ-117), so a consumer type-switching over it MUST
-// treat an unrecognised case as out-of-catalogue — refuse, skip, or
-// report — and MUST NOT panic on it.
+// The set grows as the structured-AST catalogue covers further grammar
+// positions, so a consumer type-switching over it must treat an unrecognised
+// case as out-of-catalogue (refuse, skip, or report) and must not panic on it.
 type WhereExpr interface {
 	// expr is the canonical wire form of the predicate.
 	expr() string
@@ -34,16 +33,14 @@ type WhereExpr interface {
 // FormatWhere renders a [WhereExpr] to canonical AQL text. It validates
 // the expression first; a malformed predicate (empty path, nil value,
 // …) returns an error wrapping [ErrInvalidQuery]. A nil expression
-// returns "" with no error (a vacuously-true WHERE — the builder skips
+// returns "" with no error (a vacuously true WHERE; the builder skips
 // the clause in that case), and so does a typed-nil pointer shape such as
-// `(*Comparison)(nil)`: at the TOP level both denote a clause the caller does
+// `(*Comparison)(nil)`: at the top level both denote a clause the caller does
 // not have. Inside a [NotExpr] or a [Junction] the same absence is refused
-// instead — see [DerefWhere] (REQ-119, "absence is positional").
+// instead, because there it would change the meaning; see [DerefWhere].
 //
-// This is the public read-side mirror of the internal expr() method:
-// consumers of a parsed [parse.Query] use FormatWhere to round-trip
-// the WHERE predicate back to AQL without depending on package-local
-// internals.
+// Consumers of a parsed [parse.Query] use FormatWhere to round-trip the WHERE
+// predicate back to AQL without depending on package internals.
 func FormatWhere(w WhereExpr) (string, error) {
 	pred, ok := derefWhere(w)
 	if !ok {
@@ -61,21 +58,20 @@ func FormatWhere(w WhereExpr) (string, error) {
 }
 
 // DerefWhere normalises a [WhereExpr] to the predicate it denotes, reporting
-// false when it denotes none — an untyped nil, or a nil pointer. It is the
+// false when it denotes none (an untyped nil, or a nil pointer). It is the
 // [DerefValue] of the predicate vocabulary.
 //
 // The value-receiver problem is the same one: expr and validate have value
 // receivers, so `*Comparison` satisfies WhereExpr alongside `Comparison`, and a
 // bare type switch that lists only the value shapes silently misses every
-// pointer twin. Any code deciding behaviour from a WhereExpr's concrete type —
-// including the read-side `w.(aql.Comparison)` idiom [Comparison] describes —
-// MUST normalise first, or the same rule will bind one carrier and not the
-// other (REQ-119).
+// pointer twin. Any code deciding behaviour from a WhereExpr's concrete type,
+// including the read-side `w.(aql.Comparison)` idiom [Comparison] describes,
+// must normalise first, or a rule will apply to one form and not the other.
 //
-// Both consequences have bitten this package: calling a value-receiver method
-// on a typed-nil crashes a public boundary, and deciding [Junction]
-// parenthesisation from the raw interface emitted a nested OR without its
-// parentheses — valid AQL asking something else.
+// Skipping the normalisation has two consequences: calling a value-receiver
+// method on a typed nil panics, and deciding [Junction] parenthesisation from
+// the raw interface can emit a nested OR without its parentheses, which is
+// valid AQL asking something else.
 func DerefWhere(w WhereExpr) (WhereExpr, bool) { return derefWhere(w) }
 
 // derefWhere is [derefValue] for the WHERE vocabulary: same exhaustive
@@ -117,17 +113,16 @@ func derefWhere(w WhereExpr) (WhereExpr, bool) {
 // emission the Builder uses internally). Mirrors [FormatWhere] for the value
 // side of the vocabulary.
 //
-// UNLIKE [FormatWhere], it does NOT validate: it has no error to return, so it
+// Unlike [FormatWhere], it does not validate: it has no error to return, so it
 // cannot refuse, and a value the grammar has no spelling for renders as its Go
-// text (`+Inf`, `NaN`) or as a call the parser rejects. It is therefore the
-// deliberate escape hatch for a value the caller has already checked, and is
-// excluded from REQ-119's round-trip closure guarantee for that reason. Call
-// [ValidateValue] first if the value did not come from a validated source.
+// text (`+Inf`, `NaN`) or as a call the parser rejects. It is the escape
+// hatch for a value the caller has already checked, and its output is not
+// guaranteed to re-parse. Call [ValidateValue] first if the value did not
+// come from a validated source.
 //
-// It does not PANIC, though: a value with no wire form at all — a nil, or a
-// typed-nil pointer shape such as the zero [MatchesExpr.Terminology] — returns
-// "". Refusing one is [ValidateValue]'s job, and an unvalidated formatter that
-// panics is a worse escape hatch than one that renders nothing.
+// It does not panic, though: a value with no wire form at all (a nil, or a
+// typed-nil pointer shape such as the zero [MatchesExpr.Terminology]) returns
+// "". Refusing one is [ValidateValue]'s job.
 func FormatValue(v Value) string {
 	inner, ok := derefValue(v)
 	if !ok {
@@ -175,7 +170,7 @@ func (o Operator) known() bool {
 // parser populate; consumers reading a parsed query type-assert
 // `w.(aql.Comparison)` and read the fields directly. That bare assert is safe
 // for a query [parse.ParseQuery] produced, which only ever populates the value
-// shapes; code that also handles hand-assembled predicates MUST route through
+// shapes; code that also handles hand-assembled predicates must route through
 // [DerefWhere] first, since `*Comparison` satisfies [WhereExpr] too.
 //
 // Path is the alias-qualified RM path as it appears in the AQL text (e.g.
@@ -186,20 +181,19 @@ func (o Operator) known() bool {
 //
 // ParsedPath is the structured form of Path (alias + segments), populated
 // by the parser on the read side so a consumer reads alias/segments without
-// re-splitting the raw string (REQ-113); it is nil on the write side
-// (the construction helpers set only Path) and MAY be nil on the read side
-// for a path shape the parser does not structure. When non-nil,
-// ParsedPath.Raw equals Path (both derive from the same source path).
-// Emission uses Path, not ParsedPath, so round-trip is unaffected by its
-// presence or absence.
+// re-splitting the raw string. It is nil on the write side (the construction
+// helpers set only Path) and may be nil on the read side for a path shape
+// the parser does not structure. When non-nil, ParsedPath.Raw equals Path
+// (both derive from the same source path). Emission uses Path, not
+// ParsedPath, so round-trip is unaffected by its presence or absence.
 //
-// Left carries the left operand when it is NOT a plain path — the
-// grammar's `functionCall COMPARISON_OPERATOR terminal` alternative
+// Left carries the left operand when it is not a plain path: the grammar's
+// `functionCall COMPARISON_OPERATOR terminal` alternative
 // (`LENGTH(o/name/value) > 5`, `TERMINOLOGY('a','b','c') = 'x'`), modelled
-// as a [FuncCall] (REQ-117). It is nil for the ordinary path form, where
-// Path carries the left operand; when Left is non-nil it is authoritative
-// for emission and Path is empty (the parser leaves it so). Construct this
-// form with [Compare].
+// as a [FuncCall]. It is nil for the ordinary path form, where Path carries
+// the left operand; when Left is non-nil it is authoritative for emission and
+// Path is empty (the parser leaves it so). Construct this form with
+// [Compare].
 type Comparison struct {
 	Path       string
 	Op         Operator
@@ -280,9 +274,9 @@ func Lt(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpLt
 // Le is `path <= value`.
 func Le(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpLe, Val: v} }
 
-// Compare is `<left> <op> <right>` where the LEFT operand is a structured
-// [Value] rather than a path — the write-side mirror of the parser's
-// function-call comparison LHS (REQ-117), e.g.
+// Compare is `<left> <op> <right>` where the left operand is a structured
+// [Value] instead of a path, the write-side mirror of the parser's
+// function-call comparison left-hand side, e.g.
 // Compare(Func("LENGTH", Path("o/name/value")), OpGt, Int(5)) emits
 // `LENGTH(o/name/value) > 5`. Use [Eq] / [Ne] / [Gt] / [Ge] / [Lt] / [Le]
 // for the ordinary path form.
@@ -291,8 +285,7 @@ func Compare(left Value, op Operator, right Value) WhereExpr {
 }
 
 // BoolOp is a boolean junction operator (AND or OR) joining terms in a
-// [Junction]. NOT is a single-operand prefix; see [Not] (when introduced
-// by the parser-side AST extension).
+// [Junction]. NOT is a single-operand prefix; see [Not].
 type BoolOp string
 
 const (
@@ -393,8 +386,8 @@ func (j Junction) validate() error {
 }
 
 // And joins predicates with AND. nil terms are dropped; a single surviving term
-// is returned unchanged; no terms yields nil (a vacuously-true conjunction —
-// the builder emits no WHERE rather than invalid AQL).
+// is returned unchanged; no terms yields nil (a vacuously true conjunction;
+// the builder emits no WHERE instead of invalid AQL).
 func And(terms ...WhereExpr) WhereExpr { return junctionOf(OpAnd, terms) }
 
 // Or joins predicates with OR, with the same nil/empty handling as [And].
@@ -420,10 +413,9 @@ func junctionOf(op BoolOp, terms []WhereExpr) WhereExpr {
 // NotExpr is a single-operand boolean negation (`NOT <operand>`). Parsed
 // queries populate this when the source carries an explicit NOT prefix.
 // The Builder composes NOT predicates via the package-level [Not] helper
-// passed into [Builder.Where] — mirroring how [And] / [Or] / [Eq] are
-// also package-level helpers rather than Builder methods. No dedicated
-// Builder.Not method exists by design; predicate composition is intended
-// to flow through the helper functions.
+// passed into [Builder.Where], just as [And] / [Or] / [Eq] are
+// package-level helpers and not Builder methods. There is no Builder.Not
+// method; predicates are composed through the helper functions.
 type NotExpr struct {
 	Operand WhereExpr
 }
@@ -485,22 +477,21 @@ func (e ExistsExpr) validate() error {
 func Exists(path string) WhereExpr { return ExistsExpr{Path: path} }
 
 // MatchesExpr is the `<path> MATCHES <operand>` AQL predicate. The
-// grammar admits three operand forms and exactly ONE of the fields below
+// grammar admits three operand forms and exactly one of the fields below
 // carries the operand:
 //
-//   - Values — the braced value list (`{'active', 'archived'}`). The grammar
+//   - Values: the braced value list (`{'active', 'archived'}`). The grammar
 //     is `valueListItem : primitive | PARAMETER | terminologyFunction`, which
-//     is NARROWER than the general value position: a [PathValue] and any
+//     is narrower than the general value position: a [PathValue] and any
 //     [FuncCall] other than `TERMINOLOGY` have no spelling here and are
-//     refused (REQ-119).
-//   - Terminology — a BARE `TERMINOLOGY('op','api','params')` operand,
-//     with no braces (REQ-117); construct with [MatchesTerminology]. The
-//     grammar's third alternative is `terminologyFunction`, so no other call
-//     is admitted, whatever the field's [FuncCall] type would allow.
-//   - URI — a braced URI operand (`{uri://…}`), carried verbatim
-//     (REQ-117); construct with [MatchesURI]. A whitespace-only URI counts as
-//     ABSENT — for both validation and emission — so it never shadows a
-//     populated Values list.
+//     refused.
+//   - Terminology: a bare `TERMINOLOGY('op','api','params')` operand, with no
+//     braces; construct with [MatchesTerminology]. The grammar's third
+//     alternative is `terminologyFunction`, so no other call is admitted,
+//     whatever the field's [FuncCall] type would allow.
+//   - URI: a braced URI operand (`{uri://…}`), carried verbatim; construct
+//     with [MatchesURI]. A whitespace-only URI counts as absent, for both
+//     validation and emission, so it never shadows a populated Values list.
 type MatchesExpr struct {
 	Path        string
 	Values      []Value
@@ -924,8 +915,8 @@ func Matches(path string, values ...Value) WhereExpr {
 }
 
 // MatchesTerminology constructs the `<path> MATCHES
-// TERMINOLOGY(operation, api, params)` predicate — the bare
-// terminology-function operand form (REQ-117).
+// TERMINOLOGY(operation, api, params)` predicate, the bare
+// terminology-function operand form.
 func MatchesTerminology(path, operation, api, params string) WhereExpr {
 	// Constructed directly rather than asserting Terminology()'s result back
 	// to its concrete shape — the one raw type assertion left in this package
@@ -936,9 +927,9 @@ func MatchesTerminology(path, operation, api, params string) WhereExpr {
 	}}
 }
 
-// MatchesURI constructs the `<path> MATCHES {uri}` predicate — the URI
-// operand form (REQ-117). The URI is emitted verbatim inside the braces
-// (the grammar's URI token is unquoted).
+// MatchesURI constructs the `<path> MATCHES {uri}` predicate, the URI
+// operand form. The URI is emitted verbatim inside the braces (the grammar's
+// URI token is unquoted).
 func MatchesURI(path, uri string) WhereExpr {
 	return MatchesExpr{Path: path, URI: strings.TrimSpace(uri)}
 }

@@ -10,12 +10,12 @@ import (
 )
 
 // Probe020CanonicalQuery is the canonical form of the PROBE-020 reference
-// query, pinned here as a LITERAL rather than read from the golden file.
-// Canonicalisation is a semver contract (wire.md § REQ-055): the REQ-117
-// builder additions MUST leave a program that uses none of them emitting the
-// same bytes, so PROBE-088 compares the committed golden against this constant
-// as well as against a fresh build. Editing both the file and this constant is
-// then the explicit, reviewable act a canonical-form change ought to be.
+// query, pinned here as a literal instead of being read from the golden file.
+// Canonicalisation is a semver contract: the later builder additions must
+// leave a program that uses none of them emitting the same bytes, so PROBE-088
+// compares the committed golden against this constant as well as against a
+// fresh build. A canonical-form change then means editing both the file and
+// this constant, an explicit and reviewable act.
 const Probe020CanonicalQuery = "SELECT o FROM EHR e CONTAINS COMPOSITION c " +
 	"CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] " +
 	"WHERE e/ehr_id/value = $ehr_id"
@@ -392,7 +392,7 @@ var probe088Refusals = []struct {
 // Probe088Constructs returns the construct names PROBE-088 asserts, in
 // assertion order, so a caller can read the matching
 // openehr/aql/testdata/wire/<name>.aql goldens without restating the list.
-func Probe088Constructs() []string {
+func Probe088Constructs() []string { // PROBE-088 (REQ-117, REQ-118, REQ-163)
 	out := make([]string, 0, len(probe088Constructs))
 	for _, c := range probe088Constructs {
 		out = append(out, c.name)
@@ -401,28 +401,28 @@ func Probe088Constructs() []string {
 }
 
 // Probe088BuilderContainmentAndPaging asserts the canonical-string stability
-// of the builder constructs REQ-117 adds, plus the REQ-118 `SELECT TOP` clause
-// and REQ-163's three write-side carriers (REQ-055's PROBE-020 property
-// extended, PROBE-088):
+// of the later builder constructs (containment algebra and paging), plus the
+// `SELECT TOP` clause and the three write-side carriers. It extends the
+// PROBE-020 property (PROBE-088):
 //
 //   - each construct in [Probe088Constructs] emits its committed golden
 //     byte-for-byte;
 //   - the struct-builder and the verb-functions agree on a containment-algebra
-//     query, as they must for the pre-REQ-117 surface;
-//   - probe020Golden — the committed PROBE-020 golden — still equals
+//     query, as they must for the original builder surface;
+//   - probe020Golden, the committed PROBE-020 golden, still equals
 //     [Probe020CanonicalQuery], and the unchanged builder path still
-//     reproduces it: REQ-117 and REQ-163 are both semver-minor, so a program
-//     using none of the new API MUST emit the same bytes as before;
+//     reproduces it: the additions are semver-minor, so a program using none
+//     of the new API must emit the same bytes as before;
 //   - requesting both paging channels, or an in-text OFFSET without a LIMIT,
-//     is a build-time error rather than a silent emission — and so is a
-//     projection whose emitted SELECT does not read back as what the builder
-//     recorded, or a standing predicate on a node whose bracket is the other
-//     grammar production (REQ-163).
+//     is a build-time error instead of a silent emission. So is a projection
+//     whose emitted SELECT does not read back as what the builder recorded,
+//     or a standing predicate on a node whose bracket is the other grammar
+//     production.
 //
 // goldens maps construct name to committed canonical form; the caller reads
 // the files (probes take no filesystem dependency). Sandbox-only: no
-// transport, no network (REQ-013 building block).
-func Probe088BuilderContainmentAndPaging(goldens map[string]string, probe020Golden string) (Result, error) {
+// transport, no network.
+func Probe088BuilderContainmentAndPaging(goldens map[string]string, probe020Golden string) (Result, error) { // PROBE-088 (REQ-117, REQ-118, REQ-163)
 	r := Result{Probe: "PROBE-088"}
 	if len(goldens) == 0 {
 		return r, errors.New("PROBE-088: goldens required, one per Probe088Constructs entry")

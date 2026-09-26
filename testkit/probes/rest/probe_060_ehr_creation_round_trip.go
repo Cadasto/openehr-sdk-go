@@ -16,27 +16,27 @@ import (
 )
 
 // Probe060EHRCreationRoundTrip implements PROBE-060: `POST /ehr` with an initial
-// EHR_STATUS body names the created EHR — through both the decoded body and the
-// `Location` header — and a follow-up GET of the EHR_STATUS returns the status
-// that was committed (REQ-095).
+// EHR_STATUS body names the created EHR (through both the decoded body and the
+// `Location` header), and a follow-up GET of the EHR_STATUS returns the status
+// that was committed.
 //
 // The create is server-assigned (no client id), so the SDK must recover the id
-// from the response — a create that names nothing leaves the caller unable to
+// from the response: a create that names nothing leaves the caller unable to
 // read the EHR it just made. status carries a distinctive archetype_node_id and
 // queryable/modifiable flags so the read-back is checked for identity, not mere
 // presence, and the submitted body is decoded back out of the captured request
 // so a create that dropped or rewrote the initial status is caught at the
-// source rather than only in the read-back.
+// source instead of only in the read-back.
 //
 // Both routes are asserted exactly: the create must land on `/ehr` and the
 // read-back on `/ehr/{ehr_id}/ehr_status` for the id the create returned, so a
 // read-back aimed at some other EHR cannot pass by returning a matching status.
 //
 // The probe does not assert the numeric status code (201): [openehrclient.Create]
-// does not surface it — the leaf returns the decoded EHR and the version
+// does not surface it: the leaf returns the decoded EHR and the version
 // metadata, and the code itself never reaches the caller. Asserting it here
-// would mean asserting against the fixture rather than against the SDK.
-func Probe060EHRCreationRoundTrip(ctx context.Context, c *transport.Client, captured func() []*http.Request, status *rm.EHRStatus) (Result, error) {
+// would mean asserting against the fixture instead of against the SDK.
+func Probe060EHRCreationRoundTrip(ctx context.Context, c *transport.Client, captured func() []*http.Request, status *rm.EHRStatus) (Result, error) { // PROBE-060 (REQ-095)
 	r := Result{Probe: "PROBE-060"}
 	if c == nil || status == nil {
 		return r, errors.New("PROBE-060: nil transport.Client or status")

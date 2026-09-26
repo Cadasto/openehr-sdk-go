@@ -19,24 +19,22 @@ var ErrInvalidConfig = errors.New("query: invalid configuration")
 //	if e, ok := errors.AsType[*query.AQLError](err); ok { … }
 //
 // A nil *AQLError answers as the zero AQLError on every exported method rather
-// than panicking (REQ-025 § No panics). The older errors.As out-parameter form
+// than panicking. The older errors.As out-parameter form
 //
 //	var e *query.AQLError
 //	if errors.As(err, &e) { … }
 //
 // leaves that variable nil when the match fails, and passing it onward as an
-// error boxes a typed nil in a non-nil interface — so errors.Is would call Is
-// on a nil receiver. That is caller-constructible input reachable through the
-// documented API, not a programmer error. See orZero.
+// error boxes a typed nil in a non-nil interface, so errors.Is would call Is
+// on a nil receiver. The nil-receiver handling makes that case safe.
 type AQLError struct {
 	Message string
 	// Code is the backend's own error code from the openEHR error envelope,
-	// carried through verbatim — it is NOT the SDK's classification, and the
+	// carried through verbatim. It is not the SDK's classification, and the
 	// two can disagree: a 501 whose envelope happens to carry a path-shaped
 	// code is still a capability gap, never a path resolution failure. Dispatch
 	// with errors.Is against [aql.ErrPathResolution] / [aql.ErrEngineCapability]
-	// rather than on this string; the taxonomy is normative in
-	// docs/specifications/wire.md § AQL executor.
+	// rather than on this string.
 	Code  string
 	Inner error
 	// pathResolution marks a backend error classified as an AQL path
@@ -64,7 +62,7 @@ func (e *AQLError) orZero() *AQLError {
 // Is reports whether the error matches target. A path-resolution AQLError
 // matches [aql.ErrPathResolution] and a capability gap matches
 // [aql.ErrEngineCapability], so callers can branch without inspecting
-// CDR-specific codes. The two classes are disjoint (REQ-055). A nil receiver
+// CDR-specific codes. The two classes are disjoint. A nil receiver
 // matches nothing.
 func (e *AQLError) Is(target error) bool {
 	e = e.orZero()

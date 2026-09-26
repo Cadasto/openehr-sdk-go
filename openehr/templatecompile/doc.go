@@ -1,16 +1,14 @@
-// Package templatecompile is the public bridge that turns a parsed ADL
-// 1.4 operational template into the compiled form consumed by the
-// composition builder, the RM instance synthesiser, the validator, and
-// the AQL static lint — REQ-111.
+// Package templatecompile turns a parsed ADL 1.4 operational template into
+// the compiled form consumed by the composition builder, the RM instance
+// synthesiser, the validator, and the AQL static lint.
 //
-// It exists because those entry points
+// Those entry points
 // ([github.com/cadasto/openehr-sdk-go/openehr/composition.NewBuilder],
 // [github.com/cadasto/openehr-sdk-go/openehr/instance.Generate],
 // [github.com/cadasto/openehr-sdk-go/openehr/validation.Validate] and
-// siblings) take a compiled template that, before REQ-111, was only
-// constructable from inside this module (it lived in an internal/
-// package). This package re-exports the constructor so a different
-// module can drive the whole pipeline from a public API:
+// siblings) take a compiled template. The compile engine lives in an
+// internal package, so this package exposes its constructor and lets any
+// module drive the whole pipeline from a public API:
 //
 //	opt, _ := template.ParseFile("encounter.opt")   // openehr/template
 //	c, _ := templatecompile.Compile(opt)            // this package
@@ -22,35 +20,34 @@
 //
 // # Public surface
 //
-// The committed surface is [Compile], the [Compiled] handle, its
+// The public surface is [Compile], the [Compiled] handle, its
 // introspection tree ([CompiledNode] / [CompiledAttribute]), the
 // functional [Option]s, and the [ErrInvalidInput] / [ErrPathNotFound]
 // sentinels. All three types are aliases of the engine's compiled form,
 // so values returned by [Compile] are accepted as-is by the consuming
-// packages with no conversion, and the tree is fully navigable by
-// downstream code (form generation, path discovery, custom mapping —
-// walk [Compiled.Root] / [Compiled.NodeAt] → [CompiledNode.Attributes]
-// → [CompiledAttribute.Children]).
+// packages with no conversion. Downstream code (form generation, path
+// discovery, custom mapping) can walk the whole tree:
+// [Compiled.Root] / [Compiled.NodeAt] → [CompiledNode.Attributes]
+// → [CompiledAttribute.Children].
 //
-// Pre-1.0, the one area expected to change is multi-language term
-// resolution: [CompiledNode.Term]'s lang parameter is accepted for
-// forward compatibility, and for the single-document-language OPTs of v1
+// Before 1.0, the one area expected to change is multi-language term
+// resolution. [CompiledNode.Term] accepts a lang parameter for forward
+// compatibility, but OPTs currently carry a single document language and
 // every lang resolves to the document-language term. Multi-language
-// selection (and document-language fallback) is the pre-1.0 change
-// (REQ-105).
+// selection, with document-language fallback, is planned before 1.0.
 //
 // # Why not openehr/template
 //
-// The natural home would be openehr/template (next to [template.ParseFile]),
-// but two constraints rule it out and ADR 0010 records the decision:
+// Compile does not live in openehr/template (next to [template.ParseFile])
+// for two reasons:
 //   - the compile engine imports openehr/template, so hosting Compile there
 //     would create an import cycle; and
-//   - REQ-100 mandates openehr/template stay stdlib-only, whereas
-//     compilation needs openehr/rm/rminfo for implicit-attribute injection.
+//   - openehr/template stays stdlib-only, whereas compilation needs
+//     openehr/rm/rminfo for implicit-attribute injection.
 //
-// # REQ-013 building-block independence
+// # Dependencies
 //
 // This package imports openehr/template and openehr/rm/rminfo only (plus
-// the internal compile engine). It does NOT import transport/, auth/,
+// the internal compile engine). It does not import transport/, auth/,
 // openehr/client/*, or openehr/serialize/.
 package templatecompile

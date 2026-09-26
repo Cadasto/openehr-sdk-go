@@ -35,15 +35,15 @@ import (
 // stack. The deepest legitimate RM nesting is far below this bound.
 const maxWalkDepth = 256
 
-// ValidateRM validates root against the openEHR Reference Model alone
-// (REQ-112). It checks every RM-mandatory attribute on every node
+// ValidateRM validates root against the openEHR Reference Model alone.
+// It checks every RM-mandatory attribute on every node
 // reachable from root, and runs per-RM-type invariants on the leaves it
-// touches. It does NOT consult any operational template — use
+// touches. It does not consult any operational template; use
 // [Validate] / [ValidateComposition] / [ValidateFolder] / [ValidateEHRStatus]
 // / [ValidateDemographic] when a compiled OPT is available.
 //
 // A nil root surfaces a single `nil_root` issue and is reported as
-// not-OK. An unknown RM root type (a Go value outside the v2 closed RM
+// not-OK. An unknown RM root type (a Go value outside the closed RM
 // set) surfaces `rm_type_unknown` at "/"; the floor cannot descend
 // further but does not panic.
 func ValidateRM(root any) Result {
@@ -84,7 +84,7 @@ func ValidateRMFolder(folder *rm.Folder) Result {
 // It cannot flag an omitted value-typed mandatory `subject` (typed
 // rm.PartySelf, whose zero value is indistinguishable from an absent one):
 // use [ValidateRMEHRStatusBytes], which decides subject presence from the
-// source JSON key set (REQ-112).
+// source JSON key set.
 func ValidateRMEHRStatus(status *rm.EHRStatus) Result {
 	if status == nil {
 		return resultFromIssues([]Issue{{Path: "/", Code: "nil_ehr_status", Detail: "ValidateRMEHRStatus: status is nil", Severity: Error}})

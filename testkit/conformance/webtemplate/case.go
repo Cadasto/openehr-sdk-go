@@ -1,29 +1,29 @@
 // Package webtemplate runs the PROBE-086 upstream FLAT serialisation
 // conformance harness: for each body in the pinned EHRbase FLAT corpus,
-// decode it through the REQ-053 codec and re-encode it, then compare the
+// decode it through the SDK's FLAT codec and re-encode it, then compare the
 // result against the upstream-authored original.
 //
-// The distinct value over PROBE-076 is the input. PROBE-076 round-trips the
-// SDK's *own* FLAT output, so it cannot catch a path this SDK never emits, a
-// suffix it names differently, or a leaf it drops symmetrically. Here the
-// input is FLAT this SDK did not write.
+// What this adds over the FLAT round-trip probe is the input. That probe
+// round-trips the SDK's own FLAT output, so it cannot catch a path this SDK
+// never emits, a suffix it names differently, or a leaf it drops
+// symmetrically. Here the input is FLAT this SDK did not write.
 //
 // # What is asserted
 //
-// The corpus exercises a great deal the REQ-053 codec does not model yet, so
-// a whole-body comparison would be all noise. Instead [Run] establishes the
-// **modelled subset** and asserts on that:
+// The corpus exercises a great deal the FLAT codec does not model yet, so a
+// whole-body comparison would be all noise. Instead [Run] establishes the
+// modelled subset and asserts on that:
 //
-//  1. Decode the upstream body. Where the codec refuses a key — it fails
-//     loudly, never silently drops — record the refusal and its reason, remove
-//     exactly what that refusal covers (see [dropRefused]: one suffix, one
-//     leaf, or a whole subtree, depending on the shape), and retry. The
-//     resulting [Report.Excluded] count is the unmodelled surface, *derived
-//     from the codec's own errors* rather than from a hand-kept table that
-//     would rot as gaps close.
+//  1. Decode the upstream body. The codec refuses a key it does not model
+//     with an error and never drops it silently. Record the refusal and its
+//     reason, remove exactly what that refusal covers (see [dropRefused]: one
+//     suffix, one leaf, or a whole subtree, depending on the shape), and
+//     retry. The resulting [Report.Excluded] count is the unmodelled surface,
+//     derived from the codec's own errors instead of from a hand-kept table
+//     that would go stale as gaps close.
 //  2. Re-encode what decoded, and compare against the surviving upstream
 //     keys. Inside that subset a missing key, an extra key, or a changed
-//     value is a **failure**, not a skip — there is no tolerated-drop list.
+//     value is a failure. There is no list of tolerated drops.
 //
 // The tests pin both halves: the excluded count per fixture (so the
 // unmodelled surface can shrink deliberately but never grow unnoticed) and
@@ -132,42 +132,38 @@ var contextMetaLeaves = map[string]bool{
 // IsCompositionMeta reports whether key is composition-level metadata rather
 // than archetyped content, for the given Web Template root id.
 //
-// The match is **suffix-aware**: `language` and `territory` hold out every
-// suffix ([metaLeaves]), the composer holds out only the exact spellings the
-// codec respells ([metaSpellings]). A key is metadata because of what the codec
-// does with that spelling, not because of which leaf it sits on.
+// The match is suffix-aware: `language` and `territory` hold out every
+// suffix ([metaLeaves]), while the composer holds out only the exact spellings
+// the codec respells ([metaSpellings]). A key counts as metadata because of
+// what the codec does with that spelling, whatever leaf it sits on.
 //
-// This is the one place the comparison holds a key out on *both* sides, and
-// every hold-out is the same kind of thing — a respelling; the waiver class is
-// empty and TestHoldOutMatchesCodecAliases fails if one reappears:
+// This is the one place the comparison holds a key out on both sides, and
+// every hold-out is a respelling. There are no waivers, and
+// TestHoldOutMatchesCodecAliases fails if one reappears:
 //
 //   - `language|*`, `territory|*`, `composer|name`, `composer_self`,
-//     `context/start_time` and `context/setting|*` are **respellings**. Upstream
+//     `context/start_time` and `context/setting|*` are respellings. Upstream
 //     writes them as real paths under the template root (`<root>/language|code`,
-//     `<root>/context/setting|code`); REQ-053 reads and writes the `ctx/` short
-//     forms (`ctx/language`, `ctx/setting|code` + `|value`) — the same
-//     information on a different surface, a documented codec deviation rather
-//     than lost data. Comparing across the two spellings would report every such
-//     key as both missing and extra, which is noise, not signal.
-//     `context/setting` joined this class on 2026-08-05 (the amended REQ-053):
-//     until `ctx/setting` emission landed it was the suite's one documented
-//     **waiver** — the real path decoded and then re-encoded to nothing — and
-//     ADR 0015 had deliberately left that emission gap open.
-//   - `composer|id`, `|id_scheme` and `|id_namespace` are **not** held out, and
-//     that is the point of the suffix-awareness. They are the PARTY_PROXY
-//     `external_ref`, which the `ctx/` short forms structurally cannot carry, so
-//     ADR 0015 refuses them on decode. They flow through to the codec, are
-//     refused there, and are counted as an excluded PARTY_PROXY family — real
-//     data loss, visible in the census, rather than absorbed by a base match.
+//     `<root>/context/setting|code`); the FLAT codec reads and writes the `ctx/`
+//     short forms (`ctx/language`, `ctx/setting|code` + `|value`). That is the
+//     same information on a different surface, a documented codec deviation
+//     with no data lost. Comparing across the two spellings would report every
+//     such key as both missing and extra.
+//   - `composer|id`, `|id_scheme` and `|id_namespace` are not held out, which
+//     is why the match is suffix-aware. They are the PARTY_PROXY
+//     `external_ref`, which the `ctx/` short forms cannot carry, so the codec
+//     refuses them on decode. They flow through to the codec, are refused
+//     there, and are counted as an excluded PARTY_PROXY family: real data
+//     loss, visible in the census, instead of being absorbed by a base match.
 //
 // Keys are held out even when decode happens to accept them, so a metadata
 // key that survives decode does not resurface as a phantom "missing" when
 // re-encode writes it back in ctx/ form.
 //
-// Note the asymmetry this creates on the emitted side: the `ctx/` prefix test
-// is unbounded, so *every* ctx/ key the encoder writes is skipped and a bogus
-// one would be invisible here. PROBE-076's decode leg is the backstop for
-// that — it feeds this SDK's own ctx/ output back through decode.
+// This creates an asymmetry on the emitted side: the `ctx/` prefix test is
+// unbounded, so every ctx/ key the encoder writes is skipped and a bogus one
+// would be invisible here. The decode leg of the FLAT round-trip probe covers
+// that case, because it feeds this SDK's own ctx/ output back through decode.
 func IsCompositionMeta(key, root string) bool {
 	if strings.HasPrefix(key, ctxPrefix) {
 		return true

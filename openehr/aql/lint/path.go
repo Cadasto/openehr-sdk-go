@@ -20,21 +20,21 @@ var ErrEmptyPath = errors.New("lint: identified path has no alias")
 type Path struct {
 	// Alias is the original root binding (e.g. "o").
 	Alias string
-	// Segments are the path steps after the alias, copied from the source —
-	// predicate text VERBATIM, exactly as the read side reports it (REQ-119).
+	// Segments are the path steps after the alias, copied from the source,
+	// with predicate text verbatim, exactly as the read side reports it.
 	Segments []parse.PathSegment
 	// Suffix is the canonical alias-free path; "" for a bare alias.
 	//
-	// CANONICAL means the lexer's skipped trivia is normalised out of each
-	// segment predicate — one space per interior run, ends dropped — so
+	// Canonical means the lexer's skipped trivia is normalised out of each
+	// segment predicate (one space per interior run, ends dropped), so
 	// spellings of one path that differ only in trivia share a suffix, and no
-	// skipped newline or AQL comment reaches a line-oriented report. A VALUE's
-	// own bytes ride through verbatim (inside a string literal or a term-code
-	// display name the lexer skips nothing — see [aql.StripPredicateTrivia]).
-	// Since REQ-119 the source text is verbatim, so building the suffix by
-	// concatenation put `/items[at0001 -- note\n]` into a line-oriented report.
-	// Localised diagnostics reach this form through [displayPath], which is
-	// what sets [Issue.Path].
+	// skipped newline or AQL comment reaches a line-oriented report. A value's
+	// own bytes pass through verbatim (inside a string literal or a term-code
+	// display name the lexer skips nothing; see [aql.StripPredicateTrivia]).
+	// Because the source text is verbatim, plain concatenation would put
+	// `/items[at0001 -- note\n]` into a line-oriented report. Localised
+	// diagnostics reach this form through the path display helper, which is what
+	// sets [Issue.Path].
 	Suffix string
 }
 
@@ -62,7 +62,7 @@ func displayPath(p parse.IdentifiedPath) string {
 }
 
 // Normalise strips the alias from an identified path and yields the canonical
-// alias-free segment list and suffix string. It is purely structural — it
+// alias-free segment list and suffix string. It is purely structural: it
 // does not resolve the alias or consult a template (that is Layer 3's job).
 func Normalise(p parse.IdentifiedPath) (Path, error) {
 	if p.Alias == "" {

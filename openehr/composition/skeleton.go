@@ -10,18 +10,18 @@ import (
 )
 
 // NewSkeleton produces a structurally-conformant *rm.Composition for
-// c with no clinical data. Delegates to instance.Generate with
-// Policy: Minimal — every required RM attribute is filled (BMM-
-// mandatory implicits + OPT-declared) and primitive leaves carry
-// REQ-103 ExampleValue defaults so the resulting tree is valid
-// against `validation.ValidateComposition`.
+// c with no clinical data. It delegates to instance.Generate with
+// Policy: Minimal: every required RM attribute is filled (BMM-mandatory
+// implicits and OPT-declared ones) and primitive leaves carry
+// ExampleValue defaults, so the resulting tree is valid against
+// `validation.ValidateComposition`.
 //
 // WithComposer and WithTerritory are required for COMPOSITION roots
 // (instance.Generate enforces); WithLanguage / WithCategory / WithNow
 // are optional defaults documented per Option. WithValueFill
-// (instance.RandomFill) + WithValueSource switch leaves from the fixed
-// REQ-103 ExampleValue to seeded in-constraint sampled values for a
-// diverse-but-valid corpus (REQ-107).
+// (instance.RandomFill) with WithValueSource switches leaves from the
+// fixed ExampleValue to seeded, sampled in-constraint values, for a
+// varied but valid corpus.
 func NewSkeleton(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*rm.Composition, error) {
 	if c == nil || c.Root() == nil {
 		return nil, instance.ErrNilCompiled

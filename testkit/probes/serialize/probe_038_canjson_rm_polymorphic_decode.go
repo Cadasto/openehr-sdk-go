@@ -16,15 +16,14 @@ import (
 )
 
 // Probe038CanjsonRMPolymorphicDecode implements PROBE-038: canjson
-// MUST decode every BMM-admissible `_type` discriminator at every
-// substitutable slot — covering (a) substitutable subtypes in
+// must decode every BMM-admissible `_type` discriminator at every
+// substitutable slot, covering (a) substitutable subtypes in
 // concrete-typed slots (e.g. LOCATABLE.name DV_TEXT carrying
 // DV_CODED_TEXT, per openEHR RM Liskov substitution) and (b) generic
 // types parameterised over an abstract bound (e.g.
 // DV_INTERVAL[T: DV_ORDERED]).
 //
-// Pins REQ-052. For the given `body` and target `factory`, the
-// probe asserts:
+// For the given `body` and target `factory`, the probe asserts:
 //
 //  1. canjson.Unmarshal succeeds.
 //  2. canjson.Marshal of the recovered value succeeds.
@@ -36,17 +35,16 @@ import (
 //     this assertion guards against.
 //  4. Re-marshalling is a wire-equivalence fixpoint: decoding the
 //     re-marshalled bytes (b1) and encoding again (b2) produces a
-//     document wire-equivalent to b1 (testkit/wireequiv). The catalog
-//     states this leg as "re-marshalling produces a document
-//     wire-equivalent to the same logical content" (conformance.md
-//     PROBE-038 Wire assertion); it catches a subtype or bound field
+//     document wire-equivalent to b1 (testkit/wireequiv): re-marshalling
+//     produces a document wire-equivalent to the same logical
+//     content. This leg catches a subtype or bound field
 //     that survives the first re-marshal but not the second decode,
 //     which the discriminator multiset alone can miss.
 //
-// `body` MUST be canonical-JSON bytes for a known concrete RM type.
+// `body` must be canonical-JSON bytes for a known concrete RM type.
 // `factory` returns a fresh pointer to the target Go type; it is
 // called twice, so the probe owns each decoded value's lifecycle.
-func Probe038CanjsonRMPolymorphicDecode(body []byte, factory func() any) (Result, error) {
+func Probe038CanjsonRMPolymorphicDecode(body []byte, factory func() any) (Result, error) { // PROBE-038 (REQ-040, REQ-052)
 	return probe038PolymorphicDecode(body, factory, canjson.Marshal)
 }
 

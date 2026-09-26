@@ -12,20 +12,21 @@ import (
 
 // ChangeType is an openEHR *audit change type* terminology code, carried as
 // the `commit_audit.change_type` of a contributed version. The value set is
-// the openEHR *audit change type* group of the pinned terminology (REQ-034)
-// and the constants below name every member — `523` is the deletion code,
-// while `253` is *unknown*, a member in its own right. Which code each
-// builder operation carries is docs/specifications/wire.md § REQ-130.
+// the openEHR *audit change type* group of the openEHR terminology bundled
+// with the SDK, and the constants below name every member. `523` is the
+// deletion code, while `253` is *unknown*, a member in its own right.
+// [Creation] carries 249, [Amendment] 250, [Modification] 251 and
+// [Deletion] 523.
 //
 // [Builder.WithChangeType] refuses a code outside the group, and
-// [Builder.Build] gates a wholesale [Builder.WithAudit] on all three facets
-// of the same bar — group membership, the `openehr` terminology id, and the
-// group's own rubric — so no path ships a change type the openEHR
+// [Builder.Build] checks a wholesale [Builder.WithAudit] against the same
+// three conditions (group membership, the `openehr` terminology id, and the
+// group's own rubric), so no path ships a change type the openEHR
 // AUDIT_DETAILS.Change_type_valid invariant would reject.
 type ChangeType string
 
 const (
-	// ChangeTypeCreation is code 249 ("creation") — a first version.
+	// ChangeTypeCreation is code 249 ("creation"): a first version.
 	ChangeTypeCreation ChangeType = "249"
 	// ChangeTypeAmendment is code 250 ("amendment").
 	ChangeTypeAmendment ChangeType = "250"
@@ -33,7 +34,7 @@ const (
 	ChangeTypeModification ChangeType = "251"
 	// ChangeTypeSynthesis is code 252 ("synthesis").
 	ChangeTypeSynthesis ChangeType = "252"
-	// ChangeTypeDeleted is code 523 ("deleted") — note 523, not 253.
+	// ChangeTypeDeleted is code 523 ("deleted"). Note 523, not 253.
 	ChangeTypeDeleted ChangeType = "523"
 	// ChangeTypeAttestation is code 666 ("attestation").
 	ChangeTypeAttestation ChangeType = "666"
@@ -41,31 +42,28 @@ const (
 	ChangeTypeRestoration ChangeType = "816"
 	// ChangeTypeFormatConversion is code 817 ("format conversion").
 	ChangeTypeFormatConversion ChangeType = "817"
-	// ChangeTypeUnknown is code 253 ("unknown") — a member of the group,
+	// ChangeTypeUnknown is code 253 ("unknown"), a member of the group,
 	// recording that the kind of change is not known. It is not a deletion:
 	// that is [ChangeTypeDeleted] (523).
 	ChangeTypeUnknown ChangeType = "253"
 )
 
-// IsValid reports whether c is a member of the pinned openEHR *audit change
-// type* group — the membership verdict the group itself gives, not a list
-// restated here (REQ-034).
+// IsValid reports whether c is a member of the openEHR *audit change type*
+// group in the bundled terminology.
 func (c ChangeType) IsValid() bool {
 	return terminology.AuditChangeType.Has(string(c))
 }
 
-// Rubric returns the pinned English rubric for c — "amendment" for 250 — and
-// false when c is not a member of the group. Rubrics come from the pin, so
-// none is typed beside a code in this package (REQ-034).
+// Rubric returns the English rubric for c from the bundled terminology
+// ("amendment" for 250), and false when c is not a member of the group.
 func (c ChangeType) Rubric() (string, bool) {
 	return terminology.AuditChangeType.Rubric(string(c))
 }
 
 // CodedText renders c as the DV_CODED_TEXT the write-side audit carries
-// (nested `defining_code`, terminology `openehr`) — the shape ITS-REST
+// (nested `defining_code`, terminology `openehr`), the shape ITS-REST
 // PR 131 requires in place of the withdrawn flat TERMINOLOGY_CODE. Both
-// halves reach the wire: a CDR reads the code, a human reads the pinned
-// rubric. A code outside the group has no rubric and yields the zero value;
+// halves reach the wire: a CDR reads the code, a human reads the rubric. A code outside the group has no rubric and yields the zero value;
 // check [ChangeType.IsValid] first when the code came from outside the SDK.
 func (c ChangeType) CodedText() rm.DVCodedText {
 	term, ok := c.Rubric()
@@ -97,11 +95,10 @@ func codedText(value, code string) rm.DVCodedText {
 	}
 }
 
-// Versionable is the closed set of RM types a CONTRIBUTION may commit —
+// Versionable is the closed set of RM types a CONTRIBUTION may commit:
 // the four the ITS-REST `Contribution_create` schema admits. It constrains
 // [Creation], [Amendment], [Modification], and [Deletion] so the type-set
-// is enforced by the compiler at the call site, with no reflection
-// (REQ-024).
+// is enforced by the compiler at the call site, with no reflection.
 type Versionable interface {
 	rm.Composition | rm.EHRStatus | rm.Folder | rm.EHRAccess
 }
@@ -111,7 +108,7 @@ type Versionable interface {
 // [Builder.Add]. It is inert: the write-side version is assembled at
 // [Builder.Build], once the batch audit it inherits from is known. A
 // Change that could not be formed carries its error to Build rather than
-// panicking at the call that made it (REQ-025) — a fluent chain has
+// panicking at the call that made it, because a fluent chain has
 // nowhere to return one.
 type Change struct {
 	build func(batch UpdateAudit) (CommitVersion, error)
@@ -135,8 +132,7 @@ type versionConfig struct {
 // WithLifecycleState sets this version's `lifecycle_state`, defaulting to
 // `complete` (532). It is carried in the version body, not the
 // `openehr-version` header: the header is per-request and cannot express a
-// distinct state for each version of a multi-version contribution
-// (REQ-130, REQ-059).
+// distinct state for each version of a multi-version contribution.
 func WithLifecycleState(s openehrclient.LifecycleState) VersionOption {
 	return func(c *versionConfig) { c.lifecycle = s }
 }
@@ -167,30 +163,29 @@ func WithVersionSystemID(id string) VersionOption {
 	}
 }
 
-// Creation accumulates a first version of data — change type `creation`
-// (249). A creation carries no `preceding_version_uid`: the version it
+// Creation accumulates a first version of data, with change type
+// `creation` (249). A creation carries no `preceding_version_uid`: the version it
 // would follow does not exist yet.
 func Creation[T Versionable](data *T, opts ...VersionOption) Change {
 	return newChange(ChangeTypeCreation, "", data, opts...)
 }
 
-// Amendment accumulates an amendment of the version at precedingUID —
+// Amendment accumulates an amendment of the version at precedingUID, with
 // change type `amendment` (250).
 func Amendment[T Versionable](precedingUID string, data *T, opts ...VersionOption) Change {
 	return newChange(ChangeTypeAmendment, precedingUID, data, opts...)
 }
 
-// Modification accumulates a modification of the version at precedingUID —
-// change type `modification` (251).
+// Modification accumulates a modification of the version at precedingUID,
+// with change type `modification` (251).
 func Modification[T Versionable](precedingUID string, data *T, opts ...VersionOption) Change {
 	return newChange(ChangeTypeModification, precedingUID, data, opts...)
 }
 
-// Deletion accumulates a logical deletion of the version at precedingUID —
-// change type `deleted` (523). The version's `lifecycle_state` is NOT
+// Deletion accumulates a logical deletion of the version at precedingUID,
+// with change type `deleted` (523). The version's `lifecycle_state` is not
 // derived from the change type: it defaults to `complete` like any other
-// version, since a deletion of complete content is exactly what most of the
-// vendored corpus records. Pass [WithLifecycleState] to say otherwise.
+// version, since most recorded deletions are of complete content. Pass [WithLifecycleState] to say otherwise.
 func Deletion[T Versionable](precedingUID string, data *T, opts ...VersionOption) Change {
 	return newChange(ChangeTypeDeleted, precedingUID, data, opts...)
 }
@@ -261,15 +256,15 @@ func (c versionConfig) audit(batch UpdateAudit, ct ChangeType) UpdateAudit {
 	return a
 }
 
-// Builder assembles a [Submission] — the ITS-REST `Contribution_create`
-// body — from caller payloads, without hand-wiring version wrappers,
-// change-type codes, or write-side audit fields (REQ-130). Construct with
+// Builder assembles a [Submission] (the ITS-REST `Contribution_create`
+// body) from caller payloads, without hand-wiring version wrappers,
+// change-type codes, or write-side audit fields. Construct with
 // [NewBuilder], accumulate with [Builder.Add], finalise with
 // [Builder.Build].
 //
 // Every method returns the same Builder so calls chain; errors are
-// accumulated and surfaced from Build, mirroring the composition builder
-// (REQ-101). A Builder is not safe for concurrent use; build one per
+// accumulated and surfaced from Build, mirroring the composition builder.
+// A Builder is not safe for concurrent use; build one per
 // goroutine.
 type Builder struct {
 	audit   UpdateAudit
@@ -278,7 +273,7 @@ type Builder struct {
 }
 
 // NewBuilder returns an empty Builder. The batch audit's `change_type` and
-// `committer` are required by the pin and have no default — set them via
+// `committer` are required by ITS-REST and have no default; set them via
 // [Builder.WithChangeType] and [Builder.WithCommitter] (or supply a whole
 // audit with [Builder.WithAudit]) before calling Build.
 func NewBuilder() *Builder { return &Builder{} }
@@ -286,11 +281,11 @@ func NewBuilder() *Builder { return &Builder{} }
 // WithAudit replaces the batch commit audit wholesale. Later WithCommitter
 // / WithSystemID / WithDescription / WithChangeType calls refine it.
 //
-// It is not a bypass: [Builder.Build] gates the audit's `change_type` on
-// membership of the openEHR *audit change type* group and on the pinned
+// It is not a bypass: [Builder.Build] checks the audit's `change_type` for
+// membership of the openEHR *audit change type* group and for the group's
 // rubric exactly as [Builder.WithChangeType] does, so a code outside the
 // group, a foreign terminology id, or a hand-typed rubric supplied here is
-// refused at Build (REQ-034). A caller who needs an off-spec audit hand-wires
+// refused at Build. A caller who needs an off-spec audit hand-wires
 // a [Submission].
 func (b *Builder) WithAudit(a UpdateAudit) *Builder {
 	if b == nil {
@@ -302,11 +297,11 @@ func (b *Builder) WithAudit(a UpdateAudit) *Builder {
 
 // WithChangeType sets the batch audit's change type. It describes the
 // contribution as a whole and is never derived from the accumulated
-// versions — the vendored corpus records batches whose audit change type
-// matches none of their versions (REQ-130). Any member of the openEHR
+// versions, because a batch's audit change type can legitimately match
+// none of its versions. Any member of the openEHR
 // *audit change type* group is accepted, rendered with the group's rubric;
 // a code outside the group is refused, and the refusal surfaces from
-// [Builder.Build] like every other accumulated error (REQ-034).
+// [Builder.Build] like every other accumulated error.
 func (b *Builder) WithChangeType(ct ChangeType) *Builder {
 	if b == nil {
 		return b
@@ -331,7 +326,7 @@ func (b *Builder) WithCommitter(p rm.PartyProxy) *Builder {
 }
 
 // WithCommitterName sets the batch committer to a PARTY_IDENTIFIED bearing
-// only name — the common case. Use [Builder.WithCommitter] when the
+// only name, the common case. Use [Builder.WithCommitter] when the
 // committer needs an external reference or identifiers.
 func (b *Builder) WithCommitterName(name string) *Builder {
 	if b == nil {
@@ -350,7 +345,7 @@ func (b *Builder) WithDescription(text string) *Builder {
 }
 
 // WithSystemID sets the batch audit's logical system id. It is optional on
-// the write path — the server sets its own when omitted.
+// the write path; the server sets its own when omitted.
 func (b *Builder) WithSystemID(id string) *Builder {
 	if b == nil {
 		return b
@@ -360,7 +355,7 @@ func (b *Builder) WithSystemID(id string) *Builder {
 }
 
 // WithAuditType selects the `_type` emitted on the batch audit and on every
-// version audit that inherits it — see [AuditType].
+// version audit that inherits it; see [AuditType].
 func (b *Builder) WithAuditType(t AuditType) *Builder {
 	if b == nil {
 		return b
@@ -408,7 +403,7 @@ func validateBatchChangeType(ct rm.DVCodedText) error {
 // Build assembles the accumulated changes into a [Submission] that passes
 // [Submission.Validate], or returns every accumulated error joined and no
 // submission. It is idempotent: the returned submission is freshly
-// allocated, so a second Build — or any later mutation of the Builder —
+// allocated, so a second Build, or any later mutation of the Builder,
 // leaves an earlier result untouched.
 func (b *Builder) Build() (*Submission, error) {
 	if b == nil {

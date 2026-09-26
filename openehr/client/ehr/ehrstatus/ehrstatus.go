@@ -42,8 +42,7 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (*
 // GetAtTime returns the EHR_STATUS that was current at t.
 //
 // Wire: GET /ehr/{ehr_id}/ehr_status?version_at_time={t}.
-// Zero t is rejected — callers MUST pass a real time; use [Get] for
-// the latest.
+// Zero t is rejected, so pass a real time; use [Get] for the latest.
 func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, t time.Time) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.GetAtTime: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -95,21 +94,21 @@ type putConfig struct {
 // PutOption mutates [Put]'s request shape.
 type PutOption func(*putConfig)
 
-// WithPrefer overrides the response-shape preference (REQ-094). The
-// default is [transport.PreferMinimal] per the spec's write-path rule.
+// WithPrefer overrides the response-shape preference. The
+// default is [transport.PreferMinimal], the ITS-REST default.
 func WithPrefer(p transport.Prefer) PutOption {
 	return func(c *putConfig) { c.Prefer = p }
 }
 
 // WithAuditDetails attaches the commit-time audit envelope as the
-// `openehr-audit-details` header (REQ-059). The struct is canjson-
+// `openehr-audit-details` header. The struct is canjson-
 // encoded; nil omits the header.
 func WithAuditDetails(a *rm.AuditDetails) PutOption {
 	return func(c *putConfig) { c.AuditDetails = a }
 }
 
 // WithLifecycleState sets the committed VERSION's lifecycle_state via the
-// `openehr-version` header (REQ-059). Empty omits the header; an
+// `openehr-version` header. Empty omits the header; an
 // unrecognised code fails the write with [transport.ErrInvalidConfig].
 func WithLifecycleState(s openehrclient.LifecycleState) PutOption {
 	return func(c *putConfig) { c.LifecycleState = s }
@@ -118,22 +117,22 @@ func WithLifecycleState(s openehrclient.LifecycleState) PutOption {
 // Put updates the EHR_STATUS under ehrID. `ifMatch` is the
 // preceding version's identifier (typically captured from a previous
 // GET's [openehrclient.VersionMetadata.VersionUID] or `ETag`) and is
-// REQUIRED per REQ-054 — an empty value returns
+// required: an empty value returns
 // [transport.ErrInvalidConfig] without issuing a request.
 //
 // Wire: PUT /ehr/{ehr_id}/ehr_status with If-Match. The response
-// shape follows the Prefer option (REQ-094): minimal returns no body,
+// shape follows the Prefer option: minimal returns no body,
 // the returned `*rm.EHRStatus` is nil and only the metadata is
 // populated; identifier returns the ITS-REST `Identifier` body,
 // resolved into the metadata `VersionUID`; representation returns the
 // full updated EHR_STATUS in the body. The zero resource on a
-// successful minimal/identifier write is a nil pointer — `== nil` is a
+// successful minimal/identifier write is a nil pointer, so `== nil` is a
 // correct test for this concrete return; [openehrclient.HasResource] is
-// the uniform presence test across write leaves (REQ-094). After 2xx +
+// the uniform presence test across write leaves. After 2xx +
 // PreferRepresentation, an empty or undecodable body is a
 // [*openehrclient.NoRepresentationError] carrying commit metadata.
 //
-// Errors map per REQ-093: 409 → [transport.ErrVersionConflict], 412 →
+// Errors: 409 → [transport.ErrVersionConflict], 412 →
 // [transport.ErrPreconditionFailed], 428 → [transport.ErrPreconditionRequired].
 func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ifMatch string, status *rm.EHRStatus, opts ...PutOption) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
@@ -186,7 +185,7 @@ func decodeEHRStatus(body []byte) (*rm.EHRStatus, error) {
 	return &out, nil
 }
 
-// Repository mirrors the package functions for DI seams.
+// Repository mirrors the package functions as a dependency-injection seam.
 type Repository interface {
 	Get(ctx context.Context, ehrID openehrclient.EHRID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
 	GetAtTime(ctx context.Context, ehrID openehrclient.EHRID, t time.Time) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)

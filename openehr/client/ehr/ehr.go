@@ -34,7 +34,7 @@ func Get(ctx context.Context, c *transport.Client, id EHRID) (*rm.EHR, *VersionM
 // deployment.
 //
 // Wire: HEAD /ehr/{ehr_id}. A 2xx response yields true; a 404 yields
-// (false, nil) — absence is not an error. Other wire errors (auth,
+// (false, nil); absence is not an error. Other wire errors (auth,
 // 5xx) surface as the typed error per [transport.WireError].
 func Exists(ctx context.Context, c *transport.Client, id EHRID) (bool, error) {
 	if id == "" {
@@ -55,7 +55,7 @@ func Exists(ctx context.Context, c *transport.Client, id EHRID) (bool, error) {
 }
 
 // GetBySubject retrieves the EHR associated with an external subject
-// identifier — the (namespace, id) pair that the EHR was created with.
+// identifier: the (namespace, id) pair that the EHR was created with.
 //
 // Wire: GET /ehr?subject_id=...&subject_namespace=...
 // Returns ErrNotFound on a 404 (no EHR matches the subject).
@@ -106,22 +106,21 @@ func WithInitialStatus(s *rm.EHRStatus) CreateOption {
 // The optional initial EHR_STATUS body is canjson-encoded; if omitted
 // the request body is empty and the server creates a default
 // EHR_STATUS. Returns the decoded *rm.EHR (Prefer=representation by
-// default — callers almost always need the new ehr_id back even when
+// default, because callers almost always need the new ehr_id back even when
 // they supplied one).
 //
 // Two 2xx responses are failures, not successes, and each has its own
 // type:
 //
 //   - An empty, whitespace-only, or JSON-null body committed the EHR but
-//     carries no usable representation: a [*NoRepresentationError]
-//     (REQ-094). [errors.Is](err, [transport.ErrInvalidShape]) still
+//     carries no usable representation: a [*NoRepresentationError].
+//     [errors.Is](err, [transport.ErrInvalidShape]) still
 //     holds through its Unwrap, so callers keyed on that sentinel are
 //     unaffected.
 //   - A body that is present but does not decode: a
-//     [*transport.DecodeError] carrying the raw response bytes
-//     (REQ-151).
+//     [*transport.DecodeError] carrying the raw response bytes.
 //
-// The returned *VersionMetadata is populated on both — it is what proves
+// The returned *VersionMetadata is populated on both; it is what proves
 // the EHR was committed. A non-2xx response stays a
 // [*transport.WireError].
 func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm.EHR, *VersionMetadata, error) {
@@ -202,8 +201,8 @@ func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm
 }
 
 // Repository mirrors the package-level EHR functions as a method set
-// bound to a single *transport.Client. Useful for dependency-injection
-// seams (REQ-023).
+// bound to a single *transport.Client. Useful as a dependency-injection
+// seam.
 type Repository interface {
 	Get(ctx context.Context, id EHRID) (*rm.EHR, *VersionMetadata, error)
 	Exists(ctx context.Context, id EHRID) (bool, error)

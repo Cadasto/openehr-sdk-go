@@ -1,15 +1,14 @@
 // Example: statically lint AQL with openehr/aql/lint and the
-// validation.ValidateAQL bridge (REQ-109). Demonstrates the building-block
-// path — no transport, no auth, no client: query string → parse against the
-// SDK grammar profile → 3-layer lint → Issue list.
+// validation.ValidateAQL bridge. The path has no transport, auth or client:
+// query string → parse against the SDK grammar profile → 3-layer lint →
+// Issue list.
 //
-// Note: templatecompile.Compile is internal; this example lives in the SDK
-// module and is the supported v1 call shape for the template-aware Layer 3
-// (same constraint as validate-composition — see ADR 0005). Layers 1–2
-// (syntax, shape, parameter binding, the REQ-160/161 containment +
-// portability semantic group and the REQ-164 path-shape advisories, which
-// both run unconditionally against the pinned RM) need no template and are
-// usable by any external consumer via openehr/aql/lint directly.
+// Note: templatecompile.Compile is internal. This example lives in the SDK
+// module, so it can call it for the template-aware Layer 3, the same way
+// validate-composition does. Layers 1 and 2 need no template. They cover
+// syntax, shape, parameter binding, the containment and portability checks,
+// and the path-shape advisories; the last two always run against the pinned
+// RM. Any program can use these layers through openehr/aql/lint directly.
 //
 // Run:
 //

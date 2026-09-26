@@ -10,7 +10,7 @@ import (
 )
 
 // RenderUnmarshalXMLFile renders the canonical-XML `UnmarshalXML`
-// companion file for every concrete class in `file` — the parallel
+// companion file for every concrete class in `file`, the parallel
 // of [RenderUnmarshalJSONFile] for XML. Each emitted class gains
 // one method:
 //
@@ -29,7 +29,7 @@ import (
 // For each concrete class C:
 //
 //  1. Initialise a flat switch on the child element's local name
-//     covering every effective property (in any order — XML decode
+//     covering every effective property (in any order: XML decode
 //     is name-keyed, unlike encode which is order-pinned).
 //
 //  2. Per property:
@@ -48,7 +48,7 @@ import (
 //
 // # Hash/map decoding
 //
-// Same v1 limitation as the encoder — Hash<K,V> properties are
+// Same limitation as the encoder: Hash<K,V> properties are
 // skipped at decode time. The receiver field is left at its zero
 // value. Documented in canxml/doc.go.
 func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {

@@ -24,33 +24,33 @@ type commitConfig struct {
 // CommitOption mutates [Commit]'s request shape.
 type CommitOption func(*commitConfig)
 
-// WithPrefer overrides the response-shape preference (REQ-094).
-// Default [transport.PreferMinimal] — the spec write-path rule. With
+// WithPrefer overrides the response-shape preference.
+// Default [transport.PreferMinimal], the ITS-REST default. With
 // PreferRepresentation the server returns the persisted Contribution
 // body which is decoded into the returned [*rm.Contribution]; an empty
 // or undecodable 2xx body is a [*openehrclient.NoRepresentationError],
-// not a silent metadata-only success. PreferIdentifier is metadata-only
-// today (identifier-slot population is deferred).
+// not a silent metadata-only success. PreferIdentifier is metadata-only:
+// the identifier body is not decoded.
 func WithPrefer(p transport.Prefer) CommitOption {
 	return func(c *commitConfig) { c.prefer = p }
 }
 
 // Commit posts a multi-version Contribution to ehrID. The audit
-// envelope is carried inside the Submission body (REQ-059); unlike
+// envelope is carried inside the Submission body; unlike
 // per-resource writes there is no separate `openehr-audit-details`
 // header.
 //
 // Wire: POST /ehr/{ehr_id}/contribution. Request body is the
-// ITS-REST `Contribution_create` schema — `{audit, versions[]}` with
+// ITS-REST `Contribution_create` schema, `{audit, versions[]}` with
 // each `versions[i]` an inline `ORIGINAL_VERSION<T>` or
-// `IMPORTED_VERSION<T>` (REQ-050/095 / PROBE-072), NOT the persisted
+// `IMPORTED_VERSION<T>`, not the persisted
 // `rm.Contribution` shape whose `versions[]` is `[]OBJECT_REF`. The
 // response decodes as `*rm.Contribution` (persisted shape, returned
 // under `Prefer: return=representation`). After 2xx +
 // PreferRepresentation, an empty or undecodable body is a
 // [*openehrclient.NoRepresentationError] that carries the commit
 // metadata; a non-2xx stays a [*transport.WireError]. A successful
-// minimal or identifier write returns a nil `*rm.Contribution` —
+// minimal or identifier write returns a nil `*rm.Contribution`, so
 // `== nil` is a correct test for this concrete return;
 // [openehrclient.HasResource] is the uniform presence test across
 // write leaves, including interface returns.
@@ -113,23 +113,23 @@ func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	return &out, meta, nil
 }
 
-// Get reads a persisted contribution by uid (REQ-142 / PROBE-092).
+// Get reads a persisted contribution by uid.
 //
 // Wire: GET /ehr/{ehr_id}/contribution/{contribution_uid}
 // (ITS-REST `contribution_get`). The response decodes as the persisted
-// `*rm.Contribution` — `versions[]` of OBJECT_REF, not the
+// `*rm.Contribution` (`versions[]` of OBJECT_REF), not the
 // `Contribution_create` submission shape [Commit] sends.
 //
 // The returned [*openehrclient.VersionMetadata] exists for shape
 // consistency with the other EHR leaves and carries whatever headers
-// the server sent: the vendored pin defines only `Content-Type` on
+// the server sent. ITS-REST defines only `Content-Type` on
 // `200_CONTRIBUTION` (`ETag` / `Location` belong to `201_CONTRIBUTION`),
-// so callers MUST NOT require it to be populated on a read.
+// so do not require it to be populated on a read.
 //
 // An empty ehrID or contributionUID fails with
 // [transport.ErrInvalidConfig] before any request is issued; a 404 maps
-// to [transport.ErrNotFound]. v1 requests canonical JSON only —
-// simplified-format Accept values are out of scope.
+// to [transport.ErrNotFound]. v1 requests canonical JSON only;
+// simplified-format Accept values are not supported.
 func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("contribution.Get: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -146,7 +146,7 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, co
 	return out, openehrclient.NewVersionMetadata(meta), err
 }
 
-// Repository mirrors the package functions for DI seams.
+// Repository mirrors the package functions as a dependency-injection seam.
 type Repository interface {
 	Commit(ctx context.Context, ehrID openehrclient.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error)
 	Get(ctx context.Context, ehrID openehrclient.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error)

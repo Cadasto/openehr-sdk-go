@@ -45,10 +45,10 @@ type OriginalVersion[T any] struct {
 // WrapOriginalVersion adapts an rm.OriginalVersion for the contribution
 // write path, converting its commit_audit to the UpdateAudit DTO (drops
 // time_committed). Only the returned wrapper's CommitAudit is emitted on
-// marshal — later mutations to the wrapped Version.CommitAudit are ignored.
+// marshal; later mutations to the wrapped Version.CommitAudit are ignored.
 // A nil v yields an empty wrapper; a nil or typed-nil CommitAudit yields
-// an empty UpdateAudit. [Submission.Validate] rejects both (REQ-025 —
-// no panic on caller input).
+// an empty UpdateAudit. [Submission.Validate] rejects both as errors
+// instead of panicking.
 func WrapOriginalVersion[T any](v *rm.OriginalVersion[T]) *OriginalVersion[T] {
 	if v == nil {
 		return &OriginalVersion[T]{}
@@ -112,7 +112,7 @@ func uidOrNil(uid rm.ObjectVersionID) *rm.ObjectVersionID {
 // MarshalJSONTo emits the canonical ORIGINAL_VERSION wire shape, replacing
 // commit_audit with the [UpdateAudit] write DTO. The streaming pair carries
 // the `_type` discriminators on nested rm fields (e.g. rm.DVCodedText,
-// *rm.Composition), which now marshal through MarshalJSONTo (ADR 0022, Q7).
+// *rm.Composition), which marshal through MarshalJSONTo.
 func (v *OriginalVersion[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	o := v.Version
 	if o == nil {
@@ -147,10 +147,10 @@ type ImportedVersion[T any] struct {
 // WrapImportedVersion adapts an rm.ImportedVersion for the contribution
 // write path, converting its commit_audit to the UpdateAudit DTO (drops
 // time_committed). Only the returned wrapper's CommitAudit is emitted on
-// marshal — later mutations to the wrapped Version.CommitAudit are ignored.
+// marshal; later mutations to the wrapped Version.CommitAudit are ignored.
 // A nil v yields an empty wrapper; a nil or typed-nil CommitAudit yields
-// an empty UpdateAudit. [Submission.Validate] rejects both (REQ-025 —
-// no panic on caller input).
+// an empty UpdateAudit. [Submission.Validate] rejects both as errors
+// instead of panicking.
 func WrapImportedVersion[T any](v *rm.ImportedVersion[T]) *ImportedVersion[T] {
 	if v == nil {
 		return &ImportedVersion[T]{}
@@ -171,7 +171,7 @@ type importedVersionJSON[T any] struct {
 
 // MarshalJSONTo emits the canonical IMPORTED_VERSION wire shape, replacing
 // commit_audit with the [UpdateAudit] write DTO. Nested rm fields carry their
-// `_type` discriminators through the streaming pair (ADR 0022, Q7).
+// `_type` discriminators through the streaming pair.
 func (v *ImportedVersion[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	i := v.Version
 	if i == nil {

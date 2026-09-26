@@ -67,8 +67,8 @@ type Link struct {
 type Locatable interface {
 	isLocatable()
 
-	// Generated identity accessors (ADR 0013): Get<Field> returns
-	// the flattened LOCATABLE field verbatim. Value receivers — both
+	// Generated identity accessors: Get<Field> returns
+	// the flattened LOCATABLE field verbatim. Value receivers: both
 	// T and *T satisfy Locatable; calling a getter on a typed-nil *T
 	// panics, so guard with IsTypedNil first (see rm.IsTypedNil).
 	GetArchetypeNodeID() string
@@ -140,7 +140,7 @@ func (Role) isLocatable() {}
 func (Section) isLocatable() {}
 
 // MutableLocatable is the write half of the generated LOCATABLE
-// identity surface (ADR 0013). Setters use pointer receivers, so the
+// identity surface. Setters use pointer receivers, so the
 // interface is satisfied by *T only; it shares Locatable's unexported
 // marker and cannot be implemented outside this package.
 type MutableLocatable interface {

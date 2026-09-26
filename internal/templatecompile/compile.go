@@ -29,12 +29,12 @@ type Options struct {
 }
 
 // Compile turns a parsed OPT into a walker-friendly compiled
-// representation. The input is read-only — the returned Compiled
+// representation. The input is read-only: the returned Compiled
 // tree shares no mutable state with opt (struct values are copied,
 // slices are freshly allocated).
 //
 // Returns ErrInvalidInput when opt is nil or has no root. Returns
-// any error surfaced by AQL path computation (none in v1).
+// any error surfaced by AQL path computation (currently none).
 func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, error) {
 	if opt == nil {
 		return nil, fmt.Errorf("%w: nil template", ErrInvalidInput)
@@ -356,13 +356,12 @@ func pathSegment(attrName string, card template.Cardinality, child template.Node
 }
 
 // NamePredicate appends a template-level node name to an id-derived path
-// predicate, yielding the reference's `archetype_id,'Name'` form
-// (REQ-116); it returns id unchanged when name is empty.
+// predicate, yielding the reference's `archetype_id,'Name'` form;
+// it returns id unchanged when name is empty.
 //
-// Exported inside the module because REQ-116 paths are composed by *two*
-// builders — this package's [pathSegment] and the WebTemplate builder's
-// own `predicate` — and a quoting rule duplicated across both is a rule
-// that drifts.
+// It is exported inside the module because name-predicated paths are
+// composed by two builders, this package's [pathSegment] and the
+// WebTemplate builder's own `predicate`, and both must quote the same way.
 //
 // Measured across the vendored reference goldens: the name is always
 // *appended* to an id (341 archetype-id + 9 at-code segments in the
@@ -370,11 +369,11 @@ func pathSegment(attrName string, card template.Cardinality, child template.Node
 // callers decorate an existing predicate rather than forming one.
 //
 // Quoting follows the goldens: the name sits in single quotes and commas
-// inside it are literal — one corona name ("… zu Menschen, die dort
+// inside it are literal; one corona name ("… zu Menschen, die dort
 // waren") carries one. No vendored name contains a single quote or a
 // backslash, so the escapes are the conventional AQL reading rather than
 // a golden-verified rule; revisit if a corpus name ever needs them.
-// Backslash is escaped first and quote second — the reverse order would
+// Backslash is escaped first and quote second; the reverse order would
 // re-escape the backslash just written for the quote. Escaping the
 // backslash is not optional style: a name ending in `\` would otherwise
 // emit `,'…\'`, whose closing quote every scanner honouring `\'` consumes

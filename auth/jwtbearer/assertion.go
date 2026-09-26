@@ -29,9 +29,9 @@ import (
 //     service.
 //   - Fetch a fresh assertion from a trusted broker for each call.
 //
-// Each call MUST return an unexpired JWT (the SDK does not validate
-// timing). Returning a stale assertion will be rejected by the
-// authorization server and surface as auth.ErrTokenExchangeFailed.
+// Each call must return an unexpired JWT (the SDK does not validate
+// timing). The authorization server rejects a stale assertion, which
+// surfaces as auth.ErrTokenExchangeFailed.
 type AssertionSource interface {
 	Assertion(ctx context.Context) (string, error)
 }
@@ -58,14 +58,14 @@ func StaticAssertion(jwt string) AssertionSource {
 // consumer's behalf. Iat/Exp/Jti are populated automatically by
 // ClaimsSigner unless overridden.
 type ClaimsTemplate struct {
-	// Issuer is the "iss" claim — typically the client_id of the
+	// Issuer is the "iss" claim, typically the client_id of the
 	// confidential client.
 	Issuer string
 	// Subject is the "sub" claim. For client-authentication assertions,
 	// sub == iss. For on-behalf-of assertions, sub identifies the
 	// principal.
 	Subject string
-	// Audience is the "aud" claim — typically the token endpoint URL.
+	// Audience is the "aud" claim, typically the token endpoint URL.
 	Audience string
 	// Lifetime is how long the assertion is valid. The signer sets
 	// "iat" to now and "exp" to now+Lifetime. Defaults to 5 minutes.
@@ -82,13 +82,13 @@ type ClaimsTemplate struct {
 // across the deployment's JWKS.
 //
 // Supported algorithms (SMART client-confidential-asymmetric baseline):
-//   - RS384 (default) — RSA PKCS1v15 with SHA-384; mandated by HL7 SMART
-//   - ES384 — ECDSA P-384 with SHA-384; mandated by HL7 SMART
-//   - RS256 — RSA PKCS1v15 with SHA-256; accepted for back-compat
-//   - ES256 — ECDSA P-256 with SHA-256; common in practice
+//   - RS384 (default): RSA PKCS1v15 with SHA-384; mandated by HL7 FHIR SMART App Launch
+//   - ES384: ECDSA P-384 with SHA-384; mandated by HL7 FHIR SMART App Launch
+//   - RS256: RSA PKCS1v15 with SHA-256; accepted for back-compat
+//   - ES256: ECDSA P-256 with SHA-256; common in practice
 //
-// Signing is delegated to go-jose/v4, which handles correct JOSE encoding
-// (including ECDSA r‖s padding) internally. (REQ-068)
+// Signing is delegated to go-jose/v4, which handles JOSE encoding
+// (including ECDSA r‖s padding) internally.
 type ClaimsSigner struct {
 	Template ClaimsTemplate
 	// Signer is the private-key signer. Required.
@@ -156,11 +156,11 @@ func WithAlgorithm(alg string) SignerOption {
 
 // Assertion produces a freshly signed JWT bearer assertion. Each call
 // allocates a new "iat"/"exp"/"jti" so two assertions from the same
-// signer are never identical (RFC 7523 § 3 requires jti to be unique
+// signer are never identical (RFC 7523 §3 requires jti to be unique
 // within the assertion's lifetime).
 //
 // Signing is performed by go-jose/v4, which handles all JOSE encoding
-// including ECDSA r‖s byte padding. (REQ-068)
+// including ECDSA r‖s byte padding.
 func (s *ClaimsSigner) Assertion(ctx context.Context) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err

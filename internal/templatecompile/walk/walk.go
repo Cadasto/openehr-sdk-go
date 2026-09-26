@@ -16,11 +16,11 @@ import (
 //
 //   - PreHandle returning [SkipSubtree] prunes the subtree (no
 //     children visited, PostHandle not fired) while letting sibling
-//     traversal continue. Any OTHER non-nil error aborts the walk.
+//     traversal continue. Any other non-nil error aborts the walk.
 //   - PostHandle treats every non-nil return as an abort.
-//     [SkipSubtree] is meaningless here — the children have already
+//     [SkipSubtree] is meaningless here (the children have already
 //     been walked by the time PostHandle fires, so there is nothing
-//     left to prune — and is propagated to the caller as if it were
+//     left to prune) and is propagated to the caller as if it were
 //     any other error.
 //
 // Visitors that need to inspect the attributes a node carries (e.g.
@@ -74,7 +74,7 @@ func (f VisitorFunc) PostHandle(ctx *Context) error {
 var SkipSubtree = errors.New("walk: skip subtree") //nolint:staticcheck,revive // ST1012 / error-naming: deliberate sentinel control value mirroring filepath.SkipDir, see comment above
 
 // Context carries the current walk position. It is rebuilt for each
-// visited node — callers MUST NOT retain pointers past the visitor
+// visited node, so callers must not retain pointers past the visitor
 // call; copy any fields they need.
 type Context struct {
 	node            *templatecompile.CompiledNode

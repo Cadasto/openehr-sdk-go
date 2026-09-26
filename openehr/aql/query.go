@@ -1,6 +1,3 @@
-// Query and result models for AQL (REQ-055). Construct queries with the
-// builders ([Builder] / the verb-functions) or pass a literal string via
-// [NewQuery]; the package doc (doc.go) is the canonical overview.
 package aql
 
 import (
@@ -18,7 +15,7 @@ type Query struct {
 	// Fetch limits the number of rows returned. Zero leaves the limit
 	// to the deployment default.
 	Fetch int
-	// Parameters bind $name placeholders in Q. Keys MUST NOT include
+	// Parameters bind $name placeholders in Q. Keys must not include
 	// the leading dollar sign (e.g. "ehr_id", not "$ehr_id").
 	Parameters map[string]any
 	// EHRID scopes execution to a single EHR when non-empty. The query
@@ -32,8 +29,8 @@ func NewQuery(q string) Query {
 	return Query{Q: strings.TrimSpace(q)}
 }
 
-// String returns the trimmed AQL statement. It is the wire contract
-// for the query text itself (REQ-055).
+// String returns the trimmed AQL statement: the query text as sent on the
+// wire.
 func (q Query) String() string {
 	return strings.TrimSpace(q.Q)
 }

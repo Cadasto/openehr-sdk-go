@@ -11,13 +11,13 @@ import (
 )
 
 // ErrUnmatchedRecording is returned by [Replayer] when no remaining
-// exchange matches the request. The replayer must not dial (REQ-082).
-// Removing this sentinel must fail [TestReplayer_UnmatchedFailsClosed].
+// exchange matches the request. The replayer never dials in that case.
+// Removing this sentinel must fail TestReplayer_UnmatchedFailsClosed.
 var ErrUnmatchedRecording = errors.New("probe: no recording matches the request")
 
 // Replayer is a Cassette-mode http.RoundTripper. It serves recorded
 // exchanges in capture order and refuses anything the recording does
-// not contain. It never dials (REQ-082 fail-closed).
+// not contain. It never dials: an unmatched request fails closed.
 type Replayer struct {
 	mu        sync.Mutex
 	remaining []HAREntry

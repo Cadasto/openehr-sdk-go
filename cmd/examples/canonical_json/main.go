@@ -1,7 +1,6 @@
-// Example: decode a canonical-JSON Composition cassette and print
-// a few key fields. Demonstrates the smallest building-block path
-// (REQ-013) — no transport, no auth, no discovery: just RM types +
-// canjson against bytes.
+// Example: decode a canonical-JSON Composition cassette and print a few
+// fields. This is the smallest building-block path: no transport, no auth, no
+// discovery, just RM types and canjson against bytes.
 //
 // Run: `go run ./cmd/examples/canonical_json` from any directory.
 package main

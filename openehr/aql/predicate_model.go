@@ -23,31 +23,32 @@ import (
 // [NodeIDPredicate], [ArchetypePredicate], [ParamPredicate],
 // [ComparisonPredicate], [MatchesPredicate], and [JunctionPredicate].
 //
-// The kind is a property of the FORM, not of the grammar production that
+// The kind is a property of the form, not of the grammar production that
 // carried it. `pathPredicate` is `standardPredicate | archetypePredicate |
-// nodePredicate` and the three overlap — a comparison, a bare archetype HRID
+// nodePredicate` and the three overlap: a comparison, a bare archetype HRID
 // and a bare `$param` are each spelled twice, once as their own top-level
-// alternative and once inside `nodePredicate` — so the same form reaches this
-// model through different parse contexts depending on whether it sits at the
-// top of the bracket or nested as a junction operand. It yields the same
-// kind either way.
+// alternative and once inside `nodePredicate`. The same form therefore
+// reaches this model through different parse contexts depending on whether
+// it sits at the top of the bracket or nested as a junction operand, and it
+// yields the same kind either way.
 //
-// Every component is the VALUE, not the spelling: brackets and quotes
+// Every component is the value, not the spelling: brackets and quotes
 // removed, escapes resolved, and trivia (whitespace, `--` comments) absent.
 // [PathSegment.Predicate] keeps the verbatim text for anyone who needs it.
 //
-// The set grows ADDITIVELY as further positions are structured, so a consumer
-// type-switching over it MUST treat an unrecognised case as unstructured —
-// refuse, skip, or report — and MUST NOT panic on it.
+// The set grows as further positions are structured, so a consumer
+// type-switching over it must treat an unrecognised case as unstructured
+// (refuse, skip, or report) and must not panic on it.
 //
 // # Comparability
 //
-// A SegmentPredicate is NOT safe to compare with `==` and MUST NOT be used as
+// A SegmentPredicate is not safe to compare with `==` and must not be used as
 // a map key. [ComparisonPredicate] carries an [aql.Comparison], whose Val is a
-// [Value] that panics under `==` for its slice-bearing shapes (see [Value]
-// § Comparability) — and [JunctionPredicate] can hold one transitively. The
-// compiler admits both the comparison and the map key, so this is invisible
-// at build time, exactly as it is for [Value]. Use [EqualPredicates].
+// [Value] that panics under `==` for its slice-bearing shapes (see the
+// Comparability section of [Value]), and [JunctionPredicate] can hold one
+// transitively. The compiler accepts both the comparison and the map key, so
+// this is invisible at build time, exactly as it is for [Value]. Use
+// [EqualPredicates].
 type SegmentPredicate interface {
 	// key is the canonical comparison form: a shape tag followed by each
 	// component, NUL-separated so no component boundary is ambiguous. It is
@@ -58,7 +59,7 @@ type SegmentPredicate interface {
 // NodeIDPredicate is an archetype node id, with the node name the grammar
 // optionally admits after it: `[at0001]`, `[id3]`, `[at0001, 'Systolic']`.
 type NodeIDPredicate struct {
-	// ID is the node code without its brackets — "at0001", "id3".
+	// ID is the node code without its brackets: "at0001", "id3".
 	ID string
 	// Name is the node name when the predicate carries one, nil otherwise.
 	Name *PredicateName
@@ -83,39 +84,37 @@ type ParamPredicate struct {
 	Name string
 }
 
-// ComparisonPredicate is the standing comparison form — `[ehr_id/value=$x]`,
-// `[name/value='Systolic']`. It carries the landed [Comparison] so that a
-// WHERE comparison and a predicate comparison share ONE vocabulary rather
-// than two structurally-identical ones.
+// ComparisonPredicate is the standing comparison form: `[ehr_id/value=$x]`,
+// `[name/value='Systolic']`. It carries a [Comparison], so a WHERE comparison
+// and a predicate comparison share one vocabulary.
 //
 // Because the vocabulary is reused, [Comparison.Path] keeps that type's
-// landed definition — the relative object path AS WRITTEN — and is the one
-// component here that carries a spelling rather than a value. Its trivia-free
+// definition (the relative object path as written) and is the one component
+// here that carries a spelling instead of a value. Its trivia-free
 // decomposition is [Comparison.ParsedPath].Segments, and [EqualPredicates]
 // compares through the structured form, so `[name / value = 'x']` equals
 // `[name/value='x']`.
 //
-// NOT `==`-comparable — see [SegmentPredicate] § Comparability.
+// Not `==`-comparable; see the Comparability section of [SegmentPredicate].
 type ComparisonPredicate struct {
 	Comparison Comparison
 }
 
-// MatchesPredicate is the regex form — `[name/value matches {/systolic/}]`.
+// MatchesPredicate is the regex form: `[name/value matches {/systolic/}]`.
 //
-// NOT `==`-comparable when ParsedPath is set — see [SegmentPredicate]
-// § Comparability.
+// Not `==`-comparable when ParsedPath is set; see the Comparability section
+// of [SegmentPredicate].
 type MatchesPredicate struct {
-	// Path is the left-hand object path AS WRITTEN — the same two-field
-	// story as [Comparison]: the spelling here, the structured form on
-	// ParsedPath. Equality ([EqualPredicates]) reads the structured form,
+	// Path is the left-hand object path as written. As on [Comparison], the
+	// spelling is here and the structured form is on ParsedPath. Equality ([EqualPredicates]) reads the structured form,
 	// so trivia in the spelling does not reach it.
 	Path string
 	// ParsedPath carries the same path's structured Segments with an empty
-	// Alias (a relative predicate path binds no FROM alias) — the
+	// Alias (a relative predicate path binds no FROM alias): the
 	// trivia-free component a reader compares.
 	ParsedPath *IdentifiedPath
 	// Regex is the pattern between the `/` delimiters of the token's
-	// `SLASH_REGEX` part — braces, surrounding whitespace and the slash
+	// `SLASH_REGEX` part, with braces, surrounding whitespace and the slash
 	// delimiters removed, and the `\/` spelling (which exists only because
 	// `/` is the delimiter) resolved to `/`. Every other backslash sequence
 	// is regex syntax and is left exactly as written.
@@ -126,12 +125,12 @@ type MatchesPredicate struct {
 	Label string
 }
 
-// JunctionPredicate is an `AND` / `OR` over two structured predicates —
-// `[at0001 and name/value=$name]`. Nesting is retained rather than flattened:
-// a reader that needs the flat term list can walk it, and one that needs the
-// source grouping still has it.
+// JunctionPredicate is an `AND` / `OR` over two structured predicates:
+// `[at0001 and name/value=$name]`. Nesting is kept, not flattened: a reader
+// that needs the flat term list can walk it, and one that needs the source
+// grouping still has it.
 //
-// NOT `==`-comparable — see [SegmentPredicate] § Comparability.
+// Not `==`-comparable; see the Comparability section of [SegmentPredicate].
 type JunctionPredicate struct {
 	// Op is [OpAnd] or [OpOr], reusing the WHERE-side junction vocabulary.
 	Op BoolOp
@@ -142,7 +141,7 @@ type JunctionPredicate struct {
 // PredicateNameKind discriminates the five spellings the grammar admits in a
 // predicate's name slot: `SYM_COMMA (STRING | PARAMETER | TERM_CODE | AT_CODE
 // | ID_CODE)`. Modelling fewer than five drops admissible names, and one of
-// them is not a name at all — see [NameParam].
+// them is not a name at all (see [NameParam]).
 type PredicateNameKind uint8
 
 const (
@@ -150,20 +149,20 @@ const (
 	// populated [PredicateName] never carries it, so a reader can fail closed
 	// on it rather than mistaking it for a real spelling.
 	NameUnknown PredicateNameKind = iota
-	// NameString is a quoted string name — `'Systolic'`. Text carries it
+	// NameString is a quoted string name: `'Systolic'`. Text carries it
 	// unquoted with escapes resolved.
 	NameString
-	// NameParam is a `$param` in the name slot: NOT a name, but the name
-	// DEFERRED to query-bind time. A consumer resolving names against a
-	// template MUST distinguish it from a name it can resolve now. Text
+	// NameParam is a `$param` in the name slot. It is not a name: the name is
+	// deferred to query-bind time. A consumer resolving names against a
+	// template must distinguish it from a name it can resolve immediately. Text
 	// carries the parameter name without its `$`.
 	NameParam
-	// NameTermCode is a terminology-coded name — `SNOMED-CT::271649006|systolic|`.
+	// NameTermCode is a terminology-coded name: `SNOMED-CT::271649006|systolic|`.
 	// The parts are decomposed into Terminology / Code / Display.
 	NameTermCode
-	// NameAtCode is an `at`-code in the name slot — `at0004`.
+	// NameAtCode is an `at`-code in the name slot: `at0004`.
 	NameAtCode
-	// NameIDCode is an `id`-code in the name slot — `id4`.
+	// NameIDCode is an `id`-code in the name slot: `id4`.
 	NameIDCode
 )
 
@@ -201,12 +200,12 @@ type PredicateName struct {
 	// without its `$`, or a node code as written. Empty for a term code,
 	// which decomposes into the three fields below.
 	Text string
-	// Terminology is a [NameTermCode]'s terminology id — the part before
+	// Terminology is a [NameTermCode]'s terminology id: the part before
 	// `::`, with any parenthesised version suffix kept as written.
 	Terminology string
-	// Code is a [NameTermCode]'s code — the part after `::`.
+	// Code is a [NameTermCode]'s code: the part after `::`.
 	Code string
-	// Display is a [NameTermCode]'s optional display name — the part between
+	// Display is a [NameTermCode]'s optional display name: the part between
 	// the trailing `|` delimiters, which the grammar makes optional. Empty
 	// when the source carried none.
 	Display string
@@ -300,15 +299,15 @@ func (p JunctionPredicate) key() string {
 }
 
 // EqualPredicates reports whether two structured predicates say the same
-// thing — the replacement for `==` on a [SegmentPredicate] (see
-// § Comparability), panic-free over every shape including a nil.
+// thing. Use it instead of `==` on a [SegmentPredicate] (see the
+// Comparability section there); it does not panic on any shape, including nil.
 //
-// Equality is over the KIND and its components, not over the source spelling:
-// `[at0001 , 'x']` and `[at0001,'x']` are equal, which is the point of the
-// model. Two nil predicates are equal; a nil never equals a populated one.
-// A junction is compared structurally, so `a AND (b AND c)` does NOT equal
-// `(a AND b) AND c` — the model retains the source grouping, and collapsing it
-// here would make equality disagree with what the predicate carries.
+// Equality is over the kind and its components, not over the source spelling:
+// `[at0001 , 'x']` and `[at0001,'x']` are equal. Two nil predicates are equal;
+// a nil never equals a populated one. A junction is compared structurally, so
+// `a AND (b AND c)` does not equal `(a AND b) AND c`: the model keeps the
+// source grouping, and collapsing it here would make equality disagree with
+// what the predicate carries.
 func EqualPredicates(a, b SegmentPredicate) bool {
 	av, aok := derefSegmentPredicate(a)
 	bv, bok := derefSegmentPredicate(b)

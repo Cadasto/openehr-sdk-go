@@ -16,17 +16,17 @@ import (
 // reformatting documented per deployment).
 //
 // The probe accepts the OPT bytes verbatim so the same fixture is
-// reused across conformant implementations (REQ-082). Round-trip equality is checked by a
-// byte comparison; backends that reformat the OPT on storage (e.g.
-// normalising whitespace) will not pass and SHOULD document the
+// reused across conformant implementations. Round-trip equality is checked
+// by a byte comparison; backends that reformat the OPT on storage (e.g.
+// normalising whitespace) will not pass and should document the
 // canonical-form rule for conformance comparison.
 //
 // Inputs:
 //   - opt is the OPT XML body to upload.
-//   - templateID is the deployment-assigned id the SDK MUST receive
+//   - templateID is the deployment-assigned id the SDK must receive
 //     back in the upload metadata. When empty the probe accepts any
 //     non-empty id returned by the server.
-func Probe067TemplateUploadRoundTrip(ctx context.Context, c *transport.Client, opt []byte, templateID string) (Result, error) {
+func Probe067TemplateUploadRoundTrip(ctx context.Context, c *transport.Client, opt []byte, templateID string) (Result, error) { // PROBE-067 (REQ-082)
 	r := Result{Probe: "PROBE-067"}
 	if c == nil {
 		return r, errors.New("PROBE-067: nil transport.Client")

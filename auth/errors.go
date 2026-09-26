@@ -19,7 +19,7 @@ var (
 
 	// ErrReauthRequired indicates the cached token cannot be refreshed
 	// without consumer intervention (refresh_token absent or rejected
-	// terminally). Consumers MUST restart the launch flow.
+	// terminally). Callers must restart the launch flow.
 	ErrReauthRequired = errors.New("auth: re-authentication required")
 
 	// ErrInvalidConfig indicates a provider was constructed with
@@ -28,22 +28,21 @@ var (
 	ErrInvalidConfig = errors.New("auth: invalid configuration")
 
 	// ErrJWKSValidationFailed indicates a JWT could not be validated
-	// against the deployment's JWKS even after one refresh (REQ-062).
+	// against the deployment's JWKS even after one refresh.
 	ErrJWKSValidationFailed = errors.New("auth: JWKS validation failed")
 )
 
 // OAuth2Error is the parsed error response from an OAuth2 token endpoint.
-// The error response shape is defined by RFC 6749 § 5.2.
+// The error response shape is defined by RFC 6749 §5.2.
 type OAuth2Error struct {
 	Code        string // "invalid_client", "invalid_grant", ...
 	Description string // human-readable description
 	URI         string // optional URI describing the error
 }
 
-// Error implements error. A nil receiver answers with the zero
-// OAuth2Error's text rather than dereferencing (REQ-025 nil-receiver
-// axis): a failed errors.As / errors.AsType leaves a typed nil that a
-// caller boxes into a non-nil error interface and prints.
+// Error implements error. A nil receiver returns the zero OAuth2Error's
+// text instead of panicking, so the typed nil a failed errors.As or
+// errors.AsType leaves behind is safe to print.
 func (e *OAuth2Error) Error() string {
 	if e == nil {
 		return (&OAuth2Error{}).Error()
@@ -81,9 +80,9 @@ type ExchangeError struct {
 	Inner error
 }
 
-// Error implements error. A nil receiver answers with the zero
-// ExchangeError's text rather than dereferencing (REQ-025 nil-receiver
-// axis): a failed errors.As / errors.AsType leaves a typed nil behind.
+// Error implements error. A nil receiver returns the zero ExchangeError's
+// text instead of panicking, so the typed nil a failed errors.As or
+// errors.AsType leaves behind is safe to print.
 func (e *ExchangeError) Error() string {
 	if e == nil {
 		return (&ExchangeError{}).Error()
@@ -110,7 +109,7 @@ func (e *ExchangeError) Error() string {
 
 // Unwrap walks the wrapped errors. errors.Is(err, auth.ErrTokenExchangeFailed)
 // and errors.AsType[*auth.OAuth2Error](err) both work. A nil receiver
-// unwraps to nothing (REQ-025 nil-receiver axis).
+// unwraps to nothing.
 func (e *ExchangeError) Unwrap() []error {
 	if e == nil {
 		return nil
@@ -128,13 +127,12 @@ func (e *ExchangeError) Unwrap() []error {
 	return out
 }
 
-// Terminal reports whether the token-endpoint failure is permanent — a 4xx
+// Terminal reports whether the token-endpoint failure is permanent: a 4xx
 // response whose OAuth2 envelope is invalid_grant, invalid_client, or
 // invalid_token. Transient failures (5xx, network, context, unparsed) return
-// false so callers retain the refresh token and may retry (REQ-063). Reach this
-// method via errors.AsType[*auth.ExchangeError](err) rather than a direct
-// type assertion; it is
-// nil-receiver safe.
+// false so callers keep the refresh token and can retry. Reach this method
+// via errors.AsType[*auth.ExchangeError](err) rather than a direct type
+// assertion; it is safe on a nil receiver.
 func (e *ExchangeError) Terminal() bool {
 	if e == nil || e.StatusCode < 400 || e.StatusCode >= 500 || e.OAuth2 == nil {
 		return false

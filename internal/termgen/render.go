@@ -22,7 +22,7 @@ type SourceInfo struct {
 // codeSets registry slices the package's accessors range over.
 //
 // The output is run through go/format, so it is gofmt-clean, and it depends
-// on nothing but t and src, so it is byte-deterministic — both are what let
+// on nothing but t and src, so it is byte-deterministic. Together these let
 // `make termgen-verify` treat any difference from the committed file as
 // drift.
 func Render(t *Terminology, src SourceInfo) ([]byte, error) {

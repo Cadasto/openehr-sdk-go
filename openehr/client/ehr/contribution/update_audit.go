@@ -9,8 +9,8 @@ import (
 )
 
 // AuditType selects the `_type` discriminator emitted on the write-side
-// commit audit. ITS-REST PR 131 / SPECITS-95 say a client SHOULD send
-// `UPDATE_AUDIT` while servers SHOULD accept `AUDIT_DETAILS` (or an omitted
+// commit audit. ITS-REST PR 131 / SPECITS-95 say a client should send
+// `UPDATE_AUDIT` while servers should accept `AUDIT_DETAILS` (or an omitted
 // `_type`). The SDK defaults to `AUDIT_DETAILS` (the form the reference CDRs
 // were validated against); callers can switch to `UPDATE_AUDIT` if a
 // non-conformant server rejects `AUDIT_DETAILS`.
@@ -18,22 +18,22 @@ type AuditType string
 
 const (
 	// AuditTypeAuditDetails emits `_type:"AUDIT_DETAILS"`. This is the SDK
-	// default — the zero value of [UpdateAudit.Type] resolves to it.
+	// default: the zero value of [UpdateAudit.Type] resolves to it.
 	AuditTypeAuditDetails AuditType = "AUDIT_DETAILS"
-	// AuditTypeUpdateAudit emits `_type:"UPDATE_AUDIT"` — the ITS-REST
-	// client-SHOULD form; use it as a fallback when a non-conformant server
+	// AuditTypeUpdateAudit emits `_type:"UPDATE_AUDIT"`, the form ITS-REST
+	// recommends clients send; use it as a fallback when a non-conformant server
 	// refuses AUDIT_DETAILS on contribution create.
 	AuditTypeUpdateAudit AuditType = "UPDATE_AUDIT"
 )
 
-// UpdateAudit is the ITS-REST Contribution_create commit-audit DTO — the
+// UpdateAudit is the ITS-REST Contribution_create commit-audit DTO: the
 // request-side shape, distinct from the persisted [rm.AuditDetails] returned
-// on GET. Per ITS-REST PR 131 / SPECITS-95 the commit audit MUST NOT carry
+// on GET. Per ITS-REST PR 131 / SPECITS-95 the commit audit must not carry
 // a server-assigned time_committed; system_id is optional on write. The SDK
 // emits _type:"AUDIT_DETAILS" by default (see [AuditType]).
 type UpdateAudit struct {
 	// ChangeType is the audit change-type coded value (openEHR Terminology
-	// "audit change type" group) — DV_CODED_TEXT shaped (defining_code nesting).
+	// "audit change type" group), DV_CODED_TEXT shaped (defining_code nesting).
 	ChangeType rm.DVCodedText
 	// Committer is the party that committed the change (required).
 	Committer rm.PartyProxy

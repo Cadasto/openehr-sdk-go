@@ -30,15 +30,14 @@ const (
 	routeVersionByID     = "/demographic/versioned_party/{versioned_object_uid}/version/{version_uid}"
 )
 
-// PartyVersion is a decoded VERSION<PARTY> — the commit envelope
+// PartyVersion is a decoded VERSION<PARTY>: the commit envelope
 // (ORIGINAL_VERSION) plus the polymorphically-decoded PARTY payload. The
 // envelope's `data` is decoded by `_type` into [Party]; the audit / lifecycle
 // / version-id fields come straight from the envelope.
 //
 // It is a curated projection of ORIGINAL_VERSION: the envelope's
 // `attestations`, `other_input_version_uids`, and `signature` are
-// intentionally not surfaced (the read family is not signature-/merge-aware
-// yet). Read the raw VERSION via the CDR if those are needed.
+// not surfaced (the read family is not signature- or merge-aware). Read the raw VERSION via the CDR if those are needed.
 type PartyVersion struct {
 	// UID is this version's OBJECT_VERSION_ID. Its Value is the wire string
 	// you pass back as an [ehr.VersionUID]; see [PartyVersion.VersionUID].
@@ -58,14 +57,14 @@ type PartyVersion struct {
 	Party rm.Party
 }
 
-// VersionUID returns this version's id as an [ehr.VersionUID] — the string
-// newtype the read paths take (e.g. [GetVersionByID]) — closing the
-// round-trip from a read back to a targeted fetch.
+// VersionUID returns this version's id as an [ehr.VersionUID], the string
+// newtype the read paths take (e.g. [GetVersionByID]), so a read result can
+// be passed straight back to a targeted fetch.
 func (pv *PartyVersion) VersionUID() openehrclient.VersionUID {
 	return openehrclient.VersionUID(pv.UID.Value)
 }
 
-// GetVersionedParty retrieves the VERSIONED_PARTY container for voUID — the
+// GetVersionedParty retrieves the VERSIONED_PARTY container for voUID: the
 // version-control header (owner, time created, uid). Use [GetRevisionHistory]
 // for the change log and [GetVersion] for version content.
 //

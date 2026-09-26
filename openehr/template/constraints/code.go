@@ -7,7 +7,7 @@ import (
 
 // CodedTermRef is the openEHR CODE_PHRASE shape used inside primitive
 // constraint payloads (e.g. DV_QUANTITY.property, DV_ORDINAL.symbol).
-// Kept as a flat record so this package stays stdlib-only — the rm
+// It is a flat record so this package stays stdlib-only; the rm
 // package's DvCodedText pulls in too much surface for a leaf
 // constraint type.
 type CodedTermRef struct {
@@ -34,11 +34,11 @@ type CodePhrase struct {
 
 func (CodePhrase) isPrimitive() {}
 
-// ExampleValue returns a minimal-valid [CodedTermRef]. REQ-107.
-// First entry of CodeList wins when the list is non-empty (so closed
-// enumerations produce a member); else a "local::at0000" sentinel
-// under the constrained terminology (or "local" when unconstrained)
-// so external constraints surface a recognisable placeholder.
+// ExampleValue returns a minimal-valid [CodedTermRef].
+// The first entry of CodeList wins when the list is non-empty (so closed
+// enumerations produce a member); otherwise it returns a "local::at0000"
+// sentinel under the constrained terminology (or "local" when
+// unconstrained) so external constraints surface a recognisable placeholder.
 func (c CodePhrase) ExampleValue() any {
 	if len(c.CodeList) > 0 {
 		term := c.Terminology
@@ -64,7 +64,7 @@ func (c CodePhrase) External() bool {
 // (treated as the code string under any terminology). When
 // Terminology is set and the input carries a different terminology
 // id, the result includes a CodeInvalidValue violation. When
-// CodeList is non-empty the code MUST appear in it.
+// CodeList is non-empty the code must appear in it.
 func (c CodePhrase) Validate(value any) []Violation {
 	var ref CodedTermRef
 	switch v := value.(type) {

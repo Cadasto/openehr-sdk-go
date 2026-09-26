@@ -41,7 +41,7 @@ import (
 // OPT compiler cannot yet handle yields Status "skip" (not "fail") so the probe
 // distinguishes an un-modelled template from a codec defect. Framework misuse
 // (nil inputs) returns a non-nil error.
-func Probe076SimplifiedRoundTrip(optBody, compBody []byte) (Result, error) {
+func Probe076SimplifiedRoundTrip(optBody, compBody []byte) (Result, error) { // PROBE-076 (REQ-053)
 	r := Result{Probe: "PROBE-076"}
 	if optBody == nil || compBody == nil {
 		return r, errors.New("PROBE-076: nil opt/composition body")

@@ -5,13 +5,12 @@ import "context"
 type tokenSourceCtxKey struct{}
 
 // WithTokenSource returns a derived context carrying ts as a per-request
-// override. transport/ MUST consult TokenSourceFromContext on every
-// outgoing request and prefer the per-request TokenSource over the
-// client-default when present (docs/specifications/auth.md § Per-request TokenSource;
-// PROBE-064).
+// override. The transport consults TokenSourceFromContext on every
+// outgoing request and prefers the per-request TokenSource over the
+// client default when present.
 //
 // Use case: an MCP server holds one transport.Client and forwards each
-// incoming caller's token through ctx — the client itself does not own
+// incoming caller's token through ctx, so the client itself does not own
 // the user-level credentials.
 func WithTokenSource(ctx context.Context, ts TokenSource) context.Context {
 	if ts == nil {

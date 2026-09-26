@@ -1,6 +1,6 @@
 // Package authprobes hosts the openEHR conformance probes for authentication
-// and token-refresh behaviour. Each probe corresponds to a PROBE-NNN entry in
-// docs/specifications/conformance.md.
+// and token-refresh behaviour. Each probe implements one numbered conformance
+// probe (PROBE-NNN).
 //
 // Probes are plain Go functions returning (Result, error) and are designed to
 // be invocable from:
@@ -25,7 +25,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-// Result is the shared probe outcome (REQ-082).
+// Result is the shared probe outcome, an alias of [probe.Result].
 type Result = probe.Result
 
 // refreshingTokenSource is a test-double TokenSource + Reauther used by
@@ -58,7 +58,7 @@ func (r *refreshingTokenSource) Reauth(_ context.Context) error {
 // Probe007TransportTokenRefresh implements PROBE-007 (transport half):
 // an expired / rejected access token is refreshed silently before the
 // next request when an auth.Reauther is registered via
-// transport.WithReauthOn401 (REQ-063, REQ-071 bullet 3).
+// transport.WithReauthOn401.
 //
 // Scenario:
 //   - The test server returns 401 on the first call (simulating token
@@ -74,12 +74,11 @@ func (r *refreshingTokenSource) Reauth(_ context.Context) error {
 //  4. The second request carried the new (refreshed) bearer.
 //  5. Reauth was called exactly once.
 //
-// Note: PROBE-007's broader scope (proactive expiry-based refresh via
+// The proactive half of PROBE-007 (expiry-based refresh via
 // TokenSource.Token before the request is issued) is covered by
-// auth/smart unit tests.  This probe asserts the transport-layer
-// safety-net path only.  The full PROBE-007 probe suite (sandbox +
-// cassette + live) lands in Phase 5.
-func Probe007TransportTokenRefresh(ctx context.Context) (Result, error) { // PROBE-007
+// [Probe007ProactiveTokenRefresh] and the auth/smart unit tests. This probe asserts the transport-layer
+// safety-net path only.
+func Probe007TransportTokenRefresh(ctx context.Context) (Result, error) { // PROBE-007 (REQ-063)
 	r := Result{Probe: "PROBE-007"}
 
 	var (

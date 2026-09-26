@@ -19,8 +19,8 @@ type PKCEPair struct {
 }
 
 // NewPKCEPair generates a cryptographically random code_verifier and its S256
-// code_challenge (REQ-061), delegating to golang.org/x/oauth2's RFC 7636
-// helpers (GenerateVerifier — 32 octets of entropy — and
+// code_challenge, delegating to golang.org/x/oauth2's RFC 7636 helpers
+// (GenerateVerifier, which uses 32 octets of entropy, and
 // S256ChallengeFromVerifier). The plain challenge method is never used. The
 // error return is retained for API stability; the current implementation does
 // not fail.

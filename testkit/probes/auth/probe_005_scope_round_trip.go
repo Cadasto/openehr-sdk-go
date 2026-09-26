@@ -9,7 +9,7 @@ import (
 
 // Probe005ScopeRoundTrip implements PROBE-005: a configured openEHR scope
 // (`<compartment>/<resource>.<permission>`) survives token exchange and
-// lands in the token response `scope` field (REQ-061).
+// lands in the token response `scope` field.
 //
 // Pass conditions:
 //  1. The authorization-request `scope` parameter contains the configured scope.

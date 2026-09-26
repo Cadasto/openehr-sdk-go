@@ -20,7 +20,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
 
-// MarshalStructured encodes comp as STRUCTURED JSON using wt (REQ-053).
+// MarshalStructured encodes comp as STRUCTURED JSON using wt.
 func MarshalStructured(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byte, error) {
 	flat, err := encodeFlat(comp, wt)
 	if err != nil {
@@ -34,7 +34,7 @@ func MarshalStructured(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byt
 }
 
 // UnmarshalStructured decodes STRUCTURED JSON into a canonical COMPOSITION
-// using wt (REQ-053). It restructures to FLAT and delegates to UnmarshalFlat.
+// using wt. It restructures to FLAT and delegates to UnmarshalFlat.
 func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*rm.Composition, error) {
 	s, err := unmarshalObject(data)
 	if err != nil {

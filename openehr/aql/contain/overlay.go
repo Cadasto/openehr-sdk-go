@@ -1,11 +1,10 @@
 package contain
 
-// Edge is one overlay containment fact the BMM cannot express — a From→To pair
-// with a by-reference marker (REQ-160 § Overlay edges, § Extensibility). A
-// plain edge contributes an Admissible route through it; a ByReference edge
-// contributes a ByReference route. Endpoint matching is conformance-aware for
-// BMM-known classes and exact-name for classes the pin does not know
-// (REQ-160 § Extensibility).
+// Edge is one overlay containment fact the BMM cannot express: a From→To pair
+// with a by-reference marker. A plain edge contributes an Admissible route
+// through it; a ByReference edge contributes a ByReference route. Endpoint
+// matching is conformance-aware for BMM-known classes and exact-name for
+// classes the pinned BMM does not know.
 type Edge struct {
 	From, To    string
 	ByReference bool

@@ -31,7 +31,7 @@ type segment struct {
 
 // ItemAtPath returns the single item at a unique path. It returns
 // ErrPathNotFound when nothing matches, ErrPathAmbiguous when more than
-// one item matches, and ErrPathSyntax for a malformed path. REQ-121.
+// one item matches, and ErrPathSyntax for a malformed path.
 func ItemAtPath(root rm.Locatable, path string) (any, error) {
 	items, err := resolve(root, path)
 	if err != nil {
@@ -48,20 +48,20 @@ func ItemAtPath(root rm.Locatable, path string) (any, error) {
 }
 
 // ItemsAtPath returns all items matching a (possibly non-unique) path,
-// empty when none match. A malformed path returns ErrPathSyntax. REQ-121.
+// empty when none match. A malformed path returns ErrPathSyntax.
 func ItemsAtPath(root rm.Locatable, path string) ([]any, error) {
 	return resolve(root, path)
 }
 
 // PathExists reports whether the path resolves to at least one item.
-// A malformed path reports false. REQ-121.
+// A malformed path reports false.
 func PathExists(root rm.Locatable, path string) bool {
 	items, err := resolve(root, path)
 	return err == nil && len(items) > 0
 }
 
 // PathUnique reports whether the path resolves to exactly one item.
-// A malformed path reports false. REQ-121.
+// A malformed path reports false.
 func PathUnique(root rm.Locatable, path string) bool {
 	items, err := resolve(root, path)
 	return err == nil && len(items) == 1

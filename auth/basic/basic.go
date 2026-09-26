@@ -11,18 +11,18 @@ import (
 	"github.com/cadasto/openehr-sdk-go/auth"
 )
 
-// TokenType is the Authorization scheme emitted on the wire (REQ-069).
+// TokenType is the Authorization scheme emitted on the wire.
 const TokenType = "Basic"
 
 // Source returns a fixed Basic credential on every Token() call. There is
-// no token exchange or refresh — credentials are supplied at construction.
-// Source is safe for concurrent use (REQ-026).
+// no token exchange or refresh; credentials are supplied at construction.
+// Source is safe for concurrent use.
 type Source struct {
 	token auth.Token
 }
 
-// New constructs a Source from username and password. Username MUST be
-// non-empty. Password MAY be empty when the deployment allows it.
+// New constructs a Source from username and password. Username must be
+// non-empty. Password can be empty when the deployment allows it.
 func New(username, password string) (*Source, error) {
 	if username == "" {
 		return nil, fmt.Errorf("%w: username is required", auth.ErrInvalidConfig)
@@ -30,7 +30,7 @@ func New(username, password string) (*Source, error) {
 	return &Source{token: encodeToken(username, password)}, nil
 }
 
-// Token returns the Basic credential. It honours ctx cancellation (REQ-020).
+// Token returns the Basic credential. It honours ctx cancellation.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	if err := ctx.Err(); err != nil {
 		return auth.Token{}, err

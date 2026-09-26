@@ -16,7 +16,8 @@ const (
 	// and BMM-mandatory implicits. Smallest valid tree.
 	Minimal Policy = iota
 	// Example materialises Minimal plus every primitive leaf
-	// populated with its REQ-103 ExampleValue. Default for fixtures.
+	// populated with its PrimitiveConstraint.ExampleValue. Suited to
+	// fixtures.
 	Example
 )
 
@@ -32,13 +33,13 @@ func (p Policy) String() string {
 }
 
 // ValueFill controls how primitive leaves are valued, orthogonally to
-// [Policy] (which controls *which* nodes are materialised). REQ-107.
+// [Policy] (which controls which nodes are materialised).
 type ValueFill int
 
 const (
-	// ExampleFill is the default: each primitive leaf gets its REQ-103
-	// PrimitiveConstraint.ExampleValue — a single representative value,
-	// byte-identical across calls for one OPT.
+	// ExampleFill is the default: each primitive leaf gets its
+	// PrimitiveConstraint.ExampleValue, a single representative value
+	// that is byte-identical across calls for one OPT.
 	ExampleFill ValueFill = iota
 	// RandomFill draws each leaf from within its constraint (in-range
 	// magnitudes, value-set-member codes, enumeration entries), valid by
@@ -100,8 +101,8 @@ type Options struct {
 	UIDSource func() *rm.HierObjectID
 
 	// ValueFill selects how primitive leaves are valued. Zero value =
-	// ExampleFill (the REQ-103 representative value). RandomFill draws
-	// in-constraint values that vary between calls. REQ-107.
+	// ExampleFill (the constraint's representative example value).
+	// RandomFill draws in-constraint values that vary between calls.
 	ValueFill ValueFill
 
 	// ValueSource seeds the in-constraint sampler used when ValueFill is

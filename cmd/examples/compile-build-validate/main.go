@@ -1,15 +1,13 @@
-// Example: the full clinical pipeline driven entirely through PUBLIC
-// SDK packages (REQ-111) — parse an OPT, compile it with the public
-// openehr/templatecompile bridge, build a *rm.Composition with the
-// REQ-101 builder, serialise it to canonical JSON, round-trip it, and
-// validate it against the same compiled template.
+// Example: the full clinical pipeline driven entirely through public SDK
+// packages. It parses an OPT, compiles it with the public
+// openehr/templatecompile bridge, builds a *rm.Composition with the
+// composition builder, serialises it to canonical JSON, round-trips it, and
+// validates it against the same compiled template.
 //
-// The point of this example is the import list: it uses only
+// The import list is the point of this example: it uses only
 // openehr/template, openehr/templatecompile, openehr/composition,
-// openehr/serialize/canjson, openehr/validation and openehr/rm — no
-// internal/ package. Before REQ-111 the compiled template was only
-// constructable inside the SDK module, so this exact program could not
-// be written by an external consumer. It now can.
+// openehr/serialize/canjson, openehr/validation and openehr/rm, and no
+// internal/ package, so a program in another module can do the same.
 //
 // Run:
 //

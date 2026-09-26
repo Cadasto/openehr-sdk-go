@@ -42,10 +42,8 @@ package rm
 // DVTextValueOf returns the `value` rendition of any DV_TEXT subtype.
 // Returns "" when the interface is nil.
 //
-// Compat shim: prefer `v.GetValue()` directly — that method now lives
-// on [DVTextLike] (see openehr/rm/like_interfaces.go). This helper
-// stays for callers migrating off the pre-Phase-1 closed type-switch
-// pattern.
+// Compatibility helper: prefer calling `v.GetValue()` directly, which
+// [DVTextLike] provides.
 func DVTextValueOf(v DVTextLike) string {
 	if v == nil {
 		return ""
@@ -68,7 +66,7 @@ func DVTextValueOf(v DVTextLike) string {
 // AsDVText returns the DVText payload of v (the parent struct
 // embedded in every subtype). The second return is true when v is
 // non-nil and a known DVTextLike concrete type. Useful at validation
-// sites that previously consumed a `rm.DVText` value.
+// sites that need a plain `rm.DVText` value.
 func AsDVText(v DVTextLike) (DVText, bool) {
 	switch t := v.(type) {
 	case *DVText:
@@ -91,10 +89,8 @@ func AsDVText(v DVTextLike) (DVText, bool) {
 
 // DVURIValueOf returns the URI string carried by any DV_URI subtype.
 //
-// Compat shim: prefer `v.GetValue()` directly — that method now lives
-// on [DVURILike] (see openehr/rm/like_interfaces.go). This helper
-// stays for callers migrating off the pre-Phase-1 closed type-switch
-// pattern.
+// Compatibility helper: prefer calling `v.GetValue()` directly, which
+// [DVURILike] provides.
 func DVURIValueOf(v DVURILike) string {
 	if v == nil {
 		return ""

@@ -50,10 +50,10 @@ func (b *allocBudget) add(k int) error {
 	return nil
 }
 
-// UnmarshalFlat decodes FLAT JSON into a canonical COMPOSITION using wt
-// (REQ-053). It rebuilds a canonical-JSON tree from the FLAT entries — node
-// types and the elided HISTORY/ITEM_TREE wrappers come from the Web Template
-// and rminfo, values from the FLAT suffixes — then decodes it through canjson
+// UnmarshalFlat decodes FLAT JSON into a canonical COMPOSITION using wt.
+// It rebuilds a canonical-JSON tree from the FLAT entries (node types and
+// the elided HISTORY/ITEM_TREE wrappers come from the Web Template and
+// rminfo, values from the FLAT suffixes), then decodes it through canjson
 // (typereg instantiates the polymorphic RM types).
 func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*rm.Composition, error) {
 	if wt == nil || wt.Tree == nil {
@@ -292,15 +292,15 @@ var metadataOwnedBaseCtx = map[string]string{
 }
 
 // MetadataAliasSpellings returns the root-relative FLAT spellings the decoder
-// accepts as aliases of the ctx/ composition-metadata short forms (ADR 0015),
+// accepts as aliases of the ctx/ composition-metadata short forms,
 // sorted. `"language|code"`, for instance, is accepted at
 // `<root>/language|code` and normalised to `ctx/language`.
 //
 // This is informative public surface for conformance tooling, not a decode knob.
 // A harness that has to hold composition metadata out of a like-for-like FLAT
-// comparison (PROBE-086) derives that hold-out from here rather than restating
+// comparison derives that hold-out from here rather than restating
 // the table, so an alias the codec accepts cannot silently diverge from the
-// spellings a census excuses. The returned slice is freshly allocated, so a
+// spellings the harness excuses. The returned slice is freshly allocated, so a
 // caller may sort or filter it without reaching the decoder's own table.
 func MetadataAliasSpellings() []string {
 	return slices.Sorted(maps.Keys(metadataAliases))
@@ -311,11 +311,11 @@ func MetadataAliasSpellings() []string {
 // `|terminology` keys whose value is checked against the terminology the ctx/
 // short form implies and then discarded.
 //
-// Informative public surface for conformance tooling on the same terms as
-// [MetadataAliasSpellings], reported separately because a witness is not data —
-// nothing on the ctx/ side carries it, so a comparison has to account for it as
-// a checked-and-dropped key rather than as a respelling. The returned slice is
-// freshly allocated.
+// It is informative public surface for conformance tooling on the same terms
+// as [MetadataAliasSpellings], reported separately because a witness is not
+// data. Nothing on the ctx/ side carries it, so a comparison has to account
+// for it as a checked-and-dropped key rather than as a respelling. The
+// returned slice is freshly allocated.
 func MetadataWitnessSpellings() []string {
 	return slices.Sorted(maps.Keys(metadataAliasTerminology))
 }

@@ -36,14 +36,14 @@ func WithLanguage(lang string) Option {
 }
 
 // WithTerritory sets Composition.territory. Required when the OPT
-// root is COMPOSITION — instance.Generate returns
+// root is COMPOSITION; instance.Generate returns
 // ErrTerritoryRequired otherwise.
 func WithTerritory(code string) Option {
 	return func(c *config) { c.territory = code }
 }
 
 // WithComposer sets Composition.composer. Required when the OPT root
-// is COMPOSITION — instance.Generate returns ErrComposerRequired
+// is COMPOSITION; instance.Generate returns ErrComposerRequired
 // otherwise.
 func WithComposer(p rm.PartyProxy) Option {
 	return func(c *config) { c.composer = p }
@@ -52,7 +52,7 @@ func WithComposer(p rm.PartyProxy) Option {
 // WithCategory overrides the default 433|event| Composition.category.
 // The caller-supplied value is applied to the skeleton after
 // instance.Generate has run, so the OPT-declared category (if any)
-// is overwritten — same semantics as ehrbase's WebTemplateSkeletonBuilder.
+// is overwritten. This matches EHRbase's WebTemplateSkeletonBuilder.
 func WithCategory(c rm.DVCodedText) Option {
 	return func(cf *config) {
 		v := c
@@ -69,9 +69,9 @@ func WithNow(t time.Time) Option {
 }
 
 // WithValueFill selects how primitive leaves are valued. The default
-// (instance.ExampleFill) emits the REQ-103 representative value;
-// instance.RandomFill draws in-constraint values that vary per call —
-// seed via WithValueSource for reproducibility. REQ-107.
+// (instance.ExampleFill) emits each constraint's representative example
+// value; instance.RandomFill draws in-constraint values that vary per
+// call. Seed it with WithValueSource for reproducibility.
 func WithValueFill(f instance.ValueFill) Option {
 	return func(c *config) { c.valueFill = f }
 }
@@ -83,8 +83,8 @@ func WithValueFill(f instance.ValueFill) Option {
 // under ExampleFill.
 //
 // A math/rand/v2.Source is not safe for concurrent use: do not share one
-// Source across concurrent NewSkeleton / Build calls — give each its own
-// (or leave it nil to use the concurrency-safe global). REQ-107.
+// Source across concurrent NewSkeleton / Build calls. Give each its own,
+// or leave it nil to use the concurrency-safe global.
 func WithValueSource(src mrand.Source) Option {
 	return func(c *config) { c.valueSource = src }
 }

@@ -15,16 +15,16 @@ import (
 // rawCodePhrase is the method-free canonical-JSON alias for CodePhrase. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawCodePhrase CodePhrase
 
 // MarshalJSONTo emits canonical openEHR JSON for CodePhrase with `_type`
 // (value "CODE_PHRASE") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (c CodePhrase) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -35,7 +35,7 @@ func (c CodePhrase) MarshalJSONTo(enc *jsontext.Encoder) error {
 // jsonWireDVCodedText is the flat canonical-JSON wire struct for DVCodedText. DVCodedText embeds
 // a marshaler-bearing concrete ancestor, so the zero-copy alias would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
-// struct embeds nothing and so cannot promote (ADR 0022, ruling R19).
+// struct embeds nothing and so cannot promote.
 type jsonWireDVCodedText struct {
 	Class string `json:"_type"`
 	// Value Displayable rendition of the item, regardless of its underlying structure. For `DV_CODED_TEXT`, this is the rubric of the complete term as provided by the terminology service.
@@ -63,7 +63,7 @@ type jsonWireDVCodedText struct {
 }
 
 // MarshalJSONTo emits canonical openEHR JSON for DVCodedText with `_type`
-// (value "DV_CODED_TEXT") as the leading member (REQ-052, Q6). The receiver is a
+// (value "DV_CODED_TEXT") as the leading member. The receiver is a
 // value so a by-value instance in a polymorphic slot keeps its `_type`.
 func (d DVCodedText) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &jsonWireDVCodedText{
@@ -81,16 +81,16 @@ func (d DVCodedText) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawDVParagraph is the method-free canonical-JSON alias for DVParagraph. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawDVParagraph DVParagraph
 
 // MarshalJSONTo emits canonical openEHR JSON for DVParagraph with `_type`
 // (value "DV_PARAGRAPH") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (d DVParagraph) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -101,16 +101,16 @@ func (d DVParagraph) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawDVText is the method-free canonical-JSON alias for DVText. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawDVText DVText
 
 // MarshalJSONTo emits canonical openEHR JSON for DVText with `_type`
 // (value "DV_TEXT") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (d DVText) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
@@ -121,16 +121,16 @@ func (d DVText) MarshalJSONTo(enc *jsontext.Encoder) error {
 // rawTermMapping is the method-free canonical-JSON alias for TermMapping. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted (ADR 0022).
+// ancestor, so nothing is promoted.
 type rawTermMapping TermMapping
 
 // MarshalJSONTo emits canonical openEHR JSON for TermMapping with `_type`
 // (value "TERM_MAPPING") as the leading member. Field order otherwise follows the
 // struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling
-// (REQ-052, Q6). The receiver is a value so a concrete instance sitting
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type` (REQ-052 substitution).
+// accessors admit, still carries its `_type`.
 func (t TermMapping) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`

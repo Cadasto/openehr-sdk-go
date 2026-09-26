@@ -13,23 +13,23 @@ import (
 
 // Probe041CatalogRefreshOn401 implements PROBE-041 in its
 // discovery-layer scope: a `Refresh` triggered by a stale catalog
-// MUST produce exactly one fetch and surface a typed error when the
-// upstream rejects with `401 Unauthorized`. The full transport-
-// driven retry-on-401 leg (REQ-071 bullet 3 — transport sees 401,
-// asks discovery to refresh, retries once, second 401 → typed
-// `transport.ErrUnauthorized`) is asserted at the discovery boundary
-// here; the transport-level half (opt-in via
-// `transport.WithReauthOn401` + `auth.ReautherFunc`) is covered by
-// PROBE-007 in `testkit/probes/auth/probe_007_transport_refresh.go`.
+// must produce exactly one fetch and surface a typed error when the
+// upstream rejects with `401 Unauthorized`. The full transport-driven
+// retry-on-401 leg (transport sees 401, asks discovery to refresh,
+// retries once, second 401 → typed `transport.ErrUnauthorized`) is
+// asserted at the discovery boundary here; the transport-level half
+// (opt-in via `transport.WithReauthOn401` + `auth.ReautherFunc`) is
+// covered by the transport token-refresh probe in
+// `testkit/probes/auth/probe_007_transport_refresh.go`.
 //
 // The probe primes the cache via a successful Resolve, then flips
-// the upstream to 401 and calls Refresh. The Refresh MUST:
+// the upstream to 401 and calls Refresh. The Refresh must:
 //
 //   - issue exactly one fetch (the refresh itself);
-//   - NOT retry beyond that — DiscoveryError carries the failure;
+//   - not retry beyond that (DiscoveryError carries the failure);
 //   - return a typed `*discovery.DiscoveryError` whose Reason is
 //     `ReasonFetchFailed`, so `errors.As` callers can act on it.
-func Probe041CatalogRefreshOn401(ctx context.Context, cassetteBody []byte) (Result, error) {
+func Probe041CatalogRefreshOn401(ctx context.Context, cassetteBody []byte) (Result, error) { // PROBE-041 (REQ-071, REQ-072)
 	r := Result{Probe: "PROBE-041"}
 	if len(cassetteBody) == 0 {
 		return r, errors.New("PROBE-041: cassetteBody is empty")

@@ -9,7 +9,7 @@
 //	submissions/{name}.json       # CONTRIBUTION POST wire (inline ORIGINAL_VERSION)
 //	its_rest/                     # ITS-REST wire records
 //	webtemplate/{template-id}.opt # OPT + EHRbase reference WebTemplate golden
-//	  | {template-id}.webtemplate.json   (PROBE-075 / REQ-116 oracles)
+//	  | {template-id}.webtemplate.json   (Web Template parity oracles)
 //	flat-conformance/             # pinned upstream FLAT corpus (MANIFEST.txt)
 //	  templates/{name}.opt
 //	  compositions/{name}.json
@@ -74,22 +74,22 @@ func SubmissionJSON(name string) string {
 	return filepath.Join(submissionsDir(), name+".json")
 }
 
-// WebTemplateOpt returns testkit/cassettes/webtemplate/{template-id}.opt — an
-// OPT vendored beside its EHRbase reference WebTemplate golden (the PROBE-075
-// / REQ-116 oracles). Vendored Apache-2.0 at a pinned upstream commit;
+// WebTemplateOpt returns testkit/cassettes/webtemplate/{template-id}.opt, an
+// OPT vendored beside its EHRbase reference WebTemplate golden (the oracles
+// for Web Template structural parity). Vendored Apache-2.0 at a pinned upstream commit;
 // provenance in THIRD_PARTY_LICENSES.md. Stems match template_id values.
 func WebTemplateOpt(templateID string) string {
 	return filepath.Join(webtemplateDir(), templateID+".opt")
 }
 
 // WebTemplateReference returns
-// testkit/cassettes/webtemplate/{template-id}.webtemplate.json — the EHRbase
+// testkit/cassettes/webtemplate/{template-id}.webtemplate.json, the EHRbase
 // reference WebTemplate golden for the same-stem OPT.
 func WebTemplateReference(templateID string) string {
 	return filepath.Join(webtemplateDir(), templateID+".webtemplate.json")
 }
 
-// FlatConformanceRoot is testkit/cassettes/flat-conformance — the pinned
+// FlatConformanceRoot is testkit/cassettes/flat-conformance, the pinned
 // upstream EHRbase FLAT serialisation corpus (see MANIFEST.txt there, and
 // scripts/sync-flat-conformance.sh). Vendored Apache-2.0; provenance in
 // THIRD_PARTY_LICENSES.md.
@@ -108,11 +108,12 @@ func FlatConformanceFlat(name string) string {
 	return filepath.Join(FlatConformanceRoot(), "compositions", name+".json")
 }
 
-// AQLConformanceRoot is testkit/cassettes/aql/conformance — the pinned
+// AQLConformanceRoot is testkit/cassettes/aql/conformance, the pinned
 // upstream EHRbase Robot AQL FROM-family combination corpus (see AQL_SOURCE.txt
 // and EXCLUDED.txt there, and scripts/ingest-robot-aql.sh). Vendored
 // Apache-2.0; provenance in THIRD_PARTY_LICENSES.md. The family directories
-// under it hold the CSVs PROBE-100 reconstructs into queries.
+// under it hold the CSVs the AQL conformance-corpus probe reconstructs into
+// queries.
 func AQLConformanceRoot() string {
 	return filepath.Join(CassettesRoot(), "aql", "conformance")
 }
@@ -158,10 +159,10 @@ type OPTRef struct {
 }
 
 // ListAllOPTs returns every operational template vendored under
-// [CassettesRoot] — across templates/, webtemplate/, the FLAT
-// conformance corpus, and the ITS-REST definition cassettes — sorted by
-// Name. Callers that must cover the whole corpus (REQ-116's compiled-path
-// regression guard) use this rather than naming templates individually,
+// [CassettesRoot] (across templates/, webtemplate/, the FLAT
+// conformance corpus, and the ITS-REST definition cassettes), sorted by
+// Name. Callers that must cover the whole corpus (such as the compiled-path
+// regression guard for name-predicated template paths) use this rather than naming templates individually,
 // so a newly vendored OPT is picked up automatically.
 func ListAllOPTs() ([]OPTRef, error) {
 	var refs []OPTRef

@@ -1,6 +1,6 @@
 // bmmdiff is a small CLI that compares two BMM JSON files and prints
 // a human-readable "what changed" summary. Distinct from `git diff`
-// because it understands the BMM structure — added/removed classes,
+// because it understands the BMM structure: added/removed classes,
 // per-class property additions/removals/changes, cardinality changes,
 // function changes, primitive additions/removals.
 //

@@ -20,8 +20,8 @@ type PlannedClass struct {
 	// GoName is the Go identifier ("DVQuantity").
 	GoName string
 	// PackagePath is the BMM package dotted name (e.g.
-	// "org.openehr.rm.data_types.quantity"). Empty for primitive types
-	// — those are bucketed into a synthetic file (see [PlannedFile]).
+	// "org.openehr.rm.data_types.quantity"). Empty for primitive types,
+	// which are bucketed into a synthetic file (see [PlannedFile]).
 	PackagePath string
 	// FileBase is the basename (no _gen.go) the class is emitted to.
 	FileBase string
@@ -31,7 +31,7 @@ type PlannedClass struct {
 	// primitive_types (vs class_definitions).
 	IsPrimitive bool
 	// External is true when this class is NOT owned by the plan's
-	// target — it is referenced from another target (e.g. AOM
+	// target: it is referenced from another target (e.g. AOM
 	// referencing a base/RM class). Renderers consult this flag to
 	// decide whether to prefix the Go identifier with the target's
 	// [Target.ExternalQualifier]. External classes are NEVER emitted
@@ -72,16 +72,17 @@ type Plan struct {
 	CyclicSingleProps map[string]map[string]bool
 	// Classes is a flat map by BMM class name, useful for
 	// cross-package lookup during rendering. Includes BOTH owned and
-	// external classes — the renderer consults [PlannedClass.External]
+	// external classes; the renderer consults [PlannedClass.External]
 	// to decide whether a reference needs a package qualifier.
 	Classes map[string]*PlannedClass
-	// ClassPackages maps EVERY declared class name — including the ones
-	// the skip rules dropped, which never become a [PlannedClass] — to the
+	// ClassPackages maps every declared class name (including the ones
+	// the skip rules dropped, which never become a [PlannedClass]) to the
 	// dotted BMM package that lists it. It is the package walk's own
 	// result, kept rather than discarded so a renderer asking "which
 	// package was this name in?" cannot answer differently from the walk
-	// that decided the skips (REQ-049 needs it for the excluded-package
-	// reason; a second walk could disagree on a class two packages list).
+	// that decided the skips. The rminfo absence table uses it for the
+	// excluded-package reason; a second walk could disagree on a class
+	// two packages list.
 	ClassPackages map[string]string
 	// ConcreteClasses is the ordered list of concrete (non-abstract,
 	// non-enum, non-interface) classes that get registered in
@@ -95,7 +96,7 @@ type Plan struct {
 	AbstractDescendants map[string][]string
 	// ConcreteSubtypes maps each NON-abstract BMM class that has at
 	// least one descendant to the sorted list of its descendant BMM
-	// names. Drives the REQ-052 narrow-interface emission
+	// names. Drives the narrow-interface emission
 	// (`<GoName>Like`): the openEHR RM permits Liskov substitution at
 	// every concrete-typed slot, so a property declared as DV_TEXT may
 	// admit DV_CODED_TEXT etc. The narrow Go interface lifts those
@@ -108,19 +109,19 @@ type Plan struct {
 	Notes []string
 	// MethodStubsEmitted counts how many function stubs were emitted
 	// across all classes (concrete + abstract-propagated). Diagnostic
-	// only — populated by the renderer.
+	// only; populated by the renderer.
 	MethodStubsEmitted int
 	// MethodTodoEscapes counts how many method stubs ended up with a
 	// fallback `any` return type because the function's BMM result
 	// referenced a class that was skipped (FUNCTION, ROUTINE, etc.).
-	// Diagnostic only — populated by the renderer.
+	// Diagnostic only; populated by the renderer.
 	MethodTodoEscapes int
 }
 
 // BuildPlan loads the BMM root schema (and its transitive includes
 // via the supplied resolver) and computes a [Plan]. Uses [TargetRM]
-// as the implicit target — kept for backwards compatibility with
-// Phase 2 tests. New callers should use [BuildPlanForTarget].
+// as the implicit target, kept for backwards compatibility with
+// older tests. New callers should use [BuildPlanForTarget].
 func BuildPlan(ctx context.Context, rootID string, resolver bmm.Resolver) (*Plan, error) {
 	t := TargetRM
 	if rootID != "" {

@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-// RetryPolicy configures retry-on-status behaviour. Disabled by default
-// per REQ-091; enable via transport.WithRetry. Retries respect ctx
-// cancellation immediately. See RetryPolicy.MaxAttempts / Disabled for
-// the precise "no-retry" semantics (REQ-096).
+// RetryPolicy configures retry-on-status behaviour. Retries are
+// disabled by default; enable them with transport.WithRetry. Retries
+// respect ctx cancellation immediately. See RetryPolicy.MaxAttempts and
+// Disabled for the precise "no-retry" semantics.
 type RetryPolicy struct {
 	// Disabled, when true, forces exactly one attempt regardless of
 	// MaxAttempts. Use NoRetry as the canonical zero-config form for
@@ -18,7 +18,7 @@ type RetryPolicy struct {
 	// caller-supplied base policy that already sets MaxAttempts.
 	Disabled bool
 	// MaxAttempts is the total attempt count: 0 means "use package
-	// default" (currently disabled — one attempt); 1 means exactly one
+	// default" (currently disabled, so one attempt); 1 means exactly one
 	// attempt (no retries); N ≥ 2 means up to N total attempts.
 	MaxAttempts int
 	// InitialBackoff is the wait before the first retry. Subsequent
@@ -30,18 +30,17 @@ type RetryPolicy struct {
 	// backoff. Default 2.0.
 	Multiplier float64
 	// RetriableStatus enumerates HTTP statuses that trigger a retry.
-	// Default {502, 503, 504} per the spec example.
+	// Default {502, 503, 504}.
 	RetriableStatus []int
 	// RetryNonIdempotent enables retrying POST/PATCH/DELETE etc. when
-	// the status is retriable. Defaults to false — the SDK does not
+	// the status is retriable. Defaults to false: the SDK does not
 	// retry non-idempotent methods unless the consumer opts in.
 	RetryNonIdempotent bool
 }
 
 // NoRetry is the canonical "exactly one attempt, no retries" policy.
 // Equivalent to RetryPolicy{Disabled: true}. Use it when constructing
-// a transport.Client to make the intent explicit at the call site
-// (REQ-096).
+// a transport.Client to make the intent explicit at the call site.
 var NoRetry = RetryPolicy{Disabled: true}
 
 func (p RetryPolicy) enabled() bool {

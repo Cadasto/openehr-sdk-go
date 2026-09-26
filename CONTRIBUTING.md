@@ -28,7 +28,7 @@
 2. **Run `make ci` locally** before opening the PR. CI replicates the gate ([`docs/ci.md`](docs/ci.md)).
 3. Leave [`CHANGELOG.md`](CHANGELOG.md) to the maintainers. They curate it on request or when a release is cut, not in each feature PR ([AGENTS.md](AGENTS.md#code-style-and-conventions)). Call out any consumer-visible change in the PR description so it can be folded in.
 4. If you add or change a REQ-marked behaviour, update [`docs/specifications/traceability.yaml`](docs/specifications/traceability.yaml) in the same PR (`make spec-check` enforces this).
-5. Cite REQ-NNN / PROBE-NNN in commit messages and doc comments. REQs are stable identifiers, so never renumber one.
+5. Cite REQ-NNN / PROBE-NNN in commit messages, tests and maintainer comments, but not in godoc: package docs and doc comments on exported identifiers are written for SDK users. REQs are stable identifiers, so never renumber one.
 6. **New or changed `cmd/examples/`**: update [`docs/examples.md`](docs/examples.md) and [`cmd/examples/doc.go`](cmd/examples/doc.go) in the same PR; touch [`docs/quick-start.md`](docs/quick-start.md) when the onboarding path changes. See [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
 7. Keep PRs **scoped to one logical change**. Small PRs are easier to review and get merged sooner.
 
@@ -87,7 +87,7 @@ The detailed, normative idiom spec is [`docs/specifications/idiom.md`](docs/spec
 - **Building-block independence (REQ-013)**: the openEHR building-block packages and the AQL blocks MUST be usable standalone, with no `transport/` or `auth/` import. The exact package set and the per-package import guards are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions) and [`docs/specifications/module-layout.md`](docs/specifications/module-layout.md).
 - **No reflection** (REQ-024): RM polymorphism uses closed type-switches only. Generics are fine; `reflect.Value` is not.
 - **Strict-encode / permissive-decode** numerics per [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md).
-- **Comments**: explain WHY, not WHAT; identifiers carry the WHAT. Cite REQ-NNN / PROBE-NNN where relevant; do NOT cite issue numbers or commit SHAs (those rot). One short line per non-obvious choice; no multi-paragraph docstrings except package-level `doc.go`.
+- **Comments**: explain WHY, not WHAT; identifiers carry the WHAT. Cite REQ-NNN / PROBE-NNN where relevant (tests and maintainer comments; godoc on exported API stays free of them); do NOT cite issue numbers or commit SHAs (those rot). One short line per non-obvious choice; no multi-paragraph docstrings except package-level `doc.go`.
 - **Test contexts**: in the I/O-bearing test packages (`transport/`, `auth/`, `smart/`, `openehr/client/*`) use `t.Context()` (Go 1.24+) for request-scoped contexts. Because it is cancelled at test cleanup, leaks surface. Don't reintroduce `context.Background()` there; derive timeouts/cancellation from `t.Context()`. Pure-compute test packages are unaffected.
 
 ## Releases

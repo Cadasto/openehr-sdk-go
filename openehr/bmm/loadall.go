@@ -20,13 +20,13 @@ import (
 //   - ClassDefinitions and PrimitiveTypes: the descendant's entries
 //     take precedence over identically-named entries contributed by
 //     the ancestor. (This reflects observed overlap in the real
-//     openEHR BMM corpus — e.g. TRANSLATION_DETAILS appears in both
+//     openEHR BMM corpus, e.g. TRANSLATION_DETAILS appears in both
 //     openehr_base_1.3.0 and openehr_rm_1.2.0, with the RM definition
 //     being the authoritative refinement.) When two *sibling* ancestor
 //     schemas (i.e. two distinct includes of the same descendant) both
 //     declare the same class with *differing* definitions, that's an
-//     ErrSchemaConflict — there is no winner. An *identical* definition
-//     reached via two include paths (a diamond — e.g. am24 includes both
+//     ErrSchemaConflict; there is no winner. An *identical* definition
+//     reached via two include paths (a diamond, e.g. am24 includes both
 //     base and lang, and lang also includes base) is benign and merged
 //     once.
 //   - Packages are merged by fully-qualified package name (the map key

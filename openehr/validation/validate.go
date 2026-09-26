@@ -7,15 +7,15 @@ import (
 )
 
 // Validate validates an in-memory archetypeable RM root against a
-// compiled OPT and returns every issue in one pass — REQ-110.
+// compiled OPT and returns every issue in one pass.
 //
 // It is the generic form of [ValidateComposition]: the compiled OPT
 // drives the lockstep walk and `root` is the value source. `root` must
-// be one of the RM LOCATABLE concretes the walker recognises — the
-// COMPOSITION content closed set (REQ-102) plus the demographic PARTY
+// be one of the RM LOCATABLE concretes the walker recognises: the
+// COMPOSITION content closed set plus the demographic PARTY
 // hierarchy (PERSON / ORGANISATION / GROUP / AGENT / ROLE and the
 // archetypeable sub-components ADDRESS / CONTACT / PARTY_IDENTITY /
-// PARTY_RELATIONSHIP / CAPABILITY) and the EHR-IM roots FOLDER /
+// PARTY_RELATIONSHIP / CAPABILITY) and the EHR IM roots FOLDER /
 // EHR_STATUS. A root whose concrete RM type does not match the OPT root
 // surfaces as an rm_type_mismatch at "/", not a silent pass.
 //
@@ -54,16 +54,15 @@ func Validate(root any, c *templatecompile.Compiled) Result {
 }
 
 // ValidateDemographic validates an in-memory demographic PARTY (PERSON,
-// ORGANISATION, GROUP, AGENT or ROLE) against a compiled OPT — REQ-110.
+// ORGANISATION, GROUP, AGENT or ROLE) against a compiled OPT.
 // It guards the nil party (yielding nil_party), then delegates to
 // [Validate]. The PARTY sub-components (ADDRESS, CONTACT, PARTY_IDENTITY,
 // PARTY_RELATIONSHIP, CAPABILITY) are validated in place as the walk
 // descends, or as roots in their own right via [Validate].
 //
-// Because rm.Party is an interface, the guard catches BOTH a bare-nil
+// Because rm.Party is an interface, the guard catches both a bare-nil
 // interface and a typed-nil concrete behind it (e.g. a (*rm.Person)(nil)
-// argument) — both yield nil_party rather than the generic nil_root, so
-// the wrapper's advertised contract holds for either nil shape.
+// argument). Both yield nil_party rather than the generic nil_root.
 func ValidateDemographic(party rm.Party, c *templatecompile.Compiled) Result {
 	if party == nil || rmread.IsTypedNilPointer(party) {
 		return resultFromIssues([]Issue{{
@@ -77,7 +76,7 @@ func ValidateDemographic(party rm.Party, c *templatecompile.Compiled) Result {
 }
 
 // ValidateFolder validates an in-memory FOLDER (a directory tree root or
-// sub-folder) against a compiled OPT — REQ-110.
+// sub-folder) against a compiled OPT.
 func ValidateFolder(folder *rm.Folder, c *templatecompile.Compiled) Result {
 	if folder == nil {
 		return resultFromIssues([]Issue{{
@@ -91,7 +90,7 @@ func ValidateFolder(folder *rm.Folder, c *templatecompile.Compiled) Result {
 }
 
 // ValidateEHRStatus validates an in-memory EHR_STATUS against a compiled
-// OPT — REQ-110.
+// OPT.
 func ValidateEHRStatus(status *rm.EHRStatus, c *templatecompile.Compiled) Result {
 	if status == nil {
 		return resultFromIssues([]Issue{{

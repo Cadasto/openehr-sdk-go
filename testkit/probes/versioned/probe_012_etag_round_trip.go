@@ -16,8 +16,8 @@ import (
 // returns a fresh version identifier distinct from the input.
 //
 // The probe exercises the [openehrclient.VersionMetadata] round-trip
-// contract — Location-derived VersionUID on read becomes If-Match on
-// the follow-up write without consumer-side string surgery. Closes
+// contract: the Location-derived VersionUID on read becomes If-Match on
+// the follow-up write without consumer-side string surgery. It closes
 // the read-modify-write loop that every leaf client in
 // `openehr/client/ehr/*` is shaped around.
 //
@@ -25,7 +25,7 @@ import (
 //   - ehrID and voID identify an existing versioned Composition.
 //   - update is the modification body. The probe is opaque about
 //     content semantics; the wire shape is what matters.
-func Probe012ETagRoundTrip(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, update *rm.Composition) (Result, error) {
+func Probe012ETagRoundTrip(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, update *rm.Composition) (Result, error) { // PROBE-012 (REQ-054)
 	r := Result{Probe: "PROBE-012"}
 	if c == nil || ehrID == "" || voID == "" || update == nil {
 		return r, errors.New("PROBE-012: missing required inputs (client/ehr/voID/update)")

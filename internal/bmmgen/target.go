@@ -6,12 +6,10 @@ import "strings"
 // load, which Go package name to emit, where on disk to write it,
 // and how to handle cross-target class references.
 //
-// Phase 2 emitted a single hard-coded target (RM). Phase 4 introduces
-// AOM 1.4 as a sibling target — see docs/plans/2026-05-15-bmm-codegen.md.
-// The two targets share `openehr_base_1.3.0` via include, but the AOM
-// target does NOT re-emit base classes; instead it references them
-// as `rm.<GoName>` (Option C in the Phase 4 design — one-way dep
-// `aom14 → rm`).
+// There are two targets, RM and AOM 1.4. They share
+// `openehr_base_1.3.0` via include, but the AOM target does not re-emit
+// base classes; it references them as `rm.<GoName>` through a one-way
+// `aom14 → rm` dependency.
 type Target struct {
 	// RootID is the BMM include id to load (no .bmm.json suffix).
 	// Example: "openehr_rm_1.2.0" or "openehr_am_1.4.0".
@@ -33,17 +31,17 @@ type Target struct {
 	// "external" and referenced via [ExternalQualifier] (if non-empty)
 	// or `any` (if empty).
 	//
-	// For the RM target this is empty — RM owns every class that
+	// For the RM target this is empty: RM owns every class that
 	// survives the skip rules (including base types).
 	//
-	// For the AOM target this is ["org.openehr.am."] — only AOM-namespaced
+	// For the AOM target this is ["org.openehr.am."]: only AOM-namespaced
 	// classes are emitted. Everything else (base classes, RM types
 	// transitively included by AOM properties) is rendered as
 	// `rm.<GoName>`.
 	OwnPackagePrefixes []string
 	// ExternalQualifier is the Go package qualifier prepended to class
 	// references that fall outside [OwnPackagePrefixes]. Example: "rm".
-	// Empty means "no qualifier" — the class is assumed to live in the
+	// Empty means "no qualifier": the class is assumed to live in the
 	// same package (used for the RM target).
 	ExternalQualifier string
 	// ExternalImport is the import path corresponding to
@@ -73,8 +71,7 @@ var TargetRM = Target{
 // `openehr/aom/aom14/`. AOM-defined classes are emitted locally;
 // base/RM classes referenced by AOM (e.g. AUTHORED_RESOURCE,
 // ARCHETYPE_ID, HIER_OBJECT_ID, VALIDITY_KIND) are imported from
-// the rm package as `rm.<GoName>`. See docs/plans/2026-05-15-bmm-codegen.md
-// Phase 4 § Architectural decisions for rationale.
+// the rm package as `rm.<GoName>`.
 var TargetAOM14 = Target{
 	RootID:             "openehr_am_1.4.0",
 	GoPackage:          "aom14",

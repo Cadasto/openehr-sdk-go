@@ -12,7 +12,7 @@ import (
 // RenderMarshalXMLFile renders the canonical-XML `MarshalXML`
 // companion file for every concrete class in `file`. The output is
 // the parallel of [RenderMarshalJSONFile]: each emitted class gains a
-// pair of methods — [BMMName] returning the BMM class identifier,
+// pair of methods: [BMMName] returning the BMM class identifier,
 // and [MarshalXML] writing the canonical-XML representation.
 //
 // Returns (nil, nil) when the file has no concrete classes. The
@@ -22,23 +22,23 @@ import (
 //
 // For each concrete class C, the file emits:
 //
-//  1. `func (c *C) BMMName() string { return "BMM_NAME" }` — the
+//  1. `func (c *C) BMMName() string { return "BMM_NAME" }` returns the
 //     polymorphic discriminator used by both `xsi:type` (canxml) and
 //     `_type` (canjson). Centralising it here means consumers can
 //     introspect the BMM name through a typed Go method instead of a
 //     reverse lookup against the type registry.
 //
 //  2. `func (c *C) MarshalXML(e *xml.Encoder, start xml.StartElement) error`
-//     — writes the canonical-XML representation. Element local name
+//     writes the canonical-XML representation. Element local name
 //     defaults to the snake-cased BMM class name when the parent did
 //     not set one. Child elements follow BMM property declaration
 //     order (identical to the JSON ordering). Nil-pointer optionals
 //     and empty containers are omitted. Polymorphic descendants
 //     receive `xsi:type` via [canxml.EncodePoly].
 //
-// # Hash/map XML emission (v1 limitation)
+// # Hash/map XML emission (current limitation)
 //
-// `Hash<K,V>` properties are NOT emitted to XML in v1 — there is no
+// `Hash<K,V>` properties are not emitted to XML: there is no
 // pinned canonical shape for them in the openEHR ITS-XML release
 // the SDK targets. Affected fields are skipped at encode time and
 // rejected at decode time (the decoder leaves them as the zero

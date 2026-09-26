@@ -16,7 +16,7 @@ type Property interface {
 	PropertyName() string
 }
 
-// Cardinality is P_BMM_CONTAINER_PROPERTY.cardinality —
+// Cardinality is P_BMM_CONTAINER_PROPERTY.cardinality:
 // {lower, upper?, upper_unbounded?}. The "upper" field is omitted
 // when upper_unbounded is true.
 type Cardinality struct {
@@ -83,7 +83,7 @@ func (s *SinglePropertyOpen) MarshalJSON() ([]byte, error) {
 //
 //	{ type_def: <ContainerType-shape>, cardinality: {lower, upper?, upper_unbounded?} }
 //
-// Note: type_def in this position does NOT carry its own _type discriminator.
+// Note: type_def in this position does not carry its own _type discriminator.
 type ContainerProperty struct {
 	propertyCommon
 	TypeDef     *ContainerType `json:"type_def"`
@@ -110,7 +110,7 @@ func (c *ContainerProperty) MarshalJSON() ([]byte, error) {
 }
 
 // GenericProperty is P_BMM_GENERIC_PROPERTY: { type_def: <GenericType-shape> }.
-// type_def in this position does NOT carry its own _type discriminator.
+// type_def in this position does not carry its own _type discriminator.
 type GenericProperty struct {
 	propertyCommon
 	TypeDef *GenericType `json:"type_def"`

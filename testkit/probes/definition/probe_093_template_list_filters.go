@@ -13,15 +13,15 @@ import (
 // Probe093TemplateListFilters implements PROBE-093: ListTemplates emits
 // the ITS-REST list query parameters `template_id`, `concept`, `version`,
 // `offset`, and `fetch` when the corresponding options are set, and omits
-// them when unset (REQ-143).
+// them when unset.
 //
 // Emission-only by construction. A server that silently ignores unknown
 // query parameters is indistinguishable, from the client side, from one
-// that filters — so this probe never asserts that the result set narrows.
+// that filters, so this probe never asserts that the result set narrows.
 // It asserts what the SDK controls: which keys reach the wire.
 //
-// Per REQ-080 the negative-paging leg asserts fail-closed behaviour only —
-// a non-nil error and zero captured requests. Sentinel identity
+// The negative-paging leg asserts fail-closed behaviour only: a non-nil
+// error and zero captured requests. Sentinel identity
 // (transport.ErrInvalidConfig) is pinned by the definition package's unit
 // tests, not here.
 //
@@ -29,14 +29,13 @@ import (
 //   - captured accumulates the query of every request the backend
 //     receives, in order. The caller wires it up (a `sandbox.Backend` scripted
 //     route in Sandbox mode); the probe reads length deltas to count requests, so
-//     it MUST NOT be reset between legs.
+//     it must not be reset between legs.
 //
 // The backend answers each list call with a template-metadata body; the
 // probe asserts only that the call returns no error. An empty catalog is a
-// pass — ListTemplates yields a non-nil zero-length slice for an empty body
-// or 204 (REQ-144), and REQ-143 licenses no assertion that a filtered
-// deployment holds templates.
-func Probe093TemplateListFilters(ctx context.Context, c *transport.Client, captured *[]url.Values) (Result, error) {
+// pass: ListTemplates yields a non-nil zero-length slice for an empty body
+// or 204, and nothing guarantees that a filtered deployment holds templates.
+func Probe093TemplateListFilters(ctx context.Context, c *transport.Client, captured *[]url.Values) (Result, error) { // PROBE-093 (REQ-143)
 	r := Result{Probe: "PROBE-093"}
 	if c == nil {
 		return r, errors.New("PROBE-093: nil transport.Client")

@@ -38,24 +38,23 @@ import (
 	"strings"
 )
 
-// VersionPredicate is the bracket a `VERSION` class expression carries — the
+// VersionPredicate is the bracket a `VERSION` class expression carries: the
 // grammar's `versionPredicate : LATEST_VERSION | ALL_VERSIONS |
-// standardPredicate` (REQ-163).
+// standardPredicate`.
 //
-// The interface is SEALED and has exactly three shapes, one per grammar
+// The interface is sealed and has exactly three shapes, one per grammar
 // alternative: construct them with [LatestVersion], [AllVersions] and
 // [VersionCompare], and pass the result to [Version]. `versionPredicate` does
-// not recurse into its own position, so the choice is closed by the grammar
-// rather than by policy.
+// not recurse into its own position, so the grammar itself closes the set.
 //
-// Sealing is by unexported methods, which stops a foreign type IMPLEMENTING the
-// interface but not EMBEDDING it: a `struct{ aql.VersionPredicate }` satisfies
-// this interface with nil methods. Such a value is caller input, so it is
-// REFUSED at [Builder.Build] with an error wrapping [ErrInvalidQuery] rather
-// than panicking (REQ-025) — see [derefVersionPredicate].
+// Sealing is by unexported methods, which stops a foreign type implementing
+// the interface but not embedding it: a `struct{ aql.VersionPredicate }`
+// satisfies this interface with nil methods. Such a value is caller input, so
+// [Builder.Build] refuses it with an error wrapping [ErrInvalidQuery] instead
+// of panicking.
 //
-// A nil VersionPredicate denotes the PREDICATE-LESS form (`VERSION v`), which
-// stays legal — see [Version].
+// A nil VersionPredicate denotes the predicate-less form (`VERSION v`), which
+// is legal; see [Version].
 type VersionPredicate interface {
 	// versionBracket is the canonical text BETWEEN the brackets; the emitter
 	// writes the brackets itself, so this must never carry one of its own.
@@ -110,8 +109,8 @@ func (v versionComparison) versionValidate() error {
 // LatestVersion is the `[LATEST_VERSION]` version predicate: the most recent
 // version of each versioned object.
 //
-// Stating a tier explicitly is what REQ-161's aql_version_no_predicate
-// advisory asks for — the tier a bare `VERSION` defaults to is unspecified
+// Stating a tier explicitly is what the linter's aql_version_no_predicate
+// advisory asks for. The tier a bare `VERSION` defaults to is unspecified
 // ([SPECPR-481](https://openehr.atlassian.net/browse/SPECPR-481)), so a
 // portable query says which it means.
 func LatestVersion() VersionPredicate { return latestVersion{} }
@@ -121,53 +120,53 @@ func LatestVersion() VersionPredicate { return latestVersion{} }
 // [LatestVersion].
 func AllVersions() VersionPredicate { return allVersions{} }
 
-// VersionCompare is the `standardPredicate` version predicate — ONE
+// VersionCompare is the `standardPredicate` version predicate: one
 // `<path> <op> <value>` comparison inside the VERSION bracket, e.g.
 //
 //	Version("v", VersionCompare("commit_audit/time_committed/value", OpGt, Param("since")))
 //	// -> VERSION v[commit_audit/time_committed/value > $since]
 //
-// The path is RELATIVE to the VERSION object and binds no FROM alias, so it is
-// written without one. Exactly one comparison: `standardPredicate` has no
-// junction alternative of its own, and `versionPredicate` has none either, so
-// there is nothing to join two with.
+// The path is relative to the VERSION object and binds no FROM alias, so it is
+// written without one. Exactly one comparison: neither `standardPredicate`
+// nor `versionPredicate` has a junction alternative, so there is nothing to
+// join two with.
 //
-// path and op are held to the same rules a WHERE comparison is ([Comparison]),
-// and the whole rendered bracket is additionally held to
-// [ValidateVersionPredicate] at [Builder.Build] time. A malformed comparison —
-// an unknown operator, an empty path, a nil value, an operand outside
-// `pathPredicateOperand` — is refused there rather than emitted.
+// path and op follow the same rules as a WHERE comparison ([Comparison]), and
+// [Builder.Build] also checks the whole rendered bracket with
+// [ValidateVersionPredicate]. A malformed comparison (an unknown operator, an
+// empty path, a nil value, an operand outside `pathPredicateOperand`) is
+// refused there instead of emitted.
 //
-// Edge whitespace is TRIMMED off path, as at every other path-taking
-// constructor ([Col], [ColAs], [Builder.From], [Builder.OrderBy]): the canonical
-// bracket carries no padding (REQ-163 § Canonical spellings), and storing the
-// padding verbatim would emit `v[  uid/value   = $v]` — text that re-parses to
-// the same query but is not the spelling the read side emits back, so the
-// identity round trip would fail on a query that is otherwise correct.
+// Edge whitespace is trimmed off path, as at every other path-taking
+// constructor ([Col], [ColAs], [Builder.From], [Builder.OrderBy]): the
+// canonical bracket carries no padding, and storing the padding verbatim
+// would emit `v[  uid/value   = $v]`, text that re-parses to the same query
+// but is not the spelling the read side emits back, so the identity round
+// trip would fail on a query that is otherwise correct.
 func VersionCompare(path string, op Operator, v Value) VersionPredicate {
 	return versionComparison{cmp: Comparison{Path: strings.TrimSpace(path), Op: op, Val: v}}
 }
 
-// Version is a `VERSION` containment operand — `VERSION <alias>[<predicate>]`,
-// the grammar's other `classExprOperand` alternative (REQ-163). Nest below it
-// and join it exactly as any other [Containment]:
+// Version is a `VERSION` containment operand, `VERSION <alias>[<predicate>]`,
+// the grammar's other `classExprOperand` alternative. Nest below it and join
+// it exactly as any other [Containment]:
 //
 //	Version("v", LatestVersion()).Contains(Class("COMPOSITION", "c"))
 //	// -> VERSION v[LATEST_VERSION] CONTAINS COMPOSITION c
 //
-// The RM type is the SDK's OWN spelling and never a caller string: the bracket
-// is reachable only from the VERSION alternative, so fixing the type at the
-// constructor is what makes "the predicate is on a VERSION node" true by
-// construction rather than by a check the caller could fail.
+// The RM type is fixed by the SDK and never a caller string: the bracket is
+// reachable only from the VERSION alternative, so fixing the type at the
+// constructor makes "the predicate is on a VERSION node" true by
+// construction.
 //
-// A nil pred is the PREDICATE-LESS form and stays legal: `Version("v", nil)`
+// A nil pred is the predicate-less form and is legal: `Version("v", nil)`
 // builds and emits exactly what `Class("VERSION", "v")` does, byte for byte.
-// REQ-161 advises against that shape with a WARNING and does not refuse it, so
-// neither does this — see [LatestVersion] for the advisory's own remedy.
+// The linter warns about that shape but does not refuse it, and neither does
+// the builder; see [LatestVersion] for the remedy.
 //
 // [Archetype] has no counterpart here on purpose: the VERSION alternative has
-// no archetype slot at all, so an archetype predicate on a VERSION node is
-// refused at [Builder.Build] (the landed rule in [Containment.validateTree]).
+// no archetype slot, so [Builder.Build] refuses an archetype predicate on a
+// VERSION node.
 func Version(alias string, pred VersionPredicate) Containment {
 	return Containment{rmType: "VERSION", alias: alias, versionPred: pred}
 }

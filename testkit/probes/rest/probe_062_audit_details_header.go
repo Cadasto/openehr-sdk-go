@@ -34,7 +34,7 @@ var auditDetailsAttributes = []string{
 // Probe062AuditDetailsHeader implements PROBE-062: a write carrying audit
 // details emits the `openehr-audit-details` request header in the openEHR
 // dotted-attribute grammar (not JSON), and the CONTRIBUTION the write joined
-// reflects the same fields on read-back (REQ-059).
+// reflects the same fields on read-back.
 //
 // The probe holds two independent oracles, neither of which is the SDK's own
 // encoder:
@@ -47,7 +47,7 @@ var auditDetailsAttributes = []string{
 //     assignment list whose attributes are documented ones carrying the values
 //     the caller asked for.
 //   - Read-back, bound to the write. The CONTRIBUTION is fetched and its audit
-//     envelope compared with the committed one — and the version uid the write
+//     envelope compared with the committed one, and the version uid the write
 //     returned (from its `Location`) must appear among the contribution's
 //     `versions`. Without that binding the read-back could be satisfied by any
 //     contribution that happened to carry the same audit fields.
@@ -61,7 +61,7 @@ var auditDetailsAttributes = []string{
 // captured returns the requests the backend received; the probe reads the write
 // request to check the header grammar and route, then the read-back request to
 // check its route.
-func Probe062AuditDetailsHeader(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID openehrclient.EHRID, contributionUID string, audit *rm.AuditDetails, comp *rm.Composition) (Result, error) {
+func Probe062AuditDetailsHeader(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID openehrclient.EHRID, contributionUID string, audit *rm.AuditDetails, comp *rm.Composition) (Result, error) { // PROBE-062 (REQ-059)
 	r := Result{Probe: "PROBE-062"}
 	if c == nil || ehrID == "" || contributionUID == "" || audit == nil || comp == nil {
 		return r, errors.New("PROBE-062: missing required inputs (client/ehr/contributionUID/audit/comp)")

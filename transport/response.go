@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// Response is the captured HTTP response — body fully consumed, headers
-// surfaced in typed form on Metadata.
+// Response is the captured HTTP response: the body is fully consumed and
+// the headers are surfaced in typed form on Metadata.
 type Response struct {
 	// StatusCode is the HTTP status from the wire.
 	StatusCode int
@@ -22,7 +22,7 @@ type Response struct {
 }
 
 // Metadata extracts the headers leaf clients consume most often,
-// parsed into typed values per [docs/specifications/wire.md REQ-054, REQ-059].
+// parsed into typed values.
 type Metadata struct {
 	// ETag is the response ETag, with surrounding quotes stripped so
 	// the value round-trips into a future If-Match without double
@@ -33,23 +33,23 @@ type Metadata struct {
 	// LastModified is the parsed HTTP Last-Modified header. Zero
 	// when missing or unparseable.
 	LastModified time.Time
-	// RMVersion captures the response openehr-version header (REQ-059).
+	// RMVersion captures the response openehr-version header.
 	RMVersion string
 	// AuditDetails captures the response openehr-audit-details header
-	// verbatim — typically present on Contribution responses.
+	// verbatim. It is typically present on Contribution responses.
 	AuditDetails string
-	// URI captures the response openehr-uri header (REQ-059).
+	// URI captures the response openehr-uri header.
 	URI string
-	// ItemTag captures the response openehr-item-tag header (REQ-059).
+	// ItemTag captures the response openehr-item-tag header.
 	ItemTag string
 	// VersionItemTag captures the response openehr-version-item-tag
-	// header (REQ-059).
+	// header.
 	VersionItemTag string
-	// TemplateID captures the response openehr-template-id header
-	// (REQ-059), surfaced when a composition response advertises it.
+	// TemplateID captures the response openehr-template-id header,
+	// surfaced when a composition response advertises it.
 	TemplateID string
 	// CadastoSpecVersion captures the Cadasto-OpenEhr-Spec-Version
-	// response header (REQ-051) when present.
+	// response header when present.
 	CadastoSpecVersion string
 }
 

@@ -2,7 +2,7 @@ package auth
 
 import "encoding/json"
 
-// ParseOAuth2Error decodes the RFC 6749 § 5.2 error envelope from a
+// ParseOAuth2Error decodes the RFC 6749 §5.2 error envelope from a
 // token-endpoint response body. Returns nil when the body does not
 // match the envelope shape.
 func ParseOAuth2Error(body []byte) *OAuth2Error {

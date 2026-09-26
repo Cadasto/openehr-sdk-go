@@ -75,7 +75,7 @@ func (b *Builder) TemplateID() string {
 
 // Set assigns v at path. Path must resolve in the compiled template;
 // v must match the compiled-node RM type. Errors are accumulated and
-// surfaced from Build — Set never short-circuits the builder so the
+// surfaced from Build. Set never short-circuits the builder so the
 // caller can stack assignments and recover every faulty path in one
 // round-trip.
 //
@@ -147,7 +147,7 @@ func (b *Builder) SetCodedText(path, terminology, code, display string) error {
 // Build finalises the graph. Pending assignments are applied in
 // order against the skeleton; per-path failures accumulate via
 // errors.Join. The returned *rm.Composition is the same skeleton
-// instance — Build mutates it in place.
+// instance: Build mutates it in place.
 //
 // Build is repeatable: pending Set calls and accumulated errors are
 // consumed by each invocation. A second Build with no intervening Set

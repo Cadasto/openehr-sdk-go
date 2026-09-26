@@ -21,13 +21,13 @@ import (
 
 // Probe006JWKSRotationTransparent implements PROBE-006: a signing-key
 // rotation on the authorization server triggers exactly one JWKS refresh
-// in the SDK, after which the token validates and the caller proceeds —
-// no double-refresh, no surfaced validation failure (REQ-062).
+// in the SDK, after which the token validates and the caller proceeds,
+// with no double refresh and no surfaced validation failure.
 //
 // Scenario:
 //   - An id_token is signed with key "kid-rotated".
-//   - The JWKS endpoint first serves an OLD key set (a stale "kid-old"
-//     only), then — after one rotation — serves the set containing
+//   - The JWKS endpoint first serves an old key set (a stale "kid-old"
+//     only), then, after one rotation, serves the set containing
 //     "kid-rotated". This mirrors silent server-side rotation: the SDK's
 //     cached JWKS does not contain the token's kid.
 //   - The SDK's JWKS.Key refreshes once on the cache miss; ValidateIDToken
@@ -36,8 +36,8 @@ import (
 // Pass conditions (all must hold):
 //  1. ValidateIDToken (via LaunchContextFromTokenResponse) succeeds.
 //  2. The JWKS endpoint was fetched exactly twice total: once to seed the
-//     cache (stale set), once on the miss-driven refresh (rotated set) —
-//     i.e. exactly one refresh beyond the initial fetch, no double-refresh.
+//     cache (stale set), once on the miss-driven refresh (rotated set);
+//     that is, exactly one refresh beyond the initial fetch.
 func Probe006JWKSRotationTransparent(ctx context.Context) (Result, error) { // PROBE-006 (REQ-062)
 	r := Result{Probe: "PROBE-006"}
 

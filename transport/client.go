@@ -29,31 +29,31 @@ import (
 const tracerName = "github.com/cadasto/openehr-sdk-go/transport"
 
 // DefaultCallerAttributionHeader is the header name used when
-// WithCallerAttributionHeader is not overridden. Tracks REQ-066.
+// WithCallerAttributionHeader is not overridden.
 const DefaultCallerAttributionHeader = "X-Cadasto-Caller-Attribution"
 
 // Client is the HTTP client wrapper every openEHR REST leaf client
 // uses to reach a Cadasto CDR or any conformant openEHR backend. It
 // owns:
 //
-//   - the injected *http.Client (REQ-021)
-//   - the resolved smart/discovery.ServiceCatalog (REQ-070)
-//   - the client-default auth.TokenSource (REQ-060)
-//   - the retry policy (REQ-091)
-//   - the OTel hooks (REQ-090)
+//   - the injected *http.Client
+//   - the resolved smart/discovery.ServiceCatalog
+//   - the client-default auth.TokenSource
+//   - the retry policy
+//   - the OTel hooks
 //
-// Per-client / per-tenant binding (REQ-065): each Client instance is
-// bound to one issuer / tenant context. The federator use case
-// constructs many Clients, not one shared Client.
+// Each Client instance is bound to one issuer or tenant context. A
+// caller that federates across several backends constructs one Client
+// per backend instead of sharing one.
 //
-// Safe for concurrent use by multiple goroutines (REQ-026).
+// A Client is safe for concurrent use by multiple goroutines.
 type Client struct {
 	cfg     config
 	catalog *discovery.ServiceCatalog
 }
 
-// New constructs a Client. The ServiceCatalog is mandatory (REQ-070).
-// The HTTP client must be injected via WithHTTPClient (REQ-021).
+// New constructs a Client. The ServiceCatalog is mandatory, and the
+// HTTP client must be injected with WithHTTPClient.
 //
 // A nil catalog or a missing HTTP client returns ErrInvalidConfig
 // (wrapped).
@@ -89,7 +89,7 @@ func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 // Catalog returns the ServiceCatalog the Client was constructed with.
 // Useful for leaf clients that want to project entries before issuing
 // a request (e.g. to extract the SpecVersion for observability).
-// A nil Client returns nil (REQ-025 nil-receiver axis, parity with Do).
+// A nil Client returns nil, matching Do's handling of a nil Client.
 func (c *Client) Catalog() *discovery.ServiceCatalog {
 	// REQ-025: a nil Client is caller-constructible — see Do.
 	if c == nil {
@@ -98,13 +98,12 @@ func (c *Client) Catalog() *discovery.ServiceCatalog {
 	return c.catalog
 }
 
-// HTTPClient returns the injected *http.Client (REQ-021). Exposed so
-// SDK packages that need to issue requests outside the catalog-routed
-// Do pipeline — e.g. cadasto/admin/ deployment-level health probes
-// (REQ-083) — can reuse the configured HTTP transport without
-// re-injection or wrapping. Returns nil only when New rejected the
-// configuration (which is impossible for a constructed Client) or when
-// the Client itself is nil (REQ-025 nil-receiver axis, parity with Do).
+// HTTPClient returns the injected *http.Client. SDK packages that issue
+// requests outside the catalog-routed Do pipeline, such as the
+// deployment-level health probes in cadasto/admin, use it to reuse the
+// configured HTTP transport without injecting or wrapping it again. It
+// returns nil only when the Client itself is nil; a Client built by New
+// always has an HTTP client.
 func (c *Client) HTTPClient() *http.Client {
 	// REQ-025: a nil Client is caller-constructible — see Do.
 	if c == nil {
@@ -624,7 +623,7 @@ func sanitiseURLError(err error, route string) error {
 	return &out
 }
 
-// Decode is a typed wrapper around Do — executes req, decodes the
+// Decode is a typed wrapper around Do. It executes req, decodes the
 // response body as canonical JSON into a fresh *T, and returns the
 // typed result plus the parsed Metadata.
 //
@@ -632,13 +631,10 @@ func sanitiseURLError(err error, route string) error {
 // targeting Prefer=minimal endpoints typically use Do directly so the
 // empty-body shape does not trip the decoder.
 //
-// The two 2xx failures are distinct (REQ-151): an empty, whitespace-only
-// or JSON-null body — no representation, see [IsNoRepresentationBody] —
-// fails with [ErrInvalidShape], while a non-empty body that does not
-// decode returns a [DecodeError] carrying the raw bytes the server
-// delivered.
-//
-// Generic over T per REQ-024.
+// The two 2xx failures are distinct. An empty, whitespace-only or
+// JSON-null body (no representation, see [IsNoRepresentationBody])
+// fails with [ErrInvalidShape]. A non-empty body that does not decode
+// returns a [DecodeError] carrying the raw bytes the server delivered.
 func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata, error) {
 	resp, err := c.Do(ctx, req)
 	if err != nil {

@@ -9,29 +9,27 @@ import (
 )
 
 // SlotAssertion is one parsed ARCHETYPE_SLOT include or exclude
-// expression. v1 supports the `archetype_id matches {regex}` subset
+// expression. Only the `archetype_id matches {regex}` subset
 // and the OPT XML expression shape that carries a C_STRING pattern
-// (operator 2007 / "matches").
+// (operator 2007 / "matches") are supported.
 //
 // Construct only via [NewSlotAssertion]; the zero value carries no
 // compiled regex and [SlotAssertion.MatchesArchetypeID] reports
 // false for it (it is not a valid assertion, not a match-all).
-//
-// REQ-104.
 type SlotAssertion struct {
 	pattern string
 	re      *regexp.Regexp
 }
 
 // NewSlotAssertion compiles pattern as a Go regexp / RE2 expression
-// (as in other REQ-103 string constraints). Returns an error when the
+// (as in the other string constraints). Returns an error when the
 // pattern is empty or does not compile.
 //
 // The pattern is matched against a candidate archetype id in full:
 // ADL `archetype_id matches {regex}` semantics are whole-string, so
-// the compiled regex is anchored (`\A(?:…)\z`). Storing the raw
-// source separately keeps [SlotAssertion.Pattern] (diagnostics) and
-// example synthesis honest about what the OPT author wrote.
+// the compiled regex is anchored (`\A(?:…)\z`). The raw source is
+// stored separately so [SlotAssertion.Pattern] (diagnostics) and
+// example synthesis report what the OPT author wrote.
 func NewSlotAssertion(pattern string) (SlotAssertion, error) {
 	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
@@ -77,14 +75,14 @@ func (a SlotAssertion) isUniversal() bool {
 }
 
 // SlotRules is the parsed include / exclude assertion set for one
-// ARCHETYPE_SLOT. When Includes is empty the caller MUST apply the
+// ARCHETYPE_SLOT. When Includes is empty the caller must apply the
 // RM-type-prefix fallback via [SlotRules.AllowsRMTypePrefix].
 //
 // RawIncludeCount records how many include assertion blobs the OPT
-// carried before parsing. When it is non-zero but Includes is empty
+// carried before parsing. When it is non-zero but Includes is empty,
 // every include failed to compile and [AllowsArchetypeID] degrades
-// to the permissive prefix fallback — a known fail-open limitation
-// surfaced via [SlotRules.IncludesDroppedUnparsed].
+// to the permissive prefix fallback. This is a known fail-open
+// limitation, reported by [SlotRules.IncludesDroppedUnparsed].
 type SlotRules struct {
 	RMTypeName      string
 	Includes        []SlotAssertion
@@ -110,8 +108,8 @@ func (r SlotRules) IncludesDroppedUnparsed() bool {
 }
 
 // AllowsArchetypeID reports whether archetypeID satisfies the slot's
-// include / exclude rules. When no include assertions were parsed,
-// falls back to the RM-type-prefix heuristic — including the
+// include / exclude rules. When no include assertions were parsed, it
+// falls back to the RM-type-prefix heuristic, including in the
 // fail-open case flagged by [SlotRules.IncludesDroppedUnparsed].
 //
 // A catch-all exclude (`.*`) is ignored when includes are present:
@@ -144,7 +142,7 @@ func (r SlotRules) AllowsArchetypeID(archetypeID string) bool {
 // fallback exclusively.
 func (r SlotRules) HasParsedIncludes() bool { return len(r.Includes) > 0 }
 
-// AllowsRMTypePrefix is the v1 pragmatic fallback: archetype ids with
+// AllowsRMTypePrefix is the pragmatic fallback: archetype ids with
 // prefix openEHR-EHR-<RMType>. fit a slot constrained to RMType.
 func (r SlotRules) AllowsRMTypePrefix(archetypeID string) bool {
 	if r.RMTypeName == "" {

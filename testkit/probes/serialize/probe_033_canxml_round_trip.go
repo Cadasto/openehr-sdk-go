@@ -15,18 +15,17 @@ import (
 // Probe033CanxmlRoundTrip implements PROBE-033: decoding a
 // canonical-XML RM value, encoding it, then decoding and encoding
 // that output again produces two byte-identical compact-XML SDK
-// encodes. Mirrors PROBE-030 (canjson) for the XML wire.
+// encodes. It is the XML-wire counterpart of [Probe030CanjsonRoundTrip].
 //
 // The probe asserts byte-stability of the SDK's XML round-trip
 // pipeline (Decode → Encode → Decode → Encode), not byte equality
-// against an arbitrary upstream serializer. Stability is the
-// load-bearing guarantee for hashing/signing/diff tooling against the
-// XML wire.
+// against an arbitrary upstream serializer. Hashing, signing and diff
+// tooling against the XML wire depend on that stability.
 //
-// `body` MUST be canonical-XML bytes for a known concrete RM type.
+// `body` must be canonical-XML bytes for a known concrete RM type.
 // `factory` returns a fresh pointer to the target Go type so the
 // probe owns the value lifecycle.
-func Probe033CanxmlRoundTrip(body []byte, factory func() any) (Result, error) {
+func Probe033CanxmlRoundTrip(body []byte, factory func() any) (Result, error) { // PROBE-033 (REQ-040, REQ-056, REQ-082)
 	r := Result{Probe: "PROBE-033"}
 	if factory == nil {
 		return r, errors.New("PROBE-033: factory is nil")
@@ -72,7 +71,8 @@ func Probe033CanxmlRoundTrip(body []byte, factory func() any) (Result, error) {
 // Probe033Inputs is the canonical set of inputs exercised by
 // PROBE-033 in sandbox mode. Leaf entries are bootstrap-encoded; cassette
 // entries are discovered from `testkit/cassettes/compositions/*.xml` and
-// `testkit/cassettes/rm/*.xml` via [fixtures.ListRMXML] (mirrors PROBE-030).
+// `testkit/cassettes/rm/*.xml` via [fixtures.ListRMXML], as for
+// [Probe030Inputs].
 var Probe033Inputs = func() []Probe033Input {
 	must := func(v any) []byte {
 		b, err := canxml.Marshal(v)

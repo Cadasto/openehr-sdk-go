@@ -91,7 +91,7 @@ func needsExternalImport(plan *Plan, chunks []string) bool {
 // init() registrations for every concrete class owned by the plan's
 // target. The file lives inside the target's Go package; it imports
 // the shared rm/typereg subpackage (the registry is shared between
-// RM and AOM — _type strings are disjoint).
+// RM and AOM; their _type strings are disjoint).
 func RenderTypeRegFile(plan *Plan) ([]byte, error) {
 	var b bytes.Buffer
 	b.WriteString(renderGeneratedHeader(plan))

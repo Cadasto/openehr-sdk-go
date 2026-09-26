@@ -90,21 +90,21 @@ const probe084BatchCode = "253"
 // where the operation requires it, and none of the server-assigned fields
 // the pin's `UpdateVersion` DTO does not declare.
 //
-// Pins REQ-130. The body is built and then committed through
-// [contribution.Commit], so the assertion reads the bytes the client
-// actually sent rather than a hand-marshalled copy — an encode-side
-// regression between Build and the wire is in scope.
+// The body is built and then committed through [contribution.Commit],
+// so the assertion reads the bytes the client actually sent instead of
+// a hand-marshalled copy: an encode-side regression between Build and
+// the wire is in scope.
 //
 // corpus is the vendored submission corpus (raw
 // `testkit/cassettes/submissions/*.json` bodies). It is the shape witness
 // for the final arm: every version-level field those records carry must be
 // one this SDK can emit ([builtVersionFields]). The comparison is
-// structural by construction — the records carry a top-level
+// structural by construction: the records carry a top-level
 // `_type:"CONTRIBUTION"` envelope that `Contribution_create` omits, and RM
 // payloads this SDK did not author, so a byte comparison would assert the
 // fixture instead of the contract. The corpus is a required input: an arm
-// with no data to run against is not a passing arm (REQ-082).
-func Probe084BuiltContributionBody(ctx context.Context, c *transport.Client, capturedBody *[]byte, ehrID openehrclient.EHRID, corpus [][]byte) (Result, error) {
+// with no data to run against is not a passing arm.
+func Probe084BuiltContributionBody(ctx context.Context, c *transport.Client, capturedBody *[]byte, ehrID openehrclient.EHRID, corpus [][]byte) (Result, error) { // PROBE-084 (REQ-130)
 	r := Result{Probe: "PROBE-084"}
 	if c == nil || ehrID == "" || capturedBody == nil {
 		return r, errors.New("PROBE-084: missing required inputs (client/ehr/captured)")

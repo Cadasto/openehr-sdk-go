@@ -92,21 +92,21 @@ func layer1Code(r lint.Result) string {
 	return ""
 }
 
-// MandatoryNegative names one of the three negative cases the PROBE-097 wire
-// assertion requires BY NAME (conformance.md § PROBE-097, arm (a)). A
+// MandatoryNegative names one of the three negative cases PROBE-097
+// requires by name in its firing-and-silence arm (arm (a)). A
 // [SemanticSilentCase] tagged with one counts towards that requirement, and
 // [Probe097SemanticLint] fails a corpus in which any of the three is unclaimed.
 type MandatoryNegative string
 
 const (
-	// NegUnknownClassSuppression — an unknown operand suppresses the pair
+	// NegUnknownClassSuppression means an unknown operand suppresses the pair
 	// checks on both sides of it.
 	NegUnknownClassSuppression MandatoryNegative = "unknown-class suppression"
-	// NegArchetypeMismatchSuppression — a literal archetype predicate whose
+	// NegArchetypeMismatchSuppression means a literal archetype predicate whose
 	// declared class or HRID type segment is unknown yields
 	// aql_unknown_rm_class only, never aql_archetype_class_mismatch.
 	NegArchetypeMismatchSuppression MandatoryNegative = "archetype-mismatch suppression"
-	// NegFanoutConservativeFiring — the aql_fanout_row_grain advisory's own
+	// NegFanoutConservativeFiring is the aql_fanout_row_grain advisory's own
 	// conservative firing rule (it needs >= 2 projected leaves).
 	NegFanoutConservativeFiring MandatoryNegative = "fan-out conservative firing rule"
 )
@@ -117,35 +117,35 @@ var mandatoryNegativesAll = []MandatoryNegative{
 	NegUnknownClassSuppression, NegArchetypeMismatchSuppression, NegFanoutConservativeFiring,
 }
 
-// SemanticFireCase is one PROBE-097 arm-(a) firing row: Query MUST raise
-// exactly one REQ-161 code — Code, at Severity — spanned on the SpanNth
-// (1-based) occurrence of SpanClass in Query. One row per REQ-161 code is
-// the wire assertion's minimum ("at least one corpus query yields it with
-// the specified severity at the span of the offending construct").
+// SemanticFireCase is one PROBE-097 arm-(a) firing row: Query must raise
+// exactly one semantic lint code (Code, at Severity), spanned on the SpanNth
+// (1-based) occurrence of SpanClass in Query. The corpus needs at least one
+// such row per semantic code: at least one query that yields the code with
+// its catalogue severity at the span of the offending construct.
 type SemanticFireCase struct {
 	// Name labels the case for diagnostic output.
 	Name string
 	// Query is the AQL string under test; assumed single-line (span
 	// computation does not handle multi-line queries).
 	Query string
-	// Code is the REQ-161 issue code Query MUST raise, and no other
+	// Code is the semantic lint issue code Query must raise, and no other
 	// semantic code besides it.
 	Code string
-	// Severity is Code's REQ-161 catalogue severity.
+	// Severity is Code's catalogue severity.
 	Severity lint.Severity
-	// SpanClass is the RM class token the issue's Span MUST cover.
+	// SpanClass is the RM class token the issue's Span must cover.
 	SpanClass string
 	// SpanNth is the 1-based occurrence of SpanClass in Query the Span
-	// MUST land on.
+	// must land on.
 	SpanNth int
 }
 
-// SemanticSilentCase is one PROBE-097 arm-(a) silence row: Query MUST reach
-// the REQ-161 checks at all, and MUST then raise exactly the REQ-161 code
+// SemanticSilentCase is one PROBE-097 arm-(a) silence row: Query must reach
+// the semantic checks at all, and must then raise exactly the semantic code
 // multiset in Want.
 //
-// A plain near miss leaves Want nil. The two SUPPRESSION negatives — the
-// unknown-class suppression and the archetype-mismatch suppression — set Want
+// A plain near miss leaves Want nil. The two suppression negatives (the
+// unknown-class suppression and the archetype-mismatch suppression) set Want
 // to the specific code the suppression rule still permits, e.g.
 // []string{"aql_unknown_rm_class"} for a pair the unknown operand suppresses.
 // The third mandatory negative, the fan-out advisory's own conservative near
@@ -156,24 +156,24 @@ type SemanticSilentCase struct {
 	Name string
 	// Query is the AQL string under test.
 	Query string
-	// Want is the exact REQ-161 code multiset Query MUST raise (order
+	// Want is the exact semantic code multiset Query must raise (order
 	// irrelevant; nil means none).
 	Want []string
-	// ForCode, when set, declares which REQ-161 code's silence this row
-	// guards. Every code in [semanticCodes] MUST be claimed by at least one
-	// row — conformance.md § PROBE-097 arm (a) requires, per code, a firing
-	// row AND "at least one near-miss query [that] stays silent". A row that
-	// exists for some other reason leaves it empty.
+	// ForCode, when set, declares which semantic code's silence this row
+	// guards. Every code in [semanticCodes] must be claimed by at least one
+	// row: arm (a) requires, per code, a firing row and at least one
+	// near-miss query that stays silent. A row that exists for some other
+	// reason leaves it empty.
 	ForCode string
 	// Mandatory, when set, declares this row as one of the three negatives
-	// the PROBE-097 wire assertion names explicitly. Each of
-	// [MandatoryNegative]'s three constants MUST be claimed by at least one
-	// row. A row that is not one of the three leaves it empty.
+	// PROBE-097 names explicitly. Each of [MandatoryNegative]'s three
+	// constants must be claimed by at least one row. A row that is not one
+	// of the three leaves it empty.
 	Mandatory MandatoryNegative
 }
 
-// ParityCase is one PROBE-097 arm-(c) row (REQ-162 § Contract): Build MUST
-// produce a *aql.Builder whose emitted query, run through
+// ParityCase is one PROBE-097 arm-(c) row, the read/write parity check:
+// Build must produce a *aql.Builder whose emitted query, run through
 // [aql.Builder.VerifyContainment] and through [lint.LintString], agrees on
 // the [containmentCodes] subset.
 type ParityCase struct {
@@ -184,29 +184,30 @@ type ParityCase struct {
 }
 
 // SemanticCorpus is the whole PROBE-097 corpus: four fields across three
-// wire-assertion arms — Fire and Silent are the two halves of arm (a), the
-// firing rows and the near misses that must stay silent. All four are
-// required.
+// arms. Fire and Silent are the two halves of arm (a), the firing rows and
+// the near misses that must stay silent; Additivity is arm (b); Parity is
+// arm (c). All four are required.
 //
 // Additivity reuses [LintCase] (probe_028_aql_lint.go, same package): arm (b)
-// is PROBE-028's own corpus re-run under the completed REQ-161 linter, not a
-// corpus of its own, so the case shape it needs — an optional OPT, a query,
-// the full expected code multiset — is already exactly LintCase's.
+// is the [Probe028AQLLint] corpus re-run under the full semantic linter, with
+// no corpus of its own, so the case shape it needs (an optional OPT, a query,
+// the full expected code multiset) is already exactly LintCase's.
 type SemanticCorpus struct {
-	// Fire is arm (a)'s firing rows — one per REQ-161 code, minimum.
+	// Fire is arm (a)'s firing rows, at least one per semantic code.
 	Fire []SemanticFireCase
 	// Silent is arm (a)'s near-miss and suppression-negative rows.
 	Silent []SemanticSilentCase
-	// Additivity is arm (b): the PROBE-028 corpus, re-run.
+	// Additivity is arm (b): the [Probe028AQLLint] corpus, re-run.
 	Additivity []LintCase
-	// Parity is arm (c): the REQ-162 § Contract read/write agreement.
+	// Parity is arm (c): read-side lint and write-side builder verification
+	// agree on the containment codes.
 	Parity []ParityCase
 }
 
 // Probe097SemanticLint runs every row of every arm and aggregates all
-// failures into one [Result] (collect-all, like [Probe028AQLLint] — a single
+// failures into one [Result] (collect-all, like [Probe028AQLLint]: a single
 // early failure would hide the rest of the corpus from the report).
-func Probe097SemanticLint(c SemanticCorpus) (Result, error) {
+func Probe097SemanticLint(c SemanticCorpus) (Result, error) { // PROBE-097 (REQ-160, REQ-161, REQ-162, REQ-163)
 	r := Result{Probe: "PROBE-097"}
 	if len(c.Fire) == 0 || len(c.Silent) == 0 || len(c.Additivity) == 0 || len(c.Parity) == 0 {
 		return r, errors.New("PROBE-097: all four corpus fields (Fire, Silent, Additivity, Parity) are required")

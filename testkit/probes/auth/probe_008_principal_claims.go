@@ -14,7 +14,7 @@ import (
 )
 
 // Probe008PrincipalClaimsVerbatim implements PROBE-008: when the token
-// carries `principal_uid` and `principal_type` claims (REQ-067), the SDK
+// carries `principal_uid` and `principal_type` claims, the SDK
 // surfaces them on LaunchContext.Principal without coercion; missing
 // claims surface as nil, never as guessed defaults.
 //

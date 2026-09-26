@@ -7,7 +7,7 @@ package aql
 
 import "strconv"
 
-// TopDir is the optional direction of a [TopClause] — the grammar's
+// TopDir is the optional direction of a [TopClause], the grammar's
 // `top : TOP INTEGER direction=(FORWARD|BACKWARD)?`. The zero value means
 // the source wrote no direction, so a bare `TOP n` round-trips without
 // acquiring one.
@@ -41,20 +41,19 @@ func (d TopDir) String() string {
 //
 // # Deprecated construct
 //
-// The `TOP` modifier is DEPRECATED by openEHR QUERY Release-1.1.0 § 4.4.3
-// in favour of the `LIMIT` clause combined with `ORDER BY`, and the spec
-// announces its removal in a future major release. It is modelled here
-// because the SDK does not author the queries it is handed: a client, a
-// stored query, or a conformance corpus may legitimately carry `TOP` until
-// that removal, and a dropped row limit would silently turn a bounded
-// query into an unbounded one. Prefer [Builder.LimitInline] (in-text
-// `LIMIT`) or the request envelope ([Builder.Limit]) for new queries.
+// openEHR QUERY Release-1.1.0 § 4.4.3 deprecates the `TOP` modifier in favour
+// of the `LIMIT` clause combined with `ORDER BY`, and announces its removal in
+// a future major release. It is modelled here because the SDK does not author
+// the queries it is handed: a client, a stored query, or a conformance corpus
+// may carry `TOP` until that removal, and a dropped row limit would silently
+// turn a bounded query into an unbounded one. Prefer [Builder.LimitInline]
+// (in-text `LIMIT`) or the request envelope ([Builder.Limit]) for new queries.
 //
-// § 4.4.3 also forbids `TOP` and `LIMIT` in the same query. The parser
-// reports both as written and the lint gate diagnoses the combination
-// (`aql_top_with_limit`); [Builder.Build] refuses to construct it.
+// QUERY § 4.4.3 also forbids `TOP` and `LIMIT` in the same query. The parser
+// reports both as written, the linter diagnoses the combination
+// (`aql_top_with_limit`), and [Builder.Build] refuses to construct it.
 //
-// N is the row count; it MUST NOT be negative (the `top` production admits
+// N is the row count; it must not be negative (the `top` production admits
 // no sign). Dir is the optional direction.
 type TopClause struct {
 	N   int

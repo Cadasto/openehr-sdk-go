@@ -4,28 +4,26 @@
 // Production tools (load harnesses, federators, etc.) live in their
 // own repositories; the examples here are reference shapes only.
 //
-// Developer docs: docs/examples.md (catalog) and docs/quick-start.md
-// (onboarding). When adding or materially changing an example, update
-// those files and this bullet list in the same PR — see AGENTS.md
-// § Runnable examples and docs/ai-workflow.md § Developer examples.
+// The catalog in docs/examples.md and the walkthrough in
+// docs/quick-start.md describe each program in more detail.
 //
 // Runnable programs (from repo root):
 //
-//   - cmd/examples/canonical_json       — canjson decode (REQ-052)
-//   - cmd/examples/canxml_roundtrip     — canjson ↔ canxml (REQ-056)
-//   - cmd/examples/opt-parse            — OPT parse + paths (REQ-100)
-//   - cmd/examples/validate-composition — OPT vs composition (REQ-102)
-//   - cmd/examples/validate-from-json     — canjson + OPT validate (REQ-052, REQ-102)
-//   - cmd/examples/primitive-validate     — primitive constraints (REQ-103)
-//   - cmd/examples/ehr_create           — REST EHR create (transport + client)
-//   - cmd/examples/contribution-build   — fluent multi-version Contribution_create assembly (REQ-130)
-//   - cmd/examples/generate-example     — OPT → RM instance synthesis (REQ-107)
-//   - cmd/examples/aql-build            — AQL struct + verb builders (REQ-055); containment algebra + in-text paging (REQ-117)
-//   - cmd/examples/aql-parse-structured — AQL → parse.Query AST + Emit round-trip (REQ-113, REQ-117, REQ-118)
-//   - cmd/examples/lint-aql             — AQL static lint + ValidateAQL (REQ-109)
-//   - cmd/examples/compile-build-validate — public compile→build→validate, public-only imports (REQ-111)
-//   - cmd/examples/template-explore     — introspect a compiled OPT: structure + leaf paths (REQ-111)
-//   - cmd/examples/webtemplate-export   — compiled OPT → EHRbase v2.3 WebTemplate JSON (REQ-106)
-//   - cmd/examples/flat-roundtrip       — COMPOSITION ↔ FLAT / STRUCTURED simplified formats (REQ-053)
-//   - cmd/examples/smart-launch         — standalone SMART PKCE launch, state+verifier persistence (REQ-061)
+//   - cmd/examples/canonical_json: canjson decode
+//   - cmd/examples/canxml_roundtrip: canjson to canxml and back
+//   - cmd/examples/opt-parse: OPT parse and paths
+//   - cmd/examples/validate-composition: validate a composition against an OPT
+//   - cmd/examples/validate-from-json: canjson decode, then OPT validation
+//   - cmd/examples/primitive-validate: primitive constraints
+//   - cmd/examples/ehr_create: REST EHR create (transport and client)
+//   - cmd/examples/contribution-build: fluent multi-version Contribution_create assembly
+//   - cmd/examples/generate-example: synthesise an RM instance from an OPT
+//   - cmd/examples/aql-build: AQL struct and verb builders, containment algebra and in-text paging
+//   - cmd/examples/aql-parse-structured: AQL to a parse.Query AST and back through Emit
+//   - cmd/examples/lint-aql: AQL static lint and ValidateAQL
+//   - cmd/examples/compile-build-validate: compile, build and validate using public imports only
+//   - cmd/examples/template-explore: introspect a compiled OPT (structure and leaf paths)
+//   - cmd/examples/webtemplate-export: compiled OPT to EHRbase v2.3 WebTemplate JSON
+//   - cmd/examples/flat-roundtrip: COMPOSITION to and from the FLAT and STRUCTURED simplified formats
+//   - cmd/examples/smart-launch: standalone SMART PKCE launch with state and verifier persistence
 package examples

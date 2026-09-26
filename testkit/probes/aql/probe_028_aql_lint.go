@@ -13,29 +13,29 @@ import (
 )
 
 // LintCase describes one fixture tuple consumed by PROBE-028. The probe
-// asserts the issue-code MULTISET produced by [lint.LintString] — not the
-// Detail text, not the path strings — so the conformance assertion stays at
-// the observable-behaviour level.
+// asserts the issue-code multiset produced by [lint.LintString] (not the
+// Detail text, not the path strings), so the conformance assertion stays at
+// the level of observable behaviour.
 //
-// The multiset is this SDK's, which is WIDER than REQ-109's: every additive
-// Layer-2 group runs unconditionally, so a group added later contributes its
-// codes to these cassettes wherever a cassette genuinely carries the defect
-// (REQ-164's aql_select_no_alias does, on two of the three). The
-// cross-implementation claim is therefore scoped to REQ-109's OWN codes — any
-// implementation of REQ-109 over the same grammar profile and OPT MUST produce
-// the same aql_archetype_not_in_template and aql_syntax — while each later
-// code is held by the probe of the requirement that added it
-// (conformance.md § PROBE-028 wire assertion).
+// The multiset is this SDK's, which is wider than the original lint
+// pipeline's: every additive Layer-2 group runs unconditionally, so a group
+// added later contributes its codes to these cassettes wherever a cassette
+// really carries the defect (the path-shape group's aql_select_no_alias
+// does, on two of the three). The cross-implementation claim is therefore
+// scoped to the pipeline's own codes: any implementation over the same
+// grammar profile and OPT must produce the same
+// aql_archetype_not_in_template and aql_syntax. Each later code is held by
+// the probe that covers the group that added it.
 type LintCase struct {
 	// Name labels the case for diagnostic output.
 	Name string
 
 	// OPT is the operational-template XML body to compile and lint against.
 	// Nil leaves Layer 3 off: the run is Layer 1 (syntax) plus every Layer-2
-	// group that needs no template — the shape checks, since REQ-161 the
-	// semantic group, and since REQ-164 the path-shape group. Neither of the
-	// latter two is gated by [lint.Options.Relation] (a nil relation selects
-	// the pinned RM rather than switching a group off).
+	// group that needs no template: the shape checks, the semantic group,
+	// and the path-shape group. Neither of the latter two is gated by
+	// [lint.Options.Relation] (a nil relation selects the pinned RM instead
+	// of switching a group off).
 	OPT []byte
 
 	// Query is the AQL string under test.
@@ -48,16 +48,16 @@ type LintCase struct {
 }
 
 // Probe028AQLLint runs each case through [lint.LintString] (Layer 1 syntax +
-// Layer 2 shape + the unconditional REQ-161 semantic and REQ-164 path-shape
-// groups + Layer 3 template when an OPT is supplied) and asserts the resulting
-// issue codes match the case's WantCodes multiset. Sandbox-only: no transport,
-// no network (REQ-013 building block).
+// Layer 2 shape + the unconditional semantic and path-shape groups + Layer 3
+// template when an OPT is supplied) and asserts the resulting issue codes
+// match the case's WantCodes multiset. Sandbox-only: no transport, no
+// network.
 //
-// Those groups' presence is load-bearing beyond this probe: PROBE-097 arm (b)
-// and PROBE-099 arm (b) re-run this same corpus through [runLintCase] as their
-// additivity guards, and a guard means nothing unless the checks it is guarding
-// actually ran.
-func Probe028AQLLint(cases []LintCase) (Result, error) {
+// Those groups matter beyond this probe: [Probe097SemanticLint] and
+// [Probe099PathShapeLint] re-run this same corpus through [runLintCase] as
+// their additivity guards, and a guard means nothing unless the checks it is
+// guarding actually ran.
+func Probe028AQLLint(cases []LintCase) (Result, error) { // PROBE-028 (REQ-109)
 	r := Result{Probe: "PROBE-028"}
 	if len(cases) == 0 {
 		return r, errors.New("PROBE-028: at least one case required")

@@ -10,13 +10,13 @@ import (
 )
 
 // RenderUnmarshalJSONFile renders the canonical-JSON UnmarshalJSONFrom
-// companions (encoding/json/v2, ADR 0022) for every concrete class in `file`.
+// companions (encoding/json/v2) for every concrete class in `file`.
 //
 // Returns (nil, nil) when the file has no concrete classes.
 //
-// # Strategy (ruling R19)
+// # Strategy
 //
-// Each method refuses a nil receiver (REQ-025), then hands the decoder to the
+// Each method refuses a nil receiver, then hands the decoder to the
 // shared [typereg.DecodeInto] helper, which decodes the value in one pass,
 // enforces the `_type` discipline by reading the discriminator from the
 // wire struct's declared _type field that same decode populated, threads the
@@ -25,8 +25,8 @@ import (
 // classes, or a flat wire struct copied
 // back field by field for a class that embeds a marshaler-bearing concrete
 // ancestor (see the promotion note at [effectiveFields]). Polymorphic interface
-// fields resolve through the registered hooks: there is no per-field
-// typereg.DecodeAs dispatch or json.RawMessage staging any more.
+// fields resolve through the registered hooks, with no per-field
+// typereg.DecodeAs dispatch or json.RawMessage staging.
 func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	emitting := concreteClassesIn(file)
 	if len(emitting) == 0 {
@@ -94,11 +94,11 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	var b strings.Builder
 	fmt.Fprintf(&b, "// UnmarshalJSONFrom decodes canonical openEHR JSON into %s.\n", pc.GoName)
 	b.WriteString("// A nil receiver is refused with typereg.ErrNilReceiver rather than\n")
-	b.WriteString("// dereferenced (REQ-025). The shared helper checks the `_type`\n")
+	b.WriteString("// dereferenced. The shared helper checks the `_type`\n")
 	b.WriteString("// discriminator, threads the polymorphic decode hooks so every nested\n")
 	b.WriteString("// slot resolves, and wraps a whole-value shape failure through\n")
 	b.WriteString("// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and\n")
-	b.WriteString("// adding typereg.ErrInvalidShape (REQ-052, ADR 0022).\n")
+	b.WriteString("// adding typereg.ErrInvalidShape.\n")
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalJSONFrom(dec *jsontext.Decoder) error {\n", recv, pc.GoName, typeArgs)
 	fmt.Fprintf(&b, "\tif %s == nil {\n", recv)
 	fmt.Fprintf(&b, "\t\treturn fmt.Errorf(\"canjson: %s: %%w\", typereg.ErrNilReceiver)\n", pc.BMMName)

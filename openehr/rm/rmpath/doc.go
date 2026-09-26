@@ -1,15 +1,14 @@
 // Package rmpath provides read navigation of an in-memory openEHR RM
-// instance by an openEHR path — the PATHABLE read operations
+// instance by an openEHR path. It implements the PATHABLE read operations
 // (item_at_path, items_at_path, path_exists, path_unique) over the
-// actual object tree (REQ-121).
+// actual object tree.
 //
 // # Surface
 //
 // The operations are package functions rather than methods on the RM
 // types. rmpath imports openehr/rm; a delegating rm.LOCATABLE method
-// would create an import cycle, so the generated path-method stubs are
-// suppressed (see ADR 0011) and these functions are the canonical
-// surface:
+// would create an import cycle, so the generated rm path methods remain
+// stubs and these functions are the supported surface:
 //
 //	v, err := rmpath.ItemAtPath(comp, "/content[at0001]/data[at0002]/events[at0003]/data/items[at0004]/value")
 //
@@ -29,14 +28,13 @@
 //
 // # Coverage
 //
-// The walker covers the clinical composition spine — COMPOSITION,
+// The walker covers the clinical composition spine (COMPOSITION,
 // SECTION, the ENTRY types, HISTORY / EVENT, the ITEM_STRUCTURE
-// variants, CLUSTER, ELEMENT — down to the ELEMENT leaf (its value, plus
-// name and null_flavour). Data-value internals (e.g. DV_QUANTITY.units)
+// variants, CLUSTER, ELEMENT) down to the ELEMENT leaf: its value, plus
+// name and null_flavour. Data-value internals (e.g. DV_QUANTITY.units)
 // are not traversed. Demographic (PARTY) and EHR/admin object navigation
 // are not yet covered; an unresolvable attribute simply yields no match
-// (path_exists = false). Convergence onto a single shared RM navigator
-// (with openehr/validation/rmread) is a possible later step (ADR 0011).
+// (path_exists = false).
 //
 // # Fallibility
 //

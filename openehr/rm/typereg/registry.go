@@ -4,9 +4,9 @@
 //
 // The registry is populated by the rm package's init() (the generator
 // emits openehr/rm/typereg_gen.go which calls [Default.Register] for
-// every concrete RM type). External consumers MUST NOT register types
-// for the standard RM — the registry is append-only and panics on
-// duplicate registration (REQ-040).
+// every concrete RM type). External code must not register types for
+// the standard RM: the registry is append-only and panics on duplicate
+// registration.
 package typereg
 
 import (
@@ -62,9 +62,9 @@ func jsonNestingDepth(data []byte) int {
 
 // Registry maps each openEHR _type discriminator string (e.g.
 // "DV_QUANTITY") to a constructor returning a fresh zero-value
-// instance of the corresponding concrete Go type. Per REQ-040 the
-// registry never uses reflection to instantiate types; the
-// constructor closure is the only sanctioned mechanism.
+// instance of the corresponding concrete Go type. The registry never
+// uses reflection to instantiate types; the constructor closure is the
+// only mechanism.
 //
 // Registry is safe for concurrent reads. Writes (Register) are
 // serialised under a sync.RWMutex; they are expected to happen once,
@@ -79,14 +79,14 @@ type Registry struct {
 var Default = NewRegistry()
 
 // NewRegistry returns an empty registry. Useful for tests that want
-// an isolated registry — production code uses [Default].
+// an isolated registry; production code uses [Default].
 func NewRegistry() *Registry {
 	return &Registry{ctors: make(map[string]func() any)}
 }
 
 // Register associates an openEHR _type string with a constructor.
 // Panics on duplicate registration: a name collision is a programmer
-// error (REQ-040), not a recoverable condition.
+// error, not a recoverable condition.
 func (r *Registry) Register(typeName string, ctor func() any) {
 	if typeName == "" {
 		panic("typereg.Register: typeName is empty")
@@ -111,10 +111,10 @@ func (r *Registry) Lookup(typeName string) (func() any, bool) {
 	return c, ok
 }
 
-// Names returns a sorted snapshot of every registered type name — the
-// supported-type inventory. Enumeration exists so reversibility parity
-// (REQ-040: registration name ↔ [rm.RMTypeName]) can be verified over
-// the whole registry rather than a hand-picked sample.
+// Names returns a sorted snapshot of every registered type name, which
+// is the inventory of supported types. It lets callers check the whole
+// registry, for example that every registration name matches the
+// type's [rm.RMTypeName].
 func (r *Registry) Names() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -128,7 +128,7 @@ func (r *Registry) Names() []string {
 // Returns an error if:
 //
 //   - data nests deeper than the 512-level bound, counting every bracket
-//     ([ErrMaxDepthExceeded], REQ-108),
+//     ([ErrMaxDepthExceeded]),
 //   - data is not a JSON object,
 //   - the "_type" field is missing or not a string,
 //   - no constructor is registered for the discriminator,
@@ -137,8 +137,7 @@ func (r *Registry) Names() []string {
 // A duplicate object member name (which the v2 tokenizer refuses at
 // either failure site) is classified as [ErrInvalidShape] through the
 // shared [ClassifyDuplicate] gate, so every canonical-JSON decode route,
-// this one and the canjson entry points, refuses it the same way
-// (REQ-052).
+// this one and the canjson entry points, refuses it the same way.
 func (r *Registry) Decode(data []byte) (any, error) {
 	if d := jsonNestingDepth(data); d > maxDecodeDepth {
 		return nil, fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)
@@ -192,13 +191,13 @@ func DecodeAs[T any](data []byte) (T, error) {
 // Registry constructors return pointers (`&Concrete{}`) so the JSON
 // decoder can populate them. Callers may parameterise T with either
 // the pointer shape (`*Concrete`), an interface satisfied by the
-// pointer (e.g. abstract `DVOrdered`), OR the value shape
-// (`Concrete`) — the last case arises when a generic codec method is
+// pointer (e.g. abstract `DVOrdered`), or the value shape
+// (`Concrete`). The last case arises when a generic codec method is
 // instantiated with a concrete value type (e.g.
 // `DVInterval[DVQuantity].Lower` dispatched via `DecodeAs[DVQuantity]`).
 // The method first asserts to T directly (matches the pointer /
-// interface shapes), then to `*T` and dereferences if successful —
-// closing the value-T gap without reflection.
+// interface shapes), then to `*T` and dereferences if successful,
+// which covers a value T without reflection.
 func (r *Registry) DecodeAs[T any](data []byte) (T, error) {
 	var zero T
 	v, err := r.Decode(data)

@@ -22,14 +22,14 @@ const probeVOID openehrclient.VersionedObjectID = "demographic-probe-vo-1"
 //   - Create (Prefer=representation) returns the created PARTY body.
 //   - Get returns the latest PARTY body.
 //   - GetVersion returns the ORIGINAL_VERSION<PARTY> envelope whose `data` is
-//     decoded polymorphically (the envelope's generic data cannot decode into
-//     the abstract rm.Party interface directly — REQ-040 via the type
-//     registry).
+//     decoded polymorphically through the type registry (the envelope's
+//     generic data cannot decode into the abstract rm.Party interface
+//     directly).
 //
-// All three MUST yield the same concrete type as the input party. The caller
+// All three must yield the same concrete type as the input party. The caller
 // wires c to a server that echoes the PARTY body for type t (Sandbox: a
 // `sandbox.Backend` scripted route; Cassette / Live later).
-func Probe073DemographicRoundTrip(ctx context.Context, c *transport.Client, party rm.Party, t demographic.Type) (Result, error) {
+func Probe073DemographicRoundTrip(ctx context.Context, c *transport.Client, party rm.Party, t demographic.Type) (Result, error) { // PROBE-073 (REQ-040, REQ-050)
 	r := Result{Probe: "PROBE-073"}
 	if c == nil {
 		return r, errors.New("PROBE-073: nil transport.Client")

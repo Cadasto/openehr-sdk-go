@@ -22,9 +22,9 @@ const systemID = "sandbox.local"
 const openEHRBase = "/openehr/v1"
 
 // Backend is an in-memory openEHR REST backend. It is safe for
-// concurrent use (REQ-026). The zero value is ready to use, like
-// [bytes.Buffer] — ehrs allocates lazily under mu on first write, so
-// a caller never needs [New].
+// concurrent use. The zero value is ready to use, like
+// [bytes.Buffer]: storage is allocated lazily on first write, so a
+// caller never needs [New].
 type Backend struct {
 	mu      sync.Mutex
 	ehrs    map[string][]byte
@@ -45,7 +45,7 @@ func (b *Backend) ensureEHRs() {
 }
 
 // HTTPClient returns an *http.Client whose Transport is b, so
-// transport.New can inject it with no listener (REQ-021, REQ-082).
+// transport.New can inject it with no listener.
 func (b *Backend) HTTPClient() *http.Client {
 	return &http.Client{Transport: b}
 }
@@ -57,7 +57,7 @@ func (b *Backend) HTTPClient() *http.Client {
 // must honour cancellation, and a real transport would fail the same
 // way. Without this a probe that cancels before dispatch would see a
 // successful 201 in Sandbox mode and a cancellation error against a
-// CDR — the cross-mode disagreement REQ-082 exists to prevent.
+// real CDR.
 func (b *Backend) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req == nil {
 		return nil, errors.New("sandbox: nil request")

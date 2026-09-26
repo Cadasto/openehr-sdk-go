@@ -1,17 +1,3 @@
-// Package clientcreds implements the OAuth2 Client Credentials grant
-// (RFC 6749 § 4.4) as an auth.TokenSource — for service-to-service
-// callers (benchmark, seeder, MCP server backend, federator) that do
-// not run an interactive user flow.
-//
-// The provider caches the issued access token until it nears expiry,
-// then re-requests. Client Credentials does not produce a refresh
-// token; "refresh" here means "request a new access token via the same
-// grant". Concurrent Token() calls coalesce around a single in-flight
-// request (REQ-026).
-//
-// HTTP client injection follows REQ-021 — callers MUST inject the
-// *http.Client whose timeouts and TLS roots they want to apply to the
-// token endpoint. A nil http.Client is rejected at construction.
 package clientcreds
 
 import (
@@ -38,8 +24,9 @@ type AuthMethod int
 
 const (
 	// AuthBasic sends client_id and client_secret as HTTP Basic auth
-	// per RFC 6749 § 2.3.1 ("client_secret_basic"). This is the
-	// default and the form the spec describes as REQUIRED-to-support.
+	// per RFC 6749 §2.3.1 ("client_secret_basic"). This is the
+	// default, and the method RFC 6749 requires authorization servers
+	// to support.
 	AuthBasic AuthMethod = iota
 	// AuthPost sends client_id and client_secret in the form-encoded
 	// request body ("client_secret_post"). Use when the deployment
@@ -47,7 +34,7 @@ const (
 	AuthPost
 	// AuthPrivateKeyJWT uses a signed JWT client_assertion (RFC 7523 /
 	// SMART Backend Services). FromConfig sets this automatically when
-	// WithClientAssertion is used — the field then reflects the actual
+	// WithClientAssertion is used, so the field reflects the actual
 	// auth method in use. Setting AuthPrivateKeyJWT manually without
 	// also calling WithClientAssertion is an error: FromConfig will
 	// return auth.ErrInvalidConfig.
@@ -59,7 +46,7 @@ const (
 // (env, YAML).
 type Config struct {
 	// HTTPClient is the injected client used for token-endpoint calls.
-	// Required (REQ-021).
+	// Required.
 	HTTPClient *http.Client
 	// TokenURL is the token endpoint of the authorization server.
 	TokenURL string
@@ -80,11 +67,10 @@ type Config struct {
 	// ClientAssertion, when set, enables SMART Backend Services asymmetric
 	// client authentication (RFC 7523). The source is called once per token
 	// exchange to produce a freshly signed JWT. Mutually exclusive with
-	// ClientSecret. (REQ-068)
+	// ClientSecret.
 	ClientAssertion jwtbearer.AssertionSource
 	// RefreshThreshold is how long before ExpiresAt the source treats
-	// the cached token as stale and triggers a refresh. Default 30s
-	// (matches docs/specifications/auth.md REQ-063).
+	// the cached token as stale and triggers a refresh. Default 30s.
 	RefreshThreshold time.Duration
 	// Issuer is the issuer URL recorded on the produced Token. Optional;
 	// when set it is round-tripped to Token.Issuer for audit.
@@ -95,7 +81,7 @@ type Config struct {
 type Option func(*Config)
 
 // WithHTTPClient injects the *http.Client used for token-endpoint
-// calls. Required per REQ-021 — there is no default.
+// calls. It is required; there is no default.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *Config) { cfg.HTTPClient = c }
 }
@@ -120,15 +106,15 @@ func WithIssuer(iss string) Option { return func(cfg *Config) { cfg.Issuer = iss
 // WithClientAssertion enables SMART Backend Services asymmetric client
 // authentication (RFC 7523). The provided AssertionSource is called once per
 // token exchange to produce a freshly signed JWT bearer assertion. When set,
-// ClientSecret MUST be empty (the two methods are mutually exclusive; both set
-// is rejected by FromConfig with auth.ErrInvalidConfig). (REQ-068)
+// ClientSecret must be empty: the two methods are mutually exclusive, and
+// FromConfig rejects both being set with auth.ErrInvalidConfig.
 func WithClientAssertion(src jwtbearer.AssertionSource) Option {
 	return func(cfg *Config) { cfg.ClientAssertion = src }
 }
 
 // Source is the client_credentials TokenSource. Safe for concurrent
 // use; concurrent Token() callers coalesce around one outgoing
-// exchange (REQ-026).
+// exchange.
 type Source struct {
 	cfg      Config
 	tokenURL *url.URL

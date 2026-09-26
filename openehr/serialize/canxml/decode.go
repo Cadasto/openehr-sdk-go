@@ -10,7 +10,7 @@ import (
 )
 
 // NSXMI is the XMI namespace. ITS-XML rejects `xmi:type` on the
-// wire — only `xsi:type` is recognised. The decoder maps any
+// wire; only `xsi:type` is recognised. The decoder maps any
 // `xmi:type` it sees to [ErrInvalidShape].
 const NSXMI = "http://www.omg.org/XMI"
 
@@ -25,26 +25,24 @@ type decoderConfig struct {
 }
 
 // WithRelaxedTypeDispatch toggles the polymorphic-dispatch policy
-// for ABSTRACT slots from STRICT (default — missing `xsi:type` at a
-// polymorphic site is an error) to RELAXED (missing `xsi:type` is
+// for abstract slots from strict (the default: missing `xsi:type` at a
+// polymorphic site is an error) to relaxed (missing `xsi:type` is
 // allowed when the declared abstract field has exactly one concrete
 // descendant in the merged BMM; the decoder then instantiates that
-// descendant). Scope: abstract slots only — slot types like
+// descendant). It applies to abstract slots only, i.e. slot types like
 // `DATA_VALUE`, `DV_ORDERED`, `ITEM_STRUCTURE`, `PARTY_PROXY`.
 //
-// REQ-052 narrow-interface slots (`<Parent>Like` — DVTextLike,
+// Narrow-interface slots (`<Parent>Like`: DVTextLike,
 // PartyIdentifiedLike, …) have an independent, always-on fallback:
 // a missing `xsi:type` defaults to the declared parent's concrete
-// type, served by [DecodeAsOrDefault] from the generator emission.
+// type, served by [DecodeAsOrDefault] from the generated code.
 // That fallback is deterministic (the parent type is fixed by the
-// BMM) so it is not gated by this option.
+// BMM), so this option does not control it.
 //
-// v1 NOTE: the relaxed escape hatch for ABSTRACT slots is recognised
-// by the option surface but enforced by future generator output —
-// the current generated [UnmarshalXML] methods at abstract slots
-// still implement strict dispatch. Setting this option today is a
-// no-op for those slots; the hook stays so the API does not break
-// when the relaxed path lands.
+// The option is accepted for abstract slots but not yet enforced: the
+// generated [UnmarshalXML] methods at abstract slots implement strict
+// dispatch only, so setting it is currently a no-op for those slots. It
+// exists so the API does not change when relaxed dispatch is implemented.
 func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 	return func(c *decoderConfig) { c.relaxedTypeDispatch = enabled }
 }
@@ -80,7 +78,7 @@ func (d *Decoder) Decode(v any) error {
 func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch }
 
 // Unmarshal parses canonical-XML-encoded data and stores the result
-// in the value pointed to by v. v MUST be a non-nil pointer to a
+// in the value pointed to by v. v must be a non-nil pointer to a
 // generated RM type whose UnmarshalXML method is wired through this
 // package (every concrete RM class generated under openehr/rm/
 // implements it).
@@ -102,11 +100,11 @@ func Unmarshal(data []byte, v any) error {
 
 // XSITypeOf scans a start element's attribute list and returns the
 // value of the `xsi:type` discriminator. It accepts the
-// namespace-resolved form (`Space == NSXSI, Local == "type"`) — what
-// encoding/xml produces when `xmlns:xsi` is in scope — and the
+// namespace-resolved form (`Space == NSXSI, Local == "type"`), which
+// encoding/xml produces when `xmlns:xsi` is in scope, and the
 // literal form (`Local == "xsi:type"`) produced by directly
 // constructed tokens, e.g. the encoder's own [XSITypeAttrName].
-// Note an `xsi:type` written with NO in-scope `xmlns:xsi` does not
+// An `xsi:type` written with no in-scope `xmlns:xsi` does not
 // take the literal branch: encoding/xml yields `Space == "xsi",
 // Local == "type"`, which matches neither branch and is reported as a
 // missing discriminator (below).
@@ -115,12 +113,11 @@ func Unmarshal(data []byte, v any) error {
 // Schema datatype) prefix is stripped so foundation primitives like
 // `xsd:string` decode against the BMM primitive name `String`. A
 // namespace-prefixed RM value (e.g. Better's `ns2:DV_QUANTITY`) is
-// NOT stripped and so fails registry lookup as an unknown type —
-// namespace-prefixed discriminators are out of scope per
-// docs/specifications/wire.md § REQ-056.
+// not stripped and so fails registry lookup as an unknown type;
+// namespace-prefixed discriminators are not supported.
 //
 // Returns [ErrInvalidShape] when an `xmi:type` attribute is
-// encountered — ITS-XML pins `xsi:type` and the SDK rejects XMI
+// encountered: ITS-XML specifies `xsi:type` and the SDK rejects XMI
 // discriminators on the wire.
 //
 // Returns ("", nil) when the element carries no discriminator at
@@ -161,10 +158,10 @@ func stripXSDPrefix(s string) string {
 	return s
 }
 
-// DecodeAs reads one polymorphic child element from dec — the
-// element whose start token is `start` — and returns the typereg-
-// dispatched concrete value, asserted to T. Used by generated
-// UnmarshalXML methods at every polymorphic-field decode site.
+// DecodeAs reads one polymorphic child element from dec (the
+// element whose start token is `start`) and returns the typereg-
+// dispatched concrete value, asserted to T. Generated
+// UnmarshalXML methods call it at every polymorphic-field decode site.
 //
 // Behaviour:
 //
@@ -173,9 +170,9 @@ func stripXSDPrefix(s string) string {
 //     concrete instance which receives the element body via
 //     `dec.DecodeElement`.
 //   - If start carries no `xsi:type`, returns [typereg.ErrMissingType]
-//     wrapped in [DecodeError]. Relaxed-dispatch fallback lives on
-//     the generator and the [Decoder.RelaxedTypeDispatch] flag —
-//     see canxml/doc.go.
+//     wrapped in [DecodeError]. Relaxed-dispatch fallback lives in
+//     the generated code and the [Decoder.RelaxedTypeDispatch] flag;
+//     see the package documentation.
 //   - If the concrete value does not satisfy T, returns
 //     [typereg.ErrTypeMismatch] wrapped in [DecodeError].
 //   - The body bytes are consumed up to and including the matching
@@ -223,13 +220,13 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	}
 }
 
-// DecodeAsOrDefault is the polySingleNarrow (REQ-052) XML
-// counterpart of [DecodeAs]. When the element carries an `xsi:type`,
-// dispatch goes through [typereg.Default] exactly like DecodeAs.
-// When `xsi:type` is absent, the supplied defaultCtor instantiates
-// the declared parent type and dec.DecodeElement populates it —
-// preserving openEHR canonical XML where the static field type fixes
-// the concrete subtype.
+// DecodeAsOrDefault is the XML counterpart of [DecodeAs] for
+// narrow-interface (`<Parent>Like`) slots. When the element carries an
+// `xsi:type`, dispatch goes through [typereg.Default] exactly like
+// DecodeAs. When `xsi:type` is absent, the supplied defaultCtor
+// instantiates the declared parent type and dec.DecodeElement populates
+// it. This preserves openEHR canonical XML where the static field type
+// fixes the concrete subtype.
 func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultCtor func() any) (T, error) {
 	var zero T
 	typeName, err := XSITypeOf(start)

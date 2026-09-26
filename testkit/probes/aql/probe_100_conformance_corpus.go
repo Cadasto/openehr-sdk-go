@@ -278,7 +278,7 @@ type ConformanceRow struct {
 	Query string
 }
 
-// Where is the row's corpus coordinate, `FAMILY/file.csv:LINE` — enough to open
+// Where is the row's corpus coordinate, `FAMILY/file.csv:LINE`, enough to open
 // the offending row from a CI log alone.
 func (r ConformanceRow) Where() string {
 	return fmt.Sprintf("%s/%s:%d", r.Family, r.File, r.Line)
@@ -363,8 +363,8 @@ func (c ConformanceCorpus) FamilyCounts() []ConformanceFamilyCount {
 	return out
 }
 
-// ReadConformanceCorpus reads the vendored corpus rooted at root — the
-// directory holding the family directories, AQL_SOURCE.txt and EXCLUDED.txt —
+// ReadConformanceCorpus reads the vendored corpus rooted at root (the
+// directory holding the family directories, AQL_SOURCE.txt and EXCLUDED.txt)
 // and reconstructs every row into the query its consuming suite ran.
 //
 // Callers in this repository pass fixtures.AQLConformanceRoot(); the parameter
@@ -374,8 +374,8 @@ func (c ConformanceCorpus) FamilyCounts() []ConformanceFamilyCount {
 // It is strict by design: an unlearned file at the root or in a family
 // directory, a family directory the table does not name, a header that does not
 // match field for field, a table entry with no file on disk, or a missing
-// ingest file (AQL_SOURCE.txt, EXCLUDED.txt) is an error, not a skipped row —
-// a corpus without its provenance pin or exclusion record is not a corpus.
+// ingest file (AQL_SOURCE.txt, EXCLUDED.txt) is an error, not a skipped row.
+// A corpus without its provenance pin or exclusion record is not a corpus.
 func ReadConformanceCorpus(root string) (ConformanceCorpus, error) {
 	var c ConformanceCorpus
 	entries, err := os.ReadDir(root)
@@ -507,9 +507,9 @@ func reconstructConformanceQuery(s conformanceSuite, values []string) (string, e
 
 // Probe100ConformanceCorpus runs the ratchet over every reconstructed row of c
 // and aggregates all failures into one [Result] (collect-all, like
-// [Probe099PathShapeLint] — a single early failure would hide the rest of the
+// [Probe099PathShapeLint]: a single early failure would hide the rest of the
 // corpus, and the point of a corpus ratchet is the whole picture).
-func Probe100ConformanceCorpus(c ConformanceCorpus) (Result, error) {
+func Probe100ConformanceCorpus(c ConformanceCorpus) (Result, error) { // PROBE-100 (REQ-160)
 	r := Result{Probe: "PROBE-100"}
 	if len(c.Rows) == 0 {
 		return r, errors.New("PROBE-100: the corpus reconstructed no rows at all; " +

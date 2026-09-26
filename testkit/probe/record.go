@@ -16,10 +16,10 @@ import (
 
 // Recorder is a capture-time http.RoundTripper. It forwards every request to
 // next, then appends a redacted HAR exchange: credentials stay on the wire
-// but are stripped from the recording — the credential header set, the
-// credential URL query keys, and any user:pass@ URL userinfo (REQ-082). A
+// but are stripped from the recording (the credential header set, the
+// credential URL query keys, and any user:pass@ URL userinfo). A
 // credential that survives in a request or response body is caught by
-// [ValidateHAR] when the recording is loaded, not stripped here.
+// [ValidateHAR] when the recording is loaded; the Recorder does not strip it.
 type Recorder struct {
 	next       http.RoundTripper
 	provenance HARProvenance
@@ -28,10 +28,10 @@ type Recorder struct {
 }
 
 // NewRecorder returns a Recorder that writes exchanges through next.
-// next is required — the recorder never allocates a transport
-// (REQ-021). provenance is copied onto the finished HAR as
-// log._req082; incomplete provenance is still written so ValidateHAR
-// can refuse the file rather than the recorder inventing one.
+// next is required: the recorder never allocates a transport.
+// provenance is copied onto the finished HAR as log._req082; incomplete
+// provenance is still written so ValidateHAR can refuse the file instead
+// of the recorder inventing one.
 func NewRecorder(next http.RoundTripper, provenance HARProvenance) *Recorder {
 	return &Recorder{next: next, provenance: provenance}
 }

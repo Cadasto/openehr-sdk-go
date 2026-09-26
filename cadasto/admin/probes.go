@@ -19,7 +19,7 @@ import (
 // absolute path on that origin.
 var ErrInvalidPath = errors.New("admin: invalid probe path")
 
-// Default probe paths (REQ-083). Override per call via WithLivePath
+// Default probe paths. Override per call via WithLivePath
 // or WithReadyPath when a deployment serves health on different paths
 // (e.g. "/healthz").
 const (
@@ -66,23 +66,23 @@ func WithReadyPath(p string) ReadyOption {
 //   - 5xx → [transport.ErrServerError]
 //
 // Other non-2xx codes (e.g. 400, 405, 408, 429) surface as a plain
-// formatted error with no sentinel — callers MUST NOT rely on
-// errors.Is matching outside the mapped set. Network failures from
-// the underlying http.Client (connection refused, TLS errors, context
+// formatted error with no sentinel, so do not rely on errors.Is
+// matching outside the mapped set. Network failures from the
+// underlying http.Client (connection refused, TLS errors, context
 // cancellation) are wrapped with the probe URL via %w.
 //
-// Probes borrow [transport]'s sentinel taxonomy (REQ-093) for the
-// mapped codes above, but bypass [transport.Client.Do] — no WireError
-// envelope is decoded, no OTel spans recorded, no retries applied.
+// Probes reuse [transport]'s sentinel errors for the mapped codes
+// above but bypass [transport.Client.Do]: no WireError envelope is
+// decoded, no OTel spans are recorded and no retries are applied.
 // Use [openehr/client/admin] for retry-aware admin operations.
 //
 // The request is issued at the deployment origin derived from the
-// openEHR REST service catalog entry (scheme + host) — the openEHR
+// openEHR REST service catalog entry (scheme + host). The openEHR
 // REST API path prefix is stripped so probes target deployment-level
-// endpoints, not API-scoped ones.
+// endpoints rather than API-scoped ones.
 //
-// No Authorization header is attached by this code: health endpoints
-// are public per the REQ-083 contract. (An injected
+// No Authorization header is attached by this code, because health
+// endpoints are treated as public. (An injected
 // http.RoundTripper may still inject headers.) Deployments that gate
 // /health behind auth should not use this surface.
 //
@@ -98,9 +98,9 @@ func Live(ctx context.Context, c *transport.Client, opts ...LiveOption) error {
 	return probe(ctx, c, cfg.path)
 }
 
-// Ready probes the deployment readiness endpoint. Same error contract
-// as [Live] — see that doc for the status mapping, the deliberate
-// transport.Do bypass, and the [ErrInvalidPath] guard on the
+// Ready probes the deployment readiness endpoint. It has the same error
+// contract as [Live]; see that doc for the status mapping, the
+// transport.Do bypass and the [ErrInvalidPath] guard on the
 // WithReadyPath override.
 func Ready(ctx context.Context, c *transport.Client, opts ...ReadyOption) error {
 	cfg := readyConfig{path: DefaultReadyPath}

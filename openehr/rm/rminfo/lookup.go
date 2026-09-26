@@ -37,23 +37,20 @@ type Lookup interface {
 	// universe of types (e.g. discovery probes).
 	//
 	// The set is every class the RM generation target emits a Go type
-	// for, which since REQ-048 includes the abstract and attribute-less
-	// ones (DATA_VALUE, PATHABLE, the support service classes): a class
-	// absent here cannot be asked about at all, and a descendant
-	// expansion rooted at an abstract class needs that class present.
-	// It is therefore NOT a list of instantiable types — see
-	// [Hierarchy.IsAbstract] and, for what is decodable, the type
-	// registry in openehr/rm/typereg (REQ-040).
+	// for, including the abstract and attribute-less ones (DATA_VALUE,
+	// PATHABLE, the support service classes): a class absent here cannot
+	// be asked about at all, and a descendant expansion rooted at an
+	// abstract class needs that class present. It is therefore not a list
+	// of instantiable types; see [Hierarchy.IsAbstract] and, for what is
+	// decodable, the type registry in openehr/rm/typereg.
 	KnownRMTypes() []string
 }
 
 // AttributeLister is an optional extension of [Lookup]: it enumerates a
 // type's attributes in BMM declaration order. It is kept off the Lookup
-// interface so adding it does not break external Lookup implementers
-// (idiom.md § Public-API stability — prefer a new interface plus a runtime
-// type-assertion to introduce optional behaviour). [Default] implements it;
-// consumers walking the RM graph without an OPT — e.g. the template-less
-// validation floor (REQ-112) — assert for it.
+// interface so it does not break external Lookup implementers. [Default]
+// implements it; code walking the RM graph without an OPT (for example
+// template-less validation) asserts for it.
 type AttributeLister interface {
 	// AttributeNames returns every attribute on the given RM type in BMM
 	// declaration order (ancestors first, then own), including inherited
@@ -77,7 +74,7 @@ var (
 //
 // As an [AbsenceReporter] it answers from the generated absence table, so an
 // out-of-universe name gets the reason it is out rather than a blanket
-// [AbsenceUndeclared] (REQ-049).
+// [AbsenceUndeclared].
 //
 // Default is safe for concurrent use by multiple goroutines, including on
 // first use: the derived indexes it builds lazily are published under
@@ -88,13 +85,13 @@ var Default Lookup = &lookup{data: defaultData, absence: absenceData}
 // for unit tests that need to substitute synthetic RM shapes.
 // Production callers should use [Default].
 //
-// The returned Lookup RETAINS data rather than copying it, and derives indexes
-// from it on first use. Callers MUST NOT mutate data afterwards: doing so races
+// The returned Lookup retains data rather than copying it, and derives indexes
+// from it on first use. Callers must not mutate data afterwards: doing so races
 // with those indexes and leaves the derived answers permanently stale, with no
 // diagnostic. Like [Default], the result is otherwise safe for concurrent use.
 //
 // The result carries no absence table, so as an [AbsenceReporter] it reports
-// [AbsenceUndeclared] for every name outside data (REQ-049). To exercise the
+// [AbsenceUndeclared] for every name outside data. To exercise the
 // other absence reasons on synthetic data, use [NewWithAbsence].
 func New(data map[string]ClassMeta) Lookup {
 	return &lookup{data: data}
@@ -104,9 +101,8 @@ func New(data map[string]ClassMeta) Lookup {
 // exported only to allow tests to construct synthetic data; the
 // production tables live in lookup_gen.go.
 //
-// Construct with field NAMES. Fields may be added in a minor release
-// (REQ-048 added Abstract and Parents), which breaks positional literals —
-// idiom.md § Public-API stability.
+// Construct with field names: fields may be added in a minor release,
+// which breaks positional literals.
 type ClassMeta struct {
 	// Attributes is the effective attribute set (own + inherited)
 	// keyed by attribute name.
@@ -116,40 +112,39 @@ type ClassMeta struct {
 	AttrOrder []string
 	// Abstract mirrors the BMM is_abstract flag verbatim: the model
 	// forbids instantiating the class, so naming it denotes its concrete
-	// descendants rather than one instantiable class. It is NOT a
-	// verdict on whether a stored instance can carry the name as _type
-	// — see [Hierarchy.IsAbstract] (REQ-048).
+	// descendants rather than one instantiable class. It is not a
+	// verdict on whether a stored instance can carry the name as _type;
+	// see [Hierarchy.IsAbstract].
 	Abstract bool
 	// Parents lists the class's immediate parents in BMM declaration
 	// order, filtered to the classes this data set defines. A BMM
-	// ancestor outside the class universe — the foundation typing layer
-	// (Any, Ordered, Interval, the Iso8601_* types) — is dropped, which
+	// ancestor outside the class universe (the foundation typing layer:
+	// Any, Ordered, Interval, the Iso8601_* types) is dropped, which
 	// makes its child a root rather than an edge pointing at a name no
-	// method can answer for (REQ-048).
+	// method can answer for.
 	Parents []string
 }
 
 // AttrMeta is the per-attribute data the Lookup consults.
 //
-// Construct with field NAMES, for the same reason as [ClassMeta]: REQ-048
-// added DeclaredIn, and a positional literal would no longer compile.
+// Construct with field names, for the same reason as [ClassMeta].
 type AttrMeta struct {
 	// TypeName is the BMM RM type name of the attribute value. For
 	// container properties this is the element type (the type
 	// inside the list). Never empty.
 	TypeName string
 	// Required reports whether the BMM declares the attribute as
-	// mandatory (the `is_mandatory` flag, or — for containers —
+	// mandatory (the `is_mandatory` flag, or, for containers,
 	// `cardinality.lower >= 1`).
 	Required bool
 	// Container reports whether the attribute is multi-valued
 	// (declared as a container property in the BMM).
 	Container bool
 	// DeclaredIn names the class whose BMM declaration supplied this
-	// attribute — the owning class itself, or the ancestor the
-	// inheritance fold took it from. It is recorded BY that fold, so
+	// attribute: the owning class itself, or the ancestor the
+	// inheritance fold took it from. It is recorded by that fold, so
 	// it cannot disagree with the TypeName / Required / Container
-	// triple beside it (REQ-048).
+	// triple beside it.
 	DeclaredIn string
 }
 

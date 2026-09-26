@@ -16,10 +16,10 @@ import (
 //
 // Each line carries the AQL path plus the RM type name. *Slot
 // leaves get a trailing " (slot)" tag. Nodes whose parent attribute
-// is implicit (rminfo-injected — see
+// is implicit (rminfo-injected; see
 // [templatecompile.CompiledAttribute.Implicit]) carry a trailing
 // " (implicit attr)" marker on the same line. The marker is rare in
-// practice because v1 implicit attributes have no Children; it is
+// practice because implicit attributes currently have no Children; it is
 // reserved for future RM-injection that populates default values.
 //
 // Use as:
@@ -48,7 +48,7 @@ func NewPrinter(w io.Writer, indent string) *Printer {
 }
 
 // PreHandle emits the current node's line. The compiled tree's
-// post-order would re-emit each node — we use PreHandle only.
+// post-order would re-emit each node, so only PreHandle is used.
 func (p *Printer) PreHandle(ctx *walk.Context) error {
 	n := ctx.Node()
 	indent := p.Indent

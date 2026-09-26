@@ -15,10 +15,10 @@ import (
 // inherited from ancestors, ancestor-order preserved, own overrides
 // parent on same name), and emits a single `defaultData` map literal.
 //
-// Per class it emits both layers rminfo answers over (REQ-048):
+// Per class it emits both layers rminfo answers over:
 //   - the inheritance-FLATTENED attribute set, plus the `DeclaredIn`
 //     site the fold would otherwise erase;
-//   - the class-graph facts — `Abstract` and `Parents`, the latter
+//   - the class-graph facts, `Abstract` and `Parents`, the latter
 //     filtered to the universe so the emitted graph stays closed.
 //
 // Returns nil when the target is not the RM target (rminfo is only

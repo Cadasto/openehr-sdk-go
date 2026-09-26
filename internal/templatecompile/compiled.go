@@ -57,7 +57,7 @@ func (c *Compiled) Root() *CompiledNode { return c.root }
 
 // NodeAt resolves a path string by exact lookup in the pre-built
 // byPath index (O(1)). Keys are fully qualified AQL paths computed
-// at compile time — e.g. "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
+// at compile time, e.g. "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
 // not predicate-less prefixes like "/content".
 //
 // This differs from [template.OperationalTemplate.NodeAt], which
@@ -91,15 +91,15 @@ func (c *Compiled) AllByNodeID(nodeID string) []*CompiledNode {
 
 // AllByArchetypeID returns the archetype root node(s) whose
 // archetype id equals hrid. Only ArchetypeRoot-derived nodes carry an
-// archetype id (descendants do not), so this indexes roots — typically
+// archetype id (descendants do not), so this indexes roots: typically
 // one per hrid, but more when the same archetype fills several slots.
 // Same iteration / copy semantics as AllByRMType. An unknown hrid
 // yields a nil slice (len 0).
 //
-// Lint (REQ-109) uses this for two checks: membership
-// (aql_archetype_not_in_template — does the template contain the
+// AQL lint uses this for two checks: membership
+// (aql_archetype_not_in_template: does the template contain the
 // archetype the query names?) and archetype-scoped path resolution
-// (aql_path_not_in_template — walking the returned root's subtree to
+// (aql_path_not_in_template, which walks the returned root's subtree to
 // confirm the query's path structure exists).
 func (c *Compiled) AllByArchetypeID(hrid string) []*CompiledNode {
 	return slices.Clone(c.byArchetypeID[hrid])
@@ -109,12 +109,12 @@ func (c *Compiled) AllByArchetypeID(hrid string) []*CompiledNode {
 // reachable in the compiled tree (the size of the byPath index built
 // during [Compile]). Useful as an independent "truth count" against
 // which traversal code in [internal/templatecompile/walk] can assert
-// it visited every node — comparing a walker's tally to this value
+// it visited every node; comparing a walker's tally to this value
 // detects subtree-pruning bugs that a second walker call cannot.
 func (c *Compiled) NumNodes() int { return len(c.byPath) }
 
 // Term looks up the at-code's term definition under the root
-// archetype's terminology — convenience for callers operating at the
+// archetype's terminology, a convenience for callers operating at the
 // COMPOSITION level. Returns (zero, false) when the code is not
 // defined on the root archetype.
 //
@@ -125,9 +125,8 @@ func (c *Compiled) Term(code string) (template.ArchetypeTerm, bool) {
 
 // TermLang resolves an at-code's term definition scoped to the
 // composition root archetype. The lang parameter is accepted for
-// forward compatibility but currently ignored — an ADL 1.4 OPT
+// forward compatibility but currently ignored: an ADL 1.4 OPT
 // carries a single document language; see [CompiledNode.Term].
-// REQ-105.
 func (c *Compiled) TermLang(nodeID, lang string) (template.ArchetypeTerm, bool) {
 	if c.root == nil {
 		return template.ArchetypeTerm{}, false
@@ -144,7 +143,7 @@ func (c *Compiled) TermBindings() []template.TermBinding {
 
 // TermBindingsForNode returns every flattened term-binding whose
 // NodeOrPath equals nodeID, contains the AQL-like at-code predicate
-// [nodeID], or ends with /nodeID. REQ-105.
+// [nodeID], or ends with /nodeID.
 func (c *Compiled) TermBindingsForNode(nodeID string) []template.TermBinding {
 	if nodeID == "" {
 		return nil
@@ -171,7 +170,7 @@ func termBindingMatchesNode(b template.TermBinding, nodeID string) bool {
 
 // ErrPathNotFound is returned by [Compiled.NodeAt] when the path
 // string does not resolve to a compiled node. Distinct from
-// [template.ErrPathNotFound] — the compiled API operates over
+// [template.ErrPathNotFound]: the compiled API operates over
 // pre-computed AQL paths, so the resolution semantics differ
 // (exact-match lookup, not tree-walk).
 var ErrPathNotFound = errors.New("templatecompile: path not found in compiled template")

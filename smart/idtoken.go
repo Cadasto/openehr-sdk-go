@@ -30,7 +30,7 @@ const clockSkew = 30 * time.Second
 // deployed RS256/ES256 (REQ-062, REQ-064).
 var defaultIDTokenAlgs = []string{"RS256", "RS384", "ES256", "ES384"}
 
-// IDTokenClaims holds parsed OpenID ID-token claims (REQ-064).
+// IDTokenClaims holds parsed OpenID ID-token claims.
 type IDTokenClaims struct {
 	Subject   string
 	Audience  []string
@@ -43,7 +43,7 @@ type IDTokenClaims struct {
 }
 
 // ValidateIDToken verifies a JWT ID token against jwks and returns parsed
-// claims (REQ-062, REQ-064).
+// claims.
 //
 // Signature verification is delegated to go-oidc/v3 (which uses go-jose),
 // supporting RS256, RS384, ES256, and ES384. allowedAlgs constrains the
@@ -52,8 +52,8 @@ type IDTokenClaims struct {
 // intersected with the supported set; when empty the full supported set
 // is used. The unsecured "none" algorithm is always rejected. The
 // signature is always verified before any claim is trusted; claim
-// semantics (iss/aud/exp/nbf/iat with the SDK's 30s skew, plus nonce) are
-// then applied by claimsFromMap.
+// checks (iss/aud/exp/nbf/iat with the SDK's 30s skew, plus nonce) run
+// after that.
 func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issuer, clientID, nonce string, now time.Time, allowedAlgs []string) (*IDTokenClaims, error) {
 	if raw == "" {
 		return nil, fmt.Errorf("%w: empty id_token", auth.ErrJWKSValidationFailed)

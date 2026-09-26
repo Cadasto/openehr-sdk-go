@@ -3,14 +3,10 @@
 // backoff, OpenTelemetry hooks, error mapping, and internal
 // spec-version pinning.
 //
-// Implements REQ-021 (injected client), REQ-051, REQ-054, REQ-059,
-// REQ-060, REQ-066, REQ-069, REQ-090, REQ-091, REQ-093, and REQ-094 per
-// docs/specifications/transport.md, docs/specifications/wire.md, and docs/specifications/auth.md.
-//
-// The SDK does not allocate its own transport — consumers must inject
-// the *http.Client whose connection pool, timeouts, and TLS config they
+// The SDK does not allocate its own transport: callers inject the
+// *http.Client whose connection pool, timeouts, and TLS config they
 // want to control.
 //
-// The package is named transport (not http) to avoid collision with
-// the standard-library net/http at consumer call sites.
+// The package is named transport, not http, to avoid a collision with
+// the standard-library net/http at call sites.
 package transport

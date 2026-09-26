@@ -15,15 +15,15 @@ import (
 
 // Probe103AdminBulkDelete implements PROBE-103: the Admin bulk-delete surface is
 // `DELETE /admin/ehr/all`, and a subset delete restricts to the named EHRs via
-// the repeatable `ehr_id` query parameter — not a request body and not a path
-// segment per id (REQ-099).
+// the repeatable `ehr_id` query parameter, never a request body or a path
+// segment per id.
 //
 // captured returns the requests the backend received; the probe reads the
 // newest to confirm the verb, the exact `/admin/ehr/all` path, the absence of
 // a request body, and one `ehr_id` parameter per id supplied. The OAS
 // operation `admin_ehr_delete_all` declares parameters and no requestBody, so
 // a body on the wire is off-contract however the server treats it.
-func Probe103AdminBulkDelete(ctx context.Context, c *transport.Client, captured func() []*http.Request, ids []openehrclient.EHRID) (Result, error) {
+func Probe103AdminBulkDelete(ctx context.Context, c *transport.Client, captured func() []*http.Request, ids []openehrclient.EHRID) (Result, error) { // PROBE-103 (REQ-099)
 	r := Result{Probe: "PROBE-103"}
 	if c == nil {
 		return r, errors.New("PROBE-103: nil transport.Client")

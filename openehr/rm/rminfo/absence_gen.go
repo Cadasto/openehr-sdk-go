@@ -3,10 +3,10 @@
 
 package rminfo
 
-// absenceData is the declared-but-omitted half of the class universe
-// (REQ-049): every name the pinned schemas declare that lookup_gen.go's
+// absenceData is the declared-but-omitted half of the class universe:
+// every name the pinned schemas declare that lookup_gen.go's
 // defaultData omits, with the one reason it is out. The two tables never
-// overlap, and no name outside the schemas appears here — undeclared is
+// overlap, and no name outside the schemas appears here. Undeclared is
 // computed from this table's silence, never stored in it.
 var absenceData = map[string]AbsenceReason{
 	"ADDRESSED_MESSAGE":       AbsenceExcludedPackage,

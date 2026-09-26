@@ -1,7 +1,7 @@
 // Package discoveryprobes hosts the openEHR conformance probes for
-// the openEHR service-discovery layer. Each probe corresponds to a
-// PROBE-NNN entry in docs/specifications/conformance.md and is implemented in both
-// any openEHR-conformant implementation against shared cassettes (REQ-080).
+// the openEHR service-discovery layer. Each probe implements one
+// numbered conformance probe (PROBE-NNN) that any openEHR-conformant
+// implementation can run against the same shared cassettes.
 //
 // Probes are plain Go functions returning (Result, error) and are
 // designed to be invocable from:
@@ -26,24 +26,24 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 )
 
-// Result is the shared probe outcome (REQ-082).
+// Result is the shared probe outcome, an alias of [probe.Result].
 type Result = probe.Result
 
 // Probe040CatalogTTL implements PROBE-040: two successive resolves
-// of the same issuer within the catalog's declared TTL window MUST
-// produce exactly one discovery fetch. Cache hit on the second
-// resolve is the load-bearing guarantee — without it every client
+// of the same issuer within the catalog's declared TTL window must
+// produce exactly one discovery fetch. The cache hit on the second
+// resolve is the guarantee that matters: without it every client
 // construction pays the discovery RTT.
 //
 // `cassetteBody` is the SMART configuration JSON the upstream server
-// will return on every request — typically the vendored
+// will return on every request, typically the vendored
 // `testkit/cassettes/its_rest/discovery/smart-configuration.json`
 // content read by the caller. The server replies with
 // `Cache-Control: max-age=300` so the SDK's cache honours a real TTL.
 //
 // The probe spins up a small in-process server and counts inbound
 // requests; second resolve hitting the wire is the failure mode.
-func Probe040CatalogTTL(ctx context.Context, cassetteBody []byte) (Result, error) {
+func Probe040CatalogTTL(ctx context.Context, cassetteBody []byte) (Result, error) { // PROBE-040 (REQ-070, REQ-072)
 	r := Result{Probe: "PROBE-040"}
 	if len(cassetteBody) == 0 {
 		return r, errors.New("PROBE-040: cassetteBody is empty")

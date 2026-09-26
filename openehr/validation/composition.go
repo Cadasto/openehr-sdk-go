@@ -10,18 +10,16 @@ import (
 )
 
 // ValidateComposition validates an in-memory RM Composition
-// against a compiled OPT and returns every issue in one pass —
-// REQ-102.
+// against a compiled OPT and returns every issue in one pass.
 //
 // The walk is template-driven (see package doc): the compiled OPT
-// drives traversal, the composition is the value source. Path
-// strings are built incrementally by [joinPath] as the walker
-// descends — OPT-side attribute names contribute the segments,
-// matched RM children contribute the bracket predicates. The
-// composition's at-codes therefore appear in [Issue.Path] only on
-// nodes the walker actually bound to an OPT child; missing
-// required nodes report at the parent attribute path without a
-// composition-side predicate.
+// drives traversal and the composition is the value source. Path
+// strings are built incrementally as the walker descends: OPT-side
+// attribute names contribute the segments and matched RM children
+// contribute the bracket predicates. The composition's at-codes
+// therefore appear in [Issue.Path] only on nodes the walker actually
+// bound to an OPT child; missing required nodes report at the parent
+// attribute path without a composition-side predicate.
 //
 // Returns a [Result] whose Issues slice is never nil (zero-length
 // allocation when no issues fire).
@@ -30,7 +28,7 @@ import (
 // generic [Validate]: it guards the nil composition (yielding
 // nil_composition), then delegates. Other archetypeable RM roots are
 // validated through [Validate] or its siblings [ValidateDemographic],
-// [ValidateFolder], [ValidateEHRStatus] (REQ-110).
+// [ValidateFolder], [ValidateEHRStatus].
 func ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Result {
 	if comp == nil {
 		return resultFromIssues([]Issue{{

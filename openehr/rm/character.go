@@ -13,13 +13,13 @@ import (
 // Character is the BMM Character primitive. In canonical openEHR JSON it is
 // written as a single-character string (e.g. TERM_MAPPING.match "="), never a
 // number. Its zero value ("") is not a legal Character, so an omitted attribute
-// is distinguishable from a supplied one. Mirrors the named-primitive shape of
-// Integer/Real. REQ-046 / REQ-052.
+// is distinguishable from a supplied one. It has the same named-primitive shape
+// as Integer and Real.
 //
-// Validity is a property of the value, not of the codec that carried it: the
-// same one-rune rule (see characterFault) gates canonical JSON via
-// [Character.UnmarshalJSON] / [Character.MarshalJSON] and canonical XML via the
-// [encoding.TextUnmarshaler] / [encoding.TextMarshaler] implementations below,
+// The same one-rune rule applies whichever codec carried the value. It checks
+// canonical JSON via [Character.UnmarshalJSON] / [Character.MarshalJSON] and
+// canonical XML via the [encoding.TextUnmarshaler] / [encoding.TextMarshaler]
+// implementations,
 // so an empty or multi-character `match` cannot slip in through XML element
 // content the way a plain string field would.
 //
@@ -28,7 +28,7 @@ import (
 // A U+FFFD that was manufactured out of corrupted input never reaches this type
 // on the JSON path: encoding/json/v2's tokenizer refuses invalid UTF-8 and a
 // lone UTF-16 surrogate escape while reading the value, so the string arm only
-// ever sees bytes that already decoded cleanly (ruling R15, REQ-052).
+// ever sees bytes that already decoded cleanly.
 type Character string
 
 // The canonical-XML codec reaches `match` through these two interfaces, so
@@ -68,36 +68,30 @@ func characterFault(s string) error {
 }
 
 // UnmarshalJSON accepts a canonical one-character JSON string. For backward
-// compatibility with the pre-fix encoder — which wrote match as a number — a
-// JSON number is also accepted on decode, but it is never the encoded form
-// (docs/specifications/wire.md § REQ-052's `TERM_MAPPING.match` bullet). A
-// JSON null is a no-op per the encoding/json convention for Unmarshaler
+// compatibility with older SDK encoders, which wrote match as a number, a JSON
+// number holding a Unicode code point is also accepted on decode; it is never
+// the encoded form. A JSON null is a no-op per the encoding/json convention for Unmarshaler
 // ("approximate the behavior of Unmarshal itself"), leaving the receiver
 // unchanged rather than writing the zero value.
 //
 // The string arm runs two checks: the literal must decode, and the
-// decoded value must be one rune (characterFault). It no longer inspects
-// the raw bytes for a substituted U+FFFD: encoding/json/v2's tokenizer
-// refuses invalid UTF-8 and a lone UTF-16 surrogate escape while reading
-// the value (ruling R15), so a corrupted spelling fails at json.Unmarshal
-// and never decodes to a rune this arm could mistake for genuine. A
-// genuine U+FFFD, written as itself, decodes and passes the one-rune rule,
-// which is right: the BASE primitive admits it.
+// decoded value must be one rune. The encoding/json/v2 tokenizer refuses
+// invalid UTF-8 and a lone UTF-16 surrogate escape while reading the
+// value, so a corrupted spelling fails at json.Unmarshal and never
+// decodes to a U+FFFD. A genuine U+FFFD, written as itself, decodes and
+// passes the one-rune rule, because the BASE primitive admits it.
 //
 // Every refusal on this decode path carries typereg.ErrInvalidShape, so a
-// bare-Character decode classifies the way the generated TERM_MAPPING funnel
-// would (REQ-052 § Decode-side shape sentinel). The classification rides on
-// errors.Is and leaves the message and the cause untouched (see
+// bare-Character decode classifies the same way as a decode through the
+// generated TERM_MAPPING code. The classification works through errors.Is
+// and leaves the message and the cause untouched (see
 // typereg.ClassifyShape), so the codec's own error stays both readable and
-// reachable with errors.AsType. The encode direction deliberately stays
-// outside that sentinel — canjson attaches its own encode-only
-// ErrInvalidValue there.
+// reachable with errors.AsType. Encode errors are not classified with that
+// sentinel; canjson wraps them in its own encode-only ErrInvalidValue.
 //
-// A nil receiver is refused rather than dereferenced (REQ-025, idiom.md
-// § No panics): the method assigns through the pointer, and a nil
-// pointer is caller-constructible input reachable through the documented
-// API. That refusal carries typereg.ErrNilReceiver and deliberately not
-// typereg.ErrInvalidShape — caller misuse is not a wire-shape problem.
+// A nil receiver is refused with an error rather than dereferenced. That
+// refusal carries typereg.ErrNilReceiver and not typereg.ErrInvalidShape,
+// because caller misuse is not a wire-shape problem.
 func (c *Character) UnmarshalJSON(b []byte) error {
 	if c == nil {
 		return fmt.Errorf("rm.Character: %w", typereg.ErrNilReceiver)
@@ -146,12 +140,11 @@ func (c *Character) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalJSON emits a one-character JSON string. A value that is not a single
-// valid UTF-8 character — empty, multi-rune, or malformed bytes — is an encode
-// error (never silently coerced, and never emitted as "�"), which canjson
-// wraps as ErrInvalidValue (§ REQ-052's `TERM_MAPPING.match` bullet). A U+FFFD
-// value encodes normally: it is a legal Character, and on this side there are
-// no wire bytes that could have been substituted. Diagnostics are value-free
-// (REQ-093).
+// valid UTF-8 character (empty, multi-rune, or malformed bytes) is an encode
+// error, never silently coerced and never emitted as "�"; canjson wraps it as
+// ErrInvalidValue. A U+FFFD value encodes normally: it is a legal Character,
+// and on this side there are no wire bytes that could have been substituted.
+// Error messages do not echo the value.
 func (c Character) MarshalJSON() ([]byte, error) {
 	if err := characterFault(string(c)); err != nil {
 		return nil, fmt.Errorf("rm.Character: %w", err)
@@ -163,8 +156,7 @@ func (c Character) MarshalJSON() ([]byte, error) {
 // element content is held to the same rule as canonical JSON. The
 // generated canonical-XML decoder reaches `match` through
 // xml.Decoder.DecodeElement on the plain string kind, which consults
-// this method; without it an empty or multi-character `match` would pass
-// through XML unvalidated (REQ-046 / REQ-052 / REQ-056).
+// this method, so an empty or multi-character `match` is refused in XML too.
 //
 // The rule here is the value rule alone: valid UTF-8, exactly one rune.
 // A U+FFFD passes, because this method receives decoded text and has no
@@ -177,24 +169,22 @@ func (c Character) MarshalJSON() ([]byte, error) {
 // One substitution channel does remain open through XML, and is accepted
 // deliberately: encoding/xml converts a surrogate-half character
 // reference (`&#xD800;`) with Go's rune-to-string rule, which yields
-// U+FFFD, and reports no error — so it is indistinguishable here from a
+// U+FFFD, and reports no error, so it is indistinguishable here from a
 // genuine U+FFFD. Refusing U+FFFD to close it would make a legal
-// Character unrepresentable in XML, which is the defect this rule
-// exists to avoid; on the JSON side the encoding/json/v2 tokenizer
-// refuses a lone surrogate escape before this type sees the value, so
-// that channel stays closed there.
-// TestCharacterXMLElementContentValidated pins both halves.
+// Character unrepresentable in XML. On the JSON side the encoding/json/v2
+// tokenizer refuses a lone surrogate escape before this type sees the
+// value, so that channel stays closed there.
 //
-// There is no numeric back-compat arm here: the pre-fix encoder wrote a
-// number in JSON only, and XML element content carries no JSON number
-// kind to be tolerant of.
+// There is no numeric backward-compatibility arm here: older encoders
+// wrote a number in JSON only, and XML element content has no number
+// kind to accept.
 //
 // The error is deliberately outside typereg.ErrInvalidShape:
 // that sentinel's own text names canonical JSON, and canxml classifies
-// nothing at element level — it returns encoding/xml's errors unchanged
+// nothing at element level; it returns encoding/xml's errors unchanged
 // and reserves canxml.ErrInvalidShape for xmi:type rejection and for a
 // nil / non-xml.Marshaler root. A nil receiver is refused rather than
-// dereferenced, on the same terms as [Character.UnmarshalJSON] (REQ-025).
+// dereferenced, on the same terms as [Character.UnmarshalJSON].
 //
 // encoding/json prefers [Character.UnmarshalJSON] over this method for
 // every JSON value, so the JSON surface is unchanged by its presence.
@@ -213,9 +203,9 @@ func (c *Character) UnmarshalText(text []byte) error {
 // MarshalText implements [encoding.TextMarshaler], the encode counterpart
 // of [Character.UnmarshalText]: the generated canonical-XML encoder emits
 // `match` via xml.Encoder.EncodeElement, which consults this method, so an
-// empty or multi-character value is an encode error in XML exactly as it is
-// in JSON rather than an empty or over-long element (REQ-052 / REQ-056). As
-// on the JSON side, a U+FFFD value encodes normally.
+// empty or multi-character value is an encode error in XML, as it is in
+// JSON, instead of producing an empty or over-long element. As on the JSON
+// side, a U+FFFD value encodes normally.
 //
 // encoding/json prefers [Character.MarshalJSON] over this method, so the
 // JSON surface is unchanged by its presence.

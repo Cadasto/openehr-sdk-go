@@ -13,27 +13,26 @@ import (
 // valid JSON in the wrong shape for the target RM type, such as a type
 // mismatch on a non-polymorphic field or a magnitude out of float64
 // range. It is decode-only: encode failures wrap [ErrInvalidValue]
-// instead (REQ-052).
+// instead.
 //
 // The sentinel is attached over the codec's own error, which stays
-// reachable through unwrapping, in two situations (REQ-052):
+// reachable through unwrapping, in two situations:
 //
 //   - A shape failure raised inside a generated RM type's decode (the
 //     `canjson: <RM_TYPE>:` family), where the bytes are valid JSON but
 //     the wrong shape for the target. The cause is the codec's own error,
 //     a *encoding/json/v2.SemanticError. When the failure happens inside
-//     the concrete type selected at a polymorphic slot the error is ALSO
+//     the concrete type selected at a polymorphic slot the error is also
 //     a [DecodeError] naming that slot, so both classifications hold: the
 //     path from the [DecodeError], the kind from this sentinel.
 //   - A JSON object carrying the same member name twice. jsontext refuses
-//     it (RFC 8259 § 4: names SHOULD be unique, and duplicates leave no
-//     single defined value) during tokenisation; the entry
+//     it during tokenisation (RFC 8259 § 4: names should be unique, and
+//     duplicates leave no single defined value); the entry
 //     point classifies that refusal with this sentinel, preserving the
 //     message, so errors.Is finds both this sentinel and
 //     jsontext.ErrDuplicateName.
 //
-// Four decode failures stay OUTSIDE the sentinel by design (REQ-052) and
-// never acquire it:
+// Four decode failures never carry the sentinel:
 //
 //   - Malformed JSON, which the codec reports as its own syntax or
 //     truncated-input error (an encoding/json/jsontext.SyntacticError).
@@ -54,8 +53,8 @@ import (
 //     [DecodeError], or errors.Is against [typereg.ErrMissingType] /
 //     [typereg.ErrUnknownType] / [typereg.ErrTypeMismatch].
 //   - A nesting-depth refusal: [typereg.ErrMaxDepthExceeded] inside a
-//     [DecodeError], raised when a value opens past the 512-level bound
-//     (REQ-108). It passes through the enclosing values unchanged, so no
+//     [DecodeError], raised when a value opens past the 512-level bound.
+//     It passes through the enclosing values unchanged, so no
 //     `canjson: <RM_TYPE>:` funnel adds the sentinel to it. Match it with
 //     errors.Is against [typereg.ErrMaxDepthExceeded].
 //
@@ -83,16 +82,15 @@ type decoderConfig struct {
 }
 
 // WithRelaxedTypeDispatch toggles the polymorphic-dispatch policy
-// from STRICT (default — missing `_type` at a polymorphic site is an
-// error) to RELAXED (missing `_type` is allowed when the declared
+// from strict (the default: missing `_type` at a polymorphic site is an
+// error) to relaxed (missing `_type` is allowed when the declared
 // abstract field has exactly one concrete descendant in the merged
 // BMM; the decoder then instantiates that descendant).
 //
-// v1 NOTE: the relaxed escape hatch is recognised by the option
-// surface but enforced by future generator output — the current
-// generated decode methods only implement strict dispatch. Setting
-// this option today is a no-op for built-in RM types; the hook stays
-// here so the API does not break when the relaxed path lands.
+// The option is accepted but not yet enforced: the generated decode
+// methods implement strict dispatch only, so setting it is currently a
+// no-op for built-in RM types. It exists so the API does not change
+// when relaxed dispatch is implemented.
 func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 	return func(c *decoderConfig) { c.relaxedTypeDispatch = enabled }
 }
@@ -121,7 +119,7 @@ func classifyDecode(err error) error {
 }
 
 // Unmarshal parses canonical-JSON-encoded data and stores the result
-// in the value pointed to by v. v MUST be a non-nil pointer to a
+// in the value pointed to by v. v must be a non-nil pointer to a
 // generated RM type (or a slice/map containing such types).
 //
 // Polymorphic fields on v are populated via the per-type decode methods

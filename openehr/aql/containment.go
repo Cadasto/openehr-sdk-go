@@ -8,43 +8,41 @@ import (
 
 // Containment is a containment term in the FROM clause. It is either a single
 // class expression (`OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2]`)
-// or — since REQ-117 — a whole containment expression: a chain of nested
-// CONTAINS terms, a negated term, or a boolean junction of sibling operands.
+// or a whole containment expression: a chain of nested CONTAINS terms, a
+// negated term, or a boolean junction of sibling operands.
 //
-// Construct a leaf with [Class] (no archetype predicate), [Archetype], or —
-// for the grammar's other `classExprOperand` alternative — [Version]; give an
+// Construct a leaf with [Class] (no archetype predicate), [Archetype], or
+// [Version] (the grammar's other `classExprOperand` alternative). Give an
 // ordinary class a standing comparison in class position with
-// [Containment.Predicated]; nest
-// with [Containment.Contains] / [Containment.NotContains], and join siblings
-// with [ContainsAnd] / [ContainsOr]. Every combinator returns a NEW value —
-// a Containment is immutable once constructed, so one operand can be reused
-// across several expressions. Pass the result to [Builder.Contains], or to
+// [Containment.Predicated]. Nest with [Containment.Contains] /
+// [Containment.NotContains], and join siblings with [ContainsAnd] /
+// [ContainsOr]. Every combinator returns a new value: a Containment is
+// immutable once constructed, so one operand can be reused across several
+// expressions. Pass the result to [Builder.Contains], or to
 // [Builder.NotContains] to negate the connector from the FROM root.
 //
 // The zero value is not a valid term: [Builder.Build] refuses it (an operand
-// with neither a class nor operands is unrepresentable) rather than silently
+// with neither a class nor operands is unrepresentable) instead of silently
 // dropping it.
 //
-// A junction may only END a containment chain. The grammar's `containsExpr`
+// A junction may only end a containment chain. The grammar's `containsExpr`
 // admits a parenthesised group as a whole alternative, which no CONTAINS may
 // follow, so [Builder.Build] refuses a junction with a further term after it.
-// The rule is applied to the FLATTENED chain: nesting levels built with
+// The rule applies to the flattened chain: nesting levels built with
 // [Containment.Contains] and appended with [Builder.Contains] emit as one
 // chain, so a junction that ends an inner level is still followed by whatever
 // a level above appends, and that is refused too. Write the deeper nesting
 // inside the junction's operands.
 //
-// Likewise, a junction is never a CONTAINS receiver: calling
-// [Containment.Contains] / [Containment.NotContains] ON a junction is refused
-// at [Builder.Build] rather than absorbed as one more operand — absorbing it
-// would drop the connector, silently turning a NOT CONTAINS exclusion into
-// one more alternative.
+// A junction is also never a CONTAINS receiver: [Builder.Build] refuses a call
+// to [Containment.Contains] / [Containment.NotContains] on a junction. Treating
+// it as one more operand would drop the connector and turn a NOT CONTAINS
+// exclusion into one more alternative.
 //
-// A junction always sits below a CONTAINS keyword here. A junction at the FROM
-// ROOT (`FROM COMPOSITION c1 OR COMPOSITION c2`) is grammar-admitted and the
-// parse side models it, but it has no builder entry point — the write side
-// keeps a single root class, so the FROM root is never parenthesised and
-// [Builder.From] / [Builder.FromEHR] stay unchanged.
+// Here a junction always sits below a CONTAINS keyword. A junction at the FROM
+// root (`FROM COMPOSITION c1 OR COMPOSITION c2`) is legal AQL and the parser
+// models it, but it has no builder entry point: the builder keeps a single
+// root class, so the FROM root is never parenthesised.
 type Containment struct {
 	// kind records which variant this node is. It is STORED rather than
 	// inferred from field emptiness: a class node that is merely missing
@@ -120,16 +118,15 @@ func Archetype(rmType, alias, archetypeID string) Containment {
 	return Containment{rmType: rmType, alias: alias, archetypeID: archetypeID}
 }
 
-// Class is a containment operand with no archetype predicate —
-// `<rmType> <alias>`, the grammar's bare `classExprOperand` (REQ-117). It is
-// [Archetype] with an empty archetypeID, spelled for the containment-algebra
-// call sites where a third empty argument would read as a choice rather than
-// an omission.
+// Class is a containment operand with no archetype predicate:
+// `<rmType> <alias>`, the grammar's bare `classExprOperand`. It is [Archetype]
+// with an empty archetypeID, for call sites where a third empty argument would
+// read as a choice instead of an omission.
 func Class(rmType, alias string) Containment {
 	return Containment{rmType: rmType, alias: alias}
 }
 
-// Contains nests child below c with a CONTAINS connector (REQ-117):
+// Contains nests child below c with a CONTAINS connector:
 // `Class("COMPOSITION", "c").Contains(Class("OBSERVATION", "o"))` emits
 // `COMPOSITION c CONTAINS OBSERVATION o`. Repeated calls extend the chain in
 // call order; c itself is not modified.
@@ -138,9 +135,9 @@ func (c Containment) Contains(child Containment) Containment {
 	return c.withChild(child)
 }
 
-// NotContains nests child below c with a NOT CONTAINS connector — the
-// grammar's `classExprOperand NOT CONTAINS containsExpr` (REQ-117), i.e. the
-// absence of child below c. Otherwise identical to [Containment.Contains].
+// NotContains nests child below c with a NOT CONTAINS connector, the
+// grammar's `classExprOperand NOT CONTAINS containsExpr`: the absence of child
+// below c. Otherwise identical to [Containment.Contains].
 func (c Containment) NotContains(child Containment) Containment {
 	child.negated = true
 	return c.withChild(child)
@@ -174,23 +171,22 @@ func (c Containment) withChild(child Containment) Containment {
 	return c
 }
 
-// ContainsAnd joins containment operands with AND — the grammar's
-// `containsExpr AND containsExpr` (REQ-117), i.e. every operand must be
-// present. A single operand is returned unchanged (there is nothing to
-// join); no operands yields the zero [Containment], which [Builder.Build]
-// refuses.
+// ContainsAnd joins containment operands with AND, the grammar's
+// `containsExpr AND containsExpr`: every operand must be present. A single
+// operand is returned unchanged (there is nothing to join); no operands yields
+// the zero [Containment], which [Builder.Build] refuses.
 //
 // AND binds tighter than OR, so an operand needs no parentheses unless the
-// grouping is load-bearing — the emitter adds them exactly there. Negation
-// attaches to a CONTAINS connector ([Containment.NotContains]), never to a
-// junction operand: the grammar admits NOT only as `NOT? CONTAINS`.
+// grouping changes the meaning, and the emitter adds them exactly there.
+// Negation attaches to a CONTAINS connector ([Containment.NotContains]), never
+// to a junction operand: the grammar admits NOT only as `NOT? CONTAINS`.
 func ContainsAnd(operands ...Containment) Containment {
 	return containmentJunction(joinAnd, operands)
 }
 
-// ContainsOr joins containment operands with OR — the grammar's
-// `containsExpr OR containsExpr` (REQ-117), i.e. at least one operand must be
-// present. Same collapse rules as [ContainsAnd].
+// ContainsOr joins containment operands with OR, the grammar's
+// `containsExpr OR containsExpr`: at least one operand must be present. The
+// same collapse rules as [ContainsAnd] apply.
 func ContainsOr(operands ...Containment) Containment {
 	return containmentJunction(joinOr, operands)
 }

@@ -7,8 +7,7 @@ import (
 
 // Cache is the discovery catalog cache abstraction. The default cache
 // is in-process; consumers may inject a file-backed or distributed
-// implementation for use cases that share catalogs across processes
-// (REQ-071).
+// implementation for use cases that share catalogs across processes.
 type Cache interface {
 	Get(ctx context.Context, issuer string) (*ServiceCatalog, bool)
 	Put(ctx context.Context, issuer string, c *ServiceCatalog) error

@@ -1,10 +1,10 @@
 // Example: export a compiled operational template as EHRbase
-// openEHR_SDK v2.3 WebTemplate JSON (REQ-106) — the lossy, UI-oriented
+// openEHR_SDK v2.3 WebTemplate JSON, the lossy, UI-oriented
 // projection a form renderer or FLAT-path mapper consumes.
 //
-// Like cmd/examples/template-explore, this uses PUBLIC packages only
+// Like cmd/examples/template-explore, this uses public packages only
 // (openehr/template, openehr/templatecompile, openehr/template/webtemplate)
-// — no internal/ import. It prints the form-oriented tree view (node id,
+// and no internal/ import. It prints the form-oriented tree view (node id,
 // RM type, occurrences, inputs) that consumers bind FLAT paths to, then
 // the deterministic JSON document itself.
 //

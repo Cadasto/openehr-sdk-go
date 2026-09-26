@@ -1,8 +1,8 @@
 // Example: JSON → struct → XML → struct → JSON round-trip. Decodes a
 // vendored canonical-JSON Composition cassette through canjson,
 // re-encodes it as canonical XML via canxml, decodes the XML back,
-// and re-encodes as JSON. Demonstrates the cross-format invariant
-// the canxml plan validates (REQ-056).
+// and re-encodes as JSON, showing that the content survives the trip
+// between the two canonical formats.
 //
 // Run: `go run ./cmd/examples/canxml_roundtrip` from any directory.
 package main

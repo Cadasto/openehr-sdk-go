@@ -30,7 +30,7 @@ import (
 	"strings"
 )
 
-// SelectField is one entry in the SELECT projection list — the write-side
+// SelectField is one entry in the SELECT projection list, the write-side
 // mirror of [parse.SelectItem]: one operand plus an optional `AS` alias.
 //
 // Construct with [Col] (a verbatim path or alias, the legacy route), [ColAs],
@@ -40,11 +40,11 @@ import (
 //
 // # Comparability
 //
-// A SelectField is NOT safe to compare with `==` and MUST NOT be used as a map
+// A SelectField is not safe to compare with `==` and must not be used as a map
 // key. A field built by [Fn] carries its argument list as a slice, so `==` on
-// one panics with "comparing uncomparable type" — the same change [Containment]
-// took in v0.18.0, and invisible to the compiler for the same reason: the slice
-// is behind an interface field. Compare the built query strings instead.
+// one panics with "comparing uncomparable type". The compiler cannot catch
+// this because the slice is behind an interface field. Compare the built
+// query strings instead.
 type SelectField struct {
 	// expr is the projected operand. Nil in the zero value, which Build
 	// refuses rather than emitting an empty projection slot.
@@ -383,36 +383,35 @@ func (k operandKind) String() string {
 
 // Col is a projected path or alias, e.g. Col("o") or Col("o/data[at0001]").
 //
-// Col renders its argument into the projection list VERBATIM and is checked
-// for emptiness alone, so `Col("COUNT(x) AS n")` builds. That leniency is
-// deliberate and stays (REQ-163 § `Col` stays lenient): text that re-parses as
-// a single projected item and introduces no clause-level flag the builder did
-// not record is ordinary AQL saying what the caller wrote.
+// Col renders its argument into the projection list verbatim and checks only
+// that it is not empty, so `Col("COUNT(x) AS n")` builds. That leniency is
+// deliberate: text that re-parses as a single projected item and introduces
+// no clause-level flag the builder did not record is ordinary AQL saying what
+// the caller wrote.
 //
-// What it does NOT survive is a change to the projection's STRUCTURE.
+// What Col does not allow is a change to the projection's structure.
 // `Col("a, b")` splits the list in two, and `Col("DISTINCT c/uid/value")`
-// introduces a clause-level DISTINCT the builder never set — the keyword is
-// consumed into the CLAUSE, not into the item — so both emit valid AQL asking
-// a different question, invisible to every round-trip and golden check
-// downstream. [Builder.Build] refuses them (REQ-163 § Build() verifies what it
-// emitted).
+// introduces a clause-level DISTINCT the builder never set (the keyword is
+// consumed into the clause, not the item). Both would emit valid AQL asking a
+// different question, invisible to any round-trip or golden check downstream,
+// so [Builder.Build] refuses them.
 //
-// PREFER the typed constructors — [ColAs], [Count], [CountDistinct],
-// [CountStar], [Fn], [Lit], [Star] and [SelectField.As] — which say the same
+// Prefer the typed constructors ([ColAs], [Count], [CountDistinct],
+// [CountStar], [Fn], [Lit], [Star] and [SelectField.As]), which say the same
 // things structurally and are checked at their identifier positions. Col is
 // not deprecated.
 func Col(path string) SelectField {
 	return SelectField{expr: rawColumn{text: strings.TrimSpace(path)}}
 }
 
-// ColAs is a projected path carrying an `AS` alias —
+// ColAs is a projected path carrying an `AS` alias:
 // `ColAs("o/data[at0001]/value/magnitude", "temp")` emits
 // `o/data[at0001]/value/magnitude AS temp`.
 //
-// The alias is a single-token identifier position, held to [ValidateIdentifier]
-// at [Builder.Build] time: `selectExpr : columnExpr (AS aliasName=IDENTIFIER)?`
-// is ONE token, so a spliced alias would otherwise re-parse as a second
-// projection (REQ-119).
+// The alias is a single-token identifier position, checked with
+// [ValidateIdentifier] at [Builder.Build] time: `selectExpr : columnExpr
+// (AS aliasName=IDENTIFIER)?` is one token, so a spliced alias would otherwise
+// re-parse as a second projection.
 func ColAs(path, alias string) SelectField {
 	return SelectField{
 		expr:     pathColumn{path: strings.TrimSpace(path)},
@@ -421,8 +420,8 @@ func ColAs(path, alias string) SelectField {
 	}
 }
 
-// Star is the `*` projection item. As the SOLE unaliased item it emits the
-// bare `SELECT *` form — which is how the parser reads it back — and beside
+// Star is the `*` projection item. As the sole unaliased item it emits the
+// bare `SELECT *` form (which is how the parser reads it back), and beside
 // other items it emits in place: `SELECT *, c/uid/value`.
 //
 // `selectExpr`'s star alternative carries no alias slot, so [SelectField.As] on
@@ -435,43 +434,43 @@ func Count(path string) SelectField {
 	return SelectField{expr: funcColumn{name: "COUNT", args: []SelectField{colPath(path)}}}
 }
 
-// CountDistinct is the `COUNT(DISTINCT <path>)` aggregate — the one projected
+// CountDistinct is the `COUNT(DISTINCT <path>)` aggregate, the one projected
 // call the grammar admits a DISTINCT inside (`aggregateFunctionCall`).
 func CountDistinct(path string) SelectField {
 	return SelectField{expr: funcColumn{name: "COUNT", args: []SelectField{colPath(path)}, distinct: true}}
 }
 
-// CountStar is the `COUNT(*)` aggregate — a row count, the only star form the
+// CountStar is the `COUNT(*)` aggregate: a row count, the only star form the
 // grammar admits inside a call.
 func CountStar() SelectField {
 	return SelectField{expr: funcColumn{name: "COUNT", star: true}}
 }
 
-// Fn is a projected function or aggregate call — `Fn("MAX", Col("o/value"))`
-// emits `MAX(o/value)`, `Fn("concat", Col("p/given"), Lit(String(" ")))` emits
-// `CONCAT(p/given, ' ')`.
+// Fn is a projected function or aggregate call: `Fn("MAX", Col("o/value"))`
+// emits `MAX(o/value)`, and `Fn("concat", Col("p/given"), Lit(String(" ")))`
+// emits `CONCAT(p/given, ' ')`.
 //
-// The name is canonicalised to UPPER CASE over ASCII letters (never
+// The name is canonicalised to upper case over ASCII letters (never
 // [strings.ToUpper], whose Unicode mapping would launder a name the lexer
 // cannot tokenise) and held to [ValidateSelectFuncName] at [Builder.Build]
 // time: SELECT reaches `aggregateFunctionCall`, so COUNT / MIN / MAX / SUM /
 // AVG are admissible here and refused in every value position.
 //
-// The call's SHAPE is held to the rule that admits the name: COUNT takes
+// The call's shape is held to the rule that admits the name: COUNT takes
 // `DISTINCT? identifiedPath` or a bare `*`, MIN / MAX / SUM / AVG take exactly
 // one identified path, no other projected call carries DISTINCT or a star, and
 // TERMINOLOGY keeps its fixed arity and argument type. Prefer [Count],
-// [CountDistinct] and [CountStar] for the aggregates — each builds one admitted
+// [CountDistinct] and [CountStar] for the aggregates; each builds one admitted
 // shape by construction.
 //
 // An argument carrying an `AS` alias is refused: `selectExpr` aliases the whole
 // projected item, and `functionCall`'s arguments are `terminal`s with no alias
-// slot at all. So is an AGGREGATE-shaped argument: `COUNT` / `MIN` / `MAX` /
+// slot at all. So is an aggregate-shaped argument: `COUNT` / `MIN` / `MAX` /
 // `SUM` / `AVG` reach `columnExpr` and no `terminal`, so `CONCAT(COUNT(*))` is
-// text the parser rejects. A nested ordinary call — `Fn("CONCAT",
-// Fn("LENGTH", Col("c/x")))` — is a `terminal` and stays admitted.
+// text the parser rejects. A nested ordinary call such as `Fn("CONCAT",
+// Fn("LENGTH", Col("c/x")))` is a `terminal` and is admitted.
 //
-// The variadic slice is COPIED at intake, as [Builder.Select] copies its own:
+// The variadic slice is copied at intake, as [Builder.Select] copies its own:
 // a `...SelectField` call site hands the callee the caller's own backing array
 // when the arguments were spread from a slice, so retaining it would let a
 // later write to that slice change what an already-recorded projection emits.
@@ -479,26 +478,26 @@ func Fn(name string, args ...SelectField) SelectField {
 	return SelectField{expr: funcColumn{name: name, args: slices.Clone(args)}}
 }
 
-// Lit is a projected literal — `Lit(Int(1))` emits `1`, `Lit(String("x"))`
-// emits `'x'` — rendered through the canonical value spellings a WHERE
-// comparison uses, so the two positions cannot drift (REQ-119).
+// Lit is a projected literal: `Lit(Int(1))` emits `1`, `Lit(String("x"))`
+// emits `'x'`. It is rendered through the same canonical value spellings a
+// WHERE comparison uses, so the two positions cannot drift.
 //
-// A BARE parameter is not a projection: `columnExpr` has no PARAMETER
-// alternative, so `Lit(Param("p"))` is refused at [Builder.Build] while
-// `Fn("CONCAT", Lit(String("a")), Lit(Param("p")))` is admitted — a function
-// argument is a `terminal`, which does carry one. The check is positional,
-// which is why it is not on [Lit] itself.
+// A bare parameter is not a projection: `columnExpr` has no PARAMETER
+// alternative, so [Builder.Build] refuses `Lit(Param("p"))`, while
+// `Fn("CONCAT", Lit(String("a")), Lit(Param("p")))` is admitted because a
+// function argument is a `terminal`, which does carry one. The check depends
+// on position, which is why Lit itself does not make it.
 //
-// A FUNCTION CALL is not a literal in any position: `Lit(Func("CONCAT", …))`
-// is refused at [Builder.Build] wherever it sits, because `primitive` and the
-// call alternatives are different branches of `columnExpr` and only [Fn] holds
-// a call to the rules of its own branch — the name, the argument shapes, and
-// the per-argument escape scan that keeps a spliced comma from adding an
+// A function call is not a literal in any position: [Builder.Build] refuses
+// `Lit(Func("CONCAT", …))` wherever it sits, because `primitive` and the call
+// alternatives are different branches of `columnExpr`, and only [Fn] checks a
+// call against the rules of its own branch: the name, the argument shapes,
+// and the per-argument escape scan that keeps a spliced comma from adding an
 // argument the builder never recorded. Build the call with [Fn], nesting it
 // where a nested call is what you mean.
 func Lit(v Value) SelectField { return SelectField{expr: literalColumn{v: v}} }
 
-// As returns the field carrying an `AS` alias — `Count("c/uid/value").As("n")`
+// As returns the field carrying an `AS` alias: `Count("c/uid/value").As("n")`
 // emits `COUNT(c/uid/value) AS n`. As everywhere in the builder the receiver is
 // not modified; the result is a new value, and a later call replaces an earlier
 // alias.

@@ -1,7 +1,6 @@
 // Package poly holds shared helpers for polymorphic discrimination
-// across the canjson and canxml codecs. It is intentionally
-// unexported (internal/) — only the sibling serialize/canjson and
-// serialize/canxml packages depend on it.
+// across the canjson and canxml codecs. It is internal: only the
+// sibling serialize/canjson and serialize/canxml packages depend on it.
 //
 // The [DecodeError] envelope itself lives in
 // [github.com/cadasto/openehr-sdk-go/openehr/rm/typereg] so generator

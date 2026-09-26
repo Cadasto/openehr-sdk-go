@@ -1,5 +1,5 @@
 // Package wireequiv is a JSON wire-equivalence oracle for the canonical-JSON
-// round-trip tests and PROBE-030 (REQ-052).
+// round-trip tests and the canonical-JSON round-trip conformance probe.
 //
 // Two documents are wire-equivalent when they parse into the same generic JSON
 // value. An object becomes a map keyed by member name, so member order is
@@ -7,9 +7,9 @@
 // kept as its literal text, so a value past 2^53 is compared exactly rather
 // than through a lossy float64; strings, booleans and null compare by value,
 // with string-escaping differences erased by the parse ("<" equals "<").
-// This is the wire-equivalence model the amended REQ-052 allows only as a
-// secondary check: JSON member order carries no meaning (RFC 8259 section 4)
-// and the encoder makes no byte-level promise.
+// The canonical-JSON tests use this model only as a secondary check: JSON
+// member order carries no meaning (RFC 8259 section 4) and the encoder makes no
+// byte-level promise.
 //
 // The oracle decodes with the v1 encoding/json package on purpose, and stays on
 // v1 whatever codec the code under test uses. It is the independent reference
@@ -20,8 +20,8 @@
 //
 // One model limit follows from that v1 decode, and it is not in scope for this
 // oracle: a duplicate object member collapses to the last value (v1 keeps the
-// last), so it cannot witness REQ-052's rule that the codec refuse duplicate
-// names — that is the codec's own test to make. Each document must be a single
+// last), so it cannot witness the codec's rule that duplicate names are
+// refused. That is the codec's own test to make. Each document must be a single
 // JSON value: content after the first value (a second value or trailing
 // garbage) is a parse failure here, not silently ignored, so the "not valid
 // JSON" report covers the whole input.

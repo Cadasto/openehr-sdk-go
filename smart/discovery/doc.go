@@ -4,11 +4,7 @@
 // advertised, and exposes a cached, refresh-able ServiceCatalog to the
 // typed clients.
 //
-// Discovery is a first-class step: SDK constructors take a
-// ServiceCatalog, not a single base URL. For non-discovering openEHR
-// backends (e.g. a static EHRbase deployment), callers inject a
-// hand-built catalog.
-//
-// Implements REQ-070, REQ-071, REQ-072, and REQ-092 per
-// docs/specifications/service-discovery.md and docs/specifications/transport.md.
+// SDK constructors take a ServiceCatalog instead of a single base URL.
+// For openEHR backends that do not publish a discovery document (e.g. a
+// static EHRbase deployment), callers inject a hand-built catalog.
 package discovery

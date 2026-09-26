@@ -17,8 +17,8 @@ package parse
 // set promotes to `*T` but never to `**T`.
 
 // DerefSelectExpr normalises a [SelectExpr] to the shape it denotes, reporting
-// false when it denotes none — an untyped nil, or a nil pointer. Consumers
-// type-switching over a [SelectExpr] (its godoc names that idiom) MUST route
+// false when it denotes none (an untyped nil, or a nil pointer). Consumers
+// type-switching over a [SelectExpr] (its doc names that idiom) must route
 // through this first when the tree may be hand-assembled; [ParseQuery] itself
 // only ever populates value shapes.
 func DerefSelectExpr(e SelectExpr) (SelectExpr, bool) {

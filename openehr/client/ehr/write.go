@@ -10,22 +10,18 @@ import (
 )
 
 // WriteConfig is the option set shared by every versioned-write leaf
-// client — Composition/Directory Save & Update, demographic Create &
-// Update, EHR_STATUS Put: the Prefer response-shape (REQ-094), the
-// commit-time audit envelope (REQ-059), and the committed VERSION's
-// lifecycle_state (REQ-059).
+// client (Composition/Directory Save & Update, demographic Create &
+// Update, EHR_STATUS Put): the Prefer response-shape, the
+// commit-time audit envelope, and the committed VERSION's
+// lifecycle_state.
 //
 // Leaf packages define their own unexported writeConfig struct that
-// embeds WriteConfig — either with no extra fields (directory,
-// demographic, ehrstatus) or adding resource-specific options
-// (composition, which adds template id and item tags). Embedding
-// (rather than a type alias) keeps each leaf's writeConfig a distinct,
-// unexported type, so its WriteOption / PutOption function type stays
-// opaque to external callers even though the underlying option struct
-// is structurally identical across leaves. The leaf's own WriteOption /
-// PutOption type and With* constructors are unaffected (idiom.md
-// public-API stability); only their bodies now set fields on the
-// embedded struct.
+// embeds WriteConfig, either with no extra fields (directory,
+// demographic, ehrstatus) or with resource-specific options
+// (composition, which adds template id and item tags). Because each
+// leaf's writeConfig is a distinct unexported type, its WriteOption /
+// PutOption function type stays opaque to external callers even though
+// the underlying option struct is structurally identical across leaves.
 type WriteConfig struct {
 	Prefer         transport.Prefer
 	AuditDetails   *rm.AuditDetails
@@ -33,9 +29,9 @@ type WriteConfig struct {
 }
 
 // ResolveAuditHeader formats the openehr-audit-details request header
-// (REQ-059) from the resolved config, wrapping any formatting error with
-// label (e.g. "composition.Save") so each call site's error string stays
-// exactly as it was before consolidation.
+// from the resolved config, wrapping any formatting error with
+// label (e.g. "composition.Save") so the error names the calling
+// operation.
 func (c WriteConfig) ResolveAuditHeader(label string) (string, error) {
 	h, err := MarshalAuditDetails(c.AuditDetails)
 	if err != nil {
@@ -45,9 +41,9 @@ func (c WriteConfig) ResolveAuditHeader(label string) (string, error) {
 }
 
 // ResolveLifecycleHeader formats the openehr-version request header
-// (REQ-059) from the resolved config, wrapping any formatting error with
-// label (e.g. "composition.Save") so each call site's error string stays
-// exactly as it was before consolidation.
+// from the resolved config, wrapping any formatting error with
+// label (e.g. "composition.Save") so the error names the calling
+// operation.
 func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 	h, err := FormatLifecycleStateHeader(c.LifecycleState)
 	if err != nil {
@@ -57,29 +53,29 @@ func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 }
 
 // WriteResult executes a Save / Update / Create / Put request and
-// decodes the response body per the Prefer state machine (REQ-094),
+// decodes the response body per the Prefer state machine,
 // shared by the four versioned-write leaf clients (composition,
 // directory, demographic, ehrstatus). The Prefer value that drives the
-// decode switch is read from req.Prefer — the single source of truth,
-// since it is also what was sent on the wire:
+// decode switch is read from req.Prefer, since that is also what was
+// sent on the wire:
 //
 //   - PreferRepresentation decodes the bare resource body via decode.
-//     REQ-094: representation MUST NOT silently downgrade to an empty
-//     body — an empty or undecodable body returns a
+//     Representation never silently downgrades to an empty body: an
+//     empty or undecodable body returns a
 //     [*NoRepresentationError] (wrapping [transport.ErrInvalidShape] for
 //     an empty body, the decoder's error otherwise) that carries the
 //     commit metadata, not a nil-error success. The resource slot is
 //     still the zero value.
 //   - PreferIdentifier resolves the ITS-REST Identifier body into the
-//     returned metadata's VersionUID. REQ-094: populate the identifier
-//     slot from the body when present; never silently discard it.
-//   - Any other Prefer (minimal, the spec default, or unset) returns a
+//     returned metadata's VersionUID. The identifier is taken from the
+//     body when present and never silently discarded.
+//   - Any other Prefer (minimal, the ITS-REST default, or unset) returns a
 //     nil/zero resource; the version id is in Location/ETag.
 //
 // A successful minimal or identifier write returns a zero resource: a
 // typed-nil pointer for a concrete-pointer T (`== nil` is a correct
 // test there) and a bare-nil interface for an interface T (demographic
-// [rm.Party]) — but an interface return can in general hold a boxed
+// [rm.Party]). An interface return can in general hold a boxed
 // typed-nil pointer, for which `== nil` lies. [HasResource] is the
 // uniform presence test across the return types; [rm.IsTypedNil] is the
 // typed-nil absence check for callers already holding a registered RM
@@ -92,9 +88,9 @@ func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 // site's own response-body decoder and is responsible for wrapping its
 // own decode errors with its own message.
 //
-// T instantiates as an interface for demographic ([rm.Party]) — safe
-// because the zero value of an interface type is a true nil, the same
-// pattern typereg.DecodeAs[T] already relies on (REQ-024: no reflection).
+// T instantiates as an interface for demographic ([rm.Party]). That is
+// safe because the zero value of an interface type is a true nil, the
+// same pattern typereg.DecodeAs[T] relies on, and needs no reflection.
 func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport.Request, label string, decode func([]byte) (T, error)) (T, *VersionMetadata, error) {
 	var zero T
 	resp, err := c.Do(ctx, req)
@@ -133,9 +129,9 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 	}
 }
 
-// NoRepresentationError reports a committed write — a 2xx response — whose
+// NoRepresentationError reports a committed write (a 2xx response) whose
 // `representation` body was empty or could not be decoded as the expected
-// resource (REQ-094). It lets callers tell "no body, write succeeded" from
+// resource. It lets callers tell "no body, write succeeded" from
 // "write committed, body unusable" with errors.As alone: it is never a
 // [*transport.WireError], and a non-2xx failure is never wrapped in it.
 //
@@ -143,10 +139,10 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 // the server supplied it); errors raised by this SDK always carry a non-nil
 // Meta. Together with the classification (the type itself, via errors.As),
 // Meta is the boundary-safe surface. Cause is internal diagnostics and may
-// carry payload-derived text — the strconv and encoding/json causes beneath
+// carry payload-derived text (the strconv and encoding/json causes beneath
 // an rm decode error quote the offending literal, the same class
 // [transport.WithRawErrorBodies] gates for
-// [transport.OpenEHRErrorDetail] — so, like [*transport.WireError] (REQ-093),
+// [transport.OpenEHRErrorDetail]), so, like [*transport.WireError],
 // Error is value-free and never interpolates Cause; callers that need the
 // diagnostics unwrap or read Cause deliberately.
 type NoRepresentationError struct {
@@ -154,8 +150,8 @@ type NoRepresentationError struct {
 	Cause error
 }
 
-// Error names the classification only (REQ-093 value-free discipline):
-// never Cause text, never a payload-derived value.
+// Error names the classification only: never Cause text, never a
+// payload-derived value.
 func (e *NoRepresentationError) Error() string {
 	if e == nil {
 		return "ehr: no representation"
@@ -170,7 +166,7 @@ func (e *NoRepresentationError) Error() string {
 }
 
 // Unwrap exposes Cause so errors.Is/As reach the wrapped sentinel or decode
-// error (REQ-025).
+// error.
 func (e *NoRepresentationError) Unwrap() error {
 	if e == nil {
 		return nil
@@ -179,7 +175,7 @@ func (e *NoRepresentationError) Unwrap() error {
 }
 
 // DoDelete issues a logical-delete request (Composition / Directory /
-// demographic PARTY — EHR_STATUS has no delete operation) and returns
+// demographic PARTY; EHR_STATUS has no delete operation) and returns
 // only the version metadata; a delete response carries no body.
 func DoDelete(ctx context.Context, c *transport.Client, req *transport.Request) (*VersionMetadata, error) {
 	resp, err := c.Do(ctx, req)

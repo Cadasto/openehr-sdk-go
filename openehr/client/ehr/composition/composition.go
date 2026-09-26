@@ -16,9 +16,9 @@ import (
 const routeTemplate = "/ehr/{ehr_id}/composition/{versioned_object_or_version_uid}"
 
 // ErrDeletedAtTime signals that the composition existed but had been
-// (logically) deleted at the requested version_at_time — the server
-// answered 204 No Content per the composition_get contract
-// (resources/its-rest/ehr-validation.openapi.yaml, 204_deleted_at_time).
+// (logically) deleted at the requested version_at_time: the server
+// answered 204 No Content per the ITS-REST composition_get contract
+// (response 204_deleted_at_time).
 // It is a typed success signal, not a transport failure: [Get] returns it
 // alongside the response metadata and a nil Composition. Check with
 // errors.Is(err, composition.ErrDeletedAtTime).
@@ -31,7 +31,7 @@ var ErrDeletedAtTime = errors.New("composition: deleted at requested time")
 //
 // Wire: GET /ehr/{ehr_id}/composition/{ref} [?version_at_time=...]. A 204
 // No Content response (the composition was deleted at the requested
-// version_at_time) returns a nil Composition with [ErrDeletedAtTime] — a
+// version_at_time) returns a nil Composition with [ErrDeletedAtTime], a
 // typed success signal, distinct from transport.ErrInvalidShape.
 func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ref openehrclient.Ref) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
@@ -91,19 +91,19 @@ type writeConfig struct {
 // WriteOption mutates the request shape for [Save] and [Update].
 type WriteOption func(*writeConfig)
 
-// WithPrefer overrides the response-shape preference (REQ-094). The
-// default is [transport.PreferMinimal] per the spec.
+// WithPrefer overrides the response-shape preference. The
+// default is [transport.PreferMinimal], the ITS-REST default.
 func WithPrefer(p transport.Prefer) WriteOption {
 	return func(c *writeConfig) { c.Prefer = p }
 }
 
 // WithAuditDetails attaches the commit-time audit envelope via the
-// `openehr-audit-details` header (REQ-059). Nil omits the header.
+// `openehr-audit-details` header. Nil omits the header.
 func WithAuditDetails(a *rm.AuditDetails) WriteOption {
 	return func(c *writeConfig) { c.AuditDetails = a }
 }
 
-// WithTemplateID sets the `openehr-template-id` header (REQ-059) so
+// WithTemplateID sets the `openehr-template-id` header so
 // the deployment can validate the payload against the declared
 // template. Empty omits the header.
 func WithTemplateID(id string) WriteOption {
@@ -111,7 +111,7 @@ func WithTemplateID(id string) WriteOption {
 }
 
 // WithLifecycleState sets the committed VERSION's lifecycle_state via the
-// `openehr-version` header (REQ-059) — an openEHR version-lifecycle-state
+// `openehr-version` header, as an openEHR version-lifecycle-state
 // code (e.g. [openehrclient.LifecycleStateComplete]). The empty value omits
 // the header (server default); an unrecognised code fails the write with
 // [transport.ErrInvalidConfig].
@@ -119,13 +119,12 @@ func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
 	return func(c *writeConfig) { c.LifecycleState = s }
 }
 
-// WithObjectItemTags sets the openehr-item-tag header (REQ-059).
+// WithObjectItemTags sets the openehr-item-tag header.
 func WithObjectItemTags(tags []openehrclient.ItemTag) WriteOption {
 	return func(c *writeConfig) { c.objectItemTags = tags }
 }
 
-// WithVersionItemTags sets the openehr-version-item-tag header
-// (REQ-059).
+// WithVersionItemTags sets the openehr-version-item-tag header.
 func WithVersionItemTags(tags []openehrclient.ItemTag) WriteOption {
 	return func(c *writeConfig) { c.versionItemTags = tags }
 }
@@ -141,7 +140,7 @@ type deleteConfig struct {
 type DeleteOption func(*deleteConfig)
 
 // WithDeleteAudit attaches the commit-time audit envelope as the
-// `openehr-audit-details` header on a delete (REQ-059). Nil omits.
+// `openehr-audit-details` header on a delete. Nil omits.
 func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 	return func(c *deleteConfig) { c.auditDetails = a }
 }
@@ -150,34 +149,34 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 //
 // Wire: POST /ehr/{ehr_id}/composition.
 //
-// The response shape follows the Prefer option (REQ-094) per the
-// ITS-REST OpenAPI `201_COMPOSITION` response (REQ-094):
-//   - PreferMinimal (default) — server returns the new version's
+// The response shape follows the Prefer option per the
+// ITS-REST OpenAPI `201_COMPOSITION` response:
+//   - PreferMinimal (default): server returns the new version's
 //     identifier in the `Location` header; the returned
 //     `*rm.Composition` is nil and only the metadata is populated
 //     (ETag + parsed VersionUID).
-//   - PreferRepresentation — server returns the bare `COMPOSITION`
+//   - PreferRepresentation: server returns the bare `COMPOSITION`
 //     body (not `ORIGINAL_VERSION<COMPOSITION>`) which is decoded
 //     into the returned value. The audit / lifecycle / preceding-
 //     version fields that `ORIGINAL_VERSION` carries are not in the
-//     POST/PUT body per spec; they are available via the version
+//     POST/PUT body; they are available via the version
 //     metadata (`ETag` → `VersionUID`) or via a follow-up
 //     `GET /versioned_composition/{vo_uid}/version/{version_uid}`
 //     which is the canonical home for the `ORIGINAL_VERSION` envelope.
-//   - PreferIdentifier — server returns the ITS-REST `Identifier` body
+//   - PreferIdentifier: server returns the ITS-REST `Identifier` body
 //     (`{"uid": …}`); the returned `*rm.Composition` is nil and the
 //     identifier is resolved into the metadata `VersionUID` (the
 //     `Location` header stays canonical when present).
 //
 // The zero resource on a successful minimal/identifier write is a nil
-// pointer — `== nil` is a correct test for this concrete return;
+// pointer, so `== nil` is a correct test for this concrete return;
 // [openehrclient.HasResource] is the uniform presence test across write
-// leaves, including interface returns (REQ-094). After 2xx +
+// leaves, including interface returns. After 2xx +
 // PreferRepresentation, an empty or undecodable body is a
 // [*openehrclient.NoRepresentationError] carrying commit metadata.
 //
 // Audit details and the template id flow via the `openehr-*` header
-// family (REQ-059).
+// family.
 func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Save: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -223,18 +222,18 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 }
 
 // Update modifies the Composition family identified by voID, attaching
-// `ifMatch` as the required `If-Match` header (REQ-054).
+// `ifMatch` as the required `If-Match` header.
 //
-// Wire: PUT /ehr/{ehr_id}/composition/{voID} with If-Match. Errors
-// per REQ-093: 409 → [transport.ErrVersionConflict], 412 →
+// Wire: PUT /ehr/{ehr_id}/composition/{voID} with If-Match. Errors:
+// 409 → [transport.ErrVersionConflict], 412 →
 // [transport.ErrPreconditionFailed], 422 (template / semantic validation
 // failure) → [transport.ErrUnprocessable]. (428 →
-// [transport.ErrPreconditionRequired] is a defensive mapping only — openEHR
+// [transport.ErrPreconditionRequired] is a defensive mapping only; openEHR
 // signals a missing If-Match as 400, not 428.) Forgetting ifMatch returns
 // [transport.ErrInvalidConfig] without issuing a request.
 //
 // Response shape matches [Save]: bare `*rm.Composition` per the
-// ITS-REST OpenAPI `200_COMPOSITION_updated` response (REQ-094).
+// ITS-REST OpenAPI `200_COMPOSITION_updated` response.
 func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Update: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -288,10 +287,10 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 
 // Delete logically deletes the Composition version addressed by
 // versionUID, attaching the preceding version's identifier as
-// `If-Match` (REQ-054). The server typically responds 204 No Content.
+// `If-Match`. The server typically responds 204 No Content.
 //
 // Wire: DELETE /ehr/{ehr_id}/composition/{version_uid} with If-Match.
-// REQ-054 enforcement mirrors [Update].
+// The If-Match requirement is enforced as in [Update].
 func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, fmt.Errorf("composition.Delete: %w: empty EHRID", transport.ErrInvalidConfig)

@@ -1,13 +1,12 @@
 // Example: parse an ADL 1.4 operational template (OPT) and print
-// identity, OPT metadata, and path-resolved nodes. Demonstrates the
-// building-block path for openehr/template/ (REQ-013, REQ-100 + the
-// follow-up Phases 1–3 surface) — no transport, no auth, no client.
-// Just bytes → typed tree → path walk.
+// identity, OPT metadata, and path-resolved nodes. This is the
+// building-block path for openehr/template/, with no transport, auth or
+// client: bytes → typed tree → path walk.
 //
 // Surfaces shown:
 //   - ParseFile / ParseFileStrict (default and strict parse modes)
 //   - OperationalTemplate identity (TemplateID / Concept / UID / Language)
-//   - Description() / Annotations() — OPT provenance metadata
+//   - Description() / Annotations(): OPT provenance metadata
 //   - ObjectNode supertype for walker dispatch
 //   - ParsePath / NodeAt / ValidatePath
 //   - WithStrictPaths for ambiguity surfacing (ErrAmbiguousPath)

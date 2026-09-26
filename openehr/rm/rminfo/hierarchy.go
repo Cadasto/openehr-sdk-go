@@ -4,34 +4,32 @@ import (
 	"slices"
 )
 
-// Hierarchy answers class-level questions about the pinned Reference Model —
+// Hierarchy answers class-level questions about the pinned Reference Model:
 // abstractness, ancestry, conformance, abstract-class expansion, and where an
-// attribute is declared (REQ-048).
+// attribute is declared.
 //
-// It is an optional capability interface beside [Lookup], not an extension of
-// it: widening the published Lookup interface would break every external
-// implementer of it (idiom.md § Public-API stability). [Default] implements
+// It is an optional capability interface beside [Lookup] rather than an
+// extension of it, because widening Lookup would break every external
+// implementer. [Default] implements
 // Hierarchy, and so does every [Lookup] returned by [New], so a synthetic
 // model can exercise shapes the pinned RM does not contain. Assert for it:
 //
 //	if h, ok := rminfo.Default.(rminfo.Hierarchy); ok { … }
 //
-// **Known versus false.** Every method reports whether the class is in the
-// data set at all, separately from its answer, because a caller refusing a
-// query has to say which it hit: an unknown class, an abstract class, and an
-// abstract class nothing concrete extends are three different answers. An
-// empty ancestor list on a known class means *root*; an empty
-// concrete-descendant list on a known class means *dead-end abstract*.
+// Every method reports whether the class is in the data set at all,
+// separately from its answer, so a caller refusing a query can say which case
+// it hit: an unknown class, an abstract class, and an abstract class nothing
+// concrete extends are three different answers. An empty ancestor list on a
+// known class means a root; an empty concrete-descendant list on a known class
+// means an abstract class with no concrete descendants.
 //
-// **Closure.** Every class name the class-graph methods return —
-// [Hierarchy.Parents], [Hierarchy.Ancestors], [Hierarchy.ConcreteDescendants]
-// — is itself a known class: the generator drops BMM ancestors outside the
-// emitted class universe, so the graph has no edges pointing at names no
-// method can answer for.
+// Every class name the class-graph methods return ([Hierarchy.Parents],
+// [Hierarchy.Ancestors], [Hierarchy.ConcreteDescendants]) is itself a known
+// class: the generator drops BMM ancestors outside the emitted class universe,
+// so the graph has no edges pointing at names no method can answer for.
 //
-// That is a property of the generated data (asserted by PROBE-094),
-// deliberately NOT re-imposed at run time, because filtering here would mask a
-// generator defect instead of failing on it. The consequence is visible
+// That closure is a property of the generated data and is not re-checked at
+// run time, because filtering here would hide a generator defect. The consequence is visible
 // through [New]: a synthetic data set whose Parents name a class it does not
 // define gets that name back from Ancestors, and every question about the name
 // then reports known=false. On [Default] that cannot happen.
@@ -41,7 +39,7 @@ import (
 // the attribute, which for one inherited from an excluded primitive_types
 // entry is outside the universe. That matches [Lookup.AttributeRMType], which
 // already reports primitives and generic parameters ("String", "Integer",
-// "T") — the attribute layer is faithful to the BMM, the graph is navigable.
+// "T"). The attribute layer is faithful to the BMM; the class graph is closed.
 type Hierarchy interface {
 	// IsAbstract reports the pinned BMM's is_abstract flag for rmType, so a
 	// caller can tell that naming the class denotes its concrete
@@ -49,20 +47,18 @@ type Hierarchy interface {
 	// data set does not define the class at all.
 	//
 	// It is the BMM's answer verbatim, not a local verdict on
-	// instantiability (REQ-047 — the BMM file wins). In particular it is
-	// NOT the question "can a stored instance carry this name as _type":
-	// six classes the pinned RM leaves unflagged are reported non-abstract,
-	// two of them BMM interfaces this SDK renders as Go interfaces. A
-	// caller that needs the decodable set must consult the type registry in
-	// openehr/rm/typereg (REQ-040), which is the authority for that
-	// question. Whether abstractness should widen to cover BMM interfaces
-	// is open as STRAND-12.
+	// instantiability. In particular it does not answer "can a stored
+	// instance carry this name as _type": six classes the pinned RM leaves
+	// unflagged are reported non-abstract, two of them BMM interfaces this
+	// SDK renders as Go interfaces. A caller that needs the decodable set
+	// must consult the type registry in openehr/rm/typereg, which is the
+	// authority for that question.
 	IsAbstract(rmType string) (abstract, known bool)
 
 	// Parents returns rmType's immediate parent classes in BMM declaration
-	// order — the faithful edge set, which a re-serialiser or a schema
-	// differ needs and which a transitive closure erases. The order is NOT
-	// sorted, precisely because sorting would lose it.
+	// order. This is the exact edge set, which a re-serialiser or a schema
+	// differ needs and which a transitive closure erases. The result is not
+	// sorted, because sorting would lose the declaration order.
 	//
 	// known=false for a class the data set does not define; an empty result
 	// with known=true is a root.
@@ -73,18 +69,18 @@ type Hierarchy interface {
 	// synthetic model that declares it as its own parent.
 	//
 	// known=false for a class the data set does not define; an empty result
-	// with known=true is a root — a different answer.
+	// with known=true is a root, which is a different answer.
 	//
 	// A parent the data set names but does not define is returned verbatim
-	// rather than filtered (see § Closure above), so on a malformed
+	// rather than filtered (see the closure note above), so on a malformed
 	// synthetic model an ancestor name can itself report known=false.
 	Ancestors(rmType string) (ancestors []string, known bool)
 
-	// ConformsTo reports whether sub is rmType or descends from it — the
-	// relation behind AQL CONTAINS, polymorphic slot fit, and validation
+	// ConformsTo reports whether sub is rmType or descends from it. This is
+	// the relation behind AQL CONTAINS, polymorphic slot fit, and validation
 	// walkers. It is reflexive and not symmetric.
 	//
-	// known=false when EITHER name is undefined, so "no" and "never heard
+	// known=false when either name is undefined, so "no" and "never heard
 	// of it" stay distinguishable at the call site.
 	ConformsTo(sub, rmType string) (conforms, known bool)
 
@@ -94,17 +90,17 @@ type Hierarchy interface {
 	//
 	// known=false for a class the data set does not define; an empty result
 	// with known=true is an abstract class nothing concrete extends.
-	// "Concrete" here means "not BMM-abstract" — see [Hierarchy.IsAbstract]
+	// "Concrete" here means "not BMM-abstract"; see [Hierarchy.IsAbstract]
 	// for why that is not the same as "storable".
 	ConcreteDescendants(rmType string) (descendants []string, known bool)
 
 	// DeclaredOn returns the class whose BMM declaration supplied attrName
-	// as seen from rmType — rmType itself, or the ancestor the inheritance
+	// as seen from rmType: rmType itself, or the ancestor the inheritance
 	// fold took the attribute from.
 	//
 	// The flattened [Lookup.AttributeRMType], [Lookup.IsContainer] and
-	// [Lookup.RequiredAttributes] already answer the inheritance-RESOLVED
-	// question and are unchanged by this interface; DeclaredOn recovers the
+	// [Lookup.RequiredAttributes] answer the inheritance-resolved
+	// question; DeclaredOn recovers the
 	// site that fold erases, which a reader distinguishing own from
 	// inherited attributes (BMM-faithful re-serialisation, schema diffing)
 	// cannot otherwise get back. The site and the attribute's reported
@@ -113,14 +109,13 @@ type Hierarchy interface {
 	// The site is faithful to the BMM, so it may name a class outside the
 	// known universe when the attribute is inherited from an excluded
 	// primitive_types entry ("Interval" is the only such site on the
-	// pinned RM) — the deliberate carve-out REQ-048 § The class universe
-	// specifies, with the reasoning. Every class-graph question about such
-	// a name reports not-known, which is how a caller can tell.
+	// pinned RM). Every class-graph question about such a name reports
+	// not-known, which is how a caller can tell.
 	//
 	// ok=false when rmType is undefined, when it does not carry attrName,
 	// or when the data set records no site for the attribute at all (which
-	// only a synthetic model omitting the field can produce) — never a
-	// guessed class, and never an empty class name reported as success.
+	// only a synthetic model omitting the field can produce). It never
+	// returns a guessed class or an empty class name reported as success.
 	DeclaredOn(rmType, attrName string) (declaringClass string, ok bool)
 }
 

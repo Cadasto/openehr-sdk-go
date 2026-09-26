@@ -11,12 +11,12 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
-// Build projects a compiled OPT into the typed WebTemplate tree (REQ-106).
+// Build projects a compiled OPT into the typed WebTemplate tree.
 //
-// The transform follows the EHRbase v2.3 node model (ADR-0014): it keeps
+// The transform follows the EHRbase v2.3 node model: it keeps
 // COMPOSITION / ENTRY / EVENT / EVENT_CONTEXT / CLUSTER, collapses each
 // ELEMENT into a value leaf, drops the pure structural wrappers (HISTORY
-// and the ITEM_STRUCTURE family — ITEM_TREE / ITEM_LIST / ITEM_SINGLE /
+// and the ITEM_STRUCTURE family: ITEM_TREE / ITEM_LIST / ITEM_SINGLE /
 // ITEM_TABLE) while folding their node predicates into descendant
 // aqlPaths, and emits data-bearing RM attributes as leaves.
 func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {

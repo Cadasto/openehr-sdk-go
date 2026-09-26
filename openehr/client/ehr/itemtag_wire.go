@@ -7,7 +7,7 @@ import (
 )
 
 // ItemTag is a parsed ITEM_TAG from an openehr-item-tag or
-// openehr-version-item-tag header value (REQ-059).
+// openehr-version-item-tag header value.
 type ItemTag struct {
 	Key        string
 	Value      string

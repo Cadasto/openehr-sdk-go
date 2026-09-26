@@ -18,7 +18,7 @@ import (
 // [Compiled.AllByNodeID] / [Compiled.AllByArchetypeID] index it.
 type Compiled = impl.Compiled
 
-// CompiledNode is one node in the compiled OPT tree — the unit of
+// CompiledNode is one node in the compiled OPT tree, the unit of
 // template introspection (form generation, path discovery, custom
 // mapping/validation). It reports its canonical AQL path (AQLPath), the
 // RM type it constrains (RMTypeName), its at-code / archetype id (NodeID,
