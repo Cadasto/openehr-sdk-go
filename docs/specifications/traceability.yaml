@@ -1,5 +1,13 @@
-# Machine-readable REQ traceability. Canonical normative prose: see REQ.md registry + topic specs.
-# Run: make spec-check
+# The SDD traceability map: one row per REQ-NNN, linking it to its canonical spec
+# section and to the packages, tests, probes, plans and ADRs that realise it.
+#
+# This is an index. Rows carry only the keys below — no notes and no comments
+# (make spec-check refuses both); a fact worth keeping goes in the canonical spec,
+# history stays in git. docs/specifications/REQ.md is generated from this file:
+# edit here, then run make spec-gen.
+#
+# Keys: id, title, canonical, status (draft|stable|deprecated), implementation
+# (landed|partial|planned|deprecated), packages, tests, probes, plans, adrs, fixtures.
 
 requirements:
   - id: REQ-001
@@ -8,6 +16,221 @@ requirements:
     status: draft
     implementation: landed
     packages: [go.mod]
+
+  - id: REQ-002
+    title: Go version
+    canonical: docs/specifications/packaging.md#req-002--go-version
+    status: draft
+    implementation: landed
+    packages: [go.mod]
+    plans: [docs/plans/archive/2026-09-03-go-1.27.md]
+
+  - id: REQ-003
+    title: License
+    canonical: docs/specifications/packaging.md#req-003--license
+    status: draft
+    implementation: landed
+    packages: [LICENSE, docs/licensing.md]
+
+  - id: REQ-004
+    title: Semantic versioning
+    canonical: docs/specifications/packaging.md#req-004--semantic-versioning
+    status: draft
+    implementation: landed
+    packages: [.github/workflows/release.yml]
+
+  - id: REQ-005
+    title: Internal boundary
+    canonical: docs/specifications/packaging.md#req-005--internal-boundary
+    status: draft
+    implementation: landed
+    packages: [internal]
+
+  - id: REQ-010
+    title: "`cadasto/` cut line"
+    canonical: docs/specifications/module-layout.md#req-010--cadasto-cut-line
+    status: draft
+    implementation: landed
+    packages: [cadasto]
+
+  - id: REQ-011
+    title: No sideways `cadasto/` imports
+    canonical: docs/specifications/module-layout.md#req-011--no-sideways-imports-inside-cadasto
+    status: draft
+    implementation: landed
+    packages: [cadasto]
+
+  - id: REQ-012
+    title: Auth layering
+    canonical: docs/specifications/module-layout.md#req-012--auth-layering
+    status: draft
+    implementation: landed
+    packages: [auth]
+
+  - id: REQ-013
+    title: Building-block independence
+    canonical: docs/specifications/module-layout.md#req-013--building-block-independence
+    status: draft
+    implementation: landed
+    packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/terminology, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck]
+    tests:
+      - openehr/aql/contain/imports_test.go
+      - openehr/aql/imports_test.go
+      - openehr/aql/internal/semcheck/imports_test.go
+      - openehr/aql/lint/imports_test.go
+      - openehr/aql/parse/imports_test.go
+      - openehr/composition/imports_test.go
+      - openehr/instance/imports_test.go
+      - openehr/serialize/simplified/independence_test.go
+      - openehr/template/webtemplate/independence_test.go
+      - openehr/templatecompile/imports_test.go
+      - openehr/terminology/imports_test.go
+      - openehr/validation/imports_test.go
+
+  - id: REQ-014
+    title: Dependency direction
+    canonical: docs/specifications/module-layout.md#req-014--dependency-direction
+    status: draft
+    implementation: landed
+    packages: [transport, openehr/client]
+
+  - id: REQ-020
+    title: Context-first I/O
+    canonical: docs/specifications/idiom.md#context-propagation-req-020
+    status: draft
+    implementation: landed
+    packages: [transport, openehr/client]
+
+  - id: REQ-021
+    title: Injected `*http.Client`
+    canonical: docs/specifications/idiom.md#http-client-injection-req-021
+    status: draft
+    implementation: landed
+    packages: [transport]
+    tests:
+      - transport/client_test.go
+
+  - id: REQ-022
+    title: Functional options
+    canonical: docs/specifications/idiom.md#functional-options-req-022
+    status: draft
+    implementation: landed
+    packages: [transport]
+
+  - id: REQ-023
+    title: Package-level functions
+    canonical: docs/specifications/idiom.md#surface-shape-req-023
+    status: draft
+    implementation: landed
+    packages: [openehr/client]
+
+  - id: REQ-024
+    title: Generics, no reflection
+    canonical: docs/specifications/idiom.md#generics-policy-req-024
+    status: draft
+    implementation: landed
+    packages: [openehr/rm/typereg, openehr/serialize]
+
+  - id: REQ-025
+    title: Error wrapping
+    canonical: docs/specifications/idiom.md#errors-req-025
+    status: draft
+    implementation: landed
+    packages: [transport, auth, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, openehr/rm, openehr/aom/aom14, internal, internal/bmmgen]
+    plans: [docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md, docs/plans/archive/2026-09-15-typereg-single-pass-decode.md]
+    tests:
+      - openehr/rm/typereg/nilreceiver_census_test.go
+      - openehr/client/ehr/contribution/version_test.go
+      - openehr/client/ehr/contribution/submission_test.go
+      - openehr/client/ehr/contribution/update_audit_test.go
+      - openehr/aql/version_test.go
+      - openehr/aql/lint/extract_test.go
+      - openehr/aql/lint/nilsyntaxerror_internal_test.go
+      - openehr/aql/contain/nilrelation_test.go
+      - openehr/aql/parse/nilsyntaxerror_test.go
+      - openehr/aql/parse/emit_verify_nilsyntaxerror_internal_test.go
+      - openehr/client/query/nilaqlerror_test.go
+      - openehr/client/query/nilwiredereference_internal_test.go
+      - transport/client_test.go
+      - transport/nilwireerror_test.go
+      - transport/nilwiredereference_internal_test.go
+      - transport/decode_error_test.go
+      - auth/nilautherror_test.go
+      - smart/discovery/nildiscoveryerror_test.go
+      - openehr/rm/typereg/nildecodeerror_test.go
+      - openehr/client/ehr/ehr_test.go
+      - openehr/client/ehr/resource_test.go
+      - internal/option_guard_test.go
+      - openehr/rm/typereg/streaming_test.go
+
+  - id: REQ-026
+    title: Goroutine-safe clients
+    canonical: docs/specifications/idiom.md#concurrency-req-026
+    status: draft
+    implementation: landed
+    packages: [transport]
+
+  - id: REQ-030
+    title: Concrete RM structs
+    canonical: docs/specifications/rm-modeling.md#concrete-types-req-030
+    status: draft
+    implementation: landed
+    packages: [openehr/rm]
+
+  - id: REQ-031
+    title: Embedded base structs
+    canonical: docs/specifications/rm-modeling.md#embedded-base-structs-req-031
+    status: draft
+    implementation: landed
+    packages: [openehr/rm]
+    adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
+
+  - id: REQ-032
+    title: Interfaces for abstract RM
+    canonical: docs/specifications/rm-modeling.md#abstract-categories-req-032
+    status: draft
+    implementation: landed
+    packages: [openehr/rm]
+
+  - id: REQ-033
+    title: No inheritance emulation
+    canonical: docs/specifications/rm-modeling.md#no-inheritance-emulation-req-033
+    status: draft
+    implementation: landed
+    packages: [openehr/rm, openehr/rm/typereg]
+    adrs: [docs/adr/0003-rm-event-polymorphism.md]
+
+  - id: REQ-034
+    title: openEHR terminology vocabulary
+    canonical: docs/specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034
+    status: draft
+    implementation: landed
+    packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen, openehr/client/ehr, openehr/client/ehr/contribution, openehr/serialize/simplified, openehr/instance]
+    plans: [docs/plans/archive/2026-09-07-terminology-vocabulary.md]
+    tests:
+      - internal/termgen/parse_test.go
+      - internal/termgen/render_test.go
+      - internal/termgen/run_test.go
+      - openehr/client/ehr/contribution/builder_test.go
+      - openehr/client/ehr/version_header_test.go
+      - openehr/instance/instance_test.go
+      - openehr/serialize/simplified/flat_decode_test.go
+      - openehr/serialize/simplified/rmattr_party_test.go
+      - openehr/terminology/imports_test.go
+      - openehr/terminology/tables_test.go
+      - openehr/terminology/terminology_test.go
+
+  - id: REQ-040
+    title: Type registry
+    canonical: docs/specifications/rm-modeling.md#type-registry-req-040
+    status: draft
+    implementation: landed
+    packages: [openehr/rm/typereg]
+    probes: [PROBE-031, PROBE-073, PROBE-030, PROBE-033, PROBE-034, PROBE-038]
+    adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
+    tests:
+      - openehr/client/demographic/party_test.go
+      - openehr/rm/locatable_identity_test.go
 
   - id: REQ-041
     title: Pinned BMM sources
@@ -19,7 +242,7 @@ requirements:
     adrs: [docs/adr/0001-bmm-version-bump-runbook.md]
 
   - id: REQ-042
-    title: Generated code drift-detected
+    title: Generated code, drift-detected
     canonical: docs/specifications/bmm-conformance.md#req-042--generated-code-drift-detected
     status: draft
     implementation: landed
@@ -30,6 +253,21 @@ requirements:
       - internal/bmmgen/render_test.go
       - internal/bmmgen/render_rminfo_hierarchy_test.go
       - internal/bmmgen/aom14_test.go
+
+  - id: REQ-043
+    title: P_BMM → Go mapping rules
+    canonical: docs/specifications/bmm-conformance.md#mapping-rules
+    status: draft
+    implementation: landed
+    packages: [internal/bmmgen]
+    adrs: [docs/adr/0013-generated-locatable-identity-surface.md, docs/adr/0002-bmm-codegen-decisions.md]
+
+  - id: REQ-044
+    title: Hand-written extensions isolated
+    canonical: docs/specifications/bmm-conformance.md#req-044--hand-written-extensions-are-isolated
+    status: draft
+    implementation: landed
+    packages: [openehr/rm]
 
   - id: REQ-045
     title: BMM loader building block
@@ -53,33 +291,22 @@ requirements:
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
-    notes: >-
-      landed (2026-09-03): Character, the RM's one primitive whose
-      canonical spelling (a one-character string) disagrees with a
-      numeric Go rune, is now a hand-written named type
-      (openehr/rm/character.go) carrying its own MarshalJSON /
-      UnmarshalJSON, exactly like Integer / Real, and the BMM primitive
-      map points at it. TERM_MAPPING.match is the only Character in the
-      RM.
+
+  - id: REQ-047
+    title: BMM authoritative on divergence
+    canonical: docs/specifications/bmm-conformance.md#req-047--bmm-spec-divergence-resolution
+    status: draft
+    implementation: landed
+    packages: [internal/bmmgen]
+    tests:
+      - openehr/rm/rminfo/hierarchy_test.go
+      - openehr/rm/rminfo/probe_094_test.go
 
   - id: REQ-048
     title: RM meta-model introspection
     canonical: docs/specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface
     status: draft
     implementation: landed
-    # WHY THIS EXISTS, in one line: the landed rminfo tables answer the
-    # inheritance-RESOLVED attribute question and nothing else — no ancestry,
-    # no abstractness, no descendant expansion, and the fold that resolves an
-    # attribute erases which class declared it. Any module reasoning about the
-    # RM rather than about one template had to re-reduce the pinned BMM.
-    #
-    # WHY THE EXISTING TABLES COULD NOT HAVE CARRIED IT: the emitted class
-    # universe was the attribute-BEARING subset, so DATA_VALUE and PATHABLE —
-    # the abstract roots a descendant expansion starts from — were absent
-    # entirely. Widening the universe is part of this REQ, not a side effect.
-    # STRAND-12 holds open whether abstractness should also cover BMM
-    # interface classes (six admitted classes carry no is_abstract flag).
-    # REQ-047 settles today's behaviour: report the BMM's flag verbatim.
     adrs: [docs/adr/0005-compiled-template-foundation.md]
     probes: [PROBE-094]
     packages:
@@ -101,14 +328,6 @@ requirements:
     canonical: docs/specifications/bmm-conformance.md#req-049--rm-class-universe-absence-reasons
     status: draft
     implementation: landed
-    # WHY THIS EXISTS, in one line: the universe answers "is this a class?"
-    # with one boolean, conflating "the pinned schemas do not declare this
-    # name" with "they declare it and the generator deliberately skips it" —
-    # facts the generator computes on every run (skip lists, primitive
-    # mapping, enumeration kind) and then discards; PROBE-094's accounting
-    # proves the taxonomy exists, but only inside a _test.go file. This REQ
-    # promotes it to the public surface as a closed, exhaustive-switchable
-    # reason enum on an optional capability interface.
     probes: [PROBE-098]
     packages:
       - openehr/rm/rminfo
@@ -120,17 +339,29 @@ requirements:
     plans:
       - docs/plans/archive/2026-08-26-rminfo-absence-reason.md
 
-  - id: REQ-040
-    title: Type registry
-    canonical: docs/specifications/rm-modeling.md#type-registry-req-040
+  - id: REQ-050
+    title: REST 1.1.0-development pin
+    canonical: docs/specifications/wire.md#req-050
     status: draft
     implementation: landed
-    packages: [openehr/rm/typereg]
-    probes: [PROBE-031, PROBE-073, PROBE-030, PROBE-033, PROBE-034, PROBE-038]
-    adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
+    packages: [transport, openehr/client/system, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/query, openehr/client/definition, openehr/client/admin, openehr/client/demographic]
+    plans: [docs/plans/archive/2026-05-15-rest-api-client.md, docs/plans/archive/2026-05-26-contribution-submission-shape.md, docs/plans/archive/2026-06-14-demographic-rest-client.md, docs/plans/archive/2026-09-04-spec-interop-leftovers.md]
+    probes: [PROBE-072, PROBE-073]
     tests:
+      - testkit/probes/versioned/probe_072_contribution_submission_shape.go
+      - openehr/client/ehr/contribution/contribution_test.go
+      - openehr/client/ehr/contribution/submission_test.go
+      - testkit/probes/demographic/probes_test.go
       - openehr/client/demographic/party_test.go
-      - openehr/rm/locatable_identity_test.go
+      - openehr/client/demographic/versioned_test.go
+      - openehr/client/system/system_test.go
+
+  - id: REQ-051
+    title: Cadasto spec-version header
+    canonical: docs/specifications/wire.md#req-051
+    status: draft
+    implementation: landed
+    packages: [transport]
 
   - id: REQ-052
     title: Canonical JSON
@@ -152,156 +383,98 @@ requirements:
       - openehr/serialize/canjson/decode_test.go
       - openehr/rm/typereg/registry_test.go
       - openehr/serialize/canjson/omitzero_test.go
-      - openehr/serialize/canjson/typednil_slot_test.go  # typed-nil in an optional polymorphic slot encodes as absent
-      - openehr/serialize/canjson/map_value_type_test.go  # a map-held RM value carries _type on every entry (ADR 0022)
+      - openehr/serialize/canjson/typednil_slot_test.go
+      - openehr/serialize/canjson/map_value_type_test.go
       - openehr/serialize/canjson/bare_v2_decode_test.go
-      - openehr/serialize/canjson/edgecases_test.go  # decode edge cases, the depth refusal among them
-      - openehr/serialize/canjson/type_census_test.go  # registered-type census, TestUnmarshalTypeMismatchCensus among it
-      - openehr/rm/typereg/streaming_test.go  # nil-argument refusals; listed under REQ-025 too
-      - openehr/validation/rmfloor_bytes_test.go  # the EHR_STATUS byte validator under v2 decode semantics
-      - openehr/client/demographic/versioned_test.go  # the demographic version read under v2 decode semantics
-      - internal/v1_rm_decode_guard_test.go  # no v1 encoding/json decode into an RM value in non-test code
-      - internal/bmmgen/render_streaming_test.go  # the generated decode passes the declared _type field
+      - openehr/serialize/canjson/edgecases_test.go
+      - openehr/serialize/canjson/type_census_test.go
+      - openehr/rm/typereg/streaming_test.go
+      - openehr/validation/rmfloor_bytes_test.go
+      - openehr/client/demographic/versioned_test.go
+      - internal/v1_rm_decode_guard_test.go
+      - internal/bmmgen/render_streaming_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
-      - testkit/probes/serialize/probe_030_guard_internal_test.go  # can-fail plants for the fidelity and RM-floor legs
-      - testkit/probes/serialize/probes_test.go  # PROBE-030 over the whole corpus; every discovered cassette is an input
-      - testkit/fixtures/discover_test.go  # the seven former hold-outs stay in ListCompositionJSON
+      - testkit/probes/serialize/probe_030_guard_internal_test.go
+      - testkit/probes/serialize/probes_test.go
+      - testkit/fixtures/discover_test.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
-      - testkit/probes/serialize/probe_038_guard_internal_test.go  # can-fail plant for the wire-equivalence fixpoint leg
+      - testkit/probes/serialize/probe_038_guard_internal_test.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/real_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canjson/multimedia_bytes_test.go
       - testkit/wireequiv/wireequiv_test.go
-    notes: >-
-      partial (2026-09-02): the encode-side refusal sentinel clause
-      requires canjson.Marshal / MarshalIndent to wrap the encode-only
-      canjson.ErrInvalidValue, kept errors.Is-distinguishable from the
-      decode-side canjson.ErrInvalidShape and from transport.ErrInvalidShape
-      (landed in marshal.go, pinned by marshal_sentinel_test.go; canxml
-      reuses one sentinel across both directions — observed as out of
-      scope, not aligned). The decode-side shape sentinel clause is
-      landed too: decode failures still reach the caller three ways —
-      malformed JSON unchanged from encoding/json, an in-type shape
-      error behind a `canjson: <RM_TYPE>:` prefix, a typereg.DecodeError
-      (raised at a polymorphic slot or by a whole-value _type mismatch
-      on /_type) — and the middle one now wraps
-      canjson.ErrInvalidShape, with the message and the errors.As-reachable
-      encoding/json cause both unchanged. The producer is
-      typereg.WrapShapeError, called from the one funnel the generator
-      emits (internal/bmmgen/render_jsonunmar.go), which is also why the
-      sentinel value lives in openehr/rm/typereg: generated code under
-      openehr/rm cannot import openehr/serialize. The exclusion is the
-      polymorphic dispatch failure alone: that funnel never adds the
-      sentinel to a DecodeError travelling out through it, and a
-      DecodeError never strips one raised beneath it — a shape failure
-      inside the concrete type selected at a slot is both, the path from
-      the DecodeError and the kind from the sentinel.
-      TestUnmarshalWrapsErrInvalidShape, its Decoder.Decode twin,
-      TestUnmarshalNestedDecodeErrorIsNotShapeTagged,
-      TestUnmarshalWholeValueTypeMismatchIsNotShapeTagged,
-      TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications and
-      the typereg WrapShapeError tests pin all of it, distinctness from
-      canxml.ErrInvalidShape and transport.ErrInvalidShape included
-      (assertShapeSentinelDistinct asserts both).
-      § Floating-point precision defines "exceeds JSON's number
-      precision" as a decimal literal carrying more than 17 significant
-      decimal digits (float64's shortest-round-trip maximum) — a
-      digit-count budget, not an exactness test, and by design it is
-      wrong in both directions: a literal past 17 digits can still be
-      exactly representable in float64 and is refused anyway
-      (18446744073709551616, 2^64, is exact yet carries 20 significant
-      digits and fails the budget), while a shorter literal can be
-      binary-inexact and is accepted unreported (9007199254740993, 16
-      digits, decodes to 9007199254740992; any decimal fraction that is
-      not a power of two, 0.1 included, is binary-inexact regardless of
-      digit count). A general exactness check (big.Float) would classify
-      both of those correctly but would also reject 0.1 and every other
-      ordinary binary-inexact clinical literal, over-reporting the plan
-      rejected. Parse and range failures take precedence over the
-      digit-count budget: a malformed literal or one that
-      overflows/underflows float64 reports its own parse or range error
-      first, regardless of how many significant digits its mantissa
-      carries (TestRealUnmarshalJSONParseBeforeDigitPolicy) — the budget
-      applies only to a literal that parsed as syntactically valid and
-      in range. Within that definition, both arms are now MET
-      (2026-09-03,
-      docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md): the
-      OUT-OF-RANGE arm as before (1e400 fails with a typed
-      *json.SemanticError, reachable by errors.AsType through the
-      generated UnmarshalJSONFrom wrapper — TestUnmarshalOverflowIsATypedError),
-      and the MANTISSA arm, previously open, is now closed for literals
-      past 17 significant digits — rm.significantDigits
-      (openehr/rm/real.go) counts a decimal literal's significant digits
-      (mantissa only: sign, decimal point and exponent excluded,
-      leading/trailing zeros ignored) and Real.UnmarshalJSON fails
-      wrapping canjson.ErrInvalidShape past 17 of them instead of
-      rounding — 0.1234567890123456789 (19 significant digits) now fails
-      where it used to decode silently to 0.12345678901234568. The
-      refusal message names the digit budget ("literal carries more than
-      17 significant decimal digits"), not float64's capacity — the
-      prior wording ("more precision than float64 can represent") was
-      false for an exact-but-long literal such as 2^64. The retired
-      TestUnmarshalMantissaPrecisionLossIsSilent (which pinned the old
-      silent behaviour) is replaced by
-      TestUnmarshalMantissaPrecisionLossIsATypedError and a
-      DV_PROPORTION inheritance twin; TestSignificantDigits and
-      TestRealUnmarshalJSON{CleanCases,PrecisionLoss,NullIsNoOp,ParseBeforeDigitPolicy}
-      in openehr/rm/real_test.go pin the trigger directly, including the
-      17-digit boundary case that decodes cleanly without in fact
-      round-tripping. No *typereg.DecodeError names a "/magnitude" path
-      in the resulting chain — only polymorphic slots and whole-value
-      _type mismatches attach one today — so classification rests on
-      errors.Is alone. rm.Character's decode refusals (§ REQ-052's
-      TERM_MAPPING.match bullet) carry the same canjson.ErrInvalidShape sentinel
-      through an Is-only wrapper, with the message left unchanged by the
-      classification.
-      REQ-052 amended (2026-09-14,
-      docs/plans/archive/2026-09-14-json-v2-migration.md): the deterministic
-      field-order MUST is withdrawn. _type first is now a SHOULD; beyond
-      it, member order is unspecified and a consumer MUST NOT rely on
-      it; the decoder still accepts any order. Hash lexicographic order
-      is restated as an encoder-determinism SHOULD, not a
-      consumer-facing order promise. Round-trip fidelity is asserted
-      semantically (typed deep comparison plus validation.ValidateRM,
-      REQ-112) and, where a check on encoded bytes is useful, only as
-      wire-equivalence (conformance.md § Terms); PROBE-030 and PROBE-038
-      are rewritten accordingly and no probe asserts byte equality. A
-      JSON object carrying a duplicate member name MUST now be refused,
-      wrapping canjson.ErrInvalidShape. Canonical-JSON member names
-      match exactly (case-sensitive); the case-insensitive Extras
-      carve-out (§ Unknown response keys) stays scoped to the
-      Definition, System and AQL surfaces, which remain on v1. The
-      escaping and U+FFFD substitution sentences are restated for the
-      codec generically instead of naming encoding/json. The spec now
-      names only SDK sentinels on the decode/encode paths
-      (canjson.ErrInvalidShape, canjson.ErrInvalidValue, the
-      typereg.Err* family, *typereg.DecodeError, *transport.DecodeError)
-      and leaves the concrete standard-library error type unspecified,
-      since the codec moves to encoding/json/v2 (ADR 0022) and the v1
-      types named until now (*json.UnsupportedTypeError,
-      *json.UnmarshalTypeError, *json.SyntaxError, io.ErrUnexpectedEOF,
-      io.EOF) do not carry over. Canonical XML (REQ-056, PROBE-033) is
-      unchanged and keeps its byte assertion. The order relaxation is
-      recorded in ADR 0021; the codec adoption itself is ADR 0022. This
-      requirement was specified first (Phase 0 of the migration plan);
-      the code and test/package updates it anticipated (encoding/json/v2
-      adoption, the jsonpoly retirement, the field_order_test.go rename)
-      have since landed in the later phases of that plan.
-      REQ-052 amended (2026-09-24, PR 174,
-      docs/plans/archive/2026-09-15-typereg-single-pass-decode.md,
-      post-review section; facts in wire.md § REQ-052 and ADR 0022):
-      TestUnmarshalFirstFailureInDocumentOrderWins,
-      TestUnmarshalTypeMismatchLeavesReceiverAsDocumented,
-      TestUnmarshalMaxDepthAcrossPolymorphicSlots,
-      TestUnmarshalMaxDepthBoundary, TestUnmarshalTypeMismatchCensus,
-      TestRenderUnmarshalPassesDeclaredTypeField, TestDecodeIntoNilArguments.
-      Second review round (2026-09-24): a bare v1 caller's decode options
-      govern polymorphic slots too, and non-test code is held off v1 RM
-      decodes by a source scan: TestBareV1CallerOptionsGovernPolymorphicSlots,
-      TestValidateRMEHRStatusBytes_V2DecodeSemantics,
-      TestGetVersionCaseVariantMemberIsUnknown, TestNoV1DecodeIntoRMValues.
+
+  - id: REQ-053
+    title: FLAT and STRUCTURED
+    canonical: docs/specifications/wire.md#req-053
+    status: draft
+    implementation: landed
+    adrs:
+      - docs/adr/0015-flat-metadata-spelling.md
+      - docs/adr/0016-event-context-optionals-underscore-spelling.md
+    packages:
+      - openehr/serialize/simplified
+    probes:
+      - PROBE-076
+    plans:
+      - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
+      - docs/plans/archive/2026-07-14-flat-structured-codecs.md
+      - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
+      - docs/plans/archive/2026-08-05-flat-rm-attributes.md
+    tests:
+      - openehr/serialize/simplified/simplified_test.go
+      - openehr/serialize/simplified/mediatype_test.go
+      - openehr/serialize/simplified/mediatype_fuzz_test.go
+      - openehr/serialize/simplified/mediatype_internal_test.go
+      - testkit/probes/serialize/probe_076_simplified_round_trip.go
+      - openehr/serialize/simplified/independence_test.go
+      - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/flat_encode_test.go
+      - openehr/serialize/simplified/flat_decode_test.go
+      - openehr/serialize/simplified/structured_test.go
+      - openehr/serialize/simplified/roundtrip_test.go
+      - openehr/serialize/simplified/hardening_test.go
+      - openehr/serialize/simplified/context_test.go
+      - openehr/serialize/simplified/raw_test.go
+      - openehr/serialize/simplified/names_test.go
+      - openehr/serialize/simplified/rmattr_encapsulated_test.go
+      - openehr/serialize/simplified/rmattr_party_test.go
+
+  - id: REQ-054
+    title: Optimistic concurrency
+    canonical: docs/specifications/wire.md#req-054
+    status: draft
+    implementation: landed
+    packages: [transport, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
+    plans: [docs/plans/archive/2026-05-15-rest-api-client.md]
+    probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013]
+    tests:
+      - testkit/probes/versioned/probe_010_put_without_if_match.go
+      - testkit/probes/versioned/probe_013_cross_ehr_isolation.go
+
+  - id: REQ-055
+    title: AQL wire boundary
+    canonical: docs/specifications/wire.md#req-055--wire-boundary
+    status: draft
+    implementation: landed
+    packages: [openehr/aql, openehr/client/query]
+    probes: [PROBE-020, PROBE-021, PROBE-078]
+    plans:
+      - docs/plans/archive/2026-05-15-rest-api-client.md
+      - docs/plans/archive/2026-05-21-aql-builders.md
+      - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
+      - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
+      - docs/plans/archive/2026-08-26-aql-small-corrections.md
+      - docs/plans/archive/2026-08-26-aql-write-side-parity.md
+    tests:
+      - openehr/aql/aql_test.go
+      - openehr/aql/builder_test.go
+      - openehr/client/query/query_test.go
+      - testkit/probes/aql/probes_test.go
+      - testkit/probes/query/probe_078_verb_aware_scoping.go
+      - testkit/probes/query/probes_test.go
 
   - id: REQ-056
     title: Canonical XML
@@ -310,7 +483,7 @@ requirements:
     implementation: landed
     packages:
       - openehr/serialize/canxml
-      - openehr/rm  # Character's TextMarshaler/TextUnmarshaler make canonical XML enforce the one-character rule
+      - openehr/rm
       - testkit/cassettes
       - testkit/fixtures
     plans: [docs/plans/archive/2026-05-15-canonical-xml-serialization.md, docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md]
@@ -323,55 +496,127 @@ requirements:
       - openehr/rm/character_text_test.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
       - testkit/probes/serialize/probe_034_typereg_xsi_unknown.go
-    notes: >-
-      Review round (2026-09-03,
-      docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md) made
-      canonical XML enforce the Character value rule directly (valid
-      UTF-8, exactly one character; a genuine U+FFFD is a legal
-      Character and accepted): Character's encoding.TextMarshaler /
-      encoding.TextUnmarshaler implementation is what canonical XML
-      relies on for TERM_MAPPING.match, with no canxml-specific
-      sentinel. The JSON string arm's substitution check (§ REQ-052)
-      does not reach XML: encoding/xml refuses invalid UTF-8 itself
-      but converts a surrogate-half character reference (&#xD800;)
-      to U+FFFD without error, and that channel is accepted as a
-      genuine U+FFFD rather than closed by refusing a legal
-      character (pinned in openehr/rm/character_text_test.go).
 
-  - id: REQ-051
-    title: Cadasto spec-version header
-    canonical: docs/specifications/wire.md#req-051
+  - id: REQ-057
+    title: Stored AQL queries
+    canonical: docs/specifications/wire.md#req-057
     status: draft
     implementation: landed
-    packages: [transport]
-
-  - id: REQ-021
-    title: Injected http.Client
-    canonical: docs/specifications/idiom.md#http-client-injection-req-021
-    status: draft
-    implementation: landed
-    packages: [transport]
+    packages: [openehr/client/query, openehr/client/definition]
+    plans:
+      - docs/plans/archive/2026-05-15-rest-api-client.md
+      - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
+      - docs/plans/archive/2026-08-26-aql-small-corrections.md
+      - docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md
     tests:
-      - transport/client_test.go
+      - openehr/client/query/query_test.go
+      - openehr/client/query/version_trim_test.go
+      - openehr/client/definition/stored_query_test.go
+      - openehr/client/definition/version_trim_test.go
+
+  - id: REQ-058
+    title: Datamap V2
+    canonical: docs/specifications/module-layout.md
+    status: draft
+    implementation: planned
+    packages: [cadasto/datamap]
+
+  - id: REQ-059
+    title: openEHR custom headers
+    canonical: docs/specifications/wire.md#req-059
+    status: draft
+    implementation: partial
+    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
+    probes: [PROBE-062]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
+    tests:
+      - openehr/client/ehr/itemtag_wire_test.go
+      - openehr/client/ehr/itemtags/itemtags_test.go
+      - openehr/client/ehr/audit_test.go
+      - openehr/client/ehr/version_header_test.go
+      - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/directory/directory_test.go
+      - transport/response_test.go
+      - testkit/probes/rest/probe_062_audit_details_header.go
+      - testkit/probes/rest/audit_grammar_test.go
+      - testkit/probes/rest/probes_test.go
 
   - id: REQ-060
     title: TokenSource interface
     canonical: docs/specifications/auth.md#req-060
     status: draft
     implementation: landed
-    # transport/ is in scope, not just auth/: the `Authorization: <Type> <Value>`
-    # emission rule, the empty-Type-means-Bearer default and the zero-Token
-    # suppression are REQ-060's, implemented in transport.Client.plumbHeaders.
-    # The default and the suppression were unasserted at the transport layer
-    # until 2026-08-06 (only covered incidentally, by a per-request-override
-    # test), and the suppression rule lived only in a Go doc comment — both are
-    # now stated in auth.md § REQ-060 and owned by
-    # TestDoAuthorizationSchemeForwardedVerbatim, which also pins the documented
-    # default token source (AnonymousTokenSource on an unconfigured client).
     packages: [auth, transport]
     tests:
       - auth/tokensource_test.go
       - transport/client_test.go
+
+  - id: REQ-061
+    title: SMART-on-openEHR PKCE
+    canonical: docs/specifications/auth.md#req-061--pkce-flow
+    status: draft
+    implementation: landed
+    packages: [auth/smart, auth]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
+    probes: [PROBE-001, PROBE-004, PROBE-005]
+    tests:
+      - auth/smart/smart_test.go
+      - auth/smart/pkce.go
+      - testkit/probes/auth/probes_test.go
+
+  - id: REQ-062
+    title: JWKS rotation
+    canonical: docs/specifications/auth.md#req-062--jwks-rotation
+    status: draft
+    implementation: landed
+    packages: [auth/smart, smart/discovery, auth/introspect]
+    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
+    probes: [PROBE-006]
+    fixtures:
+      - testkit/cassettes/its_rest/discovery/smart-configuration.json
+    tests:
+      - auth/smart/smart_test.go
+      - smart/discovery/resolver_test.go
+      - smart/idtoken_test.go
+      - testkit/probes/auth/probes_test.go
+      - auth/introspect/introspect_test.go
+
+  - id: REQ-063
+    title: Token refresh
+    canonical: docs/specifications/auth.md#req-063--token-refresh
+    status: draft
+    implementation: landed
+    packages: [auth, auth/smart, transport, testkit/probes/auth]
+    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
+    probes: [PROBE-007]
+    tests:
+      - auth/errors_test.go
+      - auth/smart/smart_test.go
+      - transport/client_test.go
+      - testkit/probes/auth/probes_test.go
+
+  - id: REQ-064
+    title: Launch context
+    canonical: docs/specifications/auth.md#req-064--launch-context
+    status: draft
+    implementation: landed
+    packages: [smart, auth/smart]
+    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
+    tests:
+      - smart/launch_test.go
+      - smart/idtoken_test.go
+      - auth/smart/exchange_test.go
+
+  - id: REQ-065
+    title: Per-client tenant binding
+    canonical: docs/specifications/auth.md#req-065
+    status: draft
+    implementation: landed
+    packages: [transport]
 
   - id: REQ-066
     title: Caller attribution
@@ -384,6 +629,17 @@ requirements:
       - transport/client_test.go
       - testkit/probes/auth/probe_009_caller_attribution.go
 
+  - id: REQ-067
+    title: Platform principal claims
+    canonical: docs/specifications/auth.md#req-067
+    status: draft
+    implementation: landed
+    packages: [smart]
+    probes: [PROBE-008]
+    tests:
+      - smart/launch_test.go
+      - testkit/probes/auth/probes_test.go
+
   - id: REQ-068
     title: SMART flows and launch modes
     canonical: docs/specifications/auth.md#req-068--flow-and-launch-mode-coverage
@@ -392,40 +648,6 @@ requirements:
     packages: [auth/clientcreds, auth/jwtbearer, auth/smart]
     plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
     probes: [PROBE-004, PROBE-005]
-    notes: >
-      Phase 3a (F-I): ClaimsSigner now signs via go-jose/v4. Default alg changed
-      from RS256 to RS384 (SMART client-confidential-asymmetric SHALL). RS384 and
-      ES384 are fully supported; RS256 and ES256 retained for back-compat. Key/alg
-      mismatch rejected at construction (ErrInvalidConfig). Opaque crypto.Signer
-      implementations (KMS/HSM) are supported for both RSA and ECDSA via
-      go-jose/v4 cryptosigner.Opaque (no concrete-key requirement).
-      Phase 3b (F-C): auth/smart authorization-code exchange can now authenticate
-      with private_key_jwt via WithClientAssertionKey, reusing jwtbearer.ClaimsSigner
-      (client_assertion + jwt-bearer assertion type, no HTTP Basic). Method selection
-      is deterministic; assertion-key and client-secret are mutually exclusive.
-      G-3: when the server advertises token_endpoint_auth_methods_supported, the
-      configured method is cross-checked at construction (ErrInvalidConfig on absence).
-      Phase 3c (F-C): auth/clientcreds now supports SMART Backend Services asymmetric
-      client auth via WithClientAssertion(jwtbearer.AssertionSource). Wire shape:
-      grant_type=client_credentials + client_assertion_type=jwt-bearer + signed
-      client_assertion; no HTTP Basic, no client_secret. ClientSecret and
-      ClientAssertion are mutually exclusive (ErrInvalidConfig if both set); secret
-      is optional when assertion source is provided. Signing errors surfaced as
-      ErrTokenExchangeFailed. Distinct from auth/jwtbearer (which is the JWT Bearer
-      Token Grant, not client auth).
-      Phase 3d/3e close-out: the RS384/ES384 asymmetric baseline (client-auth signing,
-      F-I/F-C; G-3 method selection) and id_token verification alg agility (F-M, see
-      REQ-062/REQ-064) have all landed.
-      Phase 5 (F-E): the four SMART grant flows (PKCE public, confidential symmetric
-      client_secret, confidential asymmetric private_key_jwt, client-credentials/backend
-      + jwt-bearer) and all three launch modes (standalone, embedded/EHR-launch, backend)
-      are now exercised in Sandbox by the auth probe suite (PROBE-001..009) plus the
-      launch-mode coverage in testkit/probes/auth/launch_modes.go. REQ-068 flips to
-      landed on this Sandbox coverage (same posture as the other landed auth REQs).
-      Recorded follow-ups: Cassette/Live ratification against a reference authorization
-      server is deferred; the backend launch-mode coverage exercises the RS384 default
-      only (an ES* client-assertion arm is a possible follow-up). See the Inferno
-      STU2.2 Client-suite cross-check in conformance.md.
     tests:
       - auth/jwtbearer/jwtbearer_test.go
       - auth/smart/smart_test.go
@@ -491,66 +713,68 @@ requirements:
     tests:
       - smart/discovery/resolver_test.go
 
-  - id: REQ-050
-    title: REST 1.1.0-development pin
-    canonical: docs/specifications/wire.md#req-050
-    status: draft
-    implementation: landed
-    packages: [transport, openehr/client/system, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/query, openehr/client/definition, openehr/client/admin, openehr/client/demographic]
-    plans: [docs/plans/archive/2026-05-15-rest-api-client.md, docs/plans/archive/2026-05-26-contribution-submission-shape.md, docs/plans/archive/2026-06-14-demographic-rest-client.md, docs/plans/archive/2026-09-04-spec-interop-leftovers.md]
-    probes: [PROBE-072, PROBE-073]
-    tests:
-      - testkit/probes/versioned/probe_072_contribution_submission_shape.go
-      - openehr/client/ehr/contribution/contribution_test.go
-      - openehr/client/ehr/contribution/submission_test.go
-      - testkit/probes/demographic/probes_test.go
-      - openehr/client/demographic/party_test.go
-      - openehr/client/demographic/versioned_test.go
-      - openehr/client/system/system_test.go
-    notes: >-
-      § REQ-050 "System descriptor" (2026-09-05) binds system.ServiceCapabilities
-      to the § REQ-144 unknown-key rule by citation -- unknown keys preserved on
-      decode into Extras, re-emitted on encode, an exact-name collision with a
-      documented field ignored (the field authoritative), a case-variant key
-      kept beside the field (TestCapabilitiesPreservesExtras,
-      TestCapabilitiesRoundTripsExtras). § REQ-144 keeps the rule text; this §
-      only names the third descriptor it reaches.
-
-  - id: REQ-054
-    title: Optimistic concurrency
-    canonical: docs/specifications/wire.md#req-054
-    status: draft
-    implementation: landed
-    packages: [transport, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
-    plans: [docs/plans/archive/2026-05-15-rest-api-client.md]
-    probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013]
-    tests:
-      - testkit/probes/versioned/probe_010_put_without_if_match.go
-      - testkit/probes/versioned/probe_013_cross_ehr_isolation.go
-
-  - id: REQ-059
-    title: openEHR custom headers
-    canonical: docs/specifications/wire.md#req-059
+  - id: REQ-080
+    title: openEHR wire conformance
+    canonical: docs/specifications/conformance.md#conformance-scope
     status: draft
     implementation: partial
-    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
-    probes: [PROBE-062]
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
-    notes: >-
-      PROBE-062 (dotted openehr-audit-details round-trip) is implemented
-      (Sandbox) at testkit/probes/rest/ per STRAND-09 item 1; encoder +
-      write-path wire coverage via audit_test and composition/directory tests.
+    packages:
+      - testkit/probes
+      - testkit/cassettes/flat-conformance
+      - testkit/conformance/webtemplate
+    probes: [PROBE-086, PROBE-089]
     tests:
-      - openehr/client/ehr/itemtag_wire_test.go
-      - openehr/client/ehr/itemtags/itemtags_test.go
-      - openehr/client/ehr/audit_test.go
-      - openehr/client/ehr/version_header_test.go
-      - openehr/client/ehr/composition/composition_test.go
-      - openehr/client/ehr/directory/directory_test.go
-      - transport/response_test.go
-      - testkit/probes/rest/probe_062_audit_details_header.go
-      - testkit/probes/rest/audit_grammar_test.go
-      - testkit/probes/rest/probes_test.go
+      - testkit/conformance/webtemplate/runner_test.go
+      - testkit/conformance/webtemplate/helpers_test.go
+      - testkit/probes/serialize/probes_test.go
+    plans:
+      - docs/plans/archive/2026-07-16-web-template-tests-conformance.md
+
+  - id: REQ-081
+    title: Wire-level parity (retired)
+    canonical: docs/specifications/conformance.md#req-081--wire-level-parity-retired
+    status: deprecated
+    implementation: deprecated
+    packages: [testkit/probes]
+
+  - id: REQ-082
+    title: Probe runnability
+    canonical: docs/specifications/conformance.md#req-082--runnability
+    status: draft
+    implementation: partial
+    packages: [testkit, testkit/probe, cmd/probe-record, sandbox, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/demographic, testkit/probes/transport, testkit/probes/discovery, testkit/probes/template, testkit/probes/query, testkit/probes/rest]
+    adrs: [docs/adr/0020-cassette-recording-har.md]
+    tests:
+      - testkit/probe/run_test.go
+      - testkit/probe/mode_test.go
+      - testkit/probe/live_test.go
+      - testkit/probe/har_test.go
+      - testkit/probe/replay_test.go
+      - testkit/probe/record_test.go
+      - testkit/probe/cassette_test.go
+      - testkit/probe/livesnapshot_test.go
+      - testkit/probe/livecomposition_test.go
+      - testkit/probe/livestoredquery_test.go
+      - cmd/probe-record/main_test.go
+      - sandbox/backend_test.go
+      - sandbox/independence_test.go
+      - sandbox/nilhandler_test.go
+      - sandbox/resourcepath_test.go
+      - sandbox/rmvalid_test.go
+      - sandbox/roundtrip_test.go
+      - sandbox/script_test.go
+      - sandbox/zerovalue_test.go
+    plans: [docs/plans/2026-08-18-probe-runnability.md]
+    probes: [PROBE-007, PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071, PROBE-086, PROBE-023, PROBE-025, PROBE-026, PROBE-072, PROBE-073, PROBE-084, PROBE-091, PROBE-092, PROBE-093, PROBE-101]
+
+  - id: REQ-083
+    title: Cadasto platform API conformance
+    canonical: docs/specifications/conformance.md#req-083--cadasto-platform-api-conformance
+    status: draft
+    implementation: partial
+    packages: [cadasto, cadasto/admin]
+    tests:
+      - cadasto/admin/probes_test.go
 
   - id: REQ-090
     title: OpenTelemetry hooks
@@ -586,24 +810,12 @@ requirements:
     packages: [transport, openehr/client/query]
     probes: [PROBE-010, PROBE-011]
     plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md, docs/plans/archive/2026-09-02-decode-error-surface-typing.md]
-    notes: >-
-      ErrUnprocessable (422) came from the ITS-REST conformance
-      remediation; the "(unrouted)" placeholder clause came from the
-      decode-error-surface plan, pinned by
-      TestErrorStringsValueFreeWhenRouteUnset. The placeholder now also
-      replaces the resolved URL a wrapped net/http *url.Error prints
-      from doOnce's network-failure arm — sanitiseURLError copies the
-      error rather than rewriting it, so the typed *url.Error, its Op
-      and its cause all survive; pinned by
-      TestNetworkFailureSanitisesWrappedURL. The telemetry carve-out
-      (Observation.Route keeps its Path fallback) is pinned by
-      TestUnroutedObservationKeepsTheResolvedPath.
     tests:
       - transport/client_test.go
       - transport/errors_test.go
 
   - id: REQ-094
-    title: Prefer negotiation
+    title: "`Prefer` negotiation"
     canonical: docs/specifications/transport.md#req-094--prefer-response-shape-negotiation
     status: draft
     implementation: landed
@@ -616,34 +828,14 @@ requirements:
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
       - openehr/client/ehr/resource_test.go
       - openehr/client/ehr/write_test.go
-      - openehr/client/ehr/ehr_test.go  # TestCreateEmpty2xxBody -- ehr.Create's empty/null-body arm
-      - openehr/client/ehr/decode_error_test.go  # the return=identifier arm: refusal shape, and the no-representation classification
-      - transport/null_body_test.go  # TestIsNoRepresentationBody is tagged REQ-151, REQ-094
+      - openehr/client/ehr/ehr_test.go
+      - openehr/client/ehr/decode_error_test.go
+      - transport/null_body_test.go
       - openehr/client/ehr/contribution/representation_test.go
       - openehr/client/demographic/party_test.go
       - testkit/probes/versioned/probe_071_composition_write_response_shape.go
       - testkit/probes/versioned/probe_065_minimal_return_round_trip.go
       - testkit/probes/versioned/probe_065_test.go
-    notes: >-
-      All three write-path modes landed for the shared WriteResult family
-      (composition / directory / ehr_status / demographic): return=representation
-      bare-body decode (PROBE-061/071); return=identifier populates the
-      VersionMetadata identifier slot from the ITS-REST Identifier body
-      (ehr.ResolveIdentifierBody); a 2xx representation with an empty body
-      returns NoRepresentationError wrapping transport.ErrInvalidShape
-      (no silent downgrade); an undecodable body returns
-      NoRepresentationError wrapping the decoder's error. Both carry the
-      commit metadata and are distinguishable via errors.As. HasResource is the
-      reflection-free typed-nil guard for the absent-resource success path.
-      contribution.Commit carries minimal and the representation decode only
-      and obeys the same NoRepresentationError rule; the identifier slot is
-      never populated from the body (deferred in that plan). PROBE-065
-      (minimal->GET round-trip) is implemented (Sandbox) at
-      testkit/probes/versioned/probe_065_minimal_return_round_trip.go.
-      Amended 2026-09-01 (closes the ehr.Create keyed exception): ehr.Create's
-      empty/null-body arm is now a typed NoRepresentationError, matching the
-      versioned-write family; its decode-failure arm remains typed by REQ-151
-      as *transport.DecodeError, unaffected by this closure.
 
   - id: REQ-095
     title: OpenAPI authoritative source
@@ -658,36 +850,6 @@ requirements:
       - docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
       - docs/plans/archive/2026-08-30-definition-metadata-decoding.md
-    notes: >
-      What keeps this partial (2026-09-05 census, table in
-      testkit/cassettes/its_rest/README.md § Coverage against the client
-      surface): no vendored StoredQueryMetadata body (metadata or list), no
-      upstream-authored persisted CONTRIBUTION response for contribution.Get,
-      no ITEM_TAG bodies (header-carried today, REQ-059 partial), and no
-      vendored ITS-REST Identifier write-response body ({"uid": ...}, decoded
-      by openehr/client/ehr/identifier.go ResolveIdentifierBody on
-      PreferIdentifier writes) -- hand-built in tests only, e.g.
-      openehr/client/ehr/composition/composition_test.go
-      TestSaveIdentifierPopulatesVersionUIDFromBody. Admin has no bodies by
-      contract and the VERSIONED_COMPOSITION / VERSIONED_EHR_STATUS family is
-      not implemented (VERSIONED_PARTY is, and is vendored under
-      demographic/), so neither counts. The other decoded surfaces in the
-      table have a vendored body here or under ../compositions, ../rm,
-      ../submissions.
-
-      Amended 2026-08-30 (ADR 0019): the section now carries one KEYED exception
-      to the OpenAPI-authoritative rule -- the REQ-144 Definition metadata
-      timestamp decode tolerance, which accepts StoredQueryMetadata.saved values
-      the pin's `format: date-time` excludes; further exceptions must be named
-      in the section, so no ADR overrides REQ-095 from outside.
-
-      Path-parameter encoding: the transport is the single canonical path
-      encoder (Request.Path is a decoded url.URL.Path); leaf clients interpolate
-      the raw id and MUST NOT pre-escape with url.PathEscape (which double-encodes
-      an id carrying an encodable character: a space → %2520 → 404). Retired the
-      pre-escape pattern across every openehr/client leaf client; enforced
-      tree-wide by TestNoPathEscapeInClientPathParams (openehr/client) and pinned
-      behaviourally by per-client single-encode tests.
     tests:
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
@@ -713,7 +875,7 @@ requirements:
       - transport/client_test.go
 
   - id: REQ-097
-    title: First-class Idempotency-Key (deprecated)
+    title: First-class `Idempotency-Key` (deprecated)
     canonical: docs/specifications/transport.md#req-097--first-class-idempotency-key-deprecated
     status: deprecated
     implementation: deprecated
@@ -740,383 +902,6 @@ requirements:
       - testkit/probes/rest/probe_103_admin_bulk_delete.go
       - testkit/probes/rest/probes_test.go
 
-  - id: REQ-053
-    title: FLAT and STRUCTURED
-    canonical: docs/specifications/wire.md#req-053
-    status: draft
-    # Bidirectional FLAT + STRUCTURED codecs in openehr/serialize/simplified,
-    # driven by the REQ-106 Web Template: encode (rm.Composition -> FLAT /
-    # STRUCTURED via rmpath), decode (canonical RM rebuild via rminfo + canjson),
-    # and OPT-free FLAT<->STRUCTURED interconversion. Round-trip verified for the
-    # composition/observation spine (incl. ITEM_SINGLE/ITEM_LIST). First-class
-    # datatypes: DV_TEXT/CODED_TEXT/DATE_TIME/DATE/TIME/QUANTITY/COUNT/BOOLEAN/
-    # DURATION/URI/EHR_URI/ORDINAL/PROPORTION/IDENTIFIER; ctx/ context (language,
-    # territory, composer, time); |other open value-sets; |raw canonical-fragment
-    # bypass makes decorated/exotic datatypes lossless. Strict, fail-loud posture:
-    # unresolvable paths, unsupported datatypes, missing required suffixes, missing
-    # mandatory context, and out-of-bound :index are errors, not silent data loss
-    # (see openehr/serialize/simplified/deviations.md). PROBE-076 (landed) round-
-    # trips the vendored EHRbase Test_dv_* corpus (24 pass, 1 skip): idempotence
-    # PLUS OPT-conformance — a WithTemplate(compiled) decode of a valid source
-    # validates against the OPT. WithTemplate repopulates LOCATABLE.name (from the
-    # archetype terminology) and completes the RM-mandatory attributes FLAT does
-    # not carry (HISTORY.origin, EVENT.time, ENTRY language/encoding/subject,
-    # EVENT_CONTEXT.setting, COMPOSITION category/composer) from ctx + RM defaults;
-    # names/defaults never leak into FLAT. Deferred (documented, deviations.md):
-    # the remaining ctx/ short forms not emitted on encode (workflow ids /
-    # composer external_ref — optional, no validity impact; non-default source
-    # values for the defaulted attributes are not round-tripped; the
-    # EVENT_CONTEXT optionals participations / health_care_facility / end_time /
-    # location are NOT deferred ctx/ forms — ADR 0016 assigns them to the
-    # REQ-140 underscore grammar). `.schema`-suffixed media types on input are
-    # landed, not deferred: simplified.ParseMediaType (2026-09-05) accepts the
-    # two canonical strings plus the deprecated .schema variants (retired from
-    # the spec, still served by EHRbase) on input, while Format.MediaType keeps
-    # emitting the canonical strings only (deviations.md).
-    # First-class _-attr decomposition is NO LONGER deferred:
-    # REQ-140 landed the whole underscore grammar on 2026-08-05, which narrowed
-    # the |raw boundary rather than relying on it (wire.md § REQ-140). The upstream byte-conformance probe landed 2026-08-01 as
-    # PROBE-086 (testkit/conformance/webtemplate) — deliberately not in this
-    # REQ's probes: list; it exercises this codec, but REQ-080 owns it.
-    #
-    # Datatype coverage widened 2026-08-03 by the PROBE-086 ratchet: standalone
-    # CODE_PHRASE leaves (ENTRY language/encoding) round-trip as |code +
-    # |terminology, and leaf-ness is decided by simplified.isValueLeafType rather
-    # than by the presence of Web Template input descriptors — the reference emits
-    # those in-context leaves with no inputs, so an Inputs test skipped them as
-    # structural.
-    #
-    # Decode input surface amended by ADR 0015: the reference's real-path
-    # composition metadata (<root>/language|code, composer|name,
-    # context/start_time, …) is accepted alongside the ctx/ short forms and
-    # normalised onto them; ctx/ stays the only EMITTED spelling, so this is
-    # additive and moves no PROBE-086 number (the probe re-encodes, so a real-path
-    # key still returns respelled). The composer external_ref suffixes are NOT
-    # aliases and stay refused (visible in the census).
-    #
-    # Amended 2026-08-05 (plan 2026-08-05-flat-rm-attributes.md, PR 1):
-    # context/setting joins the respellings — ctx/setting|code + |value are
-    # emitted when EVENT_CONTEXT.setting is populated and accepted on decode,
-    # closing the emission gap ADR 0015 left open (the census's one waiver).
-    # The DV_CODED_TEXT-at-DV_TEXT substitution is carried in suffix form
-    # (|code + |value + |terminology, with no bare key) instead of |raw — the one
-    # suffix-form substitution; the ctx-only emission rule is scoped to the six
-    # respelled scalar fields (ADR 0016), the EVENT_CONTEXT optionals riding
-    # the REQ-140 underscore grammar instead.
-    #
-    # Amended 2026-08-05 (same plan, PR 2 — the datatype-leaf closures REQ-140's
-    # machinery enabled). DV_PARSABLE (bare value + |formalism) and DV_MULTIMEDIA
-    # (bare **uri** + |mediatype + |size + |data + |alternatetext +
-    # |integrity_check + the two algorithms) are first-class leaves at a Web
-    # Template node and at every nested position the underscore grammar reaches
-    # one; a DV_PARSABLE at a leaf is now always fully captured and never rides
-    # |raw. DV_INTERVAL<T> is not a suffix set but the REQ-140 interval grammar,
-    # anchored on the bound datatype the Web Template names inside the angle
-    # brackets — a bare, unparameterised DV_INTERVAL names none and stays on
-    # |raw. The ENTRY `subject` (PARTY_PROXY) round-trips through the party
-    # grammar, PARTY_SELF spelled by the absence of every party key, which is
-    # what keeps the WithTemplate completion byte-identical on re-encode; the
-    # composition-metadata leaves are held back by name (ctxOnlyLeafPaths) now
-    # that PARTY_PROXY is emittable, rather than by a datatype gap. Two
-    # terminology decisions are recorded rather than inferred: the vendored
-    # openEHR `participation mode` group (the only vocabulary this codec
-    # carries, because |mode has no code channel) and the implied
-    # IANA_media-types identifier for DV_MULTIMEDIA.media_type (a code-set
-    # identifier, not a vocabulary — and refused for a value coded elsewhere,
-    # which rides |raw whole). The remaining coded-at-text carve-out is
-    # unchanged: only a *fully-captured* DV_CODED_TEXT at a DV_TEXT leaf takes
-    # the suffix form, a decorated one still rides |raw. `ctx/setting` and the
-    # standalone CODE_PHRASE leaves (now with |preferred_term) are as noted
-    # above. STRUCTURED gained the `"|"` member — a bare leaf value beside the
-    # same leaf's members, which a DV_MULTIMEDIA leaf always has; it is this
-    # codec's choice within the format's conventions, not corpus-pinned.
-    # Still deferred: ACTIVITY action_archetype_id (STRING — the last
-    # unmapped leaf type on encode), and reused-sibling FLAT (the REQ-116
-    # residual, fail-loud in both directions). `.schema` media types on input
-    # are no longer on this list — landed 2026-09-05, see above.
-    #
-    # Tidied 2026-08-06 (no behaviour change; the REQ-140 block carries the
-    # mirror note). The STRUCTURED `"|"` member gained RFC-2119 force — it was
-    # described, not required, in a paragraph where every other obligation
-    # carried a keyword: MUST on the object form, on the empty-suffix reading in
-    # both interconversion directions, and on the bare-scalar rule for a leaf
-    # that cannot collide, plus the not-corpus-pinned standing (ADR 0014 governs
-    # if a reference spelling appears) that deviations.md already claimed
-    # wire.md recorded. The three LEAF datatype suffix sets this REQ's comment
-    # has described since PR 2 -- DV_PARSABLE, DV_MULTIMEDIA, DV_INTERVAL<T> --
-    # moved out of § REQ-140's table into wire.md § REQ-053 § Leaf datatypes,
-    # so the normative home now agrees with this block, deviations.md and the
-    # test citations; § REQ-140 keeps a pointer and retains the two behavioural
-    # rules that govern the underscore positions too.
-    #
-    # Landed 2026-09-05 (spec-and-interop leftovers plan): `.schema`-suffixed
-    # media types on input (the § REQ-053 SHOULD) closed
-    # via simplified.ParseMediaType — see mediatype_test.go and deviations.md.
-    implementation: landed
-    adrs:
-      - docs/adr/0015-flat-metadata-spelling.md
-      - docs/adr/0016-event-context-optionals-underscore-spelling.md
-    packages:
-      - openehr/serialize/simplified
-    probes:
-      - PROBE-076
-    plans:
-      - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
-      - docs/plans/archive/2026-07-14-flat-structured-codecs.md
-      - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
-      - docs/plans/archive/2026-08-05-flat-rm-attributes.md
-    tests:
-      - openehr/serialize/simplified/simplified_test.go
-      - openehr/serialize/simplified/mediatype_test.go
-      - openehr/serialize/simplified/mediatype_fuzz_test.go
-      - openehr/serialize/simplified/mediatype_internal_test.go
-      - testkit/probes/serialize/probe_076_simplified_round_trip.go
-      - openehr/serialize/simplified/independence_test.go
-      - openehr/serialize/simplified/datatypes_test.go
-      - openehr/serialize/simplified/flat_encode_test.go
-      - openehr/serialize/simplified/flat_decode_test.go
-      - openehr/serialize/simplified/structured_test.go
-      - openehr/serialize/simplified/roundtrip_test.go
-      - openehr/serialize/simplified/hardening_test.go
-      - openehr/serialize/simplified/context_test.go
-      - openehr/serialize/simplified/raw_test.go
-      - openehr/serialize/simplified/names_test.go
-      # The 2026-08-05 datatype-leaf closures: the encapsulated and interval
-      # leaves, the ENTRY subject, and the DataValue members they share with
-      # REQ-140's grammar.
-      - openehr/serialize/simplified/rmattr_encapsulated_test.go
-      - openehr/serialize/simplified/rmattr_party_test.go
-
-  - id: REQ-055
-    title: AQL wire boundary
-    canonical: docs/specifications/wire.md#req-055--wire-boundary
-    status: draft
-    implementation: landed
-    packages: [openehr/aql, openehr/client/query]
-    probes: [PROBE-020, PROBE-021, PROBE-078]
-    plans:
-      - docs/plans/archive/2026-05-15-rest-api-client.md
-      - docs/plans/archive/2026-05-21-aql-builders.md
-      - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
-      - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
-      - docs/plans/archive/2026-08-26-aql-small-corrections.md
-      - docs/plans/archive/2026-08-26-aql-write-side-parity.md
-    notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-079 (Location recovery) is witnessed Live by testkit/probe/livestoredquery_test.go (REQ-082); PROBE-078 (verb-aware scoping) is implemented (Sandbox) at testkit/probes/query/."
-    tests:
-      - openehr/aql/aql_test.go
-      - openehr/aql/builder_test.go
-      - openehr/client/query/query_test.go
-      - testkit/probes/aql/probes_test.go
-      - testkit/probes/query/probe_078_verb_aware_scoping.go
-      - testkit/probes/query/probes_test.go
-
-  - id: REQ-057
-    title: Stored AQL queries
-    canonical: docs/specifications/wire.md#req-057
-    status: draft
-    implementation: landed
-    packages: [openehr/client/query, openehr/client/definition]
-    plans:
-      - docs/plans/archive/2026-05-15-rest-api-client.md
-      - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
-      - docs/plans/archive/2026-08-26-aql-small-corrections.md
-      - docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md
-    notes: >-
-      POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param);
-      PutStoredQuery recovers {name,version} from Location header. Verified by
-      query/execute.go, definition/stored_query.go; PROBE-079 (Location recovery)
-      and PROBE-066 (stored execution) are witnessed Live by
-      testkit/probe/livestoredquery_test.go (REQ-082); PROBE-078 (REQ-055
-      verb-aware scoping) is implemented (Sandbox) at testkit/probes/query/.
-      The Extras (unknown-key) behaviour of StoredQueryMetadata is NOT recorded
-      here: § REQ-144 owns both catalog descriptors' decode/encode contract.
-      The 2026-09-02 leftovers plan closed a version-trim asymmetry with name:
-      runStoredAtVersion and DeleteStoredQuery each trim version once and reuse
-      the trimmed value for both the empty-check and the path, matching name's
-      own trim. On top of the trim, RunStoredVersion refuses an EXPLICIT version
-      that is empty after trimming with query.ErrInvalidConfig, and
-      DeleteStoredQuery with transport.ErrInvalidConfig -- both before any
-      request is issued. RunStored alone addresses the latest version, by
-      omitting the /{version} segment; a caller passing "" to RunStoredVersion
-      no longer falls back to it (a public behaviour change).
-    tests:
-      - openehr/client/query/query_test.go
-      - openehr/client/query/version_trim_test.go
-      - openehr/client/definition/stored_query_test.go
-      - openehr/client/definition/version_trim_test.go
-
-  - id: REQ-061
-    title: SMART-on-openEHR PKCE
-    canonical: docs/specifications/auth.md#req-061--pkce-flow
-    status: draft
-    implementation: landed
-    packages: [auth/smart, auth]
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
-    adrs: [docs/adr/0009-smart-auth-library-scope.md]
-    probes: [PROBE-001, PROBE-004, PROBE-005]
-    notes: >
-      Phase 5 (F-E): the PKCE flow is now exercised as conformance probes —
-      PROBE-001 (discovery declares code + S256), PROBE-004 (S256 verifier
-      round-trip with the G-7 RFC 7636 / x/oauth2 parity assertion:
-      >=32 bytes entropy, base64.RawURLEncoding, challenge ==
-      base64url(SHA256(verifier))), and PROBE-005 (openEHR scope round-trip).
-    tests:
-      - auth/smart/smart_test.go
-      - auth/smart/pkce.go
-      - testkit/probes/auth/probes_test.go
-
-  - id: REQ-062
-    title: JWKS rotation
-    canonical: docs/specifications/auth.md#req-062--jwks-rotation
-    status: draft
-    implementation: landed
-    packages: [auth/smart, smart/discovery, auth/introspect]
-    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
-    adrs: [docs/adr/0009-smart-auth-library-scope.md]
-    probes: [PROBE-006]
-    notes: >
-      alg allowlists (token_endpoint_auth_signing_alg_values_supported,
-      id_token_signing_alg_values_supported) and introspection_endpoint are
-      surfaced onto AuthEndpoints. introspection_endpoint is consumed by the opt-in
-      RFC 7662 client auth/introspect, and token_endpoint_auth_methods_supported by
-      auth/smart.FromConfig (G-3 cross-check); only
-      token_endpoint_auth_signing_alg_values_supported remains surface-only.
-      Phase 3e (F-M): id_token verification gained algorithm agility — smart.ValidateIDToken
-      now verifies via github.com/coreos/go-oidc/v3 (go-jose) supporting RS256/RS384/ES256/ES384,
-      constrained to the server's id_token_signing_alg_values_supported when supplied
-      (smart.WithIDTokenSigningAlgs); rejects alg:none and unlisted algs as
-      ErrJWKSValidationFailed. JWK->crypto.PublicKey via go-jose JSONWebKey (RSA+ECDSA).
-      Hand-rolled RSA verify and rsaPublicKeyFromJWK removed. SDK's stricter claim
-      semantics (claimsFromMap: iss/aud/exp/nbf/iat with 30s skew + nonce) preserved
-      after signature verification.
-      Phase 5b (F-J): opt-in RFC 7662 token introspection client landed in
-      auth/introspect — resource-server / MCP-gateway scope, not wired into the
-      default client path. Implements introspect.New (endpoint + injected
-      *http.Client) and (*Client).Introspect (form-POST per RFC 7662 §2.1,
-      active:false is success not error, non-2xx wrapped as ExchangeError).
-    fixtures:
-      - testkit/cassettes/its_rest/discovery/smart-configuration.json
-    tests:
-      - auth/smart/smart_test.go
-      - smart/discovery/resolver_test.go
-      - smart/idtoken_test.go
-      - testkit/probes/auth/probes_test.go
-      - auth/introspect/introspect_test.go
-
-  - id: REQ-063
-    title: Token refresh
-    canonical: docs/specifications/auth.md#req-063--token-refresh
-    status: draft
-    implementation: landed
-    packages: [auth, auth/smart, transport, testkit/probes/auth]
-    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
-    adrs: [docs/adr/0009-smart-auth-library-scope.md]
-    probes: [PROBE-007]
-    notes: >
-      Phase 4a+4b landed. Phase 4a: ExchangeError.Terminal(), F-L
-      refresh-token clearing (clear only on invalid_grant/invalid_client 4xx),
-      RefreshIfNeeded, Reauther interface, ReautherFunc adapter, Reauth on
-      *smart.Source. Phase 4b: transport.WithReauthOn401 opt-in 401→reauth
-      safety net — wire 401 triggers Reauth once, retries once with refreshed
-      bearer; second 401 surfaces ErrUnauthorized; no-reauther path unchanged.
-      PROBE-007 passes in Sandbox for BOTH halves: the transport-401 safety
-      net (probe_007_transport_refresh.go) and, as of Phase 5, the proactive
-      expiry-based refresh on the wire (probe_007_proactive_refresh.go drives
-      Source.Token over an expired token and asserts the token endpoint
-      receives exactly one grant_type=refresh_token exchange). Full
-      cassette/live ratification deferred.
-    tests:
-      - auth/errors_test.go
-      - auth/smart/smart_test.go
-      - transport/client_test.go
-      - testkit/probes/auth/probes_test.go
-
-  - id: REQ-064
-    title: Launch context
-    canonical: docs/specifications/auth.md#req-064--launch-context
-    status: draft
-    implementation: landed
-    packages: [smart, auth/smart]
-    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
-    adrs: [docs/adr/0009-smart-auth-library-scope.md]
-    notes: >
-      Phase 3e (F-M): id_token signature verification gained algorithm agility
-      (RS256/RS384/ES256/ES384) via go-oidc/v3, constrained by the discovery
-      id_token_signing_alg_values_supported allowlist (smart.WithIDTokenSigningAlgs).
-      IDTokenClaims shape unchanged; nonce + 30s skew claim semantics preserved.
-      See REQ-062 for verification details.
-    tests:
-      - smart/launch_test.go
-      - smart/idtoken_test.go
-      - auth/smart/exchange_test.go
-
-  - id: REQ-067
-    title: Platform principal claims
-    canonical: docs/specifications/auth.md#req-067
-    status: draft
-    implementation: landed
-    packages: [smart]
-    probes: [PROBE-008]
-    tests:
-      - smart/launch_test.go
-      - testkit/probes/auth/probes_test.go
-
-  - id: REQ-082
-    title: Probe runnability
-    canonical: docs/specifications/conformance.md#req-082--runnability
-    status: draft
-    implementation: partial
-    packages: [testkit, testkit/probe, cmd/probe-record, sandbox, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/demographic, testkit/probes/transport, testkit/probes/discovery, testkit/probes/template, testkit/probes/query, testkit/probes/rest]
-    adrs: [docs/adr/0020-cassette-recording-har.md]
-    # PROBE-086 is In-repo (parity property; REQ-082's declared Modes class
-    # for a probe that asserts no wire exchange — not a mode shortfall).
-    #
-    # `partial` remains correct: the runner, Sandbox EHR surface, and
-    # scripted routes landed; CDR-facing probe tests (versioned,
-    # definition, demographic, transport) no longer use httptest.
-    # Cassette encoding is HAR 1.2 (ADR 0020); recorder, replayer, the
-    # cmd/probe-record capture harness (make probe-record), and the
-    # corpus files testkit/recordings/{ehr-create,ehr-lifecycle}.har
-    # landed. The replay key is method + REST-stripped path (Phase 3);
-    # REQ-082's full Cassette key also names the headers/body fields a
-    # probe's assertion depends on, deferred until a recording that
-    # branches on them lands (neither corpus recording does yet).
-    # Remaining catalog probes still need recordings. Auth/discovery
-    # probes still stand up httptest identity servers.
-    # Live mode is wired: OPENEHR_LIVE_* names the target and
-    # OPENEHR_LIVE_ALLOW_MUTATING is the separate write opt-in; CI
-    # leaves both unset and the live tests skip without dialing.
-    # TestLiveCoreSnapshot is the current Live baseline (core EHR
-    # create/get/exists/status green vs EHRbase 2.35.1; the System
-    # capabilities probe skips the OPTIONS / accepted deviation,
-    # conformance.md Live mode). TestLiveCompositionSnapshot adds the
-    # per-run template-upload / composition write / read-back path, and
-    # TestLiveStoredQuerySnapshot the stored-AQL path — PutStoredQuery
-    # Location recovery (PROBE-079) and stored execution → typed
-    # ResultSet (PROBE-066), both green vs EHRbase 2.35.1.
-    tests:
-      - testkit/probe/run_test.go
-      - testkit/probe/mode_test.go
-      - testkit/probe/live_test.go
-      - testkit/probe/har_test.go
-      - testkit/probe/replay_test.go
-      - testkit/probe/record_test.go
-      - testkit/probe/cassette_test.go
-      - testkit/probe/livesnapshot_test.go
-      - testkit/probe/livecomposition_test.go
-      - testkit/probe/livestoredquery_test.go
-      - cmd/probe-record/main_test.go
-      - sandbox/backend_test.go
-      - sandbox/independence_test.go
-      - sandbox/nilhandler_test.go
-      - sandbox/resourcepath_test.go
-      - sandbox/rmvalid_test.go
-      - sandbox/roundtrip_test.go
-      - sandbox/script_test.go
-      - sandbox/zerovalue_test.go
-    plans: [docs/plans/2026-08-18-probe-runnability.md]
-    probes: [PROBE-007, PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071, PROBE-086, PROBE-023, PROBE-025, PROBE-026, PROBE-072, PROBE-073, PROBE-084, PROBE-091, PROBE-092, PROBE-093, PROBE-101]
-
   - id: REQ-100
     title: ADL 1.4 operational template (OPT) parse and paths
     canonical: docs/specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths
@@ -1133,88 +918,40 @@ requirements:
       - docs/plans/archive/2026-05-21-template-parser.md
       - docs/plans/archive/2026-05-22-template-req100-followups.md
 
-  - id: REQ-108
-    title: Untrusted document bounds
-    canonical: docs/specifications/clinical-modeling.md#req-108--untrusted-document-bounds
+  - id: REQ-101
+    title: Generic OPT-driven composition builder
+    canonical: docs/specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder
     status: draft
     implementation: landed
     packages:
-      - openehr/template
-      - openehr/bmm
-      - openehr/client/definition
-      - openehr/rm/typereg
-      - openehr/serialize/canjson
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-09-15-typereg-single-pass-decode.md]
+      - openehr/composition
+      - openehr/templatecompile
+      - testkit/probes/composition
+    probes: [PROBE-023]
     tests:
-      - openehr/template/parse_cap_test.go
-      - openehr/template/parse_depth_test.go
-      - openehr/bmm/load_test.go
-      - openehr/rm/typereg/registry_test.go
-      - openehr/serialize/canjson/edgecases_test.go
-    notes: >-
-      Amended 2026-09-24 (PR 174, implementation-aligned): the 512-level
-      bound applies on every canonical-JSON decode route, at three
-      typereg sites (Registry.Decode, DecodePolymorphic, DecodeInto), and
-      measures RM nesting from the document root across polymorphic
-      slots; how each site counts is stated in clinical-modeling.md
-      § REQ-108 (descriptive). Pinned by
-      TestUnmarshalMaxDepthAcrossPolymorphicSlots,
-      TestUnmarshalMaxDepthBoundary and
-      TestUnmarshalUndeclaredNestingDependsOnBuffering. Second review round
-      (2026-09-24): the depth and order tests gain Registry.Decode and bare
-      v1 arms, and a declared array at bracket depth 513 decodes through
-      canjson.Unmarshal but is refused by Registry.Decode.
-
-  - id: REQ-109
-    title: AQL static lint
-    canonical: docs/specifications/clinical-modeling.md#req-109--aql-static-lint
-    status: draft
-    # REQ-117 (2026-08-04) narrowed the aql_unknown_alias check by two
-    # documented over-rejections — an ORDER BY key naming a SELECT `AS` alias,
-    # and a bare boolean literal in any value position (comparison operand, SELECT projection, function argument). No new codes, no severity change,
-    # PROBE-028's multiset untouched; the acceptances are owned by the REQ-117
-    # row and its § in clinical-modeling.md.
-    #
-    # § Value-free lint diagnostics (2026-08-19) adds Issue.Span — a re-export
-    # of parse.Span, NOT a twin, so a lint issue and a dropped construct are
-    # compared rather than converted — and pins normatively which fields are
-    # value-free (Code / Severity / Span) and which may carry query text
-    # (Detail / Path — a path spelling carries its own predicates). No code
-    # added or removed, so PROBE-028's multiset is untouched.
-    #
-    # REQ-161 / ADR-0017 (2026-08-22) amend Layer 2: it gains the REQ-161
-    # semantic + portability check groups, and the out-of-scope list narrows to
-    # version-predicate *value* semantics (predicate presence is REQ-161's
-    # aql_version_no_predicate). Additive — the REQ-109 codes and PROBE-028's
-    # multiset are unchanged; the new codes are owned by the REQ-161 row.
-    implementation: landed
-    packages:
-      - openehr/aql/parse
-      - openehr/aql/parse/gen
-      - openehr/aql/lint
-      - openehr/validation
-      - openehr/templatecompile  # REQ-111 — lint.Options.Compiled is the public compiled type
-      - internal/templatecompile
-      - testkit/probes/aql
-    probes: [PROBE-028, PROBE-096]
+      - openehr/composition/builder_test.go
+      - openehr/composition/imports_test.go
+      - testkit/probes/composition/probe_023_builder_round_trip.go
+      - testkit/probes/composition/probes_test.go
     plans:
-      - docs/plans/archive/2026-06-15-aql-lint.md
-      - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
-      - docs/plans/archive/2026-08-18-aql-value-free-diagnostics.md
-      - docs/plans/archive/2026-08-21-aql-semantic-layer.md
-      - docs/plans/archive/2026-08-26-aql-small-corrections.md
+      - docs/plans/archive/2026-05-21-composition-builder.md
+
+  - id: REQ-102
+    title: Composition validation
+    canonical: docs/specifications/clinical-modeling.md#req-102--composition-validation
+    status: draft
+    implementation: landed
+    packages: [openehr/validation, openehr/validation/rmread, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
+    adrs: [docs/adr/0006-composition-validation-walker-placement.md]
+    probes: [PROBE-025, PROBE-026, PROBE-074]
     tests:
-      - openehr/aql/parse/parse_test.go
-      - openehr/aql/parse/ast_test.go
-      - openehr/aql/parse/imports_test.go
-      - openehr/aql/lint/extract_test.go
-      - openehr/aql/lint/span_test.go
-      - openehr/aql/lint/lint_test.go
-      - openehr/aql/lint/imports_test.go
-      - openehr/validation/aql_test.go
-      - internal/templatecompile/compile_test.go
-      - testkit/probes/aql/probes_test.go
-    adrs: [docs/adr/0007-aql-antlr-grammar-profile.md, docs/adr/0017-aql-semantic-layer.md]
+      - openehr/validation/composition_test.go
+      - openehr/validation/interval_bounds_test.go
+      - openehr/validation/rmread/read_test.go
+      - testkit/probes/validation/probes_test.go
+    plans:
+      - docs/plans/archive/2026-05-21-validation.md
+      - docs/plans/archive/2026-05-24-composition-validation-template-driven.md
 
   - id: REQ-103
     title: Primitive constraint introspection
@@ -1264,18 +1001,6 @@ requirements:
     title: WebTemplate JSON export
     canonical: docs/specifications/clinical-modeling.md#req-106--webtemplate-json-export
     status: draft
-    # Projects the public compiled OPT (*templatecompile.Compiled, REQ-111)
-    # into the EHRbase openEHR_SDK v2.3 WebTemplate JSON shape: deterministic
-    # camelCase output, reference-locked lower-snake id generation (ADR 0014),
-    # core-datatype inputs from REQ-103 primitive constraints, structural (not
-    # byte) parity via PROBE-075 against the vendored EHRbase constrain_test
-    # fixture (104/104 node + input-suffix/type parity; documented deviations
-    # in the package's deviations.md). Direct-slice: the shared
-    # simplified-template model (umbrella Phase 1 / REQ-053) is deferred until
-    # a second consumer exists. Archetype-reuse-under-slot templates compile
-    # (shared-path subtrees admitted) and, since REQ-116 landed (2026-07-31,
-    # template-level node name + name predicates + next-free ordinal), also
-    # export — corona_anamnese is a PROBE-075 parity oracle now; see ADR 0014.
     implementation: landed
     packages:
       - openehr/template/webtemplate
@@ -1289,8 +1014,6 @@ requirements:
       - openehr/template/webtemplate/parity_test.go
       - openehr/template/webtemplate/id_internal_test.go
       - openehr/template/webtemplate/independence_test.go
-      # REQ-116 landed the id disambiguation this REQ mandates; these pin
-      # the next-free ordinal fallback and the per-oracle build outcomes.
       - openehr/template/webtemplate/dedupe_test.go
       - openehr/template/webtemplate/req116_gap_test.go
     plans:
@@ -1300,11 +1023,11 @@ requirements:
     title: Template-driven RM instance example generator
     canonical: docs/specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator
     status: draft
-    implementation: landed  # Phases 0-3 landed; Phase 4 (REQ-101 integration) is follow-up
+    implementation: landed
     packages:
       - openehr/template/constraints
       - openehr/instance
-      - openehr/templatecompile  # REQ-111 — Generate now accepts the public compiled type
+      - openehr/templatecompile
       - internal/templateinstance/rmwrite
       - testkit/fixtures
       - testkit/probes/instance
@@ -1330,71 +1053,63 @@ requirements:
       - docs/plans/archive/2026-05-24-template-instance-example-generator.md
       - docs/plans/archive/2026-06-19-realworld-opt-synthesis.md
       - docs/plans/archive/2026-08-05-flat-rm-attributes.md
-    # Two RM invariants the generic example synthesiser used to violate were
-    # closed from the REQ-053/REQ-140 PR reviews (2026-08-05), both because an
-    # RM-invalid generated instance is also unrepresentable in FLAT:
-    #   - EVENT_CONTEXT.setting now pins the openehr-coded `238 other care`
-    #     default rather than an invented archetype-local code (Setting_valid).
-    #   - an unconstrained abstract PARTY_PROXY is now filled with PARTY_SELF,
-    #     not an empty PARTY_IDENTIFIED, which violates Basic_validity and on
-    #     the FLAT wire is indistinguishable from PARTY_SELF anyway. This is a
-    #     user-visible change to the ENTRY subject of every generated
-    #     composition (concreteFor, openehr/instance/generate.go).
-    notes: "ValueFill{ExampleFill,RandomFill} + Options.ValueSource seam (composition.WithValueFill/WithValueSource). medium/detail_level level deferred."
 
-  - id: REQ-101
-    title: Generic OPT-driven composition builder
-    canonical: docs/specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder
+  - id: REQ-108
+    title: Untrusted document bounds
+    canonical: docs/specifications/clinical-modeling.md#req-108--untrusted-document-bounds
     status: draft
-    implementation: landed  # Phases 0-2 landed; per-template typed builder is a follow-up
-    packages:
-      - openehr/composition
-      - openehr/templatecompile  # REQ-111 — NewBuilder/NewSkeleton accept the public compiled type
-      - testkit/probes/composition
-    probes: [PROBE-023]
-    tests:
-      - openehr/composition/builder_test.go
-      - openehr/composition/imports_test.go
-      - testkit/probes/composition/probe_023_builder_round_trip.go
-      - testkit/probes/composition/probes_test.go
-    plans:
-      - docs/plans/archive/2026-05-21-composition-builder.md
-
-  - id: REQ-102
-    title: Composition validation
-    canonical: docs/specifications/clinical-modeling.md#req-102--composition-validation
-    status: draft
-    # Composition validation plan landed (template-driven walk): cardinality on
-    # CompiledAttribute, rmread attribute access, template-driven
-    # structural walker, REQ-103 primitive pass on bindings,
-    # C_SINGLE_ATTRIBUTE alternative matching, occurrences upper-
-    # bound enforcement, and PROBE-025 / PROBE-026 sandbox probes.
-    # See docs/plans/archive/2026-05-24-composition-validation-template-driven.md.
     implementation: landed
-    packages: [openehr/validation, openehr/validation/rmread, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
-    adrs: [docs/adr/0006-composition-validation-walker-placement.md]
-    probes: [PROBE-025, PROBE-026, PROBE-074]
+    packages:
+      - openehr/template
+      - openehr/bmm
+      - openehr/client/definition
+      - openehr/rm/typereg
+      - openehr/serialize/canjson
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-09-15-typereg-single-pass-decode.md]
     tests:
-      - openehr/validation/composition_test.go
-      - openehr/validation/interval_bounds_test.go
-      - openehr/validation/rmread/read_test.go
-      - testkit/probes/validation/probes_test.go
+      - openehr/template/parse_cap_test.go
+      - openehr/template/parse_depth_test.go
+      - openehr/bmm/load_test.go
+      - openehr/rm/typereg/registry_test.go
+      - openehr/serialize/canjson/edgecases_test.go
+
+  - id: REQ-109
+    title: AQL static lint
+    canonical: docs/specifications/clinical-modeling.md#req-109--aql-static-lint
+    status: draft
+    implementation: landed
+    packages:
+      - openehr/aql/parse
+      - openehr/aql/parse/gen
+      - openehr/aql/lint
+      - openehr/validation
+      - openehr/templatecompile
+      - internal/templatecompile
+      - testkit/probes/aql
+    probes: [PROBE-028, PROBE-096]
     plans:
-      - docs/plans/archive/2026-05-21-validation.md
-      - docs/plans/archive/2026-05-24-composition-validation-template-driven.md
+      - docs/plans/archive/2026-06-15-aql-lint.md
+      - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
+      - docs/plans/archive/2026-08-18-aql-value-free-diagnostics.md
+      - docs/plans/archive/2026-08-21-aql-semantic-layer.md
+      - docs/plans/archive/2026-08-26-aql-small-corrections.md
+    tests:
+      - openehr/aql/parse/parse_test.go
+      - openehr/aql/parse/ast_test.go
+      - openehr/aql/parse/imports_test.go
+      - openehr/aql/lint/extract_test.go
+      - openehr/aql/lint/span_test.go
+      - openehr/aql/lint/lint_test.go
+      - openehr/aql/lint/imports_test.go
+      - openehr/validation/aql_test.go
+      - internal/templatecompile/compile_test.go
+      - testkit/probes/aql/probes_test.go
+    adrs: [docs/adr/0007-aql-antlr-grammar-profile.md, docs/adr/0017-aql-semantic-layer.md]
 
   - id: REQ-110
     title: Template-driven validation beyond COMPOSITION
     canonical: docs/specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition
     status: draft
-    # Generalised the REQ-102 walker to any archetypeable RM root: the
-    # demographic PARTY hierarchy (PERSON/ORGANISATION/GROUP/AGENT/ROLE
-    # + ADDRESS/CONTACT/PARTY_IDENTITY/PARTY_RELATIONSHIP/CAPABILITY) and
-    # the EHR-IM roots FOLDER/EHR_STATUS. Generic Validate(root, c) +
-    # typed wrappers (ValidateDemographic/ValidateFolder/
-    # ValidateEHRStatus); ValidateComposition delegates. Lockstep
-    # extension of rmTypeInfo/bmmSubtypes/rmread + DataValue-leaf readers.
-    # PROBE-074. See docs/plans/archive/2026-06-17-validation-non-composition-roots.md.
     implementation: landed
     packages: [openehr/validation, openehr/validation/rmread, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
     adrs: [docs/adr/0006-composition-validation-walker-placement.md]
@@ -1413,13 +1128,6 @@ requirements:
     title: Public compiled-template bridge
     canonical: docs/specifications/clinical-modeling.md#req-111--public-compiled-template-bridge
     status: draft
-    # Public openehr/templatecompile.Compile re-exports the internal compiled
-    # form (type alias) so external modules can construct the *Compiled the
-    # composition builder (REQ-101), instance synthesiser (REQ-107), validator
-    # (REQ-102/REQ-110) and AQL lint (REQ-109) accept. Placement in a sibling
-    # package (not openehr/template) avoids an import cycle and REQ-100's
-    # stdlib-only contract — ADR 0010. No new PROBE (API-reachability, not a
-    # wire-conformance assertion; builder round-trip is PROBE-023).
     implementation: landed
     packages:
       - openehr/templatecompile
@@ -1442,30 +1150,11 @@ requirements:
     title: Template-less Reference Model validation floor
     canonical: docs/specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor
     status: draft
-    # ValidateRM (+ typed sugars for FOLDER / EHR_STATUS / EHR_ACCESS /
-    # demographic PARTY) walks an RM root with rminfo as the sole driver —
-    # no compiled OPT. Enforces RM-mandatory attribute presence + a small
-    # per-RM-type invariant catalogue (CODE_PHRASE, DV_QUANTITY, DV_PROPORTION,
-    # DV_INTERVAL bounds for numeric-comparable bounds, OBJECT_REF
-    # type/namespace, DV_TEXT/DV_CODED_TEXT Mappings_valid, and the
-    # TERM_MAPPING.match value set on TERM_MAPPING as a walked node).
-    # Driver is a second walker alongside
-    # REQ-102/110; closed-RM-set helpers (rmTypeInfo / rmread) are shared
-    # across REQ-102/110/112.
     implementation: partial
     packages:
       - openehr/validation
-      - openehr/rm/rminfo  # AttributeNames added to Lookup
-      - openehr/validation/rmread  # mappings container + TERM_MAPPING attribute readers
-    # PROBE-077 (RM-floor invariant matrix) is deferred to a follow-up
-    # cycle; the unit-test cassette matrix in rmfloor_test.go covers the
-    # first-cycle catalogue (required-set absence + the named leaf
-    # invariants, including the DV_TEXT/DV_CODED_TEXT term-mapping pair
-    # and its canjson decode-path absent/null-vs-literal-[] distinction).
-    # PROBE-081 (REQ-112) covers value-typed mandatory presence —
-    # EHR_STATUS.subject — decided from JSON-key presence by
-    # ValidateRMEHRStatusBytes (rmfloor_bytes.go), carried inline by
-    # rmfloor_bytes_test.go.
+      - openehr/rm/rminfo
+      - openehr/validation/rmread
     probes: [PROBE-081]
     tests:
       - openehr/validation/rmfloor_test.go
@@ -1474,102 +1163,21 @@ requirements:
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/handles_test.go
-      - openehr/validation/rmread/read_test.go  # ACTION time/ism_transition/instruction_details readers the floor relies on (shared with REQ-102)
-      - testkit/probes/serialize/probe_030_guard_internal_test.go  # PROBE-030 RM-floor leg: locked hold-outs, each with its findings pinned
-      - testkit/probes/serialize/probes_test.go  # PROBE-030 hold-outs fail the floor and pass the fidelity legs
+      - openehr/validation/rmread/read_test.go
+      - testkit/probes/serialize/probe_030_guard_internal_test.go
+      - testkit/probes/serialize/probes_test.go
     plans:
       - docs/plans/2026-09-24-rm-floor-archetype-roots.md
       - docs/plans/archive/2026-09-04-spec-interop-leftovers.md
       - docs/plans/archive/2026-06-29-rm-floor-validation.md
       - docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md
-      - docs/plans/archive/2026-09-14-json-v2-migration.md  # landed the rmread ACTION readers, so the floor stops reporting a populated ACTION's mandatory attributes as missing
-      - docs/plans/archive/2026-09-15-widen-composition-corpus.md  # PROBE-030 floor-leg hold-outs for four vendored cassettes
-    notes: >-
-      partial (2026-09-24, docs/plans/2026-09-24-rm-floor-archetype-roots.md):
-      the archetype-root and ARCHETYPED catalogue rows are spec-first; the
-      shipped floor (required-set walk plus the leaf-invariant catalogue) is
-      landed, and these two rows await code.
-
-      landed (2026-09-03): the floor gained two TERM_MAPPING /
-      DV_TEXT.mappings invariants — match outside {'>','=','<','?'} and
-      a present-but-empty mappings (Mappings_valid) — raised from
-      ValidateRM and its typed sugars. ValidateComposition
-      (template-driven) has never routed through the RM floor and is
-      not a producer of these issues; the plan's own Interfaces line
-      first said otherwise and was corrected in its Status header.
-      Review round 1 (2026-09-03) made TERM_MAPPING a walked node:
-      rmread reads mappings / purpose / target, and term_mapping_match
-      fires on the node — as a container element, nested under
-      purpose.mappings, or as the ValidateRM root.
-      The json/v2 migration (2026-09-14) surfaced and fixed the rmread
-      ACTION readers (time / ism_transition / instruction_details, a
-      REQ-102 reader concern proven by read_test.go's TestReadSingle_Action),
-      so ValidateRM no longer reports a populated ACTION's two mandatory
-      attributes as missing; PROBE-030's RM-floor leg exercises that benefit.
+      - docs/plans/archive/2026-09-14-json-v2-migration.md
+      - docs/plans/archive/2026-09-15-widen-composition-corpus.md
 
   - id: REQ-113
     title: Execution-oriented parsed AQL AST
     canonical: docs/specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast
     status: draft
-    # ParseQuery + Document.Query expose a stable, generated-type-free
-    # structured AQL AST (parse.Query) — the read-side mirror of
-    # aql.Builder. SELECT items / FROM containment tree / WHERE
-    # expression tree / ORDER BY / LIMIT / OFFSET, populated from the
-    # validated ANTLR tree (parse/gen) via the private extractor.
-    # WhereExpr + Value vocabulary is SHARED with the construction side:
-    # parse populates the same Comparison/Junction/NotExpr/ExistsExpr/
-    # MatchesExpr/LikeExpr/ParamValue/StringValue/IntValue/RealValue/
-    # BoolValue/NullValue the Builder constructs. (*Query).Emit +
-    # aql.FormatWhere close the round-trip loop. PROBE-080 (round-trip
-    # property) is carried inline by openehr/aql/parse/roundtrip_test.go
-    # — 87 idempotence cases plus 43 canonical-input preservation cases
-    # across the catalogue, plus the residual-gap suite asserting
-    # ParseQuery and Emit both surface aql.ErrIncompleteAST. The corpus
-    # grew when REQ-117 closed this REQ's v1 catalogue gaps (2026-08-04)
-    # and again when REQ-118 landed the SELECT TOP carrier (2026-08-05):
-    # the extractor now covers the whole SDK grammar profile and the only
-    # residual refusal is an unrepresentable numeric literal — see the
-    # REQ-117 / REQ-118 rows and PROBE-087, which own that closure.
-    # Out-of-catalogue shapes never silently emit: ErrIncompleteAST is
-    # the trust-model surface. Tier 1 — Document.Tree — exposes the
-    # validated ANTLR tree as a cheap interim (unstable consumer
-    # contract; marked // Deprecated:) ahead of the REQ-113 Tier-2 AST.
-    # The standing class predicate (ClassExpr.PredicateComparison)
-    # and the WHERE comparison path (aql.Comparison.ParsedPath) are exposed
-    # as parsed structure; the shared path vocabulary (aql.IdentifiedPath /
-    # PathSegment) moved into openehr/aql (openehr/aql/path.go) with parse
-    # aliases. PROBE-082 pins it inline in structured_test.go. The
-    # class-predicate ParsedPath is now populated too (Segments with an empty
-    # Alias, mirroring the WHERE side) so a consumer need not re-split the
-    # relative predicate path.
-    #
-    # Two sections were added 2026-08-19 and BOTH LANDED the same day —
-    # § Structured node predicates (a typed sum beside the verbatim predicate
-    # text, path-SEGMENT position only; the class position keeps the carriers
-    # above) and § Value-free structured drop records (a {kind, clause, span}
-    # record beside ErrIncompleteAST, with no source text in any field).
-    # Plans below; PROBE-095 / PROBE-096. The branch review then corrected the
-    # predicate section's "empty unstructured set" claim: three
-    # pathPredicateOperand forms are enumerated as unstructured, and the
-    # grammar sweep now descends into that production.
-    #
-    # The drop records LANDED 2026-08-19 (PROBE-096): Document.Dropped(), a
-    # ConstructKind closed over drop CLASSES rather than call sites, Clause
-    # extended append-only, and Span as a line/col pair over Position. Writing
-    # the unreachability arm caught a misclassification — an out-of-range
-    # literal in a WHERE comparison reached a site labelled defensive, because
-    # the gap travelled as a bare string — so the kind now travels with the
-    # reason.
-    #
-    # § Structured node predicates LANDED the same day (PROBE-095):
-    # PathSegment.Parsed carries a sealed sum over the whole pathPredicate
-    # position — node id (± name), archetype HRID (± name), $param,
-    # comparison, MATCHES regex, AND/OR junction — with components
-    # delimiter-free, escape-resolved and trivia-free, plus EqualPredicates as
-    # the panic-free equality the aql.Value comparability trap requires. The
-    # class position is UNCHANGED and keeps the carriers above: two carriers
-    # populated from one source node is drift by construction. Emission reads
-    # Raw only, asserted rather than assumed.
     implementation: landed
     packages:
       - openehr/aql
@@ -1598,51 +1206,13 @@ requirements:
     title: Template-level node naming and name-predicated paths
     canonical: docs/specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths
     status: draft
-    # An OPT node may pin its LOCATABLE.name via a fixed C_STRING on the name
-    # attribute. That template-level name — not the archetype concept term,
-    # which every occurrence of a reused archetype shares — is what
-    # distinguishes sibling archetype roots that fill a slot with the same
-    # archetype. Spans four layers: parse + expose on the OPT node (REQ-100),
-    # carry through the compiled tree (REQ-111), emit name predicates
-    # ([archetype_id,'Name']) on the compiled AQL path of every node that pins
-    # a name, and prefer the name for WebTemplate id derivation (REQ-106,
-    # ADR 0014). Established against the upstream EHRbase goldens 2026-07-29:
-    # the reference disambiguates by name alone (no numeric suffix appears in
-    # corona_anamnese / multi_occurrence / AlternativeEvents, because each
-    # sibling pins a distinct name), and name-predicates aqlPath 350x in the
-    # corona golden vs 0x in constrain_test — which is why PROBE-075 holds
-    # 104/104 without any of this. CORRECTED 2026-07-30: the predicate trigger
-    # is the pinned name ALONE, not sibling collision — GECCO_Diagnose
-    # predicates all three /content children though their archetype ids are
-    # distinct, and predicates a sole CLUSTER child; every predicate name in
-    # both goldens is a pinned C_STRING (1:1), and constrain_test pins none,
-    # which is the real reason parity holds. An earlier collision-conditioned
-    # reading of this rule was wrong and would emit too few predicates.
-    # LANDED 2026-07-31 (Phases 0-5). Unblocked PROBE-086 (upstream FLAT
-    # parity), which landed on it 2026-08-01, and exports any
-    # WebTemplate reusing an archetype among siblings. Where no pinned name
-    # separates siblings the reference's ordinal fallback applies (dv_text,
-    # dv_text2) — evidenced by the upstream FLAT bodies themselves. Path shape is consumed by
-    # REQ-102 validation, REQ-107 instance synthesis, and REQ-053
-    # FLAT/STRUCTURED, so paths through un-named nodes must stay byte-identical
-    # — but every vendored OPT that pins a name does change shape.
-    #
-    # PROBE-086 is deliberately NOT in `probes:` — this REQ *unblocks* it; the
-    # probe asserts REQ-053 FLAT parity, not the naming rule this REQ states,
-    # so citing it here would claim coverage it does not give. That holds now
-    # that PROBE-086 is Implemented, for the same reason it held while it was
-    # Draft.
     implementation: landed
     packages:
       - openehr/template
       - internal/templatecompile
       - openehr/templatecompile
       - openehr/template/webtemplate
-      # Phase 3: the FLAT codec strips the name predicate at the rmpath
-      # resolution boundary and keys its name index on the bare spelling.
       - openehr/serialize/simplified
-      # Phase 0 vendored the two oracles here and added the accessors that
-      # resolve them (paths.go carries the REQ-116 marks).
       - testkit/fixtures
       - testkit/cassettes/webtemplate
     adrs: [docs/adr/0014-webtemplate-reference-implementation-lock.md]
@@ -1654,23 +1224,14 @@ requirements:
       - openehr/template/webtemplate/req116_gap_test.go
       - openehr/template/node_name_test.go
       - internal/templatecompile/compile_nodename_test.go
-      # Phase 3 — the emission guard (byte-identity for templates pinning
-      # no name) and the FLAT boundary where the predicate is stripped.
       - internal/templatecompile/pathsnapshot_test.go
       - internal/templatecompile/namepredicate_test.go
       - openehr/serialize/simplified/flat_nameindex_test.go
-      # Post-review hardening: decode through a pinned container (the
-      # bare-keying regression), the reused-sibling refusal, and the
-      # next-free ordinal fallback.
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/template/webtemplate/dedupe_test.go
-      # Phase 4 — PROBE-075 parity extended to both oracles (node facts and
-      # inputs), with the documented residuals pinned by count.
       - openehr/template/webtemplate/build_test.go
       - openehr/template/webtemplate/inputs_test.go
     plans:
-      # The owning plan (declares "Covers: REQ-116") first; the conformance
-      # plan is the consumer this unblocks.
       - docs/plans/archive/2026-07-29-template-node-naming.md
       - docs/plans/archive/2026-07-16-web-template-tests-conformance.md
 
@@ -1678,57 +1239,6 @@ requirements:
     title: AQL expression-catalogue completion
     canonical: docs/specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion
     status: draft
-    # Closes the REQ-113 v1 structured-AST catalogue gaps (all grammar-admitted
-    # already — no grammar-profile change), widens the REQ-109 lint gate's two
-    # documented over-rejections (ORDER BY on a SELECT alias; bare boolean
-    # literals in comparison-operand and SELECT positions), and gives the
-    # REQ-055 builder the containment
-    # algebra (NOT CONTAINS, sibling AND/OR) plus opt-in in-text LIMIT/OFFSET
-    # that the parse side already models. Driven by consumers building AQL
-    # execution engines and conformance corpora on the structured AST, where
-    # ErrIncompleteAST is fail-closed and every catalogue gap is a refused
-    # statement.
-    #
-    # LANDED. All eight catalogue closures are modelled: primitive SELECT
-    # literals (LiteralExpr) and mixed `SELECT *, col` (StarExpr), function
-    # calls on either side of a comparison with Path/Value/Param/nested-call
-    # arguments, path-valued operands (aql.PathValue), structured MATCHES
-    # TERMINOLOGY / {URI} operands, the FROM-root containment junction
-    # (parse.FromClause.Junction), and junctions over any in-catalogue operand.
-    # The complete residual ErrIncompleteAST list is ONE class: a numeric
-    # literal the AST cannot represent (LIMIT/OFFSET beyond Go `int`, a SELECT
-    # TOP count beyond `int`, an INTEGER beyond int64, or a REAL beyond
-    # float64, in any value position; degrading would be silent precision
-    # loss), pinned by TestParseQuerySurfacesIncompleteAST. As first published
-    # this REQ listed a second residual — a SELECT TOP clause — which REQ-118
-    # CLOSED by adding the carrier; that history is informative only and no
-    # requirement to refuse a top clause is in force.
-    # TestFormerCatalogueGapsModelled asserts the nine round-trip cases covering the eight closed gap shapes
-    # now parse, emit, and round-trip (PROBE-087).
-    #
-    # Lint (PROBE-028 unaffected, no new codes): parse.Document gains
-    # SelectAliases so an ORDER BY key resolves FROM/CONTAINS first, then the
-    # SELECT `AS` aliases (TestLintOrderBySelectAlias,
-    # TestLintSelectAliasDoesNotBindClass); a bare boolean keyword in a value
-    # position — a comparison operand, a SELECT projection item, or a function-call argument — is no longer
-    # collected as a pseudo-path, and the structured AST carries it as a typed
-    # literal on both sides (TestLintBooleanComparisonOperand,
-    # TestLintSelectBooleanKeywordLiteral,
-    # TestExtractPathsSkipsBooleanKeywordOperand,
-    # TestExtractPathsSkipsBooleanKeywordSelectItem,
-    # TestParseQuerySelectKeywordLiteral). An ORDER BY key is excluded: the
-    # grammar's orderByExpr admits no literal, so it stays a path.
-    #
-    # Builder (PROBE-088): aql.Containment became a whole expression —
-    # Class/Archetype leaves, Contains/NotContains nesting, ContainsAnd/
-    # ContainsOr junctions with precedence-driven parentheses — plus opt-in
-    # LimitInline/OffsetInline (+Param) refused against the envelope channel.
-    # NOTE: Containment gained a slice field, so it is no longer ==-comparable
-    # (fields unexported; no in-repo comparisons). A builder program using none
-    # of the new API is byte-identical (the PROBE-020 golden is re-pinned by
-    # TestProbe088DetectsProbe020Drift). DEFERRED: no builder entry point for a
-    # FROM-root junction — the write side keeps a single root class until a
-    # consumer needs write-side root junctions.
     implementation: landed
     packages:
       - openehr/aql
@@ -1737,17 +1247,13 @@ requirements:
       - testkit/probes/aql
     probes: [PROBE-087, PROBE-088]
     tests:
-      # PROBE-087 — catalogue closures, per-shape structural pins, and the
-      # residual guards (unrepresentable numeric literal; SELECT TOP).
       - openehr/aql/parse/query_test.go
       - openehr/aql/parse/roundtrip_test.go
       - openehr/aql/introspect_test.go
-      # Lint acceptances (REQ-109 surface) and the pseudo-path exclusion.
       - openehr/aql/lint/lint_test.go
       - openehr/aql/lint/extract_test.go
       - openehr/aql/parse/ast_test.go
       - openehr/aql/parse/parse_test.go
-      # PROBE-088 — builder containment algebra, in-text paging, goldens.
       - openehr/aql/containment_test.go
       - openehr/aql/containment_roundtrip_test.go
       - openehr/aql/paging_test.go
@@ -1758,52 +1264,9 @@ requirements:
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
 
   - id: REQ-118
-    title: Deprecated SELECT TOP clause and literal source text
+    title: Deprecated `SELECT TOP` clause and literal source text
     canonical: docs/specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text
     status: draft
-    # AMENDS REQ-117's residual ErrIncompleteAST list: the SELECT TOP clause
-    # moves INTO the catalogue, leaving one residual (a numeric literal the
-    # value vocabulary cannot represent — an out-of-range TOP count folds into
-    # it). TOP is deprecated upstream (QUERY Release-1.1.0 §4.4.3, removal
-    # announced) and therefore must still be READ and BUILT: the SDK does not
-    # author the queries it is handed, and §4.4.3 additionally forbids TOP
-    # together with LIMIT, which nothing in the SDK could report while the
-    # clause was dropped at extraction.
-    #
-    # Two carriers: SelectClause.Top (count + FORWARD/BACKWARD direction,
-    # deliberately NOT the LimitExpr vocabulary — the `top` production admits
-    # no PARAMETER and LIMIT carries no direction, so reuse would model a shape
-    # whose emission the parser rejects) and LiteralExpr source text (read-side
-    # fidelity only: emission stays canonical, since the canonical write form
-    # is normative and a constructed literal has no source text). The
-    # canonical renderer a consumer needs for a constructed value already
-    # exists as the public aql.FormatValue — no second escaping copy.
-    #
-    # Layer split for the spec-invalid TOP+LIMIT combination: parse models
-    # both as written, Emit renders both (refusing would break the round-trip
-    # property for text the profile accepts), lint diagnoses it
-    # (aql_deprecated_top Warning / aql_top_with_limit Error — catalogue home
-    # is the REQ-109 Layer-2 table), and the builder refuses at Build() with
-    # TOP joined to the in-text paging channel's exclusivity rule.
-    # The envelope channel got the same treatment on 2026-08-26: the sibling
-    # code aql_top_with_fetch (Error) closes the read side of the Query API
-    # common-parameters rule that `fetch` cannot be combined with AQL-top,
-    # which Build() already refused. A sibling rather than a widened
-    # aql_top_with_limit, so the landed code's firing rule and Detail text stay
-    # byte-stable; keyed on Fetch alone, since Offset carries no exclusion.
-    # PROBE-028's multiset is unaffected: no lint cassette carries a TOP.
-    #
-    # LANDED. parse.SelectClause.Top + Document.Top (the flat mirror the lint
-    # gate reads), parse.LiteralExpr.Raw taken from the character-stream span
-    # (GetText would drop interior whitespace, which is itself a
-    # canonicalisation), aql.TopClause/TopDir/FormatTop as shared vocabulary,
-    # Builder.Top / Builder.TopDirected with the exclusivity + non-negative +
-    # known-direction refusals in validateTop, and the two lint codes. The
-    # retired TestParseQuerySurfacesTopClauseGap is REPLACED by
-    # TestTopClauseGapClosed (the positive assertion) — not deleted.
-    # NOTE: `TOP $n` is NOT modelled: the profile's `top` production admits
-    # INTEGER only, so the SDK-AQL-003 parameter relaxation is deliberately
-    # not extended to a construct the spec is removing.
     implementation: landed
     packages:
       - openehr/aql
@@ -1812,13 +1275,9 @@ requirements:
       - testkit/probes/aql
     probes: [PROBE-087, PROBE-088]
     tests:
-      # PROBE-087 (extended) — TOP shapes in-catalogue + round-trip, literal
-      # source text per literal kind, out-of-range TOP under the residual.
       - openehr/aql/parse/query_test.go
       - openehr/aql/parse/roundtrip_test.go
-      # Lint diagnosis for the deprecated clause and the forbidden combination.
       - openehr/aql/lint/lint_test.go
-      # PROBE-088 (extended) — builder TOP goldens + refusal matrix.
       - openehr/aql/paging_test.go
       - testkit/probes/aql/probes_test.go
     plans:
@@ -1829,121 +1288,29 @@ requirements:
     title: Re-parseable canonical AQL emission
     canonical: docs/specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission
     status: draft
-    # WHY THIS EXISTS, in one line: REQ-055's "the typed builders cannot emit
-    # syntactically invalid AQL" and REQ-117's fixed-point property are both
-    # stated over the clause SHAPES the catalogue models, and nothing bound the
-    # VALUE POSITIONS inside them. The rules themselves are normative in the
-    # canonical section — see `canonical:` above; they are not restated here.
-    #
-    # WHY THE CORPUS COULD NOT HAVE CAUGHT IT: roundtrip_test.go is written in
-    # canonical form, so no case ever carried a value that needed an escape, and
-    # the value-level renderers were never confronted with the grammar. That is
-    # the structural reason, and it is why PROBE-090 asserts round-trip IDENTITY
-    # (and, for a source literal, TWICE) rather than mere parseability.
-    #
-    # Implementation-aligned fix-up per README § Source of truth for its first
-    # cycles — the residuals reported on PR #87 — so the spec section and this
-    # entry landed in the same PRs as the code. The class-predicate splice
-    # (issue #99) was large enough to plan, and that plan is mapped below.
-    #
-    # WIRE-VISIBLE (all three classified semver-minor in the canonical section,
-    # and in wire.md § REQ-055 where the canonical write form lives): a literal
-    # carrying `'` or `\` and a whole-valued real (`2` -> `2.0`) emit
-    # differently from v0.19.0, and predicate/path text is now re-emitted
-    # VERBATIM rather than whitespace-collapsed — so emitted AQL carries the
-    # caller's own spacing, line breaks and comments. The third is visible on
-    # the READ side too (IdentifiedPath.Raw, PathSegment.Predicate,
-    # ClassExpr.Predicate), so a consumer that COMPARES that text instead of
-    # re-emitting it normalises through aql.StripPredicateTrivia — exported for
-    # exactly that, after the verbatim switch made openehr/aql/lint's template
-    # resolution miss a padded node id and report a false path divergence.
-    # Recorded in the CHANGELOG.
-    #
-    # AMENDED for issue #103: Emit now confronts its own output with the parser
-    # before returning it (§ Emission verified after emission). The consumer-
-    # visible consequences, folded into one CHANGELOG bullet: Emit costs a
-    # second parse, and it refuses what it once returned — the loud
-    # malformations the per-position guards deliberately admit (now surfaced
-    # as the PARSER's verdict), a WHERE whose expression renders nothing
-    # (a typed-nil carrier once emitted with the clause silently GONE), and
-    # a vocabulary shape the skeleton cannot model (fail-closed). The guards' own accept
-    # sets are unchanged, so aql.ValidatePathPredicate still accepts a contained
-    # malformation; only the emitter's contract narrowed.
-    #
-    # AMENDED again by REQ-163: § Emission verified after emission's Build()
-    # exemption — stated on the ground that the builder's vocabulary carries no
-    # free-text bracket or clause carrier — is NARROWED, not overturned. The
-    # SELECT projection list was already such a carrier (aql.Col splices its
-    # argument verbatim), so Build() takes the scope change this section wrote
-    # down in advance and verifies the SELECT it emitted. Every other builder
-    # field keeps the exemption, and the reduction, the carried-encodings list
-    # and the value-free diagnostic rule stay homed here — REQ-163 cites them
-    # rather than restating them.
     implementation: landed
     packages:
       - openehr/aql
       - openehr/aql/parse
-      # The verbatim read side reaches the lint's Layer-3 OPT resolution, which
-      # COMPARES predicate text rather than re-emitting it.
       - openehr/aql/lint
     plans:
       - docs/plans/archive/2026-08-08-aql-class-predicate-splice-and-source-text.md
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
     probes: [PROBE-090]
     tests:
-      # The two STRUCTURAL guards: a source-level tripwire failing any new
-      # un-normalised dispatch site on a sealed vocabulary, and the
-      # position x kind x carrier sweep (whatever a position accepts must
-      # round-trip to an equal value; both carriers get the same answer).
       - openehr/aql/parse/dispatch_tripwire_test.go
       - openehr/aql/parse/value_position_parity_test.go
-      # PROBE-090 — emit -> parse -> equal value across every value kind, the
-      # twice-through fixed point, both string delimiters, the fuzz target,
-      # and the grammar confrontations.
       - openehr/aql/parse/literal_roundtrip_test.go
-      # The single-token IDENTIFIER / ARCHETYPE_HRID positions the emitters
-      # splice verbatim (issue #96): the guard's accept set confronted with the
-      # vendored lexer, and the Emit- and Build-side refusals at all four.
       - openehr/aql/parse/identifier_parity_test.go
-      # The class BRACKET position the emitters splice verbatim (issue #99).
-      # Three files because three distinct claims are made about it: that a
-      # predicate survives extraction unmangled (identity, not parseability),
-      # that the two sub-grammars one field feeds get two accept sets, and
-      # that the guard agrees with the parser in BOTH directions over a
-      # GENERATED corpus — the position has no token names to walk.
       - openehr/aql/parse/predicate_parity_test.go
       - openehr/aql/parse/predicate_guard_test.go
       - openehr/aql/parse/predicate_confrontation_test.go
-      # The exported half, which a write path outside openehr/aql calls to
-      # hold the same line.
       - openehr/aql/predicate_test.go
-      # The closure verified AFTER emission (issue #103) — the one arm no
-      # per-position rule can reach, because the token boundary depends on text
-      # the position does not contain. Both directions: the cross-bracket
-      # substitution refused on the STRUCTURAL arm, and the AST ENCODINGS the
-      # parser is free to re-nest still accepted (the arm a field-by-field
-      # comparison fails).
       - openehr/aql/parse/emit_verify_test.go
-      # The white-box half: the fail-closed switch arms an external test cannot
-      # reach, and the per-slot census — one row per skeleton coordinate,
-      # covering the slots no splice vector reaches end-to-end.
       - openehr/aql/parse/emit_verify_internal_test.go
-      # The read-side consequence: verbatim predicate text reaches the lint's
-      # Layer-3 OPT resolution, which compares it to a node id. Pins that
-      # trivia inside the bracket does not change the answer, and that
-      # lint.Path.Suffix stays canonical (no raw newline in a diagnostic).
       - openehr/aql/lint/lint_test.go
-      # Emit-side parity: the SELECT / paging / ORDER BY value positions, the
-      # containment refusals and the order they fire in, the URI guard vs the
-      # grammar, and the pointer twin of every sealed set the emitters dispatch
-      # on (aql.WhereExpr, parse.SelectExpr, parse.LimitExpr).
       - openehr/aql/parse/emit_parity_test.go
-      # Write-side refusals (URI, function name, TERMINOLOGY arity, the narrow
-      # LIKE / MATCHES operand slots, the PARAMETER spelling, the junction
-      # operator and arity), the pointer shapes, and the EqualValues contract.
       - openehr/aql/value_test.go
-      # The canonical-form change: the builder golden that carried the SQL
-      # doubling now carries the ESCAPE_SEQ spelling.
       - openehr/aql/builder_test.go
 
   - id: REQ-120
@@ -1973,22 +1340,6 @@ requirements:
       - openehr/rm/rmpath
     tests:
       - openehr/rm/rmpath/rmpath_test.go
-      # The in-context RM attributes PROBE-086 found missing — 2026-08-01: EVENT
-      # time, INTERVAL_EVENT math_function/width, INSTRUCTION
-      # narrative/expiry_time; 2026-08-03: EVENT_CONTEXT other_context (the only
-      # template-constrained one — its data was being dropped outright),
-      # end_time/health_care_facility/location/participations, ACTIVITY timing,
-      # ACTION time, and `language`/`encoding` on all five ENTRY subtypes (via
-      # the shared entryChildren resolver) once the CODE_PHRASE leaf mapping gave
-      # the encoder something to write there — the PROBE-086 coverage ratchet.
-      # EVENT_CONTEXT start_time/setting stay exempt by design.
-      #
-      # These two tests jointly enforce rm-functions.md § REQ-121 "Attribute
-      # coverage for synthesized in-context leaves". The guard lives beside the
-      # WebTemplate builder that synthesizes those leaves, because that is where
-      # a new one is added: it asserts every in-context leaf whose datatype the
-      # FLAT codec can write resolves through rmpath, so the next one cannot be
-      # dropped silently, and reports a stale exemption.
       - openehr/template/webtemplate/incontext_rmpath_test.go
     plans:
       - docs/plans/archive/2026-06-19-rm-functions.md
@@ -2033,101 +1384,11 @@ requirements:
     tests:
       - openehr/client/ehr/contribution/builder_test.go
       - testkit/probes/versioned/probes_test.go
-    notes: >-
-      First allocation in the SDK authoring & client-tooling band (130-139).
-      A fluent builder over the landed Contribution_create submission shape
-      (REQ-050/095, PROBE-072): per-operation change-type codes, a
-      body-carried lifecycle_state (the openehr-version header is
-      per-request and cannot express one state per version), a
-      caller-supplied batch audit change_type that MUST NOT be derived, and
-      omission of the server-assigned contribution / uid fields the pin's
-      UpdateVersion DTO does not declare. Change-type and lifecycle-state
-      validity is now membership of the pinned audit change type / version
-      lifecycle state groups (REQ-034), not a hand-typed four- or three-code
-      table.
 
   - id: REQ-140
     title: Underscore-prefixed RM attributes (simplified formats)
     canonical: docs/specifications/wire.md#req-140--underscore-prefixed-rm-attributes
     status: draft
-    # The Simplified Formats "RM Attributes prefix" grammar for the REQ-053
-    # codecs: optional RM attributes the template does not constrain, addressed
-    # as `_`-prefixed segments (_uid, _link:N, _feeder_audit, _work_flow_id,
-    # _guideline_id, _other_participation:N, context/_health_care_facility,
-    # context/_participation:N, context/_end_time, context/_location,
-    # _normal_range, _other_reference_ranges:N, _mapping:N, _null_flavour,
-    # _null_reason, DV_MULTIMEDIA _charset/_language/_thumbnail, and nested
-    # _identifier:N). Recursive, RM-type-keyed, both directions, REQ-053's
-    # fail-loud posture. Suffix vocabulary is the reference implementation's
-    # (ADR 0014), pinned by the PROBE-086 corpus (1092 of 1824 keys carry an
-    # `_` segment). EVENT_CONTEXT optionals ride this grammar per ADR 0016
-    # (no new ctx/ short forms). Deliberate exclusions: composer external_ref
-    # + composer/_identifier (ADR 0015 boundary); _instruction_details and
-    # _wf_definition deferred as typed refusals (no pinnable fixture yet).
-    #
-    # LANDED 2026-08-05 over four phases (plan 2026-08-05-flat-rm-attributes.md,
-    # PR 2). The whole grammar table is carried in both directions, byte-exact:
-    # the decode router keyed by the owner's RM class (an `_` segment ends Web
-    # Template resolution at the segment before it) plus the encode hook on the
-    # owner walk; the simple families (_uid, _link:N, _work_flow_id,
-    # _guideline_id, context/_end_time, context/_location); the value
-    # decorations (_normal_range, _other_reference_ranges:N with the RM `range`
-    # level elided, _mapping:N, _null_flavour beside an absent bare value,
-    # _null_reason); the party grammar in one implementation for every position
-    # it reaches a party (context/_health_care_facility, context/_participation:N,
-    # _other_participation:N with the reference's inlined |identifiers_*:N, the
-    # nested _identifier:N, _provider, and the ENTRY subject leaf); and the
-    # deepest family, _feeder_audit, whose tails nest three levels
-    # (…/originating_system_audit/provider/_identifier:0|id). Owner
-    # admissibility comes from rminfo, not a hand table. Census: PROBE-086
-    # compared keys 360 -> 1466 of 1824 (19.7% -> 80.4%), the whole `path not in
-    # web template` refusal family bar 22 keys collapsed; PROBE-089 pins the
-    # per-family round-trip, the canonical-transit encode, the refusals and the
-    # STRUCTURED vocabulary. Corpus corrections settled against the plan and
-    # amended into wire.md in the same commits: the REFERENCE_RANGE `range`
-    # elision, the asymmetric interval boundary flags, |mode carrying the
-    # participation-mode rubric with no code, the party external_ref `type`
-    # being a default rather than a fixed PARTY, DV_MULTIMEDIA's bare key being
-    # the uri, and the explicit subject|_type: PARTY_SELF at an RM-optional
-    # PARTY_PROXY.
-    #
-    # Boundary tidied 2026-08-06 (no behaviour change): the three LEAF datatype
-    # rows this grammar's machinery enabled -- DV_PARSABLE, DV_MULTIMEDIA and
-    # DV_INTERVAL<T> -- moved out of wire.md § REQ-140's table into § REQ-053
-    # § Leaf datatypes, where the other leaf suffix sets live. Each is reachable
-    # at a Web Template leaf with no `_` segment at all, so REQ-053 owns them;
-    # this grammar reaches the same three through nested VALUE positions
-    # (_thumbnail, original_content, an interval bound) and applies their leaf
-    # rules verbatim. The behavioural rules stayed here, cross-referenced from
-    # the moved rows: the DV_MULTIMEDIA bare-code terminology rule (it governs
-    # the underscore CODE_PHRASE members too) and the interval boundary flags
-    # (introduced by _normal_range, shared with the leaf).
-    #
-    # STILL DEFERRED (refused loudly and none dropped, except the composer
-    # boundary noted below, which encode projects rather than refuses):
-    # _instruction_details
-    # (ACTION) and _wf_definition (INSTRUCTION) — spec-named, corpus-unexercised
-    # as a decodable grammar, so no fixture can pin them yet; FEEDER_AUDIT_DETAILS
-    # other_details (an ITEM_STRUCTURE with no channel in the reference's suffix
-    # set); PARTICIPATION time (same); the composer boundary — external_ref,
-    # composer/_identifier:N and composer/relationship, which ADR 0015 gives no
-    # carrier, an ADR decision rather than a codec one. That boundary is
-    # asymmetric and deliberately so: decode refuses those spellings (census-
-    # visible), while encode projects ONE of them -- a PARTY_IDENTIFIED composer
-    # carrying a name keeps the name and DROPS its external_ref / identifiers,
-    # rather than refuse every composition whose composer is properly referenced
-    # (one vendored corpus body is). Every other shape is refused on encode too:
-    # a PARTY_RELATED composer, a PARTY_SELF with an external_ref, and a nameless
-    # PARTY_IDENTIFIED. That is one of TWO encode-side drops, not the only one:
-    # the _uid / _link:N / _feeder_audit of a folded structural wrapper (ITEM_TREE,
-    # HISTORY, a lifted EVENT) are dropped too, because FLAT has no key for a node
-    # the Web Template does not model -- closable only reference-side (ADR 0014),
-    # and structurally invisible to PROBE-086 whose input is FLAT; and the ctx/ short forms ADR 0016 decision 3 declines for the
-    # EVENT_CONTEXT optionals, which ride this grammar at their real paths
-    # instead. Not an underscore question at all: the 19 keys this SDK's
-    # WebTemplate projection does not carry (ism_transition/*, INTERVAL_EVENT
-    # math_function/width, ACTION time, OBSERVATION history_origin, …), owned by
-    # openehr/template/webtemplate/deviations.md.
     implementation: landed
     adrs:
       - docs/adr/0015-flat-metadata-spelling.md
@@ -2136,432 +1397,20 @@ requirements:
     packages:
       - openehr/serialize/simplified
     tests:
-      # The router, the simple families, the `:index` rules and the owner-kind
-      # refusals.
       - openehr/serialize/simplified/rmattr_test.go
-      # The value decorations, the interval grammar and the |raw boundary.
       - openehr/serialize/simplified/rmattr_value_test.go
-      # The party grammar, the participations and the ENTRY subject leaf.
       - openehr/serialize/simplified/rmattr_party_test.go
-      # Repeating collapsed ELEMENTs (owner walk + per-instance :index), the
-      # interval encode/decode refusal symmetry and the composer projection.
       - openehr/serialize/simplified/rmattr_repeating_test.go
-      # The encapsulated / interval leaves and the DataValue members.
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
-      # _feeder_audit (three tail levels), _provider, the |_type discriminator
-      # and the other_details deferral.
       - openehr/serialize/simplified/rmattr_feeder_test.go
-      # The captured-set widening (suffix form vs |raw) and the STRUCTURED "|"
-      # member the underscore families forced.
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/structured_test.go
-      # The ADR 0015 composer boundary.
       - openehr/serialize/simplified/context_test.go
-      # PROBE-089 — the per-family probe and its runner.
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
       - testkit/probes/serialize/probes_test.go
-      # PROBE-086 — the census pins that move in step with each landed family.
       - testkit/conformance/webtemplate/runner_test.go
     plans:
       - docs/plans/archive/2026-08-05-flat-rm-attributes.md
-
-  # --- Registry-coverage backfill: index every REQ.md id (spec-check enforces completeness).
-  # status stays `draft` per the v0 convention; promotion to `stable` is a separate decision.
-  - id: REQ-002
-    title: Go version
-    canonical: docs/specifications/packaging.md#req-002--go-version
-    status: draft
-    implementation: landed
-    packages: [go.mod]
-    plans: [docs/plans/archive/2026-09-03-go-1.27.md]
-
-  - id: REQ-003
-    title: License
-    canonical: docs/specifications/packaging.md#req-003--license
-    status: draft
-    implementation: landed
-    packages: [LICENSE, docs/licensing.md]
-
-  - id: REQ-004
-    title: Semantic versioning
-    canonical: docs/specifications/packaging.md#req-004--semantic-versioning
-    status: draft
-    implementation: landed
-    packages: [.github/workflows/release.yml]
-
-  - id: REQ-005
-    title: Internal boundary
-    canonical: docs/specifications/packaging.md#req-005--internal-boundary
-    status: draft
-    implementation: landed
-    packages: [internal]
-
-  - id: REQ-010
-    title: cadasto/ cut line
-    canonical: docs/specifications/module-layout.md#req-010--cadasto-cut-line
-    status: draft
-    implementation: landed
-    packages: [cadasto]
-
-  - id: REQ-011
-    title: No sideways cadasto/ imports
-    canonical: docs/specifications/module-layout.md#req-011--no-sideways-imports-inside-cadasto
-    status: draft
-    implementation: landed
-    packages: [cadasto]
-
-  - id: REQ-012
-    title: Auth layering
-    canonical: docs/specifications/module-layout.md#req-012--auth-layering
-    status: draft
-    implementation: landed
-    packages: [auth]
-
-  - id: REQ-013
-    title: Building-block independence
-    canonical: docs/specifications/module-layout.md#req-013--building-block-independence
-    status: draft
-    implementation: landed
-    packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/terminology, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck]
-    tests:
-      - openehr/aql/contain/imports_test.go
-      - openehr/aql/imports_test.go
-      - openehr/aql/internal/semcheck/imports_test.go
-      - openehr/aql/lint/imports_test.go
-      - openehr/aql/parse/imports_test.go
-      - openehr/composition/imports_test.go
-      - openehr/instance/imports_test.go
-      - openehr/serialize/simplified/independence_test.go
-      - openehr/template/webtemplate/independence_test.go
-      - openehr/templatecompile/imports_test.go
-      - openehr/terminology/imports_test.go
-      - openehr/validation/imports_test.go
-
-  - id: REQ-014
-    title: Dependency direction
-    canonical: docs/specifications/module-layout.md#req-014--dependency-direction
-    status: draft
-    implementation: landed
-    packages: [transport, openehr/client]
-
-  - id: REQ-020
-    title: Context-first I/O
-    canonical: docs/specifications/idiom.md#context-propagation-req-020
-    status: draft
-    implementation: landed
-    packages: [transport, openehr/client]
-
-  - id: REQ-022
-    title: Functional options
-    canonical: docs/specifications/idiom.md#functional-options-req-022
-    status: draft
-    implementation: landed
-    packages: [transport]
-
-  - id: REQ-023
-    title: Package-level functions
-    canonical: docs/specifications/idiom.md#surface-shape-req-023
-    status: draft
-    implementation: landed
-    packages: [openehr/client]
-
-  - id: REQ-024
-    title: Generics, no reflection
-    canonical: docs/specifications/idiom.md#generics-policy-req-024
-    status: draft
-    implementation: landed
-    packages: [openehr/rm/typereg, openehr/serialize]
-
-  - id: REQ-025
-    title: Error wrapping
-    canonical: docs/specifications/idiom.md#errors-req-025
-    status: draft
-    implementation: landed
-    packages: [transport, auth, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, openehr/rm, openehr/aom/aom14, internal, internal/bmmgen]
-    plans: [docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md, docs/plans/archive/2026-09-04-error-axis-leftovers.md, docs/plans/archive/2026-09-15-typereg-single-pass-decode.md]
-    tests:
-      - openehr/rm/typereg/nilreceiver_census_test.go
-      - openehr/client/ehr/contribution/version_test.go
-      - openehr/client/ehr/contribution/submission_test.go
-      - openehr/client/ehr/contribution/update_audit_test.go
-      - openehr/aql/version_test.go
-      - openehr/aql/lint/extract_test.go
-      - openehr/aql/lint/nilsyntaxerror_internal_test.go
-      - openehr/aql/contain/nilrelation_test.go
-      - openehr/aql/parse/nilsyntaxerror_test.go
-      - openehr/aql/parse/emit_verify_nilsyntaxerror_internal_test.go
-      - openehr/client/query/nilaqlerror_test.go
-      - openehr/client/query/nilwiredereference_internal_test.go
-      - transport/client_test.go
-      - transport/nilwireerror_test.go
-      - transport/nilwiredereference_internal_test.go
-      - transport/decode_error_test.go  # TestDecodeErrorNilReceiver -- the DecodeError nil-receiver axis
-      - auth/nilautherror_test.go
-      - smart/discovery/nildiscoveryerror_test.go
-      - openehr/rm/typereg/nildecodeerror_test.go
-      - openehr/client/ehr/ehr_test.go
-      - openehr/client/ehr/resource_test.go
-      - internal/option_guard_test.go
-      - openehr/rm/typereg/streaming_test.go  # nil-argument refusals wrap typereg.ErrNilArgument
-    notes: >-
-      The no-panic clause is enforced across the caller-constructible axis, not
-      only at the contribution constructors: a typed-nil PartyProxy committer is
-      refused at Validate and marshal, lint.Extract guards a nil/unparsed
-      document, transport.Do guards a nil Client and Request for every
-      Do-routed leaf while the admin probes guard their deliberate Do
-      bypass themselves, and all 30 variadic-option loops skip a nil option
-      — held by an AST tripwire in internal/option_guard_test.go. The nil
-      RECEIVER is the same axis: a nil *contain.TypeRelation is the documented
-      spelling of "the default", and a nil *query.AQLError is what a failed
-      typed-error match leaves behind in either detection form — the errors.As
-      out-parameter or an errors.AsType binding — so each answers as that
-      value rather than dereferencing it —
-      both held by reflection tripwires over the whole exported method set,
-      each fed arguments that actually reach the receiver. A typed-nil
-      *transport.WireError — the value a failed errors.As / errors.AsType
-      leaves behind — answers Error and Unwrap rather than panicking
-      (transport/nilwireerror_test.go), and answers with the text its own zero
-      value produces, as *query.AQLError does; *ehr.NoRepresentationError sits
-      on the same axis but deliberately answers a nil receiver with a text
-      DIFFERENT from its zero value's, pinned at
-      openehr/client/ehr/resource_test.go:66-76. The 2026-08-30 sweep closed
-      the remaining proven-panicking receivers on the axis:
-      discovery.DiscoveryError, auth.ExchangeError and auth.OAuth2Error (the
-      latter returned nil by ParseOAuth2Error for a non-RFC-6749 body, so it
-      reaches consumers with no errors.As involved), parse.SyntaxError, and
-      typereg.DecodeError — re-exported as canjson.DecodeError and
-      canxml.DecodeError, the documented errors.As out-parameter of both
-      codecs. The four consumer sites that dereferenced a MATCHED-but-nil
-      *transport.WireError are guarded too (errors.As / errors.AsType report
-      ok for a boxed typed nil), and transport.Client's Catalog and HTTPClient
-      accessors join Do on the nil-receiver rule. A sealed exported
-      interface a caller can satisfy by EMBEDDING rather than implementing it
-      is the nil-adjacent arm of the same axis: an aql.VersionPredicate whose
-      embedded field is nil dereferences a nil interface at both dispatch
-      sites, so REQ-163's carrier refuses it at Build() as ErrInvalidQuery
-      and the emission path answers rather than panicking. The clause carries a Must-prefix carve-out for the Go
-      convention. The 2026-09-02 sweep closed the consumer-side gap the
-      2026-08-30 sweep's parse.SyntaxError / typereg.DecodeError guards left
-      open: an ok=true, typed-nil errors.AsType[*parse.SyntaxError] match was
-      read without a nil check at openehr/aql/lint.syntaxSpan/syntaxDetail
-      and at the emit_verify.go re-parse-failure site (openehr/aql/parse),
-      the latter extracted into the independently-testable
-      syntaxErrorPosition since ParseQuery itself never returns a typed-nil
-      *SyntaxError (the guard is defense in depth, matching the idiom
-      elsewhere). typereg.DecodeError.Error() also stopped calling
-      Inner.Error() directly -- Inner is any caller/codec-supplied error, not
-      only this SDK's own already-guarded types -- and now renders the cause
-      with %v, which leans on fmt's own recovery of a panicking Error() method
-      and prints "<nil>" for a boxed typed-nil receiver, rather than on a
-      hand-rolled recover. A zero Position is the separate position-honesty
-      rule on the same types, not the nil-receiver one:
-      parse.SyntaxError.Error() stopped printing a fabricated "at 0:0:" for
-      one, and parse's syntaxErrorPosition and lint's syntaxDetail report such
-      a position as ABSENT (ok=false / no "L:C:" prefix) so no consumer
-      diagnostic invents a 0:0 coordinate.
-      2026-09-24 (PR 174): typereg.DecodeInto and DecodePolymorphic refuse a
-      nil decoder and a nil target, and DecodeInto a nil gotType, with a
-      DecodeError wrapping the new sentinel typereg.ErrNilArgument
-      (TestDecodeIntoNilArguments, TestDecodePolymorphicNilArguments; ADR 0022).
-
-  - id: REQ-026
-    title: Goroutine-safe clients
-    canonical: docs/specifications/idiom.md#concurrency-req-026
-    status: draft
-    implementation: landed
-    packages: [transport]
-
-  - id: REQ-030
-    title: Concrete RM structs
-    canonical: docs/specifications/rm-modeling.md#concrete-types-req-030
-    status: draft
-    implementation: landed
-    packages: [openehr/rm]
-
-  - id: REQ-031
-    title: Embedded base structs
-    canonical: docs/specifications/rm-modeling.md#embedded-base-structs-req-031
-    status: draft
-    implementation: landed
-    packages: [openehr/rm]
-    adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
-
-  - id: REQ-032
-    title: Interfaces for abstract RM
-    canonical: docs/specifications/rm-modeling.md#abstract-categories-req-032
-    status: draft
-    implementation: landed
-    packages: [openehr/rm]
-
-  - id: REQ-033
-    title: No inheritance emulation
-    canonical: docs/specifications/rm-modeling.md#no-inheritance-emulation-req-033
-    status: draft
-    implementation: landed
-    packages: [openehr/rm, openehr/rm/typereg]
-    adrs: [docs/adr/0003-rm-event-polymorphism.md]
-
-  - id: REQ-034
-    title: openEHR terminology vocabulary
-    canonical: docs/specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034
-    status: draft
-    implementation: landed
-    packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen, openehr/client/ehr, openehr/client/ehr/contribution, openehr/serialize/simplified, openehr/instance]
-    plans: [docs/plans/archive/2026-09-07-terminology-vocabulary.md]
-    tests:
-      - internal/termgen/parse_test.go
-      - internal/termgen/render_test.go
-      - internal/termgen/run_test.go
-      - openehr/client/ehr/contribution/builder_test.go
-      - openehr/client/ehr/version_header_test.go
-      - openehr/instance/instance_test.go
-      - openehr/serialize/simplified/flat_decode_test.go
-      - openehr/serialize/simplified/rmattr_party_test.go
-      - openehr/terminology/imports_test.go
-      - openehr/terminology/tables_test.go
-      - openehr/terminology/terminology_test.go
-    notes: >-
-      The openEHR Terminology (openehr_terminology.xml, TERM Release-3.0.0) vendored
-      byte-identical with a sha256 manifest, and a stdlib-only openehr/terminology
-      accessor generated from it (termgen), drift-detected in `make test`. Replaces
-      the hand-typed openEHR code tables in openehr/client/ehr (lifecycle state),
-      openehr/client/ehr/contribution (audit change type), openehr/serialize/simplified
-      (participation mode, ctx/ defaults) and openehr/instance (setting / category
-      defaults). No new probe: the vocabulary itself never crosses the wire; its
-      wire consequences — the widened change-type and lifecycle-state validity —
-      ride PROBE-084 (the REQ-130 contribution body) and the REQ-059 openehr-version
-      header tests. Guard tests carry the bar.
-
-  - id: REQ-043
-    title: P_BMM to Go mapping rules
-    canonical: docs/specifications/bmm-conformance.md#mapping-rules
-    status: draft
-    implementation: landed
-    packages: [internal/bmmgen]
-    adrs: [docs/adr/0013-generated-locatable-identity-surface.md, docs/adr/0002-bmm-codegen-decisions.md]
-
-  - id: REQ-044
-    title: Hand-written extensions isolated
-    canonical: docs/specifications/bmm-conformance.md#req-044--hand-written-extensions-are-isolated
-    status: draft
-    implementation: landed
-    packages: [openehr/rm]
-
-  - id: REQ-047
-    title: BMM authoritative on divergence
-    canonical: docs/specifications/bmm-conformance.md#req-047--bmm-spec-divergence-resolution
-    status: draft
-    implementation: landed
-    packages: [internal/bmmgen]
-    tests:
-      - openehr/rm/rminfo/hierarchy_test.go
-      - openehr/rm/rminfo/probe_094_test.go
-
-  - id: REQ-058
-    title: Datamap V2
-    canonical: docs/specifications/module-layout.md
-    status: draft
-    implementation: planned
-    packages: [cadasto/datamap]
-
-  - id: REQ-065
-    title: Per-client tenant binding
-    canonical: docs/specifications/auth.md#req-065
-    status: draft
-    implementation: landed
-    packages: [transport]
-
-  - id: REQ-080
-    title: openEHR wire conformance
-    canonical: docs/specifications/conformance.md#conformance-scope
-    status: draft
-    # Partial: the running probe suite under testkit/probes carries REQ-080
-    # marks, and the FLAT-conformance plan landed the vendored upstream corpus
-    # (testkit/cassettes/flat-conformance/ + sync/check tooling, integrity-gated
-    # by `make ci`) plus, 2026-08-01, PROBE-086 itself — the round-trip harness
-    # in testkit/conformance/webtemplate and its probe wrapper.
-    #
-    # PROBE-086 asserts parity against upstream-AUTHORED FLAT, which PROBE-076
-    # structurally cannot: PROBE-076's input is this SDK's own output, so it
-    # cannot see a path the SDK never emits or a leaf it drops symmetrically.
-    # It earned that distinction immediately, catching a silent encode-side
-    # data loss (EVENT.time, INSTRUCTION.narrative/expiry_time — 32 keys over
-    # 30 fixtures) that PROBE-076 had run green over; fixed in rmpath the same
-    # day (REQ-121).
-    #
-    # Scope, stated plainly: 1466 of the corpus's 1824 keys are in the modelled
-    # subset today (80.4%) — 52 refused by the REQ-053 codec, 306 held out as
-    # composition metadata. (Before the REQ-140 underscore grammar landed on
-    # 2026-08-05 the same three numbers read 360 / 19.7% / 1158; the hold-out
-    # did not move, so the whole ratchet is refused-to-compared.) That hold-out is suffix-aware respellings only
-    # (language, territory, composer|name, composer_self, context/start_time and
-    # context/setting, which REQ-053 reads and writes as the ctx/ short forms;
-    # the composer external_ref suffixes are deliberately NOT held out — they are
-    # refused and visible in the census). The waiver class is empty: context/setting
-    # was the one waiver — it decoded and then re-encoded to nothing while
-    # ctx/setting emission was deferred — until the amended REQ-053 closed that
-    # emission gap on 2026-08-05 and its keys became ordinary respellings.
-    # TestHoldOutMatchesCodecAliases fails if an unbacked hold-out reappears.
-    #
-    # The earlier figure (90 / 4.9%) was a measurement error, not a smaller
-    # codec: `category` was held out as metadata although it is a
-    # template-constrained Web Template leaf on its own FLAT path, spelled
-    # identically on both sides. Its 102 keys (34 fixtures × 3) were already
-    # round-tripping byte-for-byte and are now compared — that is the whole of
-    # the 90 → 192 move; no codec gap closed to earn it.
-    #
-    # 192 → 356 (2026-08-03) is the opposite: real codec gaps closing. The
-    # CODE_PHRASE leaf mapping (ENTRY language/encoding, 136 keys over 68
-    # refusals) removed that family from the census entirely, then the optional
-    # DV_ORDERED/QUANTIFIED/AMOUNT suffixes added 28 more and removed every
-    # per-datatype |suffix row but DV_TEXT's (which is subtype substitution, not
-    # an optional attribute). 356 → 360 (2026-08-05) closed that last row too:
-    # the DV_CODED_TEXT-at-DV_TEXT carve-out took the dv_coded_text_as_dv_text
-    # fixture from 8 compared to 12. 360 -> 1466 (2026-08-05) is the REQ-140
-    # underscore grammar plus the DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL /
-    # ENTRY-subject leaves: 1106 keys moved excluded -> compared in one step,
-    # leaving 52 refusals. See
-    # docs/plans/archive/2026-08-03-flat-coverage-ratchet.md; the remaining ranked
-    # inventory is in testkit/conformance/webtemplate/SKIPPED.md.
-    #
-    # The probe is exact on what it compares (no tolerated-drop list: a key
-    # that decodes and then does not re-encode fails) and adds a coverage floor
-    # (a fixture that compared zero keys fails, since Clean() is vacuously true
-    # over an empty set). The per-fixture excluded/compared ratchet lives in
-    # the harness's own runner_test.go pins, not in the probe.
-    # The inventory and what would move it:
-    # testkit/conformance/webtemplate/SKIPPED.md. PROBE-086 is In-repo by
-    # declaration (REQ-082's Modes class); REQ-082's own `partial` is the
-    # unbuilt runner, not this probe.
-    implementation: partial
-    packages:
-      - testkit/probes
-      - testkit/cassettes/flat-conformance
-      - testkit/conformance/webtemplate
-    probes: [PROBE-086, PROBE-089]
-    tests:
-      - testkit/conformance/webtemplate/runner_test.go
-      - testkit/conformance/webtemplate/helpers_test.go
-      - testkit/probes/serialize/probes_test.go
-    plans:
-      - docs/plans/archive/2026-07-16-web-template-tests-conformance.md
-
-  - id: REQ-081
-    title: Wire-level parity (retired)
-    canonical: docs/specifications/conformance.md#req-081--wire-level-parity-retired
-    status: deprecated
-    implementation: deprecated
-    packages: [testkit/probes]
-
-  - id: REQ-083
-    title: Cadasto platform API conformance
-    canonical: docs/specifications/conformance.md#req-083--cadasto-platform-api-conformance
-    status: draft
-    implementation: partial
-    packages: [cadasto, cadasto/admin]
-    notes: "Health probes (Live/Ready) landed: default paths, WithLivePath/WithReadyPath, origin-derived URL, public/no-auth, status→sentinel map. Platform-API fixtures Phase 4."
-    tests:
-      - cadasto/admin/probes_test.go
 
   - id: REQ-142
     title: Contribution read
@@ -2574,12 +1423,6 @@ requirements:
     tests:
       - openehr/client/ehr/contribution/contribution_test.go
       - testkit/probes/versioned/probes_test.go
-    notes: >-
-      Get reads GET /ehr/{ehr_id}/contribution/{contribution_uid} and decodes
-      the persisted CONTRIBUTION; Repository grew the same read. Empty ids fail
-      with ErrInvalidConfig before any request; 404 maps to ErrNotFound. Version
-      metadata is returned for shape consistency but never required — the pin
-      defines only Content-Type on 200_CONTRIBUTION.
 
   - id: REQ-143
     title: Template list filters
@@ -2592,14 +1435,6 @@ requirements:
     tests:
       - openehr/client/definition/template_test.go
       - testkit/probes/definition/probes_test.go
-    notes: >-
-      ListTemplates gained a trailing variadic ...ListOption carrying the five
-      ITS-REST list parameters (template_id, concept, version, offset, fetch);
-      unset options omit their key and an explicit zero offset/fetch is sent.
-      Negative offset/fetch fail with ErrInvalidConfig and issue no request --
-      an SDK floor, the pin declares no minimum. Repository.ListTemplates grew
-      the same variadic signature. ADL 2 deferred: FormatADL14 is the only
-      registered TemplateFormat.
 
   - id: REQ-144
     title: Definition metadata decoding
@@ -2617,47 +1452,6 @@ requirements:
       - openehr/client/definition/template_test.go
       - openehr/client/definition/stored_query_test.go
       - openehr/client/system/system_test.go
-    notes: >-
-      Decode of the two Definition catalog timestamps
-      (TemplateMetadata.created_timestamp, StoredQueryMetadata.saved) accepts a
-      CLOSED layout set: RFC3339/RFC3339Nano, 2006-01-02T15:04:05,
-      2006-01-02T15:04, and the space-separated 2006-01-02 15:04:05 (deployment
-      interop -- not ISO 8601 extended, not REST-legal, accepted because
-      deployments emit it). Fractional seconds ride the seconds-bearing
-      layouts via stdlib time.Parse absorption; the minute-precision layout
-      takes neither. The pin is ASYMMETRIC about the two fields, which is why
-      the leniency is a departure for one and a correction for the other:
-      created_timestamp is required but a bare `type: string` with no format
-      (resources/its-rest/definition-validation.openapi.yaml:509, :521-522), so
-      RFC3339-only decode over-constrained a field the pin never constrained;
-      saved is required with `format: date-time` (:3872, :3882-3884), so its
-      tolerance genuinely exceeds the pin and is the keyed REQ-095 exception
-      ADR 0019 grants on deployment evidence (609a104, a space-separated
-      created_timestamp aborting a whole ListTemplates decode). Zone-less values
-      decode as UTC and therefore re-marshal with a Z the wire never carried;
-      the pinned REST overview assumes the deployment's LOCAL zone
-      (overview-validation.openapi.yaml:675), which an SDK cannot know for a
-      remote server -- recorded as ADR 0019 departure (c), not a time.Parse side
-      effect. Absent/null/empty yields the zero time with no error (departure
-      (b)); a non-empty unparseable value fails the containing item and the list
-      call naming the field, never a silent zero. Encode is unchanged (RFC 3339)
-      -- asymmetric tolerance, ADR 0004's precedent. Also fixes the empty-BODY
-      arm: ListTemplates/ListStoredQueries return a non-nil zero-length slice
-      (a nil slice boxed in a non-nil interface marshals as JSON null -- the
-      read-side twin of the REQ-094 typed-nil trap). The unknown-key (Extras)
-      contract is this §'s too, for the two Definition descriptors and, by
-      § REQ-050, the System descriptor, including the documented-field-wins
-      collision rule: StoredQueryMetadata reached TemplateMetadata's re-emit
-      parity here. Pinned per descriptor by
-      the collision rows of TestStoredQueryMetadataExtrasRoundTrip and
-      TestTemplateMetadataRoundTrip -- one row per mechanism, since deleting
-      the known-key deletion and restoring Extras-last precedence fail
-      different rows. Preserved values survive up to the insignificant
-      whitespace encoding/json compacts and the <, > and & it escapes as
-      \u003c, \u003e and \u0026 inside a json.RawMessage -- the escaped spelling
-      decodes to the identical value -- so those tests normalise the want
-      through json.Marshal (the encode path itself) rather than comparing raw
-      bytes.
 
   - id: REQ-150
     title: Path-parameter segment validation
@@ -2672,17 +1466,6 @@ requirements:
       - openehr/client/route_guard_test.go
       - openehr/client/ehr/composition/composition_test.go
       - testkit/probes/transport/probes_test.go
-    notes: >-
-      ValidatePathSegment / ValidateRequestPath refuse a segment that is
-      "." / ".." / empty or carries "/", "\\", a C0 control byte or DEL;
-      the chain wraps both ErrInvalidPathSegment and ErrInvalidConfig, and the
-      sentinels stay independent values. Enforced at Do's request-preparation
-      site (not inside joinTarget, whose call site already wraps
-      ErrInvalidConfig) together with the Route-arity rule that catches a
-      separator smuggled inside one parameter. A Path of exactly "/" is the
-      service root and passes -- the System API sends OPTIONS /. Route gates
-      the arity half, so openehr/client carries an AST tripwire holding every
-      transport.Request literal to setting it.
 
   - id: REQ-151
     title: Typed 2xx decode failure
@@ -2695,7 +1478,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-09-04-error-axis-leftovers.md
       - docs/plans/archive/2026-08-30-read-path-decode-taxonomy.md
-      - docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md  # ehr.Create's hand-rolled DecodeError arm
+      - docs/plans/archive/2026-09-01-ehr-create-empty-2xx-typing.md
     tests:
       - transport/null_body_test.go
       - openehr/client/ehr/composition/null_body_test.go
@@ -2707,39 +1490,10 @@ requirements:
       - openehr/client/system/decode_error_test.go
       - openehr/client/demographic/decode_error_test.go
       - openehr/client/ehr/composition/decode_error_test.go
-      - openehr/client/ehr/decode_error_test.go  # § Keyed exclusions, the Prefer=identifier arm
-      - openehr/client/ehr/ehr_test.go  # TestCreateEmpty2xxBody/garbage_body -- ehr.Create's hand-rolled *transport.DecodeError
-      - openehr/client/ehr/contribution/decode_error_test.go  # § Keyed exclusions, the write-result funnel
+      - openehr/client/ehr/decode_error_test.go
+      - openehr/client/ehr/ehr_test.go
+      - openehr/client/ehr/contribution/decode_error_test.go
       - testkit/probes/transport/probes_test.go
-    notes: >-
-      transport.DecodeError carries the request's method and route template,
-      the raw response bytes and the decoder's error. transport.Decode returns
-      it for any 2xx body that will not decode, and the hand-rolled leaf
-      decodes construct the same type -- five in definition, three in
-      demographic, plus system.Capabilities, composition.Get and ehr.Create --
-      so which implementation route a leaf took stays invisible to the caller.
-      errors.AsType reaches it through each leaf's fmt.Errorf operation-name
-      wrap; Body is populated unconditionally (ADR 0018), inheriting whatever
-      ceiling the caller's WithMaxResponseBody sets, including none where
-      REQ-093's negative escape hatch disabled the cap; Unwrap keeps the
-      codec's own diagnostics reachable; Error() names the method, the route
-      and the classification only -- never the body and never the wrapped
-      decoder's text, whose strconv / encoding/json causes quote the offending literal -- and
-      answers on a nil receiver (REQ-025). The (*T, *Metadata, error) triple
-      still populates metadata beside the error. Both disjointness arms are
-      pinned negatively: a non-2xx stays *transport.WireError, and an empty
-      representation-expecting 2xx body stays transport.ErrInvalidShape,
-      deliberately not unified. The keyed exclusions keep their owning
-      contracts and are pinned where they live: the ehr.WriteResult funnel and
-      contribution.Commit (REQ-094 NoRepresentationError), the
-      Prefer=identifier arm (ehr.ResolveIdentifierBody), the Definition
-      list leaves, where an empty 2xx body is a successful empty catalog,
-      and the four synthesized-metadata arms -- GetStoredQuery, PutStoredQuery,
-      PutStoredQueryVersion and UploadTemplate -- where an empty 2xx body is a
-      success the leaf answers from what it already knows (pre-existing
-      deployment tolerance, 0352ce8). Scope follows the decode, not the verb,
-      so the Definition upload/PUT leaves are in for their non-empty bodies.
-      PROBE-101 holds the wire-level half in Sandbox mode.
 
   - id: REQ-160
     title: AQL containment admissibility relation
@@ -2755,37 +1509,17 @@ requirements:
       - openehr/aql/contain/overlay_test.go
       - openehr/aql/contain/archetype_test.go
       - openehr/aql/contain/imports_test.go
-      - openehr/aql/contain/nilrelation_test.go  # § Nil and zero relations; also REQ-025
-      - openehr/aql/contain/unavoidable_test.go  # TypeRelation.Unavoidable, the REQ-164 widening
-      - testkit/probes/aql/probe_097_semantic_lint.go  # the PROBE-097 armature over the semantic-lint corpus
-      - testkit/probes/aql/probe_100_conformance_corpus.go  # the PROBE-100 corpus reader and its reconstruction table
-      - testkit/probes/aql/probe_100_internal_test.go  # the reconstruction table's own Vars-are-leading-Header contract
+      - openehr/aql/contain/nilrelation_test.go
+      - openehr/aql/contain/unavoidable_test.go
+      - testkit/probes/aql/probe_097_semantic_lint.go
+      - testkit/probes/aql/probe_100_conformance_corpus.go
+      - testkit/probes/aql/probe_100_internal_test.go
       - testkit/probes/aql/probes_test.go
     probes: [PROBE-097, PROBE-100]
     plans:
       - docs/plans/archive/2026-08-21-aql-semantic-layer.md
       - docs/plans/archive/2026-08-26-aql-conformance-corpus.md
     adrs: [docs/adr/0017-aql-semantic-layer.md]
-    notes: >-
-      Verdict relation (Admissible / Never / ByReference / UnknownClass)
-      derived at runtime from the pinned BMM via rminfo (REQ-048), plus the
-      cited overlay-edge table (EHR root, VERSION tier, FOLDER->COMPOSITION
-      by reference) and consumer-extensible overlays. Phase 1 landed the
-      package and its guards; PROBE-097 now arms it against the Phase 2 lint
-      corpus and the Phase 3 builder-verification parity arm. REQ-164 widened
-      the query surface by one method, TypeRelation.Unavoidable(anc, via,
-      desc) -- reachability from anc to desc with via excluded, answered over
-      the same overlaid graph and deliberately outside the verdict memo, whose
-      key is a pair. The relation's own contract is unchanged: no verdict, no
-      overlay rule and no nil/zero behaviour moved, and the new method answers
-      as the default on a nil receiver like the other four. PROBE-100 puts the
-      relation's own evidence base under CI: the compatibility guard the
-      Acceptance section cites is generalised from hand-picked rows to the
-      vendored upstream FROM/CONTAINS corpus (67 rows, 12 CSVs, five families,
-      pinned by testkit/cassettes/aql/conformance/AQL_SOURCE.txt), each row
-      reconstructed with its consuming Robot suite's own query template and
-      held to parse plus no Error-severity containment code. No relation
-      behaviour changed to meet it -- all 67 rows already held.
 
   - id: REQ-161
     title: AQL semantic and portability lint
@@ -2794,8 +1528,8 @@ requirements:
     implementation: landed
     packages:
       - openehr/aql/lint
-      - openehr/aql/internal/semcheck  # the shared verdict->code engine, also REQ-162's
-      - openehr/validation  # § Relation supply — the ValidateAQLWithTypeRelation seam
+      - openehr/aql/internal/semcheck
+      - openehr/validation
       - testkit/probes/aql
     probes: [PROBE-097]
     plans: [docs/plans/archive/2026-08-21-aql-semantic-layer.md]
@@ -2806,20 +1540,8 @@ requirements:
       - openehr/aql/internal/semcheck/semcheck_test.go
       - openehr/aql/internal/semcheck/imports_test.go
       - openehr/validation/aql_test.go
-      - testkit/probes/aql/probe_097_semantic_lint.go  # the PROBE-097 armature over the semantic-lint corpus
+      - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probes_test.go
-    notes: >-
-      Additive REQ-109 Layer-2 extension: relation-backed semantic checks
-      (impossible containment, non-containable target, archetype/class
-      mismatch, unknown class, by-reference hop) plus spec-gap portability
-      checks (VERSION predicate default SPECPR-481, unreferenced
-      VERSIONED_OBJECT, conservative fan-out advisory). Existing codes,
-      severities and texts unchanged; PROBE-028's three-cassette corpus
-      re-ran under the completed linter and gained none of the eight codes,
-      so no re-baseline was needed. The verdict->code classification and the
-      suppression rule live once in openehr/aql/internal/semcheck so
-      REQ-162's write-side adapter reports the same multiset; PROBE-097 arms
-      all eight codes, both suppression rules, and the fan-out near misses.
 
   - id: REQ-162
     title: Builder containment verification
@@ -2828,7 +1550,7 @@ requirements:
     implementation: landed
     packages:
       - openehr/aql
-      - openehr/aql/internal/semcheck  # the shared verdict->code engine, also REQ-161's
+      - openehr/aql/internal/semcheck
       - testkit/probes/aql
     probes: [PROBE-097]
     plans: [docs/plans/archive/2026-08-21-aql-semantic-layer.md]
@@ -2837,14 +1559,8 @@ requirements:
       - openehr/aql/verify_test.go
       - openehr/aql/verify_parity_test.go
       - openehr/aql/imports_test.go
-      - testkit/probes/aql/probe_097_semantic_lint.go  # PROBE-097 arm (c), the read/write parity guard
+      - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probes_test.go
-    notes: >-
-      Opt-in verification entry point over the builder's own containment
-      algebra, reporting REQ-161's containment codes; Build() validation
-      set, error texts and emission byte-identical to pre-REQ-162. Held to
-      read/write parity with lint by PROBE-097's arm (c), including its
-      non-vacuity guard over the containment-code corpus.
 
   - id: REQ-163
     title: AQL write-side expressivity parity
@@ -2867,42 +1583,8 @@ requirements:
       - openehr/aql/containment_roundtrip_test.go
       - openehr/aql/verify_parity_test.go
       - openehr/aql/parse/dispatch_tripwire_test.go
-      - testkit/probes/aql/probe_097_semantic_lint.go  # PROBE-097 arm (c), widened to REQ-163's now-buildable rows
+      - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probes_test.go
-    notes: >-
-      Write-side carriers for the three class- and projection-position
-      vocabularies the read side already models: the sealed three-shape
-      version predicate (versionPredicate : LATEST_VERSION | ALL_VERSIONS |
-      standardPredicate) reached through the VERSION-fixed aql.Version, the
-      one-comparison class standing predicate
-      (Containment.Predicated, four refusals — junction receiver, archetype
-      pair, second standing predicate, VERSION routing), and the typed
-      projection mirroring parse.SelectClause (DISTINCT, AS,
-      aggregate/function and literal items, star). Two API forks settled in
-      the prose rather than in code: Col keeps its signature and its
-      leniency while Build() gains the after-emission structural
-      verification REQ-119's own scope-change clause anticipated, and a
-      standing predicate on a VERSION-spelled node is refused with an error
-      naming the version-predicate constructor (one carrier per grammar
-      position). Build()'s verification compares the clause-level flags
-      including the deprecated TOP's FORWARD/BACKWARD direction, and fails
-      closed on a lexical region a Col leaves open where the clause ends;
-      beside it four typed constructions the grammar does not admit at the
-      position they render are refused — a FuncCall-shaped Lit, an
-      aggregate-shaped Fn argument, a function-shaped comparison operand in
-      either bracket carrier, and a VersionPredicate shape outside the sealed
-      three, that last reachable by EMBEDDING the exported interface and so
-      refused rather than panicked (REQ-025). No new probe id: PROBE-088
-      gained fifteen golden fixtures and four refusal rows, PROBE-097 arm (c)
-      four parity rows that were builder-inexpressible; what stays
-      unspellable is the FROM root's own bracket in every spelling. Additive
-      — PROBE-020's golden is byte-unchanged and no REQ-161/162 code or
-      contract moves. The two changes to previously-accepted behaviour
-      § Additivity enumerates are called out in the CHANGELOG: the Build()
-      refusal class above (semver-minor on REQ-119's footing), and
-      aql.SelectField losing useful ==-comparability — == still COMPILES and
-      panics at run time whenever either operand carries a call-shaped field,
-      map insertion likewise, the trap aql.Containment set in v0.18.0.
 
   - id: REQ-164
     title: AQL path-shape and paging lint
@@ -2914,60 +1596,14 @@ requirements:
       - openehr/aql/contain
       - testkit/probes/aql
     tests:
-      - openehr/aql/lint/pathshape_test.go  # aql_path_repeating_unpredicated, the walk's stops as seen from outside
-      - openehr/aql/lint/pathshape_parseonly_test.go  # aql_paging_no_order_by, aql_select_no_alias
-      - openehr/aql/lint/pathshape_fanout_test.go  # aql_fanout_path_grain
-      - openehr/aql/lint/pathshape_redundant_test.go  # aql_contains_redundant_step
-      - openehr/aql/lint/pathshape_internal_test.go  # § The conservative segment walk — each silent stop by name, and containsChain
+      - openehr/aql/lint/pathshape_test.go
+      - openehr/aql/lint/pathshape_parseonly_test.go
+      - openehr/aql/lint/pathshape_fanout_test.go
+      - openehr/aql/lint/pathshape_redundant_test.go
+      - openehr/aql/lint/pathshape_internal_test.go
       - testkit/probes/aql/probe_099_path_shape_lint.go
-      - testkit/probes/aql/probes_test.go  # the PROBE-099 corpus, its able-to-fail guard controls, and the PROBE-028 baseline table
+      - testkit/probes/aql/probes_test.go
     probes: [PROBE-099]
     plans:
       - docs/plans/archive/2026-08-26-aql-path-shape-lint.md
       - docs/plans/archive/2026-09-02-aql-req151-error-leftovers.md
-    notes: >-
-      Third additive REQ-109 Layer-2 group: path shape. Five Warning codes
-      shipped -- aql_path_repeating_unpredicated (an unpredicated
-      multi-valued RM segment in SELECT, WHERE or ORDER BY alike, typed
-      through rminfo's flattened AttributeRMType / IsContainer),
-      aql_paging_no_order_by (in-text LIMIT and the Options.Query envelope's
-      Fetch/Offset, no ORDER BY), aql_select_no_alias (per unaliased SELECT
-      item, star items exempt), aql_fanout_path_grain (the PATH source of
-      engine-defined row multiplicity, SPECQUERY-9, once per alias --
-      sibling of REQ-161's junction-source aql_fanout_row_grain, whose
-      catalogue row gains only the scope-boundary sentence) and
-      aql_contains_redundant_step (an unreferenced, predicate-less,
-      non-root, non-leaf operand whose class is unavoidable under the
-      REQ-160 relation). The segment walk is conservative in the Layer-3
-      style: an unknown class, an attribute the pin does not declare, a BMM
-      generic parameter (EVENT.data is typed T, as ORIGINAL_VERSION.data is)
-      or a $param archetype scope ends it silently, so the walk's reach on
-      the current pin is bounded and the spec says so. Always on rather than
-      Options-gated (no code flips Result.OK(); a caller filters by Code)
-      with the rejected style-gate alternative recorded. No
-      double-reporting: a VERSIONED_OBJECT-conforming operand keeps
-      REQ-161's aql_versioned_object_unreferenced. The redundant-step check
-      was specified as CUTTABLE -- the group's one check needing a new
-      REQ-160 relation query -- and implementation review KEPT it, so the
-      group ships five codes and not four; the fork is recorded in REQ-164
-      § The redundant-step ruling rather than erased, and the code string
-      stays un-reusable either way. That query landed as
-      TypeRelation.Unavoidable (reachability with one vertex excluded,
-      outside the verdict memo) and is also why aql_contains_redundant_step
-      is the one REQ-164 code Options.Relation governs -- a route fact is
-      exactly what an overlay edge states -- while it gates none; the other
-      four split in two pairs, the two the segment walk feeds asking class
-      questions no relation may answer differently and the two parse-only
-      ones consulting no RM fact at all. PROBE-099 (Implemented, inline)
-      carries the corpus: per-code positive, per-rule negative near-miss,
-      and the PROBE-028 re-baseline, which is RECORDED in the PROBE-099
-      catalogue entry in conformance.md -- valid.aql and missing_archetype.aql
-      each gained exactly aql_select_no_alias, bad_syntax.aql nothing. The
-      2026-09-02 leftovers plan added a discriminating supplied-relation
-      Silent-arm row: the shipped Fire-arm supplied-relation row's overlay
-      (EHR -> VERSIONED_PARTY) is deliberately inert, so it cannot detect a
-      regression that stops threading Options.Relation through the
-      redundant-step check; the new row's overlay (EHR_STATUS -> OBSERVATION,
-      mirroring TestRedundantStepReadsTheSuppliedRelation) SILENCES the same
-      witness query's finding instead, which the default relation alone
-      would still raise -- mutation-detectability verified locally.

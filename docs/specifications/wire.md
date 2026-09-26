@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers), REQ-095 (OpenAPI authoritative source), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-142 (contribution read), REQ-143 (template list filters), and REQ-144 (Definition metadata decoding). The wire-extension band 140–149 continues the exhausted 050–059 band; the SDK authoring & client-tooling band 130–139 opens here with REQ-130. Transport hygiene (REQ-090–094, REQ-150) lives in [transport.md](transport.md).
+The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers), REQ-095 (OpenAPI authoritative source), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-142 (contribution read), REQ-143 (template list filters), and REQ-144 (Definition metadata decoding). Transport hygiene (REQ-090–094, REQ-150) lives in [transport.md](transport.md).
 
 The premise: correctness is wire-level (REQ-080). The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
 
@@ -34,6 +34,8 @@ When the OpenAPI files and any in-repo prose disagree, the OpenAPI wins; the pro
 **Keyed exceptions.** One departure is granted and named here: decode of `StoredQueryMetadata.saved` **MAY** accept values the pin's `format: date-time` declaration excludes, exactly as the Definition metadata timestamp tolerance of [REQ-144](#req-144--definition-metadata-decoding) specifies. It is decided by [ADR 0019](../adr/0019-definition-timestamp-tolerance.md) on deployment evidence observed on `created_timestamp`, extended to `saved` by the shared decode path both descriptors use. Any further exception **MUST** be added to this list with the requirement and decision that key it — a departure the authoritative-source rule does not name is a defect, not an exception.
 
 **Path-parameter encoding.** A request path **MUST** conform to the OAS path template — each path parameter is percent-encoded **exactly once** on the wire. The transport is the **single canonical path encoder**: [`transport.Request.Path`](../../transport/request.go) is a **decoded** path (`url.URL.Path` semantics) that `url.URL.String()` encodes once on the way out. Leaf clients (`openehr/client/*`) **MUST** interpolate the **raw**, decoded id into `Request.Path` and **MUST NOT** pre-escape it with `url.PathEscape` — a pre-escaped parameter is encoded twice (a template id `Referral Request.v1` → `%20` → `%2520`), which a strict server unescapes to a literal `%20` and answers `404`. Segment legality is a separate question from encoding: a path parameter containing `/` — or any other content [REQ-150](transport.md#req-150--path-parameter-segment-validation) forbids — is governed by that requirement, the transport's segment validator — which also forbids honouring `url.URL.RawPath` (the encoded hint), so there is no encoding-level escape hatch for a separator-bearing value; the MUST NOT lives there, not here. Decoding a server-supplied value (e.g. the `Location` header via `url.PathUnescape`) is unaffected — the rule is about **forming** the request path, not reading a response.
+
+**Coverage of vendored bodies.** Not every decoded surface has an upstream-shaped body under `testkit/cassettes/its_rest/` yet; tests build the rest by hand. The open list is [`testkit/cassettes/its_rest/README.md` § Coverage against the client surface](../../testkit/cassettes/its_rest/README.md#coverage-against-the-client-surface).
 
 ## REST version pin
 
@@ -443,7 +445,7 @@ The set is closed: decode **MUST NOT** accept a **non-empty** value outside it (
 
 ### REQ-130 — Contribution builder
 
-The contribution leaf **MUST** expose a builder that assembles a `Contribution_create` body — a [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) — from caller payloads without hand-wiring version wrappers, change-type codes, or write-side audit fields. It is the first allocation in the **SDK authoring & client tooling** band (130–139) and is named as SDK-provided by [use-cases.md § Synthetic data seeder](use-cases.md#synthetic-data-seeder).
+The contribution leaf **MUST** expose a builder that assembles a `Contribution_create` body — a [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) — from caller payloads without hand-wiring version wrappers, change-type codes, or write-side audit fields. It is named as SDK-provided by [use-cases.md § Synthetic data seeder](use-cases.md#synthetic-data-seeder).
 
 The builder is an authoring surface over the landed submission shape (REQ-050/095, [PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)) and introduces no new wire shape: anything it emits, a caller **MUST** be able to hand-wire. Where the two could disagree, the builder **MUST** defer to the submission shape.
 
