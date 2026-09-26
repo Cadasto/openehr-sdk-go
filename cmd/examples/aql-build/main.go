@@ -1,17 +1,14 @@
-// Example: build an AQL query two ways, with the struct builder and with the
-// verb functions, and show that both emit byte-identical canonical AQL. The
-// builder is a pure building block with no transport, auth or client; the
-// executor lives at openehr/client/query.
+// This example builds AQL queries with the openehr/aql package and prints the
+// query text each one produces. AQL (Archetype Query Language) is the openEHR
+// query language. The builder only produces text and never talks to a server,
+// so the program runs offline with no fixture and no clinical data repository
+// (CDR); executing a built query is the job of openehr/client/query.
 //
-// Surfaces shown:
-//   - aql.NewBuilder() struct style with Select / FromEHR / Contains / Where
-//   - aql.Select(...) verb style producing the same wire string
-//   - aql.Param for safe placeholders (never interpolate caller data)
-//   - WHERE composition with aql.And / aql.Gt / comparison helpers
-//   - the containment algebra (aql.Class / Contains / NotContains /
-//     ContainsOr) and opt-in in-text paging (LimitInline / OffsetInline)
-//   - the opt-in RM-semantics check (Builder.VerifyContainment), which
-//     answers a question Build deliberately does not
+// It shows the two builder styles (a chained Builder and free-standing verb
+// functions) producing byte-identical text, the containment algebra for nested
+// CONTAINS clauses together with in-text LIMIT / OFFSET paging, and the opt-in
+// check that asks whether the classes in a query can contain one another
+// under the openEHR Reference Model (RM).
 //
 // Run:
 //
@@ -26,111 +23,157 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
 )
 
+// bodyTemperature is the archetype the sample queries look for. An archetype
+// id names a reusable clinical model; this one is the OBSERVATION for a body
+// temperature reading.
+const bodyTemperature = "openEHR-EHR-OBSERVATION.body_temperature.v2"
+
+// magnitudePath is the RM path, starting at the alias "o", of the measured
+// temperature inside that archetype.
+const magnitudePath = "o/data[at0001]/events[at0006]/data/items[at0004]/value/magnitude"
+
 func main() {
-	const archetype = "openEHR-EHR-OBSERVATION.body_temperature.v2"
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
 
-	const magnitude = "o/data[at0001]/events[at0006]/data/items[at0004]/value/magnitude"
+// run tells the story in three sections: the same query built two ways, a
+// query with nested containment and in-text paging, and the RM check a caller
+// can opt into after building.
+func run() error {
+	if err := buildTwoWays(); err != nil {
+		return err
+	}
+	fmt.Println()
 
-	// Struct-builder style. FromEHR scopes the query to one EHR via a WHERE
-	// condition; consecutive Contains express nested containment.
-	structQ, err := aql.NewBuilder().
+	// Section 2. Both the builder and the query it builds are kept: the
+	// verification in section 3 runs on the builder's tree, and the query
+	// text is printed next to the findings.
+	algebra := containmentAlgebra()
+	algebraQuery, err := algebra.Build()
+	if err != nil {
+		return fmt.Errorf("build containment-algebra query: %w", err)
+	}
+	fmt.Println("containment algebra + in-text paging:")
+	fmt.Println(" ", algebraQuery)
+	// LimitInline / OffsetInline put the bounds in the text, so the envelope
+	// fields of the built Query stay at their zero values.
+	fmt.Println("  envelope paging unused — Fetch/Offset stay zero:", algebraQuery.Fetch, algebraQuery.Offset)
+	fmt.Println()
+
+	// Section 3. Build only answers the shape question (is this well-formed
+	// AQL?), so the RM-impossible query below builds and emits like any
+	// other. Whether its classes can contain one another is a separate
+	// question, asked with VerifyContainment and only when the caller wants
+	// it: a caller may send such a query on purpose, to probe a server or
+	// to reproduce a bug report.
+	dead := rmImpossibleQuery()
+	deadQuery, err := dead.Build()
+	if err != nil {
+		return fmt.Errorf("build RM-impossible query: %w", err)
+	}
+	fmt.Println("containment verification (opt-in; Build never runs it):")
+	// VerifyContainment walks the builder's own tree, so it needs no built
+	// Query. The nil argument selects the default containment relation of
+	// the pinned RM; a deployment whose CDR allows extra routes passes
+	// contain.Default().WithOverlay(...) instead.
+	printFindings("containment algebra", algebraQuery, algebra.VerifyContainment(nil))
+	printFindings("RM-impossible query", deadQuery, dead.VerifyContainment(nil))
+	return nil
+}
+
+// buildTwoWays builds one logical query with each builder style and shows
+// that the emitted AQL is the same string.
+func buildTwoWays() error {
+	// Struct-builder style: start from NewBuilder and chain the clauses.
+	// FromEHR scopes the query to one EHR by adding a WHERE condition on
+	// e/ehr_id/value. Each Contains nests one level deeper: the COMPOSITION
+	// sits inside the EHR and the OBSERVATION inside the COMPOSITION.
+	// aql.Param("ehr_id") emits a $ehr_id placeholder that is bound at
+	// execution time; never paste caller data into the query text.
+	structQuery, err := aql.NewBuilder().
 		Select(aql.Col("o")).
 		FromEHR("e", aql.Param("ehr_id")).
 		Contains(aql.Archetype("COMPOSITION", "c", "")).
-		Contains(aql.Archetype("OBSERVATION", "o", archetype)).
-		Where(aql.Gt(magnitude, aql.Real(37.5))).
+		Contains(aql.Archetype("OBSERVATION", "o", bodyTemperature)).
+		Where(aql.Gt(magnitudePath, aql.Real(37.5))).
 		Build()
 	if err != nil {
-		log.Fatalf("struct-builder: %v", err)
+		return fmt.Errorf("build struct-style query: %w", err)
 	}
 
-	// Verb-functions style — same construction, different entry point; the
-	// emitter fixes clause order, so SELECT/FROM/WHERE land identically.
-	verbQ, err := aql.Select(aql.Col("o")).
-		Where(aql.Gt(magnitude, aql.Real(37.5))).
+	// Verb-function style: the same clauses, entered through package-level
+	// functions. The clauses are given in a different order on purpose; the
+	// emitter fixes the clause order, so the text still comes out identical.
+	verbQuery, err := aql.Select(aql.Col("o")).
+		Where(aql.Gt(magnitudePath, aql.Real(37.5))).
 		FromEHR("e", aql.Param("ehr_id")).
 		Contains(aql.Archetype("COMPOSITION", "c", "")).
-		Contains(aql.Archetype("OBSERVATION", "o", archetype)).
+		Contains(aql.Archetype("OBSERVATION", "o", bodyTemperature)).
 		Build()
 	if err != nil {
-		log.Fatalf("verb-functions: %v", err)
+		return fmt.Errorf("build verb-style query: %w", err)
 	}
 
-	// REQ-117 containment algebra: a COMPOSITION containing EITHER a
-	// body-temperature OBSERVATION that does NOT itself contain a CLUSTER, OR
-	// any EVALUATION. Every combinator returns a NEW Containment, so operands
-	// compose as values and one can be reused across expressions. A junction
-	// is parenthesised only where the grouping is load-bearing, and NOT
-	// attaches to a CONTAINS connector (NotContains) — never to a junction
-	// operand, because the grammar admits NOT only as `NOT? CONTAINS`.
-	//
-	// Paging goes in-text here (LimitInline / OffsetInline) instead of the
-	// request envelope, so the bound survives stored-query registration. The
-	// two channels are mutually exclusive: setting Limit/Offset as well would
-	// make Build return an error wrapping aql.ErrInvalidQuery.
-	algebraB := aql.NewBuilder().
+	fmt.Println("struct-builder :", structQuery)
+	fmt.Println("verb-functions :", verbQuery)
+	fmt.Println("byte-identical :", structQuery.String() == verbQuery.String())
+	return nil
+}
+
+// containmentAlgebra prepares a query whose CONTAINS clause is a small
+// expression tree: a COMPOSITION that contains either a body-temperature
+// OBSERVATION with no CLUSTER inside it, or any EVALUATION.
+//
+// Every combinator (Contains, NotContains, ContainsOr) returns a new
+// Containment value, so operands can be built separately and reused. The
+// emitter adds parentheses only where the grouping matters, and NOT always
+// attaches to a CONTAINS connector (NotContains) because the grammar allows
+// "NOT CONTAINS" and never a NOT in front of a group.
+//
+// LimitInline and OffsetInline write LIMIT and OFFSET into the query text.
+// The default channel is the request envelope (Limit / Offset, which land in
+// Query.Fetch / Query.Offset); the in-text form is for a query that will be
+// registered as a stored query, where only the text survives. Setting both
+// channels makes Build return an error wrapping aql.ErrInvalidQuery.
+func containmentAlgebra() *aql.Builder {
+	return aql.NewBuilder().
 		Select(aql.Col("c")).
 		FromEHR("e", aql.Param("ehr_id")).
 		Contains(aql.Class("COMPOSITION", "c").Contains(aql.ContainsOr(
-			aql.Archetype("OBSERVATION", "o", archetype).NotContains(aql.Class("CLUSTER", "cl")),
+			aql.Archetype("OBSERVATION", "o", bodyTemperature).NotContains(aql.Class("CLUSTER", "cl")),
 			aql.Class("EVALUATION", "ev"),
 		))).
 		OrderBy("c/context/start_time/value", aql.Descending).
 		LimitInline(20).
 		OffsetInline(40)
-	algebraQ, err := algebraB.Build()
-	if err != nil {
-		log.Fatalf("containment algebra: %v", err)
-	}
-
-	// REQ-162: the opt-in RM-semantics gate. Build answers the SHAPE question
-	// only — is this representable, canonical AQL — so a query whose classes can
-	// never contain one another still builds and still emits. Asking the RM
-	// question is the caller's choice, and this is how it is asked; nil means
-	// the REQ-160 default containment relation (pass a
-	// contain.Default().WithOverlay(…) copy for a deployment whose dialect
-	// admits more).
-	//
-	// The query below is grammatically perfect and semantically dead: no
-	// containment route connects OBSERVATION to EVALUATION, and the archetype
-	// predicate names an OBSERVATION archetype on an EVALUATION. Build accepts
-	// it — a caller is entitled to send it anyway, probing a dialect or
-	// reproducing a bug report — and the verification says why it can never
-	// match.
-	deadB := aql.NewBuilder().
-		Select(aql.Col("ev")).
-		From("OBSERVATION", "o").
-		Contains(aql.Archetype("EVALUATION", "ev", archetype))
-	deadQ, err := deadB.Build()
-	if err != nil {
-		log.Fatalf("RM-impossible query: %v", err) // it builds: REQ-162 leaves Build unchanged
-	}
-
-	fmt.Println("struct-builder :", structQ)
-	fmt.Println("verb-functions :", verbQ)
-	fmt.Println("byte-identical :", structQ.String() == verbQ.String())
-	fmt.Println()
-	fmt.Println("containment algebra + in-text paging (REQ-117):")
-	fmt.Println(" ", algebraQ)
-	fmt.Println("  envelope paging unused — Fetch/Offset stay zero:", algebraQ.Fetch, algebraQ.Offset)
-	fmt.Println()
-	fmt.Println("containment verification (REQ-162) — opt-in; Build never runs it:")
-	verify("containment algebra", algebraQ, algebraB.VerifyContainment(nil))
-	verify("RM-impossible query", deadQ, deadB.VerifyContainment(nil))
 }
 
-// verify prints one VerifyContainment result. A finding carries a value-free
-// Code and a value-bearing Detail and NO severity — a builder tree has no source
-// text to point into, and each code's severity is fixed once, in the REQ-161
-// catalogue — so the code is what a caller dispatches on, and what is printed.
-func verify(label string, q aql.Query, findings []contain.Finding) {
-	fmt.Printf("  == %s ==\n  %s\n", label, q)
+// rmImpossibleQuery prepares a query that is well-formed AQL and can never
+// return a row: under the RM no containment route connects OBSERVATION to
+// EVALUATION, and the archetype id names an OBSERVATION archetype on an
+// EVALUATION class.
+func rmImpossibleQuery() *aql.Builder {
+	return aql.NewBuilder().
+		Select(aql.Col("ev")).
+		From("OBSERVATION", "o").
+		Contains(aql.Archetype("EVALUATION", "ev", bodyTemperature))
+}
+
+// printFindings prints the query and one VerifyContainment result for it. A
+// Finding carries a stable Code, which is what a program dispatches on, and
+// a free-text Detail. It carries no severity and no position: a builder tree
+// has no source text to point into, and each code's severity is fixed in the
+// lint catalogue (the VerifyContainment doc lists them).
+func printFindings(label string, query aql.Query, findings []contain.Finding) {
+	fmt.Printf("  == %s ==\n  %s\n", label, query)
 	if len(findings) == 0 {
 		fmt.Print("  result : no findings — every containment step is admissible under the pinned RM\n\n")
 		return
 	}
-	for _, f := range findings {
-		fmt.Printf("  %s\n    %s\n", f.Code, f.Detail)
+	for _, finding := range findings {
+		fmt.Printf("  %s\n    %s\n", finding.Code, finding.Detail)
 	}
 	fmt.Println()
 }

@@ -1,22 +1,23 @@
-// Example: decode canonical-JSON Composition bytes with canjson,
-// compile vital_signs.opt, and validate. Shows the
-// wire-bytes → RM → validation path without HTTP.
+// Validate a COMPOSITION that arrives as canonical JSON against an operational
+// template (OPT), the way a CI check or an inbound gateway would: read the
+// bytes, decode them into RM structs, compile the OPT, and list every
+// constraint the document breaks. No HTTP is involved.
 //
-// Default fixture testdata/minimal_blood_pressure.json is a
-// single blood-pressure composition that validates cleanly against
-// vital_signs.opt (generated via gen_fixture.go). The vendored
-// testkit/cassettes/compositions/vital_signs.json cassette does
-// not validate cleanly against that OPT (demo data and constraint
-// mismatches); use -cassette to see that outcome.
-//
-// Run:
+// By default it validates testdata/minimal_blood_pressure.json, a hand-made
+// composition that passes against the vendored vital_signs.opt. With -cassette
+// it validates the vendored vital_signs.json cassette instead, which is demo
+// data and reports issues, so you can see what a failing run looks like. Two
+// positional arguments validate your own files.
 //
 //	go run ./cmd/examples/validate-from-json
 //	go run ./cmd/examples/validate-from-json -cassette
 //	go run ./cmd/examples/validate-from-json composition.json template.opt
+//
+// The exit status is 1 when the composition does not validate.
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -24,76 +25,115 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func main() {
-	cassette := flag.Bool("cassette", false, "use testkit vital_signs.json (expected to report validation issues)")
-	flag.Parse()
-	jsonPath, optPath := resolvePaths(*cassette, flag.Args())
+	valid, err := run()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !valid {
+		// Validation issues are a result, not a program failure: they were
+		// printed above, and the exit status carries the outcome to scripts.
+		os.Exit(1)
+	}
+}
 
+// run validates the chosen composition and reports whether it passed. An
+// error means the program could not do its job (bad path, unreadable OPT); a
+// false result means the composition was checked and has issues.
+func run() (valid bool, err error) {
+	useCassette := flag.Bool("cassette", false, "validate testkit vital_signs.json, demo data that reports issues")
+	flag.Parse()
+	jsonPath, optPath, err := resolvePaths(*useCassette, flag.Args())
+	if err != nil {
+		return false, err
+	}
+
+	// Step 1: read the wire bytes and decode them. canjson reads the "_type"
+	// discriminators and fills the typed rm structs; a document that is not
+	// well-formed canonical JSON fails here, before any template is involved.
 	body, err := os.ReadFile(jsonPath)
 	if err != nil {
-		log.Fatalf("read JSON %q: %v", jsonPath, err)
+		return false, fmt.Errorf("read JSON %q: %w", jsonPath, err)
 	}
-	var comp rm.Composition
-	if err := canjson.Unmarshal(body, &comp); err != nil {
-		log.Fatalf("canjson.Unmarshal: %v", err)
+	var composition rm.Composition
+	if err := canjson.Unmarshal(body, &composition); err != nil {
+		return false, fmt.Errorf("decode canonical JSON: %w", err)
 	}
 	fmt.Printf("json        : %s (%d bytes)\n", filepath.Base(jsonPath), len(body))
 	fmt.Printf("composition : archetype_node_id=%s content_items=%d\n",
-		comp.ArchetypeNodeID, len(comp.Content))
+		composition.ArchetypeNodeID, len(composition.Content))
 
+	// Step 2: parse and compile the OPT. An operational template is the
+	// deployable form of an openEHR template: every archetype it uses,
+	// flattened into one XML file with the template's constraints applied.
+	// Compile turns the parsed XML into the driver that the validator (and
+	// the composition builder, the instance generator, the AQL lint) walks.
 	opt, err := template.ParseFile(optPath)
 	if err != nil {
-		log.Fatalf("parse OPT %q: %v", optPath, err)
+		return false, fmt.Errorf("parse OPT %q: %w", optPath, err)
 	}
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {
-		log.Fatalf("Compile %q: %v", optPath, err)
+		return false, fmt.Errorf("compile OPT %q: %w", optPath, err)
 	}
 	fmt.Printf("template    : %s (%s)\n", opt.TemplateID(), filepath.Base(optPath))
 
-	r := validation.ValidateComposition(&comp, compiled)
-	if r.OK {
+	// Step 3: validate. The template drives the walk: for each node the OPT
+	// declares, the validator reads the matching part of the composition and
+	// checks existence, cardinality, RM type and primitive constraints. It
+	// collects every issue in one pass instead of stopping at the first.
+	result := validation.ValidateComposition(&composition, compiled)
+	if result.OK {
 		fmt.Println("result      : OK — JSON validates against OPT")
-		return
+		return true, nil
 	}
-	fmt.Printf("result      : %d issue(s)\n", len(r.Issues))
-	for _, issue := range r.Issues {
+	fmt.Printf("result      : %d issue(s)\n", len(result.Issues))
+	for _, issue := range result.Issues {
+		// Path points at the offending node, Code is the stable identifier to
+		// dispatch on, Detail is the explanation for a human.
 		fmt.Printf("  %s [%s] %s\n", issue.Path, issue.Code, issue.Detail)
 	}
-	if *cassette {
+	if *useCassette {
 		fmt.Println("note        : vital_signs.json is demo CDR data; issues are expected")
 	}
-	os.Exit(1)
+	return false, nil
 }
 
-func resolvePaths(useCassette bool, args []string) (jsonPath, optPath string) {
-	_, here, _, ok := runtime.Caller(0)
-	if !ok {
-		log.Fatal("cannot locate example source path")
-	}
-	exampleDir := filepath.Dir(here)
-	defaultJSON := filepath.Join(exampleDir, "testdata", "minimal_blood_pressure.json")
-	defaultOPT := fixtures.TemplateOptForName("vital_signs")
-	cassetteJSON := fixtures.CompositionJSON("vital_signs")
-
+// resolvePaths picks the composition and the OPT to validate: the caller's
+// two files, the demo cassette, or the clean default fixture next to this
+// source file.
+func resolvePaths(useCassette bool, args []string) (jsonPath, optPath string, err error) {
 	switch len(args) {
-	case 0:
-		if useCassette {
-			return cassetteJSON, defaultOPT
-		}
-		return defaultJSON, defaultOPT
 	case 2:
-		return args[0], args[1]
+		return args[0], args[1], nil
+	case 0:
+		// Both vendored inputs are checked against the same vital_signs.opt.
+		optPath = fixtures.TemplateOptForName("vital_signs")
+		if useCassette {
+			return fixtures.CompositionJSON("vital_signs"), optPath, nil
+		}
+		jsonPath, err = defaultCompositionPath()
+		return jsonPath, optPath, err
 	default:
-		log.Fatal("usage: validate-from-json [-cassette] [composition.json template.opt]")
+		return "", "", errors.New("usage: validate-from-json [-cassette] [composition.json template.opt]")
 	}
-	return "", ""
+}
+
+// defaultCompositionPath locates testdata/minimal_blood_pressure.json
+// relative to this source file, so `go run` works from any directory. The
+// fixture was written once by gen_fixture.go.
+func defaultCompositionPath() (string, error) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", errors.New("cannot locate the example's source directory")
+	}
+	return filepath.Join(filepath.Dir(thisFile), "testdata", "minimal_blood_pressure.json"), nil
 }

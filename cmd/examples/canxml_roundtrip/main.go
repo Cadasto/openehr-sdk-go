@@ -1,17 +1,21 @@
-// Example: JSON → struct → XML → struct → JSON round-trip. Decodes a
-// vendored canonical-JSON Composition cassette through canjson,
-// re-encodes it as canonical XML via canxml, decodes the XML back,
-// and re-encodes as JSON, showing that the content survives the trip
-// between the two canonical formats.
+// Take one COMPOSITION through both canonical formats and back: JSON to Go
+// structs, structs to canonical XML, XML back to structs, structs to JSON. The
+// program then compares a JSON re-encode of the decoded input with the JSON it
+// ended with, which shows that the two codecs (canjson and canxml) describe the
+// same document.
 //
-// Run: `go run ./cmd/examples/canxml_roundtrip` from any directory.
+// It runs offline against the vendored body_weight.json cassette:
+//
+//	go run ./cmd/examples/canxml_roundtrip
 package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -20,134 +24,106 @@ import (
 )
 
 func main() {
-	body := loadCassette()
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	body, err := os.ReadFile(fixtures.CompositionJSON("body_weight"))
+	if err != nil {
+		return fmt.Errorf("read cassette: %w", err)
+	}
 	fmt.Printf("input JSON: %d bytes\n", len(body))
 
-	// JSON → struct A
-	var a rm.Composition
-	if err := canjson.Unmarshal(body, &a); err != nil {
-		log.Fatalf("canjson decode: %v", err)
+	// Step 1: JSON to structs. canjson fills the typed rm structs from the
+	// canonical JSON, using the "_type" discriminators to pick concrete types.
+	var fromJSON rm.Composition
+	if err := canjson.Unmarshal(body, &fromJSON); err != nil {
+		return fmt.Errorf("decode canonical JSON: %w", err)
 	}
-	// A → XML bytes
-	xb, err := canxml.Marshal(&a)
-	if err != nil {
-		log.Fatalf("canxml encode: %v", err)
-	}
-	fmt.Printf("canonical XML: %d bytes\n", len(xb))
-	preview := string(xb)
-	if len(preview) > 200 {
-		preview = preview[:200] + "..."
-	}
-	fmt.Printf("  preview: %s\n", preview)
 
-	// XML → struct C → JSON bytes
-	var c rm.Composition
-	if err := canxml.Unmarshal(xb, &c); err != nil {
-		log.Fatalf("canxml decode: %v", err)
-	}
-	jd, err := canjson.Marshal(&c)
+	// Step 2: structs to canonical XML. Same document, other wire format: the
+	// discriminator becomes xsi:type and the element names match the JSON keys.
+	xmlBytes, err := canxml.Marshal(&fromJSON)
 	if err != nil {
-		log.Fatalf("canjson re-encode: %v", err)
+		return fmt.Errorf("encode canonical XML: %w", err)
 	}
-	fmt.Printf("re-encoded JSON: %d bytes\n", len(jd))
+	fmt.Printf("canonical XML: %d bytes\n", len(xmlBytes))
+	fmt.Printf("  preview: %s\n", preview(xmlBytes, 200))
 
-	// Compare A vs round-tripped JSON structurally (null/absent
-	// normalised on both sides).
-	ja, err := canjson.Marshal(&a)
-	if err != nil {
-		log.Fatalf("canjson encode for A: %v", err)
+	// Step 3: XML back to structs, then structs back to JSON.
+	var fromXML rm.Composition
+	if err := canxml.Unmarshal(xmlBytes, &fromXML); err != nil {
+		return fmt.Errorf("decode canonical XML: %w", err)
 	}
-	if !jsonEqualNorm(ja, jd) {
-		log.Fatalf("cross-format invariant violated — JSON round-trip diverged from JSON→XML→JSON")
+	roundTripped, err := canjson.Marshal(&fromXML)
+	if err != nil {
+		return fmt.Errorf("re-encode canonical JSON: %w", err)
+	}
+	fmt.Printf("re-encoded JSON: %d bytes\n", len(roundTripped))
+
+	// Step 4: compare start and end. The starting point is encoded through
+	// the same codec as the end point, so the cassette's own formatting
+	// (whitespace, member order) does not count; only the decoded content does.
+	direct, err := canjson.Marshal(&fromJSON)
+	if err != nil {
+		return fmt.Errorf("encode canonical JSON: %w", err)
+	}
+	same, err := sameJSON(direct, roundTripped)
+	if err != nil {
+		return err
+	}
+	if !same {
+		return errors.New("the JSON to XML to JSON trip changed the composition")
 	}
 	fmt.Println("OK: JSON ↔ XML cross-format round-trip preserves the Composition structurally")
+	return nil
 }
 
-func loadCassette() []byte {
-	path := fixtures.CompositionJSON("body_weight")
-	b, err := os.ReadFile(path)
-	if err != nil {
-		log.Fatalf("read cassette: %v", err)
+// preview returns the first n bytes of a document, with an ellipsis when
+// something was cut, so the XML shape is visible without flooding the output.
+func preview(doc []byte, n int) string {
+	if len(doc) <= n {
+		return string(doc)
 	}
-	return b
+	return string(doc[:n]) + "..."
 }
 
-// jsonEqualNorm parses two canonical-JSON blobs, strips nil-valued
-// map entries (the SDK treats null and absent equivalently), and
-// compares the resulting trees. Identical to the test-suite helper
-// at canxml/crossformat_test.go.
-func jsonEqualNorm(a, b []byte) bool {
-	av, err := parseAndStrip(a)
-	if err != nil {
-		return false
+// sameJSON reports whether two JSON documents describe the same value tree.
+// Null members are dropped before comparing because the SDK treats a null
+// member and an absent member as the same thing, and the two codecs may pick
+// either spelling for an empty optional field.
+func sameJSON(a, b []byte) (bool, error) {
+	var treeA, treeB any
+	if err := json.Unmarshal(a, &treeA); err != nil {
+		return false, fmt.Errorf("parse JSON for comparison: %w", err)
 	}
-	bv, err := parseAndStrip(b)
-	if err != nil {
-		return false
+	if err := json.Unmarshal(b, &treeB); err != nil {
+		return false, fmt.Errorf("parse JSON for comparison: %w", err)
 	}
-	return jsonEqual(av, bv)
+	return reflect.DeepEqual(withoutNulls(treeA), withoutNulls(treeB)), nil
 }
 
-func parseAndStrip(data []byte) (any, error) {
-	var v any
-	if err := json.Unmarshal(data, &v); err != nil {
-		return nil, err
-	}
-	return stripNulls(v), nil
-}
-
-func stripNulls(v any) any {
-	switch x := v.(type) {
+// withoutNulls returns a copy of a generic JSON tree with every null object
+// member removed, at any depth.
+func withoutNulls(v any) any {
+	switch node := v.(type) {
 	case map[string]any:
-		out := make(map[string]any, len(x))
-		for k, val := range x {
-			if val == nil {
-				continue
+		out := make(map[string]any, len(node))
+		for key, val := range node {
+			if val != nil {
+				out[key] = withoutNulls(val)
 			}
-			cleaned := stripNulls(val)
-			if cleaned == nil {
-				continue
-			}
-			out[k] = cleaned
 		}
 		return out
 	case []any:
-		out := make([]any, len(x))
-		for i, e := range x {
-			out[i] = stripNulls(e)
+		out := make([]any, len(node))
+		for i, item := range node {
+			out[i] = withoutNulls(item)
 		}
 		return out
 	default:
 		return v
-	}
-}
-
-func jsonEqual(a, b any) bool {
-	switch ax := a.(type) {
-	case map[string]any:
-		bx, ok := b.(map[string]any)
-		if !ok || len(ax) != len(bx) {
-			return false
-		}
-		for k, av := range ax {
-			bv, ok := bx[k]
-			if !ok || !jsonEqual(av, bv) {
-				return false
-			}
-		}
-		return true
-	case []any:
-		bx, ok := b.([]any)
-		if !ok || len(ax) != len(bx) {
-			return false
-		}
-		for i := range ax {
-			if !jsonEqual(ax[i], bx[i]) {
-				return false
-			}
-		}
-		return true
-	default:
-		return a == b
 	}
 }
