@@ -509,7 +509,7 @@ func reconstructConformanceQuery(s conformanceSuite, values []string) (string, e
 // and aggregates all failures into one [Result] (collect-all, like
 // [Probe099PathShapeLint]: a single early failure would hide the rest of the
 // corpus, and the point of a corpus ratchet is the whole picture).
-func Probe100ConformanceCorpus(c ConformanceCorpus) (Result, error) {
+func Probe100ConformanceCorpus(c ConformanceCorpus) (Result, error) { // PROBE-100 (REQ-160)
 	r := Result{Probe: "PROBE-100"}
 	if len(c.Rows) == 0 {
 		return r, errors.New("PROBE-100: the corpus reconstructed no rows at all; " +

@@ -51,7 +51,7 @@ type ValidateCase struct {
 // at least one positive (no violations) and one negative
 // (CodeOutOfRange / CodeNotInList / …) case per primitive kind they
 // rely on.
-func Probe024PrimitiveValidate(opt []byte, cases []ValidateCase) (Result, error) {
+func Probe024PrimitiveValidate(opt []byte, cases []ValidateCase) (Result, error) { // PROBE-024 (REQ-082, REQ-103)
 	r := Result{Probe: "PROBE-024"}
 	if len(opt) == 0 {
 		return r, errors.New("PROBE-024: empty OPT body")

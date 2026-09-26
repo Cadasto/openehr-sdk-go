@@ -23,7 +23,7 @@ import (
 // a request body, and one `ehr_id` parameter per id supplied. The OAS
 // operation `admin_ehr_delete_all` declares parameters and no requestBody, so
 // a body on the wire is off-contract however the server treats it.
-func Probe103AdminBulkDelete(ctx context.Context, c *transport.Client, captured func() []*http.Request, ids []openehrclient.EHRID) (Result, error) {
+func Probe103AdminBulkDelete(ctx context.Context, c *transport.Client, captured func() []*http.Request, ids []openehrclient.EHRID) (Result, error) { // PROBE-103 (REQ-099)
 	r := Result{Probe: "PROBE-103"}
 	if c == nil {
 		return r, errors.New("PROBE-103: nil transport.Client")

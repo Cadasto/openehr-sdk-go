@@ -538,7 +538,7 @@ func NewProbe089Target() (*conformance.Target, error) {
 // a non-nil error, so a harness can tell "could not run" from "the codec is
 // wrong". There is no "skip": every fixture here is authored against a
 // vendored template this SDK builds, so an unmodelled shape is a failure.
-func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Result, error) {
+func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Result, error) { // PROBE-089 (REQ-053, REQ-080, REQ-140)
 	r := Result{Probe: "PROBE-089"}
 	if target == nil || target.Web == nil {
 		return r, errors.New("PROBE-089: nil target")
@@ -660,7 +660,7 @@ func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Re
 // must fail to decode, with the sentinel the boundary declares and a message
 // naming the offending key. A successful decode is a failure however faithful
 // the rest of the body is, because that is the forbidden decode-and-drop.
-func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (Result, error) {
+func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (Result, error) { // PROBE-089 (REQ-053, REQ-080, REQ-140)
 	r := Result{Probe: "PROBE-089"}
 	if target == nil || target.Web == nil {
 		return r, errors.New("PROBE-089: nil target")

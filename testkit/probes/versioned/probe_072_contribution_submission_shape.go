@@ -36,7 +36,7 @@ import (
 // The caller supplies a non-nil Submission; the probe uses
 // `Prefer: return=minimal` (the default) so the server's response shape
 // is not part of this assertion. It is purely a request-body check.
-func Probe072ContributionSubmissionShape(ctx context.Context, c *transport.Client, capturedBody *[]byte, ehrID openehrclient.EHRID, sub *contribution.Submission) (Result, error) {
+func Probe072ContributionSubmissionShape(ctx context.Context, c *transport.Client, capturedBody *[]byte, ehrID openehrclient.EHRID, sub *contribution.Submission) (Result, error) { // PROBE-072 (REQ-050, REQ-095)
 	r := Result{Probe: "PROBE-072"}
 	if c == nil || ehrID == "" || sub == nil || capturedBody == nil {
 		return r, errors.New("PROBE-072: missing required inputs (client/ehr/submission/captured)")

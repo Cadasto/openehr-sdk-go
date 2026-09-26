@@ -25,7 +25,7 @@ import (
 // `body` must be canonical-XML bytes for a known concrete RM type.
 // `factory` returns a fresh pointer to the target Go type so the
 // probe owns the value lifecycle.
-func Probe033CanxmlRoundTrip(body []byte, factory func() any) (Result, error) {
+func Probe033CanxmlRoundTrip(body []byte, factory func() any) (Result, error) { // PROBE-033 (REQ-040, REQ-056, REQ-082)
 	r := Result{Probe: "PROBE-033"}
 	if factory == nil {
 		return r, errors.New("PROBE-033: factory is nil")

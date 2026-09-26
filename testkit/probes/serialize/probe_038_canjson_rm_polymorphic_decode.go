@@ -44,7 +44,7 @@ import (
 // `body` must be canonical-JSON bytes for a known concrete RM type.
 // `factory` returns a fresh pointer to the target Go type; it is
 // called twice, so the probe owns each decoded value's lifecycle.
-func Probe038CanjsonRMPolymorphicDecode(body []byte, factory func() any) (Result, error) {
+func Probe038CanjsonRMPolymorphicDecode(body []byte, factory func() any) (Result, error) { // PROBE-038 (REQ-040, REQ-052)
 	return probe038PolymorphicDecode(body, factory, canjson.Marshal)
 }
 

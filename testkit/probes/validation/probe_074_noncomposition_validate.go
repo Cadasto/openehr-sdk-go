@@ -42,7 +42,7 @@ type RootCase struct {
 // demographic PARTY hierarchy and the EHR-IM roots (FOLDER /
 // EHR_STATUS) must produce the same multiset for the same OPT + root
 // shape.
-func Probe074NonCompositionValidate(cases []RootCase) (Result, error) {
+func Probe074NonCompositionValidate(cases []RootCase) (Result, error) { // PROBE-074 (REQ-102, REQ-103, REQ-110)
 	r := Result{Probe: "PROBE-074"}
 	if len(cases) == 0 {
 		return r, errors.New("PROBE-074: at least one case required")

@@ -32,7 +32,7 @@ import (
 //     not be reset between legs.
 //   - presentUID is a uid the backend answers 200 for with a canonical
 //     contribution body; missingUID is one it answers 404 for.
-func Probe092ContributionGet(ctx context.Context, c *transport.Client, captured *[]*http.Request, ehrID openehrclient.EHRID, presentUID, missingUID string) (Result, error) {
+func Probe092ContributionGet(ctx context.Context, c *transport.Client, captured *[]*http.Request, ehrID openehrclient.EHRID, presentUID, missingUID string) (Result, error) { // PROBE-092 (REQ-142)
 	r := Result{Probe: "PROBE-092"}
 	if c == nil || ehrID == "" || presentUID == "" || missingUID == "" {
 		return r, errors.New("PROBE-092: missing required inputs (client/ehr/present uid/missing uid)")

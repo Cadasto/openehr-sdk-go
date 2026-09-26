@@ -42,7 +42,7 @@ type Assignment struct {
 // dependency); openEHR conformance parity means another implementation
 // of the builder against the same OPT + assignments must produce the
 // same pass outcome.
-func Probe023BuilderRoundTrip(ctx context.Context, c *templatecompile.Compiled, opts []composition.Option, assigns []Assignment) (Result, error) {
+func Probe023BuilderRoundTrip(ctx context.Context, c *templatecompile.Compiled, opts []composition.Option, assigns []Assignment) (Result, error) { // PROBE-023 (REQ-082, REQ-101)
 	r := Result{Probe: "PROBE-023"}
 	if c == nil || c.Root() == nil {
 		return r, errors.New("PROBE-023: nil compiled template")

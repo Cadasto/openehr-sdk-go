@@ -29,7 +29,7 @@ import (
 //   - not retry beyond that (DiscoveryError carries the failure);
 //   - return a typed `*discovery.DiscoveryError` whose Reason is
 //     `ReasonFetchFailed`, so `errors.As` callers can act on it.
-func Probe041CatalogRefreshOn401(ctx context.Context, cassetteBody []byte) (Result, error) {
+func Probe041CatalogRefreshOn401(ctx context.Context, cassetteBody []byte) (Result, error) { // PROBE-041 (REQ-071, REQ-072)
 	r := Result{Probe: "PROBE-041"}
 	if len(cassetteBody) == 0 {
 		return r, errors.New("PROBE-041: cassetteBody is empty")

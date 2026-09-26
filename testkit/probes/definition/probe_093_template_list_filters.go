@@ -35,7 +35,7 @@ import (
 // probe asserts only that the call returns no error. An empty catalog is a
 // pass: ListTemplates yields a non-nil zero-length slice for an empty body
 // or 204, and nothing guarantees that a filtered deployment holds templates.
-func Probe093TemplateListFilters(ctx context.Context, c *transport.Client, captured *[]url.Values) (Result, error) {
+func Probe093TemplateListFilters(ctx context.Context, c *transport.Client, captured *[]url.Values) (Result, error) { // PROBE-093 (REQ-143)
 	r := Result{Probe: "PROBE-093"}
 	if c == nil {
 		return r, errors.New("PROBE-093: nil transport.Client")

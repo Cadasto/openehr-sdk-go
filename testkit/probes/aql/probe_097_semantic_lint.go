@@ -207,7 +207,7 @@ type SemanticCorpus struct {
 // Probe097SemanticLint runs every row of every arm and aggregates all
 // failures into one [Result] (collect-all, like [Probe028AQLLint]: a single
 // early failure would hide the rest of the corpus from the report).
-func Probe097SemanticLint(c SemanticCorpus) (Result, error) {
+func Probe097SemanticLint(c SemanticCorpus) (Result, error) { // PROBE-097 (REQ-160, REQ-161, REQ-162, REQ-163)
 	r := Result{Probe: "PROBE-097"}
 	if len(c.Fire) == 0 || len(c.Silent) == 0 || len(c.Additivity) == 0 || len(c.Parity) == 0 {
 		return r, errors.New("PROBE-097: all four corpus fields (Fire, Silent, Additivity, Parity) are required")

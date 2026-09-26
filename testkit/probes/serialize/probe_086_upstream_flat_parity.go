@@ -52,7 +52,7 @@ import (
 //
 // Framework misuse (nil target, a case with no FLAT path) returns a non-nil
 // error.
-func Probe086UpstreamFlatParity(target *conformance.Target, c conformance.Case) (Result, error) {
+func Probe086UpstreamFlatParity(target *conformance.Target, c conformance.Case) (Result, error) { // PROBE-086 (REQ-053, REQ-080, REQ-106)
 	r := Result{Probe: "PROBE-086"}
 	if target == nil {
 		return r, errors.New("PROBE-086: nil target")

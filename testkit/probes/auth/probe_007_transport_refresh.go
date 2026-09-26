@@ -78,7 +78,7 @@ func (r *refreshingTokenSource) Reauth(_ context.Context) error {
 // TokenSource.Token before the request is issued) is covered by
 // [Probe007ProactiveTokenRefresh] and the auth/smart unit tests. This probe asserts the transport-layer
 // safety-net path only.
-func Probe007TransportTokenRefresh(ctx context.Context) (Result, error) { // PROBE-007
+func Probe007TransportTokenRefresh(ctx context.Context) (Result, error) { // PROBE-007 (REQ-063)
 	r := Result{Probe: "PROBE-007"}
 
 	var (

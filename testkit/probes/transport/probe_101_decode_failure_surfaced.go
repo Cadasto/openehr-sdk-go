@@ -50,7 +50,7 @@ import (
 //     cannot decode as an EHR; missingID is one it answers 404 for. The
 //     Definition list route (GET /definition/template/adl1.4) answers 200
 //     with a non-empty JSON object where an array is expected.
-func Probe101DecodeFailureSurfaced(ctx context.Context, c *transport.Client, captured func() []string, undecodableID, missingID openehrclient.EHRID) (Result, error) {
+func Probe101DecodeFailureSurfaced(ctx context.Context, c *transport.Client, captured func() []string, undecodableID, missingID openehrclient.EHRID) (Result, error) { // PROBE-101 (REQ-151)
 	r := Result{Probe: "PROBE-101"}
 	if c == nil {
 		return r, errors.New("PROBE-101: nil transport.Client")

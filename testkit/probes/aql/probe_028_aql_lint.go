@@ -57,7 +57,7 @@ type LintCase struct {
 // [Probe099PathShapeLint] re-run this same corpus through [runLintCase] as
 // their additivity guards, and a guard means nothing unless the checks it is
 // guarding actually ran.
-func Probe028AQLLint(cases []LintCase) (Result, error) {
+func Probe028AQLLint(cases []LintCase) (Result, error) { // PROBE-028 (REQ-109)
 	r := Result{Probe: "PROBE-028"}
 	if len(cases) == 0 {
 		return r, errors.New("PROBE-028: at least one case required")

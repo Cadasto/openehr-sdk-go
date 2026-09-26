@@ -392,7 +392,7 @@ var probe088Refusals = []struct {
 // Probe088Constructs returns the construct names PROBE-088 asserts, in
 // assertion order, so a caller can read the matching
 // openehr/aql/testdata/wire/<name>.aql goldens without restating the list.
-func Probe088Constructs() []string {
+func Probe088Constructs() []string { // PROBE-088 (REQ-117, REQ-118, REQ-163)
 	out := make([]string, 0, len(probe088Constructs))
 	for _, c := range probe088Constructs {
 		out = append(out, c.name)
@@ -422,7 +422,7 @@ func Probe088Constructs() []string {
 // goldens maps construct name to committed canonical form; the caller reads
 // the files (probes take no filesystem dependency). Sandbox-only: no
 // transport, no network.
-func Probe088BuilderContainmentAndPaging(goldens map[string]string, probe020Golden string) (Result, error) {
+func Probe088BuilderContainmentAndPaging(goldens map[string]string, probe020Golden string) (Result, error) { // PROBE-088 (REQ-117, REQ-118, REQ-163)
 	r := Result{Probe: "PROBE-088"}
 	if len(goldens) == 0 {
 		return r, errors.New("PROBE-088: goldens required, one per Probe088Constructs entry")

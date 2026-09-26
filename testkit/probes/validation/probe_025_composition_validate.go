@@ -39,7 +39,7 @@ type ValidateCase struct {
 // the case's WantCodes multiset. This is a stable openEHR-conformance
 // assertion: any implementation of template-driven validation with the
 // same OPT + composition shape must produce the same multiset.
-func Probe025CompositionValidate(cases []ValidateCase) (Result, error) {
+func Probe025CompositionValidate(cases []ValidateCase) (Result, error) { // PROBE-025 (REQ-082, REQ-102, REQ-103)
 	r := Result{Probe: "PROBE-025"}
 	if len(cases) == 0 {
 		return r, errors.New("PROBE-025: at least one case required")
@@ -65,7 +65,7 @@ func Probe025CompositionValidate(cases []ValidateCase) (Result, error) {
 // missing required nodes, cardinality violations,
 // alternative_mismatch, RM-type mismatch. Code multiset
 // expectations are stable across conformant implementations.
-func Probe026MissingNodes(cases []ValidateCase) (Result, error) {
+func Probe026MissingNodes(cases []ValidateCase) (Result, error) { // PROBE-026 (REQ-082, REQ-102)
 	r := Result{Probe: "PROBE-026"}
 	if len(cases) == 0 {
 		return r, errors.New("PROBE-026: at least one case required")

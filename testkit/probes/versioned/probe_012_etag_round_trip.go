@@ -25,7 +25,7 @@ import (
 //   - ehrID and voID identify an existing versioned Composition.
 //   - update is the modification body. The probe is opaque about
 //     content semantics; the wire shape is what matters.
-func Probe012ETagRoundTrip(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, update *rm.Composition) (Result, error) {
+func Probe012ETagRoundTrip(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, update *rm.Composition) (Result, error) { // PROBE-012 (REQ-054)
 	r := Result{Probe: "PROBE-012"}
 	if c == nil || ehrID == "" || voID == "" || update == nil {
 		return r, errors.New("PROBE-012: missing required inputs (client/ehr/voID/update)")

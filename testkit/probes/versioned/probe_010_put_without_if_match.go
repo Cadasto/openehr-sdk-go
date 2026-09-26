@@ -20,7 +20,7 @@ import (
 // [transport.ErrInvalidConfig] before any network call. The
 // wire-level 428 path is asserted by [Probe011PutStaleIfMatch] via a fake
 // server, since the SDK guards correct usage at compile/runtime time.
-func Probe010PutWithoutIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (Result, error) {
+func Probe010PutWithoutIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (Result, error) { // PROBE-010 (REQ-054, REQ-093)
 	r := Result{Probe: "PROBE-010"}
 	if c == nil {
 		return r, errors.New("PROBE-010: nil transport.Client")

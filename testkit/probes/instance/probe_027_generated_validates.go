@@ -20,7 +20,7 @@ import (
 //
 // It is scoped to COMPOSITION roots, the roots ValidateComposition
 // supports.
-func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled, opts instance.Options) (Result, error) {
+func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled, opts instance.Options) (Result, error) { // PROBE-027 (REQ-107)
 	r := Result{Probe: "PROBE-027"}
 	if c == nil || c.Root() == nil {
 		return r, errors.New("PROBE-027: nil compiled template")

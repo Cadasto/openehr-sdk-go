@@ -48,7 +48,7 @@ type PathAssertion struct {
 // change predicate-less first-match outcomes, in which case the
 // assertion list must use explicit at-code or archetype-id
 // predicates to disambiguate.
-func Probe022OPTPathResolution(opt []byte, assertions []PathAssertion) (Result, error) {
+func Probe022OPTPathResolution(opt []byte, assertions []PathAssertion) (Result, error) { // PROBE-022 (REQ-100)
 	r := Result{Probe: "PROBE-022"}
 	if len(opt) == 0 {
 		return r, errors.New("PROBE-022: empty OPT body")

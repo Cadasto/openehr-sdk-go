@@ -43,7 +43,7 @@ type Result = probe.Result
 //
 // The probe spins up a small in-process server and counts inbound
 // requests; second resolve hitting the wire is the failure mode.
-func Probe040CatalogTTL(ctx context.Context, cassetteBody []byte) (Result, error) {
+func Probe040CatalogTTL(ctx context.Context, cassetteBody []byte) (Result, error) { // PROBE-040 (REQ-070, REQ-072)
 	r := Result{Probe: "PROBE-040"}
 	if len(cassetteBody) == 0 {
 		return r, errors.New("PROBE-040: cassetteBody is empty")

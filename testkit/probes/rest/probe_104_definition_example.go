@@ -18,7 +18,7 @@ import (
 // newest to confirm the verb and the exact example route, every segment of
 // it, so a request that carried the wrong format or the wrong template id is
 // caught instead of passing a prefix-and-suffix match.
-func Probe104DefinitionExample(ctx context.Context, c *transport.Client, captured func() []*http.Request, templateID string, format definition.TemplateFormat) (Result, error) {
+func Probe104DefinitionExample(ctx context.Context, c *transport.Client, captured func() []*http.Request, templateID string, format definition.TemplateFormat) (Result, error) { // PROBE-104 (REQ-095)
 	r := Result{Probe: "PROBE-104"}
 	if c == nil {
 		return r, errors.New("PROBE-104: nil transport.Client")

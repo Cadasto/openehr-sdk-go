@@ -36,7 +36,7 @@ import (
 // does not surface it: the leaf returns the decoded EHR and the version
 // metadata, and the code itself never reaches the caller. Asserting it here
 // would mean asserting against the fixture instead of against the SDK.
-func Probe060EHRCreationRoundTrip(ctx context.Context, c *transport.Client, captured func() []*http.Request, status *rm.EHRStatus) (Result, error) {
+func Probe060EHRCreationRoundTrip(ctx context.Context, c *transport.Client, captured func() []*http.Request, status *rm.EHRStatus) (Result, error) { // PROBE-060 (REQ-095)
 	r := Result{Probe: "PROBE-060"}
 	if c == nil || status == nil {
 		return r, errors.New("PROBE-060: nil transport.Client or status")

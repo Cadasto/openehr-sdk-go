@@ -61,7 +61,7 @@ var auditDetailsAttributes = []string{
 // captured returns the requests the backend received; the probe reads the write
 // request to check the header grammar and route, then the read-back request to
 // check its route.
-func Probe062AuditDetailsHeader(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID openehrclient.EHRID, contributionUID string, audit *rm.AuditDetails, comp *rm.Composition) (Result, error) {
+func Probe062AuditDetailsHeader(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID openehrclient.EHRID, contributionUID string, audit *rm.AuditDetails, comp *rm.Composition) (Result, error) { // PROBE-062 (REQ-059)
 	r := Result{Probe: "PROBE-062"}
 	if c == nil || ehrID == "" || contributionUID == "" || audit == nil || comp == nil {
 		return r, errors.New("PROBE-062: missing required inputs (client/ehr/contributionUID/audit/comp)")

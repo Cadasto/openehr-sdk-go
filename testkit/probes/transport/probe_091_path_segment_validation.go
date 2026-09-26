@@ -84,7 +84,7 @@ const (
 //     requests and inspects the last entry to check that the path is
 //     percent-encoded exactly once (a space arrives as %20, never %2520),
 //     so it must not be reset between legs.
-func Probe091PathSegmentValidation(ctx context.Context, c *transport.Client, captured func() []string) (Result, error) {
+func Probe091PathSegmentValidation(ctx context.Context, c *transport.Client, captured func() []string) (Result, error) { // PROBE-091 (REQ-150)
 	r := Result{Probe: "PROBE-091"}
 	if c == nil {
 		return r, errors.New("PROBE-091: nil transport.Client")

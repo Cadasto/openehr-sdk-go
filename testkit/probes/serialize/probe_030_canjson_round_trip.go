@@ -59,7 +59,7 @@ type Result = probe.Result
 // Result{Status: probe.StatusFail}; mechanical failures (e.g. nil factory)
 // return a non-nil error so the harness can distinguish probe
 // failure from probe-framework failure.
-func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) {
+func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) { // PROBE-030 (REQ-040, REQ-052, REQ-082)
 	return probe030RoundTrip(body, factory, canjson.Marshal, false)
 }
 
@@ -70,7 +70,7 @@ func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) {
 // validation.ValidateRM leg. Use this when iterating the corpus;
 // Probe030CanjsonRoundTrip is the body/factory form with the floor leg always
 // on.
-func Probe030CanjsonRoundTripInput(in Probe030Input) (Result, error) {
+func Probe030CanjsonRoundTripInput(in Probe030Input) (Result, error) { // PROBE-030 (REQ-040, REQ-052, REQ-082)
 	if in.loadErr != nil {
 		return Result{Probe: "PROBE-030", Status: "fail", Detail: "cassette discovery: " + in.loadErr.Error()}, nil
 	}

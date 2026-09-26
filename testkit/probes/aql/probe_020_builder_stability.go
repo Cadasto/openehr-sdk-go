@@ -14,7 +14,7 @@ import (
 // given EHR". golden is the checked-in canonical form from
 // openehr/aql/testdata/wire/observations_by_archetype.aql; the caller reads it
 // (probes take no filesystem dependency).
-func Probe020BuilderStability(golden string) (Result, error) {
+func Probe020BuilderStability(golden string) (Result, error) { // PROBE-020 (REQ-055)
 	r := Result{Probe: "PROBE-020"}
 
 	const (

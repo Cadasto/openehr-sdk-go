@@ -39,7 +39,7 @@ const scopeAQL = "SELECT e/ehr_id/value FROM EHR e"
 // reads Body on the POST arms, while the sandbox closes the live request body
 // once the exchange is served, so a recorder that stored the live request
 // would hand back an unreadable one.
-func Probe078VerbAwareScoping(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID string) (Result, error) {
+func Probe078VerbAwareScoping(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID string) (Result, error) { // PROBE-078 (REQ-055)
 	r := Result{Probe: "PROBE-078"}
 	if c == nil {
 		return r, errors.New("PROBE-078: nil transport.Client")

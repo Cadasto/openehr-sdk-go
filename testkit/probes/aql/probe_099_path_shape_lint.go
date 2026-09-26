@@ -262,7 +262,7 @@ type PathShapeCorpus struct {
 // Probe099PathShapeLint runs every row of both arms and aggregates all failures
 // into one [Result] (collect-all, like [Probe097SemanticLint]: a single early
 // failure would hide the rest of the corpus from the report).
-func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) {
+func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) { // PROBE-099 (REQ-164)
 	r := Result{Probe: "PROBE-099"}
 	if len(c.Fire) == 0 || len(c.Silent) == 0 || len(c.Additivity) == 0 {
 		return r, errors.New("PROBE-099: all three corpus fields (Fire, Silent, Additivity) are required")
