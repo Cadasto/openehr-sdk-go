@@ -35,8 +35,11 @@
 //     (encoding/json/v2 default; canjson sets no case-insensitive
 //     option). A wrongly-cased member, `Magnitude` for `magnitude`, does
 //     not populate the field. The client surfaces that still decode with
-//     encoding/json v1 (Definition, System and AQL) match unknown
-//     response keys case-insensitively; that rule does not apply here.
+//     encoding/json v1 (Definition, System and AQL) behave differently and
+//     none of it applies here: they match a documented field name
+//     case-insensitively, while their Extras check compares names exactly,
+//     so a differently cased key can fill the field and still appear in
+//     Extras.
 //
 //   - A caller driving the generated methods through bare v1
 //     encoding/json inherits v1's decode options, and they govern the
