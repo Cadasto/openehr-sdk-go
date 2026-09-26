@@ -41,6 +41,10 @@ composition: archetype_node_id=openEHR-EHR-COMPOSITION.encounter.v1
 OK: canonical-JSON Composition decoded from body_weight.json
 ```
 
+`archetype_node_id` names the archetype the document is built on, `language`
+and `territory` are codes with the terminology they come from, and
+`content items` counts the entries the document carries.
+
 Packages: `openehr/rm`, `openehr/serialize/canjson`. Fixture:
 `testkit/cassettes/compositions/body_weight.json`.
 
@@ -48,24 +52,34 @@ Packages: `openehr/rm`, `openehr/serialize/canjson`. Fixture:
 
 A CI check has this shape. The program reads the bytes, decodes them into
 Reference Model objects, compiles the operational template (OPT), and prints
-either `OK` or the constraint violations it found.
+either `OK` or the constraint violations it found. The exit status is 1 when
+the composition does not validate, so the command can gate a pipeline.
 
 ```bash
 go run ./cmd/examples/validate-from-json
+go run ./cmd/examples/validate-from-json -cassette
+go run ./cmd/examples/validate-from-json composition.json template.opt
 ```
 
-Packages: `canjson`, `template`, `validation`.
+The first form validates a bundled composition that passes, `-cassette`
+validates demo data that reports issues, and two paths validate your own
+files.
+
+Packages: `canjson`, `template`, `templatecompile`, `validation`.
 
 ## Build an AQL query {#aql-build}
 
 The struct builder and the verb functions emit the same AQL string. Use this
-when the query is assembled in code rather than pasted in as text.
+when the query is assembled in code rather than pasted in as text. The program
+also shows nested CONTAINS clauses with in-text LIMIT and OFFSET, and the
+opt-in `VerifyContainment` check that asks whether the classes in a query can
+contain one another under the Reference Model. `Build` never asks that.
 
 ```bash
 go run ./cmd/examples/aql-build
 ```
 
-Packages: `openehr/aql`.
+Packages: `openehr/aql`, `openehr/aql/contain`.
 
 ## Create an EHR {#create-an-ehr}
 

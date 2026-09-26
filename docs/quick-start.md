@@ -128,8 +128,10 @@ c, err := transport.New(cat, transport.WithHTTPClient(b.HTTPClient()))
 if err != nil {
 	log.Fatal(err)
 }
-ehr, meta, err := openehrclient.Create(ctx, c)
+created, meta, err := ehr.Create(ctx, c)
 ```
+
+`ehr` is the leaf client `openehr/client/ehr`. `created` is the decoded `*rm.EHR`, and `meta` carries the response headers such as `Location`.
 
 To run the same call without importing `sandbox/`, use the [`ehr_create`](../cmd/examples/ehr_create/main.go) example. It targets a throwaway handler:
 
@@ -168,7 +170,7 @@ When one process serves many users, attach a different token to each call throug
 
 ```go
 ctx = auth.WithTokenSource(ctx, perRequestTokenSource)
-ehr, meta, err := openehrclient.Create(ctx, c)
+created, meta, err := ehr.Create(ctx, c)
 ```
 
 ---
