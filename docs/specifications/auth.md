@@ -20,7 +20,7 @@ The boundary between layers is **the generic `TokenSource` abstraction** — pro
 The SMART-on-openEHR authentication model in this SDK is derived from two primary specifications:
 
 - **openEHR SMART App Launch** — [https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html](https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html) — defines openEHR-specific extensions: the `services` discovery map, `launch/patient`, `launch/episode`, `ehrId`, `episodeId` claims, and the `org.openehr.rest` service identifier.
-- **HL7 SMART App Launch v2.2** — [https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/) — defines the PKCE flow, scopes and launch context (including `offline_access`, `online_access`, `launch`, `launch/patient`), client-confidential-asymmetric (`private_key_jwt`), Backend Services, and JWKS rotation.
+- **HL7 FHIR SMART App Launch v2.2** — [https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/) — defines the PKCE flow, scopes and launch context (including `offline_access`, `online_access`, `launch`, `launch/patient`), client-confidential-asymmetric (`private_key_jwt`), Backend Services, and JWKS rotation.
 
 See also [ADR 0009](../adr/0009-smart-auth-library-scope.md) for the dependency and library-scope decisions underpinning this implementation.
 
@@ -232,7 +232,7 @@ The SDK validates ID tokens (and, in some deployments, opaque access tokens via 
 
 The `auth/introspect` package provides a standalone, opt-in RFC 7662 token introspection client. It is a **resource-server / MCP-gateway concern**, not wired into the default `auth/smart` client path — reference SMART client SDKs deliberately omit introspection (it is not a client-side operation). Consumers acting as resource servers that need to validate opaque access tokens at runtime can use it independently.
 
-**Standards:** [RFC 7662 — OAuth 2.0 Token Introspection](https://www.rfc-editor.org/rfc/rfc7662) and the [HL7 SMART App Launch token-introspection profile](https://www.hl7.org/fhir/smart-app-launch/token-introspection.html).
+**Standards:** [RFC 7662 — OAuth 2.0 Token Introspection](https://www.rfc-editor.org/rfc/rfc7662) and the [HL7 FHIR SMART App Launch token-introspection profile](https://www.hl7.org/fhir/smart-app-launch/token-introspection.html).
 
 **Construction.** `introspect.New(endpoint string, httpClient *http.Client, opts ...Option) (*Client, error)` — injects the `*http.Client` (REQ-021; nil is rejected with `auth.ErrInvalidConfig`); validates that `endpoint` is a non-empty, parseable absolute URL (also `auth.ErrInvalidConfig` on failure). The `introspection_endpoint` URL is surfaced from the authorization server's discovery document via `smart/discovery` (see REQ-070 / `AuthEndpoints.IntrospectionEndpoint`) and can be passed directly.
 
@@ -242,7 +242,7 @@ The `auth/introspect` package provides a standalone, opt-in RFC 7662 token intro
 
 ### REQ-063 — Token refresh
 
-**Requesting a refresh token.** The authorization server grants a `refresh_token` only when the authorization request includes the appropriate offline-access scope. Per HL7 SMART App Launch v2 "Scopes and Launch Context" ([https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/)):
+**Requesting a refresh token.** The authorization server grants a `refresh_token` only when the authorization request includes the appropriate offline-access scope. Per HL7 FHIR SMART App Launch v2 "Scopes and Launch Context" ([https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/)):
 
 - Include `offline_access` in the scope list to request a refresh token that persists beyond the current browser session.
 - Include `online_access` to request a refresh token scoped to the current online session only.

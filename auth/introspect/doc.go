@@ -14,7 +14,7 @@
 //
 //   - RFC 7662: OAuth 2.0 Token Introspection
 //     (https://www.rfc-editor.org/rfc/rfc7662)
-//   - HL7 SMART App Launch: token-introspection profile
+//   - HL7 FHIR SMART App Launch: token-introspection profile
 //     (https://www.hl7.org/fhir/smart-app-launch/token-introspection.html)
 //
 // # Usage

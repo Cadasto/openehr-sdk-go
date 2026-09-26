@@ -4,7 +4,7 @@ import "strings"
 
 // Launch-context and refresh scope constants for SMART App Launch.
 //
-// These values are defined in the HL7 SMART App Launch v2 specification
+// These values are defined in the HL7 FHIR SMART App Launch v2 specification
 // (https://hl7.org/fhir/smart-app-launch/) "Scopes and Launch Context" section
 // and in the openEHR SMART App Launch specification
 // (https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html).

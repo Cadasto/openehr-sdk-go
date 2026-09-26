@@ -82,8 +82,8 @@ type ClaimsTemplate struct {
 // across the deployment's JWKS.
 //
 // Supported algorithms (SMART client-confidential-asymmetric baseline):
-//   - RS384 (default): RSA PKCS1v15 with SHA-384; mandated by HL7 SMART
-//   - ES384: ECDSA P-384 with SHA-384; mandated by HL7 SMART
+//   - RS384 (default): RSA PKCS1v15 with SHA-384; mandated by HL7 FHIR SMART App Launch
+//   - ES384: ECDSA P-384 with SHA-384; mandated by HL7 FHIR SMART App Launch
 //   - RS256: RSA PKCS1v15 with SHA-256; accepted for back-compat
 //   - ES256: ECDSA P-256 with SHA-256; common in practice
 //
