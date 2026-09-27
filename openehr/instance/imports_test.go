@@ -12,7 +12,7 @@ import (
 // reverse) or the validator (validation depends on instance only
 // via cross-package probes/tests).
 //
-// Forbidden prefixes — REQ-107 § Building-block independence:
+// Forbidden prefixes — REQ-013 (docs/specifications/module-layout.md § REQ-013):
 //
 //   - openehr/serialize       (wire-byte codecs)
 //   - openehr/client          (REST clients)

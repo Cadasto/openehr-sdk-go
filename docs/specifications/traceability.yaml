@@ -1,7 +1,7 @@
 # The SDD traceability map: one row per REQ-NNN, linking it to its canonical spec
 # section and to the packages, tests and probes that realise it. Plans and ADRs
-# name their REQs themselves (a plan's **Covers:** line, an ADR's header);
-# make spec-context finds them from there.
+# are not rows: make spec-context lists any plan that names the REQ and any ADR
+# whose header names it.
 #
 # This is an index. Rows carry only the keys below — no notes and no comments
 # (make spec-check refuses both); a fact worth keeping goes in the canonical spec,
@@ -783,7 +783,6 @@ requirements:
     canonical: docs/specifications/conformance.md#req-081--wire-level-parity-retired
     status: deprecated
     implementation: retired
-    packages: [testkit/probes]
 
   - id: REQ-082
     title: Probe runnability
@@ -1013,7 +1012,6 @@ requirements:
       - openehr/validation/aql_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/constraint_cassettes_test.go
-      - openehr/validation/imports_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/rmread/read_test.go
       - testkit/probes/validation/probe_025_composition_validate.go
@@ -1107,7 +1105,6 @@ requirements:
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - internal/templateinstance/rmwrite/write_test.go
       - openehr/instance/accessors_test.go
-      - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/instance/realworld_opt_synthesis_test.go

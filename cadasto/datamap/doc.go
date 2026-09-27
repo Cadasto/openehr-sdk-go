@@ -1,4 +1,4 @@
-// Package datamap is the codec for Datamap V2, the
-// Cadasto-specific format for resource-free read and write of clinical
-// and demographic data across the openEHR REST API surface.
+// Package datamap is reserved for the Datamap V2 codec: conversion
+// between the Cadasto Datamap payload format and openEHR canonical JSON,
+// driven by an operational template. The package has no API yet.
 package datamap

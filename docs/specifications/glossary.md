@@ -136,7 +136,7 @@ An openEHR-conformant backend the SDK talks to over openEHR REST.
 A Cadasto-specific REST surface that complements openEHR REST — convenience aggregates, deployment-specific endpoints. Client lives in `cadasto/extra`.
 
 **Datamap (V2)**
-A Cadasto-specific format for resource-free read and write of clinical and demographic data across the openEHR REST API surface (Compositions, Demographics, EHR Status). The SDK targets **Datamap V2** (REQ-058); older versions are out of scope. Codec in `cadasto/datamap`.
+A Cadasto-specific payload format for reading and writing clinical and demographic data (compositions, demographic parties, EHR status) without building Reference Model instances; the Cadasto platform uses it across its openEHR REST surface. The SDK targets **Datamap V2**; older versions are out of scope. `cadasto/datamap` is the SDK's codec for it, covering compositions and parties ([REQ-058](module-layout.md#req-058--datamap-v2)).
 
 **MPI (Master Patient Index)**
 Identity resolution and patient-merging across deployments. The SDK exposes a preview shape in `cadasto/mpi/`; the full design is the subject of a separate research strand.

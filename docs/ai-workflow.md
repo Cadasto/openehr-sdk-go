@@ -70,6 +70,39 @@ When you add, rename, remove, or materially change a [`cmd/examples/`](../cmd/ex
 
 The Claude Code format-on-save hook is documented in [`.claude/CLAUDE.md`](../.claude/CLAUDE.md). `make fmt` is the authoritative full-tree pass.
 
+## Review
+
+All findings for a change live in one PR comment, the review ledger, whose first line starts `## Review ledger`; it is edited in place each round. Ids are `F<n>`, append-only across rounds, and `status` is `open`, `fixed@<sha>`, `declined` with a reason, or `deferred`. Report blockers and should-fix findings. Polish goes to the `Deferred` table, which is carried into the next change that touches the area and never becomes a tracker issue. Write an id as `F12`, never with a leading hash sign, which GitHub turns into a link to an unrelated issue.
+
+```markdown
+## Review ledger — round N (reviewer, date)
+Dispatched: <reviewers> · Reported: <n> of <m>
+| id | severity | anchor | finding | status |
+|---|---|---|---|---|
+| F1 | blocker | <path>:214 | one sentence, plain words | fixed@abc1234 |
+
+## Deferred
+| id | item | carried from | owner |
+|---|---|---|---|
+| F3 | <the item, in a few words> | this PR | next change touching <area> |
+```
+
+A reviewer that runs outside this repository gets this request, filled in by `/sdd-review --panel`:
+
+```text
+── review request · PR <N> · lane: <full|maintenance> · round <R> ──────────────
+Review Cadasto/openehr-sdk-go PR <N>. Read docs/ai-workflow.md § Review and the PR body.
+Report blockers and should-fix only; nits
+go under "Deferred". Post ONE review body in the ledger format: ids from F<n>
+upward, severity, file:line anchor, one line per finding, plain words. Do not
+restate the PR body.
+────────────────────────────────────────────────────────────────────────────────
+```
+
+A re-review adds one line to the block: `Re-review from F<n> upward, plus anything still open.`
+
+A finding is a claim, and so is a reviewer's proposed correction; both are checked against the code and the spec before either is applied. `/sdd-triage` writes the reason for each declined finding to `docs/.sdd/reviewers/<agent-name>.md`. Read the file for your agent name before reviewing, and do not raise a declined finding again unless the change makes its reason untrue.
+
 ## When stuck
 
 - **Open decision** (STRAND-NN) → draft an [ADR](adr/) or ask the user. Don't settle it in a PR.

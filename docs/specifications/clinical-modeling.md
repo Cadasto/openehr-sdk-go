@@ -621,7 +621,6 @@ A `$param` archetype predicate (`[$name]`, `[parse.ClassExpr.ParamArchetype]`) i
 
 - **Lives in:** [`openehr/aql/parse/`](../../openehr/aql/parse/), [`openehr/aql/lint/`](../../openehr/aql/lint/); bridge in [`openehr/validation/aql.go`](../../openehr/validation/aql.go)
 - **Probes:** PROBE-028 — lint fixed query strings against the grammar profile (+ a compiled OPT for Layer 3) and assert a stable issue-code multiset.
-- **Landed in:** [PR 39](https://github.com/Cadasto/openehr-sdk-go/pull/39)
 
 ## REQ-110 — Template-driven validation beyond COMPOSITION
 
@@ -662,7 +661,6 @@ The walker logic is unchanged; generalisation is a lockstep extension of the fou
 
 - **Lives in:** [`openehr/validation/validate.go`](../../openehr/validation/validate.go), [`openehr/validation/rmread/read.go`](../../openehr/validation/rmread/read.go)
 - **Probes:** PROBE-074 — template-driven validation of non-COMPOSITION roots; asserts the issue-code multiset per (OPT, root) shape.
-- **Landed in:** [PR 42](https://github.com/Cadasto/openehr-sdk-go/pull/42)
 
 ---
 
@@ -717,7 +715,6 @@ It therefore lives in the sibling package `openehr/templatecompile`. This supers
 
 - **Lives in:** [`openehr/templatecompile/`](../../openehr/templatecompile/)
 - **Verification:** unit tests in [`openehr/templatecompile/compile_test.go`](../../openehr/templatecompile/compile_test.go); the public-only acceptance proof (external-shape build → canjson round-trip → validate, plus `ValidateEHRStatus` reachability) in [`openehr/templatecompile/external_test.go`](../../openehr/templatecompile/external_test.go); and the runnable [`cmd/examples/compile-build-validate`](../../cmd/examples/compile-build-validate/) whose direct imports are public-only. No new PROBE — this is an API-reachability requirement, not a wire-conformance assertion (the builder round-trip itself is PROBE-023).
-- **Landed in:** [PR 44](https://github.com/Cadasto/openehr-sdk-go/pull/44)
 
 ## REQ-106 — WebTemplate JSON export
 
@@ -781,7 +778,6 @@ Templates that **reuse one archetype under a multi-valued slot** (name-distingui
 
 - **Lives in:** [`openehr/template/webtemplate/`](../../openehr/template/webtemplate/).
 - **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against three vendored EHRbase references — `constrain_test` plus the two REQ-116 archetype-reuse oracles. Catalogued in [`conformance.md`](conformance.md).
-- **Landed in:** [PR 75](https://github.com/Cadasto/openehr-sdk-go/pull/75).
 
 ## REQ-116 — Template-level node naming and name-predicated paths
 
@@ -901,7 +897,6 @@ func ValidateRMEHRStatusBytes(data []byte) Result
 
 - **Lives in:** [`openehr/validation/rmfloor.go`](../../openehr/validation/rmfloor.go) + [`openehr/validation/rmfloor_adapters.go`](../../openehr/validation/rmfloor_adapters.go) + [`openehr/validation/rmfloor_bytes.go`](../../openehr/validation/rmfloor_bytes.go) (the presence-aware EHR_STATUS entry); the closed-RM-set helpers (`rmTypeInfo` / `describeRMType`) and the rmread layer are shared with REQ-102 / REQ-110.
 - **Verification:** unit pins in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go): required-set absences (FOLDER.name missing), the per-type invariants (CODE_PHRASE, DV_QUANTITY, DV_INTERVAL, OBJECT_REF-family, DV_TEXT/DV_CODED_TEXT `mappings`, and TERM_MAPPING `match` as a container element, nested under `purpose`, and as the validated root), the unbounded-skip negative, and the nil-guard contract on every typed wrapper. The DV_TEXT/DV_CODED_TEXT coverage includes the canjson decode-path pair distinguishing absent/`null` `mappings` (valid) from a decoded literal `[]` (`mappings_valid`); the `mappings` traversal and the TERM_MAPPING attribute readers are pinned in [`openehr/validation/rmread/read_datavalues_test.go`](../../openehr/validation/rmread/read_datavalues_test.go). The unit-test cassette matrix is the first-cycle verification; a dedicated PROBE-077 against vendored cassettes is deferred to a follow-up cycle. Value-typed mandatory presence (EHR_STATUS.subject, with the ARCHETYPED root arm planned) is pinned by **PROBE-081** in [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go).
-- **Landed in:** [PR 57](https://github.com/Cadasto/openehr-sdk-go/pull/57) (REQ-112).
 
 ---
 
@@ -1076,11 +1071,10 @@ For the drop record, the construct kind, the clause and the source span are all 
 
 ### Building-block independence (REQ-013)
 
-`openehr/aql/parse/` MUST stay importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/` — unchanged from REQ-109. The forbidden-import set is enforced by `TestAQLParseForbiddenImports`. `Query.Emit` reaches `openehr/aql` (the shared vocabulary) which is itself a building block.
+`openehr/aql/parse/` keeps the import rules of [§ REQ-109](#req-109--aql-static-lint), enforced by `TestAQLParseForbiddenImports`. `Query.Emit` reaches `openehr/aql` (the shared vocabulary) which is itself a building block.
 
 - **Lives in:** [`openehr/aql/parse/parse.go`](../../openehr/aql/parse/parse.go) (entry), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (translator from the validated tree). Construction vocabulary in [`openehr/aql/where.go`](../../openehr/aql/where.go) and [`openehr/aql/value.go`](../../openehr/aql/value.go).
 - **Verification:** structural pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT / FROM / CONTAINS / WHERE / ORDER BY / LIMIT, including COUNT(*), COUNT(DISTINCT), NOT CONTAINS, BoolValue, NullValue, ParamLimit, standing predicate, ParamArchetype, VERSION predicate) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (87 idempotence cases + 43 canonical-input preservation cases across the catalogue, plus the residual-gap suite asserting ParseQuery and Emit both surface `aql.ErrIncompleteAST` for the residual gap (an unrepresentable numeric literal, including an out-of-range `TOP` count) — the corpus grew under [§ REQ-117](#req-117--aql-expression-catalogue-completion), which pins the closed shapes as PROBE-087, and again under [§ REQ-118](#req-118--deprecated-select-top-clause-and-literal-source-text), which moved the `top` clause into the catalogue). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). Structured standing-predicate + WHERE-path access (REQ-113) is pinned by **PROBE-082** in [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
-- **Landed in:** [PR 58](https://github.com/Cadasto/openehr-sdk-go/pull/58) (REQ-113).
 
 
 ## REQ-117 — AQL expression-catalogue completion
@@ -1144,7 +1138,6 @@ All additions are **additive to the canonical write form** ([wire.md § REQ-055]
 - **[PROBE-087](conformance.md#probe-087--aql-structured-ast-catalogue-completeness)** — every shape in the catalogue list parses → models → emits round-trip, pinned per shape; the former gap corpus asserts `ErrIncompleteAST` is gone; the residual guard — the unrepresentable numeric literal — still fires (`TestParseQuerySurfacesIncompleteAST`).
 - **[PROBE-088](conformance.md#probe-088--aql-builder-containment-and-paging-stability)** — canonical-string stability goldens for the new builder constructs (the PROBE-020 property extended).
 - Building-block independence (REQ-013) unchanged and still enforced by the forbidden-import tests.
-- **Landed in:** [PR 87](https://github.com/Cadasto/openehr-sdk-go/pull/87) (REQ-117).
 
 
 ## REQ-118 — Deprecated `SELECT TOP` clause and literal source text
@@ -1220,7 +1213,6 @@ The four layers treat the spec-invalid combinations differently, and deliberatel
 - **[PROBE-028](conformance.md#probe-028--aql-lint-stability)** unchanged: the new codes fire only on a query carrying a `TOP`, and no lint cassette carries one. This is *pinned*, not assumed — the probe asserts an exact issue-code multiset per cassette, whatever that multiset currently is, so a code that fired spuriously fails `TestProbe028AQLLint`.
 - Building-block independence (REQ-013) unchanged and still enforced by the forbidden-import tests.
 - **Lives in:** [`openehr/aql/top.go`](../../openehr/aql/top.go) (shared vocabulary), [`openehr/aql/builder.go`](../../openehr/aql/builder.go) (write side), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (extraction), [`openehr/aql/lint/lint.go`](../../openehr/aql/lint/lint.go) (diagnosis).
-- **Landed in:** [PR 90](https://github.com/Cadasto/openehr-sdk-go/pull/90) (REQ-118).
 
 ---
 
@@ -1515,7 +1507,6 @@ Row-semantics adjudication (REQ-161 carries the single advisory; the relation an
 
 - **Lives in:** [`openehr/aql/contain/`](../../openehr/aql/contain/)
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (armed by the Phase 2 lint corpus and the Phase 3 builder-verification parity arm); [PROBE-100](conformance.md#probe-100--upstream-aql-admissibility-corpus-ratchet) (the compatibility guard's evidence gate — the vendored upstream FROM/CONTAINS corpus, § Acceptance)
-- **Landed in:** [PR 125](https://github.com/Cadasto/openehr-sdk-go/pull/125)
 
 ## REQ-161 — AQL semantic and portability lint
 
@@ -1566,7 +1557,6 @@ Widening `aql_contains_not_containable` to the FROM-root anchor position is also
 
 - **Lives in:** [`openehr/aql/lint/`](../../openehr/aql/lint/) (extension)
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus); PROBE-028 re-baseline where applicable
-- **Landed in:** [PR 126](https://github.com/Cadasto/openehr-sdk-go/pull/126)
 
 ## REQ-162 — Builder containment verification
 
@@ -1587,7 +1577,6 @@ The write side **MUST** offer the same semantic judgement as the read side, opt-
 
 - **Lives in:** [`openehr/aql/`](../../openehr/aql/) (extension)
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (parity arm)
-- **Landed in:** [PR 126](https://github.com/Cadasto/openehr-sdk-go/pull/126)
 
 ## REQ-163 — AQL write-side expressivity parity
 
@@ -1713,7 +1702,6 @@ These spellings are **additions** to the canonical write form whose home is [§ 
 
 - **Lives in:** [`openehr/aql/`](../../openehr/aql/) (extension)
 - **Probes:** [PROBE-088](conformance.md#probe-088--aql-builder-containment-and-paging-stability) (builder golden set, extended fixtures); [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) arm (c) (read/write parity corpus). No new probe id is allocated.
-- **Landed in:** [PR 130](https://github.com/Cadasto/openehr-sdk-go/pull/130)
 
 ## REQ-164 — AQL path-shape and paging lint
 
@@ -1802,4 +1790,3 @@ The rule is deliberately **narrower** than the guidance sentence it comes from (
 
 - **Lives in:** [`openehr/aql/lint/`](../../openehr/aql/lint/) (extension)
 - **Probes:** [PROBE-099](conformance.md#probe-099--aql-path-shape-lint-corpus)
-- **Landed in:** [PR 131](https://github.com/Cadasto/openehr-sdk-go/pull/131)

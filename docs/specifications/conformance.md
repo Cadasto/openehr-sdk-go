@@ -24,7 +24,7 @@ The probe suite verifies the SDK against the **openEHR wire contract**, not agai
 
 - A probe's **assertion** is wire-level: the HTTP request bytes (method, path, headers, body), the response status, the response body shape.
 - A probe's **definition** lives once, here, and is implemented in the SDK's test suite.
-- A probe **MUST NOT** assert on source-level idioms (function names, error types).
+- A probe **MUST NOT** assert on source-level idioms such as function names. Where the outcome under test is a refusal, the probe asserts the error the SDK documents for it (a sentinel or a typed error), because that error is part of the SDK's public contract.
 - JSON decode→encode round-trips **MUST** be asserted semantically — the decoded values compare equal and pass the reference-model validation floor ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)) — and, where a check on the encoded form is useful, by [wire-equivalence](#terms); they **MUST NOT** be asserted by comparing encoded JSON bytes ([§ REQ-052](wire.md#req-052)). Canonical **XML** round-trips keep their byte-stable assertion ([§ REQ-056](wire.md#req-056); PROBE-033).
 
 ### REQ-081 — Wire-level parity (retired)

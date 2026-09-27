@@ -56,6 +56,7 @@ All in the implementing PR:
 
 - Code and tests land; tests cite the `REQ-` / `PROBE-` they pin.
 - The canonical spec text is current, and `traceability.yaml` lists the landed packages and probes (`make spec-gen` writes its tests lists from the tests' REQ citations).
+- `docs/roadmap.md` is updated when the change lands a roadmap row or opens new tracked work ([roadmap.md § Updating this page](roadmap.md#updating-this-page)).
 - `make ci` passes (it includes `make spec-check`).
 
 ## superpowers + SDD
