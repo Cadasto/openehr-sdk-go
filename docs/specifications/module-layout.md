@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Authoritative package taxonomy, dependency rules, and versioning policy for `github.com/cadasto/openehr-sdk-go`. Implements REQ-001 through REQ-014.
+Authoritative package taxonomy, dependency rules, and versioning policy for `github.com/cadasto/openehr-sdk-go`. Implements REQ-010 through REQ-014, REQ-058 and REQ-099.
 
 ## Module identity
 
@@ -67,7 +67,7 @@ Application-specific layer. Shipped in the same module in v1 for adoption conven
 | Package | Scope |
 |---|---|
 | `cadasto/extra/` | Cadasto Extra API client. |
-| `cadasto/datamap/` | Datamap **V2** client and builder (REQ-058). |
+| `cadasto/datamap/` | Datamap **V2** codec: payload to and from canonical JSON against an OPT, with skeleton, schema and validation (REQ-058). |
 | `cadasto/care/` | Application aggregates over EHR + Demographic: Patient, User, CaseLoad, CareTeam, Episode. |
 | `cadasto/mpi/` | Minimal MPI search (preview surface). |
 | `cadasto/admin/` | Tenant, env, system info, healthcheck (health-probe contract: REQ-083). |
@@ -109,7 +109,8 @@ Application code (cmd/examples, downstream consumers)
 openehr/{serialize, instance, client/*} ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
 
 cadasto/care      ──→ openehr/client/*
-cadasto/{extra, datamap, mpi, admin} ──→ transport/
+cadasto/{extra, mpi, admin} ──→ transport/
+cadasto/datamap   ──→ openehr/template/   (no transport/ or auth/: REQ-058)
 
 sandbox/  -. implements .-→ openehr/client/*   cadasto/*
 testkit/  -. helpers for .-→ all of the above
@@ -119,7 +120,7 @@ testkit/  -. helpers for .-→ all of the above
 
 - `transport/` depends on `auth/`, never the reverse.
 - `openehr/client/*` depends on `transport/`, `openehr/rm/`, `openehr/serialize/`, never on `cadasto/…`.
-- `cadasto/<X>` may depend on `openehr/client/*`, `transport/`, `openehr/rm/`, etc. — but never on another `cadasto/<Y>`.
+- `cadasto/<X>` may depend on `openehr/client/*`, `transport/`, `openehr/rm/`, etc. — but never on another `cadasto/<Y>`. `cadasto/datamap` is the exception on the wire side: REQ-058 keeps it off `transport/` and `auth/`.
 - `openehr/validation/` MUST NOT take on `openehr/serialize/`'s codec dependencies — validation is structural over the in-memory RM, not over the wire bytes.
 - `openehr/bmm/` MUST NOT depend on `transport/`, `auth/`, or any HTTP package — it is a building block (REQ-045).
 - `internal/bmmgen` depends on `openehr/bmm/` and the standard `text/template` / `go/format` packages — no SDK runtime packages.
@@ -151,6 +152,24 @@ See [use-cases.md § Building-block use cases](use-cases.md#building-block-use-c
 ## REQ-014 — Dependency direction
 
 Imports between SDK packages **MUST** flow strictly downward through the dependency graph in [§ Dependency direction](#dependency-direction). Upward or cyclic imports are prohibited.
+
+## REQ-058 — Datamap V2
+
+`cadasto/datamap/` **MUST** implement version 2 of Datamap, the Cadasto payload format for reading and writing clinical and demographic data without building Reference Model instances ([glossary.md](glossary.md)). Earlier Datamap versions are out of scope. The format (its keys, value shapes and coded-value forms) is the Cadasto platform's, and [REQ-083](conformance.md#req-083--cadasto-platform-api-conformance) names the authority the package conforms to.
+
+The package is a codec between Datamap V2 and openEHR canonical JSON, driven by the operational template that governs the data. It has two profiles, chosen by the template's root type:
+
+- **Composition profile:** a template rooted on `COMPOSITION`.
+- **Party profile:** a template rooted on `PERSON`, `ORGANISATION`, `GROUP`, `AGENT` or `ROLE`, or on one of the archetypeable demographic components `ADDRESS`, `CONTACT`, `PARTY_IDENTITY` or `PARTY_RELATIONSHIP`.
+
+Every other root is out of scope, including `EHR_STATUS`, which the format covers and the codec does not yet.
+
+- For each profile the package **MUST** convert in both directions. A conversion for one profile **MUST** refuse a template of the other, and every operation **MUST** refuse a template outside both profiles.
+- A conversion that refuses its template, or meets a value it cannot map to its template node (a value of the wrong shape, a malformed coded value), **MUST** fail with an error and **MUST NOT** return a converted document alongside it.
+- Conversion walks the template and takes only the keys it defines: a payload key the template does not define **MUST NOT** reach the converted document. Validation is the operation that refuses such a key.
+- For a template of either profile the package **MUST** provide an empty payload skeleton, a JSON Schema of the payload, and a validation of a payload against the template. Validation **MUST** report every key the template does not define, every required key that is missing, and every value that breaks a constraint the template states itself. A payload that validation accepts **MUST** convert without error.
+- The canonical JSON a conversion returns **MUST** decode as the template root's RM type and pass template validation ([REQ-110](clinical-modeling.md#req-110--template-driven-validation-beyond-composition)). The Datamap payload a conversion returns **MUST** pass the package's own validation.
+- The codec **MUST** be usable without a client, like the building blocks in [REQ-013](#req-013--building-block-independence): it takes the template and the payload as values, performs no network I/O, and imports neither `transport/` nor `auth/`. Its entry points read untrusted input, so the bounds of [REQ-108](clinical-modeling.md#req-108--untrusted-document-bounds) apply to them.
 
 ## REQ-099 — ITS-REST Admin client surface
 

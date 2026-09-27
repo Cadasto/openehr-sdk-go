@@ -45,7 +45,8 @@ Imports flow strictly downward, with no upward or cyclic imports. [module-layout
 flowchart TD
   App["Application code<br/>(benchmark, seeder, MCP, federator)"]
   Care["cadasto/care/"]
-  Cadasto["cadasto/extra, datamap, mpi, admin"]
+  Cadasto["cadasto/extra, mpi, admin"]
+  Datamap["cadasto/datamap/"]
   Smart["smart/<br/>(AppContext, discovery)"]
   Composition["openehr/composition/"]
   Aql["openehr/aql/"]
@@ -67,6 +68,7 @@ flowchart TD
   App --> Aql
   App --> Client
   App --> Cadasto
+  App --> Datamap
   App -. building-block .-> Rm
   App -. building-block .-> Serialize
   App -. building-block .-> Validation
@@ -80,6 +82,7 @@ flowchart TD
 
   Care --> Client
   Cadasto --> Http
+  Datamap --> Template
   Smart --> Auth
   Composition --> Template
   Composition --> Rm

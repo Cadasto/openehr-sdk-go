@@ -55,7 +55,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-055 | AQL wire boundary | [wire.md](wire.md#req-055--wire-boundary) | draft | landed |
 | REQ-056 | Canonical XML | [wire.md](wire.md#req-056) | draft | landed |
 | REQ-057 | Stored AQL queries | [wire.md](wire.md#req-057) | draft | landed |
-| REQ-058 | Datamap V2 | [module-layout.md](module-layout.md) | draft | planned |
+| REQ-058 | Datamap V2 | [module-layout.md](module-layout.md#req-058--datamap-v2) | draft | planned |
 | REQ-059 | openEHR custom headers | [wire.md](wire.md#req-059) | draft | partial |
 | REQ-060 | TokenSource interface | [auth.md](auth.md#req-060) | draft | landed |
 | REQ-061 | SMART-on-openEHR PKCE | [auth.md](auth.md#req-061--pkce-flow) | draft | landed |

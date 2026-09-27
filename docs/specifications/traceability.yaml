@@ -562,7 +562,7 @@ requirements:
 
   - id: REQ-058
     title: Datamap V2
-    canonical: docs/specifications/module-layout.md
+    canonical: docs/specifications/module-layout.md#req-058--datamap-v2
     status: draft
     implementation: planned
     packages: [cadasto/datamap]
