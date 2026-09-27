@@ -72,7 +72,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-072 | Discovery validation | [service-discovery.md](service-discovery.md#req-072) | draft | landed |
 | REQ-073 | Discovery trust posture | [service-discovery.md](service-discovery.md#req-073--discovery-trust-posture) | draft | landed |
 | REQ-080 | openEHR wire conformance | [conformance.md](conformance.md#conformance-scope) | draft | partial |
-| REQ-081 | Wire-level parity (retired) | [conformance.md](conformance.md#req-081--wire-level-parity-retired) | deprecated | deprecated |
+| REQ-081 | Wire-level parity (retired) | [conformance.md](conformance.md#req-081--wire-level-parity-retired) | deprecated | retired |
 | REQ-082 | Probe runnability | [conformance.md](conformance.md#req-082--runnability) | draft | partial |
 | REQ-083 | Cadasto platform API conformance | [conformance.md](conformance.md#req-083--cadasto-platform-api-conformance) | draft | partial |
 | REQ-090 | OpenTelemetry hooks | [transport.md](transport.md#req-090--opentelemetry-hooks) | draft | landed |
@@ -82,7 +82,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-094 | `Prefer` negotiation | [transport.md](transport.md#req-094--prefer-response-shape-negotiation) | draft | landed |
 | REQ-095 | OpenAPI authoritative source | [wire.md](wire.md#req-095) | draft | partial |
 | REQ-096 | Unambiguous "disable retry" | [transport.md](transport.md#req-096--unambiguous-disable-retry) | draft | landed |
-| REQ-097 | First-class `Idempotency-Key` (deprecated) | [transport.md](transport.md#req-097--first-class-idempotency-key-deprecated) | deprecated | deprecated |
+| REQ-097 | First-class `Idempotency-Key` (deprecated) | [transport.md](transport.md#req-097--first-class-idempotency-key-deprecated) | deprecated | retired |
 | REQ-098 | Request-level observer hook | [transport.md](transport.md#req-098--request-level-observer-hook) | draft | landed |
 | REQ-099 | ITS-REST Admin client surface | [module-layout.md](module-layout.md#req-099--its-rest-admin-client-surface) | draft | landed |
 | REQ-100 | ADL 1.4 operational template (OPT) parse and paths | [clinical-modeling.md](clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) | draft | landed |
@@ -121,7 +121,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-164 | AQL path-shape and paging lint | [clinical-modeling.md](clinical-modeling.md#req-164--aql-path-shape-and-paging-lint) | draft | landed |
 <!-- END GENERATED: registry -->
 
-**Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `deprecated` (normative text retained; implementation removed or not shipped — removal target in canonical spec).
+**Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `retired` (a withdrawn requirement, **Stability** `deprecated`: normative text retained, implementation removed or not shipped; removal target in canonical spec).
 
 ---
 

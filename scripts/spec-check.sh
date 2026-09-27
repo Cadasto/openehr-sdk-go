@@ -107,8 +107,12 @@ flush_req() {
   # Out-of-vocabulary implementation values must fail loudly: an unmatched
   # value used to leave the row's implementation empty, silently skipping
   # every artefact check below (the REQ-116 'proposed' hole).
-  if [[ -n "$current_impl" && ! "$current_impl" =~ ^(landed|partial|planned|deprecated)$ ]]; then
-    die "$current_id: invalid implementation '$current_impl' (expected landed|partial|planned|deprecated)"
+  if [[ -n "$current_impl" && ! "$current_impl" =~ ^(landed|partial|planned|retired)$ ]]; then
+    die "$current_id: invalid implementation '$current_impl' (expected landed|partial|planned|retired)"
+  fi
+  # A withdrawn requirement is retired, and only a deprecated one can be.
+  if [[ "$current_impl" == "retired" && "$current_status" != "deprecated" ]]; then
+    die "$current_id: implementation retired needs status: deprecated (found '${current_status}')"
   fi
   if [[ "$current_impl" == "landed" || "$current_impl" == "partial" ]]; then
     if [[ ${#pkg_paths[@]} -eq 0 && ${#test_paths[@]} -eq 0 ]]; then
@@ -290,7 +294,7 @@ done
 stray="$(awk '
   index($0, "<!-- BEGIN GENERATED: registry ") == 1 { inside = 1; next }
   index($0, "<!-- END GENERATED: registry ") == 1 { inside = 0; next }
-  !inside && /^\| REQ-[0-9]+ \|.*\| (landed|partial|planned|deprecated) \|$/ { print NR }
+  !inside && /^\| REQ-[0-9]+ \|.*\| (landed|partial|planned|retired) \|$/ { print NR }
 ' "$REQ_REG")"
 [[ -z "$stray" ]] || die "REQ.md: registry row(s) outside the generated block at line(s) $(echo $stray) — edit traceability.yaml and run make spec-gen"
 

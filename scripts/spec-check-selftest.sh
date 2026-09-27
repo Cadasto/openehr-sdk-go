@@ -362,8 +362,22 @@ _row="$(awk '/^  - id: REQ-002$/{f=1} f' "$r/docs/specifications/traceability.ya
   || { echo "spec-check-selftest: FAIL tests-gained: REQ-002 row ends '${_row}'" >&2; fail=1; }
 check tests-gained "$r" ok
 
+# 36 - a withdrawn requirement is `retired`, which needs `status: deprecated`;
+#      the old word `deprecated` in implementation: is out of vocabulary.
+r="$(new_case impl-retired)"
+sed -i 's/^    status: stable$/    status: deprecated/; s/^    implementation: landed$/    implementation: retired/' \
+  "$r/docs/specifications/traceability.yaml"
+bash "$r/scripts/spec-gen.sh" >/dev/null
+check impl-retired "$r" ok
+r="$(new_case impl-retired-stable)"
+sed -i 's/^    implementation: landed$/    implementation: retired/' "$r/docs/specifications/traceability.yaml"
+check impl-retired-stable "$r" fail "implementation retired needs status: deprecated"
+r="$(new_case impl-deprecated)"
+sed -i 's/^    implementation: landed$/    implementation: deprecated/' "$r/docs/specifications/traceability.yaml"
+check impl-deprecated "$r" fail "invalid implementation 'deprecated'"
+
 if [[ $fail -ne 0 ]]; then
   echo "spec-check-selftest: FAILED" >&2
   exit 1
 fi
-echo "spec-check-selftest: OK (34 cases)"
+echo "spec-check-selftest: OK (37 cases)"
