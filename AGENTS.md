@@ -121,7 +121,7 @@ Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-J
 
 ## Do not touch (yet)
 
-- Promoting new numbered ADRs without updating [`docs/adr/README.md`](docs/adr/README.md) and [`traceability.yaml`](docs/specifications/traceability.yaml). Open decisions stay as [research strands](docs/specifications/research-strands.md) until an ADR lands.
+- Promoting new numbered ADRs without updating [`docs/adr/README.md`](docs/adr/README.md) and naming the REQs they amend in their header (the map lists no ADRs). Open decisions stay as [research strands](docs/specifications/research-strands.md) until an ADR lands.
 - `internal/bmmgen` and `internal/bmmdiff` — generator tooling, not public API; structural changes need rationale in [architecture.md](docs/architecture.md) and [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md).
 - Module path — locked at `github.com/cadasto/openehr-sdk-go` (REQ-001).
 - The `go.mod` `go` directive — the minor line's `.0` patch, never the toolchain patch you happen to run (REQ-002): a mid-line floor makes every consumer and CI image on an earlier patch fetch a new toolchain, breaking air-gapped builds. Dev-image pins ([Dockerfile](Dockerfile)) move independently.

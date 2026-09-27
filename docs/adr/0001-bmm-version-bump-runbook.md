@@ -4,6 +4,7 @@
 - **Supersedes:** —
 - **Superseded by:** —
 - **Tracks:** part of [`docs/plans/archive/2026-05-15-bmm-codegen.md`](../plans/archive/2026-05-15-bmm-codegen.md) Phase 5.
+- **Requirements:** [REQ-041](../specifications/bmm-conformance.md#req-041--pinned-bmm-sources) (the pinned BMM sources a version bump moves).
 
 ## Context
 

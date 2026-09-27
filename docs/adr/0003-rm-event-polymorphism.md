@@ -2,6 +2,7 @@
 
 - **Status:** Accepted, 2026-05-16.
 - **Tracks:** STRAND-04 (partial — Event/History cassette decode); [canonical JSON plan](../plans/archive/2026-05-15-canonical-json-serialization.md).
+- **Requirements:** [REQ-033](../specifications/rm-modeling.md#no-inheritance-emulation-req-033) (no inheritance emulation, which this codec polymorphism works within).
 
 ## Context
 

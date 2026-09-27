@@ -49,7 +49,7 @@ For an exact attribute list, invariant, or signature, call the MCP tool `type_sp
 
 ## The loop
 
-0. **Assemble context in one shot:** `make spec-context REQ=094`. It bundles the registry row, the `traceability.yaml` block (packages, probes, tests, plans), the canonical spec excerpt, and any research strands that touch the REQ. Start here: the bundle points you to the canonical sources, so you don't have to grep for them.
+0. **Assemble context in one shot:** `make spec-context REQ=094`. It bundles the registry row, the `traceability.yaml` block (packages, probes, tests), the canonical spec excerpt, the plans whose Covers line names the REQ, the ADRs whose header cites it, and any research strands that touch the REQ. Start here: the bundle points you to the canonical sources, so you don't have to grep for them.
 1. **Locate** your task's REQ via the [REQ registry](specifications/REQ.md), then follow the row to its **canonical** topic spec (don't read prose out of `REQ.md` itself).
 2. **Inspect ground truth before editing.** Check RM shapes with MCP `type_specification_get` and terminology with `terminology_resolve`. Never hardcode a path or numeric literal without verifying it. Before writing the Go itself, load the matching go-coding skill (§ Recommended tooling above).
 3. **Cite identifiers.** Tests and maintainer comments reference REQ-NNN / PROBE-NNN; godoc on exported API is written for SDK users and does not. Update [traceability.yaml](specifications/traceability.yaml) when landing packages or probes and run `make spec-gen` (the registry is generated from it); never renumber published IDs.

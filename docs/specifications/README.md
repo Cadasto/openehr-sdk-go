@@ -61,7 +61,7 @@ Every spec file starts with a `Status:` line:
 The chain that drift detection works against:
 
 ```
-docs/specifications/traceability.yaml (the one hand-edited index: packages, probes, tests, plans, status)
+docs/specifications/traceability.yaml (the index: packages, probes, tests, status)
     ├─→ docs/specifications/REQ.md (registry, generated from the map)
     └─→ canonical topic spec (packaging.md, wire.md, transport.md, …)
                     └─→ docs/plans/YYYY-MM-DD-*.md
@@ -77,6 +77,7 @@ Cite identifiers when crossing the chain:
 - Every plan in `docs/plans/` MUST list the REQ-IDs it implements on its `**Covers:**` line.
 - Every test that exercises a normative requirement SHOULD cite the REQ-ID and (if applicable) PROBE-ID in a comment. Maintainer comments may cite them too; godoc on exported API does not (it is written for SDK users — see [AGENTS.md](../../AGENTS.md#spec-driven-workflow-agents)).
 - Every ADR in `docs/adr/` MUST cite the STRAND-ID it resolves (from `research-strands.md`) and any REQ-IDs it amends.
+- The map lists no plans or ADRs: each names its REQs itself (a plan on its `**Covers:**` line, an ADR in its header), and `make spec-context` finds them from there.
 - When landing code or probes, update [`traceability.yaml`](traceability.yaml) and run `make spec-gen`.
 
 `make spec-check` catches the drift a machine can see: a cited path, probe or anchor that does not exist, a landed requirement with no packages or tests, and a generated block that no longer matches its source.
@@ -97,7 +98,7 @@ Identifiers MUST be stable once published — they are referenced from outside t
 | File | Scope |
 |---|---|
 | [REQ.md](REQ.md) | Requirement registry (generated index) — links to canonical topic specs |
-| [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test / plan map |
+| [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test map |
 | [../.sdd.yaml](../.sdd.yaml) | SDD project descriptor — identifier style, document paths, `make` targets (read by `sdd-*` skills) |
 | [../development-process.md](../development-process.md) | The two lanes, the delivery ladder, the superpowers boundary |
 | [packaging.md](packaging.md) | Module identity REQ-001–005 |

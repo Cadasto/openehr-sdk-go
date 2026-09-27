@@ -18,7 +18,7 @@ trap 'rm -rf "$TMP"' EXIT
 fail=0
 
 # Minimal tree that passes spec-check: one landed REQ with block-form
-# packages / probes / tests / plans, a registry row, a four-probe catalog
+# packages / probes / tests, a registry row, a four-probe catalog
 # (one Draft) whose census/all-three sentences are true, two runnable
 # example programs matching the tally in examples.md, and one Active plan.
 # The generated blocks are produced by the real spec-gen.sh. The checker
@@ -103,8 +103,6 @@ requirements:
       - PROBE-001
     tests:
       - pkg/good/good_test.go
-    plans:
-      - docs/plans/2026-01-01-plan.md
 EOF
   bash "$root/scripts/spec-gen.sh" >/dev/null
 }
@@ -148,10 +146,14 @@ r="$(new_case block-package)"
 sed -i 's|^      - pkg/good$|&\n      - pkg/absent|' "$r/docs/specifications/traceability.yaml"
 check block-package "$r" fail "missing package path pkg/absent"
 
-# 3 — nonexistent path in a block-form plans list.
-r="$(new_case block-plan)"
-sed -i 's|^      - docs/plans/2026-01-01-plan.md$|&\n      - docs/plans/absent.md|' "$r/docs/specifications/traceability.yaml"
-check block-plan "$r" fail "missing plan docs/plans/absent.md"
+# 3 - the retired `plans:` and `adrs:` keys are refused: plans and ADRs name
+#     their REQs themselves, so the map must not grow a second copy.
+r="$(new_case retired-plans)"
+printf '    plans:\n      - docs/plans/2026-01-01-plan.md\n' >> "$r/docs/specifications/traceability.yaml"
+check retired-plans "$r" fail "key 'plans:' is not part of the index schema"
+r="$(new_case retired-adrs)"
+printf '    adrs: [docs/adr/0001-x.md]\n' >> "$r/docs/specifications/traceability.yaml"
+check retired-adrs "$r" fail "key 'adrs:' is not part of the index schema"
 
 # 4 — block-form probes citing an uncatalogued probe.
 r="$(new_case block-probe)"
@@ -299,4 +301,4 @@ if [[ $fail -ne 0 ]]; then
   echo "spec-check-selftest: FAILED" >&2
   exit 1
 fi
-echo "spec-check-selftest: OK (27 cases)"
+echo "spec-check-selftest: OK (28 cases)"

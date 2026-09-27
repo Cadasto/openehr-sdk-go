@@ -4,6 +4,7 @@
 - **Supersedes:** —
 - **Superseded by:** —
 - **Tracks:** [`docs/plans/archive/2026-05-15-bmm-codegen.md`](../plans/archive/2026-05-15-bmm-codegen.md).
+- **Requirements:** [REQ-043](../specifications/bmm-conformance.md#mapping-rules) (the P_BMM to Go mapping rules the generator applies).
 
 ## Context
 
