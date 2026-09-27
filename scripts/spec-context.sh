@@ -80,12 +80,12 @@ fi
 echo
 
 # --- 4) Plans and ADRs that name this REQ ---------------------------------
-# The map carries no plans or ADRs: each names its REQs itself. A plan names
-# them in its **Covers:** paragraph (the Covers line and the lines below it
-# up to the first blank line, such as a bullet list), an ADR in the bullet
-# list above its first `##` heading. Only the whole identifier counts (REQ-06 never matches REQ-060).
-# A Covers line may also name a range, REQ-060..068, which covers every number
-# from the first to the last, as in the strands section below.
+# The map carries no plans or ADRs. An ADR names its REQs in the bullet list
+# above its first `##` heading. Plans are working notes outside the
+# traceability chain, with no required header: a plan is listed when its
+# text names the REQ anywhere. Only the whole identifier counts (REQ-06 never
+# matches REQ-060). A plan may also name a range, REQ-060..068, which covers
+# every number from the first to the last, as in the strands section below.
 names_req() { grep -qwF -- "$REQ" <<< "$1"; }
 covers_req() {
   names_req "$1" && return 0
@@ -105,14 +105,10 @@ plan_hits=""
 for f in "${ROOT}"/docs/plans/*.md; do
   [[ -f "$f" ]] || continue
   case "$(basename "$f")" in README.md|_template.md) continue ;; esac
-  covers="$(awk '/^\*\*Covers:\*\*/ { f = 1 } f && /^[[:space:]]*$/ { exit } f' "$f")"
-  [[ -n "$covers" ]] && covers_req "$covers" || continue
-  rel="${f#"${ROOT}/"}"
-  note="$(grep -m1 -E '^\*\*Status:\*\*' "$f" | sed -E 's/^\*\*Status:\*\*[[:space:]]*//; s/^\*\*//; s/[^A-Za-z].*$//' || true)"
-  note="${note:-no status}"
-  plan_hits+="- \`${rel}\`: $(doc_title "$f") _(${note})_"$'\n'
+  covers_req "$(cat "$f")" || continue
+  plan_hits+="- \`${f#"${ROOT}/"}\`: $(doc_title "$f")"$'\n'
 done
-if [[ -n "$plan_hits" ]]; then printf '%s' "$plan_hits"; else echo "_none names ${REQ} in its Covers paragraph_"; fi
+if [[ -n "$plan_hits" ]]; then printf '%s' "$plan_hits"; else echo "_no plan names ${REQ}_"; fi
 echo
 
 echo "## ADRs"

@@ -2,8 +2,8 @@
 # Verify docs/specifications/traceability.yaml against the working tree.
 #
 # Fail (exit 1):
-#   - the generated parts (the map's tests: lists, the REQ.md registry, the
-#     plans/README.md index) are stale (scripts/spec-gen.sh --check)
+#   - the generated parts (the map's tests: lists, the REQ.md registry) are
+#     stale (scripts/spec-gen.sh --check)
 #   - a row carries a key outside the index schema (no `notes:`, and no
 #     retired `plans:` or `adrs:`), the same key twice, or a comment; the map
 #     is an index, history lives in git
@@ -35,8 +35,8 @@ declare -A seen_ids         # REQ id -> 1 (a row id may appear once)
 
 # The keys a traceability.yaml row may carry. Anything else is refused: a
 # `notes:` memoir above all (the map is an index, and history lives in git),
-# and the retired `plans:` and `adrs:` keys (plans and ADRs name their REQs
-# themselves; spec-context finds them from there).
+# and the retired `plans:` and `adrs:` keys (an ADR names its REQs itself and
+# spec-context finds it from there; plans are outside the traceability chain).
 ROW_KEYS=" id title canonical status implementation packages tests probes fixtures "
 
 die() { echo "spec-check: error: $*" >&2; fail=1; }
@@ -282,8 +282,8 @@ for id in $(printf '%s\n' "${!trace_canonical[@]}" | sort); do
     || die "${id}: canonical anchor '#${anchor}' does not resolve to a heading in ${rel}"
 done
 
-# The generated blocks (REQ.md registry, plans/README.md index) match their
-# sources. The registry is generated from this map, so membership and
+# The generated parts (the map's tests: lists, the REQ.md registry) match
+# their sources. The registry is generated from this map, so membership and
 # implementation status cannot drift from it while this check is green.
 # A registry-shaped row outside the generated block would read as a real
 # registry entry to a human reader (spec-context reads only inside the markers).

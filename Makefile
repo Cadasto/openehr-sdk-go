@@ -221,7 +221,7 @@ spec-check: ## Verify docs/specifications/traceability.yaml against repo artefac
 sdd-check: ## Run the vendored SDD gate (advisory until green)
 	@python3 scripts/sdd-check.py selftest && python3 scripts/sdd-check.py check --root .
 
-spec-gen: ## Regenerate the map's tests lists, the REQ.md registry and the plans index from their sources
+spec-gen: ## Regenerate the map's tests lists and the REQ.md registry from their sources
 	@bash scripts/spec-gen.sh
 
 spec-context: ## Assemble the SDD context bundle for a REQ (usage: make spec-context REQ=094)

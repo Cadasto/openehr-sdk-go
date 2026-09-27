@@ -3,10 +3,10 @@
 #
 #   traceability.yaml tests:    each row's list <- the test files that cite its REQ
 #   docs/specifications/REQ.md  registry table  <- docs/specifications/traceability.yaml
-#   docs/plans/README.md        plan index      <- the **Status:** / **Covers:** headers
-#                                                  of docs/plans/*.md
 #
-# In REQ.md and plans/README.md only the text between the BEGIN/END GENERATED
+# Plans are not a source: nothing here reads docs/plans/.
+#
+# In REQ.md only the text between the BEGIN/END GENERATED
 # markers is rewritten; the prose around it is hand-written. In the map only
 # the rows' tests: lists are rewritten. Never edit a generated part by hand:
 # edit the source and run `make spec-gen`.
@@ -24,8 +24,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 YAML="${ROOT}/docs/specifications/traceability.yaml"
 REQ_REG="${ROOT}/docs/specifications/REQ.md"
-PLANS_DIR="${ROOT}/docs/plans"
-PLANS_README="${PLANS_DIR}/README.md"
 
 check=0
 [[ "${1:-}" == "--check" ]] && check=1
@@ -172,36 +170,6 @@ gen_registry() {
   ' "$YAML" | sort -t'|' -k2,2
 }
 
-# The plan index: every docs/plans/*.md except the README and the template,
-# grouped by the first word of its **Status:** line.
-gen_plans() {
-  local status f s
-  for f in "${PLANS_DIR}"/[0-9]*.md; do
-    [[ -f "$f" ]] || continue
-    s="$(grep -m1 -E '^\*\*Status:\*\*' "$f" | sed -E 's/^\*\*Status:\*\*[[:space:]]*//; s/^\*\*//; s/[^A-Za-z].*$//' || true)"
-    case "$s" in
-      Active|Draft|Parked|Done) ;;
-      *) echo "spec-gen: ${f#"${ROOT}/"}: **Status:** must start with Active, Draft, Parked or Done (found '${s}')" >&2
-         return 1 ;;
-    esac
-  done
-  for status in Active Draft Parked Done; do
-    local rows=""
-    for f in "${PLANS_DIR}"/[0-9]*.md; do
-      [[ -f "$f" ]] || continue
-      local s title covers name
-      s="$(grep -m1 -E '^\*\*Status:\*\*' "$f" | sed -E 's/^\*\*Status:\*\*[[:space:]]*//; s/^\*\*//; s/[^A-Za-z].*$//')"
-      [[ "$s" == "$status" ]] || continue
-      name="$(basename "$f")"
-      title="$(grep -m1 -E '^# ' "$f" | sed -E 's/^# (Plan — )?//; s/\|/\\|/g')"
-      covers="$(grep -m1 -E '^\*\*Covers:\*\*' "$f" | grep -oE 'REQ-[0-9]{3}' | awk '!seen[$0]++' | paste -sd, - | sed 's/,/, /g' || true)"
-      rows+="| [${name%.md}](${name}) | ${title} | ${covers:-—} |"$'\n'
-    done
-    [[ -n "$rows" ]] || continue
-    printf '\n### %s\n\n| Plan | Title | Covers |\n|---|---|---|\n%s' "$status" "$rows"
-  done
-}
-
 # Replace the lines between the BEGIN/END markers named <tag> in <file> with
 # the output of <generator>; print the result on stdout.
 splice() {
@@ -235,7 +203,6 @@ apply() {
 
 apply_tests
 apply "$REQ_REG" registry gen_registry
-apply "$PLANS_README" plans gen_plans
 
 [[ $stale -eq 0 ]] || exit 1
-[[ $check -eq 1 ]] || echo "spec-gen: regenerated the map's tests lists, the REQ.md registry and the plans/README.md index"
+[[ $check -eq 1 ]] || echo "spec-gen: regenerated the map's tests lists and the REQ.md registry"

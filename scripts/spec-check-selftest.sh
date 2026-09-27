@@ -23,25 +23,19 @@ fail=0
 # Minimal tree that passes spec-check: one landed REQ with block-form
 # packages / probes / tests, a registry row, a four-probe catalog
 # (one Draft) whose census/all-three sentences are true, two runnable
-# example programs matching the tally in examples.md, and one Active plan.
+# example programs matching the tally in examples.md.
 # The fixture is a git repository holding one test file that cites the REQ.
 # The generated parts are produced by the real spec-gen.sh. The checker
 # resolves ROOT from its own location, so copying it into <root>/scripts/
 # points it at the fixture.
 build_baseline() {
   local root="$1"
-  mkdir -p "$root/scripts" "$root/docs/specifications" "$root/docs/plans" "$root/pkg/good" \
+  mkdir -p "$root/scripts" "$root/docs/specifications" "$root/pkg/good" \
     "$root/cmd/examples/alpha" "$root/cmd/examples/beta" "$root/cmd/examples/scaffold"
   cp "$CHECK" "$root/scripts/spec-check.sh"
   cp "$GEN" "$root/scripts/spec-gen.sh"
   git -C "$root" init -q
   printf 'package good\n\n// REQ-001: fixture citation.\n' > "$root/pkg/good/good_test.go"
-  cat > "$root/docs/plans/2026-01-01-plan.md" <<'EOF'
-# Plan — Alpha
-
-**Status:** Active — under way
-**Covers:** REQ-001
-EOF
   # Two programs; `scaffold/` holds no main.go, so it is not one.
   touch "$root/cmd/examples/alpha/main.go" "$root/cmd/examples/beta/main.go" \
     "$root/cmd/examples/scaffold/README.md"
@@ -88,12 +82,6 @@ EOF
 
 <!-- BEGIN GENERATED: registry (fixture) -->
 <!-- END GENERATED: registry -->
-EOF
-  cat > "$root/docs/plans/README.md" <<'EOF'
-# Plans
-
-<!-- BEGIN GENERATED: plans (fixture) -->
-<!-- END GENERATED: plans -->
 EOF
   cat > "$root/docs/specifications/traceability.yaml" <<'EOF'
 requirements:
@@ -151,8 +139,8 @@ r="$(new_case block-package)"
 sed -i 's|^      - pkg/good$|&\n      - pkg/absent|' "$r/docs/specifications/traceability.yaml"
 check block-package "$r" fail "missing package path pkg/absent"
 
-# 3 - the retired `plans:` and `adrs:` keys are refused: plans and ADRs name
-#     their REQs themselves, so the map must not grow a second copy.
+# 3 - the retired `plans:` and `adrs:` keys are refused: an ADR names its REQs
+#     itself and plans are outside the chain, so the map lists neither.
 r="$(new_case retired-plans)"
 printf '    plans:\n      - docs/plans/2026-01-01-plan.md\n' >> "$r/docs/specifications/traceability.yaml"
 check retired-plans "$r" fail "key 'plans:' is not part of the index schema"
@@ -213,11 +201,6 @@ r="$(new_case examples-count)"
 sed -i 's/^The 2 runnable/The 3 runnable/' "$r/docs/examples.md"
 check examples-count "$r" fail "docs/examples.md: runnable-example count says 3, tree has 2"
 
-# 13 — a plan's Status line moves and the generated plan index is not refreshed.
-r="$(new_case plans-stale)"
-sed -i 's/^\*\*Status:\*\* Active/**Status:** Done/' "$r/docs/plans/2026-01-01-plan.md"
-check plans-stale "$r" fail "plans/README.md plans block is stale"
-
 # 14 — a program lands and neither doc moves (the drift that actually shipped).
 r="$(new_case examples-tree-grew)"
 mkdir -p "$r/cmd/examples/gamma"
@@ -250,11 +233,6 @@ check notes-key "$r" fail "key 'notes:' is not part of the index schema"
 r="$(new_case duplicate-key)"
 printf '    tests:\n      - pkg/good/good_test.go\n' >> "$r/docs/specifications/traceability.yaml"
 check duplicate-key "$r" fail "key 'tests:' appears twice"
-
-# 20 — a plan whose Status word is outside the four would silently leave the index.
-r="$(new_case plan-status-unknown)"
-sed -i 's/^\*\*Status:\*\* Active/**Status:** Superseded/' "$r/docs/plans/2026-01-01-plan.md"
-check plan-status-unknown "$r" fail "must start with Active, Draft, Parked or Done"
 
 # 21 — a missing END marker must be refused, not read as "truncate to EOF".
 r="$(new_case end-marker-gone)"
@@ -388,4 +366,4 @@ if [[ $fail -ne 0 ]]; then
   echo "spec-check-selftest: FAILED" >&2
   exit 1
 fi
-echo "spec-check-selftest: OK (36 cases)"
+echo "spec-check-selftest: OK (34 cases)"
