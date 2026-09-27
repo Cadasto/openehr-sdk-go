@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0011
+title: "RM behavioural-function surface and fallibility policy"
+status: accepted
+date: 2026-06-19
+---
+
 # ADR 0011 — RM behavioural-function surface and fallibility policy
 
 - **Status:** Accepted, 2026-06-19.

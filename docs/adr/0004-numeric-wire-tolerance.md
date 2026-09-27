@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0004
+title: "Strict-encode, permissive-decode for BMM `Real` and `Integer`"
+status: accepted
+date: 2026-05-16
+---
+
 # ADR 0004 — Strict-encode, permissive-decode for BMM `Real` and `Integer`
 
 - **Status:** Accepted, 2026-05-16.

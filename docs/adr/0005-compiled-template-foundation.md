@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0005
+title: "Compiled OPT foundation (rminfo + internal templatecompile)"
+status: accepted
+date: 2026-05-22
+---
+
 # ADR 0005 — Compiled OPT foundation (rminfo + internal templatecompile)
 
 - **Status:** Accepted, 2026-05-22.

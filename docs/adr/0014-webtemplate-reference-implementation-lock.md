@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0014
+title: "WebTemplate reference implementation and id-generation lock"
+status: accepted
+date: 2026-07-14
+---
+
 # ADR 0014 — WebTemplate reference implementation and id-generation lock
 
 - **Status:** Accepted, 2026-07-14 — maintainer sign-off on the REQ-106 specification (the reference + version were chosen during brainstorming, superseding the placeholder plan's shared-model-first sketch); the implementation landed in [PR 75](https://github.com/Cadasto/openehr-sdk-go/pull/75).

@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0009
+title: "SMART-on-openEHR auth library scope and dependency model"
+status: accepted
+date: 2026-06-18
+---
+
 # ADR 0009 — SMART-on-openEHR auth library scope and dependency model
 
 - **Status:** Accepted, 2026-06-18.

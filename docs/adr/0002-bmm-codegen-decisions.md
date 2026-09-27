@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0002
+title: "BMM code generator structural decisions"
+status: accepted
+date: 2026-05-16
+---
+
 # ADR 0002 — BMM code generator structural decisions
 
 - **Status:** Accepted, 2026-05-16.

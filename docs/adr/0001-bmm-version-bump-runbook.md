@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0001
+title: "BMM version-bump runbook"
+status: accepted
+date: 2026-05-16
+---
+
 # ADR 0001 — BMM version-bump runbook
 
 - **Status:** Accepted, 2026-05-16.

@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0008
+title: "SMART discovery: canonical `services` map shape"
+status: accepted
+date: 2026-06-17
+---
+
 # ADR 0008 — SMART discovery: canonical `services` map shape
 
 - **Status:** Accepted, 2026-06-17.

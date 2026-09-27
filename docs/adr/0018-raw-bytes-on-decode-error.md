@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0018
+title: "Raw response bytes on the typed 2xx decode error"
+status: accepted
+date: 2026-08-30
+---
+
 # ADR 0018 — Raw response bytes on the typed 2xx decode error
 
 - **Status:** Accepted, 2026-08-30.

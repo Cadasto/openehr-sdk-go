@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0006
+title: "Composition validation walker package placement"
+status: accepted
+date: 2026-06-11
+---
+
 # ADR 0006 — Composition validation walker package placement
 
 - **Status:** Accepted, 2026-06-11.

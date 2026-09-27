@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0013
+title: "Generated LOCATABLE identity surface and reverse type lookup"
+status: accepted
+date: 2026-07-12
+---
+
 # ADR 0013 — Generated LOCATABLE identity surface and reverse type lookup
 
 - **Status:** Accepted, 2026-07-12 — maintainer acceptance after two review rounds (field-accurate types, corrected counts, completed getter quartet, typed-nil predicate); implementation lands in the same PR.

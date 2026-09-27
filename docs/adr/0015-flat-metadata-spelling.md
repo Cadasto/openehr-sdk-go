@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0015
+title: "Composition-level FLAT metadata: accept both spellings, emit `ctx/`"
+status: accepted
+date: 2026-08-03
+---
+
 # ADR 0015 — Composition-level FLAT metadata: accept both spellings, emit `ctx/`
 
 - **Status:** Accepted, 2026-08-03 — maintainer decision, taken to unblock REQ-115 (the FLAT author linter cannot state its required-key set until the spelling question is settled) and to close a real interop rejection found by PROBE-086.

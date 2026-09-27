@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0017
+title: "AQL semantic layer: derived containment relation, overlays, opt-in enforcement"
+status: accepted
+date: 2026-08-22
+---
+
 # ADR 0017 — AQL semantic layer: derived containment relation, overlays, opt-in enforcement
 
 - **Status:** Accepted, 2026-08-22.

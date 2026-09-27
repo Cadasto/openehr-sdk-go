@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0022
+title: "Canonical JSON is encoded by `encoding/json/v2`"
+status: accepted
+date: 2026-09-14
+---
+
 # ADR 0022 — Canonical JSON is encoded by `encoding/json/v2`
 
 - **Status:** Accepted, 2026-09-14 (maintainer sign-off on the plan, PR 171); implementation landed in [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171).

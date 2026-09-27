@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0007
+title: "AQL parser: ANTLR + SDK grammar profile"
+status: accepted
+date: 2026-06-15
+---
+
 # ADR 0007 — AQL parser: ANTLR + SDK grammar profile
 
 - **Status:** Accepted, 2026-06-15.

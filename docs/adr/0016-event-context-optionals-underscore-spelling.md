@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0016
+title: "EVENT_CONTEXT optionals ride the underscore grammar, not new `ctx/` short forms"
+status: accepted
+date: 2026-08-05
+---
+
 # ADR 0016 — EVENT_CONTEXT optionals ride the underscore grammar, not new `ctx/` short forms
 
 - **Status:** Accepted, 2026-08-05 — maintainer decision, taken with REQ-140 (underscore-prefixed RM attributes) so the grammar has one spelling per attribute before implementation starts.

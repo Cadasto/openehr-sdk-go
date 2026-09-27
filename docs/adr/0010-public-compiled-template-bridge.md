@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0010
+title: "Public compiled-template bridge placement"
+status: accepted
+date: 2026-06-17
+---
+
 # ADR 0010 — Public compiled-template bridge placement
 
 - **Status:** Accepted, 2026-06-17.

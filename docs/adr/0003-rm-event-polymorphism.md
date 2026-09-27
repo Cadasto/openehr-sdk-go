@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0003
+title: "Codec polymorphism for abstract generic RM classes"
+status: accepted
+date: 2026-05-16
+---
+
 # ADR 0003 — Codec polymorphism for abstract generic RM classes
 
 - **Status:** Accepted, 2026-05-16.

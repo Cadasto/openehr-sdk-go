@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0019
+title: "Definition metadata timestamps: a closed tolerant layout set on decode, RFC 3339 on encode"
+status: accepted
+date: 2026-08-30
+---
+
 # ADR 0019 — Definition metadata timestamps: a closed tolerant layout set on decode, RFC 3339 on encode
 
 - **Status:** Accepted, 2026-08-30.

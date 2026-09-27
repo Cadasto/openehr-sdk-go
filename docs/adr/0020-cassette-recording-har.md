@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0020
+title: "Cassette recordings are HTTP Archive 1.2"
+status: accepted
+date: 2026-09-07
+---
+
 # ADR 0020 — Cassette recordings are HTTP Archive 1.2
 
 - **Status:** Accepted, 2026-09-07.
