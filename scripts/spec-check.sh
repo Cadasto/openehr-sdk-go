@@ -185,7 +185,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   # its keys to the previous row.
   if [[ $in_rows -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*id: ]]; then
     [[ "$line" =~ ^"  - id: "REQ-[0-9]{3,}[[:space:]]*$ ]] \
-      || { die "${current_id:-traceability.yaml}: malformed id line: '${line}'"; continue; }
+      || { die "traceability.yaml: malformed id line '${line}' (after ${current_id:-the header})"; continue; }
   fi
   if [[ "$line" =~ ^[[:space:]]*-[[:space:]]*id:[[:space:]]*(REQ-[0-9]+) ]]; then
     # Capture before flush_req: its internal `[[ =~ ]]` tests clobber BASH_REMATCH.
