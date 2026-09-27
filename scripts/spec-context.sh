@@ -36,7 +36,7 @@ row="$(awk -v id="$REQ" '
   inside && index($0, "| " id " |") == 1
 ' "$REQ_REG" 2>/dev/null || true)"
 if [[ -n "$row" ]]; then
-  printf '| ID | Title | Canonical | Impl. |\n|---|---|---|---|\n%s\n' "$row"
+  printf '| ID | Title | Canonical | Stability | Impl. |\n|---|---|---|---|---|\n%s\n' "$row"
 else
   echo "_not found in REQ.md registry_"
 fi

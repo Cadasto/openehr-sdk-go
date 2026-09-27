@@ -142,14 +142,14 @@ apply_tests() {
 
 # The registry: one row per traceability.yaml entry, in id order.
 gen_registry() {
-  echo '| ID | Title | Canonical | Impl. |'
-  echo '|---|---|---|---|'
+  echo '| ID | Title | Canonical | Stability | Impl. |'
+  echo '|---|---|---|---|---|'
   awk '
     function flush() {
       if (id == "") return
       file = canon; sub(/^docs\/specifications\//, "", file)
       text = file; sub(/#.*/, "", text)
-      printf "| %s | %s | [%s](%s) | %s |\n", id, title, text, file, impl
+      printf "| %s | %s | [%s](%s) | %s | %s |\n", id, title, text, file, stab, impl
       id = ""
     }
     function unquote(s) {
@@ -159,13 +159,14 @@ gen_registry() {
       return s
     }
     { sub(/\r$/, "") }
-    /^  - id: REQ-[0-9]+[[:space:]]*$/ { flush(); id = $3; title = canon = impl = ""; next }
+    /^  - id: REQ-[0-9]+[[:space:]]*$/ { flush(); id = $3; title = canon = stab = impl = ""; next }
     /^[[:space:]]*-[[:space:]]*id:/ {
       printf "spec-gen: traceability.yaml line %d: a row must start with exactly \"  - id: REQ-NNN\"\n", NR > "/dev/stderr"
       bad = 1; exit 1
     }
     id != "" && /^    title:/          { sub(/^    title:/, ""); title = unquote($0); next }
     id != "" && /^    canonical:/      { canon = $2; next }
+    id != "" && /^    status:/         { stab = $2; next }
     id != "" && /^    implementation:/ { impl = $2; next }
     END { if (!bad) flush(); exit bad }
   ' "$YAML" | sort -t'|' -k2,2

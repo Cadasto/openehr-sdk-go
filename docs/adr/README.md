@@ -1,9 +1,14 @@
+---
+kind: guide
+---
+
 # Architecture Decision Records
 
 Closed architecture decisions for `openehr-sdk-go`. Each ADR is a numbered Markdown file with the standard headings (Status, Context, Decision, Consequences). Status reaches **Accepted** before the ADR is considered closed.
 
 Open decisions (those that would be ADRs once resolved) live in this repo as **research strands** — [`docs/specifications/research-strands.md`](../specifications/research-strands.md). When a strand is resolved, an ADR lands here.
 
+<!-- sdd:generated adr-index -->
 | # | Title | Status |
 |---|---|---|
 | [0001](0001-bmm-version-bump-runbook.md) | BMM version-bump runbook | Accepted (2026-05-16) |
@@ -28,5 +33,6 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | [0020](0020-cassette-recording-har.md) | Cassette recordings are HTTP Archive 1.2 | Accepted (2026-09-07) |
 | [0021](0021-json-member-order-not-a-contract.md) | Encoded JSON member order is not part of the canonical JSON contract | Accepted (2026-09-14) |
 | [0022](0022-canonical-json-encoding-json-v2.md) | Canonical JSON is encoded by `encoding/json/v2` | Accepted (2026-09-14) |
+<!-- /sdd:generated -->
 
 See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.

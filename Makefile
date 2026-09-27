@@ -64,7 +64,7 @@ endef
         test test-race \
         lint lint-ci \
         mod-tidy mod-tidy-check \
-        spec-check spec-gen spec-context probe-status probe-record \
+        spec-check sdd-check spec-gen spec-context probe-status probe-record \
         build clean \
         docs-sync docs-sync-offline docs-build docs-check docs-serve docs-clean \
         ci
@@ -217,6 +217,9 @@ mod-tidy-check: ## Fail if go mod tidy would change go.mod or go.sum
 spec-check: ## Verify docs/specifications/traceability.yaml against repo artefacts
 	@bash scripts/spec-check-selftest.sh
 	@bash scripts/spec-check.sh
+
+sdd-check: ## Run the vendored SDD gate (advisory until green)
+	@python3 scripts/sdd-check.py selftest && python3 scripts/sdd-check.py check --root .
 
 spec-gen: ## Regenerate the map's tests lists, the REQ.md registry and the plans index from their sources
 	@bash scripts/spec-gen.sh

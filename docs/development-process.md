@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # Development process
 
 How a change moves through this repository. This page owns the two lanes and the ladder. The conventions they use (document kinds, RFC-2119 force, status headers, identifiers, the traceability chain) live once, in [specifications/README.md](specifications/README.md); the agent loop is in [ai-workflow.md § The loop](ai-workflow.md#the-loop).

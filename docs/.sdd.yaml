@@ -3,18 +3,26 @@
 # Schema: <sdd plugin>/references/traceability-schema.md §1. Methodology: §5 (identifiers).
 # Do NOT switch req_style once published — it would renumber stable IDs (a major doc event).
 sdd:
+  profile: lightweight              # full | lightweight; lightweight = the requirements index is one registry file (REQ.md), no per-REQ detail files
+
   req_style: flat-numeric           # flat-numeric (REQ-NNN) — leaner for a library
   req_gap: 1                        # sequential: a new REQ takes the next free number above the
                                     # highest registered one. The old decadal topic bands are
                                     # historical and no longer allocated from; reservations and
                                     # retired numbers are listed in REQ.md § Numbering policy.
+  excluded_areas: []                # area-prefixed only; tokens that are deliberately not areas
+
+  # The document-kind vocabulary every `kind:` frontmatter value is checked against.
+  doc_kinds: [requirement, specification, adr, plan, guide, analysis, operations, reference, upstream]
+
+  default_mode: spec-first          # the mode a specification has when its frontmatter names none
 
   paths:
     # Requirements use a REGISTRY model, not per-REQ files: the REQ-NNN index lives in
     # docs/specifications/REQ.md and each requirement's canonical normative prose lives in
     # exactly one topic spec in the same tree. There is deliberately no separate
     # docs/requirements/ dir (single canonical home — methodology §5).
-    requirements: docs/specifications
+    requirements: docs/specifications/REQ.md   # file form: the registry itself is the requirements index
     specifications: docs/specifications
     adr: docs/adr
     plans: docs/plans
@@ -50,3 +58,46 @@ sdd:
     paths, terminology codes, ITS-JSON/REST request-response shapes, and class invariants
     rather than guess. The conformance probe suite (testkit/probes, catalogued in
     docs/specifications/conformance.md) is the source of truth for wire-level semantics.
+
+  check:
+    script: scripts/sdd-check.py   # where the vendored gate lives
+    version: "0.6.0"               # must equal the vendored tool's own version
+    links:
+      exclude: ["docs/plans/archive/**"]  # the frozen archive (paths.plans_archive): its broken links are history, not drift
+    changelog:
+      path: CHANGELOG.md
+      max_words: 35
+    code_roots: []                 # for tree-to-map; must exist; empty = the repository minus docs/, .git/,
+                                   # vendor/, node_modules/, every paths.*, the traceability map, check.script
+    test_globs: ["*_test.go", "probe_*.go"]  # basename globs; probe_*.go is the testkit/probes implementations spec-gen counts as tests
+    probes_catalogue: docs/specifications/conformance.md  # its headings carry the PROBE ids
+    families:                      # error | warn | off
+      descriptor: error
+      map-schema: error
+      map-to-tree: error
+      index-sync: error
+      plans: error
+      tree-to-map: warn
+      doc-kinds: warn
+      rfc2119: warn                # the per-kind table in sdd-check.md still errors for requirement/adr/plan/reference
+      one-home: error
+      links: error
+      changelog: warn
+      generated: error
+      draft-reason: off
+
+  hooks:
+    stop_nudge: true               # the session-stop hook's one-shot "record progress" nudge; false disables it in this repository
+
+  # Delivery parameters. /sdd-deliver and /sdd-review read these instead of asking.
+  # Every value here is an example: no model and no reviewer is required by the plugin.
+  agents:
+    worker_model: inherit           # per-dispatch model override; inherit = no override, or a host model id
+    max_parallel_workers: 3
+    worktree_per_worker: true       # parallel, mutating tasks only
+    worker_skills: [go-coding:go-coding]  # skills named in the worker's brief (suggested from go.mod)
+    reviewers: [go-coding:go-reviewer]    # this repo's own language reviewers, by agent name (suggested from go.mod)
+    task_review: lane               # on | off | lane  (lane = on for full, off for maintenance)
+    review_panel:                   # who reviews the PR, per lane; names are prompt targets, not integrations
+      full: [claude, cursor]
+      maintenance: [claude]

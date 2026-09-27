@@ -1,3 +1,7 @@
+---
+kind: plan
+---
+
 # Plan — &lt;short title&gt;
 
 **Date:** YYYY-MM-DD

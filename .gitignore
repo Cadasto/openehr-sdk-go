@@ -78,3 +78,6 @@ tmp/
 # AQL parser codegen scratch dirs (make aqlgen / aqlgen-verify)
 openehr/aql/parse/gen.tmp/
 openehr/aql/parse/gen.verify/
+
+# Python bytecode from importing the vendored SDD gate
+__pycache__/

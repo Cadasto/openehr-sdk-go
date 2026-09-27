@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # Continuous integration
 
 How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks locally. CI is operational process. It is not part of the normative `docs/specifications/` contract, which holds the wire semantics and conformance probes.
