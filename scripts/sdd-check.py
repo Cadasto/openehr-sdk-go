@@ -3,8 +3,8 @@
 
 One file, standard library only, Python 3.9 or newer. The contract this file
 implements is `references/sdd-check.md` (families, report format, exit codes) and
-`references/traceability-schema.md` (the descriptor keys, the record fields, the plan
-frontmatter, the generated-block markers).
+`references/traceability-schema.md` (the descriptor keys, the record fields, the
+generated-block markers).
 
 Exit codes: 0 ran with no errors, 1 ran with at least one error, 2 could not configure
 itself or verified nothing: the descriptor is missing, unparseable, wrong-shape, or names a
@@ -29,7 +29,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 # Constants
 # ---------------------------------------------------------------------------
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 #: Every family, in report order.
 FAMILIES = (
@@ -37,7 +37,6 @@ FAMILIES = (
     "map-schema",
     "map-to-tree",
     "index-sync",
-    "plans",
     "tree-to-map",
     "doc-kinds",
     "rfc2119",
@@ -48,13 +47,16 @@ FAMILIES = (
     "draft-reason",
 )
 
+#: Families a release retired. A `check.families` line naming one is a NOTE, not an error,
+#: so a descriptor written for the previous release still loads; delete the line to clear it.
+RETIRED_FAMILIES = ("plans",)
+
 #: The severity a family has when the descriptor names none.
 DEFAULT_SEVERITY = {
     "descriptor": "error",
     "map-schema": "error",
     "map-to-tree": "error",
     "index-sync": "error",
-    "plans": "error",
     "tree-to-map": "warn",
     "doc-kinds": "warn",
     "rfc2119": "warn",
@@ -68,41 +70,40 @@ DEFAULT_SEVERITY = {
 SEVERITIES = ("error", "warn", "off")
 
 #: The families that cannot run without records.
-RECORD_FAMILIES = ("map-to-tree", "index-sync", "plans", "tree-to-map", "generated", "draft-reason")
+RECORD_FAMILIES = ("map-to-tree", "index-sync", "tree-to-map", "generated", "draft-reason")
 
 STATUS = ("draft", "stable", "deprecated")
-IMPLEMENTATION = ("proposed", "planned", "in_progress", "partial", "landed", "shipped", "deferred")
+IMPLEMENTATION = ("proposed", "planned", "in_progress", "partial", "landed", "shipped", "deferred", "retired")
 ENFORCED = ("in_progress", "partial", "landed", "shipped")
-PLAN_STATUS = ("active", "done", "postponed", "abandoned")
 MODES = ("spec-first", "implementation-aligned")
 ADR_STATUS = ("proposed", "accepted", "superseded", "deprecated")
 UPSTREAM_STATE = ("proposed", "submitted", "landed-upstream", "landed", "rejected")
+#: Which headings open a normative section for the rfc2119 family (check.rfc2119.sections).
+RFC2119_SECTIONS = ("section-sign", "requirement-id", "either")
 
 DEFAULT_KINDS = (
     "requirement",
     "specification",
     "adr",
-    "plan",
     "guide",
     "analysis",
     "operations",
     "reference",
     "upstream",
 )
-NORMATIVE_KINDS = ("requirement", "specification", "adr", "plan")
+NORMATIVE_KINDS = ("requirement", "specification", "adr")
 
 #: The frontmatter key and the vocabulary each kind's status axis is checked against.
 KIND_VOCABULARY = {
     "requirement": ("status", STATUS),
     "specification": ("status", STATUS),
     "adr": ("status", ADR_STATUS),
-    "plan": ("status", PLAN_STATUS),
     "upstream": ("state", UPSTREAM_STATE),
 }
 
 #: A keyword in one of these kinds is an error whatever the family's severity: each one
 #: cites the specification, so a binding word there is a second source of truth.
-RFC2119_CITING_KINDS = ("requirement", "adr", "plan", "reference")
+RFC2119_CITING_KINDS = ("requirement", "adr", "reference")
 
 DEFAULT_TEST_GLOBS = (
     "*_test.go",
@@ -120,6 +121,8 @@ ROOT_PRUNED = ("docs",)
 NESTED_PRUNED = (".git", "vendor", "node_modules")
 
 GENERATED_BLOCKS = ("requirements-index", "specifications-index", "adr-index")
+#: The blocks rendered from map records; a map error leaves them as they are.
+RECORD_BLOCKS = ("requirements-index",)
 GENERATED_OPEN = "<!-- sdd:generated %s -->"
 GENERATED_CLOSE = "<!-- /sdd:generated -->"
 
@@ -867,6 +870,9 @@ def _key_line(text: str, dotted: str, value: str = "") -> int:
     for segment in dotted.split("."):
         pattern = re.compile(r"^(\s*)%s\s*:" % re.escape(segment))
         hit = None
+        #: Below the first segment only a direct child matches, so check.rfc2119 is never
+        #: taken for check.families.rfc2119, whichever comes first.
+        child_indent = None
         for index in range(position, len(lines)):
             line = lines[index]
             if not line.strip() or line.lstrip().startswith("#"):
@@ -874,6 +880,11 @@ def _key_line(text: str, dotted: str, value: str = "") -> int:
             indent = len(line) - len(line.lstrip())
             if parent_indent >= 0 and indent <= parent_indent:
                 break
+            if parent_indent >= 0:
+                if child_indent is None:
+                    child_indent = indent
+                elif indent != child_indent:
+                    continue
             match = pattern.match(line)
             if match:
                 hit = (index, len(match.group(1)))
@@ -1005,6 +1016,13 @@ class Descriptor:
         globs = [_as_str(g) for g in _as_list(self.check.get("test_globs"))]
         self.test_globs = globs or list(DEFAULT_TEST_GLOBS)
         self.probes_catalogue = _as_str(self.check.get("probes_catalogue"), "")
+        rfc2119 = self.check.get("rfc2119")
+        if rfc2119 is not None and not isinstance(rfc2119, dict):
+            self.shape_problems.append("check.rfc2119 must be a mapping")
+        rfc2119 = rfc2119 if isinstance(rfc2119, dict) else {}
+        self.rfc2119_sections = (
+            _as_str(rfc2119.get("sections"), "section-sign") or "section-sign"
+        )
         families = self.check.get("families")
         self.families = {}
         if isinstance(families, dict):
@@ -1044,6 +1062,38 @@ class Descriptor:
     # -- derived ----------------------------------------------------------
     def resolve(self, rel: str) -> Path:
         return self.root / rel
+
+    def _normal(self, rel: str) -> Path:
+        return Path(os.path.normpath(str(self.root / rel)))
+
+    def plans_problem(self) -> str:
+        """Why ``paths.plans`` is unsafe to prune, or ``""``. Every docs walk skips that
+        directory, so a value that is empty, names the repository or ``docs`` root, or
+        names or contains another document path would hide real documents from every
+        family while the gate still reported OK."""
+        rel = _as_str(self.paths.get("plans", DEFAULT_PATHS["plans"]))
+        if not rel.strip():
+            return "paths.plans is empty; it names the working-plan directory the gate never reads"
+        plans = self._normal(rel)
+        guarded = [self._normal("."), self._normal("docs")]
+        for key in ("requirements", "specifications", "adr"):
+            value = _as_str(self.paths.get(key, ""))
+            if value:
+                guarded.append(self._normal(value))
+        if self.traceability:
+            guarded.append(self._normal(self.traceability))
+        for other in guarded:
+            if plans == other or plans in other.parents:
+                shown = os.path.relpath(str(other), str(self._normal(".")))
+                return "paths.plans: '%s' would hide %s from every family" % (rel, shown)
+        return ""
+
+    def plans_dir(self) -> Optional[Path]:
+        """The working-plan directory every docs walk prunes, or ``None`` when
+        :meth:`plans_problem` finds the value unsafe; an unsafe value prunes nothing."""
+        if self.plans_problem():
+            return None
+        return self._normal(_as_str(self.paths.get("plans", DEFAULT_PATHS["plans"])))
 
     def severity(self, family: str) -> str:
         value = self.families.get(family)
@@ -1091,8 +1141,7 @@ class Descriptor:
         if not target.is_dir():
             return []
         # `_template.md` is the copy /sdd-scaffold leaves for the author to fill in. It
-        # declares `kind: specification` but names no specification, so it is not one —
-        # the same basename `check_plans` and `_plans_for` skip.
+        # declares `kind: specification` but names no specification, so it is not one.
         return sorted(
             p for p in target.rglob("*.md") if p.name != "_template.md" and p.is_file()
         )
@@ -1100,7 +1149,10 @@ class Descriptor:
     def docs_roots(self) -> List[Path]:
         roots = [self.root / "docs"]
         seen = {"docs"}
-        for rel in self.paths.values():
+        for key, rel in self.paths.items():
+            if key == "plans":
+                # A plan is a working file; no family reads paths.plans.
+                continue
             normal = str(Path(rel).as_posix())
             if normal in seen or normal.startswith("docs/"):
                 continue
@@ -1302,6 +1354,7 @@ class Context:
 
     def docs_files(self) -> List[Path]:
         if self._docs_files is None:
+            plans_dir = self.desc.plans_dir()
             found: List[Path] = []
             for root in self.desc.docs_roots():
                 if root.is_file() and root.suffix == ".md":
@@ -1311,8 +1364,13 @@ class Context:
                 if not root.is_dir():
                     continue
                 for path in sorted(root.rglob("*.md")):
-                    if path.is_file() and ".git" not in path.parts:
-                        found.append(path)
+                    if not path.is_file() or ".git" in path.parts:
+                        continue
+                    if plans_dir is not None and (
+                        path == plans_dir or plans_dir in path.parents
+                    ):
+                        continue
+                    found.append(path)
             seen = set()
             unique = []
             for path in found:
@@ -1394,7 +1452,7 @@ def doc_kind(ctx: Context, path) -> Optional[str]:
 def kind_zone(kind: str) -> str:
     """The zone a kind sits in: ``normative``, ``upstream`` or ``informative``.
 
-    Any kind that is neither one of the four normative kinds nor ``upstream`` is
+    Any kind that is neither one of the three normative kinds nor ``upstream`` is
     informative, so a kind a repository adds to ``doc_kinds`` joins the informative zone
     and carries no status axis.
     """
@@ -1410,7 +1468,6 @@ _LOCATION_KIND = (
     ("specifications", "specification"),
     ("requirements", "requirement"),
     ("adr", "adr"),
-    ("plans", "plan"),
 )
 
 
@@ -1466,7 +1523,7 @@ def check_descriptor(ctx: Context, report: "Report") -> None:
     overlap = sorted(set(desc.excluded_areas) & set(desc.req_areas))
     if overlap:
         add("excluded_areas must be disjoint from req_areas: %s" % ", ".join(overlap))
-    for key in ("requirements", "specifications", "adr", "plans"):
+    for key in ("requirements", "specifications", "adr"):
         rel = desc.paths.get(key, "")
         if not rel:
             add("paths.%s is not declared" % key)
@@ -1480,6 +1537,9 @@ def check_descriptor(ctx: Context, report: "Report") -> None:
             continue
         if not desc.resolve(rel).exists():
             add("paths.%s: '%s' does not exist" % (key, rel))
+    plans_problem = desc.plans_problem()
+    if plans_problem:
+        add(plans_problem)
     if not desc.traceability:
         add("traceability is not declared")
     elif not desc.resolve(desc.traceability).is_file():
@@ -1490,7 +1550,16 @@ def check_descriptor(ctx: Context, report: "Report") -> None:
             % (desc.check_version, __version__)
         )
     for family, value in desc.families.items():
-        if family not in FAMILIES:
+        if family in RETIRED_FAMILIES:
+            text = ctx.read(ctx.root / DESCRIPTOR_REL)
+            report.add(
+                "descriptor",
+                "NOTE",
+                "%s:%d" % (DESCRIPTOR_REL, _key_line(text, "check.families.%s" % family)),
+                "check.families.%s: the %s family was retired in 0.7.0; delete the line"
+                % (family, family),
+            )
+        elif family not in FAMILIES:
             add("check.families: unknown family '%s'" % family)
         elif value not in SEVERITIES:
             add("check.families.%s: '%s' is not error | warn | off" % (family, value))
@@ -1498,6 +1567,15 @@ def check_descriptor(ctx: Context, report: "Report") -> None:
         add("default_mode: '%s' is not %s" % (desc.default_mode, " | ".join(MODES)))
     for problem in desc.shape_problems:
         add(problem)
+    if desc.rfc2119_sections not in RFC2119_SECTIONS:
+        text = ctx.read(ctx.root / DESCRIPTOR_REL)
+        report.add(
+            "descriptor",
+            level,
+            "%s:%d" % (DESCRIPTOR_REL, _key_line(text, "check.rfc2119.sections")),
+            "check.rfc2119.sections: '%s' is not %s"
+            % (desc.rfc2119_sections, " | ".join(RFC2119_SECTIONS)),
+        )
     if desc.code_roots_valid:
         for rel in desc.code_roots:
             if not desc.resolve(rel).exists():
@@ -1551,6 +1629,11 @@ def check_map_schema(ctx: Context, report: "Report", level: Optional[str] = None
             add(
                 "%s: implementation '%s' is not %s"
                 % (record.id, record.implementation, " | ".join(IMPLEMENTATION))
+            )
+        if record.implementation == "retired" and record.status and record.status != "deprecated":
+            add(
+                "%s: implementation 'retired' belongs only to a deprecated requirement, not '%s'"
+                % (record.id, record.status)
             )
         if record.canonical:
             path_part, _, anchor_part = record.canonical.partition("#")
@@ -1917,116 +2000,6 @@ def check_index_sync(ctx: Context, report: "Report") -> None:
             )
 
 
-def _newest_tag_commit(ctx: Context) -> Tuple[Optional[str], str]:
-    """The commit the newest tag points at, and the reason when there is none."""
-    if ctx.git("rev-parse", "--show-toplevel") is None:
-        return None, "stale-plan rule needs git"
-    tags = ctx.git("tag", "--sort=-creatordate") or ""
-    newest = ""
-    for line in tags.split("\n"):
-        if line.strip():
-            newest = line.strip()
-            break
-    if not newest:
-        return None, "stale-plan rule needs a release tag"
-    commit = ctx.git("rev-list", "-n", "1", newest) or ""
-    if not commit.strip():
-        return None, "stale-plan rule needs a release tag"
-    return commit.strip(), ""
-
-
-def check_plans(ctx: Context, report: "Report") -> None:
-    """Every plan carries its four frontmatter keys, and a finished plan is swept."""
-    desc = ctx.desc
-    level = ctx.level("plans")
-    plans_dir = desc.resolve(desc.paths.get("plans", "docs/plans"))
-    if not plans_dir.is_dir():
-        report.skip("plans", "no plans directory")
-        return
-    tag_commit, skip_reason = _newest_tag_commit(ctx)
-    if skip_reason:
-        report.skip("plans", skip_reason, partial=True)
-    pattern = desc.req_pattern()
-    for path in sorted(plans_dir.rglob("*.md")):
-        if path.name == "_template.md" or not path.is_file():
-            continue
-        anchor = ctx.rel(path)
-        front, reported = _frontmatter_of(ctx, report, "plans", path)
-        if front is None:
-            if not reported:
-                report.add("plans", level, anchor, "the plan carries no frontmatter")
-            continue
-        for key in ("plan", "implements", "mode", "status"):
-            if front.get(key) in (None, "", []):
-                report.add("plans", level, anchor, "frontmatter %s is required" % key)
-        name = _as_str(front.get("plan"))
-        if name and name != path.stem:
-            report.add(
-                "plans",
-                level,
-                anchor,
-                "plan '%s' does not equal the filename stem '%s'" % (name, path.stem),
-            )
-        status = _as_str(front.get("status"))
-        if status and status not in PLAN_STATUS:
-            report.add(
-                "plans", level, anchor, "status '%s' is not %s" % (status, " | ".join(PLAN_STATUS))
-            )
-        mode = _as_str(front.get("mode"))
-        if mode and mode not in MODES:
-            report.add("plans", level, anchor, "mode '%s' is not %s" % (mode, " | ".join(MODES)))
-        implemented: List[Record] = []
-        implements_value = front.get("implements")
-        # A scalar `implements: REQ-X` is a common slip; without this it would reach
-        # `_as_list` as [] and be checked against nothing, so a wrong id would pass.
-        if isinstance(implements_value, str):
-            implements_value = [implements_value]
-        for item in _as_list(implements_value):
-            token = _as_str(item)
-            if not token.startswith("REQ-"):
-                continue
-            record = ctx.records_by_id.get(token) if pattern.fullmatch(token) else None
-            if record is None:
-                report.add("plans", level, anchor, "implements %s, which has no record" % token)
-            else:
-                implemented.append(record)
-        if (
-            status == "active"
-            and mode == "spec-first"
-            and implemented
-            and all(r.implementation in ("landed", "shipped") for r in implemented)
-        ):
-            report.add(
-                "plans",
-                "WARN",
-                anchor,
-                "every requirement this plan implements is landed or shipped, yet the plan is still active",
-            )
-        if status == "done":
-            open_ids = [r.id for r in implemented if not r.enforced()]
-            if open_ids:
-                report.add(
-                    "plans",
-                    "WARN",
-                    anchor,
-                    "status is done while %s is not enforced" % ", ".join(open_ids),
-                )
-        if tag_commit and status in ("done", "abandoned"):
-            commit = ctx.git("log", "-1", "--format=%H", "--", anchor) or ""
-            commit = commit.strip()
-            if not commit:
-                report.add(
-                    "plans", "NOTE", anchor, "the stale-plan rule is skipped: the file is not committed"
-                )
-            elif ctx.git("merge-base", "--is-ancestor", commit, tag_commit) is not None:
-                report.add(
-                    "plans",
-                    level,
-                    anchor,
-                    "finished plan predates the latest release tag; run /sdd-finalize",
-                )
-
-
 def _walk_code(ctx: Context, roots: List[Path], skip: set):
     """Every file under the code roots. The only exclusions are the pruned directories,
     the descriptor's own document paths, and a file that does not decode as UTF-8."""
@@ -2224,10 +2197,33 @@ def check_doc_kinds(ctx: Context, report: "Report") -> None:
         report.skip("doc-kinds", "every document is waived")
 
 
-def _spec_sections(report: "Report", anchor: str, text: str) -> bool:
-    """Warn on every ``§`` section with no keyword. ``False`` when the document has none."""
+def _section_heading(desc: "Descriptor") -> Callable[[str], bool]:
+    """The predicate for a heading that opens a normative section, by the convention
+    ``check.rfc2119.sections`` names. The match is lexical and needs no record: the
+    requirement-id form accepts any token of the repository's REQ pattern, on identifier
+    boundaries, so REQ-FOUND-0011 is not REQ-FOUND-001. An unknown value is the
+    descriptor family's error; here it reads as the default."""
+    requirement = re.compile(
+        r"(?<![0-9A-Za-z_-])(?:%s)(?![0-9A-Za-z_-])" % desc.req_pattern().pattern
+    )
+    convention = desc.rfc2119_sections
+    if convention == "requirement-id":
+        return lambda heading: bool(requirement.search(heading))
+    if convention == "either":
+        return lambda heading: "§" in heading or bool(requirement.search(heading))
+    return lambda heading: "§" in heading
+
+
+#: How the partial-skip line names each convention.
+_SECTION_LABEL = {"requirement-id": "requirement-id", "either": "§ or requirement-id"}
+
+
+def _spec_sections(
+    report: "Report", anchor: str, text: str, is_section: Callable[[str], bool]
+) -> bool:
+    """Warn on every normative section with no keyword. ``False`` when the document has none."""
     found = headings(text)
-    marked = [index for index, entry in enumerate(found) if "§" in entry[2]]
+    marked = [index for index, entry in enumerate(found) if is_section(entry[2])]
     if not marked:
         return False
     total = len(text.split("\n"))
@@ -2247,9 +2243,11 @@ def _spec_sections(report: "Report", anchor: str, text: str) -> bool:
     return True
 
 
-def _specification_rules(report: "Report", anchor: str, text: str) -> bool:
+def _specification_rules(
+    report: "Report", anchor: str, text: str, is_section: Callable[[str], bool]
+) -> bool:
     """The three rules that apply inside a specification. ``False`` when it has no section."""
-    has_sections = _spec_sections(report, anchor, text)
+    has_sections = _spec_sections(report, anchor, text, is_section)
     for lineno, line in strip_noncontent(text):
         malformed = MALFORMED_RE.search(line)
         if malformed:
@@ -2283,6 +2281,7 @@ def check_rfc2119(ctx: Context, report: "Report") -> None:
         return
     sectionless: List[str] = []
     examined = 0
+    is_section = _section_heading(ctx.desc)
     for path in paths:
         if _waived(ctx, report, "rfc2119", path):
             continue
@@ -2294,7 +2293,7 @@ def check_rfc2119(ctx: Context, report: "Report") -> None:
         anchor = ctx.rel(path)
         text = ctx.read(path)
         if kind == "specification":
-            if not _specification_rules(report, anchor, text):
+            if not _specification_rules(report, anchor, text, is_section):
                 sectionless.append(anchor)
             continue
         at = "ERROR" if kind in RFC2119_CITING_KINDS else level
@@ -2319,7 +2318,8 @@ def check_rfc2119(ctx: Context, report: "Report") -> None:
     if sectionless:
         report.skip(
             "rfc2119",
-            "the § section rule found no section in %s" % ", ".join(sectionless),
+            "the %s section rule found no section in %s"
+            % (_SECTION_LABEL.get(ctx.desc.rfc2119_sections, "§"), ", ".join(sectionless)),
             partial=True,
         )
 
@@ -2698,7 +2698,6 @@ CHECKS = {
     "map-schema": check_map_schema,
     "map-to-tree": check_map_to_tree,
     "index-sync": check_index_sync,
-    "plans": check_plans,
     "tree-to-map": check_tree_to_map,
     "doc-kinds": check_doc_kinds,
     "rfc2119": check_rfc2119,
@@ -3471,9 +3470,12 @@ def generate(root: Path, verify: bool = False) -> Tuple[int, List[str]]:
 
     Returns ``(exit code, lines)`` — the paths written when ``verify`` is false, or a
     unified diff per stale block when it is true. Two guarantees make a non-``--verify`` run
-    safe to script: the map is validated write-free first (a ``map-schema`` error aborts with
-    no write), and a hand-written index row with no record in the map is refused, not deleted
-    — the whole run writes nothing when any row would vanish. A descriptor that is missing or
+    safe to script: the map is validated write-free first (a ``map-schema`` error leaves every
+    record-derived block and detail-file status line as it is, names each skipped block and the
+    detail-file directory — nothing, with a file-form requirements path and no requirements-index
+    block — still regenerates the blocks that read no record, and exits 1 in every case), and a
+    hand-written index row with no record in the map is refused, not deleted — the whole run
+    writes nothing when any row would vanish. A descriptor that is missing or
     does not parse fails exactly as ``check`` fails it.
     """
     root = Path(root)
@@ -3481,31 +3483,18 @@ def generate(root: Path, verify: bool = False) -> Tuple[int, List[str]]:
     if message:
         return 2, Report.fatal(message).render(root).split("\n")
 
-    report = Report()
-    report.profile = desc.profile
-    report.link_exclusions = list(desc.links_exclude)
-    records, map_ok = _load_records_or_report(desc, report)
-    report.record_count = len(records)
-    if not map_ok:
-        report.mark_run("map-schema")
-        return report.exit_code(), report.render(root).split("\n")
-
-    ctx = Context(root, desc, records)
-
     # Write-free preflight: never rewrite a document from a map that fails its own schema.
     # Forced to ERROR whatever the configured severity — write-safety is not a knob. Only
-    # an ERROR blocks: an unknown record key stays the WARN `check` reports, and is shown.
+    # an ERROR blocks, and only the record-derived output: an unknown record key stays the
+    # WARN `check` reports, and the blocks that read no record are still regenerated.
     preflight = Report()
-    check_map_schema(ctx, preflight, level="ERROR")
-    if preflight.errors():
-        for finding in preflight.findings:
-            report.add("map-schema", finding.level, finding.anchor, finding.message)
-        report.mark_run("map-schema")
-        return report.exit_code(), report.render(root).split("\n")
+    records, map_ok = _load_records_or_report(desc, preflight)
+    ctx = Context(root, desc, records)
+    if map_ok:
+        check_map_schema(ctx, preflight, level="ERROR")
+    records_blocked = bool(preflight.errors())
     warnings = [
-        "[map-schema] %s %s: %s" % (f.level, f.anchor, f.message)
-        for f in preflight.findings
-        if f.level == "WARN"
+        "[map-schema] %s %s: %s" % (f.level, f.anchor, f.message) for f in preflight.findings
     ]
 
     messages: List[str] = []
@@ -3546,6 +3535,13 @@ def generate(root: Path, verify: bool = False) -> Tuple[int, List[str]]:
         file_lines = text.split("\n")
         changed = False
         for name, start, end in sorted(known, key=lambda item: item[1], reverse=True):
+            if records_blocked and name in RECORD_BLOCKS:
+                messages.append(
+                    "%s:%d: skipped — block '%s' left as it is, because the traceability map "
+                    "has errors" % (anchor, start, name)
+                )
+                skipped = True
+                continue
             new_content = _expected_block(ctx, name, path)
             current_content = file_lines[start:end - 1]
             if current_content == new_content:
@@ -3571,7 +3567,15 @@ def generate(root: Path, verify: bool = False) -> Tuple[int, List[str]]:
                 new_texts[path] = candidate
 
     requirements_dir = desc.requirements_dir()
-    if requirements_dir is not None and requirements_dir.is_dir():
+    # A map error exits 1 through records_blocked even when no requirements-index block
+    # or detail file exists to be named as skipped (a file-form requirements path).
+    if records_blocked and requirements_dir is not None and requirements_dir.is_dir():
+        messages.append(
+            "%s: skipped — requirement detail-file status lines left as they are, because the "
+            "traceability map has errors" % ctx.rel(requirements_dir)
+        )
+        skipped = True
+    elif requirements_dir is not None and requirements_dir.is_dir():
         for record in ctx.records:
             if not record.id:
                 continue
@@ -3604,7 +3608,7 @@ def generate(root: Path, verify: bool = False) -> Tuple[int, List[str]]:
     if verify:
         # The same refusal lines a writing run prints, so a dry run never promises a write
         # the real run would refuse.
-        failed = stale or skipped or bool(refusals)
+        failed = stale or skipped or records_blocked or bool(refusals)
         return (1 if failed else 0), warnings + messages + refusals + diff_lines
     if refusals:
         # A dropped row is data loss: abort the whole run, write nothing, name every row.
@@ -3621,7 +3625,7 @@ def generate(root: Path, verify: bool = False) -> Tuple[int, List[str]]:
             ]
         ctx._texts[str(ctx.abs(path))] = new_texts[path]
         written.append(ctx.rel(path))
-    return (1 if skipped else 0), warnings + messages + sorted(written)
+    return (1 if skipped or records_blocked else 0), warnings + messages + sorted(written)
 
 
 def run_generate(root: Path, verify: bool) -> int:
@@ -3648,7 +3652,7 @@ _BASELINE_FILES = {
   req_gap: 10
   excluded_areas: [BENCH]
 
-  doc_kinds: [requirement, specification, adr, plan, guide, analysis, operations, reference, upstream]
+  doc_kinds: [requirement, specification, adr, guide, analysis, operations, reference, upstream]
 
   default_mode: spec-first
 
@@ -3687,7 +3691,6 @@ _BASELINE_FILES = {
       map-schema: error
       map-to-tree: error
       index-sync: error
-      plans: error
       tree-to-map: warn
       doc-kinds: warn
       rfc2119: warn
@@ -3802,20 +3805,17 @@ kind: guide
 
 <!-- /sdd:generated -->
 """,
-    "docs/plans/2026-01-01-env.md": """---
-kind: plan
-plan: 2026-01-01-env
-implements: [REQ-FOUND-001]
-mode: spec-first
-status: done
----
+    "docs/plans/2026-01-01-env.md": """# 2026-01-01 — Environment boundary
 
-# 2026-01-01 — Environment boundary
+**Implements:** REQ-FOUND-001 · SPEC-ENV §1
+**Lane:** full
+
+A working file: no frontmatter, a keyword that binds nothing — the service MUST read every
+declared variable — and a link to [nowhere](nope-does-not-exist.md). The gate reads none of it.
 
 ## Tasks
 
 - [x] Read the declared variables when the service starts.
-- [x] Refuse a start with a declared variable absent.
 """,
     "docs/development-process.md": """---
 kind: guide
@@ -3868,7 +3868,6 @@ _CONTEXT_HEADINGS = (
     "Traceability record",
     "Canonical section",
     "Acceptance criteria",
-    "Plans",
     "Tests citing it",
     "Open strands",
 )
@@ -3941,22 +3940,6 @@ def _acceptance_criteria(ctx: Context, req_id: str) -> Optional[str]:
     return content or None
 
 
-def _plans_for(ctx: Context, req_id: str) -> Optional[str]:
-    desc = ctx.desc
-    plans_dir = desc.resolve(desc.paths.get("plans", "docs/plans"))
-    if not plans_dir.is_dir():
-        return None
-    found = []
-    for path in sorted(plans_dir.rglob("*.md")):
-        if path.name == "_template.md" or not path.is_file():
-            continue
-        front = _quiet_frontmatter(ctx.read(path))
-        implements = [_as_str(item) for item in _as_list(front.get("implements"))]
-        if req_id in implements:
-            found.append("%s: %s" % (ctx.rel(path), _as_str(front.get("status")) or "unknown"))
-    return "\n".join(found) if found else None
-
-
 def _tests_citing(ctx: Context, req_id: str) -> Optional[str]:
     desc = ctx.desc
     roots: List[Path] = []
@@ -3992,7 +3975,7 @@ def _open_strands(ctx: Context, req_id: str) -> Optional[str]:
 
 def context_bundle(ctx: Context, req_id: str) -> str:
     """A requirement's context bundle: index row, record, canonical section, acceptance
-    criteria, plans, citing tests and open strands — sdd-methodology.md §10.
+    criteria, citing tests and open strands — sdd-methodology.md §10.
 
     :data:`_CONTEXT_HEADINGS` is the one home for the heading order; this just supplies
     each heading's content.
@@ -4003,7 +3986,6 @@ def context_bundle(ctx: Context, req_id: str) -> str:
         "Traceability record": _record_dump(record) if record else None,
         "Canonical section": _canonical_section(ctx, record) if record else None,
         "Acceptance criteria": _acceptance_criteria(ctx, req_id),
-        "Plans": _plans_for(ctx, req_id),
         "Tests citing it": _tests_citing(ctx, req_id),
         "Open strands": _open_strands(ctx, req_id),
     }
@@ -4055,9 +4037,6 @@ class SelftestCase:
     name: str
     mutate: Callable[[Path], None]
     check: Callable[["Report", Path], Optional[str]]
-    #: An external binary the mutation shells out to; without it the case is skipped with
-    #: that reason, never reported as a false failure.
-    needs: str = ""
 
 
 def _mutate_edit(rel: str, old: str, new: str) -> Callable[[Path], None]:
@@ -4114,7 +4093,6 @@ def _check_link_in_every_paths_dir(report: "Report", root: Path) -> Optional[str
         "docs/requirements/_selftest-link-check.md",
         "docs/specifications/_selftest-link-check.md",
         "docs/adr/_selftest-link-check.md",
-        "docs/plans/_selftest-link-check.md",
     ):
         hits = [
             f
@@ -4135,29 +4113,6 @@ def _check_link_exclusion_printed(report: "Report", root: Path) -> Optional[str]
     if "docs/specifications/*.md" not in rendered:
         return "the report does not name the configured exclusion"
     return None
-
-
-def _mutate_git_commit_and_tag(root: Path) -> None:
-    """Turn ``root`` into its own separate git repository: one commit (which carries the
-    baseline's already-``done`` plan) and a tag on top of it — the stale-plan rule's
-    positive fixture. Never touches the baseline used for the clean-run assertion or any
-    other case's fixture; each case already gets a fresh temporary directory."""
-
-    def git(*args):
-        subprocess.run(
-            ["git", "-C", str(root)] + list(args),
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-    git("init", "-q")
-    git("config", "user.email", "selftest@example.invalid")
-    git("config", "user.name", "sdd-check selftest")
-    git("config", "commit.gpgsign", "false")
-    git("add", "-A")
-    git("commit", "-q", "-m", "baseline")
-    git("tag", "v1.0.0")
 
 
 SELFTEST_CASES: Tuple[SelftestCase, ...] = (
@@ -4197,6 +4152,15 @@ SELFTEST_CASES: Tuple[SelftestCase, ...] = (
             "docs/specifications/traceability.yaml", "id: REQ-FOUND-001", "id: REQ-BENCH-001"
         ),
         _finding_check("map-schema", "excluded area"),
+    ),
+    SelftestCase(
+        "map-retired-not-deprecated",
+        _mutate_edit(
+            "docs/specifications/traceability.yaml",
+            "    implementation: shipped",
+            "    implementation: retired",
+        ),
+        _finding_check("map-schema", "belongs only to a deprecated requirement"),
     ),
     SelftestCase(
         "canonical-anchor-missing",
@@ -4257,20 +4221,6 @@ SELFTEST_CASES: Tuple[SelftestCase, ...] = (
         _finding_check("index-sync", "the detail file says"),
     ),
     SelftestCase(
-        "plan-frontmatter-missing",
-        _mutate_edit("docs/plans/2026-01-01-env.md", "mode: spec-first\n", ""),
-        _finding_check("plans", "is required"),
-    ),
-    SelftestCase(
-        "plan-unknown-req",
-        _mutate_edit(
-            "docs/plans/2026-01-01-env.md",
-            "implements: [REQ-FOUND-001]",
-            "implements: [REQ-FOUND-999]",
-        ),
-        _finding_check("plans", "no record"),
-    ),
-    SelftestCase(
         "doc-kind-missing",
         _mutate_edit("docs/development-process.md", "kind: guide\n", ""),
         _finding_check("doc-kinds", "declares no kind"),
@@ -4290,6 +4240,29 @@ SELFTEST_CASES: Tuple[SelftestCase, ...] = (
             "The service MUST read its configuration from the environment when it starts.",
         ),
         _finding_check("rfc2119", "does not belong in a requirement document"),
+    ),
+    SelftestCase(
+        "rfc2119-requirement-section-empty",
+        _mutate_all(
+            _mutate_edit(
+                "docs/.sdd.yaml",
+                '    probes_catalogue: ""',
+                '    probes_catalogue: ""\n    rfc2119:\n      sections: requirement-id',
+            ),
+            # No section sign, so only the requirement-id convention opens this section.
+            _mutate_edit(
+                "docs/specifications/env.md",
+                "## §1 — Boundary (REQ-FOUND-001)",
+                "## Boundary (REQ-FOUND-001)",
+            ),
+            _mutate_edit(
+                "docs/specifications/env.md",
+                "The service MUST read every declared variable from the environment when it "
+                "starts.\n\nThe service MUST refuse to start when a declared variable is absent.",
+                "The service reads every declared variable from the environment when it starts.",
+            ),
+        ),
+        _finding_check("rfc2119", "is normative and carries no RFC-2119 keyword"),
     ),
     SelftestCase(
         "rfc2119-malformed",
@@ -4337,7 +4310,6 @@ SELFTEST_CASES: Tuple[SelftestCase, ...] = (
             _mutate_write("docs/requirements/_selftest-link-check.md", _DEAD_LINK_DOC),
             _mutate_write("docs/specifications/_selftest-link-check.md", _DEAD_LINK_DOC),
             _mutate_write("docs/adr/_selftest-link-check.md", _DEAD_LINK_DOC),
-            _mutate_write("docs/plans/_selftest-link-check.md", _DEAD_LINK_DOC),
         ),
         _check_link_in_every_paths_dir,
     ),
@@ -4377,20 +4349,12 @@ SELFTEST_CASES: Tuple[SelftestCase, ...] = (
         _mutate_edit("docs/.sdd.yaml", "draft-reason: off", "draft-reason: warn"),
         _finding_check("draft-reason", "owes a draft_reason"),
     ),
-    SelftestCase(
-        "plan-stale-after-tag",
-        _mutate_git_commit_and_tag,
-        _finding_check("plans", "predates the latest release tag"),
-        needs="git",
-    ),
 )
 
 
 def selftest() -> int:
     """Run the tool against the baseline fixture it carries: clean, then each mutation
-    case — at least one per family — printing ``PASS``, ``FAIL`` or ``SKIP`` per case. A
-    case whose mutation needs a binary the machine lacks (git) is skipped with that reason;
-    a skip never fails the run."""
+    case — at least one per family — printing ``PASS`` or ``FAIL`` per case."""
     with tempfile.TemporaryDirectory() as holder:
         base_root = Path(holder)
         write_baseline(base_root)
@@ -4403,30 +4367,15 @@ def selftest() -> int:
         return 1
 
     failed: List[str] = []
-    skipped: List[str] = []
     for case in SELFTEST_CASES:
-        if case.needs and shutil.which(case.needs) is None:
-            print("SKIP %s — %s not found" % (case.name, case.needs))
-            skipped.append("%s (%s not found)" % (case.name, case.needs))
-            continue
         with tempfile.TemporaryDirectory() as holder:
             root = Path(holder)
             write_baseline(root)
             try:
                 case.mutate(root)
-            except FileNotFoundError as exc:
-                if not case.needs:
-                    print("FAIL %s — %s" % (case.name, exc))
-                    failed.append(case.name)
-                    continue
-                print("SKIP %s — %s not found" % (case.name, case.needs))
-                skipped.append("%s (%s not found)" % (case.name, case.needs))
-                continue
             except (OSError, subprocess.SubprocessError) as exc:
-                # A mutation that shells out (git, for the stale-plan fixture) must
-                # fail only this one case when the binary is missing or fails — never
-                # abort the whole run with a raw traceback after the cases before it
-                # already printed PASS.
+                # A mutation that fails must fail only this one case — never abort the
+                # whole run with a raw traceback after the cases before it printed PASS.
                 print("FAIL %s — %s" % (case.name, exc))
                 failed.append(case.name)
                 continue
@@ -4442,12 +4391,6 @@ def selftest() -> int:
     if failed:
         print("selftest: FAILED — %d of %d" % (len(failed), total))
         return 1
-    if skipped:
-        print(
-            "selftest: OK — %d cases, %d skipped: %s"
-            % (total - len(skipped), len(skipped), "; ".join(skipped))
-        )
-        return 0
     print("selftest: OK — %d cases" % total)
     return 0
 

@@ -13,7 +13,7 @@ sdd:
   excluded_areas: []                # area-prefixed only; tokens that are deliberately not areas
 
   # The document-kind vocabulary every `kind:` frontmatter value is checked against.
-  doc_kinds: [requirement, specification, adr, plan, guide, analysis, operations, reference, upstream]
+  doc_kinds: [requirement, specification, adr, guide, analysis, operations, reference, upstream]
 
   default_mode: spec-first          # the mode a specification has when its frontmatter names none
 
@@ -25,13 +25,12 @@ sdd:
     requirements: docs/specifications/REQ.md   # file form: the registry itself is the requirements index
     specifications: docs/specifications
     adr: docs/adr
-    plans: docs/plans
+    plans: docs/plans               # committed working notes; no gate, generator or map reads them
 
   # Single sources and what is generated from them (`make spec-gen`; `make spec-check` fails
   # when a generated block is stale). Edit the source, never the generated table.
   #   REQ citations in tests   -> each traceability.yaml row's tests: list
   #   traceability.yaml        -> docs/specifications/REQ.md registry table
-  #   plans' Status/Covers     -> docs/plans/README.md index
   # The citation rule: docs/development-process.md § The ladder.
   # traceability.yaml is a pure index: no notes, no comments in rows (spec-check refuses them).
 
@@ -59,7 +58,9 @@ sdd:
 
   check:
     script: scripts/sdd-check.py   # where the vendored gate lives
-    version: "0.6.0"               # must equal the vendored tool's own version
+    version: "0.7.0"               # must equal the vendored tool's own version
+    links:
+      exclude: []                  # globs; printed in every report when non-empty
     changelog:
       path: CHANGELOG.md
       max_words: 35
@@ -67,15 +68,16 @@ sdd:
                                    # vendor/, node_modules/, every paths.*, the traceability map, check.script
     test_globs: ["*_test.go", "probe_*.go"]  # basename globs; probe_*.go is the testkit/probes implementations spec-gen counts as tests
     probes_catalogue: docs/specifications/conformance.md  # its headings carry the PROBE ids
+    rfc2119:
+      sections: requirement-id     # what heading opens a normative section: section-sign (§) | requirement-id | either
     families:                      # error | warn | off
       descriptor: error
       map-schema: error
       map-to-tree: error
       index-sync: error
-      plans: error
       tree-to-map: warn
       doc-kinds: warn
-      rfc2119: warn                # the per-kind table in sdd-check.md still errors for requirement/adr/plan/reference
+      rfc2119: warn                # the per-kind table in sdd-check.md still errors for requirement/adr/reference
       one-home: error
       links: error
       changelog: warn
