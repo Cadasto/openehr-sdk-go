@@ -33,6 +33,9 @@ func testComposer() *rm.PartyIdentified {
 // TestProbe023VitalSignsPasses verifies the canonical authoring
 // flow: NewBuilder over vital_signs.opt → SetQuantity at systolic
 // and diastolic → Build → canjson.Marshal → fragments present.
+//
+// REQ-101: PROBE-023 builds with NewBuilder and Set, then checks the values
+// survive a canjson round trip.
 func TestProbe023VitalSignsPasses(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	systolic := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]/value"

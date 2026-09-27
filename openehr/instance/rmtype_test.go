@@ -8,6 +8,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
+// REQ-107: the generator materialises each OPT rm_type_name, generic
+// intervals included, as its concrete RM value.
 func TestNewRMForOPTType_generics(t *testing.T) {
 	cases := []struct {
 		declared string

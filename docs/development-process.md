@@ -13,7 +13,7 @@ Ask one question of every change: **does it alter a normative statement?** That 
 | Typical change | New capability; an API, behaviour or error-contract change; a bug fix that shows the spec was wrong | Refactor, package move, performance, dependency bump, tooling, doc polish; a bug fix that brings code back in line with the existing spec |
 | Spec, registry, ADR | Updated in the same PR (spec-first for new capability) | Not touched. Needing to touch one means the change is full lane |
 | Plan | A plan in [`plans/`](plans/) when the work spans several PRs | None |
-| `traceability.yaml` | Updated to the landed packages, tests and probes | Only the rows `make spec-check` names, when paths moved |
+| `traceability.yaml` | Updated to the landed packages and probes; `make spec-gen` writes the tests | Only the package paths `make spec-check` names, when paths moved |
 | Gate | `make ci` | `make ci` |
 | PR body | The REQ / PROBE ids touched | One line: `Lane: maintenance (no normative change)` |
 
@@ -35,6 +35,7 @@ For new capability the spec leads (spec-first). When work on shipped code shows 
 
 - The Definition of Ready and Definition of Done, and the plan header, are in [plans/_template.md](plans/_template.md).
 - The registry in [REQ.md](specifications/REQ.md) and the [plan index](plans/README.md) are generated (`make spec-gen`); `make spec-check` fails when either is stale. Edit their sources, never the tables.
+- Each `traceability.yaml` row's `tests:` list is generated too: `make spec-gen` writes the sorted list of test files that cite the row's REQ, and `make spec-check` fails when a list is stale. A test file is a `*_test.go` file or a probe implementation under `testkit/probes/`; it cites `REQ-NNN` when that token appears with no letter, digit or underscore right before or after it, so a hyphen or a dot is a boundary and `pre-REQ-117` counts. So cite the REQ in the test that pins it, and never edit the list by hand.
 - A plan never moves when it lands: its **Status:** line changes to `Done`.
 
 There is no `SDK-GAP` identifier. `REQ`/`PROBE` is the feature register, and a newly found gap is worked under a REQ with a `PROBE` for wire conformance ([ADR 0012](adr/0012-retire-sdk-gap-identifier.md)).

@@ -17,6 +17,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
+// REQ-050: the versioned-party read uses the 1.1.0-development
+// versioned_party endpoint.
 func TestGetVersionedParty(t *testing.T) {
 	var captured *http.Request
 	body := cassette(t, "versioned_party.json")

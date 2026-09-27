@@ -33,6 +33,7 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return c
 }
 
+// REQ-099: DeleteEHR sends DELETE /admin/ehr/{ehr_id}.
 func TestDeleteEHRHappyPath(t *testing.T) {
 	var gotMethod, gotPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +66,7 @@ func TestDeleteEHRMissingEHRID(t *testing.T) {
 	}
 }
 
+// REQ-099: a 404 from the admin delete surfaces as transport.ErrNotFound.
 func TestDeleteEHRSurfaces404AsErrNotFound(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -99,6 +101,8 @@ func TestDeleteAllEHRs(t *testing.T) {
 	}
 }
 
+// REQ-099: DeleteAllEHRs sends DELETE /admin/ehr/all with the repeatable
+// ehr_id subset parameter.
 func TestDeleteAllEHRsSubset(t *testing.T) {
 	var gotPath, gotQuery string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

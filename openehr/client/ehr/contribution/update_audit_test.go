@@ -104,6 +104,9 @@ func TestUpdateAuditMarshalChangeTypeDVCodedText(t *testing.T) {
 // TestUpdateAuditNoTimeCommitted verifies that time_committed is absent from
 // the marshalled payload — it is a server-assigned field and MUST NOT appear
 // on the write path.
+//
+// REQ-095: the pinned OpenAPI UpdateAudit schema leaves time_committed to the
+// server, so the write payload must not carry it.
 func TestUpdateAuditNoTimeCommitted(t *testing.T) {
 	b, err := json.Marshal(newUpdateAudit())
 	if err != nil {
@@ -245,6 +248,9 @@ func TestSubmissionAuditNoTimeCommitted(t *testing.T) {
 
 // TestUpdateAuditMarshalRejectsAbsentCommitter pins the marshal-side
 // committer gate: bare-nil and typed-nil PartyProxy both count as absent.
+//
+// REQ-025: a zero-value UpdateAudit, whose committer interface is nil, fails
+// marshalling with an error instead of panicking.
 func TestUpdateAuditMarshalRejectsAbsentCommitter(t *testing.T) {
 	cases := []struct {
 		name string

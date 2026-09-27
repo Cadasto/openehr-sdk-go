@@ -2,8 +2,8 @@
 # Verify docs/specifications/traceability.yaml against the working tree.
 #
 # Fail (exit 1):
-#   - the generated blocks (REQ.md registry, plans/README.md index) are stale
-#     (scripts/spec-gen.sh --check)
+#   - the generated parts (the map's tests: lists, the REQ.md registry, the
+#     plans/README.md index) are stale (scripts/spec-gen.sh --check)
 #   - a row carries a key outside the index schema (no `notes:`, and no
 #     retired `plans:` or `adrs:`), the same key twice, or a comment; the map
 #     is an index, history lives in git

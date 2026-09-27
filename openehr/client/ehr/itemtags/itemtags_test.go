@@ -29,6 +29,8 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return c
 }
 
+// REQ-059: the openehr-item-tag response header is surfaced as typed item
+// tags.
 func TestGetCompositionTags(t *testing.T) {
 	const tagHeader = `key="category",value="final"`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

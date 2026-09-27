@@ -110,6 +110,8 @@ func assertEmittedKeys(t *testing.T, out []byte, want map[string]string) {
 	}
 }
 
+// REQ-050: OPTIONS / decodes into ServiceCapabilities, which advertises the
+// pinned restapi_specs_version.
 func TestCapabilitiesDecodesCassette(t *testing.T) {
 	var captured *http.Request
 	body := readCassette(t, "system", "capabilities.json")
@@ -154,6 +156,8 @@ func TestCapabilitiesDecodesCassette(t *testing.T) {
 	}
 }
 
+// REQ-144: unknown keys in the capabilities response are preserved in Extras
+// on decode.
 func TestCapabilitiesPreservesExtras(t *testing.T) {
 	body := readCassette(t, "system", "capabilities.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

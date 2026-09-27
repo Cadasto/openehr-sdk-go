@@ -13,6 +13,9 @@ import (
 // composition shape. The encoder is the canonical form (compact, BMM
 // order, xsi:type at polymorphic boundaries); the decoder consumes
 // that form and re-encoding MUST produce the same bytes.
+//
+// REQ-056: compact canonical XML is the byte-equality target; encode, decode
+// and encode again yields the same bytes.
 func TestRoundTripStableSimpleValues(t *testing.T) {
 	cases := []struct {
 		name string

@@ -133,7 +133,6 @@ Clinical-modeling and codec entry points **MUST** bound how much untrusted input
 Constants **MAY** be package-level variables overridable in tests; defaults above are normative for production.
 
 - **Lives in:** [`openehr/template/`](../../openehr/template/), [`openehr/bmm/`](../../openehr/bmm/), [`openehr/client/definition/`](../../openehr/client/definition/), [`openehr/rm/typereg/`](../../openehr/rm/typereg/), [`openehr/serialize/canjson/`](../../openehr/serialize/canjson/) (the depth guard lives in `typereg`; `canjson` carries the route tests)
-- **Tests:** `openehr/template/parse_cap_test.go`, `openehr/template/parse_depth_test.go`, `openehr/bmm/load_test.go`, `openehr/rm/typereg/registry_test.go`, `openehr/serialize/canjson/edgecases_test.go`
 
 ---
 
@@ -259,7 +258,6 @@ Unparseable assertion blobs are retained on [`Slot.Includes`](../../openehr/temp
 `openehr/template/constraints/` remains stdlib-only. Slot assertion types live alongside primitive constraints.
 
 - **Lives in:** [`openehr/template/constraints/slot.go`](../../openehr/template/constraints/slot.go), [`openehr/template/slot_assertion.go`](../../openehr/template/slot_assertion.go), [`internal/templatecompile/`](../../internal/templatecompile/), [`openehr/validation/walk_composition.go`](../../openehr/validation/walk_composition.go)
-- **Tests:** [`openehr/template/constraints/slot_test.go`](../../openehr/template/constraints/slot_test.go), [`openehr/template/slot_assertion_test.go`](../../openehr/template/slot_assertion_test.go)
 
 ---
 
@@ -276,7 +274,6 @@ The SDK **MUST** expose structured accessors for archetype term definitions and 
 - External SNOMED / LOINC / ICD lookup is **out of scope** — REQ-105 only surfaces bindings the OPT carries.
 
 - **Lives in:** [`openehr/template/`](../../openehr/template/), [`internal/templatecompile/compiled.go`](../../internal/templatecompile/compiled.go)
-- **Tests:** [`internal/templatecompile/compile_test.go`](../../internal/templatecompile/compile_test.go)
 
 ---
 

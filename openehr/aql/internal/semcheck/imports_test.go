@@ -16,6 +16,9 @@ import (
 // two adapters): an import of openehr/aql or openehr/aql/lint would put the
 // engine above one of its own adapters and make the other one's use of it a
 // cycle.
+//
+// REQ-161: the lint imports the semcheck engine, never the reverse; semcheck
+// imports only contain and the standard library.
 func TestSemcheckForbiddenImports(t *testing.T) {
 	pkg, err := build.Default.ImportDir(".", 0)
 	if err != nil {

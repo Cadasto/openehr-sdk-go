@@ -11,6 +11,9 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# spec-gen lists test files with git; each fixture is its own repository, so
+# a GIT_DIR inherited from a hook must not point it at this one.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 CHECK="${HERE}/spec-check.sh"
 GEN="${HERE}/spec-gen.sh"
 TMP="$(mktemp -d)"
@@ -21,7 +24,8 @@ fail=0
 # packages / probes / tests, a registry row, a four-probe catalog
 # (one Draft) whose census/all-three sentences are true, two runnable
 # example programs matching the tally in examples.md, and one Active plan.
-# The generated blocks are produced by the real spec-gen.sh. The checker
+# The fixture is a git repository holding one test file that cites the REQ.
+# The generated parts are produced by the real spec-gen.sh. The checker
 # resolves ROOT from its own location, so copying it into <root>/scripts/
 # points it at the fixture.
 build_baseline() {
@@ -30,7 +34,8 @@ build_baseline() {
     "$root/cmd/examples/alpha" "$root/cmd/examples/beta" "$root/cmd/examples/scaffold"
   cp "$CHECK" "$root/scripts/spec-check.sh"
   cp "$GEN" "$root/scripts/spec-gen.sh"
-  touch "$root/pkg/good/good_test.go"
+  git -C "$root" init -q
+  printf 'package good\n\n// REQ-001: fixture citation.\n' > "$root/pkg/good/good_test.go"
   cat > "$root/docs/plans/2026-01-01-plan.md" <<'EOF'
 # Plan — Alpha
 
@@ -297,8 +302,90 @@ r="$(new_case spec-gen-missing)"
 rm "$r/scripts/spec-gen.sh"
 check spec-gen-missing "$r" fail "missing scripts/spec-gen.sh"
 
+# 28 - a new test cites the REQ and the map is not regenerated: the tests list
+#      is stale. Regenerating it makes the gate green again.
+r="$(new_case tests-stale)"
+printf 'package good\n\n// REQ-001: a second citing test.\n' > "$r/pkg/good/extra_test.go"
+check tests-stale "$r" fail "REQ-001 tests list is stale: pkg/good/extra_test.go cites REQ-001 but is not listed"
+bash "$r/scripts/spec-gen.sh" >/dev/null
+grep -qxF '      - pkg/good/extra_test.go' "$r/docs/specifications/traceability.yaml" \
+  || { echo "spec-check-selftest: FAIL tests-stale: spec-gen did not list pkg/good/extra_test.go" >&2; fail=1; }
+check tests-regenerated "$r" ok
+
+# 29 - a listed test stops citing the REQ: the list is stale the other way.
+r="$(new_case tests-uncited)"
+printf 'package good\n' > "$r/pkg/good/good_test.go"
+check tests-uncited "$r" fail "pkg/good/good_test.go is listed but does not cite REQ-001"
+
+# 30 - only test files count. A citation in a non-test file, a git-ignored
+#      test, or a longer token (REQ-001x, REQ-001_x, XREQ-001) is not picked
+#      up; a probe implementation under testkit/probes/ is, and so is a token
+#      bounded by a hyphen or a dot (pre-REQ-001.).
+r="$(new_case tests-scope)"
+mkdir -p "$r/testkit/probes/alpha"
+printf 'package good\n\n// REQ-001: not a test file.\n' > "$r/pkg/good/good.go"
+printf 'ignored_test.go\n' > "$r/.gitignore"
+printf 'package good\n\n// REQ-001: ignored.\n' > "$r/pkg/good/ignored_test.go"
+printf 'package good\n\n// REQ-001x, REQ-001_x and XREQ-001 are other tokens.\n' > "$r/pkg/good/boundary_test.go"
+printf 'package good\n\n// A pre-REQ-001. mention counts.\n' > "$r/pkg/good/hyphen_test.go"
+printf 'package alpha\n\n// REQ-001: a probe implementation.\n' > "$r/testkit/probes/alpha/probe_001.go"
+bash "$r/scripts/spec-gen.sh" >/dev/null
+_got="$(awk '/^    tests:/{f=1;next} f&&/^      - /{print $2;next} {f=0}' "$r/docs/specifications/traceability.yaml" | paste -sd' ' -)"
+[[ "$_got" == "pkg/good/good_test.go pkg/good/hyphen_test.go testkit/probes/alpha/probe_001.go" ]] \
+  || { echo "spec-check-selftest: FAIL tests-scope: generated tests list is '${_got}'" >&2; fail=1; }
+check tests-scope "$r" ok
+
+# 31 - a landed row with no packages is satisfied by its generated tests
+#      list, and fails once no test cites it.
+r="$(new_case tests-only-evidence)"
+sed -i '/^    packages:$/,/^      - pkg\/good$/d' "$r/docs/specifications/traceability.yaml"
+check tests-only-evidence "$r" ok
+printf 'package good\n' > "$r/pkg/good/good_test.go"
+bash "$r/scripts/spec-gen.sh" >/dev/null
+check tests-only-evidence-gone "$r" fail "REQ-001 (landed): no packages or tests listed"
+
+# 32 - the right paths in inline form: the only difference is the layout,
+#      and the diagnostic says so.
+r="$(new_case tests-inline)"
+sed -i '/^    tests:$/,/^      - pkg\/good\/good_test.go$/c\    tests: [pkg/good/good_test.go]' "$r/docs/specifications/traceability.yaml"
+check tests-inline "$r" fail "REQ-001 tests list is not in block form"
+
+# 33 - an empty tests: key is stale, and regenerating removes it.
+r="$(new_case tests-empty-key)"
+sed -i '/^      - pkg\/good\/good_test.go$/d' "$r/docs/specifications/traceability.yaml"
+printf 'package good\n' > "$r/pkg/good/good_test.go"
+check tests-empty-key "$r" fail "REQ-001 has an empty tests: key"
+bash "$r/scripts/spec-gen.sh" >/dev/null
+! grep -q '^    tests:' "$r/docs/specifications/traceability.yaml" \
+  || { echo "spec-check-selftest: FAIL tests-empty-key: spec-gen kept an empty tests: key" >&2; fail=1; }
+check tests-emptied "$r" ok
+
+# 34 - the last citing test stops citing: regenerating removes the whole key.
+r="$(new_case tests-list-emptied)"
+printf 'package good\n' > "$r/pkg/good/good_test.go"
+bash "$r/scripts/spec-gen.sh" >/dev/null
+! grep -q '^    tests:' "$r/docs/specifications/traceability.yaml" \
+  || { echo "spec-check-selftest: FAIL tests-list-emptied: spec-gen left a tests: key with no citing test" >&2; fail=1; }
+check tests-list-emptied "$r" ok
+
+# 35 - a row without a tests: key gains one, after its last line, when a test
+#      starts citing its REQ.
+r="$(new_case tests-gained)"
+printf '\n### REQ-002 Beta\n\nNormative fixture text.\n' >> "$r/docs/specifications/topic.md"
+printf '\n  - id: REQ-002\n    title: Beta\n    canonical: docs/specifications/topic.md#req-002-beta\n    status: stable\n    implementation: planned\n' \
+  >> "$r/docs/specifications/traceability.yaml"
+bash "$r/scripts/spec-gen.sh" >/dev/null
+check tests-gained-before "$r" ok
+printf 'package good\n\n// REQ-002: a first citing test.\n' > "$r/pkg/good/beta_test.go"
+check tests-gained-stale "$r" fail "pkg/good/beta_test.go cites REQ-002 but is not listed"
+bash "$r/scripts/spec-gen.sh" >/dev/null
+_row="$(awk '/^  - id: REQ-002$/{f=1} f' "$r/docs/specifications/traceability.yaml" | tail -2 | paste -sd'|' -)"
+[[ "$_row" == "    tests:|      - pkg/good/beta_test.go" ]] \
+  || { echo "spec-check-selftest: FAIL tests-gained: REQ-002 row ends '${_row}'" >&2; fail=1; }
+check tests-gained "$r" ok
+
 if [[ $fail -ne 0 ]]; then
   echo "spec-check-selftest: FAILED" >&2
   exit 1
 fi
-echo "spec-check-selftest: OK (28 cases)"
+echo "spec-check-selftest: OK (36 cases)"

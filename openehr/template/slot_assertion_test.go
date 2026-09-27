@@ -10,6 +10,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
+// REQ-104: the OPT parser turns a slot's include assertions into parsed slot
+// rules.
 func TestParseFile_VitalSigns_SlotAssertionsParsed(t *testing.T) {
 	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {
@@ -171,6 +173,8 @@ func TestSlot_SlotRulesReturnsDefensiveCopies(t *testing.T) {
 	}
 }
 
+// REQ-105: the term-definition accessor returns a copy the caller cannot use
+// to change the parsed template.
 func TestArchetypeRoot_TermsReturnsDeepCopy(t *testing.T) {
 	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {

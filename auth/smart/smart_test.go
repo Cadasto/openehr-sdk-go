@@ -189,6 +189,8 @@ func TestExchangeAndRefresh(t *testing.T) {
 	}
 }
 
+// REQ-062: a kid missing from the cached JWKS triggers one refresh before the
+// lookup fails.
 func TestJWKSRefreshOnMiss(t *testing.T) {
 	fetches := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

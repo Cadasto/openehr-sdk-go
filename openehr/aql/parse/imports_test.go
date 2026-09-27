@@ -10,6 +10,9 @@ import (
 // the wire / transport / auth / client layers. AQL parsing is a building block
 // (CI validators, MCP tools, pre-flight checks) usable without an authenticated
 // client. Non-test files only.
+//
+// REQ-109: the parse layer is a building block, usable without an
+// authenticated client.
 func TestAQLParseForbiddenImports(t *testing.T) {
 	pkg, err := build.Default.ImportDir("./", 0)
 	if err != nil {

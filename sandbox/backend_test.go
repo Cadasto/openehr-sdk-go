@@ -61,6 +61,8 @@ func TestCreateAndGetEHR(t *testing.T) {
 	}
 }
 
+// REQ-082: sandbox state is per instance, so one backend never sees another's
+// writes.
 func TestIsolation(t *testing.T) {
 	t.Parallel()
 	a := sandbox.New()
@@ -81,6 +83,8 @@ func TestIsolation(t *testing.T) {
 	}
 }
 
+// REQ-082: the sandbox serves without a network listener; its client's
+// transport is the backend itself.
 func TestNoListener(t *testing.T) {
 	t.Parallel()
 	b := sandbox.New()

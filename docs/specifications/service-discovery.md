@@ -173,7 +173,6 @@ SMART configuration documents and their auth endpoints are untrusted input until
 Same-origin JWKS enforcement (rejecting `jwks_uri` hosts that differ from the issuer host) is **deferred** — HTTPS-only is the v1 floor.
 
 - **Lives in:** [`smart/discovery/`](../../smart/discovery)
-- **Tests:** `smart/discovery/resolver_test.go`
 
 ## Refresh API
 

@@ -88,6 +88,8 @@ func TestResolveCassette(t *testing.T) {
 	}
 }
 
+// REQ-072: an advertised spec_version other than the pinned one fails
+// resolution with a typed DiscoveryError.
 func TestResolveSpecVersionMismatch(t *testing.T) {
 	srv := newCassetteServer(t, "smart-configuration-mismatch.json", nil)
 	defer srv.Close()
@@ -207,6 +209,8 @@ func TestResolveCoalescesConcurrent(t *testing.T) {
 	})
 }
 
+// REQ-072: a missing required service fails resolution with a DiscoveryError
+// naming it.
 func TestResolveMissingServiceRequired(t *testing.T) {
 	body := `{
         "authorization_endpoint":"https://x/a",
@@ -229,6 +233,8 @@ func TestResolveMissingServiceRequired(t *testing.T) {
 	}
 }
 
+// REQ-072: a malformed URL in the document fails resolution with a typed
+// DiscoveryError.
 func TestResolveMalformedURL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, `{"services":{"org.openehr.rest":{"baseUrl":"::not a url"}}}`)
@@ -332,6 +338,8 @@ func TestStaleCatalog(t *testing.T) {
 	}
 }
 
+// REQ-073: a document whose issuer differs from the one fetched is rejected
+// with ReasonIssuerMismatch.
 func TestResolveIssuerMismatch(t *testing.T) {
 	// The document's "issuer" field differs from the URL used to fetch it.
 	// Per OIDC Discovery §4.3, Resolve must reject the document and return
@@ -386,6 +394,9 @@ func TestResolveIssuerMatch(t *testing.T) {
 // rejected with ReasonInsecureURL when the resolver runs in strict mode
 // (no WithAllowInsecure). The issuer itself is served over TLS so the
 // issuer-level check does not interfere.
+//
+// REQ-073: a plaintext auth endpoint is rejected with ReasonInsecureURL
+// unless WithAllowInsecure is set.
 func TestResolveInsecureEndpointRejectedStrict(t *testing.T) {
 	body := `{
 		"authorization_endpoint":"http://attacker.example/auth",

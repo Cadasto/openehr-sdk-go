@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// REQ-034: a group answers code to rubric, rubric to code and membership in
+// source order, and an unknown code or rubric reports absence.
 func TestGroupLookups(t *testing.T) {
 	t.Parallel()
 	g := newGroup("demo", "demo group", []Concept{{"1", "one"}, {"2", "two"}})
@@ -44,6 +46,7 @@ func TestGroupLookups(t *testing.T) {
 	}
 }
 
+// REQ-034: lookups on a nil group or code set report absence and never panic.
 func TestNilGroupAndCodeSetAreInert(t *testing.T) { // REQ-025
 	t.Parallel()
 	var g *Group

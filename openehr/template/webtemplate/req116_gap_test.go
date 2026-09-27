@@ -196,6 +196,9 @@ func TestBuild_CoronaAnamneseSiblingsGetDistinctIDs(t *testing.T) {
 // longer possible. What stays here is the mechanism detail parity does not
 // spell out: the predicate set matches the golden exactly, and neither side
 // carries a `…/name` node.
+//
+// REQ-106: the exported aqlPath set matches the reference implementation's
+// golden for this template.
 func TestBuild_GeccoDiagnoseMatchesGoldenPredicates(t *testing.T) {
 	const templateID = "GECCO_Diagnose"
 

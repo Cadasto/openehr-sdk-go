@@ -271,6 +271,8 @@ func TestLoad_baseGenericPropertyNestedDefs(t *testing.T) {
 	}
 }
 
+// REQ-045: LoadAll resolves a schema's includes by schema id through the
+// Resolver and returns one merged schema.
 func TestLoadAll_rmIncludesBaseMergesPrimitives(t *testing.T) {
 	r := FSResolver{Root: resourcesDir}
 	s, err := LoadAll("openehr_rm_1.2.0", r)
@@ -493,6 +495,7 @@ func TestLoad_nilReader(t *testing.T) {
 	}
 }
 
+// REQ-108: bmm.Load refuses input over its size cap with ErrInputTooLarge.
 func TestLoad_inputTooLarge(t *testing.T) {
 	orig := maxBMMBytes
 	maxBMMBytes = 16

@@ -35,7 +35,7 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 **Start with `make spec-context REQ=NNN`** — one bundle with the registry row, traceability block, canonical excerpt, and touching strands. **Finish with `make spec-check`** (`make ci` includes it). The step-by-step loop lives in [ai-workflow.md § The loop](docs/ai-workflow.md#the-loop); the rules that bind regardless of how you got there:
 
 - New normative text goes in the **canonical topic spec** first, then its `traceability.yaml` entry (`make spec-gen` writes the registry row) — never as duplicate prose in `REQ.md`, and never as a rule that exists only in code.
-- Cite `REQ-NNN` / `PROBE-NNN` in tests and maintainer comments (function bodies, unexported code); update `traceability.yaml` in the same change that lands the code, then `make spec-gen`. The REQ.md registry and the plan index are generated — never edit them by hand — and the map is a pure index: no notes, no comments.
+- Cite `REQ-NNN` / `PROBE-NNN` in tests and maintainer comments (function bodies, unexported code); update `traceability.yaml` in the same change that lands the code, then `make spec-gen`. The REQ.md registry, the plan index and each map row's `tests:` list (from the tests' REQ citations, [development-process.md § The ladder](docs/development-process.md#the-ladder-full-lane)) are generated, so never edit them by hand, and the map is a pure index: no notes, no comments.
 - **Two lanes.** A change that alters no normative statement (refactor, move, perf, tooling, a fix that restores the spec'd behaviour) owes no spec, registry or plan edits — green `make ci` and one PR-body line. See [development-process.md § Two lanes](docs/development-process.md#two-lanes).
 - **Godoc is for SDK users.** Package docs and doc comments on exported identifiers carry no spec-process identifiers (REQ, ADR, STRAND, plan or spec paths) and no RFC-2119 capitals. State the behaviour a caller needs in plain English. A probe's own `PROBE-NNN` id and public openEHR specification citations are fine.
 - **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. No GAP-style label appears anywhere — not in plan filenames, `traceability.yaml`, test names, `doc.go`, or normative prose ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
@@ -82,7 +82,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | BMM codegen verify | `make codegen-verify` |
 | AQL parser codegen verify | `make aqlgen-verify` — fails if `openehr/aql/parse/gen/` drifts from the `active/` grammar (needs Docker, not a host JRE); regenerate with `make aqlgen` |
 | Spec traceability | `make spec-check` |
-| Regenerate spec indexes | `make spec-gen` — the REQ.md registry from `traceability.yaml`, the plan index from the plans' headers |
+| Regenerate spec indexes | `make spec-gen`: the map's `tests:` lists from the tests' REQ citations, the REQ.md registry from `traceability.yaml`, the plan index from the plans' headers |
 | Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
 | FLAT corpus integrity | `make flat-conformance-verify` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `…-check` adds a network drift report (dev helper, not a gate) |

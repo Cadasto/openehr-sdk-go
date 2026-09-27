@@ -23,8 +23,10 @@ sdd:
 
   # Single sources and what is generated from them (`make spec-gen`; `make spec-check` fails
   # when a generated block is stale). Edit the source, never the generated table.
+  #   REQ citations in tests   -> each traceability.yaml row's tests: list
   #   traceability.yaml        -> docs/specifications/REQ.md registry table
   #   plans' Status/Covers     -> docs/plans/README.md index
+  # The citation rule: docs/development-process.md § The ladder.
   # traceability.yaml is a pure index: no notes, no comments in rows (spec-check refuses them).
 
   traceability: docs/specifications/traceability.yaml

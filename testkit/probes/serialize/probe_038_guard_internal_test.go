@@ -15,6 +15,9 @@ import (
 // probe038PolymorphicDecode: then a b2 that is not wire-equivalent to b1 would
 // slip through with Status == "pass". The detail match is "not wire-equivalent"
 // because the pass detail also says "wire-equivalent".
+//
+// REQ-052: a check on the encoded form is a wire-equivalence comparison,
+// never a byte comparison; this proves that leg can fail.
 func TestProbe038GuardCatchesWireEquivFixpointBreak(t *testing.T) {
 	body := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg"}`)
 	r, err := probe038PolymorphicDecode(body, func() any { return new(rm.DVQuantity) }, dropMemberReEncoder("units"))

@@ -32,6 +32,8 @@ func TestNewRMUnknown(t *testing.T) {
 	}
 }
 
+// REQ-107: the synthesiser's writer can set every single-valued attribute the
+// vital_signs OPT asks it to build.
 func TestEnsureSingleVitalSignsCoverage(t *testing.T) {
 	type singleCase struct {
 		name       string

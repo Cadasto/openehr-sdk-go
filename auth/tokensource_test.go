@@ -39,6 +39,8 @@ func TestAnonymousTokenSource(t *testing.T) {
 	}
 }
 
+// REQ-060: a zero Token, with no value and no type, is the anonymous
+// credential; an expiry alone does not make it non-zero.
 func TestTokenIsZero(t *testing.T) {
 	tests := []struct {
 		name string

@@ -90,7 +90,6 @@ The SDK **MUST**:
 `WireError.Error()` values flow into REQ-098 observers and REQ-090 OTel span status; the PHI-safe default applies there too unless the consumer opts into raw bodies.
 
 - **Lives in:** [`transport/`](../../transport)
-- **Tests:** `transport/client_test.go` (`TestWireError*`, `TestMaxResponseBody*`), `transport/errors_test.go` (`TestErrorStringsValueFreeWhenRouteUnset`, `TestNetworkFailureSanitisesWrappedURL`, `TestUnroutedObservationKeepsTheResolvedPath`)
 
 ---
 

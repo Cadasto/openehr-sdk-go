@@ -101,6 +101,9 @@ func TestPrimitiveConstraint_ExampleValueValidates(t *testing.T) {
 // types in this package implement PrimitiveConstraint. A new
 // external implementer would break the closed type-switch the
 // validator relies on (REQ-024 — no reflection).
+//
+// REQ-103: each of the eleven OPT primitive xsi:type values has its
+// PrimitiveConstraint implementation.
 func TestPrimitiveConstraint_ExampleValueSeal(_ *testing.T) {
 	// Each entry asserts the type satisfies the full interface
 	// (Validate + ExampleValue + isPrimitive). Adding a 12th type

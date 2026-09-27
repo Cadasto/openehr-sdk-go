@@ -8,6 +8,8 @@ import (
 	"testing"
 )
 
+// REQ-053: the FLAT and STRUCTURED codecs are usable without the HTTP client,
+// auth or transport.
 func TestBuildingBlockIndependence(t *testing.T) {
 	pkg, err := build.Import("github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified", "", 0)
 	if err != nil {

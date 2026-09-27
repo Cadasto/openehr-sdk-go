@@ -194,6 +194,10 @@ func TestParseRefusesTrailingContent(t *testing.T) {
 // generated into a silently incomplete vocabulary. The two one-sided rows pin
 // the *each*: a guard weakened to at-least-one-of-either passes them and fails
 // here, and every refusal must name the table that is empty.
+//
+// REQ-034: the accessor must expose every group and every code set of the
+// pin, so a pin that parses to an empty table is refused rather than
+// generated.
 func TestParseRefusesAnEmptyVocabulary(t *testing.T) {
 	t.Parallel()
 	const attrs = `name="openehr" language="en" version="9.9.9" date="2026-01-01"`

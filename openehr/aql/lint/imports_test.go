@@ -11,6 +11,9 @@ import (
 // openehr/validation (the dependency arrow is validation → lint, never the
 // reverse). Lint is a building block (CI validators, MCP tools, pre-flight
 // checks) usable without an authenticated client. Non-test files only.
+//
+// REQ-109: openehr/aql/lint never imports openehr/validation; the arrow is
+// validation to lint.
 func TestAQLLintForbiddenImports(t *testing.T) {
 	pkg, err := build.Default.ImportDir("./", 0)
 	if err != nil {

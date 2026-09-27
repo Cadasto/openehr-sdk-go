@@ -218,7 +218,7 @@ spec-check: ## Verify docs/specifications/traceability.yaml against repo artefac
 	@bash scripts/spec-check-selftest.sh
 	@bash scripts/spec-check.sh
 
-spec-gen: ## Regenerate the REQ.md registry and the plans index from their sources
+spec-gen: ## Regenerate the map's tests lists, the REQ.md registry and the plans index from their sources
 	@bash scripts/spec-gen.sh
 
 spec-context: ## Assemble the SDD context bundle for a REQ (usage: make spec-context REQ=094)

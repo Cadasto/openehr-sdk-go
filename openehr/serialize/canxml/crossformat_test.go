@@ -133,6 +133,9 @@ func TestCrossFormatVendorFixtureXML(t *testing.T) {
 // round-trips byte-stable through canxml. The first pass (decoding
 // the upstream form) may consume non-canonical bytes; from the second
 // pass on the encoder's compact canonical form is byte-stable.
+//
+// REQ-056: the encoder's compact canonical XML is byte-stable from the second
+// pass on, for every vendored XML cassette.
 func TestCrossFormatXMLCassetteRoundTrip(t *testing.T) {
 	names := discoverXMLCassettes(t)
 	if len(names) == 0 {

@@ -169,6 +169,8 @@ func TestValidateIDTokenRejectsFutureNBF(t *testing.T) {
 	}
 }
 
+// REQ-067: without an ID token, principal claims are read from the
+// token-endpoint body.
 func TestPrincipalFromTokenResponseBody(t *testing.T) {
 	tr := authsmart.TokenResponse{
 		Patient: "p1",
@@ -186,6 +188,7 @@ func TestPrincipalFromTokenResponseBody(t *testing.T) {
 	}
 }
 
+// REQ-067: the principal claim names are configurable.
 func TestPrincipalFromCustomClaimNames(t *testing.T) {
 	priv, jwksBody := testRSAKey(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -262,6 +265,8 @@ func TestPrincipalFromFHIRUserClaimName(t *testing.T) {
 	}
 }
 
+// REQ-067: with no principal claim present, LaunchContext.Principal stays
+// nil.
 func TestPrincipalAbsentWhenNoClaims(t *testing.T) {
 	tr := authsmart.TokenResponse{Patient: "p"}
 	lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr)

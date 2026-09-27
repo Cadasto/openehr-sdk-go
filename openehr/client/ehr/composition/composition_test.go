@@ -141,6 +141,7 @@ func TestGetDeletedAtTimeReturns204Signal(t *testing.T) {
 	}
 }
 
+// REQ-059: WithLifecycleState reaches the wire as the openehr-version header.
 func TestSaveSendsLifecycleStateHeader(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -160,6 +161,8 @@ func TestSaveSendsLifecycleStateHeader(t *testing.T) {
 	}
 }
 
+// REQ-059: WithAuditDetails reaches the wire as the dotted-attribute
+// openehr-audit-details header.
 func TestSaveSendsDottedAuditHeader(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
