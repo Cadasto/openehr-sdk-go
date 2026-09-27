@@ -226,6 +226,8 @@ The reason set is **closed and exhaustive-switchable**. Adding a member is an ad
 
 ## Mapping rules
 
+**Implements:** REQ-043
+
 How each P_BMM construct becomes Go code.
 
 ### Schema → Go package set
@@ -318,6 +320,8 @@ The wire format JSON does not distinguish List/Set/Array — they all serialise 
 For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The method-body backlog is tracked in [`../docs/plans/`](../plans).
 
 ## Primitive type mapping
+
+**Implements:** REQ-046
 
 The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table below. Mappings are **fixed**; do not introduce alternative widenings.
 

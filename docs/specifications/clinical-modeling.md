@@ -383,7 +383,7 @@ Global guard codes (`nil_composition`, `nil_template`) return `nil` from `Issue.
 
 ### Building-block independence (REQ-013)
 
-`openehr/validation/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. The validator operates on **in-memory RM graphs**, never on wire bytes — callers responsible for decoding feed already-parsed `*rm.Composition` values. The full forbidden-import set is enforced by `TestValidationForbiddenImports`.
+`openehr/validation/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). The validator operates on **in-memory RM graphs**, never on wire bytes — callers responsible for decoding feed already-parsed `*rm.Composition` values. The full forbidden-import set is enforced by `TestValidationForbiddenImports`.
 
 The dependency graph: `openehr/validation/` → `openehr/template/`, `openehr/template/constraints/`, `openehr/rm/`, `openehr/rm/rminfo/`, `internal/templatecompile/` (same-module internal access).
 
@@ -484,7 +484,7 @@ Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/
 
 ### Building-block independence (REQ-013)
 
-`openehr/instance/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. The generator operates on **in-memory RM graphs**, never on wire bytes — callers wanting canonical JSON / XML output run `serialize/canjson` or `canxml` themselves (`cmd/examples/` may import the codec; the library does not).
+`openehr/instance/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). The generator operates on **in-memory RM graphs**, never on wire bytes — callers wanting canonical JSON / XML output run `serialize/canjson` or `canxml` themselves (`cmd/examples/` may import the codec; the library does not).
 
 The public signature accepts `*templatecompile.Compiled`. As with `validation.ValidateComposition`, REQ-111 makes that argument externally constructable via `openehr/templatecompile.Compile`, so `instance.Generate` is now callable from outside the module (see [ADR 0010](../adr/0010-public-compiled-template-bridge.md)).
 
@@ -528,7 +528,7 @@ REQ-101 trusts REQ-107 for the skeleton walk: every implicit RM attribute, every
 
 ### Building-block independence (REQ-013)
 
-`openehr/composition/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It depends on `openehr/rm`, `openehr/rm/typereg`, `openehr/template`, `openehr/templatecompile` (the public REQ-111 bridge, referenced in the exported `NewBuilder` / `NewSkeleton` signatures), `openehr/template/constraints`, `openehr/instance`, `openehr/validation/rmread`, `internal/templatecompile`, and `internal/templateinstance/rmwrite`. The forbidden-import set is enforced by `TestCompositionForbiddenImports`.
+`openehr/composition/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). It depends on `openehr/rm`, `openehr/rm/typereg`, `openehr/template`, `openehr/templatecompile` (the public REQ-111 bridge, referenced in the exported `NewBuilder` / `NewSkeleton` signatures), `openehr/template/constraints`, `openehr/instance`, `openehr/validation/rmread`, `internal/templatecompile`, and `internal/templateinstance/rmwrite`. The forbidden-import set is enforced by `TestCompositionForbiddenImports`.
 
 - **Lives in:** [`openehr/composition/`](../../openehr/composition/)
 - **Probes:** PROBE-023 — `composition.NewBuilder` + `Set` → `Build` → `canjson.Marshal` → `canjson.Unmarshal` → re-marshal round-trip preserves values at key paths.
@@ -713,7 +713,7 @@ It therefore lives in the sibling package `openehr/templatecompile`. This supers
 
 ### Building-block independence (REQ-013)
 
-`openehr/templatecompile/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It imports `openehr/template`, `openehr/rm/rminfo`, and the internal compile engine only.
+`openehr/templatecompile/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). It imports `openehr/template`, `openehr/rm/rminfo`, and the internal compile engine only.
 
 - **Lives in:** [`openehr/templatecompile/`](../../openehr/templatecompile/)
 - **Verification:** unit tests in [`openehr/templatecompile/compile_test.go`](../../openehr/templatecompile/compile_test.go); the public-only acceptance proof (external-shape build → canjson round-trip → validate, plus `ValidateEHRStatus` reachability) in [`openehr/templatecompile/external_test.go`](../../openehr/templatecompile/external_test.go); and the runnable [`cmd/examples/compile-build-validate`](../../cmd/examples/compile-build-validate/) whose direct imports are public-only. No new PROBE — this is an API-reachability requirement, not a wire-conformance assertion (the builder round-trip itself is PROBE-023).
@@ -777,7 +777,7 @@ Templates that **reuse one archetype under a multi-valued slot** (name-distingui
 
 ### Building-block independence (REQ-013)
 
-`openehr/template/webtemplate/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It imports `openehr/templatecompile` (the compiled input, REQ-111), `openehr/template/constraints` (primitive constraints, REQ-103), `internal/templatecompile` (the shared REQ-116 name-predicate quoting — one rule for both path builders), and the standard library only.
+`openehr/template/webtemplate/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). It imports `openehr/templatecompile` (the compiled input, REQ-111), `openehr/template/constraints` (primitive constraints, REQ-103), `internal/templatecompile` (the shared REQ-116 name-predicate quoting — one rule for both path builders), and the standard library only.
 
 - **Lives in:** [`openehr/template/webtemplate/`](../../openehr/template/webtemplate/).
 - **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against three vendored EHRbase references — `constrain_test` plus the two REQ-116 archetype-reuse oracles. Catalogued in [`conformance.md`](conformance.md).

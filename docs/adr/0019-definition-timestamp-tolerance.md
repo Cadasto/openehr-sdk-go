@@ -145,9 +145,9 @@ stated rather than hidden.
   which this decision does not provide.
 - **An unreadable non-empty timestamp still fails, and names the field.** The tolerance buys
   more accepted inputs, not a silent zero on the ones it still refuses — the failure mode
-  that would let a wrong instant reach a consumer as though the server had sent it. Catalog
-  timestamps are design-time metadata, not clinical content, so the offending value may
-  appear in the error.
+  that would let a wrong instant reach a consumer as though the server had sent it. Because
+  catalog timestamps are design-time metadata, [§ REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding)
+  lets the offending value appear in the error.
 - **REQ-095 gains its first named exception, and a precedent for how one is written.** The
   exception is keyed (this tolerance, this REQ, this ADR) and lives in the amended
   requirement, which keeps the authoritative-source rule readable in one place. It is not a

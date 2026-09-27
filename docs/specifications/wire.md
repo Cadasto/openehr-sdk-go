@@ -376,6 +376,8 @@ ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a resp
 
 ## REST leaf operations
 
+When a leaf gains an operation or an option, its package's `Repository` interface **MUST** grow with it. That is no break for callers of the package functions but a compile-time break for interface implementers (precedent: `UploadTemplate`), so the CHANGELOG `### Added` entry **MUST** name the interface growth.
+
 ### REQ-142 — Contribution read
 
 The EHR Contribution leaf **MUST** expose a read operation matching ITS-REST `contribution_get`:
@@ -386,7 +388,7 @@ The call **MUST** return the persisted `CONTRIBUTION` decoded as the SDK's contr
 
 v1 of this leaf **MUST** request canonical JSON. Simplified-format `Accept` values (FLAT / STRUCTURED inner payloads) are out of scope — no other EHR Get leaf takes a format yet.
 
-The leaf's repository interface **MUST** include the same read — no break for callers of the package functions, a compile-time break for interface implementers (precedent: `UploadTemplate`); the CHANGELOG `### Added` entry **MUST** name the interface growth.
+The leaf's repository interface includes the same read, under the interface-growth rule in [§ REST leaf operations](#rest-leaf-operations).
 
 ### REQ-143 — Template list filters
 
@@ -400,7 +402,7 @@ The leaf's repository interface **MUST** include the same read — no break for 
 | `offset` | `WithOffset` | 0-based; an explicit `0` **MUST** be sent |
 | `fetch` | `WithFetch` | An explicit `0` **MUST** be sent |
 
-Unset options **MUST** omit the corresponding query key. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` and **MUST NOT** issue a request. The existing `format` argument selects the list path; v1 supports `FormatADL14` — the only registered `TemplateFormat` value. The decoded result **MUST** remain the same template-metadata slice the unfiltered list already returns. Adding a trailing variadic option list **MUST** stay source-compatible with existing callers. The `Repository` interface **MUST** grow the same variadic options — no break for callers, a compile-time break for interface implementers (precedent: `UploadTemplate`); the CHANGELOG `### Added` entry **MUST** name the interface growth.
+Unset options **MUST** omit the corresponding query key. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` and **MUST NOT** issue a request. The existing `format` argument selects the list path; v1 supports `FormatADL14` — the only registered `TemplateFormat` value. The decoded result **MUST** remain the same template-metadata slice the unfiltered list already returns. Adding a trailing variadic option list **MUST** stay source-compatible with existing callers. The `Repository` interface grows the same variadic options, under the interface-growth rule in [§ REST leaf operations](#rest-leaf-operations).
 
 ### REQ-144 — Definition metadata decoding
 

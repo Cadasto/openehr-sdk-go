@@ -16,6 +16,8 @@ Each probe has a stable `PROBE-NNN` ID, a single normative definition (here), an
 
 ## Conformance scope
 
+**Implements:** REQ-080
+
 ### REQ-080 — openEHR wire conformance
 
 The probe suite verifies the SDK against the **openEHR wire contract**, not against any other implementation:
