@@ -3,7 +3,7 @@
 - **Status:** Accepted, 2026-06-15.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** [`docs/plans/archive/2026-06-15-aql-lint.md`](../plans/archive/2026-06-15-aql-lint.md) (REQ-109 AQL static lint). Related: [ADR 0001](0001-bmm-version-bump-runbook.md) (version-bump runbook spirit, reused for grammar rebases).
+- **Tracks:** REQ-109 AQL static lint ([PR 39](https://github.com/Cadasto/openehr-sdk-go/pull/39)). Related: [ADR 0001](0001-bmm-version-bump-runbook.md) (version-bump runbook spirit, reused for grammar rebases).
 
 ## Context
 

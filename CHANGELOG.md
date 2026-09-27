@@ -221,9 +221,9 @@ Eleventh `v0.x` minor: polymorphic `_type` round-trip stability (REQ-052) and se
 
 ### Added
 
-- **ITS-REST conformance remediation (REQ-059/093/095/099).** Corrected wire-level deviations in the landed REST clients against the vendored OpenAPI contract (headers, verbs, paths, status mapping) and vendored the EHRbase specs (`resources/ehrbase/`, Apache-2.0); see [plan](docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md). Integrator note: `composition.Get` now returns the typed `ErrDeletedAtTime` (not a nil error) on a 204 deleted-at-time read.
-- **Polymorphic `_type` round-trip stability (REQ-052/102).** Value-in-interface RM fields now emit `_type` on encode (new `openehr/internal/jsonpoly`) and a round-tripped `DV_INTERVAL<T>` re-validates from its bounds' runtime types, restoring strict round-trip template validation. [plan](docs/plans/archive/2026-06-23-polymorphic-encode-decode.md).
-- **Seeded synthetic value fill (REQ-103/107).** New orthogonal `instance.ValueFill` (`RandomFill`) + `ValueSource` seam (surfaced as `composition.WithValueFill`/`WithValueSource`) draws in-constraint, varying, reproducible leaf values; `medium` detail_level deferred. [plan](docs/plans/archive/2026-06-23-seeded-synthetic-generation.md).
+- **ITS-REST conformance remediation (REQ-059/093/095/099).** Corrected wire-level deviations in the landed REST clients against the vendored OpenAPI contract (headers, verbs, paths, status mapping) and vendored the EHRbase specs (`resources/ehrbase/`, Apache-2.0); see [PR 53](https://github.com/Cadasto/openehr-sdk-go/pull/53). Integrator note: `composition.Get` now returns the typed `ErrDeletedAtTime` (not a nil error) on a 204 deleted-at-time read.
+- **Polymorphic `_type` round-trip stability (REQ-052/102).** Value-in-interface RM fields now emit `_type` on encode (new `openehr/internal/jsonpoly`) and a round-tripped `DV_INTERVAL<T>` re-validates from its bounds' runtime types, restoring strict round-trip template validation. [PR 55](https://github.com/Cadasto/openehr-sdk-go/pull/55).
+- **Seeded synthetic value fill (REQ-103/107).** New orthogonal `instance.ValueFill` (`RandomFill`) + `ValueSource` seam (surfaced as `composition.WithValueFill`/`WithValueSource`) draws in-constraint, varying, reproducible leaf values; `medium` detail_level deferred. [PR 55](https://github.com/Cadasto/openehr-sdk-go/pull/55).
 
 ## [0.10.0] - 2026-06-19
 
@@ -338,4 +338,4 @@ First tagged release, the openEHR-first Go SDK adoption slice: REST 1.1.0-develo
 
 ### Known follow-ups (not landed at 0.1.0)
 
-- [REQ-094 write-path gaps](docs/plans/archive/2026-05-25-req094-prefer-followups.md) · AQL verb builders ([plan](docs/plans/archive/2026-05-21-aql-builders.md)) · Demographic REST client ([plan](docs/plans/archive/2026-06-14-demographic-rest-client.md)) · Benchmark harness ([plan](docs/plans/archive/2026-05-15-rest-api-client.md)).
+- REQ-094 write-path gaps ([PR 35](https://github.com/Cadasto/openehr-sdk-go/pull/35)) · AQL verb builders ([PR 38](https://github.com/Cadasto/openehr-sdk-go/pull/38)) · Demographic REST client ([PR 40](https://github.com/Cadasto/openehr-sdk-go/pull/40)) · Benchmark harness (still Deferred on the [roadmap](docs/roadmap.md)).

@@ -3,7 +3,7 @@
 - **Status:** Accepted, 2026-06-17.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** [`docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md`](../plans/archive/2026-06-16-auth-smart-conformance-audit.md) Phase 1 / Task 1 (F-A). Fixes: REQ-070 (wire decoder), REQ-072 (version-gate softening).
+- **Tracks:** the SMART-on-openEHR auth conformance audit ([PR 45](https://github.com/Cadasto/openehr-sdk-go/pull/45)). Fixes: REQ-070 (wire decoder), REQ-072 (version-gate softening).
 
 ## Context
 

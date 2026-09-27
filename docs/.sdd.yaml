@@ -26,8 +26,6 @@ sdd:
     specifications: docs/specifications
     adr: docs/adr
     plans: docs/plans
-    plans_archive: docs/plans/archive   # FROZEN: plans that landed before 2026-09-26. New plans are
-                                        # finished in place (Status: Done) and never moved.
 
   # Single sources and what is generated from them (`make spec-gen`; `make spec-check` fails
   # when a generated block is stale). Edit the source, never the generated table.
@@ -62,8 +60,6 @@ sdd:
   check:
     script: scripts/sdd-check.py   # where the vendored gate lives
     version: "0.6.0"               # must equal the vendored tool's own version
-    links:
-      exclude: ["docs/plans/archive/**"]  # the frozen archive (paths.plans_archive): its broken links are history, not drift
     changelog:
       path: CHANGELOG.md
       max_words: 35

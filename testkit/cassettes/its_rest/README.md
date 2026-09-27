@@ -26,7 +26,7 @@ Pinned commit: `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04, ITS-REST 1.1
 | `query/` | openEHR REST Query API RESULT_SET response | `openehr/client/query/` tests read `result_set.json` |
 | `demographic/` | openEHR REST Demographic API PARTY CRUD + VERSIONED_PARTY responses | `openehr/client/demographic/` tests read the party files |
 
-Tests exercise Composition GET responses (Phase 3 reads) against the canonical-JSON cassettes vendored under [`../compositions/`](../compositions/) and [`../rm/`](../rm/). Those carry full COMPOSITION shapes and are reused here instead of being duplicated. Resolve paths via [`../../fixtures/`](../../fixtures/). ADL 2 source-form templates are **deferred** until their leaf client lands in a later phase of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/archive/2026-05-15-rest-api-client.md). AQL already has a vendored RESULT_SET body (`query/result_set.json`). Stored-query metadata bodies are a separate gap, named in the Coverage table below: their client has already landed, so it is not a leaf-client deferral.
+Tests exercise Composition GET responses (Phase 3 reads) against the canonical-JSON cassettes vendored under [`../compositions/`](../compositions/) and [`../rm/`](../rm/). Those carry full COMPOSITION shapes and are reused here instead of being duplicated. Resolve paths via [`../../fixtures/`](../../fixtures/). ADL 2 source-form templates are **deferred** until their leaf client lands; the [roadmap](../../../docs/roadmap.md) tracks it as Deferred. AQL already has a vendored RESULT_SET body (`query/result_set.json`). Stored-query metadata bodies are a separate gap, named in the Coverage table below: their client has already landed, so it is not a leaf-client deferral.
 
 ## Provenance
 

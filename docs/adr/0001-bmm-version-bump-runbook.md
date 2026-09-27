@@ -3,7 +3,7 @@
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** part of [`docs/plans/archive/2026-05-15-bmm-codegen.md`](../plans/archive/2026-05-15-bmm-codegen.md) Phase 5.
+- **Tracks:** part of the BMM code generator delivery (drift bot and version-bump runbook), landed on `main` in commit [e1c6633c](https://github.com/Cadasto/openehr-sdk-go/commit/e1c6633c).
 - **Requirements:** [REQ-041](../specifications/bmm-conformance.md#req-041--pinned-bmm-sources) (the pinned BMM sources a version bump moves).
 
 ## Context
@@ -107,7 +107,7 @@ A BMM version bump MUST follow the numbered procedure below. CI enforces the det
 
 ## See also
 
-- [`docs/plans/archive/2026-05-15-bmm-codegen.md`](../plans/archive/2026-05-15-bmm-codegen.md) — Phase 5 ("Drift bot + version-bump runbook").
+- commit [e1c6633c](https://github.com/Cadasto/openehr-sdk-go/commit/e1c6633c): the BMM version-bump tooling and the weekly codegen drift workflow this runbook governs.
 - [`resources/bmm/README.md`](../../resources/bmm/README.md) — pinned BMM file inventory; the `## Updating` section defers to this ADR.
 - [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) — normative conformance contract; § Schema → Go package set carries the version pins.
 - [`.github/workflows/codegen-drift.yml`](../../.github/workflows/codegen-drift.yml) — weekly drift bot implementation.

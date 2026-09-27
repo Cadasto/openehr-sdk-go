@@ -3,7 +3,7 @@
 **Date:** 2026-07-16
 **Status:** Draft — not started
 **Owner:** SDK maintainers
-**Covers:** **REQ-115** (FLAT author linter) — proposed; canonical home to be authored at [clinical-modeling.md § REQ-115](../specifications/clinical-modeling.md#req-115--flat-author-linter) in Phase 0. The number is reserved in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy).
+**Covers:** **REQ-115** (FLAT author linter) — proposed; canonical home to be authored at `clinical-modeling.md` § REQ-115 in Phase 0. The number is reserved in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy).
 **Related:** sits next to the REQ-109 (AQL static lint) and REQ-110 (template-driven validation) tooling.
 **Verifies / builds on:** landed [REQ-053](../specifications/wire.md#req-053) (FLAT codec), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (Web Template export), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) (compiled-template bridge)
 **Probes:** **PROBE-083** (FLAT author linter corpus)
@@ -136,7 +136,7 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ rather
 
 ## Mapping to specs
 
-- [clinical-modeling.md § REQ-115](../specifications/clinical-modeling.md#req-115--flat-author-linter) — the requirement this plan implements (registry row: [REQ.md](../specifications/REQ.md))
+- [REQ-115, reserved](../specifications/REQ.md#numbering-policy) — the requirement this plan implements (registry row: [REQ.md](../specifications/REQ.md))
 - [clinical-modeling.md § REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) — the lint/issue-model precedent this mirrors
 - [wire.md § REQ-053](../specifications/wire.md#req-053) — FLAT codec (decode path; the linter is pre-decode)
 - [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) — path-enumeration source

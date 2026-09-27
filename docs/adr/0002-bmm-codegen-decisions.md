@@ -3,7 +3,7 @@
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** [`docs/plans/archive/2026-05-15-bmm-codegen.md`](../plans/archive/2026-05-15-bmm-codegen.md).
+- **Tracks:** the BMM code generator, landed on `main` in commit [b89aa589](https://github.com/Cadasto/openehr-sdk-go/commit/b89aa589).
 - **Requirements:** [REQ-043](../specifications/bmm-conformance.md#mapping-rules) (the P_BMM to Go mapping rules the generator applies).
 
 ## Context

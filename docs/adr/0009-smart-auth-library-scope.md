@@ -3,7 +3,7 @@
 - **Status:** Accepted, 2026-06-18.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** [`docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md`](../plans/archive/2026-06-16-auth-smart-conformance-audit.md). Resolves: [STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library). Amends: REQ-061, REQ-062, REQ-063, REQ-064.
+- **Tracks:** the SMART-on-openEHR auth conformance audit ([PR 45](https://github.com/Cadasto/openehr-sdk-go/pull/45)). Resolves: [STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library). Amends: REQ-061, REQ-062, REQ-063, REQ-064.
 
 ## Context
 

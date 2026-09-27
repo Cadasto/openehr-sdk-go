@@ -102,17 +102,14 @@ doc_title() { grep -m1 -E '^# ' "$1" | sed -E 's/^# (Plan[^A-Za-z]+)?//' || true
 echo "## Plans"
 echo
 plan_hits=""
-for f in "${ROOT}"/docs/plans/*.md "${ROOT}"/docs/plans/archive/*.md; do
+for f in "${ROOT}"/docs/plans/*.md; do
   [[ -f "$f" ]] || continue
   case "$(basename "$f")" in README.md|_template.md) continue ;; esac
   covers="$(awk '/^\*\*Covers:\*\*/ { f = 1 } f && /^[[:space:]]*$/ { exit } f' "$f")"
   [[ -n "$covers" ]] && covers_req "$covers" || continue
   rel="${f#"${ROOT}/"}"
-  case "$rel" in
-    */archive/*) note="archived" ;;
-    *)           note="$(grep -m1 -E '^\*\*Status:\*\*' "$f" | sed -E 's/^\*\*Status:\*\*[[:space:]]*//; s/^\*\*//; s/[^A-Za-z].*$//' || true)"
-                 note="${note:-no status}" ;;
-  esac
+  note="$(grep -m1 -E '^\*\*Status:\*\*' "$f" | sed -E 's/^\*\*Status:\*\*[[:space:]]*//; s/^\*\*//; s/[^A-Za-z].*$//' || true)"
+  note="${note:-no status}"
   plan_hits+="- \`${rel}\`: $(doc_title "$f") _(${note})_"$'\n'
 done
 if [[ -n "$plan_hits" ]]; then printf '%s' "$plan_hits"; else echo "_none names ${REQ} in its Covers paragraph_"; fi

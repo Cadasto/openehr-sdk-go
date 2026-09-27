@@ -5,7 +5,7 @@
 - **Superseded by:** —
 - **Strand:** —
 - **Introduces:** —. **Amends:** [REQ-053](../specifications/wire.md#req-053) (FLAT/STRUCTURED codecs — decode input surface). **Applies:** REQ-115 (FLAT author linter — consumes this decision), REQ-080 / PROBE-086 (the probe that surfaced it).
-- **Plan:** [2026-08-03-flat-coverage-ratchet.md](../plans/archive/2026-08-03-flat-coverage-ratchet.md) Phase 3.
+- **Landed in:** [PR 86](https://github.com/Cadasto/openehr-sdk-go/pull/86) (the FLAT coverage ratchet).
 - **Related:** [ADR 0014](0014-webtemplate-reference-implementation-lock.md) pins the reference whose spelling this admits; the package deviation register is [`simplified/deviations.md`](../../openehr/serialize/simplified/deviations.md); the census is [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md).
 
 ## Context

@@ -427,8 +427,8 @@ func findInItemTree(t *rm.ItemTree) *rm.DVDuration {
 // canjson's polymorphic dispatch on Composition.uid (an interface
 // `UIDBasedID` whose concrete should be HierObjectID) requires a
 // pointer receiver path. Before the
-// [`docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md`] Phase 2
-// fix, `newHierObjectID()` returned a value, and canjson emitted
+// C_PRIMITIVE_OBJECT wire-parser fix (PR 21), `newHierObjectID()`
+// returned a value, and canjson emitted
 // `uid` WITHOUT a `_type` discriminator — breaking the unmarshal
 // round-trip PROBE-023's spec wording promised.
 //

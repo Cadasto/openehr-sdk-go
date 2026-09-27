@@ -118,6 +118,8 @@ The discovery cache **MUST**:
 - Be invalidated on `401` / `403` against a previously-working endpoint, after at most one refresh attempt.
 - Coalesce concurrent resolution attempts (REQ-026) — one goroutine fetches; the others wait.
 
+The resolver defers closing the response body before it branches on the status, so the `304` path closes it too.
+
 **Bullet 3 — catalog refresh on 401 via transport hook (Phase 4b).** A consumer that wants the transport layer to drive a catalog refresh on a wire `401` can supply a `ReautherFunc` closure to `transport.WithReauthOn401`:
 
 ```go
@@ -168,7 +170,7 @@ SMART configuration documents and their auth endpoints are untrusted input until
 
 - **Issuer match (OIDC Discovery §4.3).** When the fetched document declares an `"issuer"` field, it **MUST** equal the issuer URL used to fetch the document. A mismatch **MUST** reject the catalog with `DiscoveryError{Reason: ReasonIssuerMismatch}` — the document's issuer **MUST NOT** silently override the caller's requested issuer (that would let a hostile or misconfigured server impersonate another identity provider downstream).
 - **HTTPS on auth endpoints.** `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `registration_endpoint` (when present) **MUST** use the `https` scheme unless the resolver is constructed with `WithAllowInsecure()`. Plaintext URLs **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`. The `allowInsecure` path **MAY** log a warning instead of failing for development deployments.
-- **Service `base_url` entries.** Plaintext `services[].base_url` values **SHOULD** emit the REQ-092 warning when not explicitly marked insecure; hard rejection remains a product decision beyond the auth-endpoint floor (see archived [security-hardening plan](../plans/archive/2026-06-11-security-hardening-and-simplification.md)).
+- **Service `base_url` entries.** Plaintext `services[].base_url` values **SHOULD** emit the REQ-092 warning when not explicitly marked insecure; hard rejection remains a product decision beyond the auth-endpoint floor ([PR 31](https://github.com/Cadasto/openehr-sdk-go/pull/31)).
 
 Same-origin JWKS enforcement (rejecting `jwks_uri` hosts that differ from the issuer host) is **deferred** — HTTPS-only is the v1 floor.
 

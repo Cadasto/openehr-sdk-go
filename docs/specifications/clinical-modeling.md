@@ -16,7 +16,7 @@ The SDK **MUST** ship a parser for ADL 1.4 **operational templates** (OPT) as a 
 
 In openEHR terminology, "template" without qualification often means the authoring template (`.oet`). In this SDK v1, **"template" in package and REST names means operational template (OPT)** unless explicitly stated otherwise.
 
-- **Input format:** ADL 1.4 OPT XML — root element `<template>` in namespace `http://schemas.openehr.org/v1` (the canonical Ocean Template Designer XSD form), wire `application/xml` (same as `definition.FormatADL14` in `openehr/client/definition/`). The parser **MUST** accept `<?xml ?>` declarations, BOM-prefixed UTF-8, and namespaced XSD-typed children (`xsi:type` discrimination on `attributes` and `children`).
+- **Input format:** ADL 1.4 OPT XML — root element `<template>` in namespace `http://schemas.openehr.org/v1` (the canonical Ocean Template Designer XSD form), wire `application/xml` (same as `definition.FormatADL14` in `openehr/client/definition/`). The parser **MUST** accept `<?xml ?>` declarations, BOM-prefixed UTF-8, and namespaced XSD-typed children (`xsi:type` discrimination on `attributes` and `children`). A document whose root is `<OPERATIONAL_TEMPLATE>`, as some tools export, is refused with `ErrInvalidOPT`; a caller renames the root before parsing, as `testkit/fixtures/parse_opt.go` does for the test corpus.
 - **File extension:** `ParseFile(path string)` **MUST** reject paths that do not end in `.opt` (case-insensitive) with `ErrNotOPTFile` to keep the v1 surface unambiguous. `ParseOPT(io.Reader)` accepts any reader and applies no path check.
 - **Output:** `*OperationalTemplate` carrying the parsed wrapper fields (template id, concept, uid, language) plus the definition tree (`Node` interface).
 
@@ -111,7 +111,7 @@ All errors wrap context with `fmt.Errorf("...: %w", err)`; callers compare with 
 
 ## REQ-108 — Untrusted document bounds
 
-Clinical-modeling and codec entry points **MUST** bound how much untrusted input they read and how deeply they recurse, so hostile OPT XML, BMM JSON, uploaded templates, or crafted canonical JSON cannot exhaust memory or CPU before the caller's own policy kicks in. Landed reasoning: archived [security-hardening plan](../plans/archive/2026-06-11-security-hardening-and-simplification.md).
+Clinical-modeling and codec entry points **MUST** bound how much untrusted input they read and how deeply they recurse, so hostile OPT XML, BMM JSON, uploaded templates, or crafted canonical JSON cannot exhaust memory or CPU before the caller's own policy kicks in. Two threats need no guard beyond these bounds. Go's `encoding/xml` does not expand DTD entity declarations and refuses an undeclared entity, so OPT parsing is open to neither external-entity injection nor entity expansion. `C_STRING` patterns compile with Go's `regexp` (RE2, linear time), so a crafted pattern cannot backtrack catastrophically. The bounds landed in [PR 31](https://github.com/Cadasto/openehr-sdk-go/pull/31).
 
 ### OPT parse and path walk (`openehr/template/`)
 
@@ -226,7 +226,7 @@ The zero-value `NumericRange{}` (no fields set) is treated as "any value accepte
 
 ### Example value emission (REQ-107 hook)
 
-Every `PrimitiveConstraint` additionally exposes `ExampleValue() any` — a minimal-valid Go example value in the shape `Validate` accepts. For bounded constraints (closed lists, bounded ranges, enumerated units), `Validate(c.ExampleValue())` MUST return an empty `Violation` slice; unbounded primitives return a documented sentinel (e.g. `"example"`, `int64(0)`, `"2020-01-01"`). The factory is the leaf primitive of the REQ-107 template-driven instance generator and stays on the sealed interface so the closed type-switch (REQ-024 — no reflection) remains the only entry point for new primitive shapes. See § REQ-107 for the generator contract and [`docs/plans/2026-05-24-template-instance-example-generator.md`](../plans/archive/2026-05-24-template-instance-example-generator.md) § "Example value factory" for the per-type strategy table.
+Every `PrimitiveConstraint` additionally exposes `ExampleValue() any` — a minimal-valid Go example value in the shape `Validate` accepts. For bounded constraints (closed lists, bounded ranges, enumerated units), `Validate(c.ExampleValue())` MUST return an empty `Violation` slice; unbounded primitives return a documented sentinel (e.g. `"example"`, `int64(0)`, `"2020-01-01"`). The factory is the leaf primitive of the REQ-107 template-driven instance generator and stays on the sealed interface so the closed type-switch (REQ-024 — no reflection) remains the only entry point for new primitive shapes. See § REQ-107 for the generator contract; the per-type example strategy landed in [PR 18](https://github.com/Cadasto/openehr-sdk-go/pull/18).
 
 - **Lives in:** [`openehr/template/constraints/`](../../openehr/template/constraints/)
 - **Probes:** PROBE-024 (primitive constraint validation against fixture inputs)
@@ -310,7 +310,7 @@ The validator treats the **compiled OPT as authoritative for structure** and the
 
 The lockstep walker lives in `openehr/validation/` (not `internal/templatecompile/walk/`) — see [ADR 0006](../adr/0006-composition-validation-walker-placement.md). `internal/templatecompile/walk/` remains OPT-only traversal for compile-time tooling.
 
-An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: it descended the composition graph via typed switches, built AQL paths from the composition's at-codes, looked up OPT constraints at those paths, and applied REQ-103 primitive checks at every matched leaf. That intermediate could not flag missing OPT-required nodes (no RM subtree → no path → no lookup); the template-driven walk closes that gap. See the plan at [`docs/plans/archive/2026-05-24-composition-validation-template-driven.md`](../plans/archive/2026-05-24-composition-validation-template-driven.md) for the migration's phase split.
+An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: it descended the composition graph via typed switches, built AQL paths from the composition's at-codes, looked up OPT constraints at those paths, and applied REQ-103 primitive checks at every matched leaf. That intermediate could not flag missing OPT-required nodes (no RM subtree → no path → no lookup); the template-driven walk closes that gap. The migration landed in [PR 16](https://github.com/Cadasto/openehr-sdk-go/pull/16).
 
 ### Validation dimensions
 
@@ -469,7 +469,7 @@ The generator is **sound** (every output is valid against the OPT), not **comple
 
 ### Trust model — phasing
 
-Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / `UIDSource` test-determinism seam / typed accessors for the closed root set; PROBE-027 implemented (Sandbox) covering `vital_signs.opt` + `clinical_note.opt` + the REQ-107 real-world corpus (`Referral Request.v1`, `Demonstration.v1`, `social`); `cmd/examples/generate-example/` worked example. The C_PRIMITIVE_OBJECT inner-`<item>` wire-parser fix + canjson-polymorphic `Composition.uid` emission landed via the [wire-parser plan](../plans/archive/2026-05-26-c-primitive-object-wire-parser.md) (archived); PROBE-023 now exercises the full marshal → unmarshal → re-marshal round-trip. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) tracked in [`docs/plans/archive/2026-05-24-template-instance-example-generator.md`](../plans/archive/2026-05-24-template-instance-example-generator.md) (archived). REQ-104 slot-fill archetype-id stamping is landed for parsed include patterns that can be synthesized safely; when no includes were parsed the synthesiser uses `openEHR-EHR-<RMType>.example.v1` to satisfy the validator's RM-type-prefix heuristic.
+Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / `UIDSource` test-determinism seam / typed accessors for the closed root set; PROBE-027 implemented (Sandbox) covering `vital_signs.opt` + `clinical_note.opt` + the REQ-107 real-world corpus (`Referral Request.v1`, `Demonstration.v1`, `social`); `cmd/examples/generate-example/` worked example. The C_PRIMITIVE_OBJECT inner-`<item>` wire-parser fix + canjson-polymorphic `Composition.uid` emission landed in [PR 21](https://github.com/Cadasto/openehr-sdk-go/pull/21); PROBE-023 now exercises the full marshal → unmarshal → re-marshal round-trip. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) landed with the composition builder in [PR 19](https://github.com/Cadasto/openehr-sdk-go/pull/19). REQ-104 slot-fill archetype-id stamping is landed for parsed include patterns that can be synthesized safely; when no includes were parsed the synthesiser uses `openEHR-EHR-<RMType>.example.v1` to satisfy the validator's RM-type-prefix heuristic.
 
 ### Out of scope
 
@@ -621,7 +621,7 @@ A `$param` archetype predicate (`[$name]`, `[parse.ClassExpr.ParamArchetype]`) i
 
 - **Lives in:** [`openehr/aql/parse/`](../../openehr/aql/parse/), [`openehr/aql/lint/`](../../openehr/aql/lint/); bridge in [`openehr/validation/aql.go`](../../openehr/validation/aql.go)
 - **Probes:** PROBE-028 — lint fixed query strings against the grammar profile (+ a compiled OPT for Layer 3) and assert a stable issue-code multiset.
-- **Plan:** [`docs/plans/archive/2026-06-15-aql-lint.md`](../plans/archive/2026-06-15-aql-lint.md)
+- **Landed in:** [PR 39](https://github.com/Cadasto/openehr-sdk-go/pull/39)
 
 ## REQ-110 — Template-driven validation beyond COMPOSITION
 
@@ -662,7 +662,7 @@ The walker logic is unchanged; generalisation is a lockstep extension of the fou
 
 - **Lives in:** [`openehr/validation/validate.go`](../../openehr/validation/validate.go), [`openehr/validation/rmread/read.go`](../../openehr/validation/rmread/read.go)
 - **Probes:** PROBE-074 — template-driven validation of non-COMPOSITION roots; asserts the issue-code multiset per (OPT, root) shape.
-- **Plan:** [`docs/plans/archive/2026-06-17-validation-non-composition-roots.md`](../plans/archive/2026-06-17-validation-non-composition-roots.md)
+- **Landed in:** [PR 42](https://github.com/Cadasto/openehr-sdk-go/pull/42)
 
 ---
 
@@ -717,7 +717,7 @@ It therefore lives in the sibling package `openehr/templatecompile`. This supers
 
 - **Lives in:** [`openehr/templatecompile/`](../../openehr/templatecompile/)
 - **Verification:** unit tests in [`openehr/templatecompile/compile_test.go`](../../openehr/templatecompile/compile_test.go); the public-only acceptance proof (external-shape build → canjson round-trip → validate, plus `ValidateEHRStatus` reachability) in [`openehr/templatecompile/external_test.go`](../../openehr/templatecompile/external_test.go); and the runnable [`cmd/examples/compile-build-validate`](../../cmd/examples/compile-build-validate/) whose direct imports are public-only. No new PROBE — this is an API-reachability requirement, not a wire-conformance assertion (the builder round-trip itself is PROBE-023).
-- **Plan:** [`docs/plans/archive/2026-06-17-public-compiled-template-bridge.md`](../plans/archive/2026-06-17-public-compiled-template-bridge.md)
+- **Landed in:** [PR 44](https://github.com/Cadasto/openehr-sdk-go/pull/44)
 
 ## REQ-106 — WebTemplate JSON export
 
@@ -781,7 +781,7 @@ Templates that **reuse one archetype under a multi-valued slot** (name-distingui
 
 - **Lives in:** [`openehr/template/webtemplate/`](../../openehr/template/webtemplate/).
 - **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against three vendored EHRbase references — `constrain_test` plus the two REQ-116 archetype-reuse oracles. Catalogued in [`conformance.md`](conformance.md).
-- **Plan:** [`docs/plans/2026-05-22-webtemplate-export.md`](../plans/archive/2026-05-22-webtemplate-export.md).
+- **Landed in:** [PR 75](https://github.com/Cadasto/openehr-sdk-go/pull/75).
 
 ## REQ-116 — Template-level node naming and name-predicated paths
 
@@ -857,13 +857,15 @@ The catalogue is intentionally small; the value is in the structural required-se
 
 **Known gap — archetype roots and ARCHETYPED.** The two catalogue entries above are specified ahead of the code: the shipped floor does **not** yet emit `is_archetype_root` or `rm_version_valid`, so an archetype root with no `archetype_details`, or an ARCHETYPED with an empty `rm_version`, currently passes the floor clean. The entries stay normative, and REQ-112 stays `partial` until the floor meets them.
 
-**Known gap — `EVENT_CONTEXT.setting` (`Setting_valid`).** The RM constrains `setting.defining_code` to a member of the
-openEHR terminology's `setting` group (`Terminology(Terminology_id_openehr).has_code_for_group_id(Group_id_setting, …)`).
-The floor does **not** evaluate it, because doing so needs the openEHR terminology group tables, which the floor
-deliberately does not carry (see *Trust model* below — terminology binding is out of scope). The consequence is real and
+**Known gap — the coded invariants (`Setting_valid` and its siblings).** The RM constrains `setting.defining_code` to a member of the
+openEHR terminology's `setting` group (`Terminology(Terminology_id_openehr).has_code_for_group_id(Group_id_setting, …)`),
+and states the same kind of group-membership rule as `Category_validity` (COMPOSITION), `Change_type_valid`
+(AUDIT_DETAILS), `Mode_valid` (PARTICIPATION) and `Normal_status_validity` (DV_ORDERED).
+The floor evaluates none of them. The groups they check now ship in `openehr/terminology` (REQ-034), but the floor is
+not wired to that package (see *Trust model* below — terminology binding is out of scope). The consequence is real and
 was observed: an RM-invalid, archetype-locally-coded setting passed the floor clean and was caught only downstream, by
-the REQ-053 FLAT encoder refusing to represent it. Closing this needs the terminology tables as an input to the floor
-and is deferred to a follow-up cycle; until then `Setting_valid` is enforced only at the wire boundary
+the REQ-053 FLAT encoder refusing to represent it. Wiring the floor to the terminology tables is deferred to a follow-up
+cycle; until then `Setting_valid` is enforced only at the wire boundary
 ([wire.md § REQ-053](wire.md#req-053)), and REQ-107's generator pins an `openehr`-coded default so the SDK cannot
 originate the invalid shape.
 
@@ -891,7 +893,7 @@ func ValidateRMEHRStatusBytes(data []byte) Result
 
 `ValidateRMEHRStatusBytes` decodes the EHR_STATUS, runs the value-based `ValidateRMEHRStatus` floor, and additionally emits `required` at `/subject` when the top-level `subject` key is absent from `data`, or present but JSON `null`, which does not satisfy the mandatory attribute and decodes to the same zero `PartySelf`. A supplied subject, even the bare form, yields no spurious `required`; a non-object or undecodable input surfaces a single `invalid_shape` at `/`. The value-based `ValidateRMEHRStatus(*rm.EHRStatus)` is retained; its docstring documents the value-typed-subject blind spot and points to the `…Bytes` entry. Per REQ-013 the decode uses the standard library, not `openehr/serialize/canjson`: the RM types carry their own `UnmarshalJSONFrom`.
 
-`ValidateRMEHRStatusBytes` also decides the root EHR_STATUS's ARCHETYPED key presence, at the root node only, matching its existing `subject` scope. When `archetype_details` is present, the entry **MUST** report `required` at `/archetype_details/archetype_id` for an absent or `null` `archetype_id` key, and `required` at `/archetype_details/rm_version` for an absent or `null` `rm_version` key. A key-absence finding sits at the attribute path and replaces the value walk's finding at that same path, so a consumer sees one finding per path: an absent `rm_version` reports `required` at `/archetype_details/rm_version`, not the value walk's `rm_version_valid`, while an absent `archetype_id` reports `required` at `/archetype_details/archetype_id` beside the value walk's `required` at the deeper `…/archetype_id/value`. Presence tracking stops at the root node; whole-tree key presence on every nested `archetype_details` stays deferred, as the [canonical-JSON fidelity plan](../plans/archive/2026-09-01-rm-canonical-json-fidelity.md) deferred per-node key tracking at arbitrary depth. This ARCHETYPED arm is the planned extension the [2026-09-24 plan](../plans/2026-09-24-rm-floor-archetype-roots.md) carries; the shipped entry decides `subject` presence only.
+`ValidateRMEHRStatusBytes` also decides the root EHR_STATUS's ARCHETYPED key presence, at the root node only, matching its existing `subject` scope. When `archetype_details` is present, the entry **MUST** report `required` at `/archetype_details/archetype_id` for an absent or `null` `archetype_id` key, and `required` at `/archetype_details/rm_version` for an absent or `null` `rm_version` key. A key-absence finding sits at the attribute path and replaces the value walk's finding at that same path, so a consumer sees one finding per path: an absent `rm_version` reports `required` at `/archetype_details/rm_version`, not the value walk's `rm_version_valid`, while an absent `archetype_id` reports `required` at `/archetype_details/archetype_id` beside the value walk's `required` at the deeper `…/archetype_id/value`. Presence tracking stops at the root node; whole-tree key presence on every nested `archetype_details` stays deferred, as the canonical-JSON fidelity work ([PR 145](https://github.com/Cadasto/openehr-sdk-go/pull/145)) deferred per-node key tracking at arbitrary depth. This ARCHETYPED arm is the planned extension the [2026-09-24 plan](../plans/2026-09-24-rm-floor-archetype-roots.md) carries; the shipped entry decides `subject` presence only.
 
 ### Building-block independence (REQ-013)
 
@@ -899,7 +901,7 @@ func ValidateRMEHRStatusBytes(data []byte) Result
 
 - **Lives in:** [`openehr/validation/rmfloor.go`](../../openehr/validation/rmfloor.go) + [`openehr/validation/rmfloor_adapters.go`](../../openehr/validation/rmfloor_adapters.go) + [`openehr/validation/rmfloor_bytes.go`](../../openehr/validation/rmfloor_bytes.go) (the presence-aware EHR_STATUS entry); the closed-RM-set helpers (`rmTypeInfo` / `describeRMType`) and the rmread layer are shared with REQ-102 / REQ-110.
 - **Verification:** unit pins in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go): required-set absences (FOLDER.name missing), the per-type invariants (CODE_PHRASE, DV_QUANTITY, DV_INTERVAL, OBJECT_REF-family, DV_TEXT/DV_CODED_TEXT `mappings`, and TERM_MAPPING `match` as a container element, nested under `purpose`, and as the validated root), the unbounded-skip negative, and the nil-guard contract on every typed wrapper. The DV_TEXT/DV_CODED_TEXT coverage includes the canjson decode-path pair distinguishing absent/`null` `mappings` (valid) from a decoded literal `[]` (`mappings_valid`); the `mappings` traversal and the TERM_MAPPING attribute readers are pinned in [`openehr/validation/rmread/read_datavalues_test.go`](../../openehr/validation/rmread/read_datavalues_test.go). The unit-test cassette matrix is the first-cycle verification; a dedicated PROBE-077 against vendored cassettes is deferred to a follow-up cycle. Value-typed mandatory presence (EHR_STATUS.subject, with the ARCHETYPED root arm planned) is pinned by **PROBE-081** in [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go).
-- **Plan:** [`docs/plans/archive/2026-06-29-rm-floor-validation.md`](../plans/archive/2026-06-29-rm-floor-validation.md) — REQ-112 (archived after PR #57).
+- **Landed in:** [PR 57](https://github.com/Cadasto/openehr-sdk-go/pull/57) (REQ-112).
 
 ---
 
@@ -1078,7 +1080,7 @@ For the drop record, the construct kind, the clause and the source span are all 
 
 - **Lives in:** [`openehr/aql/parse/parse.go`](../../openehr/aql/parse/parse.go) (entry), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (translator from the validated tree). Construction vocabulary in [`openehr/aql/where.go`](../../openehr/aql/where.go) and [`openehr/aql/value.go`](../../openehr/aql/value.go).
 - **Verification:** structural pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT / FROM / CONTAINS / WHERE / ORDER BY / LIMIT, including COUNT(*), COUNT(DISTINCT), NOT CONTAINS, BoolValue, NullValue, ParamLimit, standing predicate, ParamArchetype, VERSION predicate) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (87 idempotence cases + 43 canonical-input preservation cases across the catalogue, plus the residual-gap suite asserting ParseQuery and Emit both surface `aql.ErrIncompleteAST` for the residual gap (an unrepresentable numeric literal, including an out-of-range `TOP` count) — the corpus grew under [§ REQ-117](#req-117--aql-expression-catalogue-completion), which pins the closed shapes as PROBE-087, and again under [§ REQ-118](#req-118--deprecated-select-top-clause-and-literal-source-text), which moved the `top` clause into the catalogue). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). Structured standing-predicate + WHERE-path access (REQ-113) is pinned by **PROBE-082** in [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
-- **Plan:** [`docs/plans/archive/2026-06-29-aql-execution-ast.md`](../plans/archive/2026-06-29-aql-execution-ast.md) — REQ-113 (archived after PR #58).
+- **Landed in:** [PR 58](https://github.com/Cadasto/openehr-sdk-go/pull/58) (REQ-113).
 
 
 ## REQ-117 — AQL expression-catalogue completion
@@ -1142,7 +1144,7 @@ All additions are **additive to the canonical write form** ([wire.md § REQ-055]
 - **[PROBE-087](conformance.md#probe-087--aql-structured-ast-catalogue-completeness)** — every shape in the catalogue list parses → models → emits round-trip, pinned per shape; the former gap corpus asserts `ErrIncompleteAST` is gone; the residual guard — the unrepresentable numeric literal — still fires (`TestParseQuerySurfacesIncompleteAST`).
 - **[PROBE-088](conformance.md#probe-088--aql-builder-containment-and-paging-stability)** — canonical-string stability goldens for the new builder constructs (the PROBE-020 property extended).
 - Building-block independence (REQ-013) unchanged and still enforced by the forbidden-import tests.
-- **Plan:** [`docs/plans/archive/2026-08-04-aql-expressivity-completion.md`](../plans/archive/2026-08-04-aql-expressivity-completion.md) — REQ-117 (archived after Phase 4).
+- **Landed in:** [PR 87](https://github.com/Cadasto/openehr-sdk-go/pull/87) (REQ-117).
 
 
 ## REQ-118 — Deprecated `SELECT TOP` clause and literal source text
@@ -1218,7 +1220,7 @@ The four layers treat the spec-invalid combinations differently, and deliberatel
 - **[PROBE-028](conformance.md#probe-028--aql-lint-stability)** unchanged: the new codes fire only on a query carrying a `TOP`, and no lint cassette carries one. This is *pinned*, not assumed — the probe asserts an exact issue-code multiset per cassette, whatever that multiset currently is, so a code that fired spuriously fails `TestProbe028AQLLint`.
 - Building-block independence (REQ-013) unchanged and still enforced by the forbidden-import tests.
 - **Lives in:** [`openehr/aql/top.go`](../../openehr/aql/top.go) (shared vocabulary), [`openehr/aql/builder.go`](../../openehr/aql/builder.go) (write side), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (extraction), [`openehr/aql/lint/lint.go`](../../openehr/aql/lint/lint.go) (diagnosis).
-- **Plan:** [`docs/plans/archive/2026-08-05-aql-top-carrier-literal-source-text.md`](../plans/archive/2026-08-05-aql-top-carrier-literal-source-text.md) — REQ-118 (archived after Phase 5).
+- **Landed in:** [PR 90](https://github.com/Cadasto/openehr-sdk-go/pull/90) (REQ-118).
 
 ---
 
@@ -1513,7 +1515,7 @@ Row-semantics adjudication (REQ-161 carries the single advisory; the relation an
 
 - **Lives in:** [`openehr/aql/contain/`](../../openehr/aql/contain/)
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (armed by the Phase 2 lint corpus and the Phase 3 builder-verification parity arm); [PROBE-100](conformance.md#probe-100--upstream-aql-admissibility-corpus-ratchet) (the compatibility guard's evidence gate — the vendored upstream FROM/CONTAINS corpus, § Acceptance)
-- **Plan:** [`docs/plans/archive/2026-08-21-aql-semantic-layer.md`](../plans/archive/2026-08-21-aql-semantic-layer.md)
+- **Landed in:** [PR 125](https://github.com/Cadasto/openehr-sdk-go/pull/125)
 
 ## REQ-161 — AQL semantic and portability lint
 
@@ -1564,7 +1566,7 @@ Widening `aql_contains_not_containable` to the FROM-root anchor position is also
 
 - **Lives in:** [`openehr/aql/lint/`](../../openehr/aql/lint/) (extension)
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus); PROBE-028 re-baseline where applicable
-- **Plan:** [`docs/plans/archive/2026-08-21-aql-semantic-layer.md`](../plans/archive/2026-08-21-aql-semantic-layer.md)
+- **Landed in:** [PR 126](https://github.com/Cadasto/openehr-sdk-go/pull/126)
 
 ## REQ-162 — Builder containment verification
 
@@ -1585,7 +1587,7 @@ The write side **MUST** offer the same semantic judgement as the read side, opt-
 
 - **Lives in:** [`openehr/aql/`](../../openehr/aql/) (extension)
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (parity arm)
-- **Plan:** [`docs/plans/archive/2026-08-21-aql-semantic-layer.md`](../plans/archive/2026-08-21-aql-semantic-layer.md)
+- **Landed in:** [PR 126](https://github.com/Cadasto/openehr-sdk-go/pull/126)
 
 ## REQ-163 — AQL write-side expressivity parity
 
@@ -1711,7 +1713,7 @@ These spellings are **additions** to the canonical write form whose home is [§ 
 
 - **Lives in:** [`openehr/aql/`](../../openehr/aql/) (extension)
 - **Probes:** [PROBE-088](conformance.md#probe-088--aql-builder-containment-and-paging-stability) (builder golden set, extended fixtures); [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) arm (c) (read/write parity corpus). No new probe id is allocated.
-- **Plan:** [`docs/plans/archive/2026-08-26-aql-write-side-parity.md`](../plans/archive/2026-08-26-aql-write-side-parity.md)
+- **Landed in:** [PR 130](https://github.com/Cadasto/openehr-sdk-go/pull/130)
 
 ## REQ-164 — AQL path-shape and paging lint
 
@@ -1800,4 +1802,4 @@ The rule is deliberately **narrower** than the guidance sentence it comes from (
 
 - **Lives in:** [`openehr/aql/lint/`](../../openehr/aql/lint/) (extension)
 - **Probes:** [PROBE-099](conformance.md#probe-099--aql-path-shape-lint-corpus)
-- **Plan:** [`docs/plans/archive/2026-08-26-aql-path-shape-lint.md`](../plans/archive/2026-08-26-aql-path-shape-lint.md)
+- **Landed in:** [PR 131](https://github.com/Cadasto/openehr-sdk-go/pull/131)

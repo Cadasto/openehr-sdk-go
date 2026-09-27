@@ -1,11 +1,11 @@
 # ADR 0021 — Encoded JSON member order is not part of the canonical JSON contract
 
-- **Status:** Accepted, 2026-09-14 (maintainer sign-off on the plan, PR #171); implementation landed under [2026-09-14-json-v2-migration.md](../plans/archive/2026-09-14-json-v2-migration.md).
+- **Status:** Accepted, 2026-09-14 (maintainer sign-off on the plan, PR 171); implementation landed in [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171).
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** retires the byte-stability premise in [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance)'s remaining evidence item.
 - **Introduces:** —. **Amends:** [REQ-052](../specifications/wire.md#req-052) (the field-order profile and the probe obligation it carries).
-- **Plan:** [2026-09-14-json-v2-migration.md](../plans/archive/2026-09-14-json-v2-migration.md).
+- **Landed in:** [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171) (the `encoding/json/v2` migration).
 - **Related:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (the codec decision this one unblocks); [REQ-056](../specifications/wire.md#req-056) (canonical XML, deliberately **not** relaxed: element order is part of an XML document's identity in a way member order is not part of a JSON object's, so PROBE-033 keeps its byte assertion); [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the validation floor the rewritten PROBE-030 asserts).
 
 ## Context

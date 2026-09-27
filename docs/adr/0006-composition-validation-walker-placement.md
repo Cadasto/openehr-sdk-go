@@ -3,7 +3,7 @@
 - **Status:** Accepted, 2026-06-11.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** [`docs/plans/archive/2026-05-24-composition-validation-template-driven.md`](../plans/archive/2026-05-24-composition-validation-template-driven.md) § Deviations #1. Related: [ADR 0005](0005-compiled-template-foundation.md) (OPT-only walker at `internal/templatecompile/walk/`).
+- **Tracks:** the template-driven composition validation walk of REQ-102 ([PR 16](https://github.com/Cadasto/openehr-sdk-go/pull/16)). Related: [ADR 0005](0005-compiled-template-foundation.md) (OPT-only walker at `internal/templatecompile/walk/`).
 - **Requirements:** [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) (the validation walker this places) and [REQ-110](../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition) (the same walker beyond COMPOSITION).
 
 ## Context

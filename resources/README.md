@@ -11,4 +11,4 @@ In-tree, version-pinned inputs for code generation, validation, and conformance.
 
 See [`bmm/README.md`](bmm/README.md) for the schema inventory, provenance, and the BMM version-bump procedure (ADR 0001). See [`its-rest/README.md`](its-rest/README.md) for the REST API spec inventory and the sync/pin procedure.
 
-Later phases may add more subdirectories here, for example XSD releases beside the BMM pins, as described in the [canonical XML serialization plan](../docs/plans/archive/2026-05-15-canonical-xml-serialization.md).
+Later phases may add more subdirectories here, for example XSD releases beside the BMM pins for the canonical XML codec (landed on `main` in commit [c9f54243](https://github.com/Cadasto/openehr-sdk-go/commit/c9f54243)).
