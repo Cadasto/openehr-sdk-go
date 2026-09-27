@@ -60,11 +60,10 @@ slugify() {
     | LC_ALL=C sed -E 's/[^a-z0-9 _-]+//g' | LC_ALL=C tr ' ' '-'
 }
 
-# Strip trailing whitespace and an inline `# comment` from a block-list item.
-# Paths and PROBE ids must not contain `#`; only ` # why` suffixes are stripped.
+# Trim surrounding whitespace from a block-list item; the row loop has
+# already refused inline comments.
 yaml_item() {
   local v="$1"
-  v="$(printf '%s' "$v" | sed -E 's/[[:space:]]+#.*$//')"
   v="${v#"${v%%[![:space:]]*}"}"
   printf '%s' "${v%"${v##*[![:space:]]}"}"
 }
@@ -179,6 +178,14 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     [[ -z "${row_keys[$_key]:-}" ]] \
       || die "${current_id}: key '${_key}:' appears twice — a YAML parser keeps only the last"
     row_keys[$_key]=1
+  fi
+  # A malformed `- id:` line (wrong digit count, no space after the colon, or
+  # a bad indent) must be refused cleanly: the loose match below has no end
+  # anchor and any indent, so a truncated id would otherwise silently attach
+  # its keys to the previous row.
+  if [[ $in_rows -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*id: ]]; then
+    [[ "$line" =~ ^"  - id: "REQ-[0-9]{3,}[[:space:]]*$ ]] \
+      || { die "${current_id:-traceability.yaml}: malformed id line: '${line}'"; continue; }
   fi
   if [[ "$line" =~ ^[[:space:]]*-[[:space:]]*id:[[:space:]]*(REQ-[0-9]+) ]]; then
     # Capture before flush_req: its internal `[[ =~ ]]` tests clobber BASH_REMATCH.

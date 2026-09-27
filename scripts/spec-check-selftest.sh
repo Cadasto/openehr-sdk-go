@@ -201,7 +201,8 @@ r="$(new_case examples-count)"
 sed -i 's/^The 2 runnable/The 3 runnable/' "$r/docs/examples.md"
 check examples-count "$r" fail "docs/examples.md: runnable-example count says 3, tree has 2"
 
-# 14 — a program lands and neither doc moves (the drift that actually shipped).
+# 14 — a program lands and docs/examples.md does not move (the drift that
+#      actually shipped).
 r="$(new_case examples-tree-grew)"
 mkdir -p "$r/cmd/examples/gamma"
 touch "$r/cmd/examples/gamma/main.go"
@@ -376,8 +377,26 @@ r="$(new_case impl-deprecated)"
 sed -i 's/^    implementation: landed$/    implementation: deprecated/' "$r/docs/specifications/traceability.yaml"
 check impl-deprecated "$r" fail "invalid implementation 'deprecated'"
 
+# 37 - a CRLF traceability.yaml is otherwise current: spec-check accepts it,
+#      and spec-gen has nothing to rewrite, so the file stays byte-identical.
+r="$(new_case crlf-map)"
+sed -i 's/$/\r/' "$r/docs/specifications/traceability.yaml"
+check crlf-map "$r" ok
+_before="$(sha256sum "$r/docs/specifications/traceability.yaml" | awk '{print $1}')"
+bash "$r/scripts/spec-gen.sh" >/dev/null
+_after="$(sha256sum "$r/docs/specifications/traceability.yaml" | awk '{print $1}')"
+[[ "$_before" == "$_after" ]] \
+  || { echo "spec-check-selftest: FAIL crlf-map: spec-gen changed the CRLF map" >&2; fail=1; }
+
+# 38 - a malformed `- id:` line (wrong digit count, no space after the colon,
+#      or a bad indent) must be refused cleanly, not silently absorbed by the
+#      previous row.
+r="$(new_case malformed-id)"
+sed -i 's/^  - id: REQ-001$/  - id: REQ-01x/' "$r/docs/specifications/traceability.yaml"
+check malformed-id "$r" fail "malformed id line"
+
 if [[ $fail -ne 0 ]]; then
   echo "spec-check-selftest: FAILED" >&2
   exit 1
 fi
-echo "spec-check-selftest: OK (37 cases)"
+echo "spec-check-selftest: OK (39 cases)"

@@ -214,11 +214,13 @@ mod-tidy-check: ## Fail if go mod tidy would change go.mod or go.sum
 
 ##@ Specs
 
-spec-check: ## Verify docs/specifications/traceability.yaml against repo artefacts
+spec-check: ## Verify docs/specifications/traceability.yaml against repo artefacts; also runs the vendored sdd-check gate
 	@bash scripts/spec-check-selftest.sh
 	@bash scripts/spec-check.sh
+	@out="$$(python3 scripts/sdd-check.py selftest 2>&1)" || { printf '%s\n' "$$out"; exit 1; }; printf '%s\n' "$$out" | grep '^selftest:'
+	@out="$$(python3 scripts/sdd-check.py check --root . 2>&1)" || { printf '%s\n' "$$out"; exit 1; }; printf '%s\n' "$$out" | grep '^sdd-check:'
 
-sdd-check: ## Run the vendored SDD gate (advisory until green)
+sdd-check: ## Print the vendored SDD gate's full report, warnings included (spec-check also runs it)
 	@python3 scripts/sdd-check.py selftest && python3 scripts/sdd-check.py check --root .
 
 spec-gen: ## Regenerate the map's tests lists and the REQ.md registry from their sources
