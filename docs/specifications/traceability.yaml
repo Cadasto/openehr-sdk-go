@@ -1224,12 +1224,14 @@ requirements:
       - openehr/validation
       - openehr/rm/rminfo
       - openehr/validation/rmread
+      - openehr/internal/rmnames
     probes: [PROBE-081]
     tests:
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_test.go
+      - openehr/validation/rmread/handles_test.go
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/read_test.go
       - openehr/validation/strand14_nonchaining_test.go
