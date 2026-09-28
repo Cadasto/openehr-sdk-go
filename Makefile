@@ -169,7 +169,7 @@ its-rest-sync: ## Vendor openEHR ITS-REST OpenAPI specs into resources/its-rest/
 its-rest-check: ## Verify vendored ITS-REST specs match MANIFEST + report upstream drift (needs network)
 	@./scripts/sync-its-rest-specs.sh check
 
-flat-conformance-sync: ## Vendor the upstream EHRbase FLAT conformance corpus into testkit/cassettes/flat-conformance/ (needs network; FLAT_CONFORMANCE_REF to pin)
+flat-conformance-sync: ## Vendor the upstream EHRbase FLAT conformance corpus into testkit/corpus/flat-conformance/ (needs network; FLAT_CONFORMANCE_REF to pin)
 	@./scripts/sync-flat-conformance.sh sync
 
 flat-conformance-check: ## Verify the vendored FLAT conformance corpus matches MANIFEST + report upstream drift (offline integrity; network for drift)

@@ -94,7 +94,7 @@ func TestExoticDatatypesEmitNoInputs(t *testing.T) {
 	}
 	for fixture, rmType := range cases {
 		t.Run(rmType, func(t *testing.T) {
-			c := compileFixture(t, "../../../testkit/cassettes/templates/"+fixture)
+			c := compileFixture(t, "../../../testkit/corpus/templates/"+fixture)
 			wt, err := webtemplate.Build(c)
 			if err != nil {
 				t.Fatalf("build: %v", err)

@@ -23,7 +23,7 @@ func cassettePath(t *testing.T, name string) string {
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	return filepath.Join(filepath.Dir(src), "..", "..", "testkit", "cassettes", "its_rest", "discovery", name)
+	return filepath.Join(filepath.Dir(src), "..", "..", "testkit", "corpus", "its_rest", "discovery", name)
 }
 
 func cassetteBytes(t *testing.T, name string) []byte {

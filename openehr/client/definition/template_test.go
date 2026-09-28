@@ -58,7 +58,7 @@ func jsonServerClient(t *testing.T, body string) *transport.Client {
 func readCassette(t *testing.T, name string) []byte {
 	t.Helper()
 	_, src, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "cassettes", "its_rest", "definition", name)
+	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "corpus", "its_rest", "definition", name)
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read cassette %q: %v", path, err)

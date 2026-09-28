@@ -14,7 +14,7 @@
 // SDK grammar profile (and, for Layer 3, a compiled OPT) must produce a stable
 // issue-code multiset. Any implementation of the lint pipeline with the same
 // grammar profile + template must report the same codes. Cassettes live under
-// testkit/cassettes/aql/lint/.
+// testkit/corpus/aql/lint/.
 //
 // PROBE-088 extends the PROBE-020 property to the later builder constructs
 // (negated containment, sibling AND / OR junctions with precedence-driven

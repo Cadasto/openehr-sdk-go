@@ -20,7 +20,7 @@ import (
 //
 // `cassetteBody` is the SMART configuration JSON the upstream server
 // returns, typically the vendored
-// testkit/cassettes/its_rest/discovery/smart-configuration.json read by
+// testkit/corpus/its_rest/discovery/smart-configuration.json read by
 // the caller.
 //
 // Pass conditions:

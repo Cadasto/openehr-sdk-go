@@ -98,7 +98,7 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ rather
    - `lint_json.go` — `LintFlatJSON([]byte, *webtemplate.WebTemplate)`.
 2. Options: `WithCompositionPrefix(string)` for the EHRbase tree root; `WithStrictRequired(bool)`.
 3. Unit tests in `lint_test.go`:
-   - Valid FLAT from `testkit/cassettes/` (reuse the `flat-roundtrip` template).
+   - Valid FLAT from `testkit/corpus/` (reuse the `flat-roundtrip` template).
    - Unknown path → error.
    - Missing a required composition-level key → error.
    - Typos close to a valid path → optional suggestion (Levenshtein on the final segment, cap 3 suggestions).
@@ -146,4 +146,4 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ rather
 
 - A peer Python openEHR SDK's FLAT validator (path checker + required-field checks) — the pattern this adapts.
 - Cadasto: `openehr/serialize/simplified/`, `cmd/examples/flat-roundtrip/`, REQ-109 AQL lint (issue model).
-- EHRbase corpus: `testkit/cassettes/compositions/`, the PROBE-076 fixtures.
+- EHRbase corpus: `testkit/corpus/compositions/`, the PROBE-076 fixtures.

@@ -1,4 +1,4 @@
-# testkit/cassettes
+# testkit/corpus
 
 Vendored fixture documents for codec, validation, and probe tests: OPTs, compositions, RM samples, wire bodies, and reference goldens. They are checked in so CI does not need a sibling clone. Licences and provenance: [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md); repository-wide inventory: [`docs/licensing.md`](../../docs/licensing.md).
 
@@ -7,7 +7,7 @@ Vendored fixture documents for codec, validation, and probe tests: OPTs, composi
 ## Layout
 
 ```
-cassettes/
+corpus/
   templates/{template-id}.opt
   compositions/{template-id}.json
   compositions/{template-id}.xml      # when vendored

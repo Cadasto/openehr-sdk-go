@@ -2,7 +2,7 @@
 
 The SDK is **MIT**. That grant covers original code, tests, documentation, and plans in this repository. It does **not** re-license third-party artefacts that are pinned in-tree.
 
-This file is the front-door inventory of that in-tree material. Per-tree READMEs and [`testkit/cassettes/THIRD_PARTY_LICENSES.md`](../testkit/cassettes/THIRD_PARTY_LICENSES.md) keep the file lists, commit pins, and upstream copyright notices. Go module dependencies are declared in [`go.mod`](../go.mod) and are not repeated here.
+This file is the front-door inventory of that in-tree material. Per-tree READMEs and [`testkit/corpus/THIRD_PARTY_LICENSES.md`](../testkit/corpus/THIRD_PARTY_LICENSES.md) keep the file lists, commit pins, and upstream copyright notices. Go module dependencies are declared in [`go.mod`](../go.mod) and are not repeated here.
 
 A full copy of Apache License 2.0 sits at [`licenses/Apache-2.0.txt`](../licenses/Apache-2.0.txt) so redistributors do not have to fetch it.
 
@@ -10,9 +10,9 @@ A full copy of Apache License 2.0 sits at [`licenses/Apache-2.0.txt`](../license
 
 | Artefact | Path | Upstream | Licence | Role |
 |---|---|---|---|---|
-| EHRbase openEHR_SDK test-data | [`testkit/cassettes/`](../testkit/cassettes/) (`rm/`, template triplets, `webtemplate/`, `flat-conformance/`) | [ehrbase/openEHR_SDK](https://github.com/ehrbase/openEHR_SDK) | Apache-2.0 | Codec, WebTemplate, and FLAT parity oracles. Not part of the SDK runtime. |
-| EHRbase Robot integration-test data | [`testkit/cassettes/`](../testkit/cassettes/) (minimal / `Test_dv_*` / family-history / terminology-test triplets, `rm/ehr_status_*`, `rm/folder_*`, `submissions/`, [`aql/conformance/`](../testkit/cassettes/aql/conformance/)) | [ehrbase/integration-tests](https://github.com/ehrbase/integration-tests) | Apache-2.0 | Validation, contribution-shape, and AQL admissibility fixtures. Not part of the SDK runtime. |
-| CODE24 / Cadasto sample templates | [`testkit/cassettes/`](../testkit/cassettes/) (see the cassette README) | CODE24 | MIT | Parser, validation, and serialization samples. No patient data. |
+| EHRbase openEHR_SDK test-data | [`testkit/corpus/`](../testkit/corpus/) (`rm/`, template triplets, `webtemplate/`, `flat-conformance/`) | [ehrbase/openEHR_SDK](https://github.com/ehrbase/openEHR_SDK) | Apache-2.0 | Codec, WebTemplate, and FLAT parity oracles. Not part of the SDK runtime. |
+| EHRbase Robot integration-test data | [`testkit/corpus/`](../testkit/corpus/) (minimal / `Test_dv_*` / family-history / terminology-test triplets, `rm/ehr_status_*`, `rm/folder_*`, `submissions/`, [`aql/conformance/`](../testkit/corpus/aql/conformance/)) | [ehrbase/integration-tests](https://github.com/ehrbase/integration-tests) | Apache-2.0 | Validation, contribution-shape, and AQL admissibility fixtures. Not part of the SDK runtime. |
+| CODE24 / Cadasto sample templates | [`testkit/corpus/`](../testkit/corpus/) (see the cassette README) | CODE24 | MIT | Parser, validation, and serialization samples. No patient data. |
 | openEHR ITS-REST OpenAPI | [`resources/its-rest/`](../resources/its-rest/) | [openEHR/specifications-ITS-REST](https://github.com/openEHR/specifications-ITS-REST) | CC-BY-ND 3.0 (declared on each YAML `info.license`) | Normative REST contract (REQ-095). Unmodified. |
 | openEHR AQL grammar | [`resources/aql/grammar/`](../resources/aql/grammar/) | openEHR Foundation | CC-BY-SA 4.0 | Parser input. SDK deltas in `active/` are a documented derivative under the same terms. |
 | openEHR BMM schemas | [`resources/bmm/`](../resources/bmm/) | [openEHR/BMM-publisher](https://github.com/openEHR/BMM-publisher) | openEHR Foundation specification artefact | Pinned RM / AM / BASE inputs for codegen. |

@@ -45,7 +45,7 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 func readCassette(t *testing.T) []byte {
 	t.Helper()
 	_, src, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "..", "testkit", "cassettes", "its_rest", "ehr", "ehr_status.json")
+	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "..", "testkit", "corpus", "its_rest", "ehr", "ehr_status.json")
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read cassette %q: %v", path, err)

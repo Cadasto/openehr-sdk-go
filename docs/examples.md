@@ -48,7 +48,7 @@ go run ./cmd/examples/canonical_json
 
 **Packages:** `openehr/rm`, `openehr/serialize/canjson` (plus `testkit/fixtures`, which locates the cassette)
 
-**Fixture:** `testkit/cassettes/compositions/body_weight.json`
+**Fixture:** `testkit/corpus/compositions/body_weight.json`
 
 **Sample output:**
 
@@ -114,7 +114,7 @@ go run ./cmd/examples/opt-parse path/to/template.opt
 - `Root`, the `ObjectNode` interface a tree walker dispatches on, and `Attributes`
 - `ParsePath`, `ValidatePath`, `NodeAt`, `WithStrictPaths`, `ErrAmbiguousPath`
 
-**Default fixture:** `testkit/cassettes/templates/vital_signs.opt`
+**Default fixture:** `testkit/corpus/templates/vital_signs.opt`
 
 **Sample output:**
 
@@ -215,7 +215,7 @@ go run ./cmd/examples/validate-from-json comp.json tmpl.opt # your own files
 
 | Flag | Effect |
 |---|---|
-| `-cassette` | Validate `testkit/cassettes/compositions/vital_signs.json`, demo data that reports issues, instead of the clean local fixture |
+| `-cassette` | Validate `testkit/corpus/compositions/vital_signs.json`, demo data that reports issues, instead of the clean local fixture |
 
 The exit status is 1 when the composition does not validate (and on a usage error), so the command can gate a pipeline. Validation issues are a result the program prints; only a program error, such as a bad path or an unreadable OPT, is reported as a failure.
 
@@ -245,7 +245,7 @@ With `-cassette` the result line reports the issue count, one `path [code] detai
 ```bash
 go run ./cmd/examples/generate-example
 go run ./cmd/examples/generate-example \
-  --opt testkit/cassettes/templates/vital_signs.opt \
+  --opt testkit/corpus/templates/vital_signs.opt \
   --territory NL \
   --composer-name "Test Composer" \
   --policy example
@@ -266,7 +266,7 @@ The output is one line of JSON. Each run gets fresh uids and a wall-clock contex
 
 ```bash
 go run ./cmd/examples/generate-example --policy minimal > /tmp/generated.json
-go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/cassettes/templates/vital_signs.opt
+go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/corpus/templates/vital_signs.opt
 ```
 
 **What to copy into your app:** `instance.Generate(ctx, compiled, instance.Options{Policy: ..., Territory: ..., Composer: ...})`. It returns the root as `any`, because a template can be rooted on any archetypeable type; `canjson.Marshal` encodes it as is, and `instance.AsComposition` (with siblings for the other root types) gives you the typed value. Optional RM strings are pointers, hence `new(name)` for the composer name. An unknown policy name is an error, so a typo on the command line does not silently pick a default.
@@ -721,7 +721,7 @@ Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf co
 
 ## Fixtures and testkit
 
-Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and cassettes under `testkit/cassettes/`. These are stable, checked-in artefacts, not generated at runtime. The exception is `validate-from-json/testdata/`, produced once via `gen_fixture.go`.
+Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and cassettes under `testkit/corpus/`. These are stable, checked-in artefacts, not generated at runtime. The exception is `validate-from-json/testdata/`, produced once via `gen_fixture.go`.
 
 When writing your own tests, prefer importing fixtures from `testkit` rather than copying paths by hand.
 

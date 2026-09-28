@@ -46,7 +46,7 @@ func factoryForCassette(rel fixtures.CompositionJSONRel) (func() any, bool) {
 func TestCrossFormatRoundTripFromJSONCassettes(t *testing.T) {
 	names := discoverJSONCassettes(t)
 	if len(names) == 0 {
-		t.Fatal("no JSON cassettes discovered — check testkit/cassettes/")
+		t.Fatal("no JSON cassettes discovered — check testkit/corpus/")
 	}
 	for _, rel := range names {
 		t.Run(rel.Rel, func(t *testing.T) {

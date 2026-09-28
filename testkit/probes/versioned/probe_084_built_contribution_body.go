@@ -96,7 +96,7 @@ const probe084BatchCode = "253"
 // the wire is in scope.
 //
 // corpus is the vendored submission corpus (raw
-// `testkit/cassettes/submissions/*.json` bodies). It is the shape witness
+// `testkit/corpus/submissions/*.json` bodies). It is the shape witness
 // for the final arm: every version-level field those records carry must be
 // one this SDK can emit ([builtVersionFields]). The comparison is
 // structural by construction: the records carry a top-level

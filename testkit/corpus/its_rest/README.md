@@ -1,4 +1,4 @@
-# testkit/cassettes/its_rest
+# testkit/corpus/its_rest
 
 Vendored fixtures for openEHR REST 1.1.0-development (REQ-050, REQ-095) and the SMART discovery contract (REQ-070..072). They are checked in so CI does not need a live deployment.
 

@@ -19,7 +19,7 @@ func TestEhrbaseSDKTmpPairs(t *testing.T) {
 	}
 	root := filepath.Join("..", "..", "testkit", "ehrbase_sdk.tmp")
 	if _, err := os.Stat(root); err != nil {
-		t.Skip("testkit/ehrbase_sdk.tmp not present (integrated into testkit/cassettes/)")
+		t.Skip("testkit/ehrbase_sdk.tmp not present (integrated into testkit/corpus/)")
 	}
 	type pair struct {
 		opt  string

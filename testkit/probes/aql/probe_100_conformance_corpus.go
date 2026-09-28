@@ -16,7 +16,7 @@ import (
 
 // PROBE-100 — the REQ-160 upstream admissibility corpus ratchet.
 //
-// The vendored corpus under testkit/cassettes/aql/conformance/ is the EHRbase
+// The vendored corpus under testkit/corpus/aql/conformance/ is the EHRbase
 // Robot integration tests' FROM-family combination data: each CSV row is one
 // FROM/CONTAINS shape a conformant engine demonstrably accepted and answered.
 // This probe holds the REQ-160 relation to the looser-of-the-two position

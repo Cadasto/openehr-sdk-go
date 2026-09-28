@@ -24,7 +24,7 @@ The canonical-JSON wire profile ([`docs/specifications/wire.md`](../../docs/spec
 - "`DV_QUANTITY` magnitudes are emitted as JSON numbers, not strings, **unless the spec mandates otherwise** (some implementations have used strings to avoid float-precision loss; the SDK takes a position — see § Floating-point precision below)."
 - The double-precision rule of [wire.md § Floating-point precision](../specifications/wire.md#floating-point-precision): magnitudes are IEEE 754 double-precision JSON numbers, never coerced through `float32` or a similarly lossy intermediate.
 
-The wire spec foresees that real producers exist that emit `"magnitude": "354"` (string) rather than `"magnitude": 354` (number). The vendored cassettes confirm this — `testkit/cassettes/compositions/BMI.json` carries `"magnitude": "354"` etc. The spec ENCODE side is settled (numbers only); the DECODE side has been implicit until now.
+The wire spec foresees that real producers exist that emit `"magnitude": "354"` (string) rather than `"magnitude": 354` (number). The vendored cassettes confirm this — `testkit/corpus/compositions/BMI.json` carries `"magnitude": "354"` etc. The spec ENCODE side is settled (numbers only); the DECODE side has been implicit until now.
 
 A permissive decoder is needed for SDK consumers to round-trip real-world CDR fixtures, but strict downstream consumers (other openEHR clients, third-party producers) need to be able to assume the SDK emits numbers. Asymmetric tolerance is the standard Postel-style answer; it needs to be **explicit** so the SDK's openEHR wire conformance (REQ-080) is unambiguous.
 
@@ -68,4 +68,4 @@ Both types are emitted by the BMM generator wherever the BMM primitive `Real` / 
 - [`docs/specifications/wire.md`](../../docs/specifications/wire.md) — REQ-052 (canonical-JSON wire profile, Floating-point precision).
 - [`openehr/rm/real.go`](../../openehr/rm/real.go), [`openehr/rm/integer.go`](../../openehr/rm/integer.go) — the alias types implementing this ADR.
 - [`internal/bmmgen/primitives.go`](../../internal/bmmgen/primitives.go) — the generator's mapping table.
-- [`testkit/cassettes/compositions/BMI.json`](../../testkit/cassettes/compositions/BMI.json) — concrete fixture with quoted-number magnitudes.
+- [`testkit/corpus/compositions/BMI.json`](../../testkit/corpus/compositions/BMI.json) — concrete fixture with quoted-number magnitudes.

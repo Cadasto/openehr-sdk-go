@@ -4,7 +4,7 @@ package canjson_test
 // canonical-JSON path to encoding/json/v2 (PR 171). REQ-052 § Field order,
 // REQ-013 § building-block independence.
 //
-// Every canonical-JSON RM document vendored under testkit/cassettes is decoded
+// Every canonical-JSON RM document vendored under testkit/corpus is decoded
 // twice, once through encoding/json and once through encoding/json/v2 with no
 // options, into two fresh instances of the same generated type, and the two
 // results are compared. The net exists so that the generator change and the
@@ -112,7 +112,7 @@ func TestCorpusParityV1V2(t *testing.T) {
 	t.Run("RegistryCensus", testParityRegistryCensus)
 }
 
-// testParityCorpus walks testkit/cassettes and compares the two packages on
+// testParityCorpus walks testkit/corpus and compares the two packages on
 // every canonical-JSON RM document it holds.
 //
 // Selection rule. A file is a canonical-JSON RM document for this net when its
@@ -134,7 +134,7 @@ func TestCorpusParityV1V2(t *testing.T) {
 //     parsing is a corrupt file rather than a fixture this net has no opinion
 //     on. None today; counted and logged like the class above.
 //
-// HAR recordings live under testkit/recordings, not under testkit/cassettes,
+// HAR recordings live under testkit/recordings, not under testkit/corpus,
 // so none reaches this walk.
 func testParityCorpus(t *testing.T) {
 	root := fixtures.CassettesRoot()

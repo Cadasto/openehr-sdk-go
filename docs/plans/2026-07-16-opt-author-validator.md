@@ -45,7 +45,7 @@ Implementation (Phase 1+) may start once **Phase 0 has landed REQ-114**:
 - `Covers:` names the REQ this plan implements (REQ-114) and the landed REQs it builds on (REQ-100/104/106/108) + the complementary REQ-102.
 - Canonical normative prose for REQ-114 exists — a `clinical-modeling.md § REQ-114` section + a `traceability.yaml` entry — authored via `sdd-specify` (Phase 0). Until then this DoR item is **pending**, not satisfied.
 - The issue-category taxonomy and the stable `opt.` code catalogue are defined **once**, in REQ-114 (not duplicated in this plan).
-- PROBE-085 fixture list chosen from `testkit/cassettes/templates/`.
+- PROBE-085 fixture list chosen from `testkit/corpus/templates/`.
 - Each phase names its verification command.
 
 ## Definition of Done

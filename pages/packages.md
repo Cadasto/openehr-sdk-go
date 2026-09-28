@@ -86,7 +86,7 @@ The generic `auth.TokenSource` sits at the bottom; the providers build on it.
 |---|---|
 | `sandbox` | In-memory openEHR backend (`http.RoundTripper`) |
 | `testkit/probe` | Shared probe result type and catalog runner |
-| `testkit/cassettes` | Fixture documents kept in the repository (bodies, not HTTP recordings) |
+| `testkit/corpus` | Fixture documents kept in the repository (bodies, not HTTP recordings) |
 | `testkit/recordings` | Cassette-mode HAR 1.2 recordings |
 
 ## Cadasto extras

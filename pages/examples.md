@@ -46,7 +46,7 @@ and `territory` are codes with the terminology they come from, and
 `content items` counts the entries the document carries.
 
 Packages: `openehr/rm`, `openehr/serialize/canjson`. Fixture:
-`testkit/cassettes/compositions/body_weight.json`.
+`testkit/corpus/compositions/body_weight.json`.
 
 ## Validate JSON against a template {#validate-from-json}
 

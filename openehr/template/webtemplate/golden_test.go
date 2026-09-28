@@ -18,7 +18,7 @@ import (
 var update = flag.Bool("update", false, "update webtemplate golden files")
 
 func goldenFixtures() map[string]string {
-	tmpl := "../../../testkit/cassettes/templates/"
+	tmpl := "../../../testkit/corpus/templates/"
 	return map[string]string{
 		"minimal_evaluation":  tmpl + "minimal_evaluation.en.v1.opt",
 		"minimal_observation": tmpl + "minimal_observation.en.v1.opt",

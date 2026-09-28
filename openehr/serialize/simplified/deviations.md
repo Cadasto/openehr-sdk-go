@@ -191,7 +191,7 @@ leg catches dropped/mistyped leaves that idempotence alone (a symmetric omission
 It does **not** compare emitted FLAT/STRUCTURED against vendored upstream simplified
 output — that comparison is **PROBE-086** (Implemented, Sandbox): its harness at
 `testkit/conformance/webtemplate/` round-trips the corpus vendored at
-`testkit/cassettes/flat-conformance/` over the modelled subset, with the refusal
+`testkit/corpus/flat-conformance/` over the modelled subset, with the refusal
 inventory in that package's `SKIPPED.md`.
 
 **PROBE-089** (Implemented, Sandbox — `testkit/probes/serialize/probe_089_underscore_round_trip.go`)

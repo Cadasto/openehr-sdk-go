@@ -37,7 +37,7 @@ type Result = probe.Result
 //
 // `cassetteBody` is the SMART configuration JSON the upstream server
 // will return on every request, typically the vendored
-// `testkit/cassettes/its_rest/discovery/smart-configuration.json`
+// `testkit/corpus/its_rest/discovery/smart-configuration.json`
 // content read by the caller. The server replies with
 // `Cache-Control: max-age=300` so the SDK's cache honours a real TTL.
 //

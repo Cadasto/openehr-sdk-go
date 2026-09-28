@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Vendor the EHRbase Robot AQL FROM-combination corpus (sibling clone) into
-# testkit/cassettes/aql/conformance/.
+# testkit/corpus/aql/conformance/.
 #
 # Sibling of scripts/ingest-robot-cassettes.sh, but a different job: that one
 # hand-curates and renames composition fixtures, this one copies the upstream
@@ -36,7 +36,7 @@ if [[ -d "$ROBOT" ]]; then
   ROBOT="$(cd "$ROBOT" && pwd -P)"
 fi
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-DEST="$REPO/testkit/cassettes/aql/conformance"
+DEST="$REPO/testkit/corpus/aql/conformance"
 
 AQL="$ROBOT/aql/fields_and_results"
 SRC="$AQL/from/combinations"
@@ -202,7 +202,7 @@ recorded=${recorded:-$(date -u +%Y-%m-%d)}
   echo "commit_date: ${src_date}"
   echo "recorded_utc: ${recorded}"
   echo "source_tree: https://github.com/${src_remote}/tree/${EXPECTED_COMMIT}/${src_rel}"
-  echo "license: Apache-2.0 (see testkit/cassettes/THIRD_PARTY_LICENSES.md)"
+  echo "license: Apache-2.0 (see testkit/corpus/THIRD_PARTY_LICENSES.md)"
 } > "$pin_file"
 
 # --- exclusion list -----------------------------------------------------------

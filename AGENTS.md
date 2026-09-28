@@ -91,7 +91,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 **Gotchas worth the reading:**
 
-- **Never hand-edit a vendored fixture** under `resources/` or `testkit/cassettes/` — being byte-identical to upstream is its whole value. Re-sync instead.
+- **Never hand-edit a vendored fixture** under `resources/` or `testkit/corpus/` — being byte-identical to upstream is its whole value. Re-sync instead.
 - `make probe-status` prints `MISSING` for any probe covered inline or in a sibling's file. That is the filename heuristic, **not** drift — `make spec-check` is the real gate.
 - **`make ci` cannot complete without Docker:** `test` → `aqlgen-verify` → `antlr-image` always needs it. Everything else uses Docker only when host tooling is missing (host Go `1.27.x`; a host `golangci-lint` **built with Go 1.27**; routing in [ci.md](docs/ci.md)).
   Without Docker, run `fmt-check`, `vet`, `spec-check`, `flat-conformance-verify`, `build` and `go test ./... -count=1`, and let PR CI be the gate.

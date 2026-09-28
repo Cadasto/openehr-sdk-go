@@ -19,7 +19,7 @@ import (
 // many sibling leaves across several observations, so it exercises the paths
 // that a map-order bug would perturb.
 func TestDecodeIdempotent(t *testing.T) {
-	comp, wt := genComposition(t, "../../../testkit/cassettes/templates/vital_signs.opt")
+	comp, wt := genComposition(t, "../../../testkit/corpus/templates/vital_signs.opt")
 	f1, err := simplified.MarshalFlat(comp, wt)
 	if err != nil {
 		t.Fatalf("MarshalFlat: %v", err)
@@ -42,7 +42,7 @@ func TestDecodeIdempotent(t *testing.T) {
 	}
 }
 
-const vitalSignsOPT = "../../../testkit/cassettes/templates/vital_signs.opt"
+const vitalSignsOPT = "../../../testkit/corpus/templates/vital_signs.opt"
 
 // TestFlatRoundTripVitalSigns exercises DV_QUANTITY on an ITEM_SINGLE branch
 // (body_temperature): the leaf aqlPath is .../data[at0001]/item[at0004]/value,

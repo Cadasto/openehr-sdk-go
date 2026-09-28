@@ -24,12 +24,12 @@ import (
 // vitalSignsOPT ("encounter") sort after it. siphonContext walks a body in sorted
 // key order, so the pair pins both directions of that walk — see
 // TestMetadataCompositeValueRefusedInBothKeyOrders.
-const bodyWeightOPT = "../../../testkit/cassettes/templates/body_weight.opt"
+const bodyWeightOPT = "../../../testkit/corpus/templates/body_weight.opt"
 
 // corpusFlatOPT is the PROBE-086 corpus template — the one vendored OPT whose
 // Web Template carries a context/setting node, so it is the only target on which
 // the ctx/-owned-leaf shadowing is observable.
-const corpusFlatOPT = "../../../testkit/cassettes/flat-conformance/templates/conformance_ehrbase.de.v0.opt"
+const corpusFlatOPT = "../../../testkit/corpus/flat-conformance/templates/conformance_ehrbase.de.v0.opt"
 
 func TestContextEncodeAndRoundTrip(t *testing.T) {
 	comp, wt := genComposition(t, vitalSignsOPT)

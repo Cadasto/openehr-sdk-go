@@ -49,14 +49,14 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 }
 
 // readCassette returns the bytes of a vendored cassette at
-// testkit/cassettes/its_rest/<dir>/<name>.
+// testkit/corpus/its_rest/<dir>/<name>.
 func readCassette(t *testing.T, dir, name string) []byte {
 	t.Helper()
 	_, src, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "cassettes", "its_rest", dir, name)
+	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "corpus", "its_rest", dir, name)
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read cassette %q: %v", path, err)

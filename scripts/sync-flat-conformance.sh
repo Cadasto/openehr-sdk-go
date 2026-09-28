@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # sync-flat-conformance.sh — ingest / check / sync the upstream EHRbase FLAT
-# serialisation conformance corpus into testkit/cassettes/flat-conformance/.
+# serialisation conformance corpus into testkit/corpus/flat-conformance/.
 #
 # Source: https://github.com/ehrbase/openEHR_SDK
 #         test-data/src/main/resources/operationaltemplate/conformance_ehrbase.de.v0.opt
@@ -15,12 +15,12 @@
 # reference implementation this SDK locks to per ADR 0014.
 #
 # Upstream is Apache-2.0; attribution is retained in
-# testkit/cassettes/THIRD_PARTY_LICENSES.md.
+# testkit/corpus/THIRD_PARTY_LICENSES.md.
 #
 # Subcommands:
 #   sync     Download the OPT + every conformance FLAT body at
 #            FLAT_CONFORMANCE_REF (default: develop), write them under
-#            testkit/cassettes/flat-conformance/, and regenerate MANIFEST.txt
+#            testkit/corpus/flat-conformance/, and regenerate MANIFEST.txt
 #            (pinned commit + per-file sha256). Removes vendored fixtures no
 #            longer present upstream.
 #   ingest   Alias for sync (first-time population).
@@ -55,7 +55,7 @@ readonly OPT_NAME="conformance_ehrbase.de.v0.opt"
 readonly REF="${FLAT_CONFORMANCE_REF:-develop}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-readonly DEST="$ROOT/testkit/cassettes/flat-conformance"
+readonly DEST="$ROOT/testkit/corpus/flat-conformance"
 readonly MANIFEST="$DEST/MANIFEST.txt"
 
 # --- helpers ---------------------------------------------------------------
@@ -169,7 +169,7 @@ cmd_sync() {
     echo "commit: $commit"
     echo "fetched_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "source_tree: https://github.com/$REPO/tree/$commit/$FLAT_PATH"
-    echo "license: Apache-2.0 (see testkit/cassettes/THIRD_PARTY_LICENSES.md)"
+    echo "license: Apache-2.0 (see testkit/corpus/THIRD_PARTY_LICENSES.md)"
     echo "#"
     echo "# sha256  path"
     echo "$(sha256_of "$DEST/templates/$OPT_NAME")  templates/$OPT_NAME"
@@ -180,7 +180,7 @@ cmd_sync() {
 
   local count
   count="$(wc -l <<<"$names")"
-  echo "Synced 1 OPT + $count FLAT fixture(s) → testkit/cassettes/flat-conformance/ (commit ${commit:0:12})"
+  echo "Synced 1 OPT + $count FLAT fixture(s) → testkit/corpus/flat-conformance/ (commit ${commit:0:12})"
 }
 
 cmd_check() {

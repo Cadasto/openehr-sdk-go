@@ -15,7 +15,7 @@ import (
 // TestProbe030 runs PROBE-030 across the canonical input set and
 // asserts every input produces Status == "pass". The set spans leaf
 // RM values and full composition cassettes vendored under
-// testkit/cassettes/compositions/ and testkit/cassettes/rm/. The conformance harness in
+// testkit/corpus/compositions/ and testkit/corpus/rm/. The conformance harness in
 // `make conformance` invokes the same probe function against shared
 // openEHR conformance cassettes (REQ-080).
 func TestProbe030(t *testing.T) {
@@ -34,7 +34,7 @@ func TestProbe030(t *testing.T) {
 		t.Error("Probe030Inputs missing leaf-type entries")
 	}
 	if !cassetteSeen {
-		t.Error("Probe030Inputs missing cassette entries — check testkit/cassettes discovery via testkit/fixtures")
+		t.Error("Probe030Inputs missing cassette entries — check testkit/corpus discovery via testkit/fixtures")
 	}
 
 	for _, in := range serializeprobes.Probe030Inputs {
@@ -131,7 +131,7 @@ func TestProbe030HeldOutInputsFailFloorButPassFidelity(t *testing.T) {
 }
 
 // TestProbe038 runs PROBE-038 across the polymorphic-decode fixture
-// set vendored under testkit/cassettes/rm/polymorphic/ and asserts
+// set vendored under testkit/corpus/rm/polymorphic/ and asserts
 // every input decodes + re-marshals with the original `_type`
 // discriminators preserved (the REQ-052 substitutability guarantee).
 func TestProbe038(t *testing.T) {
@@ -182,7 +182,7 @@ func TestProbe033(t *testing.T) {
 		t.Error("Probe033Inputs missing leaf-type entries")
 	}
 	if !cassetteSeen {
-		t.Error("Probe033Inputs missing cassette entries — check testkit/cassettes discovery via testkit/fixtures")
+		t.Error("Probe033Inputs missing cassette entries — check testkit/corpus discovery via testkit/fixtures")
 	}
 	for _, in := range serializeprobes.Probe033Inputs {
 		t.Run(in.Name, func(t *testing.T) {

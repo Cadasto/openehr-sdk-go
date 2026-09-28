@@ -154,7 +154,7 @@ func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]by
 // (typed deep comparison of A and B, plus wire equivalence, and the RM
 // floor unless the input sets SkipFloor) when fed the vendored cassettes.
 // The set spans leaf RM values and full composition cassettes vendored
-// under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/`.
+// under `testkit/corpus/compositions/` and `testkit/corpus/rm/`.
 //
 // Every discovered cassette stays in the set so the fidelity legs run on
 // all of them; an input carrying an RM-floor finding independent of the

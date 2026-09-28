@@ -9,7 +9,7 @@
 //
 //	go run ./cmd/examples/generate-example
 //	go run ./cmd/examples/generate-example \
-//	    --opt testkit/cassettes/templates/vital_signs.opt \
+//	    --opt testkit/corpus/templates/vital_signs.opt \
 //	    --territory NL \
 //	    --composer-name "Test Composer" \
 //	    --policy example

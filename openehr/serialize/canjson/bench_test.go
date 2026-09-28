@@ -111,7 +111,7 @@ func BenchmarkDecodeDVQuantity(b *testing.B) {
 }
 
 // benchCassette is the largest real cassette vendored under
-// testkit/cassettes (97 725 bytes). The synthetic payloads above repeat one
+// testkit/corpus (97 725 bytes). The synthetic payloads above repeat one
 // ADMIN_ENTRY shape; this one carries the depth and datatype spread of a real
 // CDR document, DV_MULTIMEDIA included, so the two together bracket the codec
 // between a wide tree and a deep one.

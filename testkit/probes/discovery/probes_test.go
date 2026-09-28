@@ -20,7 +20,7 @@ func cassetteBytes(t *testing.T) []byte {
 	if !ok {
 		t.Fatal("cannot resolve cassette path: runtime.Caller failed")
 	}
-	path := filepath.Join(filepath.Dir(src), "..", "..", "cassettes", "its_rest", "discovery", "smart-configuration.json")
+	path := filepath.Join(filepath.Dir(src), "..", "..", "corpus", "its_rest", "discovery", "smart-configuration.json")
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read cassette %q: %v", path, err)

@@ -13,7 +13,7 @@ import (
 )
 
 // listCassettes returns vendored composition JSON paths relative to
-// testkit/cassettes (via testkit/fixtures discovery).
+// testkit/corpus (via testkit/fixtures discovery).
 func listCassettes(t *testing.T) []fixtures.CompositionJSONRel {
 	t.Helper()
 	rels, err := fixtures.ListCompositionJSON()

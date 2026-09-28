@@ -165,14 +165,14 @@ func TestProbe088GoldensRoundTripThroughParse(t *testing.T) {
 	}
 }
 
-// cassette reads an AQL lint cassette under testkit/cassettes/aql/lint/.
+// cassette reads an AQL lint cassette under testkit/corpus/aql/lint/.
 func cassette(t *testing.T, name string) string {
 	t.Helper()
 	_, here, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	path := filepath.Join(filepath.Dir(here), "..", "..", "cassettes", "aql", "lint", name)
+	path := filepath.Join(filepath.Dir(here), "..", "..", "corpus", "aql", "lint", name)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -190,7 +190,7 @@ func loadOPT(t *testing.T, name string) []byte {
 }
 
 // probe028Cases is PROBE-028's own three-cassette corpus — the cassette
-// files under testkit/cassettes/aql/lint/, the vital_signs.opt template, and
+// files under testkit/corpus/aql/lint/, the vital_signs.opt template, and
 // their WantCodes baseline. Shared between TestProbe028AQLLint
 // and PROBE-097 arm (b) so a deliberate PROBE-028 re-baseline (conformance.md
 // § PROBE-097 arm (b)) is made ONCE: before this helper existed, arm (b)
@@ -1731,7 +1731,7 @@ func TestProbe099RequiresEveryCorpusArm(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // probe100Corpus reads the shipping corpus — the vendored CSVs under
-// testkit/cassettes/aql/conformance/, reconstructed into queries by the
+// testkit/corpus/aql/conformance/, reconstructed into queries by the
 // reconstruction table in probe_100_conformance_corpus.go. The root comes from
 // the fixtures package so the path is resolved from the cassettes root rather
 // than from the working directory.

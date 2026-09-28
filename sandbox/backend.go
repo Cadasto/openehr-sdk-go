@@ -97,7 +97,7 @@ func (b *Backend) createEHR(req *http.Request, id string) (*http.Response, error
 	// The ITS-REST EHR schema (resources/its-rest/ehr-validation.openapi.yaml,
 	// components.schemas.Ehr) types both ehr_status.id and ehr_access.id as
 	// OBJECT_VERSION_ID (ObjectRefOfObjectVersionId); the vendored
-	// testkit/cassettes/its_rest/ehr/ehr.json fixture instead uses
+	// testkit/corpus/its_rest/ehr/ehr.json fixture instead uses
 	// HIER_OBJECT_ID for both — this backend follows the OpenAPI schema.
 	statusID := newID() + "::" + systemID + "::1"
 	accessID := newID() + "::" + systemID + "::1"

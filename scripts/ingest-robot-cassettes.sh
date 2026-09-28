@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROBOT="${ROBOT_ROOT:-/src/ehrbase/integration-tests/tests/robot/_resources/test_data_sets}"
-CAS="$(cd "$(dirname "$0")/.." && pwd)/testkit/cassettes"
+CAS="$(cd "$(dirname "$0")/.." && pwd)/testkit/corpus"
 
 if [[ ! -d "$ROBOT" ]]; then
   echo "robot data not found at $ROBOT" >&2

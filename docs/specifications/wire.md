@@ -145,7 +145,7 @@ Within that definition, the clause is met on both its arms: an out-of-range magn
 
 Some upstream producers (notably legacy CDR exporters) emit `Real` / `Integer` magnitudes as quoted decimal strings. The SDK adopts **asymmetric tolerance**: encode is strict (numbers only); decode accepts either a JSON number or a quoted decimal string. The full rule and its rationale live in [`docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). The asymmetric profile is part of the openEHR wire contract this SDK follows (REQ-080).
 
-Golden canonical-JSON composition inputs for codec and PROBE-030 live under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (see [Vendored fixtures](conformance.md#vendored-fixtures-testkitcassettes)). Example: `compositions/BMI.json` for quoted-number magnitudes ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
+Golden canonical-JSON composition inputs for codec and PROBE-030 live under `testkit/corpus/compositions/` and `testkit/corpus/rm/` (see [Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus)). Example: `compositions/BMI.json` for quoted-number magnitudes ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
 
 ### Polymorphic substitution
 
@@ -179,7 +179,7 @@ Canonical ordering for XML is its own deterministic profile, set out in the bull
 
 XML is a second-class format on the wire today (REST 1.1.0-development is JSON-first), but several integration scenarios pin to XML for legacy reasons. The SDK supports it without forcing it.
 
-Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (same layout as REQ-052; see [Vendored fixtures](conformance.md#vendored-fixtures-testkitcassettes)).
+Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/corpus/compositions/` and `testkit/corpus/rm/` (same layout as REQ-052; see [Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus)).
 
 ## Simplified formats
 
@@ -458,7 +458,7 @@ The builder is an authoring surface over the landed submission shape (REQ-050/09
 | Modification | `modification` | `251` |
 | Deletion | `deleted` | `523` |
 
-The codes and rubrics are the pinned openEHR terminology's ([§ REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034)); this table maps the builder's four operations onto them — `523` is the deletion code; `253` is *unknown*, not *deleted*. The batch-level `audit.change_type` **MAY** be any member of the *audit change type* group: the builder **MUST** refuse a code outside the group and **MUST** render a member with the group's rubric. This bar holds at build time on whichever path set the change type — `WithChangeType`, or a wholesale `WithAudit` that supplies the entire audit envelope — so no entry point ships an `AUDIT_DETAILS.Change_type_valid`-violating audit; a caller who needs an off-spec audit hand-wires a `Submission` per the caller-authority clause above. The batch-level `audit.change_type` describes the contribution as a whole and **MUST** be caller-supplied: the builder **MUST NOT** derive it from the versions it holds. The vendored corpus ([`testkit/cassettes/submissions/`](../../testkit/cassettes/README.md)) settles that — a batch audit there records `creation` over an all-`modification` version list, and `modification` over an all-`creation` one, so no derivation rule is faithful to it.
+The codes and rubrics are the pinned openEHR terminology's ([§ REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034)); this table maps the builder's four operations onto them — `523` is the deletion code; `253` is *unknown*, not *deleted*. The batch-level `audit.change_type` **MAY** be any member of the *audit change type* group: the builder **MUST** refuse a code outside the group and **MUST** render a member with the group's rubric. This bar holds at build time on whichever path set the change type — `WithChangeType`, or a wholesale `WithAudit` that supplies the entire audit envelope — so no entry point ships an `AUDIT_DETAILS.Change_type_valid`-violating audit; a caller who needs an off-spec audit hand-wires a `Submission` per the caller-authority clause above. The batch-level `audit.change_type` describes the contribution as a whole and **MUST** be caller-supplied: the builder **MUST NOT** derive it from the versions it holds. The vendored corpus ([`testkit/corpus/submissions/`](../../testkit/corpus/README.md)) settles that — a batch audit there records `creation` over an all-`modification` version list, and `modification` over an all-`creation` one, so no derivation rule is faithful to it.
 
 **Preceding version.** An amendment, modification, or deletion **MUST** carry `preceding_version_uid`; a creation **MUST NOT** — the version it would follow does not exist yet. The builder **MUST** refuse a preceding-version-bearing operation whose uid is empty rather than emitting a version the server cannot resolve.
 
@@ -503,11 +503,11 @@ Out of v1 scope:
 | AQL wire | REQ-055 | `openehr/aql/`, `openehr/client/query/` |
 | Stored AQL | REQ-057 | `openehr/client/definition/`, `openehr/client/query/` |
 | openEHR custom header family | REQ-059 | `transport/` (option API), `openehr/client/*` (typed per-method options) |
-| OpenAPI authoritative source | REQ-095 | `testkit/cassettes/its_rest/` (records upstream commit) |
+| OpenAPI authoritative source | REQ-095 | `testkit/corpus/its_rest/` (records upstream commit) |
 | Path-parameter segment validation | REQ-150 | [transport.md](transport.md) → `transport/` |
 | Contribution builder | REQ-130 | `openehr/client/ehr/contribution/` |
 | Contribution read | REQ-142 | `openehr/client/ehr/contribution/` |
 | Template list filters | REQ-143 | `openehr/client/definition/` |
 | Definition metadata decoding | REQ-144 | `openehr/client/definition/` |
-| Shared RM / OPT fixtures | REQ-052, REQ-056 | `testkit/cassettes/{templates,compositions,rm}/` — resolve via `testkit/fixtures/`; index in [`testkit/cassettes/README.md`](../../testkit/cassettes/README.md). Bodies, not REQ-082 Cassette-mode recordings ([conformance.md § Vendored fixtures](conformance.md#vendored-fixtures-testkitcassettes)) |
+| Shared RM / OPT fixtures | REQ-052, REQ-056 | `testkit/corpus/{templates,compositions,rm}/` — resolve via `testkit/fixtures/`; index in [`testkit/corpus/README.md`](../../testkit/corpus/README.md). Bodies, not REQ-082 Cassette-mode recordings ([conformance.md § Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus)) |
 | Transport (OTel, retry, TLS, errors, Prefer) | REQ-090–094 | [transport.md](transport.md) → `transport/`, `smart/discovery/` |

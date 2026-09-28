@@ -29,7 +29,7 @@ func newClient(t *testing.T, b *sandbox.Backend) *transport.Client {
 func readOPT(t *testing.T) []byte {
 	t.Helper()
 	_, src, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(src), "..", "..", "cassettes", "its_rest", "definition", "body_weight.opt")
+	path := filepath.Join(filepath.Dir(src), "..", "..", "corpus", "its_rest", "definition", "body_weight.opt")
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read cassette %q: %v", path, err)

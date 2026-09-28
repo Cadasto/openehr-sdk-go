@@ -408,7 +408,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/cassettes, testkit/fixtures, testkit/wireequiv]
+    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     tests:
       - internal/bmmgen/render_jsonunmar_polymorphic_test.go
@@ -535,7 +535,7 @@ requirements:
     packages:
       - openehr/serialize/canxml
       - openehr/rm
-      - testkit/cassettes
+      - testkit/corpus
       - testkit/fixtures
     probes: [PROBE-033, PROBE-034]
     tests:
@@ -620,7 +620,7 @@ requirements:
     packages: [auth/smart, smart/discovery, auth/introspect]
     probes: [PROBE-006]
     fixtures:
-      - testkit/cassettes/its_rest/discovery/smart-configuration.json
+      - testkit/corpus/its_rest/discovery/smart-configuration.json
     tests:
       - auth/introspect/introspect_test.go
       - auth/smart/smart_test.go
@@ -719,7 +719,7 @@ requirements:
     packages: [smart/discovery]
     probes: [PROBE-002, PROBE-040]
     fixtures:
-      - testkit/cassettes/its_rest/discovery/smart-configuration.json
+      - testkit/corpus/its_rest/discovery/smart-configuration.json
     tests:
       - smart/discovery/resolver_test.go
       - testkit/probes/auth/probe_002_openehr_rest_service.go
@@ -744,7 +744,7 @@ requirements:
     packages: [smart/discovery]
     probes: [PROBE-002, PROBE-003, PROBE-040, PROBE-041]
     fixtures:
-      - testkit/cassettes/its_rest/discovery/smart-configuration-mismatch.json
+      - testkit/corpus/its_rest/discovery/smart-configuration-mismatch.json
     tests:
       - smart/discovery/resolver_test.go
       - testkit/probes/auth/probe_003_spec_version_mismatch.go
@@ -768,7 +768,7 @@ requirements:
     implementation: partial
     packages:
       - testkit/probes
-      - testkit/cassettes/flat-conformance
+      - testkit/corpus/flat-conformance
       - testkit/conformance/webtemplate
     probes: [PROBE-086, PROBE-089]
     tests:
@@ -905,7 +905,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-095
     status: draft
     implementation: partial
-    packages: [testkit/cassettes/its_rest, transport, openehr/client, openehr/client/definition, openehr/client/query, openehr/client/admin, openehr/client/demographic, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus]
+    packages: [testkit/corpus/its_rest, transport, openehr/client, openehr/client/definition, openehr/client/query, openehr/client/admin, openehr/client/demographic, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus]
     probes: [PROBE-060, PROBE-072, PROBE-102, PROBE-104]
     tests:
       - openehr/client/definition/path_encoding_test.go
@@ -1266,7 +1266,7 @@ requirements:
       - openehr/template/webtemplate
       - openehr/serialize/simplified
       - testkit/fixtures
-      - testkit/cassettes/webtemplate
+      - testkit/corpus/webtemplate
     probes: [PROBE-075]
     tests:
       - internal/templatecompile/compile_nodename_test.go

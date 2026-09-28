@@ -1,4 +1,4 @@
-// Package fixtures resolves vendored cassette paths under testkit/cassettes/.
+// Package fixtures resolves vendored cassette paths under testkit/corpus/.
 //
 // Layout:
 //
@@ -16,7 +16,7 @@
 //	aql/conformance/              # pinned upstream AQL FROM corpus (AQL_SOURCE.txt)
 //	  {family}/{name}.csv
 //
-// Vendor provenance is indexed in testkit/cassettes/README.md (not in paths).
+// Vendor provenance is indexed in testkit/corpus/README.md (not in paths).
 package fixtures
 
 import (
@@ -27,13 +27,13 @@ import (
 	"strings"
 )
 
-// CassettesRoot is testkit/cassettes (absolute).
+// CassettesRoot is testkit/corpus (absolute).
 func CassettesRoot() string {
 	_, here, _, ok := runtime.Caller(0)
 	if !ok {
 		panic("fixtures: cannot resolve package path")
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(here), "..", "cassettes"))
+	return filepath.Clean(filepath.Join(filepath.Dir(here), "..", "corpus"))
 }
 
 func templatesDir() string    { return filepath.Join(CassettesRoot(), "templates") }
@@ -42,39 +42,39 @@ func rmDir() string           { return filepath.Join(CassettesRoot(), "rm") }
 func submissionsDir() string  { return filepath.Join(CassettesRoot(), "submissions") }
 func webtemplateDir() string  { return filepath.Join(CassettesRoot(), "webtemplate") }
 
-// TemplateOpt returns testkit/cassettes/templates/{template-id}.opt.
+// TemplateOpt returns testkit/corpus/templates/{template-id}.opt.
 func TemplateOpt(templateID string) string {
 	return filepath.Join(templatesDir(), resolveTemplateID(templateID)+".opt")
 }
 
-// CompositionJSON returns testkit/cassettes/compositions/{template-id}.json.
+// CompositionJSON returns testkit/corpus/compositions/{template-id}.json.
 func CompositionJSON(templateID string) string {
 	return filepath.Join(compositionsDir(), resolveTemplateID(templateID)+".json")
 }
 
-// CompositionXML returns testkit/cassettes/compositions/{template-id}.xml.
+// CompositionXML returns testkit/corpus/compositions/{template-id}.xml.
 func CompositionXML(templateID string) string {
 	return filepath.Join(compositionsDir(), resolveTemplateID(templateID)+".xml")
 }
 
-// RMJSON returns testkit/cassettes/rm/{name}.json (ehrbase / leaf RM samples).
+// RMJSON returns testkit/corpus/rm/{name}.json (ehrbase / leaf RM samples).
 func RMJSON(name string) string {
 	return filepath.Join(rmDir(), name+".json")
 }
 
-// RMXML returns testkit/cassettes/rm/{name}.xml.
+// RMXML returns testkit/corpus/rm/{name}.xml.
 func RMXML(name string) string {
 	return filepath.Join(rmDir(), name+".xml")
 }
 
-// SubmissionJSON returns testkit/cassettes/submissions/{name}.json.
+// SubmissionJSON returns testkit/corpus/submissions/{name}.json.
 // Files use the ehrbase Robot CONTRIBUTION POST shape (versions[] hold inline
 // ORIGINAL_VERSION payloads), not persisted CONTRIBUTION with OBJECT_REF.
 func SubmissionJSON(name string) string {
 	return filepath.Join(submissionsDir(), name+".json")
 }
 
-// WebTemplateOpt returns testkit/cassettes/webtemplate/{template-id}.opt, an
+// WebTemplateOpt returns testkit/corpus/webtemplate/{template-id}.opt, an
 // OPT vendored beside its EHRbase reference WebTemplate golden (the oracles
 // for Web Template structural parity). Vendored Apache-2.0 at a pinned upstream commit;
 // provenance in THIRD_PARTY_LICENSES.md. Stems match template_id values.
@@ -83,13 +83,13 @@ func WebTemplateOpt(templateID string) string {
 }
 
 // WebTemplateReference returns
-// testkit/cassettes/webtemplate/{template-id}.webtemplate.json, the EHRbase
+// testkit/corpus/webtemplate/{template-id}.webtemplate.json, the EHRbase
 // reference WebTemplate golden for the same-stem OPT.
 func WebTemplateReference(templateID string) string {
 	return filepath.Join(webtemplateDir(), templateID+".webtemplate.json")
 }
 
-// FlatConformanceRoot is testkit/cassettes/flat-conformance, the pinned
+// FlatConformanceRoot is testkit/corpus/flat-conformance, the pinned
 // upstream EHRbase FLAT serialisation corpus (see MANIFEST.txt there, and
 // scripts/sync-flat-conformance.sh). Vendored Apache-2.0; provenance in
 // THIRD_PARTY_LICENSES.md.
@@ -103,12 +103,12 @@ func FlatConformanceOpt() string {
 	return filepath.Join(FlatConformanceRoot(), "templates", "conformance_ehrbase.de.v0.opt")
 }
 
-// FlatConformanceFlat returns testkit/cassettes/flat-conformance/compositions/{name}.json.
+// FlatConformanceFlat returns testkit/corpus/flat-conformance/compositions/{name}.json.
 func FlatConformanceFlat(name string) string {
 	return filepath.Join(FlatConformanceRoot(), "compositions", name+".json")
 }
 
-// AQLConformanceRoot is testkit/cassettes/aql/conformance, the pinned
+// AQLConformanceRoot is testkit/corpus/aql/conformance, the pinned
 // upstream EHRbase Robot AQL FROM-family combination corpus (see AQL_SOURCE.txt
 // and EXCLUDED.txt there, and scripts/ingest-robot-aql.sh). Vendored
 // Apache-2.0; provenance in THIRD_PARTY_LICENSES.md. The family directories
