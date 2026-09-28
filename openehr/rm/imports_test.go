@@ -12,16 +12,7 @@ import (
 // forbidden here: the generated marshal files import openehr/serialize/canxml.
 func TestRMForbiddenImports(t *testing.T) {
 	t.Parallel()
-	forbidden := []string{
-		"github.com/cadasto/openehr-sdk-go/transport",
-		"github.com/cadasto/openehr-sdk-go/auth",
-		"github.com/cadasto/openehr-sdk-go/openehr/client",
-	}
-	if len(forbidden) == 0 {
-		t.Fatal("forbidden list is empty; the guard is vacuous")
-	}
-
-	violations, err := importguard.Scan(".", forbidden)
+	violations, err := importguard.Scan(".", importguard.WireLayers())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -13,11 +13,25 @@ const (
 	fixtures = mod + "/internal/importguard/testdata"
 )
 
-// forbidden is the wire-layer list the REQ-013 closure guards use.
-var forbidden = []string{
-	mod + "/transport",
-	mod + "/auth",
-	mod + "/openehr/client",
+// TestWireLayers pins the one REQ-013 wire-layer list the building-block
+// guards share: exactly transport, auth and openehr/client, in a new slice on
+// every call. A misspelled, missing or extra entry fails here, and TestMatches
+// then checks that the matcher catches each entry.
+func TestWireLayers(t *testing.T) {
+	t.Parallel()
+	want := []string{
+		mod + "/transport",
+		mod + "/auth",
+		mod + "/openehr/client",
+	}
+	got := importguard.WireLayers()
+	if !slices.Equal(got, want) {
+		t.Fatalf("WireLayers() = %q, want %q", got, want)
+	}
+	got[0] = mod + "/changed-by-caller"
+	if again := importguard.WireLayers(); !slices.Equal(again, want) {
+		t.Errorf("WireLayers() after a caller changed an earlier result = %q, want %q", again, want)
+	}
 }
 
 // TestScan is the can-fail control for the import-closure walk behind the
@@ -58,7 +72,7 @@ func TestScan(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := importguard.Scan(tc.dir, forbidden)
+			got, err := importguard.Scan(tc.dir, importguard.WireLayers())
 			if err != nil {
 				t.Fatalf("Scan(%q) error: %v", tc.dir, err)
 			}
@@ -85,7 +99,7 @@ func TestScanRefuses(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := importguard.Scan(tc.dir, forbidden)
+			got, err := importguard.Scan(tc.dir, importguard.WireLayers())
 			if err == nil {
 				t.Fatalf("Scan(%q) = %+v, nil; want an error containing %q", tc.dir, got, tc.wantErr)
 			}
@@ -96,8 +110,8 @@ func TestScanRefuses(t *testing.T) {
 	}
 }
 
-// TestMatches pins both arms of the REQ-013 matcher for every entry of the
-// list (the exact path and a sub-package), and the path boundary that keeps
+// TestMatches pins both arms of the REQ-013 matcher for every WireLayers entry
+// (the exact path and a sub-package), and the path boundary that keeps
 // near-miss names out.
 func TestMatches(t *testing.T) {
 	t.Parallel()
@@ -116,7 +130,7 @@ func TestMatches(t *testing.T) {
 		{imp: mod + "/openehr/rm/typereg"},
 	}
 	for _, tc := range tests {
-		got, ok := importguard.Matches(tc.imp, forbidden)
+		got, ok := importguard.Matches(tc.imp, importguard.WireLayers())
 		if wantOK := tc.wantEntry != ""; got != tc.wantEntry || ok != wantOK {
 			t.Errorf("Matches(%q) = %q, %t; want %q, %t", tc.imp, got, ok, tc.wantEntry, wantOK)
 		}

@@ -17,6 +17,19 @@ import (
 	"strings"
 )
 
+// WireLayers returns the wire-layer packages a standalone building block must
+// not pull in: transport, auth and openehr/client. Each call returns a new
+// slice, so a caller may change it without affecting other callers.
+func WireLayers() []string {
+	// REQ-013 (module-layout.md § REQ-013): the one list the building-block
+	// guards share. TestWireLayers pins it entry by entry.
+	return []string{
+		"github.com/cadasto/openehr-sdk-go/transport",
+		"github.com/cadasto/openehr-sdk-go/auth",
+		"github.com/cadasto/openehr-sdk-go/openehr/client",
+	}
+}
+
 // Violation is one forbidden import found in the closure.
 type Violation struct {
 	Importer string // import path of the package whose non-test files import it
