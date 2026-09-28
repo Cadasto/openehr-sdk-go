@@ -159,13 +159,13 @@ var typedIntervals = []any{
 }
 
 // TestTypedIntervalReaderParity checks that rmread reads every typed
-// DV_INTERVAL instantiation rmnames names, and no other (REQ-112). The RM
-// floor walks into a typed interval only when Handles accepts it and
-// ReadSingle returns its bounds, so an instantiation named in rmnames but
-// missing here leaves that interval's bounds unchecked. The case list must
-// cover the DV_ORDERED descendants the live registry derives, each in value
-// and pointer form: a new descendant fails here until the list and the
-// readers both gain it.
+// DV_INTERVAL instantiation (REQ-112). The RM floor walks into a typed
+// interval only when Handles accepts it and ReadSingle returns its bounds,
+// so a missing instantiation leaves that interval's bounds unchecked. Each
+// case must be one rmnames names; the cases must cover, in value and
+// pointer form, every DV_ORDERED descendant the live registry derives; and
+// each case must be accepted by Handles with both bounds readable. A new
+// descendant fails here until the list and the readers both gain it.
 func TestTypedIntervalReaderParity(t *testing.T) {
 	var fromRegistry []string
 	for _, name := range typereg.Default.Names() {
@@ -177,6 +177,7 @@ func TestTypedIntervalReaderParity(t *testing.T) {
 	if len(fromRegistry) == 0 {
 		t.Fatal("registry yields no DVOrdered implementers — registrations missing?")
 	}
+	slices.Sort(fromRegistry)
 
 	// forms records, per parameterised name, which of the two Go forms the
 	// case list holds.

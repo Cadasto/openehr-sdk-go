@@ -661,7 +661,10 @@ func TestRMFloorDVCodedTextMappingsNullIsValid(t *testing.T) {
 // The half-open rows pin the other side of the walk: an unbounded side
 // carries no bound, so the floor does not descend into the zero value a
 // concrete-typed Go interval holds there. A valid half-open interval reports
-// nothing, and a fault planted on its bounded side is still reported.
+// nothing, and a fault planted on its bounded side is still reported. The
+// skip applies only to an empty bound: a real bound standing beside its own
+// flag is walked like any bound, so a fault inside it is reported too (the
+// contradiction with the flag is not).
 func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 	badPrecision := rm.Integer(-5)
 	emptyStatus := &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr_normal_statuses"}}
@@ -817,6 +820,22 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 			},
 		},
 		{
+			name: "DV_QUANTITY as root, lower unbounded beside a faulty bound",
+			root: &rm.DVInterval[rm.DVQuantity]{
+				Lower: rm.DVQuantity{Magnitude: 0, Units: "mm", Precision: &badPrecision}, LowerUnbounded: true,
+				Upper: rm.DVQuantity{Magnitude: 10, Units: "mm"}, UpperIncluded: true,
+			},
+			want: []issue{{"/lower", "rm_invariant"}},
+		},
+		{
+			name: "bare DV_INTERVAL as root, lower unbounded beside a faulty bound",
+			root: &rm.DVInterval[rm.DVOrdered]{
+				Lower: rm.DVQuantity{Magnitude: 0, Units: "mm", Precision: &badPrecision}, LowerUnbounded: true,
+				Upper: rm.DVQuantity{Magnitude: 10, Units: "mm"}, UpperIncluded: true,
+			},
+			want: []issue{{"/lower", "rm_invariant"}},
+		},
+		{
 			// The bare form already descended; pinned so the fix leaves it be.
 			name: "bare DV_INTERVAL as root, upper unbounded",
 			root: &rm.DVInterval[rm.DVOrdered]{
@@ -852,27 +871,57 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 	}
 }
 
-// TestValidateRM_HalfOpenNormalRangeDecoded is the wire-path twin of the
-// half-open rows in TestValidateRM_TypedIntervalBoundsWalked (REQ-112). A
+// TestValidateRM_OpenIntervalSideDecoded is the wire-path twin of the
+// open-side rows in TestValidateRM_TypedIntervalBoundsWalked (REQ-112). A
 // DV_QUANTITY whose normal_range is "at least 3.5 mmol/L" decodes to a typed
-// interval that holds a zero-valued DV_QUANTITY on its unbounded upper side.
-// The body is valid, so the floor must report no issue at all, and none at
-// /normal_range/upper in particular.
-func TestValidateRM_HalfOpenNormalRangeDecoded(t *testing.T) {
-	const body = `{"_type":"DV_QUANTITY","magnitude":4.2,"units":"mmol/L",` +
-		`"normal_range":{"_type":"DV_INTERVAL",` +
-		`"lower":{"_type":"DV_QUANTITY","magnitude":3.5,"units":"mmol/L"},` +
-		`"lower_included":true,"lower_unbounded":false,` +
-		`"upper_included":false,"upper_unbounded":true}}`
-	var q rm.DVQuantity
-	if err := canjson.Unmarshal([]byte(body), &q); err != nil {
-		t.Fatalf("canjson.Unmarshal: %v", err)
+// interval that holds a zero-valued DV_QUANTITY on its unbounded upper side;
+// the body is valid, so the floor reports no issue at all. A bare
+// DV_INTERVAL whose lower bound is present beside `lower_unbounded: true`
+// decodes with that bound kept, and the floor walks it: its precision fault
+// is reported at the bound.
+func TestValidateRM_OpenIntervalSideDecoded(t *testing.T) {
+	type issue struct{ path, code string }
+	cases := []struct {
+		name string
+		body string
+		root func() any
+		want []issue
+	}{
+		{
+			name: "half-open normal_range",
+			body: `{"_type":"DV_QUANTITY","magnitude":4.2,"units":"mmol/L",` +
+				`"normal_range":{"_type":"DV_INTERVAL",` +
+				`"lower":{"_type":"DV_QUANTITY","magnitude":3.5,"units":"mmol/L"},` +
+				`"lower_included":true,"lower_unbounded":false,` +
+				`"upper_included":false,"upper_unbounded":true}}`,
+			root: func() any { return &rm.DVQuantity{} },
+		},
+		{
+			name: "bare interval, faulty bound beside its unbounded flag",
+			body: `{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"range"},` +
+				`"value":{"_type":"DV_INTERVAL",` +
+				`"lower":{"_type":"DV_QUANTITY","magnitude":0,"units":"mm","precision":-5},` +
+				`"lower_included":false,"lower_unbounded":true,` +
+				`"upper":{"_type":"DV_QUANTITY","magnitude":10,"units":"mm"},` +
+				`"upper_included":true,"upper_unbounded":false}}`,
+			root: func() any { return &rm.Element{} },
+			want: []issue{{"/value/lower", "rm_invariant"}},
+		},
 	}
-	if q.NormalRange == nil || !q.NormalRange.UpperUnbounded {
-		t.Fatalf("decoded normal_range = %+v, want a typed interval with upper_unbounded set", q.NormalRange)
-	}
-	r := validation.ValidateRM(&q)
-	if !r.OK || len(r.Issues) != 0 {
-		t.Errorf("ValidateRM(DV_QUANTITY with a half-open normal_range) want OK with no issues; got %+v", r.Issues)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := tc.root()
+			if err := canjson.Unmarshal([]byte(tc.body), root); err != nil {
+				t.Fatalf("canjson.Unmarshal: %v", err)
+			}
+			r := validation.ValidateRM(root)
+			var got []issue
+			for _, i := range r.Issues {
+				got = append(got, issue{i.Path, i.Code})
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateRM(decoded %T) issues = %v, want %v\nfull issues: %+v", root, got, tc.want, r.Issues)
+			}
+		})
 	}
 }
