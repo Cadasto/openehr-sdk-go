@@ -84,10 +84,10 @@ func joinPath(parent, segment string) string {
 // half delegates to rm.RMTypeName (every registered concrete — the
 // previous hand-written closed set was a subset, so recognition
 // widened to the full registry), the archetype_node_id half reads
-// polymorphically through rm.Locatable. Only the validation-facing
-// parameterised DV_INTERVAL diagnostic names stay hand-written: they
-// are display names for rm_type_mismatch findings, deliberately more
-// specific than the bare registry name.
+// polymorphically through rm.Locatable. Only the parameterised
+// DV_INTERVAL names stay hand-written: they decide the RM type match
+// against an OPT child's RMTypeName, and rm_type_mismatch details
+// carry the same names.
 //
 // Returns ("", "", false) for nil, typed-nil, and non-RM Go values.
 // REQ-024 — no reflection.
@@ -95,9 +95,9 @@ func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
 	if v == nil || rmread.IsTypedNilPointer(v) {
 		return "", "", false
 	}
-	// Typed DV_INTERVAL instantiations keep their parameterised
-	// diagnostic names (bare "DV_INTERVAL" would lose the bound in
-	// rm_type_mismatch findings). Single canonical closed set in
+	// Typed DV_INTERVAL instantiations keep their parameterised names:
+	// the type match compares them with the OPT child's RMTypeName, and
+	// rm_type_mismatch details show them. Single canonical closed set in
 	// rmnames — the previous local switch had drifted three
 	// instantiations (DV_DURATION/DV_ORDINAL/DV_SCALE) behind the
 	// DVOrdered closure.
