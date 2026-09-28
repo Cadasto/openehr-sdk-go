@@ -743,7 +743,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** Backend accepts the header (no server-side dedup behaviour required for the SDK-side assertion).
 - **Wire assertion:** Captured request headers include `Idempotency-Key: <value>` exactly as supplied; absent when `IdempotencyKey` is empty.
 - **Modes:** Sandbox.
-- **Status:** Deprecated — REQ-097 deprecated; Cadasto openEHR services no longer accept `Idempotency-Key`. Removal target: v1.0.0. Sandbox assertion removed from the tree pre-1.0 (was `TestDoIdempotencyKey` in `transport/client_test.go`).
+- **Status:** Deprecated — REQ-097 is retired. Cadasto openEHR services no longer accept `Idempotency-Key`, and the SDK no longer sends it. The sandbox assertion was removed before 1.0 (was `TestDoIdempotencyKey` in `transport/client_test.go`). The identifier is retained and carries no active requirement.
 - **Satisfies:** REQ-097
 
 #### PROBE-070 — Admin `DeleteEHR` round-trip
