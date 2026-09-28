@@ -183,7 +183,7 @@ func provenanceBaseURL(base string) (string, error) {
 // The order is the contract: validate the document in memory, replay it, then
 // write. Writing first and checking afterwards would put a leaked credential
 // on disk and could replace a good recording with a refused one — see
-// TestCaptureScenario_RefusedCaptureLeavesTheCorpusUntouched.
+// TestCaptureScenario_RefusedCaptureLeavesTheRecordingUntouched.
 func captureScenario(ctx context.Context, sc scenario, base string, next http.RoundTripper, tok auth.TokenSource, prov probe.HARProvenance, outDir string) (string, error) {
 	rec := probe.NewRecorder(next, prov)
 	c, err := probe.NewClient(base, &http.Client{Transport: rec, Timeout: 30 * time.Second}, tok)

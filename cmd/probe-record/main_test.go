@@ -61,16 +61,16 @@ func TestCaptureScenario_ProducesAValidHARFromTheSandbox(t *testing.T) {
 	}
 }
 
-// TestCaptureScenario_RefusedCaptureLeavesTheCorpusUntouched is the can-fail
+// TestCaptureScenario_RefusedCaptureLeavesTheRecordingUntouched is the can-fail
 // control for the validate-then-publish order. Incomplete provenance cannot
 // pass HAR.Validate, so the capture must fail and the recording already in the
 // output directory must survive byte-for-byte — a re-capture that goes wrong
-// must not cost the corpus the witness it had. It also asserts no temp file is
+// must not cost the recordings the witness they had. It also asserts no temp file is
 // left behind.
 //
 // Publishing before validating (the order this replaces) fails here: the
 // sentinel is overwritten.
-func TestCaptureScenario_RefusedCaptureLeavesTheCorpusUntouched(t *testing.T) {
+func TestCaptureScenario_RefusedCaptureLeavesTheRecordingUntouched(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	existing := filepath.Join(dir, "ehr-lifecycle.har")

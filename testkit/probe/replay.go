@@ -89,7 +89,7 @@ func recordedPath(raw string) string {
 // EHRbase and a replay against any catalog URL agree. REQ-082's full Cassette
 // key also names the headers and body fields a probe's assertion depends on;
 // that is deferred until a recording whose exchanges differ only on those
-// fields lands (the current corpus does not), and the deferral is recorded in
+// fields lands (no current recording does), and the deferral is recorded in
 // the REQ-082 traceability notes.
 func replayKey(method, path string) string {
 	return strings.ToUpper(method) + " " + stripRESTPrefix(path)

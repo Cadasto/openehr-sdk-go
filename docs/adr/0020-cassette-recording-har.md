@@ -26,7 +26,7 @@ HTTP Archive (`.har`) versus a purpose-built YAML schema.
 The strand asked for one real capture, serialised both ways, reviewed as a diff. That capture
 is a live `POST /ehr` against EHRbase 2.35.1 ([ehr-create.har](../plans/strand-11-evidence/ehr-create.har)
 and [ehr-create.yaml](../plans/strand-11-evidence/ehr-create.yaml)). The remaining question is
-which file a second implementation (or a reviewer) can treat as the corpus.
+which file a second implementation (or a reviewer) can treat as the recording.
 
 ## Decision
 
@@ -45,7 +45,7 @@ which file a second implementation (or a reviewer) can treat as the corpus.
 - The recordings, once captured under `testkit/recordings/`, will be `.har`. A recording without
   `_req082.provenance` or without `_req082.redaction.ran: true` is discarded, not replayed.
 - Review diffs are larger and noisier than the YAML alternative. That cost is accepted so
-  the corpus stays a published interchange format rather than an SDK-private schema.
+  the recordings stay in a published interchange format rather than an SDK-private schema.
 - Browser-oriented HAR fields (`timings`, `cache`, `pageref`) are unused. Recorders are free to
   omit them, and replay does not read them: the normalised match key is defined in REQ-082
   (conformance.md § Cassette mode) and these fields are outside it.

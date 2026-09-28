@@ -165,7 +165,7 @@ func TestReplayer_MethodIsPartOfTheKey(t *testing.T) {
 }
 
 // TestReplayer_HeadDoesNotAnswerGet is the same pin on the pair the
-// ehr-lifecycle corpus actually contains: a GET and a HEAD of one EHR path,
+// ehr-lifecycle recording actually contains: a GET and a HEAD of one EHR path,
 // told apart by nothing but the method. TestReplayer_MethodIsPartOfTheKey
 // uses GET against POST, which a key that merely separated body-bearing
 // methods from the rest would still pass; this one would not.
