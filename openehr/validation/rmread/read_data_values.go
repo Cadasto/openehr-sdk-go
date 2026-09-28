@@ -97,15 +97,38 @@ func readDVIntervalProportionSingle(iv *rm.DVInterval[rm.DVProportion], attr str
 	return readIntervalSingle(&iv.Interval, attr)
 }
 
+func readDVIntervalDurationSingle(iv *rm.DVInterval[rm.DVDuration], attr string) (any, bool) {
+	return readIntervalSingle(&iv.Interval, attr)
+}
+
+func readDVIntervalOrdinalSingle(iv *rm.DVInterval[rm.DVOrdinal], attr string) (any, bool) {
+	return readIntervalSingle(&iv.Interval, attr)
+}
+
+func readDVIntervalScaleSingle(iv *rm.DVInterval[rm.DVScale], attr string) (any, bool) {
+	return readIntervalSingle(&iv.Interval, attr)
+}
+
 func readDVIntervalOrderedSingle(iv *rm.DVInterval[rm.DVOrdered], attr string) (any, bool) {
 	return readIntervalSingle(&iv.Interval, attr)
 }
 
+// readIntervalSingle reads one attribute of an interval. A side whose
+// unbounded flag is set has no bound (the RM equivalence
+// `lower_unbounded = (lower = Void)`), so its bound reads as absent even
+// though a concrete-typed Go interval still holds that type's zero value
+// there. A bounded side reads as present, whatever its value.
 func readIntervalSingle[T any](iv *rm.Interval[T], attr string) (any, bool) {
 	switch attr {
 	case "lower":
+		if iv.LowerUnbounded {
+			return nil, false
+		}
 		return iv.Lower, true
 	case "upper":
+		if iv.UpperUnbounded {
+			return nil, false
+		}
 		return iv.Upper, true
 	case "lower_unbounded":
 		return iv.LowerUnbounded, true

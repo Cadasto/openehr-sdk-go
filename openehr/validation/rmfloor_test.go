@@ -12,12 +12,14 @@ package validation_test
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // TestValidateRMFolder_MissingName covers the dossier's named case:
@@ -142,23 +144,18 @@ func TestValidateRM_DVIntervalLowerGreaterThanUpper(t *testing.T) {
 }
 
 // TestValidateRM_DVIntervalUnboundedSkipped: an unbounded side means
-// the comparison is undefined; the floor walker skips the invariant
-// check (it does not falsely emit rm_invariant on a half-open
-// interval). Exercised on the typed instantiation.
+// the comparison is undefined, and that side carries no bound. So a valid
+// half-open typed interval reports no issue at all: the bound-ordering
+// check does not fire, and the walk does not descend into the zero-valued
+// DV_QUANTITY the Go value holds on the unbounded side (REQ-112).
 func TestValidateRM_DVIntervalUnboundedSkipped(t *testing.T) {
 	iv := rm.DVInterval[rm.DVQuantity]{
 		Lower:          rm.DVQuantity{Magnitude: 10, Units: "mg"},
 		UpperUnbounded: true,
 	}
 	r := validation.ValidateRM(&iv)
-	// The interval itself emits no rm_invariant (no comparable bounds).
-	// Other required-set issues from descent into DV_QUANTITY are
-	// allowed; this test asserts the invariant evaluator did not
-	// falsely fire.
-	for _, i := range r.Issues {
-		if i.Code == "rm_invariant" && strings.Contains(i.Detail, "DV_INTERVAL") {
-			t.Errorf("unexpected rm_invariant on unbounded DV_INTERVAL: %s", i.Detail)
-		}
+	if !r.OK || len(r.Issues) != 0 {
+		t.Errorf("ValidateRM(DVInterval[DVQuantity] upper unbounded) want OK with no issues; got %+v", r.Issues)
 	}
 }
 
@@ -644,5 +641,238 @@ func TestRMFloorDVCodedTextMappingsNullIsValid(t *testing.T) {
 	}
 	if containsCode(r.Issues, "mappings_valid") {
 		t.Errorf("null mappings must not be flagged mappings_valid; got %+v", r.Issues)
+	}
+}
+
+// TestValidateRM_TypedIntervalBoundsWalked pins that the floor walks into
+// the bounds of every typed DV_INTERVAL instantiation (REQ-112). A typed
+// interval's runtime RM type carries its bound (DV_INTERVAL<DV_QUANTITY>),
+// which rminfo does not key, so the walk once stopped at the interval and a
+// fault inside a bound validated clean. Each row plants one fault inside a
+// bound — a catalogue invariant, or an RM-mandatory attribute left empty —
+// and lists every issue the floor must report, by code and path. The list is
+// exact, so a spurious issue fails the row too.
+//
+// DV_ORDINAL and DV_SCALE bounds are opaque leaves to the floor (rmread does
+// not model those two classes), so no fault inside them is reportable. Their
+// rows check the reader path the walk takes instead: the interval is
+// modelled, and both bounds read back as the bound class.
+//
+// The half-open rows pin the other side of the walk: an unbounded side
+// carries no bound, so the floor does not descend into the zero value a
+// concrete-typed Go interval holds there. A valid half-open interval reports
+// nothing, and a fault planted on its bounded side is still reported.
+func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
+	badPrecision := rm.Integer(-5)
+	emptyStatus := &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr_normal_statuses"}}
+	symbol := func(code string) rm.DVCodedText {
+		return rm.DVCodedText{
+			Value:        code,
+			DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: code},
+		}
+	}
+	type issue struct{ path, code string }
+
+	cases := []struct {
+		name string
+		root any
+		want []issue
+		// opaqueBound names the bound class of a root interval that the
+		// floor does not model; set only on the DV_ORDINAL and DV_SCALE rows.
+		opaqueBound string
+	}{
+		{
+			name: "DV_QUANTITY under normal_range",
+			root: &rm.DVQuantity{Magnitude: 5, Units: "mm", NormalRange: &rm.DVInterval[rm.DVQuantity]{
+				Lower: rm.DVQuantity{Magnitude: 0, Units: "mm", Precision: &badPrecision}, LowerIncluded: true,
+				Upper: rm.DVQuantity{Magnitude: 10, Units: "mm"}, UpperIncluded: true,
+			}},
+			want: []issue{{"/normal_range/lower", "rm_invariant"}},
+		},
+		{
+			name: "DV_QUANTITY as root",
+			root: &rm.DVInterval[rm.DVQuantity]{
+				Lower: rm.DVQuantity{Magnitude: 0, Units: "mm"}, LowerIncluded: true,
+				Upper: rm.DVQuantity{Magnitude: 10, Units: "mm", Precision: &badPrecision}, UpperIncluded: true,
+			},
+			want: []issue{{"/upper", "rm_invariant"}},
+		},
+		{
+			name: "DV_COUNT under normal_range",
+			root: &rm.DVCount{Magnitude: 3, NormalRange: &rm.DVInterval[rm.DVCount]{
+				Lower: rm.DVCount{Magnitude: 1, NormalStatus: emptyStatus}, LowerIncluded: true,
+				Upper: rm.DVCount{Magnitude: 5}, UpperIncluded: true,
+			}},
+			want: []issue{
+				{"/normal_range/lower/normal_status", "rm_invariant"},
+				{"/normal_range/lower/normal_status/code_string", "required"},
+			},
+		},
+		{
+			name: "DV_PROPORTION under normal_range",
+			root: &rm.DVProportion{Numerator: 1, Denominator: 2, NormalRange: &rm.DVInterval[rm.DVProportion]{
+				Lower: rm.DVProportion{Numerator: 0, Denominator: 1}, LowerIncluded: true,
+				Upper: rm.DVProportion{Numerator: 1, Denominator: 1, Precision: &badPrecision}, UpperIncluded: true,
+			}},
+			want: []issue{{"/normal_range/upper", "rm_invariant"}},
+		},
+		{
+			name: "DV_DATE as root",
+			root: &rm.DVInterval[rm.DVDate]{
+				Lower: rm.DVDate{}, LowerIncluded: true,
+				Upper: rm.DVDate{Value: "2026-12-31"}, UpperIncluded: true,
+			},
+			want: []issue{{"/lower/value", "required"}},
+		},
+		{
+			name: "DV_TIME as root, value form",
+			root: rm.DVInterval[rm.DVTime]{
+				Lower: rm.DVTime{Value: "08:00:00"}, LowerIncluded: true,
+				Upper: rm.DVTime{}, UpperIncluded: true,
+			},
+			want: []issue{{"/upper/value", "required"}},
+		},
+		{
+			name: "DV_DATE_TIME as root",
+			root: &rm.DVInterval[rm.DVDateTime]{
+				Lower: rm.DVDateTime{Value: "2026-01-01T00:00:00Z"}, LowerIncluded: true,
+				Upper: rm.DVDateTime{}, UpperIncluded: true,
+			},
+			want: []issue{{"/upper/value", "required"}},
+		},
+		{
+			name: "DV_DURATION as root",
+			root: &rm.DVInterval[rm.DVDuration]{
+				Lower: rm.DVDuration{}, LowerIncluded: true,
+				Upper: rm.DVDuration{Value: "P1D"}, UpperIncluded: true,
+			},
+			want: []issue{{"/lower/value", "required"}},
+		},
+		{
+			name: "DV_ORDINAL as root",
+			root: &rm.DVInterval[rm.DVOrdinal]{
+				Lower: rm.DVOrdinal{Value: 1, Symbol: symbol("at1")}, LowerIncluded: true,
+				Upper: rm.DVOrdinal{Value: 3, Symbol: symbol("at3")}, UpperIncluded: true,
+			},
+			opaqueBound: "DV_ORDINAL",
+		},
+		{
+			name: "DV_SCALE as root",
+			root: &rm.DVInterval[rm.DVScale]{
+				Lower: rm.DVScale{Value: 0.5, Symbol: symbol("at1")}, LowerIncluded: true,
+				Upper: rm.DVScale{Value: 2.5, Symbol: symbol("at3")}, UpperIncluded: true,
+			},
+			opaqueBound: "DV_SCALE",
+		},
+		{
+			name: "DV_QUANTITY under normal_range, upper unbounded",
+			root: &rm.DVQuantity{Magnitude: 5, Units: "mm", NormalRange: &rm.DVInterval[rm.DVQuantity]{
+				Lower: rm.DVQuantity{Magnitude: 3.5, Units: "mm"}, LowerIncluded: true,
+				UpperUnbounded: true,
+			}},
+		},
+		{
+			name: "DV_QUANTITY as root, lower unbounded, fault on the bounded side",
+			root: &rm.DVInterval[rm.DVQuantity]{
+				LowerUnbounded: true,
+				Upper:          rm.DVQuantity{Magnitude: 10, Units: "mm", Precision: &badPrecision}, UpperIncluded: true,
+			},
+			want: []issue{{"/upper", "rm_invariant"}},
+		},
+		{
+			name: "DV_DATE as root, upper unbounded",
+			root: &rm.DVInterval[rm.DVDate]{
+				Lower: rm.DVDate{Value: "2026-01-01"}, LowerIncluded: true,
+				UpperUnbounded: true,
+			},
+		},
+		{
+			// A bounded side stays present, so its empty bound is still reported.
+			name: "DV_DATE as root, upper unbounded, bounded side empty",
+			root: &rm.DVInterval[rm.DVDate]{
+				Lower: rm.DVDate{}, LowerIncluded: true,
+				UpperUnbounded: true,
+			},
+			want: []issue{{"/lower/value", "required"}},
+		},
+		{
+			name: "DV_TIME as root, value form, lower unbounded",
+			root: rm.DVInterval[rm.DVTime]{
+				LowerUnbounded: true,
+				Upper:          rm.DVTime{Value: "08:00:00"}, UpperIncluded: true,
+			},
+		},
+		{
+			name: "DV_DATE_TIME as root, upper unbounded",
+			root: &rm.DVInterval[rm.DVDateTime]{
+				Lower: rm.DVDateTime{Value: "2026-01-01T00:00:00Z"}, LowerIncluded: true,
+				UpperUnbounded: true,
+			},
+		},
+		{
+			name: "DV_DURATION as root, lower unbounded",
+			root: &rm.DVInterval[rm.DVDuration]{
+				LowerUnbounded: true,
+				Upper:          rm.DVDuration{Value: "P1D"}, UpperIncluded: true,
+			},
+		},
+		{
+			// The bare form already descended; pinned so the fix leaves it be.
+			name: "bare DV_INTERVAL as root, upper unbounded",
+			root: &rm.DVInterval[rm.DVOrdered]{
+				Lower: rm.DVQuantity{Magnitude: 0, Units: "mm", Precision: &badPrecision}, LowerIncluded: true,
+				UpperUnbounded: true,
+			},
+			want: []issue{{"/lower", "rm_invariant"}},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validation.ValidateRM(tc.root)
+			var got []issue
+			for _, i := range r.Issues {
+				got = append(got, issue{i.Path, i.Code})
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateRM(%T) issues = %v, want %v\nfull issues: %+v", tc.root, got, tc.want, r.Issues)
+			}
+			if tc.opaqueBound == "" {
+				return
+			}
+			if !rmread.Handles(tc.root) {
+				t.Fatalf("rmread.Handles(%T) = false, want true: the floor stops at the interval", tc.root)
+			}
+			for _, attr := range []string{"lower", "upper"} {
+				v, ok := rmread.ReadSingle(tc.root, "DV_INTERVAL", attr)
+				if gotBound, _ := rm.RMTypeName(v); !ok || gotBound != tc.opaqueBound {
+					t.Errorf("rmread.ReadSingle(%T, %q) = (%q bound, %v), want (%q bound, true)", tc.root, attr, gotBound, ok, tc.opaqueBound)
+				}
+			}
+		})
+	}
+}
+
+// TestValidateRM_HalfOpenNormalRangeDecoded is the wire-path twin of the
+// half-open rows in TestValidateRM_TypedIntervalBoundsWalked (REQ-112). A
+// DV_QUANTITY whose normal_range is "at least 3.5 mmol/L" decodes to a typed
+// interval that holds a zero-valued DV_QUANTITY on its unbounded upper side.
+// The body is valid, so the floor must report no issue at all, and none at
+// /normal_range/upper in particular.
+func TestValidateRM_HalfOpenNormalRangeDecoded(t *testing.T) {
+	const body = `{"_type":"DV_QUANTITY","magnitude":4.2,"units":"mmol/L",` +
+		`"normal_range":{"_type":"DV_INTERVAL",` +
+		`"lower":{"_type":"DV_QUANTITY","magnitude":3.5,"units":"mmol/L"},` +
+		`"lower_included":true,"lower_unbounded":false,` +
+		`"upper_included":false,"upper_unbounded":true}}`
+	var q rm.DVQuantity
+	if err := canjson.Unmarshal([]byte(body), &q); err != nil {
+		t.Fatalf("canjson.Unmarshal: %v", err)
+	}
+	if q.NormalRange == nil || !q.NormalRange.UpperUnbounded {
+		t.Fatalf("decoded normal_range = %+v, want a typed interval with upper_unbounded set", q.NormalRange)
+	}
+	r := validation.ValidateRM(&q)
+	if !r.OK || len(r.Issues) != 0 {
+		t.Errorf("ValidateRM(DV_QUANTITY with a half-open normal_range) want OK with no issues; got %+v", r.Issues)
 	}
 }
