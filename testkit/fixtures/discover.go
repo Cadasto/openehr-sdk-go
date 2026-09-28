@@ -13,7 +13,7 @@ import (
 // [CorpusRoot], e.g. `compositions/body_weight.json` or
 // `rm/minimal_evaluation.json`.
 type CompositionJSONRel struct {
-	Rel      string // forward-slash path under fixtures root
+	Rel      string // forward-slash path under CorpusRoot
 	Template string // filename stem (template id or rm sample name)
 	Kind     string // "compositions" or "rm"
 }

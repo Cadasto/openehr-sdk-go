@@ -250,7 +250,7 @@ func publish(dir, name string, data []byte) (string, error) {
 	if err := tmp.Close(); err != nil {
 		return "", fmt.Errorf("write recording: %w", err)
 	}
-	// CreateTemp makes the file 0600; a corpus recording is committed and
+	// CreateTemp makes the file 0600; a recording is committed and
 	// world-readable like every other file in the tree.
 	if err := os.Chmod(tmpName, 0o644); err != nil {
 		return "", fmt.Errorf("set recording mode: %w", err)

@@ -1,13 +1,13 @@
 # Plan — Probe runnability: the sandbox transport and the three-mode runner
 
 **Date:** 2026-08-18
-**Status:** Active — phases 0–2 landed; phase 3 (the Cassette corpus) and phase 4 (catalog-wide Live runs) are partial
+**Status:** Active — phases 0–2 landed; phase 3 (the Cassette recordings) and phase 4 (catalog-wide Live runs) are partial
 **Owner:** SDK maintainers
 **Covers:** [REQ-082](../specifications/conformance.md#req-082--runnability) (Runnability, **Impl. `partial`**); unblocks the deferred wire-level probes named under [REQ-080](../specifications/conformance.md#req-080--openehr-wire-conformance)
 **Probes:** the runnability phases add no new `PROBE-NNN` — they give the existing catalog its missing execution modes. It has promoted **PROBE-078** (a Sandbox request-capture probe under `testkit/probes/query/`) and **PROBE-079** (witnessed on the Live snapshot) out of `Status: Deferred`, and **PROBE-065** out of `Status: Draft` to `Implemented (Sandbox)` under `testkit/probes/versioned/`; **PROBE-077** is still `Deferred` — a landed, unit-covered requirement whose dedicated wire probe is unwritten. Resolving [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1 (the four `testkit/probes/rest/*` probes) did add three new catalog ids — **PROBE-102** (System `OPTIONS`), **PROBE-103** (Admin bulk-delete), **PROBE-104** (Definition `/example`) — for wire surfaces that had no probe, alongside **PROBE-062** (audit-details) and **PROBE-060** (EHR creation) promoted from `Draft`.
 **Implementation:** partial
 **Depends on:** landed `transport/` (REQ-090–098), the probe catalog in [conformance.md](../specifications/conformance.md), and the REQ-082 normative prose landed with this plan
-**Defers:** Cassette corpus coverage beyond the two vendored recordings — `ehr-create` (`POST /ehr`) and `ehr-lifecycle` (`POST /ehr`, then `GET` and `HEAD` the created id) — which between them reach one catalog probe (Phase 3 remainder); and the full REQ-082 replay key, which today names method and resource path only. Encoding is settled ([ADR 0020](../adr/0020-cassette-recording-har.md), HAR 1.2). Live mode is no longer blocked: both CDRs are reachable locally (EHRbase `:8080`, FerroEHR `:8090`).
+**Defers:** Cassette coverage beyond the two vendored recordings — `ehr-create` (`POST /ehr`) and `ehr-lifecycle` (`POST /ehr`, then `GET` and `HEAD` the created id) — which between them reach one catalog probe (Phase 3 remainder); and the full REQ-082 replay key, which today names method and resource path only. Encoding is settled ([ADR 0020](../adr/0020-cassette-recording-har.md), HAR 1.2). Live mode is no longer blocked: both CDRs are reachable locally (EHRbase `:8080`, FerroEHR `:8090`).
 
 ## Goal
 

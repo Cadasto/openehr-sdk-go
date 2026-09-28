@@ -20,8 +20,8 @@
 //     (<id>.har, via [ValidateHAR]) and refuses a sandbox-backed
 //     client, but does not otherwise inspect the transport. Wiring a
 //     [Replayer] over the recording as [Config.Client] is the caller's
-//     job. Capture a new recording with [Recorder]; the corpus lives
-//     under testkit/recordings/.
+//     job. Capture a new recording with [Recorder]; the checked-in
+//     recordings live under testkit/recordings/.
 //   - In Live mode the runner verifies the client is not
 //     sandbox-backed. A sandbox transport under either Live or
 //     Cassette would be a silent fallback to Sandbox, and the summary would

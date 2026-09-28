@@ -29,7 +29,7 @@ func validProvenance() probe.HARProvenance {
 // capture path offline: it drives the ehr-lifecycle scenario through the
 // recorder against the in-memory sandbox (no CDR) and asserts the published
 // recording is the three-exchange document the scenario drives. The file it
-// writes is not a corpus recording — a sandbox capture witnesses nothing — but
+// writes is not a checked-in recording — a sandbox capture witnesses nothing — but
 // it proves the harness produces a replayable, redaction-attested HAR.
 //
 // This is the positive control only. It cannot fail when captureScenario stops

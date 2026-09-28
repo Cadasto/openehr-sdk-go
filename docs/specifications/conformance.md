@@ -105,7 +105,7 @@ For a backend-facing probe, a mode absent from its **Modes** line is an open gap
 
 The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform extras under `cadasto/` (Extra API, Datamap, MPI, Care, admin) have **no openEHR spec**; their wire contract is the **Cadasto platform API** itself.
 
-- The authority is the Cadasto platform's API definition (its OpenAPI document where one exists) or, failing that, recorded fixtures from a reference Cadasto deployment.
+- The authority is the Cadasto platform's API definition (its OpenAPI document where one exists) or, failing that, fixture documents captured from a reference Cadasto deployment.
 - `cadasto/*` probes assert the SDK's request/response wire shape against that contract — **not** against any other SDK. This is the first-party replacement for the retired cross-SDK parity check (REQ-081): the platform is the authority, so a divergence both SDKs shared can no longer pass silently.
 - Vendored fixture documents live under `testkit/corpus/cadasto/` (bodies and reference responses, not REQ-082 Cassette-mode recordings — [§ Vendored fixtures](#vendored-fixtures-testkitcorpus)); per-fixture provenance (deployment, commit/date) is recorded in that directory's README.
 
@@ -125,7 +125,7 @@ The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform
 
 ### Vendored fixtures (`testkit/corpus/`)
 
-This tree holds **fixture documents** — bodies, not exchanges. It is not the Cassette-mode recording corpus (REQ-082), which lives under `testkit/recordings/`; paths resolve through [`testkit/fixtures`](../../testkit/fixtures/).
+This tree holds **fixture documents** — bodies, not exchanges. The REQ-082 Cassette-mode recordings are a separate artefact under `testkit/recordings/`. Paths resolve through [`testkit/fixtures`](../../testkit/fixtures/).
 
 Serialization and clinical-modeling probes that need reference RM bytes or OPT bodies **MUST** use the checked-in tree under `testkit/corpus/`. Paths **MUST** be resolved via [`testkit/fixtures`](../../testkit/fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`) — not hard-coded legacy directory names.
 
@@ -936,7 +936,7 @@ A new probe **MUST**:
 
 - Be assigned the next available `PROBE-NNN`. The original rule was *next in the probe's topic range, with a gap of 10 between topics*; that rule was exhausted once the catalog crossed 080 and allocation has been **sequential across topics** ever since — 086 and 089 are formats probes, 087/088/090 AQL, 091–093 REST binding, 094 RM model introspection. A new topic therefore takes the next free number and adds its own catalog section rather than opening a decade. Renumbering remains prohibited either way.
 - Have a definition in this catalog *before* any implementation lands.
-- Be runnable in at least Sandbox mode; Cassette and Live modes follow when fixtures are recorded.
+- Be runnable in at least Sandbox mode; Cassette mode follows once a recording is captured, and Live mode once a reference deployment is reachable.
 - Carry a `Status:` transition (Draft → Implemented → Ratified, or Deprecated before removal) in this spec when its state changes; transitions go in the CHANGELOG.
 
 ## Removing probes

@@ -452,7 +452,7 @@ func render(v reflect.Value) string {
 	return s
 }
 
-// relativeToRoot names a fixture by its path under the fixtures root, in
+// relativeToRoot names a fixture by its path under the corpus root, in
 // forward-slash form, falling back to the absolute path if it lies elsewhere.
 func relativeToRoot(root, path string) string {
 	rel, err := filepath.Rel(root, path)

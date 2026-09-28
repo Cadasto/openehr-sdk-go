@@ -397,8 +397,8 @@ func TestHARRejectsUnreplayableEntry(t *testing.T) {
 // "Basic metabolic panel" is a lab test, "bearer of the card" is a
 // sentence, and the words token, secret and password all appear in
 // ordinary clinical text — a scan that refused those would reject
-// sound recordings far more often than leaked ones, and the corpus
-// would learn to work around it.
+// sound recordings far more often than leaked ones, and people capturing
+// recordings would learn to work around it.
 func TestHARAcceptsClinicalBodyThatReadsLikeACredential(t *testing.T) {
 	t.Parallel()
 	body := `{\"name\":\"Basic metabolic panel\",\"note\":\"the bearer of the card; token given at reception, password on file\"}`

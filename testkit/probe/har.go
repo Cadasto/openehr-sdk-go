@@ -179,8 +179,8 @@ var authSchemes = []string{"bearer ", "basic "}
 // Basic credential shorter than sixteen base64 characters sitting in
 // body text goes uncaught. Lowering it to catch that would start
 // refusing clinical phrases — "Basic metabolic panel" is the standing
-// example — and a scan that refuses sound recordings is one the corpus
-// learns to work around. The defence that catches the short credential
+// example — and a scan that refuses sound recordings is one people
+// learn to work around. The defence that catches the short credential
 // is capture-time redaction, which sees the Authorization header
 // before anything copies it into a body (REQ-082).
 const credentialRunMin = 16

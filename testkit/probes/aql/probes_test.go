@@ -1733,7 +1733,7 @@ func TestProbe099RequiresEveryCorpusArm(t *testing.T) {
 // probe100Corpus reads the shipping corpus — the vendored CSVs under
 // testkit/corpus/aql/conformance/, reconstructed into queries by the
 // reconstruction table in probe_100_conformance_corpus.go. The root comes from
-// the fixtures package so the path is resolved from the fixtures root rather
+// the fixtures package so the path is resolved from the corpus root rather
 // than from the working directory.
 func probe100Corpus(t *testing.T) aqlprobes.ConformanceCorpus {
 	t.Helper()

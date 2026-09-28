@@ -20,4 +20,4 @@ recordings are HAR 1.2. The YAML file stays here as the rejected alternative.
 
 `log._req082` on the HAR is the REQ-082 provenance / redaction slot the ADR
 requires. This directory is the side-by-side evidence that closed the
-strand. The Cassette corpus copy is [`testkit/recordings/ehr-create.har`](../../../testkit/recordings/ehr-create.har).
+strand. The checked-in Cassette copy is [`testkit/recordings/ehr-create.har`](../../../testkit/recordings/ehr-create.har).

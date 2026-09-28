@@ -112,7 +112,7 @@ type Config struct {
 	// Nil means anonymous.
 	TokenSource auth.TokenSource
 
-	// RecordingDir is the Cassette-mode corpus root
+	// RecordingDir is the directory holding the Cassette-mode recordings
 	// (testkit/recordings/). A selected backend-facing probe is
 	// unsatisfiable unless this directory holds a file named
 	// "<probe id>.har" that passes [ValidateHAR].
@@ -537,7 +537,7 @@ func modeList(modes []Mode) string {
 //
 // The extension is part of the match, not a formality: only a HAR file
 // can be validated and replayed, so a leftover PROBE-010.yaml or
-// PROBE-010.md beside the corpus must read as "no recording" rather
+// PROBE-010.md beside the recordings must read as "no recording" rather
 // than as a recording the runner then fails to decode.
 //
 // The error return distinguishes a directory the runner cannot read at
