@@ -1,6 +1,6 @@
 # Third-party licenses — vendored fixtures
 
-Some fixtures under this directory are vendored from upstream projects. Per the upstream license terms, copyright and license notices are retained here. The repository-wide inventory is [`docs/licensing.md`](../../docs/licensing.md); a full copy of Apache License 2.0 is [`licenses/Apache-2.0.txt`](../../licenses/Apache-2.0.txt).
+Some fixtures under this directory are vendored from upstream projects. Per the upstream license terms, copyright and license notices are retained here. The repository-wide inventory is [`LICENSING.md`](../../LICENSING.md); a full copy of Apache License 2.0 is [`licenses/Apache-2.0.txt`](../../licenses/Apache-2.0.txt).
 
 ## ehrbase/openEHR_SDK
 

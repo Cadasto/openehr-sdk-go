@@ -1,6 +1,6 @@
 # testkit/corpus
 
-Vendored fixture documents for codec, validation, and probe tests: OPTs, compositions, RM samples, wire bodies, and reference goldens. They are checked in so CI does not need a sibling clone. Licences and provenance: [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md); repository-wide inventory: [`docs/licensing.md`](../../docs/licensing.md).
+Vendored fixture documents for codec, validation, and probe tests: OPTs, compositions, RM samples, wire bodies, and reference goldens. They are checked in so CI does not need a sibling clone. Licences and provenance: [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md); repository-wide inventory: [`LICENSING.md`](../../LICENSING.md).
 
 **These are not REQ-082 Cassette-mode recordings.** Everything here is a request or response *body*: it carries no method, URL, header, or status code, so none of it can be replayed as an HTTP exchange. The Cassette mode that [REQ-082](../../docs/specifications/conformance.md#req-082--runnability) mandates records whole exchanges and lands under `testkit/recordings/`. Code reaches the fixtures through [`testkit/fixtures`](../fixtures/paths.go).
 
