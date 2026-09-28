@@ -38,7 +38,9 @@ var typedIntervalCases = []struct {
 
 // TestTypedIntervalName exhaustively covers the DVOrdered concrete
 // closure (9 instantiations × value/pointer) plus the negatives: the
-// bare DVOrdered form, non-interval values, and nil.
+// bare DVOrdered form, non-interval values, and nil. These are the names
+// REQ-102's rm_type_mismatch findings report and REQ-101's builder type
+// check compares a compiled node's RM type against.
 func TestTypedIntervalName(t *testing.T) {
 	for _, tc := range typedIntervalCases {
 		got, ok := rmnames.TypedIntervalName(tc.v)

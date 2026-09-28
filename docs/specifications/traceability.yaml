@@ -988,6 +988,7 @@ requirements:
     implementation: landed
     packages:
       - openehr/composition
+      - openehr/internal/rmnames
       - openehr/templatecompile
       - testkit/probes/composition
     probes: [PROBE-023]
@@ -995,6 +996,7 @@ requirements:
       - openehr/composition/builder_test.go
       - openehr/composition/imports_test.go
       - openehr/instance/imports_test.go
+      - openehr/internal/rmnames/intervals_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/composition/probes_test.go
 
@@ -1003,12 +1005,13 @@ requirements:
     canonical: docs/specifications/clinical-modeling.md#req-102--composition-validation
     status: draft
     implementation: landed
-    packages: [openehr/validation, openehr/validation/rmread, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
+    packages: [openehr/validation, openehr/validation/rmread, openehr/internal/rmnames, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
     probes: [PROBE-025, PROBE-026, PROBE-074]
     tests:
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/pathsnapshot_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
+      - openehr/internal/rmnames/intervals_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/constraint_cassettes_test.go
