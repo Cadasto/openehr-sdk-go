@@ -86,8 +86,12 @@ requirements:
       - openehr/aql/predicate_test.go
       - openehr/composition/imports_test.go
       - openehr/instance/imports_test.go
+      - openehr/rm/imports_test.go
       - openehr/serialize/canjson/corpus_parity_test.go
+      - openehr/serialize/canjson/imports_test.go
+      - openehr/serialize/canxml/imports_test.go
       - openehr/serialize/simplified/independence_test.go
+      - openehr/template/imports_test.go
       - openehr/template/webtemplate/independence_test.go
       - openehr/templatecompile/imports_test.go
       - openehr/terminology/imports_test.go
