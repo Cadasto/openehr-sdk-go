@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0012
+title: "Retire SDK-GAP as a durable identifier; REQ/PROBE is the feature register"
+status: accepted
+date: 2026-07-02
+---
+
 # ADR 0012 — Retire SDK-GAP as a durable identifier; REQ/PROBE is the feature register
 
 - **Status:** Accepted, 2026-07-02.

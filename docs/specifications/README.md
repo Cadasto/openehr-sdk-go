@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # Specifications
 
 Normative, addressable specifications for `github.com/cadasto/openehr-sdk-go`. This tree is **the source of truth** for the SDK's contract: requirements, idioms, wire format, auth flow, conformance. It is **self-contained** — implementing or reviewing the SDK does not require access to the Cadasto architecture sources.
@@ -35,8 +39,8 @@ The repo uses several document kinds, each with a distinct role and boundary:
 
 - **Topic specs** carry RFC 2119 prose only — no checkbox task lists, no implementation file paths, no PR-style summaries (use a plan for those).
 - **`REQ.md`** is registry-only — one row per REQ-NNN, generated from `traceability.yaml` by `make spec-gen` — canonical prose lives in the topic spec linked from each row.
-- **`traceability.yaml`** is an index only: ids, links and paths, with no notes or comments (`make spec-check` refuses them). A fact worth keeping goes in its canonical spec; history stays in git, plans and ADRs.
-- **Plans** MUST cite the REQ-NNN / STRAND-NN identifiers they implement in the header `**Covers:**` line.
+- **`traceability.yaml`** is an index only: ids, links and paths, with no notes or comments (`make spec-check` refuses them). Its `tests:` lists are generated from the tests' REQ citations ([development-process.md § The ladder](../development-process.md#the-ladder-full-lane)). A fact worth keeping goes in its canonical spec; history stays in git, plans and ADRs.
+- **Plans** are working notes outside the traceability chain: no rule here binds them and no gate reads them ([plans/README.md](../plans/README.md)).
 - **ADRs** cover one decision each — long flows or invariants stay in the topic spec; ADRs cite the STRAND-NN they resolve plus any REQ-NNN they amend.
 - **Guides** describe how we work — they're informative, not normative; when a guide disagrees with a spec, the spec wins and the guide is updated.
 
@@ -61,23 +65,22 @@ Every spec file starts with a `Status:` line:
 The chain that drift detection works against:
 
 ```
-docs/specifications/traceability.yaml (the one hand-edited index: packages, probes, tests, plans, status)
+docs/specifications/traceability.yaml (the index: packages, probes, tests, status)
     ├─→ docs/specifications/REQ.md (registry, generated from the map)
     └─→ canonical topic spec (packaging.md, wire.md, transport.md, …)
-                    └─→ docs/plans/YYYY-MM-DD-*.md
-                            └─→ code (Go package)
-                                    └─→ tests (*_test.go)
-                                            └─→ docs/specifications/conformance.md (PROBE-NNN)
+                    └─→ code (Go package)
+                            └─→ tests (*_test.go)
+                                    └─→ docs/specifications/conformance.md (PROBE-NNN)
 ```
 
 **Single canonical home:** normative MUST/SHALL prose lives in exactly one topic spec per REQ (see [REQ.md](REQ.md) registry `Canonical` column). REQ.md is an index only — do not duplicate requirement bodies there.
 
 Cite identifiers when crossing the chain:
 
-- Every plan in `docs/plans/` MUST list the REQ-IDs it implements on its `**Covers:**` line.
-- Every test that exercises a normative requirement SHOULD cite the REQ-ID and (if applicable) PROBE-ID in a comment. Maintainer comments may cite them too; godoc on exported API does not (it is written for SDK users — see [AGENTS.md](../../AGENTS.md#spec-driven-workflow-agents)).
+- Every test that exercises a normative requirement SHOULD cite the REQ-ID and (if applicable) PROBE-ID in a comment; that citation is what lists the test under its REQ in `traceability.yaml`. Maintainer comments may cite them too; godoc on exported API does not (it is written for SDK users; see [AGENTS.md](../../AGENTS.md#spec-driven-workflow-agents)).
 - Every ADR in `docs/adr/` MUST cite the STRAND-ID it resolves (from `research-strands.md`) and any REQ-IDs it amends.
-- When landing code or probes, update [`traceability.yaml`](traceability.yaml) and run `make spec-gen`.
+- The map lists no ADRs: an ADR names its REQs in its header, and `make spec-context` finds it from there. Plans are not part of the chain.
+- When landing code or probes, update the packages and probes in [`traceability.yaml`](traceability.yaml) and run `make spec-gen`, which writes the tests lists.
 
 `make spec-check` catches the drift a machine can see: a cited path, probe or anchor that does not exist, a landed requirement with no packages or tests, and a generated block that no longer matches its source.
 
@@ -97,7 +100,7 @@ Identifiers MUST be stable once published — they are referenced from outside t
 | File | Scope |
 |---|---|
 | [REQ.md](REQ.md) | Requirement registry (generated index) — links to canonical topic specs |
-| [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test / plan map |
+| [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test map |
 | [../.sdd.yaml](../.sdd.yaml) | SDD project descriptor — identifier style, document paths, `make` targets (read by `sdd-*` skills) |
 | [../development-process.md](../development-process.md) | The two lanes, the delivery ladder, the superpowers boundary |
 | [packaging.md](packaging.md) | Module identity REQ-001–005 |

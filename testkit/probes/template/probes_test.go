@@ -134,6 +134,9 @@ func TestProbe022OPTPathResolution_ExpectNotFoundRequiresSentinel(t *testing.T) 
 // probe surface is exercised end-to-end (parse → resolve → validate)
 // without depending on the much larger vital_signs.opt's actual
 // path predicates.
+//
+// REQ-103: PROBE-024 runs a typed primitive constraint's Validate end to end,
+// from parse through resolve.
 func TestProbe024PrimitiveValidate_Synthetic(t *testing.T) {
 	body := []byte(syntheticDvQuantityOPT)
 	cases := []probes.ValidateCase{

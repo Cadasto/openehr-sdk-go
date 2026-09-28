@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0013
+title: "Generated LOCATABLE identity surface and reverse type lookup"
+status: accepted
+date: 2026-07-12
+---
+
 # ADR 0013 — Generated LOCATABLE identity surface and reverse type lookup
 
 - **Status:** Accepted, 2026-07-12 — maintainer acceptance after two review rounds (field-accurate types, corrected counts, completed getter quartet, typed-nil predicate); implementation lands in the same PR.
@@ -5,7 +13,7 @@
 - **Superseded by:** —
 - **Strand:** cross-references [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance) (RM polymorphism; does **not** resolve it — the codec question stays open).
 - **Introduces:** — (no new `REQ`). **Amends:** REQ-031, REQ-040, REQ-043. **Applies:** REQ-013, REQ-014, REQ-024, REQ-042, REQ-044.
-- **Plan:** [2026-07-10-modernize-simplify.md § Phase 5](../plans/archive/2026-07-10-modernize-simplify.md).
+- **Landed in:** [PR 72](https://github.com/Cadasto/openehr-sdk-go/pull/72) (the modernise-and-simplify pass).
 - **Related:** [ADR 0011](0011-rm-behavioural-functions-surface.md) governs the hand-realised RM behavioural-function surface; the accessors here are SDK-idiom *generated* additions beside it (same `rm` method surface, different emission path) and reuse its sealed-interface and no-panic conventions. [ADR 0002](0002-bmm-codegen-decisions.md) D4/D6/D7 constrain the generator mechanics.
 
 ## Context
@@ -70,7 +78,7 @@ surface** in `*_gen.go` (ADR 0002 D6: the generator never touches non-`_gen.go` 
    Two consequences follow and are accepted: a getter call through the interface copies the
    receiver (auto-deref; vs. today's direct pointer field read), and a getter invoked on a
    **typed-nil `*T` panics** — so the existing guard-before-read ordering in every consumer
-   (`nodeIDOf` checks `isNilPointer` first) is load-bearing and MUST be preserved, using the
+   (`nodeIDOf` checks `isNilPointer` first) is load-bearing and is kept, using the
    generated predicate from decision 3. These are SDK-idiom additions, not BMM functions —
    they do not pass through the D6 panic-stub / D7 skip-set machinery. One acknowledged
    wart: package `rm` will carry `GetName()` with two signatures — `(string, bool)` on the

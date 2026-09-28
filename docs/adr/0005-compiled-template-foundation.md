@@ -1,9 +1,17 @@
+---
+kind: adr
+id: ADR-0005
+title: "Compiled OPT foundation (rminfo + internal templatecompile)"
+status: accepted
+date: 2026-05-22
+---
+
 # ADR 0005 — Compiled OPT foundation (rminfo + internal templatecompile)
 
 - **Status:** Accepted, 2026-05-22.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** [`docs/plans/archive/2026-05-22-template-req100-followups.md`](../plans/archive/2026-05-22-template-req100-followups.md) Phases 4 + 4-bis. Phases 5 (walker pattern at `internal/templatecompile/walk/`) and 6 (REQ-103 primitive constraints at `openehr/template/constraints/`) build on this foundation without changing C1–C6.
+- **Tracks:** the REQ-100 follow-ups that landed the compiled template tree ([PR 12](https://github.com/Cadasto/openehr-sdk-go/pull/12)). Phases 5 (walker pattern at `internal/templatecompile/walk/`) and 6 (REQ-103 primitive constraints at `openehr/template/constraints/`) build on this foundation without changing C1–C6.
 
 ## Context
 

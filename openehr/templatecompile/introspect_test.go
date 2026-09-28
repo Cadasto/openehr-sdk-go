@@ -37,6 +37,8 @@ func collectPaths(n *templatecompile.CompiledNode, out *[]string) {
 // as a function parameter.
 func countNodes(nodes []*templatecompile.CompiledNode) int { return len(nodes) }
 
+// REQ-111: the public compiled form and its node tree can be walked through
+// public packages alone.
 func TestCompiledNode_ExternallyNavigable(t *testing.T) {
 	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {

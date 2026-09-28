@@ -43,6 +43,8 @@ func newCatalog(t *testing.T, srv *httptest.Server) *discovery.ServiceCatalog {
 	return cat
 }
 
+// REQ-021: New refuses a client built without an injected *http.Client, so
+// the SDK never allocates one of its own.
 func TestNewValidates(t *testing.T) {
 	_, err := New(nil, WithHTTPClient(http.DefaultClient))
 	if !errors.Is(err, ErrInvalidConfig) {
@@ -552,6 +554,8 @@ func TestRetryCtxCancellation(t *testing.T) {
 	}
 }
 
+// REQ-066: caller attribution set at construction reaches the wire as the
+// JSON-encoded default attribution header.
 func TestCallerAttributionDefault(t *testing.T) {
 	var got string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -599,6 +603,8 @@ func TestCallerAttributionPerRequest(t *testing.T) {
 	}
 }
 
+// REQ-066: attribution is opt-in; with none configured no attribution header
+// is sent.
 func TestCallerAttributionOmittedWhenEmpty(t *testing.T) {
 	var got string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

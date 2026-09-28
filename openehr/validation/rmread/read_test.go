@@ -169,6 +169,9 @@ func TestReadSingle_Observation(t *testing.T) {
 // present when structurally populated and absent on a zero ACTION, so the
 // RM floor no longer reports a populated ACTION's time or ism_transition
 // as required-but-absent.
+//
+// REQ-112: the floor's required-set check reads presence through ReadSingle,
+// so a populated ACTION's time and ism_transition read present.
 func TestReadSingle_Action(t *testing.T) {
 	present := &rm.Action{
 		ArchetypeNodeID: "openEHR-EHR-ACTION.minimal.v1",

@@ -105,6 +105,8 @@ func TestCassette_ReplaysVendoredEHRCreate(t *testing.T) {
 	}
 }
 
+// REQ-082: the runner runs a probe in Cassette mode against a replayed
+// recording.
 func TestRun_CassetteReplaysVendoredEHRCreate(t *testing.T) {
 	t.Parallel()
 	har, err := probe.ValidateHAR(ehrCreateRecording(t))
@@ -150,6 +152,8 @@ func TestRun_CassetteReplaysVendoredEHRCreate(t *testing.T) {
 	}
 }
 
+// REQ-082: a request the recording cannot answer fails loudly instead of
+// falling back.
 func TestCassette_UnmatchedCreateFailsClosed(t *testing.T) {
 	t.Parallel()
 	c, err := probe.NewClient("https://sandbox.local/openehr/v1", probe.NewReplayer(probe.HAR{Log: probe.HARLog{

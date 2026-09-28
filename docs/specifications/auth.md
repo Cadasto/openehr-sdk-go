@@ -65,6 +65,8 @@ Rules:
 - `Token.Value` is opaque to `transport/`: transports **MUST** forward it as `Authorization: <Type> <Value>` without inspecting either half — there is no scheme allowlist, so a scheme this SDK has no provider for (`DPoP`, …) reaches the wire verbatim. When `Type` is empty, `transport/` **MUST** treat it as `Bearer`. A **zero** `Token` (no value and no type — `auth.Token.IsZero`) is the anonymous case and **MUST** suppress the `Authorization` header entirely rather than emit an empty scheme or an empty credential; `auth.AnonymousTokenSource` is the sanctioned way to ask for it, and it is `transport/`'s default token source.
 - A `TokenSource` **MAY** be stateful (caching, refresh) but **MUST** be safe for concurrent use (REQ-026).
 
+The coalesced refresh in `auth/smart` is race-free: the goroutine that refreshes stores the token before it closes the channel the other callers wait on, so under the Go memory model every waiter reads the stored result. Discovery resolution (`smart/discovery`) coalesces the same way.
+
 ### Provider sub-packages (REQ-012)
 
 `auth/` does not contain provider implementations. Each provider is a sub-package:
@@ -226,7 +228,7 @@ The SDK validates ID tokens (and, in some deployments, opaque access tokens via 
 - **Supported algorithms:** `RS256`, `RS384`, `ES256`, `ES384`. RS384/ES384 are the HL7 SMART asymmetric baseline; RS256/ES256 cover the widely deployed remainder. Both RSA and ECDSA keys published in the JWKS are honoured.
 - **Allowlist:** the caller passes the deployment's `id_token_signing_alg_values_supported` (via `smart.WithIDTokenSigningAlgs` / `ValidateConfig.AllowedIDTokenAlgs`). When non-empty it is intersected with the supported set — the discovery list can narrow but never widen the SDK's support. An empty intersection (the deployment advertises only algorithms the SDK does not support) **fails closed**: validation is rejected with `auth.ErrJWKSValidationFailed` rather than silently falling back to the full supported set, honouring the server's advertised constraint. When the caller passes nothing, the full supported set applies.
 - **Rejected:** the unsecured `none` algorithm is always rejected (explicitly, and because it is never in the allowlist); any algorithm outside the effective allowlist is rejected; an `alg`/key-type mismatch is rejected by go-jose key matching. All rejections surface as `auth.ErrJWKSValidationFailed` (preserved sentinel — `errors.Is` keeps working).
-- **Verify-before-claims:** the signature is verified before any claim is trusted (inherent to go-oidc). The SDK then re-applies its stricter claim semantics via `claimsFromMap`: `iss`/`aud`/`exp`/`nbf`/`iat` with a **30-second** clock skew (`clockSkew`) plus the required `nonce` match. The returned `*IDTokenClaims` shape is unchanged.
+- **Verify-before-claims:** the signature is verified before any claim is trusted (inherent to go-oidc). The SDK then re-applies its stricter claim semantics via `claimsFromMap`: `iss`/`aud`/`exp`/`nbf`/`iat` with a **30-second** clock skew (`clockSkew`) plus the required `nonce` match. The `iss` comparison is an exact string match, as OIDC Core §3.1.3.7 requires; the SDK applies no URL normalisation. The returned `*IDTokenClaims` shape is unchanged.
 
 #### RFC 7662 token introspection client (F-J) — opt-in, resource-server scope — landed in Phase 5b
 

@@ -1,7 +1,16 @@
+---
+kind: adr
+id: ADR-0003
+title: "Codec polymorphism for abstract generic RM classes"
+status: accepted
+date: 2026-05-16
+---
+
 # ADR 0003 — Codec polymorphism for abstract generic RM classes
 
 - **Status:** Accepted, 2026-05-16.
-- **Tracks:** STRAND-04 (partial — Event/History cassette decode); [canonical JSON plan](../plans/archive/2026-05-15-canonical-json-serialization.md).
+- **Tracks:** STRAND-04 (partial — Event/History cassette decode); the canonical JSON codec, landed on `main` in commit [374ccffb](https://github.com/Cadasto/openehr-sdk-go/commit/374ccffb).
+- **Requirements:** [REQ-033](../specifications/rm-modeling.md#no-inheritance-emulation-req-033) (no inheritance emulation, which this codec polymorphism works within).
 
 ## Context
 

@@ -21,6 +21,9 @@ import (
 // probe030RoundTrip (for example replacing reflect.DeepEqual with an
 // always-equal comparison): then a lost field would slip through with
 // Status == "pass".
+//
+// REQ-052: round-trip fidelity is asserted on the decoded values, so a field
+// lost on re-encode must fail the probe.
 func TestProbe030GuardCatchesDroppedFieldOnReEncode(t *testing.T) {
 	body := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg"}`)
 	r, err := probe030RoundTrip(body, func() any { return new(rm.DVQuantity) }, dropMemberReEncoder("units"), false)

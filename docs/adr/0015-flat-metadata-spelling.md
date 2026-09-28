@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0015
+title: "Composition-level FLAT metadata: accept both spellings, emit `ctx/`"
+status: accepted
+date: 2026-08-03
+---
+
 # ADR 0015 — Composition-level FLAT metadata: accept both spellings, emit `ctx/`
 
 - **Status:** Accepted, 2026-08-03 — maintainer decision, taken to unblock REQ-115 (the FLAT author linter cannot state its required-key set until the spelling question is settled) and to close a real interop rejection found by PROBE-086.
@@ -5,7 +13,7 @@
 - **Superseded by:** —
 - **Strand:** —
 - **Introduces:** —. **Amends:** [REQ-053](../specifications/wire.md#req-053) (FLAT/STRUCTURED codecs — decode input surface). **Applies:** REQ-115 (FLAT author linter — consumes this decision), REQ-080 / PROBE-086 (the probe that surfaced it).
-- **Plan:** [2026-08-03-flat-coverage-ratchet.md](../plans/archive/2026-08-03-flat-coverage-ratchet.md) Phase 3.
+- **Landed in:** [PR 86](https://github.com/Cadasto/openehr-sdk-go/pull/86) (the FLAT coverage ratchet).
 - **Related:** [ADR 0014](0014-webtemplate-reference-implementation-lock.md) pins the reference whose spelling this admits; the package deviation register is [`simplified/deviations.md`](../../openehr/serialize/simplified/deviations.md); the census is [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md).
 
 ## Context
@@ -52,7 +60,7 @@ PROBE-086 held 318 corpus keys out of its comparison **on both sides** precisely
   > **Closed 2026-08-05** (the amended [REQ-053](../specifications/wire.md#req-053)). `ctx/setting|code` + `|value` are now emitted and accepted, so `context/setting` became an ordinary respelling and the waiver class is empty. The decision text above is left as written — it records the state at the time of the decision, not today's behaviour.
 - **The composer's `external_ref` and `identifiers` are dropped on encode, not refused.**
 
-  > **Noted 2026-08-05** (REQ-140). This decision routes the composer through `ctx/composer_name`, which carries the name alone; decode refuses the real-path `composer|id*` / `composer/_identifier:N` / `composer/relationship` spellings that would carry the rest. That leaves encode no channel, and it writes the name and drops the two — a *projection loss*, not a refusal. Refusing instead would make every composition whose composer is properly referenced unencodable, including the vendored `clinical_content_validation` body. This is the one exception carved out of wire.md § REQ-140's "encode MUST NOT silently lose an in-scope attribute"; see also the package [deviations register](../../openehr/serialize/simplified/deviations.md). Closing it needs a `ctx/` or real-path carrier — a new decision, not a codec change.
+  > **Noted 2026-08-05** (REQ-140). This decision routes the composer through `ctx/composer_name`, which carries the name alone; decode refuses the real-path `composer|id*` / `composer/_identifier:N` / `composer/relationship` spellings that would carry the rest. That leaves encode no channel, and it writes the name and drops the two — a *projection loss*, not a refusal. Refusing instead would make every composition whose composer is properly referenced unencodable, including the vendored `clinical_content_validation` body. This is the one exception carved out of the no-silent-loss rule in [wire.md § REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes); see also the package [deviations register](../../openehr/serialize/simplified/deviations.md). Closing it needs a `ctx/` or real-path carrier — a new decision, not a codec change.
 
 - **Alias table is load-bearing.** Every accepted alias must be in one table with its `ctx/` target, so adding a sixth is a reviewed edit rather than scattered string comparisons.
 - **A template constraining a COMPOSITION-level `language` node is intercepted.** Such a key routes to `ctx/language` rather than through leaf placement. That is correct — it is the same RM attribute either way — but it means the alias table shadows those Web Template paths, which is why the table is restricted to attributes that genuinely *are* composition metadata.

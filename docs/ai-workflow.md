@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # AI workflow
 
 How AI assistants (Claude Code, Cursor, Copilot, Codex, …) work in this repo. Ground truth lives in [AGENTS.md](../AGENTS.md) and [architecture.md](architecture.md), so read those first. This file adds only the AI-specific layer: recommended tooling, openEHR ground-truth lookups, and the loop to follow. It does not restate the idiom, boundary, or spec rules, which have their canonical homes elsewhere (linked below). The public disclosure that this project is built with AI assistance is in the [README](../README.md#ai-assisted-development); the contributor rules, including the `Assisted-by:` commit trailer, are in [CONTRIBUTING.md](../CONTRIBUTING.md#ai-assisted-contributions).
@@ -49,12 +53,12 @@ For an exact attribute list, invariant, or signature, call the MCP tool `type_sp
 
 ## The loop
 
-0. **Assemble context in one shot:** `make spec-context REQ=094`. It bundles the registry row, the `traceability.yaml` block (packages, probes, tests, plans), the canonical spec excerpt, and any research strands that touch the REQ. Start here: the bundle points you to the canonical sources, so you don't have to grep for them.
+0. **Assemble context in one shot:** `make spec-context REQ=094`. It bundles the registry row, the `traceability.yaml` block (packages, probes, tests), the canonical spec excerpt, any plan that names the REQ, the ADRs whose header cites it, and any research strands that touch the REQ. Start here: the bundle points you to the canonical sources, so you don't have to grep for them.
 1. **Locate** your task's REQ via the [REQ registry](specifications/REQ.md), then follow the row to its **canonical** topic spec (don't read prose out of `REQ.md` itself).
 2. **Inspect ground truth before editing.** Check RM shapes with MCP `type_specification_get` and terminology with `terminology_resolve`. Never hardcode a path or numeric literal without verifying it. Before writing the Go itself, load the matching go-coding skill (§ Recommended tooling above).
 3. **Cite identifiers.** Tests and maintainer comments reference REQ-NNN / PROBE-NNN; godoc on exported API is written for SDK users and does not. Update [traceability.yaml](specifications/traceability.yaml) when landing packages or probes and run `make spec-gen` (the registry is generated from it); never renumber published IDs.
 4. **Don't decide open questions in code.** Don't silently resolve a [research strand](specifications/research-strands.md), and don't add a normative MUST/SHOULD/MAY without a REQ to anchor it. Raise it or draft an [ADR](adr/).
-5. **Verify.** Run `make ci` (includes `make spec-check`) before claiming done. See [ci.md](ci.md). **For wire/client changes, green tests aren't enough.** Read the `probes:` on the REQ's traceability entry (or `make spec-context`) and open each `#### PROBE-NNN` in [conformance.md](specifications/conformance.md). The task is done only when each probe is **Implemented (Sandbox)** or explicitly deferred in the plan. `make probe-status` lists each probe's status and whether its test file exists.
+5. **Verify.** Run `make ci` (includes `make spec-check`) before claiming done. See [ci.md](ci.md). **For wire/client changes, green tests aren't enough.** Read the `probes:` on the REQ's traceability entry (or `make spec-context`) and open each `#### PROBE-NNN` in [conformance.md](specifications/conformance.md). The task is done only when each probe is **Implemented (Sandbox)** or its deferral is recorded in its conformance.md entry. `make probe-status` lists each probe's status and whether its test file exists.
 
 The full editing rules (idiomatic surface, the `cadasto/` boundary contract, and the do-not-touch list) are canonical in [AGENTS.md](../AGENTS.md) and [specifications/idiom.md](specifications/idiom.md). Follow those; this file does not repeat them.
 
@@ -65,6 +69,39 @@ When you add, rename, remove, or materially change a [`cmd/examples/`](../cmd/ex
 ## Hooks
 
 The Claude Code format-on-save hook is documented in [`.claude/CLAUDE.md`](../.claude/CLAUDE.md). `make fmt` is the authoritative full-tree pass.
+
+## Review
+
+All findings for a change live in one PR comment, the review ledger, whose first line starts `## Review ledger`; it is edited in place each round. Ids are `F<n>`, append-only across rounds, and `status` is `open`, `fixed@<sha>`, `declined` with a reason, or `deferred`. Report blockers and should-fix findings. Polish goes to the `Deferred` table, which is carried into the next change that touches the area and never becomes a tracker issue. Write an id as `F12`, never with a leading hash sign, which GitHub turns into a link to an unrelated issue.
+
+```markdown
+## Review ledger — round N (reviewer, date)
+Dispatched: <reviewers> · Reported: <n> of <m>
+| id | severity | anchor | finding | status |
+|---|---|---|---|---|
+| F1 | blocker | <path>:214 | one sentence, plain words | fixed@abc1234 |
+
+## Deferred
+| id | item | carried from | owner |
+|---|---|---|---|
+| F3 | <the item, in a few words> | this PR | next change touching <area> |
+```
+
+A reviewer that runs outside this repository gets this request, filled in by `/sdd-review --panel`:
+
+```text
+── review request · PR <N> · lane: <full|maintenance> · round <R> ──────────────
+Review Cadasto/openehr-sdk-go PR <N>. Read docs/ai-workflow.md § Review and the PR body.
+Report blockers and should-fix only; nits
+go under "Deferred". Post ONE review body in the ledger format: ids from F<n>
+upward, severity, file:line anchor, one line per finding, plain words. Do not
+restate the PR body.
+────────────────────────────────────────────────────────────────────────────────
+```
+
+A re-review adds one line to the block: `Re-review from F<n> upward, plus anything still open.`
+
+A finding is a claim, and so is a reviewer's proposed correction; both are checked against the code and the spec before either is applied. `/sdd-triage` writes the reason for each declined finding to `docs/.sdd/reviewers/<agent-name>.md`. Read the file for your agent name before reviewing, and do not raise a declined finding again unless the change makes its reason untrue.
 
 ## When stuck
 

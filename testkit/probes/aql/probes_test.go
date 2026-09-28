@@ -79,6 +79,9 @@ func probe088Goldens(t *testing.T) map[string]string {
 // PROBE-020 golden is unchanged, and combining the two paging channels — or
 // emitting a SELECT that does not read back as the recorded projection — is a
 // build-time error.
+//
+// REQ-118: PROBE-088's goldens include the deprecated SELECT TOP clause, so
+// the builder's TOP emission is held byte for byte.
 func TestProbe088BuilderContainmentAndPaging(t *testing.T) {
 	r, err := aqlprobes.Probe088BuilderContainmentAndPaging(probe088Goldens(t), goldenWire(t))
 	if err != nil {

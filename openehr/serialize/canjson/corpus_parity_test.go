@@ -1,9 +1,8 @@
 package canjson_test
 
 // corpus_parity_test.go: the differential decode net for the move of the
-// canonical-JSON path to encoding/json/v2
-// (docs/plans/archive/2026-09-14-json-v2-migration.md, phase 1.3). REQ-052 § Field
-// order, REQ-013 § building-block independence.
+// canonical-JSON path to encoding/json/v2 (PR 171). REQ-052 § Field order,
+// REQ-013 § building-block independence.
 //
 // Every canonical-JSON RM document vendored under testkit/cassettes is decoded
 // twice, once through encoding/json and once through encoding/json/v2 with no

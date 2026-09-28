@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # spec-context.sh — assemble the full SDD context for one REQ into a single
 # markdown bundle: registry row, traceability block, canonical spec excerpt,
-# plans, and any research strands that touch it.
+# the plans and ADRs that name it, and any research strands that touch it.
 #
 # Agents (and humans) run this instead of hunting across files — it routes to
 # canonical sources in one shot and states the PROBE-driven definition of done.
@@ -36,7 +36,7 @@ row="$(awk -v id="$REQ" '
   inside && index($0, "| " id " |") == 1
 ' "$REQ_REG" 2>/dev/null || true)"
 if [[ -n "$row" ]]; then
-  printf '| ID | Title | Canonical | Impl. |\n|---|---|---|---|\n%s\n' "$row"
+  printf '| ID | Title | Canonical | Stability | Impl. |\n|---|---|---|---|---|\n%s\n' "$row"
 else
   echo "_not found in REQ.md registry_"
 fi
@@ -79,22 +79,48 @@ else
 fi
 echo
 
-# --- 4) Plans (from the traceability block) --------------------------------
+# --- 4) Plans and ADRs that name this REQ ---------------------------------
+# The map carries no plans or ADRs. An ADR names its REQs in the bullet list
+# above its first `##` heading. Plans are working notes outside the
+# traceability chain, with no required header: a plan is listed when its
+# text names the REQ anywhere. Only the whole identifier counts (REQ-06 never
+# matches REQ-060). A plan may also name a range, REQ-060..068, which covers
+# every number from the first to the last, as in the strands section below.
+names_req() { grep -qwF -- "$REQ" <<< "$1"; }
+covers_req() {
+  names_req "$1" && return 0
+  local tok lo hi
+  while read -r tok; do
+    [[ -n "$tok" ]] || continue
+    lo="${tok#REQ-}"; lo="${lo%%..*}"; hi="${tok##*..}"
+    (( N >= 10#$lo && N <= 10#$hi )) && return 0
+  done < <(grep -oE 'REQ-[0-9]+\.\.[0-9]+' <<< "$1" || true)
+  return 1
+}
+doc_title() { grep -m1 -E '^# ' "$1" | sed -E 's/^# (Plan[^A-Za-z]+)?//' || true; }
+
 echo "## Plans"
 echo
-plans="$(printf '%s\n' "$block" | grep -oE 'docs/plans/[^],[:space:]]+\.md' | sort -u || true)"
-if [[ -n "$plans" ]]; then
-  while IFS= read -r p; do
-    [[ -z "$p" ]] && continue
-    case "$p" in
-      */archive/*) echo "- ${p} _(archived)_" ;;
-      *)           st="$(grep -m1 -E '^\*\*Status:\*\*' "${ROOT}/${p}" 2>/dev/null | sed -E 's/^\*\*Status:\*\*[[:space:]]*//; s/[^A-Za-z].*$//' || true)"
-                   echo "- **${p}** _(${st:-no status})_" ;;
-    esac
-  done <<< "$plans"
-else
-  echo "_none referenced_"
-fi
+plan_hits=""
+for f in "${ROOT}"/docs/plans/*.md; do
+  [[ -f "$f" ]] || continue
+  case "$(basename "$f")" in README.md|_template.md) continue ;; esac
+  covers_req "$(cat "$f")" || continue
+  plan_hits+="- \`${f#"${ROOT}/"}\`: $(doc_title "$f")"$'\n'
+done
+if [[ -n "$plan_hits" ]]; then printf '%s' "$plan_hits"; else echo "_no plan names ${REQ}_"; fi
+echo
+
+echo "## ADRs"
+echo
+adr_hits=""
+for f in "${ROOT}"/docs/adr/[0-9]*.md; do
+  [[ -f "$f" ]] || continue
+  header="$(awk '/^## /{exit} /^- /' "$f")"
+  [[ -n "$header" ]] && names_req "$header" || continue
+  adr_hits+="- \`${f#"${ROOT}/"}\`: $(doc_title "$f")"$'\n'
+done
+if [[ -n "$adr_hits" ]]; then printf '%s' "$adr_hits"; else echo "_none names ${REQ} in its header_"; fi
 echo
 
 # --- 5) Research strands touching this REQ (from the Index table) ----------

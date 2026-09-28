@@ -1,9 +1,18 @@
+---
+kind: adr
+id: ADR-0006
+title: "Composition validation walker package placement"
+status: accepted
+date: 2026-06-11
+---
+
 # ADR 0006 — Composition validation walker package placement
 
 - **Status:** Accepted, 2026-06-11.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** [`docs/plans/archive/2026-05-24-composition-validation-template-driven.md`](../plans/archive/2026-05-24-composition-validation-template-driven.md) § Deviations #1. Related: [ADR 0005](0005-compiled-template-foundation.md) (OPT-only walker at `internal/templatecompile/walk/`).
+- **Tracks:** the template-driven composition validation walk of REQ-102 ([PR 16](https://github.com/Cadasto/openehr-sdk-go/pull/16)). Related: [ADR 0005](0005-compiled-template-foundation.md) (OPT-only walker at `internal/templatecompile/walk/`).
+- **Requirements:** [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) (the validation walker this places) and [REQ-110](../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition) (the same walker beyond COMPOSITION).
 
 ## Context
 
@@ -15,7 +24,7 @@ At implementation time the lockstep machinery proved tightly coupled to validati
 
 ## Decision
 
-The lockstep composition validator **MUST** live in `openehr/validation/` (`walk_composition.go` and related files), **not** in `internal/templatecompile/walk/`.
+The lockstep composition validator **lives** in `openehr/validation/` (`walk_composition.go` and related files), **not** in `internal/templatecompile/walk/`.
 
 - `internal/templatecompile/walk/` stays **OPT-only** — compile-time traversal, debug dumps, future tooling that does not import validation semantics ([ADR 0005](0005-compiled-template-foundation.md) Phase 5).
 - `WalkComposition` on the internal OPT walker remains **deferred** (`internal/templatecompile/walk/doc.go`) until a second consumer needs shared lockstep machinery.

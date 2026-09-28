@@ -44,6 +44,9 @@ func nestedOPTXML(levels int) string {
 
 // TestBuildNode_DepthExceeded verifies that ParseOPT returns an error
 // wrapping ErrInvalidOPT when the node-tree nesting depth exceeds maxOPTDepth.
+//
+// REQ-108: tree build refuses nesting deeper than the OPT depth cap with
+// ErrInvalidOPT.
 func TestBuildNode_DepthExceeded(t *testing.T) {
 	orig := maxOPTDepth
 	maxOPTDepth = 4
@@ -101,6 +104,9 @@ func TestBuildNode_DepthAtCap(t *testing.T) {
 // a fully-matching path through it — the case a non-parseOPT tree (or a
 // cyclic one) could otherwise hit. The guard must return an error
 // wrapping ErrPathNotFound mentioning the depth limit.
+//
+// REQ-108: a path walk deeper than the OPT depth cap fails with
+// ErrPathNotFound.
 func TestWalkPath_DepthGuard(t *testing.T) {
 	orig := maxOPTDepth
 	maxOPTDepth = 4

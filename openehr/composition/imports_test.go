@@ -21,6 +21,9 @@ import (
 //
 // Non-test files only — test files are allowed to import openehr/serialize
 // (canjson round-trip) and similar cross-package surfaces for assertions.
+//
+// REQ-101: the builder is importable without transport, auth, the REST
+// clients or openehr/serialize.
 func TestCompositionForbiddenImports(t *testing.T) {
 	pkg, err := build.Default.ImportDir("./", 0)
 	if err != nil {

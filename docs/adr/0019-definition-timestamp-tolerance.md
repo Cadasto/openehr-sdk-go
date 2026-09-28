@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0019
+title: "Definition metadata timestamps: a closed tolerant layout set on decode, RFC 3339 on encode"
+status: accepted
+date: 2026-08-30
+---
+
 # ADR 0019 — Definition metadata timestamps: a closed tolerant layout set on decode, RFC 3339 on encode
 
 - **Status:** Accepted, 2026-08-30.
@@ -5,7 +13,7 @@
 - **Superseded by:** —
 - **Strand:** none — direct decision (this plan's Phase 0); no prior open research strand.
 - **Introduces:** [REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding) (Definition metadata decoding). **Amends:** [REQ-095](../specifications/wire.md#req-095) (OpenAPI authoritative source) — one keyed compatibility exception, carried by § REQ-095 itself rather than asserted from here.
-- **Plan:** [2026-08-30-definition-metadata-decoding.md](../plans/archive/2026-08-30-definition-metadata-decoding.md) Phase 0.
+- **Landed in:** [PR 139](https://github.com/Cadasto/openehr-sdk-go/pull/139) (definition metadata decoding).
 - **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (strict-encode / permissive-decode for BMM numerics — the asymmetry precedent and its evidence bar); [ADR 0015](0015-flat-metadata-spelling.md) (accept both spellings on input, emit exactly one).
 
 ## Context
@@ -33,10 +41,7 @@ and the consumer sees *no* templates rather than n−1. A template catalog that 
 listed is a catalog that cannot be used, and the SDK cannot fix a remote server's
 formatting.
 
-**The zone-less forms are not obviously wrong, either.** The pinned REST overview says:
-
-> Timezone SHOULD be only supplied when needed, otherwise the local timezone is assumed.
-> — [`resources/its-rest/overview-validation.openapi.yaml:675`](../../resources/its-rest/overview-validation.openapi.yaml), the *Datetime format* note
+**The zone-less forms are not obviously wrong, either.** The *Datetime format* note of the pinned REST overview ([`resources/its-rest/overview-validation.openapi.yaml:675`](../../resources/its-rest/overview-validation.openapi.yaml)) recommends (`SHOULD`) supplying a timezone only when needed, and says the local timezone is assumed otherwise.
 
 A server omitting the zone is following that `SHOULD`. The overview then tells the reader
 to assume the *local* timezone — which is well defined for a human reading a catalog on
@@ -148,9 +153,9 @@ stated rather than hidden.
   which this decision does not provide.
 - **An unreadable non-empty timestamp still fails, and names the field.** The tolerance buys
   more accepted inputs, not a silent zero on the ones it still refuses — the failure mode
-  that would let a wrong instant reach a consumer as though the server had sent it. Catalog
-  timestamps are design-time metadata, not clinical content, so the offending value may
-  appear in the error.
+  that would let a wrong instant reach a consumer as though the server had sent it. Because
+  catalog timestamps are design-time metadata, [§ REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding)
+  lets the offending value appear in the error.
 - **REQ-095 gains its first named exception, and a precedent for how one is written.** The
   exception is keyed (this tolerance, this REQ, this ADR) and lives in the amended
   requirement, which keeps the authoritative-source rule readable in one place. It is not a

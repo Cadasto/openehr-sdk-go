@@ -13,7 +13,7 @@
 # contents:write, so the verify/build steps (make ci, scripts) never run
 # with a write-capable token.
 #
-# Policy: docs/releases.md. Plan: docs/plans/archive/2026-05-25-versioning-strategy.md.
+# Policy: docs/releases.md.
 
 name: Release
 

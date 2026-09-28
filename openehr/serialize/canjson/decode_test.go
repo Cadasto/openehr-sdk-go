@@ -760,9 +760,8 @@ func TestUnmarshalOverflowIsATypedError(t *testing.T) {
 // carrying more significant digits than float64 holds (here 19) now
 // fails rather than rounding silently, wrapping canjson.ErrInvalidShape
 // so a caller can classify it with errors.Is alone — closed by
-// docs/plans/archive/2026-09-01-rm-canonical-json-fidelity.md, which
-// replaces the retired TestUnmarshalMantissaPrecisionLossIsSilent this
-// pinned before the gap closed. rm.Real's own significant-digit trigger
+// PR 145. It replaces the retired TestUnmarshalMantissaPrecisionLossIsSilent,
+// which pinned the gap before it closed. rm.Real's own significant-digit trigger
 // is unit-tested directly in openehr/rm/real_test.go; this only proves
 // DV_QUANTITY.magnitude inherits it through the ordinary struct-field
 // decode path — no per-field path wrapping exists for a scalar Real

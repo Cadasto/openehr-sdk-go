@@ -8,8 +8,8 @@ current behaviour is and where the full behaviour lands.
 Status legend: **Deviation** = deliberate, permanent-ish choice; **Deferred** = not yet
 implemented — residual scope tracked by the
 [simplified-formats umbrella plan](../../../docs/plans/2026-06-23-simplified-formats.md)
-(the [Phase 3 plan](../../../docs/plans/archive/2026-07-14-flat-structured-codecs.md) that
-built this package is done and archived).
+(the Phase 3 work that built this package landed in
+[PR 76](https://github.com/Cadasto/openehr-sdk-go/pull/76)).
 
 ## Strict, fail-loud posture
 

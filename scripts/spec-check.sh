@@ -2,11 +2,12 @@
 # Verify docs/specifications/traceability.yaml against the working tree.
 #
 # Fail (exit 1):
-#   - the generated blocks (REQ.md registry, plans/README.md index) are stale
-#     (scripts/spec-gen.sh --check)
-#   - a row carries a key outside the index schema (no `notes:`), the same key
-#     twice, or a comment — the map is an index, history lives in git
-#   - landed/partial REQs cite existing packages/tests/plans and catalogued probes
+#   - the generated parts (the map's tests: lists, the REQ.md registry) are
+#     stale (scripts/spec-gen.sh --check)
+#   - a row carries a key outside the index schema (no `notes:`, and no
+#     retired `plans:` or `adrs:`), the same key twice, or a comment; the map
+#     is an index, history lives in git
+#   - landed/partial REQs cite existing packages/tests and catalogued probes
 #   - landed/partial REQs do not cite a probe with Status: Draft in conformance.md
 #   - canonical: anchors resolve to a real heading in the target spec file
 #   - status: is a valid spec-stability value (draft|stable|deprecated)
@@ -32,9 +33,11 @@ declare -A anchors_built    # relpath -> 1 (files whose anchors have been extrac
 declare -A row_keys         # key -> 1 for the row being read (duplicate detection)
 declare -A seen_ids         # REQ id -> 1 (a row id may appear once)
 
-# The keys a traceability.yaml row may carry. Anything else — a `notes:` memoir
-# above all — is refused: the map is an index, and history lives in git.
-ROW_KEYS=" id title canonical status implementation packages tests probes plans adrs fixtures "
+# The keys a traceability.yaml row may carry. Anything else is refused: a
+# `notes:` memoir above all (the map is an index, and history lives in git),
+# and the retired `plans:` and `adrs:` keys (an ADR names its REQs itself and
+# spec-context finds it from there; plans are outside the traceability chain).
+ROW_KEYS=" id title canonical status implementation packages tests probes fixtures "
 
 die() { echo "spec-check: error: $*" >&2; fail=1; }
 warn_msg() { echo "spec-check: warning: $*" >&2; warn=$((warn + 1)); }
@@ -57,11 +60,10 @@ slugify() {
     | LC_ALL=C sed -E 's/[^a-z0-9 _-]+//g' | LC_ALL=C tr ' ' '-'
 }
 
-# Strip trailing whitespace and an inline `# comment` from a block-list item.
-# Paths and PROBE ids must not contain `#`; only ` # why` suffixes are stripped.
+# Trim surrounding whitespace from a block-list item; the row loop has
+# already refused inline comments.
 yaml_item() {
   local v="$1"
-  v="$(printf '%s' "$v" | sed -E 's/[[:space:]]+#.*$//')"
   v="${v#"${v%%[![:space:]]*}"}"
   printf '%s' "${v%"${v##*[![:space:]]}"}"
 }
@@ -70,7 +72,6 @@ reset_collectors() {
   in_packages=0
   in_probes=0
   in_tests=0
-  in_plans=0
 }
 
 # Lazily extract every ATX heading anchor from a spec file into anchor_set["rel#slug"].
@@ -94,7 +95,6 @@ current_status=""
 in_packages=0
 in_probes=0
 in_tests=0
-in_plans=0
 
 flush_req() {
   [[ -n "$current_id" ]] || return 0
@@ -106,8 +106,12 @@ flush_req() {
   # Out-of-vocabulary implementation values must fail loudly: an unmatched
   # value used to leave the row's implementation empty, silently skipping
   # every artefact check below (the REQ-116 'proposed' hole).
-  if [[ -n "$current_impl" && ! "$current_impl" =~ ^(landed|partial|planned|deprecated)$ ]]; then
-    die "$current_id: invalid implementation '$current_impl' (expected landed|partial|planned|deprecated)"
+  if [[ -n "$current_impl" && ! "$current_impl" =~ ^(landed|partial|planned|retired)$ ]]; then
+    die "$current_id: invalid implementation '$current_impl' (expected landed|partial|planned|retired)"
+  fi
+  # A withdrawn requirement is retired, and only a deprecated one can be.
+  if [[ "$current_impl" == "retired" && "$current_status" != "deprecated" ]]; then
+    die "$current_id: implementation retired needs status: deprecated (found '${current_status}')"
   fi
   if [[ "$current_impl" == "landed" || "$current_impl" == "partial" ]]; then
     if [[ ${#pkg_paths[@]} -eq 0 && ${#test_paths[@]} -eq 0 ]]; then
@@ -118,9 +122,6 @@ flush_req() {
     done
     for t in "${test_paths[@]}"; do
       [[ -f "${ROOT}/${t}" ]] || die "$current_id: missing test path ${t}"
-    done
-    for pl in "${plan_paths[@]}"; do
-      [[ -f "${ROOT}/${pl}" ]] || die "$current_id: missing plan ${pl}"
     done
     for pr in "${probe_ids[@]}"; do
       if ! grep -qF "#### ${pr} " "$CONF"; then
@@ -141,9 +142,6 @@ flush_req() {
     for t in "${test_paths[@]}"; do
       [[ -f "${ROOT}/${t}" ]] || warn_msg "$current_id (planned): missing test path ${t}"
     done
-    for pl in "${plan_paths[@]}"; do
-      [[ -f "${ROOT}/${pl}" ]] || warn_msg "$current_id (planned): missing plan ${pl}"
-    done
   fi
   current_id=""
   current_impl=""
@@ -152,7 +150,6 @@ flush_req() {
   pkg_paths=()
   probe_ids=()
   test_paths=()
-  plan_paths=()
   row_keys=()
   reset_collectors
 }
@@ -160,7 +157,6 @@ flush_req() {
 pkg_paths=()
 probe_ids=()
 test_paths=()
-plan_paths=()
 
 in_rows=0
 while IFS= read -r line || [[ -n "$line" ]]; do
@@ -182,6 +178,14 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     [[ -z "${row_keys[$_key]:-}" ]] \
       || die "${current_id}: key '${_key}:' appears twice — a YAML parser keeps only the last"
     row_keys[$_key]=1
+  fi
+  # A malformed `- id:` line (wrong digit count, no space after the colon, or
+  # a bad indent) must be refused cleanly: the loose match below has no end
+  # anchor and any indent, so a truncated id would otherwise silently attach
+  # its keys to the previous row.
+  if [[ $in_rows -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*id: ]]; then
+    [[ "$line" =~ ^"  - id: "REQ-[0-9]{3,}[[:space:]]*$ ]] \
+      || { die "traceability.yaml: malformed id line '${line}' (after ${current_id:-the header})"; continue; }
   fi
   if [[ "$line" =~ ^[[:space:]]*-[[:space:]]*id:[[:space:]]*(REQ-[0-9]+) ]]; then
     # Capture before flush_req: its internal `[[ =~ ]]` tests clobber BASH_REMATCH.
@@ -221,7 +225,6 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     in_packages=1
     in_probes=0
     in_tests=0
-    in_plans=0
     continue
   fi
   if [[ "$line" =~ ^[[:space:]]*probes:[[:space:]]*\[(.*)\][[:space:]]*$ ]]; then
@@ -237,42 +240,17 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     in_probes=1
     in_packages=0
     in_tests=0
-    in_plans=0
     continue
   fi
   if [[ "$line" =~ ^[[:space:]]*tests:[[:space:]]*(#.*)?$ ]]; then
     in_tests=1
     in_packages=0
     in_probes=0
-    in_plans=0
-    continue
-  fi
-  if [[ "$line" =~ ^[[:space:]]*plans:[[:space:]]*\[(.*)\][[:space:]]*$ ]]; then
-    IFS=',' read -ra _parts <<< "${BASH_REMATCH[1]}"
-    for _p in "${_parts[@]}"; do
-      _p="${_p// /}"
-      [[ -n "$_p" ]] && plan_paths+=("$_p")
-    done
-    reset_collectors
-    continue
-  fi
-  # Block-form `plans:` — these used to fall through into the still-open
-  # `tests:` collector and pass the -f check only because plans are files.
-  if [[ "$line" =~ ^[[:space:]]*plans:[[:space:]]*(#.*)?$ ]]; then
-    in_plans=1
-    in_packages=0
-    in_probes=0
-    in_tests=0
     continue
   fi
   if [[ $in_packages -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*(.+)$ ]]; then
     _v="$(yaml_item "${BASH_REMATCH[1]}")"
     [[ -n "$_v" ]] && pkg_paths+=("$_v")
-    continue
-  fi
-  if [[ $in_plans -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*(.+)$ ]]; then
-    _v="$(yaml_item "${BASH_REMATCH[1]}")"
-    [[ -n "$_v" ]] && plan_paths+=("$_v")
     continue
   fi
   if [[ $in_tests -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*(.+)$ ]]; then
@@ -284,7 +262,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     probe_ids+=("${BASH_REMATCH[1]}")
     continue
   fi
-  # REQ-row fields we do not parse (adrs, fixtures, notes, title, …) must
+  # REQ-row fields we do not parse (fixtures, title, a refused key, ...) must
   # not leave a block collector armed for the next list.
   if [[ -n "$current_id" && "$line" =~ ^[[:space:]]{4}[a-z_]+: ]]; then
     reset_collectors
@@ -315,15 +293,15 @@ for id in $(printf '%s\n' "${!trace_canonical[@]}" | sort); do
     || die "${id}: canonical anchor '#${anchor}' does not resolve to a heading in ${rel}"
 done
 
-# The generated blocks (REQ.md registry, plans/README.md index) match their
-# sources. The registry is generated from this map, so membership and
+# The generated parts (the map's tests: lists, the REQ.md registry) match
+# their sources. The registry is generated from this map, so membership and
 # implementation status cannot drift from it while this check is green.
 # A registry-shaped row outside the generated block would read as a real
 # registry entry to a human reader (spec-context reads only inside the markers).
 stray="$(awk '
   index($0, "<!-- BEGIN GENERATED: registry ") == 1 { inside = 1; next }
   index($0, "<!-- END GENERATED: registry ") == 1 { inside = 0; next }
-  !inside && /^\| REQ-[0-9]+ \|.*\| (landed|partial|planned|deprecated) \|$/ { print NR }
+  !inside && /^\| REQ-[0-9]+ \|.*\| (landed|partial|planned|retired) \|$/ { print NR }
 ' "$REQ_REG")"
 [[ -z "$stray" ]] || die "REQ.md: registry row(s) outside the generated block at line(s) $(echo $stray) — edit traceability.yaml and run make spec-gen"
 

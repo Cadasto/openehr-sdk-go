@@ -74,6 +74,8 @@ func TestRunWritesTheTableThenVerifiesItClean(t *testing.T) {
 	}
 }
 
+// REQ-034: the drift check fails on a hand-edited generated table and leaves
+// the file as it found it.
 func TestRunVerifyReportsDriftWithoutWriting(t *testing.T) {
 	t.Parallel()
 	resources, outDir := pin(t, fixtureManifest)

@@ -53,7 +53,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 |---|---|---|
 | Abstract generic `EVENT` polymorphism (`History.events`) | Promote `EVENT` to a Go interface; `POINT_EVENT` / `INTERVAL_EVENT` concrete; whitelist in generator | [ADR 0003](../adr/0003-rm-event-polymorphism.md) |
 | `Real` / `Integer` wire tolerance (quoted vs numeric JSON) | Strict encode, permissive decode via `rm.Real` / `rm.Integer` defined types | [ADR 0004](../adr/0004-numeric-wire-tolerance.md) |
-| Polymorphic round-trip fidelity (REQ-052/040) | Value-in-interface `_type` on encode via `openehr/internal/jsonpoly`; round-tripped `DV_INTERVAL<T>` validated from its bounds' runtime types; corpus round-trips byte-stable. **Superseded by the row below**: `jsonpoly` is retired and byte-stability withdrawn under [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) | [archived plan](../plans/archive/2026-06-23-polymorphic-encode-decode.md) |
+| Polymorphic round-trip fidelity (REQ-052/040) | Value-in-interface `_type` on encode via `openehr/internal/jsonpoly`; round-tripped `DV_INTERVAL<T>` validated from its bounds' runtime types; corpus round-trips byte-stable. **Superseded by the row below**: `jsonpoly` is retired and byte-stability withdrawn under [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) | [PR 55](https://github.com/Cadasto/openehr-sdk-go/pull/55) |
 | `encoding/json/v2` as the canonical-JSON codec; encoded member order is not a contract | Migrate to standard-library v2; retire the generator's per-type `MarshalJSON` / `UnmarshalJSON` and `openehr/internal/jsonpoly`; `_type` first becomes a SHOULD and round-trip fidelity is asserted semantically rather than byte-wise | [ADR 0021](../adr/0021-json-member-order-not-a-contract.md), [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) |
 
 ### Still open
@@ -64,10 +64,29 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Evidence needed (remaining):**
 
-- Benchmark throughput, allocations, and memory residency for the migrated `encoding/json/v2` path against the retired generated marshalers (`openehr/serialize/canjson/bench_test.go`).
+- Memory residency for the migrated `encoding/json/v2` path against the retired generated marshalers. Time and allocations are recorded in § Benchmark evidence below.
 - Document any remaining abstract-generic classes requiring ADR whitelist (generator policy today: `EVENT` only).
 
-The `encoding/json/v2` migration evidence — `_type`-first survival, polymorphic round-trip, generated / `jsonpoly` line count removed — is delivered and recorded in the ADR 0021/0022 sub-question row above and the plan's close-out; PROBE-030 / PROBE-038 assert the round trip semantically (typed deep comparison plus [wire-equivalence](conformance.md#terms)).
+The `encoding/json/v2` migration evidence — `_type`-first survival, polymorphic round-trip, generated / `jsonpoly` line count removed — is delivered and recorded in the ADR 0021/0022 sub-question row above and in [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171); PROBE-030 / PROBE-038 assert the round trip semantically (typed deep comparison plus [wire-equivalence](conformance.md#terms)).
+
+### Benchmark evidence
+
+Time/op change against the retired generated marshalers (v1 at `90473f9f`), from `benchstat -count=10` on one machine (13th Gen i7-13700H, WSL2, `go1.27.1`). Each column was measured against its own v1 run in the same session. The benchmarks live in `openehr/serialize/canjson/`, `openehr/rm/typereg/` and `openehr/serialize/simplified/`. The allocation column gives v1, then PR 171, then PR 174, and takes its v1 figure from the PR 171 run.
+
+| Benchmark | v2 migration ([PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171), `93d06e1f`) | single-pass concrete decode ([PR 174](https://github.com/Cadasto/openehr-sdk-go/pull/174)) | allocs/op |
+|---|---|---|---|
+| `EncodeComposition_400` | -47.82% | -47.91% | 9 281 / 16 444 / 16.44k |
+| `DecodeComposition_400` | +8.98% | -39.62% | 21 665 / 16 860 / 13.25k |
+| `DecodeCompositionCassette` | -38.30% | -61.05% | 6 279 / 5 220 / 4 809 |
+| `EncodeDVQuantity` | +10.52% | not measured | 6 / 9 / not measured |
+| `DecodeDVQuantity` | +37.88% | -20.19% | 3 / 5 / 4 |
+| `RegistryDecodeElement` | +13.84% | -30.80% | 29 / 39 / 15 |
+| `RegistryDecodeDVQuantity` | +18.80% | -30.04% | 9 / 18 / 5 |
+| `FlatCorpusRoundTrip` | +1.77% | not measured | 68 400 / 69 940 / not measured |
+| `MarshalFlat` | +4.73% | not measured | 1 103 / 1 193 / not measured |
+| `UnmarshalFlat` | +2.69% | not measured | 2 962 / 2 884 / not measured |
+
+The budget line used for both runs: a benchmark regresses materially when its v2 time/op is more than 20 percent worse than v1 at p < 0.05. PR 171 crossed it once, on `DecodeDVQuantity`, where buffering, peeking and decoding each concrete value cost the most; PR 174 reads `_type` from the declared wire field after one decode and brings that benchmark under v1. PR 174 was measured on its branch before the rebase that merged it (`0fee2bb2`). A token-scanning peek for `DecodePolymorphic` and `Registry.Decode` is warranted only if their benchmarks cross the line; neither does.
 
 **Resolution form (remaining):** the full-inventory and performance sub-questions resolve through plan tasks and benchmarks, not a new ADR. The codec choice is already resolved by [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) (which also touched the codegen policy in [ADR 0002](../adr/0002-bmm-codegen-decisions.md), since it changed what the generator emits); a future codec swap, were it revisited, would amend REQ-052 / REQ-053 and possibly REQ-040.
 
@@ -153,7 +172,7 @@ The `encoding/json/v2` migration evidence — `_type`-first survival, polymorphi
 
 ## STRAND-09 — ITS-REST conformance follow-ups
 
-**Status:** Open (item 2) — opened by the [ITS-REST conformance remediation](../plans/archive/2026-06-19-its-rest-conformance-remediation.md).
+**Status:** Open (item 2) — opened by the ITS-REST conformance remediation ([PR 53](https://github.com/Cadasto/openehr-sdk-go/pull/53)).
 
 **Two follow-ups carried out of that plan:**
 
@@ -165,7 +184,7 @@ The `encoding/json/v2` migration evidence — `_type`-first survival, polymorphi
 
 ## STRAND-10 — rmpath: one sentinel for two not-found conditions
 
-**Status:** Open — opened by the PROBE-086 review round ([2026-07-16 plan](../plans/archive/2026-07-16-web-template-tests-conformance.md), follow-ups).
+**Status:** Open — opened by the PROBE-086 review round ([PR 85](https://github.com/Cadasto/openehr-sdk-go/pull/85), follow-ups).
 
 **Question:** should `rmpath.ItemAtPath` distinguish *attribute unknown to the navigator* from *attribute known but unpopulated*, instead of returning `ErrPathNotFound` for both?
 
@@ -193,7 +212,7 @@ The `encoding/json/v2` migration evidence — `_type`-first survival, polymorphi
 
 ## STRAND-12 — BMM interface classes carry no `is_abstract` flag
 
-**Status:** Open — opened by the [REQ-048 specification pass](../plans/archive/2026-08-18-rminfo-class-hierarchy.md).
+**Status:** Open — opened by the REQ-048 specification pass ([PR 113](https://github.com/Cadasto/openehr-sdk-go/pull/113)).
 
 **Question:** should the RM meta-model introspection surface ([REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface)) report a `P_BMM_INTERFACE` class as abstract even though the pinned BMM sets no `is_abstract` flag on it — and is the missing flag an upstream BMM defect this SDK should raise per [REQ-047](bmm-conformance.md#req-047--bmm-spec-divergence-resolution)?
 
@@ -241,7 +260,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 ## STRAND-14 — Should template-driven validation also run the RM-floor invariants?
 
-**Status:** Open — opened 2026-09-05 from the review round of the [RM canonical-JSON fidelity plan](../plans/archive/2026-09-01-rm-canonical-json-fidelity.md), whose text claimed `ValidateComposition` would report the new `TERM_MAPPING` invariants; it never has, and the claim was corrected there rather than in code.
+**Status:** Open — opened 2026-09-05 from the review round of the RM canonical-JSON fidelity work ([PR 145](https://github.com/Cadasto/openehr-sdk-go/pull/145)), whose plan text claimed `ValidateComposition` would report the new `TERM_MAPPING` invariants; it never has, and the claim was corrected in the plan rather than in code.
 
 **Question:** should `ValidateComposition` ([REQ-102](clinical-modeling.md#req-102--composition-validation)) and the [REQ-110](clinical-modeling.md#req-110--template-driven-validation-beyond-composition) entry points run the [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) per-type invariant catalogue as part of a template-driven pass, or stay exactly template conformance with the floor a separate call?
 

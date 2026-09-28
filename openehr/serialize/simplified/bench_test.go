@@ -1,7 +1,8 @@
 package simplified_test
 
 // bench_test.go: FLAT codec baselines for the move of the canonical-JSON path
-// to encoding/json/v2 (docs/plans/archive/2026-09-14-json-v2-migration.md, phase 3.5).
+// to encoding/json/v2 (PR 171; results in docs/specifications/research-strands.md,
+// STRAND-04).
 //
 // This package stays on encoding/json, so these benchmarks are not measuring a
 // package that changes. They measure what the change reaches indirectly: the
@@ -32,7 +33,7 @@ const minFlatCorpusBodies = 24
 // benchFlatBody is the largest body in the FLAT conformance corpus that this
 // SDK's codec accepts end to end (10 164 bytes).
 //
-// The migration plan names ehrbase_conformance_party_related.json, the largest
+// The migration named ehrbase_conformance_party_related.json, the largest
 // body in the corpus at 17 648 bytes. That body cannot be used: it carries
 // composer party sub-structure (`composer/_identifier:0|assigner`), which no
 // ctx/ short form can express and which the decoder refuses at the ADR 0015

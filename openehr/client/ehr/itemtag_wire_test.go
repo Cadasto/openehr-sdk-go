@@ -45,6 +45,9 @@ func TestItemTagHeaderRoundTripBackslash(t *testing.T) {
 // TestFormatItemTagHeader_ControlCharsRejected verifies that CR/LF/NUL in any
 // of Key, Value, or TargetPath cause FormatItemTagHeader to return a non-nil
 // error mentioning "control characters", and that the returned string is empty.
+//
+// REQ-059: control characters in an item-tag key, value or target path are
+// refused, never sanitised.
 func TestFormatItemTagHeader_ControlCharsRejected(t *testing.T) {
 	cases := []struct {
 		name string

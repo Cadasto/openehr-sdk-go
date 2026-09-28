@@ -183,6 +183,9 @@ func TestBuilder_SetCodedText_typeMismatch(t *testing.T) {
 
 // TestBuilder_Set_typeMismatch asserts ErrTypeMismatch when a
 // *rm.DVText is supplied at a DV_QUANTITY path.
+//
+// REQ-101: a Go value that does not fit the compiled node's RM type is
+// refused with ErrTypeMismatch.
 func TestBuilder_Set_typeMismatch(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,
@@ -234,6 +237,9 @@ func TestBuilder_Set_unknownPath(t *testing.T) {
 // TestBuilder_Build_AggregatesErrors confirms that two bad Set calls
 // + one good Set surface as a single joined error from Build, with
 // each per-path failure recoverable via errors.Is.
+//
+// REQ-101: Set does not short-circuit; Build returns every faulty path joined
+// in one error.
 func TestBuilder_Build_AggregatesErrors(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,
@@ -294,6 +300,8 @@ func TestBuilder_Build_Idempotent(t *testing.T) {
 
 // TestBuilder_TemplateID asserts Builder.TemplateID matches the
 // compiled template's id.
+//
+// REQ-101: TemplateID returns the compiled OPT's template id.
 func TestBuilder_TemplateID(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,

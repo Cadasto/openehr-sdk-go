@@ -37,11 +37,12 @@ func ConstraintTemplateIDs() ([]string, error) {
 }
 
 func isConstraintTemplateID(id string) bool {
-	// Test_dv_interval_* templates carry deliberately out-of-range and
-	// inverted-bound instances (REQ-052 round-trip inputs), not primitive-
-	// constraint conformance inputs, so they stay out of the constraint axis;
-	// constraint_templates_test.go pins that. Their JSON round trip is covered
-	// by PROBE-030 via ListCompositionJSON.
+	// Test_dv_interval_* templates carry out-of-range and inverted-bound
+	// instances and are not yet enrolled in the constraint axis: enrolling
+	// them needs primitive_out_of_range assertions for the lower_upper
+	// instances (an open item in docs/roadmap.md). constraint_templates_test.go
+	// pins the exclusion until then. Their JSON round trip is covered by
+	// PROBE-030 via ListCompositionJSON.
 	if strings.HasPrefix(id, "Test_dv_interval_") {
 		return false
 	}

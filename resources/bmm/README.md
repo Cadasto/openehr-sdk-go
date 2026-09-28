@@ -68,4 +68,4 @@ Each BMM file SHOULD be accompanied by a checksum in this README's git history. 
 - BMM (abstract meta-model): openEHR LANG specification, *Basic Meta-Model*.
 - P_BMM persistence: openEHR LANG specification, *BMM Persistence Format*.
 - SDK conformance contract: [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md).
-- Generator design: the `bmm-codegen` plan in [`../../docs/plans/`](../../docs/plans/).
+- Generator design: [ADR 0002](../../docs/adr/0002-bmm-codegen-decisions.md); the generator landed on `main` in commit [b89aa589](https://github.com/Cadasto/openehr-sdk-go/commit/b89aa589).

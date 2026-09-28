@@ -10,6 +10,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/auth"
 )
 
+// REQ-069: New refuses an empty username with auth.ErrInvalidConfig.
 func TestNewValidatesUsername(t *testing.T) {
 	_, err := New("", "secret")
 	if err == nil {
@@ -38,6 +39,7 @@ func TestNewAllowsEmptyPassword(t *testing.T) {
 	}
 }
 
+// REQ-069: Token carries the base64 of "username:password" per RFC 7617.
 func TestTokenEncoding(t *testing.T) {
 	src, err := New("alice", "s3cret:colon")
 	if err != nil {

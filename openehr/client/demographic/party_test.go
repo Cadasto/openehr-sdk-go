@@ -141,6 +141,9 @@ func TestGetSendsVersionMetadata(t *testing.T) {
 // TestCreateRoutesByConcreteType asserts Create derives the resource path
 // segment from the value's concrete type, for every PARTY type (pointer form)
 // plus one value form.
+//
+// REQ-050: Create posts each PARTY type to its 1.1.0-development demographic
+// endpoint.
 func TestCreateRoutesByConcreteType(t *testing.T) {
 	cases := []struct {
 		name     string

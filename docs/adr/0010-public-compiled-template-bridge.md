@@ -1,10 +1,18 @@
+---
+kind: adr
+id: ADR-0010
+title: "Public compiled-template bridge placement"
+status: accepted
+date: 2026-06-17
+---
+
 # ADR 0010 — Public compiled-template bridge placement
 
 - **Status:** Accepted, 2026-06-17.
 - **Supersedes:** —
 - **Superseded by:** —
 - **Revises:** [ADR 0005](0005-compiled-template-foundation.md) §C2 (the `template.Compile` / `template.Compiled` re-export proposal).
-- **Tracks:** [`docs/plans/archive/2026-06-17-public-compiled-template-bridge.md`](../plans/archive/2026-06-17-public-compiled-template-bridge.md). Implements [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge); unblocks external callers of REQ-101 / REQ-102 / REQ-107 / REQ-110.
+- **Tracks:** the public compiled-template bridge ([PR 44](https://github.com/Cadasto/openehr-sdk-go/pull/44)). Implements [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge); unblocks external callers of REQ-101 / REQ-102 / REQ-107 / REQ-110.
 
 > **Numbering note.** ADR numbers 0008 (SMART discovery `services` shape) and 0009 (SMART/auth dependency policy) are reserved for decisions in flight on a separate branch and are not yet on `main`. This ADR takes 0010 to avoid a number collision on merge.
 
@@ -23,7 +31,7 @@ REQ-102 §C2's own wording — *"re-export"* and *"externally callable without c
 
 ## Decision
 
-The public compiled-template bridge **MUST** live in the sibling package `openehr/templatecompile`, **not** in `openehr/template`. It re-exports the engine by **type alias**:
+The public compiled-template bridge **lives** in the sibling package `openehr/templatecompile`, **not** in `openehr/template`. It re-exports the engine by **type alias**:
 
 - `type Compiled = <internal>.Compiled` — a public alias, so `Compile` output is accepted as-is by composition / instance / validation / aql/lint with no conversion and no behavioural change.
 - `func Compile(opt *template.OperationalTemplate, opts ...Option) (*Compiled, error)` delegating to the engine, with functional `Option`s (`WithRMInfo`, `WithoutImplicitAttributes`) that keep the engine's option struct out of the public surface.

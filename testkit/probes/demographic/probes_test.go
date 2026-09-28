@@ -64,6 +64,8 @@ func partyEchoBackend(body []byte) *sandbox.Backend {
 // the version-envelope uid the fake server emits.
 const demographicprobes073VOID = "demographic-probe-vo-1"
 
+// REQ-050: PROBE-073 round-trips every PARTY type through the
+// 1.1.0-development demographic endpoints.
 func TestProbe073DemographicRoundTrip(t *testing.T) {
 	cases := []struct {
 		party    rm.Party

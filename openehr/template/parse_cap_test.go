@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// REQ-108: ParseOPT refuses input over the OPT size cap.
 func TestParseOPT_inputTooLarge(t *testing.T) {
 	orig := maxOPTBytes
 	maxOPTBytes = 64
@@ -31,6 +32,9 @@ func TestParseOPT_inputTooLarge(t *testing.T) {
 // document one byte over the cap must be rejected as too large. The
 // earlier cappedReader implementation let an exactly-cap+1 document slip
 // through because its "exceeded" flag lagged one Read behind.
+//
+// REQ-108: the OPT size cap is exact; a document of exactly the cap parses
+// and one byte more is refused.
 func TestParseOPT_capBoundary(t *testing.T) {
 	const valid = `<?xml version="1.0" encoding="UTF-8"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">

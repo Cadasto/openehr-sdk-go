@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// REQ-059: repeated openehr-item-tag response headers join into the one value
+// the typed response metadata carries.
 func TestJoinHeaderField(t *testing.T) {
 	h := http.Header{}
 	h.Add("openehr-item-tag", `key="a",value="1"`)

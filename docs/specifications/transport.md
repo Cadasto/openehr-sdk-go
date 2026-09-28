@@ -46,6 +46,8 @@ Rules:
 - Retries **MUST** respect `ctx` cancellation.
 - The retry budget **MUST** be observable via the OTel span (`retry.attempt`, `retry.backoff_ms`).
 
+The SDK checks the method before it looks at the error or the status, so a token or network failure on a non-idempotent request is not retried either.
+
 - **Lives in:** [`transport/`](../../transport)
 
 ---
@@ -90,7 +92,6 @@ The SDK **MUST**:
 `WireError.Error()` values flow into REQ-098 observers and REQ-090 OTel span status; the PHI-safe default applies there too unless the consumer opts into raw bodies.
 
 - **Lives in:** [`transport/`](../../transport)
-- **Tests:** `transport/client_test.go` (`TestWireError*`, `TestMaxResponseBody*`), `transport/errors_test.go` (`TestErrorStringsValueFreeWhenRouteUnset`, `TestNetworkFailureSanitisesWrappedURL`, `TestUnroutedObservationKeepsTheResolvedPath`)
 
 ---
 
@@ -110,7 +111,7 @@ Rules:
 - **Defaults:** writes default to `minimal`; reads default to `representation` (no Prefer header).
 - The SDK **MUST NOT** silently downgrade `representation` when the server omits the body.
 
-All three write-path modes are landed for the shared `WriteResult` family (`composition` / `directory` / `ehr_status` / `demographic`): `representation` decodes the bare resource; `identifier` populates the `VersionMetadata` identifier slot from the ITS-REST `Identifier` body (`{"uid": …}`) via `ehr.ResolveIdentifierBody`, with the `Location` header staying canonical; `minimal` returns metadata only. `contribution.Commit` (its own `WithPrefer`) carries `minimal` and the `representation` decode only: the `identifier` slot is never populated from the body (deferred; recorded in the archived [write-result plan](../plans/archive/2026-08-18-write-result-contract.md) Defers). Identifier-slot population for the WriteResult family landed in the archived [follow-up plan](../plans/archive/2026-05-25-req094-prefer-followups.md). The PROBE-065 `minimal`→GET round-trip is implemented (Sandbox) at [`testkit/probes/versioned/probe_065_minimal_return_round_trip.go`](../../testkit/probes/versioned/probe_065_minimal_return_round_trip.go).
+All three write-path modes are landed for the shared `WriteResult` family (`composition` / `directory` / `ehr_status` / `demographic`): `representation` decodes the bare resource; `identifier` populates the `VersionMetadata` identifier slot from the ITS-REST `Identifier` body (`{"uid": …}`) via `ehr.ResolveIdentifierBody`, with the `Location` header staying canonical; `minimal` returns metadata only. `contribution.Commit` (its own `WithPrefer`) carries `minimal` and the `representation` decode only: the `identifier` slot is never populated from the body (deferred when the write-result contract landed in [PR 121](https://github.com/Cadasto/openehr-sdk-go/pull/121)). Identifier-slot population for the WriteResult family landed in [PR 35](https://github.com/Cadasto/openehr-sdk-go/pull/35). The PROBE-065 `minimal`→GET round-trip is implemented (Sandbox) at [`testkit/probes/versioned/probe_065_minimal_return_round_trip.go`](../../testkit/probes/versioned/probe_065_minimal_return_round_trip.go).
 
 **Absent resource on a successful write.** `minimal` and `identifier` **MUST** return a nil error and a zero resource. For a pointer resource type the zero value is a typed nil — `== nil` is the correct test for a concrete `*T` return, but an interface return (`rm.Party`) can hold a typed-nil pointer, for which `== nil` is the wrong test. The SDK **MUST** expose a reflection-free `HasResource` helper scoped to registered RM types: it reports false for a typed-nil pointer to a registered RM type, a bare-nil interface, and an interface holding a typed-nil registered RM pointer, and true for any populated resource. A typed nil of a type outside the RM registry is out of scope. Write-path documentation **MUST** name the typed-nil trap and point at that helper (and at `rm.IsTypedNil` for callers already on the RM type).
 
@@ -153,9 +154,9 @@ Rationale: benchmark / load-tool consumers that measure server-observed latency 
 
 ## REQ-097 — First-class `Idempotency-Key` (deprecated)
 
-**Status: Deprecated (2026-05).** Removal target: **v1.0.0** (first tagged release). Cadasto openEHR services no longer accept the `Idempotency-Key` HTTP header. Until removal, the SDK **MUST NOT** expose first-class `Idempotency-Key` support on `transport.Request` or emit the header on outgoing requests.
+**Status: Deprecated (2026-05).** Cadasto openEHR services no longer accept the `Idempotency-Key` HTTP header. The SDK has no first-class `Idempotency-Key` support on `transport.Request` and does not add the header to outgoing requests.
 
-The original REQ-097 design (first-class field, verbatim header, OTel attribute) is superseded by this deprecation. The identifier is retained for traceability.
+The original REQ-097 design (first-class field, verbatim header, OTel attribute) is superseded by this deprecation. The identifier is retained for traceability and carries no active requirement.
 
 ---
 

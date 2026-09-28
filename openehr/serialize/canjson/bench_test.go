@@ -119,7 +119,7 @@ const benchCassette = "Demonstration.v1"
 
 // BenchmarkDecodeCompositionCassette measures decode plus encode of the largest
 // vendored cassette, the baseline the json/v2 migration is measured against
-// (plan 2026-09-14-json-v2-migration.md phase 3.5). b.SetBytes reports against
+// (PR 171; results in research-strands.md, STRAND-04). b.SetBytes reports against
 // the input document, so the MB/s figure is throughput per input byte over a
 // decode and an encode together. It is not comparable with the MB/s of
 // BenchmarkDecodeComposition_400, which decodes only.

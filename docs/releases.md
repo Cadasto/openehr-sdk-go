@@ -1,6 +1,6 @@
 # Releases
 
-How `github.com/cadasto/openehr-sdk-go` is versioned, tagged, and announced. Quality gate before any tag: [`docs/ci.md`](ci.md). Landed reasoning: [versioning-strategy plan](plans/archive/2026-05-25-versioning-strategy.md) (archived).
+How `github.com/cadasto/openehr-sdk-go` is versioned, tagged, and announced. Quality gate before any tag: [`docs/ci.md`](ci.md).
 
 ## Versioning
 
@@ -18,6 +18,7 @@ Standard SemVer applies (breaking → major, additive → minor, fix → patch).
 | BMM bump with no public type change | Patch |
 | `go.mod` minimum Go version raise | Minor (REQ-002) |
 | Module path change | Major + `/vN` import path (REQ-001) |
+| Tightened validation: an input that passed now fails | Minor while on `v0.x`, major from `v1.0.0`; the release notes name it |
 
 ### Four version concepts
 
@@ -32,13 +33,15 @@ The repo pins four versions independently, and the git tag tracks only the first
 
 ### Pre-1.0
 
+The SDK tags `v0.x` from the first usable adopter slice rather than waiting for `v1.0.0`. Without a tag, adopters would pin pseudo-versions for months; an alpha/beta ladder was weighed and left optional (see [Pre-releases & hotfixes](#pre-releases--hotfixes)). `v1.0.0` stays reserved for the gate below.
+
 While on `v0.x`, minor bumps may break the public API (release notes list every break) and patch bumps stay compatible. Pin an exact tag and read the notes before upgrading a minor.
 
 ### `v1.0.0` gate
 
 Cut when all three hold ([`module-layout.md` § Versioning](specifications/module-layout.md#versioning)):
 
-1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed` or `deprecated`, with no `partial` and no `planned`. (`deprecated` is terminal: REQ-081 and REQ-097 carry no active requirement and will never land, so a gate demanding `landed` for every row could not be met.)
+1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed` or `retired`, with no `partial` and no `planned`. (`retired` is terminal: REQ-081 and REQ-097 carry no active requirement and will never land, so a gate demanding `landed` for every row could not be met.)
 2. The openEHR wire-conformance probe suite passes ([REQ-080](specifications/conformance.md#req-080--openehr-wire-conformance)).
 3. A reference openEHR deployment passes the live probe suite ([REQ-082](specifications/conformance.md#req-082--runnability)).
 
@@ -72,6 +75,7 @@ Preview notes locally without side effects: `bash scripts/release-notes.sh X.Y.Z
 
 - `main` is always releasable after CI. Tag **only** from `main` (or a `release/v0.x` hotfix branch).
 - Only maintainers push tags, and branch protection on `main` enforces this.
+- Tags are annotated, not signed. Tag signing (Sigstore or GPG) is deferred: a candidate for the `v1.0.0` cut, not one of its gates.
 - **Substantive work** (features, fixes, docs of record) lands via branch + PR. A maintainer commits **mechanical release bookkeeping** directly to `main`, with no branch or PR. That covers the version-bump CHANGELOG cut (steps 2 and 3 above) and any milestone roadmap bump. If branch protection ever rejects a direct push, stop and report it. Do not quietly route the bump through a PR instead.
 
 ## References
@@ -80,5 +84,5 @@ Preview notes locally without side effects: `bash scripts/release-notes.sh X.Y.Z
 - [`module-layout.md` § Versioning](specifications/module-layout.md#versioning): bump matrix + `v1.0.0` gates
 - [ADR 0001](adr/0001-bmm-version-bump-runbook.md): BMM bumps vs codegen
 - [`docs/ci.md`](ci.md): quality gate before tag
-- [versioning-strategy plan](plans/archive/2026-05-25-versioning-strategy.md) (archived)
+- Release tooling: commit [0ee78296](https://github.com/Cadasto/openehr-sdk-go/commit/0ee78296) (the tag-driven release workflow and notes script)
 - Go modules: [version numbering](https://go.dev/doc/modules/version-numbers)

@@ -166,7 +166,7 @@ The SDK **MUST** provide a canonical XML codec in `openehr/serialize`, symmetric
 
 Canonical XML applies to the same RM surface as canonical JSON: Composition, EHR_STATUS, Directory, Contribution, demographic resources. Polymorphic discrimination uses the `xsi:type` attribute (XML Schema Instance namespace), not the JSON `_type` property. Element names **MUST** be snake_case BMM names (same as canonical JSON keys). The codec **MUST** carry the namespace declarations the openEHR XML schemas require (`http://schemas.openehr.org/v1` default namespace; `xmlns:xsi` when `xsi:type` is present).
 
-Canonical ordering for XML is its own deterministic profile (see [`docs/plans/archive/2026-05-15-canonical-xml-serialization.md`](../plans/archive/2026-05-15-canonical-xml-serialization.md)). Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-052)), element order is part of an XML document's identity, so the encoder **MUST** emit in a fixed order and PROBE-033 holds it by byte comparison:
+Canonical ordering for XML is its own deterministic profile, set out in the bullets below (the codec landed on `main` in commit [c9f54243](https://github.com/Cadasto/openehr-sdk-go/commit/c9f54243)). Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-052)), element order is part of an XML document's identity, so the encoder **MUST** emit in a fixed order and PROBE-033 holds it by byte comparison:
 
 - Child elements follow **BMM property declaration order** (same order code generation emits struct fields).
 - `xsi:type` is the **first attribute** on every encoded concrete RM value where a polymorphic site is being resolved; the encoder emits it on every concrete value boundary (deterministic profile), the decoder requires it at polymorphic sites unless [`WithRelaxedTypeDispatch`] is set.
@@ -376,6 +376,8 @@ ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a resp
 
 ## REST leaf operations
 
+When a leaf gains an operation or an option, its package's `Repository` interface **MUST** grow with it. That is no break for callers of the package functions but a compile-time break for interface implementers (precedent: `UploadTemplate`), so the CHANGELOG `### Added` entry **MUST** name the interface growth.
+
 ### REQ-142 — Contribution read
 
 The EHR Contribution leaf **MUST** expose a read operation matching ITS-REST `contribution_get`:
@@ -386,7 +388,7 @@ The call **MUST** return the persisted `CONTRIBUTION` decoded as the SDK's contr
 
 v1 of this leaf **MUST** request canonical JSON. Simplified-format `Accept` values (FLAT / STRUCTURED inner payloads) are out of scope — no other EHR Get leaf takes a format yet.
 
-The leaf's repository interface **MUST** include the same read — no break for callers of the package functions, a compile-time break for interface implementers (precedent: `UploadTemplate`); the CHANGELOG `### Added` entry **MUST** name the interface growth.
+The leaf's repository interface includes the same read, under the interface-growth rule in [§ REST leaf operations](#rest-leaf-operations).
 
 ### REQ-143 — Template list filters
 
@@ -400,7 +402,7 @@ The leaf's repository interface **MUST** include the same read — no break for 
 | `offset` | `WithOffset` | 0-based; an explicit `0` **MUST** be sent |
 | `fetch` | `WithFetch` | An explicit `0` **MUST** be sent |
 
-Unset options **MUST** omit the corresponding query key. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` and **MUST NOT** issue a request. The existing `format` argument selects the list path; v1 supports `FormatADL14` — the only registered `TemplateFormat` value. The decoded result **MUST** remain the same template-metadata slice the unfiltered list already returns. Adding a trailing variadic option list **MUST** stay source-compatible with existing callers. The `Repository` interface **MUST** grow the same variadic options — no break for callers, a compile-time break for interface implementers (precedent: `UploadTemplate`); the CHANGELOG `### Added` entry **MUST** name the interface growth.
+Unset options **MUST** omit the corresponding query key. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` and **MUST NOT** issue a request. The existing `format` argument selects the list path; v1 supports `FormatADL14` — the only registered `TemplateFormat` value. The decoded result **MUST** remain the same template-metadata slice the unfiltered list already returns. Adding a trailing variadic option list **MUST** stay source-compatible with existing callers. The `Repository` interface grows the same variadic options, under the interface-growth rule in [§ REST leaf operations](#rest-leaf-operations).
 
 ### REQ-144 — Definition metadata decoding
 

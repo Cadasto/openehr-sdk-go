@@ -1,13 +1,21 @@
+---
+kind: adr
+id: ADR-0022
+title: "Canonical JSON is encoded by `encoding/json/v2`"
+status: accepted
+date: 2026-09-14
+---
+
 # ADR 0022 — Canonical JSON is encoded by `encoding/json/v2`
 
-- **Status:** Accepted, 2026-09-14 (maintainer sign-off on the plan, PR #171); implementation landed under [2026-09-14-json-v2-migration.md](../plans/archive/2026-09-14-json-v2-migration.md).
+- **Status:** Accepted, 2026-09-14 (maintainer sign-off on the plan, PR 171); implementation landed in [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171).
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** resolves the `encoding/json/v2` simplification sub-question and the default-codec sub-question of [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance).
 - **Introduces:** —. **Amends:** [ADR 0002](0002-bmm-codegen-decisions.md) (what the generator emits for JSON: new D8).
 - **Depends on:** [ADR 0021](0021-json-member-order-not-a-contract.md). Without the order withdrawal this decision would be a different and worse one.
-- **Plan:** [2026-09-14-json-v2-migration.md](../plans/archive/2026-09-14-json-v2-migration.md).
-- **Related:** [ADR 0003](0003-rm-event-polymorphism.md) (the EVENT interface whitelist, whose codec justification this decision re-homes); [ADR 0004](0004-numeric-wire-tolerance.md) (strict encode, permissive decode, kept hand-written and unchanged); [REQ-040](../specifications/rm-modeling.md#type-registry-req-040) (the registry the dispatch hooks read).
+- **Landed in:** [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171) (the `encoding/json/v2` migration).
+- **Related:** [ADR 0003](0003-rm-event-polymorphism.md) (the EVENT interface whitelist, whose codec justification this decision re-homes); [ADR 0004](0004-numeric-wire-tolerance.md) (strict encode, permissive decode, kept hand-written and unchanged); [REQ-040](../specifications/rm-modeling.md#type-registry-req-040) (the registry the dispatch hooks read); [REQ-052](../specifications/wire.md#req-052) (the canonical-JSON contract this codec implements).
 
 ## Context
 

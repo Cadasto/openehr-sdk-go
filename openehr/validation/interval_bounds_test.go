@@ -12,6 +12,9 @@ import (
 // registration), so describeRMType reports "DV_INTERVAL". Conformance
 // to the OPT's parameterised interval is decided from the bounds'
 // runtime types, which survive the round-trip via their own `_type`.
+//
+// REQ-102: the RM type check admits a DV_INTERVAL for the OPT's parameterised
+// interval by its bounds' runtime types.
 func TestIntervalRMTypeMatches_boundsBackedCollapse(t *testing.T) {
 	collapsed := rm.DVInterval[rm.DVOrdered]{
 		Lower: &rm.DVQuantity{Magnitude: 30, Units: "cm"},

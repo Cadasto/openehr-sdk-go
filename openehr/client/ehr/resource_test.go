@@ -65,6 +65,9 @@ func TestHasResourceUncomparable(t *testing.T) {
 // never the Cause text — and the nil-receiver arms of Error/Unwrap are
 // load-bearing (a typed-nil *NoRepresentationError must not panic under
 // %v or an errors.Is/As chain walk).
+//
+// REQ-025: Error and Unwrap on a typed-nil *NoRepresentationError answer
+// instead of panicking.
 func TestNoRepresentationErrorStrings(t *testing.T) {
 	var nilErr *openehrclient.NoRepresentationError
 	if got := nilErr.Error(); got != "ehr: no representation" {

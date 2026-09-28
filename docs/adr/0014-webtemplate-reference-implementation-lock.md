@@ -1,12 +1,20 @@
+---
+kind: adr
+id: ADR-0014
+title: "WebTemplate reference implementation and id-generation lock"
+status: accepted
+date: 2026-07-14
+---
+
 # ADR 0014 — WebTemplate reference implementation and id-generation lock
 
-- **Status:** Accepted, 2026-07-14 — maintainer sign-off on the REQ-106 specification (the reference + version were chosen during brainstorming, superseding the placeholder plan's shared-model-first sketch); implementation lands under [2026-05-22-webtemplate-export.md](../plans/archive/2026-05-22-webtemplate-export.md).
+- **Status:** Accepted, 2026-07-14 — maintainer sign-off on the REQ-106 specification (the reference + version were chosen during brainstorming, superseding the placeholder plan's shared-model-first sketch); the implementation landed in [PR 75](https://github.com/Cadasto/openehr-sdk-go/pull/75).
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** —
 - **Introduces:** REQ-106 (WebTemplate JSON export). **Amends:** —. **Applies:** REQ-013 (building-block independence), REQ-111 (public compiled-template bridge — the export's input), REQ-103 (primitive constraints — the input source for `inputs`).
-- **Plan:** [2026-05-22-webtemplate-export.md](../plans/archive/2026-05-22-webtemplate-export.md).
-- **Related:** the WebTemplate node tree is the same simplified-template projection the [simplified-formats umbrella](../plans/2026-06-23-simplified-formats.md) will share with REQ-053 (FLAT/STRUCTURED); this ADR governs only the WebTemplate JSON export slice.
+- **Landed in:** [PR 75](https://github.com/Cadasto/openehr-sdk-go/pull/75).
+- **Related:** the WebTemplate node tree is the same simplified-template projection the [simplified-formats umbrella](../plans/2026-06-23-simplified-formats.md) will share with REQ-053 (FLAT/STRUCTURED); this ADR governs only the WebTemplate JSON export slice; [REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) (template-level node names, which close the archetype-reuse-under-slot gap recorded below).
 
 ## Context
 
@@ -36,7 +44,7 @@ The Better camelCase variant and multi-version output are **not** produced (see 
 - **Inherited quirks (accepted):** we adopt EHRbase's id choices verbatim, including any that are not what we would design in isolation — parity is worth more than local elegance, because interop is the whole point of the format.
 - **Better-flavoured consumers not served:** a consumer expecting Better camelCase ids gets EHRbase snake ids. Adding the Better variant later would be an additive option behind a flag, not a breaking change to the default.
 - **Fixture maintenance:** a vendored third-party Apache-2.0 fixture must carry attribution (`testkit/cassettes/THIRD_PARTY_LICENSES.md`) and is pinned to a commit; a reference bump is a deliberate, reviewed change.
-- **Deviation drift:** the documented-deviations list is load-bearing — every accepted structural difference from the reference MUST be listed, so an unlisted difference is a test failure rather than silent divergence.
+- **Deviation drift:** the documented-deviations list is load-bearing — every accepted structural difference from the reference is listed there, so an unlisted difference is a test failure rather than silent divergence.
 - **Archetype-reuse-under-slot gap (closed):** several EHRbase reference templates — including the canonical `corona_anamnese` — reuse one archetype multiple times under a multi-valued slot (name-distinguished instances), which yields **duplicate compiled AQL paths**. `templatecompile.Compile` rejected these as `ErrInvalidInput` when this ADR was written; the first-wins path index anticipated here landed first (shared-path subtrees admitted, the tree retaining every instance), and export was then blocked one layer further on — each reused sibling derived the same web `id`, so `Build` failed with `ErrIDCollision` — until [REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) landed the template-level node name and name-predicated paths, converging on this ADR's reference lock rather than departing from it. `corona_anamnese` now exports and serves as a PROBE-075 parity oracle beside `constrain_test`.
 
 ## Alternatives considered

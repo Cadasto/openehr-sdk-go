@@ -1,9 +1,17 @@
+---
+kind: adr
+id: ADR-0009
+title: "SMART-on-openEHR auth library scope and dependency model"
+status: accepted
+date: 2026-06-18
+---
+
 # ADR 0009 — SMART-on-openEHR auth library scope and dependency model
 
 - **Status:** Accepted, 2026-06-18.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** [`docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md`](../plans/archive/2026-06-16-auth-smart-conformance-audit.md). Resolves: [STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library). Amends: REQ-061, REQ-062, REQ-063, REQ-064.
+- **Tracks:** the SMART-on-openEHR auth conformance audit ([PR 45](https://github.com/Cadasto/openehr-sdk-go/pull/45)). Resolves: [STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library). Amends: REQ-061, REQ-062, REQ-063, REQ-064.
 
 ## Context
 
@@ -54,7 +62,7 @@ The SDK adopts three new runtime dependencies, scoped to `auth/` and `smart/`:
 
 - Hand-rolling JWS signing misses alg-confusion guards (e.g. RSA key used with ES* alg), ECDSA `r‖s` byte-padding edge cases, and JWK type dispatch.
 - Hand-rolling ID-token verification misses `alg:none` rejection, key-type/alg mismatch enforcement, and subtle clock-skew / claim-order issues.
-- RS256-only signing limited the SDK to a sub-baseline profile; SMART mandates RS384/ES384 as the `client-confidential-asymmetric` SHALL baseline.
+- RS256-only signing limited the SDK to a sub-baseline profile; SMART makes RS384/ES384 the mandatory baseline of the `client-confidential-asymmetric` profile.
 
 `go-jose/v4` and `go-oidc/v3` are widely deployed, receive regular security audits, and are the de-facto Go substrate for JOSE/OIDC. The supply-chain cost (three additional direct deps plus their transitive closure) is accepted in exchange for crypto correctness. The previous OTel-only rule was a heuristic, not a hard constraint — it served early development when auth was minimal. At SMART-on-openEHR scope, maintaining that heuristic would require writing and owning security-sensitive crypto code the ecosystem already provides correctly.
 

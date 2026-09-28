@@ -1,3 +1,11 @@
+---
+kind: adr
+id: ADR-0016
+title: "EVENT_CONTEXT optionals ride the underscore grammar, not new `ctx/` short forms"
+status: accepted
+date: 2026-08-05
+---
+
 # ADR 0016 — EVENT_CONTEXT optionals ride the underscore grammar, not new `ctx/` short forms
 
 - **Status:** Accepted, 2026-08-05 — maintainer decision, taken with REQ-140 (underscore-prefixed RM attributes) so the grammar has one spelling per attribute before implementation starts.
@@ -5,7 +13,7 @@
 - **Superseded by:** —
 - **Strand:** —
 - **Introduces:** —. **Amends:** [REQ-053](../specifications/wire.md#req-053) (scopes the ctx-only emission rule to the six respelled scalar fields). **Applies:** [REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes) (the grammar these attributes ride), REQ-080 / PROBE-086 (the parity probe whose census moves).
-- **Plan:** [2026-08-05-flat-rm-attributes.md](../plans/archive/2026-08-05-flat-rm-attributes.md).
+- **Landed in:** [PR 88](https://github.com/Cadasto/openehr-sdk-go/pull/88) (the FLAT RM-attribute residuals).
 - **Related:** [ADR 0015](0015-flat-metadata-spelling.md) settled the composition-metadata spelling this decision deliberately does **not** reopen; [ADR 0014](0014-webtemplate-reference-implementation-lock.md) pins the reference whose spelling wins here.
 
 ## Context
@@ -28,14 +36,14 @@ Deciding now, together with REQ-140's Phase 0, avoids the failure mode ADR 0015 
 **The EVENT_CONTEXT optionals are carried in the reference's `context/_*` underscore spelling, on both encode and decode, as ordinary REQ-140 grammar.** No new `ctx/` short forms are introduced for them.
 
 1. **One spelling, both directions.** `context/_health_care_facility`, `context/_participation:N`, `context/_end_time`, `context/_location` are emitted when populated and accepted on decode — the same recursive, RM-type-keyed grammar every other `_`-attribute uses. They get no special-case machinery.
-2. **REQ-053's ctx-only emission rule is scoped, not weakened.** The "encode MUST emit only the `ctx/` short form" rule applies to the six respelled scalar fields (`language`, `territory`, `composer_name`, `composer_self`, `time`, `setting`) — the fields where two spellings of one scalar are in circulation. The EVENT_CONTEXT optionals never had an emitted spelling to preserve, so choosing the underscore form breaks no consumer.
+2. **REQ-053's ctx-only emission rule is scoped, not weakened.** The rule in [wire.md § REQ-053](../specifications/wire.md#req-053) that encode emits only the `ctx/` short form applies to the six respelled scalar fields (`language`, `territory`, `composer_name`, `composer_self`, `time`, `setting`) — the fields where two spellings of one scalar are in circulation. The EVENT_CONTEXT optionals never had an emitted spelling to preserve, so choosing the underscore form breaks no consumer.
 3. **The `ctx/` sketches stay unaccepted.** `ctx/participation…`, `ctx/health_care_facility…`, `ctx/end_time`, `ctx/location` remain `ErrUnknownPath` on decode. They are recorded as *deferred input-alias candidates*: if a producer that writes them materialises, accepting them is an ADR 0015-style alias-table addition (accept, normalise onto the underscore spelling, error on disagreement) — an additive follow-up, not a blocker.
 
 ## Consequences
 
 - **Positive — census keys actually move.** Unlike the ADR 0015 respellings (held out on both sides, net zero), these keys will join the PROBE-086 *compared* set once REQ-140 lands: the corpus writes `context/_*`, the codec will emit `context/_*`, and the round-trip is byte-comparable. Counted directly over the 34 corpus fixtures, that is **182 keys** — `_health_care_facility` 143, `_participation` 31, `_end_time` 4, `_location` 4. (ENTRY-level `_other_participation:N` is outside this ADR's scope and is not in that figure.)
 
-  > **Landed 2026-08-05** ([REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes), [plan](../plans/archive/2026-08-05-flat-rm-attributes.md)). All **182** keys joined the compared set, and the prediction held exactly: `context/_end_time` + `context/_location` with the router's simple families (Phase C0), `context/_health_care_facility` 143 + `context/_participation:N` 31 with the party grammar (Phase C2). Per-phase deltas are in [SKIPPED.md](../../testkit/conformance/webtemplate/SKIPPED.md). The bullet above is left in the future tense as written — it records the expectation at the time of the decision, not today's behaviour.
+  > **Landed 2026-08-05** ([REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes), [PR 88](https://github.com/Cadasto/openehr-sdk-go/pull/88)). All **182** keys joined the compared set, and the prediction held exactly: `context/_end_time` + `context/_location` with the router's simple families (Phase C0), `context/_health_care_facility` 143 + `context/_participation:N` 31 with the party grammar (Phase C2). Per-phase deltas are in [SKIPPED.md](../../testkit/conformance/webtemplate/SKIPPED.md). The bullet above is left in the future tense as written — it records the expectation at the time of the decision, not today's behaviour.
 
 - **Positive — one grammar, no fork.** PARTICIPATION and PARTY_IDENTIFIED decompose identically at `context/_participation`, `_other_participation` (ENTRY), and inside `_feeder_audit` — a single implementation surface instead of a `ctx/` special case beside a `_` general case.
 - **Consistent with ADR 0015's own reasoning.** ADR 0015 chose `ctx/` for the scalar fields because that was the SDK's *already-emitted* spelling and the ITS-documented one; here the already-documented, reference-emitted spelling is the underscore form. Both decisions preserve the emitted surface consumers can already rely on and admit the other spelling only as input.

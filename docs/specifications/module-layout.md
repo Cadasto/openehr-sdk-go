@@ -2,11 +2,11 @@
 
 **Status:** Draft
 
-Authoritative package taxonomy, dependency rules, and versioning policy for `github.com/cadasto/openehr-sdk-go`. Implements REQ-001 through REQ-014.
+Authoritative package taxonomy, dependency rules, and versioning policy for `github.com/cadasto/openehr-sdk-go`. Implements REQ-010 through REQ-014, REQ-058 and REQ-099.
 
 ## Module identity
 
-The module path is **`github.com/cadasto/openehr-sdk-go`** (REQ-001). The path is all lowercase, matching idiomatic Go module naming and the GitHub organisation login; consumer imports MUST use this exact spelling.
+The module path is **`github.com/cadasto/openehr-sdk-go`**, all lowercase; [packaging.md § REQ-001](packaging.md#req-001--module-path) owns its spelling rule.
 
 The module is licensed **MIT** (REQ-003) and targets **Go 1.27.x** (REQ-002), tracking the current stable Go release line (N) as a deliberate project policy.
 
@@ -67,7 +67,7 @@ Application-specific layer. Shipped in the same module in v1 for adoption conven
 | Package | Scope |
 |---|---|
 | `cadasto/extra/` | Cadasto Extra API client. |
-| `cadasto/datamap/` | Datamap **V2** client and builder (REQ-058). |
+| `cadasto/datamap/` | Datamap **V2** codec: payload to and from canonical JSON against an OPT, with skeleton, schema and validation (REQ-058). |
 | `cadasto/care/` | Application aggregates over EHR + Demographic: Patient, User, CaseLoad, CareTeam, Episode. |
 | `cadasto/mpi/` | Minimal MPI search (preview surface). |
 | `cadasto/admin/` | Tenant, env, system info, healthcheck (health-probe contract: REQ-083). |
@@ -109,7 +109,8 @@ Application code (cmd/examples, downstream consumers)
 openehr/{serialize, instance, client/*} ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
 
 cadasto/care      ──→ openehr/client/*
-cadasto/{extra, datamap, mpi, admin} ──→ transport/
+cadasto/{extra, mpi, admin} ──→ transport/
+cadasto/datamap   ──→ openehr/template/   (no transport/ or auth/: REQ-058)
 
 sandbox/  -. implements .-→ openehr/client/*   cadasto/*
 testkit/  -. helpers for .-→ all of the above
@@ -119,7 +120,7 @@ testkit/  -. helpers for .-→ all of the above
 
 - `transport/` depends on `auth/`, never the reverse.
 - `openehr/client/*` depends on `transport/`, `openehr/rm/`, `openehr/serialize/`, never on `cadasto/…`.
-- `cadasto/<X>` may depend on `openehr/client/*`, `transport/`, `openehr/rm/`, etc. — but never on another `cadasto/<Y>`.
+- `cadasto/<X>` may depend on `openehr/client/*`, `transport/`, `openehr/rm/`, etc. — but never on another `cadasto/<Y>`. `cadasto/datamap` is the exception on the wire side: REQ-058 keeps it off `transport/` and `auth/`.
 - `openehr/validation/` MUST NOT take on `openehr/serialize/`'s codec dependencies — validation is structural over the in-memory RM, not over the wire bytes.
 - `openehr/bmm/` MUST NOT depend on `transport/`, `auth/`, or any HTTP package — it is a building block (REQ-045).
 - `internal/bmmgen` depends on `openehr/bmm/` and the standard `text/template` / `go/format` packages — no SDK runtime packages.
@@ -142,13 +143,33 @@ No `cadasto/<X>` package **MAY** import another `cadasto/<Y>` package directly. 
 
 ## REQ-013 — Building-block independence
 
-Each of `openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/template`, `openehr/terminology`, `openehr/aql`, and the AQL building blocks `openehr/aql/parse` + `openehr/aql/lint` + `openehr/aql/contain` + `openehr/aql/internal/semcheck` **MUST** be importable and useful without constructing an authenticated client or instantiating `transport/` or `auth/`. (`aql/parse` pulls the pure-Go ANTLR runtime — its sole third-party dependency — but neither it nor `aql/lint` imports `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`; `aql/contain` imports only `openehr/rm`, `openehr/rm/rminfo`, and the standard library; `openehr/terminology` imports nothing outside the standard library — it sits below `openehr/rm`, so `openehr/rm` may import it later (REQ-034); `openehr/aql` itself gained its first in-module dependency with REQ-162 — an import of `aql/contain` and the Go-internal `aql/internal/semcheck`, the containment verdict→code engine REQ-161's linter also consumes (one engine, two adapters, no drift) — but still imports none of the wire layers or `openehr/validation`; `semcheck` is Go-internal, so it adds no public API, and its own non-test imports are limited to `aql/contain` and the standard library; enforced by `TestAQLParseForbiddenImports` / `TestAQLLintForbiddenImports` / `TestContainForbiddenImports` / `TestAQLForbiddenImports` / `TestSemcheckForbiddenImports` / `TestTerminologyForbiddenImports`.)
+Each of `openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/instance`, `openehr/composition`, `openehr/template`, `openehr/templatecompile`, `openehr/template/webtemplate`, `openehr/terminology`, `openehr/aql`, and the AQL building blocks `openehr/aql/parse` + `openehr/aql/lint` + `openehr/aql/contain` + `openehr/aql/internal/semcheck` **MUST** be importable and useful without constructing an authenticated client or instantiating `transport/` or `auth/`. (`aql/parse` pulls the pure-Go ANTLR runtime — its sole third-party dependency — but neither it nor `aql/lint` imports `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`; `aql/contain` imports only `openehr/rm`, `openehr/rm/rminfo`, and the standard library; `openehr/terminology` imports nothing outside the standard library — it sits below `openehr/rm`, so `openehr/rm` may import it later (REQ-034); `openehr/aql` itself gained its first in-module dependency with REQ-162 — an import of `aql/contain` and the Go-internal `aql/internal/semcheck`, the containment verdict→code engine REQ-161's linter also consumes (one engine, two adapters, no drift) — but still imports none of the wire layers or `openehr/validation`; `semcheck` is Go-internal, so it adds no public API, and its own non-test imports are limited to `aql/contain` and the standard library; enforced by `TestAQLParseForbiddenImports` / `TestAQLLintForbiddenImports` / `TestContainForbiddenImports` / `TestAQLForbiddenImports` / `TestSemcheckForbiddenImports` / `TestTerminologyForbiddenImports`.)
+
+The template-side building blocks among them, `openehr/validation`, `openehr/instance`, `openehr/composition`, `openehr/templatecompile` and `openehr/template/webtemplate`, work on in-memory RM graphs and templates, never on wire bytes, so they **MUST NOT** import `transport/`, `auth/`, `openehr/client/*` or `openehr/serialize/`; enforced by `TestValidationForbiddenImports` / `TestInstanceForbiddenImports` / `TestCompositionForbiddenImports` / `TestTemplatecompileForbiddenImports` / `TestWebtemplateForbiddenImports`.
 
 See [use-cases.md § Building-block use cases](use-cases.md#building-block-use-cases).
 
 ## REQ-014 — Dependency direction
 
 Imports between SDK packages **MUST** flow strictly downward through the dependency graph in [§ Dependency direction](#dependency-direction). Upward or cyclic imports are prohibited.
+
+## REQ-058 — Datamap V2
+
+`cadasto/datamap/` **MUST** implement version 2 of Datamap, the Cadasto payload format for reading and writing clinical and demographic data without building Reference Model instances ([glossary.md](glossary.md)). Earlier Datamap versions are out of scope. The format (its keys, value shapes and coded-value forms) is the Cadasto platform's, and [REQ-083](conformance.md#req-083--cadasto-platform-api-conformance) names the authority the package conforms to.
+
+The package is a codec between Datamap V2 and openEHR canonical JSON, driven by the operational template that governs the data. It has two profiles, chosen by the template's root type:
+
+- **Composition profile:** a template rooted on `COMPOSITION`.
+- **Party profile:** a template rooted on `PERSON`, `ORGANISATION`, `GROUP`, `AGENT` or `ROLE`, or on one of the archetypeable demographic components `ADDRESS`, `CONTACT`, `PARTY_IDENTITY` or `PARTY_RELATIONSHIP`.
+
+Every other root is out of scope, including `EHR_STATUS`, which the format also covers.
+
+- For each profile the package **MUST** convert in both directions. A conversion for one profile **MUST** refuse a template of the other, and every operation **MUST** refuse a template outside both profiles.
+- A conversion that refuses its template, or meets a value it cannot map to its template node (a value of the wrong shape, a malformed coded value), **MUST** fail with an error and **MUST NOT** return a converted document alongside it.
+- Conversion walks the template and takes only the keys it defines: a payload key the template does not define **MUST NOT** reach the converted document. Validation is the operation that refuses such a key.
+- For a template of either profile the package **MUST** provide an empty payload skeleton, a JSON Schema of the payload, and a validation of a payload against the template. Validation **MUST** report every key the template does not define, every required key that is missing, and every value that breaks a constraint the template states itself. A payload that validation accepts **MUST** convert without error.
+- The canonical JSON a conversion returns **MUST** decode as the template root's RM type and pass template validation ([REQ-110](clinical-modeling.md#req-110--template-driven-validation-beyond-composition)). The Datamap payload a conversion returns **MUST** pass the package's own validation.
+- The codec **MUST** be usable without a client, like the building blocks in [REQ-013](#req-013--building-block-independence): it takes the template and the payload as values, performs no network I/O, and imports neither `transport/` nor `auth/`. Its entry points read untrusted input, so the bounds of [REQ-108](clinical-modeling.md#req-108--untrusted-document-bounds) apply to them.
 
 ## REQ-099 — ITS-REST Admin client surface
 
@@ -205,7 +226,7 @@ The SDK follows **Semantic Versioning 2.0.0** (REQ-004). The mapping of changes 
 
 `v0.x` is in motion until the openEHR-core surface and conformance probe set stabilise. `v1.0.0` lands when:
 
-- Every REQ in [REQ.md](REQ.md) is `Impl. landed` or `deprecated` — the per-REQ axis, with `deprecated` terminal (it satisfies the gate rather than blocking it). `Status:` is a per-**file** promise per [README.md § Status header](README.md#status-header); promoting each spec file `Draft → Stable` is part of the cut, not a precondition for it.
+- Every REQ in [REQ.md](REQ.md) is `Impl. landed` or `retired` — the per-REQ axis, with `retired` terminal (it satisfies the gate rather than blocking it). `Status:` is a per-**file** promise per [README.md § Status header](README.md#status-header); promoting each spec file `Draft → Stable` is part of the cut, not a precondition for it.
 - The openEHR wire-conformance probe suite in `conformance.md` passes.
 - A reference openEHR deployment passes the probe suite.
 

@@ -9,6 +9,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
+// REQ-059: the openehr-version request header uses the dotted-attribute
+// grammar lifecycle_state.code_string="<code>".
 func TestFormatLifecycleStateHeader(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		got, err := FormatLifecycleStateHeader("")

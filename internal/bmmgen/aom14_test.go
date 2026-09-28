@@ -166,6 +166,9 @@ func TestGoldenAOM14Archetype(t *testing.T) {
 // across runs and a clean -verify on the second run. Catches
 // non-determinism specific to AOM emission (e.g. cross-target import
 // emission triggered by map-iteration order).
+//
+// REQ-042: the AOM 1.4 target is reproducible too, and a fresh generation
+// passes the drift check.
 func TestAOM14IdempotentAndVerifyClean(t *testing.T) {
 	dir1 := t.TempDir()
 	dir2 := t.TempDir()

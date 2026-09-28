@@ -3,7 +3,7 @@
 **Date:** 2026-07-16
 **Status:** Draft — not started
 **Owner:** SDK maintainers
-**Covers:** **REQ-114** (OPT author validator) — proposed; canonical home to be authored at [clinical-modeling.md § REQ-114](../specifications/clinical-modeling.md#req-114--opt-author-validator) in Phase 0. The number is reserved in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy).
+**Covers:** **REQ-114** (OPT author validator) — proposed; canonical home to be authored at `clinical-modeling.md` § REQ-114 in Phase 0. The number is reserved in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy).
 **Builds on:** landed [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (OPT parse), [REQ-104](../specifications/clinical-modeling.md#req-104--slot-assertion-grammar) (slot assertions), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (Web Template export), [REQ-108](../specifications/clinical-modeling.md#req-108--untrusted-document-bounds) (document bounds); complementary to [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) (composition validation)
 **Probes:** **PROBE-085** (OPT author validator corpus)
 **Implementation:** planned
@@ -144,7 +144,7 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ. The t
 
 ## Mapping to specs
 
-- [clinical-modeling.md § REQ-114](../specifications/clinical-modeling.md#req-114--opt-author-validator) — the requirement this plan implements (registry row: [REQ.md](../specifications/REQ.md))
+- [REQ-114, reserved](../specifications/REQ.md#numbering-policy) — the requirement this plan implements (registry row: [REQ.md](../specifications/REQ.md))
 - [clinical-modeling.md § REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) — the lint/issue-model precedent this mirrors
 - [clinical-modeling.md § REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) — parse foundation
 - [clinical-modeling.md § REQ-104](../specifications/clinical-modeling.md#req-104--slot-assertion-grammar) — slot-assertion reuse

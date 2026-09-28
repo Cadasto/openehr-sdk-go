@@ -1,9 +1,18 @@
+---
+kind: adr
+id: ADR-0001
+title: "BMM version-bump runbook"
+status: accepted
+date: 2026-05-16
+---
+
 # ADR 0001 — BMM version-bump runbook
 
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** part of [`docs/plans/archive/2026-05-15-bmm-codegen.md`](../plans/archive/2026-05-15-bmm-codegen.md) Phase 5.
+- **Tracks:** part of the BMM code generator delivery (drift bot and version-bump runbook), landed on `main` in commit [e1c6633c](https://github.com/Cadasto/openehr-sdk-go/commit/e1c6633c).
+- **Requirements:** [REQ-041](../specifications/bmm-conformance.md#req-041--pinned-bmm-sources) (the pinned BMM sources a version bump moves).
 
 ## Context
 
@@ -18,7 +27,7 @@ We need a deterministic, reviewable procedure so that any maintainer (or AI-driv
 
 ## Decision
 
-A BMM version bump MUST follow the numbered procedure below. CI enforces the deterministic-output invariant via `make codegen-verify`; the weekly drift bot (`.github/workflows/codegen-drift.yml`) catches both accidental hand-edits and generator-template changes that would silently break the next bump.
+A BMM version bump follows the numbered procedure below. CI enforces the deterministic-output invariant via `make codegen-verify`; the weekly drift bot (`.github/workflows/codegen-drift.yml`) catches both accidental hand-edits and generator-template changes that would silently break the next bump.
 
 ### Procedure
 
@@ -38,7 +47,7 @@ A BMM version bump MUST follow the numbered procedure below. CI enforces the det
    make codegen-verify
    ```
 
-   On a freshly-regenerated tree this MUST exit 0. If it does not, re-run step 2 and investigate — a non-deterministic generator is a bug, not a "bump consequence".
+   On a freshly-regenerated tree this exits 0. If it does not, re-run step 2 and investigate — a non-deterministic generator is a bug, not a "bump consequence".
 
 4. **(Optional but recommended) Inspect the semantic diff.** Run:
 
@@ -62,7 +71,7 @@ A BMM version bump MUST follow the numbered procedure below. CI enforces the det
    - **Changed** — type changes, cardinality changes, ancestor-chain changes.
    - **Removed** — class or property deletions.
 
-   The `bmmdiff -suggest-changelog` output is a good starting point but MUST be reviewed by a human; it favours brevity over editorial polish. Keep the bullet **short and high-level** per [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) — one line, one artefact class.
+   The `bmmdiff -suggest-changelog` output is a good starting point, but a human reviews it before it lands; it favours brevity over editorial polish. Keep the bullet **short and high-level** per [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) — one line, one artefact class.
 
 9. **Remove the old BMM file in the same commit.** Never leave both versions in `resources/bmm/` — the SDK pins exactly one version per schema id at a time. The paired add/remove makes the rename reviewable.
 
@@ -106,7 +115,7 @@ A BMM version bump MUST follow the numbered procedure below. CI enforces the det
 
 ## See also
 
-- [`docs/plans/archive/2026-05-15-bmm-codegen.md`](../plans/archive/2026-05-15-bmm-codegen.md) — Phase 5 ("Drift bot + version-bump runbook").
+- commit [e1c6633c](https://github.com/Cadasto/openehr-sdk-go/commit/e1c6633c): the BMM version-bump tooling and the weekly codegen drift workflow this runbook governs.
 - [`resources/bmm/README.md`](../../resources/bmm/README.md) — pinned BMM file inventory; the `## Updating` section defers to this ADR.
 - [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) — normative conformance contract; § Schema → Go package set carries the version pins.
 - [`.github/workflows/codegen-drift.yml`](../../.github/workflows/codegen-drift.yml) — weekly drift bot implementation.

@@ -39,6 +39,9 @@ func TestDocumentTreeReturnsValidatedTree(t *testing.T) {
 // TestParseGrammarFixtures drives every fixture under testdata/grammar: `.aql`
 // files MUST parse, `.reject` files MUST fail with aql.ErrSyntax. These double
 // as the regression suite for the SDK-AQL-NNN grammar deltas (ADR 0007).
+//
+// REQ-109: the parse layer holds the SDK grammar profile; accept fixtures
+// parse and reject fixtures fail with aql.ErrSyntax.
 func TestParseGrammarFixtures(t *testing.T) {
 	dir := filepath.Join("testdata", "grammar")
 	entries, err := os.ReadDir(dir)
@@ -140,6 +143,8 @@ func TestParseREQ055Golden(t *testing.T) {
 	}
 }
 
+// REQ-109: a syntax error is a *parse.SyntaxError wrapping aql.ErrSyntax and
+// carrying the parser's position.
 func TestParseSyntaxErrorPosition(t *testing.T) {
 	_, err := parse.Parse("SELECT FROM EHR e") // missing projection
 	if !errors.Is(err, aql.ErrSyntax) {

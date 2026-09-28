@@ -595,9 +595,8 @@ func TestParse_LeafComplexObject_NoConstraint(t *testing.T) {
 // recursion across every primitive wrapper the AOM 1.4 OPTs in the
 // wild use. The wrapper carries the primitive short name on
 // rm_type_name; the inner <item xsi:type="C_*"> carries the typed
-// constraint that the parser must thread through. See [REQ-100
-// wire-parser plan](../../docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md)
-// for the full landed scope.
+// constraint that the parser must thread through. The REQ-100
+// wire-parser fix landed its full scope in PR 21.
 func TestParse_CPrimitiveObject_Coverage(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -693,8 +692,7 @@ func TestParse_CPrimitiveObject_StrictMissingItem(t *testing.T) {
 
 // TestParse_CPrimitiveObject_Duration is the focused phase-0 regression
 // gate for the C_PRIMITIVE_OBJECT inner-`<item>` extraction (now
-// landed via the [archived wire-parser
-// plan](../../docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md)).
+// landed with the wire-parser fix in PR 21).
 // Pre-fix the parser dropped the inner item, leaving
 // PrimitiveConstraint() = nil; the test pins a typed CDuration with
 // its inner-`<pattern>` preserved.

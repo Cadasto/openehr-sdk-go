@@ -1,6 +1,6 @@
 # Plan — RM function deferred stubs (arithmetic + refs/inverse-navigation)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
+> **For agentic workers:** use the superpowers:executing-plans skill. Steps use checkbox (`- [ ]`) syntax.
 >
 > **⚠ YAGNI / DoR gate — read first.** Both clusters below are `Out of scope` in [rm-functions.md](../specifications/rm-functions.md) **because no consumer needs them yet**, and neither has a REQ. This plan exists so the work is *ready*, not as a signal to start. **Do not execute** until a real consumer need appears; when it does, run Phase 0 (`sdd-specify`) first — code-first here would violate the SDD no-code-first guardrail.
 
@@ -11,7 +11,7 @@
 **Probes:** TBD at Phase 0 (behavioural — unit-covered).
 **Implementation:** planned
 **Depends on:** landed REQ-120 (identifiers), REQ-121 (path read access), REQ-123 (temporal helpers); [ADR 0011](../adr/0011-rm-behavioural-functions-surface.md) (behavioural-function surface).
-**Defers:** the `VERSIONED_OBJECT` container operations and `commit_*` mutators — those are **server-mediated by contract** (REQ-122) and MUST stay fail-loud stubs; they are not in this plan.
+**Defers:** the `VERSIONED_OBJECT` container operations and `commit_*` mutators — those are **server-mediated by contract** (REQ-122) and stay fail-loud stubs, as REQ-122 requires; they are not in this plan.
 
 **Goal:** Realise the two `rm-functions` clusters currently left as documented, fail-loud panic stubs — (1) arithmetic on the `DV_AMOUNT` datatypes, (2) reference convenience accessors plus inverse path navigation — replacing each `panic("not implemented …")` with spec-anchored behaviour, **when** a consumer needs them.
 
@@ -21,7 +21,7 @@
 
 ## Global Constraints
 
-- **Library code MUST NOT panic** on malformed input or absent paths (rm-functions.md invariant / REQ-025) — failures are a returned error, a zero value, or an empty result.
+- **Library code does not panic** on malformed input or absent paths (the rm-functions.md invariant and REQ-025 require it) — failures are a returned error, a zero value, or an empty result.
 - **Reflection-free** (REQ-024): typed dispatch only, no `reflect`.
 - **Each cluster is independently shippable.** They share nothing; split into two plans if that suits delivery better.
 
@@ -42,7 +42,7 @@
 ### Phase 0: Specify (both clusters) — `sdd-specify`
 
 - [ ] Allocate **REQ-124** and author its rm-functions.md section: arithmetic on `DV_QUANTITY`, `DV_COUNT`, `DV_PROPORTION`, `DV_DURATION` — `add`, `subtract`, `multiply`, `negative`, and `DV_DURATION` calendar-nominal `add_nominal`/`subtract_nominal` — with the RM guards (e.g. `DV_QUANTITY.add` requires equal `units`; result validity).
-- [ ] Allocate **REQ-125** and author its section: `OBJECT_REF`/`PARTY_REF`/`PARTY_PROXY` convenience accessors (SHOULD-level; `LOCATABLE_REF.as_uri` is the one already realised), and `PATHABLE.parent` / `path_of_item` inverse navigation.
+- [ ] Allocate **REQ-125** and author its section: `OBJECT_REF`/`PARTY_REF`/`PARTY_PROXY` convenience accessors (recommended, not required; `LOCATABLE_REF.as_uri` is the one already realised), and `PATHABLE.parent` / `path_of_item` inverse navigation.
 - [ ] For REQ-125 inverse navigation, open an ADR (below) and get it **Accepted** before Task 2 code.
 
 ### Task 1 (Cluster 1 — REQ-124): DV_AMOUNT arithmetic

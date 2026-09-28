@@ -15,8 +15,8 @@ import (
 // clients, not the reverse) and bloat any consumer that just wants
 // in-memory checks.
 //
-// Forbidden prefixes — the full set enumerated by REQ-102 §
-// Building-block independence in docs/specifications/clinical-modeling.md:
+// Forbidden prefixes — the set REQ-013 names for the template-side
+// building blocks (docs/specifications/module-layout.md § REQ-013):
 //
 //   - openehr/serialize  (wire-byte codecs)
 //   - openehr/client     (REST clients)

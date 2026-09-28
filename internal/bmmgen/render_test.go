@@ -49,6 +49,9 @@ func TestGoldenDataTypesQuantity(t *testing.T) {
 // TestIdempotent regenerates the full RM into a temp dir twice and
 // asserts byte-identity across runs. This catches any non-stable
 // iteration order (Go map iteration is randomised).
+//
+// REQ-042: the generator is reproducible; two runs over the same inputs are
+// byte-identical.
 func TestIdempotent(t *testing.T) {
 	dir1 := t.TempDir()
 	dir2 := t.TempDir()
@@ -67,6 +70,9 @@ func TestIdempotent(t *testing.T) {
 // TestDriftDetection generates the RM into a temp dir, mutates one
 // byte of a generated file, and asserts that -verify reports a
 // drift on that file.
+//
+// REQ-042: the drift check reports a generated file that no longer matches
+// the generator's output.
 func TestDriftDetection(t *testing.T) {
 	dir := t.TempDir()
 	if _, err := Run(Options{

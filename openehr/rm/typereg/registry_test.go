@@ -218,6 +218,9 @@ func TestDecodeAsTypeMismatchIsErrTypeMismatch(t *testing.T) {
 // TestDecode_maxDepthExceeded verifies that Decode rejects input whose
 // JSON nesting exceeds maxDecodeDepth before dispatch (so the test does
 // NOT need a registered type — the depth check runs first).
+//
+// REQ-108: Registry.Decode refuses a value nested deeper than the decode
+// depth cap with ErrMaxDepthExceeded.
 func TestDecode_maxDepthExceeded(t *testing.T) {
 	// Build a document nested ~2000 levels deep: far above maxDecodeDepth (512).
 	const depth = 2000

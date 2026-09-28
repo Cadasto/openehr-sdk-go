@@ -60,6 +60,8 @@ func TestRenderEmitsTheGeneratedTable(t *testing.T) {
 	}
 }
 
+// REQ-034: the generated tables are byte-deterministic, which the drift check
+// depends on.
 func TestRenderOutputIsGofmtCleanAndDeterministic(t *testing.T) {
 	t.Parallel()
 	term, err := Parse(strings.NewReader(fixture))

@@ -45,7 +45,8 @@ Imports flow strictly downward, with no upward or cyclic imports. [module-layout
 flowchart TD
   App["Application code<br/>(benchmark, seeder, MCP, federator)"]
   Care["cadasto/care/"]
-  Cadasto["cadasto/extra, datamap, mpi, admin"]
+  Cadasto["cadasto/extra, mpi, admin"]
+  Datamap["cadasto/datamap/"]
   Smart["smart/<br/>(AppContext, discovery)"]
   Composition["openehr/composition/"]
   Aql["openehr/aql/"]
@@ -67,6 +68,7 @@ flowchart TD
   App --> Aql
   App --> Client
   App --> Cadasto
+  App --> Datamap
   App -. building-block .-> Rm
   App -. building-block .-> Serialize
   App -. building-block .-> Validation
@@ -80,6 +82,7 @@ flowchart TD
 
   Care --> Client
   Cadasto --> Http
+  Datamap --> Template
   Smart --> Auth
   Composition --> Template
   Composition --> Rm
@@ -143,6 +146,8 @@ The API is designed for Go: package-level functions, typed errors, `context.Cont
 ### Type registry, not reflection
 
 openEHR's RM has deep polymorphism (LOCATABLE → ENTRY → COMPOSITION; DATA_VALUE → DV_QUANTITY). Go has no inheritance. The SDK uses concrete structs, embedded base structs, interfaces for abstract categories, and a central type registry for `_type` decoding. There is no reflection-heavy tag magic and no "generic RM node" superset type.
+
+Substitution slots follow the same rule. Where a slot's declared class has subtypes, such as `LOCATABLE.name` typed `DV_TEXT`, the field is a narrow `<Parent>Like` interface with `Get*` accessors, decoded through the one registry ([`idiom.md` § Substitution slots](specifications/idiom.md#substitution-slots-and-the-like-interfaces)). A per-slot tagged union was considered and rejected: a struct holding a kind discriminator and the concrete value, with one typed getter per subtype and its own `_type` decoder. That design repeats the dispatch in every union type, while the registry keeps it in one place that the JSON and XML codecs share. The union is worth revisiting only if the interface methods prove too awkward for callers ([PR 25](https://github.com/Cadasto/openehr-sdk-go/pull/25)).
 
 ### Discovery is first-class
 

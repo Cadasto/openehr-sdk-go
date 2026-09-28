@@ -1,16 +1,24 @@
+---
+kind: adr
+id: ADR-0021
+title: "Encoded JSON member order is not part of the canonical JSON contract"
+status: accepted
+date: 2026-09-14
+---
+
 # ADR 0021 — Encoded JSON member order is not part of the canonical JSON contract
 
-- **Status:** Accepted, 2026-09-14 (maintainer sign-off on the plan, PR #171); implementation landed under [2026-09-14-json-v2-migration.md](../plans/archive/2026-09-14-json-v2-migration.md).
+- **Status:** Accepted, 2026-09-14 (maintainer sign-off on the plan, PR 171); implementation landed in [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171).
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** retires the byte-stability premise in [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance)'s remaining evidence item.
 - **Introduces:** —. **Amends:** [REQ-052](../specifications/wire.md#req-052) (the field-order profile and the probe obligation it carries).
-- **Plan:** [2026-09-14-json-v2-migration.md](../plans/archive/2026-09-14-json-v2-migration.md).
+- **Landed in:** [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171) (the `encoding/json/v2` migration).
 - **Related:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (the codec decision this one unblocks); [REQ-056](../specifications/wire.md#req-056) (canonical XML, deliberately **not** relaxed: element order is part of an XML document's identity in a way member order is not part of a JSON object's, so PROBE-033 keeps its byte assertion); [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the validation floor the rewritten PROBE-030 asserts).
 
 ## Context
 
-`docs/specifications/wire.md:105` states a deterministic encode profile as a MUST: `_type` first, then BMM property declaration order, `Hash` keys lexicographic, with two successive SDK encodes byte-identical. Line 106 names the reason: "the SDK's own output contract, which a consumer may rely on for byte comparison and hashing". PROBE-030 asserts it (`testkit/probes/serialize/probe_030_canjson_round_trip.go:83`, `bytes.Equal(b1, b2)`), and the probe's own doc comment at line 39 calls it a "guarantee for hashing, signing, and diff tooling".
+`docs/specifications/wire.md:105` states a deterministic encode profile as a requirement: `_type` first, then BMM property declaration order, `Hash` keys lexicographic, with two successive SDK encodes byte-identical. Line 106 names the reason: "the SDK's own output contract, which a consumer may rely on for byte comparison and hashing". PROBE-030 asserts it (`testkit/probes/serialize/probe_030_canjson_round_trip.go:83`, `bytes.Equal(b1, b2)`), and the probe's own doc comment at line 39 calls it a "guarantee for hashing, signing, and diff tooling".
 
 No openEHR specification asks for it. RFC 8259 § 4 assigns no meaning to JSON object member order, the openEHR specifications prescribe none, and CDR implementations differ in the order they emit. The decoder's obligation to accept any order, already stated at `wire.md:110`, is the real interoperability rule and is unaffected.
 
@@ -20,13 +28,13 @@ The promise has a price. It constrains the codec: any encoder the SDK adopts mus
 
 **Encoded JSON member order is not part of the SDK's contract.**
 
-- `_type` first becomes a **SHOULD**. It has a reason that survives the withdrawal: a consumer decoding as a stream can select the concrete type before reading the rest of the object.
-- Beyond `_type`, member order is **unspecified**, and a consumer **MUST NOT** rely on it.
-- The decoder **MUST** continue to accept members in any order, `_type` included.
+- `_type` first becomes a **recommendation**. It has a reason that survives the withdrawal: a consumer decoding as a stream can select the concrete type before reading the rest of the object.
+- Beyond `_type`, member order is **unspecified**, and [REQ-052](../specifications/wire.md#req-052) forbids a consumer from relying on it.
+- The decoder continues to accept members in any order, `_type` included, as [REQ-052](../specifications/wire.md#req-052) requires.
 - Conformance is asserted **semantically**: decoded values are compared, and the recovered value is passed through the reference-model floor ([REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor)). Where a check on encoded form is useful it is wire-equivalence, defined once in the conformance catalog's Terms section. No probe asserts byte equality of encoded JSON.
-- `Hash` (`map[K]V`) members are emitted in lexicographic key order as a **SHOULD**, re-stated as a determinism property of the encoder rather than an order promise to a consumer. Go randomises map iteration, so without it one unchanged value has no reproducible encoding at all. A unit test pins it; no probe does.
+- `Hash` (`map[K]V`) members are emitted in lexicographic key order as a **recommendation**, re-stated as a determinism property of the encoder rather than an order promise to a consumer. Go randomises map iteration, so without it one unchanged value has no reproducible encoding at all. A unit test pins it; no probe does.
 
-**Encoder determinism is a SHOULD, not a MUST.** The case for MUST was that six live assertions depend on one value encoding identically twice: `openehr/serialize/canjson/field_order_test.go:132`, `openehr/serialize/canjson/marshal_sentinel_test.go:66`, `openehr/client/ehr/contribution/builder_test.go:364` and `:373`, `openehr/instance/valuefill_test.go:70`, and `openehr/serialize/simplified/roundtrip_test.go:39`. That case was considered and set aside: none of the six is an interoperability obligation, they are the SDK's own tooling, and stating an internal implementation property as a normative MUST on the wire format would be the category error this ADR exists to correct. The decision is SHOULD.
+**Encoder determinism is recommended, not required.** The case for requiring it was that six live assertions depend on one value encoding identically twice: `openehr/serialize/canjson/field_order_test.go:132`, `openehr/serialize/canjson/marshal_sentinel_test.go:66`, `openehr/client/ehr/contribution/builder_test.go:364` and `:373`, `openehr/instance/valuefill_test.go:70`, and `openehr/serialize/simplified/roundtrip_test.go:39`. That case was considered and set aside: none of the six is an interoperability obligation, they are the SDK's own tooling, and stating an internal implementation property as a normative requirement on the wire format would be the category error this ADR exists to correct. The decision is a recommendation.
 
 ## Consequences
 
@@ -38,6 +46,6 @@ The promise has a price. It constrains the codec: any encoder the SDK adopts mus
 
 ## Alternatives considered
 
-- **Keep the profile as a MUST and satisfy it under any future codec.** Technically reachable: `json.Deterministic(true)` plus a `_type`-first emission gives it. **Rejected:** it preserves a promise no openEHR specification asks for, constrains every future codec choice, and leaves the probe suite testing encoder spelling instead of round-trip fidelity. `go doc encoding/json/v2.Deterministic` also warns that determinism holds "across different instances of identical binaries, but not across different builds of a program (such as different source or toolchain version, different GOOS/GOARCH, different build flags)", so the restated promise would be weaker than the one being withdrawn while reading identical.
+- **Keep the profile as a requirement and satisfy it under any future codec.** Technically reachable: `json.Deterministic(true)` plus a `_type`-first emission gives it. **Rejected:** it preserves a promise no openEHR specification asks for, constrains every future codec choice, and leaves the probe suite testing encoder spelling instead of round-trip fidelity. `go doc encoding/json/v2.Deterministic` also warns that determinism holds "across different instances of identical binaries, but not across different builds of a program (such as different source or toolchain version, different GOOS/GOARCH, different build flags)", so the restated promise would be weaker than the one being withdrawn while reading identical.
 - **Keep the profile and publish a separate canonicalisation helper for consumers who hash.** **Rejected:** it is the withdrawn promise under a new name, and it puts the SDK in the business of defining a canonical form for a format whose specification defines none. RFC 8785 exists for consumers who need one.
-- **Downgrade the whole profile to a SHOULD without touching the probes.** **Rejected:** the probes are where the promise is actually enforced. A SHOULD that PROBE-030 still asserts byte-wise is a MUST with softer wording.
+- **Downgrade the whole profile to a recommendation without touching the probes.** **Rejected:** the probes are where the promise is actually enforced. A recommendation that PROBE-030 still asserts byte-wise is a requirement with softer wording.
