@@ -4,8 +4,6 @@ kind: guide
 
 # Reviewer memory: sdd-spec-conformance-reviewer
 
-Findings declined in triage, with the reason. Do not raise one again unless the change under review makes its reason untrue; say which part changed.
+## Out of focus
 
-| Finding | Claim | Why declined |
-|---|---|---|
-| PR 182 F3 | REQ-058's MUSTs are not implemented: `cadasto/datamap` holds only `doc.go`. | The registry says `planned`. The section is the spec written ahead of the codec, and conformance is checked when the codec lands. |
+Datamap V2 (REQ-058, `cadasto/datamap`, and the experiments on the `feat/datamap` branch) is postponed by the maintainer. Development has not started, and that branch does not count as an implementation, partial or otherwise. REQ-058 and its section stay as written. Do not raise findings on them, and do not carry datamap items in a ledger or its `Deferred` table, until the maintainer brings datamap back into focus.
