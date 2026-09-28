@@ -77,6 +77,7 @@ requirements:
     implementation: landed
     packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/instance, openehr/composition, openehr/template, openehr/templatecompile, openehr/template/webtemplate, openehr/terminology, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck]
     tests:
+      - internal/importguard/importguard_test.go
       - openehr/aql/contain/imports_test.go
       - openehr/aql/imports_test.go
       - openehr/aql/internal/semcheck/imports_test.go
@@ -86,8 +87,12 @@ requirements:
       - openehr/aql/predicate_test.go
       - openehr/composition/imports_test.go
       - openehr/instance/imports_test.go
+      - openehr/rm/imports_test.go
       - openehr/serialize/canjson/corpus_parity_test.go
+      - openehr/serialize/canjson/imports_test.go
+      - openehr/serialize/canxml/imports_test.go
       - openehr/serialize/simplified/independence_test.go
+      - openehr/template/imports_test.go
       - openehr/template/webtemplate/independence_test.go
       - openehr/templatecompile/imports_test.go
       - openehr/terminology/imports_test.go
