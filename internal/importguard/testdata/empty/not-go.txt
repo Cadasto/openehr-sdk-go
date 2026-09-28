@@ -1,0 +1,1 @@
+This directory holds no Go files, so Scan must refuse it.
