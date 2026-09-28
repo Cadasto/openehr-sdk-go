@@ -49,9 +49,8 @@ func main() {
 // error means the program could not do its job (bad path, unreadable OPT); a
 // false result means the composition was checked and has issues.
 func run() (valid bool, err error) {
-	useCorpus := flag.Bool("corpus", false, "validate testkit/corpus vital_signs.json, demo data that reports issues")
-	flag.Parse()
-	jsonPath, optPath, err := resolvePaths(*useCorpus, flag.Args())
+	useCorpus, args := parseFlags(os.Args[1:])
+	jsonPath, optPath, err := resolvePaths(useCorpus, args)
 	if err != nil {
 		return false, err
 	}
@@ -101,10 +100,24 @@ func run() (valid bool, err error) {
 		// dispatch on, Detail is the explanation for a human.
 		fmt.Printf("  %s [%s] %s\n", issue.Path, issue.Code, issue.Detail)
 	}
-	if *useCorpus {
+	if useCorpus {
 		fmt.Println("note        : vital_signs.json is demo CDR data; issues are expected")
 	}
 	return false, nil
+}
+
+// parseFlags reads the command line: the -corpus switch and the positional
+// file arguments. -cassette is the flag's old name, from before the fixture
+// tree was renamed testkit/corpus, and still sets the same switch so scripts
+// written against it keep working.
+func parseFlags(args []string) (useCorpus bool, rest []string) {
+	fs := flag.NewFlagSet("validate-from-json", flag.ExitOnError)
+	fs.BoolVar(&useCorpus, "corpus", false, "validate testkit/corpus vital_signs.json, demo data that reports issues")
+	fs.BoolVar(&useCorpus, "cassette", false, "deprecated: use -corpus")
+	// ExitOnError makes a bad flag print the usage and exit with status 2, as
+	// the default command line does, so Parse only ever returns nil here.
+	_ = fs.Parse(args)
+	return useCorpus, fs.Args()
 }
 
 // resolvePaths picks the composition and the OPT to validate: the caller's

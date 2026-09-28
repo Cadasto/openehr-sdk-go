@@ -216,6 +216,7 @@ go run ./cmd/examples/validate-from-json comp.json tmpl.opt # your own files
 | Flag | Effect |
 |---|---|
 | `-corpus` | Validate `testkit/corpus/compositions/vital_signs.json`, demo data that reports issues, instead of the clean local fixture |
+| `-cassette` | Deprecated spelling of `-corpus`, kept for scripts written before the rename |
 
 The exit status is 1 when the composition does not validate (and on a usage error), so the command can gate a pipeline. Validation issues are a result the program prints; only a program error, such as a bad path or an unreadable OPT, is reported as a failure.
 
