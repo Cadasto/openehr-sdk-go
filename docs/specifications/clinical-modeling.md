@@ -650,9 +650,11 @@ func ValidateEHRStatus(status *rm.EHRStatus, c *templatecompile.Compiled) Result
 
 The walker logic is unchanged; generalisation is a lockstep extension of the four closed routing sets — `rmTypeInfo` and `bmmSubtypes` (`openehr/validation/`), and `ReadSingle`/`ReadMultiple` per-type readers + `isTypedNilPointer` (`openehr/validation/rmread/`). The same change adds the primitive-bearing **DataValue leaf** readers (`DV_DATE`/`DV_TIME`/`DV_DATE_TIME`/`DV_DURATION`.`value`, `DV_BOOLEAN.value`, `DV_IDENTIFIER.id`, `DV_MULTIMEDIA` `media_type`/`size`) so a DV value encoded as a `C_COMPLEX_OBJECT` with an explicit `value` `C_PRIMITIVE_OBJECT` child binds and validates (REQ-103) rather than reporting a false `required`.
 
+The walker type-matches `DV_INTERVAL<T>` in both forms: a typed instantiation by its parameterised name, and a round-tripped interval that decodes as the bare `DV_INTERVAL` by the runtime types of its bounds, each present bound having to be a `T`.
+
 ### Known limitations
 
-- The walker type-matches `DV_INTERVAL<T>` in both forms: a typed instantiation by its parameterised name, and a round-tripped interval that decodes as the bare `DV_INTERVAL` by the runtime types of its bounds, each present bound having to be a `T`. A round-tripped interval with no bound present carries no `T` to check, so it matches any `DV_INTERVAL<T>` node.
+- A round-tripped `DV_INTERVAL` with no bound present carries no `T` to check, so it matches any `DV_INTERVAL<T>` node.
 - Reference-typed attributes (`PARTY.roles`, `FOLDER.items` → `OBJECT_REF`/`PARTY_REF`) are addressable for existence/cardinality but their targets are not descended.
 
 ### Building-block independence (REQ-013)
