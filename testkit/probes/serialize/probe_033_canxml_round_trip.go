@@ -132,7 +132,7 @@ func loadXMLCassetteInputs() ([]Probe033Input, error) {
 	if err != nil {
 		return nil, fmt.Errorf("PROBE-033: list cassettes: %w", err)
 	}
-	root := fixtures.CassettesRoot()
+	root := fixtures.CorpusRoot()
 	out := make([]Probe033Input, 0, len(rels))
 	for _, rel := range rels {
 		path := filepath.Join(root, filepath.FromSlash(rel))

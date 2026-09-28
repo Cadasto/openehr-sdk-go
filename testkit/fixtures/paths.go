@@ -1,4 +1,5 @@
-// Package fixtures resolves vendored cassette paths under testkit/corpus/.
+// Package fixtures resolves paths to the vendored fixture documents under
+// testkit/corpus/.
 //
 // Layout:
 //
@@ -27,8 +28,9 @@ import (
 	"strings"
 )
 
-// CassettesRoot is testkit/corpus (absolute).
-func CassettesRoot() string {
+// CorpusRoot returns the absolute path of testkit/corpus, the root of the
+// vendored fixture tree.
+func CorpusRoot() string {
 	_, here, _, ok := runtime.Caller(0)
 	if !ok {
 		panic("fixtures: cannot resolve package path")
@@ -36,11 +38,17 @@ func CassettesRoot() string {
 	return filepath.Clean(filepath.Join(filepath.Dir(here), "..", "corpus"))
 }
 
-func templatesDir() string    { return filepath.Join(CassettesRoot(), "templates") }
-func compositionsDir() string { return filepath.Join(CassettesRoot(), "compositions") }
-func rmDir() string           { return filepath.Join(CassettesRoot(), "rm") }
-func submissionsDir() string  { return filepath.Join(CassettesRoot(), "submissions") }
-func webtemplateDir() string  { return filepath.Join(CassettesRoot(), "webtemplate") }
+// CassettesRoot returns the same path as [CorpusRoot].
+//
+// Deprecated: use [CorpusRoot]. The fixture tree was renamed from
+// testkit/cassettes to testkit/corpus.
+func CassettesRoot() string { return CorpusRoot() }
+
+func templatesDir() string    { return filepath.Join(CorpusRoot(), "templates") }
+func compositionsDir() string { return filepath.Join(CorpusRoot(), "compositions") }
+func rmDir() string           { return filepath.Join(CorpusRoot(), "rm") }
+func submissionsDir() string  { return filepath.Join(CorpusRoot(), "submissions") }
+func webtemplateDir() string  { return filepath.Join(CorpusRoot(), "webtemplate") }
 
 // TemplateOpt returns testkit/corpus/templates/{template-id}.opt.
 func TemplateOpt(templateID string) string {
@@ -94,7 +102,7 @@ func WebTemplateReference(templateID string) string {
 // scripts/sync-flat-conformance.sh). Vendored Apache-2.0; provenance in
 // THIRD_PARTY_LICENSES.md.
 func FlatConformanceRoot() string {
-	return filepath.Join(CassettesRoot(), "flat-conformance")
+	return filepath.Join(CorpusRoot(), "flat-conformance")
 }
 
 // FlatConformanceOpt returns the single operational template every fixture in
@@ -115,7 +123,7 @@ func FlatConformanceFlat(name string) string {
 // under it hold the CSVs the AQL conformance-corpus probe reconstructs into
 // queries.
 func AQLConformanceRoot() string {
-	return filepath.Join(CassettesRoot(), "aql", "conformance")
+	return filepath.Join(CorpusRoot(), "aql", "conformance")
 }
 
 // ListFlatConformance returns the FLAT conformance fixture names (no
@@ -138,14 +146,14 @@ func ListFlatConformance() ([]string, error) {
 	return names, nil
 }
 
-// optDirs are every cassette directory holding operational templates,
+// optDirs are every fixture directory holding operational templates,
 // in [ListAllOPTs] scan order.
 func optDirs() []string {
 	return []string{
 		templatesDir(),
 		webtemplateDir(),
 		filepath.Join(FlatConformanceRoot(), "templates"),
-		filepath.Join(CassettesRoot(), "its_rest", "definition"),
+		filepath.Join(CorpusRoot(), "its_rest", "definition"),
 	}
 }
 
@@ -159,8 +167,8 @@ type OPTRef struct {
 }
 
 // ListAllOPTs returns every operational template vendored under
-// [CassettesRoot] (across templates/, webtemplate/, the FLAT
-// conformance corpus, and the ITS-REST definition cassettes), sorted by
+// [CorpusRoot] (across templates/, webtemplate/, the FLAT
+// conformance corpus, and the ITS-REST definition fixtures), sorted by
 // Name. Callers that must cover the whole corpus (such as the compiled-path
 // regression guard for name-predicated template paths) use this rather than naming templates individually,
 // so a newly vendored OPT is picked up automatically.

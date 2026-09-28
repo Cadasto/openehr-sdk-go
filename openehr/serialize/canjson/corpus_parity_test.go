@@ -137,7 +137,7 @@ func TestCorpusParityV1V2(t *testing.T) {
 // HAR recordings live under testkit/recordings, not under testkit/corpus,
 // so none reaches this walk.
 func testParityCorpus(t *testing.T) {
-	root := fixtures.CassettesRoot()
+	root := fixtures.CorpusRoot()
 	var scanned, compared, refusedByBoth, skippedNoType, skippedUnregistered, skippedMalformed int
 	var malformed, unregistered, divergent []string
 

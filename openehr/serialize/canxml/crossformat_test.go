@@ -143,7 +143,7 @@ func TestCrossFormatXMLCassetteRoundTrip(t *testing.T) {
 	}
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
-			body, err := os.ReadFile(filepath.Join(fixtures.CassettesRoot(), filepath.FromSlash(name)))
+			body, err := os.ReadFile(filepath.Join(fixtures.CorpusRoot(), filepath.FromSlash(name)))
 			if err != nil {
 				t.Fatalf("read cassette: %v", err)
 			}

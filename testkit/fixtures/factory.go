@@ -138,7 +138,7 @@ func FactoryHintForRel(rel string) string {
 		}
 	}
 	if strings.HasPrefix(rel, "compositions/") {
-		path := filepath.Join(CassettesRoot(), filepath.FromSlash(rel))
+		path := filepath.Join(CorpusRoot(), filepath.FromSlash(rel))
 		root, err := RootTypeFromJSON(path)
 		if err != nil {
 			return "COMPOSITION"
