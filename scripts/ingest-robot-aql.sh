@@ -194,7 +194,7 @@ recorded=${recorded:-$(date -u +%Y-%m-%d)}
   echo "# Written by scripts/ingest-robot-aql.sh. This pin IS authoritative for"
   echo "# the vendored CSVs: they are copied unmodified from the commit below, so"
   echo "# that commit fully determines their bytes. (Contrast ROBOT_SOURCE.txt one"
-  echo "# level up, whose cassettes are hand-curated and renamed, making its pin a"
+  echo "# level up, whose fixtures are hand-curated and renamed, making its pin a"
   echo "# record of the tree the ingest read rather than of the files it produced.)"
   echo "source_repo: ${src_remote}"
   echo "source_path: ${src_rel}"
@@ -202,7 +202,7 @@ recorded=${recorded:-$(date -u +%Y-%m-%d)}
   echo "commit_date: ${src_date}"
   echo "recorded_utc: ${recorded}"
   echo "source_tree: https://github.com/${src_remote}/tree/${EXPECTED_COMMIT}/${src_rel}"
-  echo "license: Apache-2.0 (see testkit/corpus/THIRD_PARTY_LICENSES.md)"
+  echo "license: Apache-2.0 (see ../../THIRD_PARTY_LICENSES.md)"
 } > "$pin_file"
 
 # --- exclusion list -----------------------------------------------------------

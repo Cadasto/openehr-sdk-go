@@ -169,7 +169,7 @@ cmd_sync() {
     echo "commit: $commit"
     echo "fetched_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "source_tree: https://github.com/$REPO/tree/$commit/$FLAT_PATH"
-    echo "license: Apache-2.0 (see testkit/corpus/THIRD_PARTY_LICENSES.md)"
+    echo "license: Apache-2.0 (see ../THIRD_PARTY_LICENSES.md)"
     echo "#"
     echo "# sha256  path"
     echo "$(sha256_of "$DEST/templates/$OPT_NAME")  templates/$OPT_NAME"
