@@ -204,7 +204,7 @@ The budget line used for both runs: a benchmark regresses materially when its v2
 
 **Question (resolved):** what serialisation do Cassette-mode recordings use — the HTTP Archive standard (`.har`), or a purpose-built YAML schema of this SDK's own?
 
-**Decision summary:** Cassette recordings are HTTP Archive 1.2. Provenance and redaction attestation ride on `log` as a `_req082` object. The purpose-built YAML twin was rejected so a second implementation can replay the same corpus with any HAR reader. Evidence: the live EHRbase `POST /ehr` pair in [strand-11-evidence](../plans/strand-11-evidence/).
+**Decision summary:** Cassette recordings are HTTP Archive 1.2. Provenance and redaction attestation ride on `log` as a `_req082` object. The purpose-built YAML twin was rejected so a second implementation can replay the same recordings with any HAR reader. Evidence: the live EHRbase `POST /ehr` pair in [strand-11-evidence](../plans/strand-11-evidence/).
 
 **Codified in:** [ADR 0020](../adr/0020-cassette-recording-har.md). Amends REQ-082.
 

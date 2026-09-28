@@ -33,7 +33,7 @@ which file a second implementation (or a reviewer) can treat as the corpus.
 **Cassette recordings are HTTP Archive 1.2 documents with a `.har` suffix.**
 
 - One file is the whole artefact. A PHP or other-language implementation of the same probe
-  can replay the same corpus with any HAR reader.
+  can replay the same recordings with any HAR reader.
 - REQ-082's provenance and redaction attestation — which HAR 1.2 does not model — live on
   `log` as a `_req082` object (HAR's documented extension slot). Tools that ignore unknown
   fields still see a valid `log.entries` list.
