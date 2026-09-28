@@ -14,18 +14,18 @@ import (
 
 // TestProbe030 runs PROBE-030 across the canonical input set and
 // asserts every input produces Status == "pass". The set spans leaf
-// RM values and full composition cassettes vendored under
+// RM values and full composition fixtures vendored under
 // testkit/corpus/compositions/ and testkit/corpus/rm/. The conformance harness in
 // `make conformance` invokes the same probe function against shared
-// openEHR conformance cassettes (REQ-080).
+// openEHR conformance fixtures (REQ-080).
 func TestProbe030(t *testing.T) {
 	// Sanity-check the input set: at least one leaf entry AND at
-	// least one cassette entry — guards against a silent regression
-	// in cassette discovery.
-	var leafSeen, cassetteSeen bool
+	// least one fixture entry — guards against a silent regression
+	// in fixture discovery.
+	var leafSeen, fixtureSeen bool
 	for _, in := range serializeprobes.Probe030Inputs {
-		if len(in.Name) > len("cassette:") && in.Name[:len("cassette:")] == "cassette:" {
-			cassetteSeen = true
+		if len(in.Name) > len("fixture:") && in.Name[:len("fixture:")] == "fixture:" {
+			fixtureSeen = true
 		} else {
 			leafSeen = true
 		}
@@ -33,8 +33,8 @@ func TestProbe030(t *testing.T) {
 	if !leafSeen {
 		t.Error("Probe030Inputs missing leaf-type entries")
 	}
-	if !cassetteSeen {
-		t.Error("Probe030Inputs missing cassette entries — check testkit/corpus discovery via testkit/fixtures")
+	if !fixtureSeen {
+		t.Error("Probe030Inputs missing fixture entries — check testkit/corpus discovery via testkit/fixtures")
 	}
 
 	for _, in := range serializeprobes.Probe030Inputs {
@@ -50,27 +50,27 @@ func TestProbe030(t *testing.T) {
 	}
 }
 
-// TestProbe030InputsCoverWholeCorpus pins that every discovered cassette is in
-// the input set, by name, next to the inline leaf entries. A cassette carrying
+// TestProbe030InputsCoverWholeCorpus pins that every discovered fixture is in
+// the input set, by name, next to the inline leaf entries. A fixture carrying
 // an RM-floor finding independent of the round trip is held out of the
 // ValidateRM leg by SkipFloor, never removed from the input set, so this fails
-// if a future hold-out silently shrinks the probe; it also fails on a cassette
+// if a future hold-out silently shrinks the probe; it also fails on a fixture
 // whose root type has no factory, which discovery would otherwise skip.
 func TestProbe030InputsCoverWholeCorpus(t *testing.T) {
 	rels, err := fixtures.ListCompositionJSON()
 	if err != nil {
-		t.Fatalf("list cassettes: %v", err)
+		t.Fatalf("list fixtures: %v", err)
 	}
-	// Count the non-cassette (inline leaf) entries in the input set rather
+	// Count the non-fixture (inline leaf) entries in the input set rather
 	// than hardcoding their number, so adding a leaf does not silently pass a
 	// stale total.
 	inlineLeaves := 0
 	for _, in := range serializeprobes.Probe030Inputs {
-		if !strings.HasPrefix(in.Name, "cassette:") {
+		if !strings.HasPrefix(in.Name, "fixture:") {
 			inlineLeaves++
 		}
 	}
-	// Every discovered cassette must reach the input set by name. A cassette
+	// Every discovered fixture must reach the input set by name. A fixture
 	// whose root type has no factory is skipped by the probe's discovery, so
 	// it is a failure here rather than a smaller expected count.
 	names := make(map[string]bool, len(serializeprobes.Probe030Inputs))
@@ -79,22 +79,22 @@ func TestProbe030InputsCoverWholeCorpus(t *testing.T) {
 	}
 	for _, rel := range rels {
 		if _, ok := fixtures.FactoryForJSONRel(rel); !ok {
-			t.Errorf("cassette %s has no factory, so PROBE-030 skips it silently: add its root type to fixtures.FactoryForRootType", rel.Rel)
+			t.Errorf("fixture %s has no factory, so PROBE-030 skips it silently: add its root type to fixtures.FactoryForRootType", rel.Rel)
 			continue
 		}
-		if !names["cassette:"+rel.Rel] {
-			t.Errorf("cassette %s is on disk but not in Probe030Inputs; a hold-out must keep the cassette in the input set and use SkipFloor", rel.Rel)
+		if !names["fixture:"+rel.Rel] {
+			t.Errorf("fixture %s is on disk but not in Probe030Inputs; a hold-out must keep the fixture in the input set and use SkipFloor", rel.Rel)
 		}
 	}
 	if got, want := len(serializeprobes.Probe030Inputs), inlineLeaves+len(rels); got != want {
-		t.Errorf("Probe030Inputs has %d entries, want %d (%d inline leaves + %d cassettes on disk)", got, want, inlineLeaves, len(rels))
+		t.Errorf("Probe030Inputs has %d entries, want %d (%d inline leaves + %d fixtures on disk)", got, want, inlineLeaves, len(rels))
 	}
 }
 
 // TestProbe030HeldOutInputsFailFloorButPassFidelity pins that every SkipFloor
 // hold-out is load-bearing: with the floor leg on it fails on the RM floor
 // (REQ-112), and with the hold-out honored it passes on the fidelity legs. A
-// spurious hold-out (one whose cassette already passes the floor) turns the
+// spurious hold-out (one whose fixture already passes the floor) turns the
 // first assertion red; a fidelity regression turns the second red. It drives
 // the two public entry points from outside the package; the exact findings each
 // hold-out hides are pinned by TestProbe030SkipFloorFindingsArePinned.
@@ -170,10 +170,10 @@ func TestProbe033(t *testing.T) {
 	if len(serializeprobes.Probe033Inputs) == 0 {
 		t.Fatal("Probe033Inputs is empty — bootstrap encoder failed at init")
 	}
-	var leafSeen, cassetteSeen bool
+	var leafSeen, fixtureSeen bool
 	for _, in := range serializeprobes.Probe033Inputs {
-		if len(in.Name) > len("cassette:") && in.Name[:len("cassette:")] == "cassette:" {
-			cassetteSeen = true
+		if len(in.Name) > len("fixture:") && in.Name[:len("fixture:")] == "fixture:" {
+			fixtureSeen = true
 		} else {
 			leafSeen = true
 		}
@@ -181,8 +181,8 @@ func TestProbe033(t *testing.T) {
 	if !leafSeen {
 		t.Error("Probe033Inputs missing leaf-type entries")
 	}
-	if !cassetteSeen {
-		t.Error("Probe033Inputs missing cassette entries — check testkit/corpus discovery via testkit/fixtures")
+	if !fixtureSeen {
+		t.Error("Probe033Inputs missing fixture entries — check testkit/corpus discovery via testkit/fixtures")
 	}
 	for _, in := range serializeprobes.Probe033Inputs {
 		t.Run(in.Name, func(t *testing.T) {
@@ -250,7 +250,7 @@ func TestProbe076(t *testing.T) {
 		})
 	}
 	if passes == 0 {
-		t.Error("PROBE-076 produced no passes — check cassette discovery / codec regressions")
+		t.Error("PROBE-076 produced no passes — check fixture discovery / codec regressions")
 	}
 }
 

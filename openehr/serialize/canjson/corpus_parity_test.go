@@ -10,14 +10,14 @@ package canjson_test
 // results are compared. The net exists so that the generator change and the
 // canjson change can each show they moved no value: a decoded tree that differs
 // between the two packages, or a document one package accepts and the other
-// refuses, is reported here by cassette path and by the first field that
+// refuses, is reported here by fixture path and by the first field that
 // differs.
 //
 // How to read the result, measured on Go 1.27 and load-bearing. In Go 1.27
 // encoding/json is itself implemented over json/v2, and both packages honour
 // both custom-unmarshaler interfaces: the v1 `UnmarshalJSON([]byte) error` and
 // the v2 `UnmarshalJSONFrom(*jsontext.Decoder) error`. Every type registered in
-// typereg.Default carries one of the two, so for a cassette both sides of the
+// typereg.Default carries one of the two, so for a fixture both sides of the
 // comparison reach the same generated code, and they still will once ADR 0022
 // swaps which of the two methods that is. What this
 // net therefore pins is entry-point parity rather than a contest between two
@@ -45,10 +45,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// minParityDocuments is a floor on how many cassettes the selection rule must
+// minParityDocuments is a floor on how many fixtures the selection rule must
 // admit and both codecs must accept. It guards the rule itself: a skip
 // condition that quietly stopped matching would empty the net without failing
-// anything. 103 cassettes clear both bars today, so the floor sits below that
+// anything. 103 fixtures clear both bars today, so the floor sits below that
 // with room for vendoring churn.
 const minParityDocuments = 90
 
@@ -83,7 +83,7 @@ func (v parityVerdict) describe(name string) string {
 // compareCodecs decodes raw twice into fresh values built by ctor, once through
 // encoding/json and once through encoding/json/v2 with no options, and reports
 // how the two compare. A decode failure on either side is recorded rather than
-// raised, so one malformed cassette reports as a line in a census instead of
+// raised, so one malformed fixture reports as a line in a census instead of
 // ending the run.
 func compareCodecs(ctor func() any, raw []byte) parityVerdict {
 	a, b := ctor(), ctor()
@@ -108,7 +108,7 @@ func compareCodecs(ctor func() any, raw []byte) parityVerdict {
 func TestCorpusParityV1V2(t *testing.T) {
 	t.Run("corpus", testParityCorpus)
 	t.Run("control_case_mismatch_is_reported", testParityControlCaseMismatch)
-	t.Run("control_two_cassettes_report_a_field", testParityControlDistinctCassettes)
+	t.Run("control_two_fixtures_report_a_field", testParityControlDistinctFixtures)
 	t.Run("RegistryCensus", testParityRegistryCensus)
 }
 
@@ -127,10 +127,10 @@ func TestCorpusParityV1V2(t *testing.T) {
 //     discriminator there is no generated type to decode into.
 //   - A `_type` that typereg.Default does not know. No generated type exists,
 //     so there is nothing to decode into and nothing to compare. None today;
-//     the class is counted and logged so a newly vendored cassette of an
+//     the class is counted and logged so a newly vendored fixture of an
 //     unsupported type becomes visible rather than silently dropped.
 //   - JSON that will not parse at all. Kept apart from the class above, which
-//     is about well-formed documents of another shape: a cassette that stopped
+//     is about well-formed documents of another shape: a fixture that stopped
 //     parsing is a corrupt file rather than a fixture this net has no opinion
 //     on. None today; counted and logged like the class above.
 //
@@ -191,30 +191,30 @@ func testParityCorpus(t *testing.T) {
 	}
 
 	if len(divergent) > 0 {
-		t.Errorf("encoding/json and encoding/json/v2 disagree on %d of the %d cassettes scanned:\n%s",
+		t.Errorf("encoding/json and encoding/json/v2 disagree on %d of the %d fixtures scanned:\n%s",
 			len(divergent), scanned, strings.Join(divergent, "\n"))
 	}
 	if classified := skippedMalformed + skippedNoType + skippedUnregistered + refusedByBoth + compared + len(divergent); classified != scanned {
-		t.Errorf("the census does not add up: %d cassettes classified, %d scanned", classified, scanned)
+		t.Errorf("the census does not add up: %d fixtures classified, %d scanned", classified, scanned)
 	}
 	if compared < minParityDocuments {
-		t.Errorf("only %d cassettes were decoded by both packages, want at least %d; the selection rule is skipping documents it should admit (no usable _type %d, unregistered _type %d, unparsable %d, refused by both %d)",
+		t.Errorf("only %d fixtures were decoded by both packages, want at least %d; the selection rule is skipping documents it should admit (no usable _type %d, unregistered _type %d, unparsable %d, refused by both %d)",
 			compared, minParityDocuments, skippedNoType, skippedUnregistered, skippedMalformed, refusedByBoth)
 	}
-	t.Logf("cassettes scanned %d: compared %d, refused by both packages %d, skipped without a usable _type %d, skipped on an unregistered _type %d, skipped as unparsable JSON %d",
+	t.Logf("fixtures scanned %d: compared %d, refused by both packages %d, skipped without a usable _type %d, skipped on an unregistered _type %d, skipped as unparsable JSON %d",
 		scanned, compared, refusedByBoth, skippedNoType, skippedUnregistered, skippedMalformed)
 	if len(unregistered) > 0 {
-		t.Logf("cassettes carrying a _type the registry does not know:\n  %s", strings.Join(unregistered, "\n  "))
+		t.Logf("fixtures carrying a _type the registry does not know:\n  %s", strings.Join(unregistered, "\n  "))
 	}
 	if len(malformed) > 0 {
-		t.Logf("cassettes that would not parse as JSON:\n  %s", strings.Join(malformed, "\n  "))
+		t.Logf("fixtures that would not parse as JSON:\n  %s", strings.Join(malformed, "\n  "))
 	}
 }
 
 // parityControlValue is a canonical-JSON shape with no custom unmarshaler of
 // its own, so each package applies its own member-name matching to it. That is
 // what makes the case mismatch in [testParityControlCaseMismatch] observable,
-// and it is why the control cannot be carried by a vendored cassette: every
+// and it is why the control cannot be carried by a vendored fixture: every
 // type in typereg.Default has a generated unmarshaler method, which both
 // packages call in preference to their own field matching (see
 // [testParityRegistryCensus]).
@@ -260,41 +260,41 @@ func testParityControlCaseMismatch(t *testing.T) {
 	}
 }
 
-// parityControlCassettes are two vendored COMPOSITION cassettes with different
+// parityControlFixtures are two vendored COMPOSITION fixtures with different
 // content, used as the second leg of the control.
-var parityControlCassettes = [2]string{"body_weight", "BMI"}
+var parityControlFixtures = [2]string{"body_weight", "BMI"}
 
-// testParityControlDistinctCassettes is the second leg of the can-fail control.
+// testParityControlDistinctFixtures is the second leg of the can-fail control.
 // The case-mismatch leg proves the harness reports a divergence on a small
 // hand-built shape; this leg proves the field walk behind that report also
 // finds and names a difference inside two real decoded RM trees, with their
-// polymorphic slots, slices and nested structures. Two different cassettes must
+// polymorphic slots, slices and nested structures. Two different fixtures must
 // produce a named differing field.
 //
 // The mutation that turns it red is a [firstDiff] that stops descending, for
 // example one that skips struct fields or treats an interface slot as always
 // equal: the corpus sweep would then keep reporting zero divergences whatever
 // the codecs did below the top level.
-func testParityControlDistinctCassettes(t *testing.T) {
+func testParityControlDistinctFixtures(t *testing.T) {
 	decode := func(name string) *rm.Composition {
 		t.Helper()
 		raw, err := os.ReadFile(fixtures.CompositionJSON(name))
 		if err != nil {
-			t.Fatalf("read cassette %s: %v", name, err)
+			t.Fatalf("read fixture %s: %v", name, err)
 		}
 		var c rm.Composition
 		if err := v1.Unmarshal(raw, &c); err != nil {
-			t.Fatalf("decode cassette %s: %v", name, err)
+			t.Fatalf("decode fixture %s: %v", name, err)
 		}
 		return &c
 	}
-	a := decode(parityControlCassettes[0])
-	b := decode(parityControlCassettes[1])
+	a := decode(parityControlFixtures[0])
+	b := decode(parityControlFixtures[1])
 
 	where, found := firstDiff(reflect.ValueOf(a), reflect.ValueOf(b), "")
 	if !found {
-		t.Fatalf("firstDiff found no difference between cassettes %s and %s, which hold different content; the field walk is not descending",
-			parityControlCassettes[0], parityControlCassettes[1])
+		t.Fatalf("firstDiff found no difference between fixtures %s and %s, which hold different content; the field walk is not descending",
+			parityControlFixtures[0], parityControlFixtures[1])
 	}
 	if !strings.HasPrefix(where, ".") {
 		t.Errorf("firstDiff reported %q, want a field path starting at the composition root", where)
@@ -305,7 +305,7 @@ func testParityControlDistinctCassettes(t *testing.T) {
 // readable: both packages reach the same generated code. Every type registered
 // in typereg.Default carries a generated unmarshaler method, and on Go 1.27
 // both encoding/json and encoding/json/v2 call either method in preference to
-// their own struct field matching, so each cassette is compared across two
+// their own struct field matching, so each fixture is compared across two
 // entry points into one implementation rather than across two implementations.
 //
 // The assertion is the disjunction on purpose. Today the generated method is
@@ -452,7 +452,7 @@ func render(v reflect.Value) string {
 	return s
 }
 
-// relativeToRoot names a cassette by its path under the cassettes root, in
+// relativeToRoot names a fixture by its path under the fixtures root, in
 // forward-slash form, falling back to the absolute path if it lies elsewhere.
 func relativeToRoot(root, path string) string {
 	rel, err := filepath.Rel(root, path)

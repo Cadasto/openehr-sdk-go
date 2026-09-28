@@ -20,7 +20,7 @@ import (
 // from ANY entry point, including a bare encoding/json/v2 Unmarshal with no
 // options and no canjson involvement. That independence is what lets a slot
 // resolve the same way whether canjson (now itself on v2) or a bare v2 caller
-// drives the decode: decoding a COMPOSITION cassette straight through v2 finds
+// drives the decode: decoding a COMPOSITION fixture straight through v2 finds
 // the concrete content[0] type.
 //
 // Can-fail control: the hooks reach the slot only because DecodeInto joins
@@ -28,9 +28,9 @@ import (
 // hook registration) and content[0] comes back a nil interface, so the type
 // assertion below fails.
 func TestBareV2UnmarshalResolvesPolymorphicSlot(t *testing.T) {
-	raw, err := os.ReadFile(fixtures.ResolveCompositionJSON(findCassette(t, "BMI.json")))
+	raw, err := os.ReadFile(fixtures.ResolveCompositionJSON(findFixture(t, "BMI.json")))
 	if err != nil {
-		t.Fatalf("read BMI cassette: %v", err)
+		t.Fatalf("read BMI fixture: %v", err)
 	}
 
 	var comp rm.Composition
@@ -49,20 +49,20 @@ func TestBareV2UnmarshalResolvesPolymorphicSlot(t *testing.T) {
 	}
 }
 
-// findCassette returns the composition cassette whose relative path ends in
+// findFixture returns the composition fixture whose relative path ends in
 // name, failing the test if it is not among the vendored fixtures.
-func findCassette(t *testing.T, name string) fixtures.CompositionJSONRel {
+func findFixture(t *testing.T, name string) fixtures.CompositionJSONRel {
 	t.Helper()
 	rels, err := fixtures.ListCompositionJSON()
 	if err != nil {
-		t.Fatalf("list cassettes: %v", err)
+		t.Fatalf("list fixtures: %v", err)
 	}
 	for _, rel := range rels {
 		if strings.HasSuffix(rel.Rel, "/"+name) || rel.Rel == name {
 			return rel
 		}
 	}
-	t.Fatalf("cassette %q not found among %d fixtures", name, len(rels))
+	t.Fatalf("fixture %q not found among %d fixtures", name, len(rels))
 	return fixtures.CompositionJSONRel{}
 }
 

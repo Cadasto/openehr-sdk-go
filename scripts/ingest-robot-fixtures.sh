@@ -113,7 +113,7 @@ while IFS= read -r -d '' f; do
   cp_sub "$rel" "$safe"
 done < <(find "$ROBOT/contributions" -name '*.json' -print0)
 
-# Record the upstream source commit so the curated cassettes carry provenance.
+# Record the upstream source commit so the curated fixtures carry provenance.
 # Best-effort: the Robot data is copied and renamed by hand, so unlike
 # flat-conformance/MANIFEST.txt this pins ONLY the source commit the ingest
 # read from — it is not a per-file sha256 lock.
@@ -126,8 +126,8 @@ if [[ -n "$src_root" ]]; then
   src_rel=${ROBOT#"$src_root/"}
   {
     echo "# EHRbase Robot integration-test data — source provenance pin"
-    echo "# Written by scripts/ingest-robot-cassettes.sh. Best-effort: the curated"
-    echo "# cassettes are copied and renamed by hand, so this pins only the upstream"
+    echo "# Written by scripts/ingest-robot-fixtures.sh. Best-effort: the curated"
+    echo "# fixtures are copied and renamed by hand, so this pins only the upstream"
     echo "# commit the ingest read from — NOT a per-file sha256 lock."
     echo "source_repo: ${src_remote:-unknown}"
     echo "source_path: ${src_rel:-unknown}"
@@ -142,4 +142,4 @@ else
   echo "WARNING: $ROBOT is not a git checkout; ROBOT_SOURCE.txt not updated" >&2
 fi
 
-echo "ingested robot cassettes into $CAS"
+echo "ingested robot fixtures into $CAS"

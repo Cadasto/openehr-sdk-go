@@ -10,7 +10,7 @@ import (
 
 // TestRealQuotedNumberDecodes asserts the permissive-decode half of
 // ADR 0004: a JSON quoted decimal string is accepted for a `Real`
-// field. The fixture cassettes (BMI.json) carry quoted magnitudes and
+// field. The vendored fixtures (BMI.json) carry quoted magnitudes and
 // the SDK MUST decode them without error.
 func TestRealQuotedNumberDecodes(t *testing.T) {
 	in := []byte(`{"_type":"DV_QUANTITY","magnitude":"80.5","units":"kg"}`)

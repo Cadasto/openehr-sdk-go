@@ -19,7 +19,7 @@ import (
 //
 // The multiset is this SDK's, which is wider than the original lint
 // pipeline's: every additive Layer-2 group runs unconditionally, so a group
-// added later contributes its codes to these cassettes wherever a cassette
+// added later contributes its codes to these fixtures wherever a fixture
 // really carries the defect (the path-shape group's aql_select_no_alias
 // does, on two of the three). The cross-implementation claim is therefore
 // scoped to the pipeline's own codes: any implementation over the same

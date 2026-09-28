@@ -11,33 +11,33 @@ import (
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/auth"
 )
 
-// smartConfigCassette loads the canonical SMART configuration cassette
+// smartConfigFixture loads the canonical SMART configuration fixture
 // shared with smart/discovery's own tests. Path resolution uses
 // runtime.Caller so the helper works regardless of CWD — the conformance
 // harness invokes probes outside `go test`.
-func smartConfigCassette(t *testing.T) []byte {
+func smartConfigFixture(t *testing.T) []byte {
 	t.Helper()
 	_, src, _, ok := runtime.Caller(0)
 	if !ok {
-		t.Fatal("cannot resolve cassette path: runtime.Caller failed")
+		t.Fatal("cannot resolve fixture path: runtime.Caller failed")
 	}
 	path := filepath.Join(filepath.Dir(src), "..", "..", "corpus", "its_rest", "discovery", "smart-configuration.json")
 	b, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
+		t.Fatalf("read fixture %q: %v", path, err)
 	}
 	return b
 }
 
-// mismatchedSpecCassette returns the canonical cassette with the
+// mismatchedSpecFixture returns the canonical fixture with the
 // org.openehr.rest spec_version rewritten to an incompatible value, for
 // PROBE-003's fail-fast assertion.
-func mismatchedSpecCassette(t *testing.T) []byte {
+func mismatchedSpecFixture(t *testing.T) []byte {
 	t.Helper()
-	b := smartConfigCassette(t)
+	b := smartConfigFixture(t)
 	out := bytes.ReplaceAll(b, []byte(`"spec_version": "1.1.0-development"`), []byte(`"spec_version": "1.0.3"`))
 	if bytes.Equal(out, b) {
-		t.Fatal("mismatchedSpecCassette: spec_version replacement did not match the cassette")
+		t.Fatal("mismatchedSpecFixture: spec_version replacement did not match the fixture")
 	}
 	return out
 }
@@ -55,21 +55,21 @@ func assertPass(t *testing.T, r probes.Result, err error) {
 // TestProbe001 runs PROBE-001 and asserts discovery declares
 // response_type=code and code_challenge_method=S256 (REQ-061).
 func TestProbe001(t *testing.T) {
-	r, err := probes.Probe001DiscoveryCodePKCE(context.Background(), smartConfigCassette(t))
+	r, err := probes.Probe001DiscoveryCodePKCE(context.Background(), smartConfigFixture(t))
 	assertPass(t, r, err)
 }
 
 // TestProbe002 runs PROBE-002 and asserts the resolved catalog advertises
 // org.openehr.rest with a parseable base URL and a spec_version (REQ-070).
 func TestProbe002(t *testing.T) {
-	r, err := probes.Probe002OpenEHRRestService(context.Background(), smartConfigCassette(t))
+	r, err := probes.Probe002OpenEHRRestService(context.Background(), smartConfigFixture(t))
 	assertPass(t, r, err)
 }
 
 // TestProbe003 runs PROBE-003 and asserts a spec-version mismatch fails
 // fast at resolution with a typed DiscoveryError (REQ-072).
 func TestProbe003(t *testing.T) {
-	r, err := probes.Probe003SpecVersionMismatch(context.Background(), mismatchedSpecCassette(t))
+	r, err := probes.Probe003SpecVersionMismatch(context.Background(), mismatchedSpecFixture(t))
 	assertPass(t, r, err)
 }
 

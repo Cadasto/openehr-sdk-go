@@ -128,14 +128,14 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ. The t
    - Exit codes per the REQ-114 contract (error → 1; warning-in-strict → 2).
 2. Document in `docs/examples.md` (CI JSON example for GitHub Actions).
 
-**Definition of done:** `go run ./cmd/examples/validate-opt …` runs on the cassette templates; `make ci` green.
+**Definition of done:** `go run ./cmd/examples/validate-opt …` runs on the fixture templates; `make ci` green.
 
 ### Phase 3 — PROBE-085 & integration
 
 **Tasks:**
 
 1. `testkit/probes/template/probe_085_opt_author_validator.go`:
-   - Run the validator on the full cassette template set; expect 0 errors on known-good OPTs.
+   - Run the validator on the full fixture template set; expect 0 errors on known-good OPTs.
    - One deliberately broken fixture must emit `opt.missing_template_id`.
 2. Optional (deferred — not v1 unless trivial): hook `template.ParseFileStrict` to call the validator under an `OPT_VALIDATE=1` env toggle. **If adopted, that toggle is normative behaviour and must be specified in REQ-114**, not left as a plan-only task.
 3. Update `traceability.yaml` (REQ-114 `landed`), run `make spec-gen`, set plan **Status:** `Done`.

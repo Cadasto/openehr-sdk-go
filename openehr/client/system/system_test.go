@@ -48,9 +48,9 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return c
 }
 
-// readCassette returns the bytes of a vendored cassette at
+// readFixture returns the bytes of a vendored fixture at
 // testkit/corpus/its_rest/<dir>/<name>.
-func readCassette(t *testing.T, dir, name string) []byte {
+func readFixture(t *testing.T, dir, name string) []byte {
 	t.Helper()
 	_, src, _, ok := runtime.Caller(0)
 	if !ok {
@@ -59,7 +59,7 @@ func readCassette(t *testing.T, dir, name string) []byte {
 	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "corpus", "its_rest", dir, name)
 	b, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
+		t.Fatalf("read fixture %q: %v", path, err)
 	}
 	return b
 }
@@ -68,7 +68,7 @@ func readCassette(t *testing.T, dir, name string) []byte {
 // comparison for a preserved Extras value. Extras holds the wire bytes
 // exactly as decoded, but re-encoding runs them through encoding/json,
 // which compacts insignificant whitespace and escapes `<`, `>` and `&`:
-// the cassette's `["application/json", "application/xml"]` comes back
+// the fixture's `["application/json", "application/xml"]` comes back
 // without the space, and a value spelled `"?a=1&b=2"` as
 // `"?a=1\u0026b=2"`, with nothing lost. Comparing raw bytes would fail
 // on the spelling alone.
@@ -112,9 +112,9 @@ func assertEmittedKeys(t *testing.T, out []byte, want map[string]string) {
 
 // REQ-050: OPTIONS / decodes into ServiceCapabilities, which advertises the
 // pinned restapi_specs_version.
-func TestCapabilitiesDecodesCassette(t *testing.T) {
+func TestCapabilitiesDecodesFixture(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t, "system", "capabilities.json")
+	body := readFixture(t, "system", "capabilities.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
@@ -159,7 +159,7 @@ func TestCapabilitiesDecodesCassette(t *testing.T) {
 // REQ-144: unknown keys in the capabilities response are preserved in Extras
 // on decode.
 func TestCapabilitiesPreservesExtras(t *testing.T) {
-	body := readCassette(t, "system", "capabilities.json")
+	body := readFixture(t, "system", "capabilities.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(body)
 	}))
@@ -218,8 +218,8 @@ func TestCapabilitiesRoundTripsExtras(t *testing.T) {
 		wantEmitted map[string]string
 	}{
 		{
-			label: "cassette",
-			body:  readCassette(t, "system", "capabilities.json"),
+			label: "fixture",
+			body:  readFixture(t, "system", "capabilities.json"),
 		},
 		{
 			label: "colliding extra on an emitted field is ignored",
@@ -328,7 +328,7 @@ func TestCapabilitiesRoundTripsExtras(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	body := readCassette(t, "system", "capabilities.json")
+	body := readFixture(t, "system", "capabilities.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(body)
 	}))
@@ -389,7 +389,7 @@ func TestCapabilitiesEmptyBodyIsInvalidShape(t *testing.T) {
 }
 
 func TestHealthUp(t *testing.T) {
-	body := readCassette(t, "system", "capabilities.json")
+	body := readFixture(t, "system", "capabilities.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(body)
 	}))
@@ -474,7 +474,7 @@ func TestHealthDownOnNetworkError(t *testing.T) {
 }
 
 func TestRepositoryMirrorsPackageFunctions(t *testing.T) {
-	body := readCassette(t, "system", "capabilities.json")
+	body := readFixture(t, "system", "capabilities.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(body)
 	}))

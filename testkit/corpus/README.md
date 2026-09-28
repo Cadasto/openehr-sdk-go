@@ -2,7 +2,7 @@
 
 Vendored fixture documents for codec, validation, and probe tests: OPTs, compositions, RM samples, wire bodies, and reference goldens. They are checked in so CI does not need a sibling clone. Licences and provenance: [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md); repository-wide inventory: [`docs/licensing.md`](../../docs/licensing.md).
 
-**These are not REQ-082 Cassette-mode recordings.** Everything here is a request or response *body*: it carries no method, URL, header, or status code, so none of it can be replayed as an HTTP exchange. The Cassette mode that [REQ-082](../../docs/specifications/conformance.md#req-082--runnability) mandates records whole exchanges and lands under `testkit/recordings/`. The directory name predates that distinction. Code reaches the fixtures through [`testkit/fixtures`](../fixtures/paths.go), so the name is kept.
+**These are not REQ-082 Cassette-mode recordings.** Everything here is a request or response *body*: it carries no method, URL, header, or status code, so none of it can be replayed as an HTTP exchange. The Cassette mode that [REQ-082](../../docs/specifications/conformance.md#req-082--runnability) mandates records whole exchanges and lands under `testkit/recordings/`. Code reaches the fixtures through [`testkit/fixtures`](../fixtures/paths.go).
 
 ## Layout
 
@@ -109,11 +109,11 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 | `Corona_Anamnese` | REQ-116 oracle. It was the loud mode (`Build` → `ErrIDCollision`: four `SECTION.adhoc.v1` siblings; eight reused screening OBSERVATIONs under Symptome). Its golden carries 350 name-predicate segments over 213 `aqlPath`s. Since REQ-116 Phase 4 it builds and holds **230/230** structural parity | 1.2 MB + 230 KB |
 | `GECCO_Diagnose` | REQ-116 oracle, silent mode. It always built, but it emitted bare paths where its golden carries 30 name-predicate segments over 24 `aqlPath`s (its three `/content` children have **distinct** archetype ids and are all predicated). Since REQ-116 Phase 4: **34/34** structural parity. The residuals are the golden's own `min=1` outlier (14 nodes) and 1 input delta, both documented | 210 KB + 73 KB |
 
-The Corona pair is the largest cassette in the repo. That size is the cost of guarding the archetype-reuse-under-slot class with the real reference fixture instead of a synthetic cut-down.
+The Corona pair is the largest fixture in the repo. That size is the cost of guarding the archetype-reuse-under-slot class with the real reference fixture instead of a synthetic cut-down.
 
 ### ehrbase (Robot integration-tests)
 
-**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md). Ingest script: [`scripts/ingest-robot-cassettes.sh`](../../scripts/ingest-robot-cassettes.sh).
+**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md). Ingest script: [`scripts/ingest-robot-fixtures.sh`](../../scripts/ingest-robot-fixtures.sh).
 
 **Minimal entry** (`valid_templates/minimal/` + `xml_compositions/`):
 
@@ -127,7 +127,7 @@ The Corona pair is the largest cassette in the repo. That size is the cost of gu
 
 **Persistent:** `persistent_minimal.en.v1` (OPT + JSON + XML, round-trip).
 
-**Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip); `Test_dv_*` (24 OPT+JSON pairs, all round-trip in PROBE-030; the two `Test_dv_interval_*_open_constraint` samples have the RM floor held out for inverted bounds, and all four `Test_dv_interval_*` stay out of the constraint-cassette axis). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
+**Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip); `Test_dv_*` (24 OPT+JSON pairs, all round-trip in PROBE-030; the two `Test_dv_interval_*_open_constraint` samples have the RM floor held out for inverted bounds, and all four `Test_dv_interval_*` stay out of the constraint-fixture axis). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
 
 **Added at the `b4625fc` pin** (valid OPT + canonical JSON only): `family_history.v.1.2.3`, `my_spanish_template_v0`, `terminology_test.ehrbase.org.v1`, `terminology_test2.ehrbase.org.v1`.
 
@@ -150,5 +150,5 @@ See [`its_rest/README.md`](its_rest/README.md).
 
 ## Conventions
 
-- Cassettes are immutable inputs. Fix the codec or refresh from upstream; do not patch cassettes to make tests pass.
+- Fixtures are immutable inputs. Fix the codec or refresh from upstream; do not patch fixtures to make tests pass.
 - New template: add `templates/` + `compositions/` files; update this table. A composition is never skipped wholesale to keep probes green. If its vendored content carries a genuine RM-floor finding independent of the round trip, it still joins the corpus. It is held out of PROBE-030's `validation.ValidateRM` leg only, and named with its finding in `probe030SkipFloor` in [`probe_030_canjson_round_trip.go`](../probes/serialize/probe_030_canjson_round_trip.go). Composition XML the canxml round trip does not exercise goes in `compositionXMLExcluded`, and an alternate-wire or deliberately invalid `rm/` sample in `rmJSONExcluded` / `rmJSONExcludedPrefixes`, both in [`discover.go`](../fixtures/discover.go).

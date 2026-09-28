@@ -78,7 +78,7 @@ func main() {
 }
 ```
 
-From a clone of this repo, run the equivalent example. It reads a vendored cassette, so there is no file to set up:
+From a clone of this repo, run the equivalent example. It reads a vendored fixture, so there is no file to set up:
 
 ```bash
 go run ./cmd/examples/canonical_json

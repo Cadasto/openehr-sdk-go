@@ -35,7 +35,7 @@ package serializeprobes
 // survives.
 //
 // Modes: In-repo (round-trip property against vendored fixtures; no backend)
-// — no cassette or live mode.
+// — no fixture or live mode.
 
 import (
 	"encoding/json"

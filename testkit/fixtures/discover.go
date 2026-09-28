@@ -9,11 +9,11 @@ import (
 	"strings"
 )
 
-// CompositionJSONRel is a composition or rm JSON cassette path relative to
+// CompositionJSONRel is a composition or rm JSON fixture path relative to
 // [CorpusRoot], e.g. `compositions/body_weight.json` or
 // `rm/minimal_evaluation.json`.
 type CompositionJSONRel struct {
-	Rel      string // forward-slash path under cassettes root
+	Rel      string // forward-slash path under fixtures root
 	Template string // filename stem (template id or rm sample name)
 	Kind     string // "compositions" or "rm"
 }

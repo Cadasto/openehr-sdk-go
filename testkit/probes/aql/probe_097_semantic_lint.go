@@ -266,7 +266,7 @@ func Probe097SemanticLint(c SemanticCorpus) (Result, error) { // PROBE-097 (REQ-
 	for _, tc := range c.Additivity {
 		// runLintCase (probe_028_aql_lint.go) is the additivity guard itself:
 		// it asserts the FULL pre-REQ-161 code multiset is unchanged, and any
-		// REQ-161 code appearing on one of these three cassettes — which carry
+		// REQ-161 code appearing on one of these three fixtures — which carry
 		// no REQ-161 defect — already breaks that equality (REQ-161
 		// § Additivity's whole point). The task-brief ruling that a gained
 		// REQ-161 code is a blocker, never a re-baseline, is a reporting

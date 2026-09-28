@@ -46,7 +46,7 @@ The Packages column lists the SDK packages each program imports, by short name (
 go run ./cmd/examples/canonical_json
 ```
 
-**Packages:** `openehr/rm`, `openehr/serialize/canjson` (plus `testkit/fixtures`, which locates the cassette)
+**Packages:** `openehr/rm`, `openehr/serialize/canjson` (plus `testkit/fixtures`, which locates the fixture)
 
 **Fixture:** `testkit/corpus/compositions/body_weight.json`
 
@@ -78,7 +78,7 @@ go run ./cmd/examples/canxml_roundtrip
 
 **Packages:** `openehr/rm`, `openehr/serialize/canjson`, `openehr/serialize/canxml`
 
-**Fixture:** same `body_weight.json` cassette as `canonical_json`.
+**Fixture:** same `body_weight.json` fixture as `canonical_json`.
 
 **Sample output:**
 
@@ -90,7 +90,7 @@ re-encoded JSON: 4626 bytes
 OK: JSON ↔ XML cross-format round-trip preserves the Composition structurally
 ```
 
-The byte counts differ because the cassette is pretty-printed and the SDK's encoders are compact; the comparison is on the decoded content, not on the bytes. In the XML, the JSON `_type` discriminator becomes `xsi:type` and the element names match the JSON keys. Before comparing, the program encodes its starting point through `canjson` too and drops null members on both sides: the SDK treats a null member and an absent member the same, and the two codecs may pick either spelling for an empty optional field.
+The byte counts differ because the fixture is pretty-printed and the SDK's encoders are compact; the comparison is on the decoded content, not on the bytes. In the XML, the JSON `_type` discriminator becomes `xsi:type` and the element names match the JSON keys. Before comparing, the program encodes its starting point through `canjson` too and drops null members on both sides: the SDK treats a null member and an absent member the same, and the two codecs may pick either spelling for an empty optional field.
 
 **What to copy into your app:** `canxml.Marshal` / `canxml.Unmarshal` are drop-in counterparts of the `canjson` pair. When you compare documents that crossed formats, encode both sides through the same codec and treat null and absent members as equal, as `sameJSON` in the program does.
 
@@ -207,7 +207,7 @@ With `-invalid` the program clears the composition's category before validating.
 
 ```bash
 go run ./cmd/examples/validate-from-json
-go run ./cmd/examples/validate-from-json -cassette          # demo data with expected issues
+go run ./cmd/examples/validate-from-json -corpus           # demo data with expected issues
 go run ./cmd/examples/validate-from-json comp.json tmpl.opt # your own files
 ```
 
@@ -215,7 +215,7 @@ go run ./cmd/examples/validate-from-json comp.json tmpl.opt # your own files
 
 | Flag | Effect |
 |---|---|
-| `-cassette` | Validate `testkit/corpus/compositions/vital_signs.json`, demo data that reports issues, instead of the clean local fixture |
+| `-corpus` | Validate `testkit/corpus/compositions/vital_signs.json`, demo data that reports issues, instead of the clean local fixture |
 
 The exit status is 1 when the composition does not validate (and on a usage error), so the command can gate a pipeline. Validation issues are a result the program prints; only a program error, such as a bad path or an unreadable OPT, is reported as a failure.
 
@@ -232,7 +232,7 @@ template    : vital_signs (vital_signs.opt)
 result      : OK — JSON validates against OPT
 ```
 
-With `-cassette` the result line reports the issue count, one `path [code] detail` line follows per issue, and a note says the issues are expected.
+With `-corpus` the result line reports the issue count, one `path [code] detail` line follows per issue, and a note says the issues are expected.
 
 **What to copy into your app:** the three steps in order: `canjson.Unmarshal` (a document that is not well-formed canonical JSON fails here, before any template is involved), `template.ParseFile` plus `templatecompile.Compile` once per template, then `validation.ValidateComposition`. Map `result.OK` to your exit status and print `result.Issues`. The same compiled template also feeds the composition builder, the instance generator and the AQL lint.
 
@@ -721,7 +721,7 @@ Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf co
 
 ## Fixtures and testkit
 
-Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and cassettes under `testkit/corpus/`. These are stable, checked-in artefacts, not generated at runtime. The exception is `validate-from-json/testdata/`, produced once via `gen_fixture.go`.
+Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and fixtures under `testkit/corpus/`. These are stable, checked-in artefacts, not generated at runtime. The exception is `validate-from-json/testdata/`, produced once via `gen_fixture.go`.
 
 When writing your own tests, prefer importing fixtures from `testkit` rather than copying paths by hand.
 

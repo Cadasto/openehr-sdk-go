@@ -62,13 +62,13 @@ func newRawErrorBodiesClient(t *testing.T, srv *httptest.Server) *transport.Clie
 	return c
 }
 
-func readCassette(t *testing.T, name string) []byte {
+func readFixture(t *testing.T, name string) []byte {
 	t.Helper()
 	_, src, _, _ := runtime.Caller(0)
 	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "corpus", "its_rest", "query", name)
 	b, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
+		t.Fatalf("read fixture %q: %v", path, err)
 	}
 	return b
 }
@@ -81,7 +81,7 @@ func TestExecuteAdhoc(t *testing.T) {
 		b, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(b, &body)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "result_set.json"))
+		_, _ = w.Write(readFixture(t, "result_set.json"))
 	}))
 	defer srv.Close()
 
@@ -117,7 +117,7 @@ func TestExecuteWithEHRID(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "result_set.json"))
+		_, _ = w.Write(readFixture(t, "result_set.json"))
 	}))
 	defer srv.Close()
 
@@ -147,7 +147,7 @@ func TestRunStoredWithEHRID(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "result_set.json"))
+		_, _ = w.Write(readFixture(t, "result_set.json"))
 	}))
 	defer srv.Close()
 
@@ -178,7 +178,7 @@ func TestExecuteGETWithEHRID(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "result_set.json"))
+		_, _ = w.Write(readFixture(t, "result_set.json"))
 	}))
 	defer srv.Close()
 
@@ -209,7 +209,7 @@ func TestRunStored(t *testing.T) {
 		b, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(b, &body)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "result_set.json"))
+		_, _ = w.Write(readFixture(t, "result_set.json"))
 	}))
 	defer srv.Close()
 
@@ -238,7 +238,7 @@ func TestExecuteGET(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "result_set.json"))
+		_, _ = w.Write(readFixture(t, "result_set.json"))
 	}))
 	defer srv.Close()
 
@@ -272,7 +272,7 @@ func TestExecuteGETEncodesScalarsLikeJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "result_set.json"))
+		_, _ = w.Write(readFixture(t, "result_set.json"))
 	}))
 	defer srv.Close()
 
@@ -298,7 +298,7 @@ func TestRunStoredGET(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "result_set.json"))
+		_, _ = w.Write(readFixture(t, "result_set.json"))
 	}))
 	defer srv.Close()
 
@@ -332,7 +332,7 @@ func TestRunStoredPOSTExplicitZeroOffset(t *testing.T) {
 		b, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(b, &body)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "result_set.json"))
+		_, _ = w.Write(readFixture(t, "result_set.json"))
 	}))
 	defer srv.Close()
 
@@ -422,7 +422,7 @@ func TestRunStoredReservedNameIsByteExact(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				gotPath = r.URL.Path
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write(readCassette(t, "result_set.json"))
+				_, _ = w.Write(readFixture(t, "result_set.json"))
 			}))
 			defer srv.Close()
 
@@ -454,7 +454,7 @@ func TestRunStoredVersionPathConstruction(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				captured = r.Clone(r.Context())
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write(readCassette(t, "result_set.json"))
+				_, _ = w.Write(readFixture(t, "result_set.json"))
 			}))
 			defer srv.Close()
 
@@ -522,7 +522,7 @@ func TestExecuteGETExplicitZeroOffset(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "result_set.json"))
+		_, _ = w.Write(readFixture(t, "result_set.json"))
 	}))
 	defer srv.Close()
 
@@ -964,7 +964,7 @@ func TestExecuteBuiltQueryEnvelope(t *testing.T) {
 		b, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(b, &body)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "result_set.json"))
+		_, _ = w.Write(readFixture(t, "result_set.json"))
 	}))
 	defer srv.Close()
 

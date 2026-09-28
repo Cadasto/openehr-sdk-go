@@ -32,7 +32,7 @@ func readOPT(t *testing.T) []byte {
 	path := filepath.Join(filepath.Dir(src), "..", "..", "corpus", "its_rest", "definition", "body_weight.opt")
 	b, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
+		t.Fatalf("read fixture %q: %v", path, err)
 	}
 	return b
 }

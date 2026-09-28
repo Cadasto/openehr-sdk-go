@@ -19,18 +19,18 @@ import (
 // declares spec_version "1.0.3" while the resolver requires the SDK pin
 // (1.1.0-development), and asserts the resolver fails fast with the
 // typed reason, never returning a usable catalog.
-func Probe003SpecVersionMismatch(ctx context.Context, mismatchedCassette []byte) (Result, error) { // PROBE-003 (REQ-072)
+func Probe003SpecVersionMismatch(ctx context.Context, mismatchedFixture []byte) (Result, error) { // PROBE-003 (REQ-072)
 	r := Result{Probe: "PROBE-003"}
-	if len(mismatchedCassette) == 0 {
-		return r, errors.New("PROBE-003: mismatchedCassette is empty")
+	if len(mismatchedFixture) == 0 {
+		return r, errors.New("PROBE-003: mismatchedFixture is empty")
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(mismatchedCassette)
+		_, _ = w.Write(mismatchedFixture)
 	}))
 	defer srv.Close()
 
-	cat, err := resolveCassette(ctx, srv)
+	cat, err := resolveFixture(ctx, srv)
 	if err == nil {
 		r.Status = "fail"
 		r.Detail = "Resolve accepted an incompatible spec_version; want spec_version_mismatch"

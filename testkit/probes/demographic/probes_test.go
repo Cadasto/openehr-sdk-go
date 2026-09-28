@@ -27,13 +27,13 @@ func newClient(t *testing.T, b *sandbox.Backend) *transport.Client {
 	return c
 }
 
-func cassette(t *testing.T, name string) []byte {
+func fixture(t *testing.T, name string) []byte {
 	t.Helper()
 	_, src, _, _ := runtime.Caller(0)
 	path := filepath.Join(filepath.Dir(src), "..", "..", "corpus", "its_rest", "demographic", name)
 	b, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
+		t.Fatalf("read fixture %q: %v", path, err)
 	}
 	return b
 }
@@ -68,9 +68,9 @@ const demographicprobes073VOID = "demographic-probe-vo-1"
 // 1.1.0-development demographic endpoints.
 func TestProbe073DemographicRoundTrip(t *testing.T) {
 	cases := []struct {
-		party    rm.Party
-		typ      demographic.Type
-		cassette string
+		party   rm.Party
+		typ     demographic.Type
+		fixture string
 	}{
 		{&rm.Person{Name: rm.DVText{Value: "Jane Doe"}}, demographic.Person, "person.json"},
 		{&rm.Organisation{Name: rm.DVText{Value: "Acme Hospital"}}, demographic.Organisation, "organisation.json"},
@@ -80,7 +80,7 @@ func TestProbe073DemographicRoundTrip(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.typ), func(t *testing.T) {
-			b := partyEchoBackend(cassette(t, tc.cassette))
+			b := partyEchoBackend(fixture(t, tc.fixture))
 
 			r, err := demographicprobes.Probe073DemographicRoundTrip(
 				context.Background(), newClient(t, b), tc.party, tc.typ,
@@ -102,7 +102,7 @@ func TestProbe073DemographicRoundTrip(t *testing.T) {
 // _type does not round-trip to the input party's concrete type.
 func TestProbe073DetectsTypeDrift(t *testing.T) {
 	// Server returns a PERSON body, but the probe is told to expect an ORGANISATION.
-	b := partyEchoBackend(cassette(t, "person.json"))
+	b := partyEchoBackend(fixture(t, "person.json"))
 
 	r, err := demographicprobes.Probe073DemographicRoundTrip(
 		context.Background(), newClient(t, b),
@@ -121,8 +121,8 @@ func TestProbe073DetectsTypeDrift(t *testing.T) {
 // different concrete type. Create/Get pass; only the VERSION-envelope hop —
 // the novel Phase-2 polymorphic-decode surface — must catch the drift.
 func TestProbe073DetectsVersionDataDrift(t *testing.T) {
-	person := cassette(t, "person.json")
-	org := cassette(t, "organisation.json")
+	person := fixture(t, "person.json")
+	org := fixture(t, "organisation.json")
 	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"`+demographicprobes073VOID+`::cdr::1"`)
 		w.Header().Set("Location", r.URL.Path)

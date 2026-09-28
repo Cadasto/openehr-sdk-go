@@ -2,13 +2,13 @@
 # Vendor the EHRbase Robot AQL FROM-combination corpus (sibling clone) into
 # testkit/corpus/aql/conformance/.
 #
-# Sibling of scripts/ingest-robot-cassettes.sh, but a different job: that one
+# Sibling of scripts/ingest-robot-fixtures.sh, but a different job: that one
 # hand-curates and renames composition fixtures, this one copies the upstream
 # CSVs byte-for-byte. So the commit recorded in AQL_SOURCE.txt is authoritative
 # for the vendored content, not merely the tree the ingest happened to read.
 #
 # ROBOT_ROOT points at the upstream test_data_sets directory (same convention as
-# the cassettes ingest). The clone root is derived from it with
+# the fixtures ingest). The clone root is derived from it with
 # `git rev-parse --show-toplevel`, so a clone laid out elsewhere works as long as
 # ROBOT_ROOT points somewhere inside it.
 #

@@ -26,7 +26,7 @@ func TestListCompositionJSON_excludesRobotEHRStatusInvalid(t *testing.T) {
 }
 
 // TestListCompositionJSON_includesFormerlyExcludedCompositions pins that the
-// seven cassettes once held out on the withdrawn byte-stability rationale
+// seven fixtures once held out on the withdrawn byte-stability rationale
 // (ruling R33) are now in the REQ-052 / PROBE-030 corpus. Dropping any one from ListCompositionJSON
 // turns this red.
 func TestListCompositionJSON_includesFormerlyExcludedCompositions(t *testing.T) {

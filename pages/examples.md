@@ -57,11 +57,11 @@ the composition does not validate, so the command can gate a pipeline.
 
 ```bash
 go run ./cmd/examples/validate-from-json
-go run ./cmd/examples/validate-from-json -cassette
+go run ./cmd/examples/validate-from-json -corpus
 go run ./cmd/examples/validate-from-json composition.json template.opt
 ```
 
-The first form validates a bundled composition that passes, `-cassette`
+The first form validates a bundled composition that passes, `-corpus`
 validates demo data that reports issues, and two paths validate your own
 files.
 

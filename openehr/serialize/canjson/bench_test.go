@@ -17,7 +17,7 @@ import (
 // composer/content polymorphic sites are populated so the dispatch
 // path is exercised — pure-leaf benchmarks would understate
 // generated-UnmarshalJSONFrom cost. For HISTORY/EVENT-bearing inputs see
-// the cassette round-trip benchmarks (TestRoundTripCassettes
+// the fixture round-trip benchmarks (TestRoundTripFixtures
 // fixtures decode through the same code path).
 func benchCompositionPayload(b *testing.B, width int) []byte {
 	b.Helper()
@@ -110,36 +110,36 @@ func BenchmarkDecodeDVQuantity(b *testing.B) {
 	}
 }
 
-// benchCassette is the largest real cassette vendored under
+// benchFixture is the largest real fixture vendored under
 // testkit/corpus (97 725 bytes). The synthetic payloads above repeat one
 // ADMIN_ENTRY shape; this one carries the depth and datatype spread of a real
 // CDR document, DV_MULTIMEDIA included, so the two together bracket the codec
 // between a wide tree and a deep one.
-const benchCassette = "Demonstration.v1"
+const benchFixture = "Demonstration.v1"
 
-// BenchmarkDecodeCompositionCassette measures decode plus encode of the largest
-// vendored cassette, the baseline the json/v2 migration is measured against
+// BenchmarkDecodeCompositionFixture measures decode plus encode of the largest
+// vendored fixture, the baseline the json/v2 migration is measured against
 // (PR 171; results in research-strands.md, STRAND-04). b.SetBytes reports against
 // the input document, so the MB/s figure is throughput per input byte over a
 // decode and an encode together. It is not comparable with the MB/s of
 // BenchmarkDecodeComposition_400, which decodes only.
 //
-// The cassette now feeds PROBE-030's fidelity legs and is held out of the
+// The fixture now feeds PROBE-030's fidelity legs and is held out of the
 // ValidateRM leg only (its vendored content has inverted DV_INTERVAL bounds);
 // it decodes and encodes cleanly, which is all this benchmark asks of it. The
-// setup decode and encode below are the control: a cassette that stopped
+// setup decode and encode below are the control: a fixture that stopped
 // decoding would fail here rather than quietly measuring an error path.
-func BenchmarkDecodeCompositionCassette(b *testing.B) {
-	payload, err := os.ReadFile(fixtures.CompositionJSON(benchCassette))
+func BenchmarkDecodeCompositionFixture(b *testing.B) {
+	payload, err := os.ReadFile(fixtures.CompositionJSON(benchFixture))
 	if err != nil {
-		b.Fatalf("read cassette %s: %v", benchCassette, err)
+		b.Fatalf("read fixture %s: %v", benchFixture, err)
 	}
 	var setup rm.Composition
 	if err := canjson.Unmarshal(payload, &setup); err != nil {
-		b.Fatalf("setup decode of %s: %v", benchCassette, err)
+		b.Fatalf("setup decode of %s: %v", benchFixture, err)
 	}
 	if _, err := canjson.Marshal(&setup); err != nil {
-		b.Fatalf("setup encode of %s: %v", benchCassette, err)
+		b.Fatalf("setup encode of %s: %v", benchFixture, err)
 	}
 	b.SetBytes(int64(len(payload)))
 	b.ReportAllocs()

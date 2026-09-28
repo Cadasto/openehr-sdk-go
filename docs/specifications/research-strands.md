@@ -77,7 +77,7 @@ Time/op change against the retired generated marshalers (v1 at `90473f9f`), from
 |---|---|---|---|
 | `EncodeComposition_400` | -47.82% | -47.91% | 9 281 / 16 444 / 16.44k |
 | `DecodeComposition_400` | +8.98% | -39.62% | 21 665 / 16 860 / 13.25k |
-| `DecodeCompositionCassette` | -38.30% | -61.05% | 6 279 / 5 220 / 4 809 |
+| `DecodeCompositionFixture` | -38.30% | -61.05% | 6 279 / 5 220 / 4 809 |
 | `EncodeDVQuantity` | +10.52% | not measured | 6 / 9 / not measured |
 | `DecodeDVQuantity` | +37.88% | -20.19% | 3 / 5 / 4 |
 | `RegistryDecodeElement` | +13.84% | -30.80% | 29 / 39 / 15 |

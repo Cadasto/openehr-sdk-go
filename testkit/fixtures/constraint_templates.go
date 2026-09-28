@@ -9,7 +9,7 @@ import (
 )
 
 // ConstraintTemplateIDs returns template ids with vendored OPT + composition JSON
-// used for the primitive-constraint and validation cassette tests
+// used for the primitive-constraint and validation fixture tests
 // (ehrbase Robot Test_dv_* and clinical_content_validation).
 func ConstraintTemplateIDs() ([]string, error) {
 	dir := templatesDir()

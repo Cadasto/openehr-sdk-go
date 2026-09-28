@@ -9,7 +9,7 @@ date: 2026-05-16
 # ADR 0003 — Codec polymorphism for abstract generic RM classes
 
 - **Status:** Accepted, 2026-05-16.
-- **Tracks:** STRAND-04 (partial — Event/History cassette decode); the canonical JSON codec, landed on `main` in commit [374ccffb](https://github.com/Cadasto/openehr-sdk-go/commit/374ccffb).
+- **Tracks:** STRAND-04 (partial — Event/History fixture decode); the canonical JSON codec, landed on `main` in commit [374ccffb](https://github.com/Cadasto/openehr-sdk-go/commit/374ccffb).
 - **Requirements:** [REQ-033](../specifications/rm-modeling.md#no-inheritance-emulation-req-033) (no inheritance emulation, which this codec polymorphism works within).
 
 ## Context
@@ -33,7 +33,7 @@ Other abstract generics (including **VERSION**) continue to emit as generic stru
 
 ## Consequences
 
-- Vendored composition cassettes round-trip through `canjson` (PROBE-030 on cassette inputs).
+- Vendored composition fixtures round-trip through `canjson` (PROBE-030 on fixture inputs).
 - Callers that referenced `Event[T]` as a struct must use the `Event` interface or concrete `PointEvent` / `IntervalEvent` types.
 - ADR 0002 D4 is narrowed: abstract generic → struct only when there are no concrete descendants.
 

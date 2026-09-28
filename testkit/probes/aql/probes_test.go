@@ -165,8 +165,8 @@ func TestProbe088GoldensRoundTripThroughParse(t *testing.T) {
 	}
 }
 
-// cassette reads an AQL lint cassette under testkit/corpus/aql/lint/.
-func cassette(t *testing.T, name string) string {
+// fixture reads an AQL lint fixture under testkit/corpus/aql/lint/.
+func fixture(t *testing.T, name string) string {
 	t.Helper()
 	_, here, _, ok := runtime.Caller(0)
 	if !ok {
@@ -189,7 +189,7 @@ func loadOPT(t *testing.T, name string) []byte {
 	return body
 }
 
-// probe028Cases is PROBE-028's own three-cassette corpus — the cassette
+// probe028Cases is PROBE-028's own three-fixture corpus — the fixture
 // files under testkit/corpus/aql/lint/, the vital_signs.opt template, and
 // their WantCodes baseline. Shared between TestProbe028AQLLint
 // and PROBE-097 arm (b) so a deliberate PROBE-028 re-baseline (conformance.md
@@ -213,25 +213,25 @@ func probe028Cases(t *testing.T) []aqlprobes.LintCase {
 		{
 			Name:      "valid",
 			OPT:       opt,
-			Query:     cassette(t, "valid.aql"),
+			Query:     fixture(t, "valid.aql"),
 			WantCodes: []string{"aql_select_no_alias"},
 		},
 		{
 			Name:      "missing_archetype",
 			OPT:       opt,
-			Query:     cassette(t, "missing_archetype.aql"),
+			Query:     fixture(t, "missing_archetype.aql"),
 			WantCodes: []string{"aql_archetype_not_in_template", "aql_select_no_alias"},
 		},
 		{
 			Name:      "bad_syntax",
 			OPT:       nil, // Layer 1 only
-			Query:     cassette(t, "bad_syntax.aql"),
+			Query:     fixture(t, "bad_syntax.aql"),
 			WantCodes: []string{"aql_syntax"},
 		},
 	}
 }
 
-// PROBE-028 — AQL lint stability. Each cassette query, linted against the SDK
+// PROBE-028 — AQL lint stability. Each fixture query, linted against the SDK
 // grammar profile (+ vital_signs.opt for the template-aware cases), yields a
 // stable issue-code multiset.
 func TestProbe028AQLLint(t *testing.T) {
@@ -251,7 +251,7 @@ func TestProbe028DetectsCodeDrift(t *testing.T) {
 	cases := []aqlprobes.LintCase{
 		{
 			Name:      "syntax_expected_clean",
-			Query:     cassette(t, "bad_syntax.aql"),
+			Query:     fixture(t, "bad_syntax.aql"),
 			WantCodes: nil, // wrong on purpose — bad_syntax yields aql_syntax
 		},
 	}
@@ -274,13 +274,13 @@ func TestProbe028DetectsCodeDrift(t *testing.T) {
 // aql_fanout_row_grain conservative firing rule — are pinned by name in
 // probe097SilentCases.
 //
-// Arm (b): the PROBE-028 corpus (the exact three cassettes
+// Arm (b): the PROBE-028 corpus (the exact three fixtures
 // TestProbe028AQLLint above already wires) re-run under the completed
 // REQ-161 linter gains no REQ-161 code — the controller's own precomputed
 // prediction, recorded in docs/specifications/conformance.md's PROBE-097 row
 // as "no re-baseline required". That claim still holds over the corpus as it
 // stands: probe028Cases has since taken a REQ-164 re-baseline (an unaliased
-// projection on two cassettes), and no REQ-161 code is among what it gained.
+// projection on two fixtures), and no REQ-161 code is among what it gained.
 //
 // Arm (c), REQ-162 § Contract: for every corpus query expressible through the
 // builder, (*aql.Builder).VerifyContainment's code multiset equals
@@ -1013,7 +1013,7 @@ func TestProbe097RequiresEveryCorpusArm(t *testing.T) {
 // verified-silent queries, which MUST now warn, and the WHERE-only clause-scope
 // witness), as are the fifteen negatives it names.
 //
-// Arm (b): the PROBE-028 corpus ([probe028Cases], the same three cassettes
+// Arm (b): the PROBE-028 corpus ([probe028Cases], the same three fixtures
 // TestProbe028AQLLint wires) re-run under the completed REQ-164 linter. Two of
 // the three gained aql_select_no_alias — a defect those queries genuinely carry
 // — which is the deliberate, recorded re-baseline REQ-161 § Additivity defines,
@@ -1660,7 +1660,7 @@ func TestProbe099GuardsCanFail(t *testing.T) {
 			want: "silent/" + probe099DiscriminatingRelationRow + ": path-shape codes = [" + codeContainsRedundantStep + "]",
 		},
 		{
-			// Arm (b): the additivity baseline. A cassette re-baselined by
+			// Arm (b): the additivity baseline. A fixture re-baselined by
 			// accident rather than by decision fails here.
 			name: "an additivity baseline drifts",
 			mutate: func(t *testing.T, c *aqlprobes.PathShapeCorpus) {
@@ -1733,7 +1733,7 @@ func TestProbe099RequiresEveryCorpusArm(t *testing.T) {
 // probe100Corpus reads the shipping corpus — the vendored CSVs under
 // testkit/corpus/aql/conformance/, reconstructed into queries by the
 // reconstruction table in probe_100_conformance_corpus.go. The root comes from
-// the fixtures package so the path is resolved from the cassettes root rather
+// the fixtures package so the path is resolved from the fixtures root rather
 // than from the working directory.
 func probe100Corpus(t *testing.T) aqlprobes.ConformanceCorpus {
 	t.Helper()

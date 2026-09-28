@@ -42,20 +42,20 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return c
 }
 
-func readCassette(t *testing.T) []byte {
+func readFixture(t *testing.T) []byte {
 	t.Helper()
 	_, src, _, _ := runtime.Caller(0)
 	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "..", "testkit", "corpus", "its_rest", "ehr", "ehr_status.json")
 	b, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
+		t.Fatalf("read fixture %q: %v", path, err)
 	}
 	return b
 }
 
 func TestGet(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t)
+	body := readFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("ETag", `"`+string(ehrStatusUID)+`"`)
@@ -84,7 +84,7 @@ func TestGet(t *testing.T) {
 
 func TestGetAtTime(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t)
+	body := readFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -110,7 +110,7 @@ func TestGetAtTimeRejectsZero(t *testing.T) {
 
 func TestGetVersioned(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t)
+	body := readFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -139,7 +139,7 @@ func TestErrorEnvelope(t *testing.T) {
 }
 
 func TestRepository(t *testing.T) {
-	body := readCassette(t)
+	body := readFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(body)
 	}))

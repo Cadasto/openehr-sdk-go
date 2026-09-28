@@ -14,11 +14,11 @@ import (
 // Probe001DiscoveryCodePKCE implements PROBE-001: the SMART configuration
 // document must declare the "code" response type and the "S256" PKCE
 // challenge method. The probe serves the SMART configuration
-// cassette from an in-process server, resolves it through the real
+// fixture from an in-process server, resolves it through the real
 // discovery.Resolver, and asserts both lists on the resolved
 // AuthEndpoints.
 //
-// `cassetteBody` is the SMART configuration JSON the upstream server
+// `fixtureBody` is the SMART configuration JSON the upstream server
 // returns, typically the vendored
 // testkit/corpus/its_rest/discovery/smart-configuration.json read by
 // the caller.
@@ -27,18 +27,18 @@ import (
 //  1. Resolve succeeds.
 //  2. AuthEndpoints.ResponseTypesSupported contains "code".
 //  3. AuthEndpoints.CodeChallengeMethodsSupported contains "S256".
-func Probe001DiscoveryCodePKCE(ctx context.Context, cassetteBody []byte) (Result, error) { // PROBE-001 (REQ-061)
+func Probe001DiscoveryCodePKCE(ctx context.Context, fixtureBody []byte) (Result, error) { // PROBE-001 (REQ-061)
 	r := Result{Probe: "PROBE-001"}
-	if len(cassetteBody) == 0 {
-		return r, errors.New("PROBE-001: cassetteBody is empty")
+	if len(fixtureBody) == 0 {
+		return r, errors.New("PROBE-001: fixtureBody is empty")
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(cassetteBody)
+		_, _ = w.Write(fixtureBody)
 	}))
 	defer srv.Close()
 
-	cat, err := resolveCassette(ctx, srv)
+	cat, err := resolveFixture(ctx, srv)
 	if err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("Resolve failed: %v", err)
@@ -59,10 +59,10 @@ func Probe001DiscoveryCodePKCE(ctx context.Context, cassetteBody []byte) (Result
 	return r, nil
 }
 
-// resolveCassette builds a strict-pin discovery.Resolver against srv and
+// resolveFixture builds a strict-pin discovery.Resolver against srv and
 // resolves it. Shared by the discovery-declaration probes (001/002/003)
 // so each exercises the real resolver, not a hand-built catalog.
-func resolveCassette(ctx context.Context, srv *httptest.Server) (*discovery.ServiceCatalog, error) {
+func resolveFixture(ctx context.Context, srv *httptest.Server) (*discovery.ServiceCatalog, error) {
 	res, err := discovery.NewResolver(
 		discovery.NewMemoryCache(),
 		discovery.WithHTTPClient(srv.Client()),

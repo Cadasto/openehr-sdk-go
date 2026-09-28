@@ -260,10 +260,10 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySlice || kind == polySliceNarrow {
 			// REQ-052: narrow-element slices share the same RawMessage
-			// + canxml.DecodeAs shape on the XML side. XML cassettes
+			// + canxml.DecodeAs shape on the XML side. XML fixtures
 			// uniformly carry xsi:type on slice items today; a
 			// dedicated polySliceNarrow XML path can be added if a
-			// cassette appears that omits the discriminator.
+			// fixture appears that omits the discriminator.
 			return unmarshalXMLPolySlice(recv, goField, elemName, ifaceName), nil
 		}
 		if p.TypeDef != nil && p.TypeDef.ContainerType == "Hash" {
@@ -334,7 +334,7 @@ func unmarshalXMLPolySingle(recv, field, elem, ifaceName string) string {
 // unmarshalXMLPolySingleNarrow emits the REQ-052 narrow-interface
 // decode case: canxml.DecodeAsOrDefault dispatches via xsi:type when
 // present and otherwise instantiates the parent concrete type
-// (`parentGo`) — preserving openEHR canonical XML cassettes that omit
+// (`parentGo`) — preserving openEHR canonical XML fixtures that omit
 // xsi:type on concrete-typed slots.
 func unmarshalXMLPolySingleNarrow(recv, field, elem, ifaceName, parentGo string) string {
 	return fmt.Sprintf(

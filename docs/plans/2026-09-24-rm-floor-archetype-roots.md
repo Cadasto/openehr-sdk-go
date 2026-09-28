@@ -87,7 +87,7 @@ ARCHETYPED-arm hold-out is needed.
 
 Handling, at implementation, with no fixture content edited:
 
-- The affected cassettes become named `SkipFloor` hold-outs carrying the finding, the mechanism PROBE-030's catalog
+- The affected fixtures become named `SkipFloor` hold-outs carrying the finding, the mechanism PROBE-030's catalog
   entry already sanctions.
 - The OK-asserting root-class unit fixtures gain `archetype_details` at implementation:
   `TestValidateRMEHRStatusBytes_BareSubjectOK` and `TestValidateRMEHRStatus_MinimallyValid`

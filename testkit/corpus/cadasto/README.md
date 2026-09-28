@@ -1,4 +1,4 @@
-# Cadasto platform API cassettes
+# Cadasto platform API fixtures
 
 Recorded request/response wire records for the Cadasto-platform extras
 (`cadasto/extra`, `cadasto/datamap`, `cadasto/mpi`, `cadasto/care`, and the

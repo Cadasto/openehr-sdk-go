@@ -43,19 +43,19 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return c
 }
 
-// readCompositionCassette returns the vendored body_weight composition JSON.
-func readCompositionCassette(t *testing.T) []byte {
+// readCompositionFixture returns the vendored body_weight composition JSON.
+func readCompositionFixture(t *testing.T) []byte {
 	t.Helper()
 	b, err := os.ReadFile(fixtures.CompositionJSON("body_weight"))
 	if err != nil {
-		t.Fatalf("read cassette: %v", err)
+		t.Fatalf("read fixture: %v", err)
 	}
 	return b
 }
 
 func TestGetLatest(t *testing.T) {
 	var captured *http.Request
-	body := readCompositionCassette(t)
+	body := readCompositionFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("ETag", `"`+string(compositionVUID)+`"`)
@@ -84,7 +84,7 @@ func TestGetLatest(t *testing.T) {
 
 func TestGetSpecificVersion(t *testing.T) {
 	var captured *http.Request
-	body := readCompositionCassette(t)
+	body := readCompositionFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -102,7 +102,7 @@ func TestGetSpecificVersion(t *testing.T) {
 
 func TestGetAtTime(t *testing.T) {
 	var captured *http.Request
-	body := readCompositionCassette(t)
+	body := readCompositionFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -218,7 +218,7 @@ func TestGetSurfacesNotFound(t *testing.T) {
 }
 
 func TestRepository(t *testing.T) {
-	body := readCompositionCassette(t)
+	body := readCompositionFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(body)
 	}))
@@ -272,7 +272,7 @@ func TestSaveMinimal(t *testing.T) {
 // (not an ORIGINAL_VERSION<COMPOSITION>) per the ITS-REST OpenAPI
 // `201_COMPOSITION` schema (oneOf: Composition | Identifier).
 func TestSaveRepresentationDecodesBareComposition(t *testing.T) {
-	body := readCompositionCassette(t)
+	body := readCompositionFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"`+string(compositionVUID)+`"`)
 		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(compositionVUID))
@@ -503,7 +503,7 @@ func TestUpdateRoundTrip(t *testing.T) {
 // PROBE-071 cites both POST and PUT, so the PUT arm is exercised
 // explicitly here.
 func TestUpdateRepresentationDecodesBareComposition(t *testing.T) {
-	body := readCompositionCassette(t)
+	body := readCompositionFixture(t)
 	newVUID := openehrclient.VersionUID("1234abcd-5678-9012-3456-7890abcdef00::cdr.example::2")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"`+string(newVUID)+`"`)
@@ -594,14 +594,14 @@ func TestDeleteRequiresIfMatch(t *testing.T) {
 	}
 }
 
-// readComposition decodes the body_weight cassette into a *rm.Composition
+// readComposition decodes the body_weight fixture into a *rm.Composition
 // so write-path tests have a valid payload without hand-constructing one.
 func readComposition(t *testing.T) *rm.Composition {
 	t.Helper()
-	body := readCompositionCassette(t)
+	body := readCompositionFixture(t)
 	var comp rm.Composition
 	if err := canjson.Unmarshal(body, &comp); err != nil {
-		t.Fatalf("decode composition cassette: %v", err)
+		t.Fatalf("decode composition fixture: %v", err)
 	}
 	return &comp
 }

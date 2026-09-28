@@ -1,7 +1,7 @@
 // Package discoveryprobes hosts the openEHR conformance probes for
 // the openEHR service-discovery layer. Each probe implements one
 // numbered conformance probe (PROBE-NNN) that any openEHR-conformant
-// implementation can run against the same shared cassettes.
+// implementation can run against the same shared fixtures.
 //
 // Probes are plain Go functions returning (Result, error) and are
 // designed to be invocable from:
@@ -35,7 +35,7 @@ type Result = probe.Result
 // resolve is the guarantee that matters: without it every client
 // construction pays the discovery RTT.
 //
-// `cassetteBody` is the SMART configuration JSON the upstream server
+// `fixtureBody` is the SMART configuration JSON the upstream server
 // will return on every request, typically the vendored
 // `testkit/corpus/its_rest/discovery/smart-configuration.json`
 // content read by the caller. The server replies with
@@ -43,17 +43,17 @@ type Result = probe.Result
 //
 // The probe spins up a small in-process server and counts inbound
 // requests; second resolve hitting the wire is the failure mode.
-func Probe040CatalogTTL(ctx context.Context, cassetteBody []byte) (Result, error) { // PROBE-040 (REQ-070, REQ-072)
+func Probe040CatalogTTL(ctx context.Context, fixtureBody []byte) (Result, error) { // PROBE-040 (REQ-070, REQ-072)
 	r := Result{Probe: "PROBE-040"}
-	if len(cassetteBody) == 0 {
-		return r, errors.New("PROBE-040: cassetteBody is empty")
+	if len(fixtureBody) == 0 {
+		return r, errors.New("PROBE-040: fixtureBody is empty")
 	}
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits.Add(1)
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "max-age=300")
-		_, _ = w.Write(cassetteBody)
+		_, _ = w.Write(fixtureBody)
 	}))
 	defer srv.Close()
 

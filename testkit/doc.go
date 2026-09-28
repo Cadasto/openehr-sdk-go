@@ -21,8 +21,7 @@
 // a replayed recording, or a live deployment.
 //
 // Vendored fixture documents live under testkit/corpus/ (templates/,
-// compositions/, rm/, its_rest/). Despite the directory name they are
-// request and response bodies, not replayable HTTP exchanges. Provenance
-// is indexed by vendor in testkit/corpus/README.md. Resolve paths via
-// testkit/fixtures.
+// compositions/, rm/, its_rest/). They are request and response bodies,
+// not replayable HTTP exchanges. Provenance is indexed by vendor in
+// testkit/corpus/README.md. Resolve paths via testkit/fixtures.
 package testkit

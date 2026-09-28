@@ -139,15 +139,15 @@ func retypeSlotReEncoder(slot string, replacement map[string]any) func(any) ([]b
 
 // TestProbe030SkipFloorSetIsLocked pins the membership of probe030SkipFloor,
 // not just that its entries behave. The RM-floor leg (REQ-112) is a MUST for
-// every cassette; only a cassette whose vendored content carries findings
+// every fixture; only a fixture whose vendored content carries findings
 // invariant to the round trip may be held out, and today that is exactly the
 // five named below, each justified at its probe030SkipFloor entry. Because
 // probe030RoundTrip skips the floor for any key in this map, an entry added
-// here silently drops the floor MUST for that cassette while TestProbe030 and
+// here silently drops the floor MUST for that fixture while TestProbe030 and
 // the ValidateRM plant both stay green. This guard fails when the set changes,
 // so a new skip has to be justified in the probe.
 //
-// Can-fail control: add any cassette to probe030SkipFloor and this test reddens.
+// Can-fail control: add any fixture to probe030SkipFloor and this test reddens.
 func TestProbe030SkipFloorSetIsLocked(t *testing.T) {
 	want := []string{
 		"compositions/Demonstration.v1.json",
@@ -163,28 +163,28 @@ func TestProbe030SkipFloorSetIsLocked(t *testing.T) {
 
 // TestProbe030InputsSkipFloorFollowsTheLockedSet pins the wiring between
 // probe030SkipFloor and Probe030Inputs (REQ-112): an input skips the RM floor
-// if and only if it is a cassette named in the locked set. The lock above pins
+// if and only if it is a fixture named in the locked set. The lock above pins
 // the set's membership; this pins that nothing else sets SkipFloor, and that
 // every key matches an input.
 //
-// Can-fail control: set SkipFloor to true for every cassette in
-// loadCassetteInputs (or on a leaf entry), or add a key that names no
-// cassette, and this test reddens, while the set lock stays green.
+// Can-fail control: set SkipFloor to true for every fixture in
+// loadFixtureInputs (or on a leaf entry), or add a key that names no
+// fixture, and this test reddens, while the set lock stays green.
 func TestProbe030InputsSkipFloorFollowsTheLockedSet(t *testing.T) {
 	skipped := 0
 	for _, in := range Probe030Inputs {
-		rel, isCassette := strings.CutPrefix(in.Name, "cassette:")
+		rel, isFixture := strings.CutPrefix(in.Name, "fixture:")
 		_, held := probe030SkipFloor[rel]
-		want := isCassette && held
+		want := isFixture && held
 		if in.SkipFloor != want {
-			t.Errorf("%s: SkipFloor = %v, want %v (only cassettes in probe030SkipFloor may skip the RM floor)", in.Name, in.SkipFloor, want)
+			t.Errorf("%s: SkipFloor = %v, want %v (only fixtures in probe030SkipFloor may skip the RM floor)", in.Name, in.SkipFloor, want)
 		}
 		if in.SkipFloor {
 			skipped++
 		}
 	}
 	if skipped != len(probe030SkipFloor) {
-		t.Errorf("%d inputs skip the RM floor, want %d (one per probe030SkipFloor entry; a key that names no cassette, or names none, is dead)", skipped, len(probe030SkipFloor))
+		t.Errorf("%d inputs skip the RM floor, want %d (one per probe030SkipFloor entry; a key that names no fixture, or names none, is dead)", skipped, len(probe030SkipFloor))
 	}
 }
 
@@ -200,9 +200,9 @@ func TestProbe030InputsSkipFloorFollowsTheLockedSet(t *testing.T) {
 // attribute adds a finding the list does not name, and this test reddens.
 func TestProbe030SkipFloorFindingsArePinned(t *testing.T) {
 	for _, in := range Probe030Inputs {
-		rel, isCassette := strings.CutPrefix(in.Name, "cassette:")
+		rel, isFixture := strings.CutPrefix(in.Name, "fixture:")
 		want, held := probe030SkipFloor[rel]
-		if !isCassette || !held {
+		if !isFixture || !held {
 			continue
 		}
 		t.Run(rel, func(t *testing.T) {

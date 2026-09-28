@@ -1,11 +1,11 @@
 # EHRbase Robot integration-test data — source provenance pin
-# Written by scripts/ingest-robot-cassettes.sh. Best-effort: the curated
-# cassettes are copied and renamed by hand, so this pins only the upstream
+# Written by scripts/ingest-robot-fixtures.sh. Best-effort: the curated
+# fixtures are copied and renamed by hand, so this pins only the upstream
 # commit the ingest read from — NOT a per-file sha256 lock.
 source_repo: ehrbase/integration-tests
 source_path: tests/robot/_resources/test_data_sets
 commit: b4625fc28d6785c05adfd6db26339b4bb2272e06
 commit_date: 2026-08-24T13:05:04+03:00
-recorded_utc: 2026-09-08
+recorded_utc: 2026-09-28
 source_tree: https://github.com/ehrbase/integration-tests/tree/b4625fc28d6785c05adfd6db26339b4bb2272e06/tests/robot/_resources/test_data_sets
 license: Apache-2.0 (see THIRD_PARTY_LICENSES.md)

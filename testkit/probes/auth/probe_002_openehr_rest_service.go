@@ -17,18 +17,18 @@ import (
 //  2. catalog.OpenEHRRest() returns an entry.
 //  3. The entry has a non-nil, absolute BaseURL.
 //  4. The entry declares a non-empty SpecVersion.
-func Probe002OpenEHRRestService(ctx context.Context, cassetteBody []byte) (Result, error) { // PROBE-002 (REQ-070)
+func Probe002OpenEHRRestService(ctx context.Context, fixtureBody []byte) (Result, error) { // PROBE-002 (REQ-070)
 	r := Result{Probe: "PROBE-002"}
-	if len(cassetteBody) == 0 {
-		return r, errors.New("PROBE-002: cassetteBody is empty")
+	if len(fixtureBody) == 0 {
+		return r, errors.New("PROBE-002: fixtureBody is empty")
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(cassetteBody)
+		_, _ = w.Write(fixtureBody)
 	}))
 	defer srv.Close()
 
-	cat, err := resolveCassette(ctx, srv)
+	cat, err := resolveFixture(ctx, srv)
 	if err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("Resolve failed: %v", err)
