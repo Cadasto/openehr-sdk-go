@@ -1022,6 +1022,8 @@ requirements:
       - openehr/validation/composition_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/interval_bounds_test.go
+      - openehr/validation/interval_open_side_test.go
+      - openehr/validation/rmread/interval_void_test.go
       - openehr/validation/rmread/read_test.go
       - testkit/probes/validation/probe_025_composition_validate.go
       - testkit/probes/validation/probe_074_noncomposition_validate.go
@@ -1232,6 +1234,7 @@ requirements:
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_test.go
       - openehr/validation/rmread/handles_test.go
+      - openehr/validation/rmread/interval_void_test.go
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/read_test.go
       - openehr/validation/strand14_nonchaining_test.go
