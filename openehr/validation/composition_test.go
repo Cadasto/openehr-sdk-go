@@ -247,6 +247,60 @@ func TestValidateComposition_RMTypeMismatch(t *testing.T) {
 	}
 }
 
+// REQ-102 — the RM type match compares a typed DV_INTERVAL value
+// against the OPT node's parameterised name. Demonstration.v1 declares
+// its "Interval of Quantity" element (at0023) as
+// DV_INTERVAL<DV_QUANTITY>. A typed DVInterval[DVQuantity] there, in
+// pointer or value form, raises no rm_type_mismatch; a typed
+// DVInterval[DVCount] at the same node raises one. The JSON fixture
+// decodes the interval as the bare DVInterval[DVOrdered], so the test
+// swaps in the typed value the instance generator produces.
+func TestValidateComposition_TypedIntervalRMTypeMatch(t *testing.T) {
+	const wantPath = "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0023]/value"
+	c := mustCompile(t, "Demonstration.v1")
+	var comp rm.Composition
+	mustDecodeJSON(t, fixtures.CompositionJSON("Demonstration.v1"), &comp)
+	obs := comp.Content[0].(*rm.Observation)
+	event := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
+	cluster := event.Data.(*rm.ItemTree).Items[1].(*rm.Cluster)
+	element := cluster.Items[4].(*rm.Element)
+	if element.ArchetypeNodeID != "at0023" {
+		t.Fatalf("element archetype_node_id = %q, want at0023 (fixture drift)", element.ArchetypeNodeID)
+	}
+
+	quantity := rm.Interval[rm.DVQuantity]{
+		Lower: rm.DVQuantity{Magnitude: 10, Units: "cm"},
+		Upper: rm.DVQuantity{Magnitude: 20, Units: "cm"},
+	}
+	cases := []struct {
+		name         string
+		value        rm.DataValue
+		wantMismatch bool
+	}{
+		{name: "DV_QUANTITY bounds, pointer", value: &rm.DVInterval[rm.DVQuantity]{Interval: quantity}},
+		{name: "DV_QUANTITY bounds, value", value: rm.DVInterval[rm.DVQuantity]{Interval: quantity}},
+		{name: "DV_COUNT bounds", value: &rm.DVInterval[rm.DVCount]{
+			Lower: rm.DVCount{Magnitude: 1},
+			Upper: rm.DVCount{Magnitude: 5},
+		}, wantMismatch: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			element.Value = tc.value
+			r := validation.ValidateComposition(&comp, c)
+			if tc.wantMismatch {
+				if !containsIssue(r.Issues, wantPath, "rm_type_mismatch") {
+					t.Errorf("ValidateComposition with %T at at0023: no rm_type_mismatch at %s, got %+v", tc.value, wantPath, r.Issues)
+				}
+				return
+			}
+			if containsCode(r.Issues, "rm_type_mismatch") {
+				t.Errorf("ValidateComposition with %T at at0023: got rm_type_mismatch, want none: %+v", tc.value, r.Issues)
+			}
+		})
+	}
+}
+
 // REQ-102 v2 — wrong archetype_node_id at a LOCATABLE node surfaces
 // archetype_id_mismatch (the LOCATABLE is at the archetype-root
 // level). Tests the identity-check branch when the matched OPT

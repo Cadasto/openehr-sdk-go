@@ -11,11 +11,12 @@ import (
 )
 
 // TestCheckRMTypeTypedInterval pins the bound-aware DV_INTERVAL
-// matching (ADR 0013 review round): a compiled node declares the
-// ITS-JSON parameterised name, the registry reverses the bare name,
-// and rmnames.TypedIntervalName bridges the two — bound-checked, so a
-// DV_INTERVAL<DV_COUNT> value cannot pass a DV_INTERVAL<DV_QUANTITY>
-// node. Typed-nil pointers fail as unrecognised.
+// matching of the REQ-101 builder type check (ADR 0013 review round):
+// a compiled node declares the ITS-JSON parameterised name, the
+// registry reverses the bare name, and rmnames.TypedIntervalName
+// bridges the two — bound-checked, so a DV_INTERVAL<DV_COUNT> value
+// cannot pass a DV_INTERVAL<DV_QUANTITY> node. Typed-nil pointers fail
+// as unrecognised.
 func TestCheckRMTypeTypedInterval(t *testing.T) {
 	opt, err := template.ParseFile(fixtures.TemplateOptForName("Demonstration.v1"))
 	if err != nil {
