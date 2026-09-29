@@ -828,8 +828,8 @@
                             </property>
                             <list>
                               <magnitude>
-                                <lower_unbounded/>
-                                <upper_unbounded/>
+                                <lower_unbounded>true</lower_unbounded>
+                                <upper_unbounded>true</upper_unbounded>
                               </magnitude>
                               <precision>
                                 <lower_included>true</lower_included>
@@ -843,8 +843,8 @@
                             </list>
                             <list>
                               <magnitude>
-                                <lower_unbounded/>
-                                <upper_unbounded/>
+                                <lower_unbounded>true</lower_unbounded>
+                                <upper_unbounded>true</upper_unbounded>
                               </magnitude>
                               <precision>
                                 <lower_included>true</lower_included>
