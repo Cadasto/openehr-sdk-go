@@ -34,12 +34,12 @@ func TestWireLayers(t *testing.T) {
 	}
 }
 
-// TestScan is the can-fail control for the import-closure walk behind the
-// REQ-013 guards of openehr/rm, openehr/serialize/canjson,
-// openehr/serialize/canxml and openehr/template. Each fixture under testdata/
-// fails if the part of Scan it pins is removed: the direct match, the walk
-// into packages of this module, the importer it names, and reading each
-// package once.
+// TestScan is the can-fail control for the import-closure walk every REQ-013
+// building-block guard runs. Each fixture under testdata/ fails if the part of
+// Scan it pins is removed: the direct match, the walk into packages of this
+// module, the importer it names, reading each package once, reading the files
+// another build compiles (tagged, cgoonly), and skipping the ones no build
+// compiles into the package (tagged).
 func TestScan(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -61,6 +61,26 @@ func TestScan(t *testing.T) {
 			dir:  "testdata/indirect",
 			want: []importguard.Violation{
 				{Importer: fixtures + "/indirect/b", Import: mod + "/auth/basic", Prefix: mod + "/auth"},
+			},
+		},
+		{
+			// tag.go, notlinux.go and a_plan9.go count; gen.go (ignore tag),
+			// other.go (package b) and a_plan9_test.go (a test) do not, and
+			// their imports would add auth/basic, openehr/client/ehr and
+			// transport/retry.
+			name: "files another build compiles",
+			dir:  "testdata/tagged",
+			want: []importguard.Violation{
+				{Importer: fixtures + "/tagged", Import: mod + "/auth", Prefix: mod + "/auth"},
+				{Importer: fixtures + "/tagged", Import: mod + "/openehr/client", Prefix: mod + "/openehr/client"},
+				{Importer: fixtures + "/tagged", Import: mod + "/transport", Prefix: mod + "/transport"},
+			},
+		},
+		{
+			name: "cgo-only package",
+			dir:  "testdata/cgoonly",
+			want: []importguard.Violation{
+				{Importer: fixtures + "/cgoonly", Import: mod + "/transport", Prefix: mod + "/transport"},
 			},
 		},
 		{
@@ -94,6 +114,7 @@ func TestScanRefuses(t *testing.T) {
 	}{
 		{name: "no Go files", dir: "testdata/empty", wantErr: "vacuous"},
 		{name: "test files only", dir: "testdata/testonly", wantErr: "vacuous"},
+		{name: "ignore-tagged files only", dir: "testdata/ignoreonly", wantErr: "vacuous"},
 		{name: "module package missing", dir: "testdata/missing", wantErr: fixtures + "/nosuchpkg"},
 	}
 	for _, tc := range tests {
@@ -105,6 +126,74 @@ func TestScanRefuses(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("Scan(%q) error = %q, want it to contain %q", tc.dir, err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestImports is the can-fail control for the own-imports reader behind the
+// package-specific REQ-013 rules (the openehr/serialize ban, the allow-lists,
+// the openehr/validation ban). It pins that Imports reads the same files as
+// Scan and does not follow what they import: indirect lists b and c but not
+// b's import of auth/basic.
+func TestImports(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		dir  string
+		want []string
+	}{
+		{name: "direct import", dir: "testdata/direct", want: []string{mod + "/transport"}},
+		{
+			name: "own imports only",
+			dir:  "testdata/indirect",
+			want: []string{fixtures + "/indirect/b", fixtures + "/indirect/c"},
+		},
+		{
+			name: "files another build compiles",
+			dir:  "testdata/tagged",
+			want: []string{mod + "/auth", mod + "/openehr/client", mod + "/transport", "strings"},
+		},
+		{name: "cgo-only package", dir: "testdata/cgoonly", want: []string{"C", mod + "/transport"}},
+		{name: "standard library only", dir: "testdata/clean", want: []string{"strings"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := importguard.Imports(tc.dir)
+			if err != nil {
+				t.Fatalf("Imports(%q) error: %v", tc.dir, err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("Imports(%q) = %q, want %q", tc.dir, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestImportsRefuses pins the errors that keep a guard built on Imports from
+// passing while checking nothing.
+func TestImportsRefuses(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		dir     string
+		wantErr string // substring the error must carry
+	}{
+		{name: "no Go files", dir: "testdata/empty", wantErr: "vacuous"},
+		{name: "test files only", dir: "testdata/testonly", wantErr: "vacuous"},
+		{name: "ignore-tagged files only", dir: "testdata/ignoreonly", wantErr: "vacuous"},
+		{name: "no such directory", dir: "testdata/nosuchdir", wantErr: "nosuchdir"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := importguard.Imports(tc.dir)
+			if err == nil {
+				t.Fatalf("Imports(%q) = %q, nil; want an error containing %q", tc.dir, got, tc.wantErr)
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("Imports(%q) error = %q, want it to contain %q", tc.dir, err, tc.wantErr)
 			}
 		})
 	}
@@ -133,6 +222,33 @@ func TestMatches(t *testing.T) {
 		got, ok := importguard.Matches(tc.imp, importguard.WireLayers())
 		if wantOK := tc.wantEntry != ""; got != tc.wantEntry || ok != wantOK {
 			t.Errorf("Matches(%q) = %q, %t; want %q, %t", tc.imp, got, ok, tc.wantEntry, wantOK)
+		}
+	}
+}
+
+// TestStandard is the can-fail control for the classifier behind the REQ-013
+// standard-library allow-lists (openehr/terminology, openehr/aql/contain,
+// openehr/aql/internal/semcheck): standard-library paths pass, and module
+// paths of this module or any other, and the cgo pseudo-package, do not.
+func TestStandard(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		imp  string
+		want bool
+	}{
+		{imp: "iter", want: true},
+		{imp: "slices", want: true},
+		{imp: "go/build", want: true},
+		{imp: "encoding/json/v2", want: true},
+		{imp: "uuid", want: true},
+		{imp: "C", want: false},
+		{imp: mod + "/openehr/rm", want: false},
+		{imp: "golang.org/x/text/unicode/norm", want: false},
+		{imp: "example.com/foo", want: false},
+	}
+	for _, tc := range tests {
+		if got := importguard.Standard(tc.imp); got != tc.want {
+			t.Errorf("Standard(%q) = %t, want %t", tc.imp, got, tc.want)
 		}
 	}
 }
