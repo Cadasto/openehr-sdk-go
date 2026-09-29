@@ -5,8 +5,8 @@ package parse_test
 // identifier_parity_test.go holds [aql.ValidateIdentifier] and
 // [aql.ValidateArchetypeID] to the grammar they were hand-derived from.
 //
-// `openehr/aql` may not import the generated lexer (REQ-013 — the dependency
-// runs the other way), so those guards carry hand-written rules. The property
+// `openehr/aql` may not import the generated lexer (the dependency runs the
+// other way), so those guards carry hand-written rules. The property
 // asserted here is not "the guard matches a list a maintainer remembered to
 // update" but AGREEMENT with the parser: the guard accepts a string exactly when
 // every position that splices it verbatim reads it back unchanged. A keyword

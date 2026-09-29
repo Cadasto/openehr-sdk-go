@@ -9,13 +9,14 @@ import (
 	"testing"
 )
 
-// TestNoListenerImports guards REQ-082 (sandbox/ serves every
-// backend-facing probe with no network listener and no credentials)
-// and REQ-013 (building-block independence): the package's non-test
-// source MUST NOT import net/http/httptest, net (the only listener
-// API), transport, or auth — no matter what a future edit adds, since
-// a grep-based check can be fooled by a renamed import but a parsed
-// import path cannot.
+// TestNoListenerImports guards REQ-082 (docs/specifications/conformance.md
+// § REQ-082, Sandbox mode): sandbox/ serves every backend-facing probe
+// with no network listener and no credentials, and SDK consumers use it
+// as a published building block with no auth/ or live-transport
+// dependency. So the package's non-test source MUST NOT import
+// net/http/httptest, net (the only listener API), transport, or auth —
+// no matter what a future edit adds, since a grep-based check can be
+// fooled by a renamed import but a parsed import path cannot.
 //
 // Parses with go/parser in ImportsOnly mode rather than go/build: it
 // reads only the import declarations, so it is cheap, and it lets
@@ -54,7 +55,7 @@ func TestNoListenerImports(t *testing.T) {
 			}
 			for _, bad := range forbidden {
 				if path == bad {
-					t.Errorf("%s imports %q — sandbox/ MUST NOT depend on it (REQ-082 no listener, REQ-013 independence)", name, path)
+					t.Errorf("%s imports %q — sandbox/ MUST NOT depend on it (REQ-082: no listener, no credentials, no auth or transport dependency)", name, path)
 				}
 			}
 		}
