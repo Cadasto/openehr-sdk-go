@@ -101,6 +101,12 @@ func EnsureSingle(parent any, _ /* parentType */, attrName string, child any) er
 		return writeDVIntervalTimeSingle(p, attrName, child)
 	case *rm.DVInterval[rm.DVProportion]:
 		return writeDVIntervalProportionSingle(p, attrName, child)
+	case *rm.DVInterval[rm.DVDuration]:
+		return writeDVIntervalDurationSingle(p, attrName, child)
+	case *rm.DVInterval[rm.DVOrdinal]:
+		return writeDVIntervalOrdinalSingle(p, attrName, child)
+	case *rm.DVInterval[rm.DVScale]:
+		return writeDVIntervalScaleSingle(p, attrName, child)
 	case *rm.DVInterval[rm.DVOrdered]:
 		return writeDVIntervalOrderedSingle(p, attrName, child)
 	}

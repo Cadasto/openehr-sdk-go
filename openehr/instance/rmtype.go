@@ -63,6 +63,12 @@ func newGenericRM(declared string) (v any, ok bool, err error) {
 			return &rm.DVInterval[rm.DVTime]{}, true, nil
 		case "DV_PROPORTION":
 			return &rm.DVInterval[rm.DVProportion]{}, true, nil
+		case "DV_DURATION":
+			return &rm.DVInterval[rm.DVDuration]{}, true, nil
+		case "DV_ORDINAL":
+			return &rm.DVInterval[rm.DVOrdinal]{}, true, nil
+		case "DV_SCALE":
+			return &rm.DVInterval[rm.DVScale]{}, true, nil
 		case "DV_ORDERED":
 			return &rm.DVInterval[rm.DVOrdered]{}, true, nil
 		default:
@@ -71,4 +77,48 @@ func newGenericRM(declared string) (v any, ok bool, err error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+// boundaryFlags points at the four boundary flags of one interval.
+type boundaryFlags struct {
+	lowerUnbounded, upperUnbounded *bool
+	lowerIncluded, upperIncluded   *bool
+}
+
+func flagsOf[T any](iv *rm.Interval[T]) boundaryFlags {
+	return boundaryFlags{
+		lowerUnbounded: &iv.LowerUnbounded,
+		upperUnbounded: &iv.UpperUnbounded,
+		lowerIncluded:  &iv.LowerIncluded,
+		upperIncluded:  &iv.UpperIncluded,
+	}
+}
+
+// intervalFlags returns the boundary flags of v when v is one of the
+// DV_INTERVAL instantiations [newGenericRM] builds, and false otherwise.
+// The two lists name the same instantiations.
+func intervalFlags(v any) (boundaryFlags, bool) {
+	switch iv := v.(type) {
+	case *rm.DVInterval[rm.DVQuantity]:
+		return flagsOf(&iv.Interval), true
+	case *rm.DVInterval[rm.DVCount]:
+		return flagsOf(&iv.Interval), true
+	case *rm.DVInterval[rm.DVDateTime]:
+		return flagsOf(&iv.Interval), true
+	case *rm.DVInterval[rm.DVDate]:
+		return flagsOf(&iv.Interval), true
+	case *rm.DVInterval[rm.DVTime]:
+		return flagsOf(&iv.Interval), true
+	case *rm.DVInterval[rm.DVProportion]:
+		return flagsOf(&iv.Interval), true
+	case *rm.DVInterval[rm.DVDuration]:
+		return flagsOf(&iv.Interval), true
+	case *rm.DVInterval[rm.DVOrdinal]:
+		return flagsOf(&iv.Interval), true
+	case *rm.DVInterval[rm.DVScale]:
+		return flagsOf(&iv.Interval), true
+	case *rm.DVInterval[rm.DVOrdered]:
+		return flagsOf(&iv.Interval), true
+	}
+	return boundaryFlags{}, false
 }

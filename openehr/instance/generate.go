@@ -158,6 +158,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 			}
 		}
 	}
+	settleIntervalEndpoints(optNode, rmValue)
 	return nil
 }
 
@@ -354,6 +355,14 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 // unbounded cases. RM types that carry no primary value (CLUSTER,
 // ELEMENT, party proxies) silently no-op.
 func (g *generator) populatePrimitiveDefault(rmValue any) {
+	if f, ok := intervalFlags(rmValue); ok {
+		// A fresh interval is open on both sides. Each bound the walk
+		// writes closes its own side, and settleIntervalEndpoints then
+		// decides whether a closed side includes its bound.
+		*f.lowerUnbounded = true
+		*f.upperUnbounded = true
+		return
+	}
 	switch v := rmValue.(type) {
 	case *rm.DVText:
 		v.Value = "example"
@@ -390,28 +399,42 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	case *rm.DVParsable:
 		v.Value = "example"
 		v.Formalism = "text/plain"
-	case *rm.DVInterval[rm.DVQuantity]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVCount]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVDateTime]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVDate]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVTime]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVProportion]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVOrdered]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
 	}
+}
+
+// settleIntervalEndpoints decides, once the walk has written the bounds
+// the OPT constrains, whether each side of an interval includes its
+// bound. A bounded side includes it unless the OPT constrains that side's
+// *_included, whose example value then applies. An open side never
+// includes it: BASE Interval requires that lower_unbounded implies not
+// lower_included, and the same for upper. A value that is not an interval
+// is left alone.
+func settleIntervalEndpoints(optNode *tcimpl.CompiledNode, rmValue any) {
+	f, ok := intervalFlags(rmValue)
+	if !ok {
+		return
+	}
+	*f.lowerIncluded = !*f.lowerUnbounded && includedPerOPT(optNode, "lower_included")
+	*f.upperIncluded = !*f.upperUnbounded && includedPerOPT(optNode, "upper_included")
+}
+
+// includedPerOPT returns the value the OPT gives an interval's
+// lower_included or upper_included: the example value of its C_BOOLEAN,
+// which is true whenever the constraint admits true. Without a constraint
+// it returns true, the closed endpoint the template parser also assumes
+// when an OPT range omits the flag.
+func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
+	attr := optNode.Attribute(attrName)
+	if attr == nil {
+		return true
+	}
+	for _, child := range attr.Children() {
+		if c, ok := child.PrimitiveConstraint().(constraints.CBoolean); ok {
+			included, _ := c.ExampleValue().(bool)
+			return included
+		}
+	}
+	return true
 }
 
 // materialiseMultiple synthesises and appends children under a

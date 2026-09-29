@@ -30,6 +30,18 @@ func writeDVIntervalProportionSingle(iv *rm.DVInterval[rm.DVProportion], attr st
 	return writeIntervalSingle(&iv.Interval, attr, child, "DV_PROPORTION")
 }
 
+func writeDVIntervalDurationSingle(iv *rm.DVInterval[rm.DVDuration], attr string, child any) error {
+	return writeIntervalSingle(&iv.Interval, attr, child, "DV_DURATION")
+}
+
+func writeDVIntervalOrdinalSingle(iv *rm.DVInterval[rm.DVOrdinal], attr string, child any) error {
+	return writeIntervalSingle(&iv.Interval, attr, child, "DV_ORDINAL")
+}
+
+func writeDVIntervalScaleSingle(iv *rm.DVInterval[rm.DVScale], attr string, child any) error {
+	return writeIntervalSingle(&iv.Interval, attr, child, "DV_SCALE")
+}
+
 func writeDVIntervalOrderedSingle(iv *rm.DVInterval[rm.DVOrdered], attr string, child any) error {
 	return writeIntervalSingle(&iv.Interval, attr, child, "DV_ORDERED")
 }

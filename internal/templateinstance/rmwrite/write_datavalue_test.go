@@ -2,9 +2,11 @@ package rmwrite
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // TestEnsureSingleNumericAndInterval pins the REQ-107 writers that
@@ -350,6 +352,96 @@ func TestIsVoidBound(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.got != tc.want {
 				t.Errorf("isVoidBound(%s) = %v, want %v", tc.name, tc.got, tc.want)
+			}
+		})
+	}
+}
+
+// intervalWriterCase is one DV_INTERVAL<T> instantiation the writer must
+// dispatch: a fresh interval, and a bound of its parameter type.
+type intervalWriterCase struct {
+	boundRM string
+	parent  func() any
+	bound   any
+}
+
+func typedIntervalWriterCase[T rm.DVOrdered]() intervalWriterCase {
+	var bound T
+	name, _ := rm.RMTypeName(bound)
+	return intervalWriterCase{
+		boundRM: name,
+		parent:  func() any { return &rm.DVInterval[T]{} },
+		bound:   bound,
+	}
+}
+
+// TestIntervalWriterParity checks that EnsureSingle writes every
+// DV_INTERVAL instantiation the reader covers. REQ-101's builder and the
+// REQ-107 generator both attach interval attributes through it, so a
+// missing instantiation fails them. rmwrite sits outside openehr/ and so
+// cannot import openehr/internal/rmnames; the canonical set is derived the
+// way TestTypedIntervalReaderParity (openehr/validation/rmread) derives
+// it, one DV_INTERVAL<X> per registered type X that implements
+// rm.DVOrdered. A new DV_ORDERED descendant fails here until the case list
+// and the writer both gain it, and a dropped writer arm fails the writes.
+// The bare DV_INTERVAL<DV_ORDERED> is reached through its own
+// registration.
+func TestIntervalWriterParity(t *testing.T) {
+	var fromRegistry []string
+	for _, name := range typereg.Default.Names() {
+		ctor, _ := typereg.Default.Lookup(name)
+		if _, ok := ctor().(rm.DVOrdered); ok {
+			fromRegistry = append(fromRegistry, name)
+		}
+	}
+	if len(fromRegistry) == 0 {
+		t.Fatal("registry yields no DVOrdered implementers; registrations missing?")
+	}
+	slices.Sort(fromRegistry)
+
+	cases := []intervalWriterCase{
+		typedIntervalWriterCase[rm.DVCount](),
+		typedIntervalWriterCase[rm.DVDate](),
+		typedIntervalWriterCase[rm.DVDateTime](),
+		typedIntervalWriterCase[rm.DVDuration](),
+		typedIntervalWriterCase[rm.DVOrdinal](),
+		typedIntervalWriterCase[rm.DVProportion](),
+		typedIntervalWriterCase[rm.DVQuantity](),
+		typedIntervalWriterCase[rm.DVScale](),
+		typedIntervalWriterCase[rm.DVTime](),
+	}
+	listed := make([]string, 0, len(cases))
+	for _, c := range cases {
+		listed = append(listed, c.boundRM)
+	}
+	slices.Sort(listed)
+	if !slices.Equal(fromRegistry, listed) {
+		t.Errorf("typed DV_INTERVAL drift:\n  registry-derived bounds: %v\n  writer cases:            %v", fromRegistry, listed)
+	}
+
+	bare, ok := typereg.Default.Lookup("DV_INTERVAL")
+	if !ok {
+		t.Fatal(`typereg has no "DV_INTERVAL" registration`)
+	}
+	cases = append(cases, intervalWriterCase{boundRM: "DV_ORDERED", parent: bare, bound: rm.DVCount{Magnitude: 1}})
+
+	for _, c := range cases {
+		t.Run("DV_INTERVAL<"+c.boundRM+">", func(t *testing.T) {
+			parent := c.parent()
+			for _, w := range []struct {
+				attr  string
+				child any
+			}{
+				{attr: "lower", child: c.bound},
+				{attr: "upper", child: c.bound},
+				{attr: "lower_unbounded", child: false},
+				{attr: "upper_unbounded", child: false},
+				{attr: "lower_included", child: true},
+				{attr: "upper_included", child: true},
+			} {
+				if err := EnsureSingle(parent, "DV_INTERVAL", w.attr, w.child); err != nil {
+					t.Errorf("EnsureSingle(%T, %q, %T) = %v, want nil", parent, w.attr, w.child, err)
+				}
 			}
 		})
 	}
