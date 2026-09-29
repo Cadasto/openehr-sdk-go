@@ -40,8 +40,8 @@ The RM forbids all five (`Is_archetype_root` + `LOCATABLE.Archetyped_valid`; `AR
 | `roadmap.md` open-work row updated (it stays Partial for the other gaps) | done |
 | Code | done |
 | Tests with `// REQ-112` / `// PROBE-081` comments | done |
-| `make spec-check` | done (OK at `8577b81e`) |
-| `make ci` | done (exit 0 at `8577b81e`) |
+| `make spec-check` | done |
+| `make ci` | done |
 
 ## Phases
 
