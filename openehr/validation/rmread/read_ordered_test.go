@@ -156,6 +156,14 @@ func TestReadSingle_ReferenceRange(t *testing.T) {
 		{"range open on both sides", &rm.ReferenceRange[rm.DVOrdered]{Range: open}, "range", true},
 		{"range with a bound", rm.ReferenceRange[rm.DVOrdered]{Range: bounded}, "range", true},
 		{"unknown attribute", &rm.ReferenceRange[rm.DVOrdered]{}, "value", false},
+		// The typed instantiations DV_COUNT, DV_QUANTITY and DV_PROPORTION
+		// carry, in value and pointer form.
+		{"REFERENCE_RANGE<DV_COUNT> meaning, value form", rm.ReferenceRange[rm.DVCount]{Meaning: meaning}, "meaning", true},
+		{"REFERENCE_RANGE<DV_COUNT> range, pointer form", &rm.ReferenceRange[rm.DVCount]{Range: open}, "range", true},
+		{"REFERENCE_RANGE<DV_QUANTITY> range, value form", rm.ReferenceRange[rm.DVQuantity]{Range: bounded}, "range", true},
+		{"REFERENCE_RANGE<DV_QUANTITY> meaning, pointer form", &rm.ReferenceRange[rm.DVQuantity]{Meaning: meaning}, "meaning", true},
+		{"REFERENCE_RANGE<DV_PROPORTION> meaning, value form", rm.ReferenceRange[rm.DVProportion]{Meaning: meaning}, "meaning", true},
+		{"REFERENCE_RANGE<DV_PROPORTION> range, pointer form", &rm.ReferenceRange[rm.DVProportion]{Range: open}, "range", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

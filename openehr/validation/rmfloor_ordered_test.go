@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -138,6 +139,19 @@ func TestValidateRM_ReferenceRangesWalked(t *testing.T) {
 			},
 		},
 		{
+			// A typed interval holds its bounds by value, so this reaches
+			// the value-form DV_COUNT reader of other_reference_ranges.
+			name: "DV_COUNT, empty meaning on a reference range of its normal_range lower bound",
+			root: &rm.DVCount{Magnitude: 3, NormalRange: &rm.DVInterval[rm.DVCount]{
+				Lower: rm.DVCount{Magnitude: 1, OtherReferenceRanges: []rm.ReferenceRange[rm.DVCount]{{
+					Meaning: rm.DVText{},
+					Range:   openUpper(rm.DVCount{Magnitude: 0}),
+				}}}, LowerIncluded: true,
+				Upper: rm.DVCount{Magnitude: 5}, UpperIncluded: true,
+			}},
+			want: []string{"required /normal_range/lower/other_reference_ranges[0]/meaning"},
+		},
+		{
 			name: "DV_ORDINAL, a complete reference range",
 			root: &rm.DVOrdinal{Value: 1, Symbol: codedSymbol("at1"), OtherReferenceRanges: []rm.ReferenceRange[rm.DVOrdered]{{
 				Meaning: rm.DVText{Value: "normal"},
@@ -149,6 +163,85 @@ func TestValidateRM_ReferenceRangesWalked(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := findingsOf(validation.ValidateRM(tc.root)); !slices.Equal(got, tc.want) {
 				t.Errorf("ValidateRM(%s) findings = %q, want %q", tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestValidateRM_ReferenceRangeOnDecodedBound is the wire-path twin of the
+// normal_range row above (REQ-112): canjson decodes a typed interval's bound
+// by value, so a reference range on it is reached through the value-form
+// reader, and its empty meaning is reported at its path.
+func TestValidateRM_ReferenceRangeOnDecodedBound(t *testing.T) {
+	const body = `{"_type":"DV_COUNT","magnitude":3,"normal_range":{"_type":"DV_INTERVAL",` +
+		`"lower":{"_type":"DV_COUNT","magnitude":1,"other_reference_ranges":[{"_type":"REFERENCE_RANGE",` +
+		`"meaning":{"_type":"DV_TEXT","value":""},` +
+		`"range":{"_type":"DV_INTERVAL","lower_unbounded":true,"upper_unbounded":true,"lower_included":false,"upper_included":false}}]},` +
+		`"upper":{"_type":"DV_COUNT","magnitude":5},` +
+		`"lower_included":true,"upper_included":true,"lower_unbounded":false,"upper_unbounded":false}}`
+	var count rm.DVCount
+	if err := canjson.Unmarshal([]byte(body), &count); err != nil {
+		t.Fatalf("canjson.Unmarshal: %v", err)
+	}
+	want := []string{"required /normal_range/lower/other_reference_ranges[0]/meaning"}
+	if got := findingsOf(validation.ValidateRM(&count)); !slices.Equal(got, want) {
+		t.Errorf("ValidateRM(decoded DV_COUNT) findings = %q, want %q", got, want)
+	}
+}
+
+// TestValidateRM_ReferenceRangeOnEveryValueFormBound checks that the walk
+// reaches other_reference_ranges on each DV_ORDERED concrete held by value,
+// as the bound of a typed interval is (REQ-112): every row plants an empty
+// meaning on the lower bound's reference range and expects it at its path.
+func TestValidateRM_ReferenceRangeOnEveryValueFormBound(t *testing.T) {
+	open := rm.DVInterval[rm.DVOrdered]{LowerUnbounded: true, UpperUnbounded: true}
+	bare := []rm.ReferenceRange[rm.DVOrdered]{{Meaning: rm.DVText{}, Range: open}}
+	cases := []struct {
+		name string
+		root any
+	}{
+		{"DV_COUNT", &rm.DVInterval[rm.DVCount]{
+			LowerIncluded: true, UpperUnbounded: true,
+			Lower: rm.DVCount{Magnitude: 1, OtherReferenceRanges: []rm.ReferenceRange[rm.DVCount]{{Meaning: rm.DVText{}, Range: open}}},
+		}},
+		{"DV_QUANTITY", &rm.DVInterval[rm.DVQuantity]{
+			LowerIncluded: true, UpperUnbounded: true,
+			Lower: rm.DVQuantity{Magnitude: 1, Units: "mm", OtherReferenceRanges: []rm.ReferenceRange[rm.DVQuantity]{{Meaning: rm.DVText{}, Range: open}}},
+		}},
+		{"DV_PROPORTION", &rm.DVInterval[rm.DVProportion]{
+			LowerIncluded: true, UpperUnbounded: true,
+			Lower: rm.DVProportion{Numerator: 1, Denominator: 2, OtherReferenceRanges: []rm.ReferenceRange[rm.DVProportion]{{Meaning: rm.DVText{}, Range: open}}},
+		}},
+		{"DV_ORDINAL", &rm.DVInterval[rm.DVOrdinal]{
+			LowerIncluded: true, UpperUnbounded: true,
+			Lower: rm.DVOrdinal{Value: 1, Symbol: codedSymbol("at1"), OtherReferenceRanges: bare},
+		}},
+		{"DV_SCALE", &rm.DVInterval[rm.DVScale]{
+			LowerIncluded: true, UpperUnbounded: true,
+			Lower: rm.DVScale{Value: 0.5, Symbol: codedSymbol("at1"), OtherReferenceRanges: bare},
+		}},
+		{"DV_DATE", &rm.DVInterval[rm.DVDate]{
+			LowerIncluded: true, UpperUnbounded: true,
+			Lower: rm.DVDate{Value: "2026-01-01", OtherReferenceRanges: bare},
+		}},
+		{"DV_TIME", &rm.DVInterval[rm.DVTime]{
+			LowerIncluded: true, UpperUnbounded: true,
+			Lower: rm.DVTime{Value: "08:00:00", OtherReferenceRanges: bare},
+		}},
+		{"DV_DATE_TIME", &rm.DVInterval[rm.DVDateTime]{
+			LowerIncluded: true, UpperUnbounded: true,
+			Lower: rm.DVDateTime{Value: "2026-01-01T00:00:00Z", OtherReferenceRanges: bare},
+		}},
+		{"DV_DURATION", &rm.DVInterval[rm.DVDuration]{
+			LowerIncluded: true, UpperUnbounded: true,
+			Lower: rm.DVDuration{Value: "P1D", OtherReferenceRanges: bare},
+		}},
+	}
+	want := []string{"required /lower/other_reference_ranges[0]/meaning"}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := findingsOf(validation.ValidateRM(tc.root)); !slices.Equal(got, want) {
+				t.Errorf("ValidateRM(DV_INTERVAL<%s> with a reference range on its lower bound) findings = %q, want %q", tc.name, got, want)
 			}
 		})
 	}
@@ -264,6 +357,31 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 			want: []string{
 				"required /value/symbol/mappings[0]/target/code_string",
 				"rm_invariant /value/symbol/mappings[0]/target",
+			},
+		},
+		{
+			// A DV_SCALE and a non-scale code in one walk: the scale is
+			// reached first, and its exemption must not spill onto the
+			// DV_ORDINAL bound below it.
+			name: "DV_ORDINAL with no code inside a DV_SCALE's other_reference_ranges",
+			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: noCode("slight"), OtherReferenceRanges: []rm.ReferenceRange[rm.DVOrdered]{{
+				Meaning: rm.DVText{Value: "normal"},
+				Range:   rm.DVInterval[rm.DVOrdered]{Lower: rm.DVOrdinal{Value: 1, Symbol: noCode("mild")}, LowerIncluded: true, UpperUnbounded: true},
+			}}}),
+			want: []string{
+				"required /value/other_reference_ranges[0]/range/lower/symbol/defining_code/code_string",
+				"rm_invariant /value/other_reference_ranges[0]/range/lower/symbol/defining_code",
+			},
+		},
+		{
+			name: "CLUSTER with a DV_SCALE with no code beside a DV_ORDINAL with no code",
+			root: &rm.Cluster{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "scores"}, Items: []rm.Item{
+				scoreElement(&rm.DVScale{Value: 0.5, Symbol: noCode("slight")}),
+				scoreElement(&rm.DVOrdinal{Value: 1, Symbol: noCode("mild")}),
+			}},
+			want: []string{
+				"required /items[1]/value/symbol/defining_code/code_string",
+				"rm_invariant /items[1]/value/symbol/defining_code",
 			},
 		},
 		{
