@@ -413,6 +413,10 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 // includes it: BASE Interval requires that lower_unbounded implies not
 // lower_included, and the same for upper. A value that is not an interval
 // is left alone.
+//
+// Two limits follow. A C_BOOLEAN on *_unbounded is not read: a side is
+// open or bounded by whether the walk wrote it a bound. And an open side
+// keeps *_included false even where the OPT admits only true.
 func settleIntervalEndpoints(optNode *tcimpl.CompiledNode, rmValue any) {
 	f, ok := intervalFlags(rmValue)
 	if !ok {
@@ -426,7 +430,10 @@ func settleIntervalEndpoints(optNode *tcimpl.CompiledNode, rmValue any) {
 // lower_included or upper_included: the example value of its C_BOOLEAN,
 // which is true whenever the constraint admits true. Without a constraint
 // it returns true, the closed endpoint the template parser also assumes
-// when an OPT range omits the flag.
+// when an OPT range omits the flag. It uses the example value under
+// RandomFill too, on purpose: a constraint that admits both values then
+// still gives a closed endpoint, so the interval stays a sensible minimal
+// example rather than a randomly half-open one.
 func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 	attr := optNode.Attribute(attrName)
 	if attr == nil {
