@@ -1,66 +1,42 @@
 package sandbox_test
 
 import (
-	"go/parser"
-	"go/token"
-	"path/filepath"
-	"strconv"
-	"strings"
+	"slices"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
 // TestNoListenerImports guards REQ-082 (docs/specifications/conformance.md
 // § REQ-082, Sandbox mode): sandbox/ serves every backend-facing probe
 // with no network listener and no credentials, and SDK consumers use it
 // as a published building block with no auth/ or live-transport
-// dependency. So the package's non-test source MUST NOT import
-// net/http/httptest, net (the only listener API), transport, or auth —
-// no matter what a future edit adds, since a grep-based check can be
-// fooled by a renamed import but a parsed import path cannot.
+// dependency. So the package's own non-test files MUST NOT import:
 //
-// Parses with go/parser in ImportsOnly mode rather than go/build: it
-// reads only the import declarations, so it is cheap, and it lets
-// this test decide for itself which files count as "non-test" instead
-// of trusting go/build's own filtering.
+//   - net/http/httptest or net, the only listener API. These match
+//     exactly: net/http itself is what the backend implements.
+//   - transport or auth, or any package under them.
+//
+// importguard.Imports reads every non-test file that any build compiles,
+// not only the ones this machine builds, and refuses a directory where
+// none is left, so the guard cannot pass while checking nothing.
 func TestNoListenerImports(t *testing.T) {
-	forbidden := []string{
-		"net/http/httptest",
-		"net",
+	t.Parallel()
+	listeners := []string{"net", "net/http/httptest"}
+	layers := []string{
 		"github.com/cadasto/openehr-sdk-go/transport",
 		"github.com/cadasto/openehr-sdk-go/auth",
 	}
-	files, err := filepath.Glob("*.go")
+	imports, err := importguard.Imports(".")
 	if err != nil {
-		t.Fatalf("glob sandbox/*.go: %v", err)
+		t.Fatal(err)
 	}
-	if len(files) == 0 {
-		t.Fatal("no .go files found — check the working directory (must be sandbox/)")
-	}
-
-	fset := token.NewFileSet()
-	seenNonTest := false
-	for _, name := range files {
-		if strings.HasSuffix(name, "_test.go") {
-			continue
+	for _, imp := range imports {
+		if slices.Contains(listeners, imp) {
+			t.Errorf("sandbox/ MUST NOT import %q in its own files (REQ-082: no network listener)", imp)
 		}
-		seenNonTest = true
-		f, err := parser.ParseFile(fset, name, nil, parser.ImportsOnly)
-		if err != nil {
-			t.Fatalf("parse %s: %v", name, err)
+		if p, ok := importguard.Matches(imp, layers); ok {
+			t.Errorf("sandbox/ MUST NOT import %q in its own files (forbidden entry %q; REQ-082: no auth or transport dependency)", imp, p)
 		}
-		for _, imp := range f.Imports {
-			path, err := strconv.Unquote(imp.Path.Value)
-			if err != nil {
-				t.Fatalf("%s: unquote import %s: %v", name, imp.Path.Value, err)
-			}
-			for _, bad := range forbidden {
-				if path == bad {
-					t.Errorf("%s imports %q — sandbox/ MUST NOT depend on it (REQ-082: no listener, no credentials, no auth or transport dependency)", name, path)
-				}
-			}
-		}
-	}
-	if !seenNonTest {
-		t.Fatal("every file matched *.go was a _test.go file — glob pattern is wrong")
 	}
 }

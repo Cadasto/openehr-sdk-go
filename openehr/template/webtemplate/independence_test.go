@@ -16,9 +16,11 @@ import (
 //
 //   - Neither the package nor any package of this module it pulls in imports
 //     transport, auth or openehr/client.
-//   - The package's own non-test files do not import openehr/serialize. This
-//     rule cannot cover what they pull in, since openehr/rm's generated
-//     marshal files import openehr/serialize/canxml.
+//   - The package's own non-test files do not import openehr/serialize, the
+//     rule every template-side building block keeps. Today nothing they pull
+//     in imports it either: the closure reaches openehr/rm/rminfo but not
+//     openehr/rm, whose generated marshal files are what bring
+//     openehr/serialize/canxml into other blocks' closures.
 func TestWebtemplateForbiddenImports(t *testing.T) {
 	t.Parallel()
 	violations, err := importguard.Scan(".", importguard.WireLayers())

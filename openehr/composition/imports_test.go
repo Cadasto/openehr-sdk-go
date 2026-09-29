@@ -8,9 +8,8 @@ import (
 
 // TestCompositionForbiddenImports guards REQ-013
 // (docs/specifications/module-layout.md § REQ-013) for openehr/composition,
-// the builder above openehr/instance and openehr/template. REQ-101 states the
-// same for the builder: it is importable without transport, auth, the REST
-// clients or openehr/serialize. Two rules hold:
+// the builder above openehr/instance and openehr/template. REQ-101 adds that
+// the builder's own files import no openehr/serialize package. Two rules hold:
 //
 //   - Neither the package nor any package of this module it pulls in imports
 //     transport, auth or openehr/client.

@@ -6,55 +6,57 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
-// TestInstanceForbiddenImports guards REQ-013
-// (docs/specifications/module-layout.md § REQ-013) for openehr/instance, plus
-// two dependency-direction bans:
+// TestInstanceForbiddenImports guards three import rules for
+// openehr/instance:
 //
-//   - Neither the package nor any package of this module it pulls in imports
-//     transport, auth or openehr/client.
-//   - The package's own non-test files do not import openehr/serialize, which
-//     REQ-013 bars from every template-side building block. This rule cannot
-//     cover what they pull in, since openehr/rm's generated marshal files
-//     import openehr/serialize/canxml.
-//   - They do not import openehr/composition either: the REQ-101 builder
-//     consumes instance, not the reverse.
-//   - Nor openehr/validation: the validator checks what instance generates,
-//     and reaches instance only from tests and probes.
+//   - REQ-013 (docs/specifications/module-layout.md § REQ-013): neither the
+//     package nor any package of this module it pulls in imports transport,
+//     auth or openehr/client.
+//   - REQ-107 (docs/specifications/clinical-modeling.md § REQ-107): nothing in
+//     that closure imports openehr/composition or openehr/validation, or a
+//     package under either. The REQ-101 builder calls the generator, not the
+//     reverse, and PROBE-027 checks the generator's output with the
+//     validator, which is an independent check only while the generator does
+//     not use it.
+//   - REQ-013: the package's own non-test files do not import
+//     openehr/serialize, which no template-side building block imports. This
+//     rule cannot cover what they pull in, since openehr/rm's generated
+//     marshal files import openehr/serialize/canxml.
 //
 // Test files may import anything, for cross-package probes for instance.
 func TestInstanceForbiddenImports(t *testing.T) {
 	t.Parallel()
-	violations, err := importguard.Scan(".", importguard.WireLayers())
-	if err != nil {
-		t.Fatal(err)
+	closure := []struct {
+		rule      string
+		forbidden []string
+	}{
+		{rule: "REQ-013 building-block independence", forbidden: importguard.WireLayers()},
+		{
+			rule: "REQ-107: the generator is independent of the builder and of the validator that checks its output",
+			forbidden: []string{
+				"github.com/cadasto/openehr-sdk-go/openehr/composition",
+				"github.com/cadasto/openehr-sdk-go/openehr/validation",
+			},
+		},
 	}
-	for _, v := range violations {
-		t.Errorf("openehr/instance MUST NOT pull in %q: %s imports it (forbidden entry %q; REQ-013 building-block independence)", v.Import, v.Importer, v.Prefix)
+	for _, r := range closure {
+		violations, err := importguard.Scan(".", r.forbidden)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, v := range violations {
+			t.Errorf("openehr/instance MUST NOT pull in %q: %s imports it (forbidden entry %q; %s)", v.Import, v.Importer, v.Prefix, r.rule)
+		}
 	}
 
-	own := []struct{ entry, rule string }{
-		{
-			entry: "github.com/cadasto/openehr-sdk-go/openehr/serialize",
-			rule:  "REQ-013: a template-side building block never imports openehr/serialize",
-		},
-		{
-			entry: "github.com/cadasto/openehr-sdk-go/openehr/composition",
-			rule:  "the composition builder imports instance, not the reverse",
-		},
-		{
-			entry: "github.com/cadasto/openehr-sdk-go/openehr/validation",
-			rule:  "the validator checks instance output, not the reverse",
-		},
-	}
+	serialize := []string{"github.com/cadasto/openehr-sdk-go/openehr/serialize"}
 	imports, err := importguard.Imports(".")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, imp := range imports {
-		for _, r := range own {
-			if p, ok := importguard.Matches(imp, []string{r.entry}); ok {
-				t.Errorf("openehr/instance MUST NOT import %q in its own files (forbidden entry %q; %s)", imp, p, r.rule)
-			}
+		if p, ok := importguard.Matches(imp, serialize); ok {
+			t.Errorf("openehr/instance MUST NOT import %q in its own files (forbidden entry %q; REQ-013: a template-side building block never imports openehr/serialize)", imp, p)
 		}
 	}
 }
