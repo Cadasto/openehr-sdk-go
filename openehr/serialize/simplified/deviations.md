@@ -168,11 +168,11 @@ not partially/silently accepted.
 
 - **Interval boundary flags are asymmetric** (REQ-140) — the four DV_INTERVAL Booleans are
   written only where they carry information their default does not, in both directions.
-  `\|lower_unbounded` / `\|upper_unbounded` are RM-mandatory Booleans whose `false` the
-  reference omits: absent decodes as `false`, and only `true` is emitted. `\|lower_included`
-  / `\|upper_included` are RM-**optional** (`Interval` declares them `0..1`) against the
-  SDK's generated mandatory Boolean, so the codec has to fix a mapping for "absent": it is
-  the **closed** endpoint, `true`, and only `false` is emitted. An absent bound is the
+  BASE `Interval` declares all four mandatory (`1..1`), and the reference omits each one's
+  default value. `\|lower_unbounded` / `\|upper_unbounded` are omitted when `false`: absent
+  decodes as `false`, and only `true` is emitted. `\|lower_included` / `\|upper_included`
+  are omitted when `true`, the **closed** endpoint: absent decodes as `true`, and only
+  `false` is emitted. An absent bound is the
   unbounded end and is never emitted as a zero-valued one. Consequence, deliberate: a
   redundant `\|lower_included: true` on input is **normalised away** on re-encode — it
   denotes the same RM value as its absence, so this is a canonical-spelling normalisation

@@ -288,7 +288,7 @@ func TestRepeatingLeafOwnersRefuseReusedSiblingOnFirstEmission(t *testing.T) {
 
 // Decode must refuse exactly what encode refuses. A bounded end with no bound
 // used to decode fine and then fail to re-encode, and a bound spelled beside
-// `|*_unbounded: true` contradicts the RM equivalence outright.
+// `|*_unbounded: true` contradicts the open boundary that flag marks outright.
 func TestIntervalDecodeMirrorsEncodeRefusals(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for name, extra := range map[string]map[string]any{
@@ -605,7 +605,7 @@ func TestCompositeLeafKeepsItsOwnerUnderscoreAttrs(t *testing.T) {
 // --- interval mirror + inlined identifier index ---------------------------
 
 // Encode must refuse what decode refuses. A bound standing beside its
-// `|*_unbounded: true` flag contradicts the RM equivalence; dropping it silently
+// `|*_unbounded: true` flag contradicts the open boundary it marks; dropping it silently
 // (the old behaviour) lost a populated clinical value while the same pair on the
 // way in was already a typed error.
 func TestIntervalBoundBesideUnboundedFlagRefusedOnEncode(t *testing.T) {

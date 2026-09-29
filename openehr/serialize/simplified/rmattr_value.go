@@ -320,13 +320,12 @@ var (
 // — the DV_INTERVAL leaf, so the interval spelling has one definition.
 //
 // The two defaults are the whole reason this is one function rather than four
-// suffix reads. `lower_unbounded` / `upper_unbounded` are RM-mandatory Booleans
-// whose false value the reference omits, so absent is false. `lower_included` /
-// `upper_included` are RM-**optional** (`Interval` declares them 0..1) while the
-// SDK's generated `Interval` carries a mandatory Boolean, so the codec has to
-// fix a mapping for "absent": it is the closed endpoint, `true`. That is the
-// reading the RM's own invariant implies for a bounded end, and it is the only
-// mapping under which the corpus round-trips byte-exactly in both directions —
+// suffix reads. BASE `Interval` declares all four Booleans mandatory (1..1),
+// and the reference omits each one's default value. `lower_unbounded` /
+// `upper_unbounded` are omitted when false, so absent is false.
+// `lower_included` / `upper_included` are omitted when true, the closed
+// endpoint, so absent is true. That is the only mapping under which the
+// corpus round-trips byte-exactly in both directions —
 // `dv_count`'s `_normal_range` omits the flags where `dv_quantity`'s spells
 // them `false`, and encode's inverse rule (emit only what contradicts the
 // default) reproduces each. One consequence is deliberate and recorded in
@@ -340,16 +339,19 @@ func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string) (map[string]
 		if err != nil {
 			return nil, err
 		}
-		// The RM ties flag and bound together — `lower_unbounded = (lower =
-		// Void)` — so each end must spell exactly one of them. Both, or
-		// neither, is a contradiction the codec must not resolve by guessing:
+		// BASE `Interval` defines `lower_unbounded` as the lower boundary being
+		// open (-infinity), and `upper_unbounded` the upper one (+infinity),
+		// so an open side carries no bound, and the grammar spells an open
+		// side by its flag alone: each end must spell exactly one of the two.
+		// Both, or neither, is a contradiction the codec must not resolve by
+		// guessing:
 		// accepting a flagless boundless end would build the very interval
 		// [intervalBoundToFlat] refuses on the way out, so the same payload
 		// would decode and then fail to re-encode.
 		switch {
 		case bounded && unbounded:
-			return nil, fmt.Errorf("%w: %s spells a /%s bound beside `|%s_unbounded: true`; the RM ties the two (`%s_unbounded = (%s = Void)`), so the pair contradicts itself",
-				ErrUnsupportedDatatype, g.prefix(), end, end, end, end)
+			return nil, fmt.Errorf("%w: %s spells a /%s bound beside `|%s_unbounded: true`; BASE Interval marks that boundary open, so it carries no bound and the pair contradicts itself",
+				ErrUnsupportedDatatype, g.prefix(), end, end)
 		case !bounded && !unbounded:
 			return nil, fmt.Errorf("%w: %s carries no /%s bound and no `|%s_unbounded: true`; an absent bound is the unbounded end and must say so",
 				ErrUnsupportedDatatype, g.prefix(), end, end)
