@@ -975,6 +975,8 @@ requirements:
     packages: [openehr/template, testkit/probes/template]
     probes: [PROBE-022]
     tests:
+      - internal/bmmtype/bmmtype_test.go
+      - internal/bmmtype/formal_parameters_test.go
       - internal/templatecompile/compile_generic_test.go
       - internal/templatecompile/flat_conformance_compile_test.go
       - internal/templatecompile/registerpath_test.go
@@ -1474,10 +1476,10 @@ requirements:
     packages:
       - openehr/serialize/simplified
     tests:
-      - openehr/instance/interval_flags_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_encode_test.go
+      - openehr/serialize/simplified/interval_leaf_anchor_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_feeder_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
