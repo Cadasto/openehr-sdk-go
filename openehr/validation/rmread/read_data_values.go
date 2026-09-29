@@ -100,9 +100,12 @@ func readOrderedMultiple[T rm.DVOrdered](ranges []rm.ReferenceRange[T], attr str
 // readReferenceRangeSingle serves REFERENCE_RANGE: the RM-mandatory meaning
 // (DV_TEXT) and range (DV_INTERVAL). range is value-typed, and an omitted
 // range decodes to an interval with no bound and neither side open, so that
-// zero interval reads as absent. Any other range reads as present, as a
-// pointer the walk descends into, so its bounds are checked like any
-// interval's.
+// zero interval reads as absent. A range supplied with no bound and every
+// flag false reads as absent too, and so is reported as `required`: it cannot
+// be told apart from an omitted one, and it breaks the RM's DV_INTERVAL
+// Limits_consistent anyway, which needs a comparable lower and upper bound
+// when neither side is open. Any other range reads as present, as a pointer
+// the walk descends into, so its bounds are checked like any interval's.
 func readReferenceRangeSingle[T rm.DVOrdered](r *rm.ReferenceRange[T], attr string) (any, bool) {
 	switch attr {
 	case "meaning":

@@ -115,23 +115,36 @@ func asArchetyped(value any) (rm.Archetyped, bool) {
 }
 
 // dvIntervalNumericBounds returns the lower/upper magnitudes of a DV_INTERVAL
-// when both bounds are numerically comparable — two DV_QUANTITY of the same
-// units, or two DV_COUNT — and neither side is unbounded. It handles the
-// monomorphised instantiations RM data actually carries
+// when neither side is unbounded and the floor can order the two bounds. The
+// RM states the rule as DV_INTERVAL.Limits_consistent: with neither side
+// open, lower.is_strictly_comparable_to(upper) and lower <= upper. `<=` is
+// defined per type: DV_COUNT.less_than takes a DV_COUNT and
+// DV_QUANTITY.less_than a DV_QUANTITY, each under the precondition
+// Pre_comparable (is_strictly_comparable_to(other)). So the floor orders two
+// DV_COUNT bounds, or two DV_QUANTITY bounds with the same units. It handles
+// the monomorphised instantiations RM data actually carries
 // (DVInterval[DVQuantity], e.g. DV_QUANTITY.normal_range; DVInterval[DVCount])
 // and the bare DVInterval[DVOrdered] collapsed form. Returns ok=false
 // otherwise:
 //
 //   - an unbounded side (the comparison is undefined);
 //   - bounds of different RM types, such as a DV_COUNT beside a DV_QUANTITY
-//     on the bare form — BASE's is_strictly_comparable_to holds only between
-//     instances of the same type, so the pair has no ordering to check, even
-//     when the quantity is unitless;
-//   - bounds with different DV_QUANTITY units — the RM defines ordering only
-//     between strictly-comparable (same-unit) quantities, so a cross-unit
-//     interval has no magnitude ordering and the floor must not assert one;
+//     on the bare form: no less_than takes both, so the pair has no ordering,
+//     even when the quantity is unitless;
+//   - DV_QUANTITY bounds with different units, which are not strictly
+//     comparable, so a cross-unit interval has no magnitude ordering and the
+//     floor must not assert one;
 //   - non-numeric bound types (DV_DATE / DV_TIME / … — richer comparison
 //     deferred to a follow-up cycle, see REQ-123's temporal helpers).
+//
+// The check is a conservative subset of Limits_consistent: it tests
+// lower <= upper only where that comparison is defined, and reports nothing
+// for a pair it cannot order, although the invariant cannot hold for one.
+// The comparability half is not checked on its own. DV_QUANTITY's
+// is_strictly_comparable_to also needs a matching units_system where one is
+// set, which is not compared: a same-units pair with different units_systems
+// is ordered by magnitude, and a lower > upper found there breaks the
+// invariant all the same.
 func dvIntervalNumericBounds(value any) (lower, upper float64, ok bool) {
 	lo, hi, bounded := intervalBounds(value)
 	if !bounded {

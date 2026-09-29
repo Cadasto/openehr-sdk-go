@@ -667,10 +667,11 @@ func TestRMFloorDVCodedTextMappingsNullIsValid(t *testing.T) {
 // flag is walked like any bound, so a fault inside it is reported too (the
 // contradiction with the flag is not).
 //
-// The mixed-bound row pins Limits_consistent to strictly comparable bounds: a
-// bare interval whose bounds are a DV_COUNT and a unitless DV_QUANTITY has no
-// ordering between them, since BASE's is_strictly_comparable_to needs the same
-// type, so lower > upper is not reported there.
+// The mixed-bound row pins the ordering check to bounds of one type. The RM
+// defines `<=` per type (DV_COUNT.less_than takes a DV_COUNT,
+// DV_QUANTITY.less_than a DV_QUANTITY), so a bare interval whose bounds are a
+// DV_COUNT and a unitless DV_QUANTITY has no ordering, and lower > upper is
+// not reported there.
 func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 	badPrecision := rm.Integer(-5)
 	emptyStatus := &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr_normal_statuses"}}
@@ -781,6 +782,7 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 			// The unitless DV_QUANTITY is itself incomplete (units is
 			// RM-mandatory); what the row pins is that its magnitude is not
 			// ordered against the DV_COUNT's.
+			// The mixed pair is not compared, and Limits_comparable is not checked.
 			name: "bare DV_INTERVAL as root, a DV_COUNT bound over a unitless DV_QUANTITY bound",
 			root: &rm.DVInterval[rm.DVOrdered]{
 				Lower: rm.DVCount{Magnitude: 10}, LowerIncluded: true,

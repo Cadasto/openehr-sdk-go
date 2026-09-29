@@ -6,11 +6,10 @@ package validation
 //
 //   - RM-mandatory attribute absences (rminfo.RequiredAttributes per type
 //     plus the container "lower bound ≥ 1" reading);
-//   - per-RM-type invariants on the leaves it touches (CODE_PHRASE
-//     code_string, DV_INTERVAL numeric bounds, DV_QUANTITY precision,
-//     DV_PROPORTION precision, the OBJECT_REF id/type/namespace floor);
-//   - archetype_details on every archetype-root node, and a non-empty
-//     archetype_id and rm_version on every ARCHETYPED.
+//   - the per-RM-type invariant catalogue of § REQ-112 in
+//     docs/specifications/clinical-modeling.md, on every node it reaches.
+//     checkInvariants dispatches it, one evaluator per catalogue row; the
+//     catalogue, not this comment, is the list to keep current.
 //
 // REQ-112 surface. Independent of REQ-102/110 (template-driven); both
 // drivers may run against the same root — REQ-110 enforces template

@@ -1168,9 +1168,10 @@ func readTermMappingSingle(m *rm.TermMapping, attr string) (any, bool) {
 // reports absent, a false `required`. The bound primitive is then
 // validated by the C_PRIMITIVE child (REQ-103).
 //
-// The four DV_TEMPORAL leaves also read their optional accuracy (a
-// DV_DURATION node on DV_DATE, DV_TIME and DV_DATE_TIME, a Real on
-// DV_DURATION) and fall back to the DV_ORDERED attributes.
+// The three DV_TEMPORAL leaves (DV_DATE, DV_TIME, DV_DATE_TIME) also read
+// their optional accuracy, a DV_DURATION node. DV_DURATION itself is a
+// DV_AMOUNT, and its accuracy is a Real. All four fall back to the
+// DV_ORDERED attributes.
 
 func readDVDateSingle(d *rm.DVDate, attr string) (any, bool) {
 	switch attr {
