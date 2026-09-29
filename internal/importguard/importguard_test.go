@@ -38,8 +38,8 @@ func TestWireLayers(t *testing.T) {
 // building-block guard runs. Each fixture under testdata/ fails if the part of
 // Scan it pins is removed: the direct match, the walk into packages of this
 // module, the importer it names, reading each package once, reading the files
-// another build compiles (tagged, cgoonly), and skipping the ones no build
-// compiles into the package (tagged).
+// another build compiles (tagged, cgoonly, hostnone), and skipping the ones
+// no build compiles (tagged).
 func TestScan(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -64,16 +64,27 @@ func TestScan(t *testing.T) {
 			},
 		},
 		{
-			// tag.go, notlinux.go and a_plan9.go count; gen.go (ignore tag),
-			// other.go (package b) and a_plan9_test.go (a test) do not, and
-			// their imports would add auth/basic, openehr/client/ehr and
+			// tag.go, notlinux.go, a_plan9.go and other.go (package b) count.
+			// gen.go (ignore tag) and a_plan9_test.go (a test) do not; each is
+			// dropped by one rule only, and would add openehr/client/ehr or
 			// transport/retry.
 			name: "files another build compiles",
 			dir:  "testdata/tagged",
 			want: []importguard.Violation{
 				{Importer: fixtures + "/tagged", Import: mod + "/auth", Prefix: mod + "/auth"},
+				{Importer: fixtures + "/tagged", Import: mod + "/auth/basic", Prefix: mod + "/auth"},
 				{Importer: fixtures + "/tagged", Import: mod + "/openehr/client", Prefix: mod + "/openehr/client"},
 				{Importer: fixtures + "/tagged", Import: mod + "/transport", Prefix: mod + "/transport"},
+			},
+		},
+		{
+			// This machine compiles none of the three files, and the first
+			// by name is package main: the package clause decides nothing.
+			name: "no file this machine compiles",
+			dir:  "testdata/hostnone",
+			want: []importguard.Violation{
+				{Importer: fixtures + "/hostnone", Import: mod + "/auth/basic", Prefix: mod + "/auth"},
+				{Importer: fixtures + "/hostnone", Import: mod + "/transport", Prefix: mod + "/transport"},
 			},
 		},
 		{
@@ -100,6 +111,31 @@ func TestScan(t *testing.T) {
 				t.Errorf("Scan(%q) = %+v, want %+v", tc.dir, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestScanStd is the can-fail control for the standard-library walk behind
+// the REQ-013 and REQ-045 guard of openehr/bmm: net/http reached only through
+// expvar is found by ScanStd, and named under expvar, while Scan, which does
+// not walk the standard library, cannot see it.
+func TestScanStd(t *testing.T) {
+	t.Parallel()
+	const dir = "testdata/stdreach"
+	forbidden := []string{"net/http"}
+	want := []importguard.Violation{{Importer: "expvar", Import: "net/http", Prefix: "net/http"}}
+	got, err := importguard.ScanStd(dir, forbidden)
+	if err != nil {
+		t.Fatalf("ScanStd(%q) error: %v", dir, err)
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("ScanStd(%q, %q) = %+v, want %+v", dir, forbidden, got, want)
+	}
+	got, err = importguard.Scan(dir, forbidden)
+	if err != nil {
+		t.Fatalf("Scan(%q) error: %v", dir, err)
+	}
+	if len(got) != 0 {
+		t.Errorf("Scan(%q, %q) = %+v, want none: Scan does not walk the standard library", dir, forbidden, got)
 	}
 }
 
@@ -152,7 +188,12 @@ func TestImports(t *testing.T) {
 		{
 			name: "files another build compiles",
 			dir:  "testdata/tagged",
-			want: []string{mod + "/auth", mod + "/openehr/client", mod + "/transport", "strings"},
+			want: []string{mod + "/auth", mod + "/auth/basic", mod + "/openehr/client", mod + "/transport", "strings"},
+		},
+		{
+			name: "no file this machine compiles",
+			dir:  "testdata/hostnone",
+			want: []string{mod + "/auth/basic", mod + "/transport", "strings"},
 		},
 		{name: "cgo-only package", dir: "testdata/cgoonly", want: []string{"C", mod + "/transport"}},
 		{name: "standard library only", dir: "testdata/clean", want: []string{"strings"}},

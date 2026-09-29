@@ -6,9 +6,9 @@ import (
 )
 
 // TestAnyBuild pins the build-tag rule that decides whether a file this
-// machine leaves out still counts for a guard: every tag but "ignore" may be
-// set or unset, whichever the expression needs at that point. Each case fails
-// if one branch of the rule is dropped or inverted.
+// machine leaves out still counts for a REQ-013 guard: every tag but "ignore"
+// may be set or unset, whichever the expression needs at that point. Each case
+// fails if one branch of the rule is dropped or inverted.
 func TestAnyBuild(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

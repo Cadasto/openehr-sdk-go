@@ -3,23 +3,27 @@
 //
 // [Scan] reads the non-test files of one package, then follows every import
 // that belongs to the same module, so a forbidden import one or more packages
-// down is found as well as a direct one. [Imports] reads one package only, for
-// a rule that holds on a package's own imports but not on everything below
-// it. Both read source files only and run no subprocess.
+// down is found as well as a direct one. [ScanStd] follows the standard
+// library's packages too. [Imports] reads one package only, for a rule that
+// holds on a package's own imports but not on everything below it. All three
+// read source files only and run no subprocess.
 //
 // # Which files count
 //
-// A file counts when it is part of the package in some build, not only in the
-// build on this machine. A file that this machine leaves out because of a
-// GOOS or GOARCH suffix in its name, a //go:build line, or a cgo import while
-// cgo is off still counts, because another build compiles it. This is the rule
-// go mod tidy and go mod vendor use to collect a package's imports: every
-// build tag is taken as set or unset, whichever the file needs, except
-// "ignore", which is never set. So a //go:build ignore file, the conventional
-// way to keep a tool program in the directory, does not count, and neither
-// does a file whose package clause names another package, since no build can
-// compile it into this one. Test files never count. Only //go:build lines are
-// read; the older // +build form is not.
+// A file counts when some build may compile it, not only the build on this
+// machine. A file that this machine leaves out because of a GOOS or GOARCH
+// suffix in its name, a //go:build line, or a cgo import while cgo is off
+// still counts. This is the rule go mod tidy and go mod vendor use to collect
+// a package's imports: every build tag is taken as set or unset, whichever the
+// file needs, except "ignore", which is never set. So a //go:build ignore
+// file, the conventional way to keep a tool program in the directory, does not
+// count. Like the go command, the guard does not read the package clause, so a
+// file that names another package still counts. Test files never count.
+//
+// Only //go:build lines are read, not the older // +build form. A file whose
+// only constraint is a // +build ignore line therefore counts. That is the
+// stricter mistake, and a harmless one: gofmt has written a //go:build line
+// beside every // +build line since Go 1.17.
 package importguard
 
 import (
@@ -72,8 +76,10 @@ func Matches(imp string, forbidden []string) (string, bool) {
 
 // Standard reports whether imp is the import path of a standard-library
 // package. It uses the go command's rule: a standard-library path has no dot
-// in its first element, and every module path has one. The cgo pseudo-package
-// "C" is not the standard library, so Standard reports false for it.
+// in its first element. The rule assumes every module path has a dot there,
+// which this module's path, github.com/cadasto/openehr-sdk-go, does. The cgo
+// pseudo-package "C" is not the standard library, so Standard reports false
+// for it.
 func Standard(imp string) bool {
 	first, _, _ := strings.Cut(imp, "/")
 	return imp != "C" && !strings.Contains(first, ".")
@@ -84,8 +90,9 @@ func Standard(imp string) bool {
 // for a package's own imports but not for what they pull in is checked on
 // this list.
 //
-// Imports returns an error when dir holds no non-test Go files, since a guard
-// built on it would then check nothing, and when the package cannot be read.
+// Imports returns an error when dir holds no non-test Go file that any build
+// compiles, since a guard built on it would then check nothing, and when the
+// package cannot be read.
 func Imports(dir string) ([]string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -109,10 +116,25 @@ func Imports(dir string) ([]string, error) {
 // two routes reports its violations once. Violations come in walk order, which
 // is stable for a given tree.
 //
-// Scan returns an error when dir holds no non-test Go files, since a guard
-// built on it would then check nothing, and when a package of the module that
-// the walk reaches cannot be read.
+// Scan returns an error when dir holds no non-test Go file that any build
+// compiles, since a guard built on it would then check nothing, and when a
+// package of the module that the walk reaches cannot be read.
 func Scan(dir string, forbidden []string) ([]Violation, error) {
+	return scan(dir, forbidden, false)
+}
+
+// ScanStd is Scan, except that it also walks the standard-library packages
+// the walk reaches, read from the GOROOT the default go/build context names.
+// A forbidden standard-library package pulled in through another one, such as
+// net/http through expvar or net/rpc, is then found as well. The standard
+// library's own vendored packages, and modules other than this one, are
+// checked but not walked.
+func ScanStd(dir string, forbidden []string) ([]Violation, error) {
+	return scan(dir, forbidden, true)
+}
+
+// scan is Scan, and with std set, ScanStd.
+func scan(dir string, forbidden []string, std bool) ([]Violation, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("importguard: resolve %s: %w", dir, err)
@@ -124,6 +146,10 @@ func Scan(dir string, forbidden []string) ([]Violation, error) {
 	start, err := importPath(abs, root, modPath)
 	if err != nil {
 		return nil, err
+	}
+	goroot := build.Default.GOROOT
+	if std && goroot == "" {
+		return nil, errors.New("importguard: GOROOT is unknown, so the standard library cannot be walked")
 	}
 	imports, err := readImports(abs)
 	if err != nil {
@@ -145,12 +171,19 @@ func Scan(dir string, forbidden []string) ([]Violation, error) {
 				violations = append(violations, Violation{Importer: n.path, Import: imp, Prefix: p})
 				continue
 			}
-			rel, inModule := relToModule(imp, modPath)
-			if !inModule || seen[imp] {
+			if seen[imp] {
+				continue
+			}
+			var pkgDir string
+			if rel, inModule := relToModule(imp, modPath); inModule {
+				pkgDir = filepath.Join(root, filepath.FromSlash(rel))
+			} else if std && Standard(imp) {
+				pkgDir = filepath.Join(goroot, "src", filepath.FromSlash(imp))
+			} else {
 				continue
 			}
 			seen[imp] = true
-			next, err := readImports(filepath.Join(root, filepath.FromSlash(rel)))
+			next, err := readImports(pkgDir)
 			if err != nil {
 				return nil, fmt.Errorf("importguard: read %s, imported by %s: %w", imp, n.path, err)
 			}
@@ -161,31 +194,31 @@ func Scan(dir string, forbidden []string) ([]Violation, error) {
 }
 
 // errNoFiles reports a directory with no non-test Go file that counts.
-var errNoFiles = errors.New("no non-test Go files")
+var errNoFiles = errors.New("no non-test Go file that any build compiles")
 
 // startError words an error from reading the package a guard starts at.
 func startError(dir string, err error) error {
 	if errors.Is(err, errNoFiles) {
-		return fmt.Errorf("importguard: no non-test Go files in %s; the guard would be vacuous", dir)
+		return fmt.Errorf("importguard: %s holds no non-test Go file that any build compiles; the guard would be vacuous", dir)
 	}
 	return fmt.Errorf("importguard: %w", err)
 }
 
 // readImports returns the imports of the files of the package in dir that
 // count (see the package documentation), sorted and without duplicates. It
-// returns errNoFiles when no file counts.
+// returns errNoFiles when no file counts. Its other errors name the directory
+// or file already, as go/build and go/parser word them.
 func readImports(dir string) ([]string, error) {
 	pkg, err := build.Default.ImportDir(dir, 0)
 	// A directory whose every Go file this machine leaves out is a NoGoError,
 	// but its files may still count, so it is read on.
 	if _, noGo := errors.AsType[*build.NoGoError](err); err != nil && !noGo {
-		return nil, fmt.Errorf("read %s: %w", dir, err)
+		return nil, err
 	}
 	// With cgo on, a cgo file is in CgoFiles and its imports are in Imports;
 	// with cgo off, it is among the IgnoredGoFiles read below.
 	imports := slices.Clone(pkg.Imports)
 	files := len(pkg.GoFiles) + len(pkg.CgoFiles)
-	name := pkg.Name
 	fset := token.NewFileSet()
 	for _, file := range pkg.IgnoredGoFiles {
 		if strings.HasSuffix(file, "_test.go") {
@@ -194,25 +227,20 @@ func readImports(dir string) ([]string, error) {
 		path := filepath.Join(pkg.Dir, file)
 		f, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly|parser.ParseComments)
 		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", path, err)
+			return nil, err
 		}
 		expr, err := buildConstraint(f)
 		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", path, err)
+			return nil, fmt.Errorf("%s: %w", path, err)
 		}
 		if expr != nil && !anyBuild(expr, true) {
-			continue
-		}
-		if name == "" {
-			name = f.Name.Name
-		} else if f.Name.Name != name {
 			continue
 		}
 		files++
 		for _, spec := range f.Imports {
 			imp, err := strconv.Unquote(spec.Path.Value)
 			if err != nil {
-				return nil, fmt.Errorf("read %s: import %s: %w", path, spec.Path.Value, err)
+				return nil, fmt.Errorf("%s: import %s: %w", path, spec.Path.Value, err)
 			}
 			imports = append(imports, imp)
 		}
@@ -240,11 +268,12 @@ func buildConstraint(f *ast.File) (constraint.Expr, error) {
 	return nil, nil
 }
 
-// anyBuild reports whether some build satisfies x, taking each tag except
+// anyBuild reports whether some build may satisfy x, taking each tag except
 // "ignore" as set or unset, whichever makes x true at that point; want is the
-// value the caller needs x to have. It is the go command's rule for gathering
-// every import a package could have (cmd/go/internal/imports, eval with the
-// "*" tag set).
+// value the caller needs x to have. Each occurrence of a tag is decided on its
+// own, so this over-approximates: "linux && !linux" counts. It is the go
+// command's rule for gathering every import a package could have
+// (cmd/go/internal/imports, eval with the "*" tag set).
 func anyBuild(x constraint.Expr, want bool) bool {
 	switch x := x.(type) {
 	case *constraint.TagExpr:
