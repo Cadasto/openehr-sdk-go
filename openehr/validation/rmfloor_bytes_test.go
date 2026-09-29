@@ -432,3 +432,18 @@ func TestValidateRMEHRStatusBytes_ArchetypeKeysRootOnly(t *testing.T) {
 		t.Errorf("ValidateRMEHRStatusBytes(nested ARCHETYPED with no attributes) findings = %q, want %q", got, want)
 	}
 }
+
+// TestValidateRMEHRStatusBytes_ArchetypeDetailsNotAnObject pins a
+// non-object archetype_details on the Bytes entry (PROBE-081, REQ-112): the
+// EHR_STATUS decode refuses it, so the result is a single invalid_shape at
+// "/", and the key-presence reading of archetype_details never runs on it.
+func TestValidateRMEHRStatusBytes_ArchetypeDetailsNotAnObject(t *testing.T) {
+	for _, details := range []string{`[]`, `"openEHR-EHR-EHR_STATUS.generic.v1"`, `42`} {
+		t.Run(details, func(t *testing.T) {
+			got := findingsOf(validation.ValidateRMEHRStatusBytes(ehrStatusWithArchetypeDetails(details)))
+			if want := []string{"invalid_shape /"}; !slices.Equal(got, want) {
+				t.Errorf("ValidateRMEHRStatusBytes(archetype_details %s) findings = %q, want %q", details, got, want)
+			}
+		})
+	}
+}

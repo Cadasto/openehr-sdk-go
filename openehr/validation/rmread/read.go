@@ -4,11 +4,13 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
 // ReadSingle returns the RM value at `attrName` on `parent`.
 // The second (named-blank) parameter is the OPT-declared RM
-// class name. Dispatch is purely on the Go concrete type of
-// `parent`, but the parameter is retained so callers boxing an
-// RM value through an interface can pass through the compiled RM
-// type without re-flattening, and so a future dispatch table can
-// key on the string.
+// class name. Dispatch is on the Go concrete type of `parent`,
+// with one exception: `archetype_details`, which every LOCATABLE
+// inherits, is read first by attribute name for any parent
+// [Handles] accepts. The parameter is unused but retained so
+// callers boxing an RM value through an interface can pass through
+// the compiled RM type without re-flattening, and so a future
+// dispatch table can key on the string.
 //
 // `ok` is false when the attribute is absent (nil pointer, nil
 // interface, typed-nil pointer behind an interface (see

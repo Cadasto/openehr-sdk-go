@@ -87,7 +87,11 @@ func ValidateRMFolder(folder *rm.Folder) Result {
 // It cannot flag an omitted value-typed mandatory `subject` (typed
 // rm.PartySelf, whose zero value is indistinguishable from an absent one):
 // use [ValidateRMEHRStatusBytes], which decides subject presence from the
-// source JSON key set.
+// source JSON key set. The same holds for the root's archetype_details: an
+// omitted `rm_version` decodes to an empty one, so this entry reports it as
+// `rm_version_valid` where [ValidateRMEHRStatusBytes] reports `required`,
+// and an omitted `archetype_id` is reported only at `archetype_id/value`,
+// without the Bytes entry's `required` at `archetype_id`.
 func ValidateRMEHRStatus(status *rm.EHRStatus) Result {
 	if status == nil {
 		return resultFromIssues([]Issue{{Path: "/", Code: "nil_ehr_status", Detail: "ValidateRMEHRStatus: status is nil", Severity: Error}})

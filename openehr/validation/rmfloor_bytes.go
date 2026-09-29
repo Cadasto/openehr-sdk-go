@@ -3,11 +3,17 @@ package validation
 // rmfloor_bytes.go: PROBE-081 — REQ-112 — the presence-aware EHR_STATUS
 // entry to the template-less RM floor. It closes the value-typed
 // mandatory-attribute blind spot that the value-based [ValidateRMEHRStatus]
-// structurally cannot: EHR_STATUS.subject is typed rm.PartySelf — a value
-// struct whose only field (external_ref) is optional — so an omitted
-// subject and a valid bare PARTY_SELF decode to the *identical* Go zero
-// value. Presence therefore cannot be read from the decoded value; only
-// the presence of the `subject` key in the source JSON carries it.
+// structurally cannot, at the root EHR_STATUS:
+//
+//   - EHR_STATUS.subject is typed rm.PartySelf — a value struct whose only
+//     field (external_ref) is optional — so an omitted subject and a valid
+//     bare PARTY_SELF decode to the *identical* Go zero value;
+//   - the root's ARCHETYPED archetype_id (rm.ArchetypeID) and rm_version
+//     (a string) are value-typed too, so an omitted one decodes to the same
+//     zero value as an empty one.
+//
+// Presence therefore cannot be read from the decoded value; only the
+// presence of the key in the source JSON carries it.
 
 import (
 	"bytes"
@@ -117,10 +123,16 @@ func rootKeyAbsences(keys map[string]jsontext.Value) []Issue {
 		return out
 	}
 	var details map[string]jsontext.Value
-	if err := json.Unmarshal(keys["archetype_details"], &details); err != nil || details == nil {
-		// Not reached: the EHR_STATUS decode has already accepted the
-		// member as an ARCHETYPED object.
-		return out
+	if err := json.Unmarshal(keys["archetype_details"], &details); err != nil {
+		// Not expected: the EHR_STATUS decode has already accepted the
+		// member as an ARCHETYPED object. Report the shape rather than read
+		// keys from a member that has none.
+		return append(out, Issue{
+			Path:     "/archetype_details",
+			Code:     "invalid_shape",
+			Detail:   "ValidateRMEHRStatusBytes: archetype_details is not a JSON object",
+			Severity: Error,
+		})
 	}
 	for _, attr := range []string{"archetype_id", "rm_version"} {
 		if keyAbsent(details, attr) {
