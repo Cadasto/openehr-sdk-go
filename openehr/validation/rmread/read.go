@@ -22,8 +22,12 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 //
 // Returns `(nil, false)` for unknown (parent, attrName) pairs;
 // callers should treat that as "not addressable" rather than an
-// error.
+// error. A nil parent, or a typed-nil pointer parent, reads as
+// `(nil, false)` too, the not-present answer, rather than panicking.
 func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
+	if IsTypedNilPointer(parent) {
+		return nil, false
+	}
 	if attrName == "archetype_details" {
 		return readArchetypeDetails(parent)
 	}
@@ -451,8 +455,12 @@ func Handles(parent any) bool {
 // carries the attribute (the returned slice may still be empty);
 // it is false for unknown (parentType, attrName) pairs. Callers
 // distinguish "absent" from "empty" via `len(items) == 0`; the
-// cardinality check at the call site needs both signals.
+// cardinality check at the call site needs both signals. A nil
+// parent, or a typed-nil pointer parent, reads as `(nil, false)`.
 func ReadMultiple(parent any, _ /* parentType */, attrName string) ([]any, bool) {
+	if IsTypedNilPointer(parent) {
+		return nil, false
+	}
 	switch p := parent.(type) {
 	case *rm.Composition:
 		return readCompositionMultiple(p, attrName)
@@ -1473,7 +1481,7 @@ func readEHRAccessSingle(a *rm.EHRAccess, attr string) (any, bool) {
 // further change. A type [Handles] rejects stays unreadable here too, as
 // Handles promises.
 func readArchetypeDetails(parent any) (any, bool) {
-	if !Handles(parent) || IsTypedNilPointer(parent) {
+	if !Handles(parent) {
 		return nil, false
 	}
 	l, ok := parent.(rm.Locatable)

@@ -243,3 +243,49 @@ func TestReadAccuracyWhereDeclared(t *testing.T) {
 		t.Fatal("no registered DV_ORDERED declares accuracy in rminfo; the parity check asserts nothing")
 	}
 }
+
+// TestReadTypedNilParent checks that ReadSingle and ReadMultiple answer a
+// typed-nil parent with (nil, false), the not-present answer, rather than
+// panicking inside a type reader (REQ-112). A panic here would cross the
+// package boundary into the caller's walk.
+func TestReadTypedNilParent(t *testing.T) {
+	cases := []struct {
+		name   string
+		parent any
+		attr   string
+		multi  bool
+	}{
+		{"ReadSingle, COMPOSITION", (*rm.Composition)(nil), "name", false},
+		{"ReadSingle, DV_QUANTITY", (*rm.DVQuantity)(nil), "units", false},
+		{"ReadSingle, EHR_ACCESS archetype_details", (*rm.EHRAccess)(nil), "archetype_details", false},
+		{"ReadSingle, REFERENCE_RANGE", (*rm.ReferenceRange[rm.DVOrdered])(nil), "meaning", false},
+		{"ReadMultiple, DV_QUANTITY unknown attribute", (*rm.DVQuantity)(nil), "bogus", true},
+		{"ReadMultiple, DV_DATE other_reference_ranges", (*rm.DVDate)(nil), "other_reference_ranges", true},
+		{"ReadMultiple, CLUSTER items", (*rm.Cluster)(nil), "items", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("read of %q on typed-nil %T panicked: %v", tc.attr, tc.parent, r)
+				}
+			}()
+			var got any
+			var ok bool
+			if tc.multi {
+				got, ok = ReadMultiple(tc.parent, "", tc.attr)
+				if items := got.([]any); items != nil {
+					t.Errorf("ReadMultiple(typed-nil %T, %q) items = %v, want nil", tc.parent, tc.attr, items)
+				}
+			} else {
+				got, ok = ReadSingle(tc.parent, "", tc.attr)
+				if got != nil {
+					t.Errorf("ReadSingle(typed-nil %T, %q) value = %v, want nil", tc.parent, tc.attr, got)
+				}
+			}
+			if ok {
+				t.Errorf("read of %q on typed-nil %T: ok = true, want false", tc.attr, tc.parent)
+			}
+		})
+	}
+}
