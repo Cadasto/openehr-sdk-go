@@ -141,7 +141,8 @@ func retypeSlotReEncoder(slot string, replacement map[string]any) func(any) ([]b
 // not just that its entries behave. The RM-floor leg (REQ-112) is a MUST for
 // every fixture; only a fixture whose vendored content carries findings
 // invariant to the round trip may be held out, and today that is exactly the
-// five named below, each justified at its probe030SkipFloor entry. Because
+// sixteen named below, each justified at its probe030SkipFloor entry. Eleven
+// of them omit archetype_details on an archetype root (REQ-112). Because
 // probe030RoundTrip skips the floor for any key in this map, an entry added
 // here silently drops the floor MUST for that fixture while TestProbe030 and
 // the ValidateRM plant both stay green. This guard fails when the set changes,
@@ -155,6 +156,17 @@ func TestProbe030SkipFloorSetIsLocked(t *testing.T) {
 		"compositions/Test_dv_interval_dv_count_open_constraint.v0.json",
 		"compositions/Test_dv_interval_dv_quantity_open_constraint.v0.json",
 		"compositions/clinical_notes.v0.json",
+		"rm/compo_with_nested_party_related.json",
+		"rm/ehr_status_other_details_simple.json",
+		"rm/ehr_status_valid_0000_ehr_status_hardcoded_subject_id_value.json",
+		"rm/ehr_status_valid_000_ehr_status.json",
+		"rm/ehr_status_valid_000_ehr_status_with_other_details.json",
+		"rm/ehr_status_valid_002_ehr_status_with_other_details_item_tree.json",
+		"rm/ehr_status_valid_003_ehr_status_with_other_details_item_list.json",
+		"rm/ehr_status_valid_004_ehr_status_with_other_details_item_single.json",
+		"rm/ehr_status_valid_005_ehr_status_with_other_details_item_table.json",
+		"rm/ehr_status_valid_ehr_can_not_be_modifyable.json",
+		"rm/minimal_evaluation.json",
 	}
 	if got := slices.Sorted(maps.Keys(probe030SkipFloor)); !slices.Equal(got, want) {
 		t.Fatalf("probe030SkipFloor holds %v, want %v: a floor-MUST holdout must be justified in the probe, not added or dropped silently", got, want)

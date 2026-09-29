@@ -97,6 +97,23 @@ func asTermMapping(value any) (rm.TermMapping, bool) {
 	return rm.TermMapping{}, false
 }
 
+// asArchetyped recovers an ARCHETYPED value (by value or by pointer). The
+// walk reaches an ARCHETYPED through LOCATABLE.archetype_details, a pointer,
+// so the pointer arm is the one that fires during a descent; the value arm
+// covers a caller handing an ARCHETYPED to [ValidateRM] directly.
+func asArchetyped(value any) (rm.Archetyped, bool) {
+	switch v := value.(type) {
+	case *rm.Archetyped:
+		if v == nil {
+			return rm.Archetyped{}, false
+		}
+		return *v, true
+	case rm.Archetyped:
+		return v, true
+	}
+	return rm.Archetyped{}, false
+}
+
 // dvIntervalNumericBounds returns the lower/upper magnitudes of a DV_INTERVAL
 // when both bounds are numerically comparable — same-unit DV_QUANTITY, or
 // DV_COUNT — and neither side is unbounded. It handles the monomorphised

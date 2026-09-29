@@ -53,17 +53,18 @@ func TestValidateRMFolder_Valid(t *testing.T) {
 }
 
 // TestValidateRMEHRStatus_MinimallyValid covers a well-formed
-// EHR_STATUS: archetype node id, name, subject (PartySelf — no required
-// child attributes), is_modifiable/is_queryable (bool defaults are
-// legal). Floor walker reports OK without descending into any
-// invariant trap.
+// EHR_STATUS: archetype node id, name, archetype_details (EHR_STATUS is an
+// archetype root, REQ-112), subject (PartySelf — no required child
+// attributes), is_modifiable/is_queryable (bool defaults are legal). Floor
+// walker reports OK without descending into any invariant trap.
 func TestValidateRMEHRStatus_MinimallyValid(t *testing.T) {
 	status := &rm.EHRStatus{
-		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
-		Name:            rm.DVText{Value: "EHR Status"},
-		Subject:         rm.PartySelf{},
-		IsModifiable:    true,
-		IsQueryable:     true,
+		ArchetypeNodeID:  "openEHR-EHR-EHR_STATUS.generic.v1",
+		Name:             rm.DVText{Value: "EHR Status"},
+		ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-EHR_STATUS.generic.v1"}, RMVersion: "1.1.0"},
+		Subject:          rm.PartySelf{},
+		IsModifiable:     true,
+		IsQueryable:      true,
 	}
 	r := validation.ValidateRMEHRStatus(status)
 	if !r.OK {
@@ -237,11 +238,13 @@ func TestValidateRMFolder_ObjectRefItemMissingType(t *testing.T) {
 
 // TestValidateRMEHRAccess_Valid is the regression guard for the EHR_ACCESS
 // dispatch gap: a non-nil EHR_ACCESS is recognised and walked (returns OK)
-// rather than reported as rm_type_unknown.
+// rather than reported as rm_type_unknown. EHR_ACCESS is an archetype root,
+// so the valid value carries archetype_details (REQ-112).
 func TestValidateRMEHRAccess_Valid(t *testing.T) {
 	access := &rm.EHRAccess{
-		ArchetypeNodeID: "openEHR-EHR-EHR_ACCESS.generic.v1",
-		Name:            rm.DVText{Value: "EHR Access"},
+		ArchetypeNodeID:  "openEHR-EHR-EHR_ACCESS.generic.v1",
+		Name:             rm.DVText{Value: "EHR Access"},
+		ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-EHR_ACCESS.generic.v1"}, RMVersion: "1.1.0"},
 	}
 	r := validation.ValidateRMEHRAccess(access)
 	if !r.OK {

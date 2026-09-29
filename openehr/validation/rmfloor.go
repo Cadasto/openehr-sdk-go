@@ -8,7 +8,9 @@ package validation
 //     plus the container "lower bound ≥ 1" reading);
 //   - per-RM-type invariants on the leaves it touches (CODE_PHRASE
 //     code_string, DV_INTERVAL numeric bounds, DV_QUANTITY precision,
-//     DV_PROPORTION precision, the OBJECT_REF id/type/namespace floor).
+//     DV_PROPORTION precision, the OBJECT_REF id/type/namespace floor);
+//   - archetype_details on every archetype-root node, and a non-empty
+//     archetype_id and rm_version on every ARCHETYPED.
 //
 // REQ-112 surface. Independent of REQ-102/110 (template-driven); both
 // drivers may run against the same root — REQ-110 enforces template
@@ -279,6 +281,87 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkTermMappings(value, path)
 	case rmType == "TERM_MAPPING":
 		w.checkTermMapping(value, path)
+	case rmType == "ARCHETYPED":
+		w.checkArchetyped(value, path)
+	case isArchetypeRootClass(rmType):
+		w.checkArchetypeRoot(value, rmType, path)
+	}
+}
+
+// isArchetypeRootClass reports whether rmType is a concrete RM class whose
+// objects are always archetype roots. It is a closed list of the classes whose
+// BMM definition declares the `Is_archetype_root` invariant (COMPOSITION,
+// EHR_ACCESS, EHR_STATUS) or inherits it from a declaring abstract class
+// (PARTY: PERSON, ORGANISATION, GROUP, AGENT, ROLE; ENTRY: ADMIN_ENTRY,
+// OBSERVATION, EVALUATION, INSTRUCTION, ACTION). rminfo does not expose
+// invariants, so the list is written out and a test pins it to the vendored
+// BMM: a BMM bump that adds a root class fails that test until the class is
+// added here.
+func isArchetypeRootClass(rmType string) bool {
+	switch rmType {
+	case "COMPOSITION", "EHR_ACCESS", "EHR_STATUS",
+		"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
+		"ADMIN_ENTRY", "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION":
+		return true
+	}
+	return false
+}
+
+// checkArchetypeRoot enforces the archetype-root rule on a node whose class
+// is always an archetype root (see [isArchetypeRootClass]). The class
+// invariant `Is_archetype_root` fixes is_archetype_root true, and
+// LOCATABLE's `Archetyped_valid` (is_archetype_root xor archetype_details =
+// Void) then makes archetype_details mandatory, although LOCATABLE declares
+// it optional. An absent archetype_details, whether omitted or JSON null,
+// reports `is_archetype_root` at the node's archetype_details.
+//
+// The attribute is read through [rm.Locatable], not rmread, so the rule holds
+// on a root rmread does not model (EHR_ACCESS) too.
+func (w *rmFloorWalker) checkArchetypeRoot(value any, rmType, path string) {
+	l, ok := value.(rm.Locatable)
+	if !ok || rmread.IsTypedNilPointer(value) {
+		return
+	}
+	if l.GetArchetypeDetails() == nil {
+		w.emit(Issue{
+			Path:   joinPath(path, "/archetype_details"),
+			Code:   "is_archetype_root",
+			Detail: rmType + " is an archetype root, so archetype_details must be present (RM Is_archetype_root, LOCATABLE.Archetyped_valid)",
+		})
+	}
+}
+
+// checkArchetyped enforces the floor on an ARCHETYPED node, wherever it sits:
+// its archetype_id and rm_version are RM-mandatory. Both are value-typed, so
+// an absent attribute, a JSON null and an empty value all decode to the same
+// zero value and are reported the same way:
+//
+//   - an empty archetype_id.value is `required` at archetype_id/value (the
+//     RM makes OBJECT_ID.value mandatory but gives it no non-empty invariant;
+//     reading empty as absent is SDK policy);
+//   - an empty rm_version is `rm_version_valid` at rm_version (the RM's
+//     `Rm_version_valid: not rm_version.is_empty`).
+//
+// The ARCHETYPE_ID grammar is not checked, and template_id is optional.
+// Diagnostics name the attribute, never its value.
+func (w *rmFloorWalker) checkArchetyped(value any, path string) {
+	a, ok := asArchetyped(value)
+	if !ok {
+		return
+	}
+	if a.ArchetypeID.Value == "" {
+		w.emit(Issue{
+			Path:   joinPath(path, "/archetype_id/value"),
+			Code:   "required",
+			Detail: "ARCHETYPED.archetype_id must carry a non-empty value",
+		})
+	}
+	if a.RMVersion == "" {
+		w.emit(Issue{
+			Path:   joinPath(path, "/rm_version"),
+			Code:   "rm_version_valid",
+			Detail: "ARCHETYPED.rm_version must be non-empty (RM Rm_version_valid)",
+		})
 	}
 }
 
