@@ -1,7 +1,7 @@
 # Plan — RM floor: archetype roots and ARCHETYPED
 
 **Date:** 2026-09-24
-**Status:** Done — the code landed on branch `feat/req-112-archetype-roots`, with the DV_ORDINAL, DV_SCALE, REFERENCE_RANGE and EHR_ACCESS readers
+**Status:** Done — the code landed in [PR 188](https://github.com/Cadasto/openehr-sdk-go/pull/188), with the DV_ORDINAL, DV_SCALE, REFERENCE_RANGE and EHR_ACCESS readers
 **Owner:** SDK maintainers
 **Covers:** REQ-112 ([clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor), *Per-RM-type invariant catalogue*: the *Archetype roots* and *ARCHETYPED* rows) — no new id
 **Probes:** PROBE-081 extended (value-typed presence now also covers `ARCHETYPED.archetype_id` / `rm_version`)
