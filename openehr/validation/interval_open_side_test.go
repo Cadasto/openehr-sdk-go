@@ -33,7 +33,7 @@ func pathCodes(issues []validation.Issue) []pathCode {
 }
 
 // TestValidateComposition_DecodedOpenIntervalSide covers a decoded
-// half-open DV_INTERVAL (REQ-102): every interval in the vendored cassette
+// half-open DV_INTERVAL (REQ-102): every interval in the vendored fixture
 // has its `upper` dropped and `upper_unbounded` set, which the OPT allows
 // (`upper` is 0..1). The open side carries no bound, so the walker reports
 // no issue there; it once read the missing bound as a present nil and
@@ -51,7 +51,7 @@ func TestValidateComposition_DecodedOpenIntervalSide(t *testing.T) {
 			}
 			edited, n := openUpperSides(t, raw)
 			if n == 0 {
-				t.Fatal("the cassette holds no DV_INTERVAL to open")
+				t.Fatal("the fixture holds no DV_INTERVAL to open")
 			}
 			var comp rm.Composition
 			if err := canjson.Unmarshal(edited, &comp); err != nil {
@@ -89,7 +89,7 @@ func TestValidateComposition_TypedOpenIntervalSide(t *testing.T) {
 		}
 	})
 	if n == 0 {
-		t.Fatal("the cassette holds no at0046 ELEMENT to set")
+		t.Fatal("the fixture holds no at0046 ELEMENT to set")
 	}
 	r := validation.ValidateComposition(&comp, c)
 	if got := pathCodes(r.Issues); len(got) != 0 {
@@ -134,7 +134,7 @@ func openUpperSides(t *testing.T, raw []byte) ([]byte, int) {
 	t.Helper()
 	var doc any
 	if err := json.Unmarshal(raw, &doc); err != nil {
-		t.Fatalf("parse cassette: %v", err)
+		t.Fatalf("parse fixture: %v", err)
 	}
 	n := 0
 	var walk func(v any)
@@ -159,13 +159,13 @@ func openUpperSides(t *testing.T, raw []byte) ([]byte, int) {
 	walk(doc)
 	out, err := json.Marshal(doc)
 	if err != nil {
-		t.Fatalf("re-encode cassette: %v", err)
+		t.Fatalf("re-encode fixture: %v", err)
 	}
 	return out, n
 }
 
 // setIntervalValues replaces the value of every at0046 ELEMENT under the
-// cassette's single OBSERVATION with a fresh value from mk. It reports how
+// fixture's single OBSERVATION with a fresh value from mk. It reports how
 // many it set.
 func setIntervalValues(t *testing.T, comp *rm.Composition, mk func() rm.DataValue) int {
 	t.Helper()
