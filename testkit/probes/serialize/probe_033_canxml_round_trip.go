@@ -32,7 +32,7 @@ func Probe033CanxmlRoundTrip(body []byte, factory func() any) (Result, error) { 
 	}
 	if body == nil {
 		r.Status = "fail"
-		r.Detail = "input body is nil — likely a cassette discovery failure"
+		r.Detail = "input body is nil — likely a fixture discovery failure"
 		return r, nil
 	}
 	v1 := factory()
@@ -69,9 +69,9 @@ func Probe033CanxmlRoundTrip(body []byte, factory func() any) (Result, error) { 
 }
 
 // Probe033Inputs is the canonical set of inputs exercised by
-// PROBE-033 in sandbox mode. Leaf entries are bootstrap-encoded; cassette
-// entries are discovered from `testkit/cassettes/compositions/*.xml` and
-// `testkit/cassettes/rm/*.xml` via [fixtures.ListRMXML], as for
+// PROBE-033 in sandbox mode. Leaf entries are bootstrap-encoded; fixture
+// entries are discovered from `testkit/corpus/compositions/*.xml` and
+// `testkit/corpus/rm/*.xml` via [fixtures.ListRMXML], as for
 // [Probe030Inputs].
 var Probe033Inputs = func() []Probe033Input {
 	must := func(v any) []byte {
@@ -105,17 +105,17 @@ var Probe033Inputs = func() []Probe033Input {
 			Factory: func() any { return new(rm.Composition) },
 		},
 	}
-	cassettes, err := loadXMLCassetteInputs()
+	vendored, err := loadXMLFixtureInputs()
 	if err != nil {
 		out = append(out, Probe033Input{
-			Name:    "_cassette_discovery_error",
+			Name:    "_fixture_discovery_error",
 			Body:    nil,
 			Factory: func() any { return new(rm.Composition) },
 			loadErr: err,
 		})
 		return out
 	}
-	return append(out, cassettes...)
+	return append(out, vendored...)
 }()
 
 // Probe033Input is one input entry for PROBE-033.
@@ -123,29 +123,29 @@ type Probe033Input struct {
 	Name    string
 	Body    []byte
 	Factory func() any
-	// loadErr is set when cassette discovery failed at init.
+	// loadErr is set when fixture discovery failed at init.
 	loadErr error
 }
 
-func loadXMLCassetteInputs() ([]Probe033Input, error) {
+func loadXMLFixtureInputs() ([]Probe033Input, error) {
 	rels, err := fixtures.ListRMXML()
 	if err != nil {
-		return nil, fmt.Errorf("PROBE-033: list cassettes: %w", err)
+		return nil, fmt.Errorf("PROBE-033: list fixtures: %w", err)
 	}
-	root := fixtures.CassettesRoot()
+	root := fixtures.CorpusRoot()
 	out := make([]Probe033Input, 0, len(rels))
 	for _, rel := range rels {
 		path := filepath.Join(root, filepath.FromSlash(rel))
 		body, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("PROBE-033: read cassette %q: %w", rel, err)
+			return nil, fmt.Errorf("PROBE-033: read fixture %q: %w", rel, err)
 		}
 		factory, ok := fixtures.FactoryForXMLBody(body)
 		if !ok {
 			continue
 		}
 		out = append(out, Probe033Input{
-			Name:    "cassette:" + rel,
+			Name:    "fixture:" + rel,
 			Body:    body,
 			Factory: factory,
 		})

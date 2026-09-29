@@ -68,9 +68,9 @@ nested in a COMPOSITION with no `archetype_details` is reported at its own path;
 
 ## Vendored content
 
-The rule matches the RM and is not weakened. Some EHRbase-origin samples under `testkit/cassettes/rm/` omit
+The rule matches the RM and is not weakened. Some EHRbase-origin samples under `testkit/corpus/rm/` omit
 `archetype_details` on a root or on a nested entry, so they gain a floor finding once this lands. Counted with a
-throwaway walk over `testkit/cassettes/rm/**` and `testkit/cassettes/compositions/*.json`: the root `_type` for the
+throwaway walk over `testkit/corpus/rm/**` and `testkit/corpus/compositions/*.json`: the root `_type` for the
 top-level rows, a recursive `_type` scan for nested entries, and a sample counts when the `archetype_details` key is
 absent or `null`.
 
@@ -87,7 +87,7 @@ ARCHETYPED-arm hold-out is needed.
 
 Handling, at implementation, with no fixture content edited:
 
-- The affected cassettes become named `SkipFloor` hold-outs carrying the finding, the mechanism PROBE-030's catalog
+- The affected fixtures become named `SkipFloor` hold-outs carrying the finding, the mechanism PROBE-030's catalog
   entry already sanctions.
 - The OK-asserting root-class unit fixtures gain `archetype_details` at implementation:
   `TestValidateRMEHRStatusBytes_BareSubjectOK` and `TestValidateRMEHRStatus_MinimallyValid`

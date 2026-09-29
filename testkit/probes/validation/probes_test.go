@@ -365,7 +365,7 @@ func TestProbe026MissingNodes_RMTypeMismatch(t *testing.T) {
 	}
 }
 
-// loadFixture reads a vendored template.opt from testkit/cassettes/templates/.
+// loadFixture reads a vendored template.opt from testkit/corpus/templates/.
 func loadFixture(t *testing.T, name string) []byte {
 	t.Helper()
 	body, err := os.ReadFile(fixtures.TemplateOptForName(name))

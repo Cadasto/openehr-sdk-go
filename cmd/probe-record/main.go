@@ -183,7 +183,7 @@ func provenanceBaseURL(base string) (string, error) {
 // The order is the contract: validate the document in memory, replay it, then
 // write. Writing first and checking afterwards would put a leaked credential
 // on disk and could replace a good recording with a refused one — see
-// TestCaptureScenario_RefusedCaptureLeavesTheCorpusUntouched.
+// TestCaptureScenario_RefusedCaptureLeavesTheRecordingUntouched.
 func captureScenario(ctx context.Context, sc scenario, base string, next http.RoundTripper, tok auth.TokenSource, prov probe.HARProvenance, outDir string) (string, error) {
 	rec := probe.NewRecorder(next, prov)
 	c, err := probe.NewClient(base, &http.Client{Transport: rec, Timeout: 30 * time.Second}, tok)
@@ -250,7 +250,7 @@ func publish(dir, name string, data []byte) (string, error) {
 	if err := tmp.Close(); err != nil {
 		return "", fmt.Errorf("write recording: %w", err)
 	}
-	// CreateTemp makes the file 0600; a corpus recording is committed and
+	// CreateTemp makes the file 0600; a recording is committed and
 	// world-readable like every other file in the tree.
 	if err := os.Chmod(tmpName, 0o644); err != nil {
 		return "", fmt.Errorf("set recording mode: %w", err)

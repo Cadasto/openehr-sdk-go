@@ -40,18 +40,18 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return c
 }
 
-// readCassette returns the bytes of a cassette under
-// testkit/cassettes/its_rest/<dir>/<name>.
-func readCassette(t *testing.T, dir, name string) []byte {
+// readFixture returns the bytes of a fixture under
+// testkit/corpus/its_rest/<dir>/<name>.
+func readFixture(t *testing.T, dir, name string) []byte {
 	t.Helper()
 	_, src, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "cassettes", "its_rest", dir, name)
+	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "corpus", "its_rest", dir, name)
 	b, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
+		t.Fatalf("read fixture %q: %v", path, err)
 	}
 	return b
 }
@@ -118,7 +118,7 @@ func wantCommitMetadata(t *testing.T, label string, meta *openehrclient.VersionM
 
 func TestGet(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t, "ehr", "ehr.json")
+	body := readFixture(t, "ehr", "ehr.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("ETag", `"`+ehrIDFixture+`"`)
@@ -219,7 +219,7 @@ func TestExistsBubblesNon404Errors(t *testing.T) {
 
 func TestGetBySubject(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t, "ehr", "ehr.json")
+	body := readFixture(t, "ehr", "ehr.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -261,7 +261,7 @@ func TestVersionUIDParsing(t *testing.T) {
 
 func TestCreateServerAssigned(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t, "ehr", "ehr.json")
+	body := readFixture(t, "ehr", "ehr.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Location", "/ehr/"+ehrIDFixture)
@@ -289,7 +289,7 @@ func TestCreateServerAssigned(t *testing.T) {
 
 func TestCreateClientSupplied(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t, "ehr", "ehr.json")
+	body := readFixture(t, "ehr", "ehr.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -416,7 +416,7 @@ func TestCreateEmpty2xxBody(t *testing.T) {
 	})
 
 	t.Run("valid_body", func(t *testing.T) {
-		body := readCassette(t, "ehr", "ehr.json")
+		body := readFixture(t, "ehr", "ehr.json")
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write(body)

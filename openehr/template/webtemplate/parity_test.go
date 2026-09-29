@@ -15,7 +15,7 @@ import (
 
 // referenceDir is the vendored EHRbase parity fixture directory, relative
 // to this package.
-const referenceDir = "../../../testkit/cassettes/webtemplate"
+const referenceDir = "../../../testkit/corpus/webtemplate"
 
 // referenceStem is the first vendored EHRbase parity fixture's filename
 // stem — the historical single oracle, kept as the default other tests

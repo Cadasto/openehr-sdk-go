@@ -15,7 +15,7 @@ import (
 // TestCreateEHRIsRMValid pins the sandbox EHR body against the RM
 // floor (REQ-112 via [validation.ValidateRM]): ehr_access is
 // RM-mandatory — rm.EHR.EHRAccess carries no `omitempty` json tag,
-// and the vendored cassette testkit/cassettes/its_rest/ehr/ehr.json
+// and the vendored fixture testkit/corpus/its_rest/ehr/ehr.json
 // carries it — so a sandbox-created EHR must too.
 //
 // Two assertions, because openehr/validation's rmread does not

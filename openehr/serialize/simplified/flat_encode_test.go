@@ -21,7 +21,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
-const minimalObsOPT = "../../../testkit/cassettes/templates/minimal_observation.en.v1.opt"
+const minimalObsOPT = "../../../testkit/corpus/templates/minimal_observation.en.v1.opt"
 
 // genComposition compiles an OPT, builds its Web Template, and synthesises an
 // Example composition against it (REQ-107).

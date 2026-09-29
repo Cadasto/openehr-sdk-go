@@ -8,10 +8,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// Robot submission cassettes use the ehrbase CONTRIBUTION envelope (top-level
+// Robot submission fixtures use the ehrbase CONTRIBUTION envelope (top-level
 // _type) while ITS-REST Contribution_create omits it — assert the version
 // inline-data shape either way.
-func TestRobotSubmissionCassettes_WireShape(t *testing.T) {
+func TestRobotSubmissionFixtures_WireShape(t *testing.T) {
 	cases := []struct {
 		name      string
 		stem      string

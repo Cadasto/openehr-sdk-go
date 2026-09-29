@@ -496,7 +496,7 @@ func recordingDir(t *testing.T, ids ...string) string {
 	return dir
 }
 
-// writeRecording drops one corpus file into dir.
+// writeRecording drops one recording file into dir.
 func writeRecording(t *testing.T, dir, name, body string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
@@ -534,7 +534,7 @@ func TestRun_CassetteRefusesMalformedRecording(t *testing.T) {
 	}
 }
 
-// TestRun_CassetteRecordingNameIsExact pins that the corpus lookup
+// TestRun_CassetteRecordingNameIsExact pins that the recording lookup
 // matches the whole file name, not a prefix of it. PROBE-0100.har and
 // PROBE-010-v2.har both start with PROBE-010; under a prefix rule
 // either could answer for it, and the probe would go green on a
@@ -579,7 +579,7 @@ func TestRun_CassetteRecordingNameIsExact(t *testing.T) {
 	}
 }
 
-// TestRun_CassetteIgnoresNonHARPrefixMatch pins that the corpus lookup
+// TestRun_CassetteIgnoresNonHARPrefixMatch pins that the recording lookup
 // matches the extension as well as the id: a PROBE-010.yaml left
 // beside the recordings shares the id but is not a recording, so
 // the run must report that no recording exists rather than adopt the

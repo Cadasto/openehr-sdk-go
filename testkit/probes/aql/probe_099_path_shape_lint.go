@@ -17,7 +17,7 @@ import (
 // read-side only, so there is no builder analogue for a parity arm to compare
 // against. What is left is arm (a), the per-code firing rows and the negative
 // near misses, and arm (b), the additivity guard that re-runs PROBE-028's
-// cassette corpus.
+// fixture corpus.
 //
 // The five REQ-164 codes are spelled here independently of openehr/aql/lint's
 // own strings, for the reason PROBE-097 spells the REQ-161 codes independently:
@@ -341,8 +341,8 @@ func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) { // PROBE-099 (RE
 	for _, tc := range c.Additivity {
 		// runLintCase (probe_028_aql_lint.go) is the additivity guard itself: it
 		// asserts the FULL issue-code multiset, so a REQ-164 code gained on a
-		// cassette that carries no REQ-164 defect breaks the baseline here. The
-		// codes two of these cassettes DO gain are a deliberate, recorded
+		// fixture that carries no REQ-164 defect breaks the baseline here. The
+		// codes two of these fixtures DO gain are a deliberate, recorded
 		// re-baseline (REQ-164 § Additivity, recorded in conformance.md's
 		// PROBE-099 entry) — a change to what the caller passes in, not to what
 		// this guard does.

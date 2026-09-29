@@ -19,7 +19,7 @@ func TestConstraintTemplates_CompiledExampleValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(ids) == 0 {
-		t.Fatal("no constraint template cassettes discovered")
+		t.Fatal("no constraint template fixtures discovered")
 	}
 	for _, id := range ids {
 		t.Run(id, func(t *testing.T) {

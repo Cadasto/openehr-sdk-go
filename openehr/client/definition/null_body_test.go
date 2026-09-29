@@ -57,7 +57,7 @@ func TestGetStoredQueryNullBodySynthesizesMetadata(t *testing.T) { // REQ-151 ke
 }
 
 func TestUploadTemplateNullBodyFallsBackToLocation(t *testing.T) { // REQ-151 keyed exclusion
-	opt := readCassette(t, "body_weight.opt")
+	opt := readFixture(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
 		w.Header().Set("Content-Type", "application/json")

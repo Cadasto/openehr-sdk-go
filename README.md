@@ -121,4 +121,4 @@ Open research strands live in [research-strands.md](docs/specifications/research
 
 The SDK is released under the MIT licence. See [LICENSE](LICENSE).
 
-Vendored third-party artefacts (test fixtures, openEHR specification pins, the AQL grammar) keep their upstream licences. The inventory is [docs/licensing.md](docs/licensing.md).
+Vendored third-party artefacts (test fixtures, openEHR specification pins, the AQL grammar) keep their upstream licences. The inventory is [LICENSING.md](LICENSING.md).

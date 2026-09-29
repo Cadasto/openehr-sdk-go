@@ -1,3 +1,3 @@
 # Moved
 
-Template cassettes: [`testkit/cassettes/templates/`](../../../testkit/cassettes/templates/), [`compositions/`](../../../testkit/cassettes/compositions/). Vendor index: [`testkit/cassettes/README.md`](../../../testkit/cassettes/README.md). Paths: [`testkit/fixtures`](../../../testkit/fixtures/).
+Template fixtures: [`testkit/corpus/templates/`](../../../testkit/corpus/templates/), [`compositions/`](../../../testkit/corpus/compositions/). Vendor index: [`testkit/corpus/README.md`](../../../testkit/corpus/README.md). Paths: [`testkit/fixtures`](../../../testkit/fixtures/).

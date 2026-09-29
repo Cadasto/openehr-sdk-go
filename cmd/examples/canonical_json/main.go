@@ -3,7 +3,7 @@
 // smallest useful program in the SDK: no HTTP, no auth, no discovery, just
 // bytes in and Go structs out.
 //
-// It runs offline against the vendored body_weight.json cassette:
+// It runs offline against the vendored body_weight.json fixture:
 //
 //	go run ./cmd/examples/canonical_json
 package main
@@ -26,12 +26,12 @@ func main() {
 }
 
 func run() error {
-	// testkit/fixtures resolves the vendored cassettes relative to the module,
+	// testkit/fixtures resolves the vendored fixtures relative to the module,
 	// so the path is right whatever the working directory is.
 	path := fixtures.CompositionJSON("body_weight")
 	body, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("read cassette: %w", err)
+		return fmt.Errorf("read fixture: %w", err)
 	}
 
 	// A COMPOSITION is the top-level clinical document in openEHR. canjson is

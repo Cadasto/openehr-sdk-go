@@ -9,11 +9,11 @@ import (
 	"strings"
 )
 
-// CompositionJSONRel is a composition or rm JSON cassette path relative to
-// [CassettesRoot], e.g. `compositions/body_weight.json` or
+// CompositionJSONRel is a composition or rm JSON fixture path relative to
+// [CorpusRoot], e.g. `compositions/body_weight.json` or
 // `rm/minimal_evaluation.json`.
 type CompositionJSONRel struct {
-	Rel      string // forward-slash path under cassettes root
+	Rel      string // forward-slash path under CorpusRoot
 	Template string // filename stem (template id or rm sample name)
 	Kind     string // "compositions" or "rm"
 }
@@ -45,7 +45,7 @@ var compositionXMLExcluded = map[string]bool{
 func ListCompositionJSON() ([]CompositionJSONRel, error) {
 	var out []CompositionJSONRel
 	for _, kind := range []string{"compositions", "rm"} {
-		dir := filepath.Join(CassettesRoot(), kind)
+		dir := filepath.Join(CorpusRoot(), kind)
 		if err := collectJSON(dir, kind, &out); err != nil {
 			return nil, err
 		}
@@ -101,7 +101,7 @@ func ListSubmissionJSON() ([]string, error) {
 
 // ResolveCompositionJSON opens a path from [ListCompositionJSON].
 func ResolveCompositionJSON(rel CompositionJSONRel) string {
-	return filepath.Join(CassettesRoot(), filepath.FromSlash(rel.Rel))
+	return filepath.Join(CorpusRoot(), filepath.FromSlash(rel.Rel))
 }
 
 // TemplateIDsWithCompositionXML lists template ids with both composition JSON and XML.
@@ -130,11 +130,11 @@ func TemplateIDsWithCompositionXML() ([]string, error) {
 	return ids, nil
 }
 
-// ListRMXML returns *.xml paths relative to [CassettesRoot] under compositions/ and rm/.
+// ListRMXML returns *.xml paths relative to [CorpusRoot] under compositions/ and rm/.
 func ListRMXML() ([]string, error) {
 	var out []string
 	for _, kind := range []string{"compositions", "rm"} {
-		dir := filepath.Join(CassettesRoot(), kind)
+		dir := filepath.Join(CorpusRoot(), kind)
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			if os.IsNotExist(err) {

@@ -326,7 +326,7 @@ func TestDoMapsErrorEnvelopes(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			body := readCassette(t, "errors", tc.file)
+			body := readFixture(t, "errors", tc.file)
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tc.status)
@@ -1184,15 +1184,15 @@ func TestDoReauthDoesNotRestartRetryBudget(t *testing.T) { // REQ-063
 	}
 }
 
-// readCassette returns the bytes of a vendored cassette at
-// testkit/cassettes/its_rest/<dir>/<name>.
-func readCassette(t *testing.T, dir, name string) []byte {
+// readFixture returns the bytes of a vendored fixture at
+// testkit/corpus/its_rest/<dir>/<name>.
+func readFixture(t *testing.T, dir, name string) []byte {
 	t.Helper()
 	_, src, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	path := filepath.Join(filepath.Dir(src), "..", "testkit", "cassettes", "its_rest", dir, name)
+	path := filepath.Join(filepath.Dir(src), "..", "testkit", "corpus", "its_rest", dir, name)
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

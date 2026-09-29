@@ -20,11 +20,11 @@ package lint_test
 // testkit/probes/aql/probe_099_path_shape_lint.go and re-spells these shapes
 // rather than importing them, so a change cannot move the probe and the package
 // it checks together. The facts its arm (b) additivity guard rests on are pinned
-// here per code: PROBE-028's valid.aql cassette predicates EVERY repeating
-// segment, so it gains no aql_path_repeating_unpredicated (see the cassette row
+// here per code: PROBE-028's valid.aql fixture predicates EVERY repeating
+// segment, so it gains no aql_path_repeating_unpredicated (see the fixture row
 // in TestPathRepeatingUnpredicatedSilentOnPredicatedSegments) — it does gain
 // aql_select_no_alias, the recorded re-baseline pinned in
-// TestSelectNoAliasFiresOnTheCassetteProjections.
+// TestSelectNoAliasFiresOnTheFixtureProjections.
 
 import (
 	"fmt"
@@ -346,15 +346,15 @@ func TestPathShapeFindingsKeepResultOK(t *testing.T) {
 // is the RIGHT node id is Layer 3's question
 // (aql_path_not_in_template), not this check's.
 //
-// The first row is PROBE-028's valid.aql cassette verbatim, which is why that
+// The first row is PROBE-028's valid.aql fixture verbatim, which is why that
 // probe's baseline gains no repeating-segment code (REQ-164 § Additivity; the
 // unaliased-projection code it does gain is pinned in
-// TestSelectNoAliasFiresOnTheCassetteProjections).
+// TestSelectNoAliasFiresOnTheFixtureProjections).
 func TestPathRepeatingUnpredicatedSilentOnPredicatedSegments(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ name, path string }{
 		{
-			"cassette spelling (node ids throughout)",
+			"fixture spelling (node ids throughout)",
 			"o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude",
 		},
 		{"node id", "o/data/events[at0006]/time"},
@@ -481,7 +481,7 @@ func TestPathRepeatingUnpredicatedStopsAtTheGenericParameter(t *testing.T) {
 
 // TestPathRepeatingUnpredicatedSilentOnBareAliasAndStar covers the two paths
 // with nothing to walk: a bare alias projection (PROBE-028's
-// missing_archetype.aql cassette shape) and `SELECT *`, which roots no
+// missing_archetype.aql fixture shape) and `SELECT *`, which roots no
 // identified path at all.
 func TestPathRepeatingUnpredicatedSilentOnBareAliasAndStar(t *testing.T) {
 	t.Parallel()

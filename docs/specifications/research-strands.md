@@ -77,7 +77,7 @@ Time/op change against the retired generated marshalers (v1 at `90473f9f`), from
 |---|---|---|---|
 | `EncodeComposition_400` | -47.82% | -47.91% | 9 281 / 16 444 / 16.44k |
 | `DecodeComposition_400` | +8.98% | -39.62% | 21 665 / 16 860 / 13.25k |
-| `DecodeCompositionCassette` | -38.30% | -61.05% | 6 279 / 5 220 / 4 809 |
+| `DecodeCompositionFixture` | -38.30% | -61.05% | 6 279 / 5 220 / 4 809 |
 | `EncodeDVQuantity` | +10.52% | not measured | 6 / 9 / not measured |
 | `DecodeDVQuantity` | +37.88% | -20.19% | 3 / 5 / 4 |
 | `RegistryDecodeElement` | +13.84% | -30.80% | 29 / 39 / 15 |
@@ -204,7 +204,7 @@ The budget line used for both runs: a benchmark regresses materially when its v2
 
 **Question (resolved):** what serialisation do Cassette-mode recordings use — the HTTP Archive standard (`.har`), or a purpose-built YAML schema of this SDK's own?
 
-**Decision summary:** Cassette recordings are HTTP Archive 1.2. Provenance and redaction attestation ride on `log` as a `_req082` object. The purpose-built YAML twin was rejected so a second implementation can replay the same corpus with any HAR reader. Evidence: the live EHRbase `POST /ehr` pair in [strand-11-evidence](../plans/strand-11-evidence/).
+**Decision summary:** Cassette recordings are HTTP Archive 1.2. Provenance and redaction attestation ride on `log` as a `_req082` object. The purpose-built YAML twin was rejected so a second implementation can replay the same recordings with any HAR reader. Evidence: the live EHRbase `POST /ehr` pair in [strand-11-evidence](../plans/strand-11-evidence/).
 
 **Codified in:** [ADR 0020](../adr/0020-cassette-recording-har.md). Amends REQ-082.
 

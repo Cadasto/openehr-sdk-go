@@ -16,7 +16,7 @@ import (
 // and careflow_step subtrees necessarily produce repeated AQL paths under
 // different attribute objects. Before shared-path subtrees were admitted,
 // Compile rejected this real reference template with a duplicate-path
-// error. Corpus provenance: testkit/cassettes/flat-conformance/MANIFEST.txt.
+// error. Corpus provenance: testkit/corpus/flat-conformance/MANIFEST.txt.
 func TestCompile_UpstreamFlatConformanceOPT(t *testing.T) {
 	path := fixtures.FlatConformanceOpt()
 	if _, err := os.Stat(path); err != nil {

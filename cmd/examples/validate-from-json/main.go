@@ -4,13 +4,13 @@
 // constraint the document breaks. No HTTP is involved.
 //
 // By default it validates testdata/minimal_blood_pressure.json, a hand-made
-// composition that passes against the vendored vital_signs.opt. With -cassette
-// it validates the vendored vital_signs.json cassette instead, which is demo
-// data and reports issues, so you can see what a failing run looks like. Two
+// composition that passes against the vendored vital_signs.opt. With -corpus
+// it validates the vendored testkit/corpus vital_signs.json instead, which is
+// demo data and reports issues, so you can see what a failing run looks like. Two
 // positional arguments validate your own files.
 //
 //	go run ./cmd/examples/validate-from-json
-//	go run ./cmd/examples/validate-from-json -cassette
+//	go run ./cmd/examples/validate-from-json -corpus
 //	go run ./cmd/examples/validate-from-json composition.json template.opt
 //
 // The exit status is 1 when the composition does not validate.
@@ -49,9 +49,8 @@ func main() {
 // error means the program could not do its job (bad path, unreadable OPT); a
 // false result means the composition was checked and has issues.
 func run() (valid bool, err error) {
-	useCassette := flag.Bool("cassette", false, "validate testkit vital_signs.json, demo data that reports issues")
-	flag.Parse()
-	jsonPath, optPath, err := resolvePaths(*useCassette, flag.Args())
+	useCorpus, args := parseFlags(os.Args[1:])
+	jsonPath, optPath, err := resolvePaths(useCorpus, args)
 	if err != nil {
 		return false, err
 	}
@@ -101,29 +100,43 @@ func run() (valid bool, err error) {
 		// dispatch on, Detail is the explanation for a human.
 		fmt.Printf("  %s [%s] %s\n", issue.Path, issue.Code, issue.Detail)
 	}
-	if *useCassette {
+	if useCorpus {
 		fmt.Println("note        : vital_signs.json is demo CDR data; issues are expected")
 	}
 	return false, nil
 }
 
+// parseFlags reads the command line: the -corpus switch and the positional
+// file arguments. -cassette is the flag's old name, from before the fixture
+// tree was renamed testkit/corpus, and still sets the same switch so scripts
+// written against it keep working.
+func parseFlags(args []string) (useCorpus bool, rest []string) {
+	fs := flag.NewFlagSet("validate-from-json", flag.ExitOnError)
+	fs.BoolVar(&useCorpus, "corpus", false, "validate testkit/corpus vital_signs.json, demo data that reports issues")
+	fs.BoolVar(&useCorpus, "cassette", false, "deprecated: use -corpus")
+	// ExitOnError makes a bad flag print the usage and exit with status 2, as
+	// the default command line does, so Parse only ever returns nil here.
+	_ = fs.Parse(args)
+	return useCorpus, fs.Args()
+}
+
 // resolvePaths picks the composition and the OPT to validate: the caller's
-// two files, the demo cassette, or the clean default fixture next to this
+// two files, the demo corpus sample, or the clean default fixture next to this
 // source file.
-func resolvePaths(useCassette bool, args []string) (jsonPath, optPath string, err error) {
+func resolvePaths(useCorpus bool, args []string) (jsonPath, optPath string, err error) {
 	switch len(args) {
 	case 2:
 		return args[0], args[1], nil
 	case 0:
 		// Both vendored inputs are checked against the same vital_signs.opt.
 		optPath = fixtures.TemplateOptForName("vital_signs")
-		if useCassette {
+		if useCorpus {
 			return fixtures.CompositionJSON("vital_signs"), optPath, nil
 		}
 		jsonPath, err = defaultCompositionPath()
 		return jsonPath, optPath, err
 	default:
-		return "", "", errors.New("usage: validate-from-json [-cassette] [composition.json template.opt]")
+		return "", "", errors.New("usage: validate-from-json [-corpus] [composition.json template.opt]")
 	}
 }
 

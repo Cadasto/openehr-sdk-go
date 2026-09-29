@@ -13,8 +13,8 @@
 // PROBE-028 asserts lint stability: linting fixed query strings against the
 // SDK grammar profile (and, for Layer 3, a compiled OPT) must produce a stable
 // issue-code multiset. Any implementation of the lint pipeline with the same
-// grammar profile + template must report the same codes. Cassettes live under
-// testkit/cassettes/aql/lint/.
+// grammar profile + template must report the same codes. Fixtures live under
+// testkit/corpus/aql/lint/.
 //
 // PROBE-088 extends the PROBE-020 property to the later builder constructs
 // (negated containment, sibling AND / OR junctions with precedence-driven

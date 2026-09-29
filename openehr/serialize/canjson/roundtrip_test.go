@@ -12,18 +12,18 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
-// listCassettes returns vendored composition JSON paths relative to
-// testkit/cassettes (via testkit/fixtures discovery).
-func listCassettes(t *testing.T) []fixtures.CompositionJSONRel {
+// listFixtures returns vendored composition JSON paths relative to
+// testkit/corpus (via testkit/fixtures discovery).
+func listFixtures(t *testing.T) []fixtures.CompositionJSONRel {
 	t.Helper()
 	rels, err := fixtures.ListCompositionJSON()
 	if err != nil {
-		t.Fatalf("list cassettes: %v", err)
+		t.Fatalf("list fixtures: %v", err)
 	}
 	return rels
 }
 
-func cassetteFactory(t *testing.T, rel fixtures.CompositionJSONRel) func() any {
+func fixtureFactory(t *testing.T, rel fixtures.CompositionJSONRel) func() any {
 	t.Helper()
 	f, ok := fixtures.FactoryForJSONRel(rel)
 	if !ok {
@@ -35,7 +35,7 @@ func cassetteFactory(t *testing.T, rel fixtures.CompositionJSONRel) func() any {
 // TestRoundTripStableSimpleValues runs decode, encode (b1), decode (A),
 // encode (b2), decode (B) and preserves the value for representative leaf
 // types and a composition shape without history. See
-// [TestRoundTripCassettes] below for the broader cassette-wide round
+// [TestRoundTripFixtures] below for the broader fixture-wide round
 // trip (composition fixtures with history; polymorphic event dispatch
 // settled in docs/adr/0003-rm-event-polymorphism.md).
 //
@@ -143,22 +143,22 @@ func TestRoundTripStructuralEquivalence(t *testing.T) {
 	}
 }
 
-// TestRoundTripCassettes is PROBE-030's package-level twin over the
+// TestRoundTripFixtures is PROBE-030's package-level twin over the
 // whole vendored corpus: decode, encode (b1), decode (A), encode (b2),
 // decode (B). A and B straddle the second encode and MUST be equal by
 // typed deep comparison; b1 and b2 MUST be wire-equivalent as a
 // secondary check. Byte equality is not asserted (member order is not a
-// contract, REQ-052). The SDK's own cassettes are all COMPOSITION;
+// contract, REQ-052). The SDK's own fixtures are all COMPOSITION;
 // vendored upstream sets (e.g. ehrbase/) include EHR_STATUS and FOLDER,
-// so the target factory is selected per cassette path.
-func TestRoundTripCassettes(t *testing.T) {
-	for _, rel := range listCassettes(t) {
+// so the target factory is selected per fixture path.
+func TestRoundTripFixtures(t *testing.T) {
+	for _, rel := range listFixtures(t) {
 		t.Run(rel.Rel, func(t *testing.T) {
 			raw, err := os.ReadFile(fixtures.ResolveCompositionJSON(rel))
 			if err != nil {
-				t.Fatalf("read cassette: %v", err)
+				t.Fatalf("read fixture: %v", err)
 			}
-			factory := cassetteFactory(t, rel)
+			factory := fixtureFactory(t, rel)
 			v := factory()
 			if err := canjson.Unmarshal(raw, v); err != nil {
 				t.Fatalf("first Unmarshal: %v", err)

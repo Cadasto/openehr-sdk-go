@@ -14,7 +14,7 @@ type rootEnvelope struct {
 	Type string `json:"_type"`
 }
 
-// RootTypeFromJSON reads the top-level "_type" from a canonical JSON cassette.
+// RootTypeFromJSON reads the top-level "_type" from a canonical JSON fixture.
 func RootTypeFromJSON(path string) (string, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -31,8 +31,8 @@ func RootTypeFromJSON(path string) (string, error) {
 }
 
 // FactoryForJSONRel returns a fresh-target factory for a composition or rm JSON
-// cassette. The second value is false when the root RM type is not wired for
-// codec round-trip probes (callers should skip those cassettes).
+// fixture. The second value is false when the root RM type is not wired for
+// codec round-trip probes (callers should skip those fixtures).
 func FactoryForJSONRel(rel CompositionJSONRel) (func() any, bool) {
 	if rel.Kind == "rm" {
 		return factoryForRMFilename(rel.Rel)
@@ -123,7 +123,7 @@ func FactoryForXMLBody(body []byte) (func() any, bool) {
 	}
 }
 
-// FactoryHintForRel returns the canonical JSON "_type" for a cassette when known.
+// FactoryHintForRel returns the canonical JSON "_type" for a fixture when known.
 // Filename hints are used for rm/ samples; compositions/ uses on-disk JSON.
 func FactoryHintForRel(rel string) string {
 	if strings.HasPrefix(rel, "rm/") {
@@ -138,7 +138,7 @@ func FactoryHintForRel(rel string) string {
 		}
 	}
 	if strings.HasPrefix(rel, "compositions/") {
-		path := filepath.Join(CassettesRoot(), filepath.FromSlash(rel))
+		path := filepath.Join(CorpusRoot(), filepath.FromSlash(rel))
 		root, err := RootTypeFromJSON(path)
 		if err != nil {
 			return "COMPOSITION"

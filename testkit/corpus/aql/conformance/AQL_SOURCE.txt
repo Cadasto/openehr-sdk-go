@@ -2,7 +2,7 @@
 # Written by scripts/ingest-robot-aql.sh. This pin IS authoritative for
 # the vendored CSVs: they are copied unmodified from the commit below, so
 # that commit fully determines their bytes. (Contrast ROBOT_SOURCE.txt one
-# level up, whose cassettes are hand-curated and renamed, making its pin a
+# level up, whose fixtures are hand-curated and renamed, making its pin a
 # record of the tree the ingest read rather than of the files it produced.)
 source_repo: ehrbase/integration-tests
 source_path: tests/robot/_resources/test_data_sets/aql/fields_and_results/from/combinations
@@ -10,4 +10,4 @@ commit: b4625fc28d6785c05adfd6db26339b4bb2272e06
 commit_date: 2026-08-24T13:05:04+03:00
 recorded_utc: 2026-09-08
 source_tree: https://github.com/ehrbase/integration-tests/tree/b4625fc28d6785c05adfd6db26339b4bb2272e06/tests/robot/_resources/test_data_sets/aql/fields_and_results/from/combinations
-license: Apache-2.0 (see testkit/cassettes/THIRD_PARTY_LICENSES.md)
+license: Apache-2.0 (see ../../THIRD_PARTY_LICENSES.md)

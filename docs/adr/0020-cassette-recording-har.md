@@ -26,14 +26,14 @@ HTTP Archive (`.har`) versus a purpose-built YAML schema.
 The strand asked for one real capture, serialised both ways, reviewed as a diff. That capture
 is a live `POST /ehr` against EHRbase 2.35.1 ([ehr-create.har](../plans/strand-11-evidence/ehr-create.har)
 and [ehr-create.yaml](../plans/strand-11-evidence/ehr-create.yaml)). The remaining question is
-which file a second implementation (or a reviewer) can treat as the corpus.
+which file a second implementation (or a reviewer) can treat as the recording.
 
 ## Decision
 
 **Cassette recordings are HTTP Archive 1.2 documents with a `.har` suffix.**
 
 - One file is the whole artefact. A PHP or other-language implementation of the same probe
-  can replay the same corpus with any HAR reader.
+  can replay the same recordings with any HAR reader.
 - REQ-082's provenance and redaction attestation — which HAR 1.2 does not model — live on
   `log` as a `_req082` object (HAR's documented extension slot). Tools that ignore unknown
   fields still see a valid `log.entries` list.
@@ -42,14 +42,14 @@ which file a second implementation (or a reviewer) can treat as the corpus.
 
 ## Consequences
 
-- The corpus, once captured under `testkit/recordings/`, will be `.har`. A recording without
+- The recordings, once captured under `testkit/recordings/`, will be `.har`. A recording without
   `_req082.provenance` or without `_req082.redaction.ran: true` is discarded, not replayed.
 - Review diffs are larger and noisier than the YAML alternative. That cost is accepted so
-  the corpus stays a published interchange format rather than an SDK-private schema.
+  the recordings stay in a published interchange format rather than an SDK-private schema.
 - Browser-oriented HAR fields (`timings`, `cache`, `pageref`) are unused. Recorders are free to
   omit them, and replay does not read them: the normalised match key is defined in REQ-082
   (conformance.md § Cassette mode) and these fields are outside it.
-- Reversing this later is a corpus migration: every checked-in recording would have to be
+- Reversing this later means migrating the recordings: every checked-in recording would have to be
   rewritten. That is the one-way door this ADR exists to walk.
 
 ## Alternatives considered

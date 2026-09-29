@@ -12,51 +12,51 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// discoverJSONCassettes returns vendored *.canonical.json cassettes.
-func discoverJSONCassettes(t *testing.T) []fixtures.CompositionJSONRel {
+// discoverJSONFixtures returns vendored *.canonical.json fixtures.
+func discoverJSONFixtures(t *testing.T) []fixtures.CompositionJSONRel {
 	t.Helper()
 	rels, err := fixtures.ListCompositionJSON()
 	if err != nil {
-		t.Fatalf("list JSON cassettes: %v", err)
+		t.Fatalf("list JSON fixtures: %v", err)
 	}
 	return rels
 }
 
-func discoverXMLCassettes(t *testing.T) []string {
+func discoverXMLFixtures(t *testing.T) []string {
 	t.Helper()
 	rels, err := fixtures.ListRMXML()
 	if err != nil {
-		t.Fatalf("list XML cassettes: %v", err)
+		t.Fatalf("list XML fixtures: %v", err)
 	}
 	return rels
 }
 
-func factoryForCassette(rel fixtures.CompositionJSONRel) (func() any, bool) {
+func factoryForFixture(rel fixtures.CompositionJSONRel) (func() any, bool) {
 	return fixtures.FactoryForJSONRel(rel)
 }
 
-// TestCrossFormatRoundTripFromJSONCassettes exercises the
+// TestCrossFormatRoundTripFromJSONFixtures exercises the
 // `JSON → struct → XML → struct → JSON` invariant against every
-// vendored cassette. Equality is asserted *structurally* (after
+// vendored fixture. Equality is asserted *structurally* (after
 // null/absent normalisation) — byte equality across the JSON and
 // XML wire shapes is not meaningful.
 //
 // This is the strongest shared invariant with the canjson plan:
 // failures indicate a bug in either codec.
-func TestCrossFormatRoundTripFromJSONCassettes(t *testing.T) {
-	names := discoverJSONCassettes(t)
+func TestCrossFormatRoundTripFromJSONFixtures(t *testing.T) {
+	names := discoverJSONFixtures(t)
 	if len(names) == 0 {
-		t.Fatal("no JSON cassettes discovered — check testkit/cassettes/")
+		t.Fatal("no JSON fixtures discovered — check testkit/corpus/")
 	}
 	for _, rel := range names {
 		t.Run(rel.Rel, func(t *testing.T) {
 			raw, err := os.ReadFile(fixtures.ResolveCompositionJSON(rel))
 			if err != nil {
-				t.Fatalf("read cassette: %v", err)
+				t.Fatalf("read fixture: %v", err)
 			}
-			factory, ok := factoryForCassette(rel)
+			factory, ok := factoryForFixture(rel)
 			if !ok {
-				t.Skipf("no factory wired for cassette %q", rel.Rel)
+				t.Skipf("no factory wired for fixture %q", rel.Rel)
 			}
 			// JSON → struct A
 			a := factory()
@@ -129,27 +129,27 @@ func TestCrossFormatVendorFixtureXML(t *testing.T) {
 	}
 }
 
-// TestCrossFormatXMLCassetteRoundTrip — every vendored XML cassette
+// TestCrossFormatXMLFixtureRoundTrip — every vendored XML fixture
 // round-trips byte-stable through canxml. The first pass (decoding
 // the upstream form) may consume non-canonical bytes; from the second
 // pass on the encoder's compact canonical form is byte-stable.
 //
 // REQ-056: the encoder's compact canonical XML is byte-stable from the second
-// pass on, for every vendored XML cassette.
-func TestCrossFormatXMLCassetteRoundTrip(t *testing.T) {
-	names := discoverXMLCassettes(t)
+// pass on, for every vendored XML fixture.
+func TestCrossFormatXMLFixtureRoundTrip(t *testing.T) {
+	names := discoverXMLFixtures(t)
 	if len(names) == 0 {
-		t.Skip("no XML cassettes vendored yet")
+		t.Skip("no XML fixtures vendored yet")
 	}
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
-			body, err := os.ReadFile(filepath.Join(fixtures.CassettesRoot(), filepath.FromSlash(name)))
+			body, err := os.ReadFile(filepath.Join(fixtures.CorpusRoot(), filepath.FromSlash(name)))
 			if err != nil {
-				t.Fatalf("read cassette: %v", err)
+				t.Fatalf("read fixture: %v", err)
 			}
 			factory, ok := fixtures.FactoryForXMLBody(body)
 			if !ok {
-				t.Skipf("no factory wired for cassette %q (root element not recognised)", name)
+				t.Skipf("no factory wired for fixture %q (root element not recognised)", name)
 			}
 			v1 := factory()
 			if err := canxml.Unmarshal(body, v1); err != nil {

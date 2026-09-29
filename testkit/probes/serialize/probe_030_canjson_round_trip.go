@@ -1,7 +1,7 @@
 // Package serializeprobes hosts the openEHR conformance probes
 // for the openEHR serialization codecs. Each probe implements one
 // numbered conformance probe (PROBE-NNN) that any openEHR-conformant
-// implementation can run against the same shared cassettes.
+// implementation can run against the same shared fixtures.
 //
 // Probes are plain Go functions returning (Result, error) and are
 // designed to be invocable from:
@@ -72,7 +72,7 @@ func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) {
 // on.
 func Probe030CanjsonRoundTripInput(in Probe030Input) (Result, error) { // PROBE-030 (REQ-040, REQ-052, REQ-082)
 	if in.loadErr != nil {
-		return Result{Probe: "PROBE-030", Status: "fail", Detail: "cassette discovery: " + in.loadErr.Error()}, nil
+		return Result{Probe: "PROBE-030", Status: "fail", Detail: "fixture discovery: " + in.loadErr.Error()}, nil
 	}
 	return probe030RoundTrip(in.Body, in.Factory, canjson.Marshal, in.SkipFloor)
 }
@@ -95,7 +95,7 @@ func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]by
 	}
 	if body == nil {
 		r.Status = "fail"
-		r.Detail = "input body is nil, likely a cassette discovery failure"
+		r.Detail = "input body is nil, likely a fixture discovery failure"
 		return r, nil
 	}
 	v := factory()
@@ -152,15 +152,15 @@ func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]by
 // Probe030Inputs is the set of inputs exercised by PROBE-030 in sandbox
 // mode. Each input survives the round trip with its meaning intact
 // (typed deep comparison of A and B, plus wire equivalence, and the RM
-// floor unless the input sets SkipFloor) when fed the vendored cassettes.
-// The set spans leaf RM values and full composition cassettes vendored
-// under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/`.
+// floor unless the input sets SkipFloor) when fed the vendored fixtures.
+// The set spans leaf RM values and full composition fixtures vendored
+// under `testkit/corpus/compositions/` and `testkit/corpus/rm/`.
 //
-// Every discovered cassette stays in the set so the fidelity legs run on
+// Every discovered fixture stays in the set so the fidelity legs run on
 // all of them; an input carrying an RM-floor finding independent of the
 // round trip sets SkipFloor, which drops only the ValidateRM leg.
 //
-// Populated at package init: the leaf entries are inline; cassette
+// Populated at package init: the leaf entries are inline; fixture
 // entries are discovered from disk so adding a fixture file does not
 // require editing this source.
 var Probe030Inputs = func() []Probe030Input {
@@ -176,20 +176,20 @@ var Probe030Inputs = func() []Probe030Input {
 			Factory: func() any { return new(rm.DVCodedText) },
 		},
 	}
-	cassettes, err := loadCassetteInputs()
+	vendored, err := loadFixtureInputs()
 	if err != nil {
 		// Surfacing at probe-invocation time rather than crashing at
 		// init keeps the conformance harness's failure mode observable:
-		// callers see a missing-cassette entry, not an opaque panic.
+		// callers see a missing-fixture entry, not an opaque panic.
 		out = append(out, Probe030Input{
-			Name:    "_cassette_discovery_error",
+			Name:    "_fixture_discovery_error",
 			Body:    nil,
 			Factory: func() any { return new(rm.Composition) },
 			loadErr: err,
 		})
 		return out
 	}
-	return append(out, cassettes...)
+	return append(out, vendored...)
 }()
 
 // Probe030Input is one input entry for PROBE-030.
@@ -198,24 +198,24 @@ type Probe030Input struct {
 	Body    []byte
 	Factory func() any
 	// SkipFloor drops only the validation.ValidateRM leg for this input,
-	// for a cassette whose vendored content carries an RM-floor finding
+	// for a fixture whose vendored content carries an RM-floor finding
 	// independent of the round trip. The fidelity legs (typed deep
 	// comparison, wire equivalence) still run. See probe030SkipFloor.
 	SkipFloor bool
-	// loadErr is set when the cassette discovery step failed at init for
+	// loadErr is set when the fixture discovery step failed at init for
 	// this entry; Probe030CanjsonRoundTripInput surfaces it as Status=fail.
 	loadErr error
 }
 
-// probe030SkipFloor names cassettes whose vendored content carries RM-floor
+// probe030SkipFloor names fixtures whose vendored content carries RM-floor
 // findings that are present before any round trip, so the ValidateRM leg is
 // skipped for them while the fidelity legs still run. Vendored content is not
 // edited.
 //
 // Each entry lists the exact findings (Issue.Code, a space, Issue.Path) that
-// validation.ValidateRM reports for the cassette. A guard test asserts that the
+// validation.ValidateRM reports for the fixture. A guard test asserts that the
 // input decode and the round-tripped value both report exactly this list, so a
-// regression that adds a floor finding to a held-out cassette still fails, and
+// regression that adds a floor finding to a held-out fixture still fails, and
 // the list cannot drift from the content it names
 // (TestProbe030SkipFloorFindingsArePinned).
 var probe030SkipFloor = map[string][]string{
@@ -262,8 +262,8 @@ var probe030SkipFloor = map[string][]string{
 	},
 }
 
-// loadCassetteInputs discovers vendored cassettes relative to this
-// source file and returns one Probe030Input per `*.json` cassette.
+// loadFixtureInputs discovers vendored fixtures relative to this
+// source file and returns one Probe030Input per `*.json` fixture.
 // Path resolution uses runtime.Caller so the helper works regardless
 // of the caller's working directory — the conformance harness invokes
 // probes outside of `go test`.
@@ -271,27 +271,27 @@ var probe030SkipFloor = map[string][]string{
 // Discovery walks one level deep so vendored upstream sets (e.g.
 // `rm/` ehrbase samples) are exercised alongside the SDK's own
 // fixtures. Each input's target RM type is picked via
-// [factoryForCassette] using filename hints — `ehr_status` → EHR_STATUS,
-// `folder` → FOLDER, otherwise COMPOSITION. Without per-cassette
-// dispatch the EHR_STATUS / FOLDER ehrbase cassettes would fail with
+// [factoryForFixture] using filename hints — `ehr_status` → EHR_STATUS,
+// `folder` → FOLDER, otherwise COMPOSITION. Without per-fixture
+// dispatch the EHR_STATUS / FOLDER ehrbase fixtures would fail with
 // `typereg: decoded type does not satisfy target` on first decode.
-func loadCassetteInputs() ([]Probe030Input, error) {
+func loadFixtureInputs() ([]Probe030Input, error) {
 	rels, err := fixtures.ListCompositionJSON()
 	if err != nil {
-		return nil, fmt.Errorf("PROBE-030: list cassettes: %w", err)
+		return nil, fmt.Errorf("PROBE-030: list fixtures: %w", err)
 	}
 	out := make([]Probe030Input, 0, len(rels))
 	for _, rel := range rels {
 		body, err := os.ReadFile(fixtures.ResolveCompositionJSON(rel))
 		if err != nil {
-			return nil, fmt.Errorf("PROBE-030: read cassette %q: %w", rel.Rel, err)
+			return nil, fmt.Errorf("PROBE-030: read fixture %q: %w", rel.Rel, err)
 		}
 		factory, ok := fixtures.FactoryForJSONRel(rel)
 		if !ok {
 			continue
 		}
 		out = append(out, Probe030Input{
-			Name:      "cassette:" + rel.Rel,
+			Name:      "fixture:" + rel.Rel,
 			Body:      body,
 			Factory:   factory,
 			SkipFloor: len(probe030SkipFloor[rel.Rel]) > 0,

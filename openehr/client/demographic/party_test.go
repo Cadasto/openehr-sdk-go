@@ -43,14 +43,14 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return c
 }
 
-// cassette reads a vendored Demographic fixture by file name.
-func cassette(t *testing.T, name string) []byte {
+// fixture reads a vendored Demographic fixture by file name.
+func fixture(t *testing.T, name string) []byte {
 	t.Helper()
 	_, src, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "cassettes", "its_rest", "demographic", name)
+	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "corpus", "its_rest", "demographic", name)
 	b, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
+		t.Fatalf("read fixture %q: %v", path, err)
 	}
 	return b
 }
@@ -80,7 +80,7 @@ func partyName(p rm.Party) string {
 func TestGetDecodesEachPartyType(t *testing.T) {
 	cases := []struct {
 		typ          demographic.Type
-		cassette     string
+		fixture      string
 		wantConcrete string
 		wantName     string
 	}{
@@ -92,7 +92,7 @@ func TestGetDecodesEachPartyType(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.typ), func(t *testing.T) {
-			body := cassette(t, tc.cassette)
+			body := fixture(t, tc.fixture)
 			var captured *http.Request
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				captured = r.Clone(r.Context())
@@ -120,7 +120,7 @@ func TestGetDecodesEachPartyType(t *testing.T) {
 }
 
 func TestGetSendsVersionMetadata(t *testing.T) {
-	body := cassette(t, "person.json")
+	body := fixture(t, "person.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("ETag", `"`+personVersion+`"`)
 		w.Header().Set("Location", "/demographic/person/"+personVersion)
@@ -181,7 +181,7 @@ func TestCreateRoutesByConcreteType(t *testing.T) {
 }
 
 func TestCreatePreferRepresentation(t *testing.T) {
-	body := cassette(t, "person.json")
+	body := fixture(t, "person.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("ETag", `"`+personVersion+`"`)
 		w.Header().Set("Location", "/demographic/person/"+personVersion)
@@ -418,7 +418,7 @@ func TestGetEmptyBodyAnomaly(t *testing.T) {
 // TestGetSpecificVersion covers the VersionOf Ref variant: the version UID is
 // the path tail and no query param is sent.
 func TestGetSpecificVersion(t *testing.T) {
-	body := cassette(t, "person.json")
+	body := fixture(t, "person.json")
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())

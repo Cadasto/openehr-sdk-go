@@ -20,7 +20,7 @@ import (
 
 // liveTemplateID is the EHRbase-origin fixture the composition snapshot uses:
 // its OPT and canonical composition are vendored from EHRbase's own test data
-// (testkit/cassettes/), so a conformant EHRbase accepts both — a failure on
+// (testkit/corpus/), so a conformant EHRbase accepts both — a failure on
 // commit is then the SDK's wire encoding, not an unfamiliar template.
 const liveTemplateID = "terminology_test.ehrbase.org.v1"
 

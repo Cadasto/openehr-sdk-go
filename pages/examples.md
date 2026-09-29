@@ -46,7 +46,7 @@ and `territory` are codes with the terminology they come from, and
 `content items` counts the entries the document carries.
 
 Packages: `openehr/rm`, `openehr/serialize/canjson`. Fixture:
-`testkit/cassettes/compositions/body_weight.json`.
+`testkit/corpus/compositions/body_weight.json`.
 
 ## Validate JSON against a template {#validate-from-json}
 
@@ -57,11 +57,11 @@ the composition does not validate, so the command can gate a pipeline.
 
 ```bash
 go run ./cmd/examples/validate-from-json
-go run ./cmd/examples/validate-from-json -cassette
+go run ./cmd/examples/validate-from-json -corpus
 go run ./cmd/examples/validate-from-json composition.json template.opt
 ```
 
-The first form validates a bundled composition that passes, `-cassette`
+The first form validates a bundled composition that passes, `-corpus`
 validates demo data that reports issues, and two paths validate your own
 files.
 

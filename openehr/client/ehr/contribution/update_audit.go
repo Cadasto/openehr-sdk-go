@@ -48,7 +48,7 @@ type UpdateAudit struct {
 }
 
 // updateAuditJSON is the on-wire shape: _type first, then system_id /
-// committer / change_type / description, mirroring the cassette field order.
+// committer / change_type / description, mirroring the fixture field order.
 // No time_committed.
 type updateAuditJSON struct {
 	Type        AuditType      `json:"_type"`

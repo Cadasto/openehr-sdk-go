@@ -24,7 +24,7 @@ import (
 // reference's name predicates (asserted below); the WebTemplate builder
 // composes its own paths and is pinned separately. See
 // openehr/template/webtemplate/deviations.md § Sibling `id` disambiguation.
-// Provenance: testkit/cassettes/THIRD_PARTY_LICENSES.md.
+// Provenance: testkit/corpus/THIRD_PARTY_LICENSES.md.
 func TestCompile_WebTemplateOracleOPTs(t *testing.T) {
 	tests := []struct {
 		templateID string

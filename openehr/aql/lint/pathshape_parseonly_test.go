@@ -335,12 +335,12 @@ func TestSelectNoAliasOrdinalCountsTheStar(t *testing.T) {
 	}
 }
 
-// TestSelectNoAliasFiresOnTheCassetteProjections is the PROBE-028 re-baseline
-// recorded at the unit level (REQ-164 § Additivity): both cassette queries
+// TestSelectNoAliasFiresOnTheFixtureProjections is the PROBE-028 re-baseline
+// recorded at the unit level (REQ-164 § Additivity): both fixture queries
 // project a column with no AS alias, so each genuinely carries this defect and
 // gains exactly this code. probe028Cases carries the same fact at the probe
 // level; this row is what fails first if the rule behind it moves.
-func TestSelectNoAliasFiresOnTheCassetteProjections(t *testing.T) {
+func TestSelectNoAliasFiresOnTheFixtureProjections(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ name, query string }{
 		{

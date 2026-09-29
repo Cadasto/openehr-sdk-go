@@ -164,7 +164,7 @@ func TestEncodeHashKeysLexicographic(t *testing.T) {
 
 // REQ-052 § Field order: the encoder writes the deterministic profile
 // (json.Deterministic), so two encodes of one value are byte-identical and
-// `_type` leads. PROBE-030 pins encode-stability over the cassette corpus
+// `_type` leads. PROBE-030 pins encode-stability over the fixture corpus
 // (decode → encode → decode → encode, the two encodes compared for
 // wire-equivalence and never against the input); this pins repeat-encode
 // identity and `_type`-first on a small value.

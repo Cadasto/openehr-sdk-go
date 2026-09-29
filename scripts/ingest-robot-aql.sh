@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Vendor the EHRbase Robot AQL FROM-combination corpus (sibling clone) into
-# testkit/cassettes/aql/conformance/.
+# testkit/corpus/aql/conformance/.
 #
-# Sibling of scripts/ingest-robot-cassettes.sh, but a different job: that one
+# Sibling of scripts/ingest-robot-fixtures.sh, but a different job: that one
 # hand-curates and renames composition fixtures, this one copies the upstream
 # CSVs byte-for-byte. So the commit recorded in AQL_SOURCE.txt is authoritative
 # for the vendored content, not merely the tree the ingest happened to read.
 #
 # ROBOT_ROOT points at the upstream test_data_sets directory (same convention as
-# the cassettes ingest). The clone root is derived from it with
+# the fixtures ingest). The clone root is derived from it with
 # `git rev-parse --show-toplevel`, so a clone laid out elsewhere works as long as
 # ROBOT_ROOT points somewhere inside it.
 #
@@ -36,7 +36,7 @@ if [[ -d "$ROBOT" ]]; then
   ROBOT="$(cd "$ROBOT" && pwd -P)"
 fi
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-DEST="$REPO/testkit/cassettes/aql/conformance"
+DEST="$REPO/testkit/corpus/aql/conformance"
 
 AQL="$ROBOT/aql/fields_and_results"
 SRC="$AQL/from/combinations"
@@ -194,7 +194,7 @@ recorded=${recorded:-$(date -u +%Y-%m-%d)}
   echo "# Written by scripts/ingest-robot-aql.sh. This pin IS authoritative for"
   echo "# the vendored CSVs: they are copied unmodified from the commit below, so"
   echo "# that commit fully determines their bytes. (Contrast ROBOT_SOURCE.txt one"
-  echo "# level up, whose cassettes are hand-curated and renamed, making its pin a"
+  echo "# level up, whose fixtures are hand-curated and renamed, making its pin a"
   echo "# record of the tree the ingest read rather than of the files it produced.)"
   echo "source_repo: ${src_remote}"
   echo "source_path: ${src_rel}"
@@ -202,7 +202,7 @@ recorded=${recorded:-$(date -u +%Y-%m-%d)}
   echo "commit_date: ${src_date}"
   echo "recorded_utc: ${recorded}"
   echo "source_tree: https://github.com/${src_remote}/tree/${EXPECTED_COMMIT}/${src_rel}"
-  echo "license: Apache-2.0 (see testkit/cassettes/THIRD_PARTY_LICENSES.md)"
+  echo "license: Apache-2.0 (see ../../THIRD_PARTY_LICENSES.md)"
 } > "$pin_file"
 
 # --- exclusion list -----------------------------------------------------------

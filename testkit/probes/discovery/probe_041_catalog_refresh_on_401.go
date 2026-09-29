@@ -29,14 +29,14 @@ import (
 //   - not retry beyond that (DiscoveryError carries the failure);
 //   - return a typed `*discovery.DiscoveryError` whose Reason is
 //     `ReasonFetchFailed`, so `errors.As` callers can act on it.
-func Probe041CatalogRefreshOn401(ctx context.Context, cassetteBody []byte) (Result, error) { // PROBE-041 (REQ-071, REQ-072)
+func Probe041CatalogRefreshOn401(ctx context.Context, fixtureBody []byte) (Result, error) { // PROBE-041 (REQ-071, REQ-072)
 	r := Result{Probe: "PROBE-041"}
-	if len(cassetteBody) == 0 {
-		return r, errors.New("PROBE-041: cassetteBody is empty")
+	if len(fixtureBody) == 0 {
+		return r, errors.New("PROBE-041: fixtureBody is empty")
 	}
 	var (
 		hits atomic.Int32
-		mode atomic.Int32 // 0 = serve cassette; 1 = 401 reject
+		mode atomic.Int32 // 0 = serve fixture; 1 = 401 reject
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits.Add(1)
@@ -47,7 +47,7 @@ func Probe041CatalogRefreshOn401(ctx context.Context, cassetteBody []byte) (Resu
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "max-age=3600")
-		_, _ = w.Write(cassetteBody)
+		_, _ = w.Write(fixtureBody)
 	}))
 	defer srv.Close()
 

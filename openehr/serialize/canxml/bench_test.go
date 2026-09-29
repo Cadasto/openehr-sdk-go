@@ -11,22 +11,22 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// loadCompositionFromJSON resolves a JSON cassette and decodes it
-// into an *rm.Composition. The vendored body_weight.json cassette is
+// loadCompositionFromJSON resolves a JSON fixture and decodes it
+// into an *rm.Composition. The vendored body_weight.json fixture is
 // ~7 KiB of canonical openEHR composition — close enough to the
 // 50 KiB benchmark target the plan calls for while keeping CI cheap.
-// Larger cassettes (BMI.json, vital_signs.json) are exercised in the
+// Larger fixtures (BMI.json, vital_signs.json) are exercised in the
 // extended bench runs (`-bench=BenchmarkAll`).
 func loadCompositionFromJSON(b *testing.B, name string) *rm.Composition {
 	b.Helper()
 	path := fixtures.CompositionJSON(fixtures.TemplateSlug(strings.TrimSuffix(name, ".json")))
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		b.Fatalf("read cassette %q: %v", path, err)
+		b.Fatalf("read fixture %q: %v", path, err)
 	}
 	var c rm.Composition
 	if err := canjson.Unmarshal(raw, &c); err != nil {
-		b.Fatalf("decode cassette %q: %v", path, err)
+		b.Fatalf("decode fixture %q: %v", path, err)
 	}
 	return &c
 }

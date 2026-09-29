@@ -71,7 +71,7 @@ func TestParseFile_ClinicalNote_Identity(t *testing.T) {
 // REQ-100 — ParseFile MUST reject non-.opt paths with ErrNotOPTFile
 // without opening the file.
 func TestParseFile_RejectsNonOPTSuffix(t *testing.T) {
-	_, err := template.ParseFile(filepath.Join(fixtures.CassettesRoot(), "README.md"))
+	_, err := template.ParseFile(filepath.Join(fixtures.CorpusRoot(), "README.md"))
 	if !errors.Is(err, template.ErrNotOPTFile) {
 		t.Fatalf("got %v, want ErrNotOPTFile", err)
 	}

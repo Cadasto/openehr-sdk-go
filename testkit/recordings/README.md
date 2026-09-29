@@ -3,7 +3,7 @@
 REQ-082 Cassette-mode HTTP Archive 1.2 recordings ([ADR 0020](../../docs/adr/0020-cassette-recording-har.md)).
 
 These are whole exchanges (method, URL, headers, status, bodies), unlike the
-request/response *bodies* under [`testkit/cassettes/`](../cassettes/). A
+request/response *bodies* under [`testkit/corpus/`](../corpus/). A
 recording without `log._req082` provenance or with `redaction.ran` other
 than `true` is discarded, not replayed ([ValidateHAR](../probe/har.go)).
 
@@ -27,7 +27,7 @@ that cannot be replayed never replaces the recording already there.
 `make probe-record` stamps `sdk_commit` from `git rev-parse HEAD`, with a
 `-dirty` suffix when the tree has uncommitted changes. A recording captured
 from a modified tree says so, instead of naming a commit whose code did not
-produce it. A corpus recording should carry a clean commit.
+produce it. A checked-in recording should carry a clean commit.
 
 Do not hand-edit a recording to invent a response. Recapture instead; otherwise
 the replay no longer witnesses a deployment.

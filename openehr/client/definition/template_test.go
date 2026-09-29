@@ -55,13 +55,13 @@ func jsonServerClient(t *testing.T, body string) *transport.Client {
 	return newClient(t, srv)
 }
 
-func readCassette(t *testing.T, name string) []byte {
+func readFixture(t *testing.T, name string) []byte {
 	t.Helper()
 	_, src, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "cassettes", "its_rest", "definition", name)
+	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "corpus", "its_rest", "definition", name)
 	b, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
+		t.Fatalf("read fixture %q: %v", path, err)
 	}
 	return b
 }
@@ -114,14 +114,14 @@ func assertEmittedKeys(t *testing.T, out []byte, want map[string]string) {
 func TestUploadTemplate(t *testing.T) {
 	var captured *http.Request
 	var capturedBody []byte
-	opt := readCassette(t, "body_weight.opt")
+	opt := readFixture(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		capturedBody, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write(readCassette(t, "template_metadata.json"))
+		_, _ = w.Write(readFixture(t, "template_metadata.json"))
 	}))
 	defer srv.Close()
 
@@ -164,7 +164,7 @@ func TestUploadTemplate(t *testing.T) {
 func TestUploadTemplateLocationFallback(t *testing.T) {
 	// 204 response with no body but a Location header — surface a
 	// minimal TemplateMetadata with TemplateID from the Location tail.
-	opt := readCassette(t, "body_weight.opt")
+	opt := readFixture(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
 		w.WriteHeader(http.StatusNoContent)
@@ -189,7 +189,7 @@ func TestUploadTemplateLocationFallback(t *testing.T) {
 // The XML body names a template_id that DIFFERS from the Location tail, so a
 // pass proves the id is taken from Location, not parsed out of the body.
 func TestUploadTemplateXMLBodyFallsBackToLocation(t *testing.T) {
-	opt := readCassette(t, "body_weight.opt")
+	opt := readFixture(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/from_location.v1")
 		w.Header().Set("Content-Type", "application/xml")
@@ -212,7 +212,7 @@ func TestUploadTemplateXMLBodyFallsBackToLocation(t *testing.T) {
 // sniff and be fed to json.Unmarshal — the decode failure the negotiation
 // exists to avoid. Delete the BOM strip and this test fails.
 func TestUploadTemplateBOMPrefixedXMLFallsBackToLocation(t *testing.T) {
-	opt := readCassette(t, "body_weight.opt")
+	opt := readFixture(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
 		w.Header().Set("Content-Type", "application/xml")
@@ -235,7 +235,7 @@ func TestUploadTemplateBOMPrefixedXMLFallsBackToLocation(t *testing.T) {
 // the upload MUST NOT return a metadata record with an empty TemplateID and a
 // nil error. Drop the guard and this returns success with an empty id.
 func TestUploadTemplateEmptyBodyNoLocationErrors(t *testing.T) {
-	opt := readCassette(t, "body_weight.opt")
+	opt := readFixture(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated) // no body, no Location
 	}))
@@ -254,7 +254,7 @@ func TestUploadTemplateEmptyBodyNoLocationErrors(t *testing.T) {
 // a JSON object body that omits template_id still identifies the template by
 // its Location. Without the backfill the caller gets an empty TemplateID.
 func TestUploadTemplateJSONBackfillsTemplateIDFromLocation(t *testing.T) {
-	opt := readCassette(t, "body_weight.opt")
+	opt := readFixture(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
 		w.Header().Set("Content-Type", "application/json")
@@ -292,10 +292,10 @@ func TestUploadRejectsInvalidInputs(t *testing.T) {
 
 func TestUploadTemplateWithVersion(t *testing.T) {
 	var captured *http.Request
-	opt := readCassette(t, "body_weight.opt")
+	opt := readFixture(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
-		_, _ = w.Write(readCassette(t, "template_metadata.json"))
+		_, _ = w.Write(readFixture(t, "template_metadata.json"))
 	}))
 	defer srv.Close()
 	if _, _, err := definition.UploadTemplate(
@@ -310,7 +310,7 @@ func TestUploadTemplateWithVersion(t *testing.T) {
 }
 
 func TestGetTemplate(t *testing.T) {
-	opt := readCassette(t, "body_weight.opt")
+	opt := readFixture(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Accept"); got != "application/xml" {
 			t.Errorf("Accept = %q, want application/xml", got)
@@ -338,7 +338,7 @@ func TestGetTemplateRejectsEmpty(t *testing.T) {
 func TestListTemplates(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "template_list.json"))
+		_, _ = w.Write(readFixture(t, "template_list.json"))
 	}))
 	defer srv.Close()
 	list, _, err := definition.ListTemplates(t.Context(), newClient(t, srv), definition.FormatADL14)
@@ -438,7 +438,7 @@ func TestDeleteTemplateMethodNotAllowed(t *testing.T) {
 
 func TestExampleComposition(t *testing.T) {
 	var captured *http.Request
-	// Reuse the canonical-JSON body_weight cassette as the example.
+	// Reuse the canonical-JSON body_weight fixture as the example.
 	composPath := fixtures.CompositionJSON("body_weight")
 	body, err := os.ReadFile(composPath)
 	if err != nil {
@@ -531,8 +531,8 @@ func TestTemplateMetadataRoundTrip(t *testing.T) {
 		wantEmitted map[string]string
 	}{
 		{
-			label:                "cassette",
-			body:                 readCassette(t, "template_metadata.json"),
+			label:                "fixture",
+			body:                 readFixture(t, "template_metadata.json"),
 			wantTimestampDecoded: true,
 		},
 		{
@@ -651,11 +651,11 @@ func TestTemplateMetadataRoundTrip(t *testing.T) {
 }
 
 func TestRepository(t *testing.T) {
-	opt := readCassette(t, "body_weight.opt")
+	opt := readFixture(t, "body_weight.opt")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			_, _ = w.Write(readCassette(t, "template_metadata.json"))
+			_, _ = w.Write(readFixture(t, "template_metadata.json"))
 		case http.MethodGet:
 			_, _ = w.Write(opt)
 		}
@@ -747,7 +747,7 @@ func TestListTemplatesFilters(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				captured = r.Clone(r.Context())
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write(readCassette(t, "template_list.json"))
+				_, _ = w.Write(readFixture(t, "template_list.json"))
 			}))
 			defer srv.Close()
 
@@ -806,7 +806,7 @@ func TestRepositoryListTemplatesCarriesOptions(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readCassette(t, "template_list.json"))
+		_, _ = w.Write(readFixture(t, "template_list.json"))
 	}))
 	defer srv.Close()
 

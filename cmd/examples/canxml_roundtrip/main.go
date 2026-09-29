@@ -4,7 +4,7 @@
 // ended with, which shows that the two codecs (canjson and canxml) describe the
 // same document.
 //
-// It runs offline against the vendored body_weight.json cassette:
+// It runs offline against the vendored body_weight.json fixture:
 //
 //	go run ./cmd/examples/canxml_roundtrip
 package main
@@ -32,7 +32,7 @@ func main() {
 func run() error {
 	body, err := os.ReadFile(fixtures.CompositionJSON("body_weight"))
 	if err != nil {
-		return fmt.Errorf("read cassette: %w", err)
+		return fmt.Errorf("read fixture: %w", err)
 	}
 	fmt.Printf("input JSON: %d bytes\n", len(body))
 
@@ -64,7 +64,7 @@ func run() error {
 	fmt.Printf("re-encoded JSON: %d bytes\n", len(roundTripped))
 
 	// Step 4: compare start and end. The starting point is encoded through
-	// the same codec as the end point, so the cassette's own formatting
+	// the same codec as the end point, so the fixture's own formatting
 	// (whitespace, member order) does not count; only the decoded content does.
 	direct, err := canjson.Marshal(&fromJSON)
 	if err != nil {

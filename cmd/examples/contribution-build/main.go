@@ -2,7 +2,7 @@
 // the Contribution_create request body the builder produces. A CONTRIBUTION
 // is the openEHR unit of commit: several versions written to one EHR in a
 // single atomic request. Two canonical-JSON compositions from the vendored
-// cassettes go in, one as a first version and one as an amendment of a
+// fixtures go in, one as a first version and one as an amendment of a
 // version that already exists. The program runs offline.
 //
 // Run:

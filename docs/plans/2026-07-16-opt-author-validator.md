@@ -45,7 +45,7 @@ Implementation (Phase 1+) may start once **Phase 0 has landed REQ-114**:
 - `Covers:` names the REQ this plan implements (REQ-114) and the landed REQs it builds on (REQ-100/104/106/108) + the complementary REQ-102.
 - Canonical normative prose for REQ-114 exists — a `clinical-modeling.md § REQ-114` section + a `traceability.yaml` entry — authored via `sdd-specify` (Phase 0). Until then this DoR item is **pending**, not satisfied.
 - The issue-category taxonomy and the stable `opt.` code catalogue are defined **once**, in REQ-114 (not duplicated in this plan).
-- PROBE-085 fixture list chosen from `testkit/cassettes/templates/`.
+- PROBE-085 fixture list chosen from `testkit/corpus/templates/`.
 - Each phase names its verification command.
 
 ## Definition of Done
@@ -128,14 +128,14 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ. The t
    - Exit codes per the REQ-114 contract (error → 1; warning-in-strict → 2).
 2. Document in `docs/examples.md` (CI JSON example for GitHub Actions).
 
-**Definition of done:** `go run ./cmd/examples/validate-opt …` runs on the cassette templates; `make ci` green.
+**Definition of done:** `go run ./cmd/examples/validate-opt …` runs on the fixture templates; `make ci` green.
 
 ### Phase 3 — PROBE-085 & integration
 
 **Tasks:**
 
 1. `testkit/probes/template/probe_085_opt_author_validator.go`:
-   - Run the validator on the full cassette template set; expect 0 errors on known-good OPTs.
+   - Run the validator on the full fixture template set; expect 0 errors on known-good OPTs.
    - One deliberately broken fixture must emit `opt.missing_template_id`.
 2. Optional (deferred — not v1 unless trivial): hook `template.ParseFileStrict` to call the validator under an `OPT_VALIDATE=1` env toggle. **If adopted, that toggle is normative behaviour and must be specified in REQ-114**, not left as a plan-only task.
 3. Update `traceability.yaml` (REQ-114 `landed`), run `make spec-gen`, set plan **Status:** `Done`.

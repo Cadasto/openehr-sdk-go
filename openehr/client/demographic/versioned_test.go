@@ -21,7 +21,7 @@ import (
 // versioned_party endpoint.
 func TestGetVersionedParty(t *testing.T) {
 	var captured *http.Request
-	body := cassette(t, "versioned_party.json")
+	body := fixture(t, "versioned_party.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -42,7 +42,7 @@ func TestGetVersionedParty(t *testing.T) {
 
 func TestGetRevisionHistory(t *testing.T) {
 	var captured *http.Request
-	body := cassette(t, "revision_history.json")
+	body := fixture(t, "revision_history.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -63,7 +63,7 @@ func TestGetRevisionHistory(t *testing.T) {
 
 func TestGetVersionLatest(t *testing.T) {
 	var captured *http.Request
-	body := cassette(t, "original_version.json")
+	body := fixture(t, "original_version.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -107,7 +107,7 @@ func TestGetVersionLatest(t *testing.T) {
 }
 
 // originalVersionEnvelope wraps a bare PARTY body in a minimal
-// ORIGINAL_VERSION so a single per-type cassette drives a VERSION read.
+// ORIGINAL_VERSION so a single per-type fixture drives a VERSION read.
 func originalVersionEnvelope(partyBody []byte) []byte {
 	return fmt.Appendf(
 		nil,
@@ -121,7 +121,7 @@ func originalVersionEnvelope(partyBody []byte) []byte {
 // subtype through the version envelope, not just PERSON.
 func TestGetVersionDecodesEachPartyType(t *testing.T) {
 	cases := []struct {
-		cassette     string
+		fixture      string
 		wantConcrete string
 	}{
 		{"person.json", "*rm.Person"},
@@ -132,7 +132,7 @@ func TestGetVersionDecodesEachPartyType(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.wantConcrete, func(t *testing.T) {
-			body := originalVersionEnvelope(cassette(t, tc.cassette))
+			body := originalVersionEnvelope(fixture(t, tc.fixture))
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write(body)
 			}))
@@ -196,7 +196,7 @@ func TestGetVersionDuplicateMemberName(t *testing.T) {
 			`"lifecycle_state":{"_type":"DV_CODED_TEXT","value":"complete","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"532"}},`+
 			`"lifecycle_state":{"_type":"DV_CODED_TEXT","value":"deleted","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"523"}},`+
 			`"data":%s}`,
-		personVOID, cassette(t, "person.json"),
+		personVOID, fixture(t, "person.json"),
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write(body)
@@ -224,7 +224,7 @@ func TestGetVersionCaseVariantMemberIsUnknown(t *testing.T) {
 	body := fmt.Appendf(
 		nil,
 		`{"_type":"ORIGINAL_VERSION","UID":{"_type":"OBJECT_VERSION_ID","value":"%s::cdr::1"},"Data":%s}`,
-		personVOID, cassette(t, "person.json"),
+		personVOID, fixture(t, "person.json"),
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write(body)
@@ -266,11 +266,11 @@ func TestVersionedRepositoryWiring(t *testing.T) {
 		paths = append(paths, r.URL.Path)
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/revision_history"):
-			_, _ = w.Write(cassette(t, "revision_history.json"))
+			_, _ = w.Write(fixture(t, "revision_history.json"))
 		case strings.HasSuffix(r.URL.Path, "/version") || strings.Contains(r.URL.Path, "/version/"):
-			_, _ = w.Write(cassette(t, "original_version.json"))
+			_, _ = w.Write(fixture(t, "original_version.json"))
 		default:
-			_, _ = w.Write(cassette(t, "versioned_party.json"))
+			_, _ = w.Write(fixture(t, "versioned_party.json"))
 		}
 	}))
 	defer srv.Close()
@@ -302,7 +302,7 @@ func TestVersionedRepositoryWiring(t *testing.T) {
 
 func TestGetVersionAtTime(t *testing.T) {
 	var captured *http.Request
-	body := cassette(t, "original_version.json")
+	body := fixture(t, "original_version.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -324,7 +324,7 @@ func TestGetVersionAtTime(t *testing.T) {
 
 func TestGetVersionByID(t *testing.T) {
 	var captured *http.Request
-	body := cassette(t, "original_version.json")
+	body := fixture(t, "original_version.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)

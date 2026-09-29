@@ -41,20 +41,20 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return c
 }
 
-func readCassette(t *testing.T) []byte {
+func readFixture(t *testing.T) []byte {
 	t.Helper()
 	_, src, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "..", "testkit", "cassettes", "its_rest", "ehr", "folder.json")
+	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "..", "testkit", "corpus", "its_rest", "ehr", "folder.json")
 	b, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
+		t.Fatalf("read fixture %q: %v", path, err)
 	}
 	return b
 }
 
 func TestGet(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t)
+	body := readFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/directory/"+string(folderVUID))
@@ -82,7 +82,7 @@ func TestGet(t *testing.T) {
 
 func TestGetWithPath(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t)
+	body := readFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -101,7 +101,7 @@ func TestGetWithPath(t *testing.T) {
 
 func TestGetAtTimeAndVersionedWithPath(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t)
+	body := readFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -131,7 +131,7 @@ func TestGetAtTimeAndVersionedWithPath(t *testing.T) {
 
 func TestGetAtTime(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t)
+	body := readFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -150,7 +150,7 @@ func TestGetAtTime(t *testing.T) {
 
 func TestGetVersioned(t *testing.T) {
 	var captured *http.Request
-	body := readCassette(t)
+	body := readFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		_, _ = w.Write(body)
@@ -174,7 +174,7 @@ func TestGetRejectsEmptyVersionUID(t *testing.T) {
 }
 
 func TestRepository(t *testing.T) {
-	body := readCassette(t)
+	body := readFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(body)
 	}))
@@ -266,7 +266,7 @@ func TestSaveSendsDottedAuditHeader(t *testing.T) {
 // bare FOLDER (not an ORIGINAL_VERSION<FOLDER>) per the ITS-REST
 // OpenAPI `201_directory` schema.
 func TestSaveRepresentationDecodesBareFolder(t *testing.T) {
-	body := readCassette(t)
+	body := readFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"`+string(folderVUID)+`"`)
 		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/directory/"+string(folderVUID))
@@ -414,7 +414,7 @@ func TestSaveIdentifierMalformedBodyErrors(t *testing.T) {
 // PUT path: `Prefer: return=representation` on PUT returns a bare FOLDER per
 // the ITS-REST OpenAPI `200_FOLDER_retrieved` schema.
 func TestUpdateRepresentationDecodesBareFolder(t *testing.T) {
-	body := readCassette(t)
+	body := readFixture(t)
 	newVUID := openehrclient.VersionUID("0a1b2c3d-4e5f-6789-abcd-ef0123456789::cdr.example::2")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"`+string(newVUID)+`"`)

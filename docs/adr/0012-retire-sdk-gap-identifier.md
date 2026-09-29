@@ -76,7 +76,7 @@ Using **GitHub issues** for the work-tracking half was considered and **rejected
 - The living, normative, and CHANGELOG surface becomes GAP-free; a single grep proves it. Contributors and agents learn one identifier scheme (`REQ`/`PROBE`/`STRAND`), and `make spec-context REQ=NNN` remains the one-shot context tool.
 - Git commit history retains the tokens; this ADR's crosswalk is the durable decoder, so old references stay resolvable without keeping the identifier alive.
 - No content is lost: the three durable facts move up into `REQ-055/057/107/083`; the undelivered `medium` level and the deferred probes are tracked honestly rather than dropped.
-- The `PROBE` register is slightly aspirational for GAP-15/16 until PROBE-077/078/079 are built; the interim verification (unit cassette matrices) is documented in `conformance.md`.
+- The `PROBE` register is slightly aspirational for GAP-15/16 until PROBE-077/078/079 are built; the interim verification (unit fixture matrices) is documented in `conformance.md`.
 - Renaming the archived plans edits the doc-form of the delivery record (the twin of git history) — accepted deliberately in exchange for a fully token-free tree; the dated prefixes and descriptive tails are preserved, and inbound links are updated in the same PR so nothing breaks.
 - **Anchor churn is a hard edge:** three `conformance.md` PROBE headings embed a GAP token, and their generated anchors are linked from `wire.md`. The heading rename and the inbound-link fix land in the same edit (PR2) so no cross-reference dangles.
 

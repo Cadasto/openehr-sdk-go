@@ -17,27 +17,27 @@ import (
 	"time"
 )
 
-func cassettePath(t *testing.T, name string) string {
+func fixturePath(t *testing.T, name string) string {
 	t.Helper()
 	_, src, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	return filepath.Join(filepath.Dir(src), "..", "..", "testkit", "cassettes", "its_rest", "discovery", name)
+	return filepath.Join(filepath.Dir(src), "..", "..", "testkit", "corpus", "its_rest", "discovery", name)
 }
 
-func cassetteBytes(t *testing.T, name string) []byte {
+func fixtureBytes(t *testing.T, name string) []byte {
 	t.Helper()
-	b, err := os.ReadFile(cassettePath(t, name))
+	b, err := os.ReadFile(fixturePath(t, name))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return b
 }
 
-func newCassetteServer(t *testing.T, name string, hdr func(http.Header)) *httptest.Server {
+func newFixtureServer(t *testing.T, name string, hdr func(http.Header)) *httptest.Server {
 	t.Helper()
-	body := cassetteBytes(t, name)
+	body := fixtureBytes(t, name)
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if hdr != nil {
@@ -56,8 +56,8 @@ func mustResolver(t *testing.T, opts ...Option) *Resolver {
 	return r
 }
 
-func TestResolveCassette(t *testing.T) {
-	srv := newCassetteServer(t, "smart-configuration.json", nil)
+func TestResolveFixture(t *testing.T) {
+	srv := newFixtureServer(t, "smart-configuration.json", nil)
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
 	cat, err := r.Resolve(t.Context(), srv.URL)
@@ -91,7 +91,7 @@ func TestResolveCassette(t *testing.T) {
 // REQ-072: an advertised spec_version other than the pinned one fails
 // resolution with a typed DiscoveryError.
 func TestResolveSpecVersionMismatch(t *testing.T) {
-	srv := newCassetteServer(t, "smart-configuration-mismatch.json", nil)
+	srv := newFixtureServer(t, "smart-configuration-mismatch.json", nil)
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
 	_, err := r.Resolve(t.Context(), srv.URL)
@@ -105,7 +105,7 @@ func TestResolveSpecVersionMismatch(t *testing.T) {
 }
 
 func TestResolveAcceptedVersionsWiden(t *testing.T) {
-	srv := newCassetteServer(t, "smart-configuration-mismatch.json", nil)
+	srv := newFixtureServer(t, "smart-configuration-mismatch.json", nil)
 	defer srv.Close()
 	r := mustResolver(
 		t,
@@ -122,7 +122,7 @@ func TestResolveCacheHit(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		w.Header().Set("Cache-Control", "max-age=300")
-		_, _ = w.Write(cassetteBytes(t, "smart-configuration.json"))
+		_, _ = w.Write(fixtureBytes(t, "smart-configuration.json"))
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
@@ -142,7 +142,7 @@ func TestResolveCacheExpiry(t *testing.T) {
 		var hits atomic.Int32
 		srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			hits.Add(1)
-			_, _ = w.Write(cassetteBytes(t, "smart-configuration.json"))
+			_, _ = w.Write(fixtureBytes(t, "smart-configuration.json"))
 		}))
 		r := mustResolver(
 			t,
@@ -167,7 +167,7 @@ func TestResolveRefreshInvalidates(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		w.Header().Set("Cache-Control", "max-age=3600")
-		_, _ = w.Write(cassetteBytes(t, "smart-configuration.json"))
+		_, _ = w.Write(fixtureBytes(t, "smart-configuration.json"))
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
@@ -186,7 +186,7 @@ func TestResolveCoalescesConcurrent(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var hits atomic.Int32
 		gate := make(chan struct{})
-		body := cassetteBytes(t, "smart-configuration.json")
+		body := fixtureBytes(t, "smart-configuration.json")
 		srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			hits.Add(1)
 			<-gate

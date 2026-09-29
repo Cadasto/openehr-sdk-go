@@ -62,7 +62,7 @@ func probe038PolymorphicDecode(body []byte, factory func() any, secondMarshal fu
 	}
 	if body == nil {
 		r.Status = "fail"
-		r.Detail = "input body is nil — likely a cassette discovery failure"
+		r.Detail = "input body is nil — likely a fixture discovery failure"
 		return r, nil
 	}
 	v := factory()
@@ -189,14 +189,14 @@ var Probe038Inputs = func() []Probe038Input {
 		body, err := os.ReadFile(fixtures.RMJSON(n))
 		if err != nil {
 			out = append(out, Probe038Input{
-				Name:    "cassette:" + n,
+				Name:    "fixture:" + n,
 				loadErr: fmt.Errorf("PROBE-038: read %q: %w", n, err),
 				Factory: func() any { return new(rm.Composition) },
 			})
 			continue
 		}
 		out = append(out, Probe038Input{
-			Name:    "cassette:" + n,
+			Name:    "fixture:" + n,
 			Body:    body,
 			Factory: func() any { return new(rm.Composition) },
 		})
