@@ -101,7 +101,7 @@ Application code (cmd/examples, downstream consumers)
     │              └──→ auth/        └──→ openehr/rm/typereg/
     │                     └──→ net/http.Client (injected)
     │
-    ├─ (building-block use, no transport) ──→ openehr/rm/
+    ├─ (building-block use, no transport) ──→ openehr/rm/          ──→ openehr/serialize/canxml/   (generated XML marshal code)
     ├─ (building-block use, no transport) ──→ openehr/serialize/
     ├─ (building-block use, no transport) ──→ openehr/validation/   ──→ openehr/rm/  openehr/template/
     └─ (building-block use, no transport) ──→ openehr/template/
@@ -120,6 +120,7 @@ testkit/  -. helpers for .-→ all of the above
 
 - `transport/` depends on `auth/`, never the reverse.
 - `openehr/client/*` depends on `transport/`, `openehr/rm/`, `openehr/serialize/`, never on `cadasto/…`.
+- `openehr/rm/`'s generated marshal files import `openehr/serialize/canxml/`. That edge does not cycle: `canxml` imports only `openehr/rm/typereg/` and `openehr/serialize/internal/poly` from this module.
 - `cadasto/<X>` may depend on `openehr/client/*`, `transport/`, `openehr/rm/`, etc. — but never on another `cadasto/<Y>`. `cadasto/datamap` is the exception on the wire side: REQ-058 keeps it off `transport/` and `auth/`.
 - `openehr/validation/` MUST NOT take on `openehr/serialize/`'s codec dependencies — validation is structural over the in-memory RM, not over the wire bytes.
 - `openehr/bmm/` MUST NOT depend on `transport/`, `auth/`, or any HTTP package — it is a building block (REQ-045).
@@ -227,6 +228,11 @@ The SDK follows **Semantic Versioning 2.0.0** (REQ-004). The mapping of changes 
 | Spec `Status:` transition `Draft` → `Stable` | minor |
 | Spec `Status:` transition `Stable` → `Deprecated` | minor |
 | Spec deletion (removing a `Deprecated` spec after a documented cycle) | major |
+| BMM bump that changes generated public types (verify with `make codegen-verify` and `bmmdiff`) | minor |
+| BMM bump with no public type change | patch |
+| Raise of the `go.mod` minimum Go version (REQ-002) | minor |
+| Module path change (REQ-001) | major, with a `/vN` import path |
+| Tightened validation: an input that passed now fails | minor while on `v0.x`, major from `v1.0.0`; the release notes name it |
 
 `v0.x` is in motion until the openEHR-core surface and conformance probe set stabilise. `v1.0.0` lands when:
 

@@ -10,15 +10,7 @@ How `github.com/cadasto/openehr-sdk-go` is versioned, tagged, and announced. Qua
 go get github.com/cadasto/openehr-sdk-go@vX.Y.Z
 ```
 
-Standard SemVer applies (breaking → major, additive → minor, fix → patch). These cases are specific to this SDK:
-
-| Change | Bump |
-|---|---|
-| BMM bump that changes generated public types (verify: `make codegen-verify` + `bmmdiff`) | Minor |
-| BMM bump with no public type change | Patch |
-| `go.mod` minimum Go version raise | Minor (REQ-002) |
-| Module path change | Major + `/vN` import path (REQ-001) |
-| Tightened validation: an input that passed now fails | Minor while on `v0.x`, major from `v1.0.0`; the release notes name it |
+Standard SemVer applies: a breaking change is a major bump, an addition a minor one, a fix a patch. The full change-to-bump table, including the cases specific to this SDK (BMM bumps, the minimum Go version, the module path, tightened validation), is in [`module-layout.md` § Versioning](specifications/module-layout.md#versioning).
 
 ### Four version concepts
 
