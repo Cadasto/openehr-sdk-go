@@ -47,25 +47,22 @@ func writeDVIntervalOrderedSingle(iv *rm.DVInterval[rm.DVOrdered], attr string, 
 }
 
 // writeIntervalSingle sets one attribute of an interval. An open side
-// carries no bound, so a bound that is not Void (see isVoidBound) also
-// marks its own side bounded; the other side is left as it is. Writes
-// apply in order: a *_unbounded flag written after the bound replaces
-// what the bound set.
+// carries no bound, so writing a bound also sets that side's *_unbounded
+// flag to match it: a bound that is not Void (see isVoidBound) closes its
+// side, and a Void bound opens it. The other side is left as it is.
+// Writes apply in order: a *_unbounded flag written after the bound
+// replaces what the bound set.
 func writeIntervalSingle[T any](iv *rm.Interval[T], attr string, child any, boundRM string) error {
 	switch attr {
 	case "lower":
 		return assignVia(child, func(v T) {
 			iv.Lower = v
-			if !isVoidBound(v) {
-				iv.LowerUnbounded = false
-			}
+			iv.LowerUnbounded = isVoidBound(v)
 		}, attr, boundRM)
 	case "upper":
 		return assignVia(child, func(v T) {
 			iv.Upper = v
-			if !isVoidBound(v) {
-				iv.UpperUnbounded = false
-			}
+			iv.UpperUnbounded = isVoidBound(v)
 		}, attr, boundRM)
 	case "lower_unbounded":
 		v, ok := child.(bool)

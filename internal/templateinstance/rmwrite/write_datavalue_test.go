@@ -195,10 +195,11 @@ func intervalOpenFlags(t *testing.T, parent any) (lowerOpen, upperOpen bool) {
 // bound writer that REQ-101's composition builder and the REQ-107
 // generator share: BASE Interval says an open side carries no bound,
 // so writing a real bound closes that side and leaves the other one
-// alone. A Void bound (a nil, or a typed-nil behind the
-// DV_INTERVAL<DV_ORDERED> interface) keeps the side open, and a flag
-// written after the bound is kept as written (last write wins). Each
-// case starts from an interval open on both sides.
+// alone. A Void bound (a typed-nil behind the DV_INTERVAL<DV_ORDERED>
+// interface; a plain nil is refused) opens its side, including one a
+// real bound closed earlier, and a flag written after the bound is kept
+// as written (last write wins). Each case starts from an interval open
+// on both sides.
 func TestEnsureSingleIntervalBoundClosesItsSide(t *testing.T) {
 	type write struct {
 		attr    string
@@ -269,16 +270,38 @@ func TestEnsureSingleIntervalBoundClosesItsSide(t *testing.T) {
 			wantUpperOpen: false,
 		},
 		{
-			name:          "DV_ORDERED typed-nil lower keeps the lower side open",
+			name:          "DV_ORDERED typed-nil lower leaves the lower side open",
 			parent:        func() any { return openInterval[rm.DVOrdered]() },
 			writes:        []write{{attr: "lower", child: nilQuantity}},
 			wantLowerOpen: true,
 			wantUpperOpen: true,
 		},
 		{
-			name:          "DV_ORDERED typed-nil upper keeps the upper side open",
+			name:          "DV_ORDERED typed-nil upper leaves the upper side open",
 			parent:        func() any { return openInterval[rm.DVOrdered]() },
 			writes:        []write{{attr: "upper", child: nilCount}},
+			wantLowerOpen: true,
+			wantUpperOpen: true,
+		},
+		{
+			// The later Void bound replaces the real one, so the side must
+			// read open again, not bounded with no bound.
+			name:   "DV_ORDERED real lower then typed-nil lower opens the lower side",
+			parent: func() any { return openInterval[rm.DVOrdered]() },
+			writes: []write{
+				{attr: "lower", child: rm.DVCount{Magnitude: 10}},
+				{attr: "lower", child: nilQuantity},
+			},
+			wantLowerOpen: true,
+			wantUpperOpen: true,
+		},
+		{
+			name:   "DV_ORDERED real upper then typed-nil upper opens the upper side",
+			parent: func() any { return openInterval[rm.DVOrdered]() },
+			writes: []write{
+				{attr: "upper", child: rm.DVCount{Magnitude: 90}},
+				{attr: "upper", child: nilCount},
+			},
 			wantLowerOpen: true,
 			wantUpperOpen: true,
 		},
