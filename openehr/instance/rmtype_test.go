@@ -2,10 +2,14 @@ package instance
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmnames"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // REQ-107: the generator materialises each OPT rm_type_name, generic
@@ -45,22 +49,78 @@ func TestNewRMForOPTType_unknownGeneric(t *testing.T) {
 	}
 }
 
-func TestParseBMMGeneric(t *testing.T) {
-	base, param, ok := parseBMMGeneric("DV_INTERVAL<DV_QUANTITY>")
-	if !ok || base != "DV_INTERVAL" || param != "DV_QUANTITY" {
-		t.Fatalf("parseBMMGeneric = %q %q %v, want DV_INTERVAL DV_QUANTITY true", base, param, ok)
+// REQ-107: a generic rm_type_name the generator cannot build is refused as
+// an unknown RM type, whether it is malformed, names no known DV_INTERVAL
+// instantiation, or gives DV_INTERVAL the wrong number of parameters. White
+// space around the parts does not matter.
+func TestNewRMForOPTType_genericSpellings(t *testing.T) {
+	if v, err := newRMForOPTType(" DV_INTERVAL< DV_COUNT > "); err != nil {
+		t.Errorf("newRMForOPTType(padded DV_INTERVAL<DV_COUNT>): %v", err)
+	} else if _, ok := v.(*rm.DVInterval[rm.DVCount]); !ok {
+		t.Errorf("newRMForOPTType(padded DV_INTERVAL<DV_COUNT>) = %T, want *rm.DVInterval[rm.DVCount]", v)
 	}
-	if _, _, ok := parseBMMGeneric("DV_TEXT"); ok {
-		t.Fatal("expected non-generic DV_TEXT to return ok=false")
+	for _, declared := range []string{
+		"DV_INTERVAL<DV_QUANTITY>junk",
+		"DV_INTERVAL<>",
+		"DV_INTERVAL<DV_QUANTITY",
+		"DV_INTERVAL<DV_QUANTITY>>",
+		"DV_INTERVAL<DV_INTERVAL<DV_QUANTITY>>",
+		"DV_INTERVAL<DV_QUANTITY, DV_COUNT>",
+		"<DV_QUANTITY>",
+	} {
+		v, err := newRMForOPTType(declared)
+		if !errors.Is(err, rmwrite.ErrUnknownRMType) {
+			t.Errorf("newRMForOPTType(%q) = (%T, %v), want ErrUnknownRMType", declared, v, err)
+		}
 	}
-	if _, _, ok := parseBMMGeneric("DV_INTERVAL<DV_QUANTITY>junk"); ok {
-		t.Fatal("expected trailing junk after generic param to return ok=false")
+}
+
+// TestIntervalInstantiationParity checks that the generator builds and
+// seeds every DV_INTERVAL instantiation the reader covers (REQ-107). The
+// canonical set is the one TestTypedIntervalReaderParity
+// (openehr/validation/rmread) derives: one DV_INTERVAL<X> per registered
+// type X that implements rm.DVOrdered, plus the bare
+// DV_INTERVAL<DV_ORDERED>. For each name, newRMForOPTType must build the
+// instantiation rmnames gives that name, and populatePrimitiveDefault must
+// seed it open on both sides: the state the bound writes and the endpoint
+// pass start from. A new DV_ORDERED descendant fails here until the
+// generator gains it. The flags are read back through rmread so the check
+// does not share the generator's own interval switch.
+func TestIntervalInstantiationParity(t *testing.T) {
+	const bare = "DV_INTERVAL<DV_ORDERED>"
+	names := []string{bare}
+	for _, name := range typereg.Default.Names() {
+		ctor, _ := typereg.Default.Lookup(name)
+		if _, ok := ctor().(rm.DVOrdered); ok {
+			names = append(names, "DV_INTERVAL<"+name+">")
+		}
 	}
-	if _, _, ok := parseBMMGeneric("DV_INTERVAL<>"); ok {
-		t.Fatal("expected empty generic param to return ok=false")
+	if len(names) == 1 {
+		t.Fatal("registry yields no DVOrdered implementers; registrations missing?")
 	}
-	base, param, ok = parseBMMGeneric("DV_INTERVAL<DV_INTERVAL<DV_QUANTITY>>")
-	if !ok || base != "DV_INTERVAL" || param != "DV_INTERVAL<DV_QUANTITY>" {
-		t.Fatalf("nested generic = %q %q %v, want DV_INTERVAL / DV_INTERVAL<DV_QUANTITY> / true — the closer is the last '>'", base, param, ok)
+	slices.Sort(names)
+
+	g := &generator{}
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			v, err := newRMForOPTType(name)
+			if err != nil {
+				t.Fatalf("newRMForOPTType(%q): %v", name, err)
+			}
+			if name == bare {
+				if _, ok := v.(*rm.DVInterval[rm.DVOrdered]); !ok {
+					t.Fatalf("newRMForOPTType(%q) built %T, want *rm.DVInterval[rm.DVOrdered]", name, v)
+				}
+			} else if got, ok := rmnames.TypedIntervalName(v); !ok || got != name {
+				t.Fatalf("newRMForOPTType(%q) built %T, which rmnames names (%q, %v)", name, v, got, ok)
+			}
+			g.populatePrimitiveDefault(v)
+			for _, attr := range []string{"lower_unbounded", "upper_unbounded"} {
+				got, ok := rmread.ReadSingle(v, "DV_INTERVAL", attr)
+				if !ok || got != true {
+					t.Errorf("after populatePrimitiveDefault, ReadSingle(%T, %q) = (%v, %v), want (true, true)", v, attr, got, ok)
+				}
+			}
+		})
 	}
 }

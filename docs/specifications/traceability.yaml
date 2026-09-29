@@ -975,6 +975,9 @@ requirements:
     packages: [openehr/template, testkit/probes/template]
     probes: [PROBE-022]
     tests:
+      - internal/bmmtype/bmmtype_test.go
+      - internal/bmmtype/formal_parameters_test.go
+      - internal/templatecompile/compile_generic_test.go
       - internal/templatecompile/flat_conformance_compile_test.go
       - internal/templatecompile/registerpath_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
@@ -983,6 +986,7 @@ requirements:
       - openehr/template/parse_primitives_test.go
       - openehr/template/path_test.go
       - openehr/template/template_test.go
+      - testkit/fixtures/corpus_xml_booleans_test.go
       - testkit/probes/template/probe_022_opt_path_resolution.go
       - testkit/probes/template/probes_test.go
 
@@ -998,6 +1002,7 @@ requirements:
       - testkit/probes/composition
     probes: [PROBE-023]
     tests:
+      - internal/templateinstance/rmwrite/write_datavalue_test.go
       - openehr/composition/builder_test.go
       - openehr/composition/imports_test.go
       - openehr/composition/typecheck_test.go
@@ -1117,6 +1122,9 @@ requirements:
       - internal/templateinstance/rmwrite/write_test.go
       - openehr/instance/accessors_test.go
       - openehr/instance/instance_test.go
+      - openehr/instance/interval_flags_test.go
+      - openehr/instance/interval_order_internal_test.go
+      - openehr/instance/interval_order_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/instance/realworld_opt_synthesis_test.go
       - openehr/instance/rmtype_test.go
@@ -1230,6 +1238,7 @@ requirements:
     probes: [PROBE-081]
     tests:
       - openehr/serialize/canjson/mappings_presence_test.go
+      - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_test.go
@@ -1470,6 +1479,7 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_encode_test.go
+      - openehr/serialize/simplified/interval_leaf_anchor_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_feeder_test.go
       - openehr/serialize/simplified/rmattr_party_test.go

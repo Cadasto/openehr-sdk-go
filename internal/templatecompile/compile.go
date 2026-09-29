@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
@@ -255,23 +256,26 @@ func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribu
 	if cn.rmTypeName == "" {
 		return nil
 	}
+	// rminfo knows each class by its bare BMM name; the OPT may declare a
+	// generic instantiation (DV_INTERVAL<DV_QUANTITY>) that it does not.
+	class := bmmtype.Class(cn.rmTypeName)
 	// Walk RM declaration order so implicit attributes appear in
 	// BMM-stable order regardless of OPT walk path.
-	for _, attrName := range allAttributesInOrder(w.lookup, cn.rmTypeName) {
+	for _, attrName := range allAttributesInOrder(w.lookup, class) {
 		if declaredByName[attrName] {
 			continue
 		}
-		rm, ok := w.lookup.AttributeRMType(cn.rmTypeName, attrName)
+		rm, ok := w.attributeType(cn.rmTypeName, attrName)
 		if !ok || rm == "" {
 			continue
 		}
-		container, _ := w.lookup.IsContainer(cn.rmTypeName, attrName)
+		container, _ := w.lookup.IsContainer(class, attrName)
 		// Skip implicit attributes the RM declares but does NOT
 		// mandate — the composition builder only needs implicit
 		// entries for required-but-OPT-silent fields. Non-required
 		// implicit entries would inflate every node with optional
 		// RM metadata that walker code does not need.
-		if !slices.Contains(w.lookup.RequiredAttributes(cn.rmTypeName), attrName) {
+		if !slices.Contains(w.lookup.RequiredAttributes(class), attrName) {
 			continue
 		}
 		card := template.Single
@@ -294,10 +298,10 @@ func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribu
 // downstream consumers can resolve type-aware constraints without a
 // separate rminfo query.
 func (w *walker) buildAttribute(parent *CompiledNode, a *template.Attribute) (*CompiledAttribute, error) {
-	rm, _ := w.lookup.AttributeRMType(parent.rmTypeName, a.Name())
+	rm, _ := w.attributeType(parent.rmTypeName, a.Name())
 	required := false
 	if parent.rmTypeName != "" {
-		required = slices.Contains(w.lookup.RequiredAttributes(parent.rmTypeName), a.Name())
+		required = slices.Contains(w.lookup.RequiredAttributes(bmmtype.Class(parent.rmTypeName)), a.Name())
 	}
 	ca := &CompiledAttribute{
 		name:              a.Name(),
@@ -319,6 +323,20 @@ func (w *walker) buildAttribute(parent *CompiledNode, a *template.Attribute) (*C
 		ca.children = append(ca.children, cn)
 	}
 	return ca, nil
+}
+
+// attributeType resolves the RM type of attribute attr on a node whose
+// OPT-declared type is owner. rminfo is keyed by bare class name, so a generic
+// instantiation is looked up by its class; and rminfo types an attribute the
+// class declares with a formal parameter by that parameter's name
+// (DV_INTERVAL.lower is "T"), so the actual parameter the declared name
+// supplies takes its place (DV_QUANTITY for DV_INTERVAL<DV_QUANTITY>).
+func (w *walker) attributeType(owner, attr string) (string, bool) {
+	rm, ok := w.lookup.AttributeRMType(bmmtype.Class(owner), attr)
+	if !ok {
+		return "", false
+	}
+	return bmmtype.Substitute(owner, rm), true
 }
 
 // pathSegment computes the path delta for descending from parent

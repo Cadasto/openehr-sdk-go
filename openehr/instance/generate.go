@@ -6,6 +6,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -141,7 +142,9 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	}
 
 	for _, attr := range optNode.Attributes() {
-		if rminfo.IsNonStorableAttr(optNode.RMTypeName(), attr.Name()) {
+		// rminfo knows each class by its bare BMM name; the OPT may declare
+		// a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
+		if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
 			continue
 		}
 		if !g.shouldVisit(attr) {
@@ -158,6 +161,8 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 			}
 		}
 	}
+	orderIntervalBounds(optNode, rmValue)
+	settleIntervalEndpoints(optNode, rmValue)
 	return nil
 }
 
@@ -354,6 +359,14 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 // unbounded cases. RM types that carry no primary value (CLUSTER,
 // ELEMENT, party proxies) silently no-op.
 func (g *generator) populatePrimitiveDefault(rmValue any) {
+	if f, ok := intervalFlags(rmValue); ok {
+		// A fresh interval is open on both sides. Each bound the walk
+		// writes closes its own side, and settleIntervalEndpoints then
+		// decides whether a closed side includes its bound.
+		*f.lowerUnbounded = true
+		*f.upperUnbounded = true
+		return
+	}
 	switch v := rmValue.(type) {
 	case *rm.DVText:
 		v.Value = "example"
@@ -390,28 +403,49 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	case *rm.DVParsable:
 		v.Value = "example"
 		v.Formalism = "text/plain"
-	case *rm.DVInterval[rm.DVQuantity]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVCount]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVDateTime]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVDate]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVTime]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVProportion]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
-	case *rm.DVInterval[rm.DVOrdered]:
-		v.LowerUnbounded = true
-		v.UpperUnbounded = true
 	}
+}
+
+// settleIntervalEndpoints decides, once the walk has written the bounds
+// the OPT constrains, whether each side of an interval includes its
+// bound. A bounded side includes it unless the OPT constrains that side's
+// *_included, whose example value then applies. An open side never
+// includes it: BASE Interval requires that lower_unbounded implies not
+// lower_included, and the same for upper. A value that is not an interval
+// is left alone.
+//
+// Two limits follow. A C_BOOLEAN on *_unbounded is not read: a side is
+// open or bounded by whether the walk wrote it a bound. And an open side
+// keeps *_included false even where the OPT admits only true.
+func settleIntervalEndpoints(optNode *tcimpl.CompiledNode, rmValue any) {
+	f, ok := intervalFlags(rmValue)
+	if !ok {
+		return
+	}
+	*f.lowerIncluded = !*f.lowerUnbounded && includedPerOPT(optNode, "lower_included")
+	*f.upperIncluded = !*f.upperUnbounded && includedPerOPT(optNode, "upper_included")
+}
+
+// includedPerOPT returns the value the OPT gives an interval's
+// lower_included or upper_included: the example value of its C_BOOLEAN,
+// which is true whenever the constraint admits true. Without a constraint
+// it returns true, the closed endpoint the template parser also assumes
+// when an OPT range omits the flag. It uses the example value under
+// RandomFill too, on purpose: a constraint that admits both values then
+// still gives a closed endpoint, so the interval stays a sensible minimal
+// example rather than a randomly half-open one.
+func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
+	attr := optNode.Attribute(attrName)
+	if attr == nil {
+		return true
+	}
+	for _, child := range attr.Children() {
+		if c, ok := child.PrimitiveConstraint().(constraints.CBoolean); ok {
+			included, _ := c.ExampleValue().(bool)
+			return included
+		}
+	}
+	return true
 }
 
 // materialiseMultiple synthesises and appends children under a

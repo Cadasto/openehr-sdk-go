@@ -45,6 +45,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
@@ -301,7 +302,11 @@ func rmattrDecode(owner rmattrOwner, g rmattrGroup, indexes map[int]bool, budget
 	if fam.value {
 		judged = owner.leaf
 	}
-	declaredType, declared := rminfo.Default.AttributeRMType(judged, fam.attr)
+	// rminfo knows each class by its bare BMM name, and a leaf datatype from the
+	// Web Template may be a generic instantiation (DV_INTERVAL<DV_QUANTITY>). The
+	// messages keep the spelling the Web Template gave.
+	declaredType, declared := rminfo.Default.AttributeRMType(bmmtype.Class(judged), fam.attr)
+	declaredType = bmmtype.Substitute(judged, declaredType)
 	if !declared {
 		return fmt.Errorf("%w: %q (%s declares no %s attribute)", ErrUnknownPath, g.prefix(),
 			cmp.Or(judged, owner.kind), fam.attr)

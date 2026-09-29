@@ -24,6 +24,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
@@ -168,7 +169,7 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
 	}
 	// rminfo knows each class by its bare BMM name; rmType may carry a
 	// generic bound (DV_INTERVAL<DV_QUANTITY>) that it does not.
-	class := bmmClassName(rmType)
+	class := bmmtype.Class(rmType)
 	attrs := lister.AttributeNames(class)
 	if attrs == nil {
 		return
@@ -238,14 +239,6 @@ func runtimeRMType(val any, declared string) string {
 		return rt
 	}
 	return declared
-}
-
-// bmmClassName returns the bare BMM class name of rmType, dropping any
-// generic bound: "DV_INTERVAL<DV_QUANTITY>" becomes "DV_INTERVAL", and a
-// name without a bound is returned unchanged.
-func bmmClassName(rmType string) string {
-	class, _, _ := strings.Cut(rmType, "<")
-	return class
 }
 
 // setFromSlice is a small helper that turns a (possibly-nil) slice into

@@ -225,10 +225,16 @@ func (a *CompiledAttribute) ChildMultiplicity() *template.Multiplicity {
 	return a.childMultiplicity
 }
 
-// RMTypeName returns the BMM-declared RM type of this attribute
-// (the element type for containers). Empty when rminfo did not
-// resolve the parent class (rare: only when the parent type is
-// outside the known RM universe).
+// RMTypeName returns the RM type the BMM declares for this attribute
+// on its parent (the element type for containers). When the BMM types
+// the attribute with a formal generic parameter and the parent's RM
+// type name supplies the actual one, the actual type is returned: the
+// lower attribute of a DV_INTERVAL<DV_QUANTITY> node gives
+// "DV_QUANTITY". On a parent named by its bare generic class no actual
+// type is known, so the formal name comes back as the BMM writes it
+// ("T" for the data attribute of an EVENT). Empty when the parent's
+// class is outside the known RM universe or does not declare the
+// attribute.
 func (a *CompiledAttribute) RMTypeName() string { return a.rmTypeName }
 
 // Implicit reports whether this attribute was injected by the

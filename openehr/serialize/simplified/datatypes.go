@@ -15,6 +15,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -244,17 +245,14 @@ func isIntervalLeafType(rmType string) bool {
 // intervalLeafAnchor extracts the bound datatype from a `DV_INTERVAL<T>` Web
 // Template leaf type. A bare, unparameterised `DV_INTERVAL` names no bound
 // datatype, so it is not an interval leaf here: the bounds would have no suffix
-// form and the value rides |raw instead of being silently mis-spelled.
+// form and the value rides |raw instead of being silently mis-spelled. Nor is
+// a malformed spelling, or one giving DV_INTERVAL other than one parameter.
 func intervalLeafAnchor(rmType string) (string, bool) {
-	inner, ok := strings.CutPrefix(rmType, "DV_INTERVAL<")
-	if !ok {
+	class, params, ok := bmmtype.Split(rmType)
+	if !ok || class != "DV_INTERVAL" || len(params) != 1 {
 		return "", false
 	}
-	inner, ok = strings.CutSuffix(inner, ">")
-	if !ok || inner == "" {
-		return "", false
-	}
-	return inner, true
+	return params[0], true
 }
 
 // isPartyLeafType reports whether a Web Template leaf's RM type is a party — the
