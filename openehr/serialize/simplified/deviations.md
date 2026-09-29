@@ -171,15 +171,22 @@ not partially/silently accepted.
   BASE `Interval` declares all four mandatory (`1..1`), and the reference omits each one's
   default value. `\|lower_unbounded` / `\|upper_unbounded` are omitted when `false`: absent
   decodes as `false`, and only `true` is emitted. `\|lower_included` / `\|upper_included`
-  are omitted when `true`, the **closed** endpoint: absent decodes as `true`, and only
-  `false` is emitted. An absent bound is the
-  unbounded end and is never emitted as a zero-valued one. Consequence, deliberate: a
-  redundant `\|lower_included: true` on input is **normalised away** on re-encode — it
-  denotes the same RM value as its absence, so this is a canonical-spelling normalisation
-  like the `:0` one above, not a loss. The rule is corpus-derived: `dv_count` omits both
-  flags on a bounded interval, `dv_quantity` spells both `false`, and `dv_ordinal`'s
-  unbounded end pairs `\|upper_unbounded: true` with `\|upper_included: false` — this is the
-  only mapping under which all three round-trip byte-exactly (wire.md § REQ-140).
+  default by side. On a bounded side they are omitted when `true`, the **closed** endpoint:
+  absent decodes as `true`, and only `false` is emitted. On an open side absent decodes as
+  `false`, the only value BASE `Lower_included_valid` / `Upper_included_valid` permit there,
+  and an included open side is a typed error both ways: an explicit `\|*_included: true`
+  beside `\|*_unbounded: true` on decode, an interval side both unbounded and included on
+  encode. An open end is spelled by its `\|*_unbounded: true` flag alone: an end that
+  spells neither a bound nor that flag is refused both ways, and a missing bound is never
+  emitted as a zero-valued one. Consequences, deliberate: a redundant
+  `\|lower_included: true` on a bounded side is **normalised away** on re-encode, and an
+  absent `\|*_included` on an open side re-encodes as an explicit `false`. Each denotes the
+  same RM value as the other spelling, so these are canonical-spelling normalisations like
+  the `:0` one above, not a loss. The rule is corpus-derived: `dv_count` omits both flags
+  on a bounded interval, `dv_quantity` spells both `false`, and every open end in the
+  corpus (`dv_ordinal`, `dv_quantity`, `interval_dv_quantity`) pairs its
+  `\|*_unbounded: true` with `\|*_included: false` — this is the only mapping under which
+  all of them round-trip byte-exactly (wire.md § REQ-140).
 
 ## Conformance
 

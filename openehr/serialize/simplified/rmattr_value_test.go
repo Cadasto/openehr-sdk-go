@@ -12,11 +12,13 @@ package simplified
 
 import (
 	"cmp"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
 
 // --- _normal_range ------------------------------------------------------
@@ -101,13 +103,15 @@ func TestRMAttrNormalRangeAnchors(t *testing.T) {
 	}
 }
 
-// TestRMAttrIntervalBoundaryDefaults — REQ-140. The RM declares
-// `Interval.lower_included` / `upper_included` optional while the SDK's
-// generated `Interval` carries a mandatory Boolean, so the codec fixes the
-// mapping in one place: an absent `|*_included` is the closed endpoint (true)
-// and is not re-emitted; an absent `|*_unbounded` is false. Both directions are
-// pinned here because the corpus writes both shapes — `dv_count`'s
-// `_normal_range` omits the flags, `dv_quantity`'s spells them false.
+// TestRMAttrIntervalBoundaryDefaults — REQ-140. BASE `Interval` declares all
+// four boundary Booleans mandatory, and the reference writes each one only
+// where it differs from its default, so the codec fixes the defaults in one
+// place. On a bounded side an absent `|*_included` is the closed endpoint
+// (true) and is not re-emitted; an absent `|*_unbounded` is false. Both
+// directions are pinned here because the corpus writes both shapes —
+// `dv_count`'s `_normal_range` omits the flags, `dv_quantity`'s spells them
+// false. The open side's default is false, pinned by
+// TestRMAttrIntervalOpenSideIncludedDefault.
 func TestRMAttrIntervalBoundaryDefaults(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	comp := assertRMAttrRoundTrip(t, wt, map[string]any{
@@ -127,8 +131,8 @@ func TestRMAttrIntervalBoundaryDefaults(t *testing.T) {
 	}
 }
 
-// TestRMAttrIntervalUnboundedEnd — REQ-140. An absent bound is the unbounded
-// end, flagged by `|upper_unbounded` — the corpus's
+// TestRMAttrIntervalUnboundedEnd — REQ-140. An open end carries no bound and is
+// spelled by its `|upper_unbounded` flag alone — the corpus's
 // `_other_reference_ranges:0` shape on `dv_quantity` and `dv_ordinal`. Encode
 // must write no `/upper` suffix at all for it: there is no bound to spell.
 func TestRMAttrIntervalUnboundedEnd(t *testing.T) {
@@ -153,6 +157,164 @@ func TestRMAttrIntervalUnboundedEnd(t *testing.T) {
 	if rr.Range.Upper != nil {
 		t.Errorf("unbounded end carries a bound: %#v", rr.Range.Upper)
 	}
+}
+
+// intervalFlags is the four boundary Booleans of one decoded interval, so a
+// table can compare them whatever the bound type.
+type intervalFlags struct {
+	lowerUnbounded, lowerIncluded, upperUnbounded, upperIncluded bool
+}
+
+func flagsOf[T any](iv rm.Interval[T]) intervalFlags {
+	return intervalFlags{iv.LowerUnbounded, iv.LowerIncluded, iv.UpperUnbounded, iv.UpperIncluded}
+}
+
+// TestRMAttrIntervalOpenSideIncludedDefault — REQ-140. An absent `|*_included`
+// defaults by side. On an open side (`|*_unbounded: true`) it decodes as false,
+// the only value BASE `Lower_included_valid` / `Upper_included_valid` permit
+// there, and re-encode spells that false explicitly, the way the corpus spells
+// every open end. The bounded side keeps the closed-endpoint default and stays
+// unspelled. Every decode position is pinned — `_normal_range`,
+// `_other_reference_ranges:N` and the DV_INTERVAL leaf — plus STRUCTURED, which
+// reaches the same grammar through FLAT.
+func TestRMAttrIntervalOpenSideIncludedDefault(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const (
+		nr  = rmattrElement + "/_normal_range"
+		orr = rmattrElement + "/_other_reference_ranges:0"
+	)
+	normalRange := func(t *testing.T, comp *rm.Composition) intervalFlags {
+		t.Helper()
+		q := elementValue[rm.DVQuantity](t, comp)
+		if q.NormalRange == nil {
+			t.Fatal("normal_range not decoded")
+		}
+		return flagsOf(q.NormalRange.Interval)
+	}
+	referenceRange := func(t *testing.T, comp *rm.Composition) intervalFlags {
+		t.Helper()
+		q := elementValue[rm.DVQuantity](t, comp)
+		if len(q.OtherReferenceRanges) != 1 {
+			t.Fatalf("other_reference_ranges = %d, want 1", len(q.OtherReferenceRanges))
+		}
+		return flagsOf(q.OtherReferenceRanges[0].Range.Interval)
+	}
+	leaf := func(t *testing.T, comp *rm.Composition) intervalFlags {
+		t.Helper()
+		return flagsOf(intervalLeafOf(t, comp).Interval)
+	}
+	openUpper := intervalFlags{lowerIncluded: true, upperUnbounded: true}
+	openLower := intervalFlags{lowerUnbounded: true, upperIncluded: true}
+	for _, tc := range []struct {
+		name       string
+		keys       map[string]any
+		structured bool
+		read       func(*testing.T, *rm.Composition) intervalFlags
+		want       intervalFlags
+		// spelled is the open side's `|*_included`, which re-encode must write as
+		// an explicit false; unspelled is the bounded side's, which it must omit.
+		spelled, unspelled string
+	}{
+		{
+			name: "_normal_range open upper",
+			keys: map[string]any{
+				nr + "/lower|magnitude": 20.5,
+				nr + "/lower|unit":      "unit",
+				nr + "|upper_unbounded": true,
+			},
+			read: normalRange, want: openUpper,
+			spelled: nr + "|upper_included", unspelled: nr + "|lower_included",
+		},
+		{
+			name: "_normal_range open lower",
+			keys: map[string]any{
+				nr + "/upper|magnitude": 66.6,
+				nr + "/upper|unit":      "unit",
+				nr + "|lower_unbounded": true,
+			},
+			read: normalRange, want: openLower,
+			spelled: nr + "|lower_included", unspelled: nr + "|upper_included",
+		},
+		{
+			name: "_other_reference_ranges open upper",
+			keys: map[string]any{
+				orr + "/lower|magnitude": 70.5,
+				orr + "/lower|unit":      "unit",
+				orr + "/meaning":         "high",
+				orr + "|upper_unbounded": true,
+			},
+			read: referenceRange, want: openUpper,
+			spelled: orr + "|upper_included", unspelled: orr + "|lower_included",
+		},
+		{
+			name: "DV_INTERVAL leaf open upper",
+			keys: map[string]any{
+				rmattrIntervalEvent + "/time":       "2022-01-12T09:00:11.7842493+01:00",
+				rmattrInterval + "/lower|magnitude": 72.83,
+				rmattrInterval + "/lower|unit":      "Unit",
+				rmattrInterval + "|upper_unbounded": true,
+			},
+			read: leaf, want: openUpper,
+			spelled: rmattrInterval + "|upper_included", unspelled: rmattrInterval + "|lower_included",
+		},
+		{
+			name: "DV_INTERVAL leaf open lower",
+			keys: map[string]any{
+				rmattrIntervalEvent + "/time":       "2022-01-12T09:00:11.7842493+01:00",
+				rmattrInterval + "/upper|magnitude": 91.2,
+				rmattrInterval + "/upper|unit":      "Unit",
+				rmattrInterval + "|lower_unbounded": true,
+			},
+			read: leaf, want: openLower,
+			spelled: rmattrInterval + "|lower_included", unspelled: rmattrInterval + "|upper_included",
+		},
+		{
+			name: "STRUCTURED _normal_range open upper",
+			keys: map[string]any{
+				nr + "/lower|magnitude": 20.5,
+				nr + "/lower|unit":      "unit",
+				nr + "|upper_unbounded": true,
+			},
+			structured: true,
+			read:       normalRange, want: openUpper,
+			spelled: nr + "|upper_included", unspelled: nr + "|lower_included",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			comp, err := decodeIntervalBody(t, wt, rmattrBody(tc.keys), tc.structured)
+			if err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if got := tc.read(t, comp); got != tc.want {
+				t.Errorf("decoded flags = %+v, want %+v", got, tc.want)
+			}
+			out := reencodeRMAttr(t, wt, comp)
+			if v, ok := out[tc.spelled]; !ok || v != false {
+				t.Errorf("re-encode %s = %#v (present %v), want an explicit false", tc.spelled, v, ok)
+			}
+			if v, ok := out[tc.unspelled]; ok {
+				t.Errorf("re-encode spelled %s = %#v, want it omitted as the closed-endpoint default", tc.unspelled, v)
+			}
+		})
+	}
+}
+
+// decodeIntervalBody decodes a FLAT body directly, or — when structured is set —
+// after restructuring it to STRUCTURED, so a table can pin both entry points.
+func decodeIntervalBody(t *testing.T, wt *webtemplate.WebTemplate, body map[string]any, structured bool) (*rm.Composition, error) {
+	t.Helper()
+	b, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !structured {
+		return UnmarshalFlat(b, wt)
+	}
+	s, err := FlatToStructured(b)
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	return UnmarshalStructured(s, wt)
 }
 
 // --- _other_reference_ranges:N -----------------------------------------
@@ -811,8 +973,8 @@ func TestIntervalZeroCountBoundEncodes(t *testing.T) {
 	}
 }
 
-// An end genuinely marked unbounded still writes only its flag — the shape the
-// refusal above must leave alone.
+// An end genuinely marked unbounded still writes its flags and no bound — the
+// shape the refusal above must leave alone.
 func TestIntervalUnboundedEndEncodes(t *testing.T) {
 	out := map[string]any{}
 	if err := intervalToFlat(out, "x/_normal_range", "DV_QUANTITY", rm.Interval[rm.DVQuantity]{
