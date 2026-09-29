@@ -6,17 +6,18 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
-// TestAQLParseForbiddenImports guards REQ-013
-// (docs/specifications/module-layout.md § REQ-013) for openehr/aql/parse.
+// TestAQLParseForbiddenImports guards two import rules for openehr/aql/parse.
 // Parsing AQL is a building block for CI validators, MCP tools and pre-flight
-// checks, usable without an authenticated client (REQ-109). Two rules hold:
+// checks, usable without an authenticated client.
 //
-//   - Neither the package nor any package of this module it pulls in imports
-//     transport, auth or openehr/client.
-//   - The package's own non-test files do not import openehr/serialize. This
-//     rule cannot cover what they pull in: parse imports openehr/aql, which
-//     reaches openehr/rm, whose generated marshal files import
-//     openehr/serialize/canxml.
+//   - REQ-013 (docs/specifications/module-layout.md § REQ-013): neither the
+//     package nor any package of this module it pulls in imports transport,
+//     auth or openehr/client.
+//   - REQ-109 (docs/specifications/clinical-modeling.md § REQ-109,
+//     Building-block independence): the package's own non-test files do not
+//     import openehr/serialize. This rule cannot cover what they pull in:
+//     parse imports openehr/aql, which reaches openehr/rm, whose generated
+//     marshal files import openehr/serialize/canxml.
 func TestAQLParseForbiddenImports(t *testing.T) {
 	t.Parallel()
 	violations, err := importguard.Scan(".", importguard.WireLayers())
@@ -34,7 +35,7 @@ func TestAQLParseForbiddenImports(t *testing.T) {
 	}
 	for _, imp := range imports {
 		if p, ok := importguard.Matches(imp, serialize); ok {
-			t.Errorf("openehr/aql/parse MUST NOT import %q in its own files (forbidden entry %q; REQ-013: aql/parse never imports openehr/serialize)", imp, p)
+			t.Errorf("openehr/aql/parse MUST NOT import %q in its own files (forbidden entry %q; REQ-109: aql/parse never imports openehr/serialize)", imp, p)
 		}
 	}
 }
