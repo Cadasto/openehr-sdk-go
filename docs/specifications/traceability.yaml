@@ -1113,7 +1113,7 @@ requirements:
     title: Template-driven RM instance example generator
     canonical: docs/specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator
     status: draft
-    implementation: landed
+    implementation: partial
     packages:
       - openehr/template/constraints
       - openehr/instance
