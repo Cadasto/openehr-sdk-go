@@ -77,12 +77,14 @@ requirements:
     implementation: landed
     packages: [openehr/rm, openehr/bmm, openehr/serialize, openehr/validation, openehr/instance, openehr/composition, openehr/template, openehr/templatecompile, openehr/template/webtemplate, openehr/terminology, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck]
     tests:
+      - internal/importguard/anybuild_internal_test.go
       - internal/importguard/importguard_test.go
       - openehr/aql/contain/imports_test.go
       - openehr/aql/imports_test.go
       - openehr/aql/internal/semcheck/imports_test.go
       - openehr/aql/lint/imports_test.go
       - openehr/aql/parse/imports_test.go
+      - openehr/bmm/imports_test.go
       - openehr/composition/imports_test.go
       - openehr/instance/imports_test.go
       - openehr/rm/imports_test.go
@@ -319,6 +321,8 @@ requirements:
     implementation: landed
     packages: [openehr/bmm]
     tests:
+      - internal/importguard/importguard_test.go
+      - openehr/bmm/imports_test.go
       - openehr/bmm/load_test.go
       - openehr/rm/rminfo/probe_094_test.go
       - openehr/rm/rminfo/probe_098_test.go
@@ -1118,6 +1122,7 @@ requirements:
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - internal/templateinstance/rmwrite/write_test.go
       - openehr/instance/accessors_test.go
+      - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/interval_flags_test.go
       - openehr/instance/interval_order_internal_test.go
