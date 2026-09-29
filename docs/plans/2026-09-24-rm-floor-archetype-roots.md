@@ -1,11 +1,11 @@
 # Plan — RM floor: archetype roots and ARCHETYPED
 
 **Date:** 2026-09-24
-**Status:** Active — the spec delta landed; the implementation is next
+**Status:** Done — the code landed on branch `feat/req-112-archetype-roots`, with the DV_ORDINAL, DV_SCALE, REFERENCE_RANGE and EHR_ACCESS readers
 **Owner:** SDK maintainers
 **Covers:** REQ-112 ([clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor), *Per-RM-type invariant catalogue*: the *Archetype roots* and *ARCHETYPED* rows) — no new id
 **Probes:** PROBE-081 extended (value-typed presence now also covers `ARCHETYPED.archetype_id` / `rm_version`)
-**Implementation:** planned
+**Implementation:** landed (REQ-112 stays `partial` for its other Known gaps)
 **Depends on:** the landed REQ-112 floor (`openehr/validation/rmfloor*.go`)
 **Defers:** `ARCHETYPE_ID` grammar validation; rules needing stored history (`VERSIONED_COMPOSITION.Archetype_node_id_valid`); `ARCHETYPED.template_id` presence (optional in the RM)
 
@@ -37,11 +37,11 @@ The RM forbids all five (`Is_archetype_root` + `LOCATABLE.Archetyped_valid`; `AR
 | Step | Status |
 |---|---|
 | Spec / registry updated (`traceability.yaml`, REQ.md row) | done (this PR) |
-| `roadmap.md` open-work row removed | at landing |
-| Code | |
-| Tests with `// REQ-112` / `// PROBE-081` comments | |
-| `make spec-check` | |
-| `make ci` | |
+| `roadmap.md` open-work row updated (it stays Partial for the other gaps) | done |
+| Code | done |
+| Tests with `// REQ-112` / `// PROBE-081` comments | done |
+| `make spec-check` | done (OK at `8577b81e`) |
+| `make ci` | done (exit 0 at `8577b81e`) |
 
 ## Phases
 
