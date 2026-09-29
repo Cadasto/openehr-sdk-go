@@ -85,10 +85,12 @@ var handledTypes = []any{
 	// EHR-IM roots
 	rm.Folder{},
 	rm.EHRStatus{},
+	// archetyping
+	rm.Archetyped{},
 }
 
 func TestHandles_ModelledTypes(t *testing.T) {
-	if got, want := len(handledTypes), 58; got != want {
+	if got, want := len(handledTypes), 59; got != want {
 		t.Errorf("handledTypes has %d entries, want %d — keep it in sync with Handles/ReadSingle", got, want)
 	}
 	for _, v := range handledTypes {
@@ -103,7 +105,7 @@ func TestHandles_PointerForm(t *testing.T) {
 	// and the walker passes whatever rmread/the caller boxes.
 	ptrs := []any{
 		&rm.Composition{}, &rm.DVQuantity{}, &rm.DVInterval[rm.DVQuantity]{},
-		&rm.Folder{}, &rm.EHRStatus{}, &rm.Cluster{},
+		&rm.Folder{}, &rm.EHRStatus{}, &rm.Cluster{}, &rm.Archetyped{},
 	}
 	for _, v := range ptrs {
 		if !Handles(v) {

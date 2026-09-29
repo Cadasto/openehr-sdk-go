@@ -22,6 +22,9 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // callers should treat that as "not addressable" rather than an
 // error.
 func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
+	if attrName == "archetype_details" {
+		return readArchetypeDetails(parent)
+	}
 	switch p := parent.(type) {
 	case *rm.Composition:
 		return readCompositionSingle(p, attrName)
@@ -309,6 +312,12 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 		return readEHRStatusSingle(p, attrName)
 	case rm.EHRStatus:
 		return readEHRStatusSingle(&p, attrName)
+
+	// --- archetyping: the ARCHETYPED node under LOCATABLE.archetype_details ---
+	case *rm.Archetyped:
+		return readArchetypedSingle(p, attrName)
+	case rm.Archetyped:
+		return readArchetypedSingle(&p, attrName)
 	}
 	return nil, false
 }
@@ -386,7 +395,8 @@ func Handles(parent any) bool {
 		*rm.PartyRelationship, rm.PartyRelationship,
 		*rm.Capability, rm.Capability,
 		*rm.Folder, rm.Folder,
-		*rm.EHRStatus, rm.EHRStatus:
+		*rm.EHRStatus, rm.EHRStatus,
+		*rm.Archetyped, rm.Archetyped:
 		return true
 	}
 	return false
@@ -1337,6 +1347,46 @@ func readEHRStatusSingle(s *rm.EHRStatus, attr string) (any, bool) {
 		return s.IsModifiable, true
 	case "is_queryable":
 		return s.IsQueryable, true
+	}
+	return nil, false
+}
+
+// --- archetyping: LOCATABLE.archetype_details and ARCHETYPED -------------
+
+// readArchetypeDetails serves archetype_details, the optional ARCHETYPED
+// attribute LOCATABLE declares and every LOCATABLE inherits. Each generated
+// LOCATABLE concrete exposes it through [rm.Locatable], so one reader covers
+// all of them, and a reader added for a new LOCATABLE gains it without
+// further change. A type [Handles] rejects stays unreadable here too, as
+// Handles promises; EHR_ACCESS is the one LOCATABLE this package does not
+// model.
+func readArchetypeDetails(parent any) (any, bool) {
+	if !Handles(parent) || IsTypedNilPointer(parent) {
+		return nil, false
+	}
+	l, ok := parent.(rm.Locatable)
+	if !ok {
+		return nil, false
+	}
+	return ptrPresent(l.GetArchetypeDetails())
+}
+
+// readArchetypedSingle serves ARCHETYPED's own attributes. archetype_id
+// (ARCHETYPE_ID) and rm_version (String) are RM-mandatory and value-typed:
+// an absent attribute, a JSON null and an empty value all decode to the same
+// zero value, so presence cannot be read from them. The reader reports both
+// as present and leaves the empty value to the RM floor's ARCHETYPED check,
+// which reports an empty archetype_id at archetype_id/value and an empty
+// rm_version under the RM's own Rm_version_valid rule. template_id is
+// optional and present only when set.
+func readArchetypedSingle(a *rm.Archetyped, attr string) (any, bool) {
+	switch attr {
+	case "archetype_id":
+		return a.ArchetypeID, true
+	case "rm_version":
+		return a.RMVersion, true
+	case "template_id":
+		return ptrPresent(a.TemplateID)
 	}
 	return nil, false
 }
