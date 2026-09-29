@@ -196,3 +196,90 @@ func TestValidateRMEHRAccess_Walked(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateRM_ScaleSymbolMayHaveNoCode pins the DV_SCALE symbol exemption
+// (REQ-112). The RM lets a scale value have no code: its symbol is then a
+// DV_CODED_TEXT carrying the terminology_id and a blank code_string. So the
+// floor reports neither the CODE_PHRASE row's rm_invariant nor the `required`
+// code_string on a DV_SCALE symbol's defining_code. Nothing else is exempt: a
+// DV_ORDINAL symbol, a blank terminology_id, a CODE_PHRASE anywhere else under
+// the same DV_SCALE, and the symbol's own value are all reported as before.
+func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
+	noCode := func(text string) rm.DVCodedText {
+		return rm.DVCodedText{Value: text, DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}}}
+	}
+	blankTarget := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}}
+	withBlankMapping := noCode("very slight")
+	withBlankMapping.Mappings = []rm.TermMapping{{Match: "=", Target: blankTarget}}
+	cases := []struct {
+		name string
+		root any
+		want []string
+	}{
+		{
+			name: "DV_SCALE symbol with a terminology_id and a blank code_string",
+			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: noCode("very very slight")}),
+		},
+		{
+			name: "the same symbol on an interval bound",
+			root: &rm.DVInterval[rm.DVScale]{
+				Lower: rm.DVScale{Value: 0.5, Symbol: noCode("very very slight")}, LowerIncluded: true,
+				Upper: rm.DVScale{Value: 2, Symbol: codedSymbol("at2")}, UpperIncluded: true,
+			},
+		},
+		{
+			name: "DV_SCALE symbol with a blank code_string and a blank value",
+			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: noCode("")}),
+			want: []string{"required /value/symbol/value"},
+		},
+		{
+			name: "DV_ORDINAL symbol with a blank code_string",
+			root: scoreElement(&rm.DVOrdinal{Value: 1, Symbol: noCode("mild")}),
+			want: []string{
+				"required /value/symbol/defining_code/code_string",
+				"rm_invariant /value/symbol/defining_code",
+			},
+		},
+		{
+			name: "DV_SCALE symbol with a blank terminology_id and a blank code_string",
+			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: rm.DVCodedText{Value: "slight"}}),
+			want: []string{"required /value/symbol/defining_code"},
+		},
+		{
+			name: "DV_SCALE symbol with a blank terminology_id and a code",
+			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: rm.DVCodedText{Value: "slight", DefiningCode: rm.CodePhrase{CodeString: "at1"}}}),
+			want: []string{"required /value/symbol/defining_code/terminology_id"},
+		},
+		{
+			name: "DV_SCALE normal_status with a blank code_string",
+			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: codedSymbol("at1"), NormalStatus: &blankTarget}),
+			want: []string{
+				"required /value/normal_status/code_string",
+				"rm_invariant /value/normal_status",
+			},
+		},
+		{
+			name: "a mapping target with a blank code_string under a DV_SCALE symbol",
+			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: withBlankMapping}),
+			want: []string{
+				"required /value/symbol/mappings[0]/target/code_string",
+				"rm_invariant /value/symbol/mappings[0]/target",
+			},
+		},
+		{
+			name: "DV_CODED_TEXT value with a blank code_string",
+			root: scoreElement(&rm.DVCodedText{Value: "slight", DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}}}),
+			want: []string{
+				"required /value/defining_code/code_string",
+				"rm_invariant /value/defining_code",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := findingsOf(validation.ValidateRM(tc.root)); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateRM(%s) findings = %q, want %q", tc.name, got, tc.want)
+			}
+		})
+	}
+}

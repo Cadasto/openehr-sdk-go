@@ -122,6 +122,10 @@ func ValidateRMDemographic(party rm.Party) Result {
 type rmFloorWalker struct {
 	info   rminfo.Lookup
 	issues []Issue
+	// blankCodeAllowed holds the paths of the CODE_PHRASE nodes whose
+	// code_string may be blank: the defining_code of each DV_SCALE symbol
+	// the walk has reached (see [rmFloorWalker.allowScaleSymbolWithoutCode]).
+	blankCodeAllowed map[string]bool
 }
 
 func (w *rmFloorWalker) emit(i Issue) {
@@ -217,7 +221,7 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
 		// Single-valued attribute.
 		val, hadField := rmread.ReadSingle(value, rmType, attr)
 		if !hadField || val == nil || rmread.IsTypedNilPointer(val) {
-			if required {
+			if required && !w.mayBeBlank(path, attr) {
 				w.emit(Issue{
 					Path:   attrPath,
 					Code:   "required",
@@ -283,6 +287,8 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkTermMapping(value, path)
 	case rmType == "ARCHETYPED":
 		w.checkArchetyped(value, path)
+	case rmType == "DV_SCALE":
+		w.allowScaleSymbolWithoutCode(path)
 	case isArchetypeRootClass(rmType):
 		w.checkArchetypeRoot(value, rmType, path)
 	}
@@ -366,21 +372,45 @@ func (w *rmFloorWalker) checkArchetyped(value any, path string) {
 }
 
 // checkCodePhrase enforces the RM spec floor on CODE_PHRASE: the
-// code_string MUST be non-empty when the value is present. (The
-// terminology_id absence is already RM-required and caught by the
-// floor's required-set walk.)
+// code_string MUST be non-empty when the value is present, except on a
+// DV_SCALE symbol's defining_code (see
+// [rmFloorWalker.allowScaleSymbolWithoutCode]). (The terminology_id absence
+// is already RM-required and caught by the floor's required-set walk.)
 func (w *rmFloorWalker) checkCodePhrase(value any, path string) {
 	cp, ok := asCodePhrase(value)
 	if !ok {
 		return
 	}
-	if cp.CodeString == "" {
+	if cp.CodeString == "" && !w.blankCodeAllowed[path] {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
 			Detail: "CODE_PHRASE.code_string must be non-empty",
 		})
 	}
+}
+
+// allowScaleSymbolWithoutCode lets the DV_SCALE at path carry a symbol with
+// no code. The RM's DV_SCALE.symbol allows a scale value that has none: its
+// symbol is then a DV_CODED_TEXT carrying the terminology_id and a blank
+// code_string. The CODE_PHRASE at the symbol's defining_code therefore reports
+// neither the non-empty code_string invariant nor a `required` code_string.
+// The exemption covers that one node only: a blank terminology_id, the
+// symbol's own value, a DV_ORDINAL symbol, and every other CODE_PHRASE under
+// the scale are checked as usual. It runs before the walk descends into the
+// scale, so the exemption is in place when the defining_code is reached.
+func (w *rmFloorWalker) allowScaleSymbolWithoutCode(path string) {
+	if w.blankCodeAllowed == nil {
+		w.blankCodeAllowed = map[string]bool{}
+	}
+	w.blankCodeAllowed[joinPath(path, "/symbol/defining_code")] = true
+}
+
+// mayBeBlank reports whether the RM-mandatory attr on the node at path is
+// exempt from the required-set check. Only the code_string of a DV_SCALE
+// symbol's defining_code is (see [rmFloorWalker.allowScaleSymbolWithoutCode]).
+func (w *rmFloorWalker) mayBeBlank(path, attr string) bool {
+	return attr == "code_string" && w.blankCodeAllowed[path]
 }
 
 // checkDVQuantity enforces the spec floor on DV_QUANTITY: precision, when
