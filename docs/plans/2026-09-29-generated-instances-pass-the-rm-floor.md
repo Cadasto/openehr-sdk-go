@@ -4,25 +4,26 @@
 **Status:** Draft
 **Owner:** SDK maintainers
 **Covers:** [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor); evidence for [STRAND-14](../specifications/research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) (REQ-102)
-**Probes:** none yet
+**Probes:** PROBE-027, extended to also assert `ValidateRM` (spec in Phase 0, probe in Phase 3)
 **Implementation:** planned
-**Depends on:** nothing
-**Defers:** the STRAND-14 decision (whether `ValidateComposition` runs the floor); strict OPT 1.4 schema checks beyond `T_ARCHETYPE_ROOT` (Phase 4 records them, and they are optional)
+**Depends on:** nothing functional. PR 188 (REQ-112 archetype roots, open at the time of writing) edits the same floor files, so whichever lands second rebases. Phase 0's spec edits were checked to merge cleanly with it
+**Defers:** the STRAND-14 decision (whether `ValidateComposition` runs the floor); strict OPT 1.4 schema checks beyond `T_ARCHETYPE_ROOT` (Phase 4 records them, and they are optional); evaluating `Language_valid` and `Encoding_valid` in the floor, which needs the ISO 639-1 and IANA character-set registers vendored first
 
 ## Goal
 
 `instance.Generate`, and `composition.NewSkeleton` built on it, produce compositions that pass template
 validation (REQ-102) but break Reference Model rules. The bodies carry:
-- the literal `"example"` as a date-time;
+- the literal `"example"` as a date-time or a duration;
 - `"example"` as an entry's language and encoding code;
 - an ELEMENT with no name;
 - a CLUSTER with no items;
-- an ELEMENT with both a value and a null flavour.
+- an ELEMENT with both a value and a null flavour, or with neither.
 
 `ValidateComposition` passes all of them, and the RM floor (`ValidateRM`, REQ-112) catches only some. A CDR
 that checks RM invariants on commit refuses every such body. After this plan, every generated instance
 passes both `ValidateComposition` and `ValidateRM`, for both policies and both value fills, and the floor
-reports each of these defects.
+reports every one of these defects it can evaluate. The language and encoding codes stay out of the floor (see
+Validator gaps); the generator is what keeps them valid.
 
 Consumers: anyone who seeds data with the generator, or serves an example-composition endpoint from it.
 
@@ -31,8 +32,8 @@ Consumers: anyone who seeds data with the generator, or serves an example-compos
 Implementation may start when:
 
 - **`**Covers:**`** lists every REQ-NNN (and STRAND-NN / ADR if applicable) this plan implements.
-- Canonical normative prose exists for each covered REQ (topic spec section + registry row in [REQ.md](../specifications/REQ.md)); Phase 0 writes the amendments.
-- Any irreversible fork has an **Accepted** [ADR](../adr/). None is needed unless Phase 0 decides STRAND-14 too.
+- Canonical normative prose exists for each covered REQ (topic spec section + registry row in [REQ.md](../specifications/REQ.md)); Phase 0 wrote the amendments.
+- Any irreversible fork has an **Accepted** [ADR](../adr/). None was needed: Phase 0 leaves STRAND-14 open.
 - Phases list concrete tasks and name the verification command (`make ci`, `make spec-check`).
 
 ## Definition of Done
@@ -42,16 +43,15 @@ The plan is complete when:
 - Code and tests land with `// REQ-` citations.
 - [`traceability.yaml`](../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the implementation.
 - A [`roadmap.md`](../roadmap.md) row records what landed.
-- Canonical spec prose for REQ-107 and REQ-112 is updated in the same PR, and STRAND-14 carries the evidence below.
+- The implementing PR flips REQ-107 back to `landed` (`REQ.md`, `traceability.yaml`), removes its Known gap and the two "specified ahead of the code" sentences on the REQ-112 rows, and marks PROBE-027's `ValidateRM` arm Implemented. STRAND-14 already carries the evidence.
 - `make spec-check` and `make ci` pass.
-- The plan is archived under [`docs/plans/archive/`](archive/).
 
 ## Implementation checklist
 
 | Step | Status |
 |---|---|
-| Spec / registry updated (`traceability.yaml`, REQ.md row) | |
-| Indexes `spec-check` misses (`roadmap.md` row) | |
+| Spec / registry updated (`traceability.yaml`, REQ.md row) | done (Phase 0) |
+| Indexes `spec-check` misses (`roadmap.md` row) | done (Phase 0) |
 | Code | |
 | Tests with `// REQ-` comments | |
 | `make spec-check` | |
@@ -60,10 +60,11 @@ The plan is complete when:
 ## The gap, reproduced
 
 **Setup.**
-- `main` at `89c34233`.
+- `main` at `89c34233`. The counts below were re-checked on `main` at `d1e099f8` (2026-09-30) and did not move.
 - Corpus OPTs `testkit/corpus/templates/{vital_signs,Demonstration.v1,BMI,body_weight}.opt`.
 - `composition.NewSkeleton(ctx, compiled, WithComposer(…), WithTerritory("NL"), WithValueFill(instance.RandomFill))`.
-- `ExampleFill` gives the same defects, in the same counts.
+- The counts are for the `Minimal` policy. `Example` carries more (`vital_signs`: 8 date-times, 4 nameless ELEMENTs, 3 empty CLUSTERs, 4 ELEMENTs with neither value nor null flavour). `ExampleFill` and `RandomFill` give the same counts.
+- The template pass returned OK on all 16 runs (4 templates, 2 policies, 2 fills). `ValidateRM` reported nothing for BMI and body_weight, and only defects 3 and 4 for vital_signs and Demonstration.v1.
 
 ```go
 opt, _ := template.ParseFile("testkit/corpus/templates/vital_signs.opt")
@@ -80,11 +81,11 @@ body, _ := canjson.Marshal(comp)              // "example" as DV_DATE_TIME.value
 
 | # | Defect in the generated body | RM rule (RM BMM) | Example path | Count: vital_signs / Demonstration.v1 / BMI / body_weight | `ValidateComposition` | `ValidateRM` |
 |---|---|---|---|---|---|---|
-| 1 | `DV_DATE_TIME.value` is `"example"` | `DV_DATE_TIME` `Value_valid: valid_iso8601_date_time (value)` | `/content[0]/data/events[0]/time` | 2 / 18 / 4 / 4 | passes | passes |
+| 1 | `DV_DATE_TIME.value` is `"example"`, and so is `DV_DURATION.value` | `DV_DATE_TIME` `Value_valid: valid_iso8601_date_time (value)`; `DV_DURATION` `Value_valid: valid_iso8601_duration (value)` | `/content[0]/data/events[0]/time` | 2 / 18 / 4 / 4, plus 5 `DV_DURATION` in Demonstration.v1 | passes | passes |
 | 2 | `ENTRY.language` and `ENTRY.encoding` are `CODE_PHRASE` `local::example` | `ENTRY` `Language_valid`, `Encoding_valid` (`code_set (…).has_code (…)`) | `/content[0]/language`, `/content[0]/encoding` | 2 per ENTRY | passes | passes |
 | 3 | an ELEMENT with no `name` and `archetype_node_id` `""` | `LOCATABLE.name` mandatory; `Archetype_node_id_valid: not archetype_node_id.is_empty` | `/content[0]/data/events[0]/state/items[0]` (vital_signs) | 1 / 0 / 0 / 0 | passes | reports (`required`) |
 | 4 | a CLUSTER with `items` null | `CLUSTER.items` mandatory, cardinality `1..*` | `/content[0]/protocol/items[0]` (vital_signs); `/content[0]/data/events[n]/data/items[2]/items[0]`, the `openEHR-EHR-CLUSTER.anatomical_location.v1` slot (Demonstration.v1) | 1 / 4 / 0 / 0 | passes | reports (`cardinality`) |
-| 5 | an ELEMENT with both `value` and `null_flavour` | `ELEMENT` `Inv_null_flavour_indicated: is_null() xor null_flavour = Void` | `/content[0]/data/events[0]/data/items[1]/items[12]` (Demonstration.v1, `at0016`) | 0 / 4 / 0 / 0 | passes | passes |
+| 5 | an ELEMENT with both `value` and `null_flavour`, or with neither | `ELEMENT` `Inv_null_flavour_indicated: is_null() xor null_flavour = Void`, an XOR | `/content[0]/data/events[0]/data/items[1]/items[12]` (Demonstration.v1, `at0016`, both) | both 0 / 4 / 0 / 0; neither 1 / 13 / 0 / 0 | passes | passes |
 
 Also seen, not judged: DV_CODED_TEXT values in Demonstration.v1 whose `defining_code` is `local::example`.
 Whether the OPT constrains those codes was not checked.
@@ -119,15 +120,23 @@ An implementation is not a specification; the rules in the table are the RM's ow
    it materialises, such as an ELEMENT inside a BMM-required container, therefore gets neither.
 4. **Empty CLUSTERs.** A CLUSTER created where the OPT gives no child constraint for `items` gets no items.
    This was seen for slot fillers and a protocol CLUSTER.
-5. **Value and null flavour together.** When the OPT constrains both `value` and `null_flavour` (0..1) on an
-   ELEMENT, as Demonstration.v1 does at `at0016`, the Example policy fills both. It must fill one.
+5. **Value and null flavour together, or neither.** When the OPT constrains both `value` and `null_flavour` (0..1)
+   on an ELEMENT, as Demonstration.v1 does at `at0016`, the Example policy fills both. On other ELEMENTs (1 in
+   vital_signs and 13 in Demonstration.v1 under `Minimal`) it fills neither. The RM wants exactly one. Why the
+   neither cases arise is not traced yet; Phase 1 starts by tracing it.
 
 ## Validator gaps
 
-- **The floor misses three rules.** `ValidateRM` (REQ-112) reports defects 3 and 4, but not 1, 2 or 5:
-  - `Value_valid` on `DV_DATE_TIME` (not checked: `DV_DATE`, `DV_TIME`);
-  - `Language_valid` and `Encoding_valid` on `ENTRY`;
-  - `Inv_null_flavour_indicated` on `ELEMENT`.
+- **The floor misses three rules, and can evaluate two of them.** `ValidateRM` (REQ-112) reports defects 3 and 4,
+  but not 1, 2 or 5:
+  - `Value_valid` on `DV_DATE_TIME`, `DV_DATE`, `DV_TIME` and `DV_DURATION` (defect 1). The RM defines the rule
+    for all four, and Demonstration.v1 carries `"example"` in five `DV_DURATION` values;
+  - `Inv_null_flavour_indicated` on `ELEMENT` (defect 5), an XOR: both, and neither, are violations;
+  - `Language_valid` and `Encoding_valid` on `ENTRY` (defect 2). The floor cannot evaluate these: they need the
+    ISO 639-1 and IANA character-set registers, `openehr/terminology` ships neither (its three code sets are
+    compression algorithms, integrity-check algorithms and normal statuses), and the floor's trust model
+    excludes external-code validation. They join the deferred coded invariants (`Setting_valid` and its
+    siblings). The generator satisfies them by construction, and Phase 3 asserts that directly.
 - **The template pass runs no floor at all.** `ValidateComposition` (REQ-102) runs none of these checks,
   which is STRAND-14. Its "Evidence needed" asks how often a template-valid, RM-invalid composition reaches
   a consumer. Here the SDK's own generator produces one on the default path, for every template tried.
@@ -181,16 +190,14 @@ The `nl` language and the `Not specified` purpose fit these Dutch exports. Pick 
 
 ### Phase 0 — Spec (`sdd-specify`)
 
-**Tasks:**
-- **REQ-107.** Generated output MUST pass `ValidateRM` as well as REQ-102, for both `Policy` values and
-  both `ValueFill` values.
-- **REQ-112.** Add to the floor catalogue:
-  - `Value_valid` for `DV_DATE_TIME`, `DV_DATE` and `DV_TIME`;
-  - `ENTRY` `Language_valid` and `Encoding_valid`;
-  - `ELEMENT` `Inv_null_flavour_indicated`.
-- **STRAND-14.** Record the evidence above.
+**Status:** done on this branch. What it wrote:
+- **REQ-107.** Floor-clean output for both `Policy` values and both `ValueFill` values, the ENTRY `language` and `encoding` defaults, and a Known gap. REQ-107 goes `partial` in `REQ.md` and `traceability.yaml` until the code lands.
+- **REQ-112.** Two catalogue rows: `Value_valid` on the four temporal data values, and ELEMENT `Inv_null_flavour_indicated`. Each is marked as specified ahead of the code. `Language_valid` and `Encoding_valid` are not catalogue rows: the trust model excludes external-code validation and the SDK ships neither register, so the trust model section records them as deferred.
+- **PROBE-027.** The spec now says it also asserts `ValidateRM`; the probe itself still asserts `ValidateComposition` only, until Phase 3.
+- **STRAND-14.** The evidence above is recorded; the strand stays open.
+- **`roadmap.md`.** A Planned row, and the coded-invariants Deferred row now names the two rules.
 
-**Definition of done:** `make spec-check` passes, and each amended section cites the RM rule.
+**Definition of done:** `make spec-check` passes, and each amended section cites the RM rule. Met.
 
 ### Phase 1 — Generator fixes
 
@@ -200,22 +207,28 @@ The `nl` language and the `Not specified` purpose fit these Dutch exports. Pick 
 2. Fill `ENTRY.language` from the composition language and `ENTRY.encoding` with `UTF-8`.
 3. Give every materialised LOCATABLE a `name` and a non-empty `archetype_node_id`.
 4. Give a CLUSTER at least one item, or leave out an optional CLUSTER the OPT does not fill.
-5. Fill `value` or `null_flavour` on an ELEMENT, never both.
+5. Fill exactly one of `value` and `null_flavour` on every ELEMENT, never both and never neither.
 
 **Definition of done:** the table's five defects are gone for the four templates.
 
 ### Phase 2 — Floor additions
 
-**Tasks:** implement the Phase 0 floor rules in `ValidateRM`, with a test that fails for each defect when its
-rule is removed.
+**Tasks:** implement the two Phase 0 catalogue rows in `ValidateRM` (`Value_valid` on the four temporal data
+values, and ELEMENT `Inv_null_flavour_indicated` as an XOR), each with a test that fails when its rule is removed.
+Both report the catch-all `rm_invariant` code, so the `floorInvariantCodes` pin in
+`strand14_nonchaining_test.go` needs no new entry; check that it still passes.
 
-**Definition of done:** the floor reports defects 1, 2 and 5 on a body that carries them.
+**Definition of done:** the floor reports defects 1 and 5 on a body that carries them. Defect 2 is not
+floor-detectable (see Validator gaps).
 
 ### Phase 3 — Corpus ratchet
 
 **Tasks:** a test over every COMPOSITION OPT in `testkit/corpus/templates` and `testkit/corpus/webtemplate`,
 for both `Policy` values and both `ValueFill` values. Each generated body must pass `ValidateComposition`
-and `ValidateRM`. Today it would fail on all four templates above, once Phase 2 detects defects 1, 2 and 5.
+and `ValidateRM`, and its ENTRY `language` and `encoding` must equal `Options.Language` and `UTF-8`, asserted
+directly because the floor cannot. Extend PROBE-027 (`testkit/probes/instance/probe_027_generated_validates.go`)
+to also call `ValidateRM` and to run both `ValueFill` values. Today the ratchet would fail on all four templates
+above, once Phase 2 detects defects 1 and 5.
 
 **Definition of done:** `make ci` passes with the ratchet in place.
 
@@ -235,4 +248,5 @@ and `ValidateRM`. Today it would fail on all four templates above, once Phase 2 
 - [clinical-modeling.md § REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator): the generator contract.
 - [clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor): the RM floor.
 - [research-strands.md § STRAND-14](../specifications/research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants): template-driven validation and the floor.
+- [conformance.md § PROBE-027](../specifications/conformance.md#probe-027--generated-instance-validates-clean): the generator and validator probe.
 - [REQ.md](../specifications/REQ.md): the registry rows.
