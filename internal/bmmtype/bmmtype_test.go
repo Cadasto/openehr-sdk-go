@@ -8,8 +8,9 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 )
 
-// Split reads the class and the top-level actual parameters, keeps a nested
-// parameter whole, and refuses every malformed spelling.
+// REQ-100 — the compiler reads OPT-declared generic names through this
+// helper. Split reads the class and the top-level actual parameters, keeps a
+// nested parameter whole, and refuses every malformed spelling.
 func TestSplit(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -27,6 +28,8 @@ func TestSplit(t *testing.T) {
 			class: "FUNCTION", params: []string{"TUPLE2<Integer, Real>", "Boolean"}, ok: true,
 		},
 		{name: "white space around the parts", in: "  DV_INTERVAL < DV_COUNT >  ", class: "DV_INTERVAL", params: []string{"DV_COUNT"}, ok: true},
+		{name: "Unicode space around the parts", in: "\u00a0DV_INTERVAL<\u0085DV_COUNT\v>\u00a0", class: "DV_INTERVAL", params: []string{"DV_COUNT"}, ok: true},
+		{name: "white space before the opening bracket", in: "A <B>", class: "A", params: []string{"B"}, ok: true},
 
 		{name: "empty", in: ""},
 		{name: "blank", in: "   "},
@@ -43,6 +46,13 @@ func TestSplit(t *testing.T) {
 		{name: "closing bracket without an opening one", in: "DV_INTERVAL>"},
 		{name: "top-level comma", in: "DV_TEXT,DV_CODED_TEXT"},
 		{name: "text after a nested closing bracket", in: "A<B<C> D>"},
+		{name: "vertical tab as the only parameter", in: "A<\v>"},
+		{name: "no-break space as the only parameter", in: "A<\u00a0>"},
+		{name: "next-line character as the only parameter", in: "A<\u0085>"},
+		{name: "blank second parameter", in: "Hash<String,\u00a0>"},
+		{name: "white space inside the class name", in: "DV INTERVAL"},
+		{name: "white space inside a generic class name", in: "DV INTERVAL<DV_COUNT>"},
+		{name: "white space inside a parameter", in: "DV_INTERVAL<DV QUANTITY>"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -72,15 +82,17 @@ func TestClass(t *testing.T) {
 	cases := []struct {
 		in, want string
 	}{
-		{"DV_TEXT", "DV_TEXT"},
-		{"DV_INTERVAL<DV_QUANTITY>", "DV_INTERVAL"},
-		{"A<B<C>>", "A"},
-		{"Hash<String, String>", "Hash"},
-		{" DV_INTERVAL <DV_COUNT> ", "DV_INTERVAL"},
-		{"", ""},
-		{"DV_INTERVAL<DV_QUANTITY", "DV_INTERVAL<DV_QUANTITY"},
-		{"DV_INTERVAL<>", "DV_INTERVAL<>"},
-		{"DV_INTERVAL<DV_QUANTITY>junk", "DV_INTERVAL<DV_QUANTITY>junk"},
+		{in: "DV_TEXT", want: "DV_TEXT"},
+		{in: "DV_INTERVAL<DV_QUANTITY>", want: "DV_INTERVAL"},
+		{in: "A<B<C>>", want: "A"},
+		{in: "Hash<String, String>", want: "Hash"},
+		{in: " DV_INTERVAL <DV_COUNT> ", want: "DV_INTERVAL"},
+		{in: "", want: ""},
+		{in: "DV_INTERVAL<DV_QUANTITY", want: "DV_INTERVAL<DV_QUANTITY"},
+		{in: "DV_INTERVAL<>", want: "DV_INTERVAL<>"},
+		{in: "DV_INTERVAL<DV_QUANTITY>junk", want: "DV_INTERVAL<DV_QUANTITY>junk"},
+		{in: "DV INTERVAL", want: "DV INTERVAL"},
+		{in: "A<\v>", want: "A<\v>"},
 	}
 	for _, tc := range cases {
 		if got := bmmtype.Class(tc.in); got != tc.want {
@@ -95,18 +107,18 @@ func TestSubstitute(t *testing.T) {
 	cases := []struct {
 		name, owner, declared, want string
 	}{
-		{"interval bound of a quantity interval", "DV_INTERVAL<DV_QUANTITY>", "T", "DV_QUANTITY"},
-		{"interval bound of a count interval", "DV_INTERVAL<DV_COUNT>", "T", "DV_COUNT"},
-		{"event data", "POINT_EVENT<ITEM_TREE>", "T", "ITEM_TREE"},
-		{"version data", "ORIGINAL_VERSION<COMPOSITION>", "T", "COMPOSITION"},
+		{name: "interval bound of a quantity interval", owner: "DV_INTERVAL<DV_QUANTITY>", declared: "T", want: "DV_QUANTITY"},
+		{name: "interval bound of a count interval", owner: "DV_INTERVAL<DV_COUNT>", declared: "T", want: "DV_COUNT"},
+		{name: "event data", owner: "POINT_EVENT<ITEM_TREE>", declared: "T", want: "ITEM_TREE"},
+		{name: "version data", owner: "ORIGINAL_VERSION<COMPOSITION>", declared: "T", want: "COMPOSITION"},
 		// Syntax, not conformance: the actual parameter is returned whole.
-		{"nested actual parameter", "DV_INTERVAL<DV_INTERVAL<DV_COUNT>>", "T", "DV_INTERVAL<DV_COUNT>"},
-		{"declared type is not a formal parameter", "DV_INTERVAL<DV_QUANTITY>", "Boolean", "Boolean"},
-		{"owner without parameters", "DV_INTERVAL", "T", "T"},
-		{"too many actual parameters", "DV_INTERVAL<DV_QUANTITY, DV_COUNT>", "T", "T"},
-		{"class that is not generic", "DV_TEXT<DV_QUANTITY>", "T", "T"},
-		{"malformed owner", "DV_INTERVAL<DV_QUANTITY", "T", "T"},
-		{"empty declared type", "DV_INTERVAL<DV_QUANTITY>", "", ""},
+		{name: "nested actual parameter", owner: "DV_INTERVAL<DV_INTERVAL<DV_COUNT>>", declared: "T", want: "DV_INTERVAL<DV_COUNT>"},
+		{name: "declared type is not a formal parameter", owner: "DV_INTERVAL<DV_QUANTITY>", declared: "Boolean", want: "Boolean"},
+		{name: "owner without parameters", owner: "DV_INTERVAL", declared: "T", want: "T"},
+		{name: "too many actual parameters", owner: "DV_INTERVAL<DV_QUANTITY, DV_COUNT>", declared: "T", want: "T"},
+		{name: "class that is not generic", owner: "DV_TEXT<DV_QUANTITY>", declared: "T", want: "T"},
+		{name: "malformed owner", owner: "DV_INTERVAL<DV_QUANTITY", declared: "T", want: "T"},
+		{name: "empty declared type", owner: "DV_INTERVAL<DV_QUANTITY>", declared: "", want: ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -11,6 +11,7 @@ package bmmtype
 import (
 	"slices"
 	"strings"
+	"unicode"
 )
 
 // Split parses a BMM type name into its class name and its actual generic
@@ -18,12 +19,13 @@ import (
 // ["DV_QUANTITY"]; "Hash<String, String>" gives "Hash" and two "String"
 // parameters; a nested parameter stays whole, so "A<B<C>>" gives "A" and
 // ["B<C>"]. A name without parameters gives itself and nil. White space
-// around the name and around each part is ignored.
+// (any Unicode space) around the name and around each part is ignored.
 //
 // ok is false when name is not a well-formed type name: it is empty, a class
-// name or a parameter is missing, the angle brackets do not balance, or text
-// follows the closing bracket. Split reads name once, so its cost grows with
-// the length of the name and not with how deeply the parameters nest.
+// name or a parameter is missing or blank, a class name has white space
+// inside it ("DV INTERVAL"), the angle brackets do not balance, or text
+// follows the closing bracket. Split runs in linear time in the length of
+// the name, however deeply the parameters nest.
 func Split(name string) (class string, params []string, ok bool) {
 	name = strings.TrimSpace(name)
 	if !wellFormed(name) {
@@ -111,26 +113,29 @@ var formalParameters = map[string][]string{
 }
 
 // wellFormed reports whether s is exactly one type name: a class name,
-// optionally followed by a bracketed, comma-separated list of type names. It
-// makes a single pass over s.
+// optionally followed by a bracketed, comma-separated list of type names. White
+// space is what [unicode.IsSpace] reports, the same set [strings.TrimSpace]
+// strips, so a part that is blank once trimmed is refused here. It makes a
+// single pass over s.
 func wellFormed(s string) bool {
 	depth := 0
 	named := false  // the type being read has a class name
+	spaced := false // white space followed that class name
 	closed := false // the type being read has had its parameter list closed
-	for i := range len(s) {
-		switch s[i] {
-		case '<':
+	for _, r := range s {
+		switch {
+		case r == '<':
 			if !named || closed {
 				return false
 			}
 			depth++
-			named = false
-		case ',':
+			named, spaced = false, false
+		case r == ',':
 			if !named || depth == 0 {
 				return false
 			}
-			named, closed = false, false
-		case '>':
+			named, spaced, closed = false, false, false
+		case r == '>':
 			if !named || depth == 0 {
 				return false
 			}
@@ -138,9 +143,12 @@ func wellFormed(s string) bool {
 			// now had its parameter list closed.
 			depth--
 			closed = true
-		case ' ', '\t', '\n', '\r':
+		case unicode.IsSpace(r):
+			spaced = named
 		default:
-			if closed {
+			// A class name is one unbroken run: nothing may follow a closed
+			// parameter list, and no white space may split the name.
+			if closed || spaced {
 				return false
 			}
 			named = true
