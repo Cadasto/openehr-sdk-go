@@ -3,11 +3,17 @@ package validation
 // rmfloor_bytes.go: PROBE-081 — REQ-112 — the presence-aware EHR_STATUS
 // entry to the template-less RM floor. It closes the value-typed
 // mandatory-attribute blind spot that the value-based [ValidateRMEHRStatus]
-// structurally cannot: EHR_STATUS.subject is typed rm.PartySelf — a value
-// struct whose only field (external_ref) is optional — so an omitted
-// subject and a valid bare PARTY_SELF decode to the *identical* Go zero
-// value. Presence therefore cannot be read from the decoded value; only
-// the presence of the `subject` key in the source JSON carries it.
+// structurally cannot, at the root EHR_STATUS:
+//
+//   - EHR_STATUS.subject is typed rm.PartySelf — a value struct whose only
+//     field (external_ref) is optional — so an omitted subject and a valid
+//     bare PARTY_SELF decode to the *identical* Go zero value;
+//   - the root's ARCHETYPED archetype_id (rm.ArchetypeID) and rm_version
+//     (a string) are value-typed too, so an omitted one decodes to the same
+//     zero value as an empty one.
+//
+// Presence therefore cannot be read from the decoded value; only the
+// presence of the key in the source JSON carries it.
 
 import (
 	"bytes"
@@ -30,6 +36,18 @@ import (
 // treated as absent: a null does not satisfy the mandatory attribute and
 // decodes to the same zero rm.PartySelf. A supplied subject, even the bare
 // form, yields no spurious `required`.
+//
+// It decides the root's ARCHETYPED key presence the same way. When the
+// top-level `archetype_details` is present, an absent or null `archetype_id`
+// key in it is `required` at `/archetype_details/archetype_id`, and an absent
+// or null `rm_version` key is `required` at `/archetype_details/rm_version`.
+// Both attributes are value-typed, so the value-based floor sees only their
+// zero values. A key-presence finding replaces the value-based finding at the
+// same path, so each path carries one finding: an absent `rm_version` is
+// `required`, not `rm_version_valid`, while an absent `archetype_id` is
+// `required` at `archetype_id` beside the value-based `required` at
+// `archetype_id/value`. Key presence is read at the root only: an
+// ARCHETYPED lower in the tree gets the value-based findings alone.
 //
 // Attributes the value-based floor already catches (the interface-,
 // pointer- and slice-typed mandatories, e.g. `name`, typed rm.DVTextLike)
@@ -75,20 +93,81 @@ func ValidateRMEHRStatusBytes(data []byte) Result {
 
 	r := ValidateRMEHRStatus(&status)
 
-	if raw, present := keys["subject"]; !present || isJSONNull(raw) {
-		// subject is RM-mandatory (rminfo) and value-typed (rm.PartySelf);
-		// the value-based floor reads its zero value as present, so the
-		// absence is decided here from JSON-key presence. A present-but-null
-		// value is treated as absent — a null does not satisfy a mandatory
-		// attribute and decodes to the same zero PartySelf as an omitted one.
-		return resultFromIssues(append(r.Issues, Issue{
+	absent := rootKeyAbsences(keys)
+	if len(absent) == 0 {
+		return r
+	}
+	return resultFromIssues(replaceAtPaths(r.Issues, absent))
+}
+
+// rootKeyAbsences returns the `required` findings for the value-typed
+// mandatory attributes of the root EHR_STATUS whose key is absent or null:
+// `subject`, and, when `archetype_details` is present, its `archetype_id`
+// and `rm_version`. The value-based floor reads the zero value of each as
+// present, so only the key set can tell an omitted attribute from a supplied
+// one. A null does not satisfy a mandatory attribute and decodes to the same
+// zero value as an omitted one, so it counts as absent.
+func rootKeyAbsences(keys map[string]jsontext.Value) []Issue {
+	var out []Issue
+	if keyAbsent(keys, "subject") {
+		out = append(out, Issue{
 			Path:     "/subject",
 			Code:     "required",
 			Detail:   `RM-mandatory attribute "subject" is absent or null on EHR_STATUS`,
 			Severity: Error,
-		}))
+		})
 	}
-	return r
+	if keyAbsent(keys, "archetype_details") {
+		// No ARCHETYPED to read keys from; the value-based floor reports
+		// the absent archetype_details on the archetype root.
+		return out
+	}
+	var details map[string]jsontext.Value
+	if err := json.Unmarshal(keys["archetype_details"], &details); err != nil {
+		// Not expected: the EHR_STATUS decode has already accepted the
+		// member as an ARCHETYPED object. Report the shape rather than read
+		// keys from a member that has none.
+		return append(out, Issue{
+			Path:     "/archetype_details",
+			Code:     "invalid_shape",
+			Detail:   "ValidateRMEHRStatusBytes: archetype_details is not a JSON object",
+			Severity: Error,
+		})
+	}
+	for _, attr := range []string{"archetype_id", "rm_version"} {
+		if keyAbsent(details, attr) {
+			out = append(out, Issue{
+				Path:     "/archetype_details/" + attr,
+				Code:     "required",
+				Detail:   `RM-mandatory attribute "` + attr + `" is absent or null on ARCHETYPED`,
+				Severity: Error,
+			})
+		}
+	}
+	return out
+}
+
+// replaceAtPaths returns issues without any issue at the path of one of
+// replacements, followed by replacements. A key-presence finding thereby takes
+// the place of the value-based finding at its path.
+func replaceAtPaths(issues, replacements []Issue) []Issue {
+	replaced := make(map[string]bool, len(replacements))
+	for _, r := range replacements {
+		replaced[r.Path] = true
+	}
+	out := make([]Issue, 0, len(issues)+len(replacements))
+	for _, i := range issues {
+		if !replaced[i.Path] {
+			out = append(out, i)
+		}
+	}
+	return append(out, replacements...)
+}
+
+// keyAbsent reports whether keys lacks key or holds it as JSON null.
+func keyAbsent(keys map[string]jsontext.Value, key string) bool {
+	raw, present := keys[key]
+	return !present || isJSONNull(raw)
 }
 
 // isJSONNull reports whether a raw JSON value is the literal `null` token

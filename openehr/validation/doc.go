@@ -44,9 +44,14 @@
 // layer beneath that: a second driver that walks any RM root with
 // rminfo as the sole structural source (no OPT) and enforces
 // RM-mandatory attribute presence plus a small per-RM-type invariant
-// catalogue (CODE_PHRASE, DV_QUANTITY precision, DV_PROPORTION
-// precision, DV_INTERVAL numeric bounds, OBJECT_REF
-// id/type/namespace). Template validity does not imply RM validity:
+// catalogue: a non-empty CODE_PHRASE code_string (a DV_SCALE symbol,
+// which the RM lets carry no code, is exempt), DV_QUANTITY and
+// DV_PROPORTION precision, DV_INTERVAL numeric bounds, OBJECT_REF
+// id/type/namespace, a DV_TEXT mappings list that is not empty when
+// present, a TERM_MAPPING match from its closed set, archetype_details
+// on every archetype root (COMPOSITION, EHR_STATUS, EHR_ACCESS, and
+// every PARTY and ENTRY), and a non-empty archetype_id and rm_version
+// on every ARCHETYPED. Template validity does not imply RM validity:
 // the template layer covers RM-mandatory presence on the nodes the
 // template models, not the per-type invariant catalogue, so a
 // composition can pass [Validate] and still be RM-invalid. The two

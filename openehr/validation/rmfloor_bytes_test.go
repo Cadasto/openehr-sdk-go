@@ -7,19 +7,28 @@ package validation_test
 // mandatories the value-based floor already catches.
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
 // A well-formed EHR_STATUS with `subject` supplied as a bare PARTY_SELF
 // (no external_ref) — the common, valid "subject is the record patient"
 // shape. It decodes to a zero rm.PartySelf, so a Go-value emptiness
-// heuristic would wrongly flag it; presence-from-JSON must not.
+// heuristic would wrongly flag it; presence-from-JSON must not. EHR_STATUS is
+// an archetype root, so the body carries a complete archetype_details and is
+// valid RM throughout (REQ-112).
 const ehrStatusBareSubject = `{
 	"_type": "EHR_STATUS",
 	"name": {"_type": "DV_TEXT", "value": "EHR Status"},
 	"archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+	"archetype_details": {"_type": "ARCHETYPED",
+		"archetype_id": {"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-EHR_STATUS.generic.v1"},
+		"rm_version": "1.1.0"},
 	"subject": {"_type": "PARTY_SELF"},
 	"is_modifiable": true,
 	"is_queryable": true
@@ -238,6 +247,202 @@ func TestValidateRMEHRStatusBytes_V2DecodeSemantics(t *testing.T) {
 			}
 			if !containsIssue(r.Issues, tc.path, tc.code) {
 				t.Errorf("ValidateRMEHRStatusBytes(%s): want %s @ %s, got %+v", tc.name, tc.code, tc.path, r.Issues)
+			}
+		})
+	}
+}
+
+// completeArchetypeDetails is an ARCHETYPED carrying both RM-mandatory
+// attributes, the shape an EHR_STATUS archetype root needs.
+const completeArchetypeDetails = `{"_type": "ARCHETYPED",
+		"archetype_id": {"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-EHR_STATUS.generic.v1"},
+		"rm_version": "1.1.0"}`
+
+// ehrStatusWithArchetypeDetails returns a valid EHR_STATUS body whose
+// archetype_details member is details, verbatim; an empty details leaves the
+// member out.
+func ehrStatusWithArchetypeDetails(details string) []byte {
+	member := ""
+	if details != "" {
+		member = `"archetype_details": ` + details + `,`
+	}
+	return []byte(`{
+	"_type": "EHR_STATUS",
+	"name": {"_type": "DV_TEXT", "value": "EHR Status"},
+	"archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+	` + member + `
+	"subject": {"_type": "PARTY_SELF"},
+	"is_modifiable": true,
+	"is_queryable": true
+}`)
+}
+
+// findingsOf returns each issue as "code path", sorted, so two results compare
+// by their findings and not by the order the walk emits them in.
+func findingsOf(r validation.Result) []string {
+	out := make([]string, 0, len(r.Issues))
+	for _, i := range r.Issues {
+		out = append(out, i.Code+" "+i.Path)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// TestValidateRMEHRStatus_ArchetypeDetails is PROBE-081's ARCHETYPED arm
+// (REQ-112). EHR_STATUS is an archetype root (RM Is_archetype_root), so its
+// archetype_details is mandatory, and an ARCHETYPED needs a non-empty
+// archetype_id and rm_version. Each row gives one archetype_details shape and
+// the exact findings of both entries:
+//
+//   - the value entry (ValidateRMEHRStatus on the decoded value) reads absent,
+//     null and empty the same way, since they decode to one zero value: an
+//     empty archetype_id is `required` at archetype_id/value, an empty
+//     rm_version is `rm_version_valid`;
+//   - the Bytes entry also sees the JSON keys of the root's archetype_details,
+//     so an absent or null archetype_id or rm_version key is `required` at the
+//     attribute path. That finding replaces the value walk's finding at the
+//     same path (rm_version), and sits beside the deeper one it does not share
+//     a path with (archetype_id/value). One finding per path.
+func TestValidateRMEHRStatus_ArchetypeDetails(t *testing.T) {
+	const (
+		detailsPath = "/archetype_details"
+		idPath      = "/archetype_details/archetype_id"
+		idValuePath = "/archetype_details/archetype_id/value"
+		versionPath = "/archetype_details/rm_version"
+	)
+	const validID = `"archetype_id": {"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-EHR_STATUS.generic.v1"}`
+	cases := []struct {
+		name      string
+		details   string // the archetype_details member; empty leaves it out
+		wantValue []string
+		wantBytes []string
+	}{
+		{
+			name:      "archetype_details absent",
+			wantValue: []string{"is_archetype_root " + detailsPath},
+			wantBytes: []string{"is_archetype_root " + detailsPath},
+		},
+		{
+			name:      "archetype_details null",
+			details:   `null`,
+			wantValue: []string{"is_archetype_root " + detailsPath},
+			wantBytes: []string{"is_archetype_root " + detailsPath},
+		},
+		{
+			name:      "ARCHETYPED with no attributes",
+			details:   `{"_type": "ARCHETYPED"}`,
+			wantValue: []string{"required " + idValuePath, "rm_version_valid " + versionPath},
+			wantBytes: []string{"required " + idPath, "required " + idValuePath, "required " + versionPath},
+		},
+		{
+			name:      "archetype_id value empty",
+			details:   `{"_type": "ARCHETYPED", "archetype_id": {"_type": "ARCHETYPE_ID", "value": ""}, "rm_version": "1.1.0"}`,
+			wantValue: []string{"required " + idValuePath},
+			wantBytes: []string{"required " + idValuePath},
+		},
+		{
+			name:      "archetype_id absent",
+			details:   `{"_type": "ARCHETYPED", "rm_version": "1.1.0"}`,
+			wantValue: []string{"required " + idValuePath},
+			wantBytes: []string{"required " + idPath, "required " + idValuePath},
+		},
+		{
+			name:      "archetype_id null",
+			details:   `{"_type": "ARCHETYPED", "archetype_id": null, "rm_version": "1.1.0"}`,
+			wantValue: []string{"required " + idValuePath},
+			wantBytes: []string{"required " + idPath, "required " + idValuePath},
+		},
+		{
+			name:      "rm_version absent",
+			details:   `{"_type": "ARCHETYPED", ` + validID + `}`,
+			wantValue: []string{"rm_version_valid " + versionPath},
+			wantBytes: []string{"required " + versionPath},
+		},
+		{
+			name:      "rm_version null",
+			details:   `{"_type": "ARCHETYPED", ` + validID + `, "rm_version": null}`,
+			wantValue: []string{"rm_version_valid " + versionPath},
+			wantBytes: []string{"required " + versionPath},
+		},
+		{
+			name:      "rm_version empty",
+			details:   `{"_type": "ARCHETYPED", ` + validID + `, "rm_version": ""}`,
+			wantValue: []string{"rm_version_valid " + versionPath},
+			wantBytes: []string{"rm_version_valid " + versionPath},
+		},
+		{
+			name:    "complete",
+			details: completeArchetypeDetails,
+		},
+		{
+			// template_id is optional in the RM; its presence changes nothing.
+			name:    "complete with template_id",
+			details: `{"_type": "ARCHETYPED", ` + validID + `, "template_id": {"_type": "TEMPLATE_ID", "value": "ehr_status.v1"}, "rm_version": "1.1.0"}`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			data := ehrStatusWithArchetypeDetails(tc.details)
+
+			var status rm.EHRStatus
+			if err := canjson.Unmarshal(data, &status); err != nil {
+				t.Fatalf("canjson.Unmarshal: %v", err)
+			}
+			if got := findingsOf(validation.ValidateRMEHRStatus(&status)); !slices.Equal(got, tc.wantValue) {
+				t.Errorf("ValidateRMEHRStatus(decoded %s) findings = %q, want %q", tc.name, got, tc.wantValue)
+			}
+
+			r := validation.ValidateRMEHRStatusBytes(data)
+			if got := findingsOf(r); !slices.Equal(got, tc.wantBytes) {
+				t.Errorf("ValidateRMEHRStatusBytes(%s) findings = %q, want %q", tc.name, got, tc.wantBytes)
+			}
+			if r.OK != (len(tc.wantBytes) == 0) {
+				t.Errorf("ValidateRMEHRStatusBytes(%s).OK = %v, want %v", tc.name, r.OK, len(tc.wantBytes) == 0)
+			}
+			seen := map[string]bool{}
+			for _, i := range r.Issues {
+				if seen[i.Path] {
+					t.Errorf("ValidateRMEHRStatusBytes(%s) reports %s twice; want one finding per path: %+v", tc.name, i.Path, r.Issues)
+				}
+				seen[i.Path] = true
+			}
+		})
+	}
+}
+
+// TestValidateRMEHRStatusBytes_ArchetypeKeysRootOnly pins the scope of the
+// Bytes entry's ARCHETYPED key presence (REQ-112): it reads the root
+// EHR_STATUS's archetype_details only, as it does subject. An ARCHETYPED lower
+// down, here under other_details, gets the value walk's findings alone: its
+// absent rm_version is `rm_version_valid`, not `required`, and its absent
+// archetype_id adds no finding at archetype_id itself.
+func TestValidateRMEHRStatusBytes_ArchetypeKeysRootOnly(t *testing.T) {
+	data := ehrStatusWithArchetypeDetails(completeArchetypeDetails)
+	nested := `"other_details": {"_type": "ITEM_TREE", "name": {"_type": "DV_TEXT", "value": "tree"},
+		"archetype_node_id": "openEHR-EHR-ITEM_TREE.status.v1",
+		"archetype_details": {"_type": "ARCHETYPED"}},
+	"is_queryable"`
+	data = []byte(strings.Replace(string(data), `"is_queryable"`, nested, 1))
+
+	want := []string{
+		"required /other_details/archetype_details/archetype_id/value",
+		"rm_version_valid /other_details/archetype_details/rm_version",
+	}
+	if got := findingsOf(validation.ValidateRMEHRStatusBytes(data)); !slices.Equal(got, want) {
+		t.Errorf("ValidateRMEHRStatusBytes(nested ARCHETYPED with no attributes) findings = %q, want %q", got, want)
+	}
+}
+
+// TestValidateRMEHRStatusBytes_ArchetypeDetailsNotAnObject pins a
+// non-object archetype_details on the Bytes entry (PROBE-081, REQ-112): the
+// EHR_STATUS decode refuses it, so the result is a single invalid_shape at
+// "/", and the key-presence reading of archetype_details never runs on it.
+func TestValidateRMEHRStatusBytes_ArchetypeDetailsNotAnObject(t *testing.T) {
+	for _, details := range []string{`[]`, `"openEHR-EHR-EHR_STATUS.generic.v1"`, `42`} {
+		t.Run(details, func(t *testing.T) {
+			got := findingsOf(validation.ValidateRMEHRStatusBytes(ehrStatusWithArchetypeDetails(details)))
+			if want := []string{"invalid_shape /"}; !slices.Equal(got, want) {
+				t.Errorf("ValidateRMEHRStatusBytes(archetype_details %s) findings = %q, want %q", details, got, want)
 			}
 		})
 	}

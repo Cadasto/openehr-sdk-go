@@ -19,7 +19,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // TestValidateRMFolder_MissingName covers the dossier's named case:
@@ -53,17 +52,18 @@ func TestValidateRMFolder_Valid(t *testing.T) {
 }
 
 // TestValidateRMEHRStatus_MinimallyValid covers a well-formed
-// EHR_STATUS: archetype node id, name, subject (PartySelf — no required
-// child attributes), is_modifiable/is_queryable (bool defaults are
-// legal). Floor walker reports OK without descending into any
-// invariant trap.
+// EHR_STATUS: archetype node id, name, archetype_details (EHR_STATUS is an
+// archetype root, REQ-112), subject (PartySelf — no required child
+// attributes), is_modifiable/is_queryable (bool defaults are legal). Floor
+// walker reports OK without descending into any invariant trap.
 func TestValidateRMEHRStatus_MinimallyValid(t *testing.T) {
 	status := &rm.EHRStatus{
-		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
-		Name:            rm.DVText{Value: "EHR Status"},
-		Subject:         rm.PartySelf{},
-		IsModifiable:    true,
-		IsQueryable:     true,
+		ArchetypeNodeID:  "openEHR-EHR-EHR_STATUS.generic.v1",
+		Name:             rm.DVText{Value: "EHR Status"},
+		ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-EHR_STATUS.generic.v1"}, RMVersion: "1.1.0"},
+		Subject:          rm.PartySelf{},
+		IsModifiable:     true,
+		IsQueryable:      true,
 	}
 	r := validation.ValidateRMEHRStatus(status)
 	if !r.OK {
@@ -236,12 +236,16 @@ func TestValidateRMFolder_ObjectRefItemMissingType(t *testing.T) {
 }
 
 // TestValidateRMEHRAccess_Valid is the regression guard for the EHR_ACCESS
-// dispatch gap: a non-nil EHR_ACCESS is recognised and walked (returns OK)
-// rather than reported as rm_type_unknown.
+// dispatch gap: a non-nil EHR_ACCESS is recognised rather than reported as
+// rm_type_unknown, and one carrying its RM-mandatory name and
+// archetype_node_id, plus the archetype_details an archetype root needs,
+// walks clean (REQ-112). The findings on an incomplete one are pinned by
+// TestValidateRMEHRAccess_Walked.
 func TestValidateRMEHRAccess_Valid(t *testing.T) {
 	access := &rm.EHRAccess{
-		ArchetypeNodeID: "openEHR-EHR-EHR_ACCESS.generic.v1",
-		Name:            rm.DVText{Value: "EHR Access"},
+		ArchetypeNodeID:  "openEHR-EHR-EHR_ACCESS.generic.v1",
+		Name:             rm.DVText{Value: "EHR Access"},
+		ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-EHR_ACCESS.generic.v1"}, RMVersion: "1.1.0"},
 	}
 	r := validation.ValidateRMEHRAccess(access)
 	if !r.OK {
@@ -651,12 +655,9 @@ func TestRMFloorDVCodedTextMappingsNullIsValid(t *testing.T) {
 // fault inside a bound validated clean. Each row plants one fault inside a
 // bound — a catalogue invariant, or an RM-mandatory attribute left empty —
 // and lists every issue the floor must report, by code and path. The list is
-// exact, so a spurious issue fails the row too.
-//
-// DV_ORDINAL and DV_SCALE bounds are opaque leaves to the floor (rmread does
-// not model those two classes), so no fault inside them is reportable. Their
-// rows check the reader path the walk takes instead: the interval is
-// modelled, and both bounds read back as the bound class.
+// exact, so a spurious issue fails the row too. For DV_ORDINAL and DV_SCALE
+// bounds the planted fault is an absent symbol, which both classes make
+// RM-mandatory.
 //
 // The half-open rows pin the other side of the walk: an unbounded side
 // carries no bound, so the floor does not descend into the zero value a
@@ -665,6 +666,12 @@ func TestRMFloorDVCodedTextMappingsNullIsValid(t *testing.T) {
 // skip applies only to an empty bound: a real bound standing beside its own
 // flag is walked like any bound, so a fault inside it is reported too (the
 // contradiction with the flag is not).
+//
+// The mixed-bound row pins the ordering check to bounds of one type. The RM
+// defines `<=` per type (DV_COUNT.less_than takes a DV_COUNT,
+// DV_QUANTITY.less_than a DV_QUANTITY), so a bare interval whose bounds are a
+// DV_COUNT and a unitless DV_QUANTITY has no ordering, and lower > upper is
+// not reported there.
 func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 	badPrecision := rm.Integer(-5)
 	emptyStatus := &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr_normal_statuses"}}
@@ -680,9 +687,6 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 		name string
 		root any
 		want []issue
-		// opaqueBound names the bound class of a root interval that the
-		// floor does not model; set only on the DV_ORDINAL and DV_SCALE rows.
-		opaqueBound string
 	}{
 		{
 			name: "DV_QUANTITY under normal_range",
@@ -755,17 +759,36 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 			name: "DV_ORDINAL as root",
 			root: &rm.DVInterval[rm.DVOrdinal]{
 				Lower: rm.DVOrdinal{Value: 1, Symbol: symbol("at1")}, LowerIncluded: true,
-				Upper: rm.DVOrdinal{Value: 3, Symbol: symbol("at3")}, UpperIncluded: true,
+				Upper: rm.DVOrdinal{Value: 3}, UpperIncluded: true,
 			},
-			opaqueBound: "DV_ORDINAL",
+			want: []issue{{"/upper/symbol", "required"}},
 		},
 		{
-			name: "DV_SCALE as root",
-			root: &rm.DVInterval[rm.DVScale]{
-				Lower: rm.DVScale{Value: 0.5, Symbol: symbol("at1")}, LowerIncluded: true,
+			name: "DV_SCALE as root, value form",
+			root: rm.DVInterval[rm.DVScale]{
+				Lower: rm.DVScale{Value: 0.5}, LowerIncluded: true,
 				Upper: rm.DVScale{Value: 2.5, Symbol: symbol("at3")}, UpperIncluded: true,
 			},
-			opaqueBound: "DV_SCALE",
+			want: []issue{{"/lower/symbol", "required"}},
+		},
+		{
+			name: "DV_ORDINAL as root, both bounds complete",
+			root: &rm.DVInterval[rm.DVOrdinal]{
+				Lower: rm.DVOrdinal{Value: 1, Symbol: symbol("at1")}, LowerIncluded: true,
+				Upper: rm.DVOrdinal{Value: 3, Symbol: symbol("at3")}, UpperIncluded: true,
+			},
+		},
+		{
+			// The unitless DV_QUANTITY is itself incomplete (units is
+			// RM-mandatory); what the row pins is that its magnitude is not
+			// ordered against the DV_COUNT's.
+			// The mixed pair is not compared, and Limits_comparable is not checked.
+			name: "bare DV_INTERVAL as root, a DV_COUNT bound over a unitless DV_QUANTITY bound",
+			root: &rm.DVInterval[rm.DVOrdered]{
+				Lower: rm.DVCount{Magnitude: 10}, LowerIncluded: true,
+				Upper: rm.DVQuantity{Magnitude: 5}, UpperIncluded: true,
+			},
+			want: []issue{{"/upper/units", "required"}},
 		},
 		{
 			name: "DV_QUANTITY under normal_range, upper unbounded",
@@ -854,18 +877,6 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 			}
 			if !slices.Equal(got, tc.want) {
 				t.Errorf("ValidateRM(%T) issues = %v, want %v\nfull issues: %+v", tc.root, got, tc.want, r.Issues)
-			}
-			if tc.opaqueBound == "" {
-				return
-			}
-			if !rmread.Handles(tc.root) {
-				t.Fatalf("rmread.Handles(%T) = false, want true: the floor stops at the interval", tc.root)
-			}
-			for _, attr := range []string{"lower", "upper"} {
-				v, ok := rmread.ReadSingle(tc.root, "DV_INTERVAL", attr)
-				if gotBound, _ := rm.RMTypeName(v); !ok || gotBound != tc.opaqueBound {
-					t.Errorf("rmread.ReadSingle(%T, %q) = (%q bound, %v), want (%q bound, true)", tc.root, attr, gotBound, ok, tc.opaqueBound)
-				}
 			}
 		})
 	}

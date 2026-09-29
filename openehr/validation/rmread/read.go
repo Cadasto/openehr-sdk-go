@@ -4,11 +4,13 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
 // ReadSingle returns the RM value at `attrName` on `parent`.
 // The second (named-blank) parameter is the OPT-declared RM
-// class name. Dispatch is purely on the Go concrete type of
-// `parent`, but the parameter is retained so callers boxing an
-// RM value through an interface can pass through the compiled RM
-// type without re-flattening, and so a future dispatch table can
-// key on the string.
+// class name. Dispatch is on the Go concrete type of `parent`,
+// with one exception: `archetype_details`, which every LOCATABLE
+// inherits, is read first by attribute name for any parent
+// [Handles] accepts. The parameter is unused but retained so
+// callers boxing an RM value through an interface can pass through
+// the compiled RM type without re-flattening, and so a future
+// dispatch table can key on the string.
 //
 // `ok` is false when the attribute is absent (nil pointer, nil
 // interface, typed-nil pointer behind an interface (see
@@ -20,8 +22,15 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 //
 // Returns `(nil, false)` for unknown (parent, attrName) pairs;
 // callers should treat that as "not addressable" rather than an
-// error.
+// error. A nil parent, or a typed-nil pointer parent, reads as
+// `(nil, false)` too, the not-present answer, rather than panicking.
 func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
+	if IsTypedNilPointer(parent) {
+		return nil, false
+	}
+	if attrName == "archetype_details" {
+		return readArchetypeDetails(parent)
+	}
 	switch p := parent.(type) {
 	case *rm.Composition:
 		return readCompositionSingle(p, attrName)
@@ -198,6 +207,36 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	case rm.DVParsable:
 		return readDVParsableSingle(&p, attrName)
 
+	case *rm.DVOrdinal:
+		return readDVOrdinalSingle(p, attrName)
+	case rm.DVOrdinal:
+		return readDVOrdinalSingle(&p, attrName)
+
+	case *rm.DVScale:
+		return readDVScaleSingle(p, attrName)
+	case rm.DVScale:
+		return readDVScaleSingle(&p, attrName)
+
+	// REFERENCE_RANGE, in the instantiations DV_ORDERED.other_reference_ranges
+	// carries: the bare one, and the typed ones of DV_COUNT, DV_QUANTITY and
+	// DV_PROPORTION.
+	case *rm.ReferenceRange[rm.DVOrdered]:
+		return readReferenceRangeSingle(p, attrName)
+	case rm.ReferenceRange[rm.DVOrdered]:
+		return readReferenceRangeSingle(&p, attrName)
+	case *rm.ReferenceRange[rm.DVCount]:
+		return readReferenceRangeSingle(p, attrName)
+	case rm.ReferenceRange[rm.DVCount]:
+		return readReferenceRangeSingle(&p, attrName)
+	case *rm.ReferenceRange[rm.DVQuantity]:
+		return readReferenceRangeSingle(p, attrName)
+	case rm.ReferenceRange[rm.DVQuantity]:
+		return readReferenceRangeSingle(&p, attrName)
+	case *rm.ReferenceRange[rm.DVProportion]:
+		return readReferenceRangeSingle(p, attrName)
+	case rm.ReferenceRange[rm.DVProportion]:
+		return readReferenceRangeSingle(&p, attrName)
+
 	case *rm.DVInterval[rm.DVQuantity]:
 		return readDVIntervalQuantitySingle(p, attrName)
 	case rm.DVInterval[rm.DVQuantity]:
@@ -309,6 +348,17 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 		return readEHRStatusSingle(p, attrName)
 	case rm.EHRStatus:
 		return readEHRStatusSingle(&p, attrName)
+
+	case *rm.EHRAccess:
+		return readEHRAccessSingle(p, attrName)
+	case rm.EHRAccess:
+		return readEHRAccessSingle(&p, attrName)
+
+	// --- archetyping: the ARCHETYPED node under LOCATABLE.archetype_details ---
+	case *rm.Archetyped:
+		return readArchetypedSingle(p, attrName)
+	case rm.Archetyped:
+		return readArchetypedSingle(&p, attrName)
 	}
 	return nil, false
 }
@@ -365,6 +415,12 @@ func Handles(parent any) bool {
 		*rm.DVURI, rm.DVURI,
 		*rm.DVEHRURI, rm.DVEHRURI,
 		*rm.DVParsable, rm.DVParsable,
+		*rm.DVOrdinal, rm.DVOrdinal,
+		*rm.DVScale, rm.DVScale,
+		*rm.ReferenceRange[rm.DVOrdered], rm.ReferenceRange[rm.DVOrdered],
+		*rm.ReferenceRange[rm.DVCount], rm.ReferenceRange[rm.DVCount],
+		*rm.ReferenceRange[rm.DVQuantity], rm.ReferenceRange[rm.DVQuantity],
+		*rm.ReferenceRange[rm.DVProportion], rm.ReferenceRange[rm.DVProportion],
 		*rm.DVInterval[rm.DVQuantity], rm.DVInterval[rm.DVQuantity],
 		*rm.DVInterval[rm.DVCount], rm.DVInterval[rm.DVCount],
 		*rm.DVInterval[rm.DVDateTime], rm.DVInterval[rm.DVDateTime],
@@ -386,7 +442,9 @@ func Handles(parent any) bool {
 		*rm.PartyRelationship, rm.PartyRelationship,
 		*rm.Capability, rm.Capability,
 		*rm.Folder, rm.Folder,
-		*rm.EHRStatus, rm.EHRStatus:
+		*rm.EHRStatus, rm.EHRStatus,
+		*rm.EHRAccess, rm.EHRAccess,
+		*rm.Archetyped, rm.Archetyped:
 		return true
 	}
 	return false
@@ -397,8 +455,12 @@ func Handles(parent any) bool {
 // carries the attribute (the returned slice may still be empty);
 // it is false for unknown (parentType, attrName) pairs. Callers
 // distinguish "absent" from "empty" via `len(items) == 0`; the
-// cardinality check at the call site needs both signals.
+// cardinality check at the call site needs both signals. A nil
+// parent, or a typed-nil pointer parent, reads as `(nil, false)`.
 func ReadMultiple(parent any, _ /* parentType */, attrName string) ([]any, bool) {
+	if IsTypedNilPointer(parent) {
+		return nil, false
+	}
 	switch p := parent.(type) {
 	case *rm.Composition:
 		return readCompositionMultiple(p, attrName)
@@ -450,6 +512,44 @@ func ReadMultiple(parent any, _ /* parentType */, attrName string) ([]any, bool)
 		return readDVCodedTextMultiple(p, attrName)
 	case rm.DVCodedText:
 		return readDVCodedTextMultiple(&p, attrName)
+
+	// --- DataValue containers: DV_ORDERED.other_reference_ranges ---
+	case *rm.DVCount:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVCount:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVQuantity:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVQuantity:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVProportion:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVProportion:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVOrdinal:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVOrdinal:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVScale:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVScale:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVDate:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVDate:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVTime:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVTime:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVDateTime:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVDateTime:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVDuration:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVDuration:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
 
 	// --- demographic: PARTY hierarchy + sub-components ---
 	case *rm.Person:
@@ -1067,33 +1167,50 @@ func readTermMappingSingle(m *rm.TermMapping, attr string) (any, bool) {
 // needs to bind the primitive. Without these readers a populated value
 // reports absent, a false `required`. The bound primitive is then
 // validated by the C_PRIMITIVE child (REQ-103).
+//
+// The three DV_TEMPORAL leaves (DV_DATE, DV_TIME, DV_DATE_TIME) also read
+// their optional accuracy, a DV_DURATION node. DV_DURATION itself is a
+// DV_AMOUNT, and its accuracy is a Real. All four fall back to the
+// DV_ORDERED attributes.
 
 func readDVDateSingle(d *rm.DVDate, attr string) (any, bool) {
-	if attr == "value" {
+	switch attr {
+	case "value":
 		return strPresent(d.Value)
+	case "accuracy":
+		return ptrPresent(d.Accuracy)
 	}
-	return nil, false
+	return readOrderedSingle(d.NormalStatus, d.NormalRange, attr)
 }
 
 func readDVTimeSingle(t *rm.DVTime, attr string) (any, bool) {
-	if attr == "value" {
+	switch attr {
+	case "value":
 		return strPresent(t.Value)
+	case "accuracy":
+		return ptrPresent(t.Accuracy)
 	}
-	return nil, false
+	return readOrderedSingle(t.NormalStatus, t.NormalRange, attr)
 }
 
 func readDVDateTimeSingle(d *rm.DVDateTime, attr string) (any, bool) {
-	if attr == "value" {
+	switch attr {
+	case "value":
 		return strPresent(d.Value)
+	case "accuracy":
+		return ptrPresent(d.Accuracy)
 	}
-	return nil, false
+	return readOrderedSingle(d.NormalStatus, d.NormalRange, attr)
 }
 
 func readDVDurationSingle(d *rm.DVDuration, attr string) (any, bool) {
-	if attr == "value" {
+	switch attr {
+	case "value":
 		return strPresent(d.Value)
+	case "accuracy":
+		return ptrPresent(d.Accuracy)
 	}
-	return nil, false
+	return readOrderedSingle(d.NormalStatus, d.NormalRange, attr)
 }
 
 func readDVBooleanSingle(b *rm.DVBoolean, attr string) (any, bool) {
@@ -1294,7 +1411,7 @@ func readCapabilitySingle(c *rm.Capability, attr string) (any, bool) {
 	return nil, false
 }
 
-// --- EHR-IM roots: FOLDER, EHR_STATUS ------------------------------------
+// --- EHR-IM roots: FOLDER, EHR_STATUS, EHR_ACCESS ------------------------------------
 
 func readFolderSingle(f *rm.Folder, attr string) (any, bool) {
 	switch attr {
@@ -1337,6 +1454,60 @@ func readEHRStatusSingle(s *rm.EHRStatus, attr string) (any, bool) {
 		return s.IsModifiable, true
 	case "is_queryable":
 		return s.IsQueryable, true
+	}
+	return nil, false
+}
+
+// readEHRAccessSingle serves EHR_ACCESS: the RM-mandatory LOCATABLE
+// archetype_node_id and name, and the optional settings
+// (ACCESS_CONTROL_SETTINGS), which the walk treats as an opaque leaf.
+func readEHRAccessSingle(a *rm.EHRAccess, attr string) (any, bool) {
+	switch attr {
+	case "archetype_node_id":
+		return strPresent(a.ArchetypeNodeID)
+	case "name":
+		return dvTextPresent(a.Name)
+	case "settings":
+		return ifacePresent(a.Settings)
+	}
+	return nil, false
+}
+
+// --- archetyping: LOCATABLE.archetype_details and ARCHETYPED -------------
+
+// readArchetypeDetails serves archetype_details, the optional ARCHETYPED
+// attribute LOCATABLE declares and every LOCATABLE inherits. Each generated
+// LOCATABLE concrete exposes it through [rm.Locatable], so one reader covers
+// all of them, and a reader added for a new LOCATABLE gains it without
+// further change. A type [Handles] rejects stays unreadable here too, as
+// Handles promises.
+func readArchetypeDetails(parent any) (any, bool) {
+	if !Handles(parent) {
+		return nil, false
+	}
+	l, ok := parent.(rm.Locatable)
+	if !ok {
+		return nil, false
+	}
+	return ptrPresent(l.GetArchetypeDetails())
+}
+
+// readArchetypedSingle serves ARCHETYPED's own attributes. archetype_id
+// (ARCHETYPE_ID) and rm_version (String) are RM-mandatory and value-typed:
+// an absent attribute, a JSON null and an empty value all decode to the same
+// zero value, so presence cannot be read from them. The reader reports both
+// as present and leaves the empty value to the RM floor's ARCHETYPED check,
+// which reports an empty archetype_id at archetype_id/value and an empty
+// rm_version under the RM's own Rm_version_valid rule. template_id is
+// optional and present only when set.
+func readArchetypedSingle(a *rm.Archetyped, attr string) (any, bool) {
+	switch attr {
+	case "archetype_id":
+		return a.ArchetypeID, true
+	case "rm_version":
+		return a.RMVersion, true
+	case "template_id":
+		return ptrPresent(a.TemplateID)
 	}
 	return nil, false
 }

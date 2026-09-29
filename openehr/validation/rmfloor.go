@@ -6,9 +6,10 @@ package validation
 //
 //   - RM-mandatory attribute absences (rminfo.RequiredAttributes per type
 //     plus the container "lower bound ≥ 1" reading);
-//   - per-RM-type invariants on the leaves it touches (CODE_PHRASE
-//     code_string, DV_INTERVAL numeric bounds, DV_QUANTITY precision,
-//     DV_PROPORTION precision, the OBJECT_REF id/type/namespace floor).
+//   - the per-RM-type invariant catalogue of § REQ-112 in
+//     docs/specifications/clinical-modeling.md, on every node it reaches.
+//     checkInvariants dispatches it, one evaluator per catalogue row; the
+//     catalogue, not this comment, is the list to keep current.
 //
 // REQ-112 surface. Independent of REQ-102/110 (template-driven); both
 // drivers may run against the same root — REQ-110 enforces template
@@ -85,7 +86,11 @@ func ValidateRMFolder(folder *rm.Folder) Result {
 // It cannot flag an omitted value-typed mandatory `subject` (typed
 // rm.PartySelf, whose zero value is indistinguishable from an absent one):
 // use [ValidateRMEHRStatusBytes], which decides subject presence from the
-// source JSON key set.
+// source JSON key set. The same holds for the root's archetype_details: an
+// omitted `rm_version` decodes to an empty one, so this entry reports it as
+// `rm_version_valid` where [ValidateRMEHRStatusBytes] reports `required`,
+// and an omitted `archetype_id` is reported only at `archetype_id/value`,
+// without the Bytes entry's `required` at `archetype_id`.
 func ValidateRMEHRStatus(status *rm.EHRStatus) Result {
 	if status == nil {
 		return resultFromIssues([]Issue{{Path: "/", Code: "nil_ehr_status", Detail: "ValidateRMEHRStatus: status is nil", Severity: Error}})
@@ -120,6 +125,10 @@ func ValidateRMDemographic(party rm.Party) Result {
 type rmFloorWalker struct {
 	info   rminfo.Lookup
 	issues []Issue
+	// blankCodeAllowed holds the paths of the CODE_PHRASE nodes whose
+	// code_string may be blank: the defining_code of each DV_SCALE symbol
+	// the walk has reached (see [rmFloorWalker.allowScaleSymbolWithoutCode]).
+	blankCodeAllowed map[string]bool
 }
 
 func (w *rmFloorWalker) emit(i Issue) {
@@ -215,7 +224,7 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
 		// Single-valued attribute.
 		val, hadField := rmread.ReadSingle(value, rmType, attr)
 		if !hadField || val == nil || rmread.IsTypedNilPointer(val) {
-			if required {
+			if required && !w.mayBeBlank(path, attr) {
 				w.emit(Issue{
 					Path:   attrPath,
 					Code:   "required",
@@ -279,25 +288,132 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkTermMappings(value, path)
 	case rmType == "TERM_MAPPING":
 		w.checkTermMapping(value, path)
+	case rmType == "ARCHETYPED":
+		w.checkArchetyped(value, path)
+	case rmType == "DV_SCALE":
+		w.allowScaleSymbolWithoutCode(path)
+	case isArchetypeRootClass(rmType):
+		w.checkArchetypeRoot(value, rmType, path)
+	}
+}
+
+// isArchetypeRootClass reports whether rmType is a concrete RM class whose
+// objects are always archetype roots. It is a closed list of the classes whose
+// BMM definition declares the `Is_archetype_root` invariant (COMPOSITION,
+// EHR_ACCESS, EHR_STATUS) or inherits it from a declaring abstract class
+// (PARTY: PERSON, ORGANISATION, GROUP, AGENT, ROLE; ENTRY: ADMIN_ENTRY,
+// OBSERVATION, EVALUATION, INSTRUCTION, ACTION). rminfo does not expose
+// invariants, so the list is written out and a test pins it to the vendored
+// BMM: a BMM bump that adds a root class fails that test until the class is
+// added here.
+func isArchetypeRootClass(rmType string) bool {
+	switch rmType {
+	case "COMPOSITION", "EHR_ACCESS", "EHR_STATUS",
+		"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
+		"ADMIN_ENTRY", "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION":
+		return true
+	}
+	return false
+}
+
+// checkArchetypeRoot enforces the archetype-root rule on a node whose class
+// is always an archetype root (see [isArchetypeRootClass]). The class
+// invariant `Is_archetype_root` fixes is_archetype_root true, and
+// LOCATABLE's `Archetyped_valid` (is_archetype_root xor archetype_details =
+// Void) then makes archetype_details mandatory, although LOCATABLE declares
+// it optional. An absent archetype_details, whether omitted or JSON null,
+// reports `is_archetype_root` at the node's archetype_details.
+//
+// The attribute is read through [rm.Locatable], which every LOCATABLE
+// concrete implements, so the rule needs no rmread reader of its own.
+func (w *rmFloorWalker) checkArchetypeRoot(value any, rmType, path string) {
+	l, ok := value.(rm.Locatable)
+	if !ok || rmread.IsTypedNilPointer(value) {
+		return
+	}
+	if l.GetArchetypeDetails() == nil {
+		w.emit(Issue{
+			Path:   joinPath(path, "/archetype_details"),
+			Code:   "is_archetype_root",
+			Detail: rmType + " is an archetype root, so archetype_details must be present (RM Is_archetype_root, LOCATABLE.Archetyped_valid)",
+		})
+	}
+}
+
+// checkArchetyped enforces the floor on an ARCHETYPED node, wherever it sits:
+// its archetype_id and rm_version are RM-mandatory. Both are value-typed, so
+// an absent attribute, a JSON null and an empty value all decode to the same
+// zero value and are reported the same way:
+//
+//   - an empty archetype_id.value is `required` at archetype_id/value (the
+//     RM makes OBJECT_ID.value mandatory but gives it no non-empty invariant;
+//     reading empty as absent is SDK policy);
+//   - an empty rm_version is `rm_version_valid` at rm_version (the RM's
+//     `Rm_version_valid: not rm_version.is_empty`).
+//
+// The ARCHETYPE_ID grammar is not checked, and template_id is optional.
+// Diagnostics name the attribute, never its value.
+func (w *rmFloorWalker) checkArchetyped(value any, path string) {
+	a, ok := asArchetyped(value)
+	if !ok {
+		return
+	}
+	if a.ArchetypeID.Value == "" {
+		w.emit(Issue{
+			Path:   joinPath(path, "/archetype_id/value"),
+			Code:   "required",
+			Detail: "ARCHETYPED.archetype_id must carry a non-empty value",
+		})
+	}
+	if a.RMVersion == "" {
+		w.emit(Issue{
+			Path:   joinPath(path, "/rm_version"),
+			Code:   "rm_version_valid",
+			Detail: "ARCHETYPED.rm_version must be non-empty (RM Rm_version_valid)",
+		})
 	}
 }
 
 // checkCodePhrase enforces the RM spec floor on CODE_PHRASE: the
-// code_string MUST be non-empty when the value is present. (The
-// terminology_id absence is already RM-required and caught by the
-// floor's required-set walk.)
+// code_string MUST be non-empty when the value is present, except on a
+// DV_SCALE symbol's defining_code (see
+// [rmFloorWalker.allowScaleSymbolWithoutCode]). (The terminology_id absence
+// is already RM-required and caught by the floor's required-set walk.)
 func (w *rmFloorWalker) checkCodePhrase(value any, path string) {
 	cp, ok := asCodePhrase(value)
 	if !ok {
 		return
 	}
-	if cp.CodeString == "" {
+	if cp.CodeString == "" && !w.blankCodeAllowed[path] {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
 			Detail: "CODE_PHRASE.code_string must be non-empty",
 		})
 	}
+}
+
+// allowScaleSymbolWithoutCode lets the DV_SCALE at path carry a symbol with
+// no code. The RM's DV_SCALE.symbol allows a scale value that has none: its
+// symbol is then a DV_CODED_TEXT carrying the terminology_id and a blank
+// code_string. The CODE_PHRASE at the symbol's defining_code therefore reports
+// neither the non-empty code_string invariant nor a `required` code_string.
+// The exemption covers that one node only: a blank terminology_id, the
+// symbol's own value, a DV_ORDINAL symbol, and every other CODE_PHRASE under
+// the scale are checked as usual. It runs before the walk descends into the
+// scale, so the exemption is in place when the defining_code is reached.
+func (w *rmFloorWalker) allowScaleSymbolWithoutCode(path string) {
+	if w.blankCodeAllowed == nil {
+		w.blankCodeAllowed = map[string]bool{}
+	}
+	w.blankCodeAllowed[joinPath(path, "/symbol/defining_code")] = true
+}
+
+// mayBeBlank reports whether the RM-mandatory attr on the node at path is
+// exempt from the required-set check. Only the code_string of a DV_SCALE
+// symbol's defining_code is (see [rmFloorWalker.allowScaleSymbolWithoutCode]).
+func (w *rmFloorWalker) mayBeBlank(path, attr string) bool {
+	return attr == "code_string" && w.blankCodeAllowed[path]
 }
 
 // checkDVQuantity enforces the spec floor on DV_QUANTITY: precision, when

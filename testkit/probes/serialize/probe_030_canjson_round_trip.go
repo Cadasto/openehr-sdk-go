@@ -260,6 +260,52 @@ var probe030SkipFloor = map[string][]string{
 	"compositions/Test_dv_interval_dv_quantity_open_constraint.v0.json": {
 		"rm_invariant /content[0]/data/events[0]/data/items[0]/value",
 	},
+
+	// The entries below omit archetype_details on an archetype root, which
+	// the RM makes mandatory there (Is_archetype_root with
+	// LOCATABLE.Archetyped_valid).
+
+	// compo_with_nested_party_related (EHRbase openEHR_SDK test data): the
+	// EVALUATION inside the first SECTION has no archetype_details.
+	"rm/compo_with_nested_party_related.json": {
+		"is_archetype_root /content[0]/items[0]/archetype_details",
+	},
+	// ehr_status_other_details_simple (EHRbase openEHR_SDK test data): the
+	// EHR_STATUS root has no archetype_details.
+	"rm/ehr_status_other_details_simple.json": {
+		"is_archetype_root /archetype_details",
+	},
+	// The eight ehr_status_valid_* samples (EHRbase Robot integration tests):
+	// each EHR_STATUS root has no archetype_details.
+	"rm/ehr_status_valid_0000_ehr_status_hardcoded_subject_id_value.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/ehr_status_valid_000_ehr_status.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/ehr_status_valid_000_ehr_status_with_other_details.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/ehr_status_valid_002_ehr_status_with_other_details_item_tree.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/ehr_status_valid_003_ehr_status_with_other_details_item_list.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/ehr_status_valid_004_ehr_status_with_other_details_item_single.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/ehr_status_valid_005_ehr_status_with_other_details_item_table.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/ehr_status_valid_ehr_can_not_be_modifyable.json": {
+		"is_archetype_root /archetype_details",
+	},
+	// minimal_evaluation (EHRbase openEHR_SDK test data): the EVALUATION in
+	// content has no archetype_details.
+	"rm/minimal_evaluation.json": {
+		"is_archetype_root /content[0]/archetype_details",
+	},
 }
 
 // loadFixtureInputs discovers vendored fixtures relative to this

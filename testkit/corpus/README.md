@@ -82,14 +82,14 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
 **RM-only** (`rm/`, no OPT):
 
-| File | RM root |
-|---|---|
-| `minimal_evaluation.json` | COMPOSITION |
-| `compo_with_nested_party_related.json` | COMPOSITION |
-| `ehr_status_other_details_simple.json` | EHR_STATUS |
-| `nested_folder.json` | FOLDER |
-| `test_all_types.v1.xml` | COMPOSITION |
-| `simple_empty_folder.xml` | FOLDER |
+| File | RM root | Probes |
+|---|---|---|
+| `minimal_evaluation.json` | COMPOSITION | JSON round-trip, RM floor held out (`EVALUATION` without `archetype_details`) |
+| `compo_with_nested_party_related.json` | COMPOSITION | JSON round-trip, RM floor held out (nested `EVALUATION` without `archetype_details`) |
+| `ehr_status_other_details_simple.json` | EHR_STATUS | JSON round-trip, RM floor held out (`EHR_STATUS` without `archetype_details`) |
+| `nested_folder.json` | FOLDER | JSON round-trip |
+| `test_all_types.v1.xml` | COMPOSITION | XML round-trip |
+| `simple_empty_folder.xml` | FOLDER | XML round-trip |
 
 **Template triplets** (`templates/` + `compositions/`, from openEHR_SDK test-data):
 
@@ -131,7 +131,7 @@ The Corona pair is the largest fixture in the repo. That size is the cost of gua
 
 **Added at the `b4625fc` pin** (valid OPT + canonical JSON only): `family_history.v.1.2.3`, `my_spanish_template_v0`, `terminology_test.ehrbase.org.v1`, `terminology_test2.ehrbase.org.v1`.
 
-**RM JSON** (`rm/`, flat names): 8 `ehr_status_valid_*` in PROBE-030/033 (excludes ECIS alternate wire); 12 `ehr_status_invalid_*` on disk for client/validation work but excluded from probe discovery (`ehr_status_invalid_*` prefix); 14 `folder_*` including `folder_update_*`.
+**RM JSON** (`rm/`, flat names): 8 `ehr_status_valid_*` in PROBE-030/033 (excludes ECIS alternate wire), all with the RM floor held out (`EHR_STATUS` without `archetype_details`); 12 `ehr_status_invalid_*` on disk for client/validation work but excluded from probe discovery (`ehr_status_invalid_*` prefix); 14 `folder_*` including `folder_update_*`.
 
 **Submissions** ([`submissions/`](submissions/README.md)): 47 CONTRIBUTION create payloads from `contributions/` (bulk `create_multiple_compositions` omitted). Decode them with `contribution.Submission`, not `rm.Contribution`.
 

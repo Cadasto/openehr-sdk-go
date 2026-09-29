@@ -52,8 +52,16 @@
 // through the supported content types (Observation,
 // Evaluation, Instruction, Action, AdminEntry, Section,
 // GenericEntry) plus the History / Event / ItemStructure / Item /
-// DataValue paths below them. The closed taxonomy is
-// asserted by table-driven tests in this package.
+// DataValue paths below them. Beyond COMPOSITION they cover the
+// other LOCATABLE roots (FOLDER, EHR_STATUS, EHR_ACCESS and the
+// demographic PARTY hierarchy with its parts), the ARCHETYPED node
+// under every LOCATABLE's archetype_details, and every DV_ORDERED
+// concrete with the attributes DV_ORDERED declares (normal_status,
+// normal_range, other_reference_ranges and its REFERENCE_RANGE
+// elements) and, where the RM declares it, accuracy. Every
+// registered LOCATABLE and DV_ORDERED concrete is modelled. The
+// closed taxonomy is asserted by table-driven and registry-driven
+// tests in this package.
 //
 // # Dependencies
 //
