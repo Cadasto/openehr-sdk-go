@@ -1,6 +1,7 @@
 package validation_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -55,10 +56,22 @@ func TestValidate_genericEventOffsetIsNotRequired(t *testing.T) {
 		Data:            &rm.ItemTree{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "tree"}},
 	}
 
-	res := validation.Validate(event, c)
-	for _, is := range res.Issues {
-		if is.Path == "/offset" {
-			t.Errorf("Validate reported %s at /offset (%s); offset is non-storable and must be skipped\nall issues: %+v", is.Code, is.Detail, res.Issues)
-		}
+	// The whole issue list is asserted, so nothing hides beside the offset
+	// check. The one issue at / is the type check's own, known gap: it matches a
+	// generic spelling only for DV_INTERVAL, so POINT_EVENT<ITEM_TREE> does not
+	// admit a POINT_EVENT value. That gap is tracked separately and is not what
+	// this test pins; a required issue at /offset is.
+	type issue struct{ path, code, detail string }
+	want := []issue{{
+		path:   "/",
+		code:   "rm_type_mismatch",
+		detail: "RM type POINT_EVENT does not satisfy template RM type POINT_EVENT<ITEM_TREE> at /",
+	}}
+	var got []issue
+	for _, is := range validation.Validate(event, c).Issues {
+		got = append(got, issue{path: is.Path, code: is.Code, detail: is.Detail})
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("Validate issues = %+v, want %+v (offset is non-storable and must be skipped)", got, want)
 	}
 }
