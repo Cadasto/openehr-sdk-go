@@ -28,7 +28,7 @@ Each stage groups several deliverables, and a stage is only as done as its weake
 | | Benchmark harness | **Deferred** |
 | **2 — Clinical building blocks** | ADL 1.4 OPT parser + compiled-template foundation | **Landed** |
 | | Composition builder | **Landed** |
-| | Validation: template-driven, non-COMPOSITION roots, RM floor | **Landed** (RM floor archetype-root and ARCHETYPED rows: partial) |
+| | Validation: template-driven, non-COMPOSITION roots, RM floor | **Landed** (RM floor: partial, see open work) |
 | | OPT → RM instance synthesis | **Landed** (`medium` detail level open) |
 | | AQL: builders, parsed AST, static lint | **Landed** |
 | | Simplified formats (FLAT / STRUCTURED) + WebTemplate export | **Landed** |
@@ -51,7 +51,7 @@ Everything below is `Partial`, `Planned` or `Deferred`. Gaps that belong to a de
 |---|---|---|---|---|
 | Core | Benchmark harness | **Deferred** | — | A few packages carry `go test -bench` benchmarks; there is no shared harness (stage 1) |
 | Core | AOM 2.4 | **Deferred** | — | BMM pinned in `resources/bmm/`; no codegen and no package yet (stage 4) |
-| Core | Template-less RM validation floor | **Partial** | `openehr/validation/`, `openehr/validation/rmread/` REQ-112 | `ValidateRM` and typed sugars walk any RM root with `rminfo` as sole driver (no template required), checking RM-mandatory absences and a per-type invariant catalogue, including `TERM_MAPPING.match`'s value set and `DV_TEXT.mappings`'s `Mappings_valid` ([PR 145](https://github.com/Cadasto/openehr-sdk-go/pull/145)). The archetype-root and ARCHETYPED catalogue rows are spec-first and await code ([plan](plans/2026-09-24-rm-floor-archetype-roots.md)). DV_ORDINAL, DV_SCALE and REFERENCE_RANGE are not yet walked ([known gap](specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor)). PROBE-077 deferred ([conformance.md § PROBE-077](specifications/conformance.md#probe-077--rm-floor-invariant-matrix)) |
+| Core | Template-less RM validation floor | **Partial** | `openehr/validation/`, `openehr/validation/rmread/` REQ-112 | `ValidateRM` and typed sugars walk any RM root with `rminfo` as sole driver (no template required), checking RM-mandatory absences and a per-type invariant catalogue, including `TERM_MAPPING.match`'s value set, `DV_TEXT.mappings`'s `Mappings_valid` ([PR 145](https://github.com/Cadasto/openehr-sdk-go/pull/145)) and the archetype-root and ARCHETYPED rows. A bound beside its own open flag is not reported ([known gap](specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor)). PROBE-077 deferred ([conformance.md § PROBE-077](specifications/conformance.md#probe-077--rm-floor-invariant-matrix)) |
 | Core | Synthesis `medium`/`detail_level` level | **Planned** | `openehr/instance/` REQ-107 | Representative optional-subset fill between `Minimal` and full population |
 | Core | LANG / TERM BMM | **Deferred** | `resources/bmm/` | Reference pins only |
 | Core | EHR Extract RM | **Deferred** | — | Out of v1 scope |
