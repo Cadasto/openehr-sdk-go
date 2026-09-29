@@ -611,14 +611,24 @@ func intervalRMTypeMatches(got, want string, val any) bool {
 	if got == want {
 		return true
 	}
-	if want == "DV_INTERVAL" && strings.HasPrefix(got, "DV_INTERVAL<") {
+	if _, gotTyped := typedIntervalBound(got); want == "DV_INTERVAL" && gotTyped {
 		return true
 	}
-	if got == "DV_INTERVAL" && strings.HasPrefix(want, "DV_INTERVAL<") {
-		inner := strings.TrimSuffix(strings.TrimPrefix(want, "DV_INTERVAL<"), ">")
-		return intervalBoundsSatisfy(val, inner)
+	if wantBound, wantTyped := typedIntervalBound(want); got == "DV_INTERVAL" && wantTyped {
+		return intervalBoundsSatisfy(val, wantBound)
 	}
 	return false
+}
+
+// typedIntervalBound returns the bound type of a parameterised interval name,
+// "DV_QUANTITY" for "DV_INTERVAL<DV_QUANTITY>". ok is false for any other
+// name, the bare "DV_INTERVAL" and a malformed spelling included.
+func typedIntervalBound(name string) (bound string, ok bool) {
+	class, params, ok := bmmtype.Split(name)
+	if !ok || class != "DV_INTERVAL" || len(params) != 1 {
+		return "", false
+	}
+	return params[0], true
 }
 
 // intervalBoundsSatisfy reports whether a round-trip-collapsed
