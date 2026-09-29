@@ -49,23 +49,29 @@ func TestNewRMForOPTType_unknownGeneric(t *testing.T) {
 	}
 }
 
-func TestParseBMMGeneric(t *testing.T) {
-	base, param, ok := parseBMMGeneric("DV_INTERVAL<DV_QUANTITY>")
-	if !ok || base != "DV_INTERVAL" || param != "DV_QUANTITY" {
-		t.Fatalf("parseBMMGeneric = %q %q %v, want DV_INTERVAL DV_QUANTITY true", base, param, ok)
+// REQ-107: a generic rm_type_name the generator cannot build is refused as
+// an unknown RM type, whether it is malformed, names no known DV_INTERVAL
+// instantiation, or gives DV_INTERVAL the wrong number of parameters. White
+// space around the parts does not matter.
+func TestNewRMForOPTType_genericSpellings(t *testing.T) {
+	if v, err := newRMForOPTType(" DV_INTERVAL< DV_COUNT > "); err != nil {
+		t.Errorf("newRMForOPTType(padded DV_INTERVAL<DV_COUNT>): %v", err)
+	} else if _, ok := v.(*rm.DVInterval[rm.DVCount]); !ok {
+		t.Errorf("newRMForOPTType(padded DV_INTERVAL<DV_COUNT>) = %T, want *rm.DVInterval[rm.DVCount]", v)
 	}
-	if _, _, ok := parseBMMGeneric("DV_TEXT"); ok {
-		t.Fatal("expected non-generic DV_TEXT to return ok=false")
-	}
-	if _, _, ok := parseBMMGeneric("DV_INTERVAL<DV_QUANTITY>junk"); ok {
-		t.Fatal("expected trailing junk after generic param to return ok=false")
-	}
-	if _, _, ok := parseBMMGeneric("DV_INTERVAL<>"); ok {
-		t.Fatal("expected empty generic param to return ok=false")
-	}
-	base, param, ok = parseBMMGeneric("DV_INTERVAL<DV_INTERVAL<DV_QUANTITY>>")
-	if !ok || base != "DV_INTERVAL" || param != "DV_INTERVAL<DV_QUANTITY>" {
-		t.Fatalf("nested generic = %q %q %v, want DV_INTERVAL / DV_INTERVAL<DV_QUANTITY> / true — the closer is the last '>'", base, param, ok)
+	for _, declared := range []string{
+		"DV_INTERVAL<DV_QUANTITY>junk",
+		"DV_INTERVAL<>",
+		"DV_INTERVAL<DV_QUANTITY",
+		"DV_INTERVAL<DV_QUANTITY>>",
+		"DV_INTERVAL<DV_INTERVAL<DV_QUANTITY>>",
+		"DV_INTERVAL<DV_QUANTITY, DV_COUNT>",
+		"<DV_QUANTITY>",
+	} {
+		v, err := newRMForOPTType(declared)
+		if !errors.Is(err, rmwrite.ErrUnknownRMType) {
+			t.Errorf("newRMForOPTType(%q) = (%T, %v), want ErrUnknownRMType", declared, v, err)
+		}
 	}
 }
 

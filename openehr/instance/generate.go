@@ -6,6 +6,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -141,7 +142,9 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	}
 
 	for _, attr := range optNode.Attributes() {
-		if rminfo.IsNonStorableAttr(optNode.RMTypeName(), attr.Name()) {
+		// rminfo knows each class by its bare BMM name; the OPT may declare
+		// a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
+		if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
 			continue
 		}
 		if !g.shouldVisit(attr) {

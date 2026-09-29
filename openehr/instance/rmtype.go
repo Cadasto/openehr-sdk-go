@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
@@ -23,33 +24,22 @@ func newRMForOPTType(declared string) (any, error) {
 	return rmwrite.NewRM(concreteFor(declared))
 }
 
-// parseBMMGeneric splits "BASE<PARAM>" OPT/BMM generic notation.
-func parseBMMGeneric(declared string) (string, string, bool) {
-	base, rest, ok := strings.Cut(declared, "<")
-	if !ok {
-		return "", "", false
-	}
-	param, after, ok := strings.CutLast(rest, ">")
-	if !ok || strings.TrimSpace(after) != "" {
-		return "", "", false
-	}
-	param = strings.TrimSpace(param)
-	if param == "" {
-		return "", "", false
-	}
-	return strings.TrimSpace(base), param, true
-}
-
 // newGenericRM materialises closed-set BMM generic RM types the OPT
 // may declare with angle-bracket notation. Returns ok=false when
 // declared is not a recognised generic form.
 func newGenericRM(declared string) (v any, ok bool, err error) {
-	base, param, ok := parseBMMGeneric(declared)
-	if !ok {
+	base, params, ok := bmmtype.Split(declared)
+	if !ok || len(params) == 0 {
 		return nil, false, nil
 	}
 	switch base {
 	case "DV_INTERVAL":
+		// DV_INTERVAL takes one parameter; any other count is no known
+		// instantiation, like an unknown parameter.
+		param := ""
+		if len(params) == 1 {
+			param = params[0]
+		}
 		switch param {
 		case "DV_QUANTITY":
 			return &rm.DVInterval[rm.DVQuantity]{}, true, nil

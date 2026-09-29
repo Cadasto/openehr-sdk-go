@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -82,7 +83,7 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 	}
 
 	for _, attr := range optNode.Attributes() {
-		if rminfo.IsNonStorableAttr(bmmClassName(optNode.RMTypeName()), attr.Name()) {
+		if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
 			continue
 		}
 		switch attr.Cardinality() {
