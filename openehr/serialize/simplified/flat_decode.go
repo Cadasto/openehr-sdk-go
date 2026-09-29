@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -622,7 +623,9 @@ func applyContext(compJSON map[string]any, ci ctxInfo) error {
 // never carried them; see deviations.md.
 func completeRequired(node map[string]any, ci ctxInfo) {
 	if t, _ := node["_type"].(string); t != "" {
-		for _, attr := range rminfo.Default.RequiredAttributes(t) {
+		// rminfo knows each class by its bare BMM name; a caller's |raw fragment
+		// may spell a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
+		for _, attr := range rminfo.Default.RequiredAttributes(bmmtype.Class(t)) {
 			if _, has := node[attr]; has {
 				continue
 			}

@@ -14,9 +14,10 @@
 //
 // The codecs take an *rm.Composition and a *webtemplate.WebTemplate and
 // return bytes (or the reverse). They import only openehr/rm (+ rmpath /
-// rminfo), openehr/template/webtemplate, openehr/templatecompile (the
-// WithTemplate name/default source), openehr/serialize/canjson (typereg
-// via canjson), and the standard library. They never import the
+// rminfo), openehr/terminology, openehr/template/webtemplate,
+// openehr/templatecompile (the WithTemplate name/default source),
+// openehr/serialize/canjson (typereg via canjson), a module-internal
+// type-name helper, and the standard library. They never import the
 // transport, auth, or client layers.
 //
 // Context output-form and exotic-datatype fallbacks are documented in
