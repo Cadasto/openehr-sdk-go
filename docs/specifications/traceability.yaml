@@ -1007,7 +1007,6 @@ requirements:
       - openehr/composition/builder_test.go
       - openehr/composition/imports_test.go
       - openehr/composition/typecheck_test.go
-      - openehr/instance/imports_test.go
       - openehr/internal/rmnames/intervals_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/composition/probes_test.go
@@ -1097,7 +1096,6 @@ requirements:
       - openehr/template/webtemplate/golden_test.go
       - openehr/template/webtemplate/id_internal_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
-      - openehr/template/webtemplate/independence_test.go
       - openehr/template/webtemplate/inputs_test.go
       - openehr/template/webtemplate/parity_test.go
       - openehr/template/webtemplate/req116_gap_test.go
@@ -1310,7 +1308,6 @@ requirements:
       - openehr/template/node_name_test.go
       - openehr/template/webtemplate/build_test.go
       - openehr/template/webtemplate/dedupe_test.go
-      - openehr/template/webtemplate/independence_test.go
       - openehr/template/webtemplate/inputs_test.go
       - openehr/template/webtemplate/parity_test.go
       - openehr/template/webtemplate/req116_gap_test.go
@@ -1620,7 +1617,6 @@ requirements:
       - testkit/probes/aql
     probes: [PROBE-097]
     tests:
-      - openehr/aql/internal/semcheck/imports_test.go
       - openehr/aql/internal/semcheck/semcheck_test.go
       - openehr/aql/lint/lint_test.go
       - openehr/aql/lint/pathshape_fanout_test.go
