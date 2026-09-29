@@ -82,22 +82,19 @@ requirements:
       - openehr/aql/imports_test.go
       - openehr/aql/internal/semcheck/imports_test.go
       - openehr/aql/lint/imports_test.go
-      - openehr/aql/parse/identifier_parity_test.go
       - openehr/aql/parse/imports_test.go
-      - openehr/aql/predicate_test.go
       - openehr/composition/imports_test.go
       - openehr/instance/imports_test.go
       - openehr/rm/imports_test.go
-      - openehr/serialize/canjson/corpus_parity_test.go
       - openehr/serialize/canjson/imports_test.go
       - openehr/serialize/canxml/imports_test.go
+      - openehr/serialize/imports_test.go
       - openehr/serialize/simplified/independence_test.go
       - openehr/template/imports_test.go
       - openehr/template/webtemplate/independence_test.go
       - openehr/templatecompile/imports_test.go
       - openehr/terminology/imports_test.go
       - openehr/validation/imports_test.go
-      - sandbox/independence_test.go
 
   - id: REQ-014
     title: Dependency direction
@@ -478,7 +475,6 @@ requirements:
       - openehr/serialize/simplified/flat_nameindex_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/hardening_test.go
-      - openehr/serialize/simplified/independence_test.go
       - openehr/serialize/simplified/mediatype_fuzz_test.go
       - openehr/serialize/simplified/mediatype_internal_test.go
       - openehr/serialize/simplified/mediatype_test.go
@@ -982,6 +978,7 @@ requirements:
       - internal/templatecompile/registerpath_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/rm/rminfo/lookup_test.go
+      - openehr/template/imports_test.go
       - openehr/template/node_name_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/template/path_test.go

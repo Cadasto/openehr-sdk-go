@@ -70,7 +70,7 @@ The catalog predates this field and most entries do not carry one yet. Until an 
 
 #### Sandbox mode
 
-The `sandbox/` transport **MUST** serve every backend-facing probe in the catalog without a network listener or credentials (an in-repo probe reaches no transport), and **MUST** be reachable by SDK consumers testing their own applications — it is a published building block, not test-only scaffolding (REQ-013: no `auth/` or live-transport dependency).
+The `sandbox/` transport **MUST** serve every backend-facing probe in the catalog without a network listener or credentials (an in-repo probe reaches no transport), and **MUST** be reachable by SDK consumers testing their own applications — it is a published building block, not test-only scaffolding, and it imports neither `auth/` nor `transport/` (`TestNoListenerImports`).
 
 Sandbox state **MUST** be per-run and isolated: two probes running against one sandbox instance **MUST NOT** observe each other's writes unless the probe definition says they share an EHR.
 

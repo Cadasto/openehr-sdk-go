@@ -94,7 +94,7 @@ All errors wrap context with `fmt.Errorf("...: %w", err)`; callers compare with 
 
 ### Building-block independence (REQ-013)
 
-`openehr/template/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, `openehr/rm/`, or `openehr/aom/aom14/`. In v1 the package depends only on the standard library plus its own sibling sub-package `openehr/template/constraints/` (REQ-103 typed primitive constraints) — RM class names appear only as string values surfaced from OPT XML, not as Go type references.
+`openehr/template/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, `openehr/rm/`, or `openehr/aom/aom14/`, anywhere in its import closure; `TestTemplateForbiddenImports` enforces it. In v1 the package depends only on the standard library plus its own sibling sub-package `openehr/template/constraints/` (REQ-103 typed primitive constraints) — RM class names appear only as string values surfaced from OPT XML, not as Go type references.
 
 ### Out of scope (v1)
 
@@ -484,7 +484,7 @@ Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/
 
 ### Building-block independence (REQ-013)
 
-`openehr/instance/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). The generator operates on **in-memory RM graphs**, never on wire bytes — callers wanting canonical JSON / XML output run `serialize/canjson` or `canxml` themselves (`cmd/examples/` may import the codec; the library does not).
+`openehr/instance/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). The generator operates on **in-memory RM graphs**, never on wire bytes — callers wanting canonical JSON / XML output run `serialize/canjson` or `canxml` themselves (`cmd/examples/` may import the codec; the library does not). The generator sits below the REQ-101 builder, which calls it, and beside the validator, which checks what it generates, so `openehr/instance` **MUST NOT** import `openehr/composition` or `openehr/validation` in its own files. `TestInstanceForbiddenImports` enforces both, with the REQ-013 rules.
 
 The public signature accepts `*templatecompile.Compiled`. As with `validation.ValidateComposition`, REQ-111 makes that argument externally constructable via `openehr/templatecompile.Compile`, so `instance.Generate` is now callable from outside the module (see [ADR 0010](../adr/0010-public-compiled-template-bridge.md)).
 
@@ -617,7 +617,7 @@ A `$param` archetype predicate (`[$name]`, `[parse.ClassExpr.ParamArchetype]`) i
 
 ### Building-block independence (REQ-013)
 
-`openehr/aql/parse/` and `openehr/aql/lint/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`, and `lint` additionally **MUST NOT** import `openehr/validation`. Enforced by `TestAQLParseForbiddenImports` and `TestAQLLintForbiddenImports`.
+`openehr/aql/parse/` and `openehr/aql/lint/` **MUST NOT** reach `transport/`, `auth/` or `openehr/client/*` anywhere in their import closure, and **MUST NOT** name `openehr/serialize/` among their own imports (their closure reaches `openehr/serialize/canxml` through `openehr/rm`). `lint` additionally **MUST NOT** reach `openehr/validation` anywhere in its closure. Enforced by `TestAQLParseForbiddenImports` and `TestAQLLintForbiddenImports`.
 
 - **Lives in:** [`openehr/aql/parse/`](../../openehr/aql/parse/), [`openehr/aql/lint/`](../../openehr/aql/lint/); bridge in [`openehr/validation/aql.go`](../../openehr/validation/aql.go)
 - **Probes:** PROBE-028 — lint fixed query strings against the grammar profile (+ a compiled OPT for Layer 3) and assert a stable issue-code multiset.
@@ -659,7 +659,7 @@ The walker type-matches `DV_INTERVAL<T>` in both forms: a typed instantiation by
 
 ### Building-block independence (REQ-013)
 
-`openehr/validation/` and `openehr/validation/rmread/` remain importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/` — enforced by `TestValidationForbiddenImports`. Decoding an instance for validation (canjson / canxml) is the caller's concern; `Validate` takes an in-memory root.
+`openehr/validation/` and `openehr/validation/rmread/` reach no `transport/`, `auth/` or `openehr/client/*` anywhere in their import closure, and neither names `openehr/serialize/` among its own imports (the closure reaches `canxml` through `openehr/rm`); `TestValidationForbiddenImports` checks both packages. Decoding an instance for validation (canjson / canxml) is the caller's concern; `Validate` takes an in-memory root.
 
 - **Lives in:** [`openehr/validation/validate.go`](../../openehr/validation/validate.go), [`openehr/validation/rmread/read.go`](../../openehr/validation/rmread/read.go)
 - **Probes:** PROBE-074 — template-driven validation of non-COMPOSITION roots; asserts the issue-code multiset per (OPT, root) shape.
