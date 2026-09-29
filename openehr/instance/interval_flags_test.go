@@ -29,18 +29,23 @@ var intervalTemplates = []string{
 
 var intervalPolicies = []instance.Policy{instance.Minimal, instance.Example}
 
-// generateCanonical generates a composition from c and returns it as
-// decoded canonical JSON.
-func generateCanonical(t *testing.T, c *templatecompile.Compiled, policy instance.Policy) any {
-	t.Helper()
-	out, err := instance.Generate(t.Context(), c, instance.Options{
+// intervalOptions returns the generator options the interval tests share.
+func intervalOptions(policy instance.Policy) instance.Options {
+	return instance.Options{
 		Policy:    policy,
 		Territory: "NL",
 		Composer:  testComposer(),
 		Now:       time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
-	})
+	}
+}
+
+// generateCanonical generates a composition from c and returns it as
+// decoded canonical JSON.
+func generateCanonical(t *testing.T, c *templatecompile.Compiled, opts instance.Options) any {
+	t.Helper()
+	out, err := instance.Generate(t.Context(), c, opts)
 	if err != nil {
-		t.Fatalf("Generate(%v): %v", policy, err)
+		t.Fatalf("Generate(%v, %v): %v", opts.Policy, opts.ValueFill, err)
 	}
 	data, err := canjson.Marshal(out)
 	if err != nil {
@@ -62,7 +67,7 @@ func forEachGeneratedInterval(t *testing.T, check func(t *testing.T, path string
 	for _, name := range intervalTemplates {
 		for _, policy := range intervalPolicies {
 			t.Run(name+"/"+policy.String(), func(t *testing.T) {
-				doc := generateCanonical(t, compileFixture(t, name), policy)
+				doc := generateCanonical(t, compileFixture(t, name), intervalOptions(policy))
 				bounds := 0
 				walkIntervals(doc, "", func(path string, iv map[string]any) {
 					for _, side := range []string{"lower", "upper"} {
@@ -177,7 +182,7 @@ func TestGenerateIntervalIncludedFollowsOPT(t *testing.T) {
 			t.Run(tc.name+"/"+policy.String(), func(t *testing.T) {
 				c := compileSyntheticOPT(t, tc.edit(t, string(raw)))
 				var found []map[string]any
-				walkIntervals(generateCanonical(t, c, policy), "", func(_ string, iv map[string]any) {
+				walkIntervals(generateCanonical(t, c, intervalOptions(policy)), "", func(_ string, iv map[string]any) {
 					found = append(found, iv)
 				})
 				if len(found) != 1 {

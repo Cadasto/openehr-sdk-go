@@ -158,6 +158,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 			}
 		}
 	}
+	orderIntervalBounds(optNode, rmValue)
 	settleIntervalEndpoints(optNode, rmValue)
 	return nil
 }
