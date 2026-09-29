@@ -62,3 +62,41 @@ func TestIntervalRMTypeMatches_boundsBackedCollapse(t *testing.T) {
 		t.Error("interval with a DV_DATE upper must not satisfy DV_INTERVAL<DV_QUANTITY>")
 	}
 }
+
+// TestIntervalRMTypeMatches_malformedNames pins how the RM type check reads a
+// malformed or padded interval name from the OPT. A name that is not one
+// well-formed DV_INTERVAL<T> matches nothing, so no bound check can admit a
+// value under it, not even a fully unbounded one. White space around the
+// parts is ignored, so a padded name matches like the canonical spelling.
+//
+// REQ-102: the RM type check reads the OPT's parameterised interval name.
+func TestIntervalRMTypeMatches_malformedNames(t *testing.T) {
+	collapsed := rm.DVInterval[rm.DVOrdered]{
+		Lower: &rm.DVQuantity{Magnitude: 30, Units: "cm"},
+		Upper: &rm.DVQuantity{Magnitude: 90, Units: "cm"},
+	}
+	unbounded := rm.DVInterval[rm.DVOrdered]{
+		LowerUnbounded: true,
+		UpperUnbounded: true,
+	}
+
+	cases := []struct {
+		name string
+		got  string
+		want string
+		val  any
+		ok   bool
+	}{
+		{name: "unclosed name does not match quantity bounds", got: "DV_INTERVAL", want: "DV_INTERVAL<DV_QUANTITY", val: collapsed, ok: false},
+		{name: "extra closing bracket does not match an unbounded interval", got: "DV_INTERVAL", want: "DV_INTERVAL<DV_QUANTITY>>", val: unbounded, ok: false},
+		{name: "two parameters do not match an unbounded interval", got: "DV_INTERVAL", want: "DV_INTERVAL<DV_QUANTITY,DV_COUNT>", val: unbounded, ok: false},
+		{name: "empty parameter list does not match an unbounded interval", got: "DV_INTERVAL", want: "DV_INTERVAL<>", val: unbounded, ok: false},
+		{name: "leading space matches like the canonical name", got: "DV_INTERVAL", want: " DV_INTERVAL<DV_QUANTITY>", val: collapsed, ok: true},
+		{name: "padded parameter matches like the canonical name", got: "DV_INTERVAL", want: "DV_INTERVAL< DV_QUANTITY >", val: collapsed, ok: true},
+	}
+	for _, tc := range cases {
+		if got := intervalRMTypeMatches(tc.got, tc.want, tc.val); got != tc.ok {
+			t.Errorf("%s: intervalRMTypeMatches(%q,%q)=%v, want %v", tc.name, tc.got, tc.want, got, tc.ok)
+		}
+	}
+}
