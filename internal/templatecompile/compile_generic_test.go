@@ -18,8 +18,8 @@ func TestCompile_GenericIntervalNodeAttributes(t *testing.T) {
 	cases := []struct {
 		fixture, declared, bound string
 	}{
-		{"Test_dv_interval_dv_quantity_lower_upper_constraint.v0", "DV_INTERVAL<DV_QUANTITY>", "DV_QUANTITY"},
-		{"Test_dv_interval_dv_count_lower_upper_constraint.v0", "DV_INTERVAL<DV_COUNT>", "DV_COUNT"},
+		{fixture: "Test_dv_interval_dv_quantity_lower_upper_constraint.v0", declared: "DV_INTERVAL<DV_QUANTITY>", bound: "DV_QUANTITY"},
+		{fixture: "Test_dv_interval_dv_count_lower_upper_constraint.v0", declared: "DV_INTERVAL<DV_COUNT>", bound: "DV_COUNT"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.declared, func(t *testing.T) {
