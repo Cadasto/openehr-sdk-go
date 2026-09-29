@@ -228,6 +228,21 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	case rm.DVInterval[rm.DVProportion]:
 		return readDVIntervalProportionSingle(&p, attrName)
 
+	case *rm.DVInterval[rm.DVDuration]:
+		return readDVIntervalDurationSingle(p, attrName)
+	case rm.DVInterval[rm.DVDuration]:
+		return readDVIntervalDurationSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVOrdinal]:
+		return readDVIntervalOrdinalSingle(p, attrName)
+	case rm.DVInterval[rm.DVOrdinal]:
+		return readDVIntervalOrdinalSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVScale]:
+		return readDVIntervalScaleSingle(p, attrName)
+	case rm.DVInterval[rm.DVScale]:
+		return readDVIntervalScaleSingle(&p, attrName)
+
 	case *rm.DVInterval[rm.DVOrdered]:
 		return readDVIntervalOrderedSingle(p, attrName)
 	case rm.DVInterval[rm.DVOrdered]:
@@ -356,6 +371,9 @@ func Handles(parent any) bool {
 		*rm.DVInterval[rm.DVDate], rm.DVInterval[rm.DVDate],
 		*rm.DVInterval[rm.DVTime], rm.DVInterval[rm.DVTime],
 		*rm.DVInterval[rm.DVProportion], rm.DVInterval[rm.DVProportion],
+		*rm.DVInterval[rm.DVDuration], rm.DVInterval[rm.DVDuration],
+		*rm.DVInterval[rm.DVOrdinal], rm.DVInterval[rm.DVOrdinal],
+		*rm.DVInterval[rm.DVScale], rm.DVInterval[rm.DVScale],
 		*rm.DVInterval[rm.DVOrdered], rm.DVInterval[rm.DVOrdered],
 		*rm.Person, rm.Person,
 		*rm.Organisation, rm.Organisation,

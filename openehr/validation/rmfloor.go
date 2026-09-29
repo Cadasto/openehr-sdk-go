@@ -166,20 +166,23 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
 	if !ok {
 		return
 	}
-	attrs := lister.AttributeNames(rmType)
+	// rminfo knows each class by its bare BMM name; rmType may carry a
+	// generic bound (DV_INTERVAL<DV_QUANTITY>) that it does not.
+	class := bmmClassName(rmType)
+	attrs := lister.AttributeNames(class)
 	if attrs == nil {
 		return
 	}
-	requiredSet := setFromSlice(w.info.RequiredAttributes(rmType))
+	requiredSet := setFromSlice(w.info.RequiredAttributes(class))
 	for _, attr := range attrs {
-		if rminfo.IsNonStorableAttr(rmType, attr) {
+		if rminfo.IsNonStorableAttr(class, attr) {
 			continue
 		}
-		attrType, ok := w.info.AttributeRMType(rmType, attr)
+		attrType, ok := w.info.AttributeRMType(class, attr)
 		if !ok {
 			continue
 		}
-		isContainer, _ := w.info.IsContainer(rmType, attr)
+		isContainer, _ := w.info.IsContainer(class, attr)
 		required := requiredSet[attr]
 		attrPath := joinPath(path, "/"+attr)
 
@@ -235,6 +238,14 @@ func runtimeRMType(val any, declared string) string {
 		return rt
 	}
 	return declared
+}
+
+// bmmClassName returns the bare BMM class name of rmType, dropping any
+// generic bound: "DV_INTERVAL<DV_QUANTITY>" becomes "DV_INTERVAL", and a
+// name without a bound is returned unchanged.
+func bmmClassName(rmType string) string {
+	class, _, _ := strings.Cut(rmType, "<")
+	return class
 }
 
 // setFromSlice is a small helper that turns a (possibly-nil) slice into
