@@ -152,7 +152,7 @@ Each of those blocks, and every package of this module it imports directly or in
 
 The template-side building blocks `openehr/validation` (with `openehr/validation/rmread`), `openehr/instance`, `openehr/composition`, `openehr/templatecompile` and `openehr/template/webtemplate` **MUST NOT** import `openehr/serialize/` in their own files: a caller that wants wire bytes imports a codec itself. The rule is on their own files because `openehr/rm`'s generated marshal code imports `openehr/serialize/canxml`, so the closure of every block that uses `openehr/rm` reaches it.
 
-A package that must keep to a narrower set of imports says so in its own section: `openehr/bmm` in [REQ-045](bmm-conformance.md#req-045--bmm-loader-is-a-building-block), `openehr/terminology` in [REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034), `openehr/template` in [REQ-100](clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths), `openehr/instance` in [REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), `openehr/aql/parse` and `openehr/aql/lint` in [REQ-109](clinical-modeling.md#req-109--aql-static-lint), `openehr/aql/contain` in [REQ-160](clinical-modeling.md#req-160--aql-containment-admissibility-relation), and `openehr/aql` and `openehr/aql/internal/semcheck` in [REQ-162](clinical-modeling.md#req-162--builder-containment-verification).
+A package with a narrower import rule states it in its own section: `openehr/bmm` in [REQ-045](bmm-conformance.md#req-045--bmm-loader-is-a-building-block), `openehr/terminology` in [REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034), `openehr/template` in [REQ-100](clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths), `openehr/instance` in [REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), `openehr/aql/parse` and `openehr/aql/lint` in [REQ-109](clinical-modeling.md#req-109--aql-static-lint), `openehr/aql/contain` in [REQ-160](clinical-modeling.md#req-160--aql-containment-admissibility-relation), and `openehr/aql` and `openehr/aql/internal/semcheck` in [REQ-162](clinical-modeling.md#req-162--builder-containment-verification).
 
 - **Enforced by:** `openehr/rm` → `TestRMForbiddenImports`; `openehr/bmm` → `TestBMMForbiddenImports`; `openehr/serialize` → `TestSerializeForbiddenImports`; `openehr/serialize/canjson` → `TestCanJSONForbiddenImports`; `openehr/serialize/canxml` → `TestCanXMLForbiddenImports`; `openehr/serialize/simplified` → `TestBuildingBlockIndependence`; `openehr/validation` and `openehr/validation/rmread` → `TestValidationForbiddenImports`; `openehr/instance` → `TestInstanceForbiddenImports`; `openehr/composition` → `TestCompositionForbiddenImports`; `openehr/template` → `TestTemplateForbiddenImports`; `openehr/templatecompile` → `TestTemplatecompileForbiddenImports`; `openehr/template/webtemplate` → `TestWebtemplateForbiddenImports`; `openehr/terminology` → `TestTerminologyForbiddenImports`; `openehr/aql` → `TestAQLForbiddenImports`; `openehr/aql/parse` → `TestAQLParseForbiddenImports`; `openehr/aql/lint` → `TestAQLLintForbiddenImports`; `openehr/aql/contain` → `TestContainForbiddenImports`; `openehr/aql/internal/semcheck` → `TestSemcheckForbiddenImports`. Each check walks the block's in-module import closure for the closure rules and reads the block's own imports for the own-files rules, through the shared helper `internal/importguard`, whose own tests are the can-fail control. A non-test file of the package counts when some build could compile it, whatever its build tags, except `//go:build ignore`.
 
@@ -219,7 +219,7 @@ When adding to `internal/`:
 
 ## Versioning
 
-The SDK follows **Semantic Versioning 2.0.0** (REQ-004). A release **MUST** take the highest bump that any of its changes maps to in the table below. While on `v0.x`, a change the table maps to major takes a minor bump instead, and the release notes **MUST** name it.
+The SDK follows **Semantic Versioning 2.0.0** (REQ-004). A release **MUST** take the highest bump that any of its changes maps to in the table below. For this table, a field added to an exported struct is not a breaking change: it breaks only positional struct literals, which [idiom.md § Public-API stability](idiom.md#public-api-stability) tells consumers not to write. While on `v0.x`, a change the table maps to major takes a minor bump instead, and the release notes **MUST** name it.
 
 | Change | Bump |
 |---|---|
@@ -236,7 +236,7 @@ The SDK follows **Semantic Versioning 2.0.0** (REQ-004). A release **MUST** take
 | BMM bump that removes or changes a generated public type or field | major (a breaking change) |
 | BMM bump with no public type change | patch |
 | Raise of the `go.mod` minimum Go version (REQ-002) | minor |
-| Module path change (REQ-001) | see [§ Module path stability](#module-path-stability) |
+| Module path change (REQ-001) | major, after a deprecation cycle ([§ Module path stability](#module-path-stability)) |
 | Tightened validation: an input that passed now fails | major (a breaking change) |
 
 `v0.x` is in motion until the openEHR-core surface and conformance probe set stabilise. `v1.0.0` lands when:
@@ -249,4 +249,4 @@ The SDK follows **Semantic Versioning 2.0.0** (REQ-004). A release **MUST** take
 
 ## Module path stability
 
-The module path (`github.com/cadasto/openehr-sdk-go`) is locked. Renaming the module path requires (a) a major version bump and (b) a deprecation cycle of at least one minor release. There is no scenario in which a patch release changes the module path.
+The module path (`github.com/cadasto/openehr-sdk-go`) is locked. Renaming it is a change the [§ Versioning](#versioning) table maps to major, and the rename **MUST** follow a deprecation cycle of at least one minor release. A patch release **MUST NOT** change the module path.
