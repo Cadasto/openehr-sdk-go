@@ -584,7 +584,7 @@ client scenarios to SDK coverage:
 #### PROBE-030 — Canonical-JSON round trip
 
 - **Title:** Decoding a canonical-JSON RM value and re-encoding it, then decoding and encoding that output again, recovers the same value and a document wire-equivalent to the first, and the recovered value satisfies the reference-model floor.
-- **Preconditions:** A canonical-JSON RM value fixture under `testkit/corpus/compositions/` or `testkit/corpus/rm/`: a Composition, or an RM root or leaf sample such as an EHR_STATUS (see [Vendored fixtures](#vendored-fixtures-testkitcorpus)).
+- **Preconditions:** A canonical-JSON RM root fixture under `testkit/corpus/compositions/` or `testkit/corpus/rm/`: a COMPOSITION, or another root sample such as an EHR_STATUS or a FOLDER (see [Vendored fixtures](#vendored-fixtures-testkitcorpus)). The probe's leaf values, a DV_QUANTITY and a DV_CODED_TEXT, are inline in the probe.
 - **Wire assertion:** Decode, Encode (`b1`), Decode (`A`), Encode (`b2`), Decode (`B`). `A` and `B` **MUST** be equal by typed deep comparison (`reflect.DeepEqual` over the decoded RM values, which compares an interface-typed field by its dynamic type and value and so covers every substitutable slot and every `DV_INTERVAL[T]` bound with no comparison options). `B` **MUST** satisfy `validation.ValidateRM` ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)) with no issues. As a secondary check, `b1` and `b2` **MUST** be [wire-equivalent](#terms). No byte equality is asserted anywhere: not against the input fixture, whose member order is its own (REQ-052), and not between the SDK's own encodes, whose order is not a contract. An input whose vendored content carries an RM-floor finding independent of the round trip **MAY** be held out of the `ValidateRM` leg only, named in the probe with the finding, while the fidelity legs (typed deep comparison and wire equivalence) still run on it.
 - **Modes:** Sandbox (no network).
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_030_canjson_round_trip.go`](../../testkit/probes/serialize/probe_030_canjson_round_trip.go).
@@ -610,8 +610,8 @@ client scenarios to SDK coverage:
 
 #### PROBE-033 — Canonical-XML round trip
 
-- **Title:** Decoding a canonical-XML Composition and re-encoding, then decoding and encoding that output again, produces two byte-identical compact-XML SDK encodes.
-- **Preconditions:** A canonical-XML RM value fixture under `testkit/corpus/compositions/` or `testkit/corpus/rm/`: a Composition, or an RM root or leaf sample such as a FOLDER or a DV_QUANTITY (see [Vendored fixtures](#vendored-fixtures-testkitcorpus)).
+- **Title:** Decoding a canonical-XML RM value and re-encoding it, then decoding and encoding that output again, produces two byte-identical compact-XML SDK encodes.
+- **Preconditions:** A canonical-XML RM value fixture under `testkit/corpus/compositions/` or `testkit/corpus/rm/`: a COMPOSITION, or an RM root or leaf sample such as a FOLDER or a DV_QUANTITY (see [Vendored fixtures](#vendored-fixtures-testkitcorpus)). The probe also builds a DV_QUANTITY, a DV_TEXT and a COMPOSITION inline.
 - **Wire assertion:** Decode → Encode → Decode → Encode; the two compact-XML SDK encodes are byte-identical. Equality with the input fixture is not asserted: the fixture's whitespace and serialisation choices need not match the SDK's compact form (§ REQ-056), and it is the SDK's own output that must be stable.
 - **Modes:** Sandbox (no network).
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_033_canxml_round_trip.go`](../../testkit/probes/serialize/probe_033_canxml_round_trip.go).
