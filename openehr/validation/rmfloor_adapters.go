@@ -115,13 +115,18 @@ func asArchetyped(value any) (rm.Archetyped, bool) {
 }
 
 // dvIntervalNumericBounds returns the lower/upper magnitudes of a DV_INTERVAL
-// when both bounds are numerically comparable — same-unit DV_QUANTITY, or
-// DV_COUNT — and neither side is unbounded. It handles the monomorphised
-// instantiations RM data actually carries (DVInterval[DVQuantity], e.g.
-// DV_QUANTITY.normal_range; DVInterval[DVCount]) and the bare
-// DVInterval[DVOrdered] collapsed form. Returns ok=false otherwise:
+// when both bounds are numerically comparable — two DV_QUANTITY of the same
+// units, or two DV_COUNT — and neither side is unbounded. It handles the
+// monomorphised instantiations RM data actually carries
+// (DVInterval[DVQuantity], e.g. DV_QUANTITY.normal_range; DVInterval[DVCount])
+// and the bare DVInterval[DVOrdered] collapsed form. Returns ok=false
+// otherwise:
 //
 //   - an unbounded side (the comparison is undefined);
+//   - bounds of different RM types, such as a DV_COUNT beside a DV_QUANTITY
+//     on the bare form — BASE's is_strictly_comparable_to holds only between
+//     instances of the same type, so the pair has no ordering to check, even
+//     when the quantity is unitless;
 //   - bounds with different DV_QUANTITY units — the RM defines ordering only
 //     between strictly-comparable (same-unit) quantities, so a cross-unit
 //     interval has no magnitude ordering and the floor must not assert one;
@@ -132,9 +137,9 @@ func dvIntervalNumericBounds(value any) (lower, upper float64, ok bool) {
 	if !bounded {
 		return 0, 0, false
 	}
-	loMag, loUnit, loOK := numericMagnitude(lo)
-	hiMag, hiUnit, hiOK := numericMagnitude(hi)
-	if !loOK || !hiOK || loUnit != hiUnit {
+	loMag, loClass, loUnit, loOK := numericMagnitude(lo)
+	hiMag, hiClass, hiUnit, hiOK := numericMagnitude(hi)
+	if !loOK || !hiOK || loClass != hiClass || loUnit != hiUnit {
 		return 0, 0, false
 	}
 	return loMag, hiMag, true
@@ -179,27 +184,28 @@ func intervalBounds(value any) (lower, upper rm.DVOrdered, bounded bool) {
 	return nil, nil, false
 }
 
-// numericMagnitude lifts a DVOrdered bound to (magnitude, unit, ok). unit is
-// the DV_QUANTITY units string (empty for the dimensionless DV_COUNT); two
-// bounds are comparable only when their units match. Returns ok=false for any
-// other DVOrdered concrete (DV_DATE/TIME/DURATION/ORDINAL/…), which need
-// RM-spec-aware comparison handled by REQ-123 follow-ups.
-func numericMagnitude(v rm.DVOrdered) (mag float64, unit string, ok bool) {
+// numericMagnitude lifts a DVOrdered bound to (magnitude, class, unit, ok).
+// class is the bound's RM type; unit is the DV_QUANTITY units string (empty
+// for the dimensionless DV_COUNT). Two bounds are comparable only when both
+// their class and their units match. Returns ok=false for any other DVOrdered
+// concrete (DV_DATE/TIME/DURATION/ORDINAL/…), which need RM-spec-aware
+// comparison handled by REQ-123 follow-ups.
+func numericMagnitude(v rm.DVOrdered) (mag float64, class, unit string, ok bool) {
 	switch x := v.(type) {
 	case rm.DVQuantity:
-		return float64(x.Magnitude), x.Units, true
+		return float64(x.Magnitude), "DV_QUANTITY", x.Units, true
 	case *rm.DVQuantity:
 		if x == nil {
-			return 0, "", false
+			return 0, "", "", false
 		}
-		return float64(x.Magnitude), x.Units, true
+		return float64(x.Magnitude), "DV_QUANTITY", x.Units, true
 	case rm.DVCount:
-		return float64(x.Magnitude), "", true
+		return float64(x.Magnitude), "DV_COUNT", "", true
 	case *rm.DVCount:
 		if x == nil {
-			return 0, "", false
+			return 0, "", "", false
 		}
-		return float64(x.Magnitude), "", true
+		return float64(x.Magnitude), "DV_COUNT", "", true
 	}
-	return 0, "", false
+	return 0, "", "", false
 }
