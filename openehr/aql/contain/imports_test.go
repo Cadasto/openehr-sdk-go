@@ -1,37 +1,48 @@
 package contain_test
 
 import (
-	"go/build"
-	"strings"
+	"slices"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
-// TestContainForbiddenImports pins the REQ-160 § Building-block independence
-// (REQ-013) contract: openehr/aql/contain's non-test files MUST import only
-// openehr/rm/rminfo, openehr/rm, and the standard library — never transport /
-// auth / client / serialize, and never openehr/aql or openehr/aql/lint (the
-// relation sits BELOW both).
+// TestContainForbiddenImports guards REQ-013
+// (docs/specifications/module-layout.md § REQ-013) for openehr/aql/contain, in
+// the scope REQ-160 sets (clinical-modeling.md § REQ-160, Building-block
+// independence). Two rules hold:
+//
+//   - Neither the package nor any package of this module it pulls in imports
+//     transport, auth or openehr/client.
+//   - The package's own non-test files import only openehr/rm,
+//     openehr/rm/rminfo and the standard library. That also keeps out
+//     openehr/aql and openehr/aql/lint, which sit above the relation, and
+//     third-party modules. It cannot cover what they pull in: openehr/rm's
+//     generated marshal files import openehr/serialize/canxml.
+//
+// importguard.TestStandard is the can-fail control for the standard-library
+// check.
 func TestContainForbiddenImports(t *testing.T) {
-	pkg, err := build.Default.ImportDir(".", 0)
+	t.Parallel()
+	violations, err := importguard.Scan(".", importguard.WireLayers())
 	if err != nil {
-		t.Fatalf("ImportDir: %v", err)
+		t.Fatal(err)
 	}
-	if len(pkg.GoFiles) == 0 {
-		t.Fatal("ImportDir enumerated no non-test Go files; the guard is vacuous")
+	for _, v := range violations {
+		t.Errorf("openehr/aql/contain MUST NOT pull in %q: %s imports it (forbidden entry %q; REQ-013 building-block independence)", v.Import, v.Importer, v.Prefix)
 	}
-	allowed := map[string]bool{
-		"github.com/cadasto/openehr-sdk-go/openehr/rm":        true,
-		"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo": true,
+
+	allowed := []string{
+		"github.com/cadasto/openehr-sdk-go/openehr/rm",
+		"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo",
 	}
-	for _, imp := range pkg.Imports {
-		if allowed[imp] {
-			continue
-		}
-		// A dot in the first path element marks a module path; the standard
-		// library never has one. This fails third-party imports too, closing
-		// the "and the standard library" half of the REQ-013 clause.
-		if first, _, _ := strings.Cut(imp, "/"); strings.Contains(first, ".") {
-			t.Errorf("openehr/aql/contain MUST NOT import %q (REQ-013; allowed: openehr/rm, openehr/rm/rminfo, stdlib)", imp)
+	imports, err := importguard.Imports(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imp := range imports {
+		if !importguard.Standard(imp) && !slices.Contains(allowed, imp) {
+			t.Errorf("openehr/aql/contain MUST NOT import %q in its own files (REQ-013: aql/contain imports only openehr/rm, openehr/rm/rminfo and the standard library)", imp)
 		}
 	}
 }

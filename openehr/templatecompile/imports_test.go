@@ -1,34 +1,39 @@
 package templatecompile_test
 
 import (
-	"go/build"
-	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
-// REQ-013 § Building-block independence — openehr/templatecompile MUST
-// stay a pure clinical building block: a parsed OPT in, a compiled
-// template out. It depends only on openehr/template, openehr/rm/rminfo,
-// and the internal compile engine, never on the wire / transport / auth /
-// client layers. Mirrors TestCompositionForbiddenImports /
-// TestValidationForbiddenImports and locks the contract documented in
-// doc.go.
+// TestTemplatecompileForbiddenImports guards REQ-013
+// (docs/specifications/module-layout.md § REQ-013) for openehr/templatecompile,
+// a clinical building block that takes a parsed OPT and returns a compiled
+// template, as doc.go documents. Two rules hold:
+//
+//   - Neither the package nor any package of this module it pulls in imports
+//     transport, auth or openehr/client.
+//   - The package's own non-test files do not import openehr/serialize. This
+//     rule cannot cover what they pull in, since openehr/rm's generated
+//     marshal files import openehr/serialize/canxml.
 func TestTemplatecompileForbiddenImports(t *testing.T) {
-	pkg, err := build.Default.ImportDir("./", 0)
+	t.Parallel()
+	violations, err := importguard.Scan(".", importguard.WireLayers())
 	if err != nil {
-		t.Fatalf("ImportDir: %v", err)
+		t.Fatal(err)
 	}
-	forbidden := []string{
-		"openehr/serialize",
-		"openehr/client",
-		"github.com/cadasto/openehr-sdk-go/transport",
-		"github.com/cadasto/openehr-sdk-go/auth",
+	for _, v := range violations {
+		t.Errorf("openehr/templatecompile MUST NOT pull in %q: %s imports it (forbidden entry %q; REQ-013 building-block independence)", v.Import, v.Importer, v.Prefix)
 	}
-	for _, imp := range pkg.Imports {
-		for _, bad := range forbidden {
-			if strings.Contains(imp, bad) {
-				t.Errorf("openehr/templatecompile MUST NOT import %q (REQ-013 building-block independence; matched forbidden prefix %q)", imp, bad)
-			}
+
+	serialize := []string{"github.com/cadasto/openehr-sdk-go/openehr/serialize"}
+	imports, err := importguard.Imports(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imp := range imports {
+		if p, ok := importguard.Matches(imp, serialize); ok {
+			t.Errorf("openehr/templatecompile MUST NOT import %q in its own files (forbidden entry %q; REQ-013: a template-side building block never imports openehr/serialize)", imp, p)
 		}
 	}
 }

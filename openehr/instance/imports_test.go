@@ -1,49 +1,59 @@
 package instance_test
 
 import (
-	"go/build"
-	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
-// REQ-013 § Building-block independence — openehr/instance MUST
-// NOT depend on wire / transport / auth / client layers, nor on
-// the composition builder (REQ-101 consumes instance, not the
-// reverse) or the validator (validation depends on instance only
-// via cross-package probes/tests).
+// TestInstanceForbiddenImports guards REQ-013
+// (docs/specifications/module-layout.md § REQ-013) for openehr/instance, plus
+// two dependency-direction bans:
 //
-// Forbidden prefixes: the set REQ-013 names for the template-side
-// building blocks (docs/specifications/module-layout.md § REQ-013),
-// plus openehr/composition and openehr/validation, the two
-// dependency-direction bans described above:
+//   - Neither the package nor any package of this module it pulls in imports
+//     transport, auth or openehr/client.
+//   - The package's own non-test files do not import openehr/serialize, which
+//     REQ-013 bars from every template-side building block. This rule cannot
+//     cover what they pull in, since openehr/rm's generated marshal files
+//     import openehr/serialize/canxml.
+//   - They do not import openehr/composition either: the REQ-101 builder
+//     consumes instance, not the reverse.
+//   - Nor openehr/validation: the validator checks what instance generates,
+//     and reaches instance only from tests and probes.
 //
-//   - openehr/serialize       (wire-byte codecs)
-//   - openehr/client          (REST clients)
-//   - openehr/composition     (REQ-101 builder)
-//   - openehr/validation      (validator)
-//   - github.com/cadasto/openehr-sdk-go/transport
-//   - github.com/cadasto/openehr-sdk-go/auth
-//
-// Non-test files only — test files are allowed to import these for
-// integration / cross-package probes (e.g. testkit/probes/instance/
-// imports openehr/validation).
+// Test files may import anything, for cross-package probes for instance.
 func TestInstanceForbiddenImports(t *testing.T) {
-	pkg, err := build.Default.ImportDir("./", 0)
+	t.Parallel()
+	violations, err := importguard.Scan(".", importguard.WireLayers())
 	if err != nil {
-		t.Fatalf("ImportDir: %v", err)
+		t.Fatal(err)
 	}
-	forbidden := []string{
-		"openehr/serialize",
-		"openehr/client",
-		"openehr/composition",
-		"openehr/validation",
-		"github.com/cadasto/openehr-sdk-go/transport",
-		"github.com/cadasto/openehr-sdk-go/auth",
+	for _, v := range violations {
+		t.Errorf("openehr/instance MUST NOT pull in %q: %s imports it (forbidden entry %q; REQ-013 building-block independence)", v.Import, v.Importer, v.Prefix)
 	}
-	for _, imp := range pkg.Imports {
-		for _, bad := range forbidden {
-			if strings.Contains(imp, bad) {
-				t.Errorf("openehr/instance MUST NOT import %q (REQ-013 building-block independence; matched forbidden prefix %q)", imp, bad)
+
+	own := []struct{ entry, rule string }{
+		{
+			entry: "github.com/cadasto/openehr-sdk-go/openehr/serialize",
+			rule:  "REQ-013: a template-side building block never imports openehr/serialize",
+		},
+		{
+			entry: "github.com/cadasto/openehr-sdk-go/openehr/composition",
+			rule:  "the composition builder imports instance, not the reverse",
+		},
+		{
+			entry: "github.com/cadasto/openehr-sdk-go/openehr/validation",
+			rule:  "the validator checks instance output, not the reverse",
+		},
+	}
+	imports, err := importguard.Imports(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imp := range imports {
+		for _, r := range own {
+			if p, ok := importguard.Matches(imp, []string{r.entry}); ok {
+				t.Errorf("openehr/instance MUST NOT import %q in its own files (forbidden entry %q; %s)", imp, p, r.rule)
 			}
 		}
 	}

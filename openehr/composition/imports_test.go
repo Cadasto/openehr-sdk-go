@@ -1,45 +1,43 @@
 package composition_test
 
 import (
-	"go/build"
-	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
-// REQ-013 § Building-block independence — openehr/composition MUST
-// NOT depend on wire / transport / auth / client layers. The
-// composition builder is a building block above openehr/instance and
-// openehr/template; it stays usable without constructing an
-// authenticated client.
+// TestCompositionForbiddenImports guards REQ-013
+// (docs/specifications/module-layout.md § REQ-013) for openehr/composition,
+// the builder above openehr/instance and openehr/template. REQ-101 states the
+// same for the builder: it is importable without transport, auth, the REST
+// clients or openehr/serialize. Two rules hold:
 //
-// Forbidden prefixes:
+//   - Neither the package nor any package of this module it pulls in imports
+//     transport, auth or openehr/client.
+//   - The package's own non-test files do not import openehr/serialize: a
+//     caller that wants wire bytes imports a codec itself. This rule cannot
+//     cover what they pull in, since openehr/rm's generated marshal files
+//     import openehr/serialize/canxml.
 //
-//   - openehr/serialize       (wire-byte codecs — caller imports separately)
-//   - openehr/client          (REST clients)
-//   - github.com/cadasto/openehr-sdk-go/transport
-//   - github.com/cadasto/openehr-sdk-go/auth
-//
-// Non-test files only — test files are allowed to import openehr/serialize
-// (canjson round-trip) and similar cross-package surfaces for assertions.
-//
-// REQ-101: the builder is importable without transport, auth, the REST
-// clients or openehr/serialize.
+// Test files may import anything, canjson for round-trip checks for instance.
 func TestCompositionForbiddenImports(t *testing.T) {
-	pkg, err := build.Default.ImportDir("./", 0)
+	t.Parallel()
+	violations, err := importguard.Scan(".", importguard.WireLayers())
 	if err != nil {
-		t.Fatalf("ImportDir: %v", err)
+		t.Fatal(err)
 	}
-	forbidden := []string{
-		"openehr/serialize",
-		"openehr/client",
-		"github.com/cadasto/openehr-sdk-go/transport",
-		"github.com/cadasto/openehr-sdk-go/auth",
+	for _, v := range violations {
+		t.Errorf("openehr/composition MUST NOT pull in %q: %s imports it (forbidden entry %q; REQ-013 building-block independence)", v.Import, v.Importer, v.Prefix)
 	}
-	for _, imp := range pkg.Imports {
-		for _, bad := range forbidden {
-			if strings.Contains(imp, bad) {
-				t.Errorf("openehr/composition MUST NOT import %q (REQ-013 building-block independence; matched forbidden prefix %q)", imp, bad)
-			}
+
+	serialize := []string{"github.com/cadasto/openehr-sdk-go/openehr/serialize"}
+	imports, err := importguard.Imports(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imp := range imports {
+		if p, ok := importguard.Matches(imp, serialize); ok {
+			t.Errorf("openehr/composition MUST NOT import %q in its own files (forbidden entry %q; REQ-013: a template-side building block never imports openehr/serialize)", imp, p)
 		}
 	}
 }

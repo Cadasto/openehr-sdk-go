@@ -1,34 +1,40 @@
 package parse_test
 
 import (
-	"go/build"
-	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
-// REQ-013 § Building-block independence — openehr/aql/parse MUST NOT depend on
-// the wire / transport / auth / client layers. AQL parsing is a building block
-// (CI validators, MCP tools, pre-flight checks) usable without an authenticated
-// client. Non-test files only.
+// TestAQLParseForbiddenImports guards REQ-013
+// (docs/specifications/module-layout.md § REQ-013) for openehr/aql/parse.
+// Parsing AQL is a building block for CI validators, MCP tools and pre-flight
+// checks, usable without an authenticated client (REQ-109). Two rules hold:
 //
-// REQ-109: the parse layer is a building block, usable without an
-// authenticated client.
+//   - Neither the package nor any package of this module it pulls in imports
+//     transport, auth or openehr/client.
+//   - The package's own non-test files do not import openehr/serialize. This
+//     rule cannot cover what they pull in: parse imports openehr/aql, which
+//     reaches openehr/rm, whose generated marshal files import
+//     openehr/serialize/canxml.
 func TestAQLParseForbiddenImports(t *testing.T) {
-	pkg, err := build.Default.ImportDir("./", 0)
+	t.Parallel()
+	violations, err := importguard.Scan(".", importguard.WireLayers())
 	if err != nil {
-		t.Fatalf("ImportDir: %v", err)
+		t.Fatal(err)
 	}
-	forbidden := []string{
-		"openehr/serialize",
-		"openehr/client",
-		"github.com/cadasto/openehr-sdk-go/transport",
-		"github.com/cadasto/openehr-sdk-go/auth",
+	for _, v := range violations {
+		t.Errorf("openehr/aql/parse MUST NOT pull in %q: %s imports it (forbidden entry %q; REQ-013 building-block independence)", v.Import, v.Importer, v.Prefix)
 	}
-	for _, imp := range pkg.Imports {
-		for _, bad := range forbidden {
-			if strings.Contains(imp, bad) {
-				t.Errorf("openehr/aql/parse MUST NOT import %q (REQ-013; matched %q)", imp, bad)
-			}
+
+	serialize := []string{"github.com/cadasto/openehr-sdk-go/openehr/serialize"}
+	imports, err := importguard.Imports(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imp := range imports {
+		if p, ok := importguard.Matches(imp, serialize); ok {
+			t.Errorf("openehr/aql/parse MUST NOT import %q in its own files (forbidden entry %q; REQ-013: aql/parse never imports openehr/serialize)", imp, p)
 		}
 	}
 }
