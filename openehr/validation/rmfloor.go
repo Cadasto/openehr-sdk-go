@@ -315,8 +315,8 @@ func isArchetypeRootClass(rmType string) bool {
 // it optional. An absent archetype_details, whether omitted or JSON null,
 // reports `is_archetype_root` at the node's archetype_details.
 //
-// The attribute is read through [rm.Locatable], not rmread, so the rule holds
-// on a root rmread does not model (EHR_ACCESS) too.
+// The attribute is read through [rm.Locatable], which every LOCATABLE
+// concrete implements, so the rule needs no rmread reader of its own.
 func (w *rmFloorWalker) checkArchetypeRoot(value any, rmType, path string) {
 	l, ok := value.(rm.Locatable)
 	if !ok || rmread.IsTypedNilPointer(value) {

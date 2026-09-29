@@ -19,7 +19,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // TestValidateRMFolder_MissingName covers the dossier's named case:
@@ -237,9 +236,11 @@ func TestValidateRMFolder_ObjectRefItemMissingType(t *testing.T) {
 }
 
 // TestValidateRMEHRAccess_Valid is the regression guard for the EHR_ACCESS
-// dispatch gap: a non-nil EHR_ACCESS is recognised and walked (returns OK)
-// rather than reported as rm_type_unknown. EHR_ACCESS is an archetype root,
-// so the valid value carries archetype_details (REQ-112).
+// dispatch gap: a non-nil EHR_ACCESS is recognised rather than reported as
+// rm_type_unknown, and one carrying its RM-mandatory name and
+// archetype_node_id, plus the archetype_details an archetype root needs,
+// walks clean (REQ-112). The findings on an incomplete one are pinned by
+// TestValidateRMEHRAccess_Walked.
 func TestValidateRMEHRAccess_Valid(t *testing.T) {
 	access := &rm.EHRAccess{
 		ArchetypeNodeID:  "openEHR-EHR-EHR_ACCESS.generic.v1",
@@ -654,12 +655,9 @@ func TestRMFloorDVCodedTextMappingsNullIsValid(t *testing.T) {
 // fault inside a bound validated clean. Each row plants one fault inside a
 // bound — a catalogue invariant, or an RM-mandatory attribute left empty —
 // and lists every issue the floor must report, by code and path. The list is
-// exact, so a spurious issue fails the row too.
-//
-// DV_ORDINAL and DV_SCALE bounds are opaque leaves to the floor (rmread does
-// not model those two classes), so no fault inside them is reportable. Their
-// rows check the reader path the walk takes instead: the interval is
-// modelled, and both bounds read back as the bound class.
+// exact, so a spurious issue fails the row too. For DV_ORDINAL and DV_SCALE
+// bounds the planted fault is an absent symbol, which both classes make
+// RM-mandatory.
 //
 // The half-open rows pin the other side of the walk: an unbounded side
 // carries no bound, so the floor does not descend into the zero value a
@@ -668,6 +666,7 @@ func TestRMFloorDVCodedTextMappingsNullIsValid(t *testing.T) {
 // skip applies only to an empty bound: a real bound standing beside its own
 // flag is walked like any bound, so a fault inside it is reported too (the
 // contradiction with the flag is not).
+
 func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 	badPrecision := rm.Integer(-5)
 	emptyStatus := &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr_normal_statuses"}}
@@ -683,9 +682,6 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 		name string
 		root any
 		want []issue
-		// opaqueBound names the bound class of a root interval that the
-		// floor does not model; set only on the DV_ORDINAL and DV_SCALE rows.
-		opaqueBound string
 	}{
 		{
 			name: "DV_QUANTITY under normal_range",
@@ -758,17 +754,24 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 			name: "DV_ORDINAL as root",
 			root: &rm.DVInterval[rm.DVOrdinal]{
 				Lower: rm.DVOrdinal{Value: 1, Symbol: symbol("at1")}, LowerIncluded: true,
-				Upper: rm.DVOrdinal{Value: 3, Symbol: symbol("at3")}, UpperIncluded: true,
+				Upper: rm.DVOrdinal{Value: 3}, UpperIncluded: true,
 			},
-			opaqueBound: "DV_ORDINAL",
+			want: []issue{{"/upper/symbol", "required"}},
 		},
 		{
-			name: "DV_SCALE as root",
-			root: &rm.DVInterval[rm.DVScale]{
-				Lower: rm.DVScale{Value: 0.5, Symbol: symbol("at1")}, LowerIncluded: true,
+			name: "DV_SCALE as root, value form",
+			root: rm.DVInterval[rm.DVScale]{
+				Lower: rm.DVScale{Value: 0.5}, LowerIncluded: true,
 				Upper: rm.DVScale{Value: 2.5, Symbol: symbol("at3")}, UpperIncluded: true,
 			},
-			opaqueBound: "DV_SCALE",
+			want: []issue{{"/lower/symbol", "required"}},
+		},
+		{
+			name: "DV_ORDINAL as root, both bounds complete",
+			root: &rm.DVInterval[rm.DVOrdinal]{
+				Lower: rm.DVOrdinal{Value: 1, Symbol: symbol("at1")}, LowerIncluded: true,
+				Upper: rm.DVOrdinal{Value: 3, Symbol: symbol("at3")}, UpperIncluded: true,
+			},
 		},
 		{
 			name: "DV_QUANTITY under normal_range, upper unbounded",
@@ -857,18 +860,6 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 			}
 			if !slices.Equal(got, tc.want) {
 				t.Errorf("ValidateRM(%T) issues = %v, want %v\nfull issues: %+v", tc.root, got, tc.want, r.Issues)
-			}
-			if tc.opaqueBound == "" {
-				return
-			}
-			if !rmread.Handles(tc.root) {
-				t.Fatalf("rmread.Handles(%T) = false, want true: the floor stops at the interval", tc.root)
-			}
-			for _, attr := range []string{"lower", "upper"} {
-				v, ok := rmread.ReadSingle(tc.root, "DV_INTERVAL", attr)
-				if gotBound, _ := rm.RMTypeName(v); !ok || gotBound != tc.opaqueBound {
-					t.Errorf("rmread.ReadSingle(%T, %q) = (%q bound, %v), want (%q bound, true)", tc.root, attr, gotBound, ok, tc.opaqueBound)
-				}
 			}
 		})
 	}

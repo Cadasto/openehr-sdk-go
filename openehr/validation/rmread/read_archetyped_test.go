@@ -1,28 +1,20 @@
 package rmread
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// unmodelledLocatables names the registered LOCATABLE concretes that rmread
-// does not model, so ReadSingle reads none of their attributes, the inherited
-// archetype_details included. The RM floor therefore does not descend into
-// them. A reader added for one of them, or a new LOCATABLE registered without
-// one, changes this list and fails TestReadSingle_ArchetypeDetailsParity.
-var unmodelledLocatables = []string{"EHR_ACCESS"}
-
 // TestReadSingle_ArchetypeDetailsParity checks that ReadSingle reads the
-// inherited LOCATABLE.archetype_details on every LOCATABLE concrete rmread
-// models (REQ-112). The RM floor reaches an ARCHETYPED node only through this
-// reader, so a LOCATABLE left out of it leaves its archetype_details
-// unchecked. The cases come from the live registry: a nil archetype_details
-// reads as absent, a set one reads back as the same pointer. A LOCATABLE that
-// Handles rejects must stay unreadable, as Handles promises, and must be one
-// unmodelledLocatables names.
+// inherited LOCATABLE.archetype_details on every registered LOCATABLE concrete
+// (REQ-112). The RM floor reaches an ARCHETYPED node only through this reader,
+// so a LOCATABLE left out of it leaves its archetype_details unchecked. The
+// cases come from the live registry: a nil archetype_details reads as absent,
+// a set one reads back as the same pointer. Every registered LOCATABLE is
+// modelled, so a new one registered without a reader fails here; were one
+// ever rejected by Handles, it must stay unreadable, as Handles promises.
 func TestReadSingle_ArchetypeDetailsParity(t *testing.T) {
 	var modelled, unmodelled []string
 	for _, name := range typereg.Default.Names() {
@@ -53,8 +45,8 @@ func TestReadSingle_ArchetypeDetailsParity(t *testing.T) {
 	if len(modelled) == 0 {
 		t.Fatal("the registry yields no modelled LOCATABLE concretes; registrations missing?")
 	}
-	if !slices.Equal(unmodelled, unmodelledLocatables) {
-		t.Errorf("registered LOCATABLE concretes Handles rejects = %v, want %v: update unmodelledLocatables together with the readers", unmodelled, unmodelledLocatables)
+	if len(unmodelled) > 0 {
+		t.Errorf("registered LOCATABLE concretes Handles rejects = %v, want none: add their readers", unmodelled)
 	}
 }
 

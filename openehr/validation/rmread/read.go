@@ -201,6 +201,36 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	case rm.DVParsable:
 		return readDVParsableSingle(&p, attrName)
 
+	case *rm.DVOrdinal:
+		return readDVOrdinalSingle(p, attrName)
+	case rm.DVOrdinal:
+		return readDVOrdinalSingle(&p, attrName)
+
+	case *rm.DVScale:
+		return readDVScaleSingle(p, attrName)
+	case rm.DVScale:
+		return readDVScaleSingle(&p, attrName)
+
+	// REFERENCE_RANGE, in the instantiations DV_ORDERED.other_reference_ranges
+	// carries: the bare one, and the typed ones of DV_COUNT, DV_QUANTITY and
+	// DV_PROPORTION.
+	case *rm.ReferenceRange[rm.DVOrdered]:
+		return readReferenceRangeSingle(p, attrName)
+	case rm.ReferenceRange[rm.DVOrdered]:
+		return readReferenceRangeSingle(&p, attrName)
+	case *rm.ReferenceRange[rm.DVCount]:
+		return readReferenceRangeSingle(p, attrName)
+	case rm.ReferenceRange[rm.DVCount]:
+		return readReferenceRangeSingle(&p, attrName)
+	case *rm.ReferenceRange[rm.DVQuantity]:
+		return readReferenceRangeSingle(p, attrName)
+	case rm.ReferenceRange[rm.DVQuantity]:
+		return readReferenceRangeSingle(&p, attrName)
+	case *rm.ReferenceRange[rm.DVProportion]:
+		return readReferenceRangeSingle(p, attrName)
+	case rm.ReferenceRange[rm.DVProportion]:
+		return readReferenceRangeSingle(&p, attrName)
+
 	case *rm.DVInterval[rm.DVQuantity]:
 		return readDVIntervalQuantitySingle(p, attrName)
 	case rm.DVInterval[rm.DVQuantity]:
@@ -313,6 +343,11 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	case rm.EHRStatus:
 		return readEHRStatusSingle(&p, attrName)
 
+	case *rm.EHRAccess:
+		return readEHRAccessSingle(p, attrName)
+	case rm.EHRAccess:
+		return readEHRAccessSingle(&p, attrName)
+
 	// --- archetyping: the ARCHETYPED node under LOCATABLE.archetype_details ---
 	case *rm.Archetyped:
 		return readArchetypedSingle(p, attrName)
@@ -374,6 +409,12 @@ func Handles(parent any) bool {
 		*rm.DVURI, rm.DVURI,
 		*rm.DVEHRURI, rm.DVEHRURI,
 		*rm.DVParsable, rm.DVParsable,
+		*rm.DVOrdinal, rm.DVOrdinal,
+		*rm.DVScale, rm.DVScale,
+		*rm.ReferenceRange[rm.DVOrdered], rm.ReferenceRange[rm.DVOrdered],
+		*rm.ReferenceRange[rm.DVCount], rm.ReferenceRange[rm.DVCount],
+		*rm.ReferenceRange[rm.DVQuantity], rm.ReferenceRange[rm.DVQuantity],
+		*rm.ReferenceRange[rm.DVProportion], rm.ReferenceRange[rm.DVProportion],
 		*rm.DVInterval[rm.DVQuantity], rm.DVInterval[rm.DVQuantity],
 		*rm.DVInterval[rm.DVCount], rm.DVInterval[rm.DVCount],
 		*rm.DVInterval[rm.DVDateTime], rm.DVInterval[rm.DVDateTime],
@@ -396,6 +437,7 @@ func Handles(parent any) bool {
 		*rm.Capability, rm.Capability,
 		*rm.Folder, rm.Folder,
 		*rm.EHRStatus, rm.EHRStatus,
+		*rm.EHRAccess, rm.EHRAccess,
 		*rm.Archetyped, rm.Archetyped:
 		return true
 	}
@@ -460,6 +502,44 @@ func ReadMultiple(parent any, _ /* parentType */, attrName string) ([]any, bool)
 		return readDVCodedTextMultiple(p, attrName)
 	case rm.DVCodedText:
 		return readDVCodedTextMultiple(&p, attrName)
+
+	// --- DataValue containers: DV_ORDERED.other_reference_ranges ---
+	case *rm.DVCount:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVCount:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVQuantity:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVQuantity:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVProportion:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVProportion:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVOrdinal:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVOrdinal:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVScale:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVScale:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVDate:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVDate:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVTime:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVTime:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVDateTime:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVDateTime:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case *rm.DVDuration:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
+	case rm.DVDuration:
+		return readOrderedMultiple(p.OtherReferenceRanges, attrName)
 
 	// --- demographic: PARTY hierarchy + sub-components ---
 	case *rm.Person:
@@ -1082,28 +1162,28 @@ func readDVDateSingle(d *rm.DVDate, attr string) (any, bool) {
 	if attr == "value" {
 		return strPresent(d.Value)
 	}
-	return nil, false
+	return readOrderedSingle(d.NormalStatus, d.NormalRange, attr)
 }
 
 func readDVTimeSingle(t *rm.DVTime, attr string) (any, bool) {
 	if attr == "value" {
 		return strPresent(t.Value)
 	}
-	return nil, false
+	return readOrderedSingle(t.NormalStatus, t.NormalRange, attr)
 }
 
 func readDVDateTimeSingle(d *rm.DVDateTime, attr string) (any, bool) {
 	if attr == "value" {
 		return strPresent(d.Value)
 	}
-	return nil, false
+	return readOrderedSingle(d.NormalStatus, d.NormalRange, attr)
 }
 
 func readDVDurationSingle(d *rm.DVDuration, attr string) (any, bool) {
 	if attr == "value" {
 		return strPresent(d.Value)
 	}
-	return nil, false
+	return readOrderedSingle(d.NormalStatus, d.NormalRange, attr)
 }
 
 func readDVBooleanSingle(b *rm.DVBoolean, attr string) (any, bool) {
@@ -1304,7 +1384,7 @@ func readCapabilitySingle(c *rm.Capability, attr string) (any, bool) {
 	return nil, false
 }
 
-// --- EHR-IM roots: FOLDER, EHR_STATUS ------------------------------------
+// --- EHR-IM roots: FOLDER, EHR_STATUS, EHR_ACCESS ------------------------------------
 
 func readFolderSingle(f *rm.Folder, attr string) (any, bool) {
 	switch attr {
@@ -1351,6 +1431,21 @@ func readEHRStatusSingle(s *rm.EHRStatus, attr string) (any, bool) {
 	return nil, false
 }
 
+// readEHRAccessSingle serves EHR_ACCESS: the RM-mandatory LOCATABLE
+// archetype_node_id and name, and the optional settings
+// (ACCESS_CONTROL_SETTINGS), which the walk treats as an opaque leaf.
+func readEHRAccessSingle(a *rm.EHRAccess, attr string) (any, bool) {
+	switch attr {
+	case "archetype_node_id":
+		return strPresent(a.ArchetypeNodeID)
+	case "name":
+		return dvTextPresent(a.Name)
+	case "settings":
+		return ifacePresent(a.Settings)
+	}
+	return nil, false
+}
+
 // --- archetyping: LOCATABLE.archetype_details and ARCHETYPED -------------
 
 // readArchetypeDetails serves archetype_details, the optional ARCHETYPED
@@ -1358,8 +1453,7 @@ func readEHRStatusSingle(s *rm.EHRStatus, attr string) (any, bool) {
 // LOCATABLE concrete exposes it through [rm.Locatable], so one reader covers
 // all of them, and a reader added for a new LOCATABLE gains it without
 // further change. A type [Handles] rejects stays unreadable here too, as
-// Handles promises; EHR_ACCESS is the one LOCATABLE this package does not
-// model.
+// Handles promises.
 func readArchetypeDetails(parent any) (any, bool) {
 	if !Handles(parent) || IsTypedNilPointer(parent) {
 		return nil, false
