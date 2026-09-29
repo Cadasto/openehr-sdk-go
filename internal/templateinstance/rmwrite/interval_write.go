@@ -34,12 +34,27 @@ func writeDVIntervalOrderedSingle(iv *rm.DVInterval[rm.DVOrdered], attr string, 
 	return writeIntervalSingle(&iv.Interval, attr, child, "DV_ORDERED")
 }
 
+// writeIntervalSingle sets one attribute of an interval. An open side
+// carries no bound, so a bound that is not Void (see isVoidBound) also
+// marks its own side bounded; the other side is left as it is. Writes
+// apply in order: a *_unbounded flag written after the bound replaces
+// what the bound set.
 func writeIntervalSingle[T any](iv *rm.Interval[T], attr string, child any, boundRM string) error {
 	switch attr {
 	case "lower":
-		return assignVia(child, func(v T) { iv.Lower = v }, attr, boundRM)
+		return assignVia(child, func(v T) {
+			iv.Lower = v
+			if !isVoidBound(v) {
+				iv.LowerUnbounded = false
+			}
+		}, attr, boundRM)
 	case "upper":
-		return assignVia(child, func(v T) { iv.Upper = v }, attr, boundRM)
+		return assignVia(child, func(v T) {
+			iv.Upper = v
+			if !isVoidBound(v) {
+				iv.UpperUnbounded = false
+			}
+		}, attr, boundRM)
 	case "lower_unbounded":
 		v, ok := child.(bool)
 		if !ok {
@@ -70,4 +85,14 @@ func writeIntervalSingle[T any](iv *rm.Interval[T], attr string, child any, boun
 		return nil
 	}
 	return fmt.Errorf("%w: *rm.Interval[%s] has no single attr %q", ErrUnknownAttribute, boundRM, attr)
+}
+
+// isVoidBound reports whether a bound the writer accepted still means
+// "no bound". Only the DV_INTERVAL<DV_ORDERED> instantiation can hold
+// one: its bound is an interface, which can be nil or carry a typed-nil
+// pointer such as (*rm.DVQuantity)(nil). A concrete bound type is a
+// struct value and is never Void, even when all its fields are zero.
+func isVoidBound[T any](v T) bool {
+	b := any(v)
+	return b == nil || rm.IsTypedNil(b)
 }
