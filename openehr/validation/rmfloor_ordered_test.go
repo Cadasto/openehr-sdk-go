@@ -283,3 +283,46 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateRM_AccuracyWalked checks that the walk reaches the optional
+// accuracy of the date and time types, a DV_DURATION node, and checks it
+// (REQ-112): a DV_DURATION's value is RM-mandatory, so an empty one inside a
+// date's accuracy is `required` at its path. A Real accuracy on a DV_AMOUNT
+// type has nothing below it to check.
+func TestValidateRM_AccuracyWalked(t *testing.T) {
+	half := rm.Real(0.5)
+	cases := []struct {
+		name string
+		root any
+		want []string
+	}{
+		{
+			name: "DV_DATE with an empty accuracy duration",
+			root: scoreElement(&rm.DVDate{Value: "2026-09-29", Accuracy: &rm.DVDuration{}}),
+			want: []string{"required /value/accuracy/value"},
+		},
+		{
+			name: "DV_DATE_TIME with a complete accuracy duration",
+			root: scoreElement(&rm.DVDateTime{Value: "2026-09-29T10:00:00Z", Accuracy: &rm.DVDuration{Value: "PT1H"}}),
+		},
+		{
+			name: "DV_TIME as a bound with an empty accuracy duration",
+			root: &rm.DVInterval[rm.DVTime]{
+				Lower: rm.DVTime{Value: "08:00:00", Accuracy: &rm.DVDuration{}}, LowerIncluded: true,
+				UpperUnbounded: true,
+			},
+			want: []string{"required /lower/accuracy/value"},
+		},
+		{
+			name: "DV_QUANTITY with a Real accuracy",
+			root: scoreElement(&rm.DVQuantity{Magnitude: 5, Units: "mm", Accuracy: &half}),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := findingsOf(validation.ValidateRM(tc.root)); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateRM(%s) findings = %q, want %q", tc.name, got, tc.want)
+			}
+		})
+	}
+}

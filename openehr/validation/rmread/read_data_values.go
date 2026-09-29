@@ -2,9 +2,15 @@ package rmread
 
 import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
+// readDVCountSingle, readDVQuantitySingle and readDVProportionSingle also
+// read the optional DV_AMOUNT accuracy (a Real), then fall back to the
+// DV_ORDERED attributes.
 func readDVCountSingle(c *rm.DVCount, attr string) (any, bool) {
-	if attr == "magnitude" {
+	switch attr {
+	case "magnitude":
 		return c.Magnitude, true
+	case "accuracy":
+		return ptrPresent(c.Accuracy)
 	}
 	return readOrderedSingle(c.NormalStatus, c.NormalRange, attr)
 }
@@ -15,6 +21,8 @@ func readDVQuantitySingle(q *rm.DVQuantity, attr string) (any, bool) {
 		return q.Magnitude, true
 	case "units":
 		return strPresent(q.Units)
+	case "accuracy":
+		return ptrPresent(q.Accuracy)
 	}
 	return readOrderedSingle(q.NormalStatus, q.NormalRange, attr)
 }
@@ -32,6 +40,8 @@ func readDVProportionSingle(p *rm.DVProportion, attr string) (any, bool) {
 			return p.Precision, false
 		}
 		return *p.Precision, true
+	case "accuracy":
+		return ptrPresent(p.Accuracy)
 	}
 	return readOrderedSingle(p.NormalStatus, p.NormalRange, attr)
 }

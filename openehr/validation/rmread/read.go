@@ -1159,31 +1159,47 @@ func readTermMappingSingle(m *rm.TermMapping, attr string) (any, bool) {
 // needs to bind the primitive. Without these readers a populated value
 // reports absent, a false `required`. The bound primitive is then
 // validated by the C_PRIMITIVE child (REQ-103).
+//
+// The four DV_TEMPORAL leaves also read their optional accuracy (a
+// DV_DURATION node on DV_DATE, DV_TIME and DV_DATE_TIME, a Real on
+// DV_DURATION) and fall back to the DV_ORDERED attributes.
 
 func readDVDateSingle(d *rm.DVDate, attr string) (any, bool) {
-	if attr == "value" {
+	switch attr {
+	case "value":
 		return strPresent(d.Value)
+	case "accuracy":
+		return ptrPresent(d.Accuracy)
 	}
 	return readOrderedSingle(d.NormalStatus, d.NormalRange, attr)
 }
 
 func readDVTimeSingle(t *rm.DVTime, attr string) (any, bool) {
-	if attr == "value" {
+	switch attr {
+	case "value":
 		return strPresent(t.Value)
+	case "accuracy":
+		return ptrPresent(t.Accuracy)
 	}
 	return readOrderedSingle(t.NormalStatus, t.NormalRange, attr)
 }
 
 func readDVDateTimeSingle(d *rm.DVDateTime, attr string) (any, bool) {
-	if attr == "value" {
+	switch attr {
+	case "value":
 		return strPresent(d.Value)
+	case "accuracy":
+		return ptrPresent(d.Accuracy)
 	}
 	return readOrderedSingle(d.NormalStatus, d.NormalRange, attr)
 }
 
 func readDVDurationSingle(d *rm.DVDuration, attr string) (any, bool) {
-	if attr == "value" {
+	switch attr {
+	case "value":
 		return strPresent(d.Value)
+	case "accuracy":
+		return ptrPresent(d.Accuracy)
 	}
 	return readOrderedSingle(d.NormalStatus, d.NormalRange, attr)
 }

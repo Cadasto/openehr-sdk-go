@@ -1,9 +1,11 @@
 package rmread
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -185,5 +187,51 @@ func TestReadSingle_EHRAccess(t *testing.T) {
 	}
 	if got, ok := ReadSingle(full, "EHR_ACCESS", "settings"); ok {
 		t.Errorf("ReadSingle(EHR_ACCESS without settings, settings) = (%v, true), want absent", got)
+	}
+}
+
+// TestReadAccuracyWhereDeclared checks that every registered DV_ORDERED
+// concrete whose rminfo attributes include accuracy reads it (REQ-112):
+// DV_DATE, DV_TIME and DV_DATE_TIME carry a DV_DURATION there, a node the
+// walk must descend into, and the DV_AMOUNT types a Real. Each case is decoded
+// from JSON with accuracy set, and the zero value reads it as absent. The
+// cases come from the registry and rminfo, so a type that gains the attribute
+// fails here until its reader does.
+func TestReadAccuracyWhereDeclared(t *testing.T) {
+	lister, ok := rminfo.Default.(rminfo.AttributeLister)
+	if !ok {
+		t.Fatal("rminfo.Default does not list attributes")
+	}
+	var checked int
+	for _, name := range typereg.Default.Names() {
+		ctor, _ := typereg.Default.Lookup(name)
+		if _, ok := ctor().(rm.DVOrdered); !ok || !slices.Contains(lister.AttributeNames(name), "accuracy") {
+			continue
+		}
+		checked++
+		t.Run(name, func(t *testing.T) {
+			attrType, _ := rminfo.Default.AttributeRMType(name, "accuracy")
+			accuracy := `0.5`
+			if attrType == "DV_DURATION" {
+				accuracy = `{"_type":"DV_DURATION","value":"PT1H"}`
+			}
+			v, err := typereg.Default.Decode([]byte(`{"_type":"` + name + `","accuracy":` + accuracy + `}`))
+			if err != nil {
+				t.Fatalf("typereg.Decode(%s with accuracy): %v", name, err)
+			}
+			got, ok := ReadSingle(v, name, "accuracy")
+			if !ok {
+				t.Fatalf("ReadSingle(%T, accuracy) = (%v, false), want present", v, got)
+			}
+			if gotName, _ := rm.RMTypeName(got); attrType == "DV_DURATION" && (gotName != "DV_DURATION" || !Handles(got)) {
+				t.Errorf("ReadSingle(%T, accuracy) = %T, want a modelled DV_DURATION", v, got)
+			}
+			if got, ok := ReadSingle(ctor(), name, "accuracy"); ok {
+				t.Errorf("ReadSingle(zero %s, accuracy) = (%v, true), want absent", name, got)
+			}
+		})
+	}
+	if checked == 0 {
+		t.Fatal("no registered DV_ORDERED declares accuracy in rminfo; the parity check asserts nothing")
 	}
 }
