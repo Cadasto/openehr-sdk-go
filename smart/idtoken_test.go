@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -62,8 +63,16 @@ func joseSign(t *testing.T, alg gojose.SignatureAlgorithm, key any, kid string, 
 	return compact
 }
 
-// jwksFromPublicKeys serves a JWKS document advertising pub under kid.
+// jwksServer serves a JWKS document advertising pub under kid.
 func jwksServer(t *testing.T, kid string, pub crypto.PublicKey, alg string) *authsmart.JWKS {
+	t.Helper()
+	jwks, _ := countingJWKSServer(t, kid, pub, alg)
+	return jwks
+}
+
+// countingJWKSServer is jwksServer that also reports how many times the JWKS
+// document was requested.
+func countingJWKSServer(t *testing.T, kid string, pub crypto.PublicKey, alg string) (*authsmart.JWKS, *atomic.Int32) {
 	t.Helper()
 	jwk := gojose.JSONWebKey{Key: pub, KeyID: kid, Algorithm: alg, Use: "sig"}
 	set := gojose.JSONWebKeySet{Keys: []gojose.JSONWebKey{jwk}}
@@ -71,7 +80,9 @@ func jwksServer(t *testing.T, kid string, pub crypto.PublicKey, alg string) *aut
 	if err != nil {
 		t.Fatal(err)
 	}
+	var requests atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(body)
 	}))
@@ -80,7 +91,7 @@ func jwksServer(t *testing.T, kid string, pub crypto.PublicKey, alg string) *aut
 	if err != nil {
 		t.Fatal(err)
 	}
-	return jwks
+	return jwks, &requests
 }
 
 func newRSAKey(t *testing.T) *rsa.PrivateKey {
@@ -205,25 +216,6 @@ func TestValidateIDTokenFailsClosedOnUnsupportedAdvertisedAlgs(t *testing.T) { /
 	}
 }
 
-// TestValidateIDTokenRejectsAlgNone confirms an unsigned (alg:none) token is
-// rejected. REQ-062 REQ-064
-func TestValidateIDTokenRejectsAlgNone(t *testing.T) {
-	now := time.Unix(1_700_000_000, 0)
-	priv := newRSAKey(t)
-	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
-
-	hdr, _ := json.Marshal(map[string]string{"alg": "none", "typ": "JWT", "kid": "kid-rs256"})
-	pl, _ := json.Marshal(defaultIDClaims(now))
-	tok := base64.RawURLEncoding.EncodeToString(hdr) + "." +
-		base64.RawURLEncoding.EncodeToString(pl) + "."
-
-	_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
-		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
-	if err == nil || !isJWKSFail(err) {
-		t.Fatalf("alg:none should be rejected with JWKS failure, got %v", err)
-	}
-}
-
 // TestValidateIDTokenRejectsBadNonce confirms the SDK's nonce check still
 // applies after go-oidc signature verification. REQ-064
 func TestValidateIDTokenRejectsBadNonce(t *testing.T) {
@@ -318,40 +310,14 @@ func TestValidateIDTokenExpiredBeyondSkew(t *testing.T) {
 	}
 }
 
-// TestValidateIDTokenRejectsAlgNoneCaseVariants extends alg:none rejection to
-// cover case variants NONE and None. Fix 3 / REQ-062.
-func TestValidateIDTokenRejectsAlgNoneCaseVariants(t *testing.T) {
+// TestValidateIDTokenRejectsAlgNone checks that an unsigned token is refused
+// in every letter case of "none", including when the caller's allowlist
+// names it. go-oidc would also refuse such a token, so each case also
+// requires that the JWKS was never fetched: the SDK's own check refuses the
+// token before it looks up a signing key.
+func TestValidateIDTokenRejectsAlgNone(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	priv := newRSAKey(t)
-	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
-
-	for _, algVariant := range []string{"NONE", "None"} {
-		t.Run("alg="+algVariant, func(t *testing.T) {
-			hdr, _ := json.Marshal(map[string]string{"alg": algVariant, "typ": "JWT", "kid": "kid-rs256"})
-			pl, _ := json.Marshal(defaultIDClaims(now))
-			tok := base64.RawURLEncoding.EncodeToString(hdr) + "." +
-				base64.RawURLEncoding.EncodeToString(pl) + "."
-
-			_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
-				"https://issuer.example", "client-id", "nonce-xyz", now, nil)
-			if err == nil {
-				t.Fatalf("alg:%s should be rejected, got nil", algVariant)
-			}
-			if !errors.Is(err, auth.ErrJWKSValidationFailed) {
-				t.Fatalf("alg:%s expected ErrJWKSValidationFailed, got %v", algVariant, err)
-			}
-		})
-	}
-}
-
-// TestValidateIDTokenRejectsAlgNoneExplicitly pins the SDK's own refusal of the
-// unsecured algorithm in every letter case, including when the caller's
-// allowlist names it. go-oidc would also refuse such a token, so the assertion
-// on the SDK's own message is what keeps the SDK's check in place.
-func TestValidateIDTokenRejectsAlgNoneExplicitly(t *testing.T) {
-	now := time.Unix(1_700_000_000, 0)
-	priv := newRSAKey(t)
-	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
 
 	allowlists := []struct {
 		name string
@@ -363,6 +329,7 @@ func TestValidateIDTokenRejectsAlgNoneExplicitly(t *testing.T) {
 	for _, alg := range []string{"none", "NONE", "None"} {
 		for _, al := range allowlists {
 			t.Run(alg+"/"+al.name, func(t *testing.T) {
+				jwks, requests := countingJWKSServer(t, "kid-rs256", &priv.PublicKey, "RS256")
 				hdr, err := json.Marshal(map[string]string{"alg": alg, "typ": "JWT", "kid": "kid-rs256"})
 				if err != nil {
 					t.Fatal(err)
@@ -380,11 +347,42 @@ func TestValidateIDTokenRejectsAlgNoneExplicitly(t *testing.T) {
 				if err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed) {
 					t.Fatalf("ValidateIDToken(alg %q, allowlist %v) error = %v, want ErrJWKSValidationFailed", alg, al.algs, err)
 				}
-				if !strings.Contains(err.Error(), "alg none") {
-					t.Fatalf("ValidateIDToken(alg %q, allowlist %v) error = %v, want the SDK's own alg none rejection", alg, al.algs, err)
+				if n := requests.Load(); n != 0 {
+					t.Fatalf("ValidateIDToken(alg %q, allowlist %v) fetched the JWKS %d time(s), want 0: the SDK must refuse alg none before any key lookup", alg, al.algs, n)
 				}
 			})
 		}
+	}
+}
+
+// TestValidateIDTokenMalformedTokenMatchesSentinel checks that a token refused
+// for its own shape (segments, header, or a key id the JWKS does not publish)
+// reports the JWKS validation sentinel, like every other token rejection.
+func TestValidateIDTokenMalformedTokenMatchesSentinel(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+	b64 := base64.RawURLEncoding.EncodeToString
+
+	cases := []struct {
+		name string
+		tok  string
+	}{
+		{name: "empty token", tok: ""},
+		{name: "two segments", tok: b64([]byte(`{"alg":"RS256"}`)) + "." + b64([]byte(`{}`))},
+		{name: "header not base64url", tok: "!!!." + b64([]byte(`{}`)) + ".sig"},
+		{name: "header not JSON", tok: b64([]byte("not json")) + "." + b64([]byte(`{}`)) + ".sig"},
+		{name: "kid not in the JWKS", tok: joseSign(t, gojose.RS256, priv, "kid-unknown", defaultIDClaims(now))},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := smart.ValidateIDToken(t.Context(), tc.tok, jwks,
+				"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+			// REQ-062: a rejection decided on the token itself matches the JWKS sentinel.
+			if err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed) {
+				t.Fatalf("ValidateIDToken(%s) error = %v, want ErrJWKSValidationFailed", tc.name, err)
+			}
+		})
 	}
 }
 
@@ -481,6 +479,7 @@ func TestValidateIDTokenClaimRules(t *testing.T) {
 		{name: "exact iss accounts.google.com", issuer: "https://accounts.google.com", set: map[string]any{"iss": "https://accounts.google.com"}},
 		{name: "scheme-less iss accounts.google.com", issuer: "https://accounts.google.com", set: map[string]any{"iss": "accounts.google.com"}, wantErr: true},
 		{name: "aud lists the client among others", set: map[string]any{"aud": []string{"other", "client-id"}}},
+		// go-oidc and the SDK both check aud on purpose, so removing either check alone stays green.
 		{name: "aud without the client", set: map[string]any{"aud": []string{"other"}}, wantErr: true},
 		{name: "nonce absent when one is expected", drop: "nonce", wantErr: true},
 	}
