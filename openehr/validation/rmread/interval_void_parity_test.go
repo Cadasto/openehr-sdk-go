@@ -1,0 +1,163 @@
+package rmread
+
+import (
+	"bytes"
+	"encoding/json/jsontext"
+	"encoding/xml"
+	"errors"
+	"io"
+	"reflect"
+	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
+)
+
+// TestREQ112IntervalBoundVoidEncoderParity keeps the floor and the canonical
+// encoders on one reading of an empty interval bound. The floor skips an open
+// side whose bound is Void (REQ-112, the isVoidDV* predicates here); canonical
+// JSON and XML omit the same bound (REQ-052, REQ-056) through the predicates
+// the generator derives for each bound type. The encoders' predicates are
+// unexported in openehr/rm, so the test reaches them through the encoders.
+//
+// For each concrete bound type it encodes an interval whose two sides are
+// both open and carry the same bound: the zero value, then a value with one
+// leaf field set, for every leaf field. The encoders must omit the bound
+// exactly when the floor's predicate calls it Void. Together with
+// TestIntervalBoundVoidPredicates, which proves the floor's predicates see
+// every field, a field one side misses fails here.
+func TestREQ112IntervalBoundVoidEncoderParity(t *testing.T) {
+	cases := []struct {
+		zero   any
+		isVoid func(any) bool
+		encode func(t *testing.T, bound any) (jsonOmits, xmlOmits bool)
+	}{
+		{rm.DVCount{}, func(v any) bool { return isVoidDVCount(v.(rm.DVCount)) }, openBoundOmitted[rm.DVCount]},
+		{rm.DVDate{}, func(v any) bool { return isVoidDVDate(v.(rm.DVDate)) }, openBoundOmitted[rm.DVDate]},
+		{rm.DVDateTime{}, func(v any) bool { return isVoidDVDateTime(v.(rm.DVDateTime)) }, openBoundOmitted[rm.DVDateTime]},
+		{rm.DVDuration{}, func(v any) bool { return isVoidDVDuration(v.(rm.DVDuration)) }, openBoundOmitted[rm.DVDuration]},
+		{rm.DVOrdinal{}, func(v any) bool { return isVoidDVOrdinal(v.(rm.DVOrdinal)) }, openBoundOmitted[rm.DVOrdinal]},
+		{rm.DVProportion{}, func(v any) bool { return isVoidDVProportion(v.(rm.DVProportion)) }, openBoundOmitted[rm.DVProportion]},
+		{rm.DVQuantity{}, func(v any) bool { return isVoidDVQuantity(v.(rm.DVQuantity)) }, openBoundOmitted[rm.DVQuantity]},
+		{rm.DVScale{}, func(v any) bool { return isVoidDVScale(v.(rm.DVScale)) }, openBoundOmitted[rm.DVScale]},
+		{rm.DVTime{}, func(v any) bool { return isVoidDVTime(v.(rm.DVTime)) }, openBoundOmitted[rm.DVTime]},
+	}
+	if got, want := len(cases), len(typedIntervals)/2; got != want {
+		t.Fatalf("%d bound types compared, want %d (one per typed DV_INTERVAL instantiation)", got, want)
+	}
+	for _, tc := range cases {
+		typ := reflect.TypeOf(tc.zero)
+		t.Run(typ.Name(), func(t *testing.T) {
+			check := func(sample string, bound any) {
+				t.Helper()
+				want := tc.isVoid(bound)
+				jsonOmits, xmlOmits := tc.encode(t, bound)
+				if jsonOmits != want {
+					t.Errorf("%s %s: canonical JSON omits the open bound = %v, but the floor reads it Void = %v", typ.Name(), sample, jsonOmits, want)
+				}
+				if xmlOmits != want {
+					t.Errorf("%s %s: canonical XML omits the open bound = %v, but the floor reads it Void = %v", typ.Name(), sample, xmlOmits, want)
+				}
+			}
+			check("zero value", tc.zero)
+			for _, f := range leafFields(typ, nil, "") {
+				v := reflect.New(typ).Elem()
+				field := v.FieldByIndex(f.index)
+				nz, err := encodableNonZeroValue(field.Type())
+				if err != nil {
+					t.Fatalf("%s.%s: %v", typ.Name(), f.name, err)
+				}
+				field.Set(nz)
+				check("with only "+f.name+" set", v.Interface())
+			}
+		})
+	}
+}
+
+// encodableNonZeroValue is nonZeroValue with one change the encoders need:
+// a slice is empty but not nil. It is still not the zero value, and a
+// one-element slice of zero elements may not encode (a zero TERM_MAPPING's
+// `match` is an empty Character, which canonical JSON refuses).
+func encodableNonZeroValue(t reflect.Type) (reflect.Value, error) {
+	if t.Kind() == reflect.Slice {
+		return reflect.MakeSlice(t, 0, 0), nil
+	}
+	return nonZeroValue(t)
+}
+
+// openBoundOmitted encodes a DV_INTERVAL whose two sides are both open and
+// carry bound, and reports whether canonical JSON and canonical XML each
+// left the bound out. Both sides must agree within one encoding.
+func openBoundOmitted[T rm.DVOrdered](t *testing.T, bound any) (jsonOmits, xmlOmits bool) {
+	t.Helper()
+	b := bound.(T)
+	iv := &rm.DVInterval[T]{Lower: b, LowerUnbounded: true, Upper: b, UpperUnbounded: true}
+
+	js, err := canjson.Marshal(iv)
+	if err != nil {
+		t.Fatalf("canjson.Marshal(%T): %v", iv, err)
+	}
+	members := jsonMembers(t, js)
+	if members["lower"] != members["upper"] {
+		t.Fatalf("canonical JSON treats the two open sides differently: %s", js)
+	}
+
+	xs, err := canxml.Marshal(iv)
+	if err != nil {
+		t.Fatalf("canxml.Marshal(%T): %v", iv, err)
+	}
+	children := xmlChildren(t, xs)
+	if children["lower"] != children["upper"] {
+		t.Fatalf("canonical XML treats the two open sides differently: %s", xs)
+	}
+	return !members["upper"], !children["upper"]
+}
+
+// jsonMembers reports which member names the JSON object b carries.
+func jsonMembers(t *testing.T, b []byte) map[string]bool {
+	t.Helper()
+	dec := jsontext.NewDecoder(bytes.NewReader(b))
+	if tok, err := dec.ReadToken(); err != nil || tok.Kind() != '{' {
+		t.Fatalf("wire is not a JSON object (token %v, error %v): %s", tok, err, b)
+	}
+	names := map[string]bool{}
+	for dec.PeekKind() != '}' {
+		tok, err := dec.ReadToken()
+		if err != nil {
+			t.Fatalf("read member name: %v: %s", err, b)
+		}
+		names[tok.String()] = true
+		if err := dec.SkipValue(); err != nil {
+			t.Fatalf("skip member %q: %v: %s", tok.String(), err, b)
+		}
+	}
+	return names
+}
+
+// xmlChildren reports which child element names the root element of b
+// carries.
+func xmlChildren(t *testing.T, b []byte) map[string]bool {
+	t.Helper()
+	dec := xml.NewDecoder(bytes.NewReader(b))
+	names := map[string]bool{}
+	depth := 0
+	for {
+		tok, err := dec.Token()
+		if errors.Is(err, io.EOF) {
+			return names
+		}
+		if err != nil {
+			t.Fatalf("read XML token: %v: %s", err, b)
+		}
+		switch el := tok.(type) {
+		case xml.StartElement:
+			depth++
+			if depth == 2 {
+				names[el.Name.Local] = true
+			}
+		case xml.EndElement:
+			depth--
+		}
+	}
+}
