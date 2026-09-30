@@ -139,3 +139,67 @@ func TestUnspelledNodeSkippedWhenAbsent(t *testing.T) {
 		})
 	}
 }
+
+// zeroValueCases are childless nodes the codec cannot classify, sitting on an
+// RM attribute held by value: rmpath hands such an attribute back even when
+// the composition never set it, as the type's zero value.
+var zeroValueCases = []struct {
+	name     string
+	nodeType string
+	path     string
+	comp     func(populated bool) *rm.Composition
+}{
+	{
+		name: "ENTRY language (CODE_PHRASE)", nodeType: "CODE PHRASE", path: "/language",
+		comp: func(populated bool) *rm.Composition {
+			c := unspelledComp(false)
+			if populated {
+				c.Content[0].(*rm.Evaluation).Language = rm.CodePhrase{
+					CodeString: "nl", TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
+				}
+			}
+			return c
+		},
+	},
+	{
+		name: "ACTION ism_transition (ISM_TRANSITION)", nodeType: "ISM_TRANSITION", path: "/ism_transition",
+		comp: func(populated bool) *rm.Composition {
+			// The entry node of unspelledWT names this archetype node id, so its
+			// path reaches the ACTION.
+			action := &rm.Action{ArchetypeNodeID: "openEHR-EHR-EVALUATION.test.v1", Name: rm.DVText{Value: "ev"}}
+			if populated {
+				action.IsmTransition.CurrentState = rm.DVCodedText{
+					Value:        unspelledSecret,
+					DefiningCode: rm.CodePhrase{CodeString: "532", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+				}
+			}
+			return &rm.Composition{
+				Name: rm.DVText{Value: "t"}, Language: rm.CodePhrase{CodeString: "en"},
+				Territory: rm.CodePhrase{CodeString: "NL"}, Content: []rm.ContentItem{action},
+			}
+		},
+	},
+}
+
+// TestUnspelledNodeZeroValueIsAbsent — REQ-140. An attribute held by value
+// that the composition never set comes back from rmpath as its zero value.
+// The backstop reads that as absent, as the codec already does for an empty
+// CODE_PHRASE, an all-zero ctx/setting and an empty STRING; a set value is
+// still refused.
+func TestUnspelledNodeZeroValueIsAbsent(t *testing.T) {
+	for _, tc := range zeroValueCases {
+		t.Run(tc.name, func(t *testing.T) {
+			wt := unspelledWT(tc.nodeType, tc.path, false)
+			if _, err := MarshalFlat(tc.comp(false), wt); err != nil {
+				t.Errorf("MarshalFlat with the attribute unset = %v, want it skipped as absent", err)
+			}
+			_, err := MarshalFlat(tc.comp(true), wt)
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("MarshalFlat with the attribute set = %v, want ErrUnsupportedDatatype", err)
+			}
+			if strings.Contains(err.Error(), unspelledSecret) {
+				t.Errorf("MarshalFlat error %q echoes the value", err)
+			}
+		})
+	}
+}

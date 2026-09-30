@@ -198,3 +198,45 @@ func TestStringLeafCorpusSpelling(t *testing.T) {
 		t.Errorf("re-encode of %s = %#v, want %q", key, got, value)
 	}
 }
+
+// TestStringLeafRefusesEmpty — REQ-053 § Leaf datatypes. An empty string at the
+// STRING leaf is refused on decode: ACTIVITY's `Action_archetype_id_valid`
+// invariant forbids it, and encode writes nothing for one.
+func TestStringLeafRefusesEmpty(t *testing.T) {
+	_, err := UnmarshalFlat(stringLeafBody(map[string]any{stringLeafKey: ""}), stringLeafWT())
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("UnmarshalFlat = %v, want ErrUnsupportedDatatype", err)
+	}
+	if !strings.Contains(err.Error(), stringLeafKey) {
+		t.Errorf("UnmarshalFlat = %v, want the error to name %q", err, stringLeafKey)
+	}
+}
+
+// unreadStringWT is [stringLeafWT] with its STRING leaf moved onto an ACTIVITY
+// attribute that is no RM String: a Web Template the SDK's builder never makes.
+func unreadStringWT() *webtemplate.WebTemplate {
+	w := stringLeafWT()
+	leaf := w.Tree.Children[0].Children[0].Children[0]
+	leaf.ID = "not_a_string"
+	leaf.AQLPath = "/content[openEHR-EHR-INSTRUCTION.test.v1]/activities[at0001]/not_a_string"
+	return w
+}
+
+// TestStringLeafOnUnreadAttributeRefused — REQ-053, REQ-140. The builder makes
+// one STRING leaf, ACTIVITY `action_archetype_id`. A STRING leaf anywhere else
+// is refused whenever its owner is there, because whether it holds a value
+// cannot be told; with no owner there is nothing to lose, and it is skipped.
+func TestStringLeafOnUnreadAttributeRefused(t *testing.T) {
+	_, err := MarshalFlat(stringLeafComp(stringLeafValue), unreadStringWT())
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("MarshalFlat = %v, want ErrUnsupportedDatatype", err)
+	}
+	if !strings.Contains(err.Error(), "root/ins/act/not_a_string") {
+		t.Errorf("MarshalFlat = %v, want it to name the FLAT path", err)
+	}
+	noActivity := stringLeafComp("")
+	noActivity.Content[0].(*rm.Instruction).Activities = nil
+	if _, err := MarshalFlat(noActivity, unreadStringWT()); err != nil {
+		t.Errorf("MarshalFlat with no ACTIVITY = %v, want the leaf skipped", err)
+	}
+}
