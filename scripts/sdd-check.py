@@ -29,7 +29,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 # Constants
 # ---------------------------------------------------------------------------
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 #: Every family, in report order.
 FAMILIES = (
@@ -72,6 +72,21 @@ SEVERITIES = ("error", "warn", "off")
 #: The families that cannot run without records.
 RECORD_FAMILIES = ("map-to-tree", "index-sync", "tree-to-map", "generated", "draft-reason")
 
+#: The profiles a descriptor may name (methodology §1a), and the older names each one reads as.
+PROFILES = ("formal", "informative")
+PROFILE_ALIASES = {"full": "formal", "lightweight": "formal"}
+#: On the informative profile only the constitution binds, so these families never run.
+INFORMATIVE_SKIPPED = (
+    "map-schema",
+    "map-to-tree",
+    "index-sync",
+    "tree-to-map",
+    "rfc2119",
+    "one-home",
+    "draft-reason",
+)
+DEFAULT_CONSTITUTION = "docs/architecture.md"
+
 STATUS = ("draft", "stable", "deprecated")
 IMPLEMENTATION = ("proposed", "planned", "in_progress", "partial", "landed", "shipped", "deferred", "retired")
 ENFORCED = ("in_progress", "partial", "landed", "shipped")
@@ -90,6 +105,7 @@ DEFAULT_KINDS = (
     "operations",
     "reference",
     "upstream",
+    "constitution",
 )
 NORMATIVE_KINDS = ("requirement", "specification", "adr")
 
@@ -824,7 +840,6 @@ DEFAULT_PATHS = {
     "requirements": "docs/requirements",
     "specifications": "docs/specifications",
     "adr": "docs/adr",
-    "plans": "docs/plans",
 }
 
 
@@ -961,13 +976,18 @@ class Descriptor:
     def __init__(self, root: Path, data: dict):
         self.root = Path(root)
         self.data = data
-        self.profile = _as_str(data.get("profile"), "full") or "full"
+        #: The profile as written, and the one it reads as: `full` and `lightweight` are
+        #: `formal` (a file-form requirements index is allowed on formal).
+        self.profile_written = _as_str(data.get("profile"), "formal") or "formal"
+        self.profile = PROFILE_ALIASES.get(self.profile_written, self.profile_written)
         self.req_style = _as_str(data.get("req_style"), "area-prefixed") or "area-prefixed"
         self.req_areas = [_as_str(a) for a in _as_list(data.get("req_areas"))]
         self.req_gap = data.get("req_gap", 10)
         self.excluded_areas = [_as_str(a) for a in _as_list(data.get("excluded_areas"))]
         kinds = [_as_str(k) for k in _as_list(data.get("doc_kinds"))]
         self.doc_kinds = kinds or list(DEFAULT_KINDS)
+        if self.profile == "informative" and "constitution" not in self.doc_kinds:
+            self.doc_kinds.append("constitution")
         self.default_mode = _as_str(data.get("default_mode"), "spec-first") or "spec-first"
         paths = data.get("paths")
         self.paths = dict(DEFAULT_PATHS)
@@ -1063,37 +1083,9 @@ class Descriptor:
     def resolve(self, rel: str) -> Path:
         return self.root / rel
 
-    def _normal(self, rel: str) -> Path:
-        return Path(os.path.normpath(str(self.root / rel)))
-
-    def plans_problem(self) -> str:
-        """Why ``paths.plans`` is unsafe to prune, or ``""``. Every docs walk skips that
-        directory, so a value that is empty, names the repository or ``docs`` root, or
-        names or contains another document path would hide real documents from every
-        family while the gate still reported OK."""
-        rel = _as_str(self.paths.get("plans", DEFAULT_PATHS["plans"]))
-        if not rel.strip():
-            return "paths.plans is empty; it names the working-plan directory the gate never reads"
-        plans = self._normal(rel)
-        guarded = [self._normal("."), self._normal("docs")]
-        for key in ("requirements", "specifications", "adr"):
-            value = _as_str(self.paths.get(key, ""))
-            if value:
-                guarded.append(self._normal(value))
-        if self.traceability:
-            guarded.append(self._normal(self.traceability))
-        for other in guarded:
-            if plans == other or plans in other.parents:
-                shown = os.path.relpath(str(other), str(self._normal(".")))
-                return "paths.plans: '%s' would hide %s from every family" % (rel, shown)
-        return ""
-
-    def plans_dir(self) -> Optional[Path]:
-        """The working-plan directory every docs walk prunes, or ``None`` when
-        :meth:`plans_problem` finds the value unsafe; an unsafe value prunes nothing."""
-        if self.plans_problem():
-            return None
-        return self._normal(_as_str(self.paths.get("plans", DEFAULT_PATHS["plans"])))
+    def constitution(self) -> str:
+        """The informative profile's one binding document (methodology §1a)."""
+        return _as_str(self.paths.get("constitution"), DEFAULT_CONSTITUTION) or DEFAULT_CONSTITUTION
 
     def severity(self, family: str) -> str:
         value = self.families.get(family)
@@ -1151,7 +1143,7 @@ class Descriptor:
         seen = {"docs"}
         for key, rel in self.paths.items():
             if key == "plans":
-                # A plan is a working file; no family reads paths.plans.
+                # paths.plans is no longer read (a NOTE says so); it never adds a root.
                 continue
             normal = str(Path(rel).as_posix())
             if normal in seen or normal.startswith("docs/"):
@@ -1313,6 +1305,7 @@ class Context:
         self.read_problems: Dict[str, str] = {}
         self._docs_files: Optional[List[Path]] = None
         self._git_ok: Optional[bool] = None
+        self._ignored: Optional[List[str]] = None
 
     # -- files ------------------------------------------------------------
     def abs(self, path) -> Path:
@@ -1353,22 +1346,33 @@ class Context:
         return self.read_problems.get(str(self.abs(path)))
 
     def docs_files(self) -> List[Path]:
+        """Every markdown document under the docs roots, less what git ignores.
+
+        A git-ignored file (a working plan, a scratch note) is not part of the repository, so
+        no family reads it. Without git every file is read: the gate would rather read too
+        much than quietly miss a document.
+        """
         if self._docs_files is None:
-            plans_dir = self.desc.plans_dir()
+            listing = self.git("ls-files", "--cached", "--others", "--exclude-standard", "-z")
+            kept = None if listing is None else {rel for rel in listing.split("\0") if rel}
+            if kept is not None:
+                # A file committed before its directory was ignored is still tracked; the ignore
+                # rule that now matches it keeps it out all the same.
+                ignored = self.git("ls-files", "--cached", "--ignored", "--exclude-standard", "-z") or ""
+                kept -= {rel for rel in ignored.split("\0") if rel}
             found: List[Path] = []
             for root in self.desc.docs_roots():
                 if root.is_file() and root.suffix == ".md":
-                    # A file-form path (the lightweight profile's requirements file).
-                    found.append(root)
+                    # A file-form path: a single-file requirements index, or the constitution.
+                    if kept is None or self.rel(root) in kept:
+                        found.append(root)
                     continue
                 if not root.is_dir():
                     continue
                 for path in sorted(root.rglob("*.md")):
                     if not path.is_file() or ".git" in path.parts:
                         continue
-                    if plans_dir is not None and (
-                        path == plans_dir or plans_dir in path.parents
-                    ):
+                    if kept is not None and self.rel(path) not in kept:
                         continue
                     found.append(path)
             seen = set()
@@ -1379,6 +1383,17 @@ class Context:
                     unique.append(path)
             self._docs_files = unique
         return self._docs_files
+
+    def ignored(self, path) -> bool:
+        """Whether git ignores ``path`` and does not track it: a file no clean checkout has."""
+        if self._ignored is None:
+            listing = self.git("ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z")
+            self._ignored = [entry for entry in (listing or "").split("\0") if entry]
+        rel = self.rel(path)
+        return any(
+            rel == entry.rstrip("/") or (entry.endswith("/") and rel.startswith(entry))
+            for entry in self._ignored
+        )
 
     # -- git --------------------------------------------------------------
     def _run_git(self, args) -> Optional[str]:
@@ -1511,8 +1526,19 @@ def check_descriptor(ctx: Context, report: "Report") -> None:
     def add(message):
         report.add("descriptor", level, DESCRIPTOR_REL, message)
 
-    if desc.profile not in ("full", "lightweight"):
-        add("profile: '%s' is not full | lightweight" % desc.profile)
+    text = ctx.read(ctx.root / DESCRIPTOR_REL)
+
+    def note(key, message):
+        report.add("descriptor", "NOTE", "%s:%d" % (DESCRIPTOR_REL, _key_line(text, key)), message)
+
+    if desc.profile not in PROFILES:
+        add("profile: '%s' is not %s" % (desc.profile_written, " | ".join(PROFILES)))
+    elif desc.profile_written == "lightweight":
+        note(
+            "profile",
+            "profile: lightweight is read as formal with a file-form requirements index; write formal",
+        )
+    informative = desc.profile == "informative"
     if desc.req_style not in ("area-prefixed", "flat-numeric"):
         add("req_style: '%s' is not area-prefixed | flat-numeric" % desc.req_style)
     elif desc.req_style == "area-prefixed":
@@ -1526,23 +1552,23 @@ def check_descriptor(ctx: Context, report: "Report") -> None:
     for key in ("requirements", "specifications", "adr"):
         rel = desc.paths.get(key, "")
         if not rel:
-            add("paths.%s is not declared" % key)
+            if not informative:
+                add("paths.%s is not declared" % key)
             continue
-        file_form = desc.is_file_form(rel)
-        if file_form and desc.profile == "full":
-            add("paths.%s: profile full requires a directory, not '%s'" % (key, rel))
-            continue
-        if file_form and key not in ("requirements", "specifications"):
+        if desc.is_file_form(rel) and key not in ("requirements", "specifications"):
             add("paths.%s: only requirements and specifications may name a file" % key)
             continue
-        if not desc.resolve(rel).exists():
+        # On the informative profile requirements, specifications and the map are optional.
+        if not informative and not desc.resolve(rel).exists():
             add("paths.%s: '%s' does not exist" % (key, rel))
-    plans_problem = desc.plans_problem()
-    if plans_problem:
-        add(plans_problem)
+    if "plans" in desc.paths:
+        note("paths.plans", "paths.plans is no longer read; delete the line")
+    if informative and "constitution" in desc.paths and not desc.resolve(desc.constitution()).is_file():
+        add("paths.constitution: '%s' is not a file" % desc.constitution())
     if not desc.traceability:
-        add("traceability is not declared")
-    elif not desc.resolve(desc.traceability).is_file():
+        if not informative:
+            add("traceability is not declared")
+    elif not informative and not desc.resolve(desc.traceability).is_file():
         add("traceability: '%s' does not exist" % desc.traceability)
     if desc.check_version != __version__:
         add(
@@ -1551,7 +1577,6 @@ def check_descriptor(ctx: Context, report: "Report") -> None:
         )
     for family, value in desc.families.items():
         if family in RETIRED_FAMILIES:
-            text = ctx.read(ctx.root / DESCRIPTOR_REL)
             report.add(
                 "descriptor",
                 "NOTE",
@@ -1947,7 +1972,7 @@ def check_index_sync(ctx: Context, report: "Report") -> None:
             "index-sync",
             "NOTE",
             index_rel,
-            "the detail-file check is skipped: the lightweight profile keeps the index in one file",
+            "the detail-file check is skipped: a file-form requirements index keeps the requirements in one file",
         )
     else:
         for record in ctx.records:
@@ -2499,6 +2524,14 @@ def check_links(ctx: Context, report: "Report") -> None:
                 if not resolved.exists():
                     report.add("links", level, where, "no such file: %s" % rel_part)
                     continue
+                if ctx.ignored(resolved):
+                    report.add(
+                        "links",
+                        level,
+                        where,
+                        "the target is git-ignored, so no clean checkout has it: %s" % rel_part,
+                    )
+                    continue
                 if not fragment or resolved.suffix != ".md":
                     continue
                 text = ctx.read(resolved)
@@ -2737,7 +2770,7 @@ class Report:
         self.waived: Dict[str, List[str]] = {}
         self.link_exclusions: List[str] = []
         self.record_count = 0
-        self.profile = "full"
+        self.profile = "formal"
         self.fatal_message: Optional[str] = None
 
     @classmethod
@@ -2852,7 +2885,14 @@ def _load_descriptor(root: Path) -> Tuple[Optional[Descriptor], Optional[str]]:
 
 def _load_records_or_report(desc: Descriptor, report: "Report") -> Tuple[List[Record], bool]:
     """Load the traceability map, reporting exactly the ``map-schema`` finding ``check``
-    reports on the same failure. Returns ``(records, map_ok)``."""
+    reports on the same failure. Returns ``(records, map_ok)``.
+
+    On the informative profile the map is optional: an absent or empty one is no records, not
+    a failure. A map that is there and broken is still reported.
+    """
+    informative = desc.profile == "informative"
+    if informative and (not desc.traceability or not desc.resolve(desc.traceability).is_file()):
+        return [], True
     try:
         records = load_map(desc)
     except FileNotFoundError:
@@ -2872,6 +2912,8 @@ def _load_records_or_report(desc: Descriptor, report: "Report") -> Tuple[List[Re
         )
         return [], False
     if not records:
+        if informative:
+            return [], True
         report.add(
             "map-schema", "ERROR", desc.traceability, "the traceability map yields zero records"
         )
@@ -2896,7 +2938,9 @@ def run_check(root: Path, only: Optional[List[str]], changelog_all: bool) -> Rep
 
     planned: List[str] = []
     for family in FAMILIES:
-        if desc.severity(family) == "off":
+        if desc.profile == "informative" and family in INFORMATIVE_SKIPPED:
+            report.skip(family, "profile informative")
+        elif desc.severity(family) == "off":
             report.skip(family, "off")
         elif only is not None and family not in only:
             report.skip(family, "not selected")
@@ -3660,7 +3704,6 @@ _BASELINE_FILES = {
     requirements: docs/requirements
     specifications: docs/specifications
     adr: docs/adr
-    plans: docs/plans
 
   traceability: docs/specifications/traceability.yaml
 
@@ -3804,18 +3847,6 @@ kind: guide
 |---|---|---|---|---|
 
 <!-- /sdd:generated -->
-""",
-    "docs/plans/2026-01-01-env.md": """# 2026-01-01 — Environment boundary
-
-**Implements:** REQ-FOUND-001 · SPEC-ENV §1
-**Lane:** full
-
-A working file: no frontmatter, a keyword that binds nothing — the service MUST read every
-declared variable — and a link to [nowhere](nope-does-not-exist.md). The gate reads none of it.
-
-## Tasks
-
-- [x] Read the declared variables when the service starts.
 """,
     "docs/development-process.md": """---
 kind: guide

@@ -1,3 +1,7 @@
+---
+kind: analysis
+---
+
 # STRAND-11 capture evidence
 
 One live `POST /ehr` against local EHRbase (2.35.1), serialised both ways so

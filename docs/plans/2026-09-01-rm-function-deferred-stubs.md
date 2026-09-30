@@ -1,3 +1,7 @@
+---
+kind: plan
+---
+
 # Plan — RM function deferred stubs (arithmetic + refs/inverse-navigation)
 
 > **For agentic workers:** use the superpowers:executing-plans skill. Steps use checkbox (`- [ ]`) syntax.

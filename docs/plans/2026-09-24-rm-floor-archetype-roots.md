@@ -1,3 +1,7 @@
+---
+kind: plan
+---
+
 # Plan — RM floor: archetype roots and ARCHETYPED
 
 **Date:** 2026-09-24

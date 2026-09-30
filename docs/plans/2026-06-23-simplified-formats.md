@@ -1,3 +1,7 @@
+---
+kind: plan
+---
+
 # Plan — Simplified formats (WebTemplate export + FLAT/STRUCTURED) — umbrella
 
 **Date:** 2026-06-23

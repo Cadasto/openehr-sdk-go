@@ -1,3 +1,7 @@
+---
+kind: plan
+---
+
 # Plan — FLAT author linter (pre-submit path validation)
 
 **Date:** 2026-07-16

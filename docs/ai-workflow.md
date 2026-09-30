@@ -62,6 +62,20 @@ For an exact attribute list, invariant, or signature, call the MCP tool `type_sp
 
 The full editing rules (idiomatic surface, the `cadasto/` boundary contract, and the do-not-touch list) are canonical in [AGENTS.md](../AGENTS.md) and [specifications/idiom.md](specifications/idiom.md). Follow those; this file does not repeat them.
 
+`/sdd-deliver` runs this loop as a pipeline: workers per task, the per-task gate, the first review pass, the draft PR. `/sdd-deliver <PR> --close-out` then updates the requirement status and writes the PR body, in the same PR.
+
+## Orchestration
+
+- **One orchestrator, bounded workers.** The main session orchestrates, on the strongest model available. It reads what binds, briefs and dispatches workers, gates each task, adjudicates spec questions, opens the draft PR, runs triage and closes out.
+- **The orchestrator does not write product code**, except for a task that cannot be made self-contained. That task is done in-session, and the PR body says so.
+- **A brief is self-contained.** It holds the task, what it cites, the clauses it must satisfy (quoted), the files it may touch, the verification command, en-route findings, the skills to load (§ Recommended tooling), and no subagents.
+- **Code index:** codebase-memory-mcp (§ Recommended tooling). Workers query it first and fall back to `grep` for literals and prose; the brief repeats the name.
+- **Workers do not spawn workers.** Parallel workers that change the tree each get their own worktree; sequential work stays on the branch.
+- **Completion is accounted for.** A worker that dies is re-dispatched, or the gap is named. A task is not done because a dispatch ended.
+- **Findings state is read from the findings file (§ Review), never remembered.**
+- **The maintainer merges.** Agents open draft PRs and mark them ready.
+- The worker model, parallelism, worktrees, the per-task review gate and the review panel are declared under `agents:` in [`.sdd.yaml`](.sdd.yaml). The model is passed per dispatch.
+
 ## Examples
 
 When you add, rename, remove, or materially change a [`cmd/examples/`](../cmd/examples/) program, keep its docs in sync **in the same PR**. That means [`cmd/examples/doc.go`](../cmd/examples/doc.go), [examples.md](examples.md), and, when the onboarding path changes, [quick-start.md](quick-start.md). See also [AGENTS.md § Spec-driven workflow](../AGENTS.md#spec-driven-workflow-agents). If `doc.go` and the markdown disagree, the runnable code wins.
@@ -72,36 +86,24 @@ The Claude Code format-on-save hook is documented in [`.claude/CLAUDE.md`](../.c
 
 ## Review
 
-All findings for a change live in one PR comment, the review ledger, whose first line starts `## Review ledger`; it is edited in place each round. Ids are `F<n>`, append-only across rounds, and `status` is `open`, `fixed@<sha>`, `declined` with a reason, or `deferred`. Report blockers and should-fix findings. Polish goes to the `Deferred` table, which is carried into the next change that touches the area and never becomes a tracker issue. Write an id as `F12`, never with a leading hash sign, which GitHub turns into a link to an unrelated issue.
+Findings for a branch live in one git-ignored file, `.sdd/findings/<branch>.md`, named after the branch with `/` replaced by `--`. Any agent on this machine, or a person, reads and edits it. It is the only list of findings, with or without a PR, and it is deleted when the branch merges. When a PR exists, `sdd-pr` keeps the file and the PR's inline review threads in step; nothing else about findings is posted. `sdd-pr status` lists what is open, prints `Mergeable: yes|no` and names the next command. The line format, the severities and the evidence rules are in the sdd plugin's `references/review.md`.
 
-```markdown
-## Review ledger — round N (reviewer, date)
-Dispatched: <reviewers> · Reported: <n> of <m>
-| id | severity | anchor | finding | status |
-|---|---|---|---|---|
-| F1 | blocker | <path>:214 | one sentence, plain words | fixed@abc1234 |
-
-## Deferred
-| id | item | carried from | owner |
-|---|---|---|---|
-| F3 | <the item, in a few words> | this PR | next change touching <area> |
-```
+There are three severities. **Critical** and **important** findings carry evidence: the command run, the failing test, or the two sentences that disagree, quoted. They are resolved before merge, either fixed or declined with the reason on the finding's line, and they are the only ones mirrored to the PR. **Suggestions** are recorded and never block. In anything posted to the PR, never write a number with a leading hash sign, which GitHub turns into a link to an unrelated issue.
 
 A reviewer that runs outside this repository gets this request, filled in by `/sdd-review --panel`:
 
 ```text
-── review request · PR <N> · lane: <full|maintenance> · round <R> ──────────────
-Review Cadasto/openehr-sdk-go PR <N>. Read docs/ai-workflow.md § Review and the PR body.
-Report blockers and should-fix only; nits
-go under "Deferred". Post ONE review body in the ledger format: ids from F<n>
-upward, severity, file:line anchor, one line per finding, plain words. Do not
-restate the PR body.
-────────────────────────────────────────────────────────────────────────────────
+── review request · <branch> · range <a>..<b> · profile formal ──
+Review commits <a>..<b> of Cadasto/openehr-sdk-go, and only those. Read docs/ai-workflow.md § Review.
+Report critical and important findings only, each with evidence (what you ran, or the two
+sentences that disagree) and a one-line fix; write anything smaller as a suggestion.
+If you work on this machine, append your lines to .sdd/findings/<branch>.md in its grammar.
+If you work on the pull request, post one review with one inline comment per finding, its
+first word **critical** or **important**; post nothing else, and do not restate the PR body.
+──────────────────────────────────────────────────────────────────────────────
 ```
 
-A re-review adds one line to the block: `Re-review from F<n> upward, plus anything still open.`
-
-A finding is a claim, and so is a reviewer's proposed correction; both are checked against the code and the spec before either is applied. `/sdd-triage` writes the reason for each declined finding to `docs/.sdd/reviewers/<agent-name>.md`. Read the file for your agent name before reviewing, and do not raise a declined finding again unless the change makes its reason untrue.
+A finding is a claim, and so is a reviewer's proposed correction; both are checked against the code and the spec before either is applied. The findings file goes when the branch merges, so a declined finding whose reason should hold for later changes becomes a sentence in the canonical spec or an ADR.
 
 ## When stuck
 

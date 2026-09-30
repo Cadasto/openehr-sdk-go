@@ -1,3 +1,7 @@
+---
+kind: plan
+---
+
 # Plan — Probe runnability: the sandbox transport and the three-mode runner
 
 **Date:** 2026-08-18
