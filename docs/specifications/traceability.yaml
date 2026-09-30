@@ -143,6 +143,7 @@ requirements:
     implementation: landed
     packages: [openehr/rm/typereg, openehr/serialize]
     tests:
+      - internal/reflect_guard_test.go
       - openehr/client/demographic/decode_error_test.go
       - openehr/client/ehr/contribution/version_shadow_internal_test.go
       - openehr/instance/instance_test.go
