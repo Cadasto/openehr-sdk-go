@@ -114,7 +114,7 @@ func Get[T rm.Resource](ctx context.Context, c *Client, id string) (T, error)
 func Get(ctx context.Context, c *Client, id string) (any, error) // forces type assertions everywhere
 ```
 
-The type registry (REQ-040) is the **only** sanctioned mechanism for projecting the `_type` discriminator onto a concrete Go type. Reflection over struct tags is acceptable for ordinary JSON field mapping (it is what `encoding/json` does); reflection to dispatch on `_type` is not.
+Library code **MUST NOT** use reflection to dispatch on the `_type` discriminator: the type registry (REQ-040) is the only mechanism that projects `_type` onto a concrete Go type. Reflection over struct tags for ordinary JSON field mapping stays allowed (it is what `encoding/json` does).
 
 If a generic API is harder to read than a `T`-specific one for the most common call site, the generic is wrong — drop it.
 
