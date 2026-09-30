@@ -92,7 +92,8 @@ not partially/silently accepted.
 
 - **`archetype_details` is rebuilt on decode, not carried.** FLAT has no key for it, because
   the Web Template already holds the archetype id of every archetype root and the template id.
-  Decode gives every node whose Web Template node id is an archetype id an `ARCHETYPED` whose
+  Decode gives every node the Web Template identifies by an archetype id (its node id, or the
+  path predicate a folded structural wrapper keeps) an `ARCHETYPED` whose
   `archetype_id` is that id and whose `rm_version` is `rm.Release`, and adds the
   Web Template's `templateId` as `template_id` on the COMPOSITION root only. Neither value
   needs `WithTemplate`, so both decode modes do it. The placement matches the reference
