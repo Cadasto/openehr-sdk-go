@@ -3,7 +3,7 @@
 # Schema: <sdd plugin>/references/traceability-schema.md §1. Methodology: §5 (identifiers).
 # Do NOT switch req_style once published — it would renumber stable IDs (a major doc event).
 sdd:
-  profile: lightweight              # full | lightweight; lightweight = the requirements index is one registry file (REQ.md), no per-REQ detail files
+  profile: formal                   # formal | informative; the requirements index is one registry file (REQ.md), no per-REQ detail files
 
   req_style: flat-numeric           # flat-numeric (REQ-NNN) — leaner for a library
   req_gap: 1                        # sequential: a new REQ takes the next free number above the
@@ -25,7 +25,6 @@ sdd:
     requirements: docs/specifications/REQ.md   # file form: the registry itself is the requirements index
     specifications: docs/specifications
     adr: docs/adr
-    plans: docs/plans               # committed working notes; no gate, generator or map reads them
 
   # Single sources and what is generated from them (`make spec-gen`; `make spec-check` fails
   # when a generated block is stale). Edit the source, never the generated table.
@@ -35,6 +34,8 @@ sdd:
   # traceability.yaml is a pure index: no notes, no comments in rows (spec-check refuses them).
 
   traceability: docs/specifications/traceability.yaml
+
+  forge: github                     # auto | github | azure-devops | none — how sdd-pr reaches the pull request
 
   build_entrypoint: make            # single entry point — extend the Makefile, no ad-hoc scripts
   ci_target: ci                     # full PR gate: `make ci` (includes spec-check)
@@ -58,7 +59,7 @@ sdd:
 
   check:
     script: scripts/sdd-check.py   # where the vendored gate lives
-    version: "0.7.0"               # must equal the vendored tool's own version
+    version: "0.8.0"               # must equal the vendored tool's own version
     links:
       exclude: []                  # globs; printed in every report when non-empty
     changelog:
