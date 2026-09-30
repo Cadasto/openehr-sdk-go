@@ -82,6 +82,34 @@ func TestREQ082ProbeClassMatchesModes(t *testing.T) {
 	}
 }
 
+// TestREQ082ProbeClassifierOnFixture runs the classifier over the fixture
+// package in testdata/probeclass, whose answers are known: one probe reaches
+// httptest through a helper, one through a method of a local type, one
+// directly under an import alias, and one reaches nothing.
+func TestREQ082ProbeClassifierOnFixture(t *testing.T) {
+	// § REQ-082: the class check above is only as sound as this classifier.
+	t.Parallel()
+	names := importNames{root: filepath.Join("..", ".."), cache: map[string]string{}}
+	g, err := loadPackage(filepath.Join("testdata", "probeclass"), &names)
+	if err != nil {
+		t.Fatalf("loadPackage(testdata/probeclass): %v", err)
+	}
+	want := map[string]string{
+		"Probe901ThroughHelper": "Probe901ThroughHelper -> startServer uses net/http/httptest.NewServer",
+		"Probe902LocalOnly":     "",
+		"Probe903ThroughMethod": "Probe903ThroughMethod -> server -> server.start uses net/http/httptest.NewServer",
+		"Probe904Aliased":       "Probe904Aliased uses net/http/httptest.Server",
+	}
+	if got := slices.Sorted(slices.Values(g.probes)); !slices.Equal(got, slices.Sorted(maps.Keys(want))) {
+		t.Fatalf("probe functions found = %v, want %v", got, slices.Sorted(maps.Keys(want)))
+	}
+	for _, fn := range slices.Sorted(maps.Keys(want)) {
+		if got := g.reach(fn); got != want[fn] {
+			t.Errorf("reach(%s) = %q, want %q", fn, got, want[fn])
+		}
+	}
+}
+
 // probeFunc is one exported ProbeNNN function and the first backend reference
 // it reaches, if any.
 type probeFunc struct {
@@ -118,7 +146,9 @@ func loadProbeFuncs(t *testing.T, root string) map[string][]probeFunc {
 	names := importNames{root: root, cache: map[string]string{}}
 	probes := map[string][]probeFunc{}
 	for _, e := range entries {
-		if !e.IsDir() {
+		// The go tool skips testdata and names starting with "." or "_";
+		// testdata holds the classifier's own fixture, not a probe package.
+		if !e.IsDir() || e.Name() == "testdata" || strings.HasPrefix(e.Name(), ".") || strings.HasPrefix(e.Name(), "_") {
 			continue
 		}
 		g, err := loadPackage(e.Name(), &names)
