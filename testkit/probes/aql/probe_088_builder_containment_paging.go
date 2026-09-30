@@ -420,8 +420,8 @@ func Probe088Constructs() []string { // PROBE-088 (REQ-117, REQ-118, REQ-163)
 //     production.
 //
 // goldens maps construct name to committed canonical form; the caller reads
-// the files (probes take no filesystem dependency). Sandbox-only: no
-// transport, no network.
+// the files (probes take no filesystem dependency). It is an in-repo
+// probe: no transport, no network.
 func Probe088BuilderContainmentAndPaging(goldens map[string]string, probe020Golden string) (Result, error) { // PROBE-088 (REQ-117, REQ-118, REQ-163)
 	r := Result{Probe: "PROBE-088"}
 	if len(goldens) == 0 {

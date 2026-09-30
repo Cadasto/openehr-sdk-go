@@ -174,7 +174,7 @@ type Probe038Input struct {
 }
 
 // Probe038Inputs is the canonical set of inputs exercised by
-// PROBE-038 in sandbox mode. Each entry isolates one substitution
+// PROBE-038. Each entry isolates one substitution
 // failure pattern (Issue A: concrete-typed slot receives subtype;
 // Issue B: generic-over-abstract-bound) plus a representative
 // composition that exercises both within one decode.

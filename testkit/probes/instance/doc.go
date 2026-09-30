@@ -1,8 +1,8 @@
 // Package instanceprobes hosts the openEHR conformance probes for
 // openehr/instance/, template-driven RM instance synthesis.
 // Probes are plain functions returning (Result, error); they are
-// sandbox-only (no transport) since the generator is a local
-// building block.
+// in-repo probes (no transport, no backend) since the generator is a
+// local building block.
 //
 // PROBE-027 closes the loop: Generate followed by
 // ValidateComposition on the same compiled OPT must surface

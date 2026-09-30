@@ -43,7 +43,7 @@ type ValidateCase struct {
 
 // Probe024PrimitiveValidate implements PROBE-024: parse the OPT body
 // and exercise its primitive-constraint surface against a
-// fixture-supplied list of validate cases. Sandbox-only, with no
+// fixture-supplied list of validate cases. In-repo, with no
 // transport involvement.
 //
 // The probe is invariant under any backend / generator that produces

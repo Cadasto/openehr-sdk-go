@@ -41,7 +41,7 @@ type PathAssertion struct {
 // Probe022OPTPathResolution implements PROBE-022: parse an OPT body
 // and resolve a fixture-defined list of paths, verifying each one
 // returns the expected node shape (or ErrPathNotFound for negative
-// cases). Sandbox-only, with no transport involvement.
+// cases). In-repo, with no transport involvement.
 //
 // The probe is invariant under reformatting that preserves OPT XML
 // semantics; backends or generators that reorder children may

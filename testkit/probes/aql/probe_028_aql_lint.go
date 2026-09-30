@@ -50,8 +50,8 @@ type LintCase struct {
 // Probe028AQLLint runs each case through [lint.LintString] (Layer 1 syntax +
 // Layer 2 shape + the unconditional semantic and path-shape groups + Layer 3
 // template when an OPT is supplied) and asserts the resulting issue codes
-// match the case's WantCodes multiset. Sandbox-only: no transport, no
-// network.
+// match the case's WantCodes multiset. It is an in-repo probe: no
+// transport, no network.
 //
 // Those groups matter beyond this probe: [Probe097SemanticLint] and
 // [Probe099PathShapeLint] re-run this same corpus through [runLintCase] as

@@ -38,7 +38,7 @@ type Assignment struct {
 // canjson.Marshal, canjson.Unmarshal back into a fresh *rm.Composition,
 // re-marshal, and verify every fragment in every Assignment appears in
 // both the first marshal and the post-unmarshal re-marshal (the
-// PROBE-023 round-trip). The probe is sandbox-only (no transport
+// PROBE-023 round-trip). The probe is in-repo (no transport
 // dependency); openEHR conformance parity means another implementation
 // of the builder against the same OPT + assignments must produce the
 // same pass outcome.
