@@ -113,11 +113,26 @@ func TestREQ052OpenIntervalSideEmptyBound(t *testing.T) {
 			fresh: func() any { return &rm.ProperInterval[rm.Integer]{} },
 		},
 		{
+			name:  "Proper_interval of a Go int, open lower side, zero bound omitted",
+			value: &rm.ProperInterval[int]{LowerUnbounded: true, Upper: 1},
+			want:  without(properInterval, "lower"),
+			fresh: func() any { return &rm.ProperInterval[int]{} },
+		},
+		{
+			name:  "Proper_interval of a Go float32, open upper side, zero bound omitted",
+			value: &rm.ProperInterval[float32]{Lower: 1.5, UpperUnbounded: true},
+			want:  without(properInterval, "upper"),
+			fresh: func() any { return &rm.ProperInterval[float32]{} },
+		},
+		{
 			name:  "Point_interval of DV_QUANTITY, open upper side, empty bound omitted",
 			value: &rm.PointInterval[rm.DVQuantity]{Lower: q, UpperUnbounded: true},
 			want:  without(pointInterval, "upper"),
 			fresh: func() any { return &rm.PointInterval[rm.DVQuantity]{} },
 		},
+		// Regression pins: the encoders already left out a nil or typed-nil
+		// interface-typed bound before the open-side rule, whatever its flag.
+		// These two cases keep it that way.
 		{
 			name:  "interface-typed bound, nil on an open side, omitted",
 			value: &rm.DVInterval[rm.DVOrdered]{Lower: &q, UpperUnbounded: true},

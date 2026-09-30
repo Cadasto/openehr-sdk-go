@@ -75,6 +75,67 @@ func TestREQ112IntervalBoundVoidEncoderParity(t *testing.T) {
 	}
 }
 
+// TestREQ112IntervalBoundVoidOrderedEncoderParity is the same parity for the
+// bare DV_INTERVAL, whose bound is typed by the DV_ORDERED interface
+// (REQ-112, REQ-052, REQ-056). The floor's isVoidOrdered and the encoders
+// must agree that only a nil or a typed-nil pointer is empty there, and that a
+// zero value, or a pointer to one, behind the interface is a bound. Each
+// concrete bound type contributes its typed-nil pointer, its zero value and a
+// pointer to its zero value.
+func TestREQ112IntervalBoundVoidOrderedEncoderParity(t *testing.T) {
+	samples := []orderedSample{{name: "nil interface", bound: nil}}
+	samples = append(samples, orderedSamples[rm.DVCount](t, "DV_COUNT")...)
+	samples = append(samples, orderedSamples[rm.DVDate](t, "DV_DATE")...)
+	samples = append(samples, orderedSamples[rm.DVDateTime](t, "DV_DATE_TIME")...)
+	samples = append(samples, orderedSamples[rm.DVDuration](t, "DV_DURATION")...)
+	samples = append(samples, orderedSamples[rm.DVOrdinal](t, "DV_ORDINAL")...)
+	samples = append(samples, orderedSamples[rm.DVProportion](t, "DV_PROPORTION")...)
+	samples = append(samples, orderedSamples[rm.DVQuantity](t, "DV_QUANTITY")...)
+	samples = append(samples, orderedSamples[rm.DVScale](t, "DV_SCALE")...)
+	samples = append(samples, orderedSamples[rm.DVTime](t, "DV_TIME")...)
+	if got, want := len(samples), 1+3*len(typedIntervals)/2; got != want {
+		t.Fatalf("%d DV_ORDERED samples, want %d (nil, then three per typed DV_INTERVAL instantiation)", got, want)
+	}
+	for _, s := range samples {
+		t.Run(s.name, func(t *testing.T) {
+			want := isVoidOrdered(s.bound)
+			jsonOmits, xmlOmits := openBoundOmitted[rm.DVOrdered](t, s.bound)
+			if jsonOmits != want {
+				t.Errorf("DV_INTERVAL<DV_ORDERED> with a %s bound: canonical JSON omits the open bound = %v, but the floor reads it Void = %v", s.name, jsonOmits, want)
+			}
+			if xmlOmits != want {
+				t.Errorf("DV_INTERVAL<DV_ORDERED> with a %s bound: canonical XML omits the open bound = %v, but the floor reads it Void = %v", s.name, xmlOmits, want)
+			}
+		})
+	}
+}
+
+// orderedSample is one bound for the bare DV_INTERVAL.
+type orderedSample struct {
+	name  string
+	bound rm.DVOrdered
+}
+
+// orderedSamples returns T's typed-nil pointer, zero value and pointer to a
+// zero value, each held in the DV_ORDERED interface.
+func orderedSamples[T rm.DVOrdered](t *testing.T, name string) []orderedSample {
+	t.Helper()
+	var zero T
+	nilPtr, ok := any((*T)(nil)).(rm.DVOrdered)
+	if !ok {
+		t.Fatalf("*%s does not implement DV_ORDERED", name)
+	}
+	zeroPtr, ok := any(new(T)).(rm.DVOrdered)
+	if !ok {
+		t.Fatalf("*%s does not implement DV_ORDERED", name)
+	}
+	return []orderedSample{
+		{name: name + " typed nil", bound: nilPtr},
+		{name: name + " zero value", bound: zero},
+		{name: name + " pointer to a zero value", bound: zeroPtr},
+	}
+}
+
 // encodableNonZeroValue is nonZeroValue with one change the encoders need:
 // a slice is empty but not nil. It is still not the zero value, and a
 // one-element slice of zero elements may not encode (a zero TERM_MAPPING's
@@ -91,7 +152,10 @@ func encodableNonZeroValue(t reflect.Type) (reflect.Value, error) {
 // left the bound out. Both sides must agree within one encoding.
 func openBoundOmitted[T rm.DVOrdered](t *testing.T, bound any) (jsonOmits, xmlOmits bool) {
 	t.Helper()
-	b := bound.(T)
+	b, ok := bound.(T)
+	if !ok && bound != nil {
+		t.Fatalf("bound %T is not a %T", bound, b)
+	}
 	iv := &rm.DVInterval[T]{Lower: b, LowerUnbounded: true, Upper: b, UpperUnbounded: true}
 
 	js, err := canjson.Marshal(iv)
