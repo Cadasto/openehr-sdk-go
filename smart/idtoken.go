@@ -126,12 +126,6 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issu
 	return claimsFromMap(claims, issuer, clientID, nonce, now)
 }
 
-// resolveIDTokenAlgs computes the effective signature allowlist. The full
-// supported set is RS256/RS384/ES256/ES384; "none" is never permitted. When
-// allowedAlgs is non-empty it is intersected with the supported set so a
-// caller passing the discovery list cannot widen the SDK's support, and an
-// empty intersection falls back to the default set rather than the go-oidc
-// RS256-only default.
 // resolveIDTokenAlgs returns the effective id_token signing-alg allowlist.
 // With no caller-supplied list it returns the full default set
 // (RS256/RS384/ES256/ES384). With a non-empty list it returns the
