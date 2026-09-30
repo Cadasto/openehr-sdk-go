@@ -1,23 +1,29 @@
 package internal_test
 
 // reflect_guard_test.go: REQ-024. idiom.md § Generics policy (REQ-024) rules
-// that library code MUST NOT use reflection to dispatch on the `_type`
-// discriminator: the type registry (openehr/rm/typereg) is the only
-// mechanism that projects `_type` onto a concrete Go type. A reflect call does not show at
-// the call site whether it chooses a type, so this walks the module's
-// non-test Go files, generated ones included, and holds every "reflect"
-// import to a reviewed list. Each entry names the file, the reflect
-// identifiers it may use, and why that use chooses no Go type from `_type`.
+// that library code MUST NOT use reflection, with two exceptions: ordinary
+// field mapping over struct tags, and uses that never choose a Go type from
+// `_type`. The second exception has four classes: a typed-nil or zero-value
+// check, a value comparison (reflect.DeepEqual), a type name in an error
+// message, and an addressable copy that reaches pointer-receiver methods. The
+// type registry (openehr/rm/typereg) stays the only mechanism that projects
+// `_type` onto a concrete Go type.
 //
+// A reflect call does not show at the call site which class it belongs to,
+// so this walks the module's non-test Go files, generated ones included, and
+// holds every "reflect" import to a reviewed list. Each entry names the file,
+// the reflect identifiers it may use, the classes those uses fall in and why.
 // The test fails on a file that imports reflect and is not on the list, on a
-// listed file that starts using another reflect identifier, on a dot import
-// of reflect (its uses would be unqualified and unseen), and on a list entry
-// whose file no longer imports reflect, so every change to reflection use
-// meets a reviewer and the list cannot rot.
+// listed file that starts using another reflect identifier, on an entry
+// without a named class, on a dot import of reflect (its uses would be
+// unqualified and unseen), and on an entry whose file no longer imports
+// reflect, so every change to reflection use meets a reviewer and the list
+// cannot rot.
 //
-// Out of scope: cmd/ (example programs), testkit/ (test support) and test
-// files. The walk must see at least minReflectScanFiles files: a green run
-// over an empty or mis-rooted tree proves nothing.
+// testkit/ is in scope: it is published for SDK consumers. Out of scope:
+// cmd/ (example programs, not importable library code) and test files. The
+// walk must see at least minReflectScanFiles files: a green run over an empty
+// or mis-rooted tree proves nothing.
 
 import (
 	"go/ast"
@@ -32,40 +38,65 @@ import (
 	"testing"
 )
 
-// reflectReviewed is the reviewed list, keyed by module-relative path. None
-// of these uses is struct-tag field mapping, the case the section names;
-// each is other reflection that chooses no Go type from `_type`.
+// The classes of reflection the section allows.
+const (
+	reflectFieldMapping    = "field mapping over struct tags"
+	reflectNilOrZeroCheck  = "typed-nil or zero-value check"
+	reflectValueComparison = "value comparison"
+	reflectTypeName        = "type name in an error message"
+	reflectAddressableCopy = "addressable copy to reach pointer-receiver methods"
+)
+
+var reflectClasses = []string{reflectFieldMapping, reflectNilOrZeroCheck, reflectValueComparison, reflectTypeName, reflectAddressableCopy}
+
+// reflectReviewed is the reviewed list, keyed by module-relative path.
 var reflectReviewed = map[string]struct {
 	members []string
+	classes []string
 	reason  string
 }{
 	"openehr/aql/parse/ast.go": {
 		[]string{"Pointer", "ValueOf"},
-		"typed-nil guard before a type switch on parser nodes; chooses no type",
+		[]string{reflectNilOrZeroCheck},
+		"typed-nil guard before a type switch on parser nodes",
 	},
 	"openehr/bmm/loadall.go": {
 		[]string{"DeepEqual"},
-		"value equality of two BMM class definitions reached through a shared ancestor",
+		[]string{reflectValueComparison},
+		"equality of two BMM class definitions reached through a shared ancestor",
 	},
 	"openehr/rm/typereg/streaming.go": {
 		[]string{"TypeFor"},
+		[]string{reflectTypeName},
 		"names the target interface in error messages; the concrete type comes from the registry lookup",
 	},
 	"openehr/serialize/canxml/marshal.go": {
 		[]string{"Chan", "Func", "Interface", "Map", "New", "Pointer", "Slice", "Struct", "ValueOf"},
-		"addressable copy to reach pointer-receiver methods, and a typed-nil check; xsi:type dispatch stays with the registry",
+		[]string{reflectAddressableCopy, reflectNilOrZeroCheck},
+		"reaches BMMName and MarshalXML on a value-typed field, and omits absent polymorphic fields; xsi:type dispatch stays with the registry",
 	},
 	"openehr/serialize/simplified/rmattr_value_encode.go": {
 		[]string{"Pointer", "ValueOf"},
-		"pointer-or-zero test on an interval bound; chooses no type",
+		[]string{reflectNilOrZeroCheck},
+		"tells a set interval bound from an unset one",
+	},
+	"testkit/probes/serialize/probe_030_canjson_round_trip.go": {
+		[]string{"DeepEqual"},
+		[]string{reflectValueComparison},
+		"compares the two decoded values of a round trip",
+	},
+	"testkit/wireequiv/wireequiv.go": {
+		[]string{"DeepEqual"},
+		[]string{reflectValueComparison},
+		"compares two decoded wire documents",
 	},
 }
 
 // minReflectScanFiles is well below the module's non-test Go file count
-// (about 500 outside cmd/ and testkit/).
+// outside cmd/ (about 580).
 const minReflectScanFiles = 400
 
-func TestREQ024NoReflectTypeDispatch(t *testing.T) {
+func TestREQ024ReflectOnlyForReviewedUses(t *testing.T) {
 	_, self, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
@@ -85,7 +116,7 @@ func TestREQ024NoReflectTypeDispatch(t *testing.T) {
 		}
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
-			if rel == "cmd" || rel == "testkit" {
+			if rel == "cmd" {
 				return fs.SkipDir
 			}
 			switch d.Name() {
@@ -109,8 +140,16 @@ func TestREQ024NoReflectTypeDispatch(t *testing.T) {
 		seen[rel] = true
 		entry, listed := reflectReviewed[rel]
 		if !listed {
-			t.Errorf("%s imports reflect and is not on the reviewed list: library code MUST NOT use reflection to dispatch on `_type` (idiom.md § Generics policy (REQ-024)); use the type registry, or add the file to reflectReviewed with the identifiers it uses and why they choose no type", rel)
+			t.Errorf("%s imports reflect and is not on the reviewed list: library code MUST NOT use reflection outside the classes idiom.md § Generics policy (REQ-024) names; use the type registry or a type switch, or, for a use in a named class, add the file to reflectReviewed with its identifiers and class", rel)
 			return nil
+		}
+		if len(entry.classes) == 0 {
+			t.Errorf("%s: reviewed entry names no class; every reflect use must fall in a class idiom.md § Generics policy (REQ-024) names", rel)
+		}
+		for _, c := range entry.classes {
+			if !slices.Contains(reflectClasses, c) {
+				t.Errorf("%s: reviewed entry names class %q, which idiom.md § Generics policy (REQ-024) does not name", rel, c)
+			}
 		}
 		if name == "." {
 			t.Errorf("%s dot-imports reflect, which hides its uses from this guard (REQ-024); import it by name", rel)
@@ -122,7 +161,7 @@ func TestREQ024NoReflectTypeDispatch(t *testing.T) {
 		}
 		for _, m := range reflectMembers(full, name) {
 			if !slices.Contains(entry.members, m) {
-				t.Errorf("%s uses reflect.%s, which its reviewed entry (%s) does not list: check it chooses no Go type from `_type` (REQ-024), then add it to the entry", rel, m, entry.reason)
+				t.Errorf("%s uses reflect.%s, which its reviewed entry (%s) does not list: check the use falls in a class idiom.md § Generics policy (REQ-024) names, then add it to the entry", rel, m, entry.reason)
 			}
 		}
 		return nil
