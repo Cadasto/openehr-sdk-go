@@ -814,6 +814,7 @@ requirements:
       - testkit/probe/run_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/definition/probe_067_template_upload_round_trip.go
+      - testkit/probes/probeclass_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
       - testkit/probes/serialize/probe_086_upstream_flat_parity.go
