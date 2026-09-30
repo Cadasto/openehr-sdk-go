@@ -163,7 +163,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		if err != nil {
 			return nil, fmt.Errorf("simplified: %q: %w", base, err)
 		}
-		dv, err := dvFromSuffixes(leaf.RMType, leafListOpen(leaf), sfx)
+		dv, err := leafFromSuffixes(nodeRMType(leaf), leafListOpen(leaf), sfx)
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
@@ -772,7 +772,7 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, ambiguous map[stri
 				// see deviations.md § Conformance (reused-sibling residual).
 				return nil, nil, nil, fmt.Errorf("%w: FLAT id %q reaches one of several reused siblings sharing the path %q — not yet decodable (see deviations.md)", ErrUnknownPath, seg.id, bare)
 			}
-			predType[bare] = next.RMType
+			predType[bare] = nodeRMType(next)
 			if seg.idx >= 0 {
 				predIndex[bare] = seg.idx
 				// A collapsed leaf's index belongs to the ELEMENT the Web
@@ -870,7 +870,7 @@ func parseAQL(p string) []aqlSeg {
 // placeLeaf walks aqlPath from compJSON, materialising the intermediate RM
 // nodes (concrete type via rminfo + the Web Template, archetype_node_id from
 // the predicate, list position from predIndex), and sets the terminal
-// attribute to the leaf DataValue.
+// attribute to the leaf value: a DataValue, or the RM String of a STRING leaf.
 //
 // Reconstructed intermediate and leaf nodes carry _type + archetype_node_id;
 // when names is non-nil (a template was supplied via WithTemplate) the mandatory
@@ -880,7 +880,7 @@ func parseAQL(p string) []aqlSeg {
 // unnamed (rmpath re-resolves by archetype_node_id, so the round-trip does not
 // depend on it — but the result is then format-idempotent, not canonically
 // complete; see deviations.md).
-func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, dv map[string]any, budget *allocBudget, names map[string]string) error {
+func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, value any, budget *allocBudget, names map[string]string) error {
 	cur, attr, err := walkAQL(compJSON, aqlPath, predIndex, predType, budget, names)
 	if err != nil {
 		return err
@@ -890,7 +890,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 		// "a:0" on a repeatable) — overwriting would silently drop one.
 		return fmt.Errorf("%w: duplicate placement at %q", ErrUnknownPath, aqlPath)
 	}
-	cur[attr] = dv
+	cur[attr] = value
 	return nil
 }
 
@@ -1042,7 +1042,7 @@ func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, fam
 			return "", "", 0, "", false
 		}
 		node = next
-		if len(node.Children) > 0 || !isCompositeLeafType(node.RMType) {
+		if len(node.Children) > 0 || !isCompositeLeafType(nodeRMType(node)) {
 			continue
 		}
 		if ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
@@ -1058,7 +1058,7 @@ func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, fam
 		// leaf grammar then refuses them: a body MarshalFlat itself writes
 		// (REQ-140), and the `<leaf>/_uid` the upstream corpus writes too.
 		if i+1 < len(pk.segs) && strings.HasPrefix(pk.segs[i+1].id, "_") &&
-			!compositeLeafOwnsSub(node.RMType, pk.segs[i+1].id) {
+			!compositeLeafOwnsSub(nodeRMType(node), pk.segs[i+1].id) {
 			return "", "", 0, "", false
 		}
 		var b, t strings.Builder
@@ -1132,7 +1132,7 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		// the reused-sibling refusal, which carries its own message.
 		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
 	}
-	value, err := compositeLeafValue(g, node.RMType)
+	value, err := compositeLeafValue(g, nodeRMType(node))
 	if err != nil {
 		return err
 	}
@@ -1205,7 +1205,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 	}
 	if len(segs) == 1 {
 		return rmattrOwner{
-			kind:    wt.Tree.RMType,
+			kind:    nodeRMType(wt.Tree),
 			resolve: func(string) (map[string]any, error) { return compJSON, nil },
 		}, nil
 	}
@@ -1213,7 +1213,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 	if err != nil {
 		return rmattrOwner{}, err
 	}
-	ownerAql, kind, leaf := bareAQLPath(node.AQLPath), node.RMType, ""
+	ownerAql, kind, leaf := bareAQLPath(node.AQLPath), nodeRMType(node), ""
 	if len(node.Children) == 0 {
 		trimmed, isElementValue := strings.CutSuffix(ownerAql, "/value")
 		if !isElementValue {
@@ -1222,7 +1222,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 		// The leaf's own RM type is the *anchor* the value-decoration families are
 		// judged and decoded against (REQ-140 § C1): one FLAT path addresses both
 		// the ELEMENT and the DataValue it holds.
-		ownerAql, kind, leaf = trimmed, "ELEMENT", node.RMType
+		ownerAql, kind, leaf = trimmed, "ELEMENT", nodeRMType(node)
 	}
 	return rmattrOwner{kind: kind, leaf: leaf, resolve: walk(ownerAql, predIndex, predType)}, nil
 }

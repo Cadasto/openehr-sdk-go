@@ -241,18 +241,13 @@ var ctxOnlyLeafPaths = map[string]bool{
 // resolves to nothing is still skipped like any absent optional, so
 // compositions that do not touch the reused region keep encoding.
 func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, resolveRoot rm.Locatable, resolveRootAql string, ambiguous map[string]bool) error {
+	rmType := nodeRMType(node)
 	isContainer := len(node.Children) > 0
 	// A value leaf normally carries input descriptors, but the Web Template emits
 	// none for some datatypes (DV_URI, DV_MULTIMEDIA, DV_PARSABLE, the in-context
 	// CODE_PHRASE pair, …); any childless node of a value leaf type is still a
 	// value leaf and must be emitted (bare/suffixed or |raw), not dropped.
-	isLeaf := !isContainer && (len(node.Inputs) > 0 || isValueLeafType(node.RMType))
-	if !isContainer && !isLeaf {
-		return nil // structural node carrying neither children nor value inputs
-	}
-	if isLeaf && ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
-		return nil
-	}
+	isLeaf := !isContainer && (len(node.Inputs) > 0 || isValueLeafType(rmType))
 	// Resolution against the RM instance keys on archetype_node_id, so the
 	// REQ-116 name predicate the Web Template now carries is dropped here.
 	// rmpath *does* honour a `node,'name'` predicate, which would filter
@@ -263,6 +258,18 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	// The prefix trim runs first: both paths are the Web Template's
 	// predicated spelling, so they only line up before stripping.
 	relPath := bareAQLPath(strings.TrimPrefix(node.AQLPath, resolveRootAql))
+	if !isContainer && !isLeaf {
+		// A childless node carrying no value inputs and no RM type this codec
+		// spells: nothing to write, unless the composition holds a value there.
+		return refuseUnspelledNode(flatPrefix+"/"+node.ID, rmType, resolveRoot, relPath)
+	}
+	if isLeaf && ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
+		return nil
+	}
+	if isLeaf && rmType == stringLeafType {
+		// An RM String attribute is single-valued, so the leaf takes no :index.
+		return emitStringLeaf(out, flatPrefix+"/"+node.ID, resolveRoot, relPath)
+	}
 
 	if node.Max != 1 {
 		// A repeatable collapsed leaf is walked from its ELEMENT owners, not
@@ -342,6 +349,28 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	return emitValue(out, node, flatPrefix+"/"+node.ID, v, isContainer, resolveRoot, resolveRootAql, ambiguous)
 }
 
+// refuseUnspelledNode is the encode backstop for a childless Web Template node
+// the codec cannot classify: no children, no input descriptors, and an RM type
+// that is no value leaf (a container the template left empty, a type the codec
+// does not map, a malformed type name). Such a node has no FLAT spelling, so a
+// value the composition holds there would be lost without a word — REQ-140
+// forbids that, and the node is refused with ErrUnsupportedDatatype naming its
+// FLAT path and RM type, never the value. With nothing at the node, it is
+// skipped like any absent optional.
+func refuseUnspelledNode(flatPath, rmType string, root rm.Locatable, relPath string) error {
+	vals, err := rmpath.ItemsAtPath(root, relPath)
+	if err != nil {
+		return skipNotFound(err, relPath)
+	}
+	for _, v := range vals {
+		if v != nil && !rm.IsTypedNil(v) {
+			return fmt.Errorf("%w: %q is a childless Web Template node typed %q, which has no FLAT spelling, and the composition carries a value there",
+				ErrUnsupportedDatatype, flatPath, rmType)
+		}
+	}
+	return nil
+}
+
 // refuseReusedSibling fails encoding when node is one of several reused
 // siblings (its bare path is claimed more than once) and data resolved at it:
 // the instance cannot be attributed to this sibling id versus the others, so
@@ -398,7 +427,7 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 		}
 		return nil
 	}
-	if err := leafToFlat(out, flatPath, v, node.RMType, leafListOpen(node)); err != nil {
+	if err := leafToFlat(out, flatPath, v, nodeRMType(node), leafListOpen(node)); err != nil {
 		return err
 	}
 	return emitLeafOwnerRMAttrs(out, node, flatPath, ancestorRoot, ancestorAql)
@@ -465,7 +494,7 @@ func emitRepeatingLeafOwners(out map[string]any, node *webtemplate.Node, flatPre
 		sub := make(map[string]any)
 		flatPath := flatPrefix + "/" + node.ID + ":" + strconv.Itoa(idx)
 		if el, isElement := as[rm.Element](owner); isElement && el.Value != nil && !rm.IsTypedNil(el.Value) {
-			if err := leafToFlat(sub, flatPath, el.Value, node.RMType, leafListOpen(node)); err != nil {
+			if err := leafToFlat(sub, flatPath, el.Value, nodeRMType(node), leafListOpen(node)); err != nil {
 				return err
 			}
 		}

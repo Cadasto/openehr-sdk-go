@@ -485,6 +485,7 @@ requirements:
       - openehr/serialize/simplified/flat_nameindex_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/hardening_test.go
+      - openehr/serialize/simplified/leaf_rmtype_test.go
       - openehr/serialize/simplified/mediatype_fuzz_test.go
       - openehr/serialize/simplified/mediatype_internal_test.go
       - openehr/serialize/simplified/mediatype_test.go
@@ -494,6 +495,7 @@ requirements:
       - openehr/serialize/simplified/rmattr_party_test.go
       - openehr/serialize/simplified/roundtrip_test.go
       - openehr/serialize/simplified/simplified_test.go
+      - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
@@ -1492,13 +1494,16 @@ requirements:
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/interval_leaf_anchor_test.go
+      - openehr/serialize/simplified/leaf_rmtype_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_feeder_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
       - openehr/serialize/simplified/rmattr_repeating_test.go
       - openehr/serialize/simplified/rmattr_test.go
       - openehr/serialize/simplified/rmattr_value_test.go
+      - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_test.go
+      - openehr/serialize/simplified/unspelled_node_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
       - testkit/probes/serialize/probes_test.go
