@@ -7,6 +7,7 @@ package simplified
 // the walk needs no separate flattening engine.
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
@@ -356,19 +359,55 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 // value the composition holds there would be lost without a word — REQ-140
 // forbids that, and the node is refused with ErrUnsupportedDatatype naming its
 // FLAT path and RM type, never the value. With nothing at the node, it is
-// skipped like any absent optional.
+// skipped like any absent optional; so is the zero value rmpath hands back for
+// an attribute held by value that the composition never set ([isZeroRMValue]).
+//
+// The backstop sees only what rmpath resolves. It is honest because rmpath
+// resolves every node the Web Template builder emits, which
+// webtemplate.TestWebTemplatePathsResolveViaRmpath enforces for every vendored
+// OPT.
 func refuseUnspelledNode(flatPath, rmType string, root rm.Locatable, relPath string) error {
 	vals, err := rmpath.ItemsAtPath(root, relPath)
 	if err != nil {
 		return skipNotFound(err, relPath)
 	}
 	for _, v := range vals {
-		if v != nil && !rm.IsTypedNil(v) {
+		if v != nil && !rm.IsTypedNil(v) && !isZeroRMValue(v) {
 			return fmt.Errorf("%w: %q is a childless Web Template node typed %q, which has no FLAT spelling, and the composition carries a value there",
 				ErrUnsupportedDatatype, flatPath, rmType)
 		}
 	}
 	return nil
+}
+
+// isZeroRMValue reports whether v is the zero value of its RM type: what
+// rmpath hands back for an attribute held by value (ENTRY language, ACTION
+// ism_transition, EVENT time, …) that the composition never set. It is the
+// reading the codec already gives an empty CODE_PHRASE, an all-zero ctx/setting
+// and an empty STRING. Reflection-free: the zero value comes from typereg, and
+// the two are compared in canonical JSON. A value it cannot judge counts as
+// set, so the backstop errs towards refusing.
+func isZeroRMValue(v any) bool {
+	if s, ok := v.(string); ok {
+		return s == ""
+	}
+	name, ok := rm.RMTypeName(v)
+	if !ok {
+		return false
+	}
+	ctor, ok := typereg.Default.Lookup(name)
+	if !ok {
+		return false
+	}
+	got, err := canjson.Marshal(v)
+	if err != nil {
+		return false
+	}
+	zero, err := canjson.Marshal(ctor())
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(got, zero)
 }
 
 // refuseReusedSibling fails encoding when node is one of several reused

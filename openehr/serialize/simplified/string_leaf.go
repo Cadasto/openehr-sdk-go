@@ -6,6 +6,7 @@ package simplified
 // leaf's key, with no suffix.
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -23,40 +24,32 @@ const stringLeafType = "STRING"
 // [leafToFlat], which spells it as its bare value. relPath is the leaf's
 // canonical path relative to root.
 //
-// rmpath resolves the LOCATABLE tree and the DataValue slots in it, not RM
-// String attributes, so the value is read off the object that owns the
-// attribute. A STRING leaf on an attribute this codec does not read is refused
-// rather than skipped, because whether it holds a value cannot be told.
+// rmpath resolves an RM String attribute it knows to the string itself, held
+// by value, so whenever the owner is there the attribute resolves (to "" when
+// unset, which writes nothing). The Web Template builder makes one STRING leaf,
+// ACTIVITY `action_archetype_id`. A STRING leaf on any other attribute is
+// therefore refused whenever its owner is there, because whether it holds a
+// value cannot be told; with no owner there is nothing to lose, and it is
+// skipped.
 func emitStringLeaf(out map[string]any, flatPath string, root rm.Locatable, relPath string) error {
+	v, err := rmpath.ItemAtPath(root, relPath)
+	if err == nil {
+		return leafToFlat(out, flatPath, v, stringLeafType, false)
+	}
+	if !errors.Is(err, rmpath.ErrPathNotFound) {
+		return fmt.Errorf("simplified: resolve %q: %w", relPath, err)
+	}
 	ownerRel, attr := "", relPath
 	if i := strings.LastIndexByte(relPath, '/'); i >= 0 {
 		ownerRel, attr = relPath[:i], relPath[i+1:]
 	}
-	var owner any = root
 	if ownerRel != "" {
-		o, err := rmpath.ItemAtPath(root, ownerRel)
-		if err != nil {
+		if _, err := rmpath.ItemAtPath(root, ownerRel); err != nil {
 			return skipNotFound(err, ownerRel)
 		}
-		owner = o
 	}
-	s, known := rmStringAttr(owner, attr)
-	if !known {
-		return fmt.Errorf("%w: %q is a %s leaf on %T.%s, which is no RM String attribute this codec reads",
-			ErrUnsupportedDatatype, flatPath, stringLeafType, owner, attr)
-	}
-	return leafToFlat(out, flatPath, s, stringLeafType, false)
-}
-
-// rmStringAttr reads the RM String attribute attr off owner. known is false
-// when owner has no String attribute of that name this codec reads. The Web
-// Template gives exactly one String attribute a leaf, ACTIVITY
-// `action_archetype_id`, so that is the one read here.
-func rmStringAttr(owner any, attr string) (s string, known bool) {
-	if a, ok := as[rm.Activity](owner); ok && attr == "action_archetype_id" {
-		return a.ActionArchetypeID, true
-	}
-	return "", false
+	return fmt.Errorf("%w: %q is a %s leaf on the attribute %q, which is no RM String attribute this codec reads",
+		ErrUnsupportedDatatype, flatPath, stringLeafType, attr)
 }
 
 // leafFromSuffixes builds the canonical-JSON value of a Web Template leaf from
@@ -71,7 +64,7 @@ func leafFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (any, er
 
 // stringFromSuffixes rebuilds a STRING leaf's RM String from its bare value.
 // Any suffix, |raw included, is ErrUnsupportedDatatype: the leaf carries a bare
-// value only. A bare value that is not a JSON string is a malformed body, not a
+// value only. So is an empty string (REQ-053 § Leaf datatypes). A bare value that is not a JSON string is a malformed body, not a
 // datatype this codec declines to model, so it carries no gap sentinel (the
 // [applyOrderedSuffixes] rule).
 func stringFromSuffixes(sfx map[string]any) (any, error) {
@@ -88,6 +81,12 @@ func stringFromSuffixes(sfx map[string]any) (any, error) {
 	s, ok := v.(string)
 	if !ok {
 		return nil, fmt.Errorf("the %s bare value must be a string, got %T", stringLeafType, v)
+	}
+	// ACTIVITY's Action_archetype_id_valid invariant forbids an empty String,
+	// and encode writes nothing for one, so an empty bare value is refused
+	// rather than rebuilt into an invalid ACTIVITY.
+	if s == "" {
+		return nil, fmt.Errorf("%w: an empty %s, which the RM invariant forbids", ErrUnsupportedDatatype, stringLeafType)
 	}
 	return s, nil
 }

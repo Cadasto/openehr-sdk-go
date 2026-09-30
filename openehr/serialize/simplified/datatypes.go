@@ -120,8 +120,8 @@ func decoratedCapturedKeys() map[string]map[string]bool {
 // is mapped despite not being a DataValue — the reference emits ENTRY language
 // / encoding as leaves in their own right. The STRING leaf (ACTIVITY
 // `action_archetype_id`) is not a DataValue either and rides its bare value;
-// emitNode writes it directly ([emitStringLeaf]), because rmpath does not
-// resolve RM String attributes.
+// emitNode reaches it through [emitStringLeaf], which refuses a STRING leaf on
+// an attribute rmpath does not know rather than skipping it.
 //
 // DV_COUNT and DV_BOOLEAN carry their value as the bare leaf (mapping to RM
 // magnitude / value), not a |suffix — per the STABLE Simplified Formats RM

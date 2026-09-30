@@ -27,15 +27,20 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // guards the class by asserting that every synthesized in-context leaf the
 // WebTemplate can emit is resolvable here unless deliberately exempted.
 //
+// `webtemplate.TestWebTemplatePathsResolveViaRmpath` widens that guard to every
+// node the WebTemplate builder emits for every vendored OPT, archetyped or
+// synthesised: ACTION `ism_transition` (an archetyped ISM_TRANSITION node) was
+// missing here, and the encoder dropped it without an error.
+//
 // Resolving an attribute here does not by itself make the FLAT encoder fail:
-// leafToFlat skips the leaf datatypes it does not map (STRING — a documented
-// skip, see openehr/serialize/simplified/deviations.md) and emits unmapped DV_*
-// datatypes as |raw. "The codec cannot write it" is therefore a reason for a
-// leaf to stay unemitted, never a reason for an attribute to stay unresolvable.
-// CODE_PHRASE was in that skip list until the PROBE-086 coverage ratchet gave it
-// a |code + |terminology leaf mapping, which is why ENTRY `language` / `encoding`
-// resolve here now; PARTY_PROXY left it on 2026-08-05 with REQ-140's party
-// grammar, which is why ENTRY `subject` does.
+// the encoder emits unmapped DV_* datatypes as |raw and refuses a populated
+// value at a leaf type it cannot spell (ErrUnsupportedDatatype), so "the codec
+// cannot write it" is never a reason for an attribute to stay unresolvable.
+// The leaf types the encoder once skipped all gained a FLAT spelling:
+// CODE_PHRASE with the PROBE-086 coverage ratchet (ENTRY `language` /
+// `encoding`), PARTY_PROXY on 2026-08-05 with REQ-140's party grammar (ENTRY
+// `subject`), and STRING with REQ-053's bare-value row (ACTIVITY
+// `action_archetype_id`, resolved below as the String itself).
 //
 // The attributes deliberately still absent are EVENT_CONTEXT `start_time` /
 // `setting` and COMPOSITION `language` / `territory`. All four are owned by the
@@ -52,8 +57,6 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // PARTY_PROXY the FLAT encoder now *could* write — it declines because the ctx/
 // short forms own composition metadata, which the encoder asserts by name rather
 // than by leaning on a datatype gap (simplified/flat_encode.go ctxOnlyLeafPaths).
-// Of the REQ-121 completeness set, only ACTIVITY `action_archetype_id` is not
-// written yet.
 func childrenAt(parent any, attr string) []any {
 	if isNilPointer(parent) {
 		return nil
@@ -108,6 +111,16 @@ func childrenAt(parent any, attr string) []any {
 		return activityChildren(p, attr)
 	case rm.Activity:
 		return activityChildren(&p, attr)
+
+	case *rm.IsmTransition:
+		return ismTransitionChildren(p, attr)
+	case rm.IsmTransition:
+		return ismTransitionChildren(&p, attr)
+
+	case *rm.InstructionDetails:
+		return instructionDetailsChildren(p, attr)
+	case rm.InstructionDetails:
+		return instructionDetailsChildren(&p, attr)
 
 	case *rm.History[rm.ItemStructure]:
 		return historyChildren(p, attr)
@@ -321,8 +334,56 @@ func actionChildren(a *rm.Action, attr string) []any {
 		// Inert on encode today — the WebTemplate builder synthesizes no
 		// ACTION `time` leaf — but ItemAtPath is a public reader (REQ-121).
 		return []any{a.Time}
+	case "ism_transition":
+		// RM-mandatory and held by value, so it always resolves, to a pointer
+		// into the instance as the struct-valued containers do (cf. OBSERVATION
+		// `data`). A template models it as one ISM_TRANSITION node per careflow
+		// step; see nodeIDOf for how their predicates match.
+		return []any{&a.IsmTransition}
+	case "instruction_details":
+		if a.InstructionDetails == nil {
+			return nil
+		}
+		return []any{a.InstructionDetails}
 	}
 	return entryChildren(a.Language, a.Encoding, a.Subject, attr)
+}
+
+// ismTransitionChildren resolves ISM_TRANSITION's four attributes. The
+// mandatory current_state is held by value and resolves by value, the DataValue
+// convention; the two optional coded texts resolve to their pointer.
+func ismTransitionChildren(i *rm.IsmTransition, attr string) []any {
+	switch attr {
+	case "current_state":
+		return []any{i.CurrentState}
+	case "transition":
+		if i.Transition == nil {
+			return nil
+		}
+		return []any{i.Transition}
+	case "careflow_step":
+		if i.CareflowStep == nil {
+			return nil
+		}
+		return []any{i.CareflowStep}
+	case "reason":
+		return ifaceSlice(i.Reason)
+	}
+	return nil
+}
+
+// instructionDetailsChildren resolves INSTRUCTION_DETAILS' three attributes.
+// `activity_id` is an RM String and resolves to the string itself.
+func instructionDetailsChildren(d *rm.InstructionDetails, attr string) []any {
+	switch attr {
+	case "instruction_id":
+		return []any{d.InstructionID}
+	case "activity_id":
+		return []any{d.ActivityID}
+	case "wf_details":
+		return iface(d.WfDetails)
+	}
+	return nil
 }
 
 func adminEntryChildren(a *rm.AdminEntry, attr string) []any {
@@ -356,6 +417,11 @@ func activityChildren(a *rm.Activity, attr string) []any {
 			return nil
 		}
 		return []any{a.Timing}
+	case "action_archetype_id":
+		// An RM String, resolved to the string itself: the Web Template's one
+		// STRING leaf. It is held by value, so an unset one resolves to "",
+		// which the FLAT encoder writes nothing for.
+		return []any{a.ActionArchetypeID}
 	}
 	return nil
 }
@@ -507,14 +573,38 @@ func isNilPointer(v any) bool {
 // Reads polymorphically through the generated rm.Locatable identity
 // surface (ADR 0013); the isNilPointer guard MUST stay ahead of the
 // assertion — a getter invoked on a typed-nil pointer panics.
+//
+// One non-LOCATABLE has a node id too: an ISM_TRANSITION. It is PATHABLE
+// but carries no archetype_node_id, yet an archetype path names it by the
+// node id of the ACTION archetype's ISM_TRANSITION constraint
+// (`ism_transition[at0005]`), one constraint per careflow step. ADL 1.4
+// codes each such transition's careflow_step with that same node id
+// (`careflow_step matches {[local::at0005]}` under ism_transition[at0005],
+// as the PROBE-086 corpus template does), so the careflow_step code stands
+// in for it: the predicate matches the transition whose careflow step it
+// names, and a transition without a careflow step matches none.
 func nodeIDOf(o any) string {
 	if isNilPointer(o) {
 		return ""
+	}
+	switch t := o.(type) {
+	case *rm.IsmTransition:
+		return careflowStepCode(t.CareflowStep)
+	case rm.IsmTransition:
+		return careflowStepCode(t.CareflowStep)
 	}
 	if l, ok := o.(rm.Locatable); ok {
 		return l.GetArchetypeNodeID()
 	}
 	return ""
+}
+
+// careflowStepCode is the code of an ISM_TRANSITION's careflow step, or "".
+func careflowStepCode(step *rm.DVCodedText) string {
+	if step == nil {
+		return ""
+	}
+	return step.DefiningCode.CodeString
 }
 
 // nameValueOf returns the name/value string of a LOCATABLE child, or "".

@@ -485,6 +485,7 @@ requirements:
       - openehr/serialize/simplified/flat_nameindex_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/hardening_test.go
+      - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/leaf_rmtype_test.go
       - openehr/serialize/simplified/mediatype_fuzz_test.go
       - openehr/serialize/simplified/mediatype_internal_test.go
@@ -498,6 +499,7 @@ requirements:
       - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
+      - openehr/template/webtemplate/paths_rmpath_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/conformance/webtemplate/helpers_test.go
       - testkit/conformance/webtemplate/runner_test.go
@@ -1320,6 +1322,7 @@ requirements:
       - openehr/template/webtemplate/dedupe_test.go
       - openehr/template/webtemplate/inputs_test.go
       - openehr/template/webtemplate/parity_test.go
+      - openehr/template/webtemplate/paths_rmpath_test.go
       - openehr/template/webtemplate/req116_gap_test.go
 
   - id: REQ-117
@@ -1439,8 +1442,10 @@ requirements:
     packages:
       - openehr/rm/rmpath
     tests:
+      - openehr/rm/rmpath/action_test.go
       - openehr/rm/rmpath/rmpath_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
+      - openehr/template/webtemplate/paths_rmpath_test.go
       - testkit/conformance/webtemplate/runner_test.go
       - testkit/probes/serialize/probe_086_upstream_flat_parity.go
 
@@ -1494,6 +1499,7 @@ requirements:
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/interval_leaf_anchor_test.go
+      - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/leaf_rmtype_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_feeder_test.go
