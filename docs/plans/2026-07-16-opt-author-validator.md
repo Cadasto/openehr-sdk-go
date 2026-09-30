@@ -1,3 +1,7 @@
+---
+kind: plan
+---
+
 # Plan — OPT author validator + CLI
 
 **Date:** 2026-07-16

@@ -13,7 +13,7 @@ sdd:
   excluded_areas: []                # area-prefixed only; tokens that are deliberately not areas
 
   # The document-kind vocabulary every `kind:` frontmatter value is checked against.
-  doc_kinds: [requirement, specification, adr, guide, analysis, operations, reference, upstream]
+  doc_kinds: [requirement, specification, adr, guide, analysis, operations, reference, upstream, plan]
 
   default_mode: spec-first          # the mode a specification has when its frontmatter names none
 
