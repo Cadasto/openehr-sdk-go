@@ -15,7 +15,7 @@ package typereg_test
 //
 // reflect is used to manufacture a typed nil of a type known only through its
 // registry constructor. The generics policy's no-reflection rule binds library
-// code, not tests (canjson/field_order_test.go is the precedent).
+// code, not tests (canjson/member_order_test.go is the precedent).
 
 import (
 	"encoding/json"
