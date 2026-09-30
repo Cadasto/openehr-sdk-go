@@ -114,6 +114,10 @@ func TestAOM14ConcreteRegistry(t *testing.T) {
 // recursion between ARCHETYPE and ARCHETYPE_ONTOLOGY is broken by a
 // pointer on at least one side. Without this the Go compiler reports
 // "invalid recursive type".
+//
+// REQ-043: § Mapping rules, Property → Go field. A mandatory property that
+// closes a cycle of mandatory struct-typed properties becomes a pointer,
+// because Go cannot declare a struct that contains itself by value.
 func TestAOM14CyclicSinglePropDetection(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
 	if err != nil {
