@@ -80,10 +80,18 @@ func countingJWKSServer(t *testing.T, kid string, pub crypto.PublicKey, alg stri
 	if err != nil {
 		t.Fatal(err)
 	}
+	return stubJWKSServer(t, http.StatusOK, body)
+}
+
+// stubJWKSServer serves body with the given status at the JWKS endpoint and
+// reports how many times it was requested.
+func stubJWKSServer(t *testing.T, status int, body []byte) (*authsmart.JWKS, *atomic.Int32) {
+	t.Helper()
 	var requests atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requests.Add(1)
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
 		_, _ = w.Write(body)
 	}))
 	t.Cleanup(srv.Close)
@@ -200,19 +208,44 @@ func TestValidateIDTokenRejectsUnlistedAlg(t *testing.T) {
 // TestValidateIDTokenFailsClosedOnUnsupportedAdvertisedAlgs verifies that when
 // the caller passes a non-empty advertised alg set that the SDK supports none
 // of (e.g. an AS advertising only HS256), validation FAILS CLOSED rather than
-// silently widening back to the default RS/ES set and accepting an RS256 token. REQ-062
+// silently widening back to the default RS/ES set and accepting an RS256 token.
+// The refusal comes before the JWKS is fetched, so it holds while the JWKS
+// endpoint is down too.
 func TestValidateIDTokenFailsClosedOnUnsupportedAdvertisedAlgs(t *testing.T) { // REQ-062
 	now := time.Unix(1_700_000_000, 0)
 	priv := newRSAKey(t)
-	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
 	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", defaultIDClaims(now))
 
-	// AS advertises only HS256/HS384 (unsupported). The RS256 token would verify
-	// against the default set, but the advertised constraint must be honoured.
-	_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
-		"https://issuer.example", "client-id", "nonce-xyz", now, []string{"HS256", "HS384"})
-	if err == nil || !isJWKSFail(err) {
-		t.Fatalf("unsupported advertised alg set must fail closed with JWKS failure, got %v", err)
+	endpoints := []struct {
+		name string
+		jwks func(t *testing.T) (*authsmart.JWKS, *atomic.Int32)
+	}{
+		{name: "JWKS serves the key", jwks: func(t *testing.T) (*authsmart.JWKS, *atomic.Int32) {
+			return countingJWKSServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+		}},
+		{name: "JWKS answers 503", jwks: func(t *testing.T) (*authsmart.JWKS, *atomic.Int32) {
+			return stubJWKSServer(t, http.StatusServiceUnavailable, nil)
+		}},
+	}
+	// The AS advertises only algorithms the SDK does not support. The RS256
+	// token would verify against the default set, but the advertised
+	// constraint must be honoured.
+	allowlists := [][]string{{"HS256", "HS384"}, {"PS256"}}
+	for _, ep := range endpoints {
+		for _, algs := range allowlists {
+			t.Run(ep.name+"/"+strings.Join(algs, ","), func(t *testing.T) {
+				jwks, requests := ep.jwks(t)
+				_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
+					"https://issuer.example", "client-id", "nonce-xyz", now, algs)
+				// REQ-062: an empty intersection fails closed with the JWKS sentinel, before any fetch.
+				if err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed) {
+					t.Fatalf("ValidateIDToken(allowlist %v, %s) error = %v, want ErrJWKSValidationFailed", algs, ep.name, err)
+				}
+				if n := requests.Load(); n != 0 {
+					t.Fatalf("ValidateIDToken(allowlist %v, %s) fetched the JWKS %d time(s), want 0: an allowlist that can never verify must be refused before the key lookup", algs, ep.name, n)
+				}
+			})
+		}
 	}
 }
 
