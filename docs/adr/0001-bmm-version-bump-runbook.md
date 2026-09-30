@@ -65,7 +65,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 
 7. **Update [`resources/bmm/README.md`](../../resources/bmm/README.md)** — both the `Files` table (schema id, bmm_version, class count) and any prose that pins a specific version. The `## Updating` section there defers to this ADR; do not duplicate the procedure.
 
-8. **Propose the CHANGELOG bullet in the PR body.** The maintainer writes [`CHANGELOG.md`](../../CHANGELOG.md) at the release cut, and pre-1.0 every bullet goes under `### Added`, whatever the change ([`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions)). So the PR body carries the one-line bullet the release entry should fold in. The `bmmdiff -suggest-changelog` output is a good starting point, but a human reviews it; it favours brevity over editorial polish. Keep the bullet **short and high-level**: one line, one artefact class.
+8. **Propose the CHANGELOG bullet in the PR body.** [`CHANGELOG.md`](../../CHANGELOG.md) follows the rule in [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) and is not edited in the bump PR, so the PR body carries the one-line bullet for the maintainer to fold in. The `bmmdiff -suggest-changelog` output is a good starting point, but a human reviews it; it favours brevity over editorial polish. Keep the bullet **short and high-level**: one line, one artefact class.
 
 9. **Remove the old BMM file in the same commit.** Never leave both versions in `resources/bmm/` — the SDK pins exactly one version per schema id at a time. The paired add/remove makes the rename reviewable.
 
@@ -105,7 +105,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 
 **Neutral.**
 
-- The procedure does not prescribe a SemVer impact (major / minor / patch); that lives in [`docs/specifications/module-layout.md § Versioning`](../../docs/specifications/module-layout.md#versioning). The CHANGELOG sub-section choice (Added / Changed / Removed) is the closest the runbook gets to a SemVer signal.
+- The procedure does not prescribe a SemVer impact (major / minor / patch); that lives in [`docs/specifications/module-layout.md § Versioning`](../../docs/specifications/module-layout.md#versioning). The runbook itself carries no SemVer signal: the impact is decided under that section.
 
 ## See also
 

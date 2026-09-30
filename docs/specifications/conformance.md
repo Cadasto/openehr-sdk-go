@@ -937,7 +937,7 @@ A new probe **MUST**:
 - Be assigned the next available `PROBE-NNN`. The original rule was *next in the probe's topic range, with a gap of 10 between topics*; that rule was exhausted once the catalog crossed 080 and allocation has been **sequential across topics** ever since — 086 and 089 are formats probes, 087/088/090 AQL, 091–093 REST binding, 094 RM model introspection. A new topic therefore takes the next free number and adds its own catalog section rather than opening a decade. Renumbering remains prohibited either way.
 - Have a definition in this catalog *before* any implementation lands.
 - Be runnable in at least Sandbox mode when it is backend-facing; Cassette mode follows once a recording is captured, and Live mode once a reference deployment is reachable. A probe that reaches no backend declares `In-repo` instead ([§ REQ-082](#req-082--runnability)).
-- Carry a `Status:` transition (Draft → Implemented → Ratified, or Deprecated before removal) in this spec when its state changes, and the PR that makes the transition names it in its body. The CHANGELOG is written at the release cut ([AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions)).
+- Carry a `Status:` transition (Draft → Implemented → Ratified, or Deprecated before removal) in this spec when its state changes, and the PR that makes the transition names it in its body; the CHANGELOG follows the rule in [AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions).
 
 ## Removing probes
 
