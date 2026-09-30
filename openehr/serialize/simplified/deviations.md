@@ -92,10 +92,12 @@ not partially/silently accepted.
 
 - **`archetype_details` is rebuilt on decode, not carried.** FLAT has no key for it, because
   the Web Template already holds the archetype id of every archetype root and the template id.
-  Decode gives every node the Web Template identifies by an archetype id (its node id, or the
-  path predicate a folded structural wrapper keeps) an `ARCHETYPED` whose
+  Decode gives every node the Web Template identifies by an archetype id an `ARCHETYPED` whose
   `archetype_id` is that id and whose `rm_version` is `rm.Release`, and adds the
-  Web Template's `templateId` as `template_id` on the COMPOSITION root only. Neither value
+  Web Template's `templateId` as `template_id` on the COMPOSITION root only. The Web Template
+  identifies a node by its node id or, for a structural wrapper it folds away (an archetyped
+  `ITEM_TREE` under an `ACTIVITY` description, for instance), by the predicate its children's
+  paths carry for the wrapper. Neither value
   needs `WithTemplate`, so both decode modes do it. The placement matches the reference
   (observed on EHRbase 2.36.0 with openEHR SDK 2.35.0, 2026-10-01). The `rm_version` value
   does not: the reference writes a fixed `1.0.4`, and the SDK writes the RM release it is

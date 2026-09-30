@@ -56,6 +56,12 @@ func (b *allocBudget) add(k int) error {
 // the elided HISTORY/ITEM_TREE wrappers come from the Web Template and
 // rminfo, values from the FLAT suffixes), then decodes it through canjson
 // (typereg instantiates the polymorphic RM types).
+//
+// FLAT carries no archetype_details, so decode rebuilds it on every node
+// the Web Template identifies by an archetype id: the archetype id is the
+// node's id, rm_version is [rm.Release], and the COMPOSITION alone also
+// gets the Web Template's template id. Whatever the original composition
+// held there is not recovered.
 func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*rm.Composition, error) {
 	if wt == nil || wt.Tree == nil {
 		return nil, ErrNoTemplate

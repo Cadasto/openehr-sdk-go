@@ -1,10 +1,21 @@
 // Package bmmgen is the BMM-driven code generator for the SDK.
 //
 // It reads the pinned BMM files in resources/bmm/ via openehr/bmm and
-// emits Go source under one or more target output directories: one
-// file per BMM top-level package, plus a single typereg_gen.go per
-// target whose init() calls typereg.Default.Register for every
-// concrete class.
+// emits Go source under one or more target output directories. Per
+// target it writes:
+//
+//   - one <package>_gen.go per BMM top-level package, with its
+//     canonical JSON and XML companions (_jsonmar_gen.go,
+//     _jsonunmar_gen.go, _xmlmar_gen.go, _xmlunmar_gen.go) for a
+//     package that declares concrete classes;
+//   - typereg_gen.go, whose init() calls typereg.Default.Register for
+//     every concrete class;
+//   - jsonhooks_gen.go, the polymorphic decode hooks, when the target
+//     has any.
+//
+// The RM target also gets release_gen.go, the constant Release taken
+// from the root schema's rm_release, and the two rminfo tables,
+// openehr/rm/rminfo/lookup_gen.go and absence_gen.go.
 //
 // # Targets
 //

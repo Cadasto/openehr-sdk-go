@@ -6,29 +6,21 @@ import (
 )
 
 // rebuildArchetypeDetails gives every node of the decoded canonical tree that
-// sits at an archetype root an ARCHETYPED, rebuilt from the Web Template. FLAT
-// and STRUCTURED carry no key for LOCATABLE.archetype_details because the Web
-// Template already records what it holds: the archetype id is the node's own
-// id, and the template id is the Web Template's. rm_version is the RM release
-// the SDK is generated from ([rm.Release]), never a value from the payload.
-// The COMPOSITION root alone also gets template_id.
+// the Web Template identifies by an archetype id an ARCHETYPED, rebuilt from
+// the Web Template. FLAT and STRUCTURED carry no key for
+// LOCATABLE.archetype_details because the Web Template already records what it
+// holds: the archetype id is the node's own id, and the template id is the Web
+// Template's. rm_version is the RM release the SDK is generated from
+// ([rm.Release]), never a value from the payload. The COMPOSITION root alone
+// also gets template_id.
 //
-// Which node ids are archetype ids is decided by two signals together (see
-// [archetypeRootIDs]): the id must be a node id of the Web Template, and it
-// must have the ARCHETYPE_ID lexical form. The Web Template has no
-// archetype-root flag of its own, so the lexical form is what tells an
-// archetype id from an at-code or id-code, and membership in the Web
-// Template's node set ties each rebuilt archetype_id to a node the template
-// declares.
-//
-// An archetype_details already present is left as it is. Neither value needs
-// the compiled template, so both decode modes run this. It has to run after the
-// phantom check: an ARCHETYPED added to a gap-filled instance would make it
-// look populated.
+// Decode owns the attribute: it writes it on every qualifying node and keeps
+// nothing that was there before. Neither value needs the compiled template, so
+// both decode modes run this. It has to run after the phantom check: an
+// ARCHETYPED added to a gap-filled instance would make it look populated.
 func rebuildArchetypeDetails(compJSON map[string]any, wt *webtemplate.WebTemplate) {
-	_, rootHad := compJSON["archetype_details"]
 	attachArchetypeDetails(compJSON, archetypeRootIDs(wt))
-	if rootHad || wt.TemplateID == "" {
+	if wt.TemplateID == "" {
 		return
 	}
 	if ad, ok := compJSON["archetype_details"].(map[string]any); ok {
@@ -36,16 +28,13 @@ func rebuildArchetypeDetails(compJSON map[string]any, wt *webtemplate.WebTemplat
 	}
 }
 
-// attachArchetypeDetails walks a canonical subtree and adds an ARCHETYPED,
-// without template_id, to every object whose archetype_node_id is in roots and
-// that carries no archetype_details yet.
+// attachArchetypeDetails walks a canonical subtree and writes an ARCHETYPED,
+// without template_id, on every object whose archetype_node_id is in roots.
 func attachArchetypeDetails(n any, roots map[string]bool) {
 	switch x := n.(type) {
 	case map[string]any:
 		if id, ok := x["archetype_node_id"].(string); ok && roots[id] {
-			if _, has := x["archetype_details"]; !has {
-				x["archetype_details"] = archetypedJSON(id)
-			}
+			x["archetype_details"] = archetypedJSON(id)
 		}
 		for k, v := range x {
 			if k != "archetype_details" {
@@ -69,13 +58,30 @@ func archetypedJSON(archetypeID string) map[string]any {
 	}
 }
 
-// archetypeRootIDs returns the Web Template node ids that are archetype ids:
-// every nodeId in the tree that parses as an ARCHETYPE_ID ([rm.ParseArchetypeID]).
-// An at-code or id-code fails that parse, so it never qualifies.
+// archetypeRootIDs returns the archetype ids by which the Web Template
+// identifies a node. Two signals decide it together:
+//
+//   - The id must come from the Web Template. A node carries it as its nodeId;
+//     a structural wrapper the Web Template folds away (an archetyped ITEM_TREE
+//     under an ACTIVITY description, for instance) has no node of its own, and
+//     carries it only as the predicate its children's aqlPaths hold for it.
+//     Decode rebuilds that wrapper with the predicate as its archetype_node_id,
+//     so both places are read.
+//   - The id must have the ARCHETYPE_ID lexical form ([rm.ParseArchetypeID]).
+//     The Web Template has no archetype-root flag, so the lexical form is what
+//     tells an archetype id from an at-code or id-code, which never qualifies.
 func archetypeRootIDs(wt *webtemplate.WebTemplate) map[string]bool {
 	ids := make(map[string]bool)
 	if wt == nil || wt.Tree == nil {
 		return ids
+	}
+	add := func(id string) {
+		if id == "" || ids[id] {
+			return
+		}
+		if _, err := rm.ParseArchetypeID(id); err == nil {
+			ids[id] = true
+		}
 	}
 	stack := []*webtemplate.Node{wt.Tree}
 	for len(stack) > 0 {
@@ -84,10 +90,9 @@ func archetypeRootIDs(wt *webtemplate.WebTemplate) map[string]bool {
 		if n == nil {
 			continue
 		}
-		if n.NodeID != "" && !ids[n.NodeID] {
-			if _, err := rm.ParseArchetypeID(n.NodeID); err == nil {
-				ids[n.NodeID] = true
-			}
+		add(n.NodeID)
+		for _, seg := range parseAQL(n.AQLPath) {
+			add(seg.pred)
 		}
 		stack = append(stack, n.Children...)
 	}

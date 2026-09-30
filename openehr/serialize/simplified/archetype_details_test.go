@@ -8,14 +8,20 @@ package simplified
 import (
 	"encoding/json"
 	"errors"
+	"maps"
+	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // Archetype roots of the PROBE-086 corpus template, as the Web Template
@@ -177,39 +183,45 @@ func TestREQ053_DecodeRebuildsArchetypeDetails(t *testing.T) {
 	}
 }
 
-// TestREQ053_RebuildArchetypeDetailsKeepsWhatIsThere — a node that already carries
-// archetype_details keeps it untouched, and the COMPOSITION root gains no
-// template_id inside an ARCHETYPED it did not get from decode.
-func TestREQ053_RebuildArchetypeDetailsKeepsWhatIsThere(t *testing.T) {
+// TestREQ053_RebuildArchetypeDetailsOverwrites — decode owns archetype_details:
+// the rebuild writes the Web Template's ARCHETYPED on every qualifying node
+// whatever the tree held there, so rm_version is always rm.Release and the
+// COMPOSITION root always carries the Web Template's template_id.
+func TestREQ053_RebuildArchetypeDetailsOverwrites(t *testing.T) {
 	wt, _ := conformanceWT(t)
+	stale := func() map[string]any {
+		return map[string]any{
+			"_type":        "ARCHETYPED",
+			"archetype_id": map[string]any{"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-SECTION.stale.v9"},
+			"template_id":  map[string]any{"_type": "TEMPLATE_ID", "value": "stale.template.v1"},
+			"rm_version":   "1.0.4",
+		}
+	}
+	section := map[string]any{
+		"_type":             "SECTION",
+		"archetype_node_id": adSection,
+		"archetype_details": stale(),
+	}
 	tree := map[string]any{
 		"_type":             "COMPOSITION",
 		"archetype_node_id": adComposition,
-		"archetype_details": map[string]any{"_type": "ARCHETYPED", "rm_version": "1.0.4"},
-		"content": []any{map[string]any{
-			"_type":             "SECTION",
-			"archetype_node_id": adSection,
-			"archetype_details": map[string]any{"_type": "ARCHETYPED", "rm_version": "1.0.4"},
-		}},
+		"archetype_details": stale(),
+		"content":           []any{section},
 	}
 	rebuildArchetypeDetails(tree, wt)
 
-	// Read back through the tree: a rebuild that replaced the value would leave
-	// the old maps intact and only the tree would show it.
-	want := map[string]any{"_type": "ARCHETYPED", "rm_version": "1.0.4"}
-	if got := tree["archetype_details"]; !reflect.DeepEqual(got, want) {
-		t.Errorf("root archetype_details = %v, want it untouched %v", got, want)
+	if got, want := tree["archetype_details"], wantArchetyped(adComposition, wt.TemplateID); !reflect.DeepEqual(got, want) {
+		t.Errorf("root archetype_details = %v, want %v", got, want)
 	}
-	section := tree["content"].([]any)[0].(map[string]any)
-	if got := section["archetype_details"]; !reflect.DeepEqual(got, want) {
-		t.Errorf("SECTION archetype_details = %v, want it untouched %v", got, want)
+	if got, want := section["archetype_details"], wantArchetyped(adSection, ""); !reflect.DeepEqual(got, want) {
+		t.Errorf("SECTION archetype_details = %v, want %v", got, want)
 	}
 }
 
-// TestREQ053_RebuildArchetypeDetailsNeedsATemplateNode — the rebuild qualifies an id
-// by the Web Template's node set and the ARCHETYPE_ID lexical form together:
-// an archetype-shaped id the template does not declare gets nothing, and an
-// at-code the template does declare gets nothing.
+// TestREQ053_RebuildArchetypeDetailsNeedsATemplateNode — the rebuild qualifies
+// an id only when the Web Template identifies a node by it and it has the
+// ARCHETYPE_ID lexical form: an archetype-shaped id the template does not
+// declare gets nothing, and an at-code the template does declare gets nothing.
 func TestREQ053_RebuildArchetypeDetailsNeedsATemplateNode(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	stray := map[string]any{"_type": "CLUSTER", "archetype_node_id": "openEHR-EHR-CLUSTER.not_in_template.v1"}
@@ -232,23 +244,46 @@ func TestREQ053_RebuildArchetypeDetailsNeedsATemplateNode(t *testing.T) {
 	}
 }
 
-// TestREQ053_ArchetypeRootIDsFromTheWebTemplate pins the qualifying set over the
-// corpus template: exactly its archetype-root node ids, and no at-code.
+// TestREQ053_ArchetypeRootIDsFromTheWebTemplate pins the qualifying set per
+// template: exactly the archetype ids the OPT declares (its archetype_id
+// values), whether the Web Template carries one as a node id or, for the
+// ITEM_TREE nested.en.v1 folds away, only as a path predicate. No at-code
+// qualifies.
 func TestREQ053_ArchetypeRootIDsFromTheWebTemplate(t *testing.T) {
-	wt, _ := conformanceWT(t)
-	got := archetypeRootIDs(wt)
-	for _, id := range []string{adComposition, adSection, adObservation, adEvaluation, adCluster} {
-		if !got[id] {
-			t.Errorf("archetypeRootIDs lacks %q", id)
-		}
-	}
-	for id := range got {
-		if _, err := rm.ParseArchetypeID(id); err != nil {
-			t.Errorf("archetypeRootIDs holds %q, which is not an ARCHETYPE_ID: %v", id, err)
-		}
-	}
-	if len(archetypeRootIDs(&webtemplate.WebTemplate{})) != 0 {
-		t.Error("archetypeRootIDs of a Web Template with no tree is not empty")
+	conformance, _ := conformanceWT(t)
+	nested, _ := nestedWT(t)
+	for _, tc := range []struct {
+		name string
+		wt   *webtemplate.WebTemplate
+		want []string
+	}{
+		{"conformance", conformance, []string{
+			"openEHR-EHR-ACTION.conformance_action_.v0",
+			"openEHR-EHR-ADMIN_ENTRY.conformance_admin_entry.v0",
+			adCluster,
+			adComposition,
+			adEvaluation,
+			"openEHR-EHR-INSTRUCTION.conformance_instruction.v0",
+			"openEHR-EHR-OBSERVATION.conformance_interval.v0",
+			adObservation,
+			adSection,
+		}},
+		{"nested", nested, []string{
+			"openEHR-EHR-CLUSTER.nested.v1",
+			"openEHR-EHR-CLUSTER.nested2.v1",
+			"openEHR-EHR-COMPOSITION.nesting.v1",
+			"openEHR-EHR-INSTRUCTION.nested.v1",
+			nestedItemTree,
+			"openEHR-EHR-SECTION.nested.v1",
+		}},
+		{"no tree", &webtemplate.WebTemplate{}, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := slices.Sorted(maps.Keys(archetypeRootIDs(tc.wt)))
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("archetypeRootIDs = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -278,7 +313,11 @@ func TestREQ140_ArchetypeDetailsRoundTripIsRebuilt(t *testing.T) {
 		"template_id":  map[string]any{"_type": "TEMPLATE_ID", "value": "some.other.template.v1"},
 		"rm_version":   "1.0.4",
 	}
-	section := locatableNodes(src)[adSection][0].obj
+	sections := locatableNodes(src)[adSection]
+	if len(sections) == 0 {
+		t.Fatalf("decoded source has no node %q — fixture changed?", adSection)
+	}
+	section := sections[0].obj
 	section["archetype_details"] = map[string]any{
 		"_type":        "ARCHETYPED",
 		"archetype_id": map[string]any{"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-SECTION.not_this_node.v9"},
@@ -322,6 +361,9 @@ func TestREQ140_ArchetypeDetailsRoundTripIsRebuilt(t *testing.T) {
 		{adComposition, wt.TemplateID},
 		{adSection, ""},
 	} {
+		if len(nodes[tc.id]) == 0 {
+			t.Fatalf("round trip built no node %q", tc.id)
+		}
 		got := nodes[tc.id][0].obj["archetype_details"]
 		if want := wantArchetyped(tc.id, tc.templateID); !reflect.DeepEqual(got, want) {
 			t.Errorf("round-tripped archetype_details on %s = %v, want %v", tc.id, got, want)
@@ -355,5 +397,97 @@ func TestREQ053_ArchetypeDetailsLeavesPhantomsVisible(t *testing.T) {
 		if _, err := UnmarshalFlat(flat, wt, opts...); !errors.Is(err, ErrUnknownPath) {
 			t.Errorf("%s: UnmarshalFlat(evaluation :0 and :2, no :1) err = %v, want ErrUnknownPath", name, err)
 		}
+	}
+}
+
+// nestedItemTree is the archetyped ITEM_TREE of the nested.en.v1 template. It
+// fills an ACTIVITY description, a structural wrapper the Web Template folds
+// away: no Web Template node carries this id, only the paths of its children.
+const nestedItemTree = "openEHR-EHR-ITEM_TREE.nested.v1"
+
+// nestedWT compiles the nested.en.v1 corpus template and builds its Web
+// Template.
+func nestedWT(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	opt, err := template.ParseFile(fixtures.TemplateOpt("nested.en.v1"))
+	if err != nil {
+		t.Fatalf("parse nested.en.v1 OPT: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("compile nested.en.v1 OPT: %v", err)
+	}
+	wt, err := webtemplate.Build(c)
+	if err != nil {
+		t.Fatalf("build nested.en.v1 Web Template: %v", err)
+	}
+	return wt, c
+}
+
+// TestREQ053_DecodeRebuildsFoldedArchetypeRoots — the Web Template folds
+// structural wrappers such as an ACTIVITY's ITEM_TREE and keeps an archetyped
+// wrapper's id only as the predicate its children's paths carry. Decode
+// rebuilds that wrapper with the id as its archetype_node_id, and it must get
+// archetype_details like any other archetype root. The reference composition
+// carries archetype_details on every node the decode must rebuild it on.
+func TestREQ053_DecodeRebuildsFoldedArchetypeRoots(t *testing.T) {
+	wt, compiled := nestedWT(t)
+	raw, err := os.ReadFile(fixtures.CompositionJSON("nested.en.v1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ref rm.Composition
+	if err := canjson.Unmarshal(raw, &ref); err != nil {
+		t.Fatalf("canjson.Unmarshal reference: %v", err)
+	}
+	// Every archetype_node_id the reference gives archetype_details, the folded
+	// ITEM_TREE among them.
+	var refRoots []string
+	for id, found := range locatableNodes(canonicalTree(t, &ref)) {
+		for _, n := range found {
+			if _, has := n.obj["archetype_details"]; has {
+				refRoots = append(refRoots, id)
+				break
+			}
+		}
+	}
+	if !slices.Contains(refRoots, nestedItemTree) {
+		t.Fatalf("reference composition carries no archetype_details on %s — fixture changed?", nestedItemTree)
+	}
+
+	// The reference's root uid is a HIER_OBJECT_ID spelled as an
+	// OBJECT_VERSION_ID, which encode refuses; it has no bearing on this test.
+	ref.UID = nil
+	flat, err := MarshalFlat(&ref, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	for name, opts := range map[string][]Option{
+		"with template":    {WithTemplate(compiled)},
+		"without template": nil,
+	} {
+		t.Run(name, func(t *testing.T) {
+			comp, err := UnmarshalFlat(flat, wt, opts...)
+			if err != nil {
+				t.Fatalf("UnmarshalFlat: %v", err)
+			}
+			nodes := locatableNodes(canonicalTree(t, comp))
+			for _, id := range refRoots {
+				found := nodes[id]
+				if len(found) == 0 {
+					t.Errorf("decode built no node with archetype_node_id %q", id)
+					continue
+				}
+				for _, n := range found {
+					templateID := ""
+					if n.path == "" {
+						templateID = wt.TemplateID
+					}
+					if got, want := n.obj["archetype_details"], wantArchetyped(id, templateID); !reflect.DeepEqual(got, want) {
+						t.Errorf("archetype_details at %q (%s) = %v, want %v", n.path, id, got, want)
+					}
+				}
+			}
+		})
 	}
 }
