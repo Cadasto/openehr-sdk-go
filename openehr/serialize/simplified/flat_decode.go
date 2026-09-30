@@ -208,6 +208,9 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	if names != nil {
 		completeRequired(compJSON, ci)
 	}
+	// Both modes: archetype_details has no FLAT key, and the Web Template
+	// alone holds what it records (REQ-053).
+	rebuildArchetypeDetails(compJSON, wt)
 	return compJSON, nil
 }
 

@@ -578,7 +578,7 @@ func (g *generator) stampSlotFill(rmValue any, slot *tcimpl.CompiledNode) bool {
 	}
 	ad := &rm.Archetyped{
 		ArchetypeID: rm.ArchetypeID{Value: archetypeID},
-		RMVersion:   "1.1.0",
+		RMVersion:   rm.Release,
 	}
 	applyLocatableIdentity(rmValue, archetypeID, slot.RMTypeName(), ad, g.nextUID)
 	return true
@@ -748,7 +748,7 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 	// top-level root only.
 	var archetypeDetails *rm.Archetyped
 	if arch := opt.ArchetypeID(); arch != "" || isTemplateRoot {
-		ad := &rm.Archetyped{RMVersion: "1.1.0"}
+		ad := &rm.Archetyped{RMVersion: rm.Release}
 		if arch != "" {
 			ad.ArchetypeID = rm.ArchetypeID{Value: arch}
 		} else if id != "" {

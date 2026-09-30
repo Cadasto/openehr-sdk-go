@@ -409,6 +409,11 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 		}
 	}
 
+	// The RM release constant (rm.Release), from the root schema's rm_release.
+	if err := emitReleaseFile(opts, plan, outDir, &tr, result); err != nil {
+		return tr, err
+	}
+
 	tr.MethodStubsEmitted = plan.MethodStubsEmitted
 	tr.MethodTodoEscapes = plan.MethodTodoEscapes
 	result.MethodStubsEmitted += plan.MethodStubsEmitted
