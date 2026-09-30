@@ -9,8 +9,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -337,6 +339,171 @@ func TestValidateIDTokenRejectsAlgNoneCaseVariants(t *testing.T) {
 			}
 			if !errors.Is(err, auth.ErrJWKSValidationFailed) {
 				t.Fatalf("alg:%s expected ErrJWKSValidationFailed, got %v", algVariant, err)
+			}
+		})
+	}
+}
+
+// TestValidateIDTokenRejectsAlgNoneExplicitly pins the SDK's own refusal of the
+// unsecured algorithm in every letter case, including when the caller's
+// allowlist names it. go-oidc would also refuse such a token, so the assertion
+// on the SDK's own message is what keeps the SDK's check in place.
+func TestValidateIDTokenRejectsAlgNoneExplicitly(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+
+	allowlists := []struct {
+		name string
+		algs []string
+	}{
+		{name: "no allowlist", algs: nil},
+		{name: "allowlist names none", algs: []string{"none", "RS256"}},
+	}
+	for _, alg := range []string{"none", "NONE", "None"} {
+		for _, al := range allowlists {
+			t.Run(alg+"/"+al.name, func(t *testing.T) {
+				hdr, err := json.Marshal(map[string]string{"alg": alg, "typ": "JWT", "kid": "kid-rs256"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				pl, err := json.Marshal(defaultIDClaims(now))
+				if err != nil {
+					t.Fatal(err)
+				}
+				tok := base64.RawURLEncoding.EncodeToString(hdr) + "." +
+					base64.RawURLEncoding.EncodeToString(pl) + "."
+
+				_, err = smart.ValidateIDToken(t.Context(), tok, jwks,
+					"https://issuer.example", "client-id", "nonce-xyz", now, al.algs)
+				// REQ-062: alg none is always rejected, by the SDK itself, with the JWKS sentinel.
+				if err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed) {
+					t.Fatalf("ValidateIDToken(alg %q, allowlist %v) error = %v, want ErrJWKSValidationFailed", alg, al.algs, err)
+				}
+				if !strings.Contains(err.Error(), "alg none") {
+					t.Fatalf("ValidateIDToken(alg %q, allowlist %v) error = %v, want the SDK's own alg none rejection", alg, al.algs, err)
+				}
+			})
+		}
+	}
+}
+
+// TestValidateIDTokenAllowlistCannotWiden checks that an allowlist naming an
+// algorithm go-jose can verify but the SDK does not support (PS256) does not
+// add it to the accepted set, while the supported algorithm it also names
+// still verifies.
+func TestValidateIDTokenAllowlistCannotWiden(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rsa", &priv.PublicKey, "")
+	allowlist := []string{"RS256", "PS256"}
+
+	// Control: the supported member of the allowlist verifies, so the
+	// allowlist is not simply rejecting everything.
+	rs256 := joseSign(t, gojose.RS256, priv, "kid-rsa", defaultIDClaims(now))
+	if _, err := smart.ValidateIDToken(t.Context(), rs256, jwks,
+		"https://issuer.example", "client-id", "nonce-xyz", now, allowlist); err != nil {
+		t.Fatalf("ValidateIDToken(RS256, allowlist %v) error = %v, want nil", allowlist, err)
+	}
+
+	ps256 := joseSign(t, gojose.PS256, priv, "kid-rsa", defaultIDClaims(now))
+	_, err := smart.ValidateIDToken(t.Context(), ps256, jwks,
+		"https://issuer.example", "client-id", "nonce-xyz", now, allowlist)
+	// REQ-062: the allowlist narrows the supported set and never widens it.
+	if err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed) {
+		t.Fatalf("ValidateIDToken(PS256, allowlist %v) error = %v, want ErrJWKSValidationFailed", allowlist, err)
+	}
+}
+
+// TestValidateIDTokenVerifiesSignatureBeforeClaims sends claims that fail two
+// of the SDK's claim checks (expired beyond the skew, wrong nonce). Signed
+// with the served key they fail on a claim; signed with another key under the
+// same kid they must fail on the signature, with no claim failure reported.
+func TestValidateIDTokenVerifiesSignatureBeforeClaims(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	served := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &served.PublicKey, "RS256")
+
+	claims := defaultIDClaims(now)
+	claims["exp"] = now.Add(-time.Hour).Unix()
+	claims["nonce"] = "other-nonce"
+	claimFailure := func(err error) bool {
+		msg := err.Error()
+		return strings.Contains(msg, "token expired") || strings.Contains(msg, "nonce mismatch")
+	}
+
+	// Control: with a valid signature the same claims reach the claim checks
+	// and fail there, so the forged case below is not passing vacuously.
+	signed := joseSign(t, gojose.RS256, served, "kid-rs256", claims)
+	_, err := smart.ValidateIDToken(t.Context(), signed, jwks,
+		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+	if err == nil || !claimFailure(err) {
+		t.Fatalf("ValidateIDToken(validly signed, expired, wrong nonce) error = %v, want a claim failure", err)
+	}
+
+	forged := joseSign(t, gojose.RS256, newRSAKey(t), "kid-rs256", claims)
+	_, err = smart.ValidateIDToken(t.Context(), forged, jwks,
+		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+	// REQ-064: the signature is verified before any claim is trusted.
+	if err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed) {
+		t.Fatalf("ValidateIDToken(badly signed) error = %v, want ErrJWKSValidationFailed", err)
+	}
+	if claimFailure(err) {
+		t.Fatalf("ValidateIDToken(badly signed, expired, wrong nonce) error = %v, want the signature failure: a claim failure means claims were read before the signature was verified", err)
+	}
+}
+
+// TestValidateIDTokenClaimRules walks the SDK's claim rules at their edges:
+// the 30-second skew on exp, nbf and iat, the exact iss match, the aud
+// membership and the expected nonce.
+func TestValidateIDTokenClaimRules(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+	at := func(d time.Duration) int64 { return now.Add(d).Unix() }
+
+	cases := []struct {
+		name    string
+		issuer  string // configured issuer; empty means https://issuer.example
+		set     map[string]any
+		drop    string
+		wantErr bool
+	}{
+		{name: "exp 29s ago is inside the skew", set: map[string]any{"exp": at(-29 * time.Second)}},
+		{name: "exp 30s ago is outside the skew", set: map[string]any{"exp": at(-30 * time.Second)}, wantErr: true},
+		{name: "nbf 30s ahead is inside the skew", set: map[string]any{"nbf": at(30 * time.Second)}},
+		{name: "nbf 31s ahead is outside the skew", set: map[string]any{"nbf": at(31 * time.Second)}, wantErr: true},
+		{name: "iat 30s ahead is inside the skew", set: map[string]any{"iat": at(30 * time.Second)}},
+		{name: "iat 31s ahead is outside the skew", set: map[string]any{"iat": at(31 * time.Second)}, wantErr: true},
+		{name: "iss with a trailing slash", set: map[string]any{"iss": "https://issuer.example/"}, wantErr: true},
+		{name: "iss in another letter case", set: map[string]any{"iss": "https://ISSUER.example"}, wantErr: true},
+		// go-oidc lets this one pair through; only the SDK's exact match refuses it.
+		{name: "exact iss accounts.google.com", issuer: "https://accounts.google.com", set: map[string]any{"iss": "https://accounts.google.com"}},
+		{name: "scheme-less iss accounts.google.com", issuer: "https://accounts.google.com", set: map[string]any{"iss": "accounts.google.com"}, wantErr: true},
+		{name: "aud lists the client among others", set: map[string]any{"aud": []string{"other", "client-id"}}},
+		{name: "aud without the client", set: map[string]any{"aud": []string{"other"}}, wantErr: true},
+		{name: "nonce absent when one is expected", drop: "nonce", wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			claims := defaultIDClaims(now)
+			maps.Copy(claims, tc.set)
+			if tc.drop != "" {
+				delete(claims, tc.drop)
+			}
+			issuer := tc.issuer
+			if issuer == "" {
+				issuer = "https://issuer.example"
+			}
+			tok := joseSign(t, gojose.RS256, priv, "kid-rs256", claims)
+
+			_, err := smart.ValidateIDToken(t.Context(), tok, jwks, issuer, "client-id", "nonce-xyz", now, nil)
+			// REQ-064: claim checks with a 30s skew, exact iss, aud membership, expected nonce.
+			switch {
+			case tc.wantErr && (err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed)):
+				t.Fatalf("ValidateIDToken(%s) error = %v, want ErrJWKSValidationFailed", tc.name, err)
+			case !tc.wantErr && err != nil:
+				t.Fatalf("ValidateIDToken(%s) error = %v, want nil", tc.name, err)
 			}
 		})
 	}
