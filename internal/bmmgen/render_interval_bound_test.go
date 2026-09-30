@@ -66,9 +66,12 @@ func TestIntervalBoundClasses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
 	}
-	classes, err := intervalBoundClasses(plan)
+	shaped, classes, err := intervalBounds(plan)
 	if err != nil {
-		t.Fatalf("intervalBoundClasses: %v", err)
+		t.Fatalf("intervalBounds: %v", err)
+	}
+	if !shaped {
+		t.Fatal("intervalBounds reports no interval-shaped class in the RM plan")
 	}
 	var got []string
 	for _, pc := range classes {

@@ -14,10 +14,12 @@ func omitIntervalBound[T any](unbounded bool, bound T) bool {
 
 // isEmptyIntervalBound reports whether an interval bound holds no value. A
 // bound typed by an interface, such as DVInterval[DVOrdered], is empty when
-// it is nil or holds a typed-nil pointer; an all-zero value behind the
-// interface is still a value. A bound of a concrete type is empty when it is
-// that type's zero value, compared field by field. A concrete type that is
-// not an interval bound type is never empty.
+// it is nil or holds a typed-nil pointer to an RM class; an all-zero value
+// behind the interface is still a value. A bound of a concrete type is empty
+// when it is that type's zero value: field by field for the RM data value
+// types the interval classes bound (the cases below), and by comparison for
+// a Go built-in scalar type or an RM primitive. A bound of any other Go type
+// is never empty, so it is emitted as it stands.
 func isEmptyIntervalBound[T any](bound T) bool {
 	v := any(bound)
 	if v == nil || IsTypedNil(v) {
@@ -47,7 +49,7 @@ func isEmptyIntervalBound[T any](bound T) bool {
 		return isZeroDVScale(x)
 	case DVTime:
 		return isZeroDVTime(x)
-	case Character, Integer, Real, bool, byte, float64, int64, string:
+	case Character, Integer, Real, bool, complex128, complex64, float32, float64, int, int16, int32, int64, int8, string, uint, uint16, uint32, uint64, uint8, uintptr:
 		return v == any(zero)
 	}
 	return false

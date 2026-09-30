@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
@@ -19,6 +20,12 @@ const intervalBoundFile = "interval_bound_gen.go"
 // concrete class whose codec fields carry all four is interval-shaped,
 // whether it descends from Interval (DV_INTERVAL, Proper_interval,
 // Point_interval) or declares the members itself.
+//
+// Multiplicity_interval has no encoder of its own and marshals through the
+// Proper_interval it embeds. The BMM makes it an interval of Integer, but the
+// Go type embeds ProperInterval[any], so its bound is interface-typed: an open
+// side's Integer(0) is a value and is kept, where ProperInterval[Integer]
+// drops it.
 const (
 	propLower          = "lower"
 	propUpper          = "upper"
@@ -78,9 +85,10 @@ func guardOpenIntervalBoundXML(recv, prop, lines string) string {
 
 // renderMarshalAliasInterval is [renderMarshalAlias] for an interval-shaped
 // class. The alias wrapper stays the wire for every member; when a side is
-// open and its bound empty, a zero-size field of the bound's name at the top
-// of the wrapper shadows the embedded bound and is always omitted, so the
-// member drops out and every other member keeps its place.
+// open and its bound empty, the wrapper declares a zero-size field of the
+// bound's name at its own level, shallower than the bound embedded through the
+// alias. The shallower field wins, and it is always omitted, so the member
+// drops out and every other member keeps its place.
 func renderMarshalAliasInterval(pc *PlannedClass, recv, typeParams, typeArgs string) string {
 	alias := aliasTypeName(pc.GoName)
 
@@ -96,9 +104,10 @@ func renderMarshalAliasInterval(pc *PlannedClass, recv, typeParams, typeArgs str
 	b.WriteString("// accessors admit, still carries its `_type`.\n")
 	b.WriteString("//\n")
 	fmt.Fprintf(&b, "// An open side (`%s` or `%s` set) whose bound is empty\n", propLowerUnbounded, propUpperUnbounded)
-	fmt.Fprintf(&b, "// emits no `%s` or `%s` member. A zero-size field of that name at the top\n", propLower, propUpper)
-	b.WriteString("// of the wrapper shadows the embedded bound and is always omitted, so the\n")
-	b.WriteString("// other members keep their order.\n")
+	fmt.Fprintf(&b, "// emits no `%s` or `%s` member. The wrapper then declares a zero-size\n", propLower, propUpper)
+	b.WriteString("// field of that name at its own level, shallower than the bound embedded\n")
+	b.WriteString("// through the alias, so it wins; it is always omitted, and the other\n")
+	b.WriteString("// members keep their order.\n")
 	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	fmt.Fprintf(&b, "\tomitLower := omitIntervalBound(%s.%s, %s.%s)\n", recv, FieldName(propLowerUnbounded), recv, FieldName(propLower))
 	fmt.Fprintf(&b, "\tomitUpper := omitIntervalBound(%s.%s, %s.%s)\n", recv, FieldName(propUpperUnbounded), recv, FieldName(propUpper))
@@ -136,20 +145,26 @@ func intervalWireReturn(pc *PlannedClass, recv, alias, typeArgs string, omitted 
 // one field-by-field zero predicate per concrete bound type, derived from the
 // BMM class's properties and using no reflection (REQ-024).
 //
-// The bound types are the concrete descendants of each interval-shaped
-// class's generic bound (DV_ORDERED for DV_INTERVAL), plus the Go scalar
-// types the BMM primitives map to (the bound of BASE Interval is the
-// primitive Ordered). A predicate for a class reached by value from a bound
-// type (DV_ORDINAL's `symbol`) is emitted too.
+// The bound types are read from each interval class's `lower` and `upper`
+// fields (see [intervalBounds]): the concrete classes a generic bound admits
+// (DV_ORDERED's for DV_INTERVAL) or a class the field names directly. Every
+// Go built-in scalar type and RM primitive is covered by a comparison with
+// its zero value, which is what BASE Interval's primitive bound Ordered
+// admits. A predicate for a class reached by value from a bound type
+// (DV_ORDINAL's `symbol`) is emitted too.
 //
 // Returns (nil, nil) when the target owns no interval-shaped concrete class.
 func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
-	boundClasses, err := intervalBoundClasses(plan)
+	shaped, boundClasses, err := intervalBounds(plan)
 	if err != nil {
 		return nil, err
 	}
-	if boundClasses == nil {
+	if !shaped {
 		return nil, nil
+	}
+	scalars, err := scalarBoundGoTypes()
+	if err != nil {
+		return nil, err
 	}
 
 	predicates, err := renderZeroPredicates(plan, boundClasses)
@@ -171,10 +186,12 @@ func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
 
 	b.WriteString("// isEmptyIntervalBound reports whether an interval bound holds no value. A\n")
 	b.WriteString("// bound typed by an interface, such as DVInterval[DVOrdered], is empty when\n")
-	b.WriteString("// it is nil or holds a typed-nil pointer; an all-zero value behind the\n")
-	b.WriteString("// interface is still a value. A bound of a concrete type is empty when it is\n")
-	b.WriteString("// that type's zero value, compared field by field. A concrete type that is\n")
-	b.WriteString("// not an interval bound type is never empty.\n")
+	b.WriteString("// it is nil or holds a typed-nil pointer to an RM class; an all-zero value\n")
+	b.WriteString("// behind the interface is still a value. A bound of a concrete type is empty\n")
+	b.WriteString("// when it is that type's zero value: field by field for the RM data value\n")
+	b.WriteString("// types the interval classes bound (the cases below), and by comparison for\n")
+	b.WriteString("// a Go built-in scalar type or an RM primitive. A bound of any other Go type\n")
+	b.WriteString("// is never empty, so it is emitted as it stands.\n")
 	b.WriteString("func isEmptyIntervalBound[T any](bound T) bool {\n")
 	b.WriteString("\tv := any(bound)\n")
 	b.WriteString("\tif v == nil || IsTypedNil(v) {\n")
@@ -190,7 +207,7 @@ func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
 		fmt.Fprintf(&b, "\tcase %s:\n", pc.GoName)
 		fmt.Fprintf(&b, "\t\treturn %s(x)\n", zeroPredicateName(pc))
 	}
-	fmt.Fprintf(&b, "\tcase %s:\n", strings.Join(scalarBoundGoTypes(), ", "))
+	fmt.Fprintf(&b, "\tcase %s:\n", strings.Join(scalars, ", "))
 	b.WriteString("\t\treturn v == any(zero)\n")
 	b.WriteString("\t}\n")
 	b.WriteString("\treturn false\n")
@@ -208,48 +225,127 @@ func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
 	return formatted, nil
 }
 
-// intervalBoundClasses returns the concrete bound classes of the target's
-// interval-shaped concrete classes, sorted by Go name. It returns nil when the
-// target owns no interval-shaped concrete class, and an empty non-nil slice
-// when it owns one whose bounds are all primitive.
-func intervalBoundClasses(plan *Plan) ([]*PlannedClass, error) {
+// intervalBounds reports whether the target owns an interval-shaped concrete
+// class, and returns the concrete classes its bounds admit, sorted by Go name.
+// The list may be empty while shaped is true: a class whose bounds are all
+// primitive needs no zero predicate, only the scalar case.
+//
+// The bound types come from each class's `lower` and `upper` fields. A field
+// typed by a generic parameter admits the parameter's bound: the concrete
+// descendants of an RM class (DV_ORDERED for DV_INTERVAL), or, for a
+// primitive or absent bound (BASE Interval's Ordered), the scalar case. A
+// field typed by a class names that class. A bound type with neither a zero
+// predicate nor a scalar case is refused, so no bound is silently left
+// "never empty".
+func intervalBounds(plan *Plan) (bool, []*PlannedClass, error) {
 	var shaped bool
 	bounds := map[string]*PlannedClass{}
 	for _, f := range plan.Files {
 		for _, pc := range concreteClassesIn(f) {
-			ok, err := intervalShaped(plan, pc)
+			fields, err := effectiveFields(plan, pc)
 			if err != nil {
-				return nil, err
+				return false, nil, err
 			}
-			if !ok {
+			if !hasIntervalShape(fields) {
 				continue
 			}
 			shaped = true
-			sc := pc.Class.(*bmm.SimpleClass)
-			for _, name := range sortedStringKeys(sc.GenericParameterDefs) {
-				bound := sc.GenericParameterDefs[name].ConformsToType
-				bp, planned := plan.Classes[bound]
-				if !planned {
-					// A primitive bound (BASE Interval's Ordered): the
-					// scalar case of the emptiness test covers it.
+			for _, ef := range fields {
+				if name := ef.Prop.PropertyName(); name != propLower && name != propUpper {
 					continue
 				}
-				if bsc, isSimple := bp.Class.(*bmm.SimpleClass); isSimple && !bsc.IsAbstract() {
-					bounds[bound] = bp
+				classes, err := boundFieldClasses(plan, pc, ef)
+				if err != nil {
+					return false, nil, fmt.Errorf("bmmgen: %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 				}
-				for _, d := range plan.AbstractDescendants[bound] {
-					bounds[d] = plan.Classes[d]
+				for _, bc := range classes {
+					bounds[bc.BMMName] = bc
 				}
 			}
 		}
 	}
-	if !shaped {
-		return nil, nil
+	out := slices.SortedFunc(maps.Values(bounds), func(a, b *PlannedClass) int { return strings.Compare(a.GoName, b.GoName) })
+	return shaped, out, nil
+}
+
+// boundFieldClasses returns the concrete classes one bound field of an
+// interval class admits by value, each of which needs a zero predicate. It
+// returns none when the field's Go type is an interface or a pointer (a nil
+// test covers it) or a scalar (the scalar case covers it).
+func boundFieldClasses(plan *Plan, pc *PlannedClass, ef emittedField) ([]*PlannedClass, error) {
+	switch p := ef.Prop.(type) {
+	case *bmm.SinglePropertyOpen:
+		return boundTypeClasses(plan, genericParamBound(plan, pc, ef, p.TypeName))
+	case *bmm.SingleProperty:
+		typ, err := singlePropTypeExpr(plan, ef.Owner, ef.OwnerName, p)
+		if err != nil {
+			return nil, err
+		}
+		if strings.HasPrefix(typ, "*") || isInterfaceTypeRef(plan, p.TypeName) {
+			return nil, nil
+		}
+		return boundTypeClasses(plan, p.TypeName)
 	}
-	out := slices.Collect(maps.Values(bounds))
-	slices.SortFunc(out, func(a, b *PlannedClass) int { return strings.Compare(a.GoName, b.GoName) })
-	for _, pc := range out {
-		if err := checkPredicateClass(pc); err != nil {
+	return nil, fmt.Errorf("a bound of property kind %T has no emptiness test", ef.Prop)
+}
+
+// genericParamBound returns the BMM bound of the generic parameter a bound
+// field is typed by. The emitting class forwards its own parameter to the
+// embedded Interval, so its declaration wins; otherwise the nearest ancestor
+// that declares the parameter, then the field's owner, decide.
+func genericParamBound(plan *Plan, pc *PlannedClass, ef emittedField, param string) string {
+	sc := pc.Class.(*bmm.SimpleClass)
+	if def, ok := sc.GenericParameterDefs[param]; ok {
+		return def.ConformsToType
+	}
+	if bound := inheritedGenericBound(plan, sc, param); bound != "" {
+		return bound
+	}
+	if def, ok := ef.Owner.GenericParameterDefs[param]; ok {
+		return def.ConformsToType
+	}
+	return ""
+}
+
+// boundTypeClasses resolves one BMM bound type to the concrete classes that
+// need a zero predicate. A type the Go code spells `any`, a Go scalar or an
+// RM primitive needs none: the interface and scalar cases cover it. A class
+// contributes itself when concrete and its concrete descendants when it has
+// any. Anything else is refused.
+func boundTypeClasses(plan *Plan, bound string) ([]*PlannedClass, error) {
+	switch {
+	case bound == "", bound == "Any", isSkippedPrimitive(bound), isSkippedClass(bound):
+		return nil, nil
+	case isPrimitive(bound):
+		goType := primitiveGoType[bound]
+		scalars, err := scalarBoundGoTypes()
+		if err != nil {
+			return nil, err
+		}
+		if goType == "any" || slices.Contains(scalars, scalarAlias(goType)) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("bound type %s (Go %s) has no scalar case", bound, goType)
+	}
+	pc, ok := plan.Classes[bound]
+	if !ok {
+		return nil, fmt.Errorf("bound type %s is neither a planned class nor a primitive", bound)
+	}
+	var out []*PlannedClass
+	if sc, isSimple := pc.Class.(*bmm.SimpleClass); isSimple && !sc.IsAbstract() {
+		out = append(out, pc)
+	}
+	for _, name := range plan.AbstractDescendants[bound] {
+		out = append(out, plan.Classes[name])
+	}
+	for _, name := range plan.ConcreteSubtypes[bound] {
+		out = append(out, plan.Classes[name])
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("bound type %s has no concrete class to test and no scalar case", bound)
+	}
+	for _, c := range out {
+		if err := checkPredicateClass(c); err != nil {
 			return nil, err
 		}
 	}
@@ -271,17 +367,60 @@ func checkPredicateClass(pc *PlannedClass) error {
 	return nil
 }
 
-// scalarBoundGoTypes lists the Go scalar types the BMM primitives map to,
-// sorted. A bound of one of these types is empty when it equals its zero
-// value.
-func scalarBoundGoTypes() []string {
+// builtinScalarGoTypes are Go's predeclared scalar types, under their own
+// names; byte and rune are aliases of uint8 and int32.
+var builtinScalarGoTypes = []string{
+	"bool", "complex128", "complex64", "float32", "float64",
+	"int", "int16", "int32", "int64", "int8", "string",
+	"uint", "uint16", "uint32", "uint64", "uint8", "uintptr",
+}
+
+// scalarAlias maps Go's predeclared alias types to the type they alias.
+func scalarAlias(goType string) string {
+	switch goType {
+	case "byte":
+		return "uint8"
+	case "rune":
+		return "int32"
+	}
+	return goType
+}
+
+// scalarBoundGoTypes lists, sorted, every Go built-in scalar type and the
+// named scalar types the BMM primitives map to (Integer, Real, Character).
+// A bound of one of these types is empty when it equals its zero value. A
+// primitive mapped to anything but an identifier (a slice, a pointer) is
+// refused: it could not be compared with its zero value.
+func scalarBoundGoTypes() ([]string, error) {
 	set := map[string]bool{}
-	for _, goType := range primitiveGoType {
-		if goType != "any" {
-			set[goType] = true
+	for _, goType := range builtinScalarGoTypes {
+		set[goType] = true
+	}
+	for _, name := range sortedStringKeys(primitiveGoType) {
+		goType := scalarAlias(primitiveGoType[name])
+		if goType == "any" {
+			continue
+		}
+		if !isGoIdentifier(goType) {
+			return nil, fmt.Errorf("bmmgen: primitive %s maps to Go %s, which has no zero comparison", name, goType)
+		}
+		set[goType] = true
+	}
+	return slices.Sorted(maps.Keys(set)), nil
+}
+
+// isGoIdentifier reports whether s is a plain Go identifier, so a type of
+// that name is a named or predeclared type, not a composite type literal.
+func isGoIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		if r != '_' && !unicode.IsLetter(r) && (i == 0 || !unicode.IsDigit(r)) {
+			return false
 		}
 	}
-	return slices.Sorted(maps.Keys(set))
+	return true
 }
 
 // zeroPredicateName is the generated predicate for pc's zero value.

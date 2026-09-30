@@ -27,9 +27,10 @@ type rawPointInterval[T any] PointInterval[T]
 // accessors admit, still carries its `_type`.
 //
 // An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
-// emits no `lower` or `upper` member. A zero-size field of that name at the top
-// of the wrapper shadows the embedded bound and is always omitted, so the
-// other members keep their order.
+// emits no `lower` or `upper` member. The wrapper then declares a zero-size
+// field of that name at its own level, shallower than the bound embedded
+// through the alias, so it wins; it is always omitted, and the other
+// members keep their order.
 func (p PointInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
 	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)
@@ -75,9 +76,10 @@ type rawProperInterval[T any] ProperInterval[T]
 // accessors admit, still carries its `_type`.
 //
 // An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
-// emits no `lower` or `upper` member. A zero-size field of that name at the top
-// of the wrapper shadows the embedded bound and is always omitted, so the
-// other members keep their order.
+// emits no `lower` or `upper` member. The wrapper then declares a zero-size
+// field of that name at its own level, shallower than the bound embedded
+// through the alias, so it wins; it is always omitted, and the other
+// members keep their order.
 func (p ProperInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
 	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)

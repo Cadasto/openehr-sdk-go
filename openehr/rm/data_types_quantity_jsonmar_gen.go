@@ -47,9 +47,10 @@ type rawDVInterval[T DVOrdered] DVInterval[T]
 // accessors admit, still carries its `_type`.
 //
 // An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
-// emits no `lower` or `upper` member. A zero-size field of that name at the top
-// of the wrapper shadows the embedded bound and is always omitted, so the
-// other members keep their order.
+// emits no `lower` or `upper` member. The wrapper then declares a zero-size
+// field of that name at its own level, shallower than the bound embedded
+// through the alias, so it wins; it is always omitted, and the other
+// members keep their order.
 func (d DVInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	omitLower := omitIntervalBound(d.LowerUnbounded, d.Lower)
 	omitUpper := omitIntervalBound(d.UpperUnbounded, d.Upper)
