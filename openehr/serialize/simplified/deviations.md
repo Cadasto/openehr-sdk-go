@@ -14,11 +14,12 @@ implemented — residual scope tracked by the
 ## Strict, fail-loud posture
 
 The codec never succeeds while silently losing or altering data (REQ-053 is
-semantics-preserving), with three registered narrowings on the **encode** leg and
+semantics-preserving), with four registered narrowings on the **encode** leg and
 no others: the ADR 0015 composer projection (§ `ctx/` context row below), the
-folded structural wrappers (§ below), and an empty repeat instance (§ below).
-The first two are the attribute classes `wire.md` § REQ-140 names as deliberately
-out of scope; the third is a FLAT structural limit, not an attribute. Concretely:
+folded structural wrappers (§ below), `archetype_details` (§ Deviations below), and
+an empty repeat instance (§ below). The first three are the attribute classes
+`wire.md` § REQ-140 names as deliberately out of scope; the fourth is a FLAT
+structural limit, not an attribute. Concretely:
 
 - **Encode** — a **clinical** datatype (`DV_*`) is emitted as its FLAT suffix form only
   when that form fully captures the value; a **decorated** value (carrying `normal_range`,
@@ -88,6 +89,19 @@ not partially/silently accepted.
   mandatory `name` on every reconstructed node from the archetype terminology (keyed by the
   compiled aqlPath); without it, nodes are unnamed and the round-trip is merely
   **format-idempotent**. Names never leak into FLAT, so idempotence is preserved either way.
+
+- **`archetype_details` is rebuilt on decode, not carried.** FLAT has no key for it, because
+  the Web Template already holds the archetype id of every archetype root and the template id.
+  Decode gives every node whose Web Template node id is an archetype id an `ARCHETYPED` whose
+  `archetype_id` is that id and whose `rm_version` is `rm.Release`, and adds the
+  Web Template's `templateId` as `template_id` on the COMPOSITION root only. Neither value
+  needs `WithTemplate`, so both decode modes do it. The placement matches the reference
+  (observed on EHRbase 2.36.0 with openEHR SDK 2.35.0, 2026-10-01). The `rm_version` value
+  does not: the reference writes a fixed `1.0.4`, and the SDK writes the RM release it is
+  generated from. Encode writes nothing for `archetype_details`, so a round trip rebuilds it:
+  an `archetype_id` that differs from its node id takes the node id, any other `rm_version`
+  becomes `rm.Release`, and a `template_id` below the root is dropped (`wire.md` § REQ-140,
+  the third out-of-scope class).
 
 - **RM-mandatory attributes not carried by FLAT — completed on `WithTemplate` decode.** The
   formats omit several RM-mandatory attributes that are neither clinical-data leaves nor names
