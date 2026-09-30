@@ -13,6 +13,10 @@ const testResources = "../../" + bmm.DefaultResourcesDir
 // expected `<base>_gen.go` file. The set is deliberately small and
 // load-bearing: if a refactor accidentally re-buckets DV_QUANTITY,
 // the test fails.
+//
+// REQ-043: § Mapping rules, Schema → Go package set. The RM target emits one
+// Go file per BMM package, so each class lands in the file of the package
+// that declares it.
 func TestPlanFileAssignments(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -97,6 +101,9 @@ func TestPlanIncludesConcreteRegistrations(t *testing.T) {
 // TestPlanAbstractDescendants asserts the marker-method closure: for
 // DATA_VALUE, every DV_* concrete leaf descends. For DV_ORDERED,
 // only the ordered concrete types do.
+//
+// REQ-043: § Mapping rules, Class → Go type. An abstract class becomes a Go
+// interface whose marker method every concrete descendant carries.
 func TestPlanAbstractDescendants(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {

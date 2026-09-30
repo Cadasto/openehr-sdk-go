@@ -17,6 +17,12 @@ import (
 //
 //	cp openehr/rm/data_types_quantity_gen.go \
 //	   internal/bmmgen/testdata/data_types_quantity_gen.go.golden
+//
+// REQ-043: § Mapping rules, for one whole BMM package. The golden holds the
+// class, property, type and container mapping: abstract classes as marker
+// interfaces, mandatory properties as values and optional ones as pointers,
+// containers as slices, generic classes as type parameters, and JSON tags
+// that keep the BMM property names.
 func TestGoldenDataTypesQuantity(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -131,6 +137,10 @@ func TestDriftDetection(t *testing.T) {
 //   - panic message uses the BMM names verbatim
 //
 // Phase 3 contract: every BMM function maps to one Go method stub.
+//
+// REQ-043: § Mapping rules, Functions. A BMM function becomes a method stub
+// that carries its pre- and post-conditions as comments and panics with a
+// not-implemented message.
 func TestMethodStubsForDVQuantity(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -180,6 +190,9 @@ func TestMethodStubsForDVQuantity(t *testing.T) {
 // generated fail-loud panic stubs. Guards the generator hook that lets
 // openehr/rm/*_funcs.go and openehr/rm/rmpath provide those surfaces
 // without a "method redeclared" collision (ADR 0002 § D7, ADR 0011).
+//
+// REQ-043: § Mapping rules, Functions. A function that has no hand-written
+// body keeps its fail-loud stub.
 func TestManualImplementationSkip(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {
