@@ -1,6 +1,8 @@
 ## Summary
 
-<!-- What does this PR do, and why? One short paragraph. -->
+<!-- What changed and why, in prose. Name the decisions taken and the alternatives not taken.
+     No commit list, no task ticks, no finding ids: findings live in the findings file and the
+     review threads (docs/ai-workflow.md § Review). -->
 
 ## Checklist
 
@@ -12,9 +14,15 @@
 
 ## Spec / probes
 
-<!-- REQ-NNN, PROBE-NNN, plan link — or, for a change that alters no normative statement:
+<!-- REQ-NNN, PROBE-NNN, ADR, plan link — or, for a change that alters no normative statement:
      "Lane: maintenance (no normative change)" (docs/development-process.md § Two lanes). -->
 
-## Test plan
+## Verification
 
-<!-- Commands run, or "n/a" for docs-only. -->
+<!-- `make ci`: what the output said, or "n/a" for docs-only.
+     Red before green: the tests that failed before the change.
+     Can-fail proof: the guards removed and the tests that then failed. -->
+
+## Notes for review
+
+<!-- Where to look hardest; what is out of scope; a known gap left on purpose. Omit when empty. -->
