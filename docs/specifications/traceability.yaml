@@ -1005,7 +1005,6 @@ requirements:
     tests:
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - openehr/composition/builder_test.go
-      - openehr/composition/imports_test.go
       - openehr/composition/typecheck_test.go
       - openehr/internal/rmnames/intervals_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go

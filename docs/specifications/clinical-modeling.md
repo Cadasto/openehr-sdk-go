@@ -523,7 +523,7 @@ REQ-101 trusts REQ-107 for the skeleton walk: every implicit RM attribute, every
 - **Per-template generated Go structs.** v1 stays generic — consumers do not import codegen'd vital-signs structs through this package. OET-driven authoring is a follow-up.
 - **FLAT / STRUCTURED ingest.** Caller decodes externally (REQ-053) and feeds the resulting `*rm.Composition` through validation.
 - **Slot resolution against a federated archetype repository.** Same compromise as REQ-102 / REQ-107: pinned slot fills come from the OPT.
-- **Encoding to wire bytes.** The builder imports no `openehr/serialize/` package in its own files; callers run `canjson.Marshal` / `canxml.Marshal` themselves.
+- **Encoding to wire bytes.** Callers run `canjson.Marshal` / `canxml.Marshal` themselves; the builder's own files import no `openehr/serialize/` package ([REQ-013](module-layout.md#req-013--building-block-independence)).
 - **Validating during Build.** A `Build()` result MUST be runnable through `validation.ValidateComposition` separately; the builder is sound-by-construction but not a validator.
 
 ### Building-block independence (REQ-013)
