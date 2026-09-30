@@ -112,21 +112,44 @@ func TestAOM14ConcreteRegistry(t *testing.T) {
 
 // TestAOM14CyclicSinglePropDetection asserts that the mutual
 // recursion between ARCHETYPE and ARCHETYPE_ONTOLOGY is broken by a
-// pointer on at least one side. Without this the Go compiler reports
-// "invalid recursive type".
+// pointer on both sides, in the plan and in the rendered structs.
+// Without the pointer the Go compiler reports "invalid recursive type".
 //
 // REQ-043: § Mapping rules, Property → Go field. A mandatory property that
 // closes a cycle of mandatory struct-typed properties becomes a pointer,
-// because Go cannot declare a struct that contains itself by value.
+// because Go cannot declare a struct that contains itself by value, and its
+// tag carries no omit option.
 func TestAOM14CyclicSinglePropDetection(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
-	aProp := plan.CyclicSingleProps["ARCHETYPE"]["ontology"]
-	oProp := plan.CyclicSingleProps["ARCHETYPE_ONTOLOGY"]["parent_archetype"]
-	if !aProp && !oProp {
-		t.Errorf("expected at least one of ARCHETYPE.ontology / ARCHETYPE_ONTOLOGY.parent_archetype to be marked cyclic; got CyclicSingleProps=%v", plan.CyclicSingleProps)
+	for _, tc := range []struct {
+		owner, prop, fileBase, field string
+	}{
+		{"ARCHETYPE", "ontology", "archetype", "Ontology *ArchetypeOntology `json:\"ontology\"`"},
+		{"ARCHETYPE_ONTOLOGY", "parent_archetype", "archetype_ontology", "ParentArchetype *Archetype `json:\"parent_archetype\"`"},
+	} {
+		if !plan.CyclicSingleProps[tc.owner][tc.prop] {
+			t.Errorf("%s.%s is not marked cyclic; got CyclicSingleProps=%v", tc.owner, tc.prop, plan.CyclicSingleProps)
+		}
+		var file *PlannedFile
+		for _, f := range plan.Files {
+			if f.FileBase == tc.fileBase {
+				file = f
+				break
+			}
+		}
+		if file == nil {
+			t.Fatalf("%s file not in AOM plan", tc.fileBase)
+		}
+		got, err := RenderFile(plan, file)
+		if err != nil {
+			t.Fatalf("RenderFile(%s): %v", tc.fileBase, err)
+		}
+		if !bytes.Contains(got, []byte(tc.field)) {
+			t.Errorf("%s_gen.go does not declare %s.%s as %q", tc.fileBase, tc.owner, tc.prop, tc.field)
+		}
 	}
 }
 

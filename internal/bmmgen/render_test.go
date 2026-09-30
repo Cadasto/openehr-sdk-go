@@ -254,6 +254,49 @@ func TestManualImplementationSkip(t *testing.T) {
 	}
 }
 
+// TestOptionalFieldsThatAreNotPointers pins the optional fields the generator
+// leaves unpointed, each with its omitempty tag, beside an optional field
+// typed by a class type parameter, which is a pointer with omitzero.
+//
+// REQ-043: § Mapping rules, Property → Go field. A non-mandatory property
+// whose type is emitted as a Go interface (an abstract class, or a concrete
+// class with subtypes emitted as a `…Like` interface) stays `T` and carries
+// `omitempty`, and so does a P_BMM_SINGLE_PROPERTY_OPEN.
+func TestOptionalFieldsThatAreNotPointers(t *testing.T) {
+	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlan: %v", err)
+	}
+	for _, tc := range []struct {
+		name, fileBase, field string
+	}{
+		{"abstract class", "composition_content_entry", "Protocol ItemStructure `json:\"protocol,omitempty\"`"},
+		{"concrete class with subtypes", "composition_content_entry", "GuidelineID ObjectRefLike `json:\"guideline_id,omitempty\"`"},
+		{"single property open", "foundation_types_interval", "Lower T `json:\"lower,omitempty\"`"},
+		{"single property typed by a type parameter", "common_change_control", "Data *T `json:\"data,omitzero\"`"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var file *PlannedFile
+			for _, f := range plan.Files {
+				if f.FileBase == tc.fileBase {
+					file = f
+					break
+				}
+			}
+			if file == nil {
+				t.Fatalf("%s file not in plan", tc.fileBase)
+			}
+			got, err := RenderFile(plan, file)
+			if err != nil {
+				t.Fatalf("RenderFile(%s): %v", tc.fileBase, err)
+			}
+			if !bytes.Contains(got, []byte(tc.field)) {
+				t.Errorf("%s_gen.go does not declare the field %q", tc.fileBase, tc.field)
+			}
+		})
+	}
+}
+
 // TestVerifyOnFreshTreeIsClean asserts that immediately after a
 // generation the working tree passes -verify with no drifts.
 func TestVerifyOnFreshTreeIsClean(t *testing.T) {

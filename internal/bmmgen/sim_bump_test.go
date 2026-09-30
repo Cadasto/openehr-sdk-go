@@ -25,7 +25,7 @@ import (
 //     optional SingleProperty `test_property` of type String.
 //  2. Generate into a fresh out dir using -target rm.
 //  3. Assert: data_types_quantity_gen.go now contains a
-//     TestProperty *string `json:"test_property,omitempty"` field on
+//     TestProperty *string `json:"test_property,omitzero"` field on
 //     DV_QUANTITY; typereg_gen.go is unchanged vs the baseline (no
 //     new class registered).
 //  4. Run bmmdiff.Diff(old, new) and assert the CHANGELOG suggestion
