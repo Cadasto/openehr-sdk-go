@@ -125,6 +125,6 @@ Identifiers MUST be stable once published — they are referenced from outside t
 - New normative statements get a new `REQ-NNN`/`PROBE-NNN` — take the next free number ([REQ.md § Numbering policy](REQ.md#numbering-policy)); do not silently re-letter existing ones.
 - A spec section states the current contract. When and how it got there belongs in git, the plan or an ADR, not in the spec.
 - A spec file MUST link out to the code package(s) it constrains once they exist.
-- Status transitions (`Draft` → `Stable`) MUST be accompanied by a CHANGELOG entry under `## [Unreleased]`.
+- A status transition (`Draft` → `Stable`) is recorded where the status lives, in the requirement's [`traceability.yaml`](traceability.yaml) row and the section's **Status:** line, and the PR that makes it names it in its body. The CHANGELOG is written at the release cut, not in the PR ([AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions)).
 - Removing a normative statement (deprecation) MUST go through a documented cycle: mark `Status: Deprecated` first, then remove in the next major version.
 - The specifications source-of-truth is **this tree**. Cadasto architecture sources may inform it, but a divergence between this tree and any external source is resolved by editing this tree, not by handwaving "see external".

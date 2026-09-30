@@ -376,7 +376,7 @@ ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a resp
 
 ## REST leaf operations
 
-When a leaf gains an operation or an option, its package's `Repository` interface **MUST** grow with it. That is no break for callers of the package functions but a compile-time break for interface implementers (precedent: `UploadTemplate`), so the CHANGELOG `### Added` entry **MUST** name the interface growth.
+When a leaf gains an operation or an option, its package's `Repository` interface **MUST** grow with it. That is no break for callers of the package functions but a compile-time break for interface implementers (precedent: `UploadTemplate`), so the PR that grows the interface calls it out as a consumer-visible change, for the maintainer to name in the release's CHANGELOG entry ([AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions)).
 
 ### REQ-142 — Contribution read
 
