@@ -1,45 +1,47 @@
 package validation_test
 
 import (
-	"go/build"
-	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
-// REQ-013 § Building-block independence — openehr/validation MUST
-// NOT depend on any of the wire / transport / auth / client
-// layers. The validator operates on in-memory RM graphs; wire
-// decoding, network calls, and authentication belong to callers.
-// Pulling any of these into the validator's transitive deps would
-// invert the dependency direction (validators feed into codecs and
-// clients, not the reverse) and bloat any consumer that just wants
-// in-memory checks.
+// TestValidationForbiddenImports guards REQ-013
+// (docs/specifications/module-layout.md § REQ-013) for openehr/validation and
+// openehr/validation/rmread. The validator works on in-memory RM graphs:
+// decoding wire bytes, network calls and authentication belong to its
+// callers. Two rules hold for each of the two packages:
 //
-// Forbidden prefixes — the set REQ-013 names for the template-side
-// building blocks (docs/specifications/module-layout.md § REQ-013):
+//   - Neither the package nor any package of this module it pulls in imports
+//     transport, auth or openehr/client.
+//   - The package's own non-test files do not import openehr/serialize. This
+//     rule cannot cover what they pull in, since openehr/rm's generated
+//     marshal files import openehr/serialize/canxml.
 //
-//   - openehr/serialize  (wire-byte codecs)
-//   - openehr/client     (REST clients)
-//   - transport          (HTTP transport)
-//   - auth               (authentication)
-//
-// The check enumerates non-test files only — the test files are
-// allowed to import these for fixture decode.
+// rmread is checked in its own right, not only as an import of validation, so
+// its rules still hold if validation stops importing it. Test files may import
+// anything, for fixture decoding for instance.
 func TestValidationForbiddenImports(t *testing.T) {
-	pkg, err := build.Default.ImportDir("./", 0)
-	if err != nil {
-		t.Fatalf("ImportDir: %v", err)
-	}
-	forbidden := []string{
-		"openehr/serialize",
-		"openehr/client",
-		"github.com/cadasto/openehr-sdk-go/transport",
-		"github.com/cadasto/openehr-sdk-go/auth",
-	}
-	for _, imp := range pkg.Imports {
-		for _, bad := range forbidden {
-			if strings.Contains(imp, bad) {
-				t.Errorf("openehr/validation MUST NOT import %q (REQ-013 building-block independence; matched forbidden prefix %q)", imp, bad)
+	t.Parallel()
+	serialize := []string{"github.com/cadasto/openehr-sdk-go/openehr/serialize"}
+	for _, pkg := range []struct{ name, dir string }{
+		{name: "openehr/validation", dir: "."},
+		{name: "openehr/validation/rmread", dir: "rmread"},
+	} {
+		violations, err := importguard.Scan(pkg.dir, importguard.WireLayers())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, v := range violations {
+			t.Errorf("%s MUST NOT pull in %q: %s imports it (forbidden entry %q; REQ-013 building-block independence)", pkg.name, v.Import, v.Importer, v.Prefix)
+		}
+		imports, err := importguard.Imports(pkg.dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, imp := range imports {
+			if p, ok := importguard.Matches(imp, serialize); ok {
+				t.Errorf("%s MUST NOT import %q in its own files (forbidden entry %q; REQ-013: a template-side building block never imports openehr/serialize)", pkg.name, imp, p)
 			}
 		}
 	}

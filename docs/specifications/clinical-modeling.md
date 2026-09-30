@@ -94,7 +94,7 @@ All errors wrap context with `fmt.Errorf("...: %w", err)`; callers compare with 
 
 ### Building-block independence (REQ-013)
 
-`openehr/template/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, `openehr/rm/`, or `openehr/aom/aom14/`. In v1 the package depends only on the standard library plus its own sibling sub-package `openehr/template/constraints/` (REQ-103 typed primitive constraints) — RM class names appear only as string values surfaced from OPT XML, not as Go type references.
+On top of [REQ-013](module-layout.md#req-013--building-block-independence)'s rules, the `openehr/template` package, and every package of this module it imports, **MUST NOT** import `openehr/rm/` or `openehr/aom/aom14/`; `TestTemplateForbiddenImports` checks both. (`openehr/template/webtemplate` is a separate building block, REQ-106.) In v1 the package imports only the standard library and its sub-package `openehr/template/constraints/` (REQ-103 typed primitive constraints) — RM class names appear only as string values surfaced from OPT XML, not as Go type references.
 
 ### Out of scope (v1)
 
@@ -385,7 +385,7 @@ Global guard codes (`nil_composition`, `nil_template`) return `nil` from `Issue.
 
 `openehr/validation/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). The validator operates on **in-memory RM graphs**, never on wire bytes — callers responsible for decoding feed already-parsed `*rm.Composition` values. The full forbidden-import set is enforced by `TestValidationForbiddenImports`.
 
-The dependency graph: `openehr/validation/` → `openehr/template/`, `openehr/template/constraints/`, `openehr/rm/`, `openehr/rm/rminfo/`, `openehr/internal/rmnames/`, `internal/templatecompile/` (same-module internal access).
+The dependency graph: `openehr/validation/` → `openehr/template/`, `openehr/template/constraints/`, `openehr/templatecompile/`, `openehr/rm/`, `openehr/rm/rminfo/`, `openehr/aql/`, `openehr/aql/contain/`, `openehr/aql/lint/`, `openehr/validation/rmread/`, and module-internal packages under `internal/` and `openehr/internal/` (same-module internal access).
 
 ### Public surface scope (resolved by REQ-111)
 
@@ -396,7 +396,7 @@ The `c *templatecompile.Compiled` argument is the compiled-template form. It was
 ### Out of scope (this REQ)
 
 - **AQL lint** (`ValidateAQL`) — **landed** as a separate entry point under REQ-109 (see below); it does not change the composition-validation surface. **Demographic validator** (`ValidateDemographic`) remains deferred.
-- **Validating wire bytes / canonical JSON** — the validator never imports `serialize/`. Callers decode first, validate second.
+- **Validating wire bytes / canonical JSON** — the validator imports no `openehr/serialize/` package in its own files. Callers decode first, validate second.
 - **External terminology lookup** — value-set membership against SNOMED CT / LOINC / external services. REQ-103 closed-code-list checking is the v1 ceiling.
 - **Cross-archetype slot-fill resolution** — no federated archetype repository; slot fit is local to parsed REQ-104 assertions, with RM-type-prefix fallback only when no include assertions were parsed.
 - **Full ADL2 / AOM 2 validation semantics.**
@@ -484,7 +484,7 @@ Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/
 
 ### Building-block independence (REQ-013)
 
-`openehr/instance/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). The generator operates on **in-memory RM graphs**, never on wire bytes — callers wanting canonical JSON / XML output run `serialize/canjson` or `canxml` themselves (`cmd/examples/` may import the codec; the library does not).
+`openehr/instance/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). The generator operates on **in-memory RM graphs**, never on wire bytes — callers wanting canonical JSON / XML output run `serialize/canjson` or `canxml` themselves (`cmd/examples/` may import the codec; the library imports none in its own files). On top of REQ-013's rules, `openehr/instance` **MUST NOT** import `openehr/composition/` or `openehr/validation/` anywhere in its import closure: the REQ-101 builder calls the generator, and PROBE-027 checks the generator's output with the validator, which is an independent check only while the generator does not use the validator. `TestInstanceForbiddenImports` checks both bans and the REQ-013 rules.
 
 The public signature accepts `*templatecompile.Compiled`. As with `validation.ValidateComposition`, REQ-111 makes that argument externally constructable via `openehr/templatecompile.Compile`, so `instance.Generate` is now callable from outside the module (see [ADR 0010](../adr/0010-public-compiled-template-bridge.md)).
 
@@ -523,12 +523,12 @@ REQ-101 trusts REQ-107 for the skeleton walk: every implicit RM attribute, every
 - **Per-template generated Go structs.** v1 stays generic — consumers do not import codegen'd vital-signs structs through this package. OET-driven authoring is a follow-up.
 - **FLAT / STRUCTURED ingest.** Caller decodes externally (REQ-053) and feeds the resulting `*rm.Composition` through validation.
 - **Slot resolution against a federated archetype repository.** Same compromise as REQ-102 / REQ-107: pinned slot fills come from the OPT.
-- **Encoding to wire bytes.** The builder does not import `openehr/serialize/`; callers run `canjson.Marshal` / `canxml.Marshal` themselves.
+- **Encoding to wire bytes.** The builder imports no `openehr/serialize/` package in its own files; callers run `canjson.Marshal` / `canxml.Marshal` themselves.
 - **Validating during Build.** A `Build()` result MUST be runnable through `validation.ValidateComposition` separately; the builder is sound-by-construction but not a validator.
 
 ### Building-block independence (REQ-013)
 
-`openehr/composition/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). It depends on `openehr/rm`, `openehr/rm/typereg`, `openehr/template`, `openehr/templatecompile` (the public REQ-111 bridge, referenced in the exported `NewBuilder` / `NewSkeleton` signatures), `openehr/template/constraints`, `openehr/instance`, `openehr/validation/rmread`, `openehr/internal/rmnames`, `internal/templatecompile`, and `internal/templateinstance/rmwrite`. The forbidden-import set is enforced by `TestCompositionForbiddenImports`.
+`openehr/composition/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). It depends on `openehr/rm`, `openehr/template`, `openehr/templatecompile` (the public REQ-111 bridge, referenced in the exported `NewBuilder` / `NewSkeleton` signatures), `openehr/instance`, `openehr/validation/rmread`, and module-internal packages under `internal/` and `openehr/internal/` (the compile engine, the template-instance writer, `rmnames`). The forbidden-import set is enforced by `TestCompositionForbiddenImports`.
 
 - **Lives in:** [`openehr/composition/`](../../openehr/composition/)
 - **Probes:** PROBE-023 — `composition.NewBuilder` + `Set` → `Build` → `canjson.Marshal` → `canjson.Unmarshal` → re-marshal round-trip preserves values at key paths.
@@ -588,7 +588,7 @@ A `$param` archetype predicate (`[$name]`, `[parse.ClassExpr.ParamArchetype]`) i
 
 ### Issue model and entry points
 
-- `openehr/aql/lint` owns its own `lint.Issue` / `lint.Result` / `lint.Severity` and **MUST NOT** import `openehr/validation` — the dependency arrow is `validation → lint`. `lint.Result.OK()` is true when no **Error**-severity issue is present (Warnings do not make a result not-OK).
+- `openehr/aql/lint` owns its own `lint.Issue` / `lint.Result` / `lint.Severity`; the dependency arrow is `validation → lint` (§ Building-block independence below). `lint.Result.OK()` is true when no **Error**-severity issue is present (Warnings do not make a result not-OK).
 - `lint.LintString(q, *Options)` is the raw-AQL entry; `lint.Lint(doc, *Options)` lints an already-parsed `*parse.Document`. `Options{Compiled, Query, Relation}` is nilable, but the three fields do not gate alike: nil `Compiled` drops Layer 3 and nil `Query` drops the parameter-binding checks, whereas nil `Relation` *selects* the REQ-160 default rather than switching anything off, so the REQ-161 semantic group always runs (REQ-161 § Relation supply).
 - `validation.ValidateAQL(q aql.Query, c *templatecompile.Compiled) validation.Result` is the seam: it parses `q.Q`, runs the layers, and maps `lint.Issue` → `validation.Issue` (code and severity carried verbatim) so callers already using `ValidateComposition` get one uniform `Result`.
 - `validation.ValidateAQLWithTypeRelation(q, c, rel *contain.TypeRelation) validation.Result` is the same seam with the containment relation supplied by the caller, and `ValidateAQL(q, c)` is its nil call. Both the obligation to offer it and the bound on what a supplied relation may change are stated once, in [REQ-161 § Relation supply](#relation-supply). Without it the uniform-`Result` seam would be unusable by the deployments REQ-160 § Extensibility exists for — a dialect CDR could not retire a containment `Error` here at all, and would have to abandon `validation.Result` for `lint.LintString`.
@@ -617,7 +617,7 @@ A `$param` archetype predicate (`[$name]`, `[parse.ClassExpr.ParamArchetype]`) i
 
 ### Building-block independence (REQ-013)
 
-`openehr/aql/parse/` and `openehr/aql/lint/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`, and `lint` additionally **MUST NOT** import `openehr/validation`. Enforced by `TestAQLParseForbiddenImports` and `TestAQLLintForbiddenImports`.
+On top of [REQ-013](module-layout.md#req-013--building-block-independence)'s rules, `openehr/aql/parse/` and `openehr/aql/lint/` **MUST NOT** import `openehr/serialize/` in their own files (their closure reaches `openehr/serialize/canxml` through `openehr/rm`), and `lint` **MUST NOT** reach `openehr/validation/` anywhere in its import closure. `aql/parse`'s only direct third-party import is the pure-Go ANTLR runtime. Enforced by `TestAQLParseForbiddenImports` and `TestAQLLintForbiddenImports`.
 
 - **Lives in:** [`openehr/aql/parse/`](../../openehr/aql/parse/), [`openehr/aql/lint/`](../../openehr/aql/lint/); bridge in [`openehr/validation/aql.go`](../../openehr/validation/aql.go)
 - **Probes:** PROBE-028 — lint fixed query strings against the grammar profile (+ a compiled OPT for Layer 3) and assert a stable issue-code multiset.
@@ -659,7 +659,7 @@ The walker type-matches `DV_INTERVAL<T>` in both forms: a typed instantiation by
 
 ### Building-block independence (REQ-013)
 
-`openehr/validation/` and `openehr/validation/rmread/` remain importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/` — enforced by `TestValidationForbiddenImports`. Decoding an instance for validation (canjson / canxml) is the caller's concern; `Validate` takes an in-memory root.
+`openehr/validation/` and `openehr/validation/rmread/` are held to [REQ-013](module-layout.md#req-013--building-block-independence), which `TestValidationForbiddenImports` checks for both packages. Decoding an instance for validation (canjson / canxml) is the caller's concern; `Validate` takes an in-memory root.
 
 - **Lives in:** [`openehr/validation/validate.go`](../../openehr/validation/validate.go), [`openehr/validation/rmread/read.go`](../../openehr/validation/rmread/read.go)
 - **Probes:** PROBE-074 — template-driven validation of non-COMPOSITION roots; asserts the issue-code multiset per (OPT, root) shape.
@@ -770,7 +770,7 @@ Conformance against the reference is **structural, not byte-exact**: PROBE-075 c
 
 The exact per-field enumeration behind these categories — the informative catalogue pinned by the parity tests — is maintained in [`openehr/template/webtemplate/deviations.md`](../../openehr/template/webtemplate/deviations.md) beside those tests. This section is the normative contract; that file elaborates it.
 
-The media type for the format is `application/openehr.wt+json` (documented for consumers). Emitting the export over a REST endpoint / content negotiation is **out of scope** for this REQ — the package produces the bytes only. Also out of scope: the WebTemplate → OPT round-trip (the format is lossy by design); the Better camelCase `id` variant; multi-version output; and the shared simplified-template model abstraction (extracted with REQ-053 when a second consumer exists — [simplified-formats umbrella](../plans/2026-06-23-simplified-formats.md)).
+The media type for the format is `application/openehr.wt+json` (documented for consumers). Emitting the export over a REST endpoint / content negotiation is **out of scope** for this REQ — the package produces the bytes only. Also out of scope: the WebTemplate → OPT round-trip (the format is lossy by design); the Better camelCase `id` variant; multi-version output; and the shared simplified-template model abstraction (extracted with REQ-053 when a second consumer exists).
 
 Templates that **reuse one archetype under a multi-valued slot** (name-distinguished instances) **are exported**, closing what was this REQ's last deferral. Two things had to land, both specified by [REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths) ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)): `openehr/templatecompile` admits shared-path subtrees, and node **identity** now comes from the template-level node name — with `aqlPath` carrying the matching name predicate — so each reused sibling is distinct by construction instead of colliding on the shared concept term.
 
@@ -899,7 +899,7 @@ func ValidateRMEHRStatusBytes(data []byte) Result
 
 ### Building-block independence (REQ-013)
 
-`openehr/validation/` imports `internal/templatecompile`, `openehr/aql`, `openehr/aql/contain`, `openehr/aql/lint`, `openehr/internal/rmnames`, `openehr/rm`, `openehr/rm/rminfo`, `openehr/template`, `openehr/template/constraints`, `openehr/templatecompile`, and `openehr/validation/rmread` — REQ-112's additions are local to the package. The forbidden-import set is unchanged and is enforced by `TestValidationForbiddenImports`.
+The floor lives in `openehr/validation`; the package's imports and its guard are in [§ REQ-102](#req-102--composition-validation) § Building-block independence.
 
 - **Lives in:** [`openehr/validation/rmfloor.go`](../../openehr/validation/rmfloor.go) + [`openehr/validation/rmfloor_adapters.go`](../../openehr/validation/rmfloor_adapters.go) + [`openehr/validation/rmfloor_bytes.go`](../../openehr/validation/rmfloor_bytes.go) (the presence-aware EHR_STATUS entry); the closed-RM-set helpers (`rmTypeInfo` / `describeRMType`) and the rmread layer are shared with REQ-102 / REQ-110.
 - **Verification:** unit pins in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go): required-set absences (FOLDER.name missing), the per-type invariants (CODE_PHRASE, DV_QUANTITY, DV_INTERVAL, OBJECT_REF-family, DV_TEXT/DV_CODED_TEXT `mappings`, and TERM_MAPPING `match` as a container element, nested under `purpose`, and as the validated root), the unbounded-side negatives (a half-open interval fires no bound-ordering check, and the walk does not descend into an open side whose bound is empty, built in memory or decoded from JSON), and the nil-guard contract on every typed wrapper. The typed-interval walk is pinned by the fault-inside-bound rows of `TestValidateRM_TypedIntervalBoundsWalked` in the same file (one planted fault per typed instantiation, reported by code and path, plus a real bound beside its open flag in bare and concrete form, and a DV_COUNT bound over a unitless DV_QUANTITY one that is not compared). The archetype-root and ARCHETYPED rows are pinned in [`rmfloor_archetype_test.go`](../../openehr/validation/rmfloor_archetype_test.go): `TestValidateRM_ArchetypeRootClassesMatchBMM` ties the closed root list to the vendored BMM's `Is_archetype_root` declarations and sweeps every registered LOCATABLE, and the other tests there cover typed entries, nested roots and nested ARCHETYPED at their own paths, and an ARCHETYPED as the root. DV_ORDINAL, DV_SCALE, REFERENCE_RANGE (reached through `other_reference_ranges`) and EHR_ACCESS are walked in [`rmfloor_ordered_test.go`](../../openehr/validation/rmfloor_ordered_test.go), with the DV_SCALE blank-`code_string` exemption and `accuracy` on the date, time and amount types. In rmread, the reader parity test (`TestTypedIntervalReaderParity`, [`handles_test.go`](../../openehr/validation/rmread/handles_test.go)) ties the typed-interval readers to rmnames and the registry, `TestHandles_EveryLocatableAndOrdered` ([`read_ordered_test.go`](../../openehr/validation/rmread/read_ordered_test.go)) requires every registered LOCATABLE and DV_ORDERED to be modelled, and [`interval_void_test.go`](../../openehr/validation/rmread/interval_void_test.go) holds the open-side reader table and the Void-predicate guard. The template-driven walker's open-side behaviour is pinned by the REQ-102 tests in [`openehr/validation/interval_open_side_test.go`](../../openehr/validation/interval_open_side_test.go). The DV_TEXT/DV_CODED_TEXT coverage includes the canjson decode-path pair distinguishing absent/`null` `mappings` (valid) from a decoded literal `[]` (`mappings_valid`); the `mappings` traversal and the TERM_MAPPING attribute readers are pinned in [`openehr/validation/rmread/read_datavalues_test.go`](../../openehr/validation/rmread/read_datavalues_test.go). The unit-test fixture matrix is the first-cycle verification; a dedicated PROBE-077 against vendored fixtures is deferred to a follow-up cycle. Value-typed mandatory presence (EHR_STATUS.subject and the root ARCHETYPED keys) is pinned by **PROBE-081** in [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go).
@@ -1509,7 +1509,7 @@ Row-semantics adjudication (REQ-161 carries the single advisory; the relation an
 
 ### Building-block independence (REQ-013)
 
-`openehr/aql/contain/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`, and **MUST** limit its direct imports to `openehr/rm/rminfo`, `openehr/rm` (REQ-120's canonical `ParseArchetypeID` — § Archetype/class conformance), and the standard library — it sits below both `openehr/aql` and `openehr/aql/lint`. Enforced by an imports test.
+On top of [REQ-013](module-layout.md#req-013--building-block-independence)'s rules, `openehr/aql/contain/` **MUST** limit its own imports to `openehr/rm/rminfo`, `openehr/rm` (REQ-120's canonical `ParseArchetypeID` — § Archetype/class conformance), and the standard library — it sits below both `openehr/aql` and `openehr/aql/lint`. Enforced by `TestContainForbiddenImports`.
 
 - **Lives in:** [`openehr/aql/contain/`](../../openehr/aql/contain/)
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (armed by the Phase 2 lint corpus and the Phase 3 builder-verification parity arm); [PROBE-100](conformance.md#probe-100--upstream-aql-admissibility-corpus-ratchet) (the compatibility guard's evidence gate — the vendored upstream FROM/CONTAINS corpus, § Acceptance)
@@ -1577,9 +1577,9 @@ The write side **MUST** offer the same semantic judgement as the read side, opt-
 
 ### Building-block independence (REQ-013)
 
-`openehr/aql` gains an import of `openehr/aql/contain` (whose own import contract is [§ REQ-160 § Building-block independence](#req-160--aql-containment-admissibility-relation)) and, for the Read/write parity clause above, of `openehr/aql/internal/semcheck` — the shared verdict→code engine (one rule engine, two adapters, no drift) that also backs REQ-161's read-side linter. `semcheck` is Go-internal to `openehr/aql/`, so it adds no public API; its own import contract has one home, [REQ-013](module-layout.md#req-013--building-block-independence), which states it and names the test that enforces it.
+`openehr/aql` gains an import of `openehr/aql/contain` (whose own import contract is [§ REQ-160 § Building-block independence](#req-160--aql-containment-admissibility-relation)) and, for the Read/write parity clause above, of `openehr/aql/internal/semcheck` — the shared verdict→code engine (one rule engine, two adapters, no drift) that also backs REQ-161's read-side linter. `semcheck` is Go-internal to `openehr/aql/`, so it adds no public API, and its own imports **MUST** be `openehr/aql/contain` and the standard library only; `TestSemcheckForbiddenImports` enforces it.
 
-`openehr/aql` **MUST NOT** name `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/` among its own imports. The ban is on naming, not on the transitive closure: this REQ gave `openehr/aql` its first in-module dependencies, and `contain` reaches `openehr/rm`, which pulls `openehr/serialize/canxml` — so the closure is not free of serialisation code, and a guard asserting otherwise would be false. What REQ-013's independence MUST is actually about still holds and is what the guard checks: nothing in the closure requires a transport, an authenticated client, or `openehr/validation`.
+On top of [REQ-013](module-layout.md#req-013--building-block-independence)'s rules, `openehr/aql` **MUST NOT** import `openehr/serialize/` in its own files, and **MUST NOT** reach `openehr/validation/` anywhere in its import closure. The serialize ban is on its own files because this REQ gave `openehr/aql` its first in-module dependencies, and `contain` reaches `openehr/rm`, which pulls `openehr/serialize/canxml`. `TestAQLForbiddenImports` enforces both.
 
 - **Lives in:** [`openehr/aql/`](../../openehr/aql/) (extension)
 - **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (parity arm)

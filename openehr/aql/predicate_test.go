@@ -7,7 +7,7 @@ package aql_test
 // `openehr/aql` — can hold the same line the emitters hold, so these are public
 // API and are tested as such. Their agreement with the real grammar is
 // confronted in openehr/aql/parse (which may import the generated lexer; this
-// package may not, REQ-013).
+// package may not, since the dependency runs the other way).
 
 import (
 	"errors"

@@ -1,74 +1,44 @@
 package terminology_test
 
 import (
-	"go/build"
-	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
-// REQ-034 § openEHR terminology vocabulary — the accessor MUST be a
-// stdlib-only building block, so it sits *below* openehr/rm and RM-level
-// consumers can adopt it without a dependency cycle. doc.go promises the
-// same thing, and it joins the REQ-013 building-block-independence set on
-// those terms.
+// TestTerminologyForbiddenImports guards REQ-013
+// (docs/specifications/module-layout.md § REQ-013) and REQ-034 for
+// openehr/terminology: the package imports only the standard library, so it
+// sits below openehr/rm and RM-level code can import it without a cycle.
+// doc.go promises the same. Two rules hold:
 //
-// The rule enforced here is stdlib-only, not merely in-module-free: any
-// import whose first path element contains a dot is a module path (standard
-// library import paths never carry one), so it fails — this module's own
-// packages (most pointedly openehr/rm, which would invert the dependency
-// direction) and third-party modules alike. Enumerating a forbidden subset
-// would let a new dependency slip in under a name nobody thought to list.
-// Same rule as the sibling stdlib-only block, openehr/rm/rminfo.
+//   - Neither the package nor any package of this module it pulls in imports
+//     transport, auth or openehr/client.
+//   - Every import of the package's own non-test files is a standard-library
+//     package. This rejects this module's packages, openehr/rm most
+//     pointedly, and third-party modules alike: listing a forbidden subset
+//     would let a new dependency in under a name nobody thought to list.
 //
-// Non-test files only: a test file may import whatever it needs (Task 3's
-// drift check re-hashes the pinned XML, for instance).
+// Test files may import anything: the drift check re-hashes the pinned XML,
+// for instance. importguard.TestStandard is the can-fail control for the
+// standard-library check.
 func TestTerminologyForbiddenImports(t *testing.T) {
 	t.Parallel()
-	pkg, err := build.Default.ImportDir("./", 0)
+	violations, err := importguard.Scan(".", importguard.WireLayers())
 	if err != nil {
-		t.Fatalf("ImportDir: %v", err)
+		t.Fatal(err)
 	}
-	if len(pkg.GoFiles) == 0 {
-		t.Fatal("no non-test Go files enumerated — the tripwire is vacuous")
+	for _, v := range violations {
+		t.Errorf("openehr/terminology MUST NOT pull in %q: %s imports it (forbidden entry %q; REQ-013 building-block independence)", v.Import, v.Importer, v.Prefix)
 	}
-	for _, imp := range pkg.Imports {
-		if isModulePath(imp) {
-			t.Errorf("openehr/terminology imports %q — the package is stdlib-only so openehr/rm can import it (REQ-034; REQ-013 building-block independence)", imp)
-		}
-	}
-}
 
-// isModulePath reports whether imp is a module import path rather than a
-// standard-library one: standard-library paths never carry a dot in their
-// first element, so any first element containing one is a module (this
-// module's own packages and third-party modules alike).
-func isModulePath(imp string) bool {
-	first, _, _ := strings.Cut(imp, "/")
-	return strings.Contains(first, ".")
-}
-
-// TestIsModulePath is the tripwire's can-fail control: the reject arm of
-// [TestTerminologyForbiddenImports] never fires on the package's real imports
-// (iter, slices), so an inverted predicate would leave that test green while
-// silently disabling the REQ-013 guard. This pins the classifier directly —
-// stdlib paths pass, module paths (openehr/rm most pointedly) are caught.
-func TestIsModulePath(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		imp  string
-		want bool
-	}{
-		{"iter", false},
-		{"slices", false},
-		{"go/build", false},
-		{"encoding/xml", false},
-		{"github.com/cadasto/openehr-sdk-go/openehr/rm", true},
-		{"golang.org/x/text/unicode/norm", true},
-		{"example.com/foo", true},
+	imports, err := importguard.Imports(".")
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, tc := range cases {
-		if got := isModulePath(tc.imp); got != tc.want {
-			t.Errorf("isModulePath(%q) = %v, want %v", tc.imp, got, tc.want)
+	for _, imp := range imports {
+		if !importguard.Standard(imp) {
+			t.Errorf("openehr/terminology MUST NOT import %q in its own files (REQ-013 and REQ-034: the package imports only the standard library, so openehr/rm can import it)", imp)
 		}
 	}
 }

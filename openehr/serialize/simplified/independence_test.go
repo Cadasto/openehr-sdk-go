@@ -1,29 +1,40 @@
 package simplified_test
 
-// REQ-013 — building-block independence: the simplified-format codecs must
-// not pull in the transport, auth, client, or cadasto layers.
 import (
-	"go/build"
-	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
-// REQ-053: the FLAT and STRUCTURED codecs are usable without the HTTP client,
-// auth or transport.
+// TestBuildingBlockIndependence guards REQ-013
+// (docs/specifications/module-layout.md § REQ-013) for the FLAT and STRUCTURED
+// codecs in openehr/serialize/simplified: converting a document to or from
+// canonical RM is a standalone use, so the codecs work without the HTTP
+// client, auth or transport. Neither the package nor any package of this
+// module it pulls in may import:
+//
+//   - transport, auth or openehr/client;
+//   - cadasto/, the Cadasto extras, which no package outside that subtree may
+//     import (module-layout.md § cadasto/ cut line).
 func TestBuildingBlockIndependence(t *testing.T) {
-	pkg, err := build.Import("github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified", "", 0)
-	if err != nil {
-		t.Fatalf("import: %v", err)
+	t.Parallel()
+	rules := []struct {
+		rule      string
+		forbidden []string
+	}{
+		{rule: "REQ-013 building-block independence", forbidden: importguard.WireLayers()},
+		{
+			rule:      "the cadasto/ cut line: no package outside cadasto/ imports it",
+			forbidden: []string{"github.com/cadasto/openehr-sdk-go/cadasto"},
+		},
 	}
-	// Note: the module path is github.com/cadasto/openehr-sdk-go, so the
-	// cadasto/ extras cut line is the "/openehr-sdk-go/cadasto/" subtree —
-	// not a bare "/cadasto" (that would match the module owner).
-	forbidden := []string{"/transport", "/auth", "/openehr/client", "/openehr-sdk-go/cadasto/"}
-	for _, imp := range pkg.Imports {
-		for _, f := range forbidden {
-			if strings.Contains(imp, f) {
-				t.Errorf("forbidden import %q (matches %q)", imp, f)
-			}
+	for _, r := range rules {
+		violations, err := importguard.Scan(".", r.forbidden)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, v := range violations {
+			t.Errorf("openehr/serialize/simplified MUST NOT pull in %q: %s imports it (forbidden entry %q; %s)", v.Import, v.Importer, v.Prefix, r.rule)
 		}
 	}
 }

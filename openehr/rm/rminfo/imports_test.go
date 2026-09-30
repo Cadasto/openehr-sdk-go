@@ -1,9 +1,9 @@
 package rminfo_test
 
 import (
-	"go/build"
-	"strings"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/internal/importguard"
 )
 
 // REQ-048 — the introspection surface MUST NOT load, parse, or resolve a BMM
@@ -13,21 +13,19 @@ import (
 // exists for — most pointedly openehr/bmm, which would turn the compiled-in
 // table back into a runtime reduction.
 //
-// Non-test files only: the PROBE-094 suite deliberately imports openehr/bmm
-// to re-derive the table from the pinned schemas.
+// It reads every non-test file that any build compiles, not only the ones this
+// machine builds (importguard.Imports), and importguard.TestStandard is the
+// can-fail control for the standard-library check. Test files may import
+// anything: the PROBE-094 suite deliberately imports openehr/bmm to re-derive
+// the table from the pinned schemas.
 func TestRMInfoImportsAreStdlibOnly(t *testing.T) {
-	pkg, err := build.Default.ImportDir("./", 0)
+	t.Parallel()
+	imports, err := importguard.Imports(".")
 	if err != nil {
-		t.Fatalf("ImportDir: %v", err)
+		t.Fatal(err)
 	}
-	if len(pkg.GoFiles) == 0 {
-		t.Fatal("no non-test Go files enumerated — the tripwire is vacuous")
-	}
-	for _, imp := range pkg.Imports {
-		// A dot in the first path element marks a module path; standard
-		// library import paths never carry one.
-		first, _, _ := strings.Cut(imp, "/")
-		if strings.Contains(first, ".") {
+	for _, imp := range imports {
+		if !importguard.Standard(imp) {
 			t.Errorf("openehr/rm/rminfo imports %q — the surface is stdlib-only (REQ-048: no runtime BMM dependency)", imp)
 		}
 	}

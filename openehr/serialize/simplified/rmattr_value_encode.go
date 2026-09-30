@@ -278,10 +278,11 @@ func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interv
 // intervalBoundToFlat writes one end of a DV_INTERVAL, or nothing when that end
 // is unbounded.
 //
-// A *bounded* end must carry a bound the wire can actually spell. The RM ties
-// the flag to the value directly — `lower_unbounded = (lower = Void)` — so an
-// end that claims to be bounded and holds no usable bound is an invalid
-// interval, and neither way of papering over it is acceptable: with an
+// A *bounded* end must carry a bound the wire can actually spell. BASE
+// `Interval` defines `lower_unbounded` / `upper_unbounded` as marking that
+// boundary open, and the grammar spells an open end by its flag alone, so an
+// end that claims to be bounded and holds no usable bound says its boundary is
+// finite without saying where. Neither way of papering over it is acceptable: with an
 // interface-typed bound (`DVInterval[DVOrdered]`, what a canonical decode
 // produces) a Void bound emits nothing at all, leaving decode to read the
 // opposite of what the flags say, while a concrete-typed bound cannot be nil
@@ -295,12 +296,13 @@ func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interv
 func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any, unbounded, voidRepresentable bool) error {
 	if unbounded {
 		// The mirror of decode's refusal (intervalSuffixes): a bound standing
-		// beside its `|*_unbounded: true` contradicts the RM equivalence, and
+		// beside its `|*_unbounded: true` contradicts the open boundary the
+		// flag marks, and
 		// dropping it here would lose a populated clinical value silently while
 		// the same pair on the way in is a typed error.
 		if boundContradictsUnbounded(bound, voidRepresentable) {
-			return fmt.Errorf("%w: %q carries a %s bound and is also marked `|%s_unbounded`; the RM ties the two (`%s_unbounded = (%s = Void)`), so the pair contradicts itself",
-				ErrUnsupportedDatatype, base+"/"+end, end, end, end, end)
+			return fmt.Errorf("%w: %q carries a %s bound and is also marked `|%s_unbounded`; BASE Interval marks that boundary open, so it carries no bound and the pair contradicts itself",
+				ErrUnsupportedDatatype, base+"/"+end, end, end)
 		}
 		return nil
 	}
@@ -310,8 +312,8 @@ func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any
 		return err
 	}
 	if len(sub) == 0 {
-		return fmt.Errorf("%w: %q carries no %s bound but is not marked `|%s_unbounded`; the RM ties the two (`%s_unbounded = (%s = Void)`), so decode would read a bounded end that no key spells",
-			ErrUnsupportedDatatype, path, end, end, end, end)
+		return fmt.Errorf("%w: %q carries no %s bound but is not marked `|%s_unbounded`; an absent bound is the unbounded end, so decode would read a bounded end that no key spells",
+			ErrUnsupportedDatatype, path, end, end)
 	}
 	if key, empty := emptyMandatorySuffix(sub, path, anchor); empty {
 		return fmt.Errorf("%w: %q is RM-mandatory on a %s bound but empty — an unpopulated bound is not an unbounded end, which is spelled `%s|%s_unbounded`",
