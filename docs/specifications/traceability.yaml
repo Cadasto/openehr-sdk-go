@@ -422,6 +422,7 @@ requirements:
     packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     tests:
+      - internal/bmmgen/render_interval_bound_test.go
       - internal/bmmgen/render_jsonunmar_polymorphic_test.go
       - internal/bmmgen/render_streaming_test.go
       - internal/bmmgen/sim_bump_test.go
@@ -431,6 +432,7 @@ requirements:
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
+      - openehr/rm/interval_bound_test.go
       - openehr/rm/like_interfaces_test.go
       - openehr/rm/quoted_literal_test.go
       - openehr/rm/real_test.go
@@ -440,6 +442,7 @@ requirements:
       - openehr/serialize/canjson/decode_test.go
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/serialize/canjson/encode_test.go
+      - openehr/serialize/canjson/interval_open_side_test.go
       - openehr/serialize/canjson/map_value_type_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canjson/marshal_sentinel_test.go
@@ -451,11 +454,13 @@ requirements:
       - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canjson/type_census_test.go
       - openehr/serialize/canjson/typednil_slot_test.go
+      - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/templatecompile/external_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_test.go
+      - openehr/validation/rmread/interval_void_parity_test.go
       - testkit/fixtures/discover_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go
@@ -555,10 +560,14 @@ requirements:
       - testkit/fixtures
     probes: [PROBE-033, PROBE-034]
     tests:
+      - internal/bmmgen/render_interval_bound_test.go
       - openehr/rm/character_text_test.go
+      - openehr/rm/interval_bound_test.go
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
+      - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/serialize/canxml/roundtrip_test.go
+      - openehr/validation/rmread/interval_void_parity_test.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
       - testkit/probes/serialize/probe_034_typereg_xsi_unknown.go
 
@@ -1248,7 +1257,10 @@ requirements:
       - openehr/internal/rmnames
     probes: [PROBE-081]
     tests:
+      - openehr/rm/interval_bound_test.go
+      - openehr/serialize/canjson/interval_open_side_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
+      - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/rmfloor_archetype_test.go
       - openehr/validation/rmfloor_bytes_test.go
@@ -1256,6 +1268,7 @@ requirements:
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_test.go
       - openehr/validation/rmread/handles_test.go
+      - openehr/validation/rmread/interval_void_parity_test.go
       - openehr/validation/rmread/interval_void_test.go
       - openehr/validation/rmread/read_archetyped_test.go
       - openehr/validation/rmread/read_datavalues_test.go

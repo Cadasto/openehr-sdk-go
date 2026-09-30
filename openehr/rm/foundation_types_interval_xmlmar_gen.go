@@ -24,6 +24,9 @@ func (p *PointInterval[T]) BMMName() string { return "Point_interval" }
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
+//
+// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound
+// is empty emits no `lower` or `upper` element.
 func (p *PointInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("Point_interval")}
@@ -31,11 +34,15 @@ func (p *PointInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) 
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
-		return err
+	if !omitIntervalBound(p.LowerUnbounded, p.Lower) {
+		if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
+			return err
+		}
 	}
-	if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
-		return err
+	if !omitIntervalBound(p.UpperUnbounded, p.Upper) {
+		if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(p.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
 		return err
@@ -68,6 +75,9 @@ func (p *ProperInterval[T]) BMMName() string { return "Proper_interval" }
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
+//
+// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound
+// is empty emits no `lower` or `upper` element.
 func (p *ProperInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("Proper_interval")}
@@ -75,11 +85,15 @@ func (p *ProperInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
-		return err
+	if !omitIntervalBound(p.LowerUnbounded, p.Lower) {
+		if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
+			return err
+		}
 	}
-	if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
-		return err
+	if !omitIntervalBound(p.UpperUnbounded, p.Upper) {
+		if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(p.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
 		return err

@@ -83,6 +83,9 @@ func (d *DVInterval[T]) BMMName() string { return "DV_INTERVAL" }
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are appended to start.Attr before
 // the start token is written.
+//
+// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound
+// is empty emits no `lower` or `upper` element.
 func (d *DVInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("DV_INTERVAL")}
@@ -90,11 +93,15 @@ func (d *DVInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := canxml.EncodePoly(_e, "lower", d.Lower); err != nil {
-		return err
+	if !omitIntervalBound(d.LowerUnbounded, d.Lower) {
+		if err := canxml.EncodePoly(_e, "lower", d.Lower); err != nil {
+			return err
+		}
 	}
-	if err := canxml.EncodePoly(_e, "upper", d.Upper); err != nil {
-		return err
+	if !omitIntervalBound(d.UpperUnbounded, d.Upper) {
+		if err := canxml.EncodePoly(_e, "upper", d.Upper); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(d.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
 		return err

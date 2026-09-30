@@ -375,6 +375,36 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 		}
 	}
 
+	// Interval-bound emptiness test, one file per target that owns an
+	// interval-shaped concrete class. The canonical encoders it serves
+	// sit in the per-package companions above.
+	boundBody, err := RenderIntervalBoundFile(plan)
+	if err != nil {
+		return tr, err
+	}
+	boundPath := filepath.Join(outDir, intervalBoundFile)
+	if boundBody == nil {
+		if opts.Verify {
+			if _, statErr := os.Stat(boundPath); statErr == nil {
+				result.Drifts = append(result.Drifts, DriftRecord{Path: boundPath, Existing: true})
+			}
+		}
+	} else {
+		tr.Files = append(tr.Files, boundPath)
+		result.Files = append(result.Files, boundPath)
+		if opts.Verify {
+			drift, err := compareFile(boundPath, boundBody)
+			if err != nil {
+				return tr, err
+			}
+			if drift != nil {
+				result.Drifts = append(result.Drifts, *drift)
+			}
+		} else if err := writeAtomic(boundPath, boundBody); err != nil {
+			return tr, err
+		}
+	}
+
 	// rminfo data tables — emitted alongside the RM target (one
 	// sub-package down). Both renderers return nil for non-RM targets,
 	// so AOM 1.4 doesn't get them. The package lives in its own

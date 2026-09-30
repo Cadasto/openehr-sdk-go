@@ -293,8 +293,19 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 		typeParams = genericClassParamList(plan, sc)
 		typeArgs = genericTypeArgList(sc)
 	}
+	shaped, err := intervalShaped(plan, pc)
+	if err != nil {
+		return "", err
+	}
 	if embedsMarshalerBearingConcrete(plan, pc) {
+		if shaped {
+			return "", fmt.Errorf("%s carries the interval shape and embeds a marshaler-bearing concrete ancestor: "+
+				"the flat wire shape cannot leave out an open side's empty bound", pc.BMMName)
+		}
 		return renderMarshalFlat(plan, pc, recv, typeParams, typeArgs)
+	}
+	if shaped {
+		return renderMarshalAliasInterval(pc, recv, typeParams, typeArgs), nil
 	}
 	return renderMarshalAlias(pc, recv, typeParams, typeArgs), nil
 }
@@ -304,11 +315,7 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs string) string {
 	alias := aliasTypeName(pc.GoName)
 	var b strings.Builder
-	fmt.Fprintf(&b, "// %s is the method-free canonical-JSON alias for %s. The alias\n", alias, pc.GoName)
-	b.WriteString("// drops the codec methods so marshalling the anonymous wrapper below\n")
-	b.WriteString("// does not recurse; the class embeds no marshaler-bearing concrete\n")
-	b.WriteString("// ancestor, so nothing is promoted.\n")
-	fmt.Fprintf(&b, "type %s%s %s%s\n\n", alias, typeParams, pc.GoName, typeArgs)
+	b.WriteString(renderMarshalAliasDecl(pc, typeParams, typeArgs))
 
 	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
 	fmt.Fprintf(&b, "// (value %q) as the leading member. Field order otherwise follows the\n", pc.BMMName)
@@ -323,6 +330,19 @@ func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs string) str
 	fmt.Fprintf(&b, "\t\t*%s%s\n", alias, typeArgs)
 	fmt.Fprintf(&b, "\t}{%q, (*%s%s)(&%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, typeArgs, recv)
 	b.WriteString("}\n")
+	return b.String()
+}
+
+// renderMarshalAliasDecl emits the method-free alias the zero-copy shape
+// marshals through, and the UnmarshalJSONFrom companion decodes into.
+func renderMarshalAliasDecl(pc *PlannedClass, typeParams, typeArgs string) string {
+	alias := aliasTypeName(pc.GoName)
+	var b strings.Builder
+	fmt.Fprintf(&b, "// %s is the method-free canonical-JSON alias for %s. The alias\n", alias, pc.GoName)
+	b.WriteString("// drops the codec methods so marshalling the anonymous wrapper below\n")
+	b.WriteString("// does not recurse; the class embeds no marshaler-bearing concrete\n")
+	b.WriteString("// ancestor, so nothing is promoted.\n")
+	fmt.Fprintf(&b, "type %s%s %s%s\n\n", alias, typeParams, pc.GoName, typeArgs)
 	return b.String()
 }
 
