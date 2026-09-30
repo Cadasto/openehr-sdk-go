@@ -333,6 +333,106 @@ func TestIntervalHalfOpenDecodes(t *testing.T) {
 	}
 }
 
+// REQ-140. An explicit `|*_included: true` beside that side's `|*_unbounded: true`
+// spells an included open boundary, which BASE Interval forbids
+// (`Lower_included_valid`, `Upper_included_valid`). Decode refuses it and names
+// the key, at every position the interval grammar reaches and through
+// STRUCTURED. An explicit false there is the corpus spelling and still decodes
+// (TestRMAttrIntervalUnboundedEnd, TestDVIntervalLeafRoundTrip).
+func TestIntervalIncludedOpenSideRefusedOnDecode(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const (
+		nr  = rmattrElement + "/_normal_range"
+		orr = rmattrElement + "/_other_reference_ranges:0"
+	)
+	for _, tc := range []struct {
+		name       string
+		keys       map[string]any
+		structured bool
+		key        string
+	}{
+		{
+			name: "_normal_range upper",
+			keys: map[string]any{
+				nr + "/lower|magnitude": 20.5,
+				nr + "/lower|unit":      "unit",
+				nr + "|upper_unbounded": true,
+				nr + "|upper_included":  true,
+			},
+			key: nr + "|upper_included",
+		},
+		{
+			name: "_normal_range lower",
+			keys: map[string]any{
+				nr + "/upper|magnitude": 66.6,
+				nr + "/upper|unit":      "unit",
+				nr + "|lower_unbounded": true,
+				nr + "|lower_included":  true,
+			},
+			key: nr + "|lower_included",
+		},
+		{
+			name: "_other_reference_ranges upper",
+			keys: map[string]any{
+				orr + "/lower|magnitude": 70.5,
+				orr + "/lower|unit":      "unit",
+				orr + "/meaning":         "high",
+				orr + "|upper_unbounded": true,
+				orr + "|upper_included":  true,
+			},
+			key: orr + "|upper_included",
+		},
+		{
+			name: "DV_INTERVAL leaf upper",
+			keys: map[string]any{
+				rmattrIntervalEvent + "/time":       "2022-01-12T09:00:11.7842493+01:00",
+				rmattrInterval + "/lower|magnitude": 72.83,
+				rmattrInterval + "/lower|unit":      "Unit",
+				rmattrInterval + "|upper_unbounded": true,
+				rmattrInterval + "|upper_included":  true,
+			},
+			key: rmattrInterval + "|upper_included",
+		},
+		{
+			name: "DV_INTERVAL leaf lower",
+			keys: map[string]any{
+				rmattrIntervalEvent + "/time":       "2022-01-12T09:00:11.7842493+01:00",
+				rmattrInterval + "/upper|magnitude": 91.2,
+				rmattrInterval + "/upper|unit":      "Unit",
+				rmattrInterval + "|lower_unbounded": true,
+				rmattrInterval + "|lower_included":  true,
+			},
+			key: rmattrInterval + "|lower_included",
+		},
+		{
+			name: "STRUCTURED _normal_range upper",
+			keys: map[string]any{
+				nr + "/lower|magnitude": 20.5,
+				nr + "/lower|unit":      "unit",
+				nr + "|upper_unbounded": true,
+				nr + "|upper_included":  true,
+			},
+			structured: true,
+			// STRUCTURED reaches FLAT with every segment re-spelled `:0`, and the
+			// refusal names the key as it arrived there.
+			key: "/_normal_range:0|upper_included",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			comp, err := decodeIntervalBody(t, wt, rmattrBody(tc.keys), tc.structured)
+			if err == nil {
+				t.Fatalf("decode succeeded (%d content items), want a refusal of the included open side", len(comp.Content))
+			}
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+			if !strings.Contains(err.Error(), tc.key) {
+				t.Errorf("err = %v, want it to name %q", err, tc.key)
+			}
+		})
+	}
+}
+
 // --- composer projection --------------------------------------------------
 
 // The composer's `external_ref` and `identifiers` are dropped on encode by
@@ -619,6 +719,103 @@ func TestIntervalBoundBesideUnboundedFlagRefusedOnEncode(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "lower") {
 		t.Errorf("err = %v, want it to name the contradicting end", err)
+	}
+}
+
+// REQ-140. The encode mirror of TestIntervalIncludedOpenSideRefusedOnDecode: an
+// RM interval whose side is both unbounded and included breaks BASE Interval's
+// `Lower_included_valid` / `Upper_included_valid`, and decode refuses the pair
+// that would spell it, so encode refuses it too rather than write what it will
+// not read. Both instantiations are pinned, interface-typed and concrete-typed,
+// and so is every encode entry: the bare interval grammar, the DV_INTERVAL leaf,
+// and the two DV_ORDERED decorations.
+func TestIntervalIncludedOpenSideRefusedOnEncode(t *testing.T) {
+	mm := func(m rm.Real) rm.DVQuantity { return rm.DVQuantity{Magnitude: m, Units: "mm"} }
+	pmm := func(m rm.Real) *rm.DVQuantity { return new(mm(m)) }
+	openIncludedUpper := rm.Interval[rm.DVQuantity]{
+		Lower: mm(3), LowerIncluded: true, UpperUnbounded: true, UpperIncluded: true,
+	}
+	for _, tc := range []struct {
+		name   string
+		encode func(out map[string]any) error
+		key    string
+	}{
+		{
+			name: "interface-typed upper",
+			encode: func(out map[string]any) error {
+				return intervalToFlat(out, "b", "DV_QUANTITY", rm.Interval[rm.DVOrdered]{
+					Lower: pmm(3), LowerIncluded: true, UpperUnbounded: true, UpperIncluded: true,
+				})
+			},
+			key: "b|upper_included",
+		},
+		{
+			name: "interface-typed lower",
+			encode: func(out map[string]any) error {
+				return intervalToFlat(out, "b", "DV_QUANTITY", rm.Interval[rm.DVOrdered]{
+					LowerUnbounded: true, LowerIncluded: true, Upper: pmm(9), UpperIncluded: true,
+				})
+			},
+			key: "b|lower_included",
+		},
+		{
+			name: "concrete-typed upper",
+			encode: func(out map[string]any) error {
+				return intervalToFlat(out, "b", "DV_QUANTITY", openIncludedUpper)
+			},
+			key: "b|upper_included",
+		},
+		{
+			name: "concrete-typed lower",
+			encode: func(out map[string]any) error {
+				return intervalToFlat(out, "b", "DV_QUANTITY", rm.Interval[rm.DVQuantity]{
+					LowerUnbounded: true, LowerIncluded: true, Upper: mm(9), UpperIncluded: true,
+				})
+			},
+			key: "b|lower_included",
+		},
+		{
+			name: "DV_INTERVAL leaf",
+			encode: func(out map[string]any) error {
+				return leafToFlat(out, "p/x", rm.DVInterval[rm.DVQuantity]{Interval: openIncludedUpper},
+					"DV_INTERVAL<DV_QUANTITY>", false)
+			},
+			key: "p/x|upper_included",
+		},
+		{
+			name: "_normal_range decoration",
+			encode: func(out map[string]any) error {
+				q := mm(5)
+				q.NormalRange = &rm.DVInterval[rm.DVQuantity]{Interval: openIncludedUpper}
+				return leafToFlat(out, "p/x", q, "DV_QUANTITY", false)
+			},
+			key: "p/x/_normal_range|upper_included",
+		},
+		{
+			name: "_other_reference_ranges decoration",
+			encode: func(out map[string]any) error {
+				q := mm(5)
+				q.OtherReferenceRanges = []rm.ReferenceRange[rm.DVQuantity]{{
+					Meaning: &rm.DVText{Value: "high"},
+					Range: rm.DVInterval[rm.DVOrdered]{Interval: rm.Interval[rm.DVOrdered]{
+						Lower: pmm(3), LowerIncluded: true, UpperUnbounded: true, UpperIncluded: true,
+					}},
+				}}
+				return leafToFlat(out, "p/x", q, "DV_QUANTITY", false)
+			},
+			key: "p/x/_other_reference_ranges:0|upper_included",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := map[string]any{}
+			err := tc.encode(out)
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want ErrUnsupportedDatatype for an included open side (emitted %#v)", err, out)
+			}
+			if !strings.Contains(err.Error(), tc.key) {
+				t.Errorf("err = %v, want it to name %q", err, tc.key)
+			}
+		})
 	}
 }
 

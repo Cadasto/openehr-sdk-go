@@ -8,15 +8,14 @@ import (
 
 // TestCompositionForbiddenImports guards REQ-013
 // (docs/specifications/module-layout.md § REQ-013) for openehr/composition,
-// the builder above openehr/instance and openehr/template. REQ-101 adds that
-// the builder's own files import no openehr/serialize package. Two rules hold:
+// the builder above openehr/instance and openehr/template. Two rules hold:
 //
 //   - Neither the package nor any package of this module it pulls in imports
 //     transport, auth or openehr/client.
-//   - The package's own non-test files do not import openehr/serialize: a
-//     caller that wants wire bytes imports a codec itself. This rule cannot
-//     cover what they pull in, since openehr/rm's generated marshal files
-//     import openehr/serialize/canxml.
+//   - The package's own non-test files do not import openehr/serialize, which
+//     no template-side building block imports: a caller that wants wire bytes
+//     imports a codec itself. This rule cannot cover what they pull in, since
+//     openehr/rm's generated marshal files import openehr/serialize/canxml.
 //
 // Test files may import anything, canjson for round-trip checks for instance.
 func TestCompositionForbiddenImports(t *testing.T) {

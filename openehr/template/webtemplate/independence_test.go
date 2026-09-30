@@ -9,10 +9,11 @@ import (
 // TestWebtemplateForbiddenImports guards REQ-013
 // (docs/specifications/module-layout.md § REQ-013) for
 // openehr/template/webtemplate, a clinical building block that takes a
-// compiled OPT and returns WebTemplate JSON (REQ-106). Today it imports
+// compiled OPT and returns WebTemplate JSON. Today it imports
 // openehr/templatecompile, openehr/template/constraints, internal/templatecompile
-// (for the shared REQ-116 name-predicate quoting) and the standard library.
-// Two rules hold:
+// (for the name-predicate quoting it shares with the template compiler, so
+// the two path builders cannot drift) and the standard library. Two rules
+// hold:
 //
 //   - Neither the package nor any package of this module it pulls in imports
 //     transport, auth or openehr/client.

@@ -236,11 +236,17 @@ func orderedRMAttrs[T rm.DVOrdered](out map[string]any, base, anchor string,
 // intervalToFlat writes the DV_INTERVAL grammar under base: each bound through
 // the anchor datatype's own suffix form, then the boundary Booleans.
 //
-// A Boolean is written only when it **contradicts** the default decode applies
-// ([intervalSuffixes]): `|*_unbounded` when true, `|*_included` when false. That
-// is what keeps an undecorated interval's FLAT form as short as the reference
-// writes it, and it reproduces both corpus shapes exactly — the flags omitted on
-// `dv_count`'s `_normal_range`, spelled `false` on `dv_quantity`'s.
+// A Boolean is written only when it **contradicts** the bounded-side default
+// decode applies ([intervalSuffixes]): `|*_unbounded` when true, `|*_included`
+// when false. That is what keeps an undecorated interval's FLAT form as short
+// as the reference writes it, and it reproduces both corpus shapes exactly —
+// the flags omitted on `dv_count`'s `_normal_range`, spelled `false` on
+// `dv_quantity`'s. An open side therefore always writes `|*_included: false`,
+// the corpus spelling, although decode reads its absence the same way.
+//
+// A side both unbounded and included is refused: BASE `Interval` forbids it
+// (`Lower_included_valid`, `Upper_included_valid`), and decode refuses the pair
+// that would spell it, so the codec never writes a pair it will not read.
 //
 // An unbounded end writes no bound: the RM's bound value is meaningless there.
 // For the nine *concrete* instantiations that reach here — the three narrowed
@@ -249,6 +255,12 @@ func orderedRMAttrs[T rm.DVOrdered](out map[string]any, base, anchor string,
 // here", and only a bound differing from the Go zero contradicts it
 // ([boundContradictsUnbounded]).
 func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interval[T]) error {
+	if iv.LowerUnbounded && iv.LowerIncluded {
+		return includedOpenSideError(base+"|lower_included", "lower")
+	}
+	if iv.UpperUnbounded && iv.UpperIncluded {
+		return includedOpenSideError(base+"|upper_included", "upper")
+	}
 	// Whether the instantiation can express Void at all is knowledge only this
 	// generic frame has — boxing into `any` erases it — and it changes what
 	// counts as a contradiction. Read it off a zero T rather than the bound.
@@ -282,12 +294,12 @@ func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interv
 // `Interval` defines `lower_unbounded` / `upper_unbounded` as marking that
 // boundary open, and the grammar spells an open end by its flag alone, so an
 // end that claims to be bounded and holds no usable bound says its boundary is
-// finite without saying where. Neither way of papering over it is acceptable: with an
-// interface-typed bound (`DVInterval[DVOrdered]`, what a canonical decode
-// produces) a Void bound emits nothing at all, leaving decode to read the
-// opposite of what the flags say, while a concrete-typed bound cannot be nil
-// and its Go zero value puts a *fabricated* bound on the wire (`|magnitude` 0
-// under an empty, RM-mandatory `|unit`). Refuse both (REQ-140).
+// finite without saying where. Neither way of papering over it is acceptable:
+// with an interface-typed bound (`DVInterval[DVOrdered]`, what a canonical
+// decode produces) a Void bound emits nothing at all, an end spelling neither a
+// bound nor its flag, which decode refuses; while a concrete-typed bound cannot
+// be nil and its Go zero value puts a *fabricated* bound on the wire
+// (`|magnitude` 0 under an empty, RM-mandatory `|unit`). Refuse both (REQ-140).
 //
 // An empty **RM-mandatory** suffix is what separates the fabricated zero from a
 // legitimate one: a genuine zero magnitude (`DV_COUNT`'s `0` lower bound) leaves
@@ -297,9 +309,8 @@ func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any
 	if unbounded {
 		// The mirror of decode's refusal (intervalSuffixes): a bound standing
 		// beside its `|*_unbounded: true` contradicts the open boundary the
-		// flag marks, and
-		// dropping it here would lose a populated clinical value silently while
-		// the same pair on the way in is a typed error.
+		// flag marks, and dropping it here would lose a populated clinical
+		// value silently while the same pair on the way in is a typed error.
 		if boundContradictsUnbounded(bound, voidRepresentable) {
 			return fmt.Errorf("%w: %q carries a %s bound and is also marked `|%s_unbounded`; BASE Interval marks that boundary open, so it carries no bound and the pair contradicts itself",
 				ErrUnsupportedDatatype, base+"/"+end, end, end)
@@ -312,8 +323,8 @@ func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any
 		return err
 	}
 	if len(sub) == 0 {
-		return fmt.Errorf("%w: %q carries no %s bound but is not marked `|%s_unbounded`; an absent bound is the unbounded end, so decode would read a bounded end that no key spells",
-			ErrUnsupportedDatatype, path, end, end)
+		return fmt.Errorf("%w: %q carries no %s bound but is not marked `|%s_unbounded`; a side not marked `|%s_unbounded` must carry a bound, and decode refuses an end that spells neither",
+			ErrUnsupportedDatatype, path, end, end, end)
 	}
 	if key, empty := emptyMandatorySuffix(sub, path, anchor); empty {
 		return fmt.Errorf("%w: %q is RM-mandatory on a %s bound but empty — an unpopulated bound is not an unbounded end, which is spelled `%s|%s_unbounded`",

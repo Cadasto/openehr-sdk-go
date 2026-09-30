@@ -523,7 +523,7 @@ REQ-101 trusts REQ-107 for the skeleton walk: every implicit RM attribute, every
 - **Per-template generated Go structs.** v1 stays generic — consumers do not import codegen'd vital-signs structs through this package. OET-driven authoring is a follow-up.
 - **FLAT / STRUCTURED ingest.** Caller decodes externally (REQ-053) and feeds the resulting `*rm.Composition` through validation.
 - **Slot resolution against a federated archetype repository.** Same compromise as REQ-102 / REQ-107: pinned slot fills come from the OPT.
-- **Encoding to wire bytes.** The builder imports no `openehr/serialize/` package in its own files; callers run `canjson.Marshal` / `canxml.Marshal` themselves.
+- **Encoding to wire bytes.** Callers run `canjson.Marshal` / `canxml.Marshal` themselves; the builder's own files import no `openehr/serialize/` package ([REQ-013](module-layout.md#req-013--building-block-independence)).
 - **Validating during Build.** A `Build()` result MUST be runnable through `validation.ValidateComposition` separately; the builder is sound-by-construction but not a validator.
 
 ### Building-block independence (REQ-013)
@@ -866,6 +866,8 @@ cycle; until then `Setting_valid` is enforced only at the wire boundary
 originate the invalid shape.
 
 **Known gap — a bound beside its own open flag.** A bound present on a side whose `*_unbounded` flag is set contradicts BASE `Interval`'s open-boundary meaning. The floor walks it as a bound but does not report the contradiction.
+
+**Known gap — an included open side.** BASE `Interval` `Lower_included_valid` and `Upper_included_valid` (`lower_unbounded implies not lower_included`, and the same for `upper`) forbid an open side marked included. The floor does not check them, so such an interval passes. The FLAT codec refuses the shape where the interval keys spell it, in both directions ([wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes)), but it still reaches the floor through canonical JSON or XML, inside a FLAT `|raw` fragment, or as an RM value built in Go.
 
 **Known gap — bounds that cannot be compared.** RM `DV_INTERVAL.Limits_consistent` (and BASE `Interval.Limits_comparable`) also require two present bounds to be strictly comparable, so an interval whose bounds are a DV_COUNT and a DV_QUANTITY (possible only in a bare `DV_INTERVAL<DV_ORDERED>`), two DV_QUANTITY in different `units`, or two DV_QUANTITY with equal `units` and different `units_system`, is RM-invalid. The floor does not report that. It skips the first two kinds of pair. It orders the third by magnitude like any same-units pair, so it reports one only when `lower` is above `upper`.
 

@@ -10,14 +10,16 @@ import (
 // § REQ-013) and REQ-045 (docs/specifications/bmm-conformance.md § REQ-045)
 // for openehr/bmm: validators, archetype tools and code generators import the
 // loader without transport, auth or any HTTP machinery. Two rules hold for the
-// package and everything it pulls in:
+// package and what it pulls in:
 //
 //   - REQ-013: no package of this module in the closure imports transport,
 //     auth or openehr/client.
-//   - REQ-045: no package in the closure, the standard library's included,
-//     imports net/http or a package under it. This walk follows the standard
-//     library too, so net/http pulled in through expvar or net/rpc is found as
-//     well; importguard.TestScanStd is its can-fail control.
+//   - REQ-045: no package reached through a chain of this module's and the
+//     standard library's packages imports net/http or a package under it.
+//     This walk follows the standard library too, so net/http pulled in
+//     through expvar or net/rpc is found as well. It stops at a package of
+//     another module, the standard library's vendored copies included.
+//     importguard.TestScanStd is its can-fail control.
 func TestBMMForbiddenImports(t *testing.T) {
 	t.Parallel()
 	rules := []struct {

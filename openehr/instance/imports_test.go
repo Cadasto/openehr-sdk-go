@@ -14,8 +14,8 @@ import (
 //     auth or openehr/client.
 //   - REQ-107 (docs/specifications/clinical-modeling.md § REQ-107): nothing in
 //     that closure imports openehr/composition or openehr/validation, or a
-//     package under either. The REQ-101 builder calls the generator, not the
-//     reverse, and PROBE-027 checks the generator's output with the
+//     package under either. The composition builder calls the generator, not
+//     the reverse, and PROBE-027 checks the generator's output with the
 //     validator, which is an independent check only while the generator does
 //     not use it.
 //   - REQ-013: the package's own non-test files do not import

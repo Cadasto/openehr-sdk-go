@@ -61,7 +61,7 @@ A non-generated file in `openehr/rm/` (e.g. helper functions over the generated 
 
 ### REQ-045 — BMM loader is a building block
 
-A `openehr/bmm/` package **MUST** exist as a public, building-block loader for BMM schemas (REQ-013). Consumers — validators, archetype tools, custom code generators, BMM-aware diff tools — **MUST** be able to import `openehr/bmm/` without instantiating `transport/`, `auth/`, or any HTTP machinery.
+A `openehr/bmm/` package **MUST** exist as a public, building-block loader for BMM schemas (REQ-013). Consumers — validators, archetype tools, custom code generators, BMM-aware diff tools — **MUST** be able to import `openehr/bmm/` without instantiating `transport/`, `auth/`, or any HTTP machinery. `openehr/bmm`, and every package it imports through a chain of this module's and the standard library's packages, **MUST NOT** import `net/http` or a package under it, so no HTTP machinery arrives through a standard-library package such as `expvar` or `net/rpc`; the chain stops at a package of another module, the standard library's vendored copies included (`TestBMMForbiddenImports`).
 
 The loader exposes:
 
@@ -101,7 +101,7 @@ If a divergence is suspected to indicate a bug in the BMM file, the SDK **MUST**
 
 The SDK **MUST** expose the pinned Reference Model's **class graph** — not only the per-class attribute shape it already answers — as a **compiled-in** introspection surface, so that a consumer reasoning about the RM rather than about one template (AQL class-expression expansion and `CONTAINS` conformance, polymorphic slot fit, validation walkers, BMM-faithful re-serialisation and schema diffing) does not have to re-reduce the pinned BMM for itself.
 
-The surface **MUST** be generated from the **primary** RM BMM file under [REQ-042](#req-042--generated-code-drift-detected)'s discipline, and **MUST NOT** load, parse, or resolve a BMM schema at runtime. That prohibition is this requirement's, extending [ADR 0005](../adr/0005-compiled-template-foundation.md) C1 from the attribute tables to the class graph; REQ-042 is cited for the emission and drift rules, not restated.
+The surface **MUST** be generated from the **primary** RM BMM file under [REQ-042](#req-042--generated-code-drift-detected)'s discipline, **MUST NOT** load, parse, or resolve a BMM schema at runtime, and the own non-test files of its package, `openehr/rm/rminfo`, **MUST** import only the standard library: a compiled-in table needs nothing else, and an import of this module's packages, `openehr/bmm` most pointedly, would turn it back into a runtime reduction (`TestRMInfoImportsAreStdlibOnly`). Both prohibitions are this requirement's, extending [ADR 0005](../adr/0005-compiled-template-foundation.md) C1 from the attribute tables to the class graph; REQ-042 is cited for the emission and drift rules, not restated.
 
 #### The class universe
 
