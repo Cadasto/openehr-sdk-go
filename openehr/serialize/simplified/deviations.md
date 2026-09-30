@@ -166,15 +166,17 @@ not partially/silently accepted.
   which decode folds back the same way; `:1` or higher there is refused, since no attribute
   of a DataValue is a list at that position.
 
-- **Interval boundary flags are asymmetric** (REQ-140) — the four DV_INTERVAL Booleans are
-  written only where they carry information their default does not, in both directions.
+- **Interval boundary flags are asymmetric** (REQ-140) — each of the four DV_INTERVAL
+  Booleans is written only where it differs from its bounded-side default, and decode reads
+  an absent one back by side.
   BASE `Interval` declares all four mandatory (`1..1`), and the reference omits each one's
-  default value. `\|lower_unbounded` / `\|upper_unbounded` are omitted when `false`: absent
+  bounded-side default. `\|lower_unbounded` / `\|upper_unbounded` are omitted when `false`: absent
   decodes as `false`, and only `true` is emitted. `\|lower_included` / `\|upper_included`
   default by side. On a bounded side they are omitted when `true`, the **closed** endpoint:
   absent decodes as `true`, and only `false` is emitted. On an open side absent decodes as
   `false`, the only value BASE `Lower_included_valid` / `Upper_included_valid` permit there,
-  and an included open side is a typed error both ways: an explicit `\|*_included: true`
+  and an included open side spelled in the interval keys is a typed error both ways (a
+  `\|raw` fragment carries it as canonical JSON writes it): an explicit `\|*_included: true`
   beside `\|*_unbounded: true` on decode, an interval side both unbounded and included on
   encode. An open end is spelled by its `\|*_unbounded: true` flag alone: an end that
   spells neither a bound nor that flag is refused both ways, and a missing bound is never
