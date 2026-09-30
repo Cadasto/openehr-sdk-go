@@ -24,8 +24,9 @@ import (
 // and `uid` carry `omitempty`, `uid` is a pointer so an unset one is omitted,
 // and `commit_audit` is a different type. A key on either side alone is drift.
 //
-// Reflection is confined to this test. REQ-024 bars it from the library
-// surface, not from a guard that reads two struct definitions at build time.
+// Reflection is confined to this test. The generics policy's no-reflection
+// rule bars it from the library surface, not from a guard that reads two
+// struct definitions at build time.
 func TestShadowMarshallersCoverTheGeneratedKeySet(t *testing.T) {
 	// The generated form is now the streaming codec's alias over the rm struct
 	// (ADR 0022, ruling R19): rm.OriginalVersion[T] / rm.ImportedVersion[T]

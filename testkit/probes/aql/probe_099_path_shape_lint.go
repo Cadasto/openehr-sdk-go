@@ -304,7 +304,7 @@ func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) { // PROBE-099 (RE
 	// row asserts it for itself when its whole result is group-only
 	// ([runPathShapeFire]); this is the guard that at least one row IS, so the
 	// claim cannot go untested on a corpus whose every row happens to carry a
-	// REQ-109 or REQ-161 bystander code too.
+	// static-lint or semantic-lint bystander code too.
 	if groupOnlyRows == 0 {
 		failures = append(failures, "fire: no fire case yields a group-only result; the OK() claim goes untested")
 	}
@@ -421,9 +421,9 @@ func runPathShapeFire(tc PathShapeFireCase) (msg string, groupOnly bool) {
 		}
 	}
 	// Group-only means every finding in the result belongs to REQ-164, which is
-	// the shape REQ-164 § Acceptance's OK() claim is about. Where a REQ-109 or
-	// REQ-161 code rides along, OK() is that code's business and this row says
-	// nothing about it.
+	// the shape REQ-164 § Acceptance's OK() claim is about. Where a code from
+	// the static lint or the semantic and portability lint rides along, OK() is
+	// that code's business and this row says nothing about it.
 	groupOnly = len(res.Issues) == len(got)
 	if groupOnly && !res.OK() {
 		return "OK() = false on a result carrying only REQ-164 findings; every code in the group is Warning", true

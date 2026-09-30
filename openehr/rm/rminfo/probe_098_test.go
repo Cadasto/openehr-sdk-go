@@ -492,8 +492,8 @@ func referencedButNotDeclared(r *bmmReduction) []string {
 }
 
 // collectPropertyTypeNames records every type NAME a property's declaration
-// names — no type mapping, so this stays independent of REQ-043 rather than
-// restating it.
+// names — no type mapping, so this stays independent of the P_BMM → Go
+// mapping rules rather than restating them.
 //
 // All four Property variants are handled; the interface's marker method is
 // unexported, so no fifth can arrive from outside openehr/bmm, and a fifth
@@ -518,8 +518,8 @@ func collectPropertyTypeNames(prop bmm.Property, out map[string]bool) {
 
 // collectTypeNames records the names in a type expression, nested generics and
 // containers included. A missing inner type is skipped rather than dereferenced:
-// this walk gathers witnesses, and a malformed schema is REQ-047's business, not
-// a reason for the probe to panic.
+// this walk gathers witnesses, and a malformed schema is the business of the
+// rule on BMM-spec divergence, not a reason for the probe to panic.
 func collectTypeNames(typ bmm.Type, out map[string]bool) {
 	if typ == nil {
 		return

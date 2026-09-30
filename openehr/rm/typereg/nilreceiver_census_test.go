@@ -14,8 +14,8 @@ package typereg_test
 // the registry that rm's own REQ-040 name-parity test enumerates.
 //
 // reflect is used to manufacture a typed nil of a type known only through its
-// registry constructor. REQ-024 binds library code, not tests
-// (canjson/field_order_test.go is the precedent).
+// registry constructor. The generics policy's no-reflection rule binds library
+// code, not tests (canjson/field_order_test.go is the precedent).
 
 import (
 	"encoding/json"

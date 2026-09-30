@@ -108,8 +108,9 @@ var predicateCorpus = []struct {
 	{"fmt_comment", "SELECT c/x FROM COMPOSITION c[a/b='c' -- note\n AND d/e='f']"},
 
 	// --- path positions: the same bracket text, reached through a path ---
-	// Guarding these against splice stays out of scope by REQ-055 rule 3;
-	// not CORRUPTING them is extraction fidelity, the opposite direction.
+	// Guarding these against splice stays out of scope by rule 3 of the AQL
+	// wire boundary; not CORRUPTING them is extraction fidelity, the opposite
+	// direction.
 	{"path_select", "SELECT c/items[a/b='c' AND d/e='f']/value FROM COMPOSITION c"},
 	// `identifiedPath : IDENTIFIER pathPredicate? …` — the predicate on the
 	// ROOT identifier is a different extraction site from a segment's, and no

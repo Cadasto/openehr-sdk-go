@@ -180,9 +180,9 @@ func Probe084BuiltContributionBody(ctx context.Context, c *transport.Client, cap
 // because each operation instantiates its own payload type, which is the
 // point: three of the four versionable types travel in one batch. The
 // payloads need only carry their discriminator — this probe asserts version
-// metadata, not composition validity (REQ-102 owns that). Their order MUST
-// match [probe084Batch], and a mismatch is reported as framework misuse
-// rather than as a builder defect.
+// metadata, not composition validity (composition validation owns that). Their
+// order MUST match [probe084Batch], and a mismatch is reported as framework
+// misuse rather than as a builder defect.
 func buildProbe084Submission() (*contribution.Submission, error) {
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	status := rm.EHRStatus{ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1", IsQueryable: true, IsModifiable: true}

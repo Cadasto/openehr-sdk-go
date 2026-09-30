@@ -133,9 +133,10 @@ func TestProbe093TemplateListFilters(t *testing.T) {
 // a decode failure: REQ-143 licenses no assertion that a filtered
 // deployment holds templates. This test says nothing about the shape of the
 // returned slice — the probe discards it entirely and asserts only on the
-// error and the captured queries. The non-nil zero-length slice REQ-144
-// requires on an empty 2xx body is pinned by TestListTemplatesEmpty and
-// TestListStoredQueriesEmpty in openehr/client/definition.
+// error and the captured queries. The non-nil zero-length slice the
+// definition metadata decoding rule requires on an empty 2xx body is pinned
+// by TestListTemplatesEmpty and TestListStoredQueriesEmpty in
+// openehr/client/definition.
 func TestProbe093EmptyCatalogPasses(t *testing.T) {
 	var captured []url.Values
 	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
