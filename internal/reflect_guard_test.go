@@ -11,7 +11,10 @@ package internal_test
 //
 // A reflect call does not show at the call site which class it belongs to,
 // so this walks the module's non-test Go files, generated ones included, and
-// holds every "reflect" import to a reviewed list. Each entry names the file,
+// holds every "reflect" import to a reviewed list. The walk reads only what
+// the go tool builds as this module's packages: it skips a nested module
+// (a directory with its own go.mod), testdata, vendor, and names starting
+// with "." or "_". Each entry names the file,
 // the reflect identifiers it may use, the classes those uses fall in and why.
 // The test fails on a file that imports reflect and is not on the list, on a
 // listed file that starts using another reflect identifier, on an entry
@@ -26,10 +29,12 @@ package internal_test
 // or mis-rooted tree proves nothing.
 
 import (
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -103,45 +108,28 @@ func TestREQ024ReflectOnlyForReviewedUses(t *testing.T) {
 	}
 	root := filepath.Dir(filepath.Dir(self)) // module root
 
+	files, err := libraryGoFiles(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 	fset := token.NewFileSet()
-	scanned := 0
+	scanned := len(files)
 	seen := map[string]bool{}
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-		if d.IsDir() {
-			if rel == "cmd" {
-				return fs.SkipDir
-			}
-			switch d.Name() {
-			case "testdata", "vendor", ".git", ".worktrees", ".claude", "site":
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") {
-			return nil
-		}
-		scanned++
+	for _, rel := range files {
+		path := filepath.Join(root, filepath.FromSlash(rel))
 		file, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
 		if err != nil {
-			return err
+			t.Fatal(err)
 		}
 		name, imported := reflectImportName(file)
 		if !imported {
-			return nil
+			continue
 		}
 		seen[rel] = true
 		entry, listed := reflectReviewed[rel]
 		if !listed {
 			t.Errorf("%s imports reflect and is not on the reviewed list: library code MUST NOT use reflection outside the classes idiom.md § Generics policy (REQ-024) names; use the type registry or a type switch, or, for a use in a named class, add the file to reflectReviewed with its identifiers and class", rel)
-			return nil
+			continue
 		}
 		if len(entry.classes) == 0 {
 			t.Errorf("%s: reviewed entry names no class; every reflect use must fall in a class idiom.md § Generics policy (REQ-024) names", rel)
@@ -153,21 +141,17 @@ func TestREQ024ReflectOnlyForReviewedUses(t *testing.T) {
 		}
 		if name == "." {
 			t.Errorf("%s dot-imports reflect, which hides its uses from this guard (REQ-024); import it by name", rel)
-			return nil
+			continue
 		}
 		full, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
 		if err != nil {
-			return err
+			t.Fatal(err)
 		}
 		for _, m := range reflectMembers(full, name) {
 			if !slices.Contains(entry.members, m) {
 				t.Errorf("%s uses reflect.%s, which its reviewed entry (%s) does not list: check the use falls in a class idiom.md § Generics policy (REQ-024) names, then add it to the entry", rel, m, entry.reason)
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 	if scanned < minReflectScanFiles {
 		t.Fatalf("walk scanned %d non-test Go file(s); the module is known to have at least %d, so the guard has gone blind", scanned, minReflectScanFiles)
@@ -178,6 +162,117 @@ func TestREQ024ReflectOnlyForReviewedUses(t *testing.T) {
 		}
 	}
 	t.Logf("scanned %d non-test Go files; %d import reflect", scanned, len(seen))
+}
+
+// TestREQ024ReflectScanReadsOnlyWhatTheGoToolBuilds runs the guard's walk over
+// a small module whose every Go file imports reflect. Only the files the go
+// tool builds as this module's library packages may come back: a nested
+// module, a directory whose name starts with "." or "_", testdata, vendor,
+// the root cmd/ and the root site/ are not part of them.
+func TestREQ024ReflectScanReadsOnlyWhatTheGoToolBuilds(t *testing.T) {
+	// idiom.md § Generics policy (REQ-024): the guard covers library code, which is what the go tool builds.
+	t.Parallel()
+	const reflectSource = "package p\n\nimport \"reflect\"\n\nvar _ = reflect.TypeOf\n"
+	tests := []struct {
+		path string
+		kept bool
+		why  string
+	}{
+		{"lib/lib.go", true, "a library package of the module"},
+		{"lib/site/site.go", true, "a package named site below the root is ordinary library code"},
+		{"lib/cmd/cmd.go", true, "a package named cmd below the root is ordinary library code"},
+		{"lib/lib_test.go", false, "a test file"},
+		{"lib/_lib.go", false, "the go tool ignores a file whose name starts with _"},
+		{"worktrees/other/openehr/x/x.go", false, "worktrees/other holds its own go.mod, so it is another module"},
+		{"_scratch1/s.go", false, "the go tool skips a directory whose name starts with _"},
+		{".x/x.go", false, "the go tool skips a directory whose name starts with ."},
+		{"lib/testdata/t.go", false, "the go tool skips testdata"},
+		{"vendor/v/v.go", false, "the go tool skips vendor"},
+		{"cmd/example/main.go", false, "cmd/ holds example programs, not importable library code"},
+		{"site/s.go", false, "site/ is the built documentation site"},
+	}
+	root := t.TempDir()
+	files := map[string]string{
+		"go.mod":                 "module example.com/m\n",
+		"worktrees/other/go.mod": "module example.com/other\n",
+	}
+	for _, tc := range tests {
+		files[tc.path] = reflectSource
+	}
+	for rel, content := range files {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := libraryGoFiles(root)
+	if err != nil {
+		t.Fatalf("libraryGoFiles: %v", err)
+	}
+	for _, tc := range tests {
+		if slices.Contains(got, tc.path) != tc.kept {
+			t.Errorf("libraryGoFiles returned %s: %v, want %v (%s); got %v", tc.path, !tc.kept, tc.kept, tc.why, got)
+		}
+	}
+}
+
+// libraryGoFiles returns, relative to root in slash form and in walk order,
+// the non-test Go files of the module at root that this guard reads. Below
+// root it skips what the go tool skips when it lists the module's packages: a
+// directory holding its own go.mod, which is another module; testdata and
+// vendor; and every directory or file whose name starts with "." or "_". It
+// also skips cmd/ and site/ at the root.
+func libraryGoFiles(root string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == root {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		name := d.Name()
+		if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			switch {
+			case name == "testdata", name == "vendor":
+				return fs.SkipDir
+			case rel == "cmd":
+				// Example programs, not importable library code.
+				return fs.SkipDir
+			case rel == "site":
+				// The built documentation site.
+				return fs.SkipDir
+			}
+			_, err := os.Stat(filepath.Join(path, "go.mod"))
+			switch {
+			case err == nil:
+				return fs.SkipDir
+			case !errors.Is(err, fs.ErrNotExist):
+				return err
+			}
+			return nil
+		}
+		if strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go") {
+			files = append(files, rel)
+		}
+		return nil
+	})
+	return files, err
 }
 
 // reflectImportName returns the name a file gives the "reflect" import, and
