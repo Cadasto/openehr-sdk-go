@@ -465,13 +465,13 @@ Generated output **MUST** also pass the RM floor (`validation.ValidateRM`, [REQ-
 
 ### Trust model
 
-The compiled OPT is **authoritative for structure**. The RM graph is assembled attribute-by-attribute from compiled metadata; the generator never guesses paths from an empty composition. Primitive leaves come from `PrimitiveConstraint.ExampleValue()` (REQ-103), which guarantees `Validate(ExampleValue()) == nil` for bounded constraints. Optional OPT `<assumed_value>` / `<default_value>`, when compile captures them, **override** the factory.
+The compiled OPT is **authoritative for structure**. The RM graph is assembled attribute-by-attribute from compiled metadata; the generator never guesses paths from an empty composition. Primitive leaves come from `PrimitiveConstraint.ExampleValue()` (REQ-103), which guarantees `Validate(ExampleValue()) == nil` for bounded constraints. Compile captures an OPT `<assumed_value>` into the constraint's `Default` field, but the generator does not read it: the factory value stands, and an assumed or default value does not override it.
 
 The generator is **sound** (every output is valid against the OPT, apart from an attribute the pinned RM lacks, above), not **complete** (it does not enumerate every valid instance — different policies may produce different but equally valid trees). Sound × validator-aligned ⇒ PROBE-027 cross-checks the contract.
 
 ### Slot fills
 
-A required slot is stamped with an archetype id drawn from the parsed REQ-104 include grammar when a safe example can be synthesized. When the OPT carried no parseable includes, the synthesiser uses `openEHR-EHR-<RMType>.example.v1`, the validator's RM-type-prefix fallback. A required slot whose includes cannot be satisfied returns `ErrSlotFillUnsupported` and does not invent an archetype id.
+A required slot **MUST** be stamped with an archetype id drawn from the parsed REQ-104 include grammar when a safe example can be synthesized. When the OPT carried no parseable includes, the synthesiser **MUST** use `openEHR-EHR-<RMType>.example.v1`, the validator's RM-type-prefix fallback. A required slot whose includes cannot be satisfied **MUST** make `Generate` return `ErrSlotFillUnsupported`, and the generator **MUST NOT** invent an archetype id for it.
 
 ### Out of scope
 
