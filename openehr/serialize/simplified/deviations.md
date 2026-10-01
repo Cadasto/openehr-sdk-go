@@ -63,7 +63,7 @@ Concretely:
   non-`Locatable` RM object (e.g. `EVENT_CONTEXT`) is recursed via the enclosing Locatable
   ancestor, not dropped. A typed-nil RM pointer is treated as an absent leaf (skipped).
   An unset `DV_CODED_TEXT` (the Go zero value: no value, code, terminology or formatting) writes no
-  keys, as an absent leaf does, where it used to write blank `\|code` and `\|value` entries.
+  keys, as an absent leaf does.
   A **composer** the `ctx/` short forms cannot carry — `PARTY_RELATED`, a
   `PARTY_IDENTIFIED` without a `name`, or a `PARTY_SELF` carrying an
   `external_ref` — is `ErrUnsupportedDatatype`, not an omission
