@@ -3,6 +3,7 @@ package probes
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -34,6 +35,10 @@ type connector struct {
 // or a connection, sends a request, or is a configured client or backend a
 // probe talks to. Naming any other member of these packages, such as a
 // constant, a request value or a pure helper, does not make a probe
+// backend-facing. The classifier does not look inside these packages: their
+// members are judged by this list alone. It does look inside every other
+// package of this module that a probe package imports, directly or through
+// another package, so a probe that connects through a helper there is
 // backend-facing.
 //
 // The list is short on purpose. A backend-facing probe that connects through
@@ -85,7 +90,9 @@ var (
 
 // TestREQ082ProbeClassMatchesModes checks that a probe which reaches no
 // backend declares In-repo in its Modes line, and that a probe which reaches
-// one does not.
+// one does not. What a probe reaches is what it uses in its own package and
+// in the other packages of this module that its package imports, directly or
+// through another package, including whatever runs when those packages load.
 func TestREQ082ProbeClassMatchesModes(t *testing.T) {
 	// § REQ-082 in docs/specifications/conformance.md: an in-repo probe MUST declare In-repo.
 	t.Parallel()
@@ -103,8 +110,13 @@ func TestREQ082ProbeClassMatchesModes(t *testing.T) {
 		t.Fatal("found no '- **Modes:**' line under a '#### PROBE-NNN' heading in conformance.md; the scan reads nothing")
 	}
 
+	backendFacing := 0
 	for _, id := range slices.Sorted(maps.Keys(probes)) {
 		funcs := probes[id]
+		reach := firstBackendReach(funcs)
+		if reach != "" {
+			backendFacing++
+		}
 		line, ok := modes[id]
 		if !ok {
 			t.Errorf("%s is implemented by %s, but conformance.md has no Modes line for it", id, funcNames(funcs))
@@ -113,7 +125,6 @@ func TestREQ082ProbeClassMatchesModes(t *testing.T) {
 		// The census in § REQ-082 counts a Modes line as in-repo when it
 		// contains "In-repo" anywhere, and so does this check.
 		inRepo := strings.Contains(line, "In-repo")
-		reach := firstBackendReach(funcs)
 		switch {
 		case reach != "" && inRepo:
 			t.Errorf("%s declares In-repo but reaches a backend: %s\n\tModes: %s", id, reach, line)
@@ -123,17 +134,20 @@ func TestREQ082ProbeClassMatchesModes(t *testing.T) {
 				id, funcNames(funcs), line)
 		}
 	}
+	t.Logf("classified %d probes: %d in-repo, %d backend-facing", len(probes), len(probes)-backendFacing, backendFacing)
 }
 
 // TestREQ082ProbeClassifierOnFixture runs the classifier over the fixture
 // packages in testdata, whose answers are known. Some probes there connect:
 // through a helper, a method, an aliased import, init, or a package-level
-// var. Others do not: one uses only local code, one names only constants of
-// connector packages, and one declares a local that shadows a connecting
-// helper's name.
+// var, in their own package or in another package they import. Others do
+// not: one uses only local code, one names only constants of connector
+// packages, one declares a local that shadows a connecting helper's name,
+// and two use only the parts of another package that open no connection.
 func TestREQ082ProbeClassifierOnFixture(t *testing.T) {
 	// § REQ-082: the class check above is only as sound as this classifier.
 	t.Parallel()
+	const fixtures = "testkit/probes/testdata/"
 	tests := []struct {
 		dir     string
 		want    map[string]string
@@ -164,21 +178,44 @@ func TestREQ082ProbeClassifierOnFixture(t *testing.T) {
 				"Probe912AtLoad":     "Probe912AtLoad -> testServer at package load uses net/http/httptest.NewServer",
 			},
 		},
+		{
+			dir: "probeclassimport",
+			want: map[string]string{
+				"Probe913ThroughPackage": "Probe913ThroughPackage -> " + fixtures + "probeclasshelper.StartServer uses net/http/httptest.NewServer",
+				"Probe914PureHelper":     "",
+				"Probe915ThroughForeignMethod": "Probe915ThroughForeignMethod -> " + fixtures + "probeclasshelper.NewServer -> " +
+					fixtures + "probeclasshelper.Server -> " + fixtures + "probeclasshelper.Server.Start uses net/http/httptest.NewServer",
+				"Probe916ForeignPureMethod": "",
+				"Probe918ThroughTwoPackages": "Probe918ThroughTwoPackages -> " + fixtures + "probeclasshelper.Relayed -> " +
+					fixtures + "probeclassdeep.Start uses net/http/httptest.NewServer",
+			},
+		},
+		{
+			dir: "probeclassimportload",
+			want: map[string]string{
+				"Probe917AtImportLoad": "Probe917AtImportLoad -> " + fixtures + "probeclassvar.testServer at package load uses net/http/httptest.NewServer",
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.dir, func(t *testing.T) {
 			t.Parallel()
-			names := importNames{root: filepath.Join("..", ".."), cache: map[string]string{}}
-			g, err := loadPackage(filepath.Join("testdata", tc.dir), &names)
+			p := newProgram(filepath.Join("..", ".."))
+			path := modulePath + "/testkit/probes/testdata/" + tc.dir
+			g, err := p.load(path)
 			if err != nil {
-				t.Fatalf("loadPackage(testdata/%s): %v", tc.dir, err)
+				t.Fatalf("load(%s): %v", path, err)
 			}
 			wantProbes := slices.Sorted(maps.Keys(tc.want))
 			if got := slices.Sorted(slices.Values(g.probes)); !slices.Equal(got, wantProbes) {
 				t.Fatalf("probe functions found = %v, want %v", got, wantProbes)
 			}
 			for _, fn := range wantProbes {
-				if got := g.reach(fn); got != tc.want[fn] {
+				got, err := p.reach(path, fn)
+				if err != nil {
+					t.Fatalf("reach(%s): %v", fn, err)
+				}
+				if got != tc.want[fn] {
 					t.Errorf("reach(%s) = %q, want %q", fn, got, tc.want[fn])
 				}
 			}
@@ -223,25 +260,33 @@ func firstBackendReach(funcs []probeFunc) string {
 // Result that a probe package names.
 func loadProbeFuncs(t *testing.T, root string) (map[string][]probeFunc, []harnessUse) {
 	t.Helper()
-	names := importNames{root: root, cache: map[string]string{}}
+	p := newProgram(root)
 	probes := map[string][]probeFunc{}
 	var harness []harnessUse
-	err := filepath.WalkDir(".", func(path string, e fs.DirEntry, err error) error {
+	err := filepath.WalkDir(".", func(dir string, e fs.DirEntry, err error) error {
 		if err != nil || !e.IsDir() {
 			return err
 		}
 		// The go tool skips testdata and names starting with "." or "_";
 		// testdata holds the classifier's own fixtures, not probe packages.
-		if path != "." && (e.Name() == "testdata" || strings.HasPrefix(e.Name(), ".") || strings.HasPrefix(e.Name(), "_")) {
+		if dir != "." && (e.Name() == "testdata" || strings.HasPrefix(e.Name(), ".") || strings.HasPrefix(e.Name(), "_")) {
 			return filepath.SkipDir
 		}
-		g, err := loadPackage(path, &names)
+		path := modulePath + "/testkit/probes"
+		if dir != "." {
+			path += "/" + filepath.ToSlash(dir)
+		}
+		g, err := p.load(path)
 		if err != nil {
-			return fmt.Errorf("testkit/probes/%s: %w", path, err)
+			return err
 		}
 		for _, fn := range g.probes {
+			reach, err := p.reach(path, fn)
+			if err != nil {
+				return err
+			}
 			id := "PROBE-" + probeFuncName.FindStringSubmatch(fn)[1]
-			probes[id] = append(probes[id], probeFunc{name: fn, reach: g.reach(fn)})
+			probes[id] = append(probes[id], probeFunc{name: fn, reach: reach})
 		}
 		harness = append(harness, g.harness...)
 		return nil
@@ -253,13 +298,20 @@ func loadProbeFuncs(t *testing.T, root string) (map[string][]probeFunc, []harnes
 }
 
 // decl is one package-level declaration: the connectors it names, the
-// package-level names it uses, and the names it selects after a dot. A method
-// is its own decl, keyed "Type.Method"; a decl uses every method whose name it
-// selects, whatever the receiver, since the receiver's type is not known here.
+// package-level names it uses, the members of other packages of this module
+// it names, and the names it selects after a dot on a value. A method is its
+// own decl, keyed "Type.Method".
 type decl struct {
 	backend []string // "net/http/httptest.NewServer", in source order
 	uses    []string
+	ext     []member
 	sels    []string
+}
+
+// member is a package-level name in another package of this module, which
+// the classifier follows.
+type member struct {
+	path, name string
 }
 
 // harnessUse is a testkit/probe member other than Result named in a probe
@@ -270,10 +322,13 @@ type harnessUse struct {
 }
 
 type pkgGraph struct {
-	decls   map[string]*decl
-	probes  []string     // exported ProbeNNN functions, in source order
-	load    []string     // init and every var with an initialiser: run when the package loads
-	harness []harnessUse // testkit/probe members other than Result
+	decls     map[string]*decl
+	methodsOf map[string][]string // type name -> its "Type.Method" keys
+	probes    []string            // exported ProbeNNN functions, in source order
+	load      []string            // init and every var with an initialiser: run when the package loads
+	harness   []harnessUse        // testkit/probe members other than Result
+	deps      []string            // packages of this module it imports, connector packages excepted
+	files     int
 }
 
 func (g *pkgGraph) node(name string) *decl {
@@ -293,29 +348,127 @@ func (g *pkgGraph) runsAtLoad(name string) {
 
 // fileScope is what scanning one file needs: the file set for positions, the
 // names under which the file refers to its imports, which of them are
-// connector packages or the runner, and the names declared inside the
-// declaration being scanned.
+// connector packages, other packages of this module or the runner, and the
+// names declared inside the declaration being scanned.
 type fileScope struct {
 	fset    *token.FileSet
 	imports map[string]bool   // local names of every import
 	aliases map[string]string // local name -> import path, connector packages only
+	modules map[string]string // local name -> import path, other packages of this module
+	deps    []string          // import paths of the other packages of this module, blank imports included
 	harness string            // local name of testkit/probe, or ""
 	local   map[string]bool
+}
+
+// program loads packages of this module by import path, each once, and walks
+// declarations across them.
+type program struct {
+	root     string
+	names    importNames
+	pkgs     map[string]*pkgGraph
+	closures map[string][]string
+}
+
+func newProgram(root string) *program {
+	return &program{
+		root:     root,
+		names:    importNames{root: root, cache: map[string]string{}},
+		pkgs:     map[string]*pkgGraph{},
+		closures: map[string][]string{},
+	}
+}
+
+// moduleDir returns the directory of a package of this module, under root.
+func moduleDir(root, path string) string {
+	rel := strings.TrimPrefix(strings.TrimPrefix(path, modulePath), "/")
+	return filepath.Join(root, filepath.FromSlash(rel))
+}
+
+func inModule(path string) bool {
+	return path == modulePath || strings.HasPrefix(path, modulePath+"/")
+}
+
+// load returns the declaration graph of the package with the given import
+// path, building it on first use.
+func (p *program) load(path string) (*pkgGraph, error) {
+	if g, ok := p.pkgs[path]; ok {
+		return g, nil
+	}
+	g, err := loadPackage(moduleDir(p.root, path), &p.names)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", strings.TrimPrefix(path, modulePath+"/"), err)
+	}
+	p.pkgs[path] = g
+	return g, nil
+}
+
+// closure loads and returns, sorted, the packages of this module that path
+// imports, directly or through another package. Connector packages are not
+// entered: their members are judged by connectors.
+func (p *program) closure(path string) ([]string, error) {
+	if c, ok := p.closures[path]; ok {
+		return c, nil
+	}
+	seen := map[string]bool{path: true}
+	queue := []string{path}
+	var out []string
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		g, err := p.load(cur)
+		if err != nil {
+			return nil, err
+		}
+		if cur != path && g.files == 0 {
+			return nil, fmt.Errorf("%s is imported but has no Go file the go tool builds", cur)
+		}
+		for _, dep := range g.deps {
+			if !seen[dep] {
+				seen[dep] = true
+				out = append(out, dep)
+				queue = append(queue, dep)
+			}
+		}
+	}
+	slices.Sort(out)
+	p.closures[path] = out
+	return out, nil
+}
+
+// goFiles returns the non-test Go files in dir that the go tool builds on
+// this platform, in name order.
+func goFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		ok, err := build.Default.MatchFile(dir, name)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			files = append(files, filepath.Join(dir, name))
+		}
+	}
+	return files, nil
 }
 
 // loadPackage builds the declaration graph of one package directory from its
 // non-test Go files.
 func loadPackage(dir string, names *importNames) (*pkgGraph, error) {
-	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	files, err := goFiles(dir)
 	if err != nil {
 		return nil, err
 	}
-	g := &pkgGraph{decls: map[string]*decl{}}
+	g := &pkgGraph{decls: map[string]*decl{}, methodsOf: map[string][]string{}, files: len(files)}
 	fset := token.NewFileSet()
 	for _, path := range files {
-		if strings.HasSuffix(path, "_test.go") {
-			continue
-		}
 		f, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
 		if err != nil {
 			return nil, err
@@ -325,13 +478,20 @@ func loadPackage(dir string, names *importNames) (*pkgGraph, error) {
 			return nil, fmt.Errorf("%s: %w", path, err)
 		}
 		fs.fset = fset
+		for _, dep := range fs.deps {
+			if !slices.Contains(g.deps, dep) {
+				g.deps = append(g.deps, dep)
+			}
+		}
 		for _, d := range f.Decls {
 			switch d := d.(type) {
 			case *ast.FuncDecl:
 				key := d.Name.Name
 				switch {
 				case d.Recv != nil && len(d.Recv.List) > 0:
-					key = receiverType(d.Recv.List[0].Type) + "." + key
+					typ := receiverType(d.Recv.List[0].Type)
+					key = typ + "." + key
+					g.methodsOf[typ] = append(g.methodsOf[typ], key)
 				case key == "init":
 					g.runsAtLoad(key)
 				case d.Name.IsExported() && probeFuncName.MatchString(key):
@@ -352,8 +512,9 @@ func loadPackage(dir string, names *importNames) (*pkgGraph, error) {
 							v := g.node(n.Name)
 							v.backend = append(v.backend, refs.backend...)
 							v.uses = append(v.uses, refs.uses...)
+							v.ext = append(v.ext, refs.ext...)
 							v.sels = append(v.sels, refs.sels...)
-							if len(s.Values) > 0 {
+							if d.Tok == token.VAR && len(s.Values) > 0 {
 								g.runsAtLoad(n.Name)
 							}
 						}
@@ -373,14 +534,18 @@ func loadPackage(dir string, names *importNames) (*pkgGraph, error) {
 			d.uses = append(d.uses, methods[sel]...)
 		}
 	}
+	for _, keys := range g.methodsOf {
+		slices.Sort(keys)
+	}
 	return g, nil
 }
 
 // scan records into d every connector n names, every name it uses that may be
-// a package-level declaration, and every name it selects after a dot on a
-// value. A name declared inside the declaration (a parameter, a result, a
-// local) is not a use. Neither is a struct field name or an identifier key in
-// a composite literal, which name fields.
+// a package-level declaration, every member of another package of this module
+// it names, and every name it selects after a dot on a value. A name declared
+// inside the declaration (a parameter, a result, a local) is not a use.
+// Neither is a struct field name or an identifier key in a composite literal,
+// which name fields.
 func (g *pkgGraph) scan(n ast.Node, fs fileScope, d *decl) {
 	ast.Inspect(n, func(n ast.Node) bool {
 		switch n := n.(type) {
@@ -388,6 +553,9 @@ func (g *pkgGraph) scan(n ast.Node, fs fileScope, d *decl) {
 			if id, ok := n.X.(*ast.Ident); ok && !fs.local[id.Name] && fs.imports[id.Name] {
 				if path, ok := fs.aliases[id.Name]; ok && isConnector(path, n.Sel.Name) {
 					d.backend = append(d.backend, path+"."+n.Sel.Name)
+				}
+				if path, ok := fs.modules[id.Name]; ok {
+					d.ext = append(d.ext, member{path: path, name: n.Sel.Name})
 				}
 				if id.Name == fs.harness && n.Sel.Name != "Result" {
 					g.harness = append(g.harness, harnessUse{
@@ -483,52 +651,101 @@ func localNames(n ast.Node) map[string]bool {
 	return local
 }
 
-// reach walks the package-level declarations name uses, breadth first, and
-// describes the shortest path to a connector, or returns "" when there is
-// none. Everything that runs when the package loads (init, and every
-// package-level var with an initialiser) counts as used by the probe.
-func (g *pkgGraph) reach(name string) string {
-	type step struct{ parent, label string }
-	seen := map[string]step{name: {label: name}}
-	queue := []string{name}
-	visit := func(from, to, label string) {
+// node is one declaration: the import path of its package and its key there.
+type node struct {
+	pkg, name string
+}
+
+// reach walks, breadth first, the declarations that the probe name in the
+// package path uses, and describes the path to the first connector it
+// meets, or returns "" when there is none. The walk follows uses within a
+// package and members of the other packages of this module. A selected name
+// uses every method of that name in the selecting package, whatever the
+// receiver, since the receiver's type is not known here, and every method of
+// that name on a type of another package that the walk reaches. Everything
+// that runs when the probe's package loads counts as used by the probe: init
+// and every package-level var with an initialiser, in that package and in
+// every package of this module it imports, directly or through another.
+func (p *program) reach(path, name string) (string, error) {
+	imported, err := p.closure(path)
+	if err != nil {
+		return "", err
+	}
+	type step struct {
+		parent node
+		label  string
+	}
+	start := node{pkg: path, name: name}
+	label := func(n node) string {
+		if n.pkg == path {
+			return n.name
+		}
+		return strings.TrimPrefix(n.pkg, modulePath+"/") + "." + n.name
+	}
+	seen := map[node]step{start: {label: name}}
+	queue := []node{start}
+	visit := func(from, to node, suffix string) {
 		if _, ok := seen[to]; ok {
 			return
 		}
-		if _, ok := g.decls[to]; !ok {
+		if g := p.pkgs[to.pkg]; g == nil || g.decls[to.name] == nil {
 			return
 		}
-		seen[to] = step{parent: from, label: label}
+		seen[to] = step{parent: from, label: label(to) + suffix}
 		queue = append(queue, to)
 	}
+	selected := map[string]bool{}  // names some visited declaration selects
+	pending := map[string][]node{} // methods of visited types, by name, not yet selected
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
-		d := g.decls[cur]
-		if d == nil {
-			continue
-		}
+		g := p.pkgs[cur.pkg]
+		d := g.decls[cur.name]
 		if len(d.backend) > 0 {
 			var chain []string
 			for k := cur; ; k = seen[k].parent {
 				chain = append(chain, seen[k].label)
-				if k == name {
+				if k == start {
 					break
 				}
 			}
 			slices.Reverse(chain)
-			return strings.Join(chain, " -> ") + " uses " + d.backend[0]
+			return strings.Join(chain, " -> ") + " uses " + d.backend[0], nil
 		}
 		for _, u := range d.uses {
-			visit(cur, u, u)
+			visit(cur, node{pkg: cur.pkg, name: u}, "")
 		}
-		if cur == name {
-			for _, u := range g.load {
-				visit(cur, u, u+" at package load")
+		for _, m := range d.ext {
+			visit(cur, node{pkg: m.path, name: m.name}, "")
+		}
+		for _, key := range g.methodsOf[cur.name] {
+			_, m, _ := strings.Cut(key, ".")
+			method := node{pkg: cur.pkg, name: key}
+			if selected[m] {
+				visit(cur, method, "")
+			} else {
+				pending[m] = append(pending[m], method)
+			}
+		}
+		for _, s := range d.sels {
+			if selected[s] {
+				continue
+			}
+			selected[s] = true
+			for _, method := range pending[s] {
+				visit(cur, method, "")
+			}
+			delete(pending, s)
+		}
+		if cur == start {
+			for _, pkg := range append([]string{path}, imported...) {
+				for _, u := range p.pkgs[pkg].load {
+					visit(cur, node{pkg: pkg, name: u}, " at package load")
+				}
 			}
 		}
 	}
-	return ""
+	return "", nil
 }
 
 func receiverType(e ast.Expr) string {
@@ -546,34 +763,41 @@ func receiverType(e ast.Expr) string {
 }
 
 // scopeOf finds the name under which f refers to each of its imports, maps
-// those of connector packages to their paths, and finds the name it gives
-// testkit/probe.
+// those of connector packages and of the other packages of this module to
+// their paths, and finds the name it gives testkit/probe.
 func scopeOf(f *ast.File, names *importNames) (fileScope, error) {
-	fs := fileScope{imports: map[string]bool{}, aliases: map[string]string{}}
+	fs := fileScope{imports: map[string]bool{}, aliases: map[string]string{}, modules: map[string]string{}}
 	for _, imp := range f.Imports {
 		path, err := strconv.Unquote(imp.Path.Value)
 		if err != nil {
 			return fs, err
 		}
+		connector := isConnectorPackage(path)
+		followed := inModule(path) && !connector
+		if followed {
+			fs.deps = append(fs.deps, path)
+		}
 		name, err := names.of(imp, path)
 		if err != nil {
 			return fs, err
 		}
-		watched := path == harnessPath || isConnectorPackage(path)
 		switch {
 		case name == "_":
 			continue
-		case name == "." && watched:
+		case name == "." && (connector || followed):
 			return fs, fmt.Errorf("dot import of %s: this check cannot see which names come from it", path)
 		case name == ".":
 			continue
 		}
 		fs.imports[name] = true
 		switch {
-		case path == harnessPath:
-			fs.harness = name
-		case watched:
+		case connector:
 			fs.aliases[name] = path
+		case followed:
+			fs.modules[name] = path
+		}
+		if path == harnessPath {
+			fs.harness = name
 		}
 	}
 	return fs, nil
@@ -612,8 +836,7 @@ func (n *importNames) of(imp *ast.ImportSpec, path string) (string, error) {
 	if name, ok := n.cache[path]; ok {
 		return name, nil
 	}
-	rel, ok := strings.CutPrefix(path, modulePath+"/")
-	if !ok {
+	if !inModule(path) {
 		elems := strings.Split(path, "/")
 		name := elems[len(elems)-1]
 		if len(elems) > 1 && majorVersion.MatchString(name) {
@@ -622,22 +845,19 @@ func (n *importNames) of(imp *ast.ImportSpec, path string) (string, error) {
 		n.cache[path] = name
 		return name, nil
 	}
-	files, err := filepath.Glob(filepath.Join(n.root, filepath.FromSlash(rel), "*.go"))
+	files, err := goFiles(moduleDir(n.root, path))
 	if err != nil {
 		return "", err
 	}
-	for _, file := range files {
-		if strings.HasSuffix(file, "_test.go") {
-			continue
-		}
-		f, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.PackageClauseOnly)
-		if err != nil {
-			return "", err
-		}
-		n.cache[path] = f.Name.Name
-		return f.Name.Name, nil
+	if len(files) == 0 {
+		return "", fmt.Errorf("no non-test Go file for %s under %s", path, n.root)
 	}
-	return "", fmt.Errorf("no non-test Go file for %s under %s", path, n.root)
+	f, err := parser.ParseFile(token.NewFileSet(), files[0], nil, parser.PackageClauseOnly)
+	if err != nil {
+		return "", err
+	}
+	n.cache[path] = f.Name.Name
+	return f.Name.Name, nil
 }
 
 // loadModes returns each catalogue entry's Modes line, keyed by PROBE id.
