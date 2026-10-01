@@ -79,7 +79,7 @@ Antipatterns the SDK **MUST NOT** use:
 
 - Setter methods after construction (`client.SetHTTPClient(...)`) — mutable after construction implies a hidden lock or a data race.
 - Builder-pattern intermediate types (`ehr.NewBuilder().WithX(...).Build()`) — verbose and harder to compose than functional options.
-- "Options bag" pattern (`ehr.New(catalog, ehr.Options{HTTPClient: ..., TokenSource: ...})`) — every new field is a breaking change to the struct literal.
+- "Options bag" pattern (`ehr.New(catalog, ehr.Options{HTTPClient: ..., TokenSource: ...})`) — the call site is a struct literal, which breaks when a field is added. [module-layout.md § Versioning](module-layout.md#versioning) does not class that as a breaking change when callers use field names.
 
 ## Surface shape (REQ-023)
 
