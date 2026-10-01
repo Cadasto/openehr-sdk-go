@@ -439,8 +439,6 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 		v.Denominator = 1
 	case *rm.DVURI:
 		v.Value = "http://example.com"
-	case *rm.DVEHRURI:
-		v.Value = "ehr://example"
 	case *rm.DVIdentifier:
 		v.ID = "example"
 	case *rm.DVParsable:
@@ -1433,6 +1431,8 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 			v.Item = *el
 		}
 	case *rm.DVEHRURI:
+		// The one place a DV_EHR_URI gets its default: the generic String
+		// pass cannot write it, and every one the generator emits is walked.
 		if v.Value == "" {
 			v.Value = "ehr://example"
 		}
