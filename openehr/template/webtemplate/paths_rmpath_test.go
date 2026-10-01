@@ -66,6 +66,37 @@ func (e errDerived) Error() string { return e.key + " is derived, not stored" }
 // silent encode loss, and the guard skips it by name.
 const encodedRoot = "COMPOSITION"
 
+// nonCompositionRoots are the vendored OPTs the guard skips because their
+// Web Template is not rooted at a COMPOSITION, each with the root class it is
+// expected to have. A template rooted anywhere else, or an entry whose OPT is
+// now rooted at a COMPOSITION, fails the guard instead of passing as a skip.
+var nonCompositionRoots = map[string]string{
+	"Address.v2.opt":    "ADDRESS",
+	"TestPerson.v2.opt": "PERSON",
+}
+
+// refusedOPTs are the vendored OPTs a build step refuses, each with the step
+// that is expected to refuse it. The two skip sets come from different
+// branches of the guard and are pinned apart, so a template that starts to
+// fail to parse cannot hide as an expected non-COMPOSITION skip, and a new
+// refusal in any step fails the guard rather than skipping.
+var refusedOPTs = map[string]string{
+	"social.opt": stageParser,
+}
+
+// The build steps buildVendored runs, in order.
+const (
+	stageParser   = "parser"
+	stageCompiler = "compiler"
+	stageBuilder  = "builder"
+)
+
+// refusal is the build step that refused an OPT, and its error.
+type refusal struct {
+	stage string
+	err   error
+}
+
 // vendoredOPTs lists every OPT this repository vendors: the template corpus and
 // the PROBE-086 FLAT conformance template.
 func vendoredOPTs(t *testing.T) []string {
@@ -90,17 +121,43 @@ func vendoredOPTs(t *testing.T) []string {
 // the Web Template built from every vendored OPT rooted at a COMPOSITION,
 // rmpath resolves the node's aqlPath on an instance built along it, unless the
 // path is ctx/-owned or reaches a derived attribute.
+//
+// Only the OPTs named in nonCompositionRoots and refusedOPTs may be skipped,
+// each for its own recorded reason. The stale-entry checks at the end look
+// across all templates, so they run only when every subtest ran: a run
+// filtered to one OPT (-run '.../name.opt') leaves them out.
 func TestWebTemplatePathsResolveViaRmpath(t *testing.T) {
 	exempted := map[string]bool{}
-	for _, path := range vendoredOPTs(t) {
-		t.Run(filepath.Base(path), func(t *testing.T) {
-			c, w, skip := buildVendored(path)
-			if skip != "" {
-				t.Skip(skip)
+	seen := map[string]bool{}
+	ran := 0
+	opts := vendoredOPTs(t)
+	for _, path := range opts {
+		name := filepath.Base(path)
+		t.Run(name, func(t *testing.T) {
+			ran++
+			seen[name] = true
+			c, w, refused := buildVendored(path)
+			wantStage, expectRefused := refusedOPTs[name]
+			switch {
+			case refused != nil && refused.stage == wantStage:
+				t.Skipf("the %s refuses %s, as refusedOPTs records: %v", refused.stage, name, refused.err)
+			case refused != nil:
+				t.Fatalf("the %s refuses %s: %v (refusedOPTs expects %s)", refused.stage, name, refused.err,
+					cmp.Or(wantStage, "no refusal at all"))
+			case expectRefused:
+				t.Fatalf("%s builds now, but refusedOPTs expects the %s to refuse it: drop the entry", name, wantStage)
 			}
-			if w.Tree.RMType != encodedRoot {
+			wantRoot, expectOtherRoot := nonCompositionRoots[name]
+			switch {
+			case w.Tree.RMType != encodedRoot && w.Tree.RMType == wantRoot:
 				t.Skipf("rooted at %s: the FLAT encoder takes a COMPOSITION, so these paths never reach it "+
 					"(rmpath does not navigate the demographic classes at all)", w.Tree.RMType)
+			case w.Tree.RMType != encodedRoot:
+				t.Fatalf("%s is rooted at %s, but nonCompositionRoots expects %s: pin the root or fix the template",
+					name, w.Tree.RMType, cmp.Or(wantRoot, encodedRoot))
+			case expectOtherRoot:
+				t.Fatalf("%s is rooted at %s now, but nonCompositionRoots expects %s: drop the entry",
+					name, encodedRoot, wantRoot)
 			}
 			var nodes []*webtemplate.Node
 			collectNodes(w.Tree, &nodes)
@@ -133,6 +190,20 @@ func TestWebTemplatePathsResolveViaRmpath(t *testing.T) {
 			}
 		})
 	}
+	if ran < len(opts) {
+		t.Logf("stale-entry checks skipped: %d of %d vendored OPTs ran", ran, len(opts))
+		return
+	}
+	for name := range nonCompositionRoots {
+		if !seen[name] {
+			t.Errorf("stale nonCompositionRoots entry %q: no such vendored OPT", name)
+		}
+	}
+	for name := range refusedOPTs {
+		if !seen[name] {
+			t.Errorf("stale refusedOPTs entry %q: no such vendored OPT", name)
+		}
+	}
 	for p, why := range ctxOwnedPaths {
 		if !exempted[p] {
 			t.Errorf("stale ctxOwnedPaths entry %q (%s): no vendored Web Template has a node there", p, why)
@@ -145,23 +216,23 @@ func TestWebTemplatePathsResolveViaRmpath(t *testing.T) {
 	}
 }
 
-// buildVendored parses, compiles and builds one OPT. A non-empty skip names the
-// step that refused it and why, so a refused template is visible in the output
-// rather than silently absent.
-func buildVendored(path string) (*templatecompile.Compiled, *webtemplate.WebTemplate, string) {
+// buildVendored parses, compiles and builds one OPT. A non-nil refusal names
+// the step that refused it and why, so the caller can tell an expected refusal
+// (refusedOPTs) from a new one.
+func buildVendored(path string) (*templatecompile.Compiled, *webtemplate.WebTemplate, *refusal) {
 	opt, err := template.ParseFile(path)
 	if err != nil {
-		return nil, nil, fmt.Sprintf("the OPT parser refuses %s: %v", filepath.Base(path), err)
+		return nil, nil, &refusal{stage: stageParser, err: err}
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
-		return nil, nil, fmt.Sprintf("the template compiler refuses %s: %v", filepath.Base(path), err)
+		return nil, nil, &refusal{stage: stageCompiler, err: err}
 	}
 	w, err := webtemplate.Build(c)
 	if err != nil {
-		return nil, nil, fmt.Sprintf("the Web Template builder refuses %s: %v", filepath.Base(path), err)
+		return nil, nil, &refusal{stage: stageBuilder, err: err}
 	}
-	return c, w, ""
+	return c, w, nil
 }
 
 // collectNodes lists every node below the root.
