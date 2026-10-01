@@ -172,7 +172,7 @@ func TestRun_InvalidEntryRefused(t *testing.T) {
 	noRun := probe.Entry{ID: "PROBE-030", InRepo: true}
 	inRepoWithBackendMode := stub("PROBE-031", probe.StatusPass, true, "")
 	inRepoWithBackendMode.Modes = []probe.Mode{probe.ModeSandbox}
-	backendClaimingInRepo := stub("PROBE-032", probe.StatusPass, false, probe.EffectReadOnly)
+	backendClaimingInRepo := stub("PROBE-010", probe.StatusPass, false, probe.EffectReadOnly)
 	backendClaimingInRepo.Modes = []probe.Mode{probe.ModeInRepo}
 
 	cases := []struct {
