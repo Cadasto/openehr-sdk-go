@@ -52,11 +52,6 @@ func emitReleaseFile(opts Options, plan *Plan, outDir string, tr *TargetResult, 
 	if err != nil || body == nil {
 		return err
 	}
-	for _, f := range plan.Files {
-		if f.FileBase+"_gen.go" == releaseFileName {
-			return fmt.Errorf("bmmgen: BMM package file %q collides with %s", f.FileBase, releaseFileName)
-		}
-	}
 	path := filepath.Join(outDir, releaseFileName)
 	tr.Files = append(tr.Files, path)
 	result.Files = append(result.Files, path)

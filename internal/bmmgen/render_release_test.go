@@ -196,3 +196,93 @@ func TestREQ042_RunEmitsReleaseFile(t *testing.T) {
 		t.Errorf("verify mode did not report drift on a hand-edited %s", releaseFileName)
 	}
 }
+
+// TestCheckFixedNameCollisions pins which file stems the generator reserves
+// for its own fixed-name files: a BMM package whose file would be written over
+// by typereg_gen.go, jsonhooks_gen.go, interval_bound_gen.go or
+// release_gen.go is refused, the error names both files, and an ordinary plan
+// passes.
+func TestCheckFixedNameCollisions(t *testing.T) {
+	for _, tc := range []struct {
+		fileBase string
+		fixed    string
+	}{
+		{"typereg", "typereg_gen.go"},
+		{"jsonhooks", "jsonhooks_gen.go"},
+		{"interval_bound", intervalBoundFile},
+		{"release", releaseFileName},
+	} {
+		t.Run(tc.fixed, func(t *testing.T) {
+			plan := &Plan{Files: []*PlannedFile{{FileBase: "data_types_quantity"}, {FileBase: tc.fileBase}}}
+			err := checkFixedNameCollisions(plan)
+			if err == nil {
+				t.Fatalf("checkFixedNameCollisions with a BMM package file %q = nil, want a collision with %s", tc.fileBase, tc.fixed)
+			}
+			for _, want := range []string{tc.fileBase, tc.fixed} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("collision error %q does not name %q", err, want)
+				}
+			}
+		})
+	}
+
+	if err := checkFixedNameCollisions(&Plan{Files: []*PlannedFile{{FileBase: "interval_bound_extra"}, {FileBase: "release_notes"}}}); err != nil {
+		t.Errorf("checkFixedNameCollisions with stems that only start like a fixed name = %v, want nil", err)
+	}
+}
+
+// TestRunRefusesBMMPackageNamedLikeAFixedFile pins that a generator run stops
+// before writing anything when a BMM package would take the name of one of its
+// fixed-name files. The test renames the RM schema's single-class
+// `integration` package, so the collision comes from the schema, not from a
+// hand-built plan.
+func TestRunRefusesBMMPackageNamedLikeAFixedFile(t *testing.T) {
+	entries, err := os.ReadDir(testResources)
+	if err != nil {
+		t.Fatalf("read %s: %v", testResources, err)
+	}
+	for _, tc := range []struct {
+		pkg   string
+		fixed string
+	}{
+		{"typereg", "typereg_gen.go"},
+		{"jsonhooks", "jsonhooks_gen.go"},
+		{"interval_bound", intervalBoundFile},
+		{"release", releaseFileName},
+	} {
+		t.Run(tc.fixed, func(t *testing.T) {
+			resources := t.TempDir()
+			for _, e := range entries {
+				if e.IsDir() {
+					continue
+				}
+				body, err := os.ReadFile(filepath.Join(testResources, e.Name()))
+				if err != nil {
+					t.Fatalf("read %s: %v", e.Name(), err)
+				}
+				if e.Name() == "openehr_rm_1.2.0.bmm.json" {
+					renamed := strings.ReplaceAll(string(body), `"org.openehr.rm.integration"`, `"org.openehr.rm.`+tc.pkg+`"`)
+					if renamed == string(body) {
+						t.Fatal("the RM schema no longer declares the package org.openehr.rm.integration")
+					}
+					body = []byte(renamed)
+				}
+				if err := os.WriteFile(filepath.Join(resources, e.Name()), body, 0o600); err != nil {
+					t.Fatalf("write %s: %v", e.Name(), err)
+				}
+			}
+
+			out := t.TempDir()
+			_, err := Run(Options{ResourcesDir: resources, OutDir: out})
+			if err == nil {
+				t.Fatalf("Run with a BMM package %q = nil error, want a collision with %s", tc.pkg, tc.fixed)
+			}
+			if want := "collides with " + tc.fixed; !strings.Contains(err.Error(), want) {
+				t.Errorf("Run error = %q, want it to contain %q", err, want)
+			}
+			if _, statErr := os.Stat(filepath.Join(out, TargetRM.OutSubDir)); statErr == nil {
+				t.Errorf("Run wrote into %s before refusing the collision", TargetRM.OutSubDir)
+			}
+		})
+	}
+}
