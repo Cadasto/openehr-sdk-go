@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -19,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	gojose "github.com/go-jose/go-jose/v4"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
@@ -549,6 +551,71 @@ func TestValidateIDTokenAllowlistCannotWiden(t *testing.T) {
 	// REQ-062: the allowlist narrows the supported set and never widens it.
 	if err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed) {
 		t.Fatalf("ValidateIDToken(PS256, allowlist %v) error = %v, want ErrJWKSValidationFailed", allowlist, err)
+	}
+}
+
+// TestValidateIDTokenSupportsNoOtherAlg checks that RS256, RS384, ES256 and
+// ES384 are the only supported algorithms: every other algorithm go-oidc can
+// verify is refused, both with no allowlist (the supported set) and with an
+// allowlist that names it. REQ-062 REQ-064
+func TestValidateIDTokenSupportsNoOtherAlg(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	rsaKey := newRSAKey(t)
+	p521 := newECKey(t, elliptic.P521())
+	edPub, edPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		alg  gojose.SignatureAlgorithm
+		priv any
+		pub  crypto.PublicKey
+	}{
+		{alg: gojose.RS512, priv: rsaKey, pub: &rsaKey.PublicKey},
+		{alg: gojose.PS256, priv: rsaKey, pub: &rsaKey.PublicKey},
+		{alg: gojose.PS384, priv: rsaKey, pub: &rsaKey.PublicKey},
+		{alg: gojose.PS512, priv: rsaKey, pub: &rsaKey.PublicKey},
+		{alg: gojose.ES512, priv: p521, pub: &p521.PublicKey},
+		{alg: gojose.EdDSA, priv: edPriv, pub: edPub},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.alg), func(t *testing.T) {
+			jwks := jwksServer(t, "kid-other", tc.pub, "")
+			tok := joseSign(t, tc.alg, tc.priv, "kid-other", defaultIDClaims(now))
+
+			// Control: go-oidc verifies the token against the served key once
+			// the algorithm is allowed, so the refusals below come from the
+			// SDK's supported set and not from a broken token or key.
+			raw, err := jwks.Key(t.Context(), "kid-other")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var served gojose.JSONWebKey
+			if err := served.UnmarshalJSON(raw); err != nil {
+				t.Fatal(err)
+			}
+			verifier := oidc.NewVerifier("https://issuer.example",
+				&oidc.StaticKeySet{PublicKeys: []crypto.PublicKey{served.Key}},
+				&oidc.Config{ClientID: "client-id", SupportedSigningAlgs: []string{string(tc.alg)}, Now: func() time.Time { return now }})
+			if _, err := verifier.Verify(t.Context(), tok); err != nil {
+				t.Fatalf("control: go-oidc Verify(%s token, allowing %s) error = %v, want nil", tc.alg, tc.alg, err)
+			}
+
+			_, err = smart.ValidateIDToken(t.Context(), tok, jwks,
+				"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+			// REQ-062: no algorithm outside the four is supported.
+			if err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed) {
+				t.Fatalf("ValidateIDToken(%s, no allowlist) error = %v, want ErrJWKSValidationFailed", tc.alg, err)
+			}
+
+			allowlist := []string{string(tc.alg)}
+			_, err = smart.ValidateIDToken(t.Context(), tok, jwks,
+				"https://issuer.example", "client-id", "nonce-xyz", now, allowlist)
+			if err == nil || !strings.Contains(err.Error(), "no supported id_token signing algorithm") {
+				t.Fatalf("ValidateIDToken(%s, allowlist %v) error = %v, want the no-supported-algorithm refusal", tc.alg, allowlist, err)
+			}
+		})
 	}
 }
 
