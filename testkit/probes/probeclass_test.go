@@ -278,6 +278,44 @@ func TestREQ082CatalogueReportsClassMismatch(t *testing.T) {
 	if calls == 0 || reported != calls {
 		t.Errorf("TestREQ082ProbeClassMatchesModes reports %d of %d classMismatch results, want every result reported", reported, calls)
 	}
+
+	// A result counts only as a direct argument of the call that reports it.
+	// Each of these shapes drops the text and must report nothing.
+	discarded := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "assigned then discarded",
+			body: `if msg := classMismatch(id, probes[id], modes); msg != "" { _ = msg }`,
+		},
+		{
+			name: "wrapped in drop",
+			body: `reportClassMismatch(t, drop(classMismatch(id, probes[id], modes)))`,
+		},
+		{
+			name: "wrapped in fmt.Errorf",
+			body: `_ = fmt.Errorf("%s", classMismatch(id, probes[id], modes))`,
+		},
+	}
+	for _, tc := range discarded {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			src := "package p\nfunc TestWrapped(t *testing.T) {\n" + tc.body + "\n}\n"
+			f, err := parser.ParseFile(token.NewFileSet(), "wrapped.go", src, parser.SkipObjectResolution)
+			if err != nil {
+				t.Fatalf("parser.ParseFile: %v", err)
+			}
+			wrapped := funcByName(f, "TestWrapped")
+			if wrapped == nil {
+				t.Fatal("TestWrapped is not in the parsed source")
+			}
+			calls, reported := classMismatchResultsReported(wrapped)
+			if calls != 1 || reported != 0 {
+				t.Errorf("classMismatchResultsReported() = %d reported of %d calls, want 0 of 1", reported, calls)
+			}
+		})
+	}
 }
 
 // TestREQ082DotImportRefused feeds scopeOf a file that dot-imports a package
@@ -321,10 +359,9 @@ func funcByName(f *ast.File, name string) *ast.FuncDecl {
 }
 
 // classMismatchResultsReported counts classMismatch calls in fn and how many
-// of their results are passed to reportClassMismatch or to Error/Errorf.
-// A result assigned to _ is not reported, and neither is a result whose only
-// later use is `_ = name`. The check walks the AST: a source-text search
-// would still pass when the call is discarded into _.
+// of their results are a direct argument of reportClassMismatch or of
+// t.Error / t.Errorf. A name the call was assigned to counts only when that
+// same identifier is a direct argument of one of those calls.
 func classMismatchResultsReported(fn *ast.FuncDecl) (calls, reported int) {
 	if fn == nil || fn.Body == nil {
 		return 0, 0
@@ -344,30 +381,27 @@ func classMismatchResultsReported(fn *ast.FuncDecl) (calls, reported int) {
 }
 
 func classMismatchResultReported(fn *ast.FuncDecl, call *ast.CallExpr, stack []ast.Node) bool {
-	for _, parentNode := range slices.Backward(stack) {
-		parent, ok := parentNode.(*ast.CallExpr)
-		if !ok || !isReportingCall(parent) {
-			continue
-		}
-		for _, arg := range parent.Args {
-			if nodeContains(arg, call) {
-				return true
-			}
-		}
-		break
-	}
 	if len(stack) == 0 {
 		return false
 	}
-	as, ok := stack[len(stack)-1].(*ast.AssignStmt)
-	if !ok {
+	switch parent := stack[len(stack)-1].(type) {
+	case *ast.CallExpr:
+		return isReportingCall(parent) && isDirectArg(parent, call)
+	case *ast.AssignStmt:
+		name := assignedName(parent, call)
+		return name != "" && identPassedToReporter(fn, name)
+	default:
 		return false
 	}
-	name := assignedName(as, call)
-	if name == "" {
-		return false
+}
+
+func isDirectArg(call *ast.CallExpr, arg ast.Expr) bool {
+	for _, a := range call.Args {
+		if a == arg {
+			return true
+		}
 	}
-	return identPassedToReporter(fn, name)
+	return false
 }
 
 func isFunIdent(call *ast.CallExpr, name string) bool {
@@ -380,7 +414,11 @@ func isReportingCall(call *ast.CallExpr) bool {
 		return id.Name == "reportClassMismatch"
 	}
 	sel, ok := call.Fun.(*ast.SelectorExpr)
-	return ok && (sel.Sel.Name == "Error" || sel.Sel.Name == "Errorf")
+	if !ok {
+		return false
+	}
+	recv, ok := sel.X.(*ast.Ident)
+	return ok && recv.Name == "t" && (sel.Sel.Name == "Error" || sel.Sel.Name == "Errorf")
 }
 
 func assignedName(as *ast.AssignStmt, rhs ast.Expr) string {
@@ -411,21 +449,6 @@ func identPassedToReporter(fn *ast.FuncDecl, name string) bool {
 				found = true
 				return false
 			}
-		}
-		return true
-	})
-	return found
-}
-
-func nodeContains(root, target ast.Node) bool {
-	found := false
-	ast.Inspect(root, func(n ast.Node) bool {
-		if found {
-			return false
-		}
-		if n == target {
-			found = true
-			return false
 		}
 		return true
 	})
