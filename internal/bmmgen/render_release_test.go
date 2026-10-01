@@ -286,3 +286,61 @@ func TestRunRefusesBMMPackageNamedLikeAFixedFile(t *testing.T) {
 		})
 	}
 }
+
+// TestRunRefusesFixedFileNameInAnyTarget pins that the reservation of the
+// generator's fixed-name files is uniform: a BMM package of the AOM 1.4 target
+// named like a fixed file is refused, including the two names that target
+// never emits (interval_bound_gen.go and release_gen.go). Guarding the check
+// with the RM target alone would let those two through. The test renames the
+// AOM schema's `openehr_archetype_profile` package and runs the AOM target
+// alone, so the RM target cannot be the one that refuses.
+func TestRunRefusesFixedFileNameInAnyTarget(t *testing.T) {
+	entries, err := os.ReadDir(testResources)
+	if err != nil {
+		t.Fatalf("read %s: %v", testResources, err)
+	}
+	for _, tc := range []struct {
+		pkg   string
+		fixed string
+	}{
+		{"typereg", "typereg_gen.go"},
+		{"jsonhooks", "jsonhooks_gen.go"},
+		{"interval_bound", intervalBoundFile},
+		{"release", releaseFileName},
+	} {
+		t.Run(tc.fixed, func(t *testing.T) {
+			resources := t.TempDir()
+			for _, e := range entries {
+				if e.IsDir() {
+					continue
+				}
+				body, err := os.ReadFile(filepath.Join(testResources, e.Name()))
+				if err != nil {
+					t.Fatalf("read %s: %v", e.Name(), err)
+				}
+				if e.Name() == "openehr_am_1.4.0.bmm.json" {
+					renamed := strings.ReplaceAll(string(body), "openehr_archetype_profile", tc.pkg)
+					if renamed == string(body) {
+						t.Fatal("the AOM 1.4 schema no longer declares the package openehr_archetype_profile")
+					}
+					body = []byte(renamed)
+				}
+				if err := os.WriteFile(filepath.Join(resources, e.Name()), body, 0o600); err != nil {
+					t.Fatalf("write %s: %v", e.Name(), err)
+				}
+			}
+
+			out := t.TempDir()
+			_, err := Run(Options{ResourcesDir: resources, OutDir: out, Targets: []Target{TargetAOM14}})
+			if err == nil {
+				t.Fatalf("Run on the AOM 1.4 target with a BMM package %q = nil error, want a collision with %s", tc.pkg, tc.fixed)
+			}
+			if want := "collides with " + tc.fixed; !strings.Contains(err.Error(), want) {
+				t.Errorf("Run error = %q, want it to contain %q", err, want)
+			}
+			if _, statErr := os.Stat(filepath.Join(out, TargetAOM14.OutSubDir)); statErr == nil {
+				t.Errorf("Run wrote into %s before refusing the collision", TargetAOM14.OutSubDir)
+			}
+		})
+	}
+}

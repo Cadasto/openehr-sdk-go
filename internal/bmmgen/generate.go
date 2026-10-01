@@ -474,6 +474,12 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 // fixedGeneratedFiles are the generator's own file names in a target package,
 // the ones not derived from a BMM package: a package whose file stem produced
 // one of them would be silently overwritten by it.
+//
+// The reservation is uniform: all four names, in every target. A BMM package
+// named like a fixed file is refused even in a target that would not emit that
+// file (the AOM 1.4 target emits neither interval_bound_gen.go nor
+// release_gen.go), so the set of reserved names never depends on the target and
+// a package can be moved between targets without a new collision.
 var fixedGeneratedFiles = []string{
 	"typereg_gen.go",
 	"jsonhooks_gen.go",
