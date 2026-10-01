@@ -122,3 +122,53 @@ func TestInterfaceWithoutDescendantMarkerOnlySynthetic(t *testing.T) {
 		t.Errorf("MethodStubsEmitted = %d, want 0 for an interface without descendants", plan.MethodStubsEmitted)
 	}
 }
+
+// TestInterfaceDescendantGetsNoMarkerSynthetic pins the rest of ADR 0002 D4
+// for a P_BMM_INTERFACE (REQ-043 § Mapping rules, Class → Go type): a
+// concrete descendant of an interface receives neither the is<X>() marker
+// nor a stub for the interface's functions, because no pinned BMM interface
+// carries is_abstract (STRAND-12). Resolving STRAND-12 changes this test
+// together with D4.
+func TestInterfaceDescendantGetsNoMarkerSynthetic(t *testing.T) {
+	ifc := &bmm.Interface{}
+	ifc.Name = "SVC_ACCESS"
+	ifc.Functions = map[string]*bmm.Function{
+		"ping": {Name: "ping", Result: &bmm.SimpleType{TypeName: "Boolean"}},
+	}
+	impl := &bmm.SimpleClass{}
+	impl.Name = "SVC_IMPL"
+	impl.Ancestors_ = []string{"SVC_ACCESS"}
+	plan := &Plan{
+		Target: TargetRM,
+		Classes: map[string]*PlannedClass{
+			"SVC_ACCESS": {BMMName: "SVC_ACCESS", GoName: "SvcAccess", Class: ifc},
+			"SVC_IMPL":   {BMMName: "SVC_IMPL", GoName: "SvcImpl", Class: impl},
+		},
+		AbstractDescendants: map[string][]string{},
+		ConcreteSubtypes:    map[string][]string{},
+		CyclicSingleProps:   map[string]map[string]bool{},
+	}
+	computeAbstractDescendants(plan)
+	file := &PlannedFile{
+		FileBase: "synthetic",
+		Classes:  []*PlannedClass{plan.Classes["SVC_ACCESS"], plan.Classes["SVC_IMPL"]},
+	}
+
+	out, err := RenderFile(plan, file)
+	if err != nil {
+		t.Fatalf("RenderFile: %v", err)
+	}
+	src := string(out)
+	if !markerOnlyInterface(src, "SvcAccess") {
+		t.Errorf("SvcAccess is not exactly `interface { isSvcAccess() }`:\n%s", src)
+	}
+	if strings.Contains(src, ") isSvcAccess()") {
+		t.Errorf("a descendant received the isSvcAccess() marker:\n%s", src)
+	}
+	if strings.Contains(src, "SVC_ACCESS.ping") || strings.Contains(src, "Ping(") {
+		t.Errorf("a method stub for SVC_ACCESS.ping was emitted:\n%s", src)
+	}
+	if plan.MethodStubsEmitted != 0 {
+		t.Errorf("MethodStubsEmitted = %d, want 0 for an interface's descendant", plan.MethodStubsEmitted)
+	}
+}
