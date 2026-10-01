@@ -9,18 +9,26 @@ package rm
 // beside its own open flag, and any bound on a bounded side, is emitted as it
 // stands.
 func omitIntervalBound[T any](unbounded bool, bound T) bool {
-	return unbounded && isEmptyIntervalBound(bound)
+	return unbounded && IsEmptyIntervalBound(bound)
 }
 
-// isEmptyIntervalBound reports whether an interval bound holds no value. A
-// bound typed by an interface, such as DVInterval[DVOrdered], is empty when
-// it is nil or holds a typed-nil pointer to an RM class; an all-zero value
-// behind the interface is still a value. A bound of a concrete type is empty
-// when it is that type's zero value: field by field for the RM data value
-// types the interval classes bound (the cases below), and by comparison for
-// a Go built-in scalar type or an RM primitive. A bound of any other Go type
-// is never empty, so it is emitted as it stands.
-func isEmptyIntervalBound[T any](bound T) bool {
+// IsEmptyIntervalBound reports whether an interval bound holds no value.
+//
+// An interval marks an open side with its `lower_unbounded` or
+// `upper_unbounded` flag, and an open side has no bound. The canonical JSON
+// and XML encoders leave out the `lower` or `upper` of an open side whose
+// bound is empty, and the validation packages read such a bound as absent.
+// A caller that reads an interval can use this function to see the same
+// bound they do.
+//
+// A bound typed by an interface, such as the bound of a DVInterval[DVOrdered],
+// is empty when it is nil or holds a typed-nil pointer to an RM class; an
+// all-zero value behind the interface is still a value. A bound of a concrete
+// type is empty when it is that type's zero value: field by field for the RM
+// data value types an interval can bound, and by comparison for a Go built-in
+// scalar type or an RM primitive such as Integer and Real. A bound of any
+// other Go type is never empty, so it is emitted as it stands.
+func IsEmptyIntervalBound[T any](bound T) bool {
 	v := any(bound)
 	if v == nil || IsTypedNil(v) {
 		return true

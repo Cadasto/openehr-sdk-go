@@ -151,7 +151,7 @@ func TestIntervalBoundFileWithoutBoundClasses(t *testing.T) {
 	if body == nil {
 		t.Fatal("RenderIntervalBoundFile without DV_INTERVAL emits no file, but Proper_interval and Point_interval still call omitIntervalBound")
 	}
-	for _, want := range []string{"func omitIntervalBound[", "func isEmptyIntervalBound["} {
+	for _, want := range []string{"func omitIntervalBound[", "func IsEmptyIntervalBound["} {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("interval bound file without DV_INTERVAL lacks %q:\n%s", want, body)
 		}
@@ -477,5 +477,39 @@ func TestIntervalDerivedWireEmbedsMethodFreeBase(t *testing.T) {
 				t.Errorf("%s still declares %q: that alias would promote BASE Interval's MarshalJSONTo:\n%s", class, banned, src)
 			}
 		})
+	}
+}
+
+// TestIntervalBoundFileExportsEmptinessTest pins the public shape of the
+// emptiness test (REQ-052): the generated file exports it as
+// IsEmptyIntervalBound, keeps the encoders' unexported omitIntervalBound
+// wrapper over it, and documents it for SDK users, as a sentence starting with
+// the name and free of requirement identifiers (AGENTS.md).
+func TestIntervalBoundFileExportsEmptinessTest(t *testing.T) {
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+	body, err := RenderIntervalBoundFile(plan)
+	if err != nil {
+		t.Fatalf("RenderIntervalBoundFile: %v", err)
+	}
+	src := string(body)
+	if strings.Contains(src, "func isEmptyIntervalBound[") {
+		t.Errorf("the emptiness test is still unexported:\n%s", src)
+	}
+	if !strings.Contains(src, "\treturn unbounded && IsEmptyIntervalBound(bound)\n") {
+		t.Errorf("omitIntervalBound does not delegate to IsEmptyIntervalBound:\n%s", src)
+	}
+	doc, _, ok := strings.Cut(src, "func IsEmptyIntervalBound[")
+	if !ok {
+		t.Fatalf("no exported IsEmptyIntervalBound in the interval bound file:\n%s", src)
+	}
+	doc = doc[strings.LastIndex(doc, "\n\n")+2:]
+	if !strings.HasPrefix(doc, "// IsEmptyIntervalBound reports ") {
+		t.Errorf("IsEmptyIntervalBound doc comment does not start with its name:\n%s", doc)
+	}
+	if regexp.MustCompile(`REQ-\d+|PROBE-\d+`).MatchString(doc) {
+		t.Errorf("IsEmptyIntervalBound doc comment carries a requirement identifier:\n%s", doc)
 	}
 }
