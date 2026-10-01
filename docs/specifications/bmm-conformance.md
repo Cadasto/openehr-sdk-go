@@ -249,7 +249,7 @@ How each P_BMM construct becomes Go code.
 |---|---|
 | Concrete class (`is_abstract` absent or `false`) | `type X struct { ... }` with embedded ancestor structs |
 | Abstract class (`is_abstract: true`) | `type X interface { isX() }` plus a marker method on every concrete descendant. Per [`rm-modeling.md`](rm-modeling.md). |
-| `P_BMM_INTERFACE` | `type X interface { ... }` with methods translated from `functions` |
+| `P_BMM_INTERFACE` | `type X interface { isX() }`, a marker only ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4). The generator emits no methods for its `functions`: today that leaves the four of `CODE_SET_ACCESS` and the six of `TERMINOLOGY_ACCESS` out, and no class in the pinned BMM descends from an interface ([STRAND-12](research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag)) |
 | `P_BMM_ENUMERATION_STRING` | `type X string` + constants for each item |
 | `P_BMM_ENUMERATION_INTEGER` | `type X int` + constants for each item |
 | Generic class (`generic_parameter_defs` present) | Generic Go type `type X[T constraint] struct { ... }` where the constraint corresponds to the `conforms_to_type` upper bound |

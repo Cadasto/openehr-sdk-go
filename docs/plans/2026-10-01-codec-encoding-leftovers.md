@@ -5,7 +5,7 @@ kind: plan
 # Plan — Codec and RM encoding leftovers from PRs 190 to 193
 
 **Date:** 2026-10-01
-**Status:** In progress — phases 1 to 3 implemented on `feat/plan-codec-encoding-leftovers`; decisions 1 and 2 took the recommended option; decision 3 still gates Phase 4
+**Status:** Done — phases 1 to 4 implemented; decisions 1 and 2 took the recommended option, and decision 3 took the ADR route (ADR 0002 D4 amended, mapping row reworded)
 **Covers:** REQ-053 and REQ-140 ([wire.md § REQ-053](../specifications/wire.md#req-053), [§ REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes)), REQ-052 and REQ-056 ([wire.md § REQ-052](../specifications/wire.md#req-052)), REQ-121 ([rm-functions.md](../specifications/rm-functions.md)), REQ-043 ([bmm-conformance.md](../specifications/bmm-conformance.md)); interacts with REQ-112 ([clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor))
 **Probes:** PROBE-086 (census, must not move in phases 1 and 2), PROBE-030 and PROBE-033 (canonical JSON and XML round trip)
 **Depends on:** nothing; the flat-decode fidelity work (PR 193) is merged
