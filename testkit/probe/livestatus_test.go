@@ -132,7 +132,17 @@ func ehrStatusLiveEntries(runID string, status *rm.EHRStatus, created *createdEH
 						st.ArchetypeNodeID, st.IsQueryable, st.IsModifiable,
 						status.ArchetypeNodeID, status.IsQueryable, status.IsModifiable), nil
 				}
-				return probe.Result{Status: probe.StatusPass, Detail: st.ArchetypeNodeID}, nil
+				// The EHR id is server-assigned. The per-run id lives only
+				// in name.value, so a read-back that dropped it would leave
+				// a resource that cannot be attributed (REQ-082).
+				gotName := ""
+				if st.Name != nil {
+					gotName = st.Name.GetValue()
+				}
+				if gotName != runID {
+					return liveFailf("ehrstatus.Get name = %q, want the per-run id %q", gotName, runID), nil
+				}
+				return probe.Result{Status: probe.StatusPass, Detail: gotName}, nil
 			},
 		},
 	}
@@ -213,7 +223,8 @@ func minimalCompositionLiveEntries(ehrID openehrclient.EHRID, templateID string,
 // The two probes use two EHRs. PROBE-060 creates one with
 // WithInitialStatus and without WithEHRID: is_queryable true,
 // is_modifiable false, and the per-run id in name.value. Location must
-// name /ehr/{id}, and ehrstatus.Get must return those three fields.
+// name /ehr/{id}, and ehrstatus.Get must return those three fields
+// and the per-run id in name.value.
 // That EHR is not modified again.
 //
 // PROBE-065 creates a second EHR with createEHRProbe (client-supplied
