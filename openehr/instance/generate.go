@@ -381,6 +381,9 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 		// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE
 		// inside DV_CODED_TEXT) get filled.
 		g.populateBMMRequiredAttrs(rmChild, concrete, depth+1)
+		// Best-effort attach: a default the slot rejects (a polymorphic
+		// attribute the BMM cannot narrow) is left to the validator, as in
+		// materialiseImplicitSingle.
 		if isContainer {
 			_ = rmwrite.AppendMultiple(parent, parentRMType, attrName, rmChild)
 		} else {
@@ -442,6 +445,8 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 		v.Denominator = 1
 	case *rm.DVURI:
 		v.Value = "http://example.com"
+	case *rm.DVEHRURI:
+		v.Value = "ehr://example"
 	case *rm.DVIdentifier:
 		v.ID = "example"
 	case *rm.DVParsable:
@@ -471,6 +476,11 @@ func (g *generator) writeBMMString(parent any, parentType, attr string) {
 	if dateTimeValueUnset(parent, parentType, attr) {
 		val = g.dateTimeDefault()
 	}
+	// Best-effort, on purpose: the write is refused for a String
+	// attribute rmwrite does not address (TERMINOLOGY_ID.value, a
+	// locatable's archetype_node_id), and those are filled by another
+	// default or reported by the validator. Returning the error would
+	// fail Generate on every OPT.
 	_ = rmwrite.EnsureSingle(parent, parentType, attr, val)
 }
 
@@ -614,6 +624,8 @@ func (g *generator) fillEntryCode(parent any, parentType, attr string) bool {
 	if !entryCodeEmpty(parent, attr) {
 		return true
 	}
+	// Best-effort: every ENTRY parent type is addressed by rmwrite, and an
+	// entry the walk builds is checked by the validator afterwards.
 	_ = rmwrite.EnsureSingle(parent, parentType, attr, phrase)
 	return true
 }
@@ -1442,8 +1454,8 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 			v.Item = *el
 		}
 	case *rm.DVEHRURI:
-		// The one place a DV_EHR_URI gets its default: the generic String
-		// pass cannot write it, and every one the generator emits is walked.
+		// Backstop for a DV_EHR_URI the primitive default did not reach;
+		// every one the generator emits is walked.
 		if v.Value == "" {
 			v.Value = "ehr://example"
 		}
