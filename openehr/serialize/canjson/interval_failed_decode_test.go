@@ -16,7 +16,7 @@ import (
 func TestREQ052IntervalFailedDecodeKeepsWhatWasRead(t *testing.T) {
 	type point = rm.PointInterval[rm.Integer]
 	start := func() *point {
-		return &point{Interval: rm.Interval[rm.Integer]{Lower: 1}, UpperUnbounded: true}
+		return &point{Lower: 1, UpperUnbounded: true}
 	}
 	cases := []struct {
 		name string
@@ -67,7 +67,7 @@ func TestREQ052IntervalFailedDecodeKeepsWhatWasRead(t *testing.T) {
 	}
 
 	t.Run("Proper_interval: a bad upper bound", func(t *testing.T) {
-		got := &rm.ProperInterval[rm.Integer]{Interval: rm.Interval[rm.Integer]{Lower: 1, UpperUnbounded: true}}
+		got := &rm.ProperInterval[rm.Integer]{Lower: 1, UpperUnbounded: true}
 		in := `{"_type":"Proper_interval","lower":5,"lower_included":true,"upper":"x"}`
 		if err := canjson.Unmarshal([]byte(in), got); err == nil {
 			t.Fatal("Unmarshal succeeded, want a failure")
