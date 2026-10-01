@@ -64,9 +64,10 @@ func leafFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (any, er
 
 // stringFromSuffixes rebuilds a STRING leaf's RM String from its bare value.
 // Any suffix, |raw included, is ErrUnsupportedDatatype: the leaf carries a bare
-// value only. So is an empty string (REQ-053 § Leaf datatypes). A bare value that is not a JSON string is a malformed body, not a
-// datatype this codec declines to model, so it carries no gap sentinel (the
-// [applyOrderedSuffixes] rule).
+// value only. A bare value that is not a JSON string, or is an empty string
+// (REQ-053 § Leaf datatypes), is a malformed body, not a datatype this codec
+// declines to model, so it carries no gap sentinel (the [applyOrderedSuffixes]
+// rule).
 func stringFromSuffixes(sfx map[string]any) (any, error) {
 	for _, k := range slices.Sorted(maps.Keys(sfx)) {
 		if k != "" {
@@ -86,7 +87,7 @@ func stringFromSuffixes(sfx map[string]any) (any, error) {
 	// and encode writes nothing for one, so an empty bare value is refused
 	// rather than rebuilt into an invalid ACTIVITY.
 	if s == "" {
-		return nil, fmt.Errorf("%w: an empty %s, which the RM invariant forbids", ErrUnsupportedDatatype, stringLeafType)
+		return nil, fmt.Errorf("an empty %s, which the RM invariant forbids", stringLeafType)
 	}
 	return s, nil
 }
