@@ -10,8 +10,9 @@ package rm
 // partial-form inspection, an idiomatic Compare, and Go-bridge
 // conversions (ToTime / ToDuration).
 //
-// No method panics: a malformed `value` yields zero components and a
-// zero magnitude; the fallible Go-bridge conversions return an error
+// No method panics: a malformed `value` yields zero components, false
+// inspection flags and a zero magnitude, never the parts read before the
+// parse stopped; the fallible Go-bridge conversions return an error
 // (also for partial / calendar-nominal values that cannot map cleanly).
 // See docs/specifications/rm-functions.md § REQ-123 and ADR 0011.
 //
@@ -75,13 +76,22 @@ func (d *DVDate) Month() int { p, _ := parseDate(d.Value); return p.month }
 // Day returns the day component, or 0 when day-unknown.
 func (d *DVDate) Day() int { p, _ := parseDate(d.Value); return p.day }
 
-// MonthUnknown reports whether the date omits the month (e.g. "2024").
-func (d *DVDate) MonthUnknown() bool { p, _ := parseDate(d.Value); return !p.monthKnown }
+// MonthUnknown reports whether the date omits the month (e.g. "2024"). It is
+// false when the value does not parse.
+func (d *DVDate) MonthUnknown() bool {
+	p, err := parseDate(d.Value)
+	return err == nil && !p.monthKnown
+}
 
-// DayUnknown reports whether the date omits the day (e.g. "2024-03").
-func (d *DVDate) DayUnknown() bool { p, _ := parseDate(d.Value); return !p.dayKnown }
+// DayUnknown reports whether the date omits the day (e.g. "2024-03"). It is
+// false when the value does not parse.
+func (d *DVDate) DayUnknown() bool {
+	p, err := parseDate(d.Value)
+	return err == nil && !p.dayKnown
+}
 
-// IsPartial reports whether the date is reduced (day or more missing).
+// IsPartial reports whether the date is reduced (day or more missing). It is
+// false when the value does not parse.
 func (d *DVDate) IsPartial() bool { return d.DayUnknown() }
 
 // Magnitude returns the number of days since the calendar origin
@@ -137,8 +147,12 @@ func (d *DVTime) FractionalSecond() float64 { p, _ := parseTime(d.Value); return
 // when none is present.
 func (d *DVTime) Timezone() string { p, _ := parseTime(d.Value); return p.tz }
 
-// IsPartial reports whether the time is reduced (second or more missing).
-func (d *DVTime) IsPartial() bool { p, _ := parseTime(d.Value); return !p.secondKnown }
+// IsPartial reports whether the time is reduced (second or more missing). It
+// is false when the value does not parse.
+func (d *DVTime) IsPartial() bool {
+	p, err := parseTime(d.Value)
+	return err == nil && !p.secondKnown
+}
 
 // Magnitude returns the number of seconds since the start of day. The
 // value is clock-local: the timezone offset is not normalized away (per
@@ -184,8 +198,21 @@ func (d *DVTime) ToTime() (time.Time, error) {
 
 // --- DV_DATE_TIME -------------------------------------------------------
 
+// split parses the date-time's value into its date and time parts. On an
+// error both parts are zero, so no accessor reports a part read before the
+// parse stopped.
 func (d *DVDateTime) split() (dateParts, timeParts, error) {
-	datePart, timePart, hasT := strings.Cut(d.Value, "T")
+	dp, tp, err := splitDateTime(d.Value)
+	if err != nil {
+		return dateParts{}, timeParts{}, err
+	}
+	return dp, tp, nil
+}
+
+// splitDateTime does the work of split. On an error the parts it returns may
+// be partly filled.
+func splitDateTime(value string) (dateParts, timeParts, error) {
+	datePart, timePart, hasT := strings.Cut(value, "T")
 	dp, derr := parseDate(datePart)
 	if derr != nil {
 		return dp, timeParts{}, derr
@@ -194,7 +221,7 @@ func (d *DVDateTime) split() (dateParts, timeParts, error) {
 		return dp, timeParts{}, nil
 	}
 	if !dp.dayKnown {
-		return dp, timeParts{}, fmt.Errorf("time part needs a full date in %q", d.Value)
+		return dp, timeParts{}, fmt.Errorf("time part needs a full date in %q", value)
 	}
 	tp, terr := parseTime(timePart)
 	if terr != nil {
@@ -202,11 +229,12 @@ func (d *DVDateTime) split() (dateParts, timeParts, error) {
 	}
 	// The date and time bodies are both extended or both compact; ISO 8601
 	// has no mixed form. The zone suffix is not part of the body, so its
-	// style may differ from the body's (10:30:00+0530, 103000+05:30): the
-	// fixtures carry both.
+	// style may differ from the body's. The fixtures carry an extended body
+	// with a compact zone (10:30:00+0530); the other mix, a compact body with
+	// an extended zone (103000+05:30), is accepted alongside it.
 	dateExtended := strings.Contains(datePart, "-")
 	if (dateExtended && tp.basic) || (!dateExtended && tp.colon) {
-		return dp, timeParts{}, fmt.Errorf("mixed extended and compact forms in %q", d.Value)
+		return dp, timeParts{}, fmt.Errorf("mixed extended and compact forms in %q", value)
 	}
 	return dp, tp, nil
 }
@@ -235,17 +263,26 @@ func (d *DVDateTime) FractionalSecond() float64 { _, tp, _ := d.split(); return 
 // Timezone returns the timezone designator, or "" when none.
 func (d *DVDateTime) Timezone() string { _, tp, _ := d.split(); return tp.tz }
 
-// MonthUnknown reports whether the date side omits the month.
-func (d *DVDateTime) MonthUnknown() bool { dp, _, _ := d.split(); return !dp.monthKnown }
+// MonthUnknown reports whether the date side omits the month. It is false
+// when the value does not parse.
+func (d *DVDateTime) MonthUnknown() bool {
+	dp, _, err := d.split()
+	return err == nil && !dp.monthKnown
+}
 
-// DayUnknown reports whether the date side omits the day.
-func (d *DVDateTime) DayUnknown() bool { dp, _, _ := d.split(); return !dp.dayKnown }
+// DayUnknown reports whether the date side omits the day. It is false when
+// the value does not parse.
+func (d *DVDateTime) DayUnknown() bool {
+	dp, _, err := d.split()
+	return err == nil && !dp.dayKnown
+}
 
 // IsPartial reports whether the date-time is reduced (second or more
-// missing, including a missing time part entirely).
+// missing, including a missing time part entirely). It is false when the
+// value does not parse.
 func (d *DVDateTime) IsPartial() bool {
-	dp, tp, _ := d.split()
-	return !dp.dayKnown || !tp.secondKnown
+	dp, tp, err := d.split()
+	return err == nil && (!dp.dayKnown || !tp.secondKnown)
 }
 
 // Magnitude returns the number of seconds since the calendar origin
@@ -314,7 +351,8 @@ func (d *DVDuration) Seconds() int { p, _ := parseDuration(d.Value); return p.se
 func (d *DVDuration) FractionalSeconds() float64 { p, _ := parseDuration(d.Value); return p.frac }
 
 // IsNegative reports whether the duration carries a leading minus sign
-// (openEHR deviation from ISO 8601).
+// (openEHR deviation from ISO 8601). It is false when the value does not
+// parse.
 func (d *DVDuration) IsNegative() bool { p, _ := parseDuration(d.Value); return p.neg }
 
 // Magnitude returns the duration as a number of seconds, using the
@@ -369,8 +407,19 @@ func (d *DVDuration) ToDuration() (time.Duration, error) {
 
 // parseDate parses the BASE valid_iso8601_date forms: YYYY-MM-DD, YYYY-MM,
 // YYYY, YYYYMMDD, YYYYMM, with the month and day checked against the
-// Gregorian calendar. Every field is zero-filled ASCII digits.
+// Gregorian calendar. Every field is zero-filled ASCII digits. On an error
+// the parts are zero.
 func parseDate(s string) (dateParts, error) {
+	p, err := scanDate(s)
+	if err != nil {
+		return dateParts{}, err
+	}
+	return p, nil
+}
+
+// scanDate does the work of parseDate. On an error the parts it returns may
+// be partly filled.
+func scanDate(s string) (dateParts, error) {
 	var p dateParts
 	if s == "" {
 		return p, errors.New("empty date")
@@ -421,7 +470,18 @@ func parseDate(s string) (dateParts, error) {
 // parseTime parses the BASE valid_iso8601_time forms: hh:mm:ss, hh:mm
 // (extended), hhmmss, hhmm, hh (compact), each with an optional comma or dot
 // fraction on the seconds and an optional zone of Z, ±hh, ±hhmm or ±hh:mm.
+// On an error the parts are zero.
 func parseTime(s string) (timeParts, error) {
+	p, err := scanTime(s)
+	if err != nil {
+		return timeParts{}, err
+	}
+	return p, nil
+}
+
+// scanTime does the work of parseTime. On an error the parts it returns may
+// be partly filled.
+func scanTime(s string) (timeParts, error) {
 	var p timeParts
 	body := s
 	if i := strings.IndexAny(s, "Z+-"); i >= 0 {
@@ -580,8 +640,18 @@ func daysInMonth(y, m int) int {
 // deviations: a leading negative sign, and the W designator mixed with the
 // others (in the order Y M W D). Designators appear at most once, in that
 // order; a T section needs at least one component; a fraction (dot or comma)
-// is allowed on the seconds only.
+// is allowed on the seconds only. On an error the parts are zero.
 func parseDuration(s string) (durationParts, error) {
+	p, err := scanDuration(s)
+	if err != nil {
+		return durationParts{}, err
+	}
+	return p, nil
+}
+
+// scanDuration does the work of parseDuration. On an error the parts it
+// returns may be partly filled.
+func scanDuration(s string) (durationParts, error) {
 	var p durationParts
 	orig := s
 	if rest, ok := strings.CutPrefix(s, "-"); ok {

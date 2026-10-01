@@ -87,6 +87,12 @@ func unknownNullFlavour() *rm.DVCodedText {
 // TestREQ112_ElementNullFlavourIndicated covers Inv_null_flavour_indicated
 // (is_null() xor null_flavour = Void): exactly one of value and null_flavour.
 func TestREQ112_ElementNullFlavourIndicated(t *testing.T) {
+	both := func() *rm.Element {
+		e := validElement()
+		e.Value = &rm.DVText{Value: "x"}
+		e.NullFlavour = unknownNullFlavour()
+		return e
+	}
 	cases := []struct {
 		name  string
 		build func() *rm.Element
@@ -102,12 +108,7 @@ func TestREQ112_ElementNullFlavourIndicated(t *testing.T) {
 			e.NullFlavour = unknownNullFlavour()
 			return e
 		}, true},
-		{"both", func() *rm.Element {
-			e := validElement()
-			e.Value = &rm.DVText{Value: "x"}
-			e.NullFlavour = unknownNullFlavour()
-			return e
-		}, false},
+		{"both", both, false},
 		{"neither", validElement, false},
 		{"typed-nil value counts as no value, with null_flavour", func() *rm.Element {
 			e := validElement()
@@ -129,6 +130,34 @@ func TestREQ112_ElementNullFlavourIndicated(t *testing.T) {
 			}
 			if tc.ok && !r.OK {
 				t.Errorf("ValidateRM(ELEMENT %s) want OK; issues=%+v", tc.name, r.Issues)
+			}
+		})
+	}
+
+	// REQ-112: an ELEMENT held by value, as the root or as a member of
+	// CLUSTER.items, is checked the same way and reported where it sits.
+	inCluster := func(e *rm.Element) *rm.Cluster {
+		return &rm.Cluster{
+			ArchetypeNodeID: "at0000",
+			Name:            rm.DVText{Value: "group"},
+			Items:           []rm.Item{*e},
+		}
+	}
+	byValue := []struct {
+		name string
+		root any
+		at   string
+	}{
+		{"both, root by value", *both(), "/"},
+		{"neither, root by value", *validElement(), "/"},
+		{"both, by value in CLUSTER.items", inCluster(both()), "/items[0]"},
+		{"neither, by value in CLUSTER.items", inCluster(validElement()), "/items[0]"},
+	}
+	for _, tc := range byValue {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validation.ValidateRM(tc.root)
+			if !containsIssue(r.Issues, tc.at, "rm_invariant") {
+				t.Errorf("ValidateRM(ELEMENT %s): want rm_invariant at %q; issues=%+v", tc.name, tc.at, r.Issues)
 			}
 		})
 	}

@@ -11,11 +11,12 @@ import (
 // REQ-123 — the temporal parse accepts every form the BASE predicates
 // valid_iso8601_date, valid_iso8601_time and valid_iso8601_date_time
 // accept (extended and compact, dot or comma fraction, Z / ±hh / ±hhmm /
-// ±hh:mm zone, partial forms) and nothing else. The values below that
-// the previous parse rejected came from real fixtures. The zone style may
-// differ from the body style (10:30:00+0530, 103000+05:30): the fixtures
-// carry such values and the BASE predicates treat the zone as a separate
-// part.
+// ±hh:mm zone, partial forms), plus the two forms REQ-123 names beyond
+// them: a zone whose style differs from the time's layout
+// (10:30:00+0530, 103000+05:30), and a DV_DATE_TIME without its hour
+// (2024, 2024-03, 2024-03-15), where BASE Iso8601_date_time needs one.
+// The values below that the previous parse rejected came from real
+// fixtures.
 
 type isoCase struct {
 	value string
@@ -115,6 +116,12 @@ func TestREQ123_ValidISO8601TimeForms(t *testing.T) {
 		{"10:00:00-13:00", false},
 		{"10:00:00+10:60", false},
 		{"10:00:00+00:00", true},
+		// a zone style not tied to the time's layout
+		{"10:30:00+0530", true},
+		{"103000+05:30", true},
+		// a five-character zone is ±hh:mm, nothing else
+		{"10:30:00+01x30", false},
+		{"10:30:00+01530", false},
 		// malformed
 		{"10:00:00+zz", false},
 		{"10:00:00+", false},
@@ -156,6 +163,10 @@ func TestREQ123_ValidISO8601TimeForms(t *testing.T) {
 				t.Errorf("DVTime(%q).ValidISO8601() = %v, want %v", tc.value, got, tc.want)
 			}
 		})
+	}
+	// REQ-123: a compact time keeps its extended zone whole.
+	if got := (&rm.DVTime{Value: "103000+05:30"}).Timezone(); got != "+05:30" {
+		t.Errorf("DVTime(%q).Timezone() = %q, want %q", "103000+05:30", got, "+05:30")
 	}
 }
 
@@ -205,6 +216,11 @@ func TestREQ123_ValidISO8601DateTimeForms(t *testing.T) {
 		{"2025-10-24T10:00:00+15:00", false},
 		{"2025-10-24T10:00:00-13:00", false},
 		{"2025-10-24T10:00:00Z+01", false},
+		{"2025-10-24T10:30:00+01x30", false},
+		{"2025-10-24T10:30:00+01530", false},
+		// a zone style not tied to the time's layout
+		{"2025-10-24T10:30:00+0530", true},
+		{"20251024T121033+01:00", true},
 		// structure
 		{"2025-10-24T", false},
 		{"2025-10T10", false}, // time part needs a full date
@@ -230,6 +246,10 @@ func TestREQ123_ValidISO8601DateTimeForms(t *testing.T) {
 				t.Errorf("DVDateTime(%q).ValidISO8601() = %v, want %v", tc.value, got, tc.want)
 			}
 		})
+	}
+	// REQ-123: a compact date-time keeps its extended zone whole.
+	if got := (&rm.DVDateTime{Value: "20251024T121033+01:00"}).Timezone(); got != "+01:00" {
+		t.Errorf("DVDateTime(%q).Timezone() = %q, want %q", "20251024T121033+01:00", got, "+01:00")
 	}
 }
 
