@@ -8,7 +8,7 @@ kind: plan
 **Status:** Draft — from the audit of the PR 181–189 review leftovers
 **Covers:** REQ-112 ([clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor)), REQ-102 and REQ-110 ([§ REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation), [§ REQ-110](../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition))
 **Probes:** PROBE-081, PROBE-027
-**Depends on:** [PR 191](https://github.com/Cadasto/openehr-sdk-go/pull/191), merged (Phase 1 removes the Known gap it added); the [generator plan](2026-09-30-generator-rm-valid-output.md) Phase 2 (before Phase 2 here)
+**Depends on:** [PR 191](https://github.com/Cadasto/openehr-sdk-go/pull/191), merged (Phase 1 removes the Known gap it added)
 **Defers:** the other REQ-112 catalogue gaps (a bound beside its own open flag, `Limits_comparable`, `Other_reference_ranges_validity`, `Range_is_simple`, `Scheme_valid`, DV_AMOUNT `accuracy_is_percent`); they are recorded, not planned
 
 This header is for the reader. No tool reads it, and nothing fails when it is missing or out of date. The work itself meets the [Definition of Ready](../development-process.md#definition-of-ready) before it starts and the [Definition of Done](../development-process.md#definition-of-done) in the implementing PR.
@@ -40,7 +40,7 @@ The two validators stop passing data the RM or the template forbids, in the thre
 
 **Tasks:**
 - Pass the whole DV_ORDINAL (value and symbol code) to the ordinal constraint and check the pair against the template's list. Report an empty symbol and a symbol that does not match its value.
-- Run the generator plan's corpus harness: it goes red here unless that plan's Phase 2 (ordinal symbols in generated output) has landed.
+- Run the PROBE-027 corpus census (`TestREQ107_CorpusRatchet`): generated ordinals carry their listed symbols, so it must stay green under the new check.
 
 **Definition of done:** a mismatched pair and an empty symbol are each reported; the vendored compositions with ordinals stay clean, or each new finding is explained in the PR.
 
