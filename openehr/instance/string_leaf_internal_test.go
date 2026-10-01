@@ -142,3 +142,34 @@ func deref(s *string) string {
 	}
 	return *s
 }
+
+// TestREQ103_PatternReadingAgreesBetweenValidatorAndGenerator pins one
+// reading of a C_STRING pattern for both sides: a value that only contains
+// a match is refused by CString.Validate, and the generator never chooses
+// it, even when it is the example or the first list member, and builds a
+// value the validator accepts instead (REQ-103, REQ-107).
+func TestREQ103_PatternReadingAgreesBetweenValidatorAndGenerator(t *testing.T) {
+	const inner = "abc123def" // contains a match for [0-9]+ but is not one
+	cs := constraints.NewCString("[0-9]+", []string{inner, "123"}, "")
+
+	if v := cs.Validate(inner); len(v) != 1 || v[0].Code != constraints.CodePatternMismatch {
+		t.Fatalf("Validate(%q) = %v, want one CodePatternMismatch", inner, v)
+	}
+	got, err := stringForConstraint(cs, inner)
+	if err != nil || got != "123" {
+		t.Errorf("stringForConstraint(list [%q 123], example %q) = %q, %v; want 123, nil", inner, inner, got, err)
+	}
+
+	patternOnly := constraints.NewCString("[0-9]+", nil, "")
+	got, err = stringForConstraint(patternOnly, inner)
+	if err != nil {
+		t.Fatalf("stringForConstraint(pattern only, example %q): %v", inner, err)
+	}
+	if got == inner || len(patternOnly.Validate(got)) != 0 {
+		t.Errorf("stringForConstraint(pattern only, example %q) = %q, want a value the validator accepts", inner, got)
+	}
+
+	if _, err := stringForConstraint(constraints.NewCString("[0-9]+", []string{inner}, ""), inner); !errors.Is(err, errNoStringValue) {
+		t.Errorf("only a substring match in the list: error = %v, want errNoStringValue", err)
+	}
+}

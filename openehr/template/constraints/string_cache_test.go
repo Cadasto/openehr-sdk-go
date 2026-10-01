@@ -125,3 +125,19 @@ func TestREQ103_CString_PatternMatchesWholeString(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ103_CString_UnbalancedPatternStaysInvalid asserts that wrapping a
+// pattern for whole-string matching does not repair a malformed one: a
+// pattern that only parses once wrapped is still CodeInvalidValue, and its
+// detail names the pattern as the OPT wrote it.
+func TestREQ103_CString_UnbalancedPatternStaysInvalid(t *testing.T) {
+	for _, c := range []CString{NewCString("a)(b", nil, ""), {Pattern: "a)(b"}} {
+		v := c.Validate("ab")
+		if len(v) != 1 || v[0].Code != CodeInvalidValue {
+			t.Errorf("Validate(ab) with pattern %q = %v, want one CodeInvalidValue", c.Pattern, v)
+		}
+		if c.re != nil {
+			t.Errorf("pattern %q: re = %v, want nil for a malformed pattern", c.Pattern, c.re)
+		}
+	}
+}

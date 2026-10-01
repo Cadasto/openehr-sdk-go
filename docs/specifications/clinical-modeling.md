@@ -180,6 +180,7 @@ The set is closed by `isPrimitive()`; new primitive shapes appear in the `constr
 
 - Integer / real validators accept any Go integer kind (`int`, `int8`..`int64`, `uint`, `uint8`..`uint64`). `uint` and `uint64` values exceeding `math.MaxInt64` return `CodeWrongType` rather than silently wrapping. `CReal.Validate` additionally accepts `float32` / `float64`.
 - String, date, time, date-time, duration validators accept Go `string`.
+- `CString.Validate` **MUST** match `Pattern` against the whole string, as if written `^(?:Pattern)$`, so a value that only contains a match is a `CodePatternMismatch`: the AOM leaves the match mode open, and the SDK reads the pattern as whole-string because the specification's own examples (`/.+/`, `/km\/h|mi\/h/`) only make sense that way and the openEHR Java libraries do the same.
 - `CBoolean.Validate` accepts Go `bool`.
 - `CodePhrase.Validate` accepts either a bare `string` (treated as the code under the constrained terminology) or a `constraints.CodedTermRef`.
 - `DvQuantity.Validate` accepts a `constraints.QuantityValue` `{Magnitude, Units, Precision}` triple.
@@ -194,7 +195,7 @@ Every `Violation` carries a typed `ViolationCode`. The closed set is:
 | Code | Triggered by |
 |---|---|
 | `CodeOutOfRange` | numeric value outside a `NumericRange` |
-| `CodePatternMismatch` | string fails a regex / pattern |
+| `CodePatternMismatch` | string fails a regex / pattern (matched against the whole string) |
 | `CodeNotInList` | value is not a member of a closed list (strings, codes, ordinals, etc.) |
 | `CodeWrongType` | input Go type cannot be coerced to the constraint's expected type |
 | `CodeUnitUnknown` | DV_QUANTITY units string is not in the enumerated allowed list |
