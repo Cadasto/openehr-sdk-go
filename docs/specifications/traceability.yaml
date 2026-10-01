@@ -810,6 +810,7 @@ requirements:
       - testkit/probe/har_test.go
       - testkit/probe/live_test.go
       - testkit/probe/livecomposition_test.go
+      - testkit/probe/liveexample_test.go
       - testkit/probe/livesnapshot_test.go
       - testkit/probe/livestatus_test.go
       - testkit/probe/livestoredquery_test.go
@@ -928,6 +929,7 @@ requirements:
       - openehr/client/ehr/path_encoding_test.go
       - openehr/client/pathencoding_guard_test.go
       - openehr/client/query/path_encoding_test.go
+      - testkit/probe/liveexample_test.go
       - testkit/probe/livestatus_test.go
       - testkit/probes/rest/probe_060_ehr_creation_round_trip.go
       - testkit/probes/rest/probe_102_system_capabilities.go
