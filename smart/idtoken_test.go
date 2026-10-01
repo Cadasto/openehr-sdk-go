@@ -347,7 +347,7 @@ func TestValidateIDTokenExpiredBeyondSkew(t *testing.T) {
 
 // TestValidateIDTokenRejectsAlgNone checks that an unsigned token is refused
 // in every letter case of "none", including when the caller's allowlist
-// names it. go-oidc would also refuse such a token, so each case also
+// names it. go-oidc would refuse such a token as well, so each case also
 // requires that the JWKS was never fetched: the SDK's own check refuses the
 // token before it looks up a signing key.
 func TestValidateIDTokenRejectsAlgNone(t *testing.T) {

@@ -117,8 +117,8 @@ func TestAOM14ConcreteRegistry(t *testing.T) {
 //
 // REQ-043: § Mapping rules, Property → Go field. A mandatory property that
 // closes a cycle of mandatory struct-typed properties becomes a pointer,
-// because Go cannot declare a struct that contains itself by value, and its
-// tag carries no omit option.
+// since Go cannot declare a struct that contains itself by value. Its tag
+// carries no omit option.
 func TestAOM14CyclicSinglePropDetection(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
 	if err != nil {
