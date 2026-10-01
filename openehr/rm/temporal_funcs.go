@@ -229,8 +229,9 @@ func splitDateTime(value string) (dateParts, timeParts, error) {
 	}
 	// The date and time bodies are both extended or both compact; ISO 8601
 	// has no mixed form. The zone suffix is not part of the body, so its
-	// style may differ from the body's (10:30:00+0530, 103000+05:30): the
-	// fixtures carry both.
+	// style may differ from the body's. The fixtures carry an extended body
+	// with a compact zone (10:30:00+0530); the other mix, a compact body with
+	// an extended zone (103000+05:30), is accepted alongside it.
 	dateExtended := strings.Contains(datePart, "-")
 	if (dateExtended && tp.basic) || (!dateExtended && tp.colon) {
 		return dp, timeParts{}, fmt.Errorf("mixed extended and compact forms in %q", value)
