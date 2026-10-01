@@ -626,16 +626,31 @@ func setOrdinalKey(o *rm.DVOrdinal, k ordinalKey) {
 // DV_ORDINAL bound on the bound node itself.
 var ordinalScale = scale[ordinalKey]{
 	compare: func(a, b ordinalKey) (int, bool) { return compareOrdered(a.value, b.value), true },
-	fits: func(node *tcimpl.CompiledNode, k ordinalKey) bool {
-		pc := primitiveOf(node)
-		return pc == nil || len(pc.Validate(int(k.value))) == 0
-	},
+	fits:    ordinalFits,
 	lowest: func(node *tcimpl.CompiledNode, _ ordinalKey) (ordinalKey, bool) {
 		return ordinalEnd(node, true)
 	},
 	highest: func(node *tcimpl.CompiledNode, _ ordinalKey) (ordinalKey, bool) {
 		return ordinalEnd(node, false)
 	},
+}
+
+// ordinalFits reports whether k suits a side's bound node. When the node
+// lists (value, symbol) pairs, k's symbol must be the one listed for k's
+// value, so a swap cannot hand one side the other side's symbol. A side
+// with no list constrains the value only.
+func ordinalFits(node *tcimpl.CompiledNode, k ordinalKey) bool {
+	pc := primitiveOf(node)
+	if pc == nil {
+		return true
+	}
+	if c, ok := pc.(constraints.CDvOrdinal); ok && len(c.Values) > 0 {
+		pair, found := ordinalPair(c, k.value)
+		want := ordinalSymbolText(pair.Symbol).DefiningCode
+		got := k.symbol.DefiningCode
+		return found && got.CodeString == want.CodeString && got.TerminologyID == want.TerminologyID
+	}
+	return len(pc.Validate(int(k.value))) == 0
 }
 
 func ordinalEnd(node *tcimpl.CompiledNode, low bool) (ordinalKey, bool) {
