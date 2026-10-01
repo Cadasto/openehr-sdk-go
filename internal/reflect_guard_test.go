@@ -11,17 +11,17 @@ package internal_test
 //
 // A reflect call does not show at the call site which class it belongs to,
 // so this walks the module's non-test Go files, generated ones included, and
-// holds every "reflect" import to a reviewed list. The walk reads only what
-// the go tool builds as this module's packages: it skips a nested module
-// (a directory with its own go.mod), testdata, vendor, and names starting
-// with "." or "_". Each entry names the file,
-// the reflect identifiers it may use, the classes those uses fall in and why.
-// The test fails on a file that imports reflect and is not on the list, on a
-// listed file that starts using another reflect identifier, on an entry
-// without a named class, on a dot import of reflect (its uses would be
-// unqualified and unseen), and on an entry whose file no longer imports
-// reflect, so every change to reflection use meets a reviewer and the list
-// cannot rot.
+// holds every "reflect" import to a reviewed list. The walk skips the
+// directories and files the go tool never builds: a nested module (a
+// directory with its own go.mod), testdata, vendor, and names starting with
+// "." or "_". Each entry on the list names the file, the reflect identifiers
+// it may use, the classes those uses fall in and why. The test fails on a
+// file that imports reflect and is not on the list, on a listed file that
+// starts using another reflect identifier, on an entry without a named class,
+// on a dot import of reflect (its uses would be unqualified and unseen), and
+// on an entry whose file no longer imports reflect. So every new file that
+// imports reflect, and every new reflect identifier in a listed file, meets a
+// reviewer, and the list cannot rot.
 //
 // testkit/ is in scope: it is published for SDK consumers. Out of scope:
 // cmd/ (example programs, not importable library code) and test files. The
@@ -97,8 +97,8 @@ var reflectReviewed = map[string]struct {
 	},
 }
 
-// minReflectScanFiles is well below the module's non-test Go file count
-// outside cmd/ (about 580).
+// minReflectScanFiles is well below the module's count of non-test Go files
+// outside cmd/, which is over 500.
 const minReflectScanFiles = 400
 
 func TestREQ024ReflectOnlyForReviewedUses(t *testing.T) {
@@ -165,12 +165,12 @@ func TestREQ024ReflectOnlyForReviewedUses(t *testing.T) {
 }
 
 // TestREQ024ReflectScanReadsOnlyWhatTheGoToolBuilds runs the guard's walk over
-// a small module whose every Go file imports reflect. Only the files the go
-// tool builds as this module's library packages may come back: a nested
-// module, a directory whose name starts with "." or "_", testdata, vendor,
-// the root cmd/ and the root site/ are not part of them.
+// a small module whose every Go file imports reflect. Only files of the
+// module's library packages may come back, and none from a nested module, a
+// directory whose name starts with "." or "_", testdata, vendor, the root
+// cmd/ or the root site/.
 func TestREQ024ReflectScanReadsOnlyWhatTheGoToolBuilds(t *testing.T) {
-	// idiom.md § Generics policy (REQ-024): the guard covers library code, which is what the go tool builds.
+	// idiom.md § Generics policy (REQ-024): the guard covers library code, the non-test code outside cmd/.
 	t.Parallel()
 	const reflectSource = "package p\n\nimport \"reflect\"\n\nvar _ = reflect.TypeOf\n"
 	tests := []struct {
@@ -226,6 +226,11 @@ func TestREQ024ReflectScanReadsOnlyWhatTheGoToolBuilds(t *testing.T) {
 // directory holding its own go.mod, which is another module; testdata and
 // vendor; and every directory or file whose name starts with "." or "_". It
 // also skips cmd/ and site/ at the root.
+//
+// It does not read build constraints: every other .go file that is not a test
+// comes back, on purpose. A file behind a constraint is library code on the
+// platforms it builds for, and reading a file the go tool would skip can only
+// add a failure here, never hide one.
 func libraryGoFiles(root string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
