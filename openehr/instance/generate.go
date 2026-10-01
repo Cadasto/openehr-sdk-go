@@ -3,6 +3,8 @@ package instance
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 	"uuid"
 
@@ -122,6 +124,13 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	// conforming archetype id when a lower-bound top-up forces a
 	// slot fill and a safe example can be derived (see stampSlotFill).
 	if optNode.IsSlot() {
+		// The slot body is not in this OPT. A cluster slot is still an
+		// RM CLUSTER, and CLUSTER.items is mandatory, so it gets one element.
+		if c, ok := rmValue.(*rm.Cluster); ok && len(c.Items) == 0 {
+			el := &rm.Element{}
+			applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
+			c.Items = []rm.Item{el}
+		}
 		return nil
 	}
 	// Primitive leaves: ExampleValue if policy allows, then return —
@@ -171,6 +180,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	}
 	orderIntervalBounds(optNode, rmValue)
 	settleIntervalEndpoints(optNode, rmValue)
+	g.finishNode(optNode, rmValue)
 	return nil
 }
 
@@ -188,6 +198,11 @@ func (g *generator) shouldVisit(attr *tcimpl.CompiledAttribute) bool {
 		return true
 	}
 	if isRequired(attr) {
+		return true
+	}
+	// Cardinality lower and existence are separate. A 1..* list is
+	// still required when existence does not say so.
+	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() && cm.Lower() > 0 {
 		return true
 	}
 	return len(attr.Children()) > 0
@@ -354,6 +369,10 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 			continue
 		}
 		g.populatePrimitiveDefault(rmChild)
+		g.stampIfLocatable(rmChild, concrete)
+		if rel, ok := rmChild.(*rm.PartyRelationship); ok {
+			fillPartyRelationship(rel)
+		}
 		// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE
 		// inside DV_CODED_TEXT) get filled.
 		g.populateBMMRequiredAttrs(rmChild, concrete, depth+1)
@@ -403,6 +422,14 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 		v.Value = true
 	case *rm.DVCount:
 		v.Magnitude = 0
+	case *rm.DVOrdinal:
+		if symbolBlank(v.Symbol) {
+			v.Symbol = localSymbol()
+		}
+	case *rm.DVScale:
+		if symbolBlank(v.Symbol) {
+			v.Symbol = localSymbol()
+		}
 	case *rm.DVQuantity:
 		// Leave zero — the OPT primitive constraint may further pin.
 	case *rm.DVProportion:
@@ -410,6 +437,8 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 		v.Denominator = 1
 	case *rm.DVURI:
 		v.Value = "http://example.com"
+	case *rm.DVEHRURI:
+		v.Value = "ehr://example"
 	case *rm.DVIdentifier:
 		v.ID = "example"
 	case *rm.DVParsable:
@@ -801,6 +830,10 @@ func (g *generator) materialiseImplicitMultiple(
 		return nil //nolint:nilerr // intentional: defer to validator
 	}
 	g.populatePrimitiveDefault(rmChild)
+	g.stampIfLocatable(rmChild, concreteFor(rmType))
+	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
+		fillPartyRelationship(rel)
+	}
 	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
 	_ = rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild)
 	return nil
@@ -839,6 +872,9 @@ func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 		return nil, fmt.Errorf("makeChild %s: %w", child.RMTypeName(), err)
 	}
 	g.setLocatableIdentity(child, rmChild, false /* isTemplateRoot */)
+	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
+		fillPartyRelationship(rel)
+	}
 	return rmChild, nil
 }
 
@@ -913,10 +949,12 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 		id = arch
 	}
 	if id == "" {
-		// Some inner nodes (data values, anonymous attribute
-		// containers) have neither — leave archetype_node_id
-		// untouched and let downstream layers populate.
-		return
+		// Data values are not locatable. A locatable the OPT left
+		// without a node id still needs one: the RM requires it.
+		if _, ok := rmValue.(rm.MutableLocatable); !ok || rm.IsTypedNil(rmValue) {
+			return
+		}
+		id = "at0000"
 	}
 
 	// Resolve a human-readable runtime name from the OPT term
@@ -1049,6 +1087,25 @@ func (g *generator) applyPrimitiveExample(rmValue any, attr string, pc constrain
 			return fmt.Errorf("DV_DURATION example value is %T, want string", ex)
 		}
 		v.Value = s
+		return nil
+	case *rm.DVIdentifier:
+		s, ok := stringForConstraint(pc, ex)
+		if !ok {
+			return fmt.Errorf("DV_IDENTIFIER example value is %T, want string", ex)
+		}
+		if attr == "" || attr == "id" {
+			v.ID = s
+		}
+		return nil
+	case *rm.Activity:
+		if attr != "action_archetype_id" {
+			return nil
+		}
+		s, ok := stringForConstraint(pc, ex)
+		if !ok {
+			return fmt.Errorf("ACTIVITY.action_archetype_id example value is %T, want string", ex)
+		}
+		v.ActionArchetypeID = s
 		return nil
 	}
 	// Unknown RM target for this constraint — silently no-op so the
@@ -1306,4 +1363,231 @@ func firstCollidingOptionalSibling(child *tcimpl.CompiledNode, siblings []*tcimp
 		}
 	}
 	return false
+}
+
+// finishNode fills RM-mandatory fields the OPT walk left empty.
+// REQ-107: generated output has to pass the template-less floor.
+func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
+	switch v := rmValue.(type) {
+	case *rm.Action:
+		if v.Time.Value == "" {
+			v.Time = rm.DVDateTime{Value: g.dateTimeDefault()}
+		}
+	case *rm.IsmTransition:
+		fillCurrentState(opt, v)
+	case *rm.Cluster:
+		g.ensureItems(opt, &v.Items)
+	case *rm.ItemTree:
+		g.ensureItems(opt, &v.Items)
+	case *rm.PartyRelationship:
+		fillPartyRelationship(v)
+	case *rm.ItemList:
+		if len(v.Items) == 0 {
+			el := rm.Element{}
+			applyLocatableIdentity(&el, "at0000", "element", nil, g.nextUID)
+			v.Items = append(v.Items, el)
+		}
+	case *rm.Activity:
+		if v.ActionArchetypeID == "" {
+			v.ActionArchetypeID = "openEHR-EHR-ACTION.example.v1"
+		}
+	case *rm.ItemSingle:
+		if v.Item.GetArchetypeNodeID() == "" && (v.Item.Value == nil || rm.IsTypedNil(v.Item.Value)) {
+			el := &rm.Element{}
+			applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
+			v.Item = *el
+		}
+	case *rm.DVEHRURI:
+		if v.Value == "" {
+			v.Value = "ehr://example"
+		}
+	case *rm.DVOrdinal:
+		if symbolBlank(v.Symbol) {
+			v.Symbol = localSymbol()
+		}
+	case *rm.DVScale:
+		if symbolBlank(v.Symbol) {
+			v.Symbol = localSymbol()
+		}
+	}
+}
+
+// ensureItems puts one member in an RM-mandatory items list. When the
+// OPT names a child, that child is used so the template's RM type is
+// kept. A list the OPT does not describe gets one ELEMENT.
+func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
+	if len(*items) > 0 {
+		return
+	}
+	if opt != nil {
+		if attr := opt.Attribute("items"); attr != nil && len(attr.Children()) > 0 {
+			for _, child := range attr.Children() {
+				made, err := g.makeChild(child)
+				if err != nil {
+					continue
+				}
+				if child.IsSlot() {
+					if !g.stampSlotFill(made, child) {
+						continue
+					}
+					// A slot is not walked: its body is not in this OPT.
+					// A cluster slot still needs one item for the RM floor.
+					if slot, ok := made.(*rm.Cluster); ok && len(slot.Items) == 0 {
+						el := &rm.Element{}
+						applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
+						slot.Items = []rm.Item{el}
+					}
+				} else if err := g.walkNode(child, made); err != nil {
+					continue
+				}
+				item, ok := made.(rm.Item)
+				if !ok {
+					continue
+				}
+				*items = append(*items, item)
+				return
+			}
+			return
+		}
+	}
+	el := &rm.Element{}
+	applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
+	*items = append(*items, el)
+}
+
+func symbolBlank(s rm.DVCodedText) bool {
+	return s.DefiningCode.CodeString == "" && s.Value == ""
+}
+
+func localSymbol() rm.DVCodedText {
+	return rm.DVCodedText{
+		Value: "example",
+		DefiningCode: rm.CodePhrase{
+			CodeString:    "at0000",
+			TerminologyID: rm.TerminologyID{Value: "local"},
+		},
+	}
+}
+
+// stampIfLocatable gives a BMM-synthesised locatable the node id and
+// name the floor requires when the OPT did not name the node.
+func (g *generator) stampIfLocatable(rmValue any, rmType string) {
+	loc, ok := rmValue.(rm.Locatable)
+	if !ok || rm.IsTypedNil(rmValue) || loc.GetArchetypeNodeID() != "" {
+		return
+	}
+	name := rmType
+	if name == "" {
+		name = "element"
+	}
+	applyLocatableIdentity(rmValue, "at0000", name, nil, g.nextUID)
+}
+
+func fillPartyRelationship(rel *rm.PartyRelationship) {
+	if rel.GetArchetypeNodeID() == "" {
+		applyLocatableIdentity(rel, "at0000", "relationship", nil, func() *rm.HierObjectID {
+			return &rm.HierObjectID{Value: "00000000-0000-0000-0000-000000000001"}
+		})
+	}
+	if rel.Source.Namespace == "" || rel.Source.Type == "" || rel.Source.ID == nil {
+		rel.Source = partyRef("00000000-0000-0000-0000-000000000001")
+	}
+	if rel.Target.Namespace == "" || rel.Target.Type == "" || rel.Target.ID == nil {
+		rel.Target = partyRef("00000000-0000-0000-0000-000000000002")
+	}
+}
+
+func partyRef(id string) rm.PartyRef {
+	return rm.PartyRef{ObjectRef: rm.ObjectRef{
+		ID:        &rm.HierObjectID{Value: id},
+		Namespace: "local",
+		Type:      "PERSON",
+	}}
+}
+
+func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
+	if iv.CurrentState.DefiningCode.CodeString != "" {
+		return
+	}
+	ref, ok := firstCodedExample(opt, "current_state")
+	if !ok {
+		ref = constraints.CodedTermRef{Terminology: terminology.ID, CodeString: "524"}
+	}
+	rubric := ref.CodeString
+	if text, found := terminology.InstructionStates.Rubric(ref.CodeString); found {
+		rubric = text
+	}
+	iv.CurrentState = rm.DVCodedText{
+		Value: rubric,
+		DefiningCode: rm.CodePhrase{
+			CodeString:    ref.CodeString,
+			TerminologyID: rm.TerminologyID{Value: ref.Terminology},
+		},
+	}
+}
+
+func firstCodedExample(opt *tcimpl.CompiledNode, attrName string) (constraints.CodedTermRef, bool) {
+	if opt == nil {
+		return constraints.CodedTermRef{}, false
+	}
+	attr := opt.Attribute(attrName)
+	if attr == nil {
+		return constraints.CodedTermRef{}, false
+	}
+	var found constraints.CodedTermRef
+	var ok bool
+	var walk func(*tcimpl.CompiledNode)
+	walk = func(n *tcimpl.CompiledNode) {
+		if n == nil || ok {
+			return
+		}
+		if pc := n.PrimitiveConstraint(); pc != nil {
+			if phrase, is := pc.(constraints.CodePhrase); is {
+				if ref, isRef := phrase.ExampleValue().(constraints.CodedTermRef); isRef && ref.CodeString != "" {
+					found = ref
+					ok = true
+					return
+				}
+			}
+		}
+		for _, a := range n.Attributes() {
+			for _, child := range a.Children() {
+				walk(child)
+			}
+		}
+	}
+	for _, child := range attr.Children() {
+		walk(child)
+	}
+	return found, ok
+}
+
+// stringForConstraint returns the example string, or a value the
+// pattern accepts when the open-string example does not. A pattern
+// whose only operator is a trailing .* keeps the literal prefix.
+func stringForConstraint(pc constraints.PrimitiveConstraint, ex any) (string, bool) {
+	s, ok := ex.(string)
+	if !ok {
+		return "", false
+	}
+	cs, isString := pc.(constraints.CString)
+	if !isString || cs.Pattern == "" {
+		return s, true
+	}
+	re, err := regexp.Compile(cs.Pattern)
+	if err != nil || re.MatchString(s) {
+		return s, true
+	}
+	prefix, has := strings.CutSuffix(cs.Pattern, ".*")
+	if has && prefix != "" && !strings.ContainsAny(prefix, `\[]()|+?^$`) && re.MatchString(prefix) {
+		return prefix, true
+	}
+	// A pattern that is only escaped dots is one archetype id.
+	if !strings.ContainsAny(cs.Pattern, `[]()|+?*^$`) {
+		literal := strings.ReplaceAll(cs.Pattern, `\`, "")
+		if literal != "" && !strings.Contains(literal, `\`) && re.MatchString(literal) {
+			return literal, true
+		}
+	}
+	return s, true
 }

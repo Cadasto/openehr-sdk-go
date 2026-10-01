@@ -440,6 +440,8 @@ func writeActionSingle(a *rm.Action, attr string, child any) error {
 	case "ism_transition":
 		// Value field. The synthesiser passes *IsmTransition.
 		return assignVia(child, func(v rm.IsmTransition) { a.IsmTransition = v }, attr, "ISM_TRANSITION")
+	case "time":
+		return assignVia(child, func(v rm.DVDateTime) { a.Time = v }, attr, "DV_DATE_TIME")
 	}
 	return fmt.Errorf("%w: *rm.Action has no single attr %q", ErrUnknownAttribute, attr)
 }
@@ -1055,6 +1057,8 @@ func writePersonMultiple(p *rm.Person, attr string, child any) error {
 		return assignVia(child, func(v rm.PartyIdentity) { p.Identities = append(p.Identities, v) }, attr, "PARTY_IDENTITY")
 	case "contacts":
 		return assignVia(child, func(v rm.Contact) { p.Contacts = append(p.Contacts, v) }, attr, "CONTACT")
+	case "relationships":
+		return assignVia(child, func(v rm.PartyRelationship) { p.Relationships = append(p.Relationships, v) }, attr, "PARTY_RELATIONSHIP")
 	}
 	return fmt.Errorf("%w: *rm.Person has no multiple attr %q", ErrUnknownAttribute, attr)
 }

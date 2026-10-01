@@ -155,6 +155,16 @@ func (c CDvOrdinal) ExampleValue() any {
 // [OrdinalSymbol] (value + symbol). For [OrdinalSymbol] inputs both
 // the value and the symbol must match an entry in Values.
 func (c CDvOrdinal) Validate(value any) []Violation {
+	// An OPT that names DV_ORDINAL and lists no pairs constrains the
+	// type only. A closed list is what rejects a value.
+	if len(c.Values) == 0 {
+		switch value.(type) {
+		case int, OrdinalSymbol:
+			return nil
+		default:
+			return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected int or OrdinalSymbol, got %T", value)}}
+		}
+	}
 	switch v := value.(type) {
 	case int:
 		for _, s := range c.Values {

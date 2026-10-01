@@ -57,6 +57,11 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	case rm.Action:
 		return readActionSingle(&p, attrName)
 
+	case *rm.IsmTransition:
+		return readIsmTransitionSingle(p, attrName)
+	case rm.IsmTransition:
+		return readIsmTransitionSingle(&p, attrName)
+
 	case *rm.AdminEntry:
 		return readAdminEntrySingle(p, attrName)
 	case rm.AdminEntry:
@@ -384,6 +389,7 @@ func Handles(parent any) bool {
 		*rm.Evaluation, rm.Evaluation,
 		*rm.Instruction, rm.Instruction,
 		*rm.Action, rm.Action,
+		*rm.IsmTransition, rm.IsmTransition,
 		*rm.AdminEntry, rm.AdminEntry,
 		*rm.GenericEntry, rm.GenericEntry,
 		*rm.Section, rm.Section,
@@ -724,6 +730,31 @@ func readInstructionMultiple(i *rm.Instruction, attr string) ([]any, bool) {
 }
 
 // --- ACTION ---------------------------------------------------------------
+
+func readIsmTransitionSingle(i *rm.IsmTransition, attr string) (any, bool) {
+	switch attr {
+	case "current_state":
+		return dvCodedTextPresent(i.CurrentState)
+	case "careflow_step":
+		if i.CareflowStep == nil {
+			return i.CareflowStep, false
+		}
+		return dvCodedTextPresent(*i.CareflowStep)
+	case "transition":
+		if i.Transition == nil {
+			return i.Transition, false
+		}
+		return dvCodedTextPresent(*i.Transition)
+	}
+	return nil, false
+}
+
+func objectRefPresent(r rm.ObjectRef) (any, bool) {
+	if r.ID == nil || rm.IsTypedNil(r.ID) || r.Namespace == "" || r.Type == "" {
+		return r, false
+	}
+	return r, true
+}
 
 func readActionSingle(a *rm.Action, attr string) (any, bool) {
 	switch attr {
@@ -1362,10 +1393,10 @@ func readRoleMultiple(r *rm.Role, attr string) ([]any, bool) {
 	return nil, false
 }
 
-// ADDRESS / PARTY_IDENTITY / PARTY_RELATIONSHIP are archetypeable
-// LOCATABLEs whose only descendable channel is `details`
-// (ITEM_STRUCTURE). source/target on PARTY_RELATIONSHIP are PARTY_REF
-// references, not archetypeable structure — not surfaced.
+// ADDRESS / PARTY_IDENTITY are archetypeable LOCATABLEs whose only
+// descendable channel is `details` (ITEM_STRUCTURE).
+// PARTY_RELATIONSHIP also carries source and target references; the
+// floor treats an empty reference as absent.
 func readAddressSingle(a *rm.Address, attr string) (any, bool) {
 	return readActorLikeSingle(a.ArchetypeNodeID, a.Name, a.Details, attr)
 }
@@ -1375,7 +1406,14 @@ func readPartyIdentitySingle(p *rm.PartyIdentity, attr string) (any, bool) {
 }
 
 func readPartyRelationshipSingle(p *rm.PartyRelationship, attr string) (any, bool) {
-	return readActorLikeSingle(p.ArchetypeNodeID, p.Name, p.Details, attr)
+	switch attr {
+	case "source":
+		return objectRefPresent(p.Source.ObjectRef)
+	case "target":
+		return objectRefPresent(p.Target.ObjectRef)
+	default:
+		return readActorLikeSingle(p.ArchetypeNodeID, p.Name, p.Details, attr)
+	}
 }
 
 // CONTACT holds a set of ADDRESS alternatives; its archetypeable

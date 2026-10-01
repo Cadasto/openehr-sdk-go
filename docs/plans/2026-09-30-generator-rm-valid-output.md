@@ -5,7 +5,7 @@ kind: plan
 # Plan — Generator and builder: RM-valid output for every vendored template
 
 **Date:** 2026-09-30
-**Status:** Draft — from the audit of the PR 181–189 review leftovers
+**Status:** Done — phases 0–4 landed. The corpus census still lists two unsynthesisable slot fills and `ITEM_TABLE.rotated`, which the pinned RM does not have.
 **Covers:** REQ-107 ([clinical-modeling.md § REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator)), REQ-101 ([§ REQ-101](../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder))
 **Probes:** PROBE-027 ([conformance.md](../specifications/conformance.md#probe-027--generated-instance-validates-clean)), widened
 **Depends on:** nothing; the [validation plan](2026-09-30-validation-false-passes.md)'s ordinal-symbol phase needs this plan's Phase 2 first

@@ -1009,10 +1009,12 @@ requirements:
     probes: [PROBE-023]
     tests:
       - internal/templateinstance/rmwrite/write_datavalue_test.go
+      - openehr/composition/builder_defaults_test.go
       - openehr/composition/builder_test.go
       - openehr/composition/typecheck_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/composition/probes_test.go
+      - testkit/probes/instance/corpus_ratchet_test.go
 
   - id: REQ-102
     title: Composition validation
@@ -1023,12 +1025,14 @@ requirements:
     probes: [PROBE-025, PROBE-026, PROBE-074]
     tests:
       - internal/templatecompile/compile_test.go
+      - internal/templatecompile/node_primitive_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/interval_open_side_test.go
       - openehr/validation/rmread/interval_void_test.go
       - openehr/validation/rmread/read_test.go
+      - openehr/validation/walk_primitive_test.go
       - testkit/probes/validation/probe_025_composition_validate.go
       - testkit/probes/validation/probe_074_noncomposition_validate.go
       - testkit/probes/validation/probes_test.go
@@ -1042,6 +1046,8 @@ requirements:
     probes: [PROBE-024, PROBE-025, PROBE-074]
     tests:
       - internal/templatecompile/compile_test.go
+      - internal/templatecompile/node_primitive_test.go
+      - openehr/instance/placeholder_test.go
       - openehr/template/constraints/constraints_test.go
       - openehr/template/constraints/example_test.go
       - openehr/template/constraints/pure_imports_test.go
@@ -1116,13 +1122,17 @@ requirements:
     probes: [PROBE-027]
     tests:
       - internal/templateinstance/rmwrite/write_datavalue_test.go
+      - internal/templateinstance/rmwrite/write_parent_test.go
       - internal/templateinstance/rmwrite/write_test.go
+      - openehr/composition/builder_defaults_test.go
       - openehr/instance/accessors_test.go
       - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/interval_flags_test.go
       - openehr/instance/interval_order_internal_test.go
       - openehr/instance/interval_order_test.go
+      - openehr/instance/phase4_test.go
+      - openehr/instance/placeholder_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/instance/realworld_opt_synthesis_test.go
       - openehr/instance/rm_release_test.go
@@ -1131,7 +1141,9 @@ requirements:
       - openehr/instance/valuefill_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/template/constraints/example_test.go
+      - openehr/validation/constraint_fixtures_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
+      - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/instance/probe_027_generated_validates.go
       - testkit/probes/instance/probes_test.go
       - testkit/probes/template/constraint_fixtures_test.go
@@ -1201,6 +1213,7 @@ requirements:
       - openehr/validation/rmfloor_test.go
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/read_demographic_test.go
+      - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/validation/probe_074_noncomposition_validate.go
       - testkit/probes/validation/probe_074_test.go
 

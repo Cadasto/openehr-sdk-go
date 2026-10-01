@@ -45,6 +45,30 @@ func TestREQ107_EnsureSingleRefusedParents(t *testing.T) {
 		}
 	})
 
+	t.Run("Action time", func(t *testing.T) {
+		t.Parallel()
+		parent := &rm.Action{}
+		when := rm.DVDateTime{Value: "2020-01-02T03:04:05Z"}
+		if err := EnsureSingle(parent, "ACTION", "time", &when); err != nil {
+			t.Fatalf("EnsureSingle(time) = %v", err)
+		}
+		if parent.Time.Value != when.Value {
+			t.Errorf("Time = %q, want %q", parent.Time.Value, when.Value)
+		}
+	})
+
+	t.Run("Person relationships", func(t *testing.T) {
+		t.Parallel()
+		parent := &rm.Person{}
+		child := &rm.PartyRelationship{ArchetypeNodeID: "at0001"}
+		if err := AppendMultiple(parent, "PERSON", "relationships", child); err != nil {
+			t.Fatalf("AppendMultiple(relationships) = %v", err)
+		}
+		if len(parent.Relationships) != 1 || parent.Relationships[0].ArchetypeNodeID != "at0001" {
+			t.Errorf("Relationships = %+v, want one at0001", parent.Relationships)
+		}
+	})
+
 	t.Run("Address name", func(t *testing.T) {
 		t.Parallel()
 		parent := &rm.Address{}

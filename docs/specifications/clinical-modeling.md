@@ -408,7 +408,7 @@ The `c *templatecompile.Compiled` argument is the compiled-template form. It was
 
 ## REQ-107 — Template-driven RM instance example generator
 
-**Status:** Draft (Phases 0–3 landed).
+**Status:** Draft.
 
 The SDK **MUST** ship a template-authoritative RM instance synthesiser at `openehr/instance/`: given a compiled OPT, produce a conformant RM object graph whose structure and primitive leaves satisfy the same template-driven contract REQ-102 validates against. The generator is the inverse of validation v2 — same compiled-OPT walk, opposite direction (`rmwrite` instead of `rmread`).
 
@@ -418,7 +418,7 @@ The generator is the single skeleton-and-populate engine the composition builder
 
 ### Contract
 
-Public entry point (target shape, lands with Phase 2):
+Public entry point:
 
 ```go
 package instance
@@ -463,13 +463,13 @@ Where the OPT leaves an RM attribute open, the generator **MUST** fill in RM-val
 
 ### Trust model
 
-The compiled OPT is **authoritative for structure**. The RM graph is assembled attribute-by-attribute from compiled metadata; the generator never guesses paths from an empty composition. Primitive leaves come from `PrimitiveConstraint.ExampleValue()` (REQ-103), which guarantees `Validate(ExampleValue()) == nil` for bounded constraints. Optional OPT `<assumed_value>` / `<default_value>` (when compile captures them — a Phase 0 follow-up) **override** the factory.
+The compiled OPT is **authoritative for structure**. The RM graph is assembled attribute-by-attribute from compiled metadata; the generator never guesses paths from an empty composition. Primitive leaves come from `PrimitiveConstraint.ExampleValue()` (REQ-103), which guarantees `Validate(ExampleValue()) == nil` for bounded constraints. Optional OPT `<assumed_value>` / `<default_value>`, when compile captures them, **override** the factory.
 
 The generator is **sound** (every output is valid against the OPT), not **complete** (it does not enumerate every valid instance — different policies may produce different but equally valid trees). Sound × validator-aligned ⇒ PROBE-027 cross-checks the contract.
 
-### Trust model — phasing
+### Slot fills
 
-Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / `UIDSource` test-determinism seam / typed accessors for the closed root set; PROBE-027 implemented (inline) covering `vital_signs.opt` + `clinical_note.opt` + the REQ-107 real-world corpus (`Referral Request.v1`, `Demonstration.v1`, `social`); `cmd/examples/generate-example/` worked example. The C_PRIMITIVE_OBJECT inner-`<item>` wire-parser fix + canjson-polymorphic `Composition.uid` emission landed in [PR 21](https://github.com/Cadasto/openehr-sdk-go/pull/21); PROBE-023 now exercises the full marshal → unmarshal → re-marshal round-trip. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) landed with the composition builder in [PR 19](https://github.com/Cadasto/openehr-sdk-go/pull/19). REQ-104 slot-fill archetype-id stamping is landed for parsed include patterns that can be synthesized safely; when no includes were parsed the synthesiser uses `openEHR-EHR-<RMType>.example.v1` to satisfy the validator's RM-type-prefix heuristic.
+A required slot is stamped with an archetype id drawn from the parsed REQ-104 include grammar when a safe example can be synthesized. When the OPT carried no parseable includes, the synthesiser uses `openEHR-EHR-<RMType>.example.v1`, the validator's RM-type-prefix fallback. A required slot whose includes cannot be satisfied returns `ErrSlotFillUnsupported` and does not invent an archetype id.
 
 ### Out of scope
 
@@ -488,8 +488,8 @@ Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/
 
 The public signature accepts `*templatecompile.Compiled`. As with `validation.ValidateComposition`, REQ-111 makes that argument externally constructable via `openehr/templatecompile.Compile`, so `instance.Generate` is now callable from outside the module (see [ADR 0010](../adr/0010-public-compiled-template-bridge.md)).
 
-- **Lives in:** [`openehr/instance/`](../../openehr/instance/) (lands in Phase 2); `openehr/template/constraints/.ExampleValue()` (Phase 0 — landed); `internal/templateinstance/` (Phase 1+).
-- **Probes:** PROBE-027 — `instance.Generate` + `validation.ValidateComposition` round-trip clean on the same OPT (Phase 3).
+- **Lives in:** [`openehr/instance/`](../../openehr/instance/); `openehr/template/constraints` `ExampleValue()`; `internal/templateinstance/`.
+- **Probes:** PROBE-027 — `instance.Generate` checked with `validation.ValidateComposition` (COMPOSITION roots) or `validation.Validate`, and with `validation.ValidateRM`, across the vendored OPTs that compile.
 
 ---
 
