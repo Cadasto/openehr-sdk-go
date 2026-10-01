@@ -115,10 +115,13 @@ func decoratedCapturedKeys() map[string]map[string]bool {
 // decorated DV_* value (extra attributes, incl. nested decorations of the
 // composite keys), a substituted subtype (bar the two spec-sanctioned forms
 // noted below), or an unmapped DV_* type is embedded losslessly as a |raw
-// canonical fragment; a leaf datatype this codec does not
-// map at all (party / context / other RM attribute) is a documented skip (see
-// deviations.md). CODE_PHRASE is mapped despite not being a DataValue — the
-// reference emits ENTRY language / encoding as leaves in their own right.
+// canonical fragment; a populated value at a leaf type this codec does not map
+// at all is ErrUnsupportedDatatype, never a silent skip (REQ-140). CODE_PHRASE
+// is mapped despite not being a DataValue — the reference emits ENTRY language
+// / encoding as leaves in their own right. The STRING leaf (ACTIVITY
+// `action_archetype_id`) is not a DataValue either and rides its bare value;
+// emitNode reaches it through [emitStringLeaf], which refuses a STRING leaf on
+// an attribute rmpath does not know rather than skipping it.
 //
 // DV_COUNT and DV_BOOLEAN carry their value as the bare leaf (mapping to RM
 // magnitude / value), not a |suffix — per the STABLE Simplified Formats RM
@@ -172,6 +175,19 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 	if isIntervalLeafType(rmType) {
 		return "", intervalLeafToFlat(out, flatPath, rmType, v)
 	}
+	// The STRING leaf rides its bare value (REQ-053 § Leaf datatypes). An RM
+	// String carries no decoration, so no anchor is returned; an empty one is
+	// absent, as Go has no other spelling of "not set".
+	if rmType == stringLeafType {
+		s, ok := v.(string)
+		if !ok {
+			return "", fmt.Errorf("%w: %q is a %s leaf but holds a %T", ErrUnsupportedDatatype, flatPath, stringLeafType, v)
+		}
+		if s != "" {
+			out[flatPath] = s
+		}
+		return "", nil
+	}
 	// A substituted subtype (the value's dynamic type differs from the WT leaf
 	// type) must not take the suffix form: decode rebuilds from the leaf type
 	// and would silently retype it (e.g. a DV_EHR_URI at a DV_URI leaf). It
@@ -209,11 +225,15 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 	}
 	// A modelled leaf type whose value the suffix form cannot capture (a
 	// preferred_term, a decorated TERMINOLOGY_ID) rides |raw rather than falling
-	// through to the non-value skip below, which would lose it silently.
+	// through to the refusal below.
 	if isValueLeafType(rmType) {
 		return "", emitRaw(out, flatPath, v, cmp.Or(dyn, rmType))
 	}
-	return "", nil
+	// A populated non-DataValue at a leaf type this codec does not map: it has no
+	// FLAT spelling, and skipping it would lose it silently (REQ-140). Named by
+	// path and type, never by value.
+	return "", fmt.Errorf("%w: %q is a Web Template leaf typed %q, which has no FLAT spelling, and the composition carries a value there",
+		ErrUnsupportedDatatype, flatPath, rmType)
 }
 
 // isValueLeafType reports whether a childless Web Template node of this RM type
@@ -225,9 +245,13 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 // in-context leaves with no input descriptors at all (webtemplate.entryIC), and
 // PROBE-075 parity locks that shape, so the reference's silence about inputs
 // must not be read as "no value here". A party leaf joined on the same terms with
-// REQ-140's party grammar.
+// REQ-140's party grammar, and the STRING leaf with REQ-053's bare-value row.
+//
+// rmType is the normalised spelling ([nodeRMType]); a padded name compared as
+// written would miss every arm here.
 func isValueLeafType(rmType string) bool {
-	return strings.HasPrefix(rmType, "DV_") || rmType == "CODE_PHRASE" || isPartyLeafType(rmType)
+	return strings.HasPrefix(rmType, "DV_") || rmType == "CODE_PHRASE" || isPartyLeafType(rmType) ||
+		rmType == stringLeafType
 }
 
 // isIntervalLeafType reports whether a Web Template leaf's RM type is a

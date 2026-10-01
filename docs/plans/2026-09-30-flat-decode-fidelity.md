@@ -5,7 +5,7 @@ kind: plan
 # Plan — Codec fidelity: archetype details on FLAT decode, and two silent drops
 
 **Date:** 2026-09-30
-**Status:** Draft — from the audit of the PR 181–189 review leftovers
+**Status:** Done in PR 193; from the audit of the PR 181–189 review leftovers; decisions settled 2026-10-01 (below)
 **Covers:** REQ-053 and REQ-140 ([wire.md § REQ-053](../specifications/wire.md#req-053), [§ REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes)), REQ-052 ([wire.md § REQ-052](../specifications/wire.md#req-052)); interacts with REQ-112 ([clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor))
 **Probes:** PROBE-086, PROBE-089 (census and round trip), PROBE-030 (canonical JSON)
 **Depends on:** nothing ([PR 191](https://github.com/Cadasto/openehr-sdk-go/pull/191), merged, rewrote the § REQ-140 bullet Phase 3 edits)
@@ -34,6 +34,14 @@ A composition decoded from FLAT or STRUCTURED passes the SDK's own template-less
 1. **What decode writes.** Recommended: `archetype_id` from the Web Template node id on every archetype root (the nodes whose id is an archetype id), `template_id` from `WebTemplate.TemplateID` on the COMPOSITION root only (the RM makes it optional; Phase 0 confirms where the reference writes it), and `rm_version` from one SDK constant that the generator uses too. Phase 0 checks this against the reference before the code is written.
 2. **Which `rm_version` string.** The pinned RM release (1.2.0), or the version the reference writes. Whichever is chosen, generator and decoder share it.
 3. **Padded names.** Trim `rmType` once when a Web Template is parsed, so every consumer sees clean names (recommended), rather than trimming at each use.
+
+**Settled (2026-10-01).** Phase 0 ran against a local EHRbase 2.36.0 (openEHR SDK 2.35.0): two corpus bodies posted as FLAT and read back as canonical JSON carry `archetype_details` on the COMPOSITION, the SECTION, the OBSERVATION and a slot-filled CLUSTER, with `archetype_id` equal to the node id, `template_id` on the COMPOSITION only, and `rm_version` `1.0.4`. The reference's FLAT decoder (`ToCompositionWalker`, openEHR_SDK at the corpus pin `e57511c6`) sets it the same way.
+
+1. Decode writes what the reference writes, in both decode modes.
+2. `rm_version` is the RM release the SDK is generated from, `rm.Release` (`1.2.0`), a constant bmmgen emits from the BMM's `rm_release` so that § REQ-041 holds; the generator uses it too. The reference's `1.0.4` is not copied, because `rm_version` records the release an object was built against.
+3. The `webtemplate` package has no parse step (callers decode the struct), so the codec reads every leaf type through one normaliser instead.
+
+Phase 2 also gained the STRING leaf: the encode backstop cannot land while encode silently skips ACTIVITY `action_archetype_id`, so § REQ-053's leaf grammar now carries it as a bare value, the reference's spelling.
 
 ## Phases
 

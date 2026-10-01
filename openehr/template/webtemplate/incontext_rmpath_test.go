@@ -17,13 +17,14 @@ package webtemplate
 // the container.
 //
 // Exempted leaves are listed in unserialisableIC. None of them is
-// rmpath-attributable data loss today, for one of two reasons (see that map's
-// doc): the encoder's leaf mapping drops the datatype regardless of what rmpath
-// does, or the value is deliberately carried on the ctx/ surface instead. Each
-// exemption records which reason applies and what the encode consequence is;
-// when the blocking condition clears, delete the entry and the guard then
-// enforces resolution. An entry that no longer matches any emitted leaf is
-// reported as stale.
+// rmpath-attributable data loss today: each value is deliberately carried on
+// the ctx/ surface instead (see that map's doc). Each exemption records its
+// reason and what the encode consequence is; when the blocking condition
+// clears, delete the entry and the guard then enforces resolution. An entry
+// that no longer matches any emitted leaf is reported as stale.
+//
+// TestWebTemplatePathsResolveViaRmpath widens this to every node the builder
+// emits for every vendored OPT, archetyped or synthesised.
 
 import (
 	"reflect"
@@ -34,18 +35,16 @@ import (
 )
 
 // unserialisableIC maps "RMTYPE.attr" to why the leaf is deliberately left
-// unresolved in rmpath, and what that costs on encode. Two reason classes are
-// present, and each entry states the mechanism that applies to it:
+// unresolved in rmpath, and what that costs on encode. One reason class is
+// left: deliberate deferral — the value is already carried on another surface
+// (the ctx/ short forms, whose encode-only spelling ADR 0015 made permanent),
+// so resolving would double-spell it.
 //
-//   - Codec gap — a non-DV_ datatype (PARTY_PROXY, STRING) that leafToFlat drops
-//     whether or not rmpath resolves it, so resolving would change nothing.
-//   - Deliberate deferral — the value is already carried on another surface
-//     (the ctx/ short forms, whose encode-only spelling ADR 0015 made
-//     permanent), so resolving would double-spell it; or its ctx/ emission is
-//     not written yet, so nothing consumes the resolution.
-//
-// Datatype is therefore not a standing reason: CODE_PHRASE is a non-DV_ type
-// that leafToFlat *does* map since the PROBE-086 ratchet.
+// Datatype is not a reason. The codec-gap class — a non-DV_ datatype the
+// encoder dropped whether or not rmpath resolved it — emptied as each leaf type
+// gained a FLAT spelling: CODE_PHRASE with the PROBE-086 ratchet, PARTY_PROXY
+// with REQ-140's party grammar, and STRING (ACTIVITY `action_archetype_id`)
+// with REQ-053's bare-value row, which is when rmpath started resolving it.
 var unserialisableIC = map[string]string{
 	"COMPOSITION.language":  "carried by ctx/language on encode; resolving here would double-spell it (the CODE_PHRASE leaf mapping exists since the PROBE-086 ratchet, so the datatype is no longer the reason)",
 	"COMPOSITION.territory": "carried by ctx/territory on encode; resolving here would double-spell it (see COMPOSITION.language)",
@@ -67,7 +66,6 @@ var unserialisableIC = map[string]string{
 	// drop those five exemptions documented is closed and this guard enforces the
 	// resolution — the same course ENTRY language / encoding took when the
 	// CODE_PHRASE leaf mapping landed.
-	"ACTIVITY.action_archetype_id": "STRING: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
 }
 
 // populated returns a LOCATABLE root carrying a populated instance of the
@@ -131,8 +129,9 @@ func populated(rmType string) (root rm.Locatable, prefix string, ok bool) {
 		return &rm.AdminEntry{Name: name, Language: lang, Encoding: enc, Subject: subject}, "", true
 	case "ACTIVITY":
 		return &rm.Activity{
-			Name:   name,
-			Timing: &rm.DVParsable{Value: "R2/2026-08-01T00:00:00Z/P1D", Formalism: "ISO8601"},
+			Name:              name,
+			Timing:            &rm.DVParsable{Value: "R2/2026-08-01T00:00:00Z/P1D", Formalism: "ISO8601"},
+			ActionArchetypeID: "/openEHR-EHR-ACTION.medication.v1/",
 		}, "", true
 	case "EVENT", "POINT_EVENT":
 		return &rm.PointEvent[rm.ItemStructure]{Name: name, Time: when}, "", true

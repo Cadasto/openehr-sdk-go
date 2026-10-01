@@ -31,10 +31,21 @@
 // The walker covers the clinical composition spine (COMPOSITION,
 // SECTION, the ENTRY types, HISTORY / EVENT, the ITEM_STRUCTURE
 // variants, CLUSTER, ELEMENT) down to the ELEMENT leaf: its value, plus
-// name and null_flavour. Data-value internals (e.g. DV_QUANTITY.units)
-// are not traversed. Demographic (PARTY) and EHR/admin object navigation
-// are not yet covered; an unresolvable attribute simply yields no match
+// name and null_flavour. Below ACTION it covers ISM_TRANSITION and
+// INSTRUCTION_DETAILS. An RM String attribute (ACTIVITY
+// action_archetype_id, INSTRUCTION_DETAILS activity_id) resolves to the Go
+// string itself. Data-value internals (e.g. DV_QUANTITY.units) are not
+// traversed. Demographic (PARTY) and EHR/admin object navigation are not
+// yet covered; an unresolvable attribute simply yields no match
 // (path_exists = false).
+//
+// A node-id predicate matches a LOCATABLE's archetype_node_id. The one
+// non-LOCATABLE it matches is ISM_TRANSITION, by its careflow_step code:
+// ADL 1.4 codes each careflow step with the node id of its ISM_TRANSITION
+// constraint, so /ism_transition[at0005] finds the transition whose
+// careflow step is local::at0005 (an at-code belongs to the archetype's
+// `local` terminology, so the same code in another terminology matches no
+// node).
 //
 // # Fallibility
 //

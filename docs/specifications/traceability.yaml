@@ -281,6 +281,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [resources/bmm, openehr/bmm]
+    tests:
+      - internal/bmmgen/render_release_test.go
 
   - id: REQ-042
     title: Generated code, drift-detected
@@ -291,6 +293,7 @@ requirements:
     tests:
       - internal/bmmgen/aom14_test.go
       - internal/bmmgen/plan_test.go
+      - internal/bmmgen/render_release_test.go
       - internal/bmmgen/render_rminfo_hierarchy_test.go
       - internal/bmmgen/render_test.go
       - openehr/rm/rminfo/hierarchy_test.go
@@ -314,6 +317,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/rm]
+    tests:
+      - internal/bmmgen/render_release_test.go
 
   - id: REQ-045
     title: BMM loader building block
@@ -417,6 +422,7 @@ requirements:
     packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     tests:
+      - internal/bmmgen/render_interval_bound_test.go
       - internal/bmmgen/render_jsonunmar_polymorphic_test.go
       - internal/bmmgen/render_streaming_test.go
       - internal/bmmgen/sim_bump_test.go
@@ -426,6 +432,7 @@ requirements:
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
+      - openehr/rm/interval_bound_test.go
       - openehr/rm/like_interfaces_test.go
       - openehr/rm/quoted_literal_test.go
       - openehr/rm/real_test.go
@@ -435,6 +442,7 @@ requirements:
       - openehr/serialize/canjson/decode_test.go
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/serialize/canjson/encode_test.go
+      - openehr/serialize/canjson/interval_open_side_test.go
       - openehr/serialize/canjson/map_value_type_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canjson/marshal_sentinel_test.go
@@ -446,11 +454,13 @@ requirements:
       - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canjson/type_census_test.go
       - openehr/serialize/canjson/typednil_slot_test.go
+      - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/templatecompile/external_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_test.go
+      - openehr/validation/rmread/interval_void_parity_test.go
       - testkit/fixtures/discover_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go
@@ -472,6 +482,7 @@ requirements:
     tests:
       - internal/templatecompile/pathsnapshot_test.go
       - openehr/rm/rmpath/rmpath_test.go
+      - openehr/serialize/simplified/archetype_details_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_decode_test.go
@@ -479,6 +490,8 @@ requirements:
       - openehr/serialize/simplified/flat_nameindex_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/hardening_test.go
+      - openehr/serialize/simplified/ism_transition_test.go
+      - openehr/serialize/simplified/leaf_rmtype_test.go
       - openehr/serialize/simplified/mediatype_fuzz_test.go
       - openehr/serialize/simplified/mediatype_internal_test.go
       - openehr/serialize/simplified/mediatype_test.go
@@ -488,8 +501,11 @@ requirements:
       - openehr/serialize/simplified/rmattr_party_test.go
       - openehr/serialize/simplified/roundtrip_test.go
       - openehr/serialize/simplified/simplified_test.go
+      - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
+      - openehr/template/webtemplate/paths_rmpath_test.go
+      - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/conformance/webtemplate/helpers_test.go
       - testkit/conformance/webtemplate/runner_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
@@ -543,10 +559,14 @@ requirements:
       - testkit/fixtures
     probes: [PROBE-033, PROBE-034]
     tests:
+      - internal/bmmgen/render_interval_bound_test.go
       - openehr/rm/character_text_test.go
+      - openehr/rm/interval_bound_test.go
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
+      - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/serialize/canxml/roundtrip_test.go
+      - openehr/validation/rmread/interval_void_parity_test.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
       - testkit/probes/serialize/probe_034_typereg_xsi_unknown.go
 
@@ -1125,6 +1145,7 @@ requirements:
       - openehr/instance/interval_order_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/instance/realworld_opt_synthesis_test.go
+      - openehr/instance/rm_release_test.go
       - openehr/instance/rmtype_test.go
       - openehr/instance/sample_test.go
       - openehr/instance/valuefill_test.go
@@ -1235,7 +1256,10 @@ requirements:
       - openehr/internal/rmnames
     probes: [PROBE-081]
     tests:
+      - openehr/rm/interval_bound_test.go
+      - openehr/serialize/canjson/interval_open_side_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
+      - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/rmfloor_archetype_test.go
       - openehr/validation/rmfloor_bytes_test.go
@@ -1243,6 +1267,7 @@ requirements:
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_test.go
       - openehr/validation/rmread/handles_test.go
+      - openehr/validation/rmread/interval_void_parity_test.go
       - openehr/validation/rmread/interval_void_test.go
       - openehr/validation/rmread/read_archetyped_test.go
       - openehr/validation/rmread/read_datavalues_test.go
@@ -1250,6 +1275,7 @@ requirements:
       - openehr/validation/rmread/read_test.go
       - openehr/validation/strand14_nonchaining_test.go
       - sandbox/rmvalid_test.go
+      - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go
       - testkit/probes/serialize/probes_test.go
@@ -1308,6 +1334,7 @@ requirements:
       - openehr/template/webtemplate/dedupe_test.go
       - openehr/template/webtemplate/inputs_test.go
       - openehr/template/webtemplate/parity_test.go
+      - openehr/template/webtemplate/paths_rmpath_test.go
       - openehr/template/webtemplate/req116_gap_test.go
 
   - id: REQ-117
@@ -1427,8 +1454,11 @@ requirements:
     packages:
       - openehr/rm/rmpath
     tests:
+      - openehr/rm/rmpath/action_test.go
       - openehr/rm/rmpath/rmpath_test.go
+      - openehr/serialize/simplified/ism_transition_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
+      - openehr/template/webtemplate/paths_rmpath_test.go
       - testkit/conformance/webtemplate/runner_test.go
       - testkit/probes/serialize/probe_086_upstream_flat_parity.go
 
@@ -1477,17 +1507,22 @@ requirements:
     packages:
       - openehr/serialize/simplified
     tests:
+      - openehr/serialize/simplified/archetype_details_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/interval_leaf_anchor_test.go
+      - openehr/serialize/simplified/ism_transition_test.go
+      - openehr/serialize/simplified/leaf_rmtype_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_feeder_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
       - openehr/serialize/simplified/rmattr_repeating_test.go
       - openehr/serialize/simplified/rmattr_test.go
       - openehr/serialize/simplified/rmattr_value_test.go
+      - openehr/serialize/simplified/string_leaf_test.go
       - openehr/serialize/simplified/structured_test.go
+      - openehr/serialize/simplified/unspelled_node_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
       - testkit/probes/serialize/probes_test.go

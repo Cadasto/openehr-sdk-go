@@ -25,11 +25,40 @@ type rawPointInterval[T any] PointInterval[T]
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
+//
+// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
+// emits no `lower` or `upper` member. The wrapper then declares a zero-size
+// field of that name at its own level, shallower than the bound embedded
+// through the alias, so it wins; it is always omitted, and the other
+// members keep their order.
 func (p PointInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
+	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)
+	switch {
+	case omitLower && omitUpper:
+		return json.MarshalEncode(enc, &struct {
+			Type string `json:"_type"`
+			*rawPointInterval[T]
+			Lower struct{} `json:"lower,omitzero"`
+			Upper struct{} `json:"upper,omitzero"`
+		}{Type: "Point_interval", rawPointInterval: (*rawPointInterval[T])(&p)}, typereg.MarshalOptions(enc))
+	case omitLower:
+		return json.MarshalEncode(enc, &struct {
+			Type string `json:"_type"`
+			*rawPointInterval[T]
+			Lower struct{} `json:"lower,omitzero"`
+		}{Type: "Point_interval", rawPointInterval: (*rawPointInterval[T])(&p)}, typereg.MarshalOptions(enc))
+	case omitUpper:
+		return json.MarshalEncode(enc, &struct {
+			Type string `json:"_type"`
+			*rawPointInterval[T]
+			Upper struct{} `json:"upper,omitzero"`
+		}{Type: "Point_interval", rawPointInterval: (*rawPointInterval[T])(&p)}, typereg.MarshalOptions(enc))
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		*rawPointInterval[T]
-	}{"Point_interval", (*rawPointInterval[T])(&p)}, typereg.MarshalOptions(enc))
+	}{Type: "Point_interval", rawPointInterval: (*rawPointInterval[T])(&p)}, typereg.MarshalOptions(enc))
 }
 
 // rawProperInterval is the method-free canonical-JSON alias for ProperInterval. The alias
@@ -45,9 +74,38 @@ type rawProperInterval[T any] ProperInterval[T]
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
+//
+// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
+// emits no `lower` or `upper` member. The wrapper then declares a zero-size
+// field of that name at its own level, shallower than the bound embedded
+// through the alias, so it wins; it is always omitted, and the other
+// members keep their order.
 func (p ProperInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
+	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)
+	switch {
+	case omitLower && omitUpper:
+		return json.MarshalEncode(enc, &struct {
+			Type string `json:"_type"`
+			*rawProperInterval[T]
+			Lower struct{} `json:"lower,omitzero"`
+			Upper struct{} `json:"upper,omitzero"`
+		}{Type: "Proper_interval", rawProperInterval: (*rawProperInterval[T])(&p)}, typereg.MarshalOptions(enc))
+	case omitLower:
+		return json.MarshalEncode(enc, &struct {
+			Type string `json:"_type"`
+			*rawProperInterval[T]
+			Lower struct{} `json:"lower,omitzero"`
+		}{Type: "Proper_interval", rawProperInterval: (*rawProperInterval[T])(&p)}, typereg.MarshalOptions(enc))
+	case omitUpper:
+		return json.MarshalEncode(enc, &struct {
+			Type string `json:"_type"`
+			*rawProperInterval[T]
+			Upper struct{} `json:"upper,omitzero"`
+		}{Type: "Proper_interval", rawProperInterval: (*rawProperInterval[T])(&p)}, typereg.MarshalOptions(enc))
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		*rawProperInterval[T]
-	}{"Proper_interval", (*rawProperInterval[T])(&p)}, typereg.MarshalOptions(enc))
+	}{Type: "Proper_interval", rawProperInterval: (*rawProperInterval[T])(&p)}, typereg.MarshalOptions(enc))
 }

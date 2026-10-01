@@ -45,11 +45,40 @@ type rawDVInterval[T DVOrdered] DVInterval[T]
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
+//
+// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
+// emits no `lower` or `upper` member. The wrapper then declares a zero-size
+// field of that name at its own level, shallower than the bound embedded
+// through the alias, so it wins; it is always omitted, and the other
+// members keep their order.
 func (d DVInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	omitLower := omitIntervalBound(d.LowerUnbounded, d.Lower)
+	omitUpper := omitIntervalBound(d.UpperUnbounded, d.Upper)
+	switch {
+	case omitLower && omitUpper:
+		return json.MarshalEncode(enc, &struct {
+			Type string `json:"_type"`
+			*rawDVInterval[T]
+			Lower struct{} `json:"lower,omitzero"`
+			Upper struct{} `json:"upper,omitzero"`
+		}{Type: "DV_INTERVAL", rawDVInterval: (*rawDVInterval[T])(&d)}, typereg.MarshalOptions(enc))
+	case omitLower:
+		return json.MarshalEncode(enc, &struct {
+			Type string `json:"_type"`
+			*rawDVInterval[T]
+			Lower struct{} `json:"lower,omitzero"`
+		}{Type: "DV_INTERVAL", rawDVInterval: (*rawDVInterval[T])(&d)}, typereg.MarshalOptions(enc))
+	case omitUpper:
+		return json.MarshalEncode(enc, &struct {
+			Type string `json:"_type"`
+			*rawDVInterval[T]
+			Upper struct{} `json:"upper,omitzero"`
+		}{Type: "DV_INTERVAL", rawDVInterval: (*rawDVInterval[T])(&d)}, typereg.MarshalOptions(enc))
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		*rawDVInterval[T]
-	}{"DV_INTERVAL", (*rawDVInterval[T])(&d)}, typereg.MarshalOptions(enc))
+	}{Type: "DV_INTERVAL", rawDVInterval: (*rawDVInterval[T])(&d)}, typereg.MarshalOptions(enc))
 }
 
 // rawDVOrdinal is the method-free canonical-JSON alias for DVOrdinal. The alias

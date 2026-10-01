@@ -148,6 +148,12 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
 	b.WriteString("// (currently `archetype_node_id`) are appended to start.Attr before\n")
 	b.WriteString("// the start token is written.\n")
+	shaped := hasIntervalShape(fields)
+	if shaped {
+		b.WriteString("//\n")
+		b.WriteString("// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound\n")
+		b.WriteString("// is empty emits no `lower` or `upper` element.\n")
+	}
 	fmt.Fprintf(&b, "func (%s *%s%s) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString("\tif _start.Name.Local == \"\" {\n")
 	fmt.Fprintf(&b, "\t\t_start.Name = xml.Name{Local: canxml.ElementName(%q)}\n", pc.BMMName)
@@ -163,6 +169,9 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 		line, err := renderMarshalXMLField(plan, recv, sc, ef)
 		if err != nil {
 			return "", fmt.Errorf("render XML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+		}
+		if shaped {
+			line = guardOpenIntervalBoundXML(recv, ef.Prop.PropertyName(), line)
 		}
 		b.WriteString(line)
 	}

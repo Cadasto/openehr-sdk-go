@@ -56,6 +56,12 @@ func (b *allocBudget) add(k int) error {
 // the elided HISTORY/ITEM_TREE wrappers come from the Web Template and
 // rminfo, values from the FLAT suffixes), then decodes it through canjson
 // (typereg instantiates the polymorphic RM types).
+//
+// FLAT carries no archetype_details, so decode rebuilds it on every node
+// the Web Template identifies by an archetype id: the archetype id is the
+// node's id, rm_version is [rm.Release], and the COMPOSITION alone also
+// gets the Web Template's template id. Whatever the original composition
+// held there is not recovered.
 func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*rm.Composition, error) {
 	if wt == nil || wt.Tree == nil {
 		return nil, ErrNoTemplate
@@ -157,7 +163,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		if err != nil {
 			return nil, fmt.Errorf("simplified: %q: %w", base, err)
 		}
-		dv, err := dvFromSuffixes(leaf.RMType, leafListOpen(leaf), sfx)
+		dv, err := leafFromSuffixes(nodeRMType(leaf), leafListOpen(leaf), sfx)
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
@@ -187,6 +193,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 			return nil, err
 		}
 	}
+	// Every key is placed, so each rebuilt ISM transition can now get the careflow
+	// step its node names, or have the body's checked against it (REQ-053).
+	if err := settleIsmTransitions(compJSON, wt); err != nil {
+		return nil, err
+	}
 	// A sparse :index (":0" and ":2" with no ":1") would have gap-filled an
 	// empty phantom instance in selectElem; reject it before context/completion
 	// can decorate fabricated data into something OPT-valid.
@@ -208,6 +219,9 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	if names != nil {
 		completeRequired(compJSON, ci)
 	}
+	// Both modes: archetype_details has no FLAT key, and the Web Template
+	// alone holds what it records (REQ-053).
+	rebuildArchetypeDetails(compJSON, wt)
 	return compJSON, nil
 }
 
@@ -763,7 +777,7 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, ambiguous map[stri
 				// see deviations.md § Conformance (reused-sibling residual).
 				return nil, nil, nil, fmt.Errorf("%w: FLAT id %q reaches one of several reused siblings sharing the path %q — not yet decodable (see deviations.md)", ErrUnknownPath, seg.id, bare)
 			}
-			predType[bare] = next.RMType
+			predType[bare] = nodeRMType(next)
 			if seg.idx >= 0 {
 				predIndex[bare] = seg.idx
 				// A collapsed leaf's index belongs to the ELEMENT the Web
@@ -861,7 +875,7 @@ func parseAQL(p string) []aqlSeg {
 // placeLeaf walks aqlPath from compJSON, materialising the intermediate RM
 // nodes (concrete type via rminfo + the Web Template, archetype_node_id from
 // the predicate, list position from predIndex), and sets the terminal
-// attribute to the leaf DataValue.
+// attribute to the leaf value: a DataValue, or the RM String of a STRING leaf.
 //
 // Reconstructed intermediate and leaf nodes carry _type + archetype_node_id;
 // when names is non-nil (a template was supplied via WithTemplate) the mandatory
@@ -871,7 +885,7 @@ func parseAQL(p string) []aqlSeg {
 // unnamed (rmpath re-resolves by archetype_node_id, so the round-trip does not
 // depend on it — but the result is then format-idempotent, not canonically
 // complete; see deviations.md).
-func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, dv map[string]any, budget *allocBudget, names map[string]string) error {
+func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, value any, budget *allocBudget, names map[string]string) error {
 	cur, attr, err := walkAQL(compJSON, aqlPath, predIndex, predType, budget, names)
 	if err != nil {
 		return err
@@ -881,7 +895,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 		// "a:0" on a repeatable) — overwriting would silently drop one.
 		return fmt.Errorf("%w: duplicate placement at %q", ErrUnknownPath, aqlPath)
 	}
-	cur[attr] = dv
+	cur[attr] = value
 	return nil
 }
 
@@ -942,14 +956,26 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 			obj, ok := cur[seg.attr].(map[string]any)
 			if !ok {
 				obj = map[string]any{"_type": childType}
+				// The node id is recorded on a non-LOCATABLE ISM_TRANSITION too,
+				// so the check below can tell its nodes apart while leaves are
+				// placed; settleIsmTransitions removes it before canjson.
 				if seg.pred != "" {
 					obj["archetype_node_id"] = seg.pred
 				}
 				cur[seg.attr] = obj
+			} else if held, _ := obj["archetype_node_id"].(string); held != seg.pred {
+				// Two Web Template nodes stand for this one single-valued
+				// attribute (an ACTION's ism_transition[at0005] and [at0006]).
+				// Merging their keys into one object would re-encode them under
+				// one node only, moving the other's keys there (REQ-053).
+				return nil, "", fmt.Errorf("%w: %s.%s is single-valued, but keys reach it through two Web Template nodes, [%s] and [%s] — refused rather than merged (aqlPath %q)",
+					ErrUnknownPath, curType, seg.attr, held, seg.pred, aqlPath)
 			}
 			cur = obj
 		}
-		if nm := names[namePrefix.String()]; nm != "" {
+		// Only a LOCATABLE has a name. The template's name index also covers an
+		// archetyped ISM_TRANSITION node, which must not gain one.
+		if nm := names[namePrefix.String()]; nm != "" && nameable(childType) {
 			if _, has := cur["name"]; !has {
 				cur["name"] = textJSON(nm)
 			}
@@ -958,6 +984,160 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 	}
 	// Unreachable: the loop returns at i == len(segs)-1 and segs is non-empty.
 	return nil, "", fmt.Errorf("%w: canonical path %q walked past its last segment", ErrUnknownPath, aqlPath)
+}
+
+// nameable reports whether a rebuilt node of this RM type declares a `name`,
+// so decode never adds a member the RM class does not have.
+func nameable(rmType string) bool {
+	_, declared := rminfo.Default.AttributeRMType(bmmtype.Class(rmType), "name")
+	return declared
+}
+
+// ismNode is an archetyped `ism_transition[atNNNN]` Web Template node: its node
+// id, its name, and its FLAT path without indexes (for messages).
+type ismNode struct {
+	id, name, flat string
+}
+
+// ismTransitionNodes indexes the Web Template's archetyped ISM_TRANSITION nodes
+// by the bare spelling of their canonical path, which is the path
+// [settleIsmTransitions] rebuilds from the decoded tree.
+func ismTransitionNodes(wt *webtemplate.WebTemplate) map[string]ismNode {
+	out := make(map[string]ismNode)
+	var walk func(n *webtemplate.Node, flat string)
+	walk = func(n *webtemplate.Node, flat string) {
+		for _, ch := range n.Children {
+			chFlat := flat + "/" + ch.ID
+			if ch.NodeID != "" && nodeRMType(ch) == "ISM_TRANSITION" {
+				out[bareAQLPath(ch.AQLPath)] = ismNode{id: ch.NodeID, name: ch.Name, flat: chFlat}
+			}
+			walk(ch, chFlat)
+		}
+	}
+	if wt.Tree != nil {
+		walk(wt.Tree, wt.Tree.ID)
+	}
+	return out
+}
+
+// settleIsmTransitions finishes each ISM_TRANSITION the placement walk rebuilt
+// at an archetyped `ism_transition[atNNNN]` node, once every key is placed.
+//
+// Encode matches a transition to its node by careflow step code, because an
+// ISM_TRANSITION is not LOCATABLE and has no archetype_node_id (REQ-121). So a
+// transition without a careflow step gets the one its node names: the node id as
+// a `local` code, the node's Web Template name as its value. A careflow step the
+// body carries must be coded with the node id; one coded otherwise belongs to
+// another node, and encode would move the transition there (REQ-053). The node id
+// [walkAQL] recorded on the object is removed here, so it never reaches canjson.
+//
+// The walk rebuilds each object's bare canonical path from the archetype_node_id
+// values placement wrote, which is how [walkAQL] spells the same path.
+func settleIsmTransitions(compJSON map[string]any, wt *webtemplate.WebTemplate) error {
+	nodes := ismTransitionNodes(wt)
+	if len(nodes) == 0 {
+		return nil
+	}
+	return settleIsmTransitionsUnder(compJSON, "", nodes)
+}
+
+// settleIsmTransitionsUnder walks obj, whose bare canonical path is path, in
+// sorted attribute order so a body with two bad transitions names the same one
+// on every run.
+func settleIsmTransitionsUnder(obj map[string]any, path string, nodes map[string]ismNode) error {
+	for _, attr := range slices.Sorted(maps.Keys(obj)) {
+		switch v := obj[attr].(type) {
+		case map[string]any:
+			p := path + "/" + attr + nodePredicate(v)
+			if n, ok := nodes[p]; ok && v["_type"] == "ISM_TRANSITION" {
+				if err := settleIsmTransition(v, n); err != nil {
+					return err
+				}
+				continue
+			}
+			if err := settleIsmTransitionsUnder(v, p, nodes); err != nil {
+				return err
+			}
+		case []any:
+			for _, e := range v {
+				m, ok := e.(map[string]any)
+				if !ok {
+					continue
+				}
+				if err := settleIsmTransitionsUnder(m, path+"/"+attr+nodePredicate(m), nodes); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// nodePredicate is the `[id]` a rebuilt node adds to its canonical path, or ""
+// for a node placed without one.
+func nodePredicate(m map[string]any) string {
+	if id, ok := m["archetype_node_id"].(string); ok && id != "" {
+		return "[" + id + "]"
+	}
+	return ""
+}
+
+// settleIsmTransition gives one rebuilt ISM_TRANSITION the careflow step its node
+// names, or checks the one the body carries. The node id is an at-code, which
+// belongs to the archetype's `local` terminology: a careflow step that names no
+// terminology (no terminology_id, a null one, or a blank value) takes it, and one
+// coded in any other terminology, or whose terminology_id has another shape,
+// names no node.
+func settleIsmTransition(tr map[string]any, n ismNode) error {
+	delete(tr, "archetype_node_id")
+	step, carried := tr["careflow_step"]
+	if !carried {
+		tr["careflow_step"] = map[string]any{
+			"_type": "DV_CODED_TEXT", "value": n.name,
+			"defining_code": codePhraseJSON(n.id, localTerminology),
+		}
+		return nil
+	}
+	dc := definingCodeOf(step)
+	code, _ := dc["code_string"].(string)
+	if code != n.id {
+		return fmt.Errorf("%w: %s/careflow_step is coded %q, but its node is ism_transition[%s]; a careflow step coded otherwise names another node",
+			ErrUnsupportedDatatype, n.flat, code, n.id)
+	}
+	switch tid := dc["terminology_id"].(type) {
+	case nil:
+		dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": localTerminology}
+	case map[string]any:
+		raw := tid["value"]
+		term, isString := raw.(string)
+		switch {
+		case raw == nil || (isString && term == ""):
+			tid["value"] = localTerminology
+		case !isString:
+			return fmt.Errorf("%w: %s/careflow_step carries a terminology_id value of JSON type %T, not a string",
+				ErrUnsupportedDatatype, n.flat, raw)
+		case term != localTerminology:
+			return fmt.Errorf("%w: %s/careflow_step is coded in terminology %q, but its node id %s is an at-code of the %s terminology",
+				ErrUnsupportedDatatype, n.flat, term, n.id, localTerminology)
+		}
+	default:
+		return fmt.Errorf("%w: %s/careflow_step carries a terminology_id of JSON type %T, not a TERMINOLOGY_ID object",
+			ErrUnsupportedDatatype, n.flat, tid)
+	}
+	return nil
+}
+
+// localTerminology is the terminology an archetype's own at-codes belong to.
+const localTerminology = "local"
+
+// definingCodeOf returns the defining_code of a rebuilt DV_CODED_TEXT, or nil
+// when the value carries none (a DV_TEXT, a |raw fragment of another shape);
+// reading a nil map yields no code, so such a step is refused before anything
+// is written into it.
+func definingCodeOf(v any) map[string]any {
+	dv, _ := v.(map[string]any)
+	dc, _ := dv["defining_code"].(map[string]any)
+	return dc
 }
 
 // compositeLeafGroups siphons the FLAT keys addressed at a **composite** Web
@@ -1033,7 +1213,7 @@ func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, fam
 			return "", "", 0, "", false
 		}
 		node = next
-		if len(node.Children) > 0 || !isCompositeLeafType(node.RMType) {
+		if len(node.Children) > 0 || !isCompositeLeafType(nodeRMType(node)) {
 			continue
 		}
 		if ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
@@ -1049,7 +1229,7 @@ func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, fam
 		// leaf grammar then refuses them: a body MarshalFlat itself writes
 		// (REQ-140), and the `<leaf>/_uid` the upstream corpus writes too.
 		if i+1 < len(pk.segs) && strings.HasPrefix(pk.segs[i+1].id, "_") &&
-			!compositeLeafOwnsSub(node.RMType, pk.segs[i+1].id) {
+			!compositeLeafOwnsSub(nodeRMType(node), pk.segs[i+1].id) {
 			return "", "", 0, "", false
 		}
 		var b, t strings.Builder
@@ -1123,7 +1303,7 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		// the reused-sibling refusal, which carries its own message.
 		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
 	}
-	value, err := compositeLeafValue(g, node.RMType)
+	value, err := compositeLeafValue(g, nodeRMType(node))
 	if err != nil {
 		return err
 	}
@@ -1196,7 +1376,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 	}
 	if len(segs) == 1 {
 		return rmattrOwner{
-			kind:    wt.Tree.RMType,
+			kind:    nodeRMType(wt.Tree),
 			resolve: func(string) (map[string]any, error) { return compJSON, nil },
 		}, nil
 	}
@@ -1204,7 +1384,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 	if err != nil {
 		return rmattrOwner{}, err
 	}
-	ownerAql, kind, leaf := bareAQLPath(node.AQLPath), node.RMType, ""
+	ownerAql, kind, leaf := bareAQLPath(node.AQLPath), nodeRMType(node), ""
 	if len(node.Children) == 0 {
 		trimmed, isElementValue := strings.CutSuffix(ownerAql, "/value")
 		if !isElementValue {
@@ -1213,7 +1393,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 		// The leaf's own RM type is the *anchor* the value-decoration families are
 		// judged and decoded against (REQ-140 § C1): one FLAT path addresses both
 		// the ELEMENT and the DataValue it holds.
-		ownerAql, kind, leaf = trimmed, "ELEMENT", node.RMType
+		ownerAql, kind, leaf = trimmed, "ELEMENT", nodeRMType(node)
 	}
 	return rmattrOwner{kind: kind, leaf: leaf, resolve: walk(ownerAql, predIndex, predType)}, nil
 }

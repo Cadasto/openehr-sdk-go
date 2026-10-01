@@ -7,6 +7,7 @@ package simplified
 // the walk needs no separate flattening engine.
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
@@ -241,18 +244,13 @@ var ctxOnlyLeafPaths = map[string]bool{
 // resolves to nothing is still skipped like any absent optional, so
 // compositions that do not touch the reused region keep encoding.
 func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, resolveRoot rm.Locatable, resolveRootAql string, ambiguous map[string]bool) error {
+	rmType := nodeRMType(node)
 	isContainer := len(node.Children) > 0
 	// A value leaf normally carries input descriptors, but the Web Template emits
 	// none for some datatypes (DV_URI, DV_MULTIMEDIA, DV_PARSABLE, the in-context
 	// CODE_PHRASE pair, …); any childless node of a value leaf type is still a
 	// value leaf and must be emitted (bare/suffixed or |raw), not dropped.
-	isLeaf := !isContainer && (len(node.Inputs) > 0 || isValueLeafType(node.RMType))
-	if !isContainer && !isLeaf {
-		return nil // structural node carrying neither children nor value inputs
-	}
-	if isLeaf && ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
-		return nil
-	}
+	isLeaf := !isContainer && (len(node.Inputs) > 0 || isValueLeafType(rmType))
 	// Resolution against the RM instance keys on archetype_node_id, so the
 	// REQ-116 name predicate the Web Template now carries is dropped here.
 	// rmpath *does* honour a `node,'name'` predicate, which would filter
@@ -263,6 +261,18 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	// The prefix trim runs first: both paths are the Web Template's
 	// predicated spelling, so they only line up before stripping.
 	relPath := bareAQLPath(strings.TrimPrefix(node.AQLPath, resolveRootAql))
+	if !isContainer && !isLeaf {
+		// A childless node carrying no value inputs and no RM type this codec
+		// spells: nothing to write, unless the composition holds a value there.
+		return refuseUnspelledNode(flatPrefix+"/"+node.ID, rmType, resolveRoot, relPath)
+	}
+	if isLeaf && ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
+		return nil
+	}
+	if isLeaf && rmType == stringLeafType {
+		// An RM String attribute is single-valued, so the leaf takes no :index.
+		return emitStringLeaf(out, flatPrefix+"/"+node.ID, resolveRoot, relPath)
+	}
 
 	if node.Max != 1 {
 		// A repeatable collapsed leaf is walked from its ELEMENT owners, not
@@ -342,6 +352,64 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	return emitValue(out, node, flatPrefix+"/"+node.ID, v, isContainer, resolveRoot, resolveRootAql, ambiguous)
 }
 
+// refuseUnspelledNode is the encode backstop for a childless Web Template node
+// the codec cannot classify: no children, no input descriptors, and an RM type
+// that is no value leaf (a container the template left empty, a type the codec
+// does not map, a malformed type name). Such a node has no FLAT spelling, so a
+// value the composition holds there would be lost without a word — REQ-140
+// forbids that, and the node is refused with ErrUnsupportedDatatype naming its
+// FLAT path and RM type, never the value. With nothing at the node, it is
+// skipped like any absent optional; so is the zero value rmpath hands back for
+// an attribute held by value that the composition never set ([isZeroRMValue]).
+//
+// The backstop sees only what rmpath resolves. It is honest because rmpath
+// resolves every node the Web Template builder emits, which
+// webtemplate.TestWebTemplatePathsResolveViaRmpath enforces for every vendored
+// OPT.
+func refuseUnspelledNode(flatPath, rmType string, root rm.Locatable, relPath string) error {
+	vals, err := rmpath.ItemsAtPath(root, relPath)
+	if err != nil {
+		return skipNotFound(err, relPath)
+	}
+	for _, v := range vals {
+		if v != nil && !rm.IsTypedNil(v) && !isZeroRMValue(v) {
+			return fmt.Errorf("%w: %q is a childless Web Template node typed %q, which has no FLAT spelling, and the composition carries a value there",
+				ErrUnsupportedDatatype, flatPath, rmType)
+		}
+	}
+	return nil
+}
+
+// isZeroRMValue reports whether v is the zero value of its RM type: what
+// rmpath hands back for an attribute held by value (ENTRY language, ACTION
+// ism_transition, EVENT time, …) that the composition never set. It is the
+// reading the codec already gives an empty CODE_PHRASE, an all-zero ctx/setting
+// and an empty STRING. Reflection-free: the zero value comes from typereg, and
+// the two are compared in canonical JSON. A value it cannot judge counts as
+// set, so the backstop errs towards refusing.
+func isZeroRMValue(v any) bool {
+	if s, ok := v.(string); ok {
+		return s == ""
+	}
+	name, ok := rm.RMTypeName(v)
+	if !ok {
+		return false
+	}
+	ctor, ok := typereg.Default.Lookup(name)
+	if !ok {
+		return false
+	}
+	got, err := canjson.Marshal(v)
+	if err != nil {
+		return false
+	}
+	zero, err := canjson.Marshal(ctor())
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(got, zero)
+}
+
 // refuseReusedSibling fails encoding when node is one of several reused
 // siblings (its bare path is claimed more than once) and data resolved at it:
 // the instance cannot be attributed to this sibling id versus the others, so
@@ -398,7 +466,7 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 		}
 		return nil
 	}
-	if err := leafToFlat(out, flatPath, v, node.RMType, leafListOpen(node)); err != nil {
+	if err := leafToFlat(out, flatPath, v, nodeRMType(node), leafListOpen(node)); err != nil {
 		return err
 	}
 	return emitLeafOwnerRMAttrs(out, node, flatPath, ancestorRoot, ancestorAql)
@@ -465,7 +533,7 @@ func emitRepeatingLeafOwners(out map[string]any, node *webtemplate.Node, flatPre
 		sub := make(map[string]any)
 		flatPath := flatPrefix + "/" + node.ID + ":" + strconv.Itoa(idx)
 		if el, isElement := as[rm.Element](owner); isElement && el.Value != nil && !rm.IsTypedNil(el.Value) {
-			if err := leafToFlat(sub, flatPath, el.Value, node.RMType, leafListOpen(node)); err != nil {
+			if err := leafToFlat(sub, flatPath, el.Value, nodeRMType(node), leafListOpen(node)); err != nil {
 				return err
 			}
 		}

@@ -1,10 +1,21 @@
 // Package bmmgen is the BMM-driven code generator for the SDK.
 //
 // It reads the pinned BMM files in resources/bmm/ via openehr/bmm and
-// emits Go source under one or more target output directories: one
-// file per BMM top-level package, plus a single typereg_gen.go per
-// target whose init() calls typereg.Default.Register for every
-// concrete class.
+// emits Go source under one or more target output directories. Per
+// target it writes:
+//
+//   - one <package>_gen.go per BMM top-level package, with its
+//     canonical JSON and XML companions (_jsonmar_gen.go,
+//     _jsonunmar_gen.go, _xmlmar_gen.go, _xmlunmar_gen.go) for a
+//     package that declares concrete classes;
+//   - typereg_gen.go, whose init() calls typereg.Default.Register for
+//     every concrete class;
+//   - jsonhooks_gen.go, the polymorphic decode hooks, when the target
+//     has any.
+//
+// The RM target also gets release_gen.go, the constant Release taken
+// from the root schema's rm_release, and the two rminfo tables,
+// openehr/rm/rminfo/lookup_gen.go and absence_gen.go.
 //
 // # Targets
 //
@@ -364,6 +375,36 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 		}
 	}
 
+	// Interval-bound emptiness test, one file per target that owns an
+	// interval-shaped concrete class. The canonical encoders it serves
+	// sit in the per-package companions above.
+	boundBody, err := RenderIntervalBoundFile(plan)
+	if err != nil {
+		return tr, err
+	}
+	boundPath := filepath.Join(outDir, intervalBoundFile)
+	if boundBody == nil {
+		if opts.Verify {
+			if _, statErr := os.Stat(boundPath); statErr == nil {
+				result.Drifts = append(result.Drifts, DriftRecord{Path: boundPath, Existing: true})
+			}
+		}
+	} else {
+		tr.Files = append(tr.Files, boundPath)
+		result.Files = append(result.Files, boundPath)
+		if opts.Verify {
+			drift, err := compareFile(boundPath, boundBody)
+			if err != nil {
+				return tr, err
+			}
+			if drift != nil {
+				result.Drifts = append(result.Drifts, *drift)
+			}
+		} else if err := writeAtomic(boundPath, boundBody); err != nil {
+			return tr, err
+		}
+	}
+
 	// rminfo data tables — emitted alongside the RM target (one
 	// sub-package down). Both renderers return nil for non-RM targets,
 	// so AOM 1.4 doesn't get them. The package lives in its own
@@ -407,6 +448,11 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 		if err := writeAtomic(gen.path, gen.body); err != nil {
 			return tr, err
 		}
+	}
+
+	// The RM release constant (rm.Release), from the root schema's rm_release.
+	if err := emitReleaseFile(opts, plan, outDir, &tr, result); err != nil {
+		return tr, err
 	}
 
 	tr.MethodStubsEmitted = plan.MethodStubsEmitted

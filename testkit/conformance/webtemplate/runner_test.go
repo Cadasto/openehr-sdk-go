@@ -217,7 +217,7 @@ var pinned = map[string]expectation{
 	"ehrbase_conformance_data_types_interval_dv_quantity":     {excluded: 0, compared: 24},
 	"ehrbase_conformance_evaluation":                          {excluded: 0, compared: 71},
 	"ehrbase_conformance_feeder_audit_multimedia":             {excluded: 0, compared: 75},
-	"ehrbase_conformance_instruction":                         {excluded: 3, compared: 75},
+	"ehrbase_conformance_instruction":                         {excluded: 2, compared: 76},
 	"ehrbase_conformance_interval_event":                      {excluded: 5, compared: 48},
 	"ehrbase_conformance_observation":                         {excluded: 1, compared: 75},
 	"ehrbase_conformance_party_identified":                    {excluded: 7, compared: 115},
