@@ -125,6 +125,11 @@ func TestIsmTransitionPredicateMatchesCareflowStep(t *testing.T) {
 		t.Errorf("ItemAtPath(/ism_transition[at0006]) = %v, want ErrPathNotFound: the careflow step is at0005", err)
 	}
 
+	a.IsmTransition.CareflowStep.DefiningCode.TerminologyID.Value = ""
+	if _, err := rmpath.ItemAtPath(a, "/ism_transition[at0005]"); err != nil {
+		t.Errorf("ItemAtPath(/ism_transition[at0005]) with a careflow step of blank terminology = %v, want the transition: a blank terminology counts as local", err)
+	}
+
 	a.IsmTransition.CareflowStep.DefiningCode.TerminologyID.Value = "SNOMED-CT"
 	if _, err := rmpath.ItemAtPath(a, "/ism_transition[at0005]"); !errors.Is(err, rmpath.ErrPathNotFound) {
 		t.Errorf("ItemAtPath(/ism_transition[at0005]) with a SNOMED-CT::at0005 careflow step = %v, want ErrPathNotFound: an at-code is local", err)

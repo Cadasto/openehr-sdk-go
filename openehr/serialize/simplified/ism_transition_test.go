@@ -150,25 +150,50 @@ func TestActionIsmTransitionDecodeGivesCareflowStep(t *testing.T) {
 }
 
 // TestActionIsmTransitionCareflowStepTerminologyDefaultsToLocal — REQ-053,
-// REQ-121. A careflow step whose body names no terminology takes `local`, the only
-// terminology an archetype's at-code belongs to, so the decoded CODE_PHRASE carries
-// its RM-mandatory terminology_id and the transition re-encodes under its node.
+// REQ-121. A careflow step that names no terminology (none, or a blank one) takes
+// `local`, the only terminology an archetype's at-code belongs to, so the decoded
+// CODE_PHRASE carries its RM-mandatory terminology_id and the transition
+// re-encodes under its node.
 func TestActionIsmTransitionCareflowStepTerminologyDefaultsToLocal(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	keys := ismTransitionKeys("transition", "524", "at0005")
-	delete(keys, rmattrAction+"/transition/careflow_step|terminology")
+	termKey := rmattrAction + "/transition/careflow_step|terminology"
+	for _, tc := range []struct {
+		name  string
+		shape func(map[string]any)
+	}{
+		{name: "absent", shape: func(m map[string]any) { delete(m, termKey) }},
+		{name: "blank", shape: func(m map[string]any) { m[termKey] = "" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			keys := ismTransitionKeys("transition", "524", "at0005")
+			tc.shape(keys)
+			comp := decodeRMAttr(t, wt, rmattrBody(keys))
+			step := firstAction(t, comp).IsmTransition.CareflowStep
+			if step == nil {
+				t.Fatal("decoded ISM_TRANSITION has no careflow_step")
+			}
+			if got := step.DefiningCode.TerminologyID.Value; got != "local" {
+				t.Errorf("careflow_step terminology = %q, want local", got)
+			}
+			got := reencodeRMAttr(t, wt, comp)
+			if got[rmattrAction+"/transition/current_state|code"] != "524" {
+				t.Errorf("re-encode lost the transition: %v", got)
+			}
+		})
+	}
+}
 
-	comp := decodeRMAttr(t, wt, rmattrBody(keys))
-	step := firstAction(t, comp).IsmTransition.CareflowStep
-	if step == nil {
-		t.Fatal("decoded ISM_TRANSITION has no careflow_step")
-	}
-	if got := step.DefiningCode.TerminologyID.Value; got != "local" {
-		t.Errorf("careflow_step terminology = %q, want local", got)
-	}
+// TestActionIsmTransitionBlankTerminologyEncodes — REQ-121, REQ-140. Encode
+// reads a careflow step the way decode does: a blank terminology counts as
+// `local`, so an ACTION built in Go with only the careflow step's code set keeps
+// its transition instead of losing it with no error.
+func TestActionIsmTransitionBlankTerminologyEncodes(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	comp := decodeRMAttr(t, wt, rmattrBody(ismTransitionKeys("transition", "524", "at0005")))
+	firstAction(t, comp).IsmTransition.CareflowStep.DefiningCode.TerminologyID.Value = ""
 	got := reencodeRMAttr(t, wt, comp)
 	if got[rmattrAction+"/transition/current_state|code"] != "524" {
-		t.Errorf("re-encode lost the transition: %v", got)
+		t.Errorf("re-encode lost the transition whose careflow step has a blank terminology: %v", got)
 	}
 }
 
@@ -191,6 +216,8 @@ func TestActionIsmTransitionCareflowStepCodedOtherwiseRefused(t *testing.T) {
 		{name: "another node's id", keys: ismTransitionKeys("transition", "524", "at0006")},
 		{name: "no node's id", keys: ismTransitionKeys("transition2", "532", "at0099")},
 		{name: "the node's id in another terminology", keys: inTerminology(ismTransitionKeys("transition", "524", "at0005"), "transition", "SNOMED-CT")},
+		{name: "a |raw step whose terminology_id is a string", keys: rawCareflowStep("SNOMED-CT")},
+		{name: "a |raw step whose terminology_id is an array", keys: rawCareflowStep([]any{"local"})},
 		{name: "a careflow step with no current state", keys: map[string]any{
 			rmattrAction + "/transition/careflow_step|code":        "at0006",
 			rmattrAction + "/transition/careflow_step|value":       "secret step",
@@ -212,6 +239,22 @@ func TestActionIsmTransitionCareflowStepCodedOtherwiseRefused(t *testing.T) {
 			}
 		})
 	}
+}
+
+// rawCareflowStep is a transition at the at0005 node whose careflow step rides
+// |raw with terminologyID as its terminology_id, a shape no CODE_PHRASE has.
+func rawCareflowStep(terminologyID any) map[string]any {
+	keys := ismTransitionKeys("transition", "524", "at0005")
+	for k := range keys {
+		if strings.Contains(k, "/careflow_step|") {
+			delete(keys, k)
+		}
+	}
+	keys[rmattrAction+"/transition/careflow_step|raw"] = map[string]any{
+		"_type": "DV_CODED_TEXT", "value": "secret step",
+		"defining_code": map[string]any{"_type": "CODE_PHRASE", "code_string": "at0005", "terminology_id": terminologyID},
+	}
+	return keys
 }
 
 // TestActionIsmTransitionTwoNodesRefused — REQ-053. An ACTION has one

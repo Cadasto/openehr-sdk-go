@@ -74,8 +74,9 @@ Concretely:
   a coerced zero value; trailing JSON after the object and an out-of-bound/over-budget
   `:index` are rejected. An ISM transition rebuilt at an `ism_transition[atNNNN]` node without a
   careflow step gets the one the node names (the node id as a `local` code, the node's Web
-  Template name as its value); one that names no terminology takes `local`, and one coded
-  otherwise (another code, or another terminology) is `ErrUnsupportedDatatype`.
+  Template name as its value); a careflow step that names no terminology (none, null or blank)
+  takes `local`, and one coded otherwise (another code, another terminology, or a
+  `terminology_id` of another shape) is `ErrUnsupportedDatatype`.
   Keys that reach two Web Template nodes standing for one single-valued RM attribute (two
   transition nodes of one ACTION) are `ErrUnknownPath`, never merged into one object.
 
