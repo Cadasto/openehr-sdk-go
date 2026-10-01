@@ -299,16 +299,18 @@ func TestOptionalFieldsThatAreNotPointers(t *testing.T) {
 	}
 }
 
-// fieldDecl matches a struct field written as "Name Type `tag`" at the start
-// of a line, with any run of white space between the three parts: gofmt
-// aligns a field's type and tag with its neighbours', so the spacing changes
-// when an unrelated field does.
+// fieldDecl matches a struct field written as "Name Type `tag`" on one line,
+// with any run of spaces or tabs between the three parts: gofmt aligns a
+// field's type and tag with its neighbours', so the spacing changes when an
+// unrelated field does. The last part must be followed by a space, a tab or
+// the end of the line, so "UID *rm.HierObjectID" does not match a field of
+// type *rm.HierObjectIDList.
 func fieldDecl(field string) *regexp.Regexp {
 	parts := strings.SplitN(field, " ", 3)
 	for i, p := range parts {
 		parts[i] = regexp.QuoteMeta(p)
 	}
-	return regexp.MustCompile(`(?m)^\s*` + strings.Join(parts, `\s+`))
+	return regexp.MustCompile(`(?m)^[ \t]*` + strings.Join(parts, `[ \t]+`) + `(?:[ \t]|$)`)
 }
 
 // TestFieldDeclIgnoresAlignment checks that fieldDecl accepts a field padded
@@ -328,6 +330,25 @@ func TestFieldDeclIgnoresAlignment(t *testing.T) {
 	} {
 		if got := fieldDecl(field).MatchString(tc.src); got != tc.want {
 			t.Errorf("fieldDecl(%q).MatchString(%q) = %v, want %v", field, tc.src, got, tc.want)
+		}
+	}
+
+	// A field without a tag ends at its type, so a longer type name that
+	// starts with the same text is another field, and so is the same text
+	// split over two lines.
+	const tagless = "UID *rm.HierObjectID"
+	for _, tc := range []struct {
+		src  string
+		want bool
+	}{
+		{src: "\tUID *rm.HierObjectID\n", want: true},
+		{src: "\tUID   *rm.HierObjectID `json:\"uid\"`\n", want: true},
+		{src: "\tUID *rm.HierObjectID", want: true},
+		{src: "\tUID *rm.HierObjectIDList\n", want: false},
+		{src: "\tUID\n\t*rm.HierObjectID\n", want: false},
+	} {
+		if got := fieldDecl(tagless).MatchString(tc.src); got != tc.want {
+			t.Errorf("fieldDecl(%q).MatchString(%q) = %v, want %v", tagless, tc.src, got, tc.want)
 		}
 	}
 }
