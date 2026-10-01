@@ -1043,6 +1043,7 @@ requirements:
       - internal/templatecompile/compile_test.go
       - openehr/template/constraints/constraints_test.go
       - openehr/template/constraints/example_test.go
+      - openehr/template/constraints/pure_imports_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/validation/constraint_fixtures_test.go
       - testkit/probes/template/constraint_fixtures_test.go
