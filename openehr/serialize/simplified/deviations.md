@@ -231,11 +231,12 @@ not partially/silently accepted.
   `\|lower_included: true` on a bounded side is **normalised away** on re-encode, and an
   absent `\|*_included` on an open side re-encodes as an explicit `false`. Each denotes the
   same RM value as the other spelling, so these are canonical-spelling normalisations like
-  the `:0` one above, not a loss. The rule is corpus-derived: `dv_count` omits both flags
-  on a bounded interval, `dv_quantity` spells both `false`, and every open end in the
-  corpus (`dv_ordinal`, `dv_quantity`, `interval_dv_quantity`) pairs its
-  `\|*_unbounded: true` with `\|*_included: false` — this is the only mapping under which
-  all of them round-trip byte-exactly (wire.md § REQ-140).
+  the `:0` one above, not a loss.
+  The bounded-side defaults are corpus-derived: `dv_count` omits both flags on a
+  bounded interval, and `dv_quantity` spells both `false`. Every open end in the
+  corpus (`dv_ordinal`, `dv_quantity`, `interval_dv_quantity`) spells
+  `\|*_included: false`, so BASE `Lower_included_valid` / `Upper_included_valid`
+  fix the open-side default, not the corpus (wire.md § REQ-140).
 
 ## Conformance
 
