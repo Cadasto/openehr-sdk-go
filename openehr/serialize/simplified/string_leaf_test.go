@@ -201,14 +201,21 @@ func TestStringLeafCorpusSpelling(t *testing.T) {
 
 // TestStringLeafRefusesEmpty — REQ-053 § Leaf datatypes. An empty string at the
 // STRING leaf is refused on decode: ACTIVITY's `Action_archetype_id_valid`
-// invariant forbids it, and encode writes nothing for one.
+// invariant forbids it, and encode writes nothing for one. The payload breaks
+// an RM invariant, so the refusal is a plain wrapped error like the not-a-string
+// case, not the unsupported-datatype gap sentinel.
 func TestStringLeafRefusesEmpty(t *testing.T) {
 	_, err := UnmarshalFlat(stringLeafBody(map[string]any{stringLeafKey: ""}), stringLeafWT())
-	if !errors.Is(err, ErrUnsupportedDatatype) {
-		t.Fatalf("UnmarshalFlat = %v, want ErrUnsupportedDatatype", err)
+	if err == nil {
+		t.Fatal("UnmarshalFlat accepted an empty string at the STRING leaf")
 	}
-	if !strings.Contains(err.Error(), stringLeafKey) {
-		t.Errorf("UnmarshalFlat = %v, want the error to name %q", err, stringLeafKey)
+	if errors.Is(err, ErrUnsupportedDatatype) {
+		t.Errorf("UnmarshalFlat = %v, want a plain error without the ErrUnsupportedDatatype gap sentinel", err)
+	}
+	for _, want := range []string{stringLeafKey, "empty"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("UnmarshalFlat = %v, want the error to name %q", err, want)
+		}
 	}
 }
 
