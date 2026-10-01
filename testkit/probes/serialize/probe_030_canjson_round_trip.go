@@ -220,7 +220,11 @@ type Probe030Input struct {
 // (TestProbe030SkipFloorFindingsArePinned).
 var probe030SkipFloor = map[string][]string{
 	// clinical_notes.v0 leaves required RM attributes absent or empty, for
-	// example the empty string at action_archetype_id.
+	// example the empty string at action_archetype_id. Its DV_DURATION and
+	// DV_DATE_TIME elements under description/items[2] carry a JSON null
+	// `value`, which the floor reports twice: as a missing mandatory
+	// attribute and as a Value_valid failure (the empty string is not an
+	// ISO 8601 value).
 	"compositions/clinical_notes.v0.json": {
 		"required /content[0]/data/origin",
 		"required /content[0]/data/events[0]/time",
@@ -228,20 +232,31 @@ var probe030SkipFloor = map[string][]string{
 		"required /content[2]/activities[0]/timing/value",
 		"required /content[2]/activities[0]/timing/formalism",
 		"required /content[2]/activities[0]/action_archetype_id",
+		"rm_invariant /content[2]/activities[0]/description/items[2]/items[0]/value",
 		"required /content[2]/activities[0]/description/items[2]/items[0]/value/value",
+		"rm_invariant /content[2]/activities[0]/description/items[2]/items[1]/value",
 		"required /content[2]/activities[0]/description/items[2]/items[1]/value/value",
+		"rm_invariant /content[2]/activities[0]/description/items[2]/items[2]/value",
 		"required /content[2]/activities[0]/description/items[2]/items[2]/value/value",
 	},
 	// Demonstration.v1: seven DV_INTERVAL values (DV_QUANTITY and DV_COUNT
 	// bounds) have lower greater than upper, for example 30 over 12.25 cm.
+	// Five ELEMENTs at items[12] (archetype node at0016, "Boolean") carry both
+	// a DV_BOOLEAN value and a null_flavour, which breaks
+	// Inv_null_flavour_indicated (exactly one of the two is present).
 	"compositions/Demonstration.v1.json": {
 		"rm_invariant /content[0]/data/events[0]/data/items[1]/items[4]/value",
 		"rm_invariant /content[0]/data/events[0]/data/items[1]/items[6]/value",
+		"rm_invariant /content[0]/data/events[0]/data/items[1]/items[12]",
 		"rm_invariant /content[0]/data/events[1]/data/items[1]/items[4]/value",
 		"rm_invariant /content[0]/data/events[1]/data/items[1]/items[6]/value",
+		"rm_invariant /content[0]/data/events[1]/data/items[1]/items[12]",
 		"rm_invariant /content[0]/data/events[2]/data/items[1]/items[6]/value",
+		"rm_invariant /content[0]/data/events[2]/data/items[1]/items[12]",
 		"rm_invariant /content[0]/data/events[3]/data/items[1]/items[4]/value",
+		"rm_invariant /content[0]/data/events[3]/data/items[1]/items[12]",
 		"rm_invariant /content[0]/data/events[3]/data/items[2]/items[4]/value",
+		"rm_invariant /content[0]/data/events[3]/data/items[2]/items[12]",
 	},
 	// TestPerson.v2: DV_MULTIMEDIA.media_type is a CODE_PHRASE whose
 	// code_string is null, which the floor reports both as an empty

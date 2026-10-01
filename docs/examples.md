@@ -471,7 +471,7 @@ go run ./cmd/examples/compile-build-validate path/to/template.opt
 
 ```text
 template : vital_signs (vital_signs.opt)
-composition: 3297 bytes canonical JSON, round-tripped
+composition: 3673 bytes canonical JSON, round-tripped
 validation : OK — round-tripped composition conforms to the OPT
 ehr_status : ValidateEHRStatus callable — 6 issue(s), root type mismatch as expected
 ```

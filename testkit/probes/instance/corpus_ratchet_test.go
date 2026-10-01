@@ -31,6 +31,9 @@ const (
 	reasonRandomInterval      = "random_interval"
 	reasonFloorCluster        = "floor_cluster"
 	reasonFloorElement        = "floor_element"
+	reasonFloorElementValue   = "floor_element_value"
+	reasonFloorTemporal       = "floor_temporal"
+	reasonHollowBody          = "hollow_body"
 	reasonFloorAction         = "floor_action"
 	reasonValidatorOther      = "validator_other"
 
@@ -40,6 +43,11 @@ const (
 
 // ratchetNow is the clock every corpus call shares.
 var ratchetNow = time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+
+// ratchetSeeds are the PCG seeds RandomFill runs with. ExampleFill ignores
+// its source, so it runs once. Three seeds keep the runtime flat while
+// widening the random draw past the single (1, 2) stream.
+var ratchetSeeds = [][2]uint64{{1, 2}, {3, 4}, {5, 6}}
 
 // ratchetFailure is one axis of the corpus ratchet. The reason carries a
 // locator, so two distinct failures on the same axis do not share a key.
@@ -61,10 +69,19 @@ var corpusCompileFailures = []string{
 
 // corpusRatchet is the failure set measured on this tree. Policy and fill
 // are the diagnostic strings from instance.Policy and instance.ValueFill.
-// RandomFill uses math/rand/v2.NewPCG(1, 2), a fresh source per call.
+// RandomFill runs once per seed in ratchetSeeds, a fresh math/rand/v2 PCG
+// source per call; a row is observed when any seed produces it.
 // Each reason is category plus a stable locator (type, attribute, code
 // and path, or JSON path).
+//
+// hollow_body rows: clinical_content_validation declares its content
+// attribute with lower bound 0, so the Minimal policy rightly generates a
+// composition with no entry, and with it no ELEMENT. The three rows pin that
+// fact so that any other template going hollow fails the ratchet.
 var corpusRatchet = []ratchetFailure{
+	{template: "templates/clinical_content_validation", entry: "builder", policy: "minimal", fill: "example", reason: "hollow_body:/"},
+	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "example", reason: "hollow_body:/"},
+	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "random", reason: "hollow_body:/"},
 	{template: "templates/clinical_content_validation", entry: "generate", policy: "example", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
 	{template: "templates/clinical_content_validation", entry: "generate", policy: "example", fill: "random", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
 	{template: "templates/family_history.v.1.2.3", entry: "builder", policy: "minimal", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
@@ -109,25 +126,31 @@ func TestREQ107_CorpusRatchet(t *testing.T) {
 
 		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
 			for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
-				opts := instance.Options{
-					Policy:      policy,
-					Language:    "en",
-					Now:         ratchetNow,
-					ValueFill:   fill,
-					ValueSource: mrand.NewPCG(1, 2),
+				seeds := ratchetSeeds
+				if fill == instance.ExampleFill {
+					seeds = seeds[:1]
 				}
-				if compositionRoot {
-					opts.Territory = "NL"
-					opts.Composer = fixedComposer()
+				for _, seed := range seeds {
+					opts := instance.Options{
+						Policy:      policy,
+						Language:    "en",
+						Now:         ratchetNow,
+						ValueFill:   fill,
+						ValueSource: mrand.NewPCG(seed[0], seed[1]),
+					}
+					if compositionRoot {
+						opts.Territory = "NL"
+						opts.Composer = fixedComposer()
+					}
+					out, err := instance.Generate(ctx, compiled, opts)
+					if err != nil {
+						reason := generateReason(t, err)
+						recordReason(observed, ref.Name, entryGenerate, policy, fill, reason)
+						continue
+					}
+					reasons := outputReasons(t, out, compiled, compositionRoot, fill)
+					recordReasons(observed, ref.Name, entryGenerate, policy, fill, reasons)
 				}
-				out, err := instance.Generate(ctx, compiled, opts)
-				if err != nil {
-					reason := generateReason(t, err)
-					recordReason(observed, ref.Name, entryGenerate, policy, fill, reason)
-					continue
-				}
-				reasons := outputReasons(t, out, compiled, compositionRoot, fill)
-				recordReasons(observed, ref.Name, entryGenerate, policy, fill, reasons)
 			}
 		}
 
@@ -223,11 +246,11 @@ func outputReasons(t *testing.T, root any, compiled *templatecompile.Compiled, c
 		// REQ-110: non-COMPOSITION roots use the generic validator.
 		note(validation.Validate(root, compiled))
 	}
-	placeholders, err := placeholderReasons(root)
+	scanned, err := bodyReasons(root)
 	if err != nil {
-		t.Fatalf("placeholder scan: %v", err)
+		t.Fatalf("body scan: %v", err)
 	}
-	for reason := range placeholders {
+	for reason := range scanned {
 		reasons[reason] = struct{}{}
 	}
 	return reasons
@@ -273,11 +296,18 @@ func generateReason(t *testing.T, err error) string {
 
 // issueReason keys a validator finding by category, code, and path.
 // The category is chosen from the code and the path's last attribute.
-// Detail text is not read.
+// The two REQ-112 rm_invariant rules that have no path signature of their
+// own, the ELEMENT null-flavour rule and the temporal Value_valid rule, are
+// told apart by the RM invariant name in the detail, so a regression of
+// either keeps a precise key. Any other detail text is not read.
 func issueReason(iss validation.Issue, fill instance.ValueFill) string {
 	last := lastAttr(iss.Path)
 	cat := reasonValidatorOther
 	switch {
+	case iss.Code == "rm_invariant" && strings.Contains(iss.Detail, "Inv_null_flavour_indicated"):
+		cat = reasonFloorElementValue
+	case iss.Code == "rm_invariant" && last == "value" && strings.Contains(iss.Detail, "Value_valid"):
+		cat = reasonFloorTemporal
 	case last == "symbol" && iss.Code == "required":
 		cat = reasonOrdinalSymbol
 	case fill == instance.RandomFill && iss.Code == "primitive_unit_unknown" && (last == "lower" || last == "upper"):
@@ -292,7 +322,11 @@ func issueReason(iss validation.Issue, fill instance.ValueFill) string {
 	return cat + ":" + iss.Code + ":" + iss.Path
 }
 
-func placeholderReasons(root any) (map[string]struct{}, error) {
+// bodyReasons decodes root as canonical JSON and returns the placeholder
+// findings plus a hollow_body finding when the body holds no ELEMENT. A body
+// with no ELEMENT passes ValidateRM and the template validator vacuously, so
+// the count is the coverage floor that keeps those two checks honest.
+func bodyReasons(root any) (map[string]struct{}, error) {
 	raw, err := canjson.Marshal(root)
 	if err != nil {
 		return nil, fmt.Errorf("canjson.Marshal: %w", err)
@@ -306,7 +340,30 @@ func placeholderReasons(root any) (map[string]struct{}, error) {
 	}
 	reasons := make(map[string]struct{})
 	walkPlaceholder(tree, "", reasons)
+	if countElements(tree) == 0 {
+		reasons[reasonHollowBody+":/"] = struct{}{}
+	}
 	return reasons, nil
+}
+
+// countElements counts the nodes of a decoded canonical JSON tree whose
+// _type is ELEMENT.
+func countElements(v any) int {
+	n := 0
+	switch node := v.(type) {
+	case map[string]any:
+		if typ, _ := node["_type"].(string); typ == "ELEMENT" {
+			n++
+		}
+		for _, child := range node {
+			n += countElements(child)
+		}
+	case []any:
+		for _, child := range node {
+			n += countElements(child)
+		}
+	}
+	return n
 }
 
 func walkPlaceholder(v any, path string, reasons map[string]struct{}) {
