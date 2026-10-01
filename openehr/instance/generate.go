@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"regexp/syntax"
 	"strings"
 	"time"
@@ -1678,26 +1677,15 @@ var errNoStringValue = errors.New("no string satisfies the C_STRING constraint")
 // stringForConstraint returns a string cs accepts: the example ex when cs
 // accepts it, else the first list member cs accepts, else, for a
 // pattern-only constraint, the shortest string the pattern's syntax
-// builds. A pattern must match the whole string, so the value also holds
-// under the AOM reading of a C_STRING pattern, not only under the
-// substring match the validator applies. It returns errNoStringValue
-// when none of these is accepted.
+// builds. Acceptance is cs.Validate, which matches a pattern against the
+// whole string, so a value that only contains a match is never
+// chosen. It returns errNoStringValue when none of these is accepted.
 func stringForConstraint(cs constraints.CString, ex any) (string, error) {
 	s, ok := ex.(string)
 	if !ok {
 		return "", fmt.Errorf("C_STRING example value is %T, want string", ex)
 	}
-	var whole *regexp.Regexp
-	if cs.Pattern != "" {
-		re, err := regexp.Compile(`^(?:` + cs.Pattern + `)$`)
-		if err != nil {
-			return "", errNoStringValue
-		}
-		whole = re
-	}
-	accepts := func(v string) bool {
-		return len(cs.Validate(v)) == 0 && (whole == nil || whole.MatchString(v))
-	}
+	accepts := func(v string) bool { return len(cs.Validate(v)) == 0 }
 	if accepts(s) {
 		return s, nil
 	}

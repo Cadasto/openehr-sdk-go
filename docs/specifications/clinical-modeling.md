@@ -180,6 +180,7 @@ The set is closed by `isPrimitive()`; new primitive shapes appear in the `constr
 
 - Integer / real validators accept any Go integer kind (`int`, `int8`..`int64`, `uint`, `uint8`..`uint64`). `uint` and `uint64` values exceeding `math.MaxInt64` return `CodeWrongType` rather than silently wrapping. `CReal.Validate` additionally accepts `float32` / `float64`.
 - String, date, time, date-time, duration validators accept Go `string`.
+- `CString.Validate` **MUST** match `Pattern` against the whole string, as if written `^(?:Pattern)$`, so a value that only contains a match is a `CodePatternMismatch`: the AOM leaves the match mode open, and the SDK reads the pattern as whole-string because the specification's own examples (`/.+/`, `/km\/h|mi\/h/`) only make sense that way and the openEHR Java libraries do the same.
 - `CBoolean.Validate` accepts Go `bool`.
 - `CodePhrase.Validate` accepts either a bare `string` (treated as the code under the constrained terminology) or a `constraints.CodedTermRef`.
 - `DvQuantity.Validate` accepts a `constraints.QuantityValue` `{Magnitude, Units, Precision}` triple.
@@ -194,7 +195,7 @@ Every `Violation` carries a typed `ViolationCode`. The closed set is:
 | Code | Triggered by |
 |---|---|
 | `CodeOutOfRange` | numeric value outside a `NumericRange` |
-| `CodePatternMismatch` | string fails a regex / pattern |
+| `CodePatternMismatch` | string fails a regex / pattern (matched against the whole string) |
 | `CodeNotInList` | value is not a member of a closed list (strings, codes, ordinals, etc.) |
 | `CodeWrongType` | input Go type cannot be coerced to the constraint's expected type |
 | `CodeUnitUnknown` | DV_QUANTITY units string is not in the enumerated allowed list |
@@ -452,6 +453,8 @@ func AsObservation(v any) (*rm.Observation, error)
 Slot handling (v1): pinned archetype-root children under a slot are synthesised; pure `ARCHETYPE_SLOT` assertions resolve via the parsed REQ-104 include grammar when a safe example id can be derived, or via the RM-type-prefix fallback only when no include assertions were parsed — same compromise as validation slot-fit.
 
 Where the OPT leaves an RM attribute open, the generator **MUST** fill in RM-valid defaults: an unconstrained abstract `PARTY_PROXY` (for example an ENTRY `subject`) becomes `PARTY_SELF`, never an empty `PARTY_IDENTIFIED`, which would break `Basic_validity`; and an unconstrained `EVENT_CONTEXT.setting` takes the `openehr`-coded `238|other care|`, never an archetype-local code, so that `Setting_valid` holds. An ENTRY's `language` takes `Options.Language` (an ISO 639-1 code) and its `encoding` takes `UTF-8` from the IANA character sets, so that `Language_valid` and `Encoding_valid` hold; the floor does not evaluate those two rules (§ [REQ-112](#req-112--template-less-reference-model-validation-floor) trust model), so the generator, not the validator, keeps them true.
+
+The generator orders the two bounds of an interval (BASE `Interval.Limits_consistent`) only where it can compare them, date-times and times that carry a zone as instants, and **MUST** leave a pair it cannot compare as generated, such as a zoned against a zoneless date-time or a partial against a full value (DV_DATE `2026-10` against `2026-01-01`).
 
 Generated output **MUST** also pass the RM floor (`validation.ValidateRM`, [REQ-112](#req-112--template-less-reference-model-validation-floor)), and `composition.NewBuilder` output likewise, for every root the generator synthesises. Two cases are outside that rule. A required slot whose includes cannot be synthesised is refused with `ErrSlotFillUnsupported` (§ Slot fills) rather than filled, at either policy and through the builder. An OPT that constrains an attribute the pinned RM does not have (today `ITEM_TABLE.rotated`) yields a value the validators reject, because the generator cannot write an attribute the RM lacks.
 
