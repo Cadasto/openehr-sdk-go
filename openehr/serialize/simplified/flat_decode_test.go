@@ -232,3 +232,31 @@ func TestCtxDefaultsAreGroupMembersWithPinnedRubrics(t *testing.T) {
 		})
 	}
 }
+
+// TestWalkAQLRefusesScalarSlot — REQ-053. A second placement that walks
+// through an attribute already holding a scalar reaches two Web Template nodes
+// for one single-valued RM attribute: it is refused with ErrUnknownPath, and
+// the scalar already placed stays. An absent slot still gets its fresh object.
+func TestWalkAQLRefusesScalarSlot(t *testing.T) {
+	t.Run("scalar slot refused and kept", func(t *testing.T) {
+		comp := map[string]any{"language": "en"}
+		_, _, err := walkAQL(comp, "/language/code_string", nil, nil, nil, nil)
+		if !errors.Is(err, ErrUnknownPath) {
+			t.Fatalf("walkAQL through a scalar slot = %v, want ErrUnknownPath", err)
+		}
+		if got := comp["language"]; got != "en" {
+			t.Errorf("walkAQL replaced the scalar: language = %#v, want %q", got, "en")
+		}
+	})
+	t.Run("absent slot gets an object", func(t *testing.T) {
+		comp := map[string]any{}
+		cur, attr, err := walkAQL(comp, "/language/code_string", nil, nil, nil, nil)
+		if err != nil {
+			t.Fatalf("walkAQL through an absent slot: %v", err)
+		}
+		lang, ok := comp["language"].(map[string]any)
+		if !ok || attr != "code_string" || lang["_type"] != "CODE_PHRASE" {
+			t.Errorf("walkAQL = (%#v, %q), language = %#v, want a CODE_PHRASE object holding code_string", cur, attr, comp["language"])
+		}
+	})
+}
