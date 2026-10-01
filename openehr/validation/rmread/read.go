@@ -1131,6 +1131,8 @@ func readDVTextSingle(t *rm.DVText, attr string) (any, bool) {
 	switch attr {
 	case "value":
 		return strPresent(t.Value)
+	case "formatting":
+		return ptrPresent(t.Formatting)
 	}
 	return nil, false
 }
@@ -1141,6 +1143,8 @@ func readDVCodedTextSingle(t *rm.DVCodedText, attr string) (any, bool) {
 		return strPresent(t.Value)
 	case "defining_code":
 		return codePhrasePresent(t.DefiningCode)
+	case "formatting":
+		return ptrPresent(t.Formatting)
 	}
 	return nil, false
 }
@@ -1270,6 +1274,8 @@ func readDVMultimediaSingle(m *rm.DVMultimedia, attr string) (any, bool) {
 	switch attr {
 	case "media_type":
 		return codePhrasePresent(m.MediaType)
+	case "alternate_text":
+		return ptrPresent(m.AlternateText)
 	case "size":
 		// Integer value-typed field — always structurally present.
 		return m.Size, true

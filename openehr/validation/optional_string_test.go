@@ -33,12 +33,34 @@ func TestREQ107_OptionalStringIdentifierSubfields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var comp rm.Composition
-	if err := canjson.Unmarshal(raw, &comp); err != nil {
-		t.Fatalf("decode composition: %v", err)
+	decode := func(t *testing.T, body string) *rm.Composition {
+		t.Helper()
+		var comp rm.Composition
+		if err := canjson.Unmarshal([]byte(body), &comp); err != nil {
+			t.Fatalf("decode composition: %v", err)
+		}
+		return &comp
 	}
-	for _, iss := range errorIssues(validation.ValidateComposition(&comp, c)) {
-		t.Errorf("%s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+	t.Run("matching", func(t *testing.T) {
+		for _, iss := range errorIssues(validation.ValidateComposition(decode(t, string(raw)), c)) {
+			t.Errorf("%s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+		}
+	})
+	// The template pins issuer, type and assigner to XYZ.*; a filled value
+	// that does not match must be reported against the pattern, not read
+	// as a pointer the validator cannot type.
+	for _, attr := range []string{"issuer", "type", "assigner"} {
+		t.Run("violating "+attr, func(t *testing.T) {
+			old := `"` + attr + `": "XYZ"`
+			if !strings.Contains(string(raw), old) {
+				t.Fatalf("composition has no %s", old)
+			}
+			body := strings.ReplaceAll(string(raw), old, `"`+attr+`": "ABC"`)
+			issues := errorIssues(validation.ValidateComposition(decode(t, body), c))
+			if !containsCode(issues, "primitive_pattern_mismatch") {
+				t.Errorf("issues = %v, want a primitive_pattern_mismatch issue", issues)
+			}
+		})
 	}
 }
 

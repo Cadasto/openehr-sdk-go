@@ -382,6 +382,12 @@ func primitiveInput(rmValue any) any {
 			Terminology: v.TerminologyID.Value,
 			CodeString:  v.CodeString,
 		}
+	case *string:
+		// An optional String attribute: validate the text, not the pointer.
+		if v == nil {
+			return ""
+		}
+		return *v
 	case rm.Integer:
 		return int64(v)
 	case rm.Real:
@@ -675,7 +681,16 @@ func primitiveValueMatchesShortName(shortName string, val any) bool {
 		return rm.IsInt64(val)
 	case "REAL":
 		return rm.IsReal(val)
-	case "DATE", "TIME", "DATE_TIME", "DURATION", "STRING":
+	case "DATE", "TIME", "DATE_TIME", "DURATION":
+		_, ok := val.(string)
+		return ok
+	case "STRING":
+		// An optional String attribute (DV_TEXT.formatting,
+		// DV_IDENTIFIER.issuer, …) is a *string in the RM; the reader
+		// returns it only when set, so a nil pointer is absent.
+		if p, isPtr := val.(*string); isPtr {
+			return p != nil
+		}
 		_, ok := val.(string)
 		return ok
 	default:
