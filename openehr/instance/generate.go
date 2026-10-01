@@ -1530,16 +1530,19 @@ func (g *generator) placeholderElement() *rm.Element {
 }
 
 // settleElement makes an ELEMENT carry exactly one of value and null_flavour
-// (RM Inv_null_flavour_indicated). A value wins over a null flavour: when the
-// OPT constrains both attributes, the null flavour is dropped. An ELEMENT with
-// no value, because the OPT constrains none or none could be generated, gets
-// the null flavour "no information".
+// (RM Inv_null_flavour_indicated), and a null_reason only while it is null
+// (RM Inv_null_reason_valid). A value wins: when the OPT constrains the value
+// and either null attribute, the null flavour and the null reason are both
+// dropped. An ELEMENT with no value, because the OPT constrains none or none
+// could be generated, keeps any null reason and gets the null flavour
+// "no information" when it has none.
 func settleElement(e *rm.Element) {
-	hasValue := e.Value != nil && !rm.IsTypedNil(e.Value)
-	switch {
-	case hasValue && e.NullFlavour != nil:
+	if e.Value != nil && !rm.IsTypedNil(e.Value) {
 		e.NullFlavour = nil
-	case !hasValue && e.NullFlavour == nil:
+		e.NullReason = nil
+		return
+	}
+	if e.NullFlavour == nil {
 		e.NullFlavour = noInformation()
 	}
 }
