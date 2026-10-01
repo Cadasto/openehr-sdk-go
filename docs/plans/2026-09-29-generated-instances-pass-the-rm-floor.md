@@ -52,7 +52,7 @@ The plan is complete when:
 
 - Code and tests land with `// REQ-` citations.
 - [`traceability.yaml`](../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the implementation.
-- A [`roadmap.md`](../roadmap.md) row records what landed.
+- The [`roadmap.md`](../roadmap.md) Planned row for this work is removed once it lands.
 - The implementing PR flips REQ-107 back to `landed` (`REQ.md`, `traceability.yaml`), removes its Known gap and the two "specified ahead of the code" sentences on the REQ-112 rows, and marks PROBE-027's `ValidateRM` arm Implemented. STRAND-14 already carries the evidence.
 - `make spec-check` and `make ci` pass.
 
@@ -61,7 +61,7 @@ The plan is complete when:
 | Step | Status |
 |---|---|
 | Spec / registry updated (`traceability.yaml`, REQ.md row) | done (Phase 0) |
-| Indexes `spec-check` misses (`roadmap.md` row) | done (Phase 0) |
+| Indexes `spec-check` misses (`roadmap.md` row) | done (the Planned row is removed) |
 | Code | done (phases 1 to 3) |
 | Tests with `// REQ-` comments | done |
 | `make spec-check` | done |

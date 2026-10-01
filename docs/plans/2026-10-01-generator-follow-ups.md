@@ -65,8 +65,7 @@ Close the four gaps PR 196 left open on purpose, so generated values fill every 
 
 These came up during the same triage and stay out unless the maintainer pulls them in:
 
-- `rmwrite.EnsureSingle` has no case for `DV_PARSABLE`, `DV_IDENTIFIER`, `DV_URI` or `DV_EHR_URI`, so `writeBMMString` cannot write their values and its error is ignored.
-- `ValidateRM` accepts `DV_DATE_TIME.value = "example"`; the floor has no ISO 8601 check.
+- `rmwrite.EnsureSingle` has no case for `TERMINOLOGY_ID.value` or the locatable identity strings, so `writeBMMString` cannot write them and the generator ignores that error; propagating it would move census outcomes.
 - `fillCurrentState`'s `firstCodedExample` path looks unreachable.
 - The fourteen suggestions in the PR 196 findings file.
 
