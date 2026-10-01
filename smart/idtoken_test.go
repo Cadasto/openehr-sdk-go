@@ -190,7 +190,7 @@ func TestValidateIDTokenES256(t *testing.T) {
 	}
 }
 
-// TestValidateIDTokenRespectsDiscoveryAllowlist confirms the discovery
+// TestValidateIDTokenRejectsUnlistedAlg confirms the discovery
 // id_token_signing_alg_values_supported narrows the accepted set: a token
 // signed with an alg outside the advertised list is rejected. REQ-062 REQ-064
 func TestValidateIDTokenRejectsUnlistedAlg(t *testing.T) {
@@ -486,7 +486,7 @@ func TestValidateIDTokenOutageKeepsItsOwnError(t *testing.T) {
 
 // TestValidateIDTokenMissingTrustAnchorIsInvalidConfig checks that a missing
 // JWKS, issuer or client ID is reported as a configuration error, not as a bad
-// token. The token itself is valid.
+// token, whether the token is valid or empty.
 func TestValidateIDTokenMissingTrustAnchorIsInvalidConfig(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	priv := newRSAKey(t)
@@ -494,18 +494,26 @@ func TestValidateIDTokenMissingTrustAnchorIsInvalidConfig(t *testing.T) {
 	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", defaultIDClaims(now))
 
 	cases := []struct {
-		name     string
-		jwks     *authsmart.JWKS
-		issuer   string
-		clientID string
+		name       string
+		jwks       *authsmart.JWKS
+		issuer     string
+		clientID   string
+		emptyToken bool
 	}{
 		{name: "no JWKS", issuer: "https://issuer.example", clientID: "client-id"},
 		{name: "no issuer", jwks: jwks, clientID: "client-id"},
 		{name: "no client ID", jwks: jwks, issuer: "https://issuer.example"},
+		// The configuration is checked before the token, so an empty token cannot hide it.
+		{name: "no JWKS and an empty token", issuer: "https://issuer.example", clientID: "client-id", emptyToken: true},
+		{name: "no issuer and an empty token", jwks: jwks, clientID: "client-id", emptyToken: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := smart.ValidateIDToken(t.Context(), tok, tc.jwks, tc.issuer, tc.clientID, "nonce-xyz", now, nil)
+			raw := tok
+			if tc.emptyToken {
+				raw = ""
+			}
+			_, err := smart.ValidateIDToken(t.Context(), raw, tc.jwks, tc.issuer, tc.clientID, "nonce-xyz", now, nil)
 			// REQ-062 REQ-064: a missing trust anchor is a configuration error and never matches the JWKS sentinel.
 			if err == nil || !errors.Is(err, auth.ErrInvalidConfig) {
 				t.Fatalf("ValidateIDToken(%s) error = %v, want ErrInvalidConfig", tc.name, err)
