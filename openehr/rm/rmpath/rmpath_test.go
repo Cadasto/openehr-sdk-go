@@ -355,7 +355,7 @@ func TestNamePredicateTypedNilNameNoPanic(t *testing.T) {
 
 // TestItemAtPathInContextAttributes — REQ-121. The RM attributes the
 // WebTemplate synthesizes as in-context leaves must resolve here, because
-// the FLAT encoder (REQ-053) reads them through rmpath and treats a
+// the FLAT encoder reads them through rmpath and treats a
 // not-found as an absent optional: an attribute missing from childrenAt is
 // silently dropped data, not an error. PROBE-086 caught EVENT `time` and
 // INSTRUCTION `narrative` / `expiry_time` being lost exactly that way.

@@ -41,11 +41,16 @@ var compositionXMLExcluded = map[string]bool{
 	"TestPerson.v2":    true,
 }
 
-// ListCompositionJSON returns every *.json under compositions/ and rm/.
+// ListCompositionJSON returns every top-level *.json in compositions/ and rm/.
+// A subdirectory of either is not walked.
 func ListCompositionJSON() ([]CompositionJSONRel, error) {
+	return listCompositionJSON(CorpusRoot())
+}
+
+func listCompositionJSON(root string) ([]CompositionJSONRel, error) {
 	var out []CompositionJSONRel
 	for _, kind := range []string{"compositions", "rm"} {
-		dir := filepath.Join(CorpusRoot(), kind)
+		dir := filepath.Join(root, kind)
 		if err := collectJSON(dir, kind, &out); err != nil {
 			return nil, err
 		}
@@ -130,11 +135,16 @@ func TemplateIDsWithCompositionXML() ([]string, error) {
 	return ids, nil
 }
 
-// ListRMXML returns *.xml paths relative to [CorpusRoot] under compositions/ and rm/.
+// ListRMXML returns top-level *.xml paths relative to [CorpusRoot] under
+// compositions/ and rm/. A subdirectory of either is not walked.
 func ListRMXML() ([]string, error) {
+	return listRMXML(CorpusRoot())
+}
+
+func listRMXML(root string) ([]string, error) {
 	var out []string
 	for _, kind := range []string{"compositions", "rm"} {
-		dir := filepath.Join(CorpusRoot(), kind)
+		dir := filepath.Join(root, kind)
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			if os.IsNotExist(err) {

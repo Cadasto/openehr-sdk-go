@@ -166,11 +166,11 @@ The registry is also **reversible** ([ADR 0013](../adr/0013-generated-locatable-
 
 - A generated `rm.RMTypeName(any) (string, bool)` **MUST** map every registered concrete Go type — including generic instantiations over the parameter bound's closed descendant set — back to its bare registration name (`DVInterval[DVQuantity]` → `"DV_INTERVAL"`). Nil interfaces, typed-nil pointers, and non-RM values report `("", false)`.
 - A generated `rm.IsTypedNil(any) bool` **MUST** report whether a value is an interface carrying a typed-nil pointer to a registered concrete; it is the sanctioned guard before calling `Locatable` accessors.
-- Both **MUST** be reflection-free and regenerated with the forward registrations, so forward and reverse mappings cannot drift.
+- The reflection rule of [idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024) applies to both unchanged, and both **MUST** be regenerated with the forward registrations, so forward and reverse mappings cannot drift.
 
 ## Generics for clients, validators, repositories (REQ-024)
 
-Generics carry typed responses through clients and validators without forcing reflection or `any`-casts at every call site:
+Generics carry typed responses through clients and validators without `any`-casts at every call site. The reflection rule of [idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024) applies unchanged.
 
 ```go
 // openehr/client/ehr/composition (sketch)

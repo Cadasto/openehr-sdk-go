@@ -145,7 +145,7 @@ func TestDemographicDecodeFailuresAreTyped(t *testing.T) { // REQ-151
 // isNil reports whether an any holding one of the leaves' return types is
 // absent. The leaves return rm.Party (an interface) and *PartyVersion, so a
 // plain `out != nil` on the any would be true for a boxed typed nil; the type
-// switch keeps this reflection-free (REQ-024).
+// switch keeps this free of reflection.
 func isNil(out any) bool {
 	switch v := out.(type) {
 	case nil:

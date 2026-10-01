@@ -26,7 +26,7 @@ import (
 //
 // REQ-161 § Checks states the fan-out rule as "flattening nested AND
 // junctions", and andFrontier implements that literally with a branch that
-// recurses when a child is ITSELF an AND junction. But REQ-117's
+// recurses when a child is ITSELF an AND junction. But the parser's
 // same-operator splicing (openehr/aql/parse/extract_query.go:513-520) always
 // merges a same-operator child's Children into its parent BEFORE this
 // package ever sees the tree, so no query [parse.Parse] can produce hands
@@ -41,7 +41,7 @@ import (
 // The rule stays implemented as written rather than deleted as dead code
 // (the controller's ruling): REQ-161 states it in terms of nesting, and
 // keeping the recursive branch means the check stays correct even if
-// REQ-117's splicing were ever relaxed. This test is what makes that branch
+// that splicing were ever relaxed. This test is what makes that branch
 // answerable to a regression instead of merely present.
 func TestAndFrontierFlattensHandBuiltNestedAnd(t *testing.T) {
 	t.Parallel()

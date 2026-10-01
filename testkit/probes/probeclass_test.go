@@ -115,9 +115,7 @@ func TestREQ082ProbeClassMatchesModes(t *testing.T) {
 		if firstBackendReach(probes[id]) != "" {
 			backendFacing++
 		}
-		if msg := classMismatch(id, probes[id], modes); msg != "" {
-			t.Error(msg)
-		}
+		reportClassMismatch(t, classMismatch(id, probes[id], modes))
 	}
 	t.Logf("classified %d probes: %d in-repo, %d backend-facing", len(probes), len(probes)-backendFacing, backendFacing)
 }
@@ -142,6 +140,33 @@ func classMismatch(id string, funcs []probeFunc, modes map[string]string) string
 			id, funcNames(funcs), line)
 	}
 	return ""
+}
+
+// mismatchReporter is the part of testing.TB that reports a class
+// disagreement. The catalogue passes *testing.T; the fixture passes a recorder.
+type mismatchReporter interface {
+	Helper()
+	Error(args ...any)
+}
+
+// mismatchCapture records reports so a fixture can assert them without failing itself.
+type mismatchCapture struct {
+	msgs []string
+}
+
+func (mismatchCapture) Helper() {}
+
+func (c *mismatchCapture) Error(args ...any) {
+	c.msgs = append(c.msgs, fmt.Sprint(args...))
+}
+
+// reportClassMismatch reports msg when it disagrees. The catalogue loop and
+// the fixture both call it, so a helper that drops msg fails the fixture.
+func reportClassMismatch(r mismatchReporter, msg string) {
+	r.Helper()
+	if msg != "" {
+		r.Error(msg)
+	}
 }
 
 // TestREQ082ProbeClassMismatch runs the comparison the class check makes over
@@ -196,17 +221,211 @@ func TestREQ082ProbeClassMismatch(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := classMismatch("PROBE-901", tc.funcs, tc.modes)
+			var rec mismatchCapture
+			reportClassMismatch(&rec, classMismatch("PROBE-901", tc.funcs, tc.modes))
+			got := strings.Join(rec.msgs, "\n")
 			switch {
 			case tc.want == "" && got != "":
-				t.Errorf("classMismatch(PROBE-901, %s, %v) = %q, want no mismatch", funcNames(tc.funcs), tc.modes, got)
+				t.Errorf("reportClassMismatch(classMismatch(PROBE-901, %s, %v)) = %q, want no mismatch", funcNames(tc.funcs), tc.modes, got)
 			case tc.want != "" && !strings.Contains(got, tc.want):
-				t.Errorf("classMismatch(PROBE-901, %s, %v) = %q, want a mismatch containing %q", funcNames(tc.funcs), tc.modes, got, tc.want)
+				t.Errorf("reportClassMismatch(classMismatch(PROBE-901, %s, %v)) = %q, want a mismatch containing %q", funcNames(tc.funcs), tc.modes, got, tc.want)
 			case tc.wantMore != "" && !strings.Contains(got, tc.wantMore):
-				t.Errorf("classMismatch(PROBE-901, %s, %v) = %q, want it to name the backend path %q", funcNames(tc.funcs), tc.modes, got, tc.wantMore)
+				t.Errorf("reportClassMismatch(classMismatch(PROBE-901, %s, %v)) = %q, want it to name the backend path %q", funcNames(tc.funcs), tc.modes, got, tc.wantMore)
 			}
 		})
 	}
+}
+
+// TestREQ082CatalogueReportsClassMismatch checks that the catalogue loop
+// passes every classMismatch result to something that reports it. The live
+// catalogue currently mismatches nothing, so replacing that report with
+// `_ = msg` would leave TestREQ082ProbeClassMatchesModes green.
+func TestREQ082CatalogueReportsClassMismatch(t *testing.T) {
+	// § REQ-082: the catalogue must report a class disagreement, not only compute it.
+	t.Parallel()
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "probeclass_test.go", nil, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatalf("parser.ParseFile(probeclass_test.go): %v", err)
+	}
+	fn := funcByName(f, "TestREQ082ProbeClassMatchesModes")
+	if fn == nil {
+		t.Fatal("TestREQ082ProbeClassMatchesModes is not in probeclass_test.go")
+	}
+	calls, reported := classMismatchResultsReported(fn)
+	if calls == 0 || reported != calls {
+		t.Errorf("TestREQ082ProbeClassMatchesModes reports %d of %d classMismatch results, want every result reported", reported, calls)
+	}
+
+	// A result counts only as a direct argument of the call that reports it.
+	// Each of these shapes drops the text and must report nothing.
+	discarded := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "assigned then discarded",
+			body: `if msg := classMismatch(id, probes[id], modes); msg != "" { _ = msg }`,
+		},
+		{
+			name: "wrapped in drop",
+			body: `reportClassMismatch(t, drop(classMismatch(id, probes[id], modes)))`,
+		},
+		{
+			name: "wrapped in fmt.Errorf",
+			body: `_ = fmt.Errorf("%s", classMismatch(id, probes[id], modes))`,
+		},
+	}
+	for _, tc := range discarded {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			src := "package p\nfunc TestWrapped(t *testing.T) {\n" + tc.body + "\n}\n"
+			f, err := parser.ParseFile(token.NewFileSet(), "wrapped.go", src, parser.SkipObjectResolution)
+			if err != nil {
+				t.Fatalf("parser.ParseFile: %v", err)
+			}
+			wrapped := funcByName(f, "TestWrapped")
+			if wrapped == nil {
+				t.Fatal("TestWrapped is not in the parsed source")
+			}
+			calls, reported := classMismatchResultsReported(wrapped)
+			if calls != 1 || reported != 0 {
+				t.Errorf("classMismatchResultsReported() = %d reported of %d calls, want 0 of 1", reported, calls)
+			}
+		})
+	}
+}
+
+// TestREQ082DotImportRefused feeds scopeOf a file that dot-imports a package
+// the class walk would otherwise follow. No probe in the catalogue does this,
+// so deleting the refusal would leave the catalogue test green.
+func TestREQ082DotImportRefused(t *testing.T) {
+	// § REQ-082: scopeOf refuses a dot import whose names this check cannot see.
+	t.Parallel()
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "connector", path: "net/http"},
+		{name: "followed module package", path: modulePath + "/openehr/rm"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			src := "package p\n\nimport . \"" + tc.path + "\"\n"
+			f, err := parser.ParseFile(token.NewFileSet(), "dot.go", src, parser.SkipObjectResolution)
+			if err != nil {
+				t.Fatalf("parser.ParseFile: %v", err)
+			}
+			_, err = scopeOf(f, &importNames{cache: map[string]string{}})
+			want := "dot import of " + tc.path + ": this check cannot see which names come from it"
+			if err == nil || err.Error() != want {
+				t.Errorf("scopeOf(dot import of %s) = %v, want %q", tc.path, err, want)
+			}
+		})
+	}
+}
+
+func funcByName(f *ast.File, name string) *ast.FuncDecl {
+	for _, d := range f.Decls {
+		fn, ok := d.(*ast.FuncDecl)
+		if ok && fn.Name.Name == name && fn.Recv == nil {
+			return fn
+		}
+	}
+	return nil
+}
+
+// classMismatchResultsReported counts classMismatch calls in fn and how many
+// of their results are a direct argument of reportClassMismatch or of
+// t.Error / t.Errorf. A name the call was assigned to counts only when that
+// same identifier is a direct argument of one of those calls.
+func classMismatchResultsReported(fn *ast.FuncDecl) (calls, reported int) {
+	if fn == nil || fn.Body == nil {
+		return 0, 0
+	}
+	ast.PreorderStack(fn.Body, nil, func(n ast.Node, stack []ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || !isFunIdent(call, "classMismatch") {
+			return true
+		}
+		calls++
+		if classMismatchResultReported(fn, call, stack) {
+			reported++
+		}
+		return true
+	})
+	return calls, reported
+}
+
+func classMismatchResultReported(fn *ast.FuncDecl, call *ast.CallExpr, stack []ast.Node) bool {
+	if len(stack) == 0 {
+		return false
+	}
+	switch parent := stack[len(stack)-1].(type) {
+	case *ast.CallExpr:
+		return isReportingCall(parent) && isDirectArg(parent, call)
+	case *ast.AssignStmt:
+		name := assignedName(parent, call)
+		return name != "" && identPassedToReporter(fn, name)
+	default:
+		return false
+	}
+}
+
+func isDirectArg(call *ast.CallExpr, arg ast.Expr) bool {
+	return slices.Contains(call.Args, arg)
+}
+
+func isFunIdent(call *ast.CallExpr, name string) bool {
+	id, ok := call.Fun.(*ast.Ident)
+	return ok && id.Name == name
+}
+
+func isReportingCall(call *ast.CallExpr) bool {
+	if id, ok := call.Fun.(*ast.Ident); ok {
+		return id.Name == "reportClassMismatch"
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	recv, ok := sel.X.(*ast.Ident)
+	return ok && recv.Name == "t" && (sel.Sel.Name == "Error" || sel.Sel.Name == "Errorf")
+}
+
+func assignedName(as *ast.AssignStmt, rhs ast.Expr) string {
+	for i, e := range as.Rhs {
+		if e == rhs && i < len(as.Lhs) {
+			id, ok := as.Lhs[i].(*ast.Ident)
+			if ok && id.Name != "_" {
+				return id.Name
+			}
+		}
+	}
+	return ""
+}
+
+func identPassedToReporter(fn *ast.FuncDecl, name string) bool {
+	found := false
+	ast.Inspect(fn, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		call, ok := n.(*ast.CallExpr)
+		if !ok || !isReportingCall(call) {
+			return true
+		}
+		for _, arg := range call.Args {
+			id, ok := arg.(*ast.Ident)
+			if ok && id.Name == name {
+				found = true
+				return false
+			}
+		}
+		return true
+	})
+	return found
 }
 
 // TestREQ082ProbeClassifierOnFixture runs the classifier over the fixture

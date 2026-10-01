@@ -10,7 +10,7 @@ package serializeprobes
 // path this SDK never emits, a suffix it names differently, or a leaf it
 // drops symmetrically. Here the input is FLAT this SDK did not write — which
 // is how the EVENT.time / INSTRUCTION.narrative / INSTRUCTION.expiry_time
-// encode-side data loss was found (fixed 2026-08-01, REQ-121).
+// encode-side data loss was found (fixed 2026-08-01 in the path reader).
 //
 // This is a thin wrapper: the engine lives in
 // testkit/conformance/webtemplate so the same runner backs both this probe
@@ -19,7 +19,7 @@ package serializeprobes
 // that package — SKIPPED.md carries the counted inventory.
 //
 // Modes: In-repo (parity property against vendored fixtures; no backend).
-// Cassette / Live are out of scope for v1, so REQ-082 runnability is a
+// Cassette / Live are out of scope for v1, so server runnability is a
 // documented partial.
 
 import (

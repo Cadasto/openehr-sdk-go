@@ -175,7 +175,7 @@ func TestExternalValidateEHRStatus(t *testing.T) {
 }
 
 // TestExternalInstanceAndAQL proves the other two REQ-111 consumers —
-// instance.Generate (REQ-107) and validation.ValidateAQL (REQ-109) — are
+// instance.Generate and validation.ValidateAQL — are
 // reachable on the public-only call path with an externally-compiled OPT,
 // so every entry point REQ-111 names is covered, not just the builder and
 // the composition validator.

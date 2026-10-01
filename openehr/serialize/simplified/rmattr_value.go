@@ -326,12 +326,13 @@ var (
 // `lower_included` / `upper_included` default by side. On a bounded side they
 // are omitted when true, the closed endpoint, so absent is true. On an open
 // side absent is false, the only value BASE `Lower_included_valid` /
-// `Upper_included_valid` permit there, and an explicit true is refused. That is
-// the only mapping under which the corpus round-trips byte-exactly in both
-// directions: `dv_count`'s `_normal_range` omits the flags where
-// `dv_quantity`'s spells them `false`, every open end spells its `false`, and
-// encode's inverse rule (emit only what contradicts the bounded-side default)
-// reproduces each. Two consequences are deliberate and recorded in
+// `Upper_included_valid` permit there, and an explicit true is refused.
+// Every open end in the corpus spells `|*_included: false`, so those
+// invariants fix the open-side default, not the corpus. The corpus pins
+// the bounded side: `dv_count`'s `_normal_range` omits the flags where
+// `dv_quantity`'s spells them `false`, and encode's inverse rule (emit
+// only what contradicts the bounded-side default) reproduces each. Two
+// consequences are deliberate and recorded in
 // deviations.md: a redundant `|lower_included: true` on a bounded side is
 // normalised away, since it decodes to the same RM value as its absence, and an
 // absent `|*_included` on an open side re-encodes as an explicit false.

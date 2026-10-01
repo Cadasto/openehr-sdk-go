@@ -193,7 +193,7 @@ func TestInContextLeavesResolveViaRmpath(t *testing.T) {
 
 // entryCodes returns the ENTRY-level language / encoding an instance carries, so
 // a resolution can be compared against the real field instead of against
-// "non-nil". A type switch keeps it reflection-free, as rmpath is (REQ-024).
+// "non-nil". A type switch keeps it free of reflection, as the path reader is.
 func entryCodes(root rm.Locatable) (language, encoding rm.CodePhrase, ok bool) {
 	switch e := root.(type) {
 	case *rm.Observation:

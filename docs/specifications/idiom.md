@@ -79,7 +79,7 @@ Antipatterns the SDK **MUST NOT** use:
 
 - Setter methods after construction (`client.SetHTTPClient(...)`) — mutable after construction implies a hidden lock or a data race.
 - Builder-pattern intermediate types (`ehr.NewBuilder().WithX(...).Build()`) — verbose and harder to compose than functional options.
-- "Options bag" pattern (`ehr.New(catalog, ehr.Options{HTTPClient: ..., TokenSource: ...})`) — every new field is a breaking change to the struct literal.
+- "Options bag" pattern (`ehr.New(catalog, ehr.Options{HTTPClient: ..., TokenSource: ...})`) — a second configuration style beside functional options. A keyed literal keeps compiling when a field is added, and [module-layout.md § Versioning](module-layout.md#versioning) does not class that as a breaking change.
 
 ## Surface shape (REQ-023)
 
@@ -275,4 +275,4 @@ Anything outside `internal/` (REQ-005) participates in semver (REQ-004). Implica
 - Renaming or removing a public symbol is a major bump.
 - Loosening a return type (e.g. `(*X, error)` → `(any, error)`) is a breaking change even if the new type is a superset.
 - Adding a method to a public interface is **breaking** for consumers that implement it — prefer adding a new interface and a runtime type-assertion to introduce optional behaviour.
-- Adding a struct field is **breaking** for consumers using positional construction (`Thing{a, b, c}`) — always document that struct literals **SHOULD** use field-by-name.
+- Adding a struct field is not a breaking change per [module-layout.md § Versioning](module-layout.md#versioning). Positional struct literals are what break; struct literals **SHOULD** use field-by-name.

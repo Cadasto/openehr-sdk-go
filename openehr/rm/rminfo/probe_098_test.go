@@ -5,7 +5,7 @@ package rminfo_test
 //
 // The expectation is the SAME independent reduction PROBE-094 builds
 // (probe_094_test.go: the pinned schemas read through the openehr/bmm loader,
-// REQ-045, with the generator's exclusion lists restated as literals).
+// with the generator's exclusion lists restated as literals).
 // exclusionKindOf is the one derivation both probes share; this file maps its
 // answer onto the shipped AbsenceReason and compares. internal/bmmgen is never
 // imported — comparing the table against the walk that produced it would pass

@@ -3,8 +3,8 @@ package templatecompile_test
 // REQ-116 Phase 3 — the compiled-path regression guard.
 //
 // Emitting name predicates changes compiled AQL paths, and those paths
-// are consumed by REQ-102 validation, REQ-107 instance generation and
-// REQ-053 FLAT/STRUCTURED. The guard partitions the vendored corpus by
+// are consumed by validation, instance generation and
+// FLAT/STRUCTURED. The guard partitions the vendored corpus by
 // the only thing that may cause a path to move — whether the OPT pins a
 // template-level node name anywhere — and snapshots both halves:
 //

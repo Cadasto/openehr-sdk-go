@@ -4,7 +4,7 @@ package rminfo_test
 // of the pinned BMM (REQ-048).
 //
 // The reduction below reads the pinned schemas through the openehr/bmm loader
-// (REQ-045) and re-derives every answer from the raw BMM. It deliberately does
+// and re-derives every answer from the raw BMM. It deliberately does
 // NOT call internal/bmmgen: comparing the table against the walk that produced
 // it would pass on a generator whose walk is itself wrong, which is the one
 // failure this probe exists to catch. `make codegen-verify` already covers the
@@ -56,7 +56,7 @@ var probeExcludedClasses = map[string]bool{
 	"Comparable": true, "Container": true,
 }
 
-// probeExcludedPackagePrefixes mirrors REQ-042's wholesale package skips.
+// probeExcludedPackagePrefixes mirrors the generator's wholesale package skips.
 var probeExcludedPackagePrefixes = []string{
 	"org.openehr.rm.ehr_extract",
 	"org.openehr.base.foundation_types.functional",
@@ -588,7 +588,7 @@ func TestProbe094AttributeSetsAreComplete(t *testing.T) {
 //
 // The single entry is a PRE-EXISTING emission gap this arm surfaced, not
 // something REQ-048 introduced. `Iso8601_type` is a primitive_types entry
-// mapped to Go `string` (REQ-046, § Primitive type mapping), so the generator
+// mapped to Go `string` (the primitive type mapping), so the generator
 // never plans it as a class and never folds the mandatory `value` it declares
 // into its class_definitions descendant. openehr/rm agrees with the table
 // rather than with the BMM — `rm.ISO8601Timezone` is emitted as an EMPTY
