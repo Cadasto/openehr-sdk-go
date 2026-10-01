@@ -273,16 +273,17 @@ func (g *generator) materialiseImplicitSingle(
 			return nil
 		}
 	}
+	if g.fillEntryCode(parentRM, optNode.RMTypeName(), attr.Name()) {
+		return nil
+	}
 	rmType := attr.RMTypeName()
 	if rmType == "" {
 		return nil
 	}
 	if rmType == "String" {
-		// BMM String → a literal placeholder string. The rmwrite
-		// dispatcher routes "value" / "code_string" / etc. to the
-		// matching field; for everything else the silent best-effort
-		// attach is acceptable.
-		_ = rmwrite.EnsureSingle(parentRM, optNode.RMTypeName(), attr.Name(), "example")
+		// BMM String. Write only when the field is still empty, so a
+		// clock or code already stored on the parent is left alone.
+		g.writeBMMString(parentRM, optNode.RMTypeName(), attr.Name())
 		return nil
 	}
 	rmChild, err := newRMForOPTType(rmType)
@@ -331,9 +332,12 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 		if !ok || rmType == "" {
 			continue
 		}
+		if g.fillEntryCode(parent, parentRMType, attrName) {
+			continue
+		}
 		isContainer, _ := rminfo.Default.IsContainer(parentRMType, attrName)
 		if rmType == "String" {
-			_ = rmwrite.EnsureSingle(parent, parentRMType, attrName, "example")
+			g.writeBMMString(parent, parentRMType, attrName)
 			continue
 		}
 		concrete := concreteFor(rmType)
@@ -384,7 +388,7 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	case *rm.DVTime:
 		v.Value = "12:00:00"
 	case *rm.DVDateTime:
-		v.Value = g.opts.Now.Format("2006-01-02T15:04:05Z07:00")
+		v.Value = g.dateTimeDefault()
 	case *rm.DVDuration:
 		v.Value = "P0D"
 	case *rm.DVBoolean:
@@ -403,6 +407,181 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	case *rm.DVParsable:
 		v.Value = "example"
 		v.Formalism = "text/plain"
+	}
+}
+
+// dateTimeDefault is the ISO 8601 form Options.Now contributes to
+// DV_DATE_TIME values. It matches the clock applyCompositionDefaults
+// uses for EventContext.start_time.
+func (g *generator) dateTimeDefault() string {
+	return g.opts.Now.Format(time.RFC3339)
+}
+
+// writeBMMString stores a BMM String attribute. A field that already
+// holds a value is left alone: populatePrimitiveDefault may have set
+// a clock or a code before this pass. An empty DV_DATE_TIME value
+// takes the clock; every other empty string keeps the open-string
+// example sentinel.
+func (g *generator) writeBMMString(parent any, parentType, attr string) {
+	cur, known := stringAttr(parent, attr)
+	if known && cur != "" {
+		return
+	}
+	val := "example"
+	if dateTimeValueUnset(parent, parentType, attr) {
+		val = g.dateTimeDefault()
+	}
+	_ = rmwrite.EnsureSingle(parent, parentType, attr, val)
+}
+
+// dateTimeValueUnset reports a DV_DATE_TIME.value that this pass may fill.
+func dateTimeValueUnset(parent any, parentType, attr string) bool {
+	if attr != "value" {
+		return false
+	}
+	if parentType != "DV_DATE_TIME" {
+		if _, ok := parent.(*rm.DVDateTime); !ok {
+			return false
+		}
+	}
+	cur, known := stringAttr(parent, attr)
+	return !known || cur == ""
+}
+
+// stringAttr reads a BMM String field the generator itself writes.
+// ok is false when parent has no such field under attr.
+func stringAttr(parent any, attr string) (string, bool) {
+	switch p := parent.(type) {
+	case *rm.DVText:
+		if attr == "value" {
+			return p.Value, true
+		}
+	case *rm.DVCodedText:
+		if attr == "value" {
+			return p.Value, true
+		}
+	case *rm.CodePhrase:
+		if attr == "code_string" {
+			return p.CodeString, true
+		}
+	case *rm.DVDate:
+		if attr == "value" {
+			return p.Value, true
+		}
+	case *rm.DVTime:
+		if attr == "value" {
+			return p.Value, true
+		}
+	case *rm.DVDateTime:
+		if attr == "value" {
+			return p.Value, true
+		}
+	case *rm.DVDuration:
+		if attr == "value" {
+			return p.Value, true
+		}
+	case *rm.DVURI:
+		if attr == "value" {
+			return p.Value, true
+		}
+	case *rm.DVEHRURI:
+		if attr == "value" {
+			return p.Value, true
+		}
+	case *rm.DVIdentifier:
+		if attr == "id" {
+			return p.ID, true
+		}
+	case *rm.DVParsable:
+		switch attr {
+		case "value":
+			return p.Value, true
+		case "formalism":
+			return p.Formalism, true
+		}
+	case *rm.DVQuantity:
+		if attr == "units" {
+			return p.Units, true
+		}
+	case *rm.Activity:
+		if attr == "action_archetype_id" {
+			return p.ActionArchetypeID, true
+		}
+	case *rm.TerminologyID:
+		if attr == "value" {
+			return p.Value, true
+		}
+	}
+	return "", false
+}
+
+// fillEntryCode sets ENTRY.language from Options.Language and
+// ENTRY.encoding to UTF-8 when that code is still empty. It reports
+// whether attr is one of those two fields, so the caller does not
+// also build a generic code phrase.
+func (g *generator) fillEntryCode(parent any, parentType, attr string) bool {
+	phrase, ok := g.entryCodePhrase(parentType, attr)
+	if !ok {
+		return false
+	}
+	if !entryCodeEmpty(parent, attr) {
+		return true
+	}
+	_ = rmwrite.EnsureSingle(parent, parentType, attr, phrase)
+	return true
+}
+
+func (g *generator) entryCodePhrase(parentType, attr string) (rm.CodePhrase, bool) {
+	switch parentType {
+	case "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY", "CARE_ENTRY", "ENTRY":
+	default:
+		return rm.CodePhrase{}, false
+	}
+	switch attr {
+	case "language":
+		return rm.CodePhrase{
+			CodeString:    g.opts.Language,
+			TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
+		}, true
+	case "encoding":
+		return rm.CodePhrase{
+			CodeString:    "UTF-8",
+			TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"},
+		}, true
+	default:
+		return rm.CodePhrase{}, false
+	}
+}
+
+func entryCodeEmpty(parent any, attr string) bool {
+	lang, enc, ok := entryCodes(parent)
+	if !ok {
+		return true
+	}
+	switch attr {
+	case "language":
+		return lang.CodeString == ""
+	case "encoding":
+		return enc.CodeString == ""
+	default:
+		return true
+	}
+}
+
+func entryCodes(parent any) (language, encoding rm.CodePhrase, ok bool) {
+	switch p := parent.(type) {
+	case *rm.Observation:
+		return p.Language, p.Encoding, true
+	case *rm.Evaluation:
+		return p.Language, p.Encoding, true
+	case *rm.Instruction:
+		return p.Language, p.Encoding, true
+	case *rm.Action:
+		return p.Language, p.Encoding, true
+	case *rm.AdminEntry:
+		return p.Language, p.Encoding, true
+	default:
+		return rm.CodePhrase{}, rm.CodePhrase{}, false
 	}
 }
 
@@ -836,12 +1015,7 @@ func (g *generator) applyPrimitiveExample(
 		v.Magnitude = n
 		return nil
 	case *rm.DVOrdinal:
-		n, ok := rm.AsInt64(ex)
-		if !ok {
-			return fmt.Errorf("DV_ORDINAL example value is %T, want integer", ex)
-		}
-		v.Value = rm.Integer(n)
-		return nil
+		return applyOrdinal(v, pc, ex)
 	case *rm.DVDate:
 		s, ok := ex.(string)
 		if !ok {
@@ -875,6 +1049,61 @@ func (g *generator) applyPrimitiveExample(
 	// generator stays sound on RM types REQ-103 does not yet have a
 	// typed primitive for.
 	return nil
+}
+
+// applyOrdinal sets the integer and, when the constraint lists pairs,
+// the symbol of the pair for that integer. ExampleFill's integer is
+// the first pair's value. An empty list keeps the integer and does
+// not invent a code.
+func applyOrdinal(v *rm.DVOrdinal, pc constraints.PrimitiveConstraint, ex any) error {
+	ord, isOrd := pc.(constraints.CDvOrdinal)
+	if !isOrd || len(ord.Values) == 0 {
+		n, ok := rm.AsInt64(ex)
+		if !ok {
+			if isOrd {
+				v.Value = 0
+				return nil
+			}
+			return fmt.Errorf("DV_ORDINAL example value is %T, want integer", ex)
+		}
+		v.Value = rm.Integer(n)
+		return nil
+	}
+	n, ok := rm.AsInt64(ex)
+	if !ok {
+		return fmt.Errorf("DV_ORDINAL example value is %T, want integer", ex)
+	}
+	pair, found := ordinalPair(ord, n)
+	if !found {
+		v.Value = rm.Integer(n)
+		return nil
+	}
+	v.Value = rm.Integer(pair.Value)
+	v.Symbol = ordinalSymbolText(pair.Symbol)
+	return nil
+}
+
+func ordinalPair(c constraints.CDvOrdinal, n int64) (constraints.OrdinalSymbol, bool) {
+	for _, s := range c.Values {
+		if int64(s.Value) == n {
+			return s, true
+		}
+	}
+	return constraints.OrdinalSymbol{}, false
+}
+
+func ordinalSymbolText(ref constraints.CodedTermRef) rm.DVCodedText {
+	term := ref.Terminology
+	if term == "" {
+		term = "local"
+	}
+	return rm.DVCodedText{
+		DVText: rm.DVText{Value: ref.CodeString},
+		DefiningCode: rm.CodePhrase{
+			CodeString:    ref.CodeString,
+			TerminologyID: rm.TerminologyID{Value: term},
+		},
+	}
 }
 
 // applyCompositionDefaults sets the COMPOSITION-specific fields
