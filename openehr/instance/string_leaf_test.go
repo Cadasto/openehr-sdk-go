@@ -156,28 +156,20 @@ func TestREQ107_StringLeafListOnDVParsableFormalism(t *testing.T) {
 // TestREQ107_StringLeafDispatchesOnAttribute is the REQ-107 check that a
 // C_STRING lands only on the attribute the OPT names: a list on
 // DV_TEXT.formatting never reaches value, and formatting, an optional
-// attribute the generator leaves unset, holds nothing but a member.
+// attribute, is filled with a member of the list.
 func TestREQ107_StringLeafDispatchesOnAttribute(t *testing.T) {
 	opt := renameAttrBefore(t, instance.ReadVendoredOPT(t, textListOPT), textValueListXYZ, "value", "formatting")
 	c := compileSyntheticOPT(t, opt)
 	for _, opts := range stringLeafFills() {
 		root, doc := generateWithJSON(t, c, opts)
 		v := elementValue(t, doc, "at0031")
-		if got, set := v["formatting"]; set && got != "XYZ" && got != "OPQ" {
-			t.Errorf("ValueFill %v: DV_TEXT.formatting = %v, want unset or a member of [XYZ OPQ]", opts.ValueFill, got)
+		if got := v["formatting"]; got != "XYZ" && got != "OPQ" {
+			t.Errorf("ValueFill %v: DV_TEXT.formatting = %v, want a member of [XYZ OPQ]", opts.ValueFill, got)
 		}
 		if value := v["value"]; value == "XYZ" || value == "OPQ" {
 			t.Errorf("ValueFill %v: DV_TEXT.value = %v, want the formatting list kept off value", opts.ValueFill, value)
 		}
-		comp, err := instance.AsComposition(root)
-		if err != nil {
-			t.Fatalf("AsComposition: %v", err)
-		}
-		for _, iss := range validation.ValidateRM(comp).Issues {
-			if iss.Severity == validation.Error {
-				t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
-			}
-		}
+		validateClean(t, root, c)
 	}
 }
 
@@ -254,5 +246,24 @@ func TestREQ107_StringLeafUnsatisfiableErrors(t *testing.T) {
 				t.Error("composition.NewBuilder returned a builder with the error, want nil")
 			}
 		})
+	}
+}
+
+// TestREQ107_StringLeafFillsOptionalIdentifierSubfields is the REQ-107 /
+// REQ-103 check that the optional DV_IDENTIFIER attributes issuer, type and
+// assigner are filled with a value their XYZ.* pattern accepts, and that
+// the result passes both the template validator and the RM floor.
+func TestREQ107_StringLeafFillsOptionalIdentifierSubfields(t *testing.T) {
+	c := compileSyntheticOPT(t, instance.ReadVendoredOPT(t, "Test_dv_identifier_pattern_constraint.v0"))
+	match := regexp.MustCompile(`^XYZ.*$`)
+	for _, opts := range stringLeafFills() {
+		root, doc := generateWithJSON(t, c, opts)
+		v := elementValue(t, doc, "at0030")
+		for _, attr := range []string{"issuer", "type", "assigner"} {
+			if got, _ := v[attr].(string); !match.MatchString(got) {
+				t.Errorf("ValueFill %v: DV_IDENTIFIER.%s = %v, want a match of XYZ.*", opts.ValueFill, attr, v[attr])
+			}
+		}
+		validateClean(t, root, c)
 	}
 }

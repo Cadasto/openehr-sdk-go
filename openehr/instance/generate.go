@@ -501,8 +501,8 @@ func stringAttr(parent any, attr string) (string, bool) {
 // stringField returns a reader and a writer for the BMM String attribute
 // attr of parent. It covers every String attribute of the data values the
 // generator builds, plus ACTIVITY.action_archetype_id and
-// TERMINOLOGY_ID.value. An optional attribute reads as "" while unset
-// and has a nil writer. ok is false when parent has no such field.
+// TERMINOLOGY_ID.value. An optional attribute reads as "" while unset.
+// ok is false when parent has no such field.
 func stringField(parent any, attr string) (get func() string, set func(string), ok bool) {
 	switch p := parent.(type) {
 	case *rm.DVText:
@@ -588,10 +588,9 @@ func requiredString(f *string) (func() string, func(string), bool) {
 	return func() string { return *f }, func(s string) { *f = s }, true
 }
 
-// optionalString reads an optional String attribute and gives it no
-// writer: the generator leaves optional String attributes unset, because
-// the template-driven validator does not read them yet and would report
-// a filled one against the template. Leaving them unset is RM-valid.
+// optionalString reads and writes an optional String attribute. It reads
+// as "" while unset; the writer sets the attribute, so a C_STRING
+// constraint on it is honoured like any other String leaf.
 func optionalString(f **string) (func() string, func(string), bool) {
 	get := func() string {
 		if *f == nil {
@@ -599,7 +598,7 @@ func optionalString(f **string) (func() string, func(string), bool) {
 		}
 		return **f
 	}
-	return get, nil, true
+	return get, func(s string) { *f = &s }, true
 }
 
 // fillEntryCode sets ENTRY.language from Options.Language and
