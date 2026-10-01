@@ -273,6 +273,12 @@ func TestCDvOrdinal_Validate(t *testing.T) {
 	if v := open.Validate(0); len(v) != 0 {
 		t.Errorf("Validate(open 0) = %v, want nil", v)
 	}
+	if v := open.Validate(constraints.OrdinalSymbol{
+		Value:  3,
+		Symbol: constraints.CodedTermRef{Terminology: "local", CodeString: "at0003"},
+	}); len(v) != 0 {
+		t.Errorf("Validate(open OrdinalSymbol) = %v, want nil", v)
+	}
 	if v := open.Validate("nope"); len(v) != 1 || v[0].Code != constraints.CodeWrongType {
 		t.Errorf("Validate(open wrong type) = %v, want CodeWrongType", v)
 	}

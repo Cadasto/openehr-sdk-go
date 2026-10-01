@@ -152,8 +152,10 @@ func (c CDvOrdinal) ExampleValue() any {
 }
 
 // Validate accepts either an int (the ordinal value) or a full
-// [OrdinalSymbol] (value + symbol). For [OrdinalSymbol] inputs both
-// the value and the symbol must match an entry in Values.
+// [OrdinalSymbol] (value + symbol). When Values is empty the constraint
+// fixes the type only, so any int or OrdinalSymbol is accepted. Otherwise
+// an int must match the value of an entry in Values, and an
+// [OrdinalSymbol] must match both the value and the symbol of one.
 func (c CDvOrdinal) Validate(value any) []Violation {
 	// An OPT that names DV_ORDINAL and lists no pairs constrains the
 	// type only. A closed list is what rejects a value.
