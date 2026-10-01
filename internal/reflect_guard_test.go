@@ -11,16 +11,17 @@ package internal_test
 //
 // A reflect call does not show at the call site which class it belongs to,
 // so this walks the module's non-test Go files, generated ones included, and
-// holds every "reflect" import to a reviewed list. The walk skips the
-// directories and files the go tool never builds: a nested module (a
-// directory with its own go.mod), testdata, vendor, and names starting with
-// "." or "_". Each entry on the list names the file, the reflect identifiers
-// it may use, the classes those uses fall in and why. The test fails on a
-// file that imports reflect and is not on the list, on a listed file that
-// starts using another reflect identifier, on an entry without a named class,
-// on a dot import of reflect (its uses would be unqualified and unseen), and
-// on an entry whose file no longer imports reflect. So every new file that
-// imports reflect, and every new reflect identifier in a listed file, meets a
+// holds every "reflect" import to a reviewed list. The walk skips what the go
+// tool skips when it lists the module's packages: a directory holding its own
+// go.mod, which is another module; testdata and vendor; and every directory or
+// file whose name starts with "." or "_". Each entry on the list names the
+// file, the reflect identifiers it may use, the classes those uses fall in and
+// why. The test fails on a file that imports reflect and is not on the list,
+// on a listed file that starts using another reflect identifier, on a listed
+// identifier the file no longer uses, on an entry without a named class, on a
+// dot import of reflect (its uses would be unqualified and unseen), and on an
+// entry whose file no longer imports reflect. So every new file that imports
+// reflect, and every new reflect identifier in a listed file, meets a
 // reviewer, and the list cannot rot.
 //
 // testkit/ is in scope: it is published for SDK consumers. Out of scope:
@@ -147,9 +148,15 @@ func TestREQ024ReflectOnlyForReviewedUses(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, m := range reflectMembers(full, name) {
+		used := reflectMembers(full, name)
+		for _, m := range used {
 			if !slices.Contains(entry.members, m) {
 				t.Errorf("%s uses reflect.%s, which its reviewed entry (%s) does not list: check the use falls in a class idiom.md § Generics policy (REQ-024) names, then add it to the entry", rel, m, entry.reason)
+			}
+		}
+		for _, m := range entry.members {
+			if !slices.Contains(used, m) {
+				t.Errorf("%s no longer uses reflect.%s, which its reviewed entry still lists: remove it from the entry so a later use meets a reviewer (REQ-024)", rel, m)
 			}
 		}
 	}
