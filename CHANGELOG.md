@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **`rm.IsEmptyIntervalBound` (REQ-052).** Reports whether an interval bound is nil, a typed nil or a zero value; the encoders and the RM floor now share it.
+
+### Fixed
+
+- **AOM 1.4 constraint intervals omit an open side's zero bound (REQ-052, REQ-056).** `occurrences` and `existence` no longer write `"upper":0` beside an open flag, and canonical XML uses snake_case names while still decoding the v0.28.0 PascalCase.
+- **FLAT encode writes no keys for an unset coded text (REQ-053).** The blank `|code` and `|value` keys are gone, and decode now refuses a second placement on a scalar-filled attribute.
+- **FLAT decode of an empty STRING returns a plain error (REQ-053).** It no longer wraps `ErrUnsupportedDatatype`.
+
 ## [0.28.0] - 2026-09-25
 
 Twenty-eighth `v0.x` minor: canonical JSON moves to `encoding/json/v2`, stricter and faster on decode, and the vendored ITS-REST contract is pinned to a tagged release. One source break: the generated RM and AOM types drop their v1 JSON methods.
