@@ -59,8 +59,8 @@ func mustClient(t *testing.T) *transport.Client {
 func TestRun_AllSkippedIsNotGreen(t *testing.T) {
 	t.Parallel()
 	sum, err := probe.Run(t.Context(), probe.Config{Mode: probe.ModeSandbox}, []probe.Entry{
-		stubDetail("PROBE-001", probe.StatusSkip, "no template loaded"),
-		stubDetail("PROBE-002", probe.StatusSkip, "no template loaded"),
+		stubDetail("PROBE-020", probe.StatusSkip, "no template loaded"),
+		stubDetail("PROBE-028", probe.StatusSkip, "no template loaded"),
 	})
 	if !errors.Is(err, probe.ErrAllSkipped) {
 		t.Fatalf("Run() error = %v, want %v", err, probe.ErrAllSkipped)
@@ -208,8 +208,8 @@ func TestRun_InvalidEntryRefused(t *testing.T) {
 func TestSelect_Sentinels(t *testing.T) {
 	t.Parallel()
 	catalog := []probe.Entry{
-		stub("PROBE-001", probe.StatusPass, true, ""),
-		stub("PROBE-002", probe.StatusPass, true, ""),
+		stub("PROBE-080", probe.StatusPass, true, ""),
+		stub("PROBE-082", probe.StatusPass, true, ""),
 	}
 
 	if _, err := probe.Select(catalog, "PROBE-404"); !errors.Is(err, probe.ErrUnknownProbe) {
@@ -223,12 +223,12 @@ func TestSelect_Sentinels(t *testing.T) {
 		t.Fatalf("Select(no ids) returned %d entries; an empty filter must not mean the whole catalog", len(got))
 	}
 
-	sel, err := probe.Select(catalog, "PROBE-002")
+	sel, err := probe.Select(catalog, "PROBE-082")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(sel) != 1 || sel[0].ID != "PROBE-002" {
-		t.Fatalf("Select(\"PROBE-002\") = %v, want the single named entry", sel)
+	if len(sel) != 1 || sel[0].ID != "PROBE-082" {
+		t.Fatalf("Select(\"PROBE-082\") = %v, want the single named entry", sel)
 	}
 }
 
@@ -255,18 +255,18 @@ func TestRun_EmptySelectionRefused(t *testing.T) {
 // error itself reaches the caller.
 func TestRun_ProbeErrorIsRecordedAndRunContinues(t *testing.T) {
 	t.Parallel()
-	boom := errors.New("backend exploded")
+	boom := errors.New("probe exploded")
 	second := false
 	entries := []probe.Entry{
 		{
-			ID:     "PROBE-040",
+			ID:     "PROBE-087",
 			InRepo: true,
 			Run: func(context.Context, *transport.Client) (probe.Result, error) {
 				return probe.Result{}, boom
 			},
 		},
 		{
-			ID:     "PROBE-041",
+			ID:     "PROBE-088",
 			InRepo: true,
 			Run: func(context.Context, *transport.Client) (probe.Result, error) {
 				second = true
@@ -290,8 +290,8 @@ func TestRun_ProbeErrorIsRecordedAndRunContinues(t *testing.T) {
 	if sum.Failed != 1 || sum.Passed != 1 {
 		t.Fatalf("failed=%d passed=%d, want failed=1 passed=1", sum.Failed, sum.Passed)
 	}
-	if got := sum.Results[0]; got.Probe != "PROBE-040" || got.Status != probe.StatusFail {
-		t.Fatalf("first result = %+v, want PROBE-040 recorded as a failure", got)
+	if got := sum.Results[0]; got.Probe != "PROBE-087" || got.Status != probe.StatusFail {
+		t.Fatalf("first result = %+v, want PROBE-087 recorded as a failure", got)
 	}
 	if want := "probe error: " + boom.Error(); sum.Results[0].Detail != want {
 		t.Fatalf("first result detail = %q, want %q", sum.Results[0].Detail, want)
@@ -304,7 +304,7 @@ func TestRun_ProbeErrorIsRecordedAndRunContinues(t *testing.T) {
 func TestRun_UnrecognizedStatusBecomesFailure(t *testing.T) {
 	t.Parallel()
 	sum, err := probe.Run(t.Context(), probe.Config{Mode: probe.ModeSandbox}, []probe.Entry{
-		stubDetail("PROBE-050", probe.Status("inconclusive"), ""),
+		stubDetail("PROBE-090", probe.Status("inconclusive"), ""),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -326,8 +326,8 @@ func TestRun_UnrecognizedStatusBecomesFailure(t *testing.T) {
 func TestRun_SkipWithoutPreconditionBecomesFailure(t *testing.T) {
 	t.Parallel()
 	sum, err := probe.Run(t.Context(), probe.Config{Mode: probe.ModeSandbox}, []probe.Entry{
-		stubDetail("PROBE-060", probe.StatusSkip, "   "),
-		stubDetail("PROBE-061", probe.StatusSkip, "no live endpoint configured"),
+		stubDetail("PROBE-097", probe.StatusSkip, "   "),
+		stubDetail("PROBE-099", probe.StatusSkip, "no fixture corpus vendored"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -346,8 +346,8 @@ func TestRun_SkipWithoutPreconditionBecomesFailure(t *testing.T) {
 func TestRun_SkipNotCountedAsPass(t *testing.T) {
 	t.Parallel()
 	sum, err := probe.Run(t.Context(), probe.Config{Mode: probe.ModeSandbox}, []probe.Entry{
-		stubDetail("PROBE-001", probe.StatusPass, ""),
-		stubDetail("PROBE-002", probe.StatusSkip, "nothing to compare against"),
+		stubDetail("PROBE-100", probe.StatusPass, ""),
+		stubDetail("PROBE-094", probe.StatusSkip, "nothing to compare against"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -390,11 +390,11 @@ func TestUnclassifiedEffectIsMutating(t *testing.T) {
 func TestRun_SubsetAndSingle(t *testing.T) {
 	t.Parallel()
 	catalog := []probe.Entry{
-		stub("PROBE-001", probe.StatusPass, true, ""),
-		stub("PROBE-002", probe.StatusFail, true, ""),
-		stub("PROBE-003", probe.StatusPass, true, ""),
+		stub("PROBE-022", probe.StatusPass, true, ""),
+		stub("PROBE-023", probe.StatusFail, true, ""),
+		stub("PROBE-024", probe.StatusPass, true, ""),
 	}
-	single, err := probe.Select(catalog, "PROBE-001")
+	single, err := probe.Select(catalog, "PROBE-022")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +409,7 @@ func TestRun_SubsetAndSingle(t *testing.T) {
 		t.Fatalf("in-repo result mode = %q, want %q", sum.Results[0].Mode, probe.ModeInRepo)
 	}
 
-	subset, err := probe.Select(catalog, "PROBE-001", "PROBE-003")
+	subset, err := probe.Select(catalog, "PROBE-022", "PROBE-024")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -788,7 +788,7 @@ func TestRun_NoPartialExecutionOnUnsatisfiable(t *testing.T) {
 func TestRun_ResultIsAttributedToTheEntry(t *testing.T) {
 	t.Parallel()
 	misreporting := probe.Entry{
-		ID:     "PROBE-010",
+		ID:     "PROBE-025",
 		InRepo: true,
 		Run: func(context.Context, *transport.Client) (probe.Result, error) {
 			return probe.Result{Probe: "PROBE-999", Status: probe.StatusPass}, nil
@@ -798,8 +798,8 @@ func TestRun_ResultIsAttributedToTheEntry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := sum.Results[0].Probe; got != "PROBE-010" {
-		t.Fatalf("result probe id = %q, want %q — the runner stamps the entry it invoked", got, "PROBE-010")
+	if got := sum.Results[0].Probe; got != "PROBE-025" {
+		t.Fatalf("result probe id = %q, want %q — the runner stamps the entry it invoked", got, "PROBE-025")
 	}
 }
 
@@ -817,20 +817,20 @@ func TestRun_CancelledContextStopsTheRun(t *testing.T) {
 
 	var ran []string
 	first := probe.Entry{
-		ID:     "PROBE-010",
+		ID:     "PROBE-026",
 		InRepo: true,
 		Run: func(context.Context, *transport.Client) (probe.Result, error) {
-			ran = append(ran, "PROBE-010")
+			ran = append(ran, "PROBE-026")
 			// The caller walks away while the first probe is running.
 			cancel()
 			return probe.Result{Status: probe.StatusPass}, nil
 		},
 	}
 	second := probe.Entry{
-		ID:     "PROBE-011",
+		ID:     "PROBE-027",
 		InRepo: true,
 		Run: func(context.Context, *transport.Client) (probe.Result, error) {
-			ran = append(ran, "PROBE-011")
+			ran = append(ran, "PROBE-027")
 			return probe.Result{Status: probe.StatusPass}, nil
 		},
 	}
@@ -839,10 +839,10 @@ func TestRun_CancelledContextStopsTheRun(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Run(cancelled ctx) error = %v, want it to carry %v", err, context.Canceled)
 	}
-	if len(ran) != 1 || ran[0] != "PROBE-010" {
-		t.Fatalf("probes run = %v, want only PROBE-010; the run must stop at the cancellation", ran)
+	if len(ran) != 1 || ran[0] != "PROBE-026" {
+		t.Fatalf("probes run = %v, want only PROBE-026; the run must stop at the cancellation", ran)
 	}
-	if !strings.Contains(err.Error(), "PROBE-011") {
+	if !strings.Contains(err.Error(), "PROBE-027") {
 		t.Fatalf("Run(cancelled ctx) error = %q, want it to name the probe the run stopped before", err)
 	}
 	if sum.Green() {
@@ -855,8 +855,8 @@ func TestRun_CancelledContextStopsTheRun(t *testing.T) {
 		t.Fatalf("summary has %d results for %d selected, want every entry accounted for", len(sum.Results), sum.Selected)
 	}
 	notRun := sum.Results[1]
-	if notRun.Probe != "PROBE-011" || notRun.Status != probe.StatusFail {
-		t.Fatalf("second result = %+v, want PROBE-011 recorded as a failure", notRun)
+	if notRun.Probe != "PROBE-027" || notRun.Status != probe.StatusFail {
+		t.Fatalf("second result = %+v, want PROBE-027 recorded as a failure", notRun)
 	}
 	if !strings.HasPrefix(notRun.Detail, "not run:") {
 		t.Fatalf("second result detail = %q, want it to open with \"not run:\" so the row says why", notRun.Detail)
