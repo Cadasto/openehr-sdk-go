@@ -374,8 +374,9 @@ func TestGenerateClinicalNoteValidates(t *testing.T) {
 
 // findFirstDVDuration walks a Composition's content depth-first
 // looking for a DV_DURATION leaf in any ELEMENT.value. Returns the
-// first match or nil. REQ-024: closed dispatch on the RM types the
-// clinical_note.opt subtree traverses (CLUSTER + ELEMENT).
+// first match or nil. Closed dispatch on the RM types the
+// clinical_note.opt subtree traverses (CLUSTER + ELEMENT), so the walk
+// stays free of reflection.
 func findFirstDVDuration(comp *rm.Composition) *rm.DVDuration {
 	for _, c := range comp.Content {
 		if d := findInContent(c); d != nil {

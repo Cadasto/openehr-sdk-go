@@ -144,17 +144,13 @@ requirements:
     packages: [openehr/rm/typereg, openehr/serialize]
     tests:
       - internal/reflect_guard_test.go
-      - openehr/client/demographic/decode_error_test.go
-      - openehr/instance/instance_test.go
-      - openehr/template/constraints/example_test.go
-      - openehr/template/webtemplate/incontext_rmpath_test.go
 
   - id: REQ-025
     title: Error wrapping
     canonical: docs/specifications/idiom.md#errors-req-025
     status: draft
     implementation: landed
-    packages: [transport, auth, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, openehr/rm, openehr/aom/aom14, internal, internal/bmmgen]
+    packages: [transport, auth, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, openehr/rm, openehr/aom/aom14, internal/bmmgen]
     tests:
       - auth/nilautherror_test.go
       - cadasto/admin/probes_test.go
@@ -267,7 +263,6 @@ requirements:
       - openehr/client/demographic/decode_error_test.go
       - openehr/client/demographic/party_test.go
       - openehr/rm/locatable_identity_test.go
-      - openehr/rm/typereg/nilreceiver_census_test.go
       - testkit/probes/demographic/probe_073_demographic_round_trip.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_031_typereg_unknown_type.go
@@ -296,8 +291,6 @@ requirements:
       - internal/bmmgen/render_release_test.go
       - internal/bmmgen/render_rminfo_hierarchy_test.go
       - internal/bmmgen/render_test.go
-      - openehr/rm/rminfo/hierarchy_test.go
-      - openehr/rm/rminfo/probe_094_test.go
 
   - id: REQ-043
     title: P_BMM → Go mapping rules
@@ -330,8 +323,6 @@ requirements:
       - internal/importguard/importguard_test.go
       - openehr/bmm/imports_test.go
       - openehr/bmm/load_test.go
-      - openehr/rm/rminfo/probe_094_test.go
-      - openehr/rm/rminfo/probe_098_test.go
 
   - id: REQ-046
     title: Primitive type mapping
@@ -342,7 +333,6 @@ requirements:
     tests:
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
-      - openehr/rm/rminfo/probe_094_test.go
       - openehr/serialize/canjson/edgecases_test.go
 
   - id: REQ-047
@@ -367,11 +357,9 @@ requirements:
     tests:
       - internal/bmmgen/primitive_ancestor_census_test.go
       - internal/bmmgen/render_rminfo_hierarchy_test.go
-      - openehr/aql/lint/pathshape_test.go
       - openehr/rm/rminfo/hierarchy_test.go
       - openehr/rm/rminfo/imports_test.go
       - openehr/rm/rminfo/probe_094_test.go
-      - testkit/probes/aql/probes_test.go
 
   - id: REQ-049
     title: RM class-universe absence reasons
@@ -480,8 +468,6 @@ requirements:
     probes:
       - PROBE-076
     tests:
-      - internal/templatecompile/pathsnapshot_test.go
-      - openehr/rm/rmpath/rmpath_test.go
       - openehr/serialize/simplified/archetype_details_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
@@ -568,6 +554,7 @@ requirements:
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/validation/rmread/interval_void_parity_test.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
+      - testkit/probes/serialize/probe_033_canxml_round_trip_test.go
       - testkit/probes/serialize/probe_034_typereg_xsi_unknown.go
 
   - id: REQ-057
@@ -643,8 +630,6 @@ requirements:
     implementation: landed
     packages: [auth/smart, smart/discovery, auth/introspect]
     probes: [PROBE-006]
-    fixtures:
-      - testkit/corpus/its_rest/discovery/smart-configuration.json
     tests:
       - auth/introspect/introspect_test.go
       - auth/smart/smart_test.go
@@ -742,8 +727,6 @@ requirements:
     implementation: landed
     packages: [smart/discovery]
     probes: [PROBE-002, PROBE-040]
-    fixtures:
-      - testkit/corpus/its_rest/discovery/smart-configuration.json
     tests:
       - smart/discovery/resolver_test.go
       - testkit/probes/auth/probe_002_openehr_rest_service.go
@@ -767,8 +750,6 @@ requirements:
     implementation: landed
     packages: [smart/discovery]
     probes: [PROBE-002, PROBE-003, PROBE-040, PROBE-041]
-    fixtures:
-      - testkit/corpus/its_rest/discovery/smart-configuration-mismatch.json
     tests:
       - smart/discovery/resolver_test.go
       - testkit/probes/auth/probe_003_spec_version_mismatch.go
@@ -835,7 +816,6 @@ requirements:
       - testkit/probes/probeclass_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
-      - testkit/probes/serialize/probe_086_upstream_flat_parity.go
       - testkit/probes/template/probe_024_primitive_validate.go
       - testkit/probes/validation/probe_025_composition_validate.go
       - testkit/probes/versioned/probes_test.go
@@ -1026,7 +1006,6 @@ requirements:
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - openehr/composition/builder_test.go
       - openehr/composition/typecheck_test.go
-      - openehr/internal/rmnames/intervals_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/composition/probes_test.go
 
@@ -1039,9 +1018,6 @@ requirements:
     probes: [PROBE-025, PROBE-026, PROBE-074]
     tests:
       - internal/templatecompile/compile_test.go
-      - internal/templatecompile/pathsnapshot_test.go
-      - internal/templatecompile/webtemplate_oracle_compile_test.go
-      - openehr/internal/rmnames/intervals_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/interval_bounds_test.go
@@ -1134,7 +1110,6 @@ requirements:
       - testkit/probes/instance
     probes: [PROBE-027]
     tests:
-      - internal/templatecompile/pathsnapshot_test.go
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - internal/templateinstance/rmwrite/write_test.go
       - openehr/instance/accessors_test.go
@@ -1151,7 +1126,6 @@ requirements:
       - openehr/instance/valuefill_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/template/constraints/example_test.go
-      - openehr/templatecompile/external_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/instance/probe_027_generated_validates.go
       - testkit/probes/instance/probes_test.go
@@ -1203,7 +1177,6 @@ requirements:
       - openehr/aql/parse/imports_test.go
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/roundtrip_test.go
-      - openehr/templatecompile/external_test.go
       - openehr/validation/aql_test.go
       - testkit/probes/aql/probe_028_aql_lint.go
       - testkit/probes/aql/probe_099_path_shape_lint.go
@@ -1355,7 +1328,6 @@ requirements:
       - openehr/aql/introspect_test.go
       - openehr/aql/lint/extract_test.go
       - openehr/aql/lint/lint_test.go
-      - openehr/aql/lint/semantic_internal_test.go
       - openehr/aql/lint/semantic_test.go
       - openehr/aql/paging_test.go
       - openehr/aql/parse/ast_test.go
@@ -1403,12 +1375,8 @@ requirements:
     tests:
       - openehr/aql/builder_test.go
       - openehr/aql/lint/lint_test.go
-      - openehr/aql/lint/pathshape_fanout_test.go
       - openehr/aql/lint/pathshape_internal_test.go
-      - openehr/aql/lint/pathshape_parseonly_test.go
-      - openehr/aql/lint/pathshape_redundant_test.go
       - openehr/aql/lint/pathshape_test.go
-      - openehr/aql/paging_test.go
       - openehr/aql/parse/dispatch_tripwire_test.go
       - openehr/aql/parse/dropped_test.go
       - openehr/aql/parse/emit_parity_test.go
@@ -1459,8 +1427,6 @@ requirements:
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
       - openehr/template/webtemplate/paths_rmpath_test.go
-      - testkit/conformance/webtemplate/runner_test.go
-      - testkit/probes/serialize/probe_086_upstream_flat_parity.go
 
   - id: REQ-122
     title: Version-control derived helpers
@@ -1652,7 +1618,6 @@ requirements:
       - openehr/aql/lint/pathshape_fanout_test.go
       - openehr/aql/lint/pathshape_internal_test.go
       - openehr/aql/lint/pathshape_redundant_test.go
-      - openehr/aql/lint/pathshape_test.go
       - openehr/aql/lint/semantic_internal_test.go
       - openehr/aql/lint/semantic_test.go
       - openehr/aql/standing_internal_test.go
@@ -1663,7 +1628,6 @@ requirements:
       - openehr/validation/aql_test.go
       - testkit/probes/aql/probe_088_builder_containment_paging.go
       - testkit/probes/aql/probe_097_semantic_lint.go
-      - testkit/probes/aql/probe_099_path_shape_lint.go
       - testkit/probes/aql/probe_100_conformance_corpus.go
       - testkit/probes/aql/probes_test.go
 

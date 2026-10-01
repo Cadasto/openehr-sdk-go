@@ -11,7 +11,7 @@ package typereg_test
 //
 // It lives in typereg's external test package rather than in openehr/rm so
 // that importing openehr/aom/aom14 (to register the AOM types) does not widen
-// the registry that rm's own REQ-040 name-parity test enumerates.
+// the registry that rm's own name-parity test enumerates.
 //
 // reflect is used to manufacture a typed nil of a type known only through its
 // registry constructor. The generics policy's no-reflection rule binds library

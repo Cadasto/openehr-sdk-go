@@ -186,7 +186,7 @@ type expectation struct {
 
 // pinned is the corpus conformance position, per fixture. It is a ratchet,
 // not a waiver: every number here is expected to move only when a REQ-053 or
-// REQ-121 gap is deliberately closed, and the accompanying SKIPPED.md entry
+// locatable-path gap is deliberately closed, and the accompanying SKIPPED.md entry
 // updated. Regenerate with:
 //
 //	go test ./testkit/conformance/webtemplate/ -run TestCensus -census -v

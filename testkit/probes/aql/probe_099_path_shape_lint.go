@@ -20,7 +20,7 @@ import (
 // fixture corpus.
 //
 // The five REQ-164 codes are spelled here independently of openehr/aql/lint's
-// own strings, for the reason PROBE-097 spells the REQ-161 codes independently:
+// own strings, for the reason PROBE-097 spells its codes independently:
 // a probe that imported the constants it is pinning would pass through a rename
 // that broke every consumer.
 const (

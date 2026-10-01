@@ -104,7 +104,7 @@ func TestCompile_WebTemplateOracleOPTs(t *testing.T) {
 // their own compiled path, and byPath resolves each to the node whose name
 // the predicate carries. Before Phase 3 all four collided and byPath kept
 // only the first; this is the DoD assertion for the phase, and the
-// precondition every downstream consumer (REQ-102/107/053) needs in order
+// precondition every downstream consumer (validation, generation, and the simplified formats) needs in order
 // to address the second-through-fourth occurrence at all.
 func TestCompile_CoronaSiblingsResolveDistinctly(t *testing.T) {
 	opt, err := template.ParseFile(fixtures.WebTemplateOpt("Corona_Anamnese"))

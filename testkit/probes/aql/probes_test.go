@@ -1395,7 +1395,7 @@ func probe099SilentCases() []aqlprobes.PathShapeSilentCase {
 		},
 		{
 			// EVENT.data is literally typed `T` on the pinned tables, and
-			// REQ-048 leaves generic-parameter resolution out of scope. The
+			// The class-graph requirement leaves generic-parameter resolution out of scope. The
 			// `items` below that stop IS a container on every class that
 			// declares it, so a walk that guessed what `T` stands for would
 			// report it — with `events` predicated here, the stop is the only

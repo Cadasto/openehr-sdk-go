@@ -49,7 +49,7 @@ func TestIsAbstractReportsTheBMMFlag(t *testing.T) {
 		// Never defined by the pinned RM.
 		{"NOT_AN_RM_CLASS", false, false},
 		{"", false, false},
-		// Excluded from the universe: ehr_extract (REQ-042) and enums.
+		// Excluded from the universe: the ehr_extract package and enumerations.
 		{"EXTRACT", false, false},
 		{"PROPORTION_KIND", false, false},
 	}

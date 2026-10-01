@@ -416,7 +416,7 @@ func TestPathRepeatingUnpredicatedSilentOnUnknownAliasClass(t *testing.T) {
 
 // TestPathRepeatingUnpredicatedSilentOnParamArchetypeScope is the second named
 // silent stop: a `$param` archetype scope, whose extent the CDR resolves at
-// execution — the skip Layer 3 and the REQ-161 checks already apply for the
+// execution — the skip Layer 3 and the semantic-lint checks already apply for the
 // same reason.
 func TestPathRepeatingUnpredicatedSilentOnParamArchetypeScope(t *testing.T) {
 	t.Parallel()
@@ -456,7 +456,7 @@ func TestPathRepeatingUnpredicatedSilentOnUndeclaredAttribute(t *testing.T) {
 
 // TestPathRepeatingUnpredicatedStopsAtTheGenericParameter is the fourth named
 // silent stop, and REQ-164 § Acceptance names it explicitly: `EVENT.data` is
-// literally typed `T` on the pinned tables, and REQ-048 leaves generic-
+// literally typed `T` on the pinned tables, and the class-graph requirement leaves generic-
 // parameter resolution out of scope, so the walk stops there.
 //
 // The consequence is observable and is the point: the audit query's `items` is

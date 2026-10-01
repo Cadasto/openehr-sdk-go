@@ -100,7 +100,7 @@ func TestPrimitiveConstraint_ExampleValueValidates(t *testing.T) {
 // REQ-107 — the sealing contract still holds: only the 11 known
 // types in this package implement PrimitiveConstraint. A new
 // external implementer would break the closed type-switch the
-// validator relies on (REQ-024 — no reflection).
+// validator relies on, which stays free of reflection.
 //
 // REQ-103: each of the eleven OPT primitive xsi:type values has its
 // PrimitiveConstraint implementation.

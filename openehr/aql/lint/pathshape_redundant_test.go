@@ -9,8 +9,8 @@ package lint_test
 //
 // Every guard is mutation-detectable: the mapping from guard to the named test
 // that fails when it is removed is recorded in the task report. The silence
-// rows carry their own names for the reason REQ-119 § Emission verified after
-// emission records — an over-firing linter must not ship green, and a
+// rows carry their own names for the reason the emission checks record
+// (verified after emission) — an over-firing linter must not ship green, and a
 // firing-only corpus cannot tell. That matters more for this code than for its
 // group-mates: it advises DELETING a step, so a false finding does not merely
 // annoy, it invites a wrong edit.
