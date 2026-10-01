@@ -326,6 +326,10 @@ func (g *generator) materialiseImplicitSingle(
 	// validator's "required attribute absent" check passes for
 	// BMM-mandatory implicit attrs the OPT did not constrain.
 	g.populatePrimitiveDefault(rmChild)
+	// A locatable the OPT does not name (OBSERVATION.data's HISTORY, an
+	// ENTRY's ITEM_TREE) still needs the node id and name the RM floor
+	// requires.
+	g.stampIfLocatable(rmChild, concreteFor(rmType))
 	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
 	// Best-effort attach; if the slot rejects the default (e.g. type
 	// mismatch on a polymorphic attr), let downstream defaults
@@ -420,13 +424,13 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 		v.CodeString = "at0000"
 		v.TerminologyID = rm.TerminologyID{Value: "local"}
 	case *rm.DVDate:
-		v.Value = "2020-01-01"
+		v.Value = g.temporalSentinel(v)
 	case *rm.DVTime:
-		v.Value = "12:00:00"
+		v.Value = g.temporalSentinel(v)
 	case *rm.DVDateTime:
-		v.Value = g.dateTimeDefault()
+		v.Value = g.temporalSentinel(v)
 	case *rm.DVDuration:
-		v.Value = "P0D"
+		v.Value = g.temporalSentinel(v)
 	case *rm.DVBoolean:
 		v.Value = true
 	case *rm.DVCount:
@@ -463,19 +467,39 @@ func (g *generator) dateTimeDefault() string {
 	return g.opts.Now.Format(time.RFC3339)
 }
 
+// temporalSentinel is the valid ISO 8601 value the generator writes on
+// an empty value of a DV_DATE, DV_TIME, DV_DATE_TIME or DV_DURATION, and
+// "" for any other value. populatePrimitiveDefault and writeBMMString
+// both take it from here, so a temporal value gets the same default
+// whichever pass fills it.
+func (g *generator) temporalSentinel(v any) string {
+	switch v.(type) {
+	case *rm.DVDate:
+		return "2020-01-01"
+	case *rm.DVTime:
+		return "12:00:00"
+	case *rm.DVDateTime:
+		return g.dateTimeDefault()
+	case *rm.DVDuration:
+		return "P0D"
+	}
+	return ""
+}
+
 // writeBMMString stores a BMM String attribute. A field that already
 // holds a value is left alone: populatePrimitiveDefault may have set
-// a clock or a code before this pass. An empty DV_DATE_TIME value
-// takes the clock; every other empty string keeps the open-string
-// example sentinel.
+// a clock or a code before this pass. An empty value of a temporal
+// data value takes its temporal sentinel, so it stays a valid ISO 8601
+// value; every other empty string keeps the open-string example
+// sentinel.
 func (g *generator) writeBMMString(parent any, parentType, attr string) {
 	cur, known := stringAttr(parent, attr)
 	if known && cur != "" {
 		return
 	}
 	val := "example"
-	if dateTimeValueUnset(parent, parentType, attr) {
-		val = g.dateTimeDefault()
+	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
+		val = s
 	}
 	// Best-effort, on purpose: the write is refused for a String
 	// attribute rmwrite does not address (TERMINOLOGY_ID.value, a
@@ -483,20 +507,6 @@ func (g *generator) writeBMMString(parent any, parentType, attr string) {
 	// default or reported by the validator. Returning the error would
 	// fail Generate on every OPT.
 	_ = rmwrite.EnsureSingle(parent, parentType, attr, val)
-}
-
-// dateTimeValueUnset reports a DV_DATE_TIME.value that this pass may fill.
-func dateTimeValueUnset(parent any, parentType, attr string) bool {
-	if attr != "value" {
-		return false
-	}
-	if parentType != "DV_DATE_TIME" {
-		if _, ok := parent.(*rm.DVDateTime); !ok {
-			return false
-		}
-	}
-	cur, known := stringAttr(parent, attr)
-	return !known || cur == ""
 }
 
 // stringAttr reads a BMM String field the generator itself writes.
@@ -1524,16 +1534,19 @@ func (g *generator) placeholderElement() *rm.Element {
 }
 
 // settleElement makes an ELEMENT carry exactly one of value and null_flavour
-// (RM Inv_null_flavour_indicated). A value wins over a null flavour: when the
-// OPT constrains both attributes, the null flavour is dropped. An ELEMENT with
-// no value, because the OPT constrains none or none could be generated, gets
-// the null flavour "no information".
+// (RM Inv_null_flavour_indicated), and a null_reason only while it is null
+// (RM Inv_null_reason_valid). A value wins: when the OPT constrains the value
+// and either null attribute, the null flavour and the null reason are both
+// dropped. An ELEMENT with no value, because the OPT constrains none or none
+// could be generated, keeps any null reason and gets the null flavour
+// "no information" when it has none.
 func settleElement(e *rm.Element) {
-	hasValue := e.Value != nil && !rm.IsTypedNil(e.Value)
-	switch {
-	case hasValue && e.NullFlavour != nil:
+	if e.Value != nil && !rm.IsTypedNil(e.Value) {
 		e.NullFlavour = nil
-	case !hasValue && e.NullFlavour == nil:
+		e.NullReason = nil
+		return
+	}
+	if e.NullFlavour == nil {
 		e.NullFlavour = noInformation()
 	}
 }

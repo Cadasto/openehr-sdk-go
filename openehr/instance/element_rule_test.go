@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
@@ -49,6 +50,66 @@ func TestREQ107_GeneratedElementsCarryExactlyOneOfValueAndNullFlavour(t *testing
 				})
 			}
 		}
+	}
+}
+
+// REQ-107 — an ELEMENT carries a null_reason only while it is null (RM
+// Inv_null_reason_valid: null_reason /= Void implies is_null()). The floor does
+// not evaluate this invariant, so the test reads the fields. When the OPT
+// constrains the value and either null attribute, the value wins and both null
+// fields go; with no value the ELEMENT keeps its null_reason.
+func TestREQ107_GeneratedElementHasNullReasonOnlyWhenNull(t *testing.T) {
+	nullFlavour := optSingle("null_flavour", optNode("DV_CODED_TEXT", ""))
+	nullReason := optSingle("null_reason", optNode("DV_TEXT", ""))
+	cases := []struct {
+		name       string
+		opt        string
+		wantValue  bool
+		wantReason bool
+	}{
+		{
+			name:      "value wins over null_flavour and null_reason",
+			opt:       optTemplate("ELEMENT", optSingle("value", optNode("DV_TEXT", "")), nullFlavour, nullReason),
+			wantValue: true,
+		},
+		{
+			name:      "value wins over null_reason alone",
+			opt:       optTemplate("ELEMENT", optSingle("value", optNode("DV_TEXT", "")), nullReason),
+			wantValue: true,
+		},
+		{
+			name:       "no value keeps null_reason",
+			opt:        optTemplate("ELEMENT", nullFlavour, nullReason),
+			wantReason: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, tc.opt, true)
+			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
+						out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, ValueFill: fill, Now: defaultsNow})
+						if err != nil {
+							t.Fatalf("Generate: %v", err)
+						}
+						el, ok := out.(*rm.Element)
+						if !ok {
+							t.Fatalf("Generate returned %T, want *rm.Element", out)
+						}
+						if hasValue := el.Value != nil && !rm.IsTypedNil(el.Value); hasValue != tc.wantValue {
+							t.Errorf("ELEMENT.value = %+v, want present: %v", el.Value, tc.wantValue)
+						}
+						if hasFlavour := el.NullFlavour != nil; hasFlavour == tc.wantValue {
+							t.Errorf("ELEMENT.null_flavour = %+v, want present: %v", el.NullFlavour, !tc.wantValue)
+						}
+						if hasReason := el.NullReason != nil && !rm.IsTypedNil(el.NullReason); hasReason != tc.wantReason {
+							t.Errorf("ELEMENT.null_reason = %+v, want present: %v", el.NullReason, tc.wantReason)
+						}
+					})
+				}
+			}
+		})
 	}
 }
 

@@ -253,7 +253,7 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 // the defaults the generator writes on values it builds from the BMM
 // alone, and on values the OPT names but leaves unconstrained. Each case
 // asserts the field the default writes and checks the generated value
-// against the RM floor.
+// against the RM floor, under both policies and both value fills.
 func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -325,6 +325,36 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 			},
 		},
 		{
+			// REQ-107: a temporal root's value comes from the string pass,
+			// which must write a valid ISO 8601 date, not the open-string
+			// sentinel (RM Value_valid).
+			name: "DV_DATE value is a valid date",
+			opt:  optTemplate("DV_DATE"),
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.DVDate).Value, "2020-01-01"; got != want {
+					t.Errorf("DV_DATE.value = %q, want %q", got, want)
+				}
+			},
+		},
+		{
+			name: "DV_TIME value is a valid time",
+			opt:  optTemplate("DV_TIME"),
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.DVTime).Value, "12:00:00"; got != want {
+					t.Errorf("DV_TIME.value = %q, want %q", got, want)
+				}
+			},
+		},
+		{
+			name: "DV_DURATION value is a valid duration",
+			opt:  optTemplate("DV_DURATION"),
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.DVDuration).Value, "P0D"; got != want {
+					t.Errorf("DV_DURATION.value = %q, want %q", got, want)
+				}
+			},
+		},
+		{
 			name: "DV_EHR_URI under ELEMENT keeps the ehr scheme",
 			opt:  optTemplate("ELEMENT", optSingle("value", optNode("DV_EHR_URI", ""))),
 			check: func(t *testing.T, out any) {
@@ -359,20 +389,27 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, tc.opt, true)
-			out, err := instance.Generate(t.Context(), c, instance.Options{
-				Policy:    instance.Example,
-				Language:  "en",
-				Territory: "NL",
-				Composer:  testComposer(),
-				Now:       defaultsNow,
-			})
-			if err != nil {
-				t.Fatalf("Generate: %v", err)
-			}
-			tc.check(t, out)
-			for _, iss := range validation.ValidateRM(out).Issues {
-				if iss.Severity == validation.Error {
-					t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
+						out, err := instance.Generate(t.Context(), c, instance.Options{
+							Policy:    policy,
+							ValueFill: fill,
+							Language:  "en",
+							Territory: "NL",
+							Composer:  testComposer(),
+							Now:       defaultsNow,
+						})
+						if err != nil {
+							t.Fatalf("Generate: %v", err)
+						}
+						tc.check(t, out)
+						for _, iss := range validation.ValidateRM(out).Issues {
+							if iss.Severity == validation.Error {
+								t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+							}
+						}
+					})
 				}
 			}
 		})
@@ -384,6 +421,108 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 var pinnedObservationOPT = optTemplate("COMPOSITION", optMultiple("content",
 	optArchetypeRoot("OBSERVATION", "openEHR-EHR-OBSERVATION.rm_defaults.v1",
 		optSingle("data", optNode("HISTORY", "at0001")))))
+
+// TestREQ107_ImplicitEntryStructureCarriesLocatableIdentity is the REQ-107
+// check that a structure the generator builds from the BMM alone, for a
+// mandatory single the OPT leaves silent (OBSERVATION.data, EVALUATION.data,
+// ACTION.description, ADMIN_ENTRY.data), carries the archetype_node_id and
+// name the RM floor requires, under both policies and both value fills.
+func TestREQ107_ImplicitEntryStructureCarriesLocatableIdentity(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  string
+		// structure returns the implicit single under test.
+		structure func(t *testing.T, out any) any
+	}{
+		{
+			name:      "OBSERVATION.data of a pinned COMPOSITION entry",
+			opt:       dataSilentObservationOPT,
+			structure: func(t *testing.T, out any) any { return &pinnedObservation(t, out).Data },
+		},
+		{
+			name: "EVALUATION.data of a pinned COMPOSITION entry",
+			opt: optTemplate("COMPOSITION", optMultiple("content",
+				optArchetypeRoot("EVALUATION", "openEHR-EHR-EVALUATION.rm_defaults.v1"))),
+			structure: func(t *testing.T, out any) any {
+				comp, err := instance.AsComposition(out)
+				if err != nil {
+					t.Fatalf("AsComposition: %v", err)
+				}
+				if len(comp.Content) != 1 {
+					t.Fatalf("COMPOSITION.content has %d items, want 1", len(comp.Content))
+				}
+				ev, ok := comp.Content[0].(*rm.Evaluation)
+				if !ok {
+					t.Fatalf("COMPOSITION.content[0] is %T, want *rm.Evaluation", comp.Content[0])
+				}
+				return ev.Data
+			},
+		},
+		{
+			name:      "OBSERVATION root data",
+			opt:       optTemplate("OBSERVATION"),
+			structure: func(_ *testing.T, out any) any { return &out.(*rm.Observation).Data },
+		},
+		{
+			name:      "EVALUATION root data",
+			opt:       optTemplate("EVALUATION"),
+			structure: func(_ *testing.T, out any) any { return out.(*rm.Evaluation).Data },
+		},
+		{
+			name:      "ACTION root description",
+			opt:       optTemplate("ACTION"),
+			structure: func(_ *testing.T, out any) any { return out.(*rm.Action).Description },
+		},
+		{
+			name:      "ADMIN_ENTRY root data",
+			opt:       optTemplate("ADMIN_ENTRY"),
+			structure: func(_ *testing.T, out any) any { return out.(*rm.AdminEntry).Data },
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, tc.opt, true)
+			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
+						out, err := instance.Generate(t.Context(), c, instance.Options{
+							Policy:    policy,
+							ValueFill: fill,
+							Language:  "en",
+							Territory: "NL",
+							Composer:  testComposer(),
+							Now:       defaultsNow,
+						})
+						if err != nil {
+							t.Fatalf("Generate: %v", err)
+						}
+						s := tc.structure(t, out)
+						loc, ok := s.(rm.Locatable)
+						if !ok || rm.IsTypedNil(s) {
+							t.Fatalf("implicit structure is %T, want a locatable", s)
+						}
+						if got := loc.GetArchetypeNodeID(); got != "at0000" {
+							t.Errorf("%T archetype_node_id = %q, want at0000", s, got)
+						}
+						if name := loc.GetName(); name == nil || rm.IsTypedNil(name) || name.GetValue() == "" {
+							t.Errorf("%T name = %v, want a non-empty name", s, name)
+						}
+						for _, iss := range validation.ValidateRM(out).Issues {
+							if iss.Severity == validation.Error {
+								t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+							}
+						}
+					})
+				}
+			}
+		})
+	}
+}
+
+// dataSilentObservationOPT is a COMPOSITION whose content is one OBSERVATION
+// the OPT pins by archetype, with its mandatory data left silent.
+var dataSilentObservationOPT = optTemplate("COMPOSITION", optMultiple("content",
+	optArchetypeRoot("OBSERVATION", "openEHR-EHR-OBSERVATION.rm_defaults.v1")))
 
 // pinnedObservation returns the one OBSERVATION in COMPOSITION.content.
 func pinnedObservation(t *testing.T, out any) *rm.Observation {
