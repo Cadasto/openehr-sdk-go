@@ -614,7 +614,7 @@ func parseDuration(s string) (durationParts, error) {
 		case (c >= '0' && c <= '9') || c == '.' || c == ',':
 			continue
 		}
-		whole, frac, err := splitNumber(s[start:i])
+		whole, frac, hasFrac, err := splitNumber(s[start:i])
 		if err != nil {
 			return p, fmt.Errorf("bad duration component in %q", orig)
 		}
@@ -623,7 +623,7 @@ func parseDuration(s string) (durationParts, error) {
 		// seconds component (fractional_second); a fraction on any other
 		// component is malformed — reject it rather than silently
 		// truncate to the integer part.
-		if frac != 0 && c != 'S' {
+		if hasFrac && c != 'S' {
 			return p, fmt.Errorf("fractional %q component not permitted in %q", string(c), orig)
 		}
 		var r int
@@ -666,28 +666,29 @@ func parseDuration(s string) (durationParts, error) {
 	return p, nil
 }
 
-// splitNumber parses "12" → (12, 0), "12.5" and "12,5" → (12, 0.5). A second
-// decimal sign, or a mix of both, fails the integer or fraction parse.
-func splitNumber(s string) (whole int, frac float64, err error) {
-	if s == "" {
-		return 0, 0, errors.New("empty number")
-	}
+// splitNumber parses "12" → (12, 0, false), "12.5" and "12,5" → (12, 0.5,
+// true). Both parts must be plain ASCII digits and a separator needs at least
+// one digit after it, so "1.", ".5" and "+1" fail; hasFrac reports that a
+// separator was written even when the fraction is zero ("1.0").
+func splitNumber(s string) (whole int, frac float64, hasFrac bool, err error) {
 	intPart, fracPart, hasFrac := strings.Cut(s, ".")
 	if !hasFrac {
 		intPart, fracPart, hasFrac = strings.Cut(s, ",")
 	}
+	if !allDigits(intPart) || (hasFrac && !allDigits(fracPart)) {
+		return 0, 0, false, errors.New("malformed number")
+	}
 	whole, err = strconv.Atoi(intPart)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, false, err
 	}
 	if hasFrac {
-		f, ferr := strconv.ParseFloat("0."+fracPart, 64)
-		if ferr != nil {
-			return 0, 0, ferr
+		frac, err = strconv.ParseFloat("0."+fracPart, 64)
+		if err != nil {
+			return 0, 0, false, err
 		}
-		frac = f
 	}
-	return whole, frac, nil
+	return whole, frac, hasFrac, nil
 }
 
 // dateMagnitudeDays returns days since 0001-01-01, treating an unknown

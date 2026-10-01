@@ -396,6 +396,15 @@ func TestREQ123_ValidISO8601DurationForms(t *testing.T) {
 		{"PT2.5H", false}, // a fraction only on the seconds
 		{"PT2,5H", false},
 		{"P1,5D", false},
+		// a zero fraction is still a fraction; a separator needs digits
+		{"P1.0D", false},
+		{"PT1.0H", false},
+		{"PT0.0M", false},
+		{"PT1.S", false},
+		{"PT1,S", false},
+		{"PT.5S", false},
+		{"PT1.0S", true},
+		{"P+1D", false},
 		// openEHR deviations: leading negative sign, W mixed with others
 		{"-P1D", true},
 		{"-PT1H", true},
