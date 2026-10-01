@@ -238,23 +238,17 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 // asserts the field the default writes and checks the generated value
 // against the RM floor.
 func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
-	// knownGap is the one floor issue a BMM-built content item still
-	// carries: it is an archetype root with no archetype_details. The
-	// cases that build one check every other floor rule.
-	const knownGap = "is_archetype_root @ /content[0]/archetype_details"
 	cases := []struct {
-		name     string
-		opt      string
-		tolerate string
-		check    func(t *testing.T, out any)
+		name  string
+		opt   string
+		check func(t *testing.T, out any)
 	}{
 		{
 			// COMPOSITION.content named with no children: the generator
 			// builds an OBSERVATION from the BMM, with its ENTRY codes and
 			// the identity of each locatable it adds below it.
-			name:     "BMM-built ENTRY language and encoding",
-			opt:      optTemplate("COMPOSITION", optMultiple("content")),
-			tolerate: knownGap,
+			name: "BMM-built ENTRY language and encoding",
+			opt:  optTemplate("COMPOSITION", optMultiple("content")),
 			check: func(t *testing.T, out any) {
 				obs := bmmObservation(t, out)
 				if obs.Language.TerminologyID.Value != "ISO_639-1" || obs.Language.CodeString != "en" {
@@ -266,9 +260,8 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 			},
 		},
 		{
-			name:     "BMM-built locatable identity",
-			opt:      optTemplate("COMPOSITION", optMultiple("content")),
-			tolerate: knownGap,
+			name: "BMM-built locatable identity",
+			opt:  optTemplate("COMPOSITION", optMultiple("content")),
 			check: func(t *testing.T, out any) {
 				obs := bmmObservation(t, out)
 				if obs.ArchetypeNodeID != "at0000" {
@@ -345,7 +338,7 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 			}
 			tc.check(t, out)
 			for _, iss := range validation.ValidateRM(out).Issues {
-				if iss.Severity == validation.Error && iss.Code+" @ "+iss.Path != tc.tolerate {
+				if iss.Severity == validation.Error {
 					t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
 				}
 			}
