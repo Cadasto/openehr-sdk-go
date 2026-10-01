@@ -13,6 +13,57 @@ import (
 
 // BMM package: org.openehr.base.foundation_types.interval — canonical-XML UnmarshalXML companions
 
+// UnmarshalXML decodes canonical openEHR XML into Interval.
+// Polymorphic fields are routed through canxml.DecodeAs so the
+// concrete type is selected by `xsi:type` at each polymorphic site.
+// Missing/unknown/type-mismatch dispatch failures wrap typereg
+// sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
+func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	for {
+		_tok, _err := _dec.Token()
+		if _err != nil {
+			return _err
+		}
+		switch _t := _tok.(type) {
+		case xml.StartElement:
+			switch _t.Name.Local {
+			case "lower":
+				if _err := _dec.DecodeElement(&i.Lower, &_t); _err != nil {
+					return _err
+				}
+			case "upper":
+				if _err := _dec.DecodeElement(&i.Upper, &_t); _err != nil {
+					return _err
+				}
+			case "lower_unbounded":
+				if _err := _dec.DecodeElement(&i.LowerUnbounded, &_t); _err != nil {
+					return _err
+				}
+			case "upper_unbounded":
+				if _err := _dec.DecodeElement(&i.UpperUnbounded, &_t); _err != nil {
+					return _err
+				}
+			case "lower_included":
+				if _err := _dec.DecodeElement(&i.LowerIncluded, &_t); _err != nil {
+					return _err
+				}
+			case "upper_included":
+				if _err := _dec.DecodeElement(&i.UpperIncluded, &_t); _err != nil {
+					return _err
+				}
+			default:
+				if _err := _dec.Skip(); _err != nil {
+					return _err
+				}
+			}
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
 // UnmarshalXML decodes canonical openEHR XML into PointInterval.
 // Polymorphic fields are routed through canxml.DecodeAs so the
 // concrete type is selected by `xsi:type` at each polymorphic site.

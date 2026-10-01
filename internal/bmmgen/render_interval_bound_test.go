@@ -14,16 +14,17 @@ import (
 // TestIntervalShapedCensus pins which generated classes carry the BASE
 // Interval shape (`lower`, `upper`, `lower_unbounded`, `upper_unbounded`) and
 // so get encoders that leave out an open side's empty bound (REQ-052,
-// REQ-056). The shape is read from the codec fields, not from the ancestry,
-// so a class that declares the four members itself is caught too. A new
-// interval class in the pinned schemas changes this list and is covered
-// without further work.
+// REQ-056): the concrete interval classes and the abstract BASE Interval
+// itself, which AOM 1.4 holds by value. The shape is read from the codec
+// fields, not from the ancestry, so a class that declares the four members
+// itself is caught too. A new interval class in the pinned schemas changes
+// this list and is covered without further work.
 func TestIntervalShapedCensus(t *testing.T) {
 	for _, tc := range []struct {
 		target Target
 		want   []string
 	}{
-		{target: TargetRM, want: []string{"DV_INTERVAL", "Point_interval", "Proper_interval"}},
+		{target: TargetRM, want: []string{"DV_INTERVAL", "Interval", "Point_interval", "Proper_interval"}},
 		{target: TargetAOM14, want: nil},
 	} {
 		t.Run(tc.target.RootID, func(t *testing.T) {
@@ -33,7 +34,11 @@ func TestIntervalShapedCensus(t *testing.T) {
 			}
 			var got []string
 			for _, f := range plan.Files {
-				for _, pc := range concreteClassesIn(f) {
+				classes, err := codecClassesIn(plan, f)
+				if err != nil {
+					t.Fatalf("codecClassesIn(%s): %v", f.FileBase, err)
+				}
+				for _, pc := range classes {
 					shaped, err := intervalShaped(plan, pc)
 					if err != nil {
 						t.Fatalf("intervalShaped(%s): %v", pc.BMMName, err)
@@ -255,7 +260,7 @@ func TestIntervalMarshalJSONOpenSideArms(t *testing.T) {
 		lowerField = "Lower struct{} `json:\"lower,omitzero\"`"
 		upperField = "Upper struct{} `json:\"upper,omitzero\"`"
 	)
-	for _, class := range []string{"Point_interval", "Proper_interval", "DV_INTERVAL"} {
+	for _, class := range []string{"Interval", "Point_interval", "Proper_interval", "DV_INTERVAL"} {
 		t.Run(class, func(t *testing.T) {
 			pc, ok := plan.Classes[class]
 			if !ok {
@@ -264,6 +269,9 @@ func TestIntervalMarshalJSONOpenSideArms(t *testing.T) {
 			src, err := renderMarshalJSON(plan, pc)
 			if err != nil {
 				t.Fatalf("renderMarshalJSON(%s): %v", class, err)
+			}
+			if got, want := strings.Contains(src, "`json:\"_type\"`"), class != "Interval"; got != want {
+				t.Errorf("MarshalJSONTo of %s writes `_type` = %v, want %v: BASE Interval is abstract and carries none:\n%s", class, got, want, src)
 			}
 			recv := jsonmarReceiverName(pc.GoName)
 			for _, want := range []string{
@@ -292,8 +300,13 @@ func TestIntervalMarshalJSONOpenSideArms(t *testing.T) {
 				if !ok {
 					continue
 				}
-				if !strings.Contains(body, "return json.MarshalEncode(enc, &struct {") {
-					t.Errorf("arm %q of %s does not return the wrapper:\n%s", tc.label, class, body)
+				if !strings.Contains(body, "return json.MarshalEncode(enc, ") {
+					t.Errorf("arm %q of %s does not return the wire value:\n%s", tc.label, class, body)
+				}
+				if tc.wantLower || tc.wantUpper {
+					if !strings.Contains(body, "return json.MarshalEncode(enc, &struct {") {
+						t.Errorf("arm %q of %s does not return a wrapper that can drop a member:\n%s", tc.label, class, body)
+					}
 				}
 				if got := strings.Contains(body, lowerField); got != tc.wantLower {
 					t.Errorf("arm %q of %s declares the omitted lower field = %v, want %v:\n%s", tc.label, class, got, tc.wantLower, body)
@@ -331,12 +344,12 @@ func TestIntervalMarshalXMLOpenSideGuards(t *testing.T) {
 	}
 	src := string(body)
 	for _, tc := range []struct{ name, re string }{
-		{"lower", `\tif !omitIntervalBound\(p\.LowerUnbounded, p\.Lower\) \{\n\t\tif err := _e\.EncodeElement\(&p\.Lower, `},
-		{"upper", `\tif !omitIntervalBound\(p\.UpperUnbounded, p\.Upper\) \{\n\t\tif err := _e\.EncodeElement\(&p\.Upper, `},
+		{"lower", `\tif !omitIntervalBound\([pi]\.LowerUnbounded, [pi]\.Lower\) \{\n\t\tif err := _e\.EncodeElement\(&[pi]\.Lower, `},
+		{"upper", `\tif !omitIntervalBound\([pi]\.UpperUnbounded, [pi]\.Upper\) \{\n\t\tif err := _e\.EncodeElement\(&[pi]\.Upper, `},
 	} {
-		// Point_interval and Proper_interval each carry one.
-		if got := len(regexp.MustCompile(tc.re).FindAllString(src, -1)); got != 2 {
-			t.Errorf("foundation_types_interval XML marshallers guard the %s element %d times, want 2:\n%s", tc.name, got, src)
+		// Interval, Point_interval and Proper_interval each carry one.
+		if got := len(regexp.MustCompile(tc.re).FindAllString(src, -1)); got != 3 {
+			t.Errorf("foundation_types_interval XML marshallers guard the %s element %d times, want 3:\n%s", tc.name, got, src)
 		}
 	}
 }
@@ -357,5 +370,112 @@ func TestGuardOpenIntervalBoundXML(t *testing.T) {
 		if got := guardOpenIntervalBoundXML("p", tc.prop, lines); got != tc.want {
 			t.Errorf("guardOpenIntervalBoundXML(%q) = %q, want %q", tc.prop, got, tc.want)
 		}
+	}
+}
+
+// TestIntervalBaseCodecClasses pins which abstract classes get a codec beside
+// the concrete ones (REQ-052, REQ-056): BASE Interval, the abstract generic
+// struct that carries the interval shape, and nothing else. EVENT is abstract
+// and generic too, but it is emitted as an interface, and a target that does
+// not own Interval (AOM 1.4 reaches it through rm) emits no codec for it.
+func TestIntervalBaseCodecClasses(t *testing.T) {
+	for _, tc := range []struct {
+		target Target
+		want   []string
+	}{
+		{target: TargetRM, want: []string{"Interval"}},
+		{target: TargetAOM14, want: nil},
+	} {
+		t.Run(tc.target.RootID, func(t *testing.T) {
+			plan, err := BuildPlanForTarget(context.Background(), tc.target, bmm.FSResolver{Root: testResources})
+			if err != nil {
+				t.Fatalf("BuildPlanForTarget(%s): %v", tc.target.RootID, err)
+			}
+			var got []string
+			for _, f := range plan.Files {
+				classes, err := codecClassesIn(plan, f)
+				if err != nil {
+					t.Fatalf("codecClassesIn(%s): %v", f.FileBase, err)
+				}
+				for _, pc := range classes {
+					if sc := pc.Class.(*bmm.SimpleClass); sc.IsAbstract() {
+						got = append(got, pc.BMMName)
+					}
+				}
+			}
+			slices.Sort(got)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("abstract classes with a codec = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestIntervalBaseHasNoDiscriminatorMethods pins that the abstract BASE
+// Interval gets MarshalXML and UnmarshalXML but no BMMName: it is no
+// polymorphic discriminator value, and a BMMName on it would be promoted into
+// every class that embeds it.
+func TestIntervalBaseHasNoDiscriminatorMethods(t *testing.T) {
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+	var file *PlannedFile
+	for _, f := range plan.Files {
+		if f.FileBase == "foundation_types_interval" {
+			file = f
+		}
+	}
+	if file == nil {
+		t.Fatal("foundation_types_interval file not in the RM plan")
+	}
+	marshal, err := RenderMarshalXMLFile(plan, file)
+	if err != nil {
+		t.Fatalf("RenderMarshalXMLFile: %v", err)
+	}
+	unmarshal, err := RenderUnmarshalXMLFile(plan, file)
+	if err != nil {
+		t.Fatalf("RenderUnmarshalXMLFile: %v", err)
+	}
+	if !strings.Contains(string(marshal), "func (i *Interval[T]) MarshalXML(") {
+		t.Errorf("no MarshalXML on Interval:\n%s", marshal)
+	}
+	if !strings.Contains(string(unmarshal), "func (i *Interval[T]) UnmarshalXML(") {
+		t.Errorf("no UnmarshalXML on Interval:\n%s", unmarshal)
+	}
+	if strings.Contains(string(marshal), "func (i *Interval[T]) BMMName(") {
+		t.Errorf("BASE Interval got a BMMName, which every embedding class would promote:\n%s", marshal)
+	}
+}
+
+// TestIntervalDerivedWireEmbedsMethodFreeBase pins the wire struct of every
+// class that embeds BASE Interval (REQ-052, REQ-056). BASE Interval now has a
+// MarshalJSONTo, and a method-free alias of the embedding class would promote
+// it, which encoding/json/v2 refuses at run time. The wire struct must reach
+// the base through the base's own alias, and no embedding class may keep a
+// `type rawX X` alias of itself.
+func TestIntervalDerivedWireEmbedsMethodFreeBase(t *testing.T) {
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+	for _, class := range []string{"Point_interval", "Proper_interval", "DV_INTERVAL"} {
+		t.Run(class, func(t *testing.T) {
+			pc := plan.Classes[class]
+			base, err := embeddedIntervalBase(plan, pc)
+			if err != nil || base == nil {
+				t.Fatalf("embeddedIntervalBase(%s) = %v, %v; want BASE Interval", class, base, err)
+			}
+			src, err := renderMarshalJSON(plan, pc)
+			if err != nil {
+				t.Fatalf("renderMarshalJSON(%s): %v", class, err)
+			}
+			if want := "\t*" + aliasTypeName(base.GoName) + "[T]\n"; !strings.Contains(src, want) {
+				t.Errorf("wire struct of %s does not embed the base's method-free alias %q:\n%s", class, want, src)
+			}
+			if banned := "type " + aliasTypeName(pc.GoName) + "["; strings.Contains(src, banned) {
+				t.Errorf("%s still declares %q: that alias would promote BASE Interval's MarshalJSONTo:\n%s", class, banned, src)
+			}
+		})
 	}
 }

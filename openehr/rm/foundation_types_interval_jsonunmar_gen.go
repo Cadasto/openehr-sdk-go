@@ -23,11 +23,15 @@ func (p *PointInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: Point_interval: %w", typereg.ErrNilReceiver)
 	}
-	w := struct {
-		Type string `json:"_type"`
-		*rawPointInterval[T]
-	}{rawPointInterval: (*rawPointInterval[T])(p)}
-	return typereg.DecodeInto(dec, "Point_interval", &w, &w.Type)
+	wire := &jsonWirePointInterval[T]{rawInterval: (*rawInterval[T])(&p.Interval), LowerIncluded: p.LowerIncluded, LowerUnbounded: p.LowerUnbounded, UpperIncluded: p.UpperIncluded, UpperUnbounded: p.UpperUnbounded}
+	if err := typereg.DecodeInto(dec, "Point_interval", wire, &wire.Type); err != nil {
+		return err
+	}
+	p.LowerIncluded = wire.LowerIncluded
+	p.LowerUnbounded = wire.LowerUnbounded
+	p.UpperIncluded = wire.UpperIncluded
+	p.UpperUnbounded = wire.UpperUnbounded
+	return nil
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ProperInterval.
@@ -41,9 +45,9 @@ func (p *ProperInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: Proper_interval: %w", typereg.ErrNilReceiver)
 	}
-	w := struct {
-		Type string `json:"_type"`
-		*rawProperInterval[T]
-	}{rawProperInterval: (*rawProperInterval[T])(p)}
-	return typereg.DecodeInto(dec, "Proper_interval", &w, &w.Type)
+	wire := &jsonWireProperInterval[T]{rawInterval: (*rawInterval[T])(&p.Interval)}
+	if err := typereg.DecodeInto(dec, "Proper_interval", wire, &wire.Type); err != nil {
+		return err
+	}
+	return nil
 }

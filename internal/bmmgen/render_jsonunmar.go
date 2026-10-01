@@ -104,7 +104,29 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	fmt.Fprintf(&b, "\t\treturn fmt.Errorf(\"canjson: %s: %%w\", typereg.ErrNilReceiver)\n", pc.BMMName)
 	b.WriteString("\t}\n")
 
-	if embedsMarshalerBearingConcrete(plan, pc) {
+	base, err := intervalDerivedBase(plan, pc)
+	if err != nil {
+		return "", err
+	}
+	switch {
+	case base != nil:
+		own, err := intervalDerivedOwnFields(plan, pc)
+		if err != nil {
+			return "", err
+		}
+		// The wire struct reaches the receiver's embedded BASE Interval
+		// through its method-free alias, so those members decode in place;
+		// the class's own members go in by value and come back on success.
+		fmt.Fprintf(&b, "\twire := %s\n", intervalDerivedWireValue(pc, base, recv, typeArgs, own, false))
+		fmt.Fprintf(&b, "\tif err := typereg.DecodeInto(dec, %q, wire, &wire.Type); err != nil {\n", pc.BMMName)
+		b.WriteString("\t\treturn err\n")
+		b.WriteString("\t}\n")
+		for _, ef := range own {
+			fn := FieldName(ef.Prop.PropertyName())
+			fmt.Fprintf(&b, "\t%s.%s = wire.%s\n", recv, fn, fn)
+		}
+		b.WriteString("\treturn nil\n")
+	case embedsMarshalerBearingConcrete(plan, pc):
 		wire := flatWireTypeName(pc.GoName)
 		fmt.Fprintf(&b, "\tvar wire %s%s\n", wire, typeArgs)
 		fmt.Fprintf(&b, "\tif err := typereg.DecodeInto(dec, %q, &wire, &wire.Class); err != nil {\n", pc.BMMName)
@@ -115,7 +137,7 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 			fmt.Fprintf(&b, "\t%s.%s = wire.%s\n", recv, fn, fn)
 		}
 		b.WriteString("\treturn nil\n")
-	} else {
+	default:
 		alias := aliasTypeName(pc.GoName)
 		b.WriteString("\tw := struct {\n")
 		b.WriteString("\t\tType string `json:\"_type\"`\n")

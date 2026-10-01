@@ -47,7 +47,10 @@ import (
 // extensibility hooks (`other_details`, `author`, …) under
 // AUTHORED_RESOURCE descendants. Documented in canxml/doc.go.
 func RenderMarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
-	emitting := concreteClassesIn(file)
+	emitting, err := codecClassesIn(plan, file)
+	if err != nil {
+		return nil, err
+	}
 	if len(emitting) == 0 {
 		return nil, nil
 	}
@@ -133,11 +136,14 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 
 	var b strings.Builder
 
-	// BMMName method.
-	fmt.Fprintf(&b, "// BMMName returns %q — the BMM class identifier used as the\n", pc.BMMName)
-	b.WriteString("// `xsi:type` polymorphic discriminator in canonical XML and the\n")
-	b.WriteString("// `_type` discriminator in canonical JSON.\n")
-	fmt.Fprintf(&b, "func (%s *%s%s) BMMName() string { return %q }\n\n", recv, pc.GoName, typeArgs, pc.BMMName)
+	// BMMName method. An abstract class (BASE Interval) is no polymorphic
+	// discriminator value, so it gets none.
+	if !sc.IsAbstract() {
+		fmt.Fprintf(&b, "// BMMName returns %q — the BMM class identifier used as the\n", pc.BMMName)
+		b.WriteString("// `xsi:type` polymorphic discriminator in canonical XML and the\n")
+		b.WriteString("// `_type` discriminator in canonical JSON.\n")
+		fmt.Fprintf(&b, "func (%s *%s%s) BMMName() string { return %q }\n\n", recv, pc.GoName, typeArgs, pc.BMMName)
+	}
 
 	// MarshalXML method.
 	fmt.Fprintf(&b, "// MarshalXML emits canonical openEHR XML for %s. The default\n", pc.GoName)

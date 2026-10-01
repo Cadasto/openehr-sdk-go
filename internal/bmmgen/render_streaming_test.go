@@ -77,6 +77,11 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 			aliasEmbed := ""
 			if !embedsMarshalerBearingConcrete(plan, pc) {
 				aliasEmbed = "*" + aliasTypeName(pc.GoName)
+				if base, err := intervalDerivedBase(plan, pc); err != nil {
+					t.Fatalf("intervalDerivedBase %s: %v", pc.BMMName, err)
+				} else if base != nil {
+					aliasEmbed = "*" + aliasTypeName(base.GoName)
+				}
 			}
 			if !marshalLeadsWithType(chunk, aliasEmbed) {
 				t.Errorf("%s marshaller does not lead with `_type`: the discriminator must be the first member (REQ-052)", pc.BMMName)
@@ -140,7 +145,8 @@ func TestRenderFlatDecodeDropPropertyLosesCopy(t *testing.T) {
 // TestRenderUnmarshalPassesDeclaredTypeField pins, on every concrete class the
 // RM plan emits, that the rendered UnmarshalJSONFrom hands typereg.DecodeInto
 // the wire value's own declared `_type` field as gotType (REQ-052, ADR 0022):
-// `&wire.Class` on the flat shape and `&w.Type` on the alias shape. The
+// `&wire.Class` on the flat shape, `&w.Type` on the alias shape and
+// `&wire.Type` on the interval wire struct. The
 // whole-value `_type` guard reads that field after the single decode, so any
 // other pointer (a fresh `new(string)`, say) would leave it reading an empty
 // discriminator and accept a mislabelled body silently. The runtime twin is
@@ -166,6 +172,11 @@ func TestRenderUnmarshalPassesDeclaredTypeField(t *testing.T) {
 			shape, want := "alias", `typereg.DecodeInto(dec, "`+pc.BMMName+`", &w, &w.Type)`
 			if embedsMarshalerBearingConcrete(plan, pc) {
 				shape, want = "flat", `typereg.DecodeInto(dec, "`+pc.BMMName+`", &wire, &wire.Class)`
+			}
+			if base, err := intervalDerivedBase(plan, pc); err != nil {
+				t.Fatalf("intervalDerivedBase %s: %v", pc.BMMName, err)
+			} else if base != nil {
+				shape, want = "interval", `typereg.DecodeInto(dec, "`+pc.BMMName+`", wire, &wire.Type)`
 			}
 			if !strings.Contains(chunk, want) {
 				t.Errorf("%s (%s shape) decoder does not contain %s: the `_type` guard must read the wire value's declared field", pc.BMMName, shape, want)

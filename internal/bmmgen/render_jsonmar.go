@@ -44,7 +44,10 @@ const typeregImportPath = "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 // polymorphic interface fields through the registered decode hooks: there is
 // no per-field routing and no json.RawMessage staging any more.
 func RenderMarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
-	concrete := concreteClassesIn(file)
+	concrete, err := codecClassesIn(plan, file)
+	if err != nil {
+		return nil, err
+	}
 	if len(concrete) == 0 {
 		return nil, nil
 	}
@@ -124,19 +127,22 @@ func needsExternalImportForJSONMar(plan *Plan, chunks []string) bool {
 func concreteClassesIn(file *PlannedFile) []*PlannedClass {
 	out := make([]*PlannedClass, 0, len(file.Classes))
 	for _, pc := range file.Classes {
-		if pc.External || pc.IsPrimitive {
-			continue
+		if isConcreteCodecClass(pc) {
+			out = append(out, pc)
 		}
-		sc, ok := pc.Class.(*bmm.SimpleClass)
-		if !ok {
-			continue
-		}
-		if sc.IsAbstract() {
-			continue
-		}
-		out = append(out, pc)
 	}
 	return out
+}
+
+// isConcreteCodecClass reports whether pc is a non-external, non-primitive,
+// non-abstract SimpleClass: the classes that carry the full generated codec
+// (type registration, both JSON methods, both XML methods).
+func isConcreteCodecClass(pc *PlannedClass) bool {
+	if pc.External || pc.IsPrimitive {
+		return false
+	}
+	sc, ok := pc.Class.(*bmm.SimpleClass)
+	return ok && !sc.IsAbstract()
 }
 
 // emittedField captures one wire-struct field together with the BMM class where
@@ -305,7 +311,7 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 		return renderMarshalFlat(plan, pc, recv, typeParams, typeArgs)
 	}
 	if shaped {
-		return renderMarshalAliasInterval(pc, recv, typeParams, typeArgs), nil
+		return renderMarshalInterval(plan, pc, recv, typeParams, typeArgs)
 	}
 	return renderMarshalAlias(pc, recv, typeParams, typeArgs), nil
 }

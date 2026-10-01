@@ -198,8 +198,8 @@ type corpusInterval struct {
 	inner string
 	// want is the interval the corpus states.
 	want rm.Interval[aom14.Integer]
-	// hasLower and hasUpper report whether the corpus gives the bound.
-	hasLower, hasUpper bool
+	// hasLower reports whether the corpus gives a lower bound.
+	hasLower bool
 }
 
 // problems collects the failures of a corpus walk by kind, so a regression
@@ -397,7 +397,6 @@ func readCorpusIntervals(t *testing.T, file string) []corpusInterval {
 					UpperUnbounded: raw.UpperUnbounded,
 				},
 				hasLower: raw.Lower != nil,
-				hasUpper: raw.Upper != nil,
 			}
 			for _, side := range []struct {
 				text *string

@@ -54,6 +54,84 @@ func intervalShaped(plan *Plan, pc *PlannedClass) (bool, error) {
 	return hasIntervalShape(fields), nil
 }
 
+// isIntervalBase reports whether pc is the abstract generic class that carries
+// the BASE Interval shape and is emitted as a Go struct: BASE Interval itself.
+// The base schema lists it among its primitive types, which the check
+// therefore ignores. It has no concrete BMM instances, so it gets no type
+// registration, but the
+// SDK holds it by value (AOM 1.4's occurrences, existence and cardinality
+// intervals are `Interval[Integer]`) and so its JSON and XML encoders leave out
+// an open side's empty bound like every other interval-shaped class (REQ-052,
+// REQ-056). An abstract generic class that is emitted as an interface (EVENT)
+// is not a struct and never qualifies.
+func isIntervalBase(plan *Plan, pc *PlannedClass) (bool, error) {
+	if pc.External {
+		return false, nil
+	}
+	sc, ok := pc.Class.(*bmm.SimpleClass)
+	if !ok || !sc.IsAbstract() || !sc.IsGeneric() || codecPolymorphicAbstractGeneric(plan, pc) {
+		return false, nil
+	}
+	return intervalShaped(plan, pc)
+}
+
+// codecClassesIn returns the classes of file that receive a canonical-JSON
+// marshaller and the canonical-XML codec: the concrete classes, plus the
+// abstract BASE Interval struct ([isIntervalBase]). Type registration, the
+// canonical-JSON decoder and the discriminator methods stay with the concrete
+// classes ([concreteClassesIn]); BASE Interval decodes from JSON through its
+// struct tags and writes no `_type`.
+func codecClassesIn(plan *Plan, file *PlannedFile) ([]*PlannedClass, error) {
+	out := make([]*PlannedClass, 0, len(file.Classes))
+	for _, pc := range file.Classes {
+		if isConcreteCodecClass(pc) {
+			out = append(out, pc)
+			continue
+		}
+		base, err := isIntervalBase(plan, pc)
+		if err != nil {
+			return nil, err
+		}
+		if base {
+			out = append(out, pc)
+		}
+	}
+	return out, nil
+}
+
+// embeddedIntervalBase returns the BASE Interval struct pc embeds directly, or
+// nil when pc embeds none. A class that embeds it through another embedded
+// class takes the flat wire shape, which refuses an interval-shaped class
+// ([embedsMarshalerBearingConcrete]), so only a direct embedding reaches the
+// interval wire struct.
+func embeddedIntervalBase(plan *Plan, pc *PlannedClass) (*PlannedClass, error) {
+	_, ancestors := embeddedStructAncestors(plan, pc)
+	for _, ap := range ancestors {
+		base, err := isIntervalBase(plan, ap)
+		if err != nil {
+			return nil, err
+		}
+		if base {
+			return ap, nil
+		}
+	}
+	return nil, nil
+}
+
+// intervalDerivedBase returns the BASE Interval struct pc embeds directly when
+// pc is an interval-shaped concrete class that takes the interval wire struct,
+// and nil otherwise.
+func intervalDerivedBase(plan *Plan, pc *PlannedClass) (*PlannedClass, error) {
+	if sc := pc.Class.(*bmm.SimpleClass); sc.IsAbstract() {
+		return nil, nil
+	}
+	shaped, err := intervalShaped(plan, pc)
+	if err != nil || !shaped {
+		return nil, err
+	}
+	return embeddedIntervalBase(plan, pc)
+}
+
 // openBoundFlag maps a bound property to the Go field of the flag that marks
 // its side open.
 func openBoundFlag(prop string) (string, bool) {
@@ -83,12 +161,68 @@ func guardOpenIntervalBoundXML(recv, prop, lines string) string {
 	return b.String()
 }
 
+// renderMarshalInterval emits the wire type and MarshalJSONTo of an
+// interval-shaped class, choosing the shape by how the class holds the BASE
+// Interval members: the abstract base itself ([renderMarshalIntervalBase]), a
+// class that embeds it ([renderMarshalIntervalDerived]), or a class that
+// declares the members itself ([renderMarshalAliasInterval]).
+func renderMarshalInterval(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs string) (string, error) {
+	if sc := pc.Class.(*bmm.SimpleClass); sc.IsAbstract() {
+		return renderMarshalIntervalBase(pc, recv, typeParams, typeArgs), nil
+	}
+	base, err := embeddedIntervalBase(plan, pc)
+	if err != nil {
+		return "", err
+	}
+	if base != nil {
+		return renderMarshalIntervalDerived(plan, pc, base, recv, typeParams, typeArgs)
+	}
+	return renderMarshalAliasInterval(pc, recv, typeParams, typeArgs), nil
+}
+
+// openBoundDoc is the part of an interval MarshalJSONTo doc comment that
+// explains how an open side's empty bound drops out.
+func openBoundDoc() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "// An open side (`%s` or `%s` set) whose bound is empty\n", propLowerUnbounded, propUpperUnbounded)
+	fmt.Fprintf(&b, "// emits no `%s` or `%s` member. The wrapper then declares a zero-size\n", propLower, propUpper)
+	b.WriteString("// field of that name at its own level, shallower than the bound embedded\n")
+	b.WriteString("// through the alias, so it wins; it is always omitted, and the other\n")
+	b.WriteString("// members keep their order.\n")
+	return b.String()
+}
+
+// omitFlags renders the two omit decisions of an interval-shaped class.
+func omitFlags(recv string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "\tomitLower := omitIntervalBound(%s.%s, %s.%s)\n", recv, FieldName(propLowerUnbounded), recv, FieldName(propLower))
+	fmt.Fprintf(&b, "\tomitUpper := omitIntervalBound(%s.%s, %s.%s)\n", recv, FieldName(propUpperUnbounded), recv, FieldName(propUpper))
+	return b.String()
+}
+
+// omitSwitch renders the four-way switch over the omit decisions; ret renders
+// the `return` for the bound properties named in omitted.
+func omitSwitch(ret func(omitted ...string) string) string {
+	var b strings.Builder
+	b.WriteString("\tswitch {\n")
+	b.WriteString("\tcase omitLower && omitUpper:\n")
+	b.WriteString(ret(propLower, propUpper))
+	b.WriteString("\tcase omitLower:\n")
+	b.WriteString(ret(propLower))
+	b.WriteString("\tcase omitUpper:\n")
+	b.WriteString(ret(propUpper))
+	b.WriteString("\t}\n")
+	b.WriteString(ret())
+	return b.String()
+}
+
 // renderMarshalAliasInterval is [renderMarshalAlias] for an interval-shaped
-// class. The alias wrapper stays the wire for every member; when a side is
-// open and its bound empty, the wrapper declares a zero-size field of the
-// bound's name at its own level, shallower than the bound embedded through the
-// alias. The shallower field wins, and it is always omitted, so the member
-// drops out and every other member keeps its place.
+// class that declares the BASE Interval members itself. The alias wrapper
+// stays the wire for every member; when a side is open and its bound empty,
+// the wrapper declares a zero-size field of the bound's name at its own level,
+// shallower than the bound embedded through the alias. The shallower field
+// wins, and it is always omitted, so the member drops out and every other
+// member keeps its place.
 func renderMarshalAliasInterval(pc *PlannedClass, recv, typeParams, typeArgs string) string {
 	alias := aliasTypeName(pc.GoName)
 
@@ -103,44 +237,192 @@ func renderMarshalAliasInterval(pc *PlannedClass, recv, typeParams, typeArgs str
 	b.WriteString("// in a polymorphic interface slot by value, the shape the like-interface\n")
 	b.WriteString("// accessors admit, still carries its `_type`.\n")
 	b.WriteString("//\n")
-	fmt.Fprintf(&b, "// An open side (`%s` or `%s` set) whose bound is empty\n", propLowerUnbounded, propUpperUnbounded)
-	fmt.Fprintf(&b, "// emits no `%s` or `%s` member. The wrapper then declares a zero-size\n", propLower, propUpper)
-	b.WriteString("// field of that name at its own level, shallower than the bound embedded\n")
-	b.WriteString("// through the alias, so it wins; it is always omitted, and the other\n")
-	b.WriteString("// members keep their order.\n")
+	b.WriteString(openBoundDoc())
 	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
-	fmt.Fprintf(&b, "\tomitLower := omitIntervalBound(%s.%s, %s.%s)\n", recv, FieldName(propLowerUnbounded), recv, FieldName(propLower))
-	fmt.Fprintf(&b, "\tomitUpper := omitIntervalBound(%s.%s, %s.%s)\n", recv, FieldName(propUpperUnbounded), recv, FieldName(propUpper))
-	b.WriteString("\tswitch {\n")
-	b.WriteString("\tcase omitLower && omitUpper:\n")
-	b.WriteString(intervalWireReturn(pc, recv, alias, typeArgs, propLower, propUpper))
-	b.WriteString("\tcase omitLower:\n")
-	b.WriteString(intervalWireReturn(pc, recv, alias, typeArgs, propLower))
-	b.WriteString("\tcase omitUpper:\n")
-	b.WriteString(intervalWireReturn(pc, recv, alias, typeArgs, propUpper))
-	b.WriteString("\t}\n")
-	b.WriteString(intervalWireReturn(pc, recv, alias, typeArgs))
+	b.WriteString(omitFlags(recv))
+	b.WriteString(omitSwitch(func(omitted ...string) string {
+		var r strings.Builder
+		r.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
+		r.WriteString("\t\tType string `json:\"_type\"`\n")
+		fmt.Fprintf(&r, "\t\t*%s%s\n", alias, typeArgs)
+		for _, prop := range omitted {
+			fmt.Fprintf(&r, "\t\t%s struct{} `json:%q`\n", FieldName(prop), prop+",omitzero")
+		}
+		fmt.Fprintf(&r, "\t}{Type: %q, %s: (*%s%s)(&%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, alias, typeArgs, recv)
+		return r.String()
+	}))
 	b.WriteString("}\n")
 	return b.String()
 }
 
-// intervalWireReturn renders one `return json.MarshalEncode(...)` over the
-// `_type` + alias wrapper, with a zero-size `omitzero` field for each bound
-// property named in omitted.
-func intervalWireReturn(pc *PlannedClass, recv, alias, typeArgs string, omitted ...string) string {
+// renderMarshalIntervalBase emits the wire type and MarshalJSONTo of BASE
+// Interval itself. It is abstract, so it writes no `_type`, and AOM 1.4 holds
+// it by value in fields typed by it. The omission mechanism is the one
+// [renderMarshalAliasInterval] uses.
+func renderMarshalIntervalBase(pc *PlannedClass, recv, typeParams, typeArgs string) string {
+	alias := aliasTypeName(pc.GoName)
+
 	var b strings.Builder
-	b.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
-	b.WriteString("\t\tType string `json:\"_type\"`\n")
-	fmt.Fprintf(&b, "\t\t*%s%s\n", alias, typeArgs)
-	for _, prop := range omitted {
-		fmt.Fprintf(&b, "\t\t%s struct{} `json:%q`\n", FieldName(prop), prop+",omitzero")
-	}
-	fmt.Fprintf(&b, "\t}{Type: %q, %s: (*%s%s)(&%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, alias, typeArgs, recv)
+	b.WriteString(renderMarshalAliasDecl(pc, typeParams, typeArgs))
+
+	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s, which is abstract and\n", pc.GoName)
+	b.WriteString("// so carries no `_type`. Field order follows the struct declaration;\n")
+	b.WriteString("// json.Deterministic sorts any Hash keys and the\n")
+	b.WriteString("// FormatNil* options keep a mandatory nil container's `null` spelling.\n")
+	b.WriteString("// The receiver is a value so an Interval held by value in a struct field\n")
+	b.WriteString("// takes this encoder.\n")
+	b.WriteString("//\n")
+	b.WriteString(openBoundDoc())
+	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	b.WriteString(omitFlags(recv))
+	b.WriteString(omitSwitch(func(omitted ...string) string {
+		var r strings.Builder
+		r.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
+		fmt.Fprintf(&r, "\t\t*%s%s\n", alias, typeArgs)
+		for _, prop := range omitted {
+			fmt.Fprintf(&r, "\t\t%s struct{} `json:%q`\n", FieldName(prop), prop+",omitzero")
+		}
+		fmt.Fprintf(&r, "\t}{%s: (*%s%s)(&%s)}, typereg.MarshalOptions(enc))\n", alias, alias, typeArgs, recv)
+		return r.String()
+	}))
+	b.WriteString("}\n")
 	return b.String()
 }
 
+// intervalDerivedOwnFields returns the fields a class that embeds BASE Interval
+// declares itself: the members the wire struct carries beside the embedded
+// base. They come in the order of the class's Go struct body, which sorts by
+// property name, so the wire keeps the encoding the class always had.
+// Point_interval re-declares the four flags, so they are its own;
+// Proper_interval and DV_INTERVAL declare none.
+func intervalDerivedOwnFields(plan *Plan, pc *PlannedClass) ([]emittedField, error) {
+	fields, err := effectiveFields(plan, pc)
+	if err != nil {
+		return nil, err
+	}
+	var own []emittedField
+	for _, ef := range fields {
+		if ef.OwnerName == pc.BMMName {
+			own = append(own, ef)
+		}
+	}
+	slices.SortFunc(own, func(a, b emittedField) int {
+		return strings.Compare(a.Prop.PropertyName(), b.Prop.PropertyName())
+	})
+	return own, nil
+}
+
+// renderIntervalDerivedWire emits the canonical-JSON wire struct of a class
+// that embeds BASE Interval: `_type`, the method-free alias of the base, and
+// the class's own members. The class cannot be marshalled through a method-free
+// alias of itself: the alias would still embed BASE Interval and promote its
+// MarshalJSONTo, which encoding/json/v2 refuses. The wire struct reaches the
+// base through the base's own method-free alias, which has no methods, and so
+// promotes none.
+func renderIntervalDerivedWire(plan *Plan, pc, base *PlannedClass, typeParams string) (string, []emittedField, error) {
+	own, err := intervalDerivedOwnFields(plan, pc)
+	if err != nil {
+		return "", nil, err
+	}
+	typeArgs := genericTypeArgList(pc.Class.(*bmm.SimpleClass))
+	wire := flatWireTypeName(pc.GoName)
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "// %s is the canonical-JSON wire struct for %s. %s embeds BASE\n", wire, pc.GoName, pc.GoName)
+	b.WriteString("// Interval, so a method-free alias of the class would promote the base's\n")
+	b.WriteString("// MarshalJSONTo. The wire struct embeds the method-free alias of the base\n")
+	b.WriteString("// instead, and carries the class's own members beside it.\n")
+	fmt.Fprintf(&b, "type %s%s struct {\n", wire, typeParams)
+	b.WriteString("\tType string `json:\"_type\"`\n")
+	fmt.Fprintf(&b, "\t*%s%s\n", aliasTypeName(base.GoName), typeArgs)
+	for _, ef := range own {
+		line, err := renderField(plan, ef.Owner, ef.OwnerName, ef.Prop)
+		if err != nil {
+			return "", nil, fmt.Errorf("render wire field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+		}
+		b.WriteString(withoutCommentLines(line))
+	}
+	b.WriteString("}\n\n")
+	return b.String(), own, nil
+}
+
+// withoutCommentLines drops the doc-comment lines of rendered field source.
+func withoutCommentLines(src string) string {
+	var b strings.Builder
+	for line := range strings.Lines(src) {
+		if strings.HasPrefix(strings.TrimSpace(line), "//") {
+			continue
+		}
+		b.WriteString(line)
+	}
+	return b.String()
+}
+
+// intervalDerivedWireValue renders the composite literal that fills the wire
+// struct of a class from its receiver: the base through the method-free alias,
+// and each own member by value. The encoder sets `_type`; the decoder leaves it
+// empty so that a missing discriminator is still seen as missing.
+func intervalDerivedWireValue(pc, base *PlannedClass, recv, typeArgs string, own []emittedField, withType bool) string {
+	alias := aliasTypeName(base.GoName)
+	var b strings.Builder
+	fmt.Fprintf(&b, "&%s%s{", flatWireTypeName(pc.GoName), typeArgs)
+	if withType {
+		fmt.Fprintf(&b, "Type: %q, ", pc.BMMName)
+	}
+	fmt.Fprintf(&b, "%s: (*%s%s)(&%s.%s)", alias, alias, typeArgs, recv, base.GoName)
+	for _, ef := range own {
+		fn := FieldName(ef.Prop.PropertyName())
+		fmt.Fprintf(&b, ", %s: %s.%s", fn, recv, fn)
+	}
+	b.WriteString("}")
+	return b.String()
+}
+
+// renderMarshalIntervalDerived emits the wire struct and MarshalJSONTo of an
+// interval-shaped class that embeds BASE Interval. The open-side mechanism is
+// [renderMarshalAliasInterval]'s: a zero-size `omitzero` field of the bound's
+// name, one level shallower than the bound the wire struct embeds.
+func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, typeParams, typeArgs string) (string, error) {
+	wireDecl, own, err := renderIntervalDerivedWire(plan, pc, base, typeParams)
+	if err != nil {
+		return "", err
+	}
+	wire := flatWireTypeName(pc.GoName)
+
+	var b strings.Builder
+	b.WriteString(wireDecl)
+	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
+	fmt.Fprintf(&b, "// (value %q) as the leading member. Field order otherwise follows the\n", pc.BMMName)
+	b.WriteString("// struct declaration; json.Deterministic sorts any Hash keys and the\n")
+	b.WriteString("// FormatNil* options keep a mandatory nil container's `null` spelling.\n")
+	b.WriteString("// The receiver is a value so a concrete instance sitting\n")
+	b.WriteString("// in a polymorphic interface slot by value, the shape the like-interface\n")
+	b.WriteString("// accessors admit, still carries its `_type`.\n")
+	b.WriteString("//\n")
+	b.WriteString(openBoundDoc())
+	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	b.WriteString(omitFlags(recv))
+	fmt.Fprintf(&b, "\tw := %s\n", intervalDerivedWireValue(pc, base, recv, typeArgs, own, true))
+	b.WriteString(omitSwitch(func(omitted ...string) string {
+		if len(omitted) == 0 {
+			return "\treturn json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))\n"
+		}
+		var r strings.Builder
+		r.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
+		fmt.Fprintf(&r, "\t\t*%s%s\n", wire, typeArgs)
+		for _, prop := range omitted {
+			fmt.Fprintf(&r, "\t\t%s struct{} `json:%q`\n", FieldName(prop), prop+",omitzero")
+		}
+		fmt.Fprintf(&r, "\t}{%s: w}, typereg.MarshalOptions(enc))\n", wire)
+		return r.String()
+	}))
+	b.WriteString("}\n")
+	return b.String(), nil
+}
+
 // RenderIntervalBoundFile renders <pkg>/interval_bound_gen.go for a target
-// that owns an interval-shaped concrete class: the emptiness test the
+// that owns an interval-shaped class (a concrete one, or the abstract BASE
+// Interval struct, see [codecClassesIn]): the exported emptiness test the
 // canonical encoders apply to an open side's bound (REQ-052, REQ-056), with
 // one field-by-field zero predicate per concrete bound type, derived from the
 // BMM class's properties and using no reflection (REQ-024).
@@ -153,7 +435,7 @@ func intervalWireReturn(pc *PlannedClass, recv, alias, typeArgs string, omitted 
 // admits. A predicate for a class reached by value from a bound type
 // (DV_ORDINAL's `symbol`) is emitted too.
 //
-// Returns (nil, nil) when the target owns no interval-shaped concrete class.
+// Returns (nil, nil) when the target owns no interval-shaped class.
 func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
 	shaped, boundClasses, err := intervalBounds(plan)
 	if err != nil {
@@ -241,7 +523,11 @@ func intervalBounds(plan *Plan) (bool, []*PlannedClass, error) {
 	var shaped bool
 	bounds := map[string]*PlannedClass{}
 	for _, f := range plan.Files {
-		for _, pc := range concreteClassesIn(f) {
+		emitting, err := codecClassesIn(plan, f)
+		if err != nil {
+			return false, nil, err
+		}
+		for _, pc := range emitting {
 			fields, err := effectiveFields(plan, pc)
 			if err != nil {
 				return false, nil, err

@@ -12,11 +12,62 @@ import (
 
 // BMM package org.openehr.base.foundation_types.interval: canonical-JSON MarshalJSONTo companions
 
-// rawPointInterval is the method-free canonical-JSON alias for PointInterval. The alias
+// rawInterval is the method-free canonical-JSON alias for Interval. The alias
 // drops the codec methods so marshalling the anonymous wrapper below
 // does not recurse; the class embeds no marshaler-bearing concrete
 // ancestor, so nothing is promoted.
-type rawPointInterval[T any] PointInterval[T]
+type rawInterval[T any] Interval[T]
+
+// MarshalJSONTo emits canonical openEHR JSON for Interval, which is abstract and
+// so carries no `_type`. Field order follows the struct declaration;
+// json.Deterministic sorts any Hash keys and the
+// FormatNil* options keep a mandatory nil container's `null` spelling.
+// The receiver is a value so an Interval held by value in a struct field
+// takes this encoder.
+//
+// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
+// emits no `lower` or `upper` member. The wrapper then declares a zero-size
+// field of that name at its own level, shallower than the bound embedded
+// through the alias, so it wins; it is always omitted, and the other
+// members keep their order.
+func (i Interval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	omitLower := omitIntervalBound(i.LowerUnbounded, i.Lower)
+	omitUpper := omitIntervalBound(i.UpperUnbounded, i.Upper)
+	switch {
+	case omitLower && omitUpper:
+		return json.MarshalEncode(enc, &struct {
+			*rawInterval[T]
+			Lower struct{} `json:"lower,omitzero"`
+			Upper struct{} `json:"upper,omitzero"`
+		}{rawInterval: (*rawInterval[T])(&i)}, typereg.MarshalOptions(enc))
+	case omitLower:
+		return json.MarshalEncode(enc, &struct {
+			*rawInterval[T]
+			Lower struct{} `json:"lower,omitzero"`
+		}{rawInterval: (*rawInterval[T])(&i)}, typereg.MarshalOptions(enc))
+	case omitUpper:
+		return json.MarshalEncode(enc, &struct {
+			*rawInterval[T]
+			Upper struct{} `json:"upper,omitzero"`
+		}{rawInterval: (*rawInterval[T])(&i)}, typereg.MarshalOptions(enc))
+	}
+	return json.MarshalEncode(enc, &struct {
+		*rawInterval[T]
+	}{rawInterval: (*rawInterval[T])(&i)}, typereg.MarshalOptions(enc))
+}
+
+// jsonWirePointInterval is the canonical-JSON wire struct for PointInterval. PointInterval embeds BASE
+// Interval, so a method-free alias of the class would promote the base's
+// MarshalJSONTo. The wire struct embeds the method-free alias of the base
+// instead, and carries the class's own members beside it.
+type jsonWirePointInterval[T any] struct {
+	Type string `json:"_type"`
+	*rawInterval[T]
+	LowerIncluded  bool `json:"lower_included"`
+	LowerUnbounded bool `json:"lower_unbounded"`
+	UpperIncluded  bool `json:"upper_included"`
+	UpperUnbounded bool `json:"upper_unbounded"`
+}
 
 // MarshalJSONTo emits canonical openEHR JSON for PointInterval with `_type`
 // (value "Point_interval") as the leading member. Field order otherwise follows the
@@ -34,38 +85,36 @@ type rawPointInterval[T any] PointInterval[T]
 func (p PointInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
 	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)
+	w := &jsonWirePointInterval[T]{Type: "Point_interval", rawInterval: (*rawInterval[T])(&p.Interval), LowerIncluded: p.LowerIncluded, LowerUnbounded: p.LowerUnbounded, UpperIncluded: p.UpperIncluded, UpperUnbounded: p.UpperUnbounded}
 	switch {
 	case omitLower && omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			Type string `json:"_type"`
-			*rawPointInterval[T]
+			*jsonWirePointInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
 			Upper struct{} `json:"upper,omitzero"`
-		}{Type: "Point_interval", rawPointInterval: (*rawPointInterval[T])(&p)}, typereg.MarshalOptions(enc))
+		}{jsonWirePointInterval: w}, typereg.MarshalOptions(enc))
 	case omitLower:
 		return json.MarshalEncode(enc, &struct {
-			Type string `json:"_type"`
-			*rawPointInterval[T]
+			*jsonWirePointInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
-		}{Type: "Point_interval", rawPointInterval: (*rawPointInterval[T])(&p)}, typereg.MarshalOptions(enc))
+		}{jsonWirePointInterval: w}, typereg.MarshalOptions(enc))
 	case omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			Type string `json:"_type"`
-			*rawPointInterval[T]
+			*jsonWirePointInterval[T]
 			Upper struct{} `json:"upper,omitzero"`
-		}{Type: "Point_interval", rawPointInterval: (*rawPointInterval[T])(&p)}, typereg.MarshalOptions(enc))
+		}{jsonWirePointInterval: w}, typereg.MarshalOptions(enc))
 	}
-	return json.MarshalEncode(enc, &struct {
-		Type string `json:"_type"`
-		*rawPointInterval[T]
-	}{Type: "Point_interval", rawPointInterval: (*rawPointInterval[T])(&p)}, typereg.MarshalOptions(enc))
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
-// rawProperInterval is the method-free canonical-JSON alias for ProperInterval. The alias
-// drops the codec methods so marshalling the anonymous wrapper below
-// does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted.
-type rawProperInterval[T any] ProperInterval[T]
+// jsonWireProperInterval is the canonical-JSON wire struct for ProperInterval. ProperInterval embeds BASE
+// Interval, so a method-free alias of the class would promote the base's
+// MarshalJSONTo. The wire struct embeds the method-free alias of the base
+// instead, and carries the class's own members beside it.
+type jsonWireProperInterval[T any] struct {
+	Type string `json:"_type"`
+	*rawInterval[T]
+}
 
 // MarshalJSONTo emits canonical openEHR JSON for ProperInterval with `_type`
 // (value "Proper_interval") as the leading member. Field order otherwise follows the
@@ -83,29 +132,24 @@ type rawProperInterval[T any] ProperInterval[T]
 func (p ProperInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
 	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)
+	w := &jsonWireProperInterval[T]{Type: "Proper_interval", rawInterval: (*rawInterval[T])(&p.Interval)}
 	switch {
 	case omitLower && omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			Type string `json:"_type"`
-			*rawProperInterval[T]
+			*jsonWireProperInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
 			Upper struct{} `json:"upper,omitzero"`
-		}{Type: "Proper_interval", rawProperInterval: (*rawProperInterval[T])(&p)}, typereg.MarshalOptions(enc))
+		}{jsonWireProperInterval: w}, typereg.MarshalOptions(enc))
 	case omitLower:
 		return json.MarshalEncode(enc, &struct {
-			Type string `json:"_type"`
-			*rawProperInterval[T]
+			*jsonWireProperInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
-		}{Type: "Proper_interval", rawProperInterval: (*rawProperInterval[T])(&p)}, typereg.MarshalOptions(enc))
+		}{jsonWireProperInterval: w}, typereg.MarshalOptions(enc))
 	case omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			Type string `json:"_type"`
-			*rawProperInterval[T]
+			*jsonWireProperInterval[T]
 			Upper struct{} `json:"upper,omitzero"`
-		}{Type: "Proper_interval", rawProperInterval: (*rawProperInterval[T])(&p)}, typereg.MarshalOptions(enc))
+		}{jsonWireProperInterval: w}, typereg.MarshalOptions(enc))
 	}
-	return json.MarshalEncode(enc, &struct {
-		Type string `json:"_type"`
-		*rawProperInterval[T]
-	}{Type: "Proper_interval", rawProperInterval: (*rawProperInterval[T])(&p)}, typereg.MarshalOptions(enc))
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }

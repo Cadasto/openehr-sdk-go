@@ -52,7 +52,10 @@ import (
 // skipped at decode time. The receiver field is left at its zero
 // value. Documented in canxml/doc.go.
 func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
-	emitting := concreteClassesIn(file)
+	emitting, err := codecClassesIn(plan, file)
+	if err != nil {
+		return nil, err
+	}
 	if len(emitting) == 0 {
 		return nil, nil
 	}
