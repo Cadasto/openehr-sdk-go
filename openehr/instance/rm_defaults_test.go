@@ -253,7 +253,7 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 // the defaults the generator writes on values it builds from the BMM
 // alone, and on values the OPT names but leaves unconstrained. Each case
 // asserts the field the default writes and checks the generated value
-// against the RM floor.
+// against the RM floor, under both policies and both value fills.
 func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -325,6 +325,36 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 			},
 		},
 		{
+			// REQ-107: a temporal root's value comes from the string pass,
+			// which must write a valid ISO 8601 date, not the open-string
+			// sentinel (RM Value_valid).
+			name: "DV_DATE value is a valid date",
+			opt:  optTemplate("DV_DATE"),
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.DVDate).Value, "2020-01-01"; got != want {
+					t.Errorf("DV_DATE.value = %q, want %q", got, want)
+				}
+			},
+		},
+		{
+			name: "DV_TIME value is a valid time",
+			opt:  optTemplate("DV_TIME"),
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.DVTime).Value, "12:00:00"; got != want {
+					t.Errorf("DV_TIME.value = %q, want %q", got, want)
+				}
+			},
+		},
+		{
+			name: "DV_DURATION value is a valid duration",
+			opt:  optTemplate("DV_DURATION"),
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.DVDuration).Value, "P0D"; got != want {
+					t.Errorf("DV_DURATION.value = %q, want %q", got, want)
+				}
+			},
+		},
+		{
 			name: "DV_EHR_URI under ELEMENT keeps the ehr scheme",
 			opt:  optTemplate("ELEMENT", optSingle("value", optNode("DV_EHR_URI", ""))),
 			check: func(t *testing.T, out any) {
@@ -359,20 +389,27 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, tc.opt, true)
-			out, err := instance.Generate(t.Context(), c, instance.Options{
-				Policy:    instance.Example,
-				Language:  "en",
-				Territory: "NL",
-				Composer:  testComposer(),
-				Now:       defaultsNow,
-			})
-			if err != nil {
-				t.Fatalf("Generate: %v", err)
-			}
-			tc.check(t, out)
-			for _, iss := range validation.ValidateRM(out).Issues {
-				if iss.Severity == validation.Error {
-					t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
+						out, err := instance.Generate(t.Context(), c, instance.Options{
+							Policy:    policy,
+							ValueFill: fill,
+							Language:  "en",
+							Territory: "NL",
+							Composer:  testComposer(),
+							Now:       defaultsNow,
+						})
+						if err != nil {
+							t.Fatalf("Generate: %v", err)
+						}
+						tc.check(t, out)
+						for _, iss := range validation.ValidateRM(out).Issues {
+							if iss.Severity == validation.Error {
+								t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+							}
+						}
+					})
 				}
 			}
 		})
