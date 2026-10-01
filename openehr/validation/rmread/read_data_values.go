@@ -122,7 +122,7 @@ func readReferenceRangeSingle[T rm.DVOrdered](r *rm.ReferenceRange[T], attr stri
 // isZeroInterval reports whether iv is the Go zero interval: no bound, and
 // every flag false.
 func isZeroInterval(iv *rm.DVInterval[rm.DVOrdered]) bool {
-	return isVoidOrdered(iv.Lower) && isVoidOrdered(iv.Upper) &&
+	return rm.IsEmptyIntervalBound(iv.Lower) && rm.IsEmptyIntervalBound(iv.Upper) &&
 		!iv.LowerUnbounded && !iv.UpperUnbounded && !iv.LowerIncluded && !iv.UpperIncluded
 }
 
@@ -151,61 +151,62 @@ func readDVParsableSingle(p *rm.DVParsable, attr string) (any, bool) {
 }
 
 func readDVIntervalQuantitySingle(iv *rm.DVInterval[rm.DVQuantity], attr string) (any, bool) {
-	return readIntervalSingle(&iv.Interval, attr, isVoidDVQuantity)
+	return readIntervalSingle(&iv.Interval, attr)
 }
 
 func readDVIntervalCountSingle(iv *rm.DVInterval[rm.DVCount], attr string) (any, bool) {
-	return readIntervalSingle(&iv.Interval, attr, isVoidDVCount)
+	return readIntervalSingle(&iv.Interval, attr)
 }
 
 func readDVIntervalDateTimeSingle(iv *rm.DVInterval[rm.DVDateTime], attr string) (any, bool) {
-	return readIntervalSingle(&iv.Interval, attr, isVoidDVDateTime)
+	return readIntervalSingle(&iv.Interval, attr)
 }
 
 func readDVIntervalDateSingle(iv *rm.DVInterval[rm.DVDate], attr string) (any, bool) {
-	return readIntervalSingle(&iv.Interval, attr, isVoidDVDate)
+	return readIntervalSingle(&iv.Interval, attr)
 }
 
 func readDVIntervalTimeSingle(iv *rm.DVInterval[rm.DVTime], attr string) (any, bool) {
-	return readIntervalSingle(&iv.Interval, attr, isVoidDVTime)
+	return readIntervalSingle(&iv.Interval, attr)
 }
 
 func readDVIntervalProportionSingle(iv *rm.DVInterval[rm.DVProportion], attr string) (any, bool) {
-	return readIntervalSingle(&iv.Interval, attr, isVoidDVProportion)
+	return readIntervalSingle(&iv.Interval, attr)
 }
 
 func readDVIntervalDurationSingle(iv *rm.DVInterval[rm.DVDuration], attr string) (any, bool) {
-	return readIntervalSingle(&iv.Interval, attr, isVoidDVDuration)
+	return readIntervalSingle(&iv.Interval, attr)
 }
 
 func readDVIntervalOrdinalSingle(iv *rm.DVInterval[rm.DVOrdinal], attr string) (any, bool) {
-	return readIntervalSingle(&iv.Interval, attr, isVoidDVOrdinal)
+	return readIntervalSingle(&iv.Interval, attr)
 }
 
 func readDVIntervalScaleSingle(iv *rm.DVInterval[rm.DVScale], attr string) (any, bool) {
-	return readIntervalSingle(&iv.Interval, attr, isVoidDVScale)
+	return readIntervalSingle(&iv.Interval, attr)
 }
 
 func readDVIntervalOrderedSingle(iv *rm.DVInterval[rm.DVOrdered], attr string) (any, bool) {
-	return readIntervalSingle(&iv.Interval, attr, isVoidOrdered)
+	return readIntervalSingle(&iv.Interval, attr)
 }
 
 // readIntervalSingle reads one attribute of an interval. BASE Interval's
 // `*_unbounded` flag marks that boundary open, so an open side carries no
-// bound value: when the flag is set and the bound is Void (isVoid), the
+// bound value: when the flag is set and the bound is Void
+// ([rm.IsEmptyIntervalBound], the test the canonical encoders apply), the
 // bound reads as absent. A concrete-typed Go interval cannot hold a nil
 // bound and keeps the type's zero value there instead. A bound that is not
 // Void reads as present even beside its own flag, and so does a bounded
 // side, whatever its value.
-func readIntervalSingle[T any](iv *rm.Interval[T], attr string, isVoid func(T) bool) (any, bool) {
+func readIntervalSingle[T any](iv *rm.Interval[T], attr string) (any, bool) {
 	switch attr {
 	case "lower":
-		if iv.LowerUnbounded && isVoid(iv.Lower) {
+		if iv.LowerUnbounded && rm.IsEmptyIntervalBound(iv.Lower) {
 			return nil, false
 		}
 		return iv.Lower, true
 	case "upper":
-		if iv.UpperUnbounded && isVoid(iv.Upper) {
+		if iv.UpperUnbounded && rm.IsEmptyIntervalBound(iv.Upper) {
 			return nil, false
 		}
 		return iv.Upper, true
