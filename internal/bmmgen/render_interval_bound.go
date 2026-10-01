@@ -101,9 +101,9 @@ func codecClassesIn(plan *Plan, file *PlannedFile) ([]*PlannedClass, error) {
 
 // embeddedIntervalBase returns the BASE Interval struct pc embeds directly, or
 // nil when pc embeds none. A class that embeds it through another embedded
-// class takes the flat wire shape, which refuses an interval-shaped class
-// ([embedsMarshalerBearingConcrete]), so only a direct embedding reaches the
-// interval wire struct.
+// class embeds a marshaler-bearing concrete class too, which
+// [jsonWireShape] refuses for an interval-shaped class, so only a direct
+// embedding reaches the interval wire struct.
 func embeddedIntervalBase(plan *Plan, pc *PlannedClass) (*PlannedClass, error) {
 	_, ancestors := embeddedStructAncestors(plan, pc)
 	for _, ap := range ancestors {
@@ -116,20 +116,6 @@ func embeddedIntervalBase(plan *Plan, pc *PlannedClass) (*PlannedClass, error) {
 		}
 	}
 	return nil, nil
-}
-
-// intervalDerivedBase returns the BASE Interval struct pc embeds directly when
-// pc is an interval-shaped concrete class that takes the interval wire struct,
-// and nil otherwise.
-func intervalDerivedBase(plan *Plan, pc *PlannedClass) (*PlannedClass, error) {
-	if sc := pc.Class.(*bmm.SimpleClass); sc.IsAbstract() {
-		return nil, nil
-	}
-	shaped, err := intervalShaped(plan, pc)
-	if err != nil || !shaped {
-		return nil, err
-	}
-	return embeddedIntervalBase(plan, pc)
 }
 
 // openBoundFlag maps a bound property to the Go field of the flag that marks
@@ -176,25 +162,6 @@ func guardOpenIntervalBoundXML(recv, prop, lines string) string {
 	}
 	b.WriteString("\t}\n")
 	return b.String()
-}
-
-// renderMarshalInterval emits the wire type and MarshalJSONTo of an
-// interval-shaped class, choosing the shape by how the class holds the BASE
-// Interval members: the abstract base itself ([renderMarshalIntervalBase]), a
-// class that embeds it ([renderMarshalIntervalDerived]), or a class that
-// declares the members itself ([renderMarshalAliasInterval]).
-func renderMarshalInterval(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs string) (string, error) {
-	if sc := pc.Class.(*bmm.SimpleClass); sc.IsAbstract() {
-		return renderMarshalIntervalBase(pc, recv, typeParams, typeArgs), nil
-	}
-	base, err := embeddedIntervalBase(plan, pc)
-	if err != nil {
-		return "", err
-	}
-	if base != nil {
-		return renderMarshalIntervalDerived(plan, pc, base, recv, typeParams, typeArgs)
-	}
-	return renderMarshalAliasInterval(pc, recv, typeParams, typeArgs), nil
 }
 
 // openBoundDoc is the part of an interval MarshalJSONTo doc comment that
@@ -333,9 +300,12 @@ func intervalDerivedOwnFields(plan *Plan, pc *PlannedClass) ([]emittedField, err
 // that embeds BASE Interval: `_type`, the method-free alias of the base, and
 // the class's own members. The class cannot be marshalled through a method-free
 // alias of itself: the alias would still embed BASE Interval and promote its
-// MarshalJSONTo, which encoding/json/v2 refuses. The wire struct reaches the
-// base through the base's own method-free alias, which has no methods, and so
-// promotes none.
+// MarshalJSONTo. With that method promoted, encoding/json/v2 encodes the
+// wrapper through it, silently emitting the base's payload without `_type` and
+// without the open-side omission, and decoding into the wrapper fails at run
+// time with "must not implement marshal or unmarshal methods". The wire struct
+// reaches the base through the base's own method-free alias, which has no
+// methods, and so promotes none.
 func renderIntervalDerivedWire(plan *Plan, pc, base *PlannedClass, typeParams string) (string, []emittedField, error) {
 	own, err := intervalDerivedOwnFields(plan, pc)
 	if err != nil {

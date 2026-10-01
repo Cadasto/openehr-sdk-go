@@ -77,9 +77,9 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 			aliasEmbed := ""
 			if !embedsMarshalerBearingConcrete(plan, pc) {
 				aliasEmbed = "*" + aliasTypeName(pc.GoName)
-				if base, err := intervalDerivedBase(plan, pc); err != nil {
-					t.Fatalf("intervalDerivedBase %s: %v", pc.BMMName, err)
-				} else if base != nil {
+				if shape, base, err := classJSONWireShape(plan, pc); err != nil {
+					t.Fatalf("classJSONWireShape %s: %v", pc.BMMName, err)
+				} else if shape == shapeIntervalDerived {
 					aliasEmbed = "*" + aliasTypeName(base.GoName)
 				}
 			}
@@ -173,9 +173,9 @@ func TestRenderUnmarshalPassesDeclaredTypeField(t *testing.T) {
 			if embedsMarshalerBearingConcrete(plan, pc) {
 				shape, want = "flat", `typereg.DecodeInto(dec, "`+pc.BMMName+`", &wire, &wire.Class)`
 			}
-			if base, err := intervalDerivedBase(plan, pc); err != nil {
-				t.Fatalf("intervalDerivedBase %s: %v", pc.BMMName, err)
-			} else if base != nil {
+			if got, _, err := classJSONWireShape(plan, pc); err != nil {
+				t.Fatalf("classJSONWireShape %s: %v", pc.BMMName, err)
+			} else if got == shapeIntervalDerived {
 				shape, want = "interval", `typereg.DecodeInto(dec, "`+pc.BMMName+`", wire, &wire.Type)`
 			}
 			if !strings.Contains(chunk, want) {

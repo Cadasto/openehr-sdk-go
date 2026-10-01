@@ -452,7 +452,10 @@ func TestIntervalBaseHasNoDiscriminatorMethods(t *testing.T) {
 // TestIntervalDerivedWireEmbedsMethodFreeBase pins the wire struct of every
 // class that embeds BASE Interval (REQ-052, REQ-056). BASE Interval now has a
 // MarshalJSONTo, and a method-free alias of the embedding class would promote
-// it, which encoding/json/v2 refuses at run time. The wire struct must reach
+// it: encoding/json/v2 would then encode the wrapper through it, silently
+// emitting the base's payload without `_type` or the open-side omission, and
+// fail to decode into it with "must not implement marshal or unmarshal
+// methods". The wire struct must reach
 // the base through the base's own alias, and no embedding class may keep a
 // `type rawX X` alias of itself.
 func TestIntervalDerivedWireEmbedsMethodFreeBase(t *testing.T) {
@@ -578,10 +581,39 @@ func TestIntervalDerivedDecodeCopiesOwnMembersBeforeReturning(t *testing.T) {
 	decode := strings.Index(src, "err := typereg.DecodeInto(")
 	copyBack := strings.Index(src, "p.LowerIncluded = wire.LowerIncluded")
 	ret := strings.Index(src, "return err")
-	if decode < 0 || copyBack < 0 || ret < 0 || !(decode < copyBack && copyBack < ret) {
+	if decode < 0 || copyBack < 0 || ret < 0 || decode >= copyBack || copyBack >= ret {
 		t.Errorf("decoder does not decode, copy the own members back, then return the error (positions %d, %d, %d):\n%s", decode, copyBack, ret, src)
 	}
 	if strings.Contains(src, "err != nil") {
 		t.Errorf("decoder returns early on an error before copying the own members back:\n%s", src)
+	}
+}
+
+// TestJSONWireShapeCensus pins the one decision both the marshaller and the
+// unmarshaller read (REQ-052): the shape of each interval class and of a few
+// neighbours, and the refusal of an interval-shaped class that embeds a
+// marshaler-bearing concrete class.
+func TestJSONWireShapeCensus(t *testing.T) {
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+	for class, want := range map[string]jsonWireShape{
+		"Interval":        shapeIntervalBase,
+		"Point_interval":  shapeIntervalDerived,
+		"Proper_interval": shapeIntervalDerived,
+		"DV_INTERVAL":     shapeIntervalDerived,
+		"DV_CODED_TEXT":   shapeFlat,
+		"DV_QUANTITY":     shapeAlias,
+	} {
+		got, _, err := classJSONWireShape(plan, plan.Classes[class])
+		if err != nil || got != want {
+			t.Errorf("classJSONWireShape(%s) = %v, %v; want %v", class, got, err, want)
+		}
+	}
+	// Multiplicity_interval embeds Proper_interval, a marshaler-bearing
+	// concrete class, and is interval-shaped: the flat shape cannot serve it.
+	if _, _, err := classJSONWireShape(plan, plan.Classes["Multiplicity_interval"]); err == nil {
+		t.Error("classJSONWireShape(Multiplicity_interval) succeeded, want a refusal")
 	}
 }

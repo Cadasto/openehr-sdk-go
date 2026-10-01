@@ -78,8 +78,9 @@ func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 
 // renderUnmarshalJSON emits the UnmarshalJSONFrom method for a single concrete
 // class. The wire type it decodes into is defined in the sibling
-// _jsonmar_gen.go: a method-free alias (zero-copy) or a flat wire struct
-// (copied back), chosen by [embedsMarshalerBearingConcrete].
+// _jsonmar_gen.go: a method-free alias (zero-copy), a flat wire struct (copied
+// back) or an interval wire struct, chosen by [classJSONWireShape] exactly as
+// for the marshaller.
 func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (string, error) {
 	sc, ok := pc.Class.(*bmm.SimpleClass)
 	if !ok {
@@ -104,12 +105,12 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	fmt.Fprintf(&b, "\t\treturn fmt.Errorf(\"canjson: %s: %%w\", typereg.ErrNilReceiver)\n", pc.BMMName)
 	b.WriteString("\t}\n")
 
-	base, err := intervalDerivedBase(plan, pc)
+	shape, base, err := classJSONWireShape(plan, pc)
 	if err != nil {
 		return "", err
 	}
-	switch {
-	case base != nil:
+	switch shape {
+	case shapeIntervalDerived:
 		own, err := intervalDerivedOwnFields(plan, pc)
 		if err != nil {
 			return "", err
@@ -131,7 +132,7 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 			fmt.Fprintf(&b, "\t%s.%s = wire.%s\n", recv, fn, fn)
 		}
 		b.WriteString("\treturn err\n")
-	case embedsMarshalerBearingConcrete(plan, pc):
+	case shapeFlat:
 		wire := flatWireTypeName(pc.GoName)
 		fmt.Fprintf(&b, "\tvar wire %s%s\n", wire, typeArgs)
 		fmt.Fprintf(&b, "\tif err := typereg.DecodeInto(dec, %q, &wire, &wire.Class); err != nil {\n", pc.BMMName)
@@ -142,13 +143,17 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 			fmt.Fprintf(&b, "\t%s.%s = wire.%s\n", recv, fn, fn)
 		}
 		b.WriteString("\treturn nil\n")
-	default:
+	case shapeIntervalBase:
+		return "", fmt.Errorf("%s is abstract and has no UnmarshalJSONFrom", pc.BMMName)
+	case shapeAlias, shapeIntervalAlias:
 		alias := aliasTypeName(pc.GoName)
 		b.WriteString("\tw := struct {\n")
 		b.WriteString("\t\tType string `json:\"_type\"`\n")
 		fmt.Fprintf(&b, "\t\t*%s%s\n", alias, typeArgs)
 		fmt.Fprintf(&b, "\t}{%s: (*%s%s)(%s)}\n", alias, alias, typeArgs, recv)
 		fmt.Fprintf(&b, "\treturn typereg.DecodeInto(dec, %q, &w, &w.Type)\n", pc.BMMName)
+	default:
+		return "", fmt.Errorf("%s: unhandled JSON wire shape %d", pc.BMMName, shape)
 	}
 	b.WriteString("}\n")
 	return b.String(), nil
