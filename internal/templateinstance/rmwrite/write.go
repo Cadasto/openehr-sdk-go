@@ -71,6 +71,14 @@ func EnsureSingle(parent any, _ /* parentType */, attrName string, child any) er
 		return writeDVTextSingle(p, attrName, child)
 	case *rm.DVCodedText:
 		return writeDVCodedTextSingle(p, attrName, child)
+	case *rm.DVURI:
+		return writeDVURISingle(p, attrName, child)
+	case *rm.DVEHRURI:
+		return writeDVEHRURISingle(p, attrName, child)
+	case *rm.DVParsable:
+		return writeDVParsableSingle(p, attrName, child)
+	case *rm.DVIdentifier:
+		return writeDVIdentifierSingle(p, attrName, child)
 	case *rm.DVDate:
 		return writeDVTemporalValueSingle("DV_DATE", attrName, child, func(s string) { p.Value = s })
 	case *rm.DVTime:
