@@ -665,7 +665,7 @@ func intervalBoundsSatisfy(val any, wantInner string) bool {
 
 // primitiveValueMatchesShortName reports whether an RM-side Go value
 // satisfies an AOM 1.4 primitive short-name OPT child (INTEGER,
-// REAL, DURATION, …) bound to a BMM scalar attribute slot.
+// REAL, DURATION, STRING, …) bound to a BMM scalar attribute slot.
 func primitiveValueMatchesShortName(shortName string, val any) bool {
 	switch shortName {
 	case "BOOLEAN":
@@ -675,7 +675,7 @@ func primitiveValueMatchesShortName(shortName string, val any) bool {
 		return rm.IsInt64(val)
 	case "REAL":
 		return rm.IsReal(val)
-	case "DATE", "TIME", "DATE_TIME", "DURATION":
+	case "DATE", "TIME", "DATE_TIME", "DURATION", "STRING":
 		_, ok := val.(string)
 		return ok
 	default:
