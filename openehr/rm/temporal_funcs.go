@@ -201,7 +201,9 @@ func (d *DVDateTime) split() (dateParts, timeParts, error) {
 		return dp, tp, terr
 	}
 	// The date and time bodies are both extended or both compact; ISO 8601
-	// has no mixed form. (The zone suffix is not part of the body.)
+	// has no mixed form. The zone suffix is not part of the body, so its
+	// style may differ from the body's (10:30:00+0530, 103000+05:30): the
+	// fixtures carry both.
 	dateExtended := strings.Contains(datePart, "-")
 	if (dateExtended && tp.basic) || (!dateExtended && tp.colon) {
 		return dp, timeParts{}, fmt.Errorf("mixed extended and compact forms in %q", d.Value)
@@ -467,7 +469,9 @@ func parseTime(s string) (timeParts, error) {
 		}
 		nums[i] = n
 	}
-	if nums[0] > 24 {
+	// BASE: hh is 00 to 23; "24:00:00" is not allowed, since it would mean
+	// the date was really on the next day.
+	if nums[0] > 23 {
 		return p, fmt.Errorf("bad hour in %q", s)
 	}
 	p.hour = nums[0]
@@ -489,10 +493,6 @@ func parseTime(s string) (timeParts, error) {
 			return p, fmt.Errorf("bad fractional second in %q", s)
 		}
 		p.frac = f
-	}
-	// 24:00:00 is the end of day; hour 24 admits nothing after it.
-	if p.hour == 24 && (p.minute != 0 || p.second != 0 || p.frac != 0) {
-		return p, fmt.Errorf("bad hour in %q", s)
 	}
 	return p, nil
 }
@@ -575,21 +575,29 @@ func daysInMonth(y, m int) int {
 	}
 }
 
+// parseDuration parses the BASE ISO8601_DURATION form
+// P[nnY][nnM][nnW][nnD][T[nnH][nnM][nnS]], plus the two documented openEHR
+// deviations: a leading negative sign, and the W designator mixed with the
+// others (in the order Y M W D). Designators appear at most once, in that
+// order; a T section needs at least one component; a fraction (dot or comma)
+// is allowed on the seconds only.
 func parseDuration(s string) (durationParts, error) {
 	var p durationParts
+	orig := s
 	if rest, ok := strings.CutPrefix(s, "-"); ok {
 		p.neg = true
-		s = rest
-	} else if rest, ok := strings.CutPrefix(s, "+"); ok {
 		s = rest
 	}
 	rest, ok := strings.CutPrefix(s, "P")
 	if !ok {
-		return p, fmt.Errorf("bad duration %q (no 'P')", s)
+		return p, fmt.Errorf("bad duration %q (no 'P')", orig)
 	}
 	s = rest
-	inTime := false
-	num := ""
+	inTime, timeComponents := false, 0
+	// rank is the position of the last designator seen in the current
+	// section; a designator must rank strictly higher than the one before.
+	rank := 0
+	start := 0 // start of the number awaiting its designator
 	sawComponent := false
 	// Byte indices, not runes: designators are ASCII and every byte must
 	// be inspected, so `range s` (which skips continuation bytes) is wrong.
@@ -597,61 +605,77 @@ func parseDuration(s string) (durationParts, error) {
 		c := s[i]
 		switch {
 		case c == 'T':
-			inTime = true
+			if inTime || start != i {
+				return p, fmt.Errorf("misplaced 'T' in duration %q", orig)
+			}
+			inTime, rank = true, 0
+			start = i + 1
 			continue
-		case (c >= '0' && c <= '9') || c == '.':
-			num += string(c)
+		case (c >= '0' && c <= '9') || c == '.' || c == ',':
 			continue
 		}
-		whole, frac, err := splitNumber(num)
+		whole, frac, err := splitNumber(s[start:i])
 		if err != nil {
-			return p, fmt.Errorf("bad duration component in %q", s)
+			return p, fmt.Errorf("bad duration component in %q", orig)
 		}
-		num = ""
+		start = i + 1
 		// openEHR's ISO8601_DURATION carries a fraction only on the
 		// seconds component (fractional_second); a fraction on any other
 		// component is malformed — reject it rather than silently
 		// truncate to the integer part.
 		if frac != 0 && c != 'S' {
-			return p, fmt.Errorf("fractional %q component not permitted in %q", string(c), s)
+			return p, fmt.Errorf("fractional %q component not permitted in %q", string(c), orig)
 		}
-		switch c {
-		case 'Y':
-			p.years = whole
-		case 'W':
-			p.weeks = whole
-		case 'D':
-			p.days = whole
-		case 'H':
-			p.hours = whole
-		case 'S':
-			p.seconds, p.frac = whole, frac
-		case 'M':
-			if inTime {
-				p.minutes = whole
-			} else {
-				p.months = whole
-			}
+		var r int
+		switch {
+		case !inTime && c == 'Y':
+			r, p.years = 1, whole
+		case !inTime && c == 'M':
+			r, p.months = 2, whole
+		case !inTime && c == 'W':
+			r, p.weeks = 3, whole
+		case !inTime && c == 'D':
+			r, p.days = 4, whole
+		case inTime && c == 'H':
+			r, p.hours = 1, whole
+		case inTime && c == 'M':
+			r, p.minutes = 2, whole
+		case inTime && c == 'S':
+			r, p.seconds, p.frac = 3, whole, frac
 		default:
-			return p, fmt.Errorf("bad duration designator %q in %q", string(c), s)
+			return p, fmt.Errorf("bad duration designator %q in %q", string(c), orig)
 		}
+		if r <= rank {
+			return p, fmt.Errorf("duration designator %q out of order or repeated in %q", string(c), orig)
+		}
+		rank = r
 		sawComponent = true
+		if inTime {
+			timeComponents++
+		}
 	}
-	if num != "" {
-		return p, fmt.Errorf("dangling number in duration %q", s)
+	if start != len(s) {
+		return p, fmt.Errorf("dangling number in duration %q", orig)
+	}
+	if inTime && timeComponents == 0 {
+		return p, fmt.Errorf("empty time section in duration %q", orig)
 	}
 	if !sawComponent {
-		return p, fmt.Errorf("empty duration %q", s)
+		return p, fmt.Errorf("empty duration %q", orig)
 	}
 	return p, nil
 }
 
-// splitNumber parses "12" → (12, 0) and "12.5" → (12, 0.5).
+// splitNumber parses "12" → (12, 0), "12.5" and "12,5" → (12, 0.5). A second
+// decimal sign, or a mix of both, fails the integer or fraction parse.
 func splitNumber(s string) (whole int, frac float64, err error) {
 	if s == "" {
 		return 0, 0, errors.New("empty number")
 	}
 	intPart, fracPart, hasFrac := strings.Cut(s, ".")
+	if !hasFrac {
+		intPart, fracPart, hasFrac = strings.Cut(s, ",")
+	}
 	whole, err = strconv.Atoi(intPart)
 	if err != nil {
 		return 0, 0, err
