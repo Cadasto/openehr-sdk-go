@@ -51,7 +51,7 @@ Concretely:
   `offset` as its only reasoned exemptions. An ACTION's **ISM transition** round-trips through the
   Web Template's ISM_TRANSITION nodes (one per careflow step, `ism_transition[at0005]`, …): an
   ISM_TRANSITION carries no `archetype_node_id`, so `rmpath` matches the predicate against its
-  `careflow_step` code, which ADL 1.4 codes with the same node id. A transition whose careflow
+  `careflow_step` code in the `local` terminology, which ADL 1.4 codes with the same node id. A transition whose careflow
   step names none of the template's nodes is instance data the template does not model, and like
   any such data it is not encoded. Only a matched transition's `current_state` and
   `careflow_step` travel: the builder models no `transition` leaf and no `_reason` family on those
@@ -74,7 +74,8 @@ Concretely:
   a coerced zero value; trailing JSON after the object and an out-of-bound/over-budget
   `:index` are rejected. An ISM transition rebuilt at an `ism_transition[atNNNN]` node without a
   careflow step gets the one the node names (the node id as a `local` code, the node's Web
-  Template name as its value), and a careflow step coded otherwise is `ErrUnsupportedDatatype`.
+  Template name as its value); one that names no terminology takes `local`, and one coded
+  otherwise (another code, or another terminology) is `ErrUnsupportedDatatype`.
   Keys that reach two Web Template nodes standing for one single-valued RM attribute (two
   transition nodes of one ACTION) are `ErrUnknownPath`, never merged into one object.
 

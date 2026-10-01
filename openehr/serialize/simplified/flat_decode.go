@@ -1083,31 +1083,50 @@ func nodePredicate(m map[string]any) string {
 }
 
 // settleIsmTransition gives one rebuilt ISM_TRANSITION the careflow step its node
-// names, or checks the one the body carries.
+// names, or checks the one the body carries. The node id is an at-code, which
+// belongs to the archetype's `local` terminology: a careflow step that names no
+// terminology takes it, and one coded in any other terminology names no node.
 func settleIsmTransition(tr map[string]any, n ismNode) error {
 	delete(tr, "archetype_node_id")
 	step, carried := tr["careflow_step"]
 	if !carried {
 		tr["careflow_step"] = map[string]any{
 			"_type": "DV_CODED_TEXT", "value": n.name,
-			"defining_code": codePhraseJSON(n.id, "local"),
+			"defining_code": codePhraseJSON(n.id, localTerminology),
 		}
 		return nil
 	}
-	if code := definingCodeOf(step); code != n.id {
+	dc := definingCodeOf(step)
+	code, _ := dc["code_string"].(string)
+	if code != n.id {
 		return fmt.Errorf("%w: %s/careflow_step is coded %q, but its node is ism_transition[%s]; a careflow step coded otherwise names another node",
 			ErrUnsupportedDatatype, n.flat, code, n.id)
+	}
+	tid, named := dc["terminology_id"].(map[string]any)
+	if !named {
+		dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": localTerminology}
+		return nil
+	}
+	if term, _ := tid["value"].(string); term != localTerminology {
+		return fmt.Errorf("%w: %s/careflow_step is coded in terminology %q, but its node id %s is an at-code of the %s terminology",
+			ErrUnsupportedDatatype, n.flat, term, n.id, localTerminology)
 	}
 	return nil
 }
 
-// definingCodeOf returns the code_string of a rebuilt DV_CODED_TEXT, or "" when
-// the value carries none (a DV_TEXT, a |raw fragment of another shape).
-func definingCodeOf(v any) string {
+// localTerminology is the terminology an archetype's own at-codes belong to.
+const localTerminology = "local"
+
+// definingCodeOf returns the defining_code of a rebuilt DV_CODED_TEXT, or an
+// empty map when the value carries none (a DV_TEXT, a |raw fragment of another
+// shape).
+func definingCodeOf(v any) map[string]any {
 	dv, _ := v.(map[string]any)
 	dc, _ := dv["defining_code"].(map[string]any)
-	code, _ := dc["code_string"].(string)
-	return code
+	if dc == nil {
+		return map[string]any{}
+	}
+	return dc
 }
 
 // compositeLeafGroups siphons the FLAT keys addressed at a **composite** Web

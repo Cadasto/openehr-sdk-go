@@ -43,7 +43,9 @@
 // non-LOCATABLE it matches is ISM_TRANSITION, by its careflow_step code:
 // ADL 1.4 codes each careflow step with the node id of its ISM_TRANSITION
 // constraint, so /ism_transition[at0005] finds the transition whose
-// careflow step is at0005.
+// careflow step is local::at0005 (an at-code belongs to the archetype's
+// `local` terminology, so the same code in another terminology matches no
+// node).
 //
 // # Fallibility
 //
