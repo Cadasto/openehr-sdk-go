@@ -146,4 +146,4 @@ echo
 
 # --- definition of done ----------------------------------------------------
 echo "---"
-echo "**Definition of done:** code + tests green **and** \`traceability.yaml\` updated and the canonical spec current. For wire/client work the \`probes:\` listed above are part of done — each must be Implemented (Sandbox) in [conformance.md](docs/specifications/conformance.md) or explicitly deferred in the plan."
+echo "**Definition of done:** code + tests green **and** \`traceability.yaml\` updated and the canonical spec current. For wire/client work the \`probes:\` listed above are part of done — each must be Implemented (Sandbox), or Implemented (inline) for an in-repo probe, in [conformance.md](docs/specifications/conformance.md), or explicitly deferred in the plan."

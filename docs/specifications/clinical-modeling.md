@@ -176,7 +176,7 @@ The set is closed by `isPrimitive()`; new primitive shapes appear in the `constr
 
 ### Validate contract
 
-`Validate(value any) []Violation` returns nil when the input satisfies every clause of the constraint, or one `Violation` per failing clause (range, list, pattern, …). Validators **MUST** be pure functions: no I/O and no reflection ([idiom.md § Generics policy](idiom.md#generics-policy-req-024)). Each accepts a small fixed set of Go input types. Concretely:
+`Validate(value any) []Violation` returns nil when the input satisfies every clause of the constraint, or one `Violation` per failing clause (range, list, pattern, …). Validators **MUST** be pure functions with no I/O, and the reflection rule of [idiom.md § Generics policy](idiom.md#generics-policy-req-024) applies to them unchanged. Each accepts a small fixed set of Go input types. Concretely:
 
 - Integer / real validators accept any Go integer kind (`int`, `int8`..`int64`, `uint`, `uint8`..`uint64`). `uint` and `uint64` values exceeding `math.MaxInt64` return `CodeWrongType` rather than silently wrapping. `CReal.Validate` additionally accepts `float32` / `float64`.
 - String, date, time, date-time, duration validators accept Go `string`.
@@ -283,7 +283,7 @@ The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templateco
 
 ### Contract
 
-- **Pure function.** No I/O, no goroutines, no reflection. Stateless — concurrent callers share `c` safely.
+- **Pure function.** No I/O and no goroutines, and the reflection rule of [idiom.md § Generics policy](idiom.md#generics-policy-req-024) applies unchanged. Stateless — concurrent callers share `c` safely.
 - **Collect-all, not fail-fast.** Validators emit one `Issue` per failing clause; the walk completes regardless of how many issues fire. UIs and CI consumers need the full list.
 - **Result shape:**
   ```go

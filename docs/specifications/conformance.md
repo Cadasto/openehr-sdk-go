@@ -164,7 +164,7 @@ The catalog is the normative list. Each entry has:
 - **Wire assertion** — what's checked at the byte / status level.
 - **Modes** — Sandbox / Cassette / Live for a backend-facing probe, or In-repo for a probe that reaches no server in any mode (REQ-082). For a backend-facing probe this line is the authoritative record of which modes it supports today.
 - **Effect** — read-only or mutating (REQ-082). Absent means *treated as* mutating; the catalog is only partially populated.
-- **Status** — Draft (in this spec), Implemented (in code), Ratified (passes against a reference openEHR deployment), Deferred (the requirement it covers is landed and unit-covered, but this dedicated probe is not written), Deprecated (scheduled removal; may be unrunnable when implementation is already gone pre-v1.0). The parenthesis after Implemented says how the probe runs today: (Sandbox) or (Live snapshot) for a backend-facing probe, (inline) for an in-repo probe whose test calls it directly.
+- **Status** — Draft (in this spec), Implemented (in code), Ratified (passes against a reference openEHR deployment), Deferred (the requirement it covers is landed and unit-covered, but this dedicated probe is not written), Deprecated (scheduled removal; may be unrunnable when implementation is already gone pre-v1.0). The parenthesis after Implemented names what runs the probe's committed test: (Sandbox) or (Live snapshot) for a backend-facing probe, (inline) for an in-repo probe that a Go test runs directly rather than the runner. Which modes a probe supports is for the Modes line alone to say.
 - **Satisfies** — REQ-IDs this probe exercises (inverse of the [REQ registry](REQ.md)).
 
 ### Terms
@@ -937,7 +937,7 @@ A new probe **MUST**:
 - Be assigned the next available `PROBE-NNN`. The original rule was *next in the probe's topic range, with a gap of 10 between topics*; that rule was exhausted once the catalog crossed 080 and allocation has been **sequential across topics** ever since — 086 and 089 are formats probes, 087/088/090 AQL, 091–093 REST binding, 094 RM model introspection. A new topic therefore takes the next free number and adds its own catalog section rather than opening a decade. Renumbering remains prohibited either way.
 - Have a definition in this catalog *before* any implementation lands.
 - Be runnable in at least Sandbox mode when it is backend-facing; Cassette mode follows once a recording is captured, and Live mode once a reference deployment is reachable. A probe that reaches no backend declares `In-repo` instead ([§ REQ-082](#req-082--runnability)).
-- Carry a `Status:` transition (Draft → Implemented → Ratified, Deferred, or Deprecated before removal) in this spec when its state changes, and the PR that makes the transition names it in its body; the CHANGELOG follows the rule in [AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions).
+- Carry a `Status:` transition (Draft → Implemented, then Ratified for a backend-facing probe; Draft → Deferred while the probe is unwritten; Deprecated before removal) in this spec when its state changes, and the PR that makes the transition names it in its body; the CHANGELOG follows the rule in [AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions).
 
 ## Removing probes
 
