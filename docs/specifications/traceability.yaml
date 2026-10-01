@@ -415,6 +415,7 @@ requirements:
       - internal/bmmgen/render_streaming_test.go
       - internal/bmmgen/sim_bump_test.go
       - internal/v1_rm_decode_guard_test.go
+      - openehr/aom/aom14/interval_open_side_test.go
       - openehr/client/demographic/versioned_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
@@ -541,11 +542,13 @@ requirements:
     packages:
       - openehr/serialize/canxml
       - openehr/rm
+      - openehr/aom/aom14
       - testkit/corpus
       - testkit/fixtures
     probes: [PROBE-033, PROBE-034]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
+      - openehr/aom/aom14/interval_open_side_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/serialize/canxml/crossformat_test.go
