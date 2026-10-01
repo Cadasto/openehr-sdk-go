@@ -19,7 +19,7 @@ func TestREQ107_ReadSingle_OptionalString(t *testing.T) {
 		rmType, att string
 	}{
 		{"DV_TEXT.formatting", &rm.DVText{Formatting: &s}, &rm.DVText{}, "DV_TEXT", "formatting"},
-		{"DV_CODED_TEXT.formatting", &rm.DVCodedText{DVText: rm.DVText{Formatting: &s}}, &rm.DVCodedText{}, "DV_CODED_TEXT", "formatting"},
+		{"DV_CODED_TEXT.formatting", &rm.DVCodedText{Formatting: &s}, &rm.DVCodedText{}, "DV_CODED_TEXT", "formatting"},
 		{"DV_MULTIMEDIA.alternate_text", &rm.DVMultimedia{AlternateText: &s}, &rm.DVMultimedia{}, "DV_MULTIMEDIA", "alternate_text"},
 		{"DV_QUANTITY.magnitude_status", &rm.DVQuantity{MagnitudeStatus: &s}, &rm.DVQuantity{}, "DV_QUANTITY", "magnitude_status"},
 		{"DV_IDENTIFIER.issuer", &rm.DVIdentifier{Issuer: &s}, &rm.DVIdentifier{}, "DV_IDENTIFIER", "issuer"},
@@ -45,7 +45,7 @@ func TestREQ107_ReadSingle_OptionalString(t *testing.T) {
 // optional careflow_step and transition read present only when set.
 func TestReadSingle_IsmTransition(t *testing.T) {
 	step := rm.DVCodedText{
-		DVText:       rm.DVText{Value: "step"},
+		Value:        "step",
 		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at1"},
 	}
 	full := &rm.IsmTransition{CurrentState: step, CareflowStep: &step, Transition: &step}
