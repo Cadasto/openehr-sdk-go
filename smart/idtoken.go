@@ -55,11 +55,14 @@ type IDTokenClaims struct {
 // checks (iss/aud/exp/nbf/iat with the SDK's 30s skew, plus nonce) run
 // after that.
 func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issuer, clientID, nonce string, now time.Time, allowedAlgs []string) (*IDTokenClaims, error) {
-	if raw == "" {
-		return nil, fmt.Errorf("%w: empty id_token", auth.ErrJWKSValidationFailed)
-	}
+	// The trust anchors are the caller's configuration, so they are checked
+	// before the token: a configuration error must not read as a bad token,
+	// even when the token is empty too (REQ-064).
 	if err := requireIDTokenTrustAnchors(jwks, issuer, clientID); err != nil {
 		return nil, err
+	}
+	if raw == "" {
+		return nil, fmt.Errorf("%w: empty id_token", auth.ErrJWKSValidationFailed)
 	}
 	if now.IsZero() {
 		now = time.Now()
