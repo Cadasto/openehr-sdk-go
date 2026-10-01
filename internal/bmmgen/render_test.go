@@ -5,6 +5,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -290,10 +292,43 @@ func TestOptionalFieldsThatAreNotPointers(t *testing.T) {
 			if err != nil {
 				t.Fatalf("RenderFile(%s): %v", tc.fileBase, err)
 			}
-			if !bytes.Contains(got, []byte(tc.field)) {
+			if !fieldDecl(tc.field).Match(got) {
 				t.Errorf("%s_gen.go does not declare the field %q", tc.fileBase, tc.field)
 			}
 		})
+	}
+}
+
+// fieldDecl matches a struct field written as "Name Type `tag`" at the start
+// of a line, with any run of white space between the three parts: gofmt
+// aligns a field's type and tag with its neighbours', so the spacing changes
+// when an unrelated field does.
+func fieldDecl(field string) *regexp.Regexp {
+	parts := strings.SplitN(field, " ", 3)
+	for i, p := range parts {
+		parts[i] = regexp.QuoteMeta(p)
+	}
+	return regexp.MustCompile(`(?m)^\s*` + strings.Join(parts, `\s+`))
+}
+
+// TestFieldDeclIgnoresAlignment checks that fieldDecl accepts a field padded
+// for alignment and still tells the field from one with another name, type or
+// tag.
+func TestFieldDeclIgnoresAlignment(t *testing.T) {
+	const field = "Data *T `json:\"data,omitzero\"`"
+	for _, tc := range []struct {
+		src  string
+		want bool
+	}{
+		{src: "\tData *T `json:\"data,omitzero\"`\n", want: true},
+		{src: "\tData        *T      `json:\"data,omitzero\"`\n", want: true},
+		{src: "\tData T `json:\"data,omitzero\"`\n", want: false},
+		{src: "\tMetaData *T `json:\"data,omitzero\"`\n", want: false},
+		{src: "\tData *T `json:\"data,omitempty\"`\n", want: false},
+	} {
+		if got := fieldDecl(field).MatchString(tc.src); got != tc.want {
+			t.Errorf("fieldDecl(%q).MatchString(%q) = %v, want %v", field, tc.src, got, tc.want)
+		}
 	}
 }
 

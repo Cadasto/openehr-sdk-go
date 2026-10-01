@@ -147,7 +147,7 @@ func TestAOM14CyclicSinglePropDetection(t *testing.T) {
 		if err != nil {
 			t.Fatalf("RenderFile(%s): %v", tc.fileBase, err)
 		}
-		if !bytes.Contains(got, []byte(tc.field)) {
+		if !fieldDecl(tc.field).Match(got) {
 			t.Errorf("%s_gen.go does not declare %s.%s as %q", tc.fileBase, tc.owner, tc.prop, tc.field)
 		}
 	}
