@@ -112,29 +112,101 @@ func TestREQ082ProbeClassMatchesModes(t *testing.T) {
 
 	backendFacing := 0
 	for _, id := range slices.Sorted(maps.Keys(probes)) {
-		funcs := probes[id]
-		reach := firstBackendReach(funcs)
-		if reach != "" {
+		if firstBackendReach(probes[id]) != "" {
 			backendFacing++
 		}
-		line, ok := modes[id]
-		if !ok {
-			t.Errorf("%s is implemented by %s, but conformance.md has no Modes line for it", id, funcNames(funcs))
-			continue
-		}
-		// The census in § REQ-082 counts a Modes line as in-repo when it
-		// contains "In-repo" anywhere, and so does this check.
-		inRepo := strings.Contains(line, "In-repo")
-		switch {
-		case reach != "" && inRepo:
-			t.Errorf("%s declares In-repo but reaches a backend: %s\n\tModes: %s", id, reach, line)
-		case reach == "" && !inRepo:
-			t.Errorf("%s reaches no backend: neither %s nor anything they use names a member in connectors. "+
-				"Declare In-repo, or, if the probe does connect, add the member it connects through to connectors\n\tModes: %s",
-				id, funcNames(funcs), line)
+		if msg := classMismatch(id, probes[id], modes); msg != "" {
+			t.Error(msg)
 		}
 	}
 	t.Logf("classified %d probes: %d in-repo, %d backend-facing", len(probes), len(probes)-backendFacing, backendFacing)
+}
+
+// classMismatch compares the class of the probe id, which funcs implement,
+// with its line in modes. It returns what disagrees, or "" when the two agree.
+func classMismatch(id string, funcs []probeFunc, modes map[string]string) string {
+	line, ok := modes[id]
+	if !ok {
+		return fmt.Sprintf("%s is implemented by %s, but conformance.md has no Modes line for it", id, funcNames(funcs))
+	}
+	reach := firstBackendReach(funcs)
+	// The census in § REQ-082 counts a Modes line as in-repo when it
+	// contains "In-repo" anywhere, and so does this check.
+	inRepo := strings.Contains(line, "In-repo")
+	switch {
+	case reach != "" && inRepo:
+		return fmt.Sprintf("%s declares In-repo but reaches a backend: %s\n\tModes: %s", id, reach, line)
+	case reach == "" && !inRepo:
+		return fmt.Sprintf("%s reaches no backend: neither %s nor anything they use names a member in connectors. "+
+			"Declare In-repo, or, if the probe does connect, add the member it connects through to connectors\n\tModes: %s",
+			id, funcNames(funcs), line)
+	}
+	return ""
+}
+
+// TestREQ082ProbeClassMismatch runs the comparison the class check makes over
+// fixture probes and Modes lines. The catalogue and the classifier agree
+// today, so without this test the class check could stop reporting a
+// disagreement and stay green.
+func TestREQ082ProbeClassMismatch(t *testing.T) {
+	// § REQ-082: an in-repo probe MUST declare In-repo; this pins the comparison that enforces it.
+	t.Parallel()
+	backendFree := []probeFunc{{name: "Probe901Local"}}
+	backendFacing := []probeFunc{
+		{name: "Probe901Local"},
+		{name: "Probe901Server", reach: "Probe901Server uses net/http/httptest.NewServer"},
+	}
+	tests := []struct {
+		name     string
+		funcs    []probeFunc
+		modes    map[string]string
+		want     string // a phrase the reported mismatch contains; "" when none is reported
+		wantMore string // a second phrase it must contain, or ""
+	}{
+		{
+			name:  "backend-free declared Sandbox",
+			funcs: backendFree,
+			modes: map[string]string{"PROBE-901": "Sandbox."},
+			want:  "PROBE-901 reaches no backend",
+		},
+		{
+			name:     "backend-facing declared In-repo",
+			funcs:    backendFacing,
+			modes:    map[string]string{"PROBE-901": "In-repo (unit-level property; no backend)."},
+			want:     "PROBE-901 declares In-repo but reaches a backend",
+			wantMore: "Probe901Server uses net/http/httptest.NewServer",
+		},
+		{
+			name:  "backend-free declared In-repo",
+			funcs: backendFree,
+			modes: map[string]string{"PROBE-901": "In-repo (unit-level property; no backend)."},
+		},
+		{
+			name:  "backend-facing declared Sandbox",
+			funcs: backendFacing,
+			modes: map[string]string{"PROBE-901": "Sandbox, Cassette, Live."},
+		},
+		{
+			name:  "no Modes line",
+			funcs: backendFree,
+			modes: map[string]string{"PROBE-902": "In-repo."},
+			want:  "PROBE-901 is implemented by Probe901Local, but conformance.md has no Modes line for it",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := classMismatch("PROBE-901", tc.funcs, tc.modes)
+			switch {
+			case tc.want == "" && got != "":
+				t.Errorf("classMismatch(PROBE-901, %s, %v) = %q, want no mismatch", funcNames(tc.funcs), tc.modes, got)
+			case tc.want != "" && !strings.Contains(got, tc.want):
+				t.Errorf("classMismatch(PROBE-901, %s, %v) = %q, want a mismatch containing %q", funcNames(tc.funcs), tc.modes, got, tc.want)
+			case tc.wantMore != "" && !strings.Contains(got, tc.wantMore):
+				t.Errorf("classMismatch(PROBE-901, %s, %v) = %q, want it to name the backend path %q", funcNames(tc.funcs), tc.modes, got, tc.wantMore)
+			}
+		})
+	}
 }
 
 // TestREQ082ProbeClassifierOnFixture runs the classifier over the fixture
@@ -145,7 +217,7 @@ func TestREQ082ProbeClassMatchesModes(t *testing.T) {
 // packages, one declares a local that shadows a connecting helper's name,
 // and two use only the parts of another package that open no connection.
 func TestREQ082ProbeClassifierOnFixture(t *testing.T) {
-	// § REQ-082: the class check above is only as sound as this classifier.
+	// § REQ-082: the class check above is right only when this classifier is.
 	t.Parallel()
 	const fixtures = "testkit/probes/testdata/"
 	tests := []struct {
@@ -591,8 +663,12 @@ func (g *pkgGraph) scan(n ast.Node, fs fileScope, d *decl) {
 // localNames returns every name declared inside n: parameters, results,
 // receivers, type parameters, := and var declarations, range variables and
 // labels. It ignores block scope, so a name declared anywhere in n counts as
-// local everywhere in n. That can only drop a use, which makes a probe look
-// in-repo; for a backend-facing probe the class check then fails loudly.
+// local everywhere in n. A use outside the local's block can then go unseen:
+// a package-level name or, when the local shares an import's name, a
+// connector or a member of another package of this module. That can make a
+// backend-facing probe look in-repo, and the class check then reports the
+// probe unless its Modes line wrongly declares In-repo. A selector on such a
+// local counts as a method selection instead, which can only add a path.
 func localNames(n ast.Node) map[string]bool {
 	local := map[string]bool{}
 	fields := func(fl *ast.FieldList) {
@@ -694,6 +770,11 @@ func (p *program) reach(path, name string) (string, error) {
 		seen[to] = step{parent: from, label: label(to) + suffix}
 		queue = append(queue, to)
 	}
+	// Methods are matched by name across every type the walk reaches, so
+	// selecting Start on one type also walks Start on any other. That can only
+	// add a path to a backend, never hide one. A probe it wrongly classes
+	// backend-facing fails the class check loudly, as long as its Modes line
+	// declares In-repo.
 	selected := map[string]bool{}  // names some visited declaration selects
 	pending := map[string][]node{} // methods of visited types, by name, not yet selected
 	for len(queue) > 0 {
