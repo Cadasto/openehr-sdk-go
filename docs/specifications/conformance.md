@@ -106,7 +106,7 @@ For a backend-facing probe, a mode absent from its **Modes** line is an open gap
 **Known gaps.**
 
 - The auth probes (PROBE-001 to PROBE-009) and the discovery probes (PROBE-040, PROBE-041) start their own `httptest` server from a fixture instead of receiving an already-configured client, so their **Modes** lines claim Cassette and Live modes the runner cannot yet serve them in.
-- `probe.ParseModes` refuses the spelling `Sandbox; Cassette, Live not yet scoped.` with `ErrInvalidEntry`, and seven entries use it (PROBE-060, PROBE-062, PROBE-065, PROBE-078, PROBE-102, PROBE-103, PROBE-104).
+- `probe.ParseModes` refuses the spelling `Sandbox; Cassette, Live not yet scoped.` with `ErrInvalidEntry`, and five entries use it (PROBE-062, PROBE-078, PROBE-102, PROBE-103, PROBE-104).
 - `TestREQ082ProbeClassMatchesModes` classifies only the probes that have a `ProbeNNN` function under `testkit/probes`. The **Modes** lines of in-repo probes implemented as unit tests elsewhere are checked by review alone.
 
 ### REQ-083 — Cadasto platform API conformance
@@ -672,8 +672,8 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** Backend supports server-assigned `ehr_id`.
 - **Wire assertion:** The create is one `POST` on the exact service-relative `/ehr` path whose captured body decodes back (through the SDK codec, not the write path) as the submitted EHR_STATUS (`archetype_node_id`, `is_queryable`, `is_modifiable`); the response carries a `Location` ending in `/ehr/{ehr_id}` for the id the SDK recovered; the read-back is one `GET` on `/ehr/{ehr_id}/ehr_status` for that id and returns the same fields. The `201` status itself is consumed by the transport (a non-2xx fails the call) and is not surfaced by the leaf, so the probe does not assert the number.
 - **Effect:** mutating.
-- **Modes:** Sandbox; Cassette, Live not yet scoped.
-- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_060_ehr_creation_round_trip.go`](../../testkit/probes/rest/probe_060_ehr_creation_round_trip.go); harness in [`probes_test.go`](../../testkit/probes/rest/probes_test.go). Server-assigned create with an initial EHR_STATUS carrying a distinctive archetype and queryable/modifiable flags; the SDK recovers the id, and the `ehr_status` read-back on that id round-trips the fields. Can-fail plants: a divergent read-back status, a create answered without `Location`, a submitted body that is not the EHR_STATUS, and a read-back issued on another EHR's path.
+- **Modes:** Sandbox, Live (snapshot); Cassette not yet scoped.
+- **Status:** Implemented (Sandbox) — [`testkit/probes/rest/probe_060_ehr_creation_round_trip.go`](../../testkit/probes/rest/probe_060_ehr_creation_round_trip.go); harness in [`probes_test.go`](../../testkit/probes/rest/probes_test.go). Server-assigned create with an initial EHR_STATUS carrying a distinctive archetype and queryable/modifiable flags; the SDK recovers the id, and the `ehr_status` read-back on that id round-trips the fields. Can-fail plants: a divergent read-back status, a create answered without `Location`, a submitted body that is not the EHR_STATUS, and a read-back issued on another EHR's path. A Live snapshot of the server-assigned create and the EHR_STATUS read-back runs in [`testkit/probe/livestatus_test.go`](../../testkit/probe/livestatus_test.go).
 - **Satisfies:** REQ-095.
 
 #### PROBE-061 — Composition versioned write with `Prefer: return=representation`
@@ -716,8 +716,8 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Title:** `POST /ehr/{ehr_id}/composition` with `Prefer: return=minimal` returns an empty body and a `Location` header; a follow-up GET returns the full payload.
 - **Preconditions:** Backend honours `Prefer: return=minimal`.
 - **Wire assertion:** POST response body is empty; `Location` is set; SDK surfaces only `*VersionMetadata`. Subsequent GET returns the full Composition.
-- **Modes:** Sandbox; Cassette, Live not yet scoped.
-- **Status:** Implemented (Sandbox) — [`testkit/probes/versioned/probe_065_minimal_return_round_trip.go`](../../testkit/probes/versioned/probe_065_minimal_return_round_trip.go); harness in [`probe_065_test.go`](../../testkit/probes/versioned/probe_065_test.go) (shared fixtures in [`probes_test.go`](../../testkit/probes/versioned/probes_test.go)). The default `Save` (Prefer `return=minimal`) recovers the `Location` into the `VersionUID` and returns a nil Composition; a follow-up `Get` — which the harness answers only on the path naming that `VersionUID` — returns the full body. Can-fail plants strip the `Location`, 404 the read-back, and serve a read-back with no `archetype_node_id`; each pins the failure detail it expects.
+- **Modes:** Sandbox, Live (snapshot); Cassette not yet scoped.
+- **Status:** Implemented (Sandbox) — [`testkit/probes/versioned/probe_065_minimal_return_round_trip.go`](../../testkit/probes/versioned/probe_065_minimal_return_round_trip.go); harness in [`probe_065_test.go`](../../testkit/probes/versioned/probe_065_test.go) (shared fixtures in [`probes_test.go`](../../testkit/probes/versioned/probes_test.go)). The default `Save` (Prefer `return=minimal`) recovers the `Location` into the `VersionUID` and returns a nil Composition; a follow-up `Get` — which the harness answers only on the path naming that `VersionUID` — returns the full body. Can-fail plants strip the `Location`, 404 the read-back, and serve a read-back with no `archetype_node_id`; each pins the failure detail it expects. A Live snapshot of the default minimal save and the follow-up GET runs in [`testkit/probe/livestatus_test.go`](../../testkit/probe/livestatus_test.go).
 - **Satisfies:** REQ-094.
 
 #### PROBE-066 — Stored AQL query execution
