@@ -1,15 +1,15 @@
 package constraints_test
 
 // pure_imports_test.go: REQ-103. clinical-modeling.md § Validate contract
-// (under § REQ-103) rules that validators MUST be pure functions: no I/O and
-// no reflection. Nothing at a call site shows that a validator stays in
-// memory, so this reads the package's non-test Go files and holds every
-// import to a list of packages that do no I/O. "os", "io", "net", "reflect"
-// and the rest of the standard library are not on it. Two listed packages
-// also have members that do I/O or read the clock; a use of one of those
-// fails too, and so does a dot import of either package, whose uses would be
-// unqualified and unseen. A scan that reads no file fails: a green run over
-// nothing proves nothing.
+// (under § REQ-103) rules that validators MUST be pure functions with no
+// I/O. Nothing at a call site shows that a validator stays in memory, so
+// this reads the package's non-test Go files and holds every import to a
+// list of packages that do no I/O. "os", "io", "net", "reflect" and the rest
+// of the standard library are not on it. Two listed packages also have
+// members that do I/O or read the clock; a use of one of those fails too, and
+// so does a dot import of either package, whose uses would be unqualified and
+// unseen. A scan that reads no file fails: a green run over nothing proves
+// nothing.
 
 import (
 	"fmt"
@@ -50,7 +50,7 @@ func TestREQ103ValidatorsImportNoIO(t *testing.T) {
 		t.Fatal("scanned no non-test Go file in the package directory, so the guard has gone blind")
 	}
 	for _, p := range problems {
-		t.Errorf("%s: validators MUST be pure functions with no I/O and no reflection (clinical-modeling.md § Validate contract, REQ-103)", p)
+		t.Errorf("%s: validators MUST be pure functions with no I/O (clinical-modeling.md § Validate contract, REQ-103)", p)
 	}
 	t.Logf("scanned %d non-test Go files", scanned)
 }
