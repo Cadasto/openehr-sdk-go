@@ -137,27 +137,16 @@ func TestWebTemplatePathsResolveViaRmpath(t *testing.T) {
 			ran++
 			seen[name] = true
 			c, w, refused := buildVendored(path)
-			wantStage, expectRefused := refusedOPTs[name]
-			switch {
-			case refused != nil && refused.stage == wantStage:
-				t.Skipf("the %s refuses %s, as refusedOPTs records: %v", refused.stage, name, refused.err)
-			case refused != nil:
-				t.Fatalf("the %s refuses %s: %v (refusedOPTs expects %s)", refused.stage, name, refused.err,
-					cmp.Or(wantStage, "no refusal at all"))
-			case expectRefused:
-				t.Fatalf("%s builds now, but refusedOPTs expects the %s to refuse it: drop the entry", name, wantStage)
+			root := ""
+			if w != nil {
+				root = w.Tree.RMType
 			}
-			wantRoot, expectOtherRoot := nonCompositionRoots[name]
-			switch {
-			case w.Tree.RMType != encodedRoot && w.Tree.RMType == wantRoot:
-				t.Skipf("rooted at %s: the FLAT encoder takes a COMPOSITION, so these paths never reach it "+
-					"(rmpath does not navigate the demographic classes at all)", w.Tree.RMType)
-			case w.Tree.RMType != encodedRoot:
-				t.Fatalf("%s is rooted at %s, but nonCompositionRoots expects %s: pin the root or fix the template",
-					name, w.Tree.RMType, cmp.Or(wantRoot, encodedRoot))
-			case expectOtherRoot:
-				t.Fatalf("%s is rooted at %s now, but nonCompositionRoots expects %s: drop the entry",
-					name, encodedRoot, wantRoot)
+			switch out := classifyOPT(name, refused, root, refusedOPTs, nonCompositionRoots); out.verdict {
+			case verdictSkip:
+				t.Skip(out.reason)
+			case verdictFail:
+				t.Fatal(out.reason)
+			case verdictCheck:
 			}
 			var nodes []*webtemplate.Node
 			collectNodes(w.Tree, &nodes)
@@ -213,6 +202,104 @@ func TestWebTemplatePathsResolveViaRmpath(t *testing.T) {
 		if !exempted[k] {
 			t.Errorf("stale derivedAttributes entry %q (%s): no vendored Web Template reaches it", k, why)
 		}
+	}
+}
+
+// optVerdict is what the guard does with one vendored OPT.
+type optVerdict int
+
+const (
+	// verdictCheck: walk the Web Template's nodes.
+	verdictCheck optVerdict = iota
+	// verdictSkip: an expected skip, recorded in refusedOPTs or nonCompositionRoots.
+	verdictSkip
+	// verdictFail: neither walked nor an expected skip.
+	verdictFail
+)
+
+// optOutcome is a verdict with the sentence the test reports for it.
+type optOutcome struct {
+	verdict optVerdict
+	reason  string
+}
+
+// classifyOPT decides what the guard does with one OPT, from the refusal its
+// build met (nil when it built) and the root class of its Web Template (empty
+// when the build was refused, or the template names none). refused and
+// nonComposition are the two skip sets, passed in so the decision is a pure
+// function that a test can drive with synthetic data:
+//
+//   - a refusal at the recorded step is a skip, a refusal at any other step or
+//     of an OPT with no record is a failure, and an OPT recorded as refused
+//     that now builds is a failure;
+//   - a root class the OPT is recorded with is a skip, any other root that is
+//     not the COMPOSITION (an empty root included) is a failure, and a
+//     recorded OPT that is now rooted at a COMPOSITION is a failure.
+func classifyOPT(name string, met *refusal, root string, refused, nonComposition map[string]string) optOutcome {
+	wantStage, expectRefused := refused[name]
+	switch {
+	case met != nil && expectRefused && met.stage == wantStage:
+		return optOutcome{verdictSkip, fmt.Sprintf("the %s refuses %s, as refusedOPTs records: %v", met.stage, name, met.err)}
+	case met != nil:
+		return optOutcome{verdictFail, fmt.Sprintf("the %s refuses %s: %v (refusedOPTs expects %s)", met.stage, name, met.err,
+			cmp.Or(wantStage, "no refusal at all"))}
+	case expectRefused:
+		return optOutcome{verdictFail, fmt.Sprintf("%s builds now, but refusedOPTs expects the %s to refuse it: drop the entry", name, wantStage)}
+	}
+	wantRoot, expectOtherRoot := nonComposition[name]
+	switch {
+	case expectOtherRoot && root != encodedRoot && root == wantRoot:
+		return optOutcome{verdictSkip, fmt.Sprintf("rooted at %s: the FLAT encoder takes a COMPOSITION, so these paths never reach it "+
+			"(rmpath does not navigate the demographic classes at all)", root)}
+	case root != encodedRoot:
+		return optOutcome{verdictFail, fmt.Sprintf("%s is rooted at %q, but nonCompositionRoots expects %s: pin the root or fix the template",
+			name, root, cmp.Or(wantRoot, encodedRoot))}
+	case expectOtherRoot:
+		return optOutcome{verdictFail, fmt.Sprintf("%s is rooted at %s now, but nonCompositionRoots expects %s: drop the entry",
+			name, encodedRoot, wantRoot)}
+	}
+	return optOutcome{verdictCheck, ""}
+}
+
+// TestClassifyOPT drives every arm of the guard's per-OPT decision with
+// synthetic inputs, because today's vendored data reaches only three of them:
+// removing any other arm would leave TestWebTemplatePathsResolveViaRmpath green.
+func TestClassifyOPT(t *testing.T) {
+	refused := map[string]string{"parser-refused.opt": stageParser}
+	nonComposition := map[string]string{"address.opt": "ADDRESS"}
+	boom := errors.New("boom")
+	cases := []struct {
+		name    string
+		opt     string
+		refusal *refusal
+		root    string
+		want    optVerdict
+		// reasonHas is a phrase the reason must carry, so a verdict reached
+		// through the wrong arm is caught.
+		reasonHas string
+	}{
+		{"expected refusal at the recorded step", "parser-refused.opt", &refusal{stageParser, boom}, "", verdictSkip, "as refusedOPTs records"},
+		{"new refusal at the wrong step", "parser-refused.opt", &refusal{stageBuilder, boom}, "", verdictFail, "refusedOPTs expects parser"},
+		{"refusal of an OPT with no record", "plain.opt", &refusal{stageCompiler, boom}, "", verdictFail, "no refusal at all"},
+		{"a refused OPT that now builds", "parser-refused.opt", nil, encodedRoot, verdictFail, "drop the entry"},
+		{"expected non-COMPOSITION root", "address.opt", nil, "ADDRESS", verdictSkip, "FLAT encoder takes a COMPOSITION"},
+		{"root differs from the recorded one", "address.opt", nil, "PERSON", verdictFail, "expects ADDRESS"},
+		{"empty root of an OPT with no record", "plain.opt", nil, "", verdictFail, "pin the root"},
+		{"empty root of a recorded OPT", "address.opt", nil, "", verdictFail, "expects ADDRESS"},
+		{"other root of an OPT with no record", "plain.opt", nil, "PERSON", verdictFail, "pin the root"},
+		{"a recorded OPT now rooted at a COMPOSITION", "address.opt", nil, encodedRoot, verdictFail, "drop the entry"},
+		{"an ordinary COMPOSITION", "plain.opt", nil, encodedRoot, verdictCheck, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := classifyOPT(tc.opt, tc.refusal, tc.root, refused, nonComposition)
+			if got.verdict != tc.want {
+				t.Errorf("classifyOPT(%q, %v, %q) = verdict %d (%s), want %d", tc.opt, tc.refusal, tc.root, got.verdict, got.reason, tc.want)
+			}
+			if !strings.Contains(got.reason, tc.reasonHas) {
+				t.Errorf("classifyOPT(%q, %v, %q) reason %q lacks %q", tc.opt, tc.refusal, tc.root, got.reason, tc.reasonHas)
+			}
+		})
 	}
 }
 
