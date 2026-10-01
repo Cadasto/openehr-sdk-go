@@ -41,11 +41,8 @@ func (d *DVInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_INTERVAL: %w", typereg.ErrNilReceiver)
 	}
-	w := struct {
-		Type string `json:"_type"`
-		*rawDVInterval[T]
-	}{rawDVInterval: (*rawDVInterval[T])(d)}
-	return typereg.DecodeInto(dec, "DV_INTERVAL", &w, &w.Type)
+	wire := &jsonWireDVInterval[T]{rawInterval: (*rawInterval[T])(&d.Interval)}
+	return typereg.DecodeInto(dec, "DV_INTERVAL", wire, &wire.Type)
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVOrdinal.

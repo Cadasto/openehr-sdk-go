@@ -11,7 +11,13 @@
 //   - typereg_gen.go, whose init() calls typereg.Default.Register for
 //     every concrete class;
 //   - jsonhooks_gen.go, the polymorphic decode hooks, when the target
-//     has any.
+//     has any;
+//   - interval_bound_gen.go, the emptiness test the canonical encoders
+//     apply to an open interval side's bound, when the target owns an
+//     interval-shaped class.
+//
+// These fixed file names are reserved: a BMM package whose file stem would
+// produce one of them fails generation instead of being overwritten.
 //
 // The RM target also gets release_gen.go, the constant Release taken
 // from the root schema's rm_release, and the two rminfo tables,
@@ -174,6 +180,9 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 
 	outDir := filepath.Join(opts.OutDir, t.OutSubDir)
 	if err := confinePath(opts.OutDir, outDir); err != nil {
+		return tr, err
+	}
+	if err := checkFixedNameCollisions(plan); err != nil {
 		return tr, err
 	}
 	for _, f := range plan.Files {
@@ -460,6 +469,35 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 	result.MethodStubsEmitted += plan.MethodStubsEmitted
 	result.MethodTodoEscapes += plan.MethodTodoEscapes
 	return tr, nil
+}
+
+// fixedGeneratedFiles are the generator's own file names in a target package,
+// the ones not derived from a BMM package: a package whose file stem produced
+// one of them would be silently overwritten by it.
+//
+// The reservation is uniform: all four names, in every target. A BMM package
+// named like a fixed file is refused even in a target that would not emit that
+// file (the AOM 1.4 target emits neither interval_bound_gen.go nor
+// release_gen.go), so the set of reserved names never depends on the target and
+// a package can be moved between targets without a new collision.
+var fixedGeneratedFiles = []string{
+	"typereg_gen.go",
+	"jsonhooks_gen.go",
+	intervalBoundFile,
+	releaseFileName,
+}
+
+// checkFixedNameCollisions refuses a plan in which a BMM package file would
+// be written to one of the [fixedGeneratedFiles].
+func checkFixedNameCollisions(plan *Plan) error {
+	for _, name := range fixedGeneratedFiles {
+		for _, f := range plan.Files {
+			if f.FileBase+"_gen.go" == name {
+				return fmt.Errorf("bmmgen: BMM package file %q collides with %s", f.FileBase, name)
+			}
+		}
+	}
+	return nil
 }
 
 // compareFile reads path and returns nil if its content equals want.

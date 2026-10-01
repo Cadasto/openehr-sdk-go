@@ -862,8 +862,14 @@ func nilRMPointer(v any) bool {
 }
 
 // codedToFlat emits the |code, |value and (external only) |terminology suffix
-// entries for a DV_CODED_TEXT leaf.
+// entries for a DV_CODED_TEXT leaf. A coded text the composition never set (no
+// value, no code, no terminology, no formatting) writes no keys, as an absent
+// leaf does; blank entries would claim a coded value that is not there.
 func codedToFlat(out map[string]any, flatPath string, dv rm.DVCodedText) {
+	if dv.Value == "" && dv.DefiningCode.CodeString == "" &&
+		dv.DefiningCode.TerminologyID.Value == "" && dv.Formatting == nil {
+		return
+	}
 	out[flatPath+"|code"] = dv.DefiningCode.CodeString
 	out[flatPath+"|value"] = dv.Value
 	if term := dv.DefiningCode.TerminologyID.Value; term != "" {

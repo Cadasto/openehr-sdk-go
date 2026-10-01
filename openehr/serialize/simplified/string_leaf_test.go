@@ -201,14 +201,21 @@ func TestStringLeafCorpusSpelling(t *testing.T) {
 
 // TestStringLeafRefusesEmpty — REQ-053 § Leaf datatypes. An empty string at the
 // STRING leaf is refused on decode: ACTIVITY's `Action_archetype_id_valid`
-// invariant forbids it, and encode writes nothing for one.
+// invariant forbids it, and encode writes nothing for one. The payload breaks
+// an RM invariant, so the refusal is a plain wrapped error like the not-a-string
+// case, not the unsupported-datatype gap sentinel.
 func TestStringLeafRefusesEmpty(t *testing.T) {
 	_, err := UnmarshalFlat(stringLeafBody(map[string]any{stringLeafKey: ""}), stringLeafWT())
-	if !errors.Is(err, ErrUnsupportedDatatype) {
-		t.Fatalf("UnmarshalFlat = %v, want ErrUnsupportedDatatype", err)
+	if err == nil {
+		t.Fatal("UnmarshalFlat accepted an empty string at the STRING leaf")
 	}
-	if !strings.Contains(err.Error(), stringLeafKey) {
-		t.Errorf("UnmarshalFlat = %v, want the error to name %q", err, stringLeafKey)
+	if errors.Is(err, ErrUnsupportedDatatype) {
+		t.Errorf("UnmarshalFlat = %v, want a plain error without the ErrUnsupportedDatatype gap sentinel", err)
+	}
+	for _, want := range []string{stringLeafKey, "empty"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("UnmarshalFlat = %v, want the error to name %q", err, want)
+		}
 	}
 }
 
@@ -223,9 +230,10 @@ func unreadStringWT() *webtemplate.WebTemplate {
 }
 
 // TestStringLeafOnUnreadAttributeRefused — REQ-053, REQ-140. The builder makes
-// one STRING leaf, ACTIVITY `action_archetype_id`. A STRING leaf anywhere else
-// is refused whenever its owner is there, because whether it holds a value
-// cannot be told; with no owner there is nothing to lose, and it is skipped.
+// one STRING leaf, ACTIVITY `action_archetype_id`. A STRING leaf on an
+// attribute rmpath does not resolve to an RM String is refused whenever its
+// owner is there, because whether it holds a value cannot be told; with no
+// owner there is nothing to lose, and it is skipped.
 func TestStringLeafOnUnreadAttributeRefused(t *testing.T) {
 	_, err := MarshalFlat(stringLeafComp(stringLeafValue), unreadStringWT())
 	if !errors.Is(err, ErrUnsupportedDatatype) {
@@ -238,5 +246,53 @@ func TestStringLeafOnUnreadAttributeRefused(t *testing.T) {
 	noActivity.Content[0].(*rm.Instruction).Activities = nil
 	if _, err := MarshalFlat(noActivity, unreadStringWT()); err != nil {
 		t.Errorf("MarshalFlat with no ACTIVITY = %v, want the leaf skipped", err)
+	}
+}
+
+// TestIsValueLeafType — REQ-053. The predicate takes the normalised RM type
+// ([nodeRMType]), so a padded spelling is no match as written; every DV_* type,
+// CODE_PHRASE, a party type and STRING are value leaves, and a container type is
+// not.
+func TestIsValueLeafType(t *testing.T) {
+	for _, tc := range []struct {
+		rmType string
+		want   bool
+	}{
+		{"STRING", true},
+		{" STRING", false},
+		{"DV_TEXT", true},
+		{"CODE_PHRASE", true},
+		{"PARTY_IDENTIFIED", true},
+		{"CLUSTER", false},
+		{"", false},
+	} {
+		if got := isValueLeafType(tc.rmType); got != tc.want {
+			t.Errorf("isValueLeafType(%q) = %v, want %v", tc.rmType, got, tc.want)
+		}
+	}
+	if got := canonicalRMType(" STRING"); !isValueLeafType(got) {
+		t.Errorf("isValueLeafType(canonicalRMType(%q)) = false, want true", " STRING")
+	}
+}
+
+// TestStringLeafWithoutInputsEncodes — REQ-053. The Web Template builder gives
+// the STRING leaf no input descriptors the codec could recognise it by, so the
+// RM type alone must make it a value leaf: the bare value is written, padded
+// RM type spelling included, and not refused as a node the codec cannot spell.
+func TestStringLeafWithoutInputsEncodes(t *testing.T) {
+	for name, rmType := range map[string]string{"clean": "STRING", "padded": " STRING "} {
+		t.Run(name, func(t *testing.T) {
+			wt := stringLeafWT()
+			leaf := wt.Tree.Children[0].Children[0].Children[0]
+			leaf.Inputs = nil
+			leaf.RMType = rmType
+			b, err := MarshalFlat(stringLeafComp(stringLeafValue), wt)
+			if err != nil {
+				t.Fatalf("MarshalFlat with a %s STRING node and no inputs: %v", name, err)
+			}
+			if got := flatMap(t, b)[stringLeafKey]; got != stringLeafValue {
+				t.Errorf("MarshalFlat wrote %s = %#v, want the bare string %q", stringLeafKey, got, stringLeafValue)
+			}
+		})
 	}
 }

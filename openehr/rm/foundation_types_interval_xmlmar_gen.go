@@ -11,6 +11,52 @@ import (
 
 // BMM package: org.openehr.base.foundation_types.interval — canonical-XML MarshalXML companions
 
+// MarshalXML emits canonical openEHR XML for Interval. The default
+// element local name is the snake-cased BMM class name when the
+// parent did not set one. Child elements follow BMM property
+// declaration order; nil-pointer optionals and empty containers are
+// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
+//
+// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound
+// is empty emits no `lower` or `upper` element.
+func (i *Interval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
+	if _start.Name.Local == "" {
+		_start.Name = xml.Name{Local: canxml.ElementName("Interval")}
+	}
+	if err := _e.EncodeToken(_start); err != nil {
+		return err
+	}
+	if !omitIntervalBound(i.LowerUnbounded, i.Lower) {
+		if err := _e.EncodeElement(&i.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
+			return err
+		}
+	}
+	if !omitIntervalBound(i.UpperUnbounded, i.Upper) {
+		if err := _e.EncodeElement(&i.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
+			return err
+		}
+	}
+	if err := _e.EncodeElement(i.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(i.UpperUnbounded, xml.StartElement{Name: xml.Name{Local: "upper_unbounded"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(i.LowerIncluded, xml.StartElement{Name: xml.Name{Local: "lower_included"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeElement(i.UpperIncluded, xml.StartElement{Name: xml.Name{Local: "upper_included"}}); err != nil {
+		return err
+	}
+	if err := _e.EncodeToken(_start.End()); err != nil {
+		return err
+	}
+	return nil
+}
+
 // BMMName returns "Point_interval" — the BMM class identifier used as the
 // `xsi:type` polymorphic discriminator in canonical XML and the
 // `_type` discriminator in canonical JSON.

@@ -215,12 +215,14 @@ func enumConstName(typeName, item string) string {
 	return typeName + PascalCase(item)
 }
 
-// renderInterface emits `type X interface { ... }` with the
-// marker method is<X>(). Functions on the interface are emitted as
-// concrete method stubs on each non-overriding descendant (see
-// [renderFunctions]). The Go interface stays marker-only in v1 to
-// avoid the signature-mismatch fan-out caused by BMM
-// covariant-return / contravariant-parameter overrides.
+// renderInterface emits `type X interface { is<X>() }` for a
+// P_BMM_INTERFACE: a marker-only interface, as for an abstract class.
+// The interface's functions get no Go methods today. No descendant
+// receives the is<X>() marker (see [computeAbstractDescendants]) and
+// [renderFunctions] emits no stubs for an interface, so the marker
+// methods and propagated stubs described for abstract classes are not
+// implemented for interfaces (STRAND-12). The pinned BMM has no
+// interface with a descendant, so the output is unaffected.
 func renderInterface(plan *Plan, pc *PlannedClass, _ *bmm.Interface) (string, error) {
 	var b strings.Builder
 	writeDoc(&b, pc.GoName, pc.Class.Documentation())

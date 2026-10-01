@@ -52,7 +52,10 @@ import (
 // skipped at decode time. The receiver field is left at its zero
 // value. Documented in canxml/doc.go.
 func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
-	emitting := concreteClassesIn(file)
+	emitting, err := codecClassesIn(plan, file)
+	if err != nil {
+		return nil, err
+	}
 	if len(emitting) == 0 {
 		return nil, nil
 	}
@@ -157,6 +160,11 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("// sentinels inside *canxml.DecodeError for errors.Is / errors.As.\n")
 	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
 	b.WriteString("// (currently `archetype_node_id`) are read from _start.Attr.\n")
+	legacy := sc.IsAbstract() && hasIntervalShape(fields)
+	if legacy {
+		b.WriteString("//\n")
+		b.WriteString(legacyIntervalXMLDoc)
+	}
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
 	// Read attribute-typed properties from _start.Attr.
 	for _, ef := range attrFields {
@@ -176,6 +184,9 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 		caseBody, err := renderUnmarshalXMLField(plan, recv, sc, ef)
 		if err != nil {
 			return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+		}
+		if legacy {
+			caseBody = withLegacyElementName(caseBody, ef.Prop.PropertyName())
 		}
 		b.WriteString(caseBody)
 	}

@@ -102,7 +102,7 @@ func TestPolymorphicPropertyRendersTyperegDispatch(t *testing.T) {
 	src := string(got)
 	for _, want := range []string{
 		`typereg.DecodeInto(dec, "DV_INTERVAL"`,
-		`*rawDVInterval[T]`,
+		`*rawInterval[T]`,
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("rendered DVInterval unmarshaller missing %q", want)

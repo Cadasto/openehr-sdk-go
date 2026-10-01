@@ -3,6 +3,7 @@ package canjson_test
 import (
 	"bytes"
 	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"reflect"
 	"slices"
 	"testing"
@@ -130,6 +131,51 @@ func TestREQ052OpenIntervalSideEmptyBound(t *testing.T) {
 			want:  without(pointInterval, "upper"),
 			fresh: func() any { return &rm.PointInterval[rm.DVQuantity]{} },
 		},
+		// The typed Point_interval and Proper_interval carry the same rule as
+		// DV_INTERVAL through their own generated marshallers, one arm per
+		// open-side combination, so each combination is pinned on its own.
+		{
+			name:  "Point_interval of DV_QUANTITY, open lower side, empty bound omitted",
+			value: &rm.PointInterval[rm.DVQuantity]{LowerUnbounded: true, Upper: q},
+			want:  without(pointInterval, "lower"),
+			fresh: func() any { return &rm.PointInterval[rm.DVQuantity]{} },
+		},
+		{
+			name:  "Point_interval of DV_QUANTITY, both sides open, both empty bounds omitted",
+			value: &rm.PointInterval[rm.DVQuantity]{LowerUnbounded: true, UpperUnbounded: true},
+			want:  without(pointInterval, "lower", "upper"),
+			fresh: func() any { return &rm.PointInterval[rm.DVQuantity]{} },
+		},
+		{
+			name:  "Point_interval of DV_QUANTITY, bounded sides keep both bounds",
+			value: &rm.PointInterval[rm.DVQuantity]{Lower: q, Upper: q},
+			want:  pointInterval,
+			fresh: func() any { return &rm.PointInterval[rm.DVQuantity]{} },
+		},
+		{
+			name:  "Proper_interval of DV_QUANTITY, open upper side, empty bound omitted",
+			value: &rm.ProperInterval[rm.DVQuantity]{Lower: q, UpperUnbounded: true},
+			want:  without(properInterval, "upper"),
+			fresh: func() any { return &rm.ProperInterval[rm.DVQuantity]{} },
+		},
+		{
+			name:  "Proper_interval of DV_QUANTITY, open lower side, empty bound omitted",
+			value: &rm.ProperInterval[rm.DVQuantity]{LowerUnbounded: true, Upper: q},
+			want:  without(properInterval, "lower"),
+			fresh: func() any { return &rm.ProperInterval[rm.DVQuantity]{} },
+		},
+		{
+			name:  "Proper_interval of DV_QUANTITY, both sides open, both empty bounds omitted",
+			value: &rm.ProperInterval[rm.DVQuantity]{LowerUnbounded: true, UpperUnbounded: true},
+			want:  without(properInterval, "lower", "upper"),
+			fresh: func() any { return &rm.ProperInterval[rm.DVQuantity]{} },
+		},
+		{
+			name:  "Proper_interval of DV_QUANTITY, bounded sides keep both bounds",
+			value: &rm.ProperInterval[rm.DVQuantity]{Lower: q, Upper: q},
+			want:  properInterval,
+			fresh: func() any { return &rm.ProperInterval[rm.DVQuantity]{} },
+		},
 		// Regression pins: the encoders already left out a nil or typed-nil
 		// interface-typed bound before the open-side rule, whatever its flag.
 		// These two cases keep it that way.
@@ -168,6 +214,91 @@ func TestREQ052OpenIntervalSideEmptyBound(t *testing.T) {
 			}
 			if !reflect.DeepEqual(back, tc.value) {
 				t.Errorf("round trip = %#v, want %#v\nwire: %s", back, tc.value, b)
+			}
+		})
+	}
+}
+
+// TestREQ052PointIntervalOuterFlagsWin pins which flags a Point_interval
+// encodes. The class re-declares the four Boolean flags beside the embedded
+// Interval's own, so a value carries two sets. The outer set is the one the
+// encoder reads, both for the open-side omission and for the flag members it
+// writes; a flag set only on the embedded Interval is never emitted and never
+// opens a side. The shape stays as generated, and this test records that
+// behaviour rather than a wish.
+func TestREQ052PointIntervalOuterFlagsWin(t *testing.T) {
+	q := rm.DVQuantity{Magnitude: 5, Units: "mmol/L"}
+	pointInterval := []string{"_type", "lower", "upper", "lower_included", "lower_unbounded", "upper_included", "upper_unbounded"}
+	allFalse := map[string]bool{"lower_unbounded": false, "upper_unbounded": false, "lower_included": false, "upper_included": false}
+
+	cases := []struct {
+		name      string
+		value     *rm.PointInterval[rm.DVQuantity]
+		wantNames []string
+		wantFlags map[string]bool
+	}{
+		{
+			name: "embedded lower_unbounded alone does not open the lower side",
+			value: &rm.PointInterval[rm.DVQuantity]{
+				Interval: rm.Interval[rm.DVQuantity]{Upper: q, LowerUnbounded: true},
+			},
+			wantNames: pointInterval,
+			wantFlags: allFalse,
+		},
+		{
+			name: "embedded upper_unbounded alone does not open the upper side",
+			value: &rm.PointInterval[rm.DVQuantity]{
+				Interval: rm.Interval[rm.DVQuantity]{Lower: q, UpperUnbounded: true},
+			},
+			wantNames: pointInterval,
+			wantFlags: allFalse,
+		},
+		{
+			name: "embedded included flags are not emitted",
+			value: &rm.PointInterval[rm.DVQuantity]{
+				Interval: rm.Interval[rm.DVQuantity]{Lower: q, Upper: q, LowerIncluded: true, UpperIncluded: true},
+			},
+			wantNames: pointInterval,
+			wantFlags: allFalse,
+		},
+		{
+			name: "outer flag wins over a disagreeing embedded flag",
+			value: &rm.PointInterval[rm.DVQuantity]{
+				LowerUnbounded: true,
+				Interval:       rm.Interval[rm.DVQuantity]{Upper: q, LowerIncluded: true},
+			},
+			wantNames: without(pointInterval, "lower"),
+			wantFlags: map[string]bool{"lower_unbounded": true, "upper_unbounded": false, "lower_included": false, "upper_included": false},
+		},
+		{
+			name: "outer flags are emitted as they stand beside embedded ones",
+			value: &rm.PointInterval[rm.DVQuantity]{
+				UpperUnbounded: true,
+				LowerIncluded:  true,
+				Interval:       rm.Interval[rm.DVQuantity]{Lower: q, UpperIncluded: true},
+			},
+			wantNames: without(pointInterval, "upper"),
+			wantFlags: map[string]bool{"lower_unbounded": false, "upper_unbounded": true, "lower_included": true, "upper_included": false},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			b, err := canjson.Marshal(tc.value)
+			if err != nil {
+				t.Fatalf("Marshal(%T) error: %v", tc.value, err)
+			}
+			if got := topLevelMembers(t, b); !slices.Equal(got, tc.wantNames) {
+				t.Errorf("Marshal(%+v) members = %q, want %q\nwire: %s", *tc.value, got, tc.wantNames, b)
+			}
+			var wire map[string]any
+			if err := json.Unmarshal(b, &wire); err != nil {
+				t.Fatalf("decode wire %s: %v", b, err)
+			}
+			for flag, want := range tc.wantFlags {
+				if got, _ := wire[flag].(bool); got != want {
+					t.Errorf("Marshal(%+v) %s = %v, want %v\nwire: %s", *tc.value, flag, got, want, b)
+				}
 			}
 		})
 	}

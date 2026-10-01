@@ -38,8 +38,12 @@ func receiverIdent(goName string) string {
 }
 
 // renderFunctions emits all functions declared on sc (the planned
-// class's BMM class) as Go method stubs. For abstract non-generic
-// classes (rendered as Go interfaces), the methods are emitted on
+// class's BMM class) as Go method stubs. It handles *bmm.SimpleClass
+// only: for a *bmm.Interface (P_BMM_INTERFACE) it returns without
+// emitting anything, so an interface's functions get no stubs, neither
+// on the interface nor on any descendant (STRAND-12). The rules below
+// describe abstract and concrete SimpleClass values. For abstract
+// non-generic classes (rendered as Go interfaces), the methods are emitted on
 // each concrete descendant that does NOT itself override the function
 // — the abstract Go interface stays marker-only. For abstract+generic
 // classes (rendered as Go structs), the methods are emitted directly

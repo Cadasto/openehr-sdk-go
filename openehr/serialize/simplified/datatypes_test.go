@@ -1154,3 +1154,32 @@ func TestEmptyCodeDoesNotPromoteTextLeaf(t *testing.T) {
 		})
 	}
 }
+
+// TestUnsetCodedTextWritesNoKeys — REQ-053. A DV_CODED_TEXT the composition
+// never set is the Go zero value, which has no spelling of its own, so it
+// writes no keys: blank |code and |value entries would claim a coded value that
+// is not there. A value carrying anything stays written.
+func TestUnsetCodedTextWritesNoKeys(t *testing.T) {
+	formatting := "formatting-only"
+	for name, tc := range map[string]struct {
+		v        any
+		wantKeys int
+	}{
+		"zero value":       {v: rm.DVCodedText{}, wantKeys: 0},
+		"pointer to zero":  {v: &rm.DVCodedText{}, wantKeys: 0},
+		"value only":       {v: rm.DVCodedText{DVText: rm.DVText{Value: "v"}}, wantKeys: 2},
+		"formatting only":  {v: rm.DVCodedText{DVText: rm.DVText{Formatting: &formatting}}, wantKeys: 3},
+		"code only":        {v: rm.DVCodedText{DefiningCode: rm.CodePhrase{CodeString: "c"}}, wantKeys: 2},
+		"terminology only": {v: rm.DVCodedText{DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "t"}}}, wantKeys: 3},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out := map[string]any{}
+			if err := leafToFlat(out, "p/x", tc.v, "DV_CODED_TEXT", false); err != nil {
+				t.Fatalf("leafToFlat(%s): %v", name, err)
+			}
+			if len(out) != tc.wantKeys {
+				t.Errorf("leafToFlat(%s) wrote %d keys %#v, want %d", name, len(out), out, tc.wantKeys)
+			}
+		})
+	}
+}

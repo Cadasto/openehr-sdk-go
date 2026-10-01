@@ -14,6 +14,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -239,6 +240,103 @@ func TestEncodeComposerShapesCtxCannotCarry(t *testing.T) {
 			comp.Composer = composer
 			if _, err := simplified.MarshalFlat(comp, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) {
 				t.Errorf("MarshalFlat err = %v, want ErrUnsupportedDatatype", err)
+			}
+		})
+	}
+}
+
+// flatKeys encodes comp and returns the FLAT map.
+func flatKeys(t *testing.T, comp *rm.Composition, wt *webtemplate.WebTemplate) map[string]any {
+	t.Helper()
+	data, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatalf("unmarshal flat: %v", err)
+	}
+	return m
+}
+
+// leafNode finds the Web Template node with the given id.
+func leafNode(t *testing.T, wt *webtemplate.WebTemplate, id string) *webtemplate.Node {
+	t.Helper()
+	var found *webtemplate.Node
+	var walk func(n *webtemplate.Node)
+	walk = func(n *webtemplate.Node) {
+		if n.ID == id && found == nil {
+			found = n
+		}
+		for _, c := range n.Children {
+			walk(c)
+		}
+	}
+	walk(wt.Tree)
+	if found == nil {
+		t.Fatalf("no Web Template node with id %q", id)
+	}
+	return found
+}
+
+// TestMarshalFlatZeroCodedTextWritesNoKeys — REQ-053. A zero DV_CODED_TEXT
+// at a leaf, a coded text the composition never set, writes no FLAT keys for
+// it: no blank |code or |value, and no |raw either, because the zero value
+// carries nothing the suffix form cannot hold. The leaf is absent, as a nil
+// one would be, and every other key of the composition is unchanged. It is
+// checked at a DV_CODED_TEXT leaf and at a DV_TEXT leaf, where DV_CODED_TEXT
+// is the spec-sanctioned substitution.
+func TestMarshalFlatZeroCodedTextWritesNoKeys(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		opt      string
+		leafID   string
+		wantType string
+	}{
+		{"DV_CODED_TEXT leaf", "../../../testkit/corpus/templates/Test_dv_coded_text_open_constraint.v0.opt", "my_dv_coded_text", "DV_CODED_TEXT"},
+		{"DV_TEXT leaf", "../../../testkit/corpus/templates/minimal_observation.en.v1.opt", "text", "DV_TEXT"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			comp, wt := genComposition(t, tc.opt)
+			leaf := leafNode(t, wt, tc.leafID)
+			if leaf.RMType != tc.wantType {
+				t.Fatalf("leaf %q is a %s, want %s", tc.leafID, leaf.RMType, tc.wantType)
+			}
+			before := flatKeys(t, comp, wt)
+			var leafKeys []string
+			for k := range before {
+				if base, _, _ := strings.Cut(k, "|"); strings.HasSuffix(base, "/"+tc.leafID) {
+					leafKeys = append(leafKeys, k)
+				}
+			}
+			if len(leafKeys) == 0 {
+				t.Fatalf("the generated composition writes no key for %q: %v", tc.leafID, sortedKeys(before))
+			}
+
+			// Zero the leaf's value in place with a DV_CODED_TEXT nothing set.
+			holder, err := rmpath.ItemsAtPath(comp, strings.TrimSuffix(leaf.AQLPath, "/value"))
+			if err != nil || len(holder) != 1 {
+				t.Fatalf("resolve the leaf's ELEMENT: %d items, %v", len(holder), err)
+			}
+			el, ok := holder[0].(*rm.Element)
+			if !ok {
+				t.Fatalf("the leaf's holder is a %T, want *rm.Element", holder[0])
+			}
+			el.Value = &rm.DVCodedText{}
+
+			after := flatKeys(t, comp, wt)
+			for k := range after {
+				if base, _, _ := strings.Cut(k, "|"); strings.HasSuffix(base, "/"+tc.leafID) {
+					t.Errorf("a zero DV_CODED_TEXT wrote the key %q = %v, want no key for the leaf", k, after[k])
+				}
+			}
+			for k, v := range before {
+				if slices.Contains(leafKeys, k) {
+					continue
+				}
+				if !reflect.DeepEqual(after[k], v) {
+					t.Errorf("key %q changed from %v to %v when only the leaf was zeroed", k, v, after[k])
+				}
 			}
 		})
 	}

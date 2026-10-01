@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **The canonical JSON and XML codec covers AOM 1.4 constraint intervals (REQ-052, REQ-056).** An open side omits its zero bound, XML uses snake_case names while still decoding the v0.28.0 PascalCase, and `rm.IsEmptyIntervalBound` is exported.
+- **FLAT encode writes no keys for an unset coded text (REQ-053).** The blank `|code` and `|value` keys are gone, and decode now refuses a second placement on a scalar-filled attribute.
+
 ## [0.28.0] - 2026-09-25
 
 Twenty-eighth `v0.x` minor: canonical JSON moves to `encoding/json/v2`, stricter and faster on decode, and the vendored ITS-REST contract is pinned to a tagged release. One source break: the generated RM and AOM types drop their v1 JSON methods.

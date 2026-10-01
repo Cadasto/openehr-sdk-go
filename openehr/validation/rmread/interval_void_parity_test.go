@@ -14,34 +14,34 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
 
-// TestREQ112IntervalBoundVoidEncoderParity keeps the floor and the canonical
-// encoders on one reading of an empty interval bound. The floor skips an open
-// side whose bound is Void (REQ-112, the isVoidDV* predicates here); canonical
-// JSON and XML omit the same bound (REQ-052, REQ-056) through the predicates
-// the generator derives for each bound type. The encoders' predicates are
-// unexported in openehr/rm, so the test reaches them through the encoders.
+// TestREQ112IntervalBoundVoidEncoderParity keeps the canonical encoders on the
+// reading of an empty interval bound that REQ-112 gives the floor and
+// [rm.IsEmptyIntervalBound] implements: a bound of a concrete type is empty
+// exactly when it is that type's zero value. The oracle is reflection's
+// IsZero, so it is independent of the generated predicate the encoders call.
 //
 // For each concrete bound type it encodes an interval whose two sides are
 // both open and carry the same bound: the zero value, then a value with one
-// leaf field set, for every leaf field. The encoders must omit the bound
-// exactly when the floor's predicate calls it Void. Together with
-// TestIntervalBoundVoidPredicates, which proves the floor's predicates see
-// every field, a field one side misses fails here.
+// leaf field set, for every leaf field. Canonical JSON and XML must omit the
+// bound exactly when it is the zero value. Together with
+// TestIntervalBoundVoidPredicates, which proves the predicate sees every
+// field, a field the predicate misses, or an encoder that stops using it,
+// fails here.
 func TestREQ112IntervalBoundVoidEncoderParity(t *testing.T) {
 	cases := []struct {
 		zero   any
 		isVoid func(any) bool
 		encode func(t *testing.T, bound any) (jsonOmits, xmlOmits bool)
 	}{
-		{rm.DVCount{}, func(v any) bool { return isVoidDVCount(v.(rm.DVCount)) }, openBoundOmitted[rm.DVCount]},
-		{rm.DVDate{}, func(v any) bool { return isVoidDVDate(v.(rm.DVDate)) }, openBoundOmitted[rm.DVDate]},
-		{rm.DVDateTime{}, func(v any) bool { return isVoidDVDateTime(v.(rm.DVDateTime)) }, openBoundOmitted[rm.DVDateTime]},
-		{rm.DVDuration{}, func(v any) bool { return isVoidDVDuration(v.(rm.DVDuration)) }, openBoundOmitted[rm.DVDuration]},
-		{rm.DVOrdinal{}, func(v any) bool { return isVoidDVOrdinal(v.(rm.DVOrdinal)) }, openBoundOmitted[rm.DVOrdinal]},
-		{rm.DVProportion{}, func(v any) bool { return isVoidDVProportion(v.(rm.DVProportion)) }, openBoundOmitted[rm.DVProportion]},
-		{rm.DVQuantity{}, func(v any) bool { return isVoidDVQuantity(v.(rm.DVQuantity)) }, openBoundOmitted[rm.DVQuantity]},
-		{rm.DVScale{}, func(v any) bool { return isVoidDVScale(v.(rm.DVScale)) }, openBoundOmitted[rm.DVScale]},
-		{rm.DVTime{}, func(v any) bool { return isVoidDVTime(v.(rm.DVTime)) }, openBoundOmitted[rm.DVTime]},
+		{rm.DVCount{}, isZeroValue, openBoundOmitted[rm.DVCount]},
+		{rm.DVDate{}, isZeroValue, openBoundOmitted[rm.DVDate]},
+		{rm.DVDateTime{}, isZeroValue, openBoundOmitted[rm.DVDateTime]},
+		{rm.DVDuration{}, isZeroValue, openBoundOmitted[rm.DVDuration]},
+		{rm.DVOrdinal{}, isZeroValue, openBoundOmitted[rm.DVOrdinal]},
+		{rm.DVProportion{}, isZeroValue, openBoundOmitted[rm.DVProportion]},
+		{rm.DVQuantity{}, isZeroValue, openBoundOmitted[rm.DVQuantity]},
+		{rm.DVScale{}, isZeroValue, openBoundOmitted[rm.DVScale]},
+		{rm.DVTime{}, isZeroValue, openBoundOmitted[rm.DVTime]},
 	}
 	if got, want := len(cases), len(typedIntervals)/2; got != want {
 		t.Fatalf("%d bound types compared, want %d (one per typed DV_INTERVAL instantiation)", got, want)
@@ -54,10 +54,10 @@ func TestREQ112IntervalBoundVoidEncoderParity(t *testing.T) {
 				want := tc.isVoid(bound)
 				jsonOmits, xmlOmits := tc.encode(t, bound)
 				if jsonOmits != want {
-					t.Errorf("%s %s: canonical JSON omits the open bound = %v, but the floor reads it Void = %v", typ.Name(), sample, jsonOmits, want)
+					t.Errorf("%s %s: canonical JSON omits the open bound = %v, but the bound is empty = %v", typ.Name(), sample, jsonOmits, want)
 				}
 				if xmlOmits != want {
-					t.Errorf("%s %s: canonical XML omits the open bound = %v, but the floor reads it Void = %v", typ.Name(), sample, xmlOmits, want)
+					t.Errorf("%s %s: canonical XML omits the open bound = %v, but the bound is empty = %v", typ.Name(), sample, xmlOmits, want)
 				}
 			}
 			check("zero value", tc.zero)
@@ -77,13 +77,13 @@ func TestREQ112IntervalBoundVoidEncoderParity(t *testing.T) {
 
 // TestREQ112IntervalBoundVoidOrderedEncoderParity is the same parity for the
 // bare DV_INTERVAL, whose bound is typed by the DV_ORDERED interface
-// (REQ-112, REQ-052, REQ-056). The floor's isVoidOrdered and the encoders
-// must agree that only a nil or a typed-nil pointer is empty there, and that a
+// (REQ-112, REQ-052, REQ-056). The encoders must agree with the reading
+// wire.md gives there: only a nil or a typed-nil pointer is empty, and a
 // zero value, or a pointer to one, behind the interface is a bound. Each
 // concrete bound type contributes its typed-nil pointer, its zero value and a
 // pointer to its zero value.
 func TestREQ112IntervalBoundVoidOrderedEncoderParity(t *testing.T) {
-	samples := []orderedSample{{name: "nil interface", bound: nil}}
+	samples := []orderedSample{{name: "nil interface", bound: nil, empty: true}}
 	samples = append(samples, orderedSamples[rm.DVCount](t, "DV_COUNT")...)
 	samples = append(samples, orderedSamples[rm.DVDate](t, "DV_DATE")...)
 	samples = append(samples, orderedSamples[rm.DVDateTime](t, "DV_DATE_TIME")...)
@@ -98,13 +98,13 @@ func TestREQ112IntervalBoundVoidOrderedEncoderParity(t *testing.T) {
 	}
 	for _, s := range samples {
 		t.Run(s.name, func(t *testing.T) {
-			want := isVoidOrdered(s.bound)
+			want := s.empty
 			jsonOmits, xmlOmits := openBoundOmitted[rm.DVOrdered](t, s.bound)
 			if jsonOmits != want {
-				t.Errorf("DV_INTERVAL<DV_ORDERED> with a %s bound: canonical JSON omits the open bound = %v, but the floor reads it Void = %v", s.name, jsonOmits, want)
+				t.Errorf("DV_INTERVAL<DV_ORDERED> with a %s bound: canonical JSON omits the open bound = %v, but the bound is empty = %v", s.name, jsonOmits, want)
 			}
 			if xmlOmits != want {
-				t.Errorf("DV_INTERVAL<DV_ORDERED> with a %s bound: canonical XML omits the open bound = %v, but the floor reads it Void = %v", s.name, xmlOmits, want)
+				t.Errorf("DV_INTERVAL<DV_ORDERED> with a %s bound: canonical XML omits the open bound = %v, but the bound is empty = %v", s.name, xmlOmits, want)
 			}
 		})
 	}
@@ -114,6 +114,8 @@ func TestREQ112IntervalBoundVoidOrderedEncoderParity(t *testing.T) {
 type orderedSample struct {
 	name  string
 	bound rm.DVOrdered
+	// empty is whether the bound is empty: only nil and a typed-nil pointer.
+	empty bool
 }
 
 // orderedSamples returns T's typed-nil pointer, zero value and pointer to a
@@ -130,11 +132,15 @@ func orderedSamples[T rm.DVOrdered](t *testing.T, name string) []orderedSample {
 		t.Fatalf("*%s does not implement DV_ORDERED", name)
 	}
 	return []orderedSample{
-		{name: name + " typed nil", bound: nilPtr},
+		{name: name + " typed nil", bound: nilPtr, empty: true},
 		{name: name + " zero value", bound: zero},
 		{name: name + " pointer to a zero value", bound: zeroPtr},
 	}
 }
+
+// isZeroValue is the parity test's oracle for a concrete bound: the value is
+// its type's zero value.
+func isZeroValue(v any) bool { return reflect.ValueOf(v).IsZero() }
 
 // encodableNonZeroValue is nonZeroValue with one change the encoders need:
 // a slice is empty but not nil. It is still not the zero value, and a

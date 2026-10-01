@@ -32,11 +32,14 @@ func (d DVCount) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}{"DV_COUNT", (*rawDVCount)(&d)}, typereg.MarshalOptions(enc))
 }
 
-// rawDVInterval is the method-free canonical-JSON alias for DVInterval. The alias
-// drops the codec methods so marshalling the anonymous wrapper below
-// does not recurse; the class embeds no marshaler-bearing concrete
-// ancestor, so nothing is promoted.
-type rawDVInterval[T DVOrdered] DVInterval[T]
+// jsonWireDVInterval is the canonical-JSON wire struct for DVInterval. DVInterval embeds BASE
+// Interval, so a method-free alias of the class would promote the base's
+// MarshalJSONTo. The wire struct embeds the method-free alias of the base
+// instead, and carries the class's own members beside it.
+type jsonWireDVInterval[T DVOrdered] struct {
+	Type string `json:"_type"`
+	*rawInterval[T]
+}
 
 // MarshalJSONTo emits canonical openEHR JSON for DVInterval with `_type`
 // (value "DV_INTERVAL") as the leading member. Field order otherwise follows the
@@ -54,31 +57,26 @@ type rawDVInterval[T DVOrdered] DVInterval[T]
 func (d DVInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	omitLower := omitIntervalBound(d.LowerUnbounded, d.Lower)
 	omitUpper := omitIntervalBound(d.UpperUnbounded, d.Upper)
+	w := &jsonWireDVInterval[T]{Type: "DV_INTERVAL", rawInterval: (*rawInterval[T])(&d.Interval)}
 	switch {
 	case omitLower && omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			Type string `json:"_type"`
-			*rawDVInterval[T]
+			*jsonWireDVInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
 			Upper struct{} `json:"upper,omitzero"`
-		}{Type: "DV_INTERVAL", rawDVInterval: (*rawDVInterval[T])(&d)}, typereg.MarshalOptions(enc))
+		}{jsonWireDVInterval: w}, typereg.MarshalOptions(enc))
 	case omitLower:
 		return json.MarshalEncode(enc, &struct {
-			Type string `json:"_type"`
-			*rawDVInterval[T]
+			*jsonWireDVInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
-		}{Type: "DV_INTERVAL", rawDVInterval: (*rawDVInterval[T])(&d)}, typereg.MarshalOptions(enc))
+		}{jsonWireDVInterval: w}, typereg.MarshalOptions(enc))
 	case omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			Type string `json:"_type"`
-			*rawDVInterval[T]
+			*jsonWireDVInterval[T]
 			Upper struct{} `json:"upper,omitzero"`
-		}{Type: "DV_INTERVAL", rawDVInterval: (*rawDVInterval[T])(&d)}, typereg.MarshalOptions(enc))
+		}{jsonWireDVInterval: w}, typereg.MarshalOptions(enc))
 	}
-	return json.MarshalEncode(enc, &struct {
-		Type string `json:"_type"`
-		*rawDVInterval[T]
-	}{Type: "DV_INTERVAL", rawDVInterval: (*rawDVInterval[T])(&d)}, typereg.MarshalOptions(enc))
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // rawDVOrdinal is the method-free canonical-JSON alias for DVOrdinal. The alias

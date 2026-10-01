@@ -954,6 +954,14 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 			cur = next
 		} else {
 			obj, ok := cur[seg.attr].(map[string]any)
+			if held, present := cur[seg.attr]; present && !ok {
+				// The slot already holds a scalar (a STRING leaf, a bare
+				// attribute): a second key reaching the same single-valued
+				// attribute through a deeper node would replace it with an
+				// object and drop the first value (REQ-053).
+				return nil, "", fmt.Errorf("%w: %s.%s already holds a %T, but keys reach it through a second Web Template node — refused rather than overwritten (aqlPath %q)",
+					ErrUnknownPath, curType, seg.attr, held, aqlPath)
+			}
 			if !ok {
 				obj = map[string]any{"_type": childType}
 				// The node id is recorded on a non-LOCATABLE ISM_TRANSITION too,

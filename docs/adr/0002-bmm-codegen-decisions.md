@@ -11,6 +11,7 @@ date: 2026-05-16
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
+- **Amended:** D4, 2026-10-01 (the `P_BMM_INTERFACE` shape).
 - **Tracks:** the BMM code generator, landed on `main` in commit [b89aa589](https://github.com/Cadasto/openehr-sdk-go/commit/b89aa589).
 - **Requirements:** [REQ-043](../specifications/bmm-conformance.md#mapping-rules) (the P_BMM to Go mapping rules the generator applies).
 
@@ -38,13 +39,15 @@ The hand-written `Registry` lives in `openehr/rm/typereg/`. Generated `init()` r
 
 Non-generic abstract classes become Go interfaces with unexported `is<X>()` markers; their properties flatten into each concrete descendant struct. Abstract **generic** classes **with concrete descendants** (e.g. `EVENT`, `VERSION`) are also emitted as marker interfaces so codec polymorphism works — see [ADR 0003](0003-rm-event-polymorphism.md). Abstract generics **without** concrete descendants remain generic structs.
 
+A `P_BMM_INTERFACE` class is emitted as a Go interface with the unexported `is<X>()` marker and no methods: the generator emits nothing for its `functions`. The RM has two, `CODE_SET_ACCESS` and `TERMINOLOGY_ACCESS`, which the BMM declares with four and six functions; nothing in the SDK implements or consumes them, so both are marker-only. Emitting their functions as interface methods was considered and not taken: it would put ten methods on the public surface with no implementer and no reader, and the BMM's signatures would be frozen there. The generator also gives an interface no marker on a descendant, because the pinned BMM sets no `is_abstract` on any interface ([STRAND-12](../specifications/research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag)) and no class in it descends from one; propagating the functions to concrete descendants is left until a BMM bump supplies one.
+
 ### D5 — AOM 1.4 references RM for base types (one-way import)
 
 `openehr/aom/aom14/` imports `openehr/rm` for shared base types (`rm.HierObjectID`, etc.). AOM does not duplicate base classes. Dependency is strictly `aom14 → rm`.
 
 ### D6 — BMM functions become panic stubs; bodies live in `*_ext.go`
 
-Every BMM `function` becomes a Go method whose body is `panic("not implemented: …")` with BMM documentation propagated as godoc. Real implementations belong in hand-written companion files only (REQ-044) — `*_ext.go`, or `*_funcs.go` for the behavioural-function set realised under [ADR 0011](0011-rm-behavioural-functions-surface.md). The generator never touches non-`_gen.go` files.
+Every BMM `function` of a class becomes a Go method whose body is `panic("not implemented: …")` with BMM documentation propagated as godoc; a `P_BMM_INTERFACE`'s functions get no method (D4). Real implementations belong in hand-written companion files only (REQ-044) — `*_ext.go`, or `*_funcs.go` for the behavioural-function set realised under [ADR 0011](0011-rm-behavioural-functions-surface.md). The generator never touches non-`_gen.go` files.
 
 ### D7 — Manual-implementation skip set suppresses chosen stubs
 

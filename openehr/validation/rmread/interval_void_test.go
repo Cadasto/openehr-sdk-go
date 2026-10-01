@@ -11,27 +11,27 @@ import (
 )
 
 // TestIntervalBoundVoidPredicates guards the field-by-field Void test of
-// each concrete bound type (REQ-112). The zero value must be Void, and a
-// value with any one exported field set to non-zero — reached through
-// struct-typed fields too, such as DV_ORDINAL's `symbol` — must not be.
-// The fields are enumerated by reflection, so a field added to an RM type
-// later fails here until its predicate covers it. Without that, a real
-// bound carrying only the new field would read as Void beside its
-// `*_unbounded` flag and go unchecked.
+// each concrete bound type, [rm.IsEmptyIntervalBound] (REQ-112). The zero
+// value must be Void, and a value with any one exported field set to
+// non-zero, reached through struct-typed fields too such as DV_ORDINAL's
+// `symbol`, must not be. The fields are enumerated by reflection, so a field
+// added to an RM type later fails here until the generated predicate covers
+// it. Without that, a real bound carrying only the new field would read as
+// Void beside its `*_unbounded` flag and go unchecked.
 func TestIntervalBoundVoidPredicates(t *testing.T) {
 	cases := []struct {
 		zero   any
 		isVoid func(any) bool
 	}{
-		{rm.DVCount{}, func(v any) bool { return isVoidDVCount(v.(rm.DVCount)) }},
-		{rm.DVDate{}, func(v any) bool { return isVoidDVDate(v.(rm.DVDate)) }},
-		{rm.DVDateTime{}, func(v any) bool { return isVoidDVDateTime(v.(rm.DVDateTime)) }},
-		{rm.DVDuration{}, func(v any) bool { return isVoidDVDuration(v.(rm.DVDuration)) }},
-		{rm.DVOrdinal{}, func(v any) bool { return isVoidDVOrdinal(v.(rm.DVOrdinal)) }},
-		{rm.DVProportion{}, func(v any) bool { return isVoidDVProportion(v.(rm.DVProportion)) }},
-		{rm.DVQuantity{}, func(v any) bool { return isVoidDVQuantity(v.(rm.DVQuantity)) }},
-		{rm.DVScale{}, func(v any) bool { return isVoidDVScale(v.(rm.DVScale)) }},
-		{rm.DVTime{}, func(v any) bool { return isVoidDVTime(v.(rm.DVTime)) }},
+		{rm.DVCount{}, func(v any) bool { return rm.IsEmptyIntervalBound(v.(rm.DVCount)) }},
+		{rm.DVDate{}, func(v any) bool { return rm.IsEmptyIntervalBound(v.(rm.DVDate)) }},
+		{rm.DVDateTime{}, func(v any) bool { return rm.IsEmptyIntervalBound(v.(rm.DVDateTime)) }},
+		{rm.DVDuration{}, func(v any) bool { return rm.IsEmptyIntervalBound(v.(rm.DVDuration)) }},
+		{rm.DVOrdinal{}, func(v any) bool { return rm.IsEmptyIntervalBound(v.(rm.DVOrdinal)) }},
+		{rm.DVProportion{}, func(v any) bool { return rm.IsEmptyIntervalBound(v.(rm.DVProportion)) }},
+		{rm.DVQuantity{}, func(v any) bool { return rm.IsEmptyIntervalBound(v.(rm.DVQuantity)) }},
+		{rm.DVScale{}, func(v any) bool { return rm.IsEmptyIntervalBound(v.(rm.DVScale)) }},
+		{rm.DVTime{}, func(v any) bool { return rm.IsEmptyIntervalBound(v.(rm.DVTime)) }},
 	}
 	if got, want := len(cases), len(typedIntervals)/2; got != want {
 		t.Fatalf("%d bound types guarded, want %d (one per typed DV_INTERVAL instantiation)", got, want)
@@ -58,7 +58,7 @@ func TestIntervalBoundVoidPredicates(t *testing.T) {
 	}
 }
 
-// TestIntervalBoundVoidOrdered pins the Void test of the bare form's
+// TestIntervalBoundVoidOrdered pins [rm.IsEmptyIntervalBound] on the bare form's
 // interface-typed bound (REQ-112): only a nil or typed-nil interface is
 // Void. A zero-valued concrete behind the interface is a value, as wire.md
 // reads an interface-typed bound.
@@ -75,8 +75,8 @@ func TestIntervalBoundVoidOrdered(t *testing.T) {
 		{name: "real bound", v: &rm.DVCount{Magnitude: 3}, want: false},
 	}
 	for _, tc := range cases {
-		if got := isVoidOrdered(tc.v); got != tc.want {
-			t.Errorf("isVoidOrdered(%s) = %v, want %v", tc.name, got, tc.want)
+		if got := rm.IsEmptyIntervalBound(tc.v); got != tc.want {
+			t.Errorf("rm.IsEmptyIntervalBound(%s) = %v, want %v", tc.name, got, tc.want)
 		}
 	}
 }

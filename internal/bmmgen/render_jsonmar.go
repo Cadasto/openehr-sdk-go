@@ -20,14 +20,18 @@ const typeregImportPath = "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 
 // RenderMarshalJSONFile renders the canonical-JSON MarshalJSONTo companions
 // (encoding/json/v2) for every concrete class in the supplied
-// [PlannedFile]. It also emits the per-class wire type, a method-free alias
-// or a flat wire struct, that the UnmarshalJSONFrom companion in the sibling
-// _jsonunmar_gen.go references.
+// [PlannedFile], and for the abstract BASE Interval struct ([codecClassesIn]).
+// It also emits the per-class wire type, a method-free alias, a flat wire
+// struct or an interval wire struct, that the UnmarshalJSONFrom companion in
+// the sibling _jsonunmar_gen.go references.
 //
 // The output is byte-stable per file. Returns (nil, nil) when the file has no
-// concrete classes.
+// such classes.
 //
-// # Two wire shapes
+// # Three wire shapes
+//
+// [jsonWireShape] picks the shape of a class, for the marshaller and the
+// unmarshaller alike.
 //
 // Most classes take the zero-copy shape: a method-free alias `type rawC C`
 // marshalled through an anonymous `struct{ _type; *rawC }`, so no fields are
@@ -35,16 +39,26 @@ const typeregImportPath = "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 // concrete ancestor, because a defined type over such a struct PROMOTES the
 // ancestor's MarshalJSONTo / UnmarshalJSONFrom: encoding/json/v2 would then
 // dispatch to the ancestor and emit its payload under the wrong `_type`,
-// silently (see the promotion note at [effectiveFields]). Those classes,
-// [embedsMarshalerBearingConcrete] finds them, take a flat wire struct that
-// embeds nothing and so cannot promote, with explicit field copies both ways.
+// silently, and refuse to decode into it (see the promotion note at
+// [effectiveFields]). Those classes, [embedsMarshalerBearingConcrete] finds
+// them, take a flat wire struct that embeds nothing and so cannot promote,
+// with explicit field copies both ways.
 //
-// Either shape emits `_type` first, joins json.Deterministic(true) plus the
-// FormatNil* options ([typereg.MarshalOptions]), and lets v2 resolve
+// A class that embeds BASE Interval (DV_INTERVAL, Point_interval,
+// Proper_interval) takes the third shape, the interval wire struct: it embeds
+// the base's own method-free alias and carries the class's own members beside
+// it, so it reaches the base without promoting the base's MarshalJSONTo.
+//
+// Every shape but BASE Interval's emits `_type` first. BASE Interval is
+// abstract and writes none. All of them join json.Deterministic(true) plus the
+// FormatNil* options ([typereg.MarshalOptions]), and let v2 resolve
 // polymorphic interface fields through the registered decode hooks: there is
 // no per-field routing and no json.RawMessage staging any more.
 func RenderMarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
-	concrete := concreteClassesIn(file)
+	concrete, err := codecClassesIn(plan, file)
+	if err != nil {
+		return nil, err
+	}
 	if len(concrete) == 0 {
 		return nil, nil
 	}
@@ -124,19 +138,22 @@ func needsExternalImportForJSONMar(plan *Plan, chunks []string) bool {
 func concreteClassesIn(file *PlannedFile) []*PlannedClass {
 	out := make([]*PlannedClass, 0, len(file.Classes))
 	for _, pc := range file.Classes {
-		if pc.External || pc.IsPrimitive {
-			continue
+		if isConcreteCodecClass(pc) {
+			out = append(out, pc)
 		}
-		sc, ok := pc.Class.(*bmm.SimpleClass)
-		if !ok {
-			continue
-		}
-		if sc.IsAbstract() {
-			continue
-		}
-		out = append(out, pc)
 	}
 	return out
+}
+
+// isConcreteCodecClass reports whether pc is a non-external, non-primitive,
+// non-abstract SimpleClass: the classes that carry the full generated codec
+// (type registration, both JSON methods, both XML methods).
+func isConcreteCodecClass(pc *PlannedClass) bool {
+	if pc.External || pc.IsPrimitive {
+		return false
+	}
+	sc, ok := pc.Class.(*bmm.SimpleClass)
+	return ok && !sc.IsAbstract()
 }
 
 // emittedField captures one wire-struct field together with the BMM class where
@@ -180,9 +197,17 @@ func embeddedStructAncestors(plan *Plan, cur *PlannedClass) (map[string]bool, []
 }
 
 // bearsGeneratedMarshaler reports whether pc is a class the generator equips
-// with the MarshalJSONTo / UnmarshalJSONFrom pair, a non-primitive,
+// with the full MarshalJSONTo / UnmarshalJSONFrom pair: a non-primitive,
 // non-abstract SimpleClass. An external concrete class counts: it carries the
 // pair in its own package, so embedding it still promotes the methods.
+//
+// The abstract BASE Interval bears a MarshalJSONTo (and no UnmarshalJSONFrom),
+// and is left out here on purpose. Every class that embeds it has the BASE
+// Interval members, so it is interval-shaped, and [jsonWireShape] sends it
+// down the interval path ([embeddedIntervalBase]) instead of the alias shape
+// that would promote the method. A class that reaches BASE Interval only
+// through an embedded concrete class embeds a bearing class and takes the flat
+// check, which refuses it for an interval-shaped class.
 func bearsGeneratedMarshaler(pc *PlannedClass) bool {
 	if pc.IsPrimitive {
 		return false
@@ -195,9 +220,10 @@ func bearsGeneratedMarshaler(pc *PlannedClass) bool {
 // through a chain of embedded ancestors, a concrete class that bears the
 // generated codec pair. Such a class cannot use the zero-copy `type rawC C`
 // alias: the defined type promotes the embedded ancestor's MarshalJSONTo /
-// UnmarshalJSONFrom, so v2 dispatches to the ancestor and emits the wrong
-// `_type` with no compile error (the promotion trap documented at
-// [effectiveFields]). These classes take the flat wire struct instead.
+// UnmarshalJSONFrom, so v2 encodes through the ancestor and emits the wrong
+// `_type` with no compile error, and cannot decode into it at all (the
+// promotion trap documented at [effectiveFields]). These classes take the flat
+// wire struct instead.
 func embedsMarshalerBearingConcrete(plan *Plan, pc *PlannedClass) bool {
 	_, ancestors := embeddedStructAncestors(plan, pc)
 	for _, ap := range ancestors {
@@ -279,9 +305,63 @@ func effectiveFields(plan *Plan, pc *PlannedClass) ([]emittedField, error) {
 	return result, nil
 }
 
+// jsonWireShape names the wire shape of a class's canonical-JSON codec.
+type jsonWireShape int
+
+const (
+	// shapeAlias is the zero-copy method-free alias.
+	shapeAlias jsonWireShape = iota
+	// shapeFlat is the flat wire struct with explicit field copies.
+	shapeFlat
+	// shapeIntervalAlias is the alias shape for an interval-shaped class that
+	// declares the BASE Interval members itself.
+	shapeIntervalAlias
+	// shapeIntervalDerived is the interval wire struct of a class that embeds
+	// BASE Interval.
+	shapeIntervalDerived
+	// shapeIntervalBase is BASE Interval itself, which has a marshaller only.
+	shapeIntervalBase
+)
+
+// classJSONWireShape decides, in one place for the marshaller and the
+// unmarshaller, which wire shape pc takes. The second result is the embedded
+// BASE Interval for [shapeIntervalDerived]. An interval-shaped class that
+// embeds a marshaler-bearing concrete class has no shape: the flat struct
+// cannot leave out an open side's empty bound.
+func classJSONWireShape(plan *Plan, pc *PlannedClass) (jsonWireShape, *PlannedClass, error) {
+	sc, ok := pc.Class.(*bmm.SimpleClass)
+	if !ok {
+		return 0, nil, fmt.Errorf("expected SimpleClass for %s, got %T", pc.BMMName, pc.Class)
+	}
+	shaped, err := intervalShaped(plan, pc)
+	if err != nil {
+		return 0, nil, err
+	}
+	if embedsMarshalerBearingConcrete(plan, pc) {
+		if shaped {
+			return 0, nil, fmt.Errorf("%s carries the interval shape and embeds a marshaler-bearing concrete ancestor: "+
+				"the flat wire shape cannot leave out an open side's empty bound", pc.BMMName)
+		}
+		return shapeFlat, nil, nil
+	}
+	if !shaped {
+		return shapeAlias, nil, nil
+	}
+	if sc.IsAbstract() {
+		return shapeIntervalBase, nil, nil
+	}
+	base, err := embeddedIntervalBase(plan, pc)
+	if err != nil {
+		return 0, nil, err
+	}
+	if base != nil {
+		return shapeIntervalDerived, base, nil
+	}
+	return shapeIntervalAlias, nil, nil
+}
+
 // renderMarshalJSON emits the wire type + MarshalJSONTo method for a single
-// concrete class, choosing the alias or flat shape per
-// [embedsMarshalerBearingConcrete].
+// class, choosing the shape per [classJSONWireShape].
 func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	sc, ok := pc.Class.(*bmm.SimpleClass)
 	if !ok {
@@ -293,21 +373,23 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 		typeParams = genericClassParamList(plan, sc)
 		typeArgs = genericTypeArgList(sc)
 	}
-	shaped, err := intervalShaped(plan, pc)
+	shape, base, err := classJSONWireShape(plan, pc)
 	if err != nil {
 		return "", err
 	}
-	if embedsMarshalerBearingConcrete(plan, pc) {
-		if shaped {
-			return "", fmt.Errorf("%s carries the interval shape and embeds a marshaler-bearing concrete ancestor: "+
-				"the flat wire shape cannot leave out an open side's empty bound", pc.BMMName)
-		}
+	switch shape {
+	case shapeFlat:
 		return renderMarshalFlat(plan, pc, recv, typeParams, typeArgs)
-	}
-	if shaped {
+	case shapeIntervalBase:
+		return renderMarshalIntervalBase(pc, recv, typeParams, typeArgs), nil
+	case shapeIntervalDerived:
+		return renderMarshalIntervalDerived(plan, pc, base, recv, typeParams, typeArgs)
+	case shapeIntervalAlias:
 		return renderMarshalAliasInterval(pc, recv, typeParams, typeArgs), nil
+	case shapeAlias:
+		return renderMarshalAlias(pc, recv, typeParams, typeArgs), nil
 	}
-	return renderMarshalAlias(pc, recv, typeParams, typeArgs), nil
+	return "", fmt.Errorf("%s: unhandled JSON wire shape %d", pc.BMMName, shape)
 }
 
 // renderMarshalAlias emits the zero-copy shape: a method-free alias and a
