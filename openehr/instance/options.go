@@ -86,9 +86,10 @@ type Options struct {
 	Composer rm.PartyProxy
 
 	// Now is the clock for EVENT.time / EventContext.start_time
-	// defaults. Zero value falls back to time.Now().UTC() inside
-	// Generate so callers that don't pin the clock get a sensible
-	// default; tests pin it for determinism.
+	// defaults. Zero value falls back to time.Now() inside Generate so
+	// callers that don't pin the clock get a sensible default; tests pin
+	// it for determinism. Generate writes every date-time it takes from
+	// Now in UTC, whatever zone Now carries.
 	Now time.Time
 
 	// UIDSource is the optional generator for LOCATABLE.uid values.
@@ -135,3 +136,11 @@ var ErrNilCompiled = errors.New("instance.Generate: nil compiled template")
 // ErrSlotFillUnsupported signals that a required ARCHETYPE_SLOT fill
 // could not be synthesized safely from the parsed slot assertions.
 var ErrSlotFillUnsupported = errors.New("instance.Generate: required slot fill cannot be synthesized")
+
+// ErrConstraintUnsatisfiable signals that no value the generator can
+// derive satisfies a primitive leaf's constraint, for example a C_STRING
+// whose pattern and list admit no string. The error names the RM type,
+// the attribute and the OPT path of the leaf, and Generate returns no
+// root. It is never wrapped together with [ErrSlotFillUnsupported], which
+// concerns slots only.
+var ErrConstraintUnsatisfiable = errors.New("instance.Generate: no value satisfies the primitive constraint")

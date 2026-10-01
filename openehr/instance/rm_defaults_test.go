@@ -1,0 +1,372 @@
+package instance_test
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+)
+
+// The helpers below build small synthetic OPTs for the REQ-107 default
+// fills. Each OPT names only what its case needs, so the generator's own
+// default is the only thing that can fill the field under test.
+
+// optNode is a C_COMPLEX_OBJECT of rmType with the given node id and
+// attributes.
+func optNode(rmType, nodeID string, attrs ...string) string {
+	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>` + rmType + `</rm_type_name>` +
+		`<node_id>` + nodeID + `</node_id>` + strings.Join(attrs, "") + `</children>`
+}
+
+// optPrimitive is a C_PRIMITIVE_OBJECT of the AOM primitive rmType whose
+// item is an itemType carrying body.
+func optPrimitive(rmType, itemType, body string) string {
+	return `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>` + rmType + `</rm_type_name>` +
+		`<node_id></node_id><item xsi:type="` + itemType + `">` + body + `</item></children>`
+}
+
+// optSingle is a C_SINGLE_ATTRIBUTE called name over children.
+func optSingle(name string, children ...string) string {
+	return `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
+		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
+		`<lower>1</lower><upper>1</upper></existence>` + strings.Join(children, "") + `</attributes>`
+}
+
+// optMultiple is a C_MULTIPLE_ATTRIBUTE called name over children.
+func optMultiple(name string, children ...string) string {
+	return `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
+		strings.Join(children, "") +
+		`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
+		`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` +
+		`<upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality></attributes>`
+}
+
+// optTemplate is an OPT whose definition is an archetype root of rmType.
+func optTemplate(rmType string, attrs ...string) string {
+	return `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>rm_defaults</value></template_id><concept>rm_defaults</concept>
+<definition><rm_type_name>` + rmType + `</rm_type_name><node_id>at0000</node_id>` + strings.Join(attrs, "") +
+		`<archetype_id><value>openEHR-EHR-` + rmType + `.rm_defaults.v1</value></archetype_id></definition>
+</template>`
+}
+
+// compileOPTText compiles xml, with or without the implicit RM
+// attributes the compile step adds for every mandatory field the OPT
+// leaves out.
+func compileOPTText(t *testing.T, xml string, implicit bool) *templatecompile.Compiled {
+	t.Helper()
+	opt, err := template.ParseOPT(strings.NewReader(xml))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	var opts []templatecompile.Option
+	if !implicit {
+		opts = append(opts, templatecompile.WithoutImplicitAttributes())
+	}
+	c, err := templatecompile.Compile(opt, opts...)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	return c
+}
+
+// nodeID is the archetype_node_id of a locatable, or "" for any other value.
+func nodeID(v any) string {
+	if l, ok := v.(rm.Locatable); ok {
+		return l.GetArchetypeNodeID()
+	}
+	return ""
+}
+
+var defaultsNow = time.Date(2021, 3, 4, 5, 6, 7, 0, time.UTC)
+
+// entryAttrs are the ENTRY attributes an ACTION or INSTRUCTION case names
+// without children, so the generator's implicit fills supply them.
+var entryAttrs = []string{optSingle("language"), optSingle("encoding"), optSingle("subject")}
+
+// emptyTree is an ITEM_TREE the OPT names with no attributes, so its
+// items list is left to the generator.
+var emptyTree = optNode("ITEM_TREE", "at0001")
+
+// TestREQ107_RMDefaultsFillOPTSilentFields is the REQ-107 check that
+// "where the OPT leaves an RM attribute open, the generator MUST fill in
+// RM-valid defaults". Each case builds an OPT in which nothing upstream
+// of the default fills the field, asserts the field the default writes,
+// and checks the generated value against the RM floor.
+func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
+	cases := []struct {
+		name     string
+		opt      string
+		implicit bool
+		check    func(t *testing.T, out any)
+	}{
+		{
+			name: "ACTION time",
+			opt: optTemplate("ACTION", append(entryAttrs,
+				optSingle("ism_transition", optNode("ISM_TRANSITION", "")),
+				optSingle("description", emptyTree))...),
+			check: func(t *testing.T, out any) {
+				a := out.(*rm.Action)
+				if want := defaultsNow.Format(time.RFC3339); a.Time.Value != want {
+					t.Errorf("ACTION.time = %q, want %q", a.Time.Value, want)
+				}
+			},
+		},
+		{
+			name: "ISM_TRANSITION current_state",
+			opt: optTemplate("ACTION", append(entryAttrs,
+				optSingle("ism_transition", optNode("ISM_TRANSITION", "")),
+				optSingle("description", emptyTree))...),
+			check: func(t *testing.T, out any) {
+				cs := out.(*rm.Action).IsmTransition.CurrentState
+				if cs.DefiningCode.TerminologyID.Value != "openehr" || cs.DefiningCode.CodeString != "524" || cs.Value != "initial" {
+					t.Errorf("ISM_TRANSITION.current_state = %+v, want openehr::524|initial|", cs)
+				}
+			},
+		},
+		{
+			name: "ITEM_TREE items",
+			opt: optTemplate("ACTION", append(entryAttrs,
+				optSingle("ism_transition", optNode("ISM_TRANSITION", "")),
+				optSingle("description", emptyTree))...),
+			check: func(t *testing.T, out any) {
+				tree, _ := out.(*rm.Action).Description.(*rm.ItemTree)
+				if tree == nil || len(tree.Items) != 1 || nodeID(tree.Items[0]) != "at0000" {
+					t.Errorf("ACTION.description = %+v, want an ITEM_TREE with one at0000 item", out.(*rm.Action).Description)
+				}
+			},
+		},
+		{
+			name: "CLUSTER items",
+			opt:  optTemplate("CLUSTER"),
+			check: func(t *testing.T, out any) {
+				c := out.(*rm.Cluster)
+				if len(c.Items) != 1 || nodeID(c.Items[0]) != "at0000" {
+					t.Errorf("CLUSTER.items = %+v, want one at0000 item", c.Items)
+				}
+			},
+		},
+		{
+			name: "ITEM_LIST items",
+			opt:  optTemplate("ITEM_LIST"),
+			check: func(t *testing.T, out any) {
+				l := out.(*rm.ItemList)
+				if len(l.Items) != 1 || l.Items[0].ArchetypeNodeID != "at0000" {
+					t.Errorf("ITEM_LIST.items = %+v, want one at0000 ELEMENT", l.Items)
+				}
+			},
+		},
+		{
+			name: "ACTIVITY action_archetype_id",
+			opt:  optTemplate("ACTIVITY", optSingle("description", emptyTree)),
+			check: func(t *testing.T, out any) {
+				if got := out.(*rm.Activity).ActionArchetypeID; got != "openEHR-EHR-ACTION.example.v1" {
+					t.Errorf("ACTIVITY.action_archetype_id = %q, want openEHR-EHR-ACTION.example.v1", got)
+				}
+			},
+		},
+		{
+			name: "PARTY_RELATIONSHIP source and target",
+			opt:  optTemplate("PARTY_RELATIONSHIP"),
+			check: func(t *testing.T, out any) {
+				rel := out.(*rm.PartyRelationship)
+				for side, ref := range map[string]rm.PartyRef{"source": rel.Source, "target": rel.Target} {
+					if ref.ID == nil || ref.Namespace == "" || ref.Type == "" {
+						t.Errorf("PARTY_RELATIONSHIP.%s = %+v, want id, namespace and type", side, ref)
+					}
+				}
+			},
+		},
+		{
+			name: "DV_EHR_URI value",
+			opt:  optTemplate("DV_EHR_URI"),
+			check: func(t *testing.T, out any) {
+				if got := out.(*rm.DVEHRURI).Value; !strings.HasPrefix(got, "ehr:") {
+					t.Errorf("DV_EHR_URI.value = %q, want the ehr scheme", got)
+				}
+			},
+		},
+		{
+			name: "DV_ORDINAL symbol",
+			opt:  optTemplate("DV_ORDINAL"),
+			check: func(t *testing.T, out any) {
+				if s := out.(*rm.DVOrdinal).Symbol; s.DefiningCode.CodeString == "" || s.Value == "" {
+					t.Errorf("DV_ORDINAL.symbol = %+v, want a coded symbol", s)
+				}
+			},
+		},
+		{
+			name: "DV_SCALE symbol",
+			opt:  optTemplate("DV_SCALE"),
+			check: func(t *testing.T, out any) {
+				if s := out.(*rm.DVScale).Symbol; s.DefiningCode.CodeString == "" || s.Value == "" {
+					t.Errorf("DV_SCALE.symbol = %+v, want a coded symbol", s)
+				}
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, tc.opt, tc.implicit)
+			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+				if err != nil {
+					t.Fatalf("Generate(%v): %v", policy, err)
+				}
+				tc.check(t, out)
+				for _, iss := range validation.ValidateRM(out).Issues {
+					if iss.Severity == validation.Error {
+						t.Errorf("Generate(%v): ValidateRM: %s @ %s: %s", policy, iss.Code, iss.Path, iss.Detail)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestREQ107_RMDefaultsFillBMMSynthesisedValues is the REQ-107 check of
+// the defaults the generator writes on values it builds from the BMM
+// alone, and on values the OPT names but leaves unconstrained. Each case
+// asserts the field the default writes and checks the generated value
+// against the RM floor.
+func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
+	// knownGap is the one floor issue a BMM-built content item still
+	// carries: it is an archetype root with no archetype_details. The
+	// cases that build one check every other floor rule.
+	const knownGap = "is_archetype_root @ /content[0]/archetype_details"
+	cases := []struct {
+		name     string
+		opt      string
+		tolerate string
+		check    func(t *testing.T, out any)
+	}{
+		{
+			// COMPOSITION.content named with no children: the generator
+			// builds an OBSERVATION from the BMM, with its ENTRY codes and
+			// the identity of each locatable it adds below it.
+			name:     "BMM-built ENTRY language and encoding",
+			opt:      optTemplate("COMPOSITION", optMultiple("content")),
+			tolerate: knownGap,
+			check: func(t *testing.T, out any) {
+				obs := bmmObservation(t, out)
+				if obs.Language.TerminologyID.Value != "ISO_639-1" || obs.Language.CodeString != "en" {
+					t.Errorf("OBSERVATION.language = %+v, want ISO_639-1::en", obs.Language)
+				}
+				if obs.Encoding.TerminologyID.Value != "IANA_character-sets" || obs.Encoding.CodeString != "UTF-8" {
+					t.Errorf("OBSERVATION.encoding = %+v, want IANA_character-sets::UTF-8", obs.Encoding)
+				}
+			},
+		},
+		{
+			name:     "BMM-built locatable identity",
+			opt:      optTemplate("COMPOSITION", optMultiple("content")),
+			tolerate: knownGap,
+			check: func(t *testing.T, out any) {
+				obs := bmmObservation(t, out)
+				if obs.ArchetypeNodeID != "at0000" {
+					t.Errorf("OBSERVATION.archetype_node_id = %q, want at0000", obs.ArchetypeNodeID)
+				}
+				if obs.Data.ArchetypeNodeID != "at0000" || obs.Data.Name == nil {
+					t.Errorf("OBSERVATION.data = %+v, want archetype_node_id at0000 and a name", obs.Data)
+				}
+			},
+		},
+		{
+			name: "locatable without a node id",
+			opt:  optTemplate("CLUSTER", optMultiple("items", optNode("ELEMENT", ""))),
+			check: func(t *testing.T, out any) {
+				c := out.(*rm.Cluster)
+				if len(c.Items) != 1 || nodeID(c.Items[0]) != "at0000" {
+					t.Errorf("CLUSTER.items = %+v, want one item with archetype_node_id at0000", c.Items)
+				}
+			},
+		},
+		{
+			name: "DV_DATE_TIME value from the clock",
+			opt:  optTemplate("DV_DATE_TIME"),
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.DVDateTime).Value, defaultsNow.Format(time.RFC3339); got != want {
+					t.Errorf("DV_DATE_TIME.value = %q, want %q", got, want)
+				}
+			},
+		},
+		{
+			name: "DV_EHR_URI under ELEMENT keeps the ehr scheme",
+			opt:  optTemplate("ELEMENT", optSingle("value", optNode("DV_EHR_URI", ""))),
+			check: func(t *testing.T, out any) {
+				uri, _ := out.(*rm.Element).Value.(*rm.DVEHRURI)
+				if uri == nil || !strings.HasPrefix(uri.Value, "ehr:") {
+					t.Errorf("ELEMENT.value = %+v, want a DV_EHR_URI with the ehr scheme", out.(*rm.Element).Value)
+				}
+			},
+		},
+		{
+			name: "DV_PROPORTION precision and accuracy",
+			opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_PROPORTION", "",
+				optSingle("numerator", optPrimitive("REAL", "C_REAL", "<list>3</list>")),
+				optSingle("denominator", optPrimitive("REAL", "C_REAL", "<list>4</list>")),
+				optSingle("type", optPrimitive("INTEGER", "C_INTEGER", "<list>0</list>")),
+				optSingle("precision", optPrimitive("INTEGER", "C_INTEGER", "<list>2</list>")),
+				optSingle("accuracy", optPrimitive("REAL", "C_REAL", "<list>0.5</list>"))))),
+			check: func(t *testing.T, out any) {
+				p, _ := out.(*rm.Element).Value.(*rm.DVProportion)
+				if p == nil {
+					t.Fatalf("ELEMENT.value = %T, want *rm.DVProportion", out.(*rm.Element).Value)
+				}
+				if p.Precision == nil || *p.Precision != 2 {
+					t.Errorf("DV_PROPORTION.precision = %v, want 2", p.Precision)
+				}
+				if p.Accuracy == nil || *p.Accuracy != 0.5 {
+					t.Errorf("DV_PROPORTION.accuracy = %v, want 0.5", p.Accuracy)
+				}
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, tc.opt, true)
+			out, err := instance.Generate(t.Context(), c, instance.Options{
+				Policy:    instance.Example,
+				Language:  "en",
+				Territory: "NL",
+				Composer:  testComposer(),
+				Now:       defaultsNow,
+			})
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			tc.check(t, out)
+			for _, iss := range validation.ValidateRM(out).Issues {
+				if iss.Severity == validation.Error && iss.Code+" @ "+iss.Path != tc.tolerate {
+					t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+				}
+			}
+		})
+	}
+}
+
+// bmmObservation returns the one OBSERVATION the generator built for an
+// OPT-silent COMPOSITION.content.
+func bmmObservation(t *testing.T, out any) *rm.Observation {
+	t.Helper()
+	comp, err := instance.AsComposition(out)
+	if err != nil {
+		t.Fatalf("AsComposition: %v", err)
+	}
+	if len(comp.Content) != 1 {
+		t.Fatalf("COMPOSITION.content has %d items, want 1", len(comp.Content))
+	}
+	obs, ok := comp.Content[0].(*rm.Observation)
+	if !ok {
+		t.Fatalf("COMPOSITION.content[0] is %T, want *rm.Observation", comp.Content[0])
+	}
+	return obs
+}

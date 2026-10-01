@@ -9,15 +9,16 @@ import (
 )
 
 // IsAOMPrimitiveShortName reports whether s is an AOM 1.4 primitive
-// short name (BOOLEAN, DATE, TIME, DATE_TIME, DURATION). These appear
-// as the rm_type_name of C_PRIMITIVE_OBJECT children pinned under
-// BMM-typed primitive attributes (e.g. DV_DURATION.value). Shared by
-// the validator and the instance synthesiser so both agree on which
-// leaves carry a primitive constraint rather than an RM wrapper.
-// It is a closed switch and uses no reflection.
+// short name (BOOLEAN, DATE, TIME, DATE_TIME, DURATION, INTEGER, REAL,
+// STRING). These appear as the rm_type_name of C_PRIMITIVE_OBJECT
+// children pinned under BMM-typed primitive attributes (e.g.
+// DV_DURATION.value, DV_TEXT.value). Shared by the validator and the
+// instance synthesiser so both agree on which leaves carry a primitive
+// constraint rather than an RM wrapper. It is a closed switch and
+// uses no reflection.
 func IsAOMPrimitiveShortName(s string) bool {
 	switch s {
-	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION", "INTEGER", "REAL":
+	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION", "INTEGER", "REAL", "STRING":
 		return true
 	default:
 		return false

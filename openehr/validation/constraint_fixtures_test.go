@@ -41,6 +41,12 @@ func TestValidateComposition_ConstraintFixtures_NoPrimitiveViolations(t *testing
 		"Test_dv_boolean_true_false.v0": "value false not allowed",
 		// OPT pins magnitude range [10..20] while the instance carries 25.
 		"Test_dv_count_range_constraint.v0": "magnitude 25 outside [10..20]",
+		// OPT pins formalism to [text/plain] while the instance carries abc.
+		// Surfaced once STRING became an AOM primitive short name (REQ-107).
+		"Test_dv_parsable_open_constraint.v0": "formalism abc not in [text/plain]",
+		// OPT name lists are shorter than the instance's runtime names, and
+		// one list entry is itself misspelled. Surfaced with the STRING check.
+		"clinical_content_validation": "name/value not in the OPT's closed list",
 	}
 	for _, id := range ids {
 		if _, skip := constraintViolatingFixtures[id]; skip {

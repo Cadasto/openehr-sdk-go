@@ -183,7 +183,7 @@ The set is closed by `isPrimitive()`; new primitive shapes appear in the `constr
 - `CBoolean.Validate` accepts Go `bool`.
 - `CodePhrase.Validate` accepts either a bare `string` (treated as the code under the constrained terminology) or a `constraints.CodedTermRef`.
 - `DvQuantity.Validate` accepts a `constraints.QuantityValue` `{Magnitude, Units, Precision}` triple.
-- `CDvOrdinal.Validate` accepts either an `int` (ordinal value) or a `constraints.OrdinalSymbol` `(value, symbol)` pair.
+- `CDvOrdinal.Validate` accepts either an `int` (ordinal value) or a `constraints.OrdinalSymbol` `(value, symbol)` pair. An empty `Values` list constrains the type only: `Validate` **MUST** accept any `int` or `OrdinalSymbol` against it, because an OPT that names `DV_ORDINAL` and lists no pairs leaves the value open, and **MUST** refuse any other Go type with `CodeWrongType`.
 
 A value whose Go type is not in the accepted set returns a single `CodeWrongType` violation; this is a contract failure on the caller side, not a constraint failure.
 
@@ -408,7 +408,7 @@ The `c *templatecompile.Compiled` argument is the compiled-template form. It was
 
 ## REQ-107 — Template-driven RM instance example generator
 
-**Status:** Draft (Phases 0–3 landed).
+**Status:** Draft.
 
 The SDK **MUST** ship a template-authoritative RM instance synthesiser at `openehr/instance/`: given a compiled OPT, produce a conformant RM object graph whose structure and primitive leaves satisfy the same template-driven contract REQ-102 validates against. The generator is the inverse of validation v2 — same compiled-OPT walk, opposite direction (`rmwrite` instead of `rmread`).
 
@@ -418,7 +418,7 @@ The generator is the single skeleton-and-populate engine the composition builder
 
 ### Contract
 
-Public entry point (target shape, lands with Phase 2):
+Public entry point:
 
 ```go
 package instance
@@ -453,6 +453,10 @@ Slot handling (v1): pinned archetype-root children under a slot are synthesised;
 
 Where the OPT leaves an RM attribute open, the generator **MUST** fill in RM-valid defaults: an unconstrained abstract `PARTY_PROXY` (for example an ENTRY `subject`) becomes `PARTY_SELF`, never an empty `PARTY_IDENTIFIED`, which would break `Basic_validity`; and an unconstrained `EVENT_CONTEXT.setting` takes the `openehr`-coded `238|other care|`, never an archetype-local code, so that `Setting_valid` holds.
 
+Generated output **MUST** also pass the RM floor (`validation.ValidateRM`, [REQ-112](#req-112--template-less-reference-model-validation-floor)), and `composition.NewBuilder` output likewise, for every root the generator synthesises. Two cases are outside that rule. A required slot whose includes cannot be synthesised is refused with `ErrSlotFillUnsupported` (§ Slot fills) rather than filled, at either policy and through the builder. An OPT that constrains an attribute the pinned RM does not have (today `ITEM_TABLE.rotated`) yields a value the validators reject, because the generator cannot write an attribute the RM lacks.
+
+When no value can satisfy a primitive leaf's constraint (for example a STRING whose pattern and list admit no string the generator can derive), `Generate` **MUST** return an error wrapping `instance.ErrConstraintUnsatisfiable` that names the RM type, the attribute and the OPT path, and **MUST NOT** write a value the constraint rejects. That error **MUST NOT** wrap `ErrSlotFillUnsupported`, which is kept for slots.
+
 ### Primitive-leaf value fill
 
 `Policy` selects *which* nodes are materialised; an orthogonal **`ValueFill`** selects *how* primitive leaves are valued. The SDK **MUST** offer two fills: `ExampleFill` (default) populates each leaf with its REQ-103 `PrimitiveConstraint.ExampleValue` — a single representative value, byte-identical across calls for one OPT; `RandomFill` draws each leaf from within its constraint (in-range magnitudes, value-set-member codes, enumeration entries), valid by construction and varying between calls. A `ValueFill` other than `RandomFill` **MUST** degrade to `ExampleFill` rather than error.
@@ -463,13 +467,13 @@ Where the OPT leaves an RM attribute open, the generator **MUST** fill in RM-val
 
 ### Trust model
 
-The compiled OPT is **authoritative for structure**. The RM graph is assembled attribute-by-attribute from compiled metadata; the generator never guesses paths from an empty composition. Primitive leaves come from `PrimitiveConstraint.ExampleValue()` (REQ-103), which guarantees `Validate(ExampleValue()) == nil` for bounded constraints. Optional OPT `<assumed_value>` / `<default_value>` (when compile captures them — a Phase 0 follow-up) **override** the factory.
+The compiled OPT is **authoritative for structure**. The RM graph is assembled attribute-by-attribute from compiled metadata; the generator never guesses paths from an empty composition. Primitive leaves come from `PrimitiveConstraint.ExampleValue()` (REQ-103), which guarantees `Validate(ExampleValue()) == nil` for bounded constraints. Compile captures an OPT `<assumed_value>` into the constraint's `Default` field, but the generator does not read it: the factory value stands, and an assumed or default value does not override it.
 
-The generator is **sound** (every output is valid against the OPT), not **complete** (it does not enumerate every valid instance — different policies may produce different but equally valid trees). Sound × validator-aligned ⇒ PROBE-027 cross-checks the contract.
+The generator is **sound** (every output is valid against the OPT, apart from an attribute the pinned RM lacks, above), not **complete** (it does not enumerate every valid instance — different policies may produce different but equally valid trees). Sound × validator-aligned ⇒ PROBE-027 cross-checks the contract.
 
-### Trust model — phasing
+### Slot fills
 
-Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / `UIDSource` test-determinism seam / typed accessors for the closed root set; PROBE-027 implemented (inline) covering `vital_signs.opt` + `clinical_note.opt` + the REQ-107 real-world corpus (`Referral Request.v1`, `Demonstration.v1`, `social`); `cmd/examples/generate-example/` worked example. The C_PRIMITIVE_OBJECT inner-`<item>` wire-parser fix + canjson-polymorphic `Composition.uid` emission landed in [PR 21](https://github.com/Cadasto/openehr-sdk-go/pull/21); PROBE-023 now exercises the full marshal → unmarshal → re-marshal round-trip. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) landed with the composition builder in [PR 19](https://github.com/Cadasto/openehr-sdk-go/pull/19). REQ-104 slot-fill archetype-id stamping is landed for parsed include patterns that can be synthesized safely; when no includes were parsed the synthesiser uses `openEHR-EHR-<RMType>.example.v1` to satisfy the validator's RM-type-prefix heuristic.
+A required slot **MUST** be stamped with an archetype id drawn from the parsed REQ-104 include grammar when a safe example can be synthesized. When the OPT carried no parseable includes, the synthesiser **MUST** use `openEHR-EHR-<RMType>.example.v1`, the validator's RM-type-prefix fallback. A required slot whose includes cannot be satisfied **MUST** make `Generate` return `ErrSlotFillUnsupported`, and the generator **MUST NOT** invent an archetype id for it.
 
 ### Out of scope
 
@@ -488,8 +492,8 @@ Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/
 
 The public signature accepts `*templatecompile.Compiled`. As with `validation.ValidateComposition`, REQ-111 makes that argument externally constructable via `openehr/templatecompile.Compile`, so `instance.Generate` is now callable from outside the module (see [ADR 0010](../adr/0010-public-compiled-template-bridge.md)).
 
-- **Lives in:** [`openehr/instance/`](../../openehr/instance/) (lands in Phase 2); `openehr/template/constraints/.ExampleValue()` (Phase 0 — landed); `internal/templateinstance/` (Phase 1+).
-- **Probes:** PROBE-027 — `instance.Generate` + `validation.ValidateComposition` round-trip clean on the same OPT (Phase 3).
+- **Lives in:** [`openehr/instance/`](../../openehr/instance/); `openehr/template/constraints` `ExampleValue()`; `internal/templateinstance/`.
+- **Probes:** PROBE-027 — `instance.Generate` checked with `validation.ValidateComposition` (COMPOSITION roots) or `validation.Validate`, and with `validation.ValidateRM`, across the vendored OPTs that compile.
 
 ---
 
@@ -871,7 +875,7 @@ originate the invalid shape.
 
 **Known gap — bounds that cannot be compared.** RM `DV_INTERVAL.Limits_consistent` (and BASE `Interval.Limits_comparable`) also require two present bounds to be strictly comparable, so an interval whose bounds are a DV_COUNT and a DV_QUANTITY (possible only in a bare `DV_INTERVAL<DV_ORDERED>`), two DV_QUANTITY in different `units`, or two DV_QUANTITY with equal `units` and different `units_system`, is RM-invalid. The floor does not report that. It skips the first two kinds of pair. It orders the third by magnitude like any same-units pair, so it reports one only when `lower` is above `upper`.
 
-**Known gap — classes rmread does not model.** The floor reads a node's attributes only for the classes rmread models: every registered LOCATABLE and DV_ORDERED, the data values DV_BOOLEAN, DV_TEXT, DV_CODED_TEXT, DV_URI, DV_EHR_URI, DV_IDENTIFIER, DV_MULTIMEDIA and DV_PARSABLE, and CODE_PHRASE, TERM_MAPPING, EVENT_CONTEXT, REFERENCE_RANGE and ARCHETYPED. Any other class is a leaf: the required-set walk does not read its attributes, and the walk does not go below it. A leaf's RM-mandatory attributes are checked only where its own catalogue entry checks them, as the OBJECT_REF family's entry does. The leaves with no such entry are the PARTY_PROXY family (PARTY_SELF, PARTY_IDENTIFIED, PARTY_RELATED), PARTICIPATION, LINK, FEEDER_AUDIT and FEEDER_AUDIT_DETAILS, ISM_TRANSITION, INSTRUCTION_DETAILS, TRANSLATION_DETAILS, DV_STATE, DV_PARAGRAPH, the time-specification data values and the OBJECT_ID family, so a PARTICIPATION with no `function`, or a PARTY_RELATED with no `relationship`, passes the floor. The LOCATABLE readers also leave out `uid`, `links` and `feeder_audit`.
+**Known gap — classes rmread does not model.** The floor reads a node's attributes only for the classes rmread models: every registered LOCATABLE and DV_ORDERED, the data values DV_BOOLEAN, DV_TEXT, DV_CODED_TEXT, DV_URI, DV_EHR_URI, DV_IDENTIFIER, DV_MULTIMEDIA and DV_PARSABLE, and CODE_PHRASE, TERM_MAPPING, EVENT_CONTEXT, REFERENCE_RANGE, ARCHETYPED and ISM_TRANSITION. Any other class is a leaf: the required-set walk does not read its attributes, and the walk does not go below it. A leaf's RM-mandatory attributes are checked only where its own catalogue entry checks them, as the OBJECT_REF family's entry does. The leaves with no such entry are the PARTY_PROXY family (PARTY_SELF, PARTY_IDENTIFIED, PARTY_RELATED), PARTICIPATION, LINK, FEEDER_AUDIT and FEEDER_AUDIT_DETAILS, INSTRUCTION_DETAILS, TRANSLATION_DETAILS, DV_STATE, DV_PARAGRAPH, the time-specification data values and the OBJECT_ID family, so a PARTICIPATION with no `function`, or a PARTY_RELATED with no `relationship`, passes the floor. The LOCATABLE readers also leave out `uid`, `links` and `feeder_audit`.
 
 Catalogue additions follow [ADR 0001](../adr/0001-bmm-version-bump-runbook.md) — adding a new BMM concrete that needs a leaf invariant requires editing the closed switch in `rmfloor_adapters.go` and adding the evaluator. Most invariants emit `Issue.Code = "rm_invariant"`; the term-mapping checks are the exception (`mappings_valid` on DV_TEXT / DV_CODED_TEXT, `term_mapping_match` on TERM_MAPPING), as are the archetype-root check (`is_archetype_root`) and the ARCHETYPED check (`rm_version_valid`), carrying their own stable codes so consumers can dispatch on the specific violation without parsing `Detail`.
 

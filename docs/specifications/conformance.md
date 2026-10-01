@@ -517,11 +517,11 @@ client scenarios to SDK coverage:
 
 #### PROBE-027 — Generated instance validates clean
 
-- **Title:** `instance.Generate(c, opts)` followed by `validation.ValidateComposition(out, c)` returns `Result.OK = true` for both `Minimal` and `Example` policies on the same OPT.
+- **Title:** `instance.Generate(c, opts)` followed by `validation.ValidateComposition(out, c)` returns `Result.OK = true` for both `Minimal` and `Example` policies on an OPT the generator can synthesise, outside the census rows in the status.
 - **Preconditions:** Compiled OPT for a fixture template; valid composer + territory for COMPOSITION roots.
-- **Wire assertion:** Cross-package round-trip — generator and validator agree on the same template-driven contract.
+- **Wire assertion:** Cross-package round-trip — generator and validator agree on the same template-driven contract. On the compiling vendored corpus the same generated value also passes `validation.ValidateRM`, the RM-floor rule of [§ REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) with its two exceptions.
 - **Modes:** In-repo (generator and validator agreement over fixture OPTs; no backend).
-- **Status:** Implemented (inline) — see [`testkit/probes/instance/probe_027_generated_validates.go`](../../testkit/probes/instance/probe_027_generated_validates.go). Probe runs against both `vital_signs.opt` and `clinical_note.opt` for `Minimal` and `Example` policies. Slot fills draw a conforming archetype id from the parsed REQ-104 include grammar when a safe example can be synthesized, falling back to `openEHR-EHR-<RMType>.example.v1` (the validator's RM-type-prefix fallback path) only when the OPT carried no parseable includes.
+- **Status:** Implemented (inline) — [`testkit/probes/instance/probe_027_generated_validates.go`](../../testkit/probes/instance/probe_027_generated_validates.go) and the corpus census `TestREQ107_CorpusRatchet`. The census runs `instance.Generate` (both policies, both fills, one fixed seed) and `composition.NewBuilder` over every vendored OPT that compiles, then `validation.ValidateRM` and, for a COMPOSITION root, `validation.ValidateComposition` (otherwise `validation.Validate`). A failure that is not in the census table fails the test, and a table row that now passes fails it too. Two OPTs do not compile and are allowlisted: `definition/body_weight` (no `template_id`) and `templates/social` (root element `OPERATIONAL_TEMPLATE`). What remains in the table is not a validator miss: `family_history.v.1.2.3` returns `ErrSlotFillUnsupported` at both policies and through `composition.NewBuilder`, and `Corona_Anamnese` at Example policy, for a required slot whose includes cannot be synthesized; `clinical_content_validation` asks for `ITEM_TABLE.rotated`, which the pinned RM does not have.
 - **Satisfies:** REQ-107.
 
 #### PROBE-074 — Template-driven validation of non-COMPOSITION roots

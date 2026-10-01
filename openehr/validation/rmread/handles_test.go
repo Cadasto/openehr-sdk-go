@@ -28,6 +28,7 @@ var handledTypes = []any{
 	rm.Evaluation{},
 	rm.Instruction{},
 	rm.Action{},
+	rm.IsmTransition{},
 	rm.AdminEntry{},
 	rm.GenericEntry{},
 	rm.Section{},
@@ -97,7 +98,7 @@ var handledTypes = []any{
 }
 
 func TestHandles_ModelledTypes(t *testing.T) {
-	if got, want := len(handledTypes), 66; got != want {
+	if got, want := len(handledTypes), 67; got != want {
 		t.Errorf("handledTypes has %d entries, want %d — keep it in sync with Handles/ReadSingle", got, want)
 	}
 	for _, v := range handledTypes {
