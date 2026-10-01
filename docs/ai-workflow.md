@@ -86,9 +86,9 @@ The Claude Code format-on-save hook is documented in [`.claude/CLAUDE.md`](../.c
 
 ## Review
 
-Findings for a branch live in one git-ignored file, `.sdd/findings/<branch>.md`, named after the branch with `/` replaced by `--`. Any agent on this machine, or a person, reads and edits it. It is the only list of findings, with or without a PR, and it is deleted when the branch merges. When a PR exists, `sdd-pr` keeps the file and the PR's inline review threads in step; nothing else about findings is posted. `sdd-pr status` lists what is open, prints `Mergeable: yes|no` and names the next command. The line format, the severities and the evidence rules are in the sdd plugin's `references/review.md`.
+Findings for a branch live in one file in the clone's git directory, `<git-common-dir>/sdd/findings/<branch-slug>.md`, named after the branch with `/` replaced by `--`. Every worktree and every agent on this machine sees it, git never commits it, and removing a worktree keeps it; `sdd-pr status` prints its path. `sdd-pr` makes every write to it (`add`, `flip`, `record`, `rename`), so nobody edits it by hand. It is the only list of findings, with or without a PR, and `sdd-pr status` names it for deletion once the PR merges. When a PR exists, `sdd-pr` keeps the file and the PR's inline review threads in step, and keeps a review-state block in the PR body; nothing else about findings is posted. `sdd-pr status` lists what is open, prints `Mergeable: yes|no` and names the next command. The line format, the severities and the evidence rules are in the sdd plugin's `references/review.md`.
 
-There are three severities. **Critical** and **important** findings carry evidence: the command run, the failing test, or the two sentences that disagree, quoted. They are resolved before merge, either fixed or declined with the reason on the finding's line, and they are the only ones mirrored to the PR. **Suggestions** are recorded and never block. In anything posted to the PR, never write a number with a leading hash sign, which GitHub turns into a link to an unrelated issue.
+There are three severities. **Critical** and **important** findings carry evidence: the command run, the failing test, or the two sentences that disagree, quoted. They are resolved before merge, either fixed or declined with the reason on the finding's line, and they are the only ones mirrored to the PR. **Suggestions** are recorded and never block. Before merge each one is routed with the maintainer, to a *Known gaps* line, a deferred requirement or a tracker issue, or dropped. In anything posted to the PR, never write a number with a leading hash sign, which GitHub turns into a link to an unrelated issue.
 
 A reviewer that runs outside this repository gets this request, filled in by `/sdd-review --panel`:
 
@@ -97,7 +97,7 @@ A reviewer that runs outside this repository gets this request, filled in by `/s
 Review commits <a>..<b> of Cadasto/openehr-sdk-go, and only those. Read docs/ai-workflow.md § Review.
 Report critical and important findings only, each with evidence (what you ran, or the two
 sentences that disagree) and a one-line fix; write anything smaller as a suggestion.
-If you work on this machine, append your lines to .sdd/findings/<branch>.md in its grammar.
+If you work on this machine, pipe your lines in that grammar to: <plugin root>/tools/sdd-pr.py add -
 If you work on the pull request, post one review with one inline comment per finding, its
 first word **critical** or **important**; post nothing else, and do not restate the PR body.
 ──────────────────────────────────────────────────────────────────────────────
