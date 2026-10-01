@@ -1,7 +1,9 @@
 package rm_test
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
@@ -10,7 +12,10 @@ import (
 // valid_iso8601_date, valid_iso8601_time and valid_iso8601_date_time
 // accept (extended and compact, dot or comma fraction, Z / ±hh / ±hhmm /
 // ±hh:mm zone, partial forms) and nothing else. The values below that
-// the previous parse rejected came from real fixtures.
+// the previous parse rejected came from real fixtures. The zone style may
+// differ from the body style (10:30:00+0530, 103000+05:30): the fixtures
+// carry such values and the BASE predicates treat the zone as a separate
+// part.
 
 type isoCase struct {
 	value string
@@ -91,10 +96,13 @@ func TestREQ123_ValidISO8601TimeForms(t *testing.T) {
 		{"00:00:00", true},
 		{"23:59:59", true},
 		{"23:59:60", true}, // leap second
-		{"24:00:00", true},
-		{"24:00", true},
-		{"24", true},
-		{"240000", true},
+		// BASE: "the time 24:00:00 is not allowed", valid_iso8601_time gives hh as 00 to 23
+		{"24:00:00", false},
+		{"24:00", false},
+		{"24", false},
+		{"240000", false},
+		{"2400", false},
+		{"24:00:00Z", false},
 		{"24:00:01", false},
 		{"24:30", false},
 		{"2430", false},
@@ -177,9 +185,12 @@ func TestREQ123_ValidISO8601DateTimeForms(t *testing.T) {
 		{"2024-03-05", true},
 		{"20240305", true},
 		{"202403", true},
-		// 24:00 end of day
-		{"2025-10-24T24:00:00", true},
-		{"20251024T240000", true},
+		// hour 24 is refused: it would silently be the next day
+		{"2025-10-24T24:00:00", false},
+		{"2024-03-15T24:00:00", false},
+		{"2025-10-24T24:00", false},
+		{"2025-10-24T24", false},
+		{"20251024T240000", false},
 		{"2025-10-24T24:00:01", false},
 		// out of range
 		{"2025-13-01T10:00:00", false},
@@ -341,4 +352,131 @@ func TestREQ123_WidenedFormsDecompose(t *testing.T) {
 			t.Error("DVTime.ToTime(+zz) = nil error")
 		}
 	})
+}
+
+// Hour 24 must not convert either: the old end-of-day reading moved the
+// value to the next day with a nil error.
+func TestREQ123_Hour24DoesNotConvert(t *testing.T) {
+	if _, err := (&rm.DVDateTime{Value: "2024-03-15T24:00:00"}).ToTime(); !errors.Is(err, rm.ErrTemporalConversion) {
+		t.Errorf("DVDateTime.ToTime(T24:00:00) err = %v, want ErrTemporalConversion", err)
+	}
+	if _, err := (&rm.DVTime{Value: "24:00:00"}).ToTime(); !errors.Is(err, rm.ErrTemporalConversion) {
+		t.Errorf("DVTime.ToTime(24:00:00) err = %v, want ErrTemporalConversion", err)
+	}
+	if m := (&rm.DVTime{Value: "24:00:00"}).Magnitude(); m != 0 {
+		t.Errorf("DVTime.Magnitude(24:00:00) = %v, want 0", m)
+	}
+}
+
+func TestREQ123_ValidISO8601DurationForms(t *testing.T) {
+	cases := []isoCase{
+		// BASE form P[nnY][nnM][nnW][nnD][T[nnH][nnM][nnS]]
+		{"P1Y", true},
+		{"P1M", true},
+		{"P1W", true},
+		{"P1D", true},
+		{"PT1H", true},
+		{"PT1M", true},
+		{"PT1S", true},
+		{"P1Y2M3W4DT5H6M7S", true},
+		{"P1Y2M3W4DT5H6M7.5S", true},
+		{"P1Y2M4DT5H", true},
+		{"P1Y3D", true},
+		{"P12Y", true},
+		{"PT0S", true},
+		// fractional seconds, dot or comma
+		{"PT1.5S", true},
+		{"PT1,5S", true},
+		{"P1DT1,5S", true},
+		{"PT1,5", false},
+		{"PT1,5,5S", false},
+		{"PT1.5,5S", false},
+		{"PT1.5.5S", false},
+		{"PT,5S", false},
+		{"PT2.5H", false}, // a fraction only on the seconds
+		{"PT2,5H", false},
+		{"P1,5D", false},
+		// openEHR deviations: leading negative sign, W mixed with others
+		{"-P1D", true},
+		{"-PT1H", true},
+		{"P1W2D", true},
+		{"P1Y2W3D", true},
+		{"P1M2W", true},
+		{"P1Y2M3W4D", true},
+		// a leading plus is not a BASE form
+		{"+P1D", false},
+		{"+PT1H", false},
+		{"--P1D", false},
+		{"-+P1D", false},
+		// designators in the wrong section
+		{"P1S", false},
+		{"P1H", false},
+		{"PT1Y", false},
+		{"PT1W", false},
+		{"PT1D", false},
+		// order and uniqueness
+		{"P1D1Y", false},
+		{"P1D1M", false},
+		{"P1D1W", false},
+		{"P1W1M", false},
+		{"P1M1Y", false},
+		{"P1M1M", false},
+		{"P1Y1Y", false},
+		{"PT1M1M", false},
+		{"PT1S1M", false},
+		{"PT1M1H", false},
+		{"PT1S1S", false},
+		// the T section
+		{"P1DT", false},
+		{"PT", false},
+		{"PTT1S", false},
+		{"PT1ST", false},
+		{"P1T1S", false},
+		{"P1DT1HT1S", false},
+		// emptiness and junk
+		{"P", false},
+		{"-P", false},
+		{"", false},
+		{"1D", false},
+		{"P1", false},
+		{"P1DX", false},
+		{"PD", false},
+		{"P1 D", false},
+		{"p1d", false},
+		{"example", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.value, func(t *testing.T) {
+			if got := (&rm.DVDuration{Value: tc.value}).ValidISO8601(); got != tc.want {
+				t.Errorf("DVDuration(%q).ValidISO8601() = %v, want %v", tc.value, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestREQ123_DurationCommaFractionDecomposes(t *testing.T) {
+	d := rm.DVDuration{Value: "PT1,5S"}
+	if d.Seconds() != 1 || d.FractionalSeconds() != 0.5 {
+		t.Errorf("PT1,5S = %ds + %v, want 1s + 0.5", d.Seconds(), d.FractionalSeconds())
+	}
+	got, err := d.ToDuration()
+	if err != nil || got != 1500*time.Millisecond {
+		t.Errorf("ToDuration(PT1,5S) = %v, %v; want 1.5s", got, err)
+	}
+}
+
+// The validity methods never panic, a nil receiver included.
+func TestREQ123_ValidISO8601NilReceiver(t *testing.T) {
+	if (*rm.DVDate)(nil).ValidISO8601() {
+		t.Error("nil DVDate reported valid")
+	}
+	if (*rm.DVTime)(nil).ValidISO8601() {
+		t.Error("nil DVTime reported valid")
+	}
+	if (*rm.DVDateTime)(nil).ValidISO8601() {
+		t.Error("nil DVDateTime reported valid")
+	}
+	if (*rm.DVDuration)(nil).ValidISO8601() {
+		t.Error("nil DVDuration reported valid")
+	}
 }
