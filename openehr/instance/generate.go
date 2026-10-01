@@ -865,7 +865,8 @@ func firstNonSlot(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
 // BMM-mandatory multi-valued attribute the OPT did not pin. Uses
 // the attribute's BMM element type via [concreteFor]; silently no-op
 // when the type is outside the typereg registry — the validator
-// will flag it.
+// will flag it. An attribute that is optional (neither BMM-mandatory,
+// nor existence or cardinality lower ≥ 1) gets no child.
 func (g *generator) materialiseImplicitMultiple(
 	optNode *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -873,6 +874,13 @@ func (g *generator) materialiseImplicitMultiple(
 ) error {
 	rmType := attr.RMTypeName()
 	if rmType == "" {
+		return nil
+	}
+	// An optional attribute the OPT leaves empty stays empty. A child
+	// built from the BMM alone has no archetype to name, so an
+	// archetype-rooted one (COMPOSITION.content) would break the RM
+	// floor's archetype_details rule; the RM rule needs no such child.
+	if remainingLowerNeeded(attr, 0) == 0 {
 		return nil
 	}
 	rmChild, err := newRMForOPTType(rmType)
