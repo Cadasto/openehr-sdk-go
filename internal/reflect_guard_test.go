@@ -193,8 +193,8 @@ func TestREQ024ReflectScanReadsOnlyWhatTheGoToolBuilds(t *testing.T) {
 		{"worktrees/other/openehr/x/x.go", false, "worktrees/other holds its own go.mod, so it is another module"},
 		{"_scratch1/s.go", false, "the go tool skips a directory whose name starts with _"},
 		{".x/x.go", false, "the go tool skips a directory whose name starts with ."},
-		{"lib/testdata/t.go", false, "the go tool skips testdata"},
-		{"vendor/v/v.go", false, "the go tool skips vendor"},
+		{"lib/testdata/t.go", false, "the go tool skips testdata when it lists the module's packages"},
+		{"vendor/v/v.go", false, "the go tool skips vendor when it lists the module's packages"},
 		{"cmd/example/main.go", false, "cmd/ holds example programs, not importable library code"},
 		{"site/s.go", false, "site/ is the built documentation site"},
 	}
