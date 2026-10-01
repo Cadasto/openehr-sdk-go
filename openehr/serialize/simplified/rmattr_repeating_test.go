@@ -289,12 +289,25 @@ func TestRepeatingLeafOwnersRefuseReusedSiblingOnFirstEmission(t *testing.T) {
 // Decode must refuse exactly what encode refuses. A bounded end with no bound
 // used to decode fine and then fail to re-encode, and a bound spelled beside
 // `|*_unbounded: true` contradicts the open boundary that flag marks outright.
+// REQ-140. The boundless end is one interval grammar, so the refusal is pinned
+// at `_normal_range`, at `_other_reference_ranges:N`, and at a DV_INTERVAL leaf.
 func TestIntervalDecodeMirrorsEncodeRefusals(t *testing.T) {
 	wt, _ := conformanceWT(t)
+	const orr = rmattrElement + "/_other_reference_ranges:0"
 	for name, extra := range map[string]map[string]any{
 		"bounded end with no bound": {
 			rmattrElement + "/_normal_range/lower|magnitude": 20.5,
 			rmattrElement + "/_normal_range/lower|unit":      "unit",
+		},
+		"_other_reference_ranges:0 bounded end with no bound": {
+			orr + "/lower|magnitude": 70.5,
+			orr + "/lower|unit":      "unit",
+			orr + "/meaning":         "high",
+		},
+		"DV_INTERVAL leaf bounded end with no bound": {
+			rmattrIntervalEvent + "/time":       "2022-01-12T09:00:11.7842493+01:00",
+			rmattrInterval + "/lower|magnitude": 72.83,
+			rmattrInterval + "/lower|unit":      "Unit",
 		},
 		"bound beside an unbounded flag": {
 			rmattrElement + "/_normal_range/lower|magnitude": 20.5,
@@ -428,6 +441,57 @@ func TestIntervalIncludedOpenSideRefusedOnDecode(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tc.key) {
 				t.Errorf("err = %v, want it to name %q", err, tc.key)
+			}
+		})
+	}
+}
+
+// TestREQ140_IncludedOpenSideNamesItsInvariant — REQ-140. Decode of an included
+// open side names that side's BASE invariant (`Lower_included_valid` for lower,
+// `Upper_included_valid` for upper) and not the other side's. The two names are
+// chosen in includedOpenSideError; swapping them must fail this test.
+func TestREQ140_IncludedOpenSideNamesItsInvariant(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const nr = rmattrElement + "/_normal_range"
+	for _, tc := range []struct {
+		name        string
+		keys        map[string]any
+		want, other string
+	}{
+		{
+			name: "lower",
+			keys: map[string]any{
+				nr + "/upper|magnitude": 66.6,
+				nr + "/upper|unit":      "unit",
+				nr + "|lower_unbounded": true,
+				nr + "|lower_included":  true,
+			},
+			want:  "Lower_included_valid",
+			other: "Upper_included_valid",
+		},
+		{
+			name: "upper",
+			keys: map[string]any{
+				nr + "/lower|magnitude": 20.5,
+				nr + "/lower|unit":      "unit",
+				nr + "|upper_unbounded": true,
+				nr + "|upper_included":  true,
+			},
+			want:  "Upper_included_valid",
+			other: "Lower_included_valid",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := decodeIntervalBody(t, wt, rmattrBody(tc.keys), false)
+			if err == nil {
+				t.Fatal("decode succeeded, want a refusal of the included open side")
+			}
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("decode included open %s: err = %v, want ErrUnsupportedDatatype", tc.name, err)
+			}
+			msg := err.Error()
+			if !strings.Contains(msg, tc.want) || strings.Contains(msg, tc.other) {
+				t.Errorf("decode included open %s: err = %v, want it to name %s and not %s", tc.name, err, tc.want, tc.other)
 			}
 		})
 	}
