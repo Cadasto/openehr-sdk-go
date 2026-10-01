@@ -21,6 +21,8 @@ func readDVQuantitySingle(q *rm.DVQuantity, attr string) (any, bool) {
 		return q.Magnitude, true
 	case "units":
 		return strPresent(q.Units)
+	case "magnitude_status":
+		return ptrPresent(q.MagnitudeStatus)
 	case "accuracy":
 		return ptrPresent(q.Accuracy)
 	}
