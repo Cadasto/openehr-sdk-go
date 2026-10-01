@@ -554,3 +554,34 @@ func TestIntervalBaseReadsLegacyXMLNames(t *testing.T) {
 		})
 	}
 }
+
+// TestIntervalDerivedDecodeCopiesOwnMembersBeforeReturning pins the generator
+// side of the failed-decode state (REQ-052): the decoder of a class with
+// members of its own (Point_interval's flags) copies them back before it
+// returns the decode error, so a failed decode leaves what was read, as an
+// in-place decode does. A copy placed after an early `return err` would leave
+// the flags behind.
+func TestIntervalDerivedDecodeCopiesOwnMembersBeforeReturning(t *testing.T) {
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+	pc := plan.Classes["Point_interval"]
+	fields, err := effectiveFields(plan, pc)
+	if err != nil {
+		t.Fatalf("effectiveFields: %v", err)
+	}
+	src, err := renderUnmarshalJSON(plan, pc, fields)
+	if err != nil {
+		t.Fatalf("renderUnmarshalJSON: %v", err)
+	}
+	decode := strings.Index(src, "err := typereg.DecodeInto(")
+	copyBack := strings.Index(src, "p.LowerIncluded = wire.LowerIncluded")
+	ret := strings.Index(src, "return err")
+	if decode < 0 || copyBack < 0 || ret < 0 || !(decode < copyBack && copyBack < ret) {
+		t.Errorf("decoder does not decode, copy the own members back, then return the error (positions %d, %d, %d):\n%s", decode, copyBack, ret, src)
+	}
+	if strings.Contains(src, "err != nil") {
+		t.Errorf("decoder returns early on an error before copying the own members back:\n%s", src)
+	}
+}

@@ -115,17 +115,22 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 			return "", err
 		}
 		// The wire struct reaches the receiver's embedded BASE Interval
-		// through its method-free alias, so those members decode in place;
-		// the class's own members go in by value and come back on success.
+		// through its method-free alias, so those members decode in place.
+		// The class's own members go in by value and come back whether or
+		// not the decode fails, so a failed decode leaves the receiver as an
+		// in-place decode would: members read before the failure are set, the
+		// others keep their previous values.
 		fmt.Fprintf(&b, "\twire := %s\n", intervalDerivedWireValue(pc, base, recv, typeArgs, own, false))
-		fmt.Fprintf(&b, "\tif err := typereg.DecodeInto(dec, %q, wire, &wire.Type); err != nil {\n", pc.BMMName)
-		b.WriteString("\t\treturn err\n")
-		b.WriteString("\t}\n")
+		if len(own) == 0 {
+			fmt.Fprintf(&b, "\treturn typereg.DecodeInto(dec, %q, wire, &wire.Type)\n", pc.BMMName)
+			break
+		}
+		fmt.Fprintf(&b, "\terr := typereg.DecodeInto(dec, %q, wire, &wire.Type)\n", pc.BMMName)
 		for _, ef := range own {
 			fn := FieldName(ef.Prop.PropertyName())
 			fmt.Fprintf(&b, "\t%s.%s = wire.%s\n", recv, fn, fn)
 		}
-		b.WriteString("\treturn nil\n")
+		b.WriteString("\treturn err\n")
 	case embedsMarshalerBearingConcrete(plan, pc):
 		wire := flatWireTypeName(pc.GoName)
 		fmt.Fprintf(&b, "\tvar wire %s%s\n", wire, typeArgs)
