@@ -455,6 +455,8 @@ Where the OPT leaves an RM attribute open, the generator **MUST** fill in RM-val
 
 Generated output **MUST** also pass the RM floor (`validation.ValidateRM`, [REQ-112](#req-112--template-less-reference-model-validation-floor)), and `composition.NewBuilder` output likewise, for every root the generator synthesises. Two cases are outside that rule. A required slot whose includes cannot be synthesised is refused with `ErrSlotFillUnsupported` (§ Slot fills) rather than filled, at either policy and through the builder. An OPT that constrains an attribute the pinned RM does not have (today `ITEM_TABLE.rotated`) yields a value the validators reject, because the generator cannot write an attribute the RM lacks.
 
+When no value can satisfy a primitive leaf's constraint (for example a STRING whose pattern and list admit no string the generator can derive), `Generate` **MUST** return an error wrapping `instance.ErrConstraintUnsatisfiable` that names the RM type, the attribute and the OPT path, and **MUST NOT** write a value the constraint rejects. That error **MUST NOT** wrap `ErrSlotFillUnsupported`, which is kept for slots.
+
 ### Primitive-leaf value fill
 
 `Policy` selects *which* nodes are materialised; an orthogonal **`ValueFill`** selects *how* primitive leaves are valued. The SDK **MUST** offer two fills: `ExampleFill` (default) populates each leaf with its REQ-103 `PrimitiveConstraint.ExampleValue` — a single representative value, byte-identical across calls for one OPT; `RandomFill` draws each leaf from within its constraint (in-range magnitudes, value-set-member codes, enumeration entries), valid by construction and varying between calls. A `ValueFill` other than `RandomFill` **MUST** degrade to `ExampleFill` rather than error.
