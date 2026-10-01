@@ -1,13 +1,17 @@
+---
+kind: plan
+---
+
 # Plan — Generated instances pass the RM floor
 
 **Date:** 2026-09-29
 **Status:** Draft
 **Owner:** SDK maintainers
 **Covers:** [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor); evidence for [STRAND-14](../specifications/research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) (REQ-102)
-**Probes:** PROBE-027, extended to also assert `ValidateRM` (spec in Phase 0, probe in Phase 3)
+**Probes:** PROBE-027. PR 196's corpus census already runs `ValidateRM`; this plan makes it see the ELEMENT rule (Phases 2 and 3)
 **Implementation:** planned
-**Depends on:** nothing functional. PR 188 (REQ-112 archetype roots, open at the time of writing) edits the same floor files, so whichever lands second rebases. Phase 0's spec edits were checked to merge cleanly with it
-**Defers:** the STRAND-14 decision (whether `ValidateComposition` runs the floor); strict OPT 1.4 schema checks beyond `T_ARCHETYPE_ROOT` (Phase 4 records them, and they are optional); evaluating `Language_valid` and `Encoding_valid` in the floor, which needs the ISO 639-1 and IANA character-set registers vendored first
+**Depends on:** PR 196, merged: it fixed defects 1 to 4 and 6 in the generator, added the corpus census `TestREQ107_CorpusRatchet`, and bound generated output to the RM floor in REQ-107. PR 188 has landed, and Phase 0's spec edits sit on top of its catalogue. The [generator follow-ups plan](2026-10-01-generator-follow-ups.md) owns PR 196's other leftovers and does not cover the ELEMENT rule
+**Defers:** the STRAND-14 decision (whether `ValidateComposition` runs the floor); strict OPT 1.4 schema checks beyond `T_ARCHETYPE_ROOT` (Phase 4 records them, and they are optional); evaluating `Language_valid` and `Encoding_valid` in the floor, which needs the ISO 639-1 and IANA character-set registers vendored first; whether the lenient `ParseOPT` reports a subtree it drops (Phase 4 decides)
 
 ## Goal
 
@@ -17,13 +21,19 @@ validation (REQ-102) but break Reference Model rules. The bodies carry:
 - `"example"` as an entry's language and encoding code;
 - an ELEMENT with no name;
 - a CLUSTER with no items;
-- an ELEMENT with both a value and a null flavour, or with neither.
+- an ELEMENT with both a value and a null flavour, or with neither;
+- a DV_ORDINAL with no symbol.
 
 `ValidateComposition` passes all of them, and the RM floor (`ValidateRM`, REQ-112) catches only some. A CDR
-that checks RM invariants on commit refuses every such body. After this plan, every generated instance
-passes both `ValidateComposition` and `ValidateRM`, for both policies and both value fills, and the floor
-reports every one of these defects it can evaluate. The language and encoding codes stay out of the floor (see
-Validator gaps); the generator is what keeps them valid.
+that checks RM invariants on commit refuses every such body.
+
+PR 196 fixes all of them except the ELEMENT one, which it makes more frequent (see Root causes, item 5). What
+this plan still owns:
+- the generator fix for that ELEMENT rule;
+- floor rows for the ELEMENT rule and for temporal `Value_valid`, so the floor reports defects 1 and 5 on any
+  body, not only on generated ones (the language and encoding codes stay out of the floor, see Validator gaps);
+- the census additions that make PR 196's ratchet see them, and a coverage floor;
+- the STRAND-14 evidence, and the Code24 OPT conversion (Phase 4).
 
 Consumers: anyone who seeds data with the generator, or serves an example-composition endpoint from it.
 
@@ -60,11 +70,12 @@ The plan is complete when:
 ## The gap, reproduced
 
 **Setup.**
-- `main` at `89c34233`. The counts below were re-checked on `main` at `d1e099f8` (2026-09-30) and did not move.
+- `main` at `89c34233`. The counts below were re-checked on `main` at `f38f1ed4` (2026-10-01) and did not move. What did move is the floor: PR 188 taught it to read DV_ORDINAL, which exposes defect 6.
 - Corpus OPTs `testkit/corpus/templates/{vital_signs,Demonstration.v1,BMI,body_weight}.opt`.
 - `composition.NewSkeleton(ctx, compiled, WithComposer(…), WithTerritory("NL"), WithValueFill(instance.RandomFill))`.
 - The counts are for the `Minimal` policy. `Example` carries more (`vital_signs`: 8 date-times, 4 nameless ELEMENTs, 3 empty CLUSTERs, 4 ELEMENTs with neither value nor null flavour). `ExampleFill` and `RandomFill` give the same counts.
-- The template pass returned OK on all 16 runs (4 templates, 2 policies, 2 fills). `ValidateRM` reported nothing for BMI and body_weight, and only defects 3 and 4 for vital_signs and Demonstration.v1.
+- The template pass returned OK on all 16 runs (4 templates, 2 policies, 2 fills). `ValidateRM` reports nothing for BMI and body_weight, defects 3 and 4 for vital_signs, and defects 4 and 6 for Demonstration.v1.
+- **On `main` after PR 196 (`861e9997`, measured 2026-10-01)** only defect 5 remains, and `ValidateRM` reports nothing on any of the 16 runs. ELEMENTs with neither value nor null flavour, under `Minimal` / `Example`: vital_signs 2 / 7, Demonstration.v1 17 / 17, BMI 0 / 2, body_weight 1 / 1. With both: Demonstration.v1 4 / 4 (`at0016`). The fill makes no difference.
 
 ```go
 opt, _ := template.ParseFile("testkit/corpus/templates/vital_signs.opt")
@@ -86,6 +97,7 @@ body, _ := canjson.Marshal(comp)              // "example" as DV_DATE_TIME.value
 | 3 | an ELEMENT with no `name` and `archetype_node_id` `""` | `LOCATABLE.name` mandatory; `Archetype_node_id_valid: not archetype_node_id.is_empty` | `/content[0]/data/events[0]/state/items[0]` (vital_signs) | 1 / 0 / 0 / 0 | passes | reports (`required`) |
 | 4 | a CLUSTER with `items` null | `CLUSTER.items` mandatory, cardinality `1..*` | `/content[0]/protocol/items[0]` (vital_signs); `/content[0]/data/events[n]/data/items[2]/items[0]`, the `openEHR-EHR-CLUSTER.anatomical_location.v1` slot (Demonstration.v1) | 1 / 4 / 0 / 0 | passes | reports (`cardinality`) |
 | 5 | an ELEMENT with both `value` and `null_flavour`, or with neither | `ELEMENT` `Inv_null_flavour_indicated: is_null() xor null_flavour = Void`, an XOR | `/content[0]/data/events[0]/data/items[1]/items[12]` (Demonstration.v1, `at0016`, both) | both 0 / 4 / 0 / 0; neither 1 / 13 / 0 / 0 | passes | passes |
+| 6 | a DV_ORDINAL with no `symbol` | `DV_ORDINAL.symbol` is mandatory (`DV_CODED_TEXT`, 1..1) | `/content[0]/data/events[0]/data/items[1]/items[11]/value/symbol` (Demonstration.v1) | 0 / 4 / 0 / 0 | passes | reports (`required`) |
 
 Also seen, not judged: DV_CODED_TEXT values in Demonstration.v1 whose `defining_code` is `local::example`.
 Whether the OPT constrains those codes was not checked.
@@ -105,7 +117,7 @@ invalid canonical JSON body: missing field `items` (at $.content[0].data.events[
 
 An implementation is not a specification; the rules in the table are the RM's own.
 
-## Root causes (`openehr/instance/generate.go` on `main`)
+## Root causes (`openehr/instance/generate.go` on `main`, before PR 196)
 
 1. **The `"example"` overwrite.** `populateBMMRequiredAttrs` first calls `populatePrimitiveDefault` on a
    new DV value, which sets a sound sentinel: `Now` for `DV_DATE_TIME`, `at0000`/`local` for `CODE_PHRASE`.
@@ -124,10 +136,17 @@ An implementation is not a specification; the rules in the table are the RM's ow
    on an ELEMENT, as Demonstration.v1 does at `at0016`, the Example policy fills both. On other ELEMENTs (1 in
    vital_signs and 13 in Demonstration.v1 under `Minimal`) it fills neither. The RM wants exactly one. Why the
    neither cases arise is not traced yet; Phase 1 starts by tracing it.
+   PR 196 adds a source of its own: to give an empty CLUSTER, ITEM_LIST, ITEM_TREE or ITEM_SINGLE a member, it
+   synthesises an ELEMENT (`archetype_node_id` `at0000`, name `element`) with neither `value` nor `null_flavour`
+   (every `applyLocatableIdentity(el, "at0000", "element", …)` call in `generate.go`). That is why the neither
+   count went up.
+6. **A DV_ORDINAL with no symbol.** The generator fills a DV_ORDINAL's integer `value` and never its `symbol`,
+   although `CDvOrdinal.Values` pairs each integer with a coded symbol (`local::at0038` for the first entry of
+   Demonstration.v1's first ordinal list). The floor could not see it until PR 188 taught it to read DV_ORDINAL.
 
 ## Validator gaps
 
-- **The floor misses three rules, and can evaluate two of them.** `ValidateRM` (REQ-112) reports defects 3 and 4,
+- **The floor misses three rules, and can evaluate two of them.** `ValidateRM` (REQ-112) reports defects 3, 4 and 6,
   but not 1, 2 or 5:
   - `Value_valid` on `DV_DATE_TIME`, `DV_DATE`, `DV_TIME` and `DV_DURATION` (defect 1). The RM defines the rule
     for all four, and Demonstration.v1 carries `"example"` in five `DV_DURATION` values;
@@ -146,12 +165,25 @@ An implementation is not a specification; the rules in the table are the RM's ow
 `testkit/corpus/templates/social.opt` (SocialeAnamnese.v1) is a Code24 export, and it is not schema-valid
 OPT 1.4:
 - `template.ParseFile` refuses it: `expected element type <template> but have <OPERATIONAL_TEMPLATE>`.
-- With the root renamed, `ParseOPT` accepts it. `ParseOPTStrict` then refuses only `T_ARCHETYPE_ROOT`.
+- With the root renamed, `ParseOPT` accepts it and drops every subtree under a `T_ARCHETYPE_ROOT` without a word
+  (next paragraph). `ParseOPTStrict` refuses it, naming the type.
 - A strict consumer refuses such a file outright. FerroEHR 4.3.1 refused seven Code24 exports: biografie.v2,
   Crisis Monitor - DagScore.v2, Honos_plus.v1, Laboratorium uitslagen.v1, MiddelenGebruik.v1, Screening.v1
   and SocialeAnamnese.v1.
 
-These changes make such a file standard OPT 1.4. With them, all seven upload to FerroEHR 4.3.1, and the SDK
+**The lenient parse drops content silently.** REQ-100 keeps `ParseOPT` forward-compatible: an unknown child
+`xsi:type` is admitted as a leaf node, and everything nested under it is discarded with no error and no report.
+A `T_ARCHETYPE_ROOT` is such a type, so every entry archetype under one is lost and the template compiles hollow.
+Measured on `social.opt` (SocialeAnamnese.v1) with the root renamed: a generated body has 0 ELEMENTs under
+`Minimal` and 0 under `Example`, against 2 and 26 once its seven `T_ARCHETYPE_ROOT` become `C_ARCHETYPE_ROOT`.
+On the other Code24 exports the same conversion takes the ELEMENT count per generated body from 0 to between 2
+and 26 (biografie.v2 0 to 11, Honos_plus.v1 0 to 26); those files are not in the corpus, so only `social.opt`
+reproduces here. The existing real-world synthesis test loads `social.opt` through this lenient path and asserts
+the content count only, so it does not see the hollow entries. A hollow body has nothing to violate: it passes
+`ValidateComposition` and `ValidateRM` vacuously, and a consumer that stores such an OPT through the lenient
+parse serves hollow example compositions without knowing.
+
+These eight changes make such a file standard OPT 1.4. With them, all seven upload to FerroEHR 4.3.1, and the SDK
 compiles them with the same template ids:
 
 1. **The root element.** `<OPERATIONAL_TEMPLATE … xsi:type="OPERATIONAL_TEMPLATE">` becomes
@@ -165,6 +197,10 @@ compiles them with the same template ids:
 6. **Empty `lifecycle_state`.** `<lifecycle_state/>` gets a value, for example `unmanaged`.
 7. **Empty `details`.** `<details/>` gets a details item with a `<language>` (an ISO_639-1 code) and a
    non-empty `<purpose>`.
+8. **Empty `original_author`.** `<original_author/>` becomes
+   `<original_author id="Original Author">Not Specified</original_author>`, the form the other corpus OPTs use.
+   `Resource.xsd` (ITS-XML, AM Release-1.4) declares the element as a `StringDictionaryItem` with a required
+   `id` attribute, and it is mandatory (`minOccurs` 1, unbounded). Screening.v1 carries the bare form.
 
 ```python
 import re, sys, pathlib
@@ -181,6 +217,7 @@ s = s.replace('<details/>', '<details>\n      <language>\n        <terminology_i
               '          <value>ISO_639-1</value>\n        </terminology_id>\n'
               '        <code_string>nl</code_string>\n      </language>\n'
               '      <purpose>Not specified</purpose>\n    </details>')
+s = s.replace('<original_author/>', '<original_author id="Original Author">Not Specified</original_author>', 1)
 dst.write_text(s)
 ```
 
@@ -191,25 +228,28 @@ The `nl` language and the `Not specified` purpose fit these Dutch exports. Pick 
 ### Phase 0 — Spec (`sdd-specify`)
 
 **Status:** done on this branch. What it wrote:
-- **REQ-107.** Floor-clean output for both `Policy` values and both `ValueFill` values, the ENTRY `language` and `encoding` defaults, and a Known gap. REQ-107 goes `partial` in `REQ.md` and `traceability.yaml` until the code lands.
+- **REQ-107.** PR 196 made passing the RM floor binding on generated output. Phase 0 adds that the rule binds the RM itself, so the generator satisfies the invariants the floor does not check yet (the ELEMENT rule, temporal `Value_valid`), plus the ENTRY `language` and `encoding` defaults and a Known gap for the ELEMENT rule. REQ-107 goes `partial` in `REQ.md` and `traceability.yaml` until the code lands.
 - **REQ-112.** Two catalogue rows: `Value_valid` on the four temporal data values, and ELEMENT `Inv_null_flavour_indicated`. Each is marked as specified ahead of the code. `Language_valid` and `Encoding_valid` are not catalogue rows: the trust model excludes external-code validation and the SDK ships neither register, so the trust model section records them as deferred.
-- **PROBE-027.** The spec now says it also asserts `ValidateRM`; the probe itself still asserts `ValidateComposition` only, until Phase 3.
+- **PROBE-027.** The title now names `ValidateRM` and both `ValueFill` values. Its wire assertion and status are PR 196's, whose census already runs both.
 - **STRAND-14.** The evidence above is recorded; the strand stays open.
 - **`roadmap.md`.** A Planned row, and the coded-invariants Deferred row now names the two rules.
 
 **Definition of done:** `make spec-check` passes, and each amended section cites the RM rule. Met.
 
-### Phase 1 — Generator fixes
+### Phase 1 — Generator fix for the ELEMENT rule
+
+PR 196 did tasks 1 to 4 and 6 of the original list (the `"example"` overwrite, ENTRY language and encoding,
+nameless LOCATABLEs, empty CLUSTERs, ordinal symbols). One task is left.
 
 **Tasks:**
-1. Stop the `"example"` overwrite: don't recurse into a value whose primitive default is already set, or
-   skip `String` attributes that default already filled.
-2. Fill `ENTRY.language` from the composition language and `ENTRY.encoding` with `UTF-8`.
-3. Give every materialised LOCATABLE a `name` and a non-empty `archetype_node_id`.
-4. Give a CLUSTER at least one item, or leave out an optional CLUSTER the OPT does not fill.
-5. Fill exactly one of `value` and `null_flavour` on every ELEMENT, never both and never neither.
+5. Fill exactly one of `value` and `null_flavour` on every ELEMENT, never both and never neither:
+   - a synthesised member (PR 196's `at0000` ELEMENT) gets a `null_flavour` from the openEHR `null flavours`
+     group (`openehr/terminology`), since it has no value constraint to fill;
+   - an ELEMENT the OPT constrains with both attributes gets the `value` only;
+   - trace the other neither cases first, then fill the `value` where the OPT constrains one and a `null_flavour`
+     where it does not.
 
-**Definition of done:** the table's five defects are gone for the four templates.
+**Definition of done:** no ELEMENT with both or neither attribute in the 16 runs above, and none in the census.
 
 ### Phase 2 — Floor additions
 
@@ -223,25 +263,36 @@ floor-detectable (see Validator gaps).
 
 ### Phase 3 — Corpus ratchet
 
-**Tasks:** a test over every COMPOSITION OPT in `testkit/corpus/templates` and `testkit/corpus/webtemplate`,
-for both `Policy` values and both `ValueFill` values. Each generated body must pass `ValidateComposition`
-and `ValidateRM`, and its ENTRY `language` and `encoding` must equal `Options.Language` and `UTF-8`, asserted
-directly because the floor cannot. Extend PROBE-027 (`testkit/probes/instance/probe_027_generated_validates.go`)
-to also call `ValidateRM` and to run both `ValueFill` values. Today the ratchet would fail on all four templates
-above, once Phase 2 detects defects 1 and 5.
+**Tasks:** extend PR 196's `TestREQ107_CorpusRatchet` (`testkit/probes/instance/corpus_ratchet_test.go`), which
+already runs `Generate` (both policies, both fills) and `composition.NewBuilder` over every vendored OPT that
+compiles, with `ValidateRM` and the template validator, and walks the output for placeholders and example
+language codes.
+- Once Phase 2 lands, the census sees the ELEMENT rule and temporal `Value_valid` through `ValidateRM`. Give
+  `issueReason` a category for them, so a failure is keyed like the existing rows.
+- Add a coverage floor: each generated body must contain at least one ELEMENT, because a hollow body (see OPT
+  fixes) passes both validators vacuously. PROBE-086's harness applies the same floor to its fixtures.
+- `templates/social` is already in the census's compile-failure allowlist (`ParseFile` refuses its
+  `<OPERATIONAL_TEMPLATE>` root), so it reaches neither check until Phase 4 replaces it.
+
+The ENTRY `language` and `encoding` assertion is already covered: the census's placeholder walk reports an
+example language code.
 
 **Definition of done:** `make ci` passes with the ratchet in place.
 
 ### Phase 4 — Code24 OPTs (optional)
 
 **Tasks:**
-- Add a converted, standard copy of `social.opt` to the corpus, so the ratchet covers it through `ParseFile`.
+- Add a converted, standard copy of `social.opt` to the corpus, so `ParseFile` accepts it, the census drops its
+  compile-failure allowlist row, and its entries are no longer hollow.
 - Decide whether `ParseOPTStrict` should also refuse three deviations it accepts today:
   - a missing `OPERATIONAL_TEMPLATE.language`, with `original_language` in its place;
   - a top-level `archetype_id`;
-  - empty mandatory description fields.
+  - empty mandatory description fields (`lifecycle_state`, `details`, `original_author`).
+- Decide what the lenient `ParseOPT` does when it discards a subtree: report it, refuse it, or stay silent. Today
+  it is silent by specification (REQ-100 admits an unknown child `xsi:type` as a leaf), so changing it amends
+  REQ-100 through `sdd-specify` first, and it may deserve a plan of its own.
 
-**Definition of done:** the decision is recorded; if it is yes, each refusal has a test.
+**Definition of done:** the decisions are recorded; where the answer is yes, each refusal has a test.
 
 ## Mapping to specs
 
