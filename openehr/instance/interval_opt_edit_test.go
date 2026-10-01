@@ -196,25 +196,25 @@ func replaceBoundChildren(t *testing.T, opt, lowerXML, upperXML string) string {
 
 // tagSpan returns the span of the element that starts at start, matching
 // nested copies of the same open and close tags.
-func tagSpan(s string, start int, open, close string) (int, int) {
-	if start < 0 || start >= len(s) || !strings.HasPrefix(s[start:], open) {
+func tagSpan(s string, start int, openTag, closeTag string) (int, int) {
+	if start < 0 || start >= len(s) || !strings.HasPrefix(s[start:], openTag) {
 		return -1, -1
 	}
 	depth := 0
 	i := start
 	for i < len(s) {
-		relOpen := strings.Index(s[i:], open)
-		relClose := strings.Index(s[i:], close)
+		relOpen := strings.Index(s[i:], openTag)
+		relClose := strings.Index(s[i:], closeTag)
 		if relClose < 0 {
 			return -1, -1
 		}
 		if relOpen >= 0 && relOpen < relClose {
 			depth++
-			i += relOpen + len(open)
+			i += relOpen + len(openTag)
 			continue
 		}
 		depth--
-		i += relClose + len(close)
+		i += relClose + len(closeTag)
 		if depth == 0 {
 			return start, i
 		}

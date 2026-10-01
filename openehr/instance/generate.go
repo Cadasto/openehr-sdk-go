@@ -1214,7 +1214,7 @@ func ordinalSymbolText(ref constraints.CodedTermRef) rm.DVCodedText {
 		term = "local"
 	}
 	return rm.DVCodedText{
-		DVText: rm.DVText{Value: ref.CodeString},
+		Value: ref.CodeString,
 		DefiningCode: rm.CodePhrase{
 			CodeString:    ref.CodeString,
 			TerminologyID: rm.TerminologyID{Value: term},
@@ -1498,11 +1498,11 @@ func fillPartyRelationship(rel *rm.PartyRelationship) {
 }
 
 func partyRef(id string) rm.PartyRef {
-	return rm.PartyRef{ObjectRef: rm.ObjectRef{
+	return rm.PartyRef{
 		ID:        &rm.HierObjectID{Value: id},
 		Namespace: "local",
 		Type:      "PERSON",
-	}}
+	}
 }
 
 func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
