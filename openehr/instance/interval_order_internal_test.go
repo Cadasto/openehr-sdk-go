@@ -305,8 +305,9 @@ func TestOrderIntervalBoundsOrdered(t *testing.T) {
 }
 
 // TestOrderIntervalBoundsTemporal pins the REQ-107 ordering rule on
-// DV_DATE, DV_TIME and DV_DATE_TIME. The generator writes fixed-width
-// ISO-8601 strings, so the strings themselves are the order. A C_DATE,
+// DV_DATE, DV_TIME and DV_DATE_TIME bounds the generator writes: UTC
+// date-times compare as instants, and zoneless values of one layout as
+// text (TestREQ107_TemporalBoundsCompareAsInstants pins the rest). A C_DATE,
 // C_TIME or C_DATE_TIME has no numeric end, so an inversion is repaired
 // by swapping, and a side the OPT leaves open is left alone.
 func TestOrderIntervalBoundsTemporal(t *testing.T) {

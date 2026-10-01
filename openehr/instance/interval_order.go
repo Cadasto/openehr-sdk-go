@@ -5,6 +5,7 @@ package instance
 import (
 	"math"
 	"strings"
+	"time"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -24,9 +25,10 @@ import (
 // types. Quantities are ordered only when both bounds share their units,
 // since magnitudes in different units do not compare. Proportions are
 // ordered by the ratio numerator/denominator, and only when both bounds
-// share their type (proportionScale). Dates, times and date-times are
-// ordered as the ISO-8601 strings the generator writes. A pair that does
-// not compare is left alone.
+// share their type (proportionScale). Date-times and times that carry a
+// zone are ordered as instants, and other dates, times and date-times as
+// text when both share one zoneless layout (temporalCompare). A pair that
+// does not compare is left alone.
 //
 // An inverted pair is replaced by the first of these two pairs that is in
 // order and fits each side's OPT constraint:
@@ -54,15 +56,15 @@ func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any) {
 	case *rm.DVInterval[rm.DVQuantity]:
 		orderConcrete(&iv.Interval, optNode, quantityScale, quantityKeyOf, setQuantityKey)
 	case *rm.DVInterval[rm.DVDate]:
-		orderConcrete(&iv.Interval, optNode, isoScale,
+		orderConcrete(&iv.Interval, optNode, dateScale,
 			func(b rm.DVDate) string { return b.Value },
 			func(b *rm.DVDate, v string) { b.Value = v })
 	case *rm.DVInterval[rm.DVTime]:
-		orderConcrete(&iv.Interval, optNode, isoScale,
+		orderConcrete(&iv.Interval, optNode, timeScale,
 			func(b rm.DVTime) string { return b.Value },
 			func(b *rm.DVTime, v string) { b.Value = v })
 	case *rm.DVInterval[rm.DVDateTime]:
-		orderConcrete(&iv.Interval, optNode, isoScale,
+		orderConcrete(&iv.Interval, optNode, dateTimeScale,
 			func(b rm.DVDateTime) string { return b.Value },
 			func(b *rm.DVDateTime, v string) { b.Value = v })
 	case *rm.DVInterval[rm.DVProportion]:
@@ -99,13 +101,13 @@ func orderOrderedBounds(optNode *tcimpl.CompiledNode, iv *rm.Interval[rm.DVOrder
 	if orderOrderedAs(iv, optNode, quantityScale, asQuantity, quantityKeyOf, setOrderedQuantity) {
 		return
 	}
-	if orderOrderedAs(iv, optNode, isoScale, asDate, func(d rm.DVDate) string { return d.Value }, setOrderedDate) {
+	if orderOrderedAs(iv, optNode, dateScale, asDate, func(d rm.DVDate) string { return d.Value }, setOrderedDate) {
 		return
 	}
-	if orderOrderedAs(iv, optNode, isoScale, asTime, func(d rm.DVTime) string { return d.Value }, setOrderedTime) {
+	if orderOrderedAs(iv, optNode, timeScale, asTime, func(d rm.DVTime) string { return d.Value }, setOrderedTime) {
 		return
 	}
-	if orderOrderedAs(iv, optNode, isoScale, asDateTime, func(d rm.DVDateTime) string { return d.Value }, setOrderedDateTime) {
+	if orderOrderedAs(iv, optNode, dateTimeScale, asDateTime, func(d rm.DVDateTime) string { return d.Value }, setOrderedDateTime) {
 		return
 	}
 	if orderOrderedAs(iv, optNode, proportionScale, asProportion, proportionKeyOf, setOrderedProportion) {
@@ -408,19 +410,72 @@ func setOrderedQuantity(slot *rm.DVOrdered, k quantityKey) {
 	}
 }
 
-// isoScale orders DV_DATE, DV_TIME and DV_DATE_TIME bounds by the
-// ISO-8601 strings the generator writes. Those strings are fixed-width,
-// so their lexicographic order is their chronological order. A C_DATE,
-// C_TIME or C_DATE_TIME has no numeric end, so only a swap repairs an
-// inversion.
-var isoScale = scale[string]{
-	compare: func(a, b string) (int, bool) { return strings.Compare(a, b), true },
-	fits: func(node *tcimpl.CompiledNode, v string) bool {
-		pc := primitiveOf(firstChild(node, "value"))
-		return pc == nil || len(pc.Validate(v)) == 0
-	},
-	lowest:  func(*tcimpl.CompiledNode, string) (string, bool) { return "", false },
-	highest: func(*tcimpl.CompiledNode, string) (string, bool) { return "", false },
+// dateScale, timeScale and dateTimeScale order DV_DATE, DV_TIME and
+// DV_DATE_TIME bounds (temporalCompare says how). A C_DATE, C_TIME or
+// C_DATE_TIME has no numeric end, so only a swap repairs an inversion.
+var (
+	dateScale     = temporalScale(temporalCompare("", noZone))
+	timeScale     = temporalScale(temporalCompare("15:04:05Z07:00", timeZoned))
+	dateTimeScale = temporalScale(temporalCompare(time.RFC3339, dateTimeZoned))
+)
+
+func temporalScale(compare func(a, b string) (int, bool)) scale[string] {
+	return scale[string]{
+		compare: compare,
+		fits: func(node *tcimpl.CompiledNode, v string) bool {
+			pc := primitiveOf(firstChild(node, "value"))
+			return pc == nil || len(pc.Validate(v)) == 0
+		},
+		lowest:  func(*tcimpl.CompiledNode, string) (string, bool) { return "", false },
+		highest: func(*tcimpl.CompiledNode, string) (string, bool) { return "", false },
+	}
+}
+
+// temporalCompare compares two ISO 8601 values. When both parse under
+// layout, which carries a zone, they compare as instants. Otherwise they
+// compare as text, which is their chronological order only when both have
+// the same layout and no zone: then they are the same fixed-width shape.
+// Any other pair, such as a zoned value and a zoneless one, or a full date
+// and a partial one, does not compare. An empty layout skips the instant
+// step.
+func temporalCompare(layout string, zoned func(string) bool) func(a, b string) (int, bool) {
+	return func(a, b string) (int, bool) {
+		if layout != "" {
+			ta, errA := time.Parse(layout, a)
+			tb, errB := time.Parse(layout, b)
+			if errA == nil && errB == nil {
+				return ta.Compare(tb), true
+			}
+		}
+		if zoned(a) || zoned(b) || isoShape(a) != isoShape(b) {
+			return 0, false
+		}
+		return strings.Compare(a, b), true
+	}
+}
+
+func noZone(string) bool { return false }
+
+// timeZoned reports whether an ISO 8601 time carries a zone: Z or an
+// offset.
+func timeZoned(s string) bool { return strings.ContainsAny(s, "Z+-") }
+
+// dateTimeZoned reports whether an ISO 8601 date-time carries a zone after
+// its time part. A value with no time part has none.
+func dateTimeZoned(s string) bool {
+	_, clock, ok := strings.Cut(s, "T")
+	return ok && timeZoned(clock)
+}
+
+// isoShape is s with every digit replaced by 0, so two values have the same
+// shape exactly when they use the same layout.
+func isoShape(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return '0'
+		}
+		return r
+	}, s)
 }
 
 // proportionKey is the part of a DV_PROPORTION bound that is compared.

@@ -51,8 +51,11 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	}
 
 	if opts.Now.IsZero() {
-		opts.Now = time.Now().UTC()
+		opts.Now = time.Now()
 	}
+	// Every date-time the generator writes is in UTC, one layout, so the
+	// interval ordering compares like with like.
+	opts.Now = opts.Now.UTC()
 	if opts.Language == "" {
 		opts.Language = c.Language()
 	}

@@ -86,9 +86,10 @@ type Options struct {
 	Composer rm.PartyProxy
 
 	// Now is the clock for EVENT.time / EventContext.start_time
-	// defaults. Zero value falls back to time.Now().UTC() inside
-	// Generate so callers that don't pin the clock get a sensible
-	// default; tests pin it for determinism.
+	// defaults. Zero value falls back to time.Now() inside Generate so
+	// callers that don't pin the clock get a sensible default; tests pin
+	// it for determinism. Generate writes every date-time it takes from
+	// Now in UTC, whatever zone Now carries.
 	Now time.Time
 
 	// UIDSource is the optional generator for LOCATABLE.uid values.
