@@ -144,6 +144,23 @@ func openBoundFlag(prop string) (string, bool) {
 	return "", false
 }
 
+// legacyIntervalXMLDoc is the part of the BASE Interval UnmarshalXML doc
+// comment that explains the legacy element names it also reads.
+const legacyIntervalXMLDoc = "// BASE Interval also reads the Go field names (Lower, LowerIncluded, ...) that\n" +
+	"// SDK v0.28.0 and earlier wrote for it, onto the same fields, so a stored\n" +
+	"// document does not decode to an empty interval without an error. The encoder\n" +
+	"// writes the snake_case names only.\n"
+
+// withLegacyElementName adds the Go field name of a BASE Interval member to
+// the case label of its UnmarshalXML branch, so the decoder reads both
+// spellings. Only BASE Interval takes it: SDK v0.28.0 wrote Go field names
+// for that class alone, because the other interval classes had their own
+// encoders.
+func withLegacyElementName(caseBody, prop string) string {
+	old := fmt.Sprintf("\t\t\tcase %q:\n", prop)
+	return strings.Replace(caseBody, old, fmt.Sprintf("\t\t\tcase %q, %q:\n", prop, FieldName(prop)), 1)
+}
+
 // guardOpenIntervalBoundXML wraps the lines that emit one bound element of an
 // interval-shaped class, so the element is left out when its side is open and
 // the bound is empty. Lines for any other property pass through unchanged.

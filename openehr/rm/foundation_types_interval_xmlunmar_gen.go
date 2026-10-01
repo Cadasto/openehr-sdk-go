@@ -20,6 +20,11 @@ import (
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+//
+// BASE Interval also reads the Go field names (Lower, LowerIncluded, ...) that
+// SDK v0.28.0 and earlier wrote for it, onto the same fields, so a stored
+// document does not decode to an empty interval without an error. The encoder
+// writes the snake_case names only.
 func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	for {
 		_tok, _err := _dec.Token()
@@ -29,27 +34,27 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 		switch _t := _tok.(type) {
 		case xml.StartElement:
 			switch _t.Name.Local {
-			case "lower":
+			case "lower", "Lower":
 				if _err := _dec.DecodeElement(&i.Lower, &_t); _err != nil {
 					return _err
 				}
-			case "upper":
+			case "upper", "Upper":
 				if _err := _dec.DecodeElement(&i.Upper, &_t); _err != nil {
 					return _err
 				}
-			case "lower_unbounded":
+			case "lower_unbounded", "LowerUnbounded":
 				if _err := _dec.DecodeElement(&i.LowerUnbounded, &_t); _err != nil {
 					return _err
 				}
-			case "upper_unbounded":
+			case "upper_unbounded", "UpperUnbounded":
 				if _err := _dec.DecodeElement(&i.UpperUnbounded, &_t); _err != nil {
 					return _err
 				}
-			case "lower_included":
+			case "lower_included", "LowerIncluded":
 				if _err := _dec.DecodeElement(&i.LowerIncluded, &_t); _err != nil {
 					return _err
 				}
-			case "upper_included":
+			case "upper_included", "UpperIncluded":
 				if _err := _dec.DecodeElement(&i.UpperIncluded, &_t); _err != nil {
 					return _err
 				}

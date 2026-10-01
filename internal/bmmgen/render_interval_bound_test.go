@@ -2,6 +2,7 @@ package bmmgen
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"regexp"
 	"slices"
@@ -511,5 +512,45 @@ func TestIntervalBoundFileExportsEmptinessTest(t *testing.T) {
 	}
 	if regexp.MustCompile(`REQ-\d+|PROBE-\d+`).MatchString(doc) {
 		t.Errorf("IsEmptyIntervalBound doc comment carries a requirement identifier:\n%s", doc)
+	}
+}
+
+// TestIntervalBaseReadsLegacyXMLNames pins that the BASE Interval XML decoder
+// also reads the Go field names SDK v0.28.0 and earlier wrote (REQ-056), and
+// that no other interval class does: their encoders always wrote snake_case.
+func TestIntervalBaseReadsLegacyXMLNames(t *testing.T) {
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+	for _, tc := range []struct {
+		class      string
+		wantLegacy bool
+	}{
+		{"Interval", true},
+		{"Point_interval", false},
+		{"Proper_interval", false},
+		{"DV_INTERVAL", false},
+	} {
+		t.Run(tc.class, func(t *testing.T) {
+			pc := plan.Classes[tc.class]
+			fields, err := effectiveFields(plan, pc)
+			if err != nil {
+				t.Fatalf("effectiveFields: %v", err)
+			}
+			src, err := renderUnmarshalXML(plan, pc, fields)
+			if err != nil {
+				t.Fatalf("renderUnmarshalXML: %v", err)
+			}
+			for _, prop := range []string{"lower", "upper", "lower_unbounded", "upper_unbounded", "lower_included", "upper_included"} {
+				want := fmt.Sprintf("case %q, %q:", prop, FieldName(prop))
+				if got := strings.Contains(src, want); got != tc.wantLegacy {
+					t.Errorf("UnmarshalXML of %s reads the legacy name with %q = %v, want %v", tc.class, want, got, tc.wantLegacy)
+				}
+				if !strings.Contains(src, fmt.Sprintf("case %q", prop)) {
+					t.Errorf("UnmarshalXML of %s lost the canonical case for %q", tc.class, prop)
+				}
+			}
+		})
 	}
 }
