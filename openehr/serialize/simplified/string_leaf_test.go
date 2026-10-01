@@ -241,3 +241,51 @@ func TestStringLeafOnUnreadAttributeRefused(t *testing.T) {
 		t.Errorf("MarshalFlat with no ACTIVITY = %v, want the leaf skipped", err)
 	}
 }
+
+// TestIsValueLeafType — REQ-053. The predicate takes the normalised RM type
+// ([nodeRMType]), so a padded spelling is no match as written; every DV_* type,
+// CODE_PHRASE, a party type and STRING are value leaves, and a container type is
+// not.
+func TestIsValueLeafType(t *testing.T) {
+	for _, tc := range []struct {
+		rmType string
+		want   bool
+	}{
+		{"STRING", true},
+		{" STRING", false},
+		{"DV_TEXT", true},
+		{"CODE_PHRASE", true},
+		{"PARTY_IDENTIFIED", true},
+		{"CLUSTER", false},
+		{"", false},
+	} {
+		if got := isValueLeafType(tc.rmType); got != tc.want {
+			t.Errorf("isValueLeafType(%q) = %v, want %v", tc.rmType, got, tc.want)
+		}
+	}
+	if got := canonicalRMType(" STRING"); !isValueLeafType(got) {
+		t.Errorf("isValueLeafType(canonicalRMType(%q)) = false, want true", " STRING")
+	}
+}
+
+// TestStringLeafWithoutInputsEncodes — REQ-053. The Web Template builder gives
+// the STRING leaf no input descriptors the codec could recognise it by, so the
+// RM type alone must make it a value leaf: the bare value is written, padded
+// RM type spelling included, and not refused as a node the codec cannot spell.
+func TestStringLeafWithoutInputsEncodes(t *testing.T) {
+	for name, rmType := range map[string]string{"clean": "STRING", "padded": " STRING "} {
+		t.Run(name, func(t *testing.T) {
+			wt := stringLeafWT()
+			leaf := wt.Tree.Children[0].Children[0].Children[0]
+			leaf.Inputs = nil
+			leaf.RMType = rmType
+			b, err := MarshalFlat(stringLeafComp(stringLeafValue), wt)
+			if err != nil {
+				t.Fatalf("MarshalFlat with a %s STRING node and no inputs: %v", name, err)
+			}
+			if got := flatMap(t, b)[stringLeafKey]; got != stringLeafValue {
+				t.Errorf("MarshalFlat wrote %s = %#v, want the bare string %q", stringLeafKey, got, stringLeafValue)
+			}
+		})
+	}
+}
