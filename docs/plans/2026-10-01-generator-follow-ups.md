@@ -5,7 +5,7 @@ kind: plan
 # Plan — Generator and validator follow-ups from PR 196
 
 **Date:** 2026-10-01
-**Status:** Draft — gathered from the PR 196 triage, not re-investigated; three decisions for the maintainer below
+**Status:** Done — phases 1 to 4 landed; decisions 1 to 3 took the recommended option (whole-string pattern, no child for an optional attribute the OPT leaves empty, uncomparable pairs left as generated)
 **Covers:** REQ-107 ([clinical-modeling.md § REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator)), REQ-103 ([§ REQ-103](../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection)), REQ-102 ([§ REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation)), REQ-112 ([§ REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor))
 **Probes:** PROBE-027 (the corpus census; its nine rows are the baseline)
 **Depends on:** PR 196 merged
@@ -65,8 +65,7 @@ Close the four gaps PR 196 left open on purpose, so generated values fill every 
 
 These came up during the same triage and stay out unless the maintainer pulls them in:
 
-- `rmwrite.EnsureSingle` has no case for `DV_PARSABLE`, `DV_IDENTIFIER`, `DV_URI` or `DV_EHR_URI`, so `writeBMMString` cannot write their values and its error is ignored.
-- `ValidateRM` accepts `DV_DATE_TIME.value = "example"`; the floor has no ISO 8601 check.
+- `rmwrite.EnsureSingle` has no case for `TERMINOLOGY_ID.value` or the locatable identity strings, so `writeBMMString` cannot write them and the generator ignores that error; propagating it would move census outcomes.
 - `fillCurrentState`'s `firstCodedExample` path looks unreachable.
 - The fourteen suggestions in the PR 196 findings file.
 

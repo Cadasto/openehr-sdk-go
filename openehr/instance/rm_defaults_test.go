@@ -23,6 +23,14 @@ func optNode(rmType, nodeID string, attrs ...string) string {
 		`<node_id>` + nodeID + `</node_id>` + strings.Join(attrs, "") + `</children>`
 }
 
+// optArchetypeRoot is a C_ARCHETYPE_ROOT of rmType: a child the OPT pins
+// as an archetype of its own, so the generator can name its archetype.
+func optArchetypeRoot(rmType, archetypeID string, attrs ...string) string {
+	return `<children xsi:type="C_ARCHETYPE_ROOT"><rm_type_name>` + rmType + `</rm_type_name>` +
+		`<node_id>at0000</node_id>` + strings.Join(attrs, "") +
+		`<archetype_id><value>` + archetypeID + `</value></archetype_id></children>`
+}
+
 // optPrimitive is a C_PRIMITIVE_OBJECT of the AOM primitive rmType whose
 // item is an itemType carrying body.
 func optPrimitive(rmType, itemType, body string) string {
@@ -45,6 +53,15 @@ func optMultiple(name string, children ...string) string {
 		`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
 		`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` +
 		`<upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality></attributes>`
+}
+
+// optOptionalMultiple is a C_MULTIPLE_ATTRIBUTE called name that the OPT
+// names with no children and no lower bound: the attribute is optional.
+func optOptionalMultiple(name string) string {
+	return `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
+		`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
+		`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` +
+		`<upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality></attributes>`
 }
 
 // optTemplate is an OPT whose definition is an archetype root of rmType.
@@ -236,27 +253,21 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 // the defaults the generator writes on values it builds from the BMM
 // alone, and on values the OPT names but leaves unconstrained. Each case
 // asserts the field the default writes and checks the generated value
-// against the RM floor.
+// against the RM floor, under both policies and both value fills.
 func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
-	// knownGap is the one floor issue a BMM-built content item still
-	// carries: it is an archetype root with no archetype_details. The
-	// cases that build one check every other floor rule.
-	const knownGap = "is_archetype_root @ /content[0]/archetype_details"
 	cases := []struct {
-		name     string
-		opt      string
-		tolerate string
-		check    func(t *testing.T, out any)
+		name  string
+		opt   string
+		check func(t *testing.T, out any)
 	}{
 		{
-			// COMPOSITION.content named with no children: the generator
-			// builds an OBSERVATION from the BMM, with its ENTRY codes and
-			// the identity of each locatable it adds below it.
-			name:     "BMM-built ENTRY language and encoding",
-			opt:      optTemplate("COMPOSITION", optMultiple("content")),
-			tolerate: knownGap,
+			// An OBSERVATION the OPT pins by archetype and leaves
+			// otherwise open: the generator fills its ENTRY codes from
+			// the BMM.
+			name: "ENTRY language and encoding of a pinned OBSERVATION",
+			opt:  pinnedObservationOPT,
 			check: func(t *testing.T, out any) {
-				obs := bmmObservation(t, out)
+				obs := pinnedObservation(t, out)
 				if obs.Language.TerminologyID.Value != "ISO_639-1" || obs.Language.CodeString != "en" {
 					t.Errorf("OBSERVATION.language = %+v, want ISO_639-1::en", obs.Language)
 				}
@@ -266,16 +277,31 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 			},
 		},
 		{
-			name:     "BMM-built locatable identity",
-			opt:      optTemplate("COMPOSITION", optMultiple("content")),
-			tolerate: knownGap,
+			// CLUSTER.items named with no children: the generator builds
+			// an ELEMENT from the BMM and stamps the identity of the
+			// locatable.
+			name: "BMM-built locatable identity",
+			opt:  optTemplate("CLUSTER", optMultiple("items")),
 			check: func(t *testing.T, out any) {
-				obs := bmmObservation(t, out)
-				if obs.ArchetypeNodeID != "at0000" {
-					t.Errorf("OBSERVATION.archetype_node_id = %q, want at0000", obs.ArchetypeNodeID)
+				c := out.(*rm.Cluster)
+				if len(c.Items) != 1 || nodeID(c.Items[0]) != "at0000" || c.Items[0].(rm.Locatable).GetName() == nil {
+					t.Errorf("CLUSTER.items = %+v, want one item with archetype_node_id at0000 and a name", c.Items)
 				}
-				if obs.Data.ArchetypeNodeID != "at0000" || obs.Data.Name == nil {
-					t.Errorf("OBSERVATION.data = %+v, want archetype_node_id at0000 and a name", obs.Data)
+			},
+		},
+		{
+			// COMPOSITION.content is optional in the RM. With the OPT
+			// silent on it the generator builds no entry: one built from
+			// the BMM alone would be an archetype root with no archetype.
+			name: "OPT-silent optional content stays empty",
+			opt:  optTemplate("COMPOSITION", optOptionalMultiple("content")),
+			check: func(t *testing.T, out any) {
+				comp, err := instance.AsComposition(out)
+				if err != nil {
+					t.Fatalf("AsComposition: %v", err)
+				}
+				if len(comp.Content) != 0 {
+					t.Errorf("COMPOSITION.content = %+v, want none", comp.Content)
 				}
 			},
 		},
@@ -295,6 +321,36 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 			check: func(t *testing.T, out any) {
 				if got, want := out.(*rm.DVDateTime).Value, defaultsNow.Format(time.RFC3339); got != want {
 					t.Errorf("DV_DATE_TIME.value = %q, want %q", got, want)
+				}
+			},
+		},
+		{
+			// REQ-107: a temporal root's value comes from the string pass,
+			// which must write a valid ISO 8601 date, not the open-string
+			// sentinel (RM Value_valid).
+			name: "DV_DATE value is a valid date",
+			opt:  optTemplate("DV_DATE"),
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.DVDate).Value, "2020-01-01"; got != want {
+					t.Errorf("DV_DATE.value = %q, want %q", got, want)
+				}
+			},
+		},
+		{
+			name: "DV_TIME value is a valid time",
+			opt:  optTemplate("DV_TIME"),
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.DVTime).Value, "12:00:00"; got != want {
+					t.Errorf("DV_TIME.value = %q, want %q", got, want)
+				}
+			},
+		},
+		{
+			name: "DV_DURATION value is a valid duration",
+			opt:  optTemplate("DV_DURATION"),
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.DVDuration).Value, "P0D"; got != want {
+					t.Errorf("DV_DURATION.value = %q, want %q", got, want)
 				}
 			},
 		},
@@ -333,29 +389,143 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, tc.opt, true)
-			out, err := instance.Generate(t.Context(), c, instance.Options{
-				Policy:    instance.Example,
-				Language:  "en",
-				Territory: "NL",
-				Composer:  testComposer(),
-				Now:       defaultsNow,
-			})
-			if err != nil {
-				t.Fatalf("Generate: %v", err)
-			}
-			tc.check(t, out)
-			for _, iss := range validation.ValidateRM(out).Issues {
-				if iss.Severity == validation.Error && iss.Code+" @ "+iss.Path != tc.tolerate {
-					t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
+						out, err := instance.Generate(t.Context(), c, instance.Options{
+							Policy:    policy,
+							ValueFill: fill,
+							Language:  "en",
+							Territory: "NL",
+							Composer:  testComposer(),
+							Now:       defaultsNow,
+						})
+						if err != nil {
+							t.Fatalf("Generate: %v", err)
+						}
+						tc.check(t, out)
+						for _, iss := range validation.ValidateRM(out).Issues {
+							if iss.Severity == validation.Error {
+								t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+							}
+						}
+					})
 				}
 			}
 		})
 	}
 }
 
-// bmmObservation returns the one OBSERVATION the generator built for an
-// OPT-silent COMPOSITION.content.
-func bmmObservation(t *testing.T, out any) *rm.Observation {
+// pinnedObservationOPT is a COMPOSITION whose content is one OBSERVATION
+// the OPT pins by archetype, with its history pinned and nothing else.
+var pinnedObservationOPT = optTemplate("COMPOSITION", optMultiple("content",
+	optArchetypeRoot("OBSERVATION", "openEHR-EHR-OBSERVATION.rm_defaults.v1",
+		optSingle("data", optNode("HISTORY", "at0001")))))
+
+// TestREQ107_ImplicitEntryStructureCarriesLocatableIdentity is the REQ-107
+// check that a structure the generator builds from the BMM alone, for a
+// mandatory single the OPT leaves silent (OBSERVATION.data, EVALUATION.data,
+// ACTION.description, ADMIN_ENTRY.data), carries the archetype_node_id and
+// name the RM floor requires, under both policies and both value fills.
+func TestREQ107_ImplicitEntryStructureCarriesLocatableIdentity(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  string
+		// structure returns the implicit single under test.
+		structure func(t *testing.T, out any) any
+	}{
+		{
+			name:      "OBSERVATION.data of a pinned COMPOSITION entry",
+			opt:       dataSilentObservationOPT,
+			structure: func(t *testing.T, out any) any { return &pinnedObservation(t, out).Data },
+		},
+		{
+			name: "EVALUATION.data of a pinned COMPOSITION entry",
+			opt: optTemplate("COMPOSITION", optMultiple("content",
+				optArchetypeRoot("EVALUATION", "openEHR-EHR-EVALUATION.rm_defaults.v1"))),
+			structure: func(t *testing.T, out any) any {
+				comp, err := instance.AsComposition(out)
+				if err != nil {
+					t.Fatalf("AsComposition: %v", err)
+				}
+				if len(comp.Content) != 1 {
+					t.Fatalf("COMPOSITION.content has %d items, want 1", len(comp.Content))
+				}
+				ev, ok := comp.Content[0].(*rm.Evaluation)
+				if !ok {
+					t.Fatalf("COMPOSITION.content[0] is %T, want *rm.Evaluation", comp.Content[0])
+				}
+				return ev.Data
+			},
+		},
+		{
+			name:      "OBSERVATION root data",
+			opt:       optTemplate("OBSERVATION"),
+			structure: func(_ *testing.T, out any) any { return &out.(*rm.Observation).Data },
+		},
+		{
+			name:      "EVALUATION root data",
+			opt:       optTemplate("EVALUATION"),
+			structure: func(_ *testing.T, out any) any { return out.(*rm.Evaluation).Data },
+		},
+		{
+			name:      "ACTION root description",
+			opt:       optTemplate("ACTION"),
+			structure: func(_ *testing.T, out any) any { return out.(*rm.Action).Description },
+		},
+		{
+			name:      "ADMIN_ENTRY root data",
+			opt:       optTemplate("ADMIN_ENTRY"),
+			structure: func(_ *testing.T, out any) any { return out.(*rm.AdminEntry).Data },
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, tc.opt, true)
+			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
+						out, err := instance.Generate(t.Context(), c, instance.Options{
+							Policy:    policy,
+							ValueFill: fill,
+							Language:  "en",
+							Territory: "NL",
+							Composer:  testComposer(),
+							Now:       defaultsNow,
+						})
+						if err != nil {
+							t.Fatalf("Generate: %v", err)
+						}
+						s := tc.structure(t, out)
+						loc, ok := s.(rm.Locatable)
+						if !ok || rm.IsTypedNil(s) {
+							t.Fatalf("implicit structure is %T, want a locatable", s)
+						}
+						if got := loc.GetArchetypeNodeID(); got != "at0000" {
+							t.Errorf("%T archetype_node_id = %q, want at0000", s, got)
+						}
+						if name := loc.GetName(); name == nil || rm.IsTypedNil(name) || name.GetValue() == "" {
+							t.Errorf("%T name = %v, want a non-empty name", s, name)
+						}
+						for _, iss := range validation.ValidateRM(out).Issues {
+							if iss.Severity == validation.Error {
+								t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+							}
+						}
+					})
+				}
+			}
+		})
+	}
+}
+
+// dataSilentObservationOPT is a COMPOSITION whose content is one OBSERVATION
+// the OPT pins by archetype, with its mandatory data left silent.
+var dataSilentObservationOPT = optTemplate("COMPOSITION", optMultiple("content",
+	optArchetypeRoot("OBSERVATION", "openEHR-EHR-OBSERVATION.rm_defaults.v1")))
+
+// pinnedObservation returns the one OBSERVATION in COMPOSITION.content.
+func pinnedObservation(t *testing.T, out any) *rm.Observation {
 	t.Helper()
 	comp, err := instance.AsComposition(out)
 	if err != nil {

@@ -2,6 +2,7 @@ package rm_test
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -240,6 +241,117 @@ func TestTemporalMalformedNoPanic(t *testing.T) {
 	}
 }
 
+// reading is one accessor result, named for the failure message.
+type reading struct {
+	accessor string
+	got      any
+}
+
+// REQ-123: a value that does not parse reports zero components and false
+// inspection flags. It must not report the parts read before the parse
+// stopped: an illegal day such as 2024-04-31 must not pass for the partial
+// date 2024-04, and a repeated designator must not leave its number behind.
+func TestREQ123_MalformedValueReadsAsZero(t *testing.T) {
+	date := func(v string) []reading {
+		d := rm.DVDate{Value: v}
+		return []reading{
+			{"Year", d.Year()},
+			{"Month", d.Month()},
+			{"Day", d.Day()},
+			{"MonthUnknown", d.MonthUnknown()},
+			{"DayUnknown", d.DayUnknown()},
+			{"IsPartial", d.IsPartial()},
+			{"Magnitude", d.Magnitude()},
+			{"ValidISO8601", d.ValidISO8601()},
+		}
+	}
+	clock := func(v string) []reading {
+		d := rm.DVTime{Value: v}
+		return []reading{
+			{"Hour", d.Hour()},
+			{"Minute", d.Minute()},
+			{"Second", d.Second()},
+			{"FractionalSecond", d.FractionalSecond()},
+			{"Timezone", d.Timezone()},
+			{"IsPartial", d.IsPartial()},
+			{"Magnitude", d.Magnitude()},
+			{"ValidISO8601", d.ValidISO8601()},
+		}
+	}
+	dateTime := func(v string) []reading {
+		d := rm.DVDateTime{Value: v}
+		return []reading{
+			{"Year", d.Year()},
+			{"Month", d.Month()},
+			{"Day", d.Day()},
+			{"Hour", d.Hour()},
+			{"Minute", d.Minute()},
+			{"Second", d.Second()},
+			{"FractionalSecond", d.FractionalSecond()},
+			{"Timezone", d.Timezone()},
+			{"MonthUnknown", d.MonthUnknown()},
+			{"DayUnknown", d.DayUnknown()},
+			{"IsPartial", d.IsPartial()},
+			{"Magnitude", d.Magnitude()},
+			{"ValidISO8601", d.ValidISO8601()},
+		}
+	}
+	duration := func(v string) []reading {
+		d := rm.DVDuration{Value: v}
+		return []reading{
+			{"Years", d.Years()},
+			{"Months", d.Months()},
+			{"Weeks", d.Weeks()},
+			{"Days", d.Days()},
+			{"Hours", d.Hours()},
+			{"Minutes", d.Minutes()},
+			{"Seconds", d.Seconds()},
+			{"FractionalSeconds", d.FractionalSeconds()},
+			{"IsNegative", d.IsNegative()},
+			{"Magnitude", d.Magnitude()},
+			{"ValidISO8601", d.ValidISO8601()},
+		}
+	}
+	cases := []struct {
+		rmType string
+		value  string
+		read   func(string) []reading
+	}{
+		{"DV_DATE", "2024-04-31", date},        // bad day after year and month
+		{"DV_DATE", "2024-13-01", date},        // bad month after year
+		{"DV_DATE", "2024-13", date},           // bad month, no day
+		{"DV_DATE", "nope", date},              // nothing parsed
+		{"DV_TIME", "10:30:61", clock},         // bad second after hour and minute
+		{"DV_TIME", "10:60", clock},            // bad minute after hour
+		{"DV_TIME", "10:30:00+zz", clock},      // bad zone
+		{"DV_TIME", "10:30:00,x+01:00", clock}, // bad fraction after the zone
+		{"DV_TIME", "nope", clock},
+		{"DV_DATE_TIME", "2024-04-31T10:30:00Z", dateTime}, // bad day
+		{"DV_DATE_TIME", "2024-03T10:00", dateTime},        // time part without a full date
+		{"DV_DATE_TIME", "2024-03-15T25:00:00", dateTime},  // bad time after a good date
+		{"DV_DATE_TIME", "2024-03-15T10:30:00+zz", dateTime},
+		{"DV_DATE_TIME", "20240315T10:30:00", dateTime}, // mixed layouts
+		{"DV_DATE_TIME", "nope", dateTime},
+		{"DV_DURATION", "P1Y2Y", duration},   // repeated designator
+		{"DV_DURATION", "P1D1Y", duration},   // designator out of order
+		{"DV_DURATION", "-nope", duration},   // sign, then no P
+		{"DV_DURATION", "-P1Y2Y", duration},  // sign, then a repeated designator
+		{"DV_DURATION", "P1Y2.5M", duration}, // fraction off the seconds
+		{"DV_DURATION", "P1DX", duration},    // unknown designator
+		{"DV_DURATION", "P1DT", duration},    // empty time section
+		{"DV_DURATION", "P1D2", duration},    // dangling number
+	}
+	for _, tc := range cases {
+		t.Run(tc.rmType+" "+tc.value, func(t *testing.T) {
+			for _, r := range tc.read(tc.value) {
+				if !reflect.ValueOf(r.got).IsZero() {
+					t.Errorf("%s{Value: %q}.%s() = %v, want the zero value", tc.rmType, tc.value, r.accessor, r.got)
+				}
+			}
+		})
+	}
+}
+
 func TestDVDurationWeekMixing(t *testing.T) {
 	// openEHR permits the W designator mixed with others (deviation).
 	d := rm.DVDuration{Value: "P1Y2W3D"}
@@ -258,5 +370,37 @@ func TestDVTimeMagnitudeIsClockLocal(t *testing.T) {
 	plus2 := rm.DVTime{Value: "12:00:00+02:00"} // same instant as 10:00Z
 	if !utc.LessThan(plus2) {
 		t.Error("expected clock-local 10:00 < 12:00 (tz ignored)")
+	}
+}
+
+func TestREQ123_ValidISO8601(t *testing.T) {
+	cases := []struct {
+		name string
+		got  bool
+		want bool
+	}{
+		{"date full", (&rm.DVDate{Value: "2024-03-15"}).ValidISO8601(), true},
+		{"date partial month", (&rm.DVDate{Value: "2024-03"}).ValidISO8601(), true},
+		{"date partial year", (&rm.DVDate{Value: "2024"}).ValidISO8601(), true},
+		{"date placeholder", (&rm.DVDate{Value: "example"}).ValidISO8601(), false},
+		{"date empty", (&rm.DVDate{Value: ""}).ValidISO8601(), false},
+		{"time full", (&rm.DVTime{Value: "10:30:00Z"}).ValidISO8601(), true},
+		{"time partial", (&rm.DVTime{Value: "10:30"}).ValidISO8601(), true},
+		{"time placeholder", (&rm.DVTime{Value: "example"}).ValidISO8601(), false},
+		{"date-time full", (&rm.DVDateTime{Value: "2024-03-15T10:30:00+01:00"}).ValidISO8601(), true},
+		{"date-time partial", (&rm.DVDateTime{Value: "2024-03"}).ValidISO8601(), true},
+		{"date-time placeholder", (&rm.DVDateTime{Value: "example"}).ValidISO8601(), false},
+		{"date-time empty time part", (&rm.DVDateTime{Value: "2024-03-15T"}).ValidISO8601(), false},
+		{"duration mixed week", (&rm.DVDuration{Value: "P1W2D"}).ValidISO8601(), true},
+		{"duration negative", (&rm.DVDuration{Value: "-P1D"}).ValidISO8601(), true},
+		{"duration placeholder", (&rm.DVDuration{Value: "example"}).ValidISO8601(), false},
+		{"duration bare P", (&rm.DVDuration{Value: "P"}).ValidISO8601(), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.got != tc.want {
+				t.Errorf("ValidISO8601() = %v, want %v", tc.got, tc.want)
+			}
+		})
 	}
 }

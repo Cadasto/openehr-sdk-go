@@ -1055,6 +1055,7 @@ requirements:
       - openehr/template/constraints/pure_imports_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/validation/constraint_fixtures_test.go
+      - openehr/validation/optional_string_test.go
       - testkit/probes/template/constraint_fixtures_test.go
       - testkit/probes/template/probe_024_primitive_validate.go
       - testkit/probes/template/probes_test.go
@@ -1113,7 +1114,7 @@ requirements:
     title: Template-driven RM instance example generator
     canonical: docs/specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator
     status: draft
-    implementation: partial
+    implementation: landed
     packages:
       - openehr/template/constraints
       - openehr/instance
@@ -1127,8 +1128,10 @@ requirements:
       - internal/templateinstance/rmwrite/write_item_single_test.go
       - internal/templateinstance/rmwrite/write_parent_test.go
       - internal/templateinstance/rmwrite/write_test.go
+      - internal/templateinstance/rmwrite/write_text_like_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/instance/accessors_test.go
+      - openehr/instance/element_rule_test.go
       - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/interval_flags_test.go
@@ -1151,6 +1154,8 @@ requirements:
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/template/constraints/example_test.go
       - openehr/validation/constraint_fixtures_test.go
+      - openehr/validation/optional_string_test.go
+      - openehr/validation/walk_primitive_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/instance/probe_027_generated_validates.go
@@ -1257,6 +1262,7 @@ requirements:
     probes: [PROBE-081]
     tests:
       - openehr/rm/interval_bound_test.go
+      - openehr/rm/temporal_iso_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
@@ -1266,6 +1272,7 @@ requirements:
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_ordered_test.go
       - openehr/validation/rmfloor_proportion_test.go
+      - openehr/validation/rmfloor_temporal_element_test.go
       - openehr/validation/rmfloor_test.go
       - openehr/validation/rmread/handles_test.go
       - openehr/validation/rmread/interval_void_parity_test.go
@@ -1277,6 +1284,8 @@ requirements:
       - openehr/validation/strand14_nonchaining_test.go
       - sandbox/rmvalid_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
+      - testkit/probes/instance/corpus_ratchet_test.go
+      - testkit/probes/instance/ratchet_categories_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go
       - testkit/probes/serialize/probes_test.go
@@ -1477,6 +1486,8 @@ requirements:
       - openehr/rm
     tests:
       - openehr/rm/temporal_funcs_test.go
+      - openehr/rm/temporal_iso_test.go
+      - openehr/validation/rmfloor_temporal_element_test.go
 
   - id: REQ-130
     title: Contribution builder

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"regexp/syntax"
 	"strings"
 	"time"
@@ -132,9 +131,11 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		// The slot body is not in this OPT. A cluster slot is still an
 		// RM CLUSTER, and CLUSTER.items is mandatory, so it gets one element.
 		if c, ok := rmValue.(*rm.Cluster); ok && len(c.Items) == 0 {
-			el := &rm.Element{}
-			applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
-			c.Items = []rm.Item{el}
+			c.Items = []rm.Item{g.placeholderElement()}
+		}
+		// An element slot has no value constraint to fill either.
+		if el, ok := rmValue.(*rm.Element); ok {
+			settleElement(el)
 		}
 		return nil
 	}
@@ -325,6 +326,10 @@ func (g *generator) materialiseImplicitSingle(
 	// validator's "required attribute absent" check passes for
 	// BMM-mandatory implicit attrs the OPT did not constrain.
 	g.populatePrimitiveDefault(rmChild)
+	// A locatable the OPT does not name (OBSERVATION.data's HISTORY, an
+	// ENTRY's ITEM_TREE) still needs the node id and name the RM floor
+	// requires.
+	g.stampIfLocatable(rmChild, concreteFor(rmType))
 	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
 	// Best-effort attach; if the slot rejects the default (e.g. type
 	// mismatch on a polymorphic attr), let downstream defaults
@@ -381,6 +386,9 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 		// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE
 		// inside DV_CODED_TEXT) get filled.
 		g.populateBMMRequiredAttrs(rmChild, concrete, depth+1)
+		// Best-effort attach: a default the slot rejects (a polymorphic
+		// attribute the BMM cannot narrow) is left to the validator, as in
+		// materialiseImplicitSingle.
 		if isContainer {
 			_ = rmwrite.AppendMultiple(parent, parentRMType, attrName, rmChild)
 		} else {
@@ -416,13 +424,13 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 		v.CodeString = "at0000"
 		v.TerminologyID = rm.TerminologyID{Value: "local"}
 	case *rm.DVDate:
-		v.Value = "2020-01-01"
+		v.Value = g.temporalSentinel(v)
 	case *rm.DVTime:
-		v.Value = "12:00:00"
+		v.Value = g.temporalSentinel(v)
 	case *rm.DVDateTime:
-		v.Value = g.dateTimeDefault()
+		v.Value = g.temporalSentinel(v)
 	case *rm.DVDuration:
-		v.Value = "P0D"
+		v.Value = g.temporalSentinel(v)
 	case *rm.DVBoolean:
 		v.Value = true
 	case *rm.DVCount:
@@ -442,6 +450,8 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 		v.Denominator = 1
 	case *rm.DVURI:
 		v.Value = "http://example.com"
+	case *rm.DVEHRURI:
+		v.Value = "ehr://example"
 	case *rm.DVIdentifier:
 		v.ID = "example"
 	case *rm.DVParsable:
@@ -457,35 +467,46 @@ func (g *generator) dateTimeDefault() string {
 	return g.opts.Now.Format(time.RFC3339)
 }
 
+// temporalSentinel is the valid ISO 8601 value the generator writes on
+// an empty value of a DV_DATE, DV_TIME, DV_DATE_TIME or DV_DURATION, and
+// "" for any other value. populatePrimitiveDefault and writeBMMString
+// both take it from here, so a temporal value gets the same default
+// whichever pass fills it.
+func (g *generator) temporalSentinel(v any) string {
+	switch v.(type) {
+	case *rm.DVDate:
+		return "2020-01-01"
+	case *rm.DVTime:
+		return "12:00:00"
+	case *rm.DVDateTime:
+		return g.dateTimeDefault()
+	case *rm.DVDuration:
+		return "P0D"
+	}
+	return ""
+}
+
 // writeBMMString stores a BMM String attribute. A field that already
 // holds a value is left alone: populatePrimitiveDefault may have set
-// a clock or a code before this pass. An empty DV_DATE_TIME value
-// takes the clock; every other empty string keeps the open-string
-// example sentinel.
+// a clock or a code before this pass. An empty value of a temporal
+// data value takes its temporal sentinel, so it stays a valid ISO 8601
+// value; every other empty string keeps the open-string example
+// sentinel.
 func (g *generator) writeBMMString(parent any, parentType, attr string) {
 	cur, known := stringAttr(parent, attr)
 	if known && cur != "" {
 		return
 	}
 	val := "example"
-	if dateTimeValueUnset(parent, parentType, attr) {
-		val = g.dateTimeDefault()
+	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
+		val = s
 	}
+	// Best-effort, on purpose: the write is refused for a String
+	// attribute rmwrite does not address (TERMINOLOGY_ID.value, a
+	// locatable's archetype_node_id), and those are filled by another
+	// default or reported by the validator. Returning the error would
+	// fail Generate on every OPT.
 	_ = rmwrite.EnsureSingle(parent, parentType, attr, val)
-}
-
-// dateTimeValueUnset reports a DV_DATE_TIME.value that this pass may fill.
-func dateTimeValueUnset(parent any, parentType, attr string) bool {
-	if attr != "value" {
-		return false
-	}
-	if parentType != "DV_DATE_TIME" {
-		if _, ok := parent.(*rm.DVDateTime); !ok {
-			return false
-		}
-	}
-	cur, known := stringAttr(parent, attr)
-	return !known || cur == ""
 }
 
 // stringAttr reads a BMM String field the generator itself writes.
@@ -501,8 +522,9 @@ func stringAttr(parent any, attr string) (string, bool) {
 // stringField returns a reader and a writer for the BMM String attribute
 // attr of parent. It covers every String attribute of the data values the
 // generator builds, plus ACTIVITY.action_archetype_id and
-// TERMINOLOGY_ID.value. An optional attribute reads as "" while unset
-// and has a nil writer. ok is false when parent has no such field.
+// TERMINOLOGY_ID.value. An optional attribute reads as "" while unset, and
+// its writer sets it. ok is false when parent has no such field; when ok is
+// true, get and set are both non-nil.
 func stringField(parent any, attr string) (get func() string, set func(string), ok bool) {
 	switch p := parent.(type) {
 	case *rm.DVText:
@@ -588,10 +610,9 @@ func requiredString(f *string) (func() string, func(string), bool) {
 	return func() string { return *f }, func(s string) { *f = s }, true
 }
 
-// optionalString reads an optional String attribute and gives it no
-// writer: the generator leaves optional String attributes unset, because
-// the template-driven validator does not read them yet and would report
-// a filled one against the template. Leaving them unset is RM-valid.
+// optionalString reads and writes an optional String attribute. It reads
+// as "" while unset; the writer sets the attribute, so a C_STRING
+// constraint on it is honoured like any other String leaf.
 func optionalString(f **string) (func() string, func(string), bool) {
 	get := func() string {
 		if *f == nil {
@@ -599,7 +620,7 @@ func optionalString(f **string) (func() string, func(string), bool) {
 		}
 		return **f
 	}
-	return get, nil, true
+	return get, func(s string) { *f = &s }, true
 }
 
 // fillEntryCode sets ENTRY.language from Options.Language and
@@ -614,6 +635,8 @@ func (g *generator) fillEntryCode(parent any, parentType, attr string) bool {
 	if !entryCodeEmpty(parent, attr) {
 		return true
 	}
+	// Best-effort: every ENTRY parent type is addressed by rmwrite, and an
+	// entry the walk builds is checked by the validator afterwards.
 	_ = rmwrite.EnsureSingle(parent, parentType, attr, phrase)
 	return true
 }
@@ -726,10 +749,12 @@ func (g *generator) materialiseMultiple(
 ) error {
 	children := attr.Children()
 	if len(children) == 0 {
-		// Implicit / OPT-silent multi-valued attribute. Synthesise one
-		// default child of the BMM-resolved element type so the
+		// Implicit / OPT-silent multi-valued attribute. A required one
+		// (BMM-mandatory, or existence or cardinality lower of 1 or more)
+		// gets one default child of the BMM-resolved element type so the
 		// validator's required-attribute / cardinality.lower check
-		// passes; downstream consumers (REQ-101 Builder) overwrite.
+		// passes; downstream consumers (REQ-101 Builder) overwrite. An
+		// optional one gets no child.
 		return g.materialiseImplicitMultiple(optNode, attr, parentRM)
 	}
 	upperBound := -1 // -1 == unbounded
@@ -865,7 +890,8 @@ func firstNonSlot(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
 // BMM-mandatory multi-valued attribute the OPT did not pin. Uses
 // the attribute's BMM element type via [concreteFor]; silently no-op
 // when the type is outside the typereg registry — the validator
-// will flag it.
+// will flag it. An attribute that is optional (neither BMM-mandatory,
+// nor existence or cardinality lower ≥ 1) gets no child.
 func (g *generator) materialiseImplicitMultiple(
 	optNode *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -873,6 +899,13 @@ func (g *generator) materialiseImplicitMultiple(
 ) error {
 	rmType := attr.RMTypeName()
 	if rmType == "" {
+		return nil
+	}
+	// An optional attribute the OPT leaves empty stays empty. A child
+	// built from the BMM alone has no archetype to name, so an
+	// archetype-rooted one (COMPOSITION.content) would break the RM
+	// floor's archetype_details rule; the RM rule needs no such child.
+	if remainingLowerNeeded(attr, 0) == 0 {
 		return nil
 	}
 	rmChild, err := newRMForOPTType(rmType)
@@ -1417,11 +1450,11 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		g.ensureItems(opt, &v.Items)
 	case *rm.PartyRelationship:
 		fillPartyRelationship(v)
+	case *rm.Element:
+		settleElement(v)
 	case *rm.ItemList:
 		if len(v.Items) == 0 {
-			el := rm.Element{}
-			applyLocatableIdentity(&el, "at0000", "element", nil, g.nextUID)
-			v.Items = append(v.Items, el)
+			v.Items = append(v.Items, *g.placeholderElement())
 		}
 	case *rm.Activity:
 		if v.ActionArchetypeID == "" {
@@ -1429,13 +1462,11 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		}
 	case *rm.ItemSingle:
 		if v.Item.GetArchetypeNodeID() == "" && (v.Item.Value == nil || rm.IsTypedNil(v.Item.Value)) {
-			el := &rm.Element{}
-			applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
-			v.Item = *el
+			v.Item = *g.placeholderElement()
 		}
 	case *rm.DVEHRURI:
-		// The one place a DV_EHR_URI gets its default: the generic String
-		// pass cannot write it, and every one the generator emits is walked.
+		// Backstop for a DV_EHR_URI the primitive default did not reach;
+		// every one the generator emits is walked.
 		if v.Value == "" {
 			v.Value = "ehr://example"
 		}
@@ -1471,9 +1502,10 @@ func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
 					// A slot is not walked: its body is not in this OPT.
 					// A cluster slot still needs one item for the RM floor.
 					if slot, ok := made.(*rm.Cluster); ok && len(slot.Items) == 0 {
-						el := &rm.Element{}
-						applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
-						slot.Items = []rm.Item{el}
+						slot.Items = []rm.Item{g.placeholderElement()}
+					}
+					if slot, ok := made.(*rm.Element); ok {
+						settleElement(slot)
 					}
 				} else if err := g.walkNode(child, made); err != nil {
 					continue
@@ -1488,9 +1520,49 @@ func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
 			return
 		}
 	}
+	*items = append(*items, g.placeholderElement())
+}
+
+// placeholderElement is the one member the generator adds to an RM-mandatory
+// items list that the OPT does not describe. It has no value constraint to
+// fill, so it carries a null flavour (RM Inv_null_flavour_indicated).
+func (g *generator) placeholderElement() *rm.Element {
 	el := &rm.Element{}
 	applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
-	*items = append(*items, el)
+	settleElement(el)
+	return el
+}
+
+// settleElement makes an ELEMENT carry exactly one of value and null_flavour
+// (RM Inv_null_flavour_indicated), and a null_reason only while it is null
+// (RM Inv_null_reason_valid). A value wins: when the OPT constrains the value
+// and either null attribute, the null flavour and the null reason are both
+// dropped. An ELEMENT with no value, because the OPT constrains none or none
+// could be generated, keeps any null reason and gets the null flavour
+// "no information" when it has none.
+func settleElement(e *rm.Element) {
+	if e.Value != nil && !rm.IsTypedNil(e.Value) {
+		e.NullFlavour = nil
+		e.NullReason = nil
+		return
+	}
+	if e.NullFlavour == nil {
+		e.NullFlavour = noInformation()
+	}
+}
+
+// noInformation is the "no information" code (271) of the openEHR null
+// flavours group.
+func noInformation() *rm.DVCodedText {
+	const code = "271"
+	rubric, _ := terminology.NullFlavours.Rubric(code)
+	return &rm.DVCodedText{
+		Value: rubric,
+		DefiningCode: rm.CodePhrase{
+			CodeString:    code,
+			TerminologyID: rm.TerminologyID{Value: terminology.ID},
+		},
+	}
 }
 
 func symbolBlank(s rm.DVCodedText) bool {
@@ -1519,6 +1591,9 @@ func (g *generator) stampIfLocatable(rmValue any, rmType string) {
 		name = "element"
 	}
 	applyLocatableIdentity(rmValue, "at0000", name, nil, g.nextUID)
+	if el, ok := rmValue.(*rm.Element); ok {
+		settleElement(el)
+	}
 }
 
 func fillPartyRelationship(rel *rm.PartyRelationship) {
@@ -1611,7 +1686,7 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 		attr = mainStringAttr(rmValue)
 	}
 	_, set, ok := stringField(rmValue, attr)
-	if !ok || set == nil {
+	if !ok {
 		return nil
 	}
 	s, err := stringForConstraint(cs, ex)
@@ -1659,26 +1734,15 @@ var errNoStringValue = errors.New("no string satisfies the C_STRING constraint")
 // stringForConstraint returns a string cs accepts: the example ex when cs
 // accepts it, else the first list member cs accepts, else, for a
 // pattern-only constraint, the shortest string the pattern's syntax
-// builds. A pattern must match the whole string, so the value also holds
-// under the AOM reading of a C_STRING pattern, not only under the
-// substring match the validator applies. It returns errNoStringValue
-// when none of these is accepted.
+// builds. Acceptance is cs.Validate, which matches a pattern against the
+// whole string, so a value that only contains a match is never
+// chosen. It returns errNoStringValue when none of these is accepted.
 func stringForConstraint(cs constraints.CString, ex any) (string, error) {
 	s, ok := ex.(string)
 	if !ok {
 		return "", fmt.Errorf("C_STRING example value is %T, want string", ex)
 	}
-	var whole *regexp.Regexp
-	if cs.Pattern != "" {
-		re, err := regexp.Compile(`^(?:` + cs.Pattern + `)$`)
-		if err != nil {
-			return "", errNoStringValue
-		}
-		whole = re
-	}
-	accepts := func(v string) bool {
-		return len(cs.Validate(v)) == 0 && (whole == nil || whole.MatchString(v))
-	}
+	accepts := func(v string) bool { return len(cs.Validate(v)) == 0 }
 	if accepts(s) {
 		return s, nil
 	}

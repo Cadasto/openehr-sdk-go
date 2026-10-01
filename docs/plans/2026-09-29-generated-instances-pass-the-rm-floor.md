@@ -5,11 +5,11 @@ kind: plan
 # Plan — Generated instances pass the RM floor
 
 **Date:** 2026-09-29
-**Status:** Draft
+**Status:** Active — phases 0 to 3 landed; phase 4 (Code24 OPTs) is optional and open
 **Owner:** SDK maintainers
 **Covers:** [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor); evidence for [STRAND-14](../specifications/research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) (REQ-102)
 **Probes:** PROBE-027. PR 196's corpus census already runs `ValidateRM`; this plan makes it see the ELEMENT rule (Phases 2 and 3)
-**Implementation:** planned
+**Implementation:** landed for phases 0 to 3
 **Depends on:** PR 196, merged: it fixed defects 1 to 4 and 6 in the generator, added the corpus census `TestREQ107_CorpusRatchet`, and bound generated output to the RM floor in REQ-107. PR 188 has landed, and Phase 0's spec edits sit on top of its catalogue. The [generator follow-ups plan](2026-10-01-generator-follow-ups.md) owns PR 196's other leftovers and does not cover the ELEMENT rule
 **Defers:** the STRAND-14 decision (whether `ValidateComposition` runs the floor); strict OPT 1.4 schema checks beyond `T_ARCHETYPE_ROOT` (Phase 4 records them, and they are optional); evaluating `Language_valid` and `Encoding_valid` in the floor, which needs the ISO 639-1 and IANA character-set registers vendored first; whether the lenient `ParseOPT` reports a subtree it drops (Phase 4 decides)
 
@@ -52,7 +52,7 @@ The plan is complete when:
 
 - Code and tests land with `// REQ-` citations.
 - [`traceability.yaml`](../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the implementation.
-- A [`roadmap.md`](../roadmap.md) row records what landed.
+- The [`roadmap.md`](../roadmap.md) Planned row for this work is removed once it lands.
 - The implementing PR flips REQ-107 back to `landed` (`REQ.md`, `traceability.yaml`), removes its Known gap and the two "specified ahead of the code" sentences on the REQ-112 rows, and marks PROBE-027's `ValidateRM` arm Implemented. STRAND-14 already carries the evidence.
 - `make spec-check` and `make ci` pass.
 
@@ -61,11 +61,11 @@ The plan is complete when:
 | Step | Status |
 |---|---|
 | Spec / registry updated (`traceability.yaml`, REQ.md row) | done (Phase 0) |
-| Indexes `spec-check` misses (`roadmap.md` row) | done (Phase 0) |
-| Code | |
-| Tests with `// REQ-` comments | |
-| `make spec-check` | |
-| `make ci` | |
+| Indexes `spec-check` misses (`roadmap.md` row) | done (the Planned row is removed) |
+| Code | done (phases 1 to 3) |
+| Tests with `// REQ-` comments | done |
+| `make spec-check` | done |
+| `make ci` | done |
 
 ## The gap, reproduced
 

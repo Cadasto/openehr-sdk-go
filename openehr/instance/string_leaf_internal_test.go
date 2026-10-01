@@ -66,8 +66,9 @@ func TestREQ107_StringForConstraintPrefersExampleThenList(t *testing.T) {
 }
 
 // TestREQ107_StringLeafWritesTheNamedAttribute pins the attribute
-// dispatch of applyStringLeaf for each required String attribute it
-// writes, including the "" form that names the value's main attribute.
+// dispatch of applyStringLeaf for each String attribute it writes,
+// required or optional, including the "" form that names the value's main
+// attribute.
 func TestREQ107_StringLeafWritesTheNamedAttribute(t *testing.T) {
 	cs := constraints.NewCString("", []string{"XYZ"}, "")
 	cases := []struct {
@@ -89,6 +90,14 @@ func TestREQ107_StringLeafWritesTheNamedAttribute(t *testing.T) {
 		{"DV_QUANTITY.units", &rm.DVQuantity{}, "units", func(v any) string { return v.(*rm.DVQuantity).Units }},
 		{"ACTIVITY main", &rm.Activity{}, "", func(v any) string { return v.(*rm.Activity).ActionArchetypeID }},
 		{"TERMINOLOGY_ID.value", &rm.TerminologyID{}, "value", func(v any) string { return v.(*rm.TerminologyID).Value }},
+		{"DV_TEXT.formatting", &rm.DVText{}, "formatting", func(v any) string { return deref(v.(*rm.DVText).Formatting) }},
+		{"DV_CODED_TEXT.formatting", &rm.DVCodedText{}, "formatting", func(v any) string { return deref(v.(*rm.DVCodedText).Formatting) }},
+		{"DV_IDENTIFIER.issuer", &rm.DVIdentifier{}, "issuer", func(v any) string { return deref(v.(*rm.DVIdentifier).Issuer) }},
+		{"DV_IDENTIFIER.assigner", &rm.DVIdentifier{}, "assigner", func(v any) string { return deref(v.(*rm.DVIdentifier).Assigner) }},
+		{"DV_IDENTIFIER.type", &rm.DVIdentifier{}, "type", func(v any) string { return deref(v.(*rm.DVIdentifier).Type) }},
+		{"DV_MULTIMEDIA.alternate_text", &rm.DVMultimedia{}, "alternate_text", func(v any) string { return deref(v.(*rm.DVMultimedia).AlternateText) }},
+		{"DV_QUANTITY.magnitude_status", &rm.DVQuantity{}, "magnitude_status", func(v any) string { return deref(v.(*rm.DVQuantity).MagnitudeStatus) }},
+		{"CODE_PHRASE.preferred_term", &rm.CodePhrase{}, "preferred_term", func(v any) string { return deref(v.(*rm.CodePhrase).PreferredTerm) }},
 	}
 	for _, tc := range cases {
 		if err := applyStringLeaf(nil, tc.value, tc.attr, cs, "XYZ"); err != nil {
@@ -100,10 +109,11 @@ func TestREQ107_StringLeafWritesTheNamedAttribute(t *testing.T) {
 		}
 	}
 
-	// An optional attribute and an unknown one are left alone.
+	// Writing formatting leaves value alone, and an unknown attribute is
+	// left alone.
 	text := &rm.DVText{}
-	if err := applyStringLeaf(nil, text, "formatting", cs, "XYZ"); err != nil || text.Formatting != nil || text.Value != "" {
-		t.Errorf("DV_TEXT.formatting: applyStringLeaf = %v, value %q, formatting %v; want nil, both unset", err, text.Value, text.Formatting)
+	if err := applyStringLeaf(nil, text, "formatting", cs, "XYZ"); err != nil || text.Value != "" {
+		t.Errorf("DV_TEXT.formatting: applyStringLeaf = %v, value %q; want nil, value unset", err, text.Value)
 	}
 	if err := applyStringLeaf(nil, text, "no_such", cs, "XYZ"); err != nil || text.Value != "" {
 		t.Errorf("DV_TEXT.no_such: applyStringLeaf = %v, value %q; want nil, value unset", err, text.Value)
@@ -122,5 +132,44 @@ func TestREQ107_StringLeafWritesTheNamedAttribute(t *testing.T) {
 	}
 	if parsable.Formalism != "text/plain" {
 		t.Errorf("unsatisfiable formalism: formalism %q after the error, want text/plain kept", parsable.Formalism)
+	}
+}
+
+// deref returns the string s points to, or "" when it points to nothing.
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+// TestREQ103_PatternReadingAgreesBetweenValidatorAndGenerator pins one
+// reading of a C_STRING pattern for both sides: a value that only contains
+// a match is refused by CString.Validate, and the generator never chooses
+// it, even when it is the example or the first list member, and builds a
+// value the validator accepts instead (REQ-103, REQ-107).
+func TestREQ103_PatternReadingAgreesBetweenValidatorAndGenerator(t *testing.T) {
+	const inner = "abc123def" // contains a match for [0-9]+ but is not one
+	cs := constraints.NewCString("[0-9]+", []string{inner, "123"}, "")
+
+	if v := cs.Validate(inner); len(v) != 1 || v[0].Code != constraints.CodePatternMismatch {
+		t.Fatalf("Validate(%q) = %v, want one CodePatternMismatch", inner, v)
+	}
+	got, err := stringForConstraint(cs, inner)
+	if err != nil || got != "123" {
+		t.Errorf("stringForConstraint(list [%q 123], example %q) = %q, %v; want 123, nil", inner, inner, got, err)
+	}
+
+	patternOnly := constraints.NewCString("[0-9]+", nil, "")
+	got, err = stringForConstraint(patternOnly, inner)
+	if err != nil {
+		t.Fatalf("stringForConstraint(pattern only, example %q): %v", inner, err)
+	}
+	if got == inner || len(patternOnly.Validate(got)) != 0 {
+		t.Errorf("stringForConstraint(pattern only, example %q) = %q, want a value the validator accepts", inner, got)
+	}
+
+	if _, err := stringForConstraint(constraints.NewCString("[0-9]+", []string{inner}, ""), inner); !errors.Is(err, errNoStringValue) {
+		t.Errorf("only a substring match in the list: error = %v, want errNoStringValue", err)
 	}
 }
