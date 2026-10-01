@@ -431,6 +431,7 @@ requirements:
       - openehr/serialize/canjson/decode_test.go
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/serialize/canjson/encode_test.go
+      - openehr/serialize/canjson/interval_failed_decode_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
       - openehr/serialize/canjson/map_value_type_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
