@@ -43,6 +43,9 @@ func TestREQ123_ValidISO8601DateForms(t *testing.T) {
 		{"2024-03-15-", false},
 		{"2024-03-15-01", false},
 		{"+2024", false},
+		{"+202", false}, // Atoi would take a sign
+		{"2024-+3", false},
+		{"2024-03-+5", false},
 		{"-2024-03", false},
 		{"2024-03-15 ", false},
 		{"example", false},
