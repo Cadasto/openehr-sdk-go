@@ -128,7 +128,10 @@ func TestValidateRM_ReferenceRangesWalked(t *testing.T) {
 				Meaning: rm.DVText{Value: "valid period"},
 				Range:   openUpper(rm.DVDate{}),
 			}}}),
-			want: []string{"required /value/other_reference_ranges[0]/range/lower/value"},
+			want: []string{
+				"required /value/other_reference_ranges[0]/range/lower/value",
+				"rm_invariant /value/other_reference_ranges[0]/range/lower",
+			},
 		},
 		{
 			name: "DV_DATE in an ELEMENT, normal_status with an empty code_string",
@@ -417,7 +420,10 @@ func TestValidateRM_AccuracyWalked(t *testing.T) {
 		{
 			name: "DV_DATE with an empty accuracy duration",
 			root: scoreElement(&rm.DVDate{Value: "2026-09-29", Accuracy: &rm.DVDuration{}}),
-			want: []string{"required /value/accuracy/value"},
+			want: []string{
+				"required /value/accuracy/value",
+				"rm_invariant /value/accuracy",
+			},
 		},
 		{
 			name: "DV_DATE_TIME with a complete accuracy duration",
@@ -429,7 +435,10 @@ func TestValidateRM_AccuracyWalked(t *testing.T) {
 				Lower: rm.DVTime{Value: "08:00:00", Accuracy: &rm.DVDuration{}}, LowerIncluded: true,
 				UpperUnbounded: true,
 			},
-			want: []string{"required /lower/accuracy/value"},
+			want: []string{
+				"required /lower/accuracy/value",
+				"rm_invariant /lower/accuracy",
+			},
 		},
 		{
 			name: "DV_QUANTITY with a Real accuracy",
