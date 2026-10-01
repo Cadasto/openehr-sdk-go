@@ -52,6 +52,10 @@ type timeParts struct {
 	frac                              float64
 	minuteKnown, secondKnown, tzKnown bool
 	tz                                string
+	// colon marks the extended form (hh:mm[:ss]); basic marks a compact body
+	// longer than hh (hhmm[ss]). A bare hh is neither, so it fits both a
+	// compact and an extended date-time.
+	colon, basic bool
 }
 
 type durationParts struct {
@@ -189,8 +193,20 @@ func (d *DVDateTime) split() (dateParts, timeParts, error) {
 	if !hasT {
 		return dp, timeParts{}, nil
 	}
+	if !dp.dayKnown {
+		return dp, timeParts{}, fmt.Errorf("time part needs a full date in %q", d.Value)
+	}
 	tp, terr := parseTime(timePart)
-	return dp, tp, terr
+	if terr != nil {
+		return dp, tp, terr
+	}
+	// The date and time bodies are both extended or both compact; ISO 8601
+	// has no mixed form. (The zone suffix is not part of the body.)
+	dateExtended := strings.Contains(datePart, "-")
+	if (dateExtended && tp.basic) || (!dateExtended && tp.colon) {
+		return dp, timeParts{}, fmt.Errorf("mixed extended and compact forms in %q", d.Value)
+	}
+	return dp, tp, nil
 }
 
 // Year returns the year component.
@@ -349,6 +365,9 @@ func (d *DVDuration) ToDuration() (time.Duration, error) {
 
 // --- parsing ------------------------------------------------------------
 
+// parseDate parses the BASE valid_iso8601_date forms: YYYY-MM-DD, YYYY-MM,
+// YYYY, YYYYMMDD, YYYYMM, with the month and day checked against the
+// Gregorian calendar. Every field is zero-filled ASCII digits.
 func parseDate(s string) (dateParts, error) {
 	var p dateParts
 	if s == "" {
@@ -357,7 +376,7 @@ func parseDate(s string) (dateParts, error) {
 	var fields []string
 	if strings.Contains(s, "-") {
 		fields = strings.Split(s, "-")
-	} else { // basic form YYYY[MM[DD]]
+	} else { // compact form YYYY[MM[DD]]
 		switch len(s) {
 		case 4:
 			fields = []string{s}
@@ -369,72 +388,191 @@ func parseDate(s string) (dateParts, error) {
 			return p, fmt.Errorf("bad date %q", s)
 		}
 	}
-	if len(fields) == 0 || len(fields) > 3 {
+	if len(fields) > 3 {
 		return p, fmt.Errorf("bad date %q", s)
 	}
-	y, err := strconv.Atoi(fields[0])
-	if err != nil {
-		return p, fmt.Errorf("bad year in %q", s)
+	widths := [3]int{4, 2, 2}
+	var nums [3]int
+	for i, f := range fields {
+		n, ok := fixedDigits(f, widths[i])
+		if !ok {
+			return p, fmt.Errorf("bad date %q", s)
+		}
+		nums[i] = n
 	}
-	p.year = y
+	p.year = nums[0]
 	if len(fields) >= 2 {
-		m, err := strconv.Atoi(fields[1])
-		if err != nil || m < 1 || m > 12 {
+		if nums[1] < 1 || nums[1] > 12 {
 			return p, fmt.Errorf("bad month in %q", s)
 		}
-		p.month, p.monthKnown = m, true
+		p.month, p.monthKnown = nums[1], true
 	}
 	if len(fields) == 3 {
-		dd, err := strconv.Atoi(fields[2])
-		if err != nil || dd < 1 || dd > 31 {
+		if nums[2] < 1 || nums[2] > daysInMonth(p.year, p.month) {
 			return p, fmt.Errorf("bad day in %q", s)
 		}
-		p.day, p.dayKnown = dd, true
+		p.day, p.dayKnown = nums[2], true
 	}
 	return p, nil
 }
 
+// parseTime parses the BASE valid_iso8601_time forms: hh:mm:ss, hh:mm
+// (extended), hhmmss, hhmm, hh (compact), each with an optional comma or dot
+// fraction on the seconds and an optional zone of Z, ±hh, ±hhmm or ±hh:mm.
 func parseTime(s string) (timeParts, error) {
 	var p timeParts
-	if s == "" {
+	body := s
+	if i := strings.IndexAny(s, "Z+-"); i >= 0 {
+		body, p.tz, p.tzKnown = s[:i], s[i:], true
+		if _, err := parseZone(p.tz); err != nil {
+			return p, err
+		}
+	}
+	if body == "" {
 		return p, errors.New("empty time")
 	}
-	// Strip timezone suffix.
-	if base, ok := strings.CutSuffix(s, "Z"); ok {
-		p.tz, p.tzKnown = "Z", true
-		s = base
-	} else if base, tz, ok := strings.Cut(s, "+"); ok {
-		p.tz, p.tzKnown = "+"+tz, true
-		s = base
-	} else if i := strings.LastIndexByte(s, '-'); i > 0 {
-		p.tz, p.tzKnown = s[i:], true
-		s = s[:i]
+	main, fracDigits, hasFrac := body, "", false
+	if i := strings.IndexAny(body, ".,"); i >= 0 {
+		main, fracDigits, hasFrac = body[:i], body[i+1:], true
+		if !allDigits(fracDigits) {
+			return p, fmt.Errorf("bad fractional second in %q", s)
+		}
 	}
-	fields := strings.Split(s, ":")
-	if len(fields) == 0 || len(fields) > 3 {
+	var fields []string
+	if strings.Contains(main, ":") {
+		p.colon = true
+		fields = strings.Split(main, ":")
+	} else { // compact form hh[mm[ss]]
+		switch len(main) {
+		case 2:
+			fields = []string{main}
+		case 4:
+			fields = []string{main[:2], main[2:4]}
+			p.basic = true
+		case 6:
+			fields = []string{main[:2], main[2:4], main[4:6]}
+			p.basic = true
+		default:
+			return p, fmt.Errorf("bad time %q", s)
+		}
+	}
+	if len(fields) > 3 || (hasFrac && len(fields) != 3) {
 		return p, fmt.Errorf("bad time %q", s)
 	}
-	h, err := strconv.Atoi(fields[0])
-	if err != nil || h < 0 || h > 23 {
+	var nums [3]int
+	for i, f := range fields {
+		n, ok := fixedDigits(f, 2)
+		if !ok {
+			return p, fmt.Errorf("bad time %q", s)
+		}
+		nums[i] = n
+	}
+	if nums[0] > 24 {
 		return p, fmt.Errorf("bad hour in %q", s)
 	}
-	p.hour = h
+	p.hour = nums[0]
 	if len(fields) >= 2 {
-		m, err := strconv.Atoi(fields[1])
-		if err != nil || m < 0 || m > 59 {
+		if nums[1] > 59 {
 			return p, fmt.Errorf("bad minute in %q", s)
 		}
-		p.minute, p.minuteKnown = m, true
+		p.minute, p.minuteKnown = nums[1], true
 	}
 	if len(fields) == 3 {
-		secField := fields[2]
-		whole, frac, err := splitNumber(secField)
-		if err != nil || whole < 0 || whole > 60 {
+		if nums[2] > 60 {
 			return p, fmt.Errorf("bad second in %q", s)
 		}
-		p.second, p.frac, p.secondKnown = whole, frac, true
+		p.second, p.secondKnown = nums[2], true
+	}
+	if hasFrac {
+		f, err := strconv.ParseFloat("0."+fracDigits, 64)
+		if err != nil {
+			return p, fmt.Errorf("bad fractional second in %q", s)
+		}
+		p.frac = f
+	}
+	// 24:00:00 is the end of day; hour 24 admits nothing after it.
+	if p.hour == 24 && (p.minute != 0 || p.second != 0 || p.frac != 0) {
+		return p, fmt.Errorf("bad hour in %q", s)
 	}
 	return p, nil
+}
+
+// parseZone parses a timezone designator (Z, ±hh, ±hhmm or ±hh:mm) and
+// returns its offset in seconds east of UTC. The hour is at most 14 east and
+// 12 west (TIME_DEFINITIONS Max_timezone_hour / Min_timezone_hour).
+func parseZone(tz string) (int, error) {
+	if tz == "Z" {
+		return 0, nil
+	}
+	if tz == "" {
+		return 0, errors.New("empty timezone")
+	}
+	sign, maxHour := 1, 14
+	switch tz[0] {
+	case '+':
+	case '-':
+		sign, maxHour = -1, 12
+	default:
+		return 0, fmt.Errorf("bad timezone %q", tz)
+	}
+	rest := tz[1:]
+	hh, mm := "", "00"
+	switch len(rest) {
+	case 2:
+		hh = rest
+	case 4:
+		hh, mm = rest[:2], rest[2:]
+	case 5:
+		if rest[2] != ':' {
+			return 0, fmt.Errorf("bad timezone %q", tz)
+		}
+		hh, mm = rest[:2], rest[3:]
+	default:
+		return 0, fmt.Errorf("bad timezone %q", tz)
+	}
+	h, okH := fixedDigits(hh, 2)
+	m, okM := fixedDigits(mm, 2)
+	if !okH || !okM || h > maxHour || m > 59 {
+		return 0, fmt.Errorf("bad timezone %q", tz)
+	}
+	return sign * (h*3600 + m*60), nil
+}
+
+// fixedDigits parses s as exactly width ASCII digits.
+func fixedDigits(s string, width int) (int, bool) {
+	if len(s) != width || !allDigits(s) {
+		return 0, false
+	}
+	n, err := strconv.Atoi(s)
+	return n, err == nil
+}
+
+// allDigits reports whether s is a non-empty run of ASCII digits.
+func allDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := range len(s) {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// daysInMonth returns the Gregorian length of month m (1-12) in year y.
+func daysInMonth(y, m int) int {
+	switch m {
+	case 2:
+		if y%4 == 0 && (y%100 != 0 || y%400 == 0) {
+			return 29
+		}
+		return 28
+	case 4, 6, 9, 11:
+		return 30
+	default:
+		return 31
+	}
 }
 
 func parseDuration(s string) (durationParts, error) {
@@ -568,25 +706,11 @@ func tzLocation(p timeParts) (*time.Location, error) {
 	if !p.tzKnown || p.tz == "" || p.tz == "Z" {
 		return time.UTC, nil
 	}
-	sign := 1
-	tz := p.tz
-	switch tz[0] {
-	case '+':
-		tz = tz[1:]
-	case '-':
-		sign = -1
-		tz = tz[1:]
+	off, err := parseZone(p.tz)
+	if err != nil {
+		return nil, err
 	}
-	tz = strings.ReplaceAll(tz, ":", "")
-	if len(tz) != 4 {
-		return nil, fmt.Errorf("bad timezone %q", p.tz)
-	}
-	hh, err1 := strconv.Atoi(tz[:2])
-	mm, err2 := strconv.Atoi(tz[2:])
-	if err1 != nil || err2 != nil {
-		return nil, fmt.Errorf("bad timezone %q", p.tz)
-	}
-	return time.FixedZone(p.tz, sign*(hh*3600+mm*60)), nil
+	return time.FixedZone(p.tz, off), nil
 }
 
 func cmpInt(a, b int) int {

@@ -7,7 +7,9 @@ package rm
 // partial forms (`2024`, `2024-03`) and DV_DURATION's documented deviations
 // are valid. It stands in for the BASE predicates valid_iso8601_date,
 // valid_iso8601_time, valid_iso8601_date_time and valid_iso8601_duration.
-// The methods never panic.
+// The date, time and date-time parse accepts the forms those predicates
+// define: extended and compact layouts, a comma or dot fraction, and a zone
+// of Z, ±hh, ±hhmm or ±hh:mm. The methods never panic.
 
 // ValidISO8601 reports whether the date's value is a valid ISO 8601 date,
 // partial forms included.
