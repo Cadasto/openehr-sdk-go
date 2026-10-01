@@ -151,17 +151,17 @@ func TestREQ107_StringLeafListOnDVParsableFormalism(t *testing.T) {
 }
 
 // TestREQ107_StringLeafDispatchesOnAttribute is the REQ-107 check that a
-// C_STRING lands on the attribute the OPT names: a list on
-// DV_TEXT.formatting fills formatting and leaves value alone.
+// C_STRING lands only on the attribute the OPT names: a list on
+// DV_TEXT.formatting never reaches value, and formatting, an optional
+// attribute the generator leaves unset, holds nothing but a member.
 func TestREQ107_StringLeafDispatchesOnAttribute(t *testing.T) {
 	opt := renameAttrBefore(t, instance.ReadVendoredOPT(t, textListOPT), textValueListXYZ, "value", "formatting")
 	c := compileSyntheticOPT(t, opt)
 	for _, opts := range stringLeafFills() {
 		root, doc := generateWithJSON(t, c, opts)
 		v := elementValue(t, doc, "at0031")
-		got, _ := v["formatting"].(string)
-		if got != "XYZ" && got != "OPQ" {
-			t.Errorf("ValueFill %v: DV_TEXT.formatting = %v, want a member of [XYZ OPQ]", opts.ValueFill, v["formatting"])
+		if got, set := v["formatting"]; set && got != "XYZ" && got != "OPQ" {
+			t.Errorf("ValueFill %v: DV_TEXT.formatting = %v, want unset or a member of [XYZ OPQ]", opts.ValueFill, got)
 		}
 		if value := v["value"]; value == "XYZ" || value == "OPQ" {
 			t.Errorf("ValueFill %v: DV_TEXT.value = %v, want the formatting list kept off value", opts.ValueFill, value)

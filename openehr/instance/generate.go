@@ -2,8 +2,10 @@ package instance
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
+	"regexp/syntax"
 	"strings"
 	"time"
 	"uuid"
@@ -140,14 +142,14 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	// either.
 	if pc := optNode.PrimitiveConstraint(); pc != nil {
 		if g.opts.Policy == Example {
-			return g.applyPrimitiveExample(rmValue, "", pc)
+			return g.applyPrimitiveExample(optNode, rmValue, "", pc)
 		}
 		// Under Minimal we still populate the leaf so the resulting
 		// tree is valid (bounded constraints require a value); leaving
 		// a zero RM value would surface as primitive_wrong_type or
 		// out_of_range at validation. Cheap and aligned with the
 		// "structurally complete" Minimal contract.
-		return g.applyPrimitiveExample(rmValue, "", pc)
+		return g.applyPrimitiveExample(optNode, rmValue, "", pc)
 	}
 
 	if g.opts.ValueFill == RandomFill {
@@ -245,7 +247,7 @@ func (g *generator) materialiseSingle(
 	// the populatePrimitiveDefault sentinel holds.
 	if tcimpl.IsAOMPrimitiveShortName(child.RMTypeName()) {
 		if pc := child.PrimitiveConstraint(); pc != nil {
-			return g.applyPrimitiveExample(parentRM, attr.Name(), pc)
+			return g.applyPrimitiveExample(child, parentRM, attr.Name(), pc)
 		}
 		return nil
 	}
@@ -488,68 +490,115 @@ func dateTimeValueUnset(parent any, parentType, attr string) bool {
 // stringAttr reads a BMM String field the generator itself writes.
 // ok is false when parent has no such field under attr.
 func stringAttr(parent any, attr string) (string, bool) {
+	get, _, ok := stringField(parent, attr)
+	if !ok {
+		return "", false
+	}
+	return get(), true
+}
+
+// stringField returns a reader and a writer for the BMM String attribute
+// attr of parent. It covers every String attribute of the data values the
+// generator builds, plus ACTIVITY.action_archetype_id and
+// TERMINOLOGY_ID.value. An optional attribute reads as "" while unset
+// and has a nil writer. ok is false when parent has no such field.
+func stringField(parent any, attr string) (get func() string, set func(string), ok bool) {
 	switch p := parent.(type) {
 	case *rm.DVText:
-		if attr == "value" {
-			return p.Value, true
-		}
+		return textField(&p.Value, &p.Formatting, attr)
 	case *rm.DVCodedText:
-		if attr == "value" {
-			return p.Value, true
-		}
+		return textField(&p.Value, &p.Formatting, attr)
 	case *rm.CodePhrase:
-		if attr == "code_string" {
-			return p.CodeString, true
+		switch attr {
+		case "code_string":
+			return requiredString(&p.CodeString)
+		case "preferred_term":
+			return optionalString(&p.PreferredTerm)
 		}
 	case *rm.DVDate:
-		if attr == "value" {
-			return p.Value, true
-		}
+		return valueField(&p.Value, attr)
 	case *rm.DVTime:
-		if attr == "value" {
-			return p.Value, true
-		}
+		return valueField(&p.Value, attr)
 	case *rm.DVDateTime:
-		if attr == "value" {
-			return p.Value, true
-		}
+		return valueField(&p.Value, attr)
 	case *rm.DVDuration:
-		if attr == "value" {
-			return p.Value, true
-		}
+		return valueField(&p.Value, attr)
 	case *rm.DVURI:
-		if attr == "value" {
-			return p.Value, true
-		}
+		return valueField(&p.Value, attr)
 	case *rm.DVEHRURI:
-		if attr == "value" {
-			return p.Value, true
-		}
+		return valueField(&p.Value, attr)
 	case *rm.DVIdentifier:
-		if attr == "id" {
-			return p.ID, true
+		switch attr {
+		case "id":
+			return requiredString(&p.ID)
+		case "issuer":
+			return optionalString(&p.Issuer)
+		case "assigner":
+			return optionalString(&p.Assigner)
+		case "type":
+			return optionalString(&p.Type)
 		}
 	case *rm.DVParsable:
 		switch attr {
 		case "value":
-			return p.Value, true
+			return requiredString(&p.Value)
 		case "formalism":
-			return p.Formalism, true
+			return requiredString(&p.Formalism)
+		}
+	case *rm.DVMultimedia:
+		if attr == "alternate_text" {
+			return optionalString(&p.AlternateText)
 		}
 	case *rm.DVQuantity:
-		if attr == "units" {
-			return p.Units, true
+		switch attr {
+		case "units":
+			return requiredString(&p.Units)
+		case "magnitude_status":
+			return optionalString(&p.MagnitudeStatus)
 		}
 	case *rm.Activity:
 		if attr == "action_archetype_id" {
-			return p.ActionArchetypeID, true
+			return requiredString(&p.ActionArchetypeID)
 		}
 	case *rm.TerminologyID:
-		if attr == "value" {
-			return p.Value, true
-		}
+		return valueField(&p.Value, attr)
 	}
-	return "", false
+	return nil, nil, false
+}
+
+func textField(value *string, formatting **string, attr string) (func() string, func(string), bool) {
+	switch attr {
+	case "value":
+		return requiredString(value)
+	case "formatting":
+		return optionalString(formatting)
+	}
+	return nil, nil, false
+}
+
+func valueField(value *string, attr string) (func() string, func(string), bool) {
+	if attr != "value" {
+		return nil, nil, false
+	}
+	return requiredString(value)
+}
+
+func requiredString(f *string) (func() string, func(string), bool) {
+	return func() string { return *f }, func(s string) { *f = s }, true
+}
+
+// optionalString reads an optional String attribute and gives it no
+// writer: the generator leaves optional String attributes unset, because
+// the template-driven validator does not read them yet and would report
+// a filled one against the template. Leaving them unset is RM-valid.
+func optionalString(f **string) (func() string, func(string), bool) {
+	get := func() string {
+		if *f == nil {
+			return ""
+		}
+		return **f
+	}
+	return get, nil, true
 }
 
 // fillEntryCode sets ENTRY.language from Options.Language and
@@ -993,13 +1042,18 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 // applyPrimitiveExample materialises a primitive leaf's ExampleValue
 // against the RM value bound at this OPT node. Closed switch on the
 // constraint type because the value shape differs per primitive
-// (REQ-103 closed set).
-func (g *generator) applyPrimitiveExample(rmValue any, attr string, pc constraints.PrimitiveConstraint) error {
+// (REQ-103 closed set). leaf is the OPT node that carries pc; attr is
+// the attribute of rmValue it constrains, or "" when pc constrains
+// rmValue itself.
+func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any, attr string, pc constraints.PrimitiveConstraint) error {
 	ex := pc.ExampleValue()
 	if g.opts.ValueFill == RandomFill {
 		// In-constraint sampled value (valid by construction); same Go
 		// shape as ExampleValue so the switch below is unchanged. REQ-107.
 		ex = sampleValue(pc, g.valueSampler)
+	}
+	if cs, ok := pc.(constraints.CString); ok {
+		return applyStringLeaf(leaf, rmValue, attr, cs, ex)
 	}
 	switch v := rmValue.(type) {
 	case *rm.DVQuantity:
@@ -1087,25 +1141,6 @@ func (g *generator) applyPrimitiveExample(rmValue any, attr string, pc constrain
 			return fmt.Errorf("DV_DURATION example value is %T, want string", ex)
 		}
 		v.Value = s
-		return nil
-	case *rm.DVIdentifier:
-		s, ok := stringForConstraint(pc, ex)
-		if !ok {
-			return fmt.Errorf("DV_IDENTIFIER example value is %T, want string", ex)
-		}
-		if attr == "" || attr == "id" {
-			v.ID = s
-		}
-		return nil
-	case *rm.Activity:
-		if attr != "action_archetype_id" {
-			return nil
-		}
-		s, ok := stringForConstraint(pc, ex)
-		if !ok {
-			return fmt.Errorf("ACTIVITY.action_archetype_id example value is %T, want string", ex)
-		}
-		v.ActionArchetypeID = s
 		return nil
 	}
 	// Unknown RM target for this constraint — silently no-op so the
@@ -1562,32 +1597,196 @@ func firstCodedExample(opt *tcimpl.CompiledNode, attrName string) (constraints.C
 	return found, ok
 }
 
-// stringForConstraint returns the example string, or a value the
-// pattern accepts when the open-string example does not. A pattern
-// whose only operator is a trailing .* keeps the literal prefix.
-func stringForConstraint(pc constraints.PrimitiveConstraint, ex any) (string, bool) {
+// applyStringLeaf writes a C_STRING leaf onto the String attribute attr
+// of rmValue, or onto its main string attribute when attr is "". The
+// value is a list member or a pattern match that the constraint accepts.
+// An attribute the generator has no field or no writer for is left
+// alone, like any other unknown primitive target.
+func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs constraints.CString, ex any) error {
+	if attr == "" {
+		attr = mainStringAttr(rmValue)
+	}
+	_, set, ok := stringField(rmValue, attr)
+	if !ok || set == nil {
+		return nil
+	}
+	s, err := stringForConstraint(cs, ex)
+	if err != nil {
+		return fmt.Errorf("%w: %s.%s at %s: %w", ErrSlotFillUnsupported, rmTypeOf(rmValue), attr, leafPath(leaf), err)
+	}
+	set(s)
+	return nil
+}
+
+// mainStringAttr names the attribute a C_STRING constrains when the OPT
+// puts it on the data value itself rather than on one of its attributes.
+func mainStringAttr(rmValue any) string {
+	switch rmValue.(type) {
+	case *rm.DVIdentifier:
+		return "id"
+	case *rm.CodePhrase:
+		return "code_string"
+	case *rm.Activity:
+		return "action_archetype_id"
+	default:
+		return "value"
+	}
+}
+
+func rmTypeOf(v any) string {
+	if t, ok := v.(interface{ BMMName() string }); ok {
+		return t.BMMName()
+	}
+	return fmt.Sprintf("%T", v)
+}
+
+func leafPath(leaf *tcimpl.CompiledNode) string {
+	if leaf == nil {
+		return "?"
+	}
+	return leaf.AQLPath()
+}
+
+// errNoStringValue reports a C_STRING that no string the generator can
+// build satisfies: no list member passes the pattern, the pattern matches
+// nothing, or the pattern does not compile.
+var errNoStringValue = errors.New("no string satisfies the C_STRING constraint")
+
+// stringForConstraint returns a string cs accepts: the example ex when cs
+// accepts it, else the first list member cs accepts, else, for a
+// pattern-only constraint, the shortest string the pattern's syntax
+// builds. A pattern must match the whole string, so the value also holds
+// under the AOM reading of a C_STRING pattern, not only under the
+// substring match the validator applies. It returns errNoStringValue
+// when none of these is accepted.
+func stringForConstraint(cs constraints.CString, ex any) (string, error) {
 	s, ok := ex.(string)
 	if !ok {
-		return "", false
+		return "", fmt.Errorf("C_STRING example value is %T, want string", ex)
 	}
-	cs, isString := pc.(constraints.CString)
-	if !isString || cs.Pattern == "" {
-		return s, true
+	var whole *regexp.Regexp
+	if cs.Pattern != "" {
+		re, err := regexp.Compile(`^(?:` + cs.Pattern + `)$`)
+		if err != nil {
+			return "", errNoStringValue
+		}
+		whole = re
 	}
-	re, err := regexp.Compile(cs.Pattern)
-	if err != nil || re.MatchString(s) {
-		return s, true
+	accepts := func(v string) bool {
+		return len(cs.Validate(v)) == 0 && (whole == nil || whole.MatchString(v))
 	}
-	prefix, has := strings.CutSuffix(cs.Pattern, ".*")
-	if has && prefix != "" && !strings.ContainsAny(prefix, `\[]()|+?^$`) && re.MatchString(prefix) {
-		return prefix, true
+	if accepts(s) {
+		return s, nil
 	}
-	// A pattern that is only escaped dots is one archetype id.
-	if !strings.ContainsAny(cs.Pattern, `[]()|+?*^$`) {
-		literal := strings.ReplaceAll(cs.Pattern, `\`, "")
-		if literal != "" && !strings.Contains(literal, `\`) && re.MatchString(literal) {
-			return literal, true
+	for _, member := range cs.List {
+		if accepts(member) {
+			return member, nil
 		}
 	}
-	return s, true
+	if len(cs.List) == 0 && cs.Pattern != "" {
+		if m, built := patternExample(cs.Pattern); built && accepts(m) {
+			return m, nil
+		}
+	}
+	return "", errNoStringValue
+}
+
+// patternExample builds the shortest string the regular expression
+// pattern describes: no repetition beyond the minimum, the first
+// alternative, and one plain character for a class or a dot. built is
+// false when the pattern does not parse or matches nothing.
+func patternExample(pattern string) (string, bool) {
+	re, err := syntax.Parse(pattern, syntax.Perl)
+	if err != nil {
+		return "", false
+	}
+	var b strings.Builder
+	if !writeShortest(&b, re.Simplify()) {
+		return "", false
+	}
+	return b.String(), true
+}
+
+func writeShortest(b *strings.Builder, re *syntax.Regexp) bool {
+	switch re.Op {
+	case syntax.OpEmptyMatch, syntax.OpStar, syntax.OpQuest,
+		syntax.OpBeginLine, syntax.OpEndLine, syntax.OpBeginText, syntax.OpEndText,
+		syntax.OpWordBoundary, syntax.OpNoWordBoundary:
+		// Zero width, or zero repetitions. The caller checks the whole
+		// string against the pattern, so a boundary that does not hold
+		// there is caught.
+		return true
+	case syntax.OpLiteral:
+		for _, r := range re.Rune {
+			b.WriteRune(r)
+		}
+		return true
+	case syntax.OpCharClass:
+		r, ok := classRune(re.Rune)
+		if ok {
+			b.WriteRune(r)
+		}
+		return ok
+	case syntax.OpAnyChar, syntax.OpAnyCharNotNL:
+		b.WriteByte('a')
+		return true
+	case syntax.OpCapture, syntax.OpPlus:
+		return writeShortest(b, re.Sub[0])
+	case syntax.OpRepeat:
+		for range re.Min {
+			if !writeShortest(b, re.Sub[0]) {
+				return false
+			}
+		}
+		return true
+	case syntax.OpConcat:
+		for _, sub := range re.Sub {
+			if !writeShortest(b, sub) {
+				return false
+			}
+		}
+		return true
+	case syntax.OpAlternate:
+		for _, sub := range re.Sub {
+			var alt strings.Builder
+			if writeShortest(&alt, sub) {
+				b.WriteString(alt.String())
+				return true
+			}
+		}
+		return false
+	case syntax.OpNoMatch:
+		// The pattern admits no string.
+		return false
+	default:
+		return false
+	}
+}
+
+// classRune picks one character of a character class given as rune
+// ranges: a letter or digit when the class has one, else the first
+// printable ASCII character, else the class's first character.
+func classRune(ranges []rune) (rune, bool) {
+	if len(ranges) < 2 {
+		return 0, false
+	}
+	in := func(r rune) bool {
+		for i := 0; i+1 < len(ranges); i += 2 {
+			if ranges[i] <= r && r <= ranges[i+1] {
+				return true
+			}
+		}
+		return false
+	}
+	for _, r := range "aA0" {
+		if in(r) {
+			return r, true
+		}
+	}
+	for r := rune(0x21); r < 0x7f; r++ {
+		if in(r) {
+			return r, true
+		}
+	}
+	return ranges[0], true
 }
