@@ -512,8 +512,9 @@ func stringAttr(parent any, attr string) (string, bool) {
 // stringField returns a reader and a writer for the BMM String attribute
 // attr of parent. It covers every String attribute of the data values the
 // generator builds, plus ACTIVITY.action_archetype_id and
-// TERMINOLOGY_ID.value. An optional attribute reads as "" while unset.
-// ok is false when parent has no such field.
+// TERMINOLOGY_ID.value. An optional attribute reads as "" while unset, and
+// its writer sets it. ok is false when parent has no such field; when ok is
+// true, get and set are both non-nil.
 func stringField(parent any, attr string) (get func() string, set func(string), ok bool) {
 	switch p := parent.(type) {
 	case *rm.DVText:
@@ -738,10 +739,12 @@ func (g *generator) materialiseMultiple(
 ) error {
 	children := attr.Children()
 	if len(children) == 0 {
-		// Implicit / OPT-silent multi-valued attribute. Synthesise one
-		// default child of the BMM-resolved element type so the
+		// Implicit / OPT-silent multi-valued attribute. A required one
+		// (BMM-mandatory, or existence or cardinality lower of 1 or more)
+		// gets one default child of the BMM-resolved element type so the
 		// validator's required-attribute / cardinality.lower check
-		// passes; downstream consumers (REQ-101 Builder) overwrite.
+		// passes; downstream consumers (REQ-101 Builder) overwrite. An
+		// optional one gets no child.
 		return g.materialiseImplicitMultiple(optNode, attr, parentRM)
 	}
 	upperBound := -1 // -1 == unbounded
@@ -1670,7 +1673,7 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 		attr = mainStringAttr(rmValue)
 	}
 	_, set, ok := stringField(rmValue, attr)
-	if !ok || set == nil {
+	if !ok {
 		return nil
 	}
 	s, err := stringForConstraint(cs, ex)

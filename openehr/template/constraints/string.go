@@ -33,11 +33,23 @@ type CString struct {
 // flag the pattern sets (such as (?s)) scoped to the pattern. The pattern
 // is compiled on its own first: wrapped, an unbalanced one such as a)(b
 // would parse, and the error for a malformed one would show the wrapper.
+//
+// A pattern may end inside an open \Q quote (\Qabc); the quote then runs
+// to the end of the pattern, and a plain wrapper would swallow its closing
+// group into the quote. Because the pattern compiled on its own, the plain
+// wrapper fails only for that reason, so the wrapper is retried with the
+// quote closed (\E) before the group.
 func compileWhole(pattern string) (*regexp.Regexp, error) {
 	if _, err := regexp.Compile(pattern); err != nil {
 		return nil, err
 	}
-	return regexp.Compile(`^(?:` + pattern + `)$`)
+	re, err := regexp.Compile(`^(?:` + pattern + `)$`)
+	if err != nil {
+		if closed, errClosed := regexp.Compile(`^(?:` + pattern + `\E)$`); errClosed == nil {
+			return closed, nil
+		}
+	}
+	return re, err
 }
 
 // NewCString builds a CString and pre-compiles pattern so repeated

@@ -101,6 +101,12 @@ func TestREQ103_CString_PatternMatchesWholeString(t *testing.T) {
 		{name: "own dot-all flag crosses a newline", pattern: "(?s).*", value: "two\nlines", want: true},
 		{name: "own multi-line flag does not move the anchors", pattern: "(?m)^[0-9]+$", value: "12\n34", want: false},
 		{name: "non-empty pattern refuses empty", pattern: ".+", value: "", want: false},
+		{name: "unterminated quote matches the whole literal", pattern: `\Qabc`, value: "abc", want: true},
+		{name: "unterminated quote does not match a longer string", pattern: `\Qabc`, value: "abcd", want: false},
+		{name: "unterminated quote keeps its metacharacters literal", pattern: `\Qa|b.`, value: "a|b.", want: true},
+		{name: "unterminated quote does not match an alternative", pattern: `\Qa|b.`, value: "a", want: false},
+		{name: "closed quote still matches the whole string", pattern: `\Qa.b\E`, value: "a.b", want: true},
+		{name: "own case-fold flag stays scoped to the pattern", pattern: "(?i)abc", value: "ABC", want: true},
 	}
 	for _, tc := range cases {
 		for _, path := range []struct {
