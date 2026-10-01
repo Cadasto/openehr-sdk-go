@@ -583,8 +583,8 @@ func isNilPointer(v any) bool {
 // as the PROBE-086 corpus template does), so the careflow_step code stands
 // in for it: the predicate matches the transition whose careflow step it
 // names in the `local` terminology (an at-code belongs to the archetype's
-// own terminology), and a transition without such a careflow step matches
-// none.
+// own terminology; a blank terminology counts as `local`), and a transition
+// without such a careflow step matches none.
 func nodeIDOf(o any) string {
 	if isNilPointer(o) {
 		return ""
@@ -602,9 +602,13 @@ func nodeIDOf(o any) string {
 }
 
 // careflowStepCode is the code of an ISM_TRANSITION's careflow step when it is
-// an at-code of the `local` terminology, or "".
+// an at-code of the `local` terminology, or "". A blank terminology counts as
+// `local`, the reading FLAT decode gives a careflow step that names none.
 func careflowStepCode(step *rm.DVCodedText) string {
-	if step == nil || step.DefiningCode.TerminologyID.Value != "local" {
+	if step == nil {
+		return ""
+	}
+	if term := step.DefiningCode.TerminologyID.Value; term != "" && term != "local" {
 		return ""
 	}
 	return step.DefiningCode.CodeString

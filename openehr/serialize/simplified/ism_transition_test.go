@@ -218,6 +218,7 @@ func TestActionIsmTransitionCareflowStepCodedOtherwiseRefused(t *testing.T) {
 		{name: "the node's id in another terminology", keys: inTerminology(ismTransitionKeys("transition", "524", "at0005"), "transition", "SNOMED-CT")},
 		{name: "a |raw step whose terminology_id is a string", keys: rawCareflowStep("SNOMED-CT")},
 		{name: "a |raw step whose terminology_id is an array", keys: rawCareflowStep([]any{"local"})},
+		{name: "a |raw step whose terminology_id value is a number", keys: rawCareflowStep(map[string]any{"_type": "TERMINOLOGY_ID", "value": 7})},
 		{name: "a careflow step with no current state", keys: map[string]any{
 			rmattrAction + "/transition/careflow_step|code":        "at0006",
 			rmattrAction + "/transition/careflow_step|value":       "secret step",

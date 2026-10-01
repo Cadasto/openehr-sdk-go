@@ -1085,7 +1085,9 @@ func nodePredicate(m map[string]any) string {
 // settleIsmTransition gives one rebuilt ISM_TRANSITION the careflow step its node
 // names, or checks the one the body carries. The node id is an at-code, which
 // belongs to the archetype's `local` terminology: a careflow step that names no
-// terminology takes it, and one coded in any other terminology names no node.
+// terminology (no terminology_id, a null one, or a blank value) takes it, and one
+// coded in any other terminology, or whose terminology_id has another shape,
+// names no node.
 func settleIsmTransition(tr map[string]any, n ismNode) error {
 	delete(tr, "archetype_node_id")
 	step, carried := tr["careflow_step"]
@@ -1102,14 +1104,25 @@ func settleIsmTransition(tr map[string]any, n ismNode) error {
 		return fmt.Errorf("%w: %s/careflow_step is coded %q, but its node is ism_transition[%s]; a careflow step coded otherwise names another node",
 			ErrUnsupportedDatatype, n.flat, code, n.id)
 	}
-	tid, named := dc["terminology_id"].(map[string]any)
-	if !named {
+	switch tid := dc["terminology_id"].(type) {
+	case nil:
 		dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": localTerminology}
-		return nil
-	}
-	if term, _ := tid["value"].(string); term != localTerminology {
-		return fmt.Errorf("%w: %s/careflow_step is coded in terminology %q, but its node id %s is an at-code of the %s terminology",
-			ErrUnsupportedDatatype, n.flat, term, n.id, localTerminology)
+	case map[string]any:
+		raw := tid["value"]
+		term, isString := raw.(string)
+		switch {
+		case raw == nil || (isString && term == ""):
+			tid["value"] = localTerminology
+		case !isString:
+			return fmt.Errorf("%w: %s/careflow_step carries a terminology_id value of JSON type %T, not a string",
+				ErrUnsupportedDatatype, n.flat, raw)
+		case term != localTerminology:
+			return fmt.Errorf("%w: %s/careflow_step is coded in terminology %q, but its node id %s is an at-code of the %s terminology",
+				ErrUnsupportedDatatype, n.flat, term, n.id, localTerminology)
+		}
+	default:
+		return fmt.Errorf("%w: %s/careflow_step carries a terminology_id of JSON type %T, not a TERMINOLOGY_ID object",
+			ErrUnsupportedDatatype, n.flat, tid)
 	}
 	return nil
 }
@@ -1117,15 +1130,13 @@ func settleIsmTransition(tr map[string]any, n ismNode) error {
 // localTerminology is the terminology an archetype's own at-codes belong to.
 const localTerminology = "local"
 
-// definingCodeOf returns the defining_code of a rebuilt DV_CODED_TEXT, or an
-// empty map when the value carries none (a DV_TEXT, a |raw fragment of another
-// shape).
+// definingCodeOf returns the defining_code of a rebuilt DV_CODED_TEXT, or nil
+// when the value carries none (a DV_TEXT, a |raw fragment of another shape);
+// reading a nil map yields no code, so such a step is refused before anything
+// is written into it.
 func definingCodeOf(v any) map[string]any {
 	dv, _ := v.(map[string]any)
 	dc, _ := dv["defining_code"].(map[string]any)
-	if dc == nil {
-		return map[string]any{}
-	}
 	return dc
 }
 
