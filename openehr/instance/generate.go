@@ -326,6 +326,10 @@ func (g *generator) materialiseImplicitSingle(
 	// validator's "required attribute absent" check passes for
 	// BMM-mandatory implicit attrs the OPT did not constrain.
 	g.populatePrimitiveDefault(rmChild)
+	// A locatable the OPT does not name (OBSERVATION.data's HISTORY, an
+	// ENTRY's ITEM_TREE) still needs the node id and name the RM floor
+	// requires.
+	g.stampIfLocatable(rmChild, concreteFor(rmType))
 	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
 	// Best-effort attach; if the slot rejects the default (e.g. type
 	// mismatch on a polymorphic attr), let downstream defaults
