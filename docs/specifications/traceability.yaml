@@ -1134,6 +1134,9 @@ requirements:
       - openehr/instance/interval_flags_test.go
       - openehr/instance/interval_order_internal_test.go
       - openehr/instance/interval_order_test.go
+      - openehr/instance/interval_ordinal_pairs_internal_test.go
+      - openehr/instance/interval_temporal_internal_test.go
+      - openehr/instance/interval_zone_test.go
       - openehr/instance/phase4_test.go
       - openehr/instance/placeholder_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
