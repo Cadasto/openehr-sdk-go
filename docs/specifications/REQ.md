@@ -133,7 +133,7 @@ Identifiers **MUST** be stable once published. Renumbering and reuse are prohibi
 
 A plan may reserve a number before its spec text exists; record the reservation in the list below, and remove the entry once the requirement is registered. The list is prose, not a table, so the registry stays the only index table in this file.
 
-- REQ-114: reserved by the [OPT author-validator plan](../plans/2026-07-16-opt-author-validator.md).
-- REQ-115: reserved by the [FLAT author-linter plan](../plans/2026-07-16-flat-author-linter.md).
-- REQ-124 and REQ-125: reserved by the [RM-function stubs plan](../plans/2026-09-01-rm-function-deferred-stubs.md).
+- REQ-114: reserved for the OPT author validator.
+- REQ-115: reserved for the FLAT author linter.
+- REQ-124 and REQ-125: reserved for the deferred RM-function stubs.
 - REQ-141: retired, never reused.

@@ -14,7 +14,7 @@ date: 2026-07-14
 - **Strand:** —
 - **Introduces:** REQ-106 (WebTemplate JSON export). **Amends:** —. **Applies:** REQ-013 (building-block independence), REQ-111 (public compiled-template bridge — the export's input), REQ-103 (primitive constraints — the input source for `inputs`).
 - **Landed in:** [PR 75](https://github.com/Cadasto/openehr-sdk-go/pull/75).
-- **Related:** the WebTemplate node tree is the same simplified-template projection the [simplified-formats umbrella](../plans/2026-06-23-simplified-formats.md) will share with REQ-053 (FLAT/STRUCTURED); this ADR governs only the WebTemplate JSON export slice; [REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) (template-level node names, which close the archetype-reuse-under-slot gap recorded below).
+- **Related:** the WebTemplate node tree is the same simplified-template projection the planned simplified-formats work will share with REQ-053 (FLAT/STRUCTURED); this ADR governs only the WebTemplate JSON export slice; [REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) (template-level node names, which close the archetype-reuse-under-slot gap recorded below).
 
 ## Context
 
