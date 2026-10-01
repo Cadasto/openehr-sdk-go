@@ -13,7 +13,6 @@ date: 2026-09-07
 - **Superseded by:** —
 - **Strand:** [STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml).
 - **Introduces:** —. **Amends:** [REQ-082](../specifications/conformance.md#req-082--runnability) Cassette encoding.
-- **Plan:** [2026-08-18-probe-runnability.md](../plans/2026-08-18-probe-runnability.md).
 - **Related:** the side-by-side capture in [strand-11-evidence](../plans/strand-11-evidence/).
 
 ## Context

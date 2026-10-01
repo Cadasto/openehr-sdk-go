@@ -6,6 +6,7 @@ sdd:
   profile: formal                   # formal | informative. A single requirements file comes from paths.requirements naming a file, not from this profile.
 
   req_style: flat-numeric           # flat-numeric (REQ-NNN) — leaner for a library
+  req_areas: []                     # area-prefixed only; a flat-numeric repository declares none
   req_gap: 1                        # sequential: a new REQ takes the next free number above the
                                     # highest registered one. The old decadal topic bands are
                                     # historical and no longer allocated from; reservations and
@@ -25,6 +26,7 @@ sdd:
     requirements: docs/specifications/REQ.md   # file form: the registry itself is the requirements index
     specifications: docs/specifications
     adr: docs/adr
+    constitution: docs/architecture.md   # informative profile only; not read on this formal repository
 
   # Single sources and what is generated from them (`make spec-gen`; `make spec-check` fails
   # when a generated block is stale). Edit the source, never the generated table.
@@ -59,7 +61,7 @@ sdd:
 
   check:
     script: scripts/sdd-check.py   # where the vendored gate lives
-    version: "0.8.0"               # must equal the vendored tool's own version
+    version: "0.9.0"               # must equal the vendored tool's own version
     links:
       exclude: []                  # globs; printed in every report when non-empty
     changelog:
