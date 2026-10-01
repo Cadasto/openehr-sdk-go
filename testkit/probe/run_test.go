@@ -143,7 +143,7 @@ func TestRun_InRepoModeRefusesBackendProbe(t *testing.T) {
 // run against a deployment it never declared support for.
 func TestRun_DeclaredModesAreEnforced(t *testing.T) {
 	t.Parallel()
-	e := stub("PROBE-020", probe.StatusPass, false, probe.EffectReadOnly)
+	e := stub("PROBE-062", probe.StatusPass, false, probe.EffectReadOnly)
 	e.Modes = []probe.Mode{probe.ModeSandbox}
 
 	_, err := probe.Run(t.Context(), probe.Config{
@@ -380,7 +380,7 @@ func TestUnclassifiedEffectIsMutating(t *testing.T) {
 		Mode:   probe.ModeLive,
 		Client: mustClient(t),
 	}, []probe.Entry{
-		stub("PROBE-099", probe.StatusPass, false, ""),
+		stub("PROBE-012", probe.StatusPass, false, ""),
 	})
 	if !errors.Is(err, probe.ErrMutatingNotOptedIn) {
 		t.Fatalf("unclassified live run error = %v, want %v", err, probe.ErrMutatingNotOptedIn)
@@ -726,8 +726,8 @@ func TestRun_CassetteRecordingDirUnreadable(t *testing.T) {
 // unclassified, which resolves to mutating) probe run.
 func TestRun_MutatingLiveRunsWithOptIn(t *testing.T) {
 	t.Parallel()
-	mutating := stub("PROBE-080", probe.StatusPass, false, probe.EffectMutating)
-	unclassified := stub("PROBE-081", probe.StatusPass, false, "")
+	mutating := stub("PROBE-067", probe.StatusPass, false, probe.EffectMutating)
+	unclassified := stub("PROBE-071", probe.StatusPass, false, "")
 	cfg := probe.Config{
 		Mode:          probe.ModeLive,
 		Endpoint:      "https://cdr.example.com/openehr/v1",
@@ -760,7 +760,7 @@ func TestRun_MutatingLiveRunsWithOptIn(t *testing.T) {
 func TestRun_NoPartialExecutionOnUnsatisfiable(t *testing.T) {
 	t.Parallel()
 	var seen []*transport.Client
-	first := capture("PROBE-090", &seen)
+	first := capture("PROBE-013", &seen)
 	second := stub("PROBE-091", probe.StatusPass, false, probe.EffectReadOnly)
 	second.Modes = []probe.Mode{probe.ModeSandbox}
 
