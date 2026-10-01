@@ -770,11 +770,14 @@ func (p *program) reach(path, name string) (string, error) {
 		seen[to] = step{parent: from, label: label(to) + suffix}
 		queue = append(queue, to)
 	}
-	// Methods are matched by name across every type the walk reaches, so
-	// selecting Start on one type also walks Start on any other. That can only
-	// add a path to a backend, never hide one. A probe it wrongly classes
-	// backend-facing fails the class check loudly, as long as its Modes line
-	// declares In-repo.
+	// Methods are matched by name, not by type. In the package of a
+	// declaration that selects Start, every method named Start on every type
+	// of that package counts as a use, whether or not the walk reached the
+	// type. In any package, a method of a type the walk reaches is walked once
+	// some visited declaration selects its name. So selecting Start on one
+	// type also walks Start on others. That can only add a path to a backend,
+	// never hide one. A probe it wrongly classes backend-facing fails the
+	// class check loudly, as long as its Modes line declares In-repo.
 	selected := map[string]bool{}  // names some visited declaration selects
 	pending := map[string][]node{} // methods of visited types, by name, not yet selected
 	for len(queue) > 0 {
