@@ -92,7 +92,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-104 | Slot assertion grammar | [clinical-modeling.md](clinical-modeling.md#req-104--slot-assertion-grammar) | draft | landed |
 | REQ-105 | Terminology bindings | [clinical-modeling.md](clinical-modeling.md#req-105--terminology-bindings) | draft | landed |
 | REQ-106 | WebTemplate JSON export | [clinical-modeling.md](clinical-modeling.md#req-106--webtemplate-json-export) | draft | landed |
-| REQ-107 | Template-driven RM instance example generator | [clinical-modeling.md](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) | draft | landed |
+| REQ-107 | Template-driven RM instance example generator | [clinical-modeling.md](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) | draft | partial |
 | REQ-108 | Untrusted document bounds | [clinical-modeling.md](clinical-modeling.md#req-108--untrusted-document-bounds) | draft | landed |
 | REQ-109 | AQL static lint | [clinical-modeling.md](clinical-modeling.md#req-109--aql-static-lint) | draft | landed |
 | REQ-110 | Template-driven validation beyond COMPOSITION | [clinical-modeling.md](clinical-modeling.md#req-110--template-driven-validation-beyond-composition) | draft | landed |

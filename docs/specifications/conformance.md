@@ -517,7 +517,7 @@ client scenarios to SDK coverage:
 
 #### PROBE-027 — Generated instance validates clean
 
-- **Title:** `instance.Generate(c, opts)` followed by `validation.ValidateComposition(out, c)` returns `Result.OK = true` for both `Minimal` and `Example` policies on an OPT the generator can synthesise, outside the census rows in the status.
+- **Title:** `instance.Generate(c, opts)` followed by `validation.ValidateComposition(out, c)` and `validation.ValidateRM(out)` each return `Result.OK = true` for both `Minimal` and `Example` policies, under both `ValueFill` values, on an OPT the generator can synthesise, outside the census rows in the status.
 - **Preconditions:** Compiled OPT for a fixture template; valid composer + territory for COMPOSITION roots.
 - **Wire assertion:** Cross-package round-trip — generator and validator agree on the same template-driven contract. On the compiling vendored corpus the same generated value also passes `validation.ValidateRM`, the RM-floor rule of [§ REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) with its two exceptions.
 - **Modes:** In-repo (generator and validator agreement over fixture OPTs; no backend).
