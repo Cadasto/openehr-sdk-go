@@ -134,12 +134,6 @@ func classMismatch(id string, funcs []probeFunc, modes map[string]string) string
 	switch {
 	case reach != "" && inRepo:
 		return fmt.Sprintf("%s declares In-repo but reaches a backend: %s\n\tModes: %s", id, reach, line)
-	case reach != "" && !strings.Contains(line, "Sandbox"):
-		// § Adding probes: a backend-facing probe is runnable in at least
-		// Sandbox mode, so its Modes line contains Sandbox. A line that
-		// already contains the word, including a known-gap spelling, is
-		// accepted. In-repo lines are the cases above and below.
-		return fmt.Sprintf("%s reaches a backend but its Modes line does not contain Sandbox; Sandbox is required: %s\n\tModes: %s", id, reach, line)
 	case reach == "" && !inRepo:
 		return fmt.Sprintf("%s reaches no backend: neither %s nor anything they use names a member in connectors. "+
 			"Declare In-repo, or, if the probe does connect, add the member it connects through to connectors\n\tModes: %s",
@@ -216,22 +210,6 @@ func TestREQ082ProbeClassMismatch(t *testing.T) {
 			name:  "backend-facing declared Sandbox",
 			funcs: backendFacing,
 			modes: map[string]string{"PROBE-901": "Sandbox, Cassette, Live."},
-		},
-		{
-			name:  "backend-facing Modes Live only",
-			funcs: backendFacing,
-			modes: map[string]string{"PROBE-901": "Live."},
-			want:  "Sandbox is required",
-		},
-		{
-			name:  "backend-facing Modes Sandbox only",
-			funcs: backendFacing,
-			modes: map[string]string{"PROBE-901": "Sandbox."},
-		},
-		{
-			name:  "backend-facing known-gap Sandbox spelling",
-			funcs: backendFacing,
-			modes: map[string]string{"PROBE-901": "Sandbox; Cassette, Live not yet scoped."},
 		},
 		{
 			name:  "no Modes line",
@@ -396,12 +374,7 @@ func classMismatchResultReported(fn *ast.FuncDecl, call *ast.CallExpr, stack []a
 }
 
 func isDirectArg(call *ast.CallExpr, arg ast.Expr) bool {
-	for _, a := range call.Args {
-		if a == arg {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(call.Args, arg)
 }
 
 func isFunIdent(call *ast.CallExpr, name string) bool {

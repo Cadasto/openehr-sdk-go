@@ -219,7 +219,7 @@ When adding to `internal/`:
 
 ## Versioning
 
-The SDK follows **Semantic Versioning 2.0.0** (REQ-004). A release **MUST** take the highest bump that any of its changes maps to in the table below. For this table, a field added to an exported struct is not a breaking change. An added exported field breaks positional struct literals, which [idiom.md § Public-API stability](idiom.md#public-api-stability) tells consumers not to write. A slice, map, or function field also makes the struct incomparable. A new field can clash with a promoted name. While on `v0.x`, a change the table maps to major takes a minor bump instead, and the release notes **MUST** name it.
+The SDK follows **Semantic Versioning 2.0.0** (REQ-004). A release **MUST** take the highest bump that any of its changes maps to in the table below. For this table, a field added to an exported struct is not a breaking change, and that includes a slice, map, or function field. Callers still see three effects, and none of them changes the bump: positional struct literals no longer compile, which [idiom.md § Public-API stability](idiom.md#public-api-stability) tells consumers not to write; a slice, map, or function field makes the struct incomparable; a new field can clash with a promoted name. While on `v0.x`, a change the table maps to major takes a minor bump instead, and the release notes **MUST** name it.
 
 | Change | Bump |
 |---|---|
