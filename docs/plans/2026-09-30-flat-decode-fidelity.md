@@ -5,7 +5,7 @@ kind: plan
 # Plan — Codec fidelity: archetype details on FLAT decode, and two silent drops
 
 **Date:** 2026-09-30
-**Status:** In progress — from the audit of the PR 181–189 review leftovers; decisions settled 2026-10-01 (below)
+**Status:** Done in PR 193; from the audit of the PR 181–189 review leftovers; decisions settled 2026-10-01 (below)
 **Covers:** REQ-053 and REQ-140 ([wire.md § REQ-053](../specifications/wire.md#req-053), [§ REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes)), REQ-052 ([wire.md § REQ-052](../specifications/wire.md#req-052)); interacts with REQ-112 ([clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor))
 **Probes:** PROBE-086, PROBE-089 (census and round trip), PROBE-030 (canonical JSON)
 **Depends on:** nothing ([PR 191](https://github.com/Cadasto/openehr-sdk-go/pull/191), merged, rewrote the § REQ-140 bullet Phase 3 edits)
