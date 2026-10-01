@@ -56,6 +56,45 @@ func asDVProportion(value any) (rm.DVProportion, bool) {
 	return rm.DVProportion{}, false
 }
 
+// asElement recovers an ELEMENT value (by value or by pointer).
+func asElement(value any) (rm.Element, bool) {
+	switch v := value.(type) {
+	case *rm.Element:
+		if v == nil {
+			return rm.Element{}, false
+		}
+		return *v, true
+	case rm.Element:
+		return v, true
+	}
+	return rm.Element{}, false
+}
+
+// temporalValueValid reports whether value, one of DV_DATE_TIME / DV_DATE /
+// DV_TIME / DV_DURATION (by value or by pointer), satisfies its ISO 8601
+// predicate, using the REQ-123 parse. ok is false for any other value.
+func temporalValueValid(value any) (valid, ok bool) {
+	switch v := value.(type) {
+	case *rm.DVDateTime:
+		return v != nil && v.ValidISO8601(), v != nil
+	case rm.DVDateTime:
+		return v.ValidISO8601(), true
+	case *rm.DVDate:
+		return v != nil && v.ValidISO8601(), v != nil
+	case rm.DVDate:
+		return v.ValidISO8601(), true
+	case *rm.DVTime:
+		return v != nil && v.ValidISO8601(), v != nil
+	case rm.DVTime:
+		return v.ValidISO8601(), true
+	case *rm.DVDuration:
+		return v != nil && v.ValidISO8601(), v != nil
+	case rm.DVDuration:
+		return v.ValidISO8601(), true
+	}
+	return false, false
+}
+
 // asMappings recovers the DV_TEXT.mappings slice (by value or by
 // pointer) from any concrete carrying it — DV_TEXT itself, and
 // DV_CODED_TEXT, which inherits the attribute via its embedded DV_TEXT.

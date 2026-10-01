@@ -260,3 +260,35 @@ func TestDVTimeMagnitudeIsClockLocal(t *testing.T) {
 		t.Error("expected clock-local 10:00 < 12:00 (tz ignored)")
 	}
 }
+
+func TestREQ123_ValidISO8601(t *testing.T) {
+	cases := []struct {
+		name string
+		got  bool
+		want bool
+	}{
+		{"date full", (&rm.DVDate{Value: "2024-03-15"}).ValidISO8601(), true},
+		{"date partial month", (&rm.DVDate{Value: "2024-03"}).ValidISO8601(), true},
+		{"date partial year", (&rm.DVDate{Value: "2024"}).ValidISO8601(), true},
+		{"date placeholder", (&rm.DVDate{Value: "example"}).ValidISO8601(), false},
+		{"date empty", (&rm.DVDate{Value: ""}).ValidISO8601(), false},
+		{"time full", (&rm.DVTime{Value: "10:30:00Z"}).ValidISO8601(), true},
+		{"time partial", (&rm.DVTime{Value: "10:30"}).ValidISO8601(), true},
+		{"time placeholder", (&rm.DVTime{Value: "example"}).ValidISO8601(), false},
+		{"date-time full", (&rm.DVDateTime{Value: "2024-03-15T10:30:00+01:00"}).ValidISO8601(), true},
+		{"date-time partial", (&rm.DVDateTime{Value: "2024-03"}).ValidISO8601(), true},
+		{"date-time placeholder", (&rm.DVDateTime{Value: "example"}).ValidISO8601(), false},
+		{"date-time empty time part", (&rm.DVDateTime{Value: "2024-03-15T"}).ValidISO8601(), false},
+		{"duration mixed week", (&rm.DVDuration{Value: "P1W2D"}).ValidISO8601(), true},
+		{"duration negative", (&rm.DVDuration{Value: "-P1D"}).ValidISO8601(), true},
+		{"duration placeholder", (&rm.DVDuration{Value: "example"}).ValidISO8601(), false},
+		{"duration bare P", (&rm.DVDuration{Value: "P"}).ValidISO8601(), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.got != tc.want {
+				t.Errorf("ValidISO8601() = %v, want %v", tc.got, tc.want)
+			}
+		})
+	}
+}

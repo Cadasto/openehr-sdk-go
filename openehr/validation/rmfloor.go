@@ -292,6 +292,10 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkArchetyped(value, path)
 	case rmType == "DV_SCALE":
 		w.allowScaleSymbolWithoutCode(path)
+	case rmType == "DV_DATE_TIME", rmType == "DV_DATE", rmType == "DV_TIME", rmType == "DV_DURATION":
+		w.checkTemporalValue(value, rmType, path)
+	case rmType == "ELEMENT":
+		w.checkElementNullFlavour(value, path)
 	case isArchetypeRootClass(rmType):
 		w.checkArchetypeRoot(value, rmType, path)
 	}
@@ -500,6 +504,52 @@ func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 func isIntegralReal(v rm.Real) bool {
 	f := float64(v)
 	return !math.IsInf(f, 0) && math.Trunc(f) == f
+}
+
+// checkTemporalValue enforces the REQ-112 Value_valid rule on the four ISO
+// 8601-backed data values: `value` must satisfy the type's BASE predicate,
+// decided with the REQ-123 parse so the partial forms it admits and
+// DV_DURATION's documented deviations stay valid. The empty string and a
+// placeholder such as "example" fail it. The diagnostic names the attribute,
+// never the offending value (REQ-093).
+func (w *rmFloorWalker) checkTemporalValue(value any, rmType, path string) {
+	valid, ok := temporalValueValid(value)
+	if !ok || valid {
+		return
+	}
+	w.emit(Issue{
+		Path:   path,
+		Code:   "rm_invariant",
+		Detail: rmType + ".value must be a valid ISO 8601 value (RM Value_valid)",
+	})
+}
+
+// checkElementNullFlavour enforces the RM invariant
+// `Inv_null_flavour_indicated: is_null() xor null_flavour = Void` on an
+// ELEMENT. is_null() means there is no `value`, so exactly one of `value` and
+// `null_flavour` must be present. A typed-nil `value` counts as absent, as it
+// does everywhere else in the walk. The rule is reported on the ELEMENT.
+func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
+	e, ok := asElement(value)
+	if !ok {
+		return
+	}
+	hasValue := e.Value != nil && !rmread.IsTypedNilPointer(e.Value)
+	hasNullFlavour := e.NullFlavour != nil
+	switch {
+	case hasValue && hasNullFlavour:
+		w.emit(Issue{
+			Path:   path,
+			Code:   "rm_invariant",
+			Detail: "ELEMENT carries both value and null_flavour; exactly one must be present (RM Inv_null_flavour_indicated)",
+		})
+	case !hasValue && !hasNullFlavour:
+		w.emit(Issue{
+			Path:   path,
+			Code:   "rm_invariant",
+			Detail: "ELEMENT carries neither value nor null_flavour; exactly one must be present (RM Inv_null_flavour_indicated)",
+		})
+	}
 }
 
 // checkDVInterval enforces the spec floor on DV_INTERVAL when both

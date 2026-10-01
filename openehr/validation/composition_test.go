@@ -840,6 +840,9 @@ func validBloodPressureObservation() *rm.Observation {
 						Items: []rm.Element{{
 							ArchetypeNodeID: "at0008",
 							Name:            rm.DVText{Value: "Position"},
+							// An ELEMENT carries exactly one of value and
+							// null_flavour (RM Inv_null_flavour_indicated).
+							Value: &rm.DVText{Value: "Sitting"},
 						}},
 					},
 				},
