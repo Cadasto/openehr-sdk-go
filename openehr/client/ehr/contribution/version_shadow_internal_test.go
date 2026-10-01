@@ -26,7 +26,7 @@ import (
 //
 // Reflection is confined to this test. The generics policy's no-reflection
 // rule bars it from the library surface, not from a guard that reads two
-// struct definitions at build time.
+// struct definitions when the test runs.
 func TestShadowMarshallersCoverTheGeneratedKeySet(t *testing.T) {
 	// The generated form is now the streaming codec's alias over the rm struct
 	// (ADR 0022, ruling R19): rm.OriginalVersion[T] / rm.ImportedVersion[T]

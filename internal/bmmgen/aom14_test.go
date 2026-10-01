@@ -262,13 +262,16 @@ func TestAOM14CrossTargetReferences(t *testing.T) {
 	}
 	wantSnippets := []string{
 		`import "github.com/cadasto/openehr-sdk-go/openehr/rm"`,
-		"ArchetypeID rm.ArchetypeID",
-		"UID *rm.HierObjectID",
 		`panic("not implemented: ARCHETYPE.concept_name`,
 	}
 	for _, snip := range wantSnippets {
 		if !bytes.Contains(got, []byte(snip)) {
 			t.Errorf("expected snippet not found in AOM archetype output:\n  want: %s", snip)
+		}
+	}
+	for _, field := range []string{"ArchetypeID rm.ArchetypeID", "UID *rm.HierObjectID"} {
+		if !fieldDecl(field).Match(got) {
+			t.Errorf("expected field not found in AOM archetype output:\n  want: %s", field)
 		}
 	}
 }
