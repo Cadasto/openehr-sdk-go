@@ -13,6 +13,9 @@ import (
 // a caller-supplied [Options.ValueSource] for byte-reproducible output.
 type sampler struct {
 	rng *mrand.Rand
+	// quantityUnit, when set, is the unit both sides of one quantity
+	// interval draw. Empty means the constraint's own unit list.
+	quantityUnit string
 }
 
 // newSampler builds a sampler from an optional source. A nil source
@@ -137,12 +140,15 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 		return nil
 
 	case constraints.DvQuantity:
-		if len(c.Units) > 0 {
-			u := c.Units[s.intN(len(c.Units))]
-			mag := sampleMagnitude(u.Magnitude, s)
-			return constraints.QuantityValue{Magnitude: mag, Units: u.Units, Precision: -1}
+		if len(c.Units) == 0 {
+			return nil
 		}
-		return nil
+		u, ok := quantityUnitEntry(c, s.quantityUnit)
+		if !ok {
+			u = c.Units[s.intN(len(c.Units))]
+		}
+		mag := sampleMagnitude(u.Magnitude, s)
+		return constraints.QuantityValue{Magnitude: mag, Units: u.Units, Precision: -1}
 
 	case constraints.CDate:
 		return s.randomDate()
@@ -153,6 +159,22 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 	}
 	// CDuration and any unknown constraint: ExampleValue sentinel.
 	return nil
+}
+
+// quantityUnitEntry returns the first entry whose units equal name.
+// An empty name, or a name the constraint does not list, is not an entry:
+// the caller then draws a unit of its own. DvQuantity.Validate checks
+// the first entry for a unit, so this is that entry.
+func quantityUnitEntry(c constraints.DvQuantity, name string) (constraints.QuantityUnit, bool) {
+	if name == "" {
+		return constraints.QuantityUnit{}, false
+	}
+	for _, u := range c.Units {
+		if u.Units == name {
+			return u, true
+		}
+	}
+	return constraints.QuantityUnit{}, false
 }
 
 // sampleMagnitude draws an in-range magnitude for a quantity unit,

@@ -131,14 +131,22 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	// either.
 	if pc := optNode.PrimitiveConstraint(); pc != nil {
 		if g.opts.Policy == Example {
-			return g.applyPrimitiveExample(optNode, rmValue, pc)
+			return g.applyPrimitiveExample(rmValue, "", pc)
 		}
 		// Under Minimal we still populate the leaf so the resulting
 		// tree is valid (bounded constraints require a value); leaving
 		// a zero RM value would surface as primitive_wrong_type or
 		// out_of_range at validation. Cheap and aligned with the
 		// "structurally complete" Minimal contract.
-		return g.applyPrimitiveExample(optNode, rmValue, pc)
+		return g.applyPrimitiveExample(rmValue, "", pc)
+	}
+
+	if g.opts.ValueFill == RandomFill {
+		if unit, ok := sharedQuantityUnit(optNode, g.valueSampler); ok {
+			saved := g.valueSampler.quantityUnit
+			g.valueSampler.quantityUnit = unit
+			defer func() { g.valueSampler.quantityUnit = saved }()
+		}
 	}
 
 	for _, attr := range optNode.Attributes() {
@@ -222,7 +230,7 @@ func (g *generator) materialiseSingle(
 	// the populatePrimitiveDefault sentinel holds.
 	if tcimpl.IsAOMPrimitiveShortName(child.RMTypeName()) {
 		if pc := child.PrimitiveConstraint(); pc != nil {
-			return g.applyPrimitiveExample(child, parentRM, pc)
+			return g.applyPrimitiveExample(parentRM, attr.Name(), pc)
 		}
 		return nil
 	}
@@ -948,11 +956,7 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 // against the RM value bound at this OPT node. Closed switch on the
 // constraint type because the value shape differs per primitive
 // (REQ-103 closed set).
-func (g *generator) applyPrimitiveExample(
-	_ *tcimpl.CompiledNode,
-	rmValue any,
-	pc constraints.PrimitiveConstraint,
-) error {
+func (g *generator) applyPrimitiveExample(rmValue any, attr string, pc constraints.PrimitiveConstraint) error {
 	ex := pc.ExampleValue()
 	if g.opts.ValueFill == RandomFill {
 		// In-constraint sampled value (valid by construction); same Go
@@ -1016,6 +1020,8 @@ func (g *generator) applyPrimitiveExample(
 		return nil
 	case *rm.DVOrdinal:
 		return applyOrdinal(v, pc, ex)
+	case *rm.DVProportion:
+		return applyProportionPrimitive(v, attr, ex)
 	case *rm.DVDate:
 		s, ok := ex.(string)
 		if !ok {
@@ -1081,6 +1087,59 @@ func applyOrdinal(v *rm.DVOrdinal, pc constraints.PrimitiveConstraint, ex any) e
 	v.Value = rm.Integer(pair.Value)
 	v.Symbol = ordinalSymbolText(pair.Symbol)
 	return nil
+}
+
+// applyProportionPrimitive writes one sampled primitive onto the
+// proportion field the OPT named. A C_REAL or C_INTEGER on numerator,
+// denominator or type is otherwise discarded: the proportion node itself
+// has no primitive constraint, so the value stayed at the sentinel.
+func applyProportionPrimitive(v *rm.DVProportion, attr string, ex any) error {
+	switch attr {
+	case "numerator", "denominator", "accuracy":
+		f, ok := float64Value(ex)
+		if !ok {
+			return fmt.Errorf("DV_PROPORTION %s example value is %T, want real", attr, ex)
+		}
+		switch attr {
+		case "numerator":
+			v.Numerator = rm.Real(f)
+		case "denominator":
+			v.Denominator = rm.Real(f)
+		default:
+			a := rm.Real(f)
+			v.Accuracy = &a
+		}
+		return nil
+	case "type":
+		n, ok := rm.AsInt64(ex)
+		if !ok {
+			return fmt.Errorf("DV_PROPORTION type example value is %T, want integer", ex)
+		}
+		v.Type = rm.Integer(n)
+		return nil
+	case "precision":
+		n, ok := rm.AsInt64(ex)
+		if !ok {
+			return fmt.Errorf("DV_PROPORTION precision example value is %T, want integer", ex)
+		}
+		p := rm.Integer(n)
+		v.Precision = &p
+		return nil
+	default:
+		return nil
+	}
+}
+
+func float64Value(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	default:
+		i, ok := rm.AsInt64(v)
+		return float64(i), ok
+	}
 }
 
 func ordinalPair(c constraints.CDvOrdinal, n int64) (constraints.OrdinalSymbol, bool) {

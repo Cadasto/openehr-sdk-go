@@ -303,3 +303,283 @@ func TestOrderIntervalBoundsOrdered(t *testing.T) {
 		t.Errorf("pointer counts after ordering = [%d, %d], want [55, 60] written through the pointers", lowerPtr.Magnitude, upperPtr.Magnitude)
 	}
 }
+
+// TestOrderIntervalBoundsTemporal pins the REQ-107 ordering rule on
+// DV_DATE, DV_TIME and DV_DATE_TIME. The generator writes fixed-width
+// ISO-8601 strings, so the strings themselves are the order. A C_DATE,
+// C_TIME or C_DATE_TIME has no numeric end, so an inversion is repaired
+// by swapping, and a side the OPT leaves open is left alone.
+func TestOrderIntervalBoundsTemporal(t *testing.T) {
+	cases := []struct {
+		name         string
+		apply        func(lo, hi string, open bool) (gotLo, gotHi string)
+		lower, upper string
+		lowerOpen    bool
+		want         [2]string
+	}{
+		{
+			name:  "date: swapped",
+			apply: orderDates,
+			lower: "2020-06-01", upper: "2020-01-01",
+			want: [2]string{"2020-01-01", "2020-06-01"},
+		},
+		{
+			name:  "date: in order, left alone",
+			apply: orderDates,
+			lower: "2020-01-01", upper: "2020-06-01",
+			want: [2]string{"2020-01-01", "2020-06-01"},
+		},
+		{
+			name:  "date: open side, left alone",
+			apply: orderDates,
+			lower: "2020-06-01", upper: "2020-01-01", lowerOpen: true,
+			want: [2]string{"2020-06-01", "2020-01-01"},
+		},
+		{
+			name:  "time: swapped",
+			apply: orderTimes,
+			lower: "23:00:00", upper: "01:00:00",
+			want: [2]string{"01:00:00", "23:00:00"},
+		},
+		{
+			name:  "date-time: swapped",
+			apply: orderDateTimes,
+			lower: "2020-06-01T00:00:00Z", upper: "2020-01-01T00:00:00Z",
+			want: [2]string{"2020-01-01T00:00:00Z", "2020-06-01T00:00:00Z"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotLo, gotHi := tc.apply(tc.lower, tc.upper, tc.lowerOpen)
+			if gotLo != tc.want[0] || gotHi != tc.want[1] {
+				t.Errorf("orderIntervalBounds(%q, %q) = (%q, %q), want (%q, %q)", tc.lower, tc.upper, gotLo, gotHi, tc.want[0], tc.want[1])
+			}
+		})
+	}
+
+	t.Run("DV_ORDERED pointer dates: swapped in place", func(t *testing.T) {
+		lower, upper := &rm.DVDate{Value: "2020-06-01"}, &rm.DVDate{Value: "2020-01-01"}
+		iv := &rm.DVInterval[rm.DVOrdered]{}
+		iv.Lower, iv.Upper = lower, upper
+		orderIntervalBounds(nil, iv)
+		if lower.Value != "2020-01-01" || upper.Value != "2020-06-01" {
+			t.Errorf("pointer dates after ordering = (%q, %q), want (%q, %q)", lower.Value, upper.Value, "2020-01-01", "2020-06-01")
+		}
+	})
+	t.Run("DV_ORDERED value date-times: swapped", func(t *testing.T) {
+		iv := &rm.DVInterval[rm.DVOrdered]{}
+		iv.Lower = rm.DVDateTime{Value: "2020-06-01T00:00:00Z"}
+		iv.Upper = rm.DVDateTime{Value: "2020-01-01T00:00:00Z"}
+		orderIntervalBounds(nil, iv)
+		if got := [2]string{orderedString(iv.Lower), orderedString(iv.Upper)}; got != [2]string{"2020-01-01T00:00:00Z", "2020-06-01T00:00:00Z"} {
+			t.Errorf("orderIntervalBounds = %q, want swapped date-times", got)
+		}
+	})
+}
+
+func proportionParts(p rm.DVProportion) [3]float64 {
+	return [3]float64{float64(p.Numerator), float64(p.Denominator), float64(p.Type)}
+}
+
+func ordinalParts(o rm.DVOrdinal) [2]string {
+	return [2]string{fmt.Sprintf("%d", o.Value), o.Symbol.DefiningCode.CodeString}
+}
+
+func orderDates(lo, hi string, open bool) (string, string) {
+	iv := &rm.DVInterval[rm.DVDate]{}
+	iv.Lower.Value, iv.Upper.Value = lo, hi
+	iv.LowerUnbounded = open
+	orderIntervalBounds(nil, iv)
+	return iv.Lower.Value, iv.Upper.Value
+}
+
+func orderTimes(lo, hi string, open bool) (string, string) {
+	iv := &rm.DVInterval[rm.DVTime]{}
+	iv.Lower.Value, iv.Upper.Value = lo, hi
+	iv.LowerUnbounded = open
+	orderIntervalBounds(nil, iv)
+	return iv.Lower.Value, iv.Upper.Value
+}
+
+func orderDateTimes(lo, hi string, open bool) (string, string) {
+	iv := &rm.DVInterval[rm.DVDateTime]{}
+	iv.Lower.Value, iv.Upper.Value = lo, hi
+	iv.LowerUnbounded = open
+	orderIntervalBounds(nil, iv)
+	return iv.Lower.Value, iv.Upper.Value
+}
+
+func orderedString(v rm.DVOrdered) string {
+	switch x := v.(type) {
+	case rm.DVDate:
+		return x.Value
+	case *rm.DVDate:
+		return x.Value
+	case rm.DVTime:
+		return x.Value
+	case *rm.DVTime:
+		return x.Value
+	case rm.DVDateTime:
+		return x.Value
+	case *rm.DVDateTime:
+		return x.Value
+	default:
+		return fmt.Sprintf("%T", v)
+	}
+}
+
+// TestOrderIntervalBoundsProportion pins the REQ-107 ordering rule on
+// DV_PROPORTION. The compared key is the ratio numerator/denominator, and
+// only when both bounds have the same type; DV_PROPORTION.magnitude is not
+// implemented on the generated type. A zero denominator does not compare.
+func TestOrderIntervalBoundsProportion(t *testing.T) {
+	p := func(num, den float64, kind int32) rm.DVProportion {
+		return rm.DVProportion{Numerator: rm.Real(num), Denominator: rm.Real(den), Type: rm.Integer(kind)}
+	}
+	opt := ReadVendoredOPT(t, CountIntervalOPT)
+	node := func(lowerBody, upperBody string) *tcimpl.CompiledNode {
+		t.Helper()
+		return intervalNode(t, RetargetInterval(t, opt, "DV_PROPORTION", ProportionBound(lowerBody), ProportionBound(upperBody)))
+	}
+	cases := []struct {
+		name         string
+		node         *tcimpl.CompiledNode
+		bounds, want [2]rm.DVProportion
+	}{
+		{
+			// Numerators are equal; the ratios 1/2 and 1/4 are not.
+			name:   "ratio, not the numerator: swapped",
+			bounds: [2]rm.DVProportion{p(1, 2, 0), p(1, 4, 0)},
+			want:   [2]rm.DVProportion{p(1, 4, 0), p(1, 2, 0)},
+		},
+		{
+			// Numerators are 2 > 1, but the ratios 2/8 and 1/2 are in order.
+			name:   "ratio already in order: left alone",
+			bounds: [2]rm.DVProportion{p(2, 8, 0), p(1, 2, 0)},
+			want:   [2]rm.DVProportion{p(2, 8, 0), p(1, 2, 0)},
+		},
+		{
+			name:   "different types: left alone",
+			bounds: [2]rm.DVProportion{p(2, 1, 0), p(1, 2, 1)},
+			want:   [2]rm.DVProportion{p(2, 1, 0), p(1, 2, 1)},
+		},
+		{
+			name:   "zero denominator: left alone",
+			bounds: [2]rm.DVProportion{p(1, 0, 0), p(1, 1, 0)},
+			want:   [2]rm.DVProportion{p(1, 0, 0), p(1, 1, 0)},
+		},
+		{
+			// 10 is not in the lower list, so no swap; 12 and 15 are the ends.
+			name:   "the lowest lower numerator with the highest upper",
+			node:   node(RealList(20, 12), RealRange(Closed(0), Closed(15))),
+			bounds: [2]rm.DVProportion{p(20, 1, 0), p(10, 1, 0)},
+			want:   [2]rm.DVProportion{p(12, 1, 0), p(15, 1, 0)},
+		},
+		{
+			// A negative denominator reverses which numerator end is the low ratio.
+			name:   "negative denominator: the high numerator is the low ratio",
+			node:   node(RealList(2, 8), RealList(3, 9)),
+			bounds: [2]rm.DVProportion{p(2, -1, 0), p(9, -1, 0)},
+			want:   [2]rm.DVProportion{p(8, -1, 0), p(3, -1, 0)},
+		},
+		{
+			name:   "unsatisfiable: left alone",
+			node:   node(RealRange(Closed(10), Closed(20)), RealRange(Closed(0), Closed(5))),
+			bounds: [2]rm.DVProportion{p(15, 1, 0), p(3, 1, 0)},
+			want:   [2]rm.DVProportion{p(15, 1, 0), p(3, 1, 0)},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			iv := &rm.DVInterval[rm.DVProportion]{}
+			iv.Lower, iv.Upper = tc.bounds[0], tc.bounds[1]
+			orderIntervalBounds(tc.node, iv)
+			if got, want := [2][3]float64{proportionParts(iv.Lower), proportionParts(iv.Upper)}, [2][3]float64{proportionParts(tc.want[0]), proportionParts(tc.want[1])}; got != want {
+				t.Errorf("orderIntervalBounds(%v) = %v, want %v", tc.bounds, got, want)
+			}
+		})
+	}
+	t.Run("DV_ORDERED pointer proportions: ratio swapped in place", func(t *testing.T) {
+		lower := &rm.DVProportion{Numerator: 1, Denominator: 2}
+		upper := &rm.DVProportion{Numerator: 1, Denominator: 4}
+		iv := &rm.DVInterval[rm.DVOrdered]{}
+		iv.Lower, iv.Upper = lower, upper
+		orderIntervalBounds(nil, iv)
+		if lower.Denominator != 4 || upper.Denominator != 2 {
+			t.Errorf("pointer proportions after ordering = (%v, %v), want denominators 4 and 2", lower.Denominator, upper.Denominator)
+		}
+	})
+}
+
+// TestOrderIntervalBoundsOrdinal pins the REQ-107 ordering rule on
+// DV_ORDINAL, compared by Value. The symbol travels with the value on a
+// swap, and an extreme taken from the OPT carries that entry's symbol.
+func TestOrderIntervalBoundsOrdinal(t *testing.T) {
+	opt := ReadVendoredOPT(t, CountIntervalOPT)
+	node := func(lower, upper []int) *tcimpl.CompiledNode {
+		t.Helper()
+		return intervalNode(t, RetargetInterval(t, opt, "DV_ORDINAL", OrdinalBound(lower...), OrdinalBound(upper...)))
+	}
+	ord := func(v int, code string) rm.DVOrdinal {
+		return rm.DVOrdinal{
+			Value: rm.Integer(v),
+			Symbol: rm.DVCodedText{
+				DVText:       rm.DVText{Value: code},
+				DefiningCode: rm.CodePhrase{CodeString: code, TerminologyID: rm.TerminologyID{Value: "local"}},
+			},
+		}
+	}
+	cases := []struct {
+		name         string
+		node         *tcimpl.CompiledNode
+		lowerOpen    bool
+		bounds, want [2]rm.DVOrdinal
+	}{
+		{
+			name:   "the swapped pair keeps each symbol",
+			node:   node([]int{1, 2}, []int{1, 2}),
+			bounds: [2]rm.DVOrdinal{ord(2, "at0002"), ord(1, "at0001")},
+			want:   [2]rm.DVOrdinal{ord(1, "at0001"), ord(2, "at0002")},
+		},
+		{
+			// 4 is not in the lower list, so no swap. The extremes are 3
+			// (code at0002 on the lower list) and 6 (code at0002 on the upper).
+			name:   "the lowest lower with the highest upper",
+			node:   node([]int{5, 3}, []int{4, 6}),
+			bounds: [2]rm.DVOrdinal{ord(5, "at0001"), ord(4, "at0001")},
+			want:   [2]rm.DVOrdinal{ord(3, "at0002"), ord(6, "at0002")},
+		},
+		{
+			name:   "unsatisfiable: left alone",
+			node:   node([]int{5, 6}, []int{1, 2}),
+			bounds: [2]rm.DVOrdinal{ord(6, "at0002"), ord(1, "at0001")},
+			want:   [2]rm.DVOrdinal{ord(6, "at0002"), ord(1, "at0001")},
+		},
+		{
+			name:      "open side: left alone",
+			lowerOpen: true,
+			bounds:    [2]rm.DVOrdinal{ord(2, "at0002"), ord(1, "at0001")},
+			want:      [2]rm.DVOrdinal{ord(2, "at0002"), ord(1, "at0001")},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			iv := &rm.DVInterval[rm.DVOrdinal]{}
+			iv.Lower, iv.Upper = tc.bounds[0], tc.bounds[1]
+			iv.LowerUnbounded = tc.lowerOpen
+			orderIntervalBounds(tc.node, iv)
+			if got, want := [2][2]string{ordinalParts(iv.Lower), ordinalParts(iv.Upper)}, [2][2]string{ordinalParts(tc.want[0]), ordinalParts(tc.want[1])}; got != want {
+				t.Errorf("orderIntervalBounds = %q, want %q", got, want)
+			}
+		})
+	}
+	t.Run("DV_ORDERED pointer ordinals: swapped in place", func(t *testing.T) {
+		lower, upper := &rm.DVOrdinal{Value: 3}, &rm.DVOrdinal{Value: 1}
+		iv := &rm.DVInterval[rm.DVOrdered]{}
+		iv.Lower, iv.Upper = lower, upper
+		orderIntervalBounds(nil, iv)
+		if lower.Value != 1 || upper.Value != 3 {
+			t.Errorf("pointer ordinals after ordering = (%d, %d), want (1, 3)", lower.Value, upper.Value)
+		}
+	})
+}
