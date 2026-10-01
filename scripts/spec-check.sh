@@ -357,9 +357,10 @@ EXAMPLES="${ROOT}/docs/examples.md"
 if [[ -f "$CONF" ]]; then
   probe_total="$(count_matches "$CONF" '^#### PROBE-')"
   inrepo_total="$(count_matches "$CONF" '^- \*\*Modes:\*\*.*In-repo')"
-  # Canonical all-three spelling only. The `Sandbox (planned); Cassette, Live
-  # not yet scoped.` lines deliberately do NOT match: their Sandbox is planned
-  # and the other two unscoped, so they declare no mode the sentence counts.
+  # Canonical all-three spelling only. A line that leaves a mode planned or
+  # unscoped, such as `Sandbox; Cassette, Live not yet scoped.` or `Live
+  # (snapshot); Sandbox planned; Cassette not yet scoped.`, deliberately does
+  # NOT match: it does not declare all three modes the sentence counts.
   allthree_total="$(count_matches "$CONF" '^- \*\*Modes:\*\* Sandbox, Cassette, Live\.')"
 
   # "<in-repo> of the <total> catalog entries are in-repo by construction".

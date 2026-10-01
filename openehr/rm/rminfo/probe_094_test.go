@@ -501,7 +501,7 @@ func TestProbe094DeclarationSitesAreRealBMMDeclarations(t *testing.T) {
 				t.Errorf("DeclaredOn(%s, %s) = %s, which %s does not descend from", name, attr, site, name)
 			}
 			// Container-ness is the one shape fact readable from the raw
-			// BMM property without re-implementing REQ-043's type
+			// BMM property without re-implementing the P_BMM → Go type
 			// mapping, so it is the one asserted here.
 			gotContainer, _ := rminfo.Default.IsContainer(name, attr)
 			if gotContainer != bmmIsContainer(cls, attr) {
@@ -526,7 +526,7 @@ func TestProbe094DeclarationSitesAreRealBMMDeclarations(t *testing.T) {
 //
 // The expectation is re-derived here by walking the unfiltered BMM ancestor
 // chain and collecting property NAMES only — no type mapping, so this stays
-// independent of REQ-043 rather than restating it.
+// independent of the P_BMM → Go mapping rules rather than restating them.
 func TestProbe094AttributeSetsAreComplete(t *testing.T) {
 	r := reducePinnedBMM(t)
 	lister, ok := rminfo.Default.(rminfo.AttributeLister)
@@ -596,8 +596,9 @@ func TestProbe094AttributeSetsAreComplete(t *testing.T) {
 //
 // Whether the generator should fold a primitive-mapped ancestor's properties —
 // which would make rminfo disagree with the emitted Go struct instead of with
-// the BMM — is a REQ-042/REQ-043 emission question, not this surface's, and it
-// is open as STRAND-13. It MUST NOT be resolved here.
+// the BMM — is an emission question for the generated code and the P_BMM → Go
+// mapping rules, not this surface's, and it is open as STRAND-13. It MUST NOT
+// be resolved here.
 //
 // The strand's evidence is split across two pins that are not interchangeable:
 // internal/bmmgen/primitive_ancestor_census_test.go pins the BMM-ancestry fact

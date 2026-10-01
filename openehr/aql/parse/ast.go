@@ -86,8 +86,8 @@ func spanAt(node any) Span {
 	// An absent node yields a zero span whether the nil arrives untyped or
 	// typed — a typed nil would satisfy the interface cases below and panic
 	// inside the accessor, and a diagnostics helper must not be able to
-	// panic. This is a nil GUARD, not type dispatch (the REQ-024 reflection
-	// rule binds `_type` dispatch).
+	// panic. The reflect call is a typed-nil check, one of the classes of
+	// reflection idiom.md § Generics policy (REQ-024) allows in library code.
 	if node == nil {
 		return Span{}
 	}

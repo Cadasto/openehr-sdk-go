@@ -143,10 +143,9 @@ requirements:
     implementation: landed
     packages: [openehr/rm/typereg, openehr/serialize]
     tests:
+      - internal/reflect_guard_test.go
       - openehr/client/demographic/decode_error_test.go
-      - openehr/client/ehr/contribution/version_shadow_internal_test.go
       - openehr/instance/instance_test.go
-      - openehr/rm/typereg/nilreceiver_census_test.go
       - openehr/template/constraints/example_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
 
@@ -304,8 +303,10 @@ requirements:
     implementation: landed
     packages: [internal/bmmgen]
     tests:
-      - openehr/rm/rminfo/probe_094_test.go
-      - openehr/rm/rminfo/probe_098_test.go
+      - internal/bmmgen/aom14_test.go
+      - internal/bmmgen/plan_test.go
+      - internal/bmmgen/render_test.go
+      - internal/bmmgen/sim_bump_test.go
 
   - id: REQ-044
     title: Hand-written extensions isolated
@@ -348,7 +349,6 @@ requirements:
     tests:
       - openehr/rm/rminfo/hierarchy_test.go
       - openehr/rm/rminfo/probe_094_test.go
-      - openehr/rm/rminfo/probe_098_test.go
 
   - id: REQ-048
     title: RM meta-model introspection
@@ -522,7 +522,6 @@ requirements:
       - openehr/aql/parse/identifier_parity_test.go
       - openehr/aql/parse/literal_roundtrip_test.go
       - openehr/aql/parse/parse_test.go
-      - openehr/aql/parse/predicate_parity_test.go
       - openehr/aql/parse/query_test.go
       - openehr/aql/projection_test.go
       - openehr/aql/value_test.go
@@ -813,6 +812,7 @@ requirements:
       - testkit/probe/run_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/definition/probe_067_template_upload_round_trip.go
+      - testkit/probes/probeclass_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
       - testkit/probes/serialize/probe_086_upstream_flat_parity.go
@@ -1024,7 +1024,6 @@ requirements:
       - openehr/internal/rmnames/intervals_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/composition_test.go
-      - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/interval_open_side_test.go
       - openehr/validation/rmread/interval_void_test.go
@@ -1032,7 +1031,6 @@ requirements:
       - testkit/probes/validation/probe_025_composition_validate.go
       - testkit/probes/validation/probe_074_noncomposition_validate.go
       - testkit/probes/validation/probes_test.go
-      - testkit/probes/versioned/probe_084_built_contribution_body.go
 
   - id: REQ-103
     title: Primitive constraint introspection
@@ -1045,6 +1043,7 @@ requirements:
       - internal/templatecompile/compile_test.go
       - openehr/template/constraints/constraints_test.go
       - openehr/template/constraints/example_test.go
+      - openehr/template/constraints/pure_imports_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/validation/constraint_fixtures_test.go
       - testkit/probes/template/constraint_fixtures_test.go
@@ -1529,7 +1528,6 @@ requirements:
       - openehr/client/definition/template_test.go
       - openehr/client/system/system_test.go
       - testkit/probes/definition/probe_093_template_list_filters.go
-      - testkit/probes/definition/probes_test.go
 
   - id: REQ-150
     title: Path-parameter segment validation
@@ -1539,7 +1537,6 @@ requirements:
     packages: [transport, openehr/client]
     probes: [PROBE-091]
     tests:
-      - openehr/client/definition/version_trim_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/contribution/contribution_test.go
       - openehr/client/route_guard_test.go
@@ -1573,7 +1570,6 @@ requirements:
       - testkit/probes/transport/probe_101_decode_failure_surfaced.go
       - testkit/probes/transport/probes_test.go
       - transport/decode_error_test.go
-      - transport/nilwireerror_test.go
       - transport/null_body_test.go
 
   - id: REQ-160

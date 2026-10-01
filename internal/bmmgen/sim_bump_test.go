@@ -25,12 +25,15 @@ import (
 //     optional SingleProperty `test_property` of type String.
 //  2. Generate into a fresh out dir using -target rm.
 //  3. Assert: data_types_quantity_gen.go now contains a
-//     TestProperty *string `json:"test_property,omitempty"` field on
+//     TestProperty *string `json:"test_property,omitzero"` field on
 //     DV_QUANTITY; typereg_gen.go is unchanged vs the baseline (no
 //     new class registered).
 //  4. Run bmmdiff.Diff(old, new) and assert the CHANGELOG suggestion
 //     is the expected one-liner. Print it via t.Logf so a human
 //     running the test sees the suggestion.
+//
+// REQ-043: § Mapping rules, Property → Go field. The added optional property
+// becomes a field whose JSON tag keeps the BMM property name.
 func TestSimulatedVersionBump(t *testing.T) {
 	// --- 1. Stage the synthetic 1.2.1 resources dir.
 	stage := t.TempDir()

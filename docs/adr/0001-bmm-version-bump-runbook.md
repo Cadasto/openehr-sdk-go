@@ -65,13 +65,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 
 7. **Update [`resources/bmm/README.md`](../../resources/bmm/README.md)** — both the `Files` table (schema id, bmm_version, class count) and any prose that pins a specific version. The `## Updating` section there defers to this ADR; do not duplicate the procedure.
 
-8. **Add a CHANGELOG entry.** Drop a one-liner under [`CHANGELOG.md`](../../CHANGELOG.md) `## [Unreleased]`, in the appropriate sub-section:
-
-   - **Added** — pure additions (new classes / properties).
-   - **Changed** — type changes, cardinality changes, ancestor-chain changes.
-   - **Removed** — class or property deletions.
-
-   The `bmmdiff -suggest-changelog` output is a good starting point, but a human reviews it before it lands; it favours brevity over editorial polish. Keep the bullet **short and high-level** per [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) — one line, one artefact class.
+8. **Propose the CHANGELOG bullet in the PR body.** [`CHANGELOG.md`](../../CHANGELOG.md) follows the rule in [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) and is not edited in the bump PR, so the PR body carries the one-line bullet for the maintainer to fold in. The `bmmdiff -suggest-changelog` output is a good starting point, but a human reviews it; it favours brevity over editorial polish. Keep the bullet **short and high-level**: one line, one artefact class.
 
 9. **Remove the old BMM file in the same commit.** Never leave both versions in `resources/bmm/` — the SDK pins exactly one version per schema id at a time. The paired add/remove makes the rename reviewable.
 
@@ -87,7 +81,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 ### Roles
 
 - **Author** runs steps 1–9, opens the PR, requests review.
-- **Reviewer** confirms the BMM diff (step 4 output is the ideal artefact to paste into the PR body) matches the Go-side diff scope, and that the CHANGELOG bullet correctly classifies the change.
+- **Reviewer** confirms the BMM diff (step 4 output is the ideal artefact to paste into the PR body) matches the Go-side diff scope, and that the proposed CHANGELOG bullet describes the change correctly.
 - **The drift bot** (`.github/workflows/codegen-drift.yml`) acts after merge: a green next-Monday run is the definition of "the bump landed cleanly".
 
 ### Tooling guarantees
@@ -100,7 +94,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 
 **Positive.**
 
-- A BMM version bump becomes a single PR with deterministic shape: BMM file rename + a small `_gen.go` diff + four documentation updates + one CHANGELOG bullet.
+- A BMM version bump becomes a single PR with deterministic shape: BMM file rename + a small `_gen.go` diff + four documentation updates + one CHANGELOG bullet proposed in the PR body.
 - The drift bot catches three failure modes: accidental hand-edits to `_gen.go`, generator-template regressions, and BMM ingestion bugs introduced after the bump.
 - The simulated-bump test in [`internal/bmmgen/sim_bump_test.go`](../../internal/bmmgen/sim_bump_test.go) exercises the regen path on every CI run, so the procedure is not just documentation — it is continuously verified.
 
@@ -111,7 +105,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 
 **Neutral.**
 
-- The procedure does not prescribe a SemVer impact (major / minor / patch); that lives in [`docs/specifications/module-layout.md § Versioning`](../../docs/specifications/module-layout.md#versioning). The CHANGELOG sub-section choice (Added / Changed / Removed) is the closest the runbook gets to a SemVer signal.
+- The procedure does not prescribe a SemVer impact (major / minor / patch); that lives in [`docs/specifications/module-layout.md § Versioning`](../../docs/specifications/module-layout.md#versioning). The runbook itself carries no SemVer signal: the impact is decided under that section.
 
 ## See also
 

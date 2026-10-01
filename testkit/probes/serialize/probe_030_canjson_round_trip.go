@@ -149,8 +149,8 @@ func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]by
 	return r, nil
 }
 
-// Probe030Inputs is the set of inputs exercised by PROBE-030 in sandbox
-// mode. Each input survives the round trip with its meaning intact
+// Probe030Inputs is the set of inputs exercised by PROBE-030. Each
+// input survives the round trip with its meaning intact
 // (typed deep comparison of A and B, plus wire equivalence, and the RM
 // floor unless the input sets SkipFloor) when fed the vendored fixtures.
 // The set spans leaf RM values and full composition fixtures vendored

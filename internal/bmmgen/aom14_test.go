@@ -12,6 +12,9 @@ import (
 
 // TestAOM14PlanFileAssignments asserts that the small load-bearing
 // subset of AOM 1.4 classes lands in the expected files.
+//
+// REQ-043: § Mapping rules, Schema → Go package set. The AOM 1.4 target also
+// emits one Go file per BMM package.
 func TestAOM14PlanFileAssignments(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -109,17 +112,44 @@ func TestAOM14ConcreteRegistry(t *testing.T) {
 
 // TestAOM14CyclicSinglePropDetection asserts that the mutual
 // recursion between ARCHETYPE and ARCHETYPE_ONTOLOGY is broken by a
-// pointer on at least one side. Without this the Go compiler reports
-// "invalid recursive type".
+// pointer on both sides, in the plan and in the rendered structs.
+// Without the pointer the Go compiler reports "invalid recursive type".
+//
+// REQ-043: § Mapping rules, Property → Go field. A mandatory property that
+// closes a cycle of mandatory struct-typed properties becomes a pointer,
+// since Go cannot declare a struct that contains itself by value. Its tag
+// carries no omit option.
 func TestAOM14CyclicSinglePropDetection(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
 	}
-	aProp := plan.CyclicSingleProps["ARCHETYPE"]["ontology"]
-	oProp := plan.CyclicSingleProps["ARCHETYPE_ONTOLOGY"]["parent_archetype"]
-	if !aProp && !oProp {
-		t.Errorf("expected at least one of ARCHETYPE.ontology / ARCHETYPE_ONTOLOGY.parent_archetype to be marked cyclic; got CyclicSingleProps=%v", plan.CyclicSingleProps)
+	for _, tc := range []struct {
+		owner, prop, fileBase, field string
+	}{
+		{"ARCHETYPE", "ontology", "archetype", "Ontology *ArchetypeOntology `json:\"ontology\"`"},
+		{"ARCHETYPE_ONTOLOGY", "parent_archetype", "archetype_ontology", "ParentArchetype *Archetype `json:\"parent_archetype\"`"},
+	} {
+		if !plan.CyclicSingleProps[tc.owner][tc.prop] {
+			t.Errorf("%s.%s is not marked cyclic; got CyclicSingleProps=%v", tc.owner, tc.prop, plan.CyclicSingleProps)
+		}
+		var file *PlannedFile
+		for _, f := range plan.Files {
+			if f.FileBase == tc.fileBase {
+				file = f
+				break
+			}
+		}
+		if file == nil {
+			t.Fatalf("%s file not in AOM plan", tc.fileBase)
+		}
+		got, err := RenderFile(plan, file)
+		if err != nil {
+			t.Fatalf("RenderFile(%s): %v", tc.fileBase, err)
+		}
+		if !fieldDecl(tc.field).Match(got) {
+			t.Errorf("%s_gen.go does not declare %s.%s as %q", tc.fileBase, tc.owner, tc.prop, tc.field)
+		}
 	}
 }
 
@@ -132,6 +162,9 @@ func TestAOM14CyclicSinglePropDetection(t *testing.T) {
 //
 //	cp openehr/aom/aom14/archetype_gen.go \
 //	   internal/bmmgen/testdata/aom14_archetype_gen.go.golden
+//
+// REQ-043: § Mapping rules, for the AOM target. The golden holds the class,
+// property and function mapping of the ARCHETYPE file.
 func TestGoldenAOM14Archetype(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -203,6 +236,11 @@ func TestAOM14IdempotentAndVerifyClean(t *testing.T) {
 // archetype file qualifies base-class references with the `rm.`
 // package prefix and emits the corresponding import. This is the
 // concrete check that Option C (one-way aom14 → rm dep) is wired.
+//
+// REQ-043: § Mapping rules, Schema → Go package set. openehr/aom/aom14 is a
+// sibling of openehr/rm and names the base types through it. The snippets also
+// pin § Property → Go field: the mandatory archetype_id is a value and the
+// optional uid a pointer.
 func TestAOM14CrossTargetReferences(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -224,13 +262,16 @@ func TestAOM14CrossTargetReferences(t *testing.T) {
 	}
 	wantSnippets := []string{
 		`import "github.com/cadasto/openehr-sdk-go/openehr/rm"`,
-		"ArchetypeID rm.ArchetypeID",
-		"UID *rm.HierObjectID",
 		`panic("not implemented: ARCHETYPE.concept_name`,
 	}
 	for _, snip := range wantSnippets {
 		if !bytes.Contains(got, []byte(snip)) {
 			t.Errorf("expected snippet not found in AOM archetype output:\n  want: %s", snip)
+		}
+	}
+	for _, field := range []string{"ArchetypeID rm.ArchetypeID", "UID *rm.HierObjectID"} {
+		if !fieldDecl(field).Match(got) {
+			t.Errorf("expected field not found in AOM archetype output:\n  want: %s", field)
 		}
 	}
 }

@@ -92,7 +92,7 @@ func TestProbe027MissingTerritoryFails(t *testing.T) {
 // TestProbe027_RealWorldCorpus extends PROBE-027 to the real-world OPTs
 // filed against REQ-107. Minimal policy only —
 // Example on social.opt still emits every optional content archetype
-// root and fails validation (out of scope per REQ-107 plan).
+// root and fails validation (out of scope per the example generator's plan).
 func TestProbe027_RealWorldCorpus(t *testing.T) {
 	opts := instance.Options{
 		Policy:    instance.Minimal,

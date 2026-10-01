@@ -173,7 +173,7 @@ The *out-of-universe* state itself has structure: why a given name is not in the
 #### Determinism and independence
 
 - Answers **MUST** be deterministic across runs and processes: every returned ordering is fixed (BMM declaration order for immediate parents, sorted otherwise), and a returned collection **MUST NOT** alias package state a caller could mutate.
-- [REQ-024](idiom.md#generics-policy-req-024) (no reflection) and [REQ-013](module-layout.md#req-013--building-block-independence) (building-block independence) apply unchanged; they are cited here because they are what make this surface importable from any building block, not restated as fresh obligations.
+- [REQ-024](idiom.md#generics-policy-req-024) (no reflection beyond its stated exceptions) and [REQ-013](module-layout.md#req-013--building-block-independence) (building-block independence) apply unchanged; they are cited here because they are what make this surface importable from any building block, not restated as fresh obligations.
 - Introducing it **MUST NOT** break an external implementer of the existing attribute-lookup interface: the new questions belong on an **optional capability interface** discovered by assertion, per [idiom.md § Public-API stability](idiom.md#public-api-stability), following the precedent already set for attribute enumeration. Each question **MUST** be reachable through the same seam that admits synthetic model data, so the negative space above is testable without the pinned RM.
 
 **Acceptance:** the compiled-in answers equal an independent reduction of the pinned BMM (class universe, abstractness, immediate parents, transitive ancestors, per-attribute declaring class) — the equivalence [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) asserts. `ENTRY` reports abstract and expands to exactly the concrete entry classes; a concrete class expands to itself; a dead-end abstract class expands to nothing while still reporting as known. `LOCATABLE`-inherited attributes report `LOCATABLE` (or the redefining descendant) as their declaration site while the flattened lookup keeps answering unchanged. A name outside the universe is distinguishable from every in-universe answer on every question. Hand-editing a generated hierarchy field fails the REQ-042 drift check.
@@ -235,8 +235,8 @@ How each P_BMM construct becomes Go code.
 | BMM schema | Go package | v1 |
 |---|---|---|
 | `openehr_base_1.3.0` | shared between `openehr/rm/` (primitives + foundational classes); no dedicated `openehr/base/` package — base types appear in their using packages | ✓ |
-| `openehr_rm_1.2.0` | `openehr/rm/` — one Go file per BMM package, e.g. `openehr/rm/data_types_quantity_gen.go`. The `org.openehr.rm.ehr_extract` package is **skipped** for v1. | ✓ (less ehr_extract) |
-| `openehr_am_1.4.0` | `openehr/aom/aom14/` — sibling of `openehr/rm/`, **not** a sub-package of `openehr/template/`. Rationale: AOM is the in-memory model of an *archetype*; templates consume archetypes but AOM is the more fundamental sibling of RM. | ✓ |
+| `openehr_rm_1.2.0` | `openehr/rm/` — one struct file per BMM package, e.g. `openehr/rm/data_types_quantity_gen.go`, plus its JSON and XML codec files when the package has concrete classes. The `org.openehr.rm.ehr_extract` package is **skipped** for v1. | ✓ (less ehr_extract) |
+| `openehr_am_1.4.0` | `openehr/aom/aom14/`, one struct file per BMM package, e.g. `openehr/aom/aom14/archetype_gen.go`, plus its JSON and XML codec files when the package has concrete classes. The package is a sibling of `openehr/rm/`, **not** a sub-package of `openehr/template/`. Rationale: AOM is the in-memory model of an *archetype*; templates consume archetypes but AOM is the more fundamental sibling of RM. | ✓ |
 | `openehr_am_2.4.0` | `openehr/aom/aom2/` (when wired in) | deferred |
 | `openehr_lang_1.1.0` | would target `openehr/bmm/` (BMM meta-classes), but v1 hand-writes that loader against the P_BMM persistence shape — generation deferred | deferred |
 | `openehr_term_3.1.0` | would target `openehr/rm/terminology/` (terminology service interface) | deferred |
@@ -268,7 +268,9 @@ LOCATABLE concrete descendants additionally receive the **generated identity sur
 | `P_BMM_CONTAINER_PROPERTY` | `[]T` for `List` / `Array`; `[]T` (with a documented uniqueness invariant) for `Set`; `map[K]V` for `Hash` — see § Container mapping |
 | `P_BMM_GENERIC_PROPERTY` | The generic instantiation, e.g. `*DVInterval[DVQuantity]` for `DV_INTERVAL<DV_QUANTITY>` |
 
-JSON tags **MUST** preserve the original BMM property name (snake_case), with `omitempty` for non-mandatory single properties. The example below is **conceptual** — it shows the BMM property → Go field mapping and the `DV_AMOUNT` ancestor relationship:
+Two cases depart from the single-property rows. A non-mandatory property whose type the generator emits as a Go interface (an abstract class, or a concrete class with subtypes, emitted as a narrow `…Like` interface) stays `T`, because an interface field is already nilable. A mandatory property that closes a cycle of mandatory struct-typed properties, such as AOM 1.4's `ARCHETYPE.ontology` and `ARCHETYPE_ONTOLOGY.parent_archetype`, becomes `*T`, because Go cannot declare a struct that contains itself by value.
+
+JSON tags **MUST** preserve the original BMM property name (snake_case), with `omitzero` on a non-mandatory single or generic property held as a pointer (`*T`, `*DVInterval[DVQuantity]`, `*[]T`, `*map[string]V`), so that only a nil pointer is omitted, and `omitempty` on a non-mandatory one that is not a pointer (a Go interface, or a `P_BMM_SINGLE_PROPERTY_OPEN` typed by the open generic parameter). A mandatory property carries no omit option, including one held as a pointer to break a cycle. A `P_BMM_CONTAINER_PROPERTY` field (`[]T`) carries `omitempty` when its cardinality lower bound is 0 or absent, and no omit option otherwise. A `P_BMM_GENERIC_PROPERTY` over `Hash` or `List` follows the single-property rule: a mandatory one is `map[string]V` or `[]T` with no omit option, and an optional one is `*map[string]V` or `*[]T` with `omitzero`. Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0002 § D8](../adr/0002-bmm-codegen-decisions.md#d8--the-generator-emits-no-bespoke-json-codec-methods) and [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md). The example below is **conceptual** — it shows the BMM property → Go field mapping and the `DV_AMOUNT` ancestor relationship:
 
 ```go
 // Conceptual mapping only — not the generated struct shape.
@@ -276,11 +278,11 @@ type DVQuantity struct {
     DVAmount                            // conceptual ancestor; flattened by generator (ADR 0002 D4)
     Magnitude            rm.Real        `json:"magnitude"`   // BMM Real → rm.Real per REQ-046 / ADR 0004
     Units                string         `json:"units"`
-    Precision            *rm.Integer    `json:"precision,omitempty"`
-    NormalRange          *DVInterval[DVQuantity] `json:"normal_range,omitempty"`
+    Precision            *rm.Integer    `json:"precision,omitzero"`
+    NormalRange          *DVInterval[DVQuantity] `json:"normal_range,omitzero"`
     OtherReferenceRanges []ReferenceRange[DVQuantity] `json:"other_reference_ranges,omitempty"`
-    UnitsSystem          *string        `json:"units_system,omitempty"`
-    UnitsDisplayName     *string        `json:"units_display_name,omitempty"`
+    UnitsSystem          *string        `json:"units_system,omitzero"`
+    UnitsDisplayName     *string        `json:"units_display_name,omitzero"`
 }
 ```
 

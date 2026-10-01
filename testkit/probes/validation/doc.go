@@ -1,7 +1,7 @@
 // Package validationprobes hosts the openEHR conformance probes
 // for openehr/validation/: template-driven RM validation against a
-// compiled OPT. Probes are plain functions returning (Result, error);
-// they are sandbox-only (no transport) since the validator is a local
+// compiled OPT. Probes are plain functions returning (Result, error).
+// They need no client or server, because the validator is a local
 // building block.
 //
 // PROBE-025 covers the canonical fixture path: a complete

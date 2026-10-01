@@ -165,7 +165,8 @@ func TestGenerateVitalSignsExamplePopulatesPrimitives(t *testing.T) {
 // back from the pin — never a string typed beside the code (REQ-034). Where it
 // did not fire, the OPT-driven walk's own value stands and is not pinned here:
 // this OPT constrains `defining_code` only, so the walk leaves the DV_CODED_TEXT
-// carrying the generic example sentinel, which is a separate REQ-107 matter.
+// carrying the generic example sentinel, which is a separate matter for the
+// example generator.
 func TestGenerateSettingMembershipAgainstThePin(t *testing.T) {
 	for _, tc := range []struct {
 		name, terminology, pinned, wantCode string

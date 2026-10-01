@@ -176,7 +176,7 @@ The set is closed by `isPrimitive()`; new primitive shapes appear in the `constr
 
 ### Validate contract
 
-`Validate(value any) []Violation` returns nil when the input satisfies every clause of the constraint, or one `Violation` per failing clause (range, list, pattern, …). Validators **MUST** be pure functions — no I/O, no reflection over user types beyond a small fixed coercion table per type. Concretely:
+`Validate(value any) []Violation` returns nil when the input satisfies every clause of the constraint, or one `Violation` per failing clause (range, list, pattern, …). Validators **MUST** be pure functions with no I/O, and the reflection rule of [idiom.md § Generics policy](idiom.md#generics-policy-req-024) applies to them unchanged. Each accepts a small fixed set of Go input types. Concretely:
 
 - Integer / real validators accept any Go integer kind (`int`, `int8`..`int64`, `uint`, `uint8`..`uint64`). `uint` and `uint64` values exceeding `math.MaxInt64` return `CodeWrongType` rather than silently wrapping. `CReal.Validate` additionally accepts `float32` / `float64`.
 - String, date, time, date-time, duration validators accept Go `string`.
@@ -226,7 +226,7 @@ The zero-value `NumericRange{}` (no fields set) is treated as "any value accepte
 
 ### Example value emission (REQ-107 hook)
 
-Every `PrimitiveConstraint` additionally exposes `ExampleValue() any` — a minimal-valid Go example value in the shape `Validate` accepts. For bounded constraints (closed lists, bounded ranges, enumerated units), `Validate(c.ExampleValue())` MUST return an empty `Violation` slice; unbounded primitives return a documented sentinel (e.g. `"example"`, `int64(0)`, `"2020-01-01"`). The factory is the leaf primitive of the REQ-107 template-driven instance generator and stays on the sealed interface so the closed type-switch (REQ-024 — no reflection) remains the only entry point for new primitive shapes. See § REQ-107 for the generator contract; the per-type example strategy landed in [PR 18](https://github.com/Cadasto/openehr-sdk-go/pull/18).
+Every `PrimitiveConstraint` additionally exposes `ExampleValue() any` — a minimal-valid Go example value in the shape `Validate` accepts. For bounded constraints (closed lists, bounded ranges, enumerated units), `Validate(c.ExampleValue())` MUST return an empty `Violation` slice; unbounded primitives return a documented sentinel (e.g. `"example"`, `int64(0)`, `"2020-01-01"`). The factory is the leaf primitive of the REQ-107 template-driven instance generator and stays on the sealed interface so the closed type-switch remains the only entry point for new primitive shapes, with no reflection ([idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024)). See § REQ-107 for the generator contract; the per-type example strategy landed in [PR 18](https://github.com/Cadasto/openehr-sdk-go/pull/18).
 
 - **Lives in:** [`openehr/template/constraints/`](../../openehr/template/constraints/)
 - **Probes:** PROBE-024 (primitive constraint validation against fixture inputs)
@@ -283,7 +283,7 @@ The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templateco
 
 ### Contract
 
-- **Pure function.** No I/O, no goroutines, no reflection. Stateless — concurrent callers share `c` safely.
+- **Pure function.** No I/O and no goroutines, and the reflection rule of [idiom.md § Generics policy](idiom.md#generics-policy-req-024) applies unchanged. Stateless — concurrent callers share `c` safely.
 - **Collect-all, not fail-fast.** Validators emit one `Issue` per failing clause; the walk completes regardless of how many issues fire. UIs and CI consumers need the full list.
 - **Result shape:**
   ```go
@@ -469,7 +469,7 @@ The generator is **sound** (every output is valid against the OPT), not **comple
 
 ### Trust model — phasing
 
-Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / `UIDSource` test-determinism seam / typed accessors for the closed root set; PROBE-027 implemented (Sandbox) covering `vital_signs.opt` + `clinical_note.opt` + the REQ-107 real-world corpus (`Referral Request.v1`, `Demonstration.v1`, `social`); `cmd/examples/generate-example/` worked example. The C_PRIMITIVE_OBJECT inner-`<item>` wire-parser fix + canjson-polymorphic `Composition.uid` emission landed in [PR 21](https://github.com/Cadasto/openehr-sdk-go/pull/21); PROBE-023 now exercises the full marshal → unmarshal → re-marshal round-trip. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) landed with the composition builder in [PR 19](https://github.com/Cadasto/openehr-sdk-go/pull/19). REQ-104 slot-fill archetype-id stamping is landed for parsed include patterns that can be synthesized safely; when no includes were parsed the synthesiser uses `openEHR-EHR-<RMType>.example.v1` to satisfy the validator's RM-type-prefix heuristic.
+Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / `UIDSource` test-determinism seam / typed accessors for the closed root set; PROBE-027 implemented (inline) covering `vital_signs.opt` + `clinical_note.opt` + the REQ-107 real-world corpus (`Referral Request.v1`, `Demonstration.v1`, `social`); `cmd/examples/generate-example/` worked example. The C_PRIMITIVE_OBJECT inner-`<item>` wire-parser fix + canjson-polymorphic `Composition.uid` emission landed in [PR 21](https://github.com/Cadasto/openehr-sdk-go/pull/21); PROBE-023 now exercises the full marshal → unmarshal → re-marshal round-trip. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) landed with the composition builder in [PR 19](https://github.com/Cadasto/openehr-sdk-go/pull/19). REQ-104 slot-fill archetype-id stamping is landed for parsed include patterns that can be synthesized safely; when no includes were parsed the synthesiser uses `openEHR-EHR-<RMType>.example.v1` to satisfy the validator's RM-type-prefix heuristic.
 
 ### Out of scope
 

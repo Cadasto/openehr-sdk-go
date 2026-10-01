@@ -55,11 +55,14 @@ type IDTokenClaims struct {
 // checks (iss/aud/exp/nbf/iat with the SDK's 30s skew, plus nonce) run
 // after that.
 func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issuer, clientID, nonce string, now time.Time, allowedAlgs []string) (*IDTokenClaims, error) {
-	if raw == "" {
-		return nil, fmt.Errorf("%w: empty id_token", auth.ErrJWKSValidationFailed)
-	}
+	// The trust anchors are the caller's configuration, so they are checked
+	// before the token: a configuration error must not read as a bad token,
+	// even when the token is empty too (REQ-064).
 	if err := requireIDTokenTrustAnchors(jwks, issuer, clientID); err != nil {
 		return nil, err
+	}
+	if raw == "" {
+		return nil, fmt.Errorf("%w: empty id_token", auth.ErrJWKSValidationFailed)
 	}
 	if now.IsZero() {
 		now = time.Now()
@@ -82,6 +85,18 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issu
 		return nil, fmt.Errorf("%w: unsecured id_token (alg none) rejected", auth.ErrJWKSValidationFailed)
 	}
 
+	algs := resolveIDTokenAlgs(allowedAlgs)
+	if len(algs) == 0 {
+		// The caller supplied a non-empty advertised set (e.g. discovery's
+		// id_token_signing_alg_values_supported) but none of its algorithms are
+		// supported. Fail closed — honour the server's constraint rather than
+		// silently falling back to the default RS/ES set (REQ-062). This runs
+		// before the key lookup, so no JWKS fetch happens for an allowlist that
+		// can never verify, and a JWKS outage cannot replace the sentinel with
+		// its fetch error.
+		return nil, fmt.Errorf("%w: no supported id_token signing algorithm in the advertised set %v (supported: %v)", auth.ErrJWKSValidationFailed, allowedAlgs, defaultIDTokenAlgs)
+	}
+
 	jwkRaw, err := jwks.Key(ctx, hdr.Kid)
 	if err != nil {
 		return nil, err
@@ -89,15 +104,6 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issu
 	pub, err := publicKeyFromJWK(jwkRaw)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", auth.ErrJWKSValidationFailed, err)
-	}
-
-	algs := resolveIDTokenAlgs(allowedAlgs)
-	if len(algs) == 0 {
-		// The caller supplied a non-empty advertised set (e.g. discovery's
-		// id_token_signing_alg_values_supported) but none of its algorithms are
-		// supported. Fail closed — honour the server's constraint rather than
-		// silently falling back to the default RS/ES set (REQ-062).
-		return nil, fmt.Errorf("%w: no supported id_token signing algorithm in the advertised set %v (supported: %v)", auth.ErrJWKSValidationFailed, allowedAlgs, defaultIDTokenAlgs)
 	}
 
 	keySet := &oidc.StaticKeySet{PublicKeys: []crypto.PublicKey{pub}}
@@ -126,12 +132,6 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issu
 	return claimsFromMap(claims, issuer, clientID, nonce, now)
 }
 
-// resolveIDTokenAlgs computes the effective signature allowlist. The full
-// supported set is RS256/RS384/ES256/ES384; "none" is never permitted. When
-// allowedAlgs is non-empty it is intersected with the supported set so a
-// caller passing the discovery list cannot widen the SDK's support, and an
-// empty intersection falls back to the default set rather than the go-oidc
-// RS256-only default.
 // resolveIDTokenAlgs returns the effective id_token signing-alg allowlist.
 // With no caller-supplied list it returns the full default set
 // (RS256/RS384/ES256/ES384). With a non-empty list it returns the

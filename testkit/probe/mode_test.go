@@ -119,7 +119,7 @@ func TestSandboxModeIsolatesProbesFromEachOther(t *testing.T) {
 	t.Parallel()
 	const id openehrclient.EHRID = "9a1f0f6e-1d2c-4c0b-9b3a-6d5e4c3b2a10"
 
-	create := createEHR("PROBE-077", id)
+	create := createEHR("PROBE-060", id)
 	lookFor := expectEHR("PROBE-078", id, false,
 		"the second probe saw the first probe's EHR; sandbox state leaked between probes")
 
@@ -173,8 +173,8 @@ func TestSandboxModeSharesConfiguredBackendWithinOneRun(t *testing.T) {
 	const id openehrclient.EHRID = "0b5e8d3c-7f21-4a9e-a6d4-2c8b1f04e775"
 	cfg := probe.Config{Mode: probe.ModeSandbox, Sandbox: sandbox.New()}
 
-	create := createEHR("PROBE-074", id)
-	lookFor := expectEHR("PROBE-075", id, true,
+	create := createEHR("PROBE-060", id)
+	lookFor := expectEHR("PROBE-078", id, true,
 		"the second probe did not see the first probe's EHR; the run did not serve both probes from the configured backend")
 
 	sum, err := probe.Run(t.Context(), cfg, []probe.Entry{create, lookFor})
@@ -195,7 +195,7 @@ func TestSandboxModeRefusesACallerClient(t *testing.T) {
 	_, err := probe.Run(t.Context(), probe.Config{
 		Mode:   probe.ModeSandbox,
 		Client: mustClient(t),
-	}, []probe.Entry{capture("PROBE-074", &seen)})
+	}, []probe.Entry{capture("PROBE-063", &seen)})
 	if !errors.Is(err, probe.ErrUnsatisfiableMode) {
 		t.Fatalf("Run() error = %v, want %v", err, probe.ErrUnsatisfiableMode)
 	}
@@ -262,7 +262,7 @@ func TestLiveModeBuildsFromEndpoint(t *testing.T) {
 		Mode:       probe.ModeLive,
 		Endpoint:   "https://cdr.example.com/openehr/v1",
 		HTTPClient: &http.Client{},
-	}, []probe.Entry{capture("PROBE-075", &seen)})
+	}, []probe.Entry{capture("PROBE-002", &seen)})
 	if err != nil {
 		t.Fatal(err)
 	}

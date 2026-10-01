@@ -84,13 +84,13 @@ func recordedPath(raw string) string {
 	return u.Path
 }
 
-// replayKey is the Phase-3 replay key: the request method plus the openEHR
+// replayKey is the replay key in use today: the request method plus the openEHR
 // resource path, with the REST base prefix stripped so a capture against
 // EHRbase and a replay against any catalog URL agree. REQ-082's full Cassette
 // key also names the headers and body fields a probe's assertion depends on;
 // that is deferred until a recording whose exchanges differ only on those
-// fields lands (no current recording does), and the deferral is recorded in
-// the REQ-082 traceability notes.
+// fields lands (no current recording does). See conformance.md § REQ-082
+// (Cassette mode); docs/roadmap.md tracks the deferral.
 func replayKey(method, path string) string {
 	return strings.ToUpper(method) + " " + stripRESTPrefix(path)
 }

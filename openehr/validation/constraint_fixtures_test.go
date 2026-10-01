@@ -12,8 +12,8 @@ import (
 )
 
 // REQ-103 — vendored Robot Test_dv_* compositions must not violate OPT
-// primitive constraints. Full REQ-102 validation may still report structural
-// issues (slot_fill, rm_type_mismatch on LOCATABLE.name, …) until those
+// primitive constraints. Full composition validation may still report
+// structural issues (slot_fill, rm_type_mismatch on LOCATABLE.name, …) until those
 // codec/validator gaps close; this test pins constraint conformance only.
 func TestValidateComposition_ConstraintFixtures_NoPrimitiveViolations(t *testing.T) {
 	ids, err := fixtures.ConstraintTemplateIDs()

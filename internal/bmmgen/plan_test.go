@@ -2,6 +2,7 @@ package bmmgen
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -13,6 +14,10 @@ const testResources = "../../" + bmm.DefaultResourcesDir
 // expected `<base>_gen.go` file. The set is deliberately small and
 // load-bearing: if a refactor accidentally re-buckets DV_QUANTITY,
 // the test fails.
+//
+// REQ-043: § Mapping rules, Schema → Go package set. The RM target emits one
+// Go file per BMM package, so each class lands in the file of the package
+// that declares it.
 func TestPlanFileAssignments(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -94,25 +99,77 @@ func TestPlanIncludesConcreteRegistrations(t *testing.T) {
 	}
 }
 
-// TestPlanAbstractDescendants asserts the marker-method closure: for
-// DATA_VALUE, every DV_* concrete leaf descends. For DV_ORDERED,
-// only the ordered concrete types do.
+// TestPlanAbstractDescendants asserts the marker-method closure: the
+// concrete descendants the plan lists for DATA_VALUE and for DV_ORDERED
+// are exactly the owned concrete classes whose ancestor chain reaches
+// that class. The expectation walks the ancestors upward, so it does not
+// share the plan's downward walk.
+//
+// REQ-043: § Mapping rules, Class → Go type. An abstract class becomes a Go
+// interface whose marker method every concrete descendant carries; this pins
+// the descendant set the renderer emits those marker methods from.
 func TestPlanAbstractDescendants(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {
 		t.Fatalf("BuildPlan: %v", err)
 	}
-	dvDescendants := plan.AbstractDescendants["DATA_VALUE"]
-	if len(dvDescendants) < 5 {
-		t.Errorf("DATA_VALUE expected many descendants, got %d", len(dvDescendants))
-	}
-	hasDvQuantity := false
-	for _, d := range dvDescendants {
-		if d == "DV_QUANTITY" {
-			hasDvQuantity = true
+	for _, tc := range []struct {
+		root    string
+		has     string // a descendant several levels down
+		hasNot  string // a descendant of the other root only
+		minSize int
+	}{
+		{root: "DATA_VALUE", has: "DV_QUANTITY", hasNot: "", minSize: 5},
+		{root: "DV_ORDERED", has: "DV_QUANTITY", hasNot: "DV_TEXT", minSize: 5},
+	} {
+		want := concreteDescendantsByAncestry(plan, tc.root)
+		got := plan.AbstractDescendants[tc.root]
+		if !slices.Equal(got, want) {
+			t.Errorf("AbstractDescendants[%s] = %v, want %v", tc.root, got, want)
+		}
+		// Vacuity guards: an empty or truncated walk on both sides would
+		// otherwise compare equal.
+		if len(want) < tc.minSize {
+			t.Errorf("%s: %d concrete descendants by ancestry, want at least %d", tc.root, len(want), tc.minSize)
+		}
+		if !slices.Contains(want, tc.has) {
+			t.Errorf("%s: concrete descendants by ancestry %v miss %s", tc.root, want, tc.has)
+		}
+		if tc.hasNot != "" && slices.Contains(want, tc.hasNot) {
+			t.Errorf("%s: concrete descendants by ancestry %v include %s", tc.root, want, tc.hasNot)
 		}
 	}
-	if !hasDvQuantity {
-		t.Errorf("DATA_VALUE descendants missing DV_QUANTITY")
+}
+
+// concreteDescendantsByAncestry returns, sorted, every owned concrete
+// SimpleClass in the plan whose ancestor chain reaches root.
+func concreteDescendantsByAncestry(plan *Plan, root string) []string {
+	var out []string
+	for name, pc := range plan.Classes {
+		if pc.External || pc.Class.IsAbstract() {
+			continue
+		}
+		if _, isSimple := pc.Class.(*bmm.SimpleClass); !isSimple {
+			continue
+		}
+		seen := map[string]bool{}
+		stack := slices.Clone(pc.Class.Ancestors())
+		for len(stack) > 0 {
+			anc := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if seen[anc] {
+				continue
+			}
+			seen[anc] = true
+			if anc == root {
+				out = append(out, name)
+				break
+			}
+			if apc, ok := plan.Classes[anc]; ok {
+				stack = append(stack, apc.Class.Ancestors()...)
+			}
+		}
 	}
+	slices.Sort(out)
+	return out
 }

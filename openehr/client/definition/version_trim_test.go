@@ -62,7 +62,7 @@ func TestDeleteStoredQueryRefusesEmptyVersion(t *testing.T) {
 			if !errors.Is(err, transport.ErrInvalidConfig) {
 				t.Errorf("DeleteStoredQuery(version=%q) err = %v, want errors.Is(err, transport.ErrInvalidConfig)", tt.version, err)
 			}
-			// Naming the operation is what separates this refusal from REQ-150's
+			// Naming the operation is what separates this refusal from the transport's
 			// path-segment validator, which also rejects an empty segment with the
 			// same sentinel and no request: without this line the test stays green
 			// when the operation's own guard is removed.
@@ -102,7 +102,7 @@ func TestGetStoredQueryRefusesEmptyVersion(t *testing.T) {
 			if !errors.Is(err, transport.ErrInvalidConfig) {
 				t.Errorf("GetStoredQuery(version=%q) err = %v, want errors.Is(err, transport.ErrInvalidConfig)", tt.version, err)
 			}
-			// Naming the operation is what separates this refusal from REQ-150's
+			// Naming the operation is what separates this refusal from the transport's
 			// path-segment validator, which also rejects an empty segment with the
 			// same sentinel and no request: without this line the test stays green
 			// when the operation's own guard is removed.

@@ -5,6 +5,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -17,6 +19,12 @@ import (
 //
 //	cp openehr/rm/data_types_quantity_gen.go \
 //	   internal/bmmgen/testdata/data_types_quantity_gen.go.golden
+//
+// REQ-043: § Mapping rules, for one whole BMM package. The golden holds the
+// class, property, type and container mapping: abstract classes as marker
+// interfaces, mandatory properties as values and optional ones as pointers,
+// containers as slices, generic classes as type parameters, and JSON tags
+// that keep the BMM property names.
 func TestGoldenDataTypesQuantity(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -131,6 +139,10 @@ func TestDriftDetection(t *testing.T) {
 //   - panic message uses the BMM names verbatim
 //
 // Phase 3 contract: every BMM function maps to one Go method stub.
+//
+// REQ-043: § Mapping rules, Functions. A BMM function becomes a method stub
+// that carries its pre- and post-conditions as comments and panics with a
+// not-implemented message.
 func TestMethodStubsForDVQuantity(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -180,6 +192,9 @@ func TestMethodStubsForDVQuantity(t *testing.T) {
 // generated fail-loud panic stubs. Guards the generator hook that lets
 // openehr/rm/*_funcs.go and openehr/rm/rmpath provide those surfaces
 // without a "method redeclared" collision (ADR 0002 § D7, ADR 0011).
+//
+// REQ-043: § Mapping rules, Functions. A function that has no hand-written
+// body keeps its fail-loud stub.
 func TestManualImplementationSkip(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -237,6 +252,103 @@ func TestManualImplementationSkip(t *testing.T) {
 			if !bytes.Contains([]byte(src), []byte(m)) {
 				t.Errorf("%s: deferred stub %q should remain but was not emitted", fileBase, m)
 			}
+		}
+	}
+}
+
+// TestOptionalFieldsThatAreNotPointers pins the optional fields the generator
+// leaves unpointed, each with its omitempty tag, beside an optional field
+// typed by a class type parameter, which is a pointer with omitzero.
+//
+// REQ-043: § Mapping rules, Property → Go field. A non-mandatory property
+// whose type is emitted as a Go interface (an abstract class, or a concrete
+// class with subtypes emitted as a `…Like` interface) stays `T` and carries
+// `omitempty`, and so does a P_BMM_SINGLE_PROPERTY_OPEN.
+func TestOptionalFieldsThatAreNotPointers(t *testing.T) {
+	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlan: %v", err)
+	}
+	for _, tc := range []struct {
+		name, fileBase, field string
+	}{
+		{"abstract class", "composition_content_entry", "Protocol ItemStructure `json:\"protocol,omitempty\"`"},
+		{"concrete class with subtypes", "composition_content_entry", "GuidelineID ObjectRefLike `json:\"guideline_id,omitempty\"`"},
+		{"single property open", "foundation_types_interval", "Lower T `json:\"lower,omitempty\"`"},
+		{"single property typed by a type parameter", "common_change_control", "Data *T `json:\"data,omitzero\"`"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var file *PlannedFile
+			for _, f := range plan.Files {
+				if f.FileBase == tc.fileBase {
+					file = f
+					break
+				}
+			}
+			if file == nil {
+				t.Fatalf("%s file not in plan", tc.fileBase)
+			}
+			got, err := RenderFile(plan, file)
+			if err != nil {
+				t.Fatalf("RenderFile(%s): %v", tc.fileBase, err)
+			}
+			if !fieldDecl(tc.field).Match(got) {
+				t.Errorf("%s_gen.go does not declare the field %q", tc.fileBase, tc.field)
+			}
+		})
+	}
+}
+
+// fieldDecl matches a struct field written as "Name Type `tag`" on one line,
+// with any run of spaces or tabs between the three parts: gofmt aligns a
+// field's type and tag with its neighbours', so the spacing changes when an
+// unrelated field does. The last part must be followed by a space, a tab or
+// the end of the line, so "UID *rm.HierObjectID" does not match a field of
+// type *rm.HierObjectIDList.
+func fieldDecl(field string) *regexp.Regexp {
+	parts := strings.SplitN(field, " ", 3)
+	for i, p := range parts {
+		parts[i] = regexp.QuoteMeta(p)
+	}
+	return regexp.MustCompile(`(?m)^[ \t]*` + strings.Join(parts, `[ \t]+`) + `(?:[ \t]|$)`)
+}
+
+// TestFieldDeclIgnoresAlignment checks that fieldDecl accepts a field padded
+// for alignment and still tells the field from one with another name, type or
+// tag.
+func TestFieldDeclIgnoresAlignment(t *testing.T) {
+	const field = "Data *T `json:\"data,omitzero\"`"
+	for _, tc := range []struct {
+		src  string
+		want bool
+	}{
+		{src: "\tData *T `json:\"data,omitzero\"`\n", want: true},
+		{src: "\tData        *T      `json:\"data,omitzero\"`\n", want: true},
+		{src: "\tData T `json:\"data,omitzero\"`\n", want: false},
+		{src: "\tMetaData *T `json:\"data,omitzero\"`\n", want: false},
+		{src: "\tData *T `json:\"data,omitempty\"`\n", want: false},
+	} {
+		if got := fieldDecl(field).MatchString(tc.src); got != tc.want {
+			t.Errorf("fieldDecl(%q).MatchString(%q) = %v, want %v", field, tc.src, got, tc.want)
+		}
+	}
+
+	// A field without a tag ends at its type, so a longer type name that
+	// starts with the same text is another field, and so is the same text
+	// split over two lines.
+	const tagless = "UID *rm.HierObjectID"
+	for _, tc := range []struct {
+		src  string
+		want bool
+	}{
+		{src: "\tUID *rm.HierObjectID\n", want: true},
+		{src: "\tUID   *rm.HierObjectID `json:\"uid\"`\n", want: true},
+		{src: "\tUID *rm.HierObjectID", want: true},
+		{src: "\tUID *rm.HierObjectIDList\n", want: false},
+		{src: "\tUID\n\t*rm.HierObjectID\n", want: false},
+	} {
+		if got := fieldDecl(tagless).MatchString(tc.src); got != tc.want {
+			t.Errorf("fieldDecl(%q).MatchString(%q) = %v, want %v", tagless, tc.src, got, tc.want)
 		}
 	}
 }

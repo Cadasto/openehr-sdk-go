@@ -38,10 +38,9 @@ type Assignment struct {
 // canjson.Marshal, canjson.Unmarshal back into a fresh *rm.Composition,
 // re-marshal, and verify every fragment in every Assignment appears in
 // both the first marshal and the post-unmarshal re-marshal (the
-// PROBE-023 round-trip). The probe is sandbox-only (no transport
-// dependency); openEHR conformance parity means another implementation
-// of the builder against the same OPT + assignments must produce the
-// same pass outcome.
+// PROBE-023 round-trip). The probe needs no client or server. For
+// openEHR conformance, another implementation of the builder against
+// the same OPT and assignments must produce the same pass outcome.
 func Probe023BuilderRoundTrip(ctx context.Context, c *templatecompile.Compiled, opts []composition.Option, assigns []Assignment) (Result, error) { // PROBE-023 (REQ-082, REQ-101)
 	r := Result{Probe: "PROBE-023"}
 	if c == nil || c.Root() == nil {

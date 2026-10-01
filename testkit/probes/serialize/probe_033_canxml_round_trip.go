@@ -69,7 +69,7 @@ func Probe033CanxmlRoundTrip(body []byte, factory func() any) (Result, error) { 
 }
 
 // Probe033Inputs is the canonical set of inputs exercised by
-// PROBE-033 in sandbox mode. Leaf entries are bootstrap-encoded; fixture
+// PROBE-033. Leaf entries are bootstrap-encoded; fixture
 // entries are discovered from `testkit/corpus/compositions/*.xml` and
 // `testkit/corpus/rm/*.xml` via [fixtures.ListRMXML], as for
 // [Probe030Inputs].

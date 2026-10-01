@@ -1,7 +1,7 @@
 // Package aqlprobes hosts the openEHR conformance probes for openehr/aql:
 // the AQL builders and the AQL lint pipeline. Probes are plain functions
-// returning (Result, error); all are sandbox-only (no transport), because
-// the builders and the lint pipeline are local building blocks.
+// returning (Result, error). They need no client or server, because the
+// builders and the lint pipeline are local building blocks.
 //
 // PROBE-020 asserts wire-output stability: the struct-builder and the
 // verb-functions must emit byte-identical AQL for the same logical query, and

@@ -76,7 +76,7 @@ generated tables follow the pin. A bump is one explicit, reviewable commit:
 3. Update the pin table in this README (release tag, byte size, root attributes, counts) and
    the release tag in the [`resources/README.md`](../README.md) inventory row. The manifest
    cannot update either of them.
-4. Add a short CHANGELOG bullet under `## [Unreleased]`.
+4. Propose the one-line CHANGELOG bullet in the PR body; the CHANGELOG follows the rule in [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions).
 5. Commit the pin, the manifest, the regenerated tables and those doc rows together.
 
 With no `TERMINOLOGY_REF`, `sync` re-fetches the ref already pinned in `MANIFEST.txt`

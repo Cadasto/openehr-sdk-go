@@ -7,9 +7,9 @@ package constraints
 //
 // Validate(value any) returns nil when the input satisfies the
 // constraint. Otherwise it returns one [Violation] per failing
-// clause (range, list, pattern, …). Validators are pure: no I/O and no
-// reflection over user types beyond a small fixed coercion table per
-// type (see each Validate doc for the accepted Go shapes).
+// clause (range, list, pattern, …). Validators do no I/O and use no
+// reflection. Each accepts a small fixed set of Go types; see each
+// Validate doc for the types it accepts.
 type PrimitiveConstraint interface {
 	Validate(value any) []Violation
 

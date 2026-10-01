@@ -55,8 +55,8 @@ func storedQueryLiveEntries(id openehrclient.EHRID, qualifiedName string, out *s
 					return liveFailf("store returned nil metadata"), nil
 				}
 				// PROBE-079: PutStoredQuery's recovery order — Location header
-				// first, then the JSON body, then the caller's input — is REQ-057's
-				// and is unit-covered in
+				// first, then the JSON body, then the caller's input — belongs to
+				// the stored-query contract and is unit-covered in
 				// openehr/client/definition/stored_query_test.go. What this entry
 				// checks is the decoded StoredQueryMetadata: the name round-trips
 				// and a version is present. An unversioned PUT sends version "", so
