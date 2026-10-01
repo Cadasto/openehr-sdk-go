@@ -132,9 +132,11 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		// The slot body is not in this OPT. A cluster slot is still an
 		// RM CLUSTER, and CLUSTER.items is mandatory, so it gets one element.
 		if c, ok := rmValue.(*rm.Cluster); ok && len(c.Items) == 0 {
-			el := &rm.Element{}
-			applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
-			c.Items = []rm.Item{el}
+			c.Items = []rm.Item{g.placeholderElement()}
+		}
+		// An element slot has no value constraint to fill either.
+		if el, ok := rmValue.(*rm.Element); ok {
+			settleElement(el)
 		}
 		return nil
 	}
@@ -1436,11 +1438,11 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		g.ensureItems(opt, &v.Items)
 	case *rm.PartyRelationship:
 		fillPartyRelationship(v)
+	case *rm.Element:
+		settleElement(v)
 	case *rm.ItemList:
 		if len(v.Items) == 0 {
-			el := rm.Element{}
-			applyLocatableIdentity(&el, "at0000", "element", nil, g.nextUID)
-			v.Items = append(v.Items, el)
+			v.Items = append(v.Items, *g.placeholderElement())
 		}
 	case *rm.Activity:
 		if v.ActionArchetypeID == "" {
@@ -1448,9 +1450,7 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		}
 	case *rm.ItemSingle:
 		if v.Item.GetArchetypeNodeID() == "" && (v.Item.Value == nil || rm.IsTypedNil(v.Item.Value)) {
-			el := &rm.Element{}
-			applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
-			v.Item = *el
+			v.Item = *g.placeholderElement()
 		}
 	case *rm.DVEHRURI:
 		// Backstop for a DV_EHR_URI the primitive default did not reach;
@@ -1490,9 +1490,10 @@ func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
 					// A slot is not walked: its body is not in this OPT.
 					// A cluster slot still needs one item for the RM floor.
 					if slot, ok := made.(*rm.Cluster); ok && len(slot.Items) == 0 {
-						el := &rm.Element{}
-						applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
-						slot.Items = []rm.Item{el}
+						slot.Items = []rm.Item{g.placeholderElement()}
+					}
+					if slot, ok := made.(*rm.Element); ok {
+						settleElement(slot)
 					}
 				} else if err := g.walkNode(child, made); err != nil {
 					continue
@@ -1507,9 +1508,46 @@ func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
 			return
 		}
 	}
+	*items = append(*items, g.placeholderElement())
+}
+
+// placeholderElement is the one member the generator adds to an RM-mandatory
+// items list that the OPT does not describe. It has no value constraint to
+// fill, so it carries a null flavour (RM Inv_null_flavour_indicated).
+func (g *generator) placeholderElement() *rm.Element {
 	el := &rm.Element{}
 	applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
-	*items = append(*items, el)
+	settleElement(el)
+	return el
+}
+
+// settleElement makes an ELEMENT carry exactly one of value and null_flavour
+// (RM Inv_null_flavour_indicated). A value wins over a null flavour: when the
+// OPT constrains both attributes, the null flavour is dropped. An ELEMENT with
+// no value, because the OPT constrains none or none could be generated, gets
+// the null flavour "no information".
+func settleElement(e *rm.Element) {
+	hasValue := e.Value != nil && !rm.IsTypedNil(e.Value)
+	switch {
+	case hasValue && e.NullFlavour != nil:
+		e.NullFlavour = nil
+	case !hasValue && e.NullFlavour == nil:
+		e.NullFlavour = noInformation()
+	}
+}
+
+// noInformation is the "no information" code (271) of the openEHR null
+// flavours group.
+func noInformation() *rm.DVCodedText {
+	const code = "271"
+	rubric, _ := terminology.NullFlavours.Rubric(code)
+	return &rm.DVCodedText{
+		Value: rubric,
+		DefiningCode: rm.CodePhrase{
+			CodeString:    code,
+			TerminologyID: rm.TerminologyID{Value: terminology.ID},
+		},
+	}
 }
 
 func symbolBlank(s rm.DVCodedText) bool {
@@ -1538,6 +1576,9 @@ func (g *generator) stampIfLocatable(rmValue any, rmType string) {
 		name = "element"
 	}
 	applyLocatableIdentity(rmValue, "at0000", name, nil, g.nextUID)
+	if el, ok := rmValue.(*rm.Element); ok {
+		settleElement(el)
+	}
 }
 
 func fillPartyRelationship(rel *rm.PartyRelationship) {
