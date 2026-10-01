@@ -5,17 +5,17 @@ kind: plan
 # Plan — Spec integrity: probe classes, security rules with force, one CHANGELOG rule, real evidence
 
 **Date:** 2026-09-30
-**Status:** Draft — from the audit of the PR 181–189 review leftovers
+**Status:** Done in PR 192; from the audit of the PR 181–189 review leftovers
 **Covers:** REQ-082 ([conformance.md § REQ-082](../specifications/conformance.md#req-082--runnability)), REQ-062 and REQ-064 (auth.md, *ID-token verification algorithm agility*), REQ-024 ([idiom.md § Generics policy](../specifications/idiom.md#generics-policy-req-024)), REQ-043 ([bmm-conformance.md § Mapping rules](../specifications/bmm-conformance.md#mapping-rules)), and the process rules in [development-process.md](../development-process.md)
 **Probes:** the in-repo probes of the catalogue (listed in Phase 1)
-**Depends on:** nothing; one maintainer decision in Phase 3
-**Defers:** wording and duplication clean-ups that state nothing false; they are in the findings file
+**Depends on:** nothing; the Phase 3 decision is taken (the release cut)
+**Defers:** the open items are Known gaps in [conformance.md § REQ-082](../specifications/conformance.md#req-082--runnability) and auth.md *ID-token verification algorithm agility*; the passing REQ mentions in tests (about 45 to 50) are left for a later sweep
 
 This header is for the reader. No tool reads it, and nothing fails when it is missing or out of date. The work itself meets the [Definition of Ready](../development-process.md#definition-of-ready) before it starts and the [Definition of Done](../development-process.md#definition-of-done) in the implementing PR.
 
 ## Goal
 
-Four places where the specification says something false, or leaves a rule the code enforces without the force that makes it a rule. Each one misleads the next implementer or reviewer.
+Five places where the specification says something false, or leaves a rule the code enforces without the force that makes it a rule. Each one misleads the next implementer or reviewer.
 
 ## Evidence (main `bfa10c10`)
 
@@ -49,7 +49,7 @@ Four places where the specification says something false, or leaves a rule the c
 
 ### Phase 3 — one CHANGELOG rule
 
-**Maintainer decision:** follow AGENTS.md, where the CHANGELOG is written at the release cut (recommended, since that is the practice), or the spec texts.
+**Maintainer decision:** follow AGENTS.md, where the CHANGELOG is written at the release cut (recommended, since that is the practice), or the spec texts. Decided: the release cut.
 
 **Tasks:**
 - Reword the three texts to match the decision. With the recommended option, state where a status transition is recorded instead (the traceability map and the PR body).

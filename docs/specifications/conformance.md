@@ -101,6 +101,12 @@ The same probe **MUST** reach the same verdict in every mode it is exercised in,
 
 For a backend-facing probe, a mode absent from its **Modes** line is an open gap in this requirement rather than a defect in the probe. An in-repo probe reaching no server in any mode is neither.
 
+**Known gaps.**
+
+- The auth probes (PROBE-001 to PROBE-009) and the discovery probes (PROBE-040, PROBE-041) start their own `httptest` server from a fixture instead of receiving an already-configured client, so their **Modes** lines claim Cassette and Live modes the runner cannot yet serve them in.
+- `probe.ParseModes` refuses the spelling `Sandbox; Cassette, Live not yet scoped.` with `ErrInvalidEntry`, and seven entries use it (PROBE-060, PROBE-062, PROBE-065, PROBE-078, PROBE-102, PROBE-103, PROBE-104).
+- `TestREQ082ProbeClassMatchesModes` classifies only the probes that have a `ProbeNNN` function under `testkit/probes`. The **Modes** lines of in-repo probes implemented as unit tests elsewhere are checked by review alone.
+
 ### REQ-083 — Cadasto platform API conformance
 
 The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform extras under `cadasto/` (Extra API, Datamap, MPI, Care, admin) have **no openEHR spec**; their wire contract is the **Cadasto platform API** itself.
