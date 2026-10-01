@@ -3,9 +3,11 @@ package simplified
 // REQ-053 — FLAT decode: parsing the FLAT key grammar (inverse of the path
 // build). Segment ids, zero-based :index, and the trailing |suffix.
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
@@ -257,6 +259,62 @@ func TestWalkAQLRefusesScalarSlot(t *testing.T) {
 		lang, ok := comp["language"].(map[string]any)
 		if !ok || attr != "code_string" || lang["_type"] != "CODE_PHRASE" {
 			t.Errorf("walkAQL = (%#v, %q), language = %#v, want a CODE_PHRASE object holding code_string", cur, attr, comp["language"])
+		}
+	})
+}
+
+// TestUnmarshalFlatRefusesSecondKeyThroughScalarSlot — REQ-053, end to end.
+// Two Web Template nodes reach one single-valued RM attribute, INSTRUCTION
+// `narrative`: the first is a STRING leaf, which places a bare string there,
+// and the second a leaf whose path runs beneath the attribute. Decode refuses
+// the second key with ErrUnknownPath, naming the slot that already holds a
+// scalar, instead of replacing the string with an object and dropping the first
+// value. The Web Template is the hand-built shape the other FLAT tests use.
+func TestUnmarshalFlatRefusesSecondKeyThroughScalarSlot(t *testing.T) {
+	const ins = "/content[openEHR-EHR-INSTRUCTION.test.v1]"
+	wt := &webtemplate.WebTemplate{Tree: &webtemplate.Node{
+		ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
+		Children: []*webtemplate.Node{{
+			ID: "ins", RMType: "INSTRUCTION", NodeID: "openEHR-EHR-INSTRUCTION.test.v1", Max: 1,
+			AQLPath: ins,
+			Children: []*webtemplate.Node{
+				{
+					ID: "a_narrative", RMType: "STRING", Max: 1,
+					AQLPath: ins + "/narrative",
+					Inputs:  []webtemplate.Input{{Type: "TEXT"}},
+				},
+				{
+					ID: "b_narrative_value", RMType: "STRING", Max: 1,
+					AQLPath: ins + "/narrative/value",
+					Inputs:  []webtemplate.Input{{Type: "TEXT"}},
+				},
+			},
+		}},
+	}}
+	body := func(keys ...string) []byte {
+		m := map[string]any{"ctx/language": "en", "ctx/territory": "NL"}
+		for _, k := range keys {
+			m[k] = "text"
+		}
+		b, err := json.Marshal(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+
+	t.Run("the second key alone decodes", func(t *testing.T) {
+		if _, err := UnmarshalFlat(body("root/ins/b_narrative_value"), wt); err != nil {
+			t.Fatalf("UnmarshalFlat with the key beneath the attribute alone: %v", err)
+		}
+	})
+	t.Run("a second key beneath the scalar is refused", func(t *testing.T) {
+		_, err := UnmarshalFlat(body("root/ins/a_narrative", "root/ins/b_narrative_value"), wt)
+		if !errors.Is(err, ErrUnknownPath) {
+			t.Fatalf("UnmarshalFlat with two keys reaching INSTRUCTION.narrative = %v, want ErrUnknownPath", err)
+		}
+		if want := "already holds a string"; !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not carry %q: the refusal came from another arm", err, want)
 		}
 	})
 }
