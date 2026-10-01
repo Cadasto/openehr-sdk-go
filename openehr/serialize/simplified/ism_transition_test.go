@@ -149,18 +149,48 @@ func TestActionIsmTransitionDecodeGivesCareflowStep(t *testing.T) {
 	}
 }
 
+// TestActionIsmTransitionCareflowStepTerminologyDefaultsToLocal — REQ-053,
+// REQ-121. A careflow step whose body names no terminology takes `local`, the only
+// terminology an archetype's at-code belongs to, so the decoded CODE_PHRASE carries
+// its RM-mandatory terminology_id and the transition re-encodes under its node.
+func TestActionIsmTransitionCareflowStepTerminologyDefaultsToLocal(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	keys := ismTransitionKeys("transition", "524", "at0005")
+	delete(keys, rmattrAction+"/transition/careflow_step|terminology")
+
+	comp := decodeRMAttr(t, wt, rmattrBody(keys))
+	step := firstAction(t, comp).IsmTransition.CareflowStep
+	if step == nil {
+		t.Fatal("decoded ISM_TRANSITION has no careflow_step")
+	}
+	if got := step.DefiningCode.TerminologyID.Value; got != "local" {
+		t.Errorf("careflow_step terminology = %q, want local", got)
+	}
+	got := reencodeRMAttr(t, wt, comp)
+	if got[rmattrAction+"/transition/current_state|code"] != "524" {
+		t.Errorf("re-encode lost the transition: %v", got)
+	}
+}
+
 // TestActionIsmTransitionCareflowStepCodedOtherwiseRefused — REQ-053, REQ-121. A
 // careflow step whose code is not its node's id names another node, so encode
-// would move the transition there. Decode refuses it instead, naming the key's
-// node and the code, never the clinical value.
+// would move the transition there. One carrying the node's id in a terminology
+// other than `local` names no archetype node at all: an at-code belongs to the
+// archetype's own terminology. Decode refuses both, naming the key's node and the
+// code, never the clinical value.
 func TestActionIsmTransitionCareflowStepCodedOtherwiseRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
+	inTerminology := func(keys map[string]any, node, terminology string) map[string]any {
+		keys[rmattrAction+"/"+node+"/careflow_step|terminology"] = terminology
+		return keys
+	}
 	for _, tc := range []struct {
 		name string
 		keys map[string]any
 	}{
 		{name: "another node's id", keys: ismTransitionKeys("transition", "524", "at0006")},
 		{name: "no node's id", keys: ismTransitionKeys("transition2", "532", "at0099")},
+		{name: "the node's id in another terminology", keys: inTerminology(ismTransitionKeys("transition", "524", "at0005"), "transition", "SNOMED-CT")},
 		{name: "a careflow step with no current state", keys: map[string]any{
 			rmattrAction + "/transition/careflow_step|code":        "at0006",
 			rmattrAction + "/transition/careflow_step|value":       "secret step",

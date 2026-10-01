@@ -110,8 +110,8 @@ func TestItemAtPathActivityActionArchetypeID(t *testing.T) {
 // not LOCATABLE, so it carries no archetype_node_id. An archetype path names it
 // by the node id of the ACTION archetype's ISM_TRANSITION constraint, and ADL
 // 1.4 codes that transition's careflow_step with the same node id, so the
-// predicate matches the transition whose careflow step it names, and only that
-// one.
+// predicate matches the transition whose careflow step it names, in the `local`
+// terminology, and only that one.
 func TestIsmTransitionPredicateMatchesCareflowStep(t *testing.T) {
 	a := completedAction()
 	got, err := rmpath.ItemAtPath(a, "/ism_transition[at0005]/current_state")
@@ -123,6 +123,11 @@ func TestIsmTransitionPredicateMatchesCareflowStep(t *testing.T) {
 	}
 	if _, err := rmpath.ItemAtPath(a, "/ism_transition[at0006]"); !errors.Is(err, rmpath.ErrPathNotFound) {
 		t.Errorf("ItemAtPath(/ism_transition[at0006]) = %v, want ErrPathNotFound: the careflow step is at0005", err)
+	}
+
+	a.IsmTransition.CareflowStep.DefiningCode.TerminologyID.Value = "SNOMED-CT"
+	if _, err := rmpath.ItemAtPath(a, "/ism_transition[at0005]"); !errors.Is(err, rmpath.ErrPathNotFound) {
+		t.Errorf("ItemAtPath(/ism_transition[at0005]) with a SNOMED-CT::at0005 careflow step = %v, want ErrPathNotFound: an at-code is local", err)
 	}
 
 	a.IsmTransition.CareflowStep = nil
