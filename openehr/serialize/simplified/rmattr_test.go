@@ -555,6 +555,116 @@ func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 	}
 }
 
+// TestRMAttrBothDirectionRefusalsOnEncode — REQ-140. wire.md lists four
+// attributes as refused in both directions: PARTICIPATION `time`,
+// FEEDER_AUDIT_DETAILS `other_details`, ACTION `instruction_details` and
+// INSTRUCTION `wf_definition`. Decode refuses their keys (the test above, and the
+// party and feeder-audit tests). Encode must refuse a populated one too, with a
+// typed error naming the owner's FLAT path and the attribute but never the value,
+// and must stay silent when the attribute is absent.
+func TestRMAttrBothDirectionRefusalsOnEncode(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const (
+		instruction = rmattrSection + "/conformance_instruction"
+		secret      = "do-not-echo-this-value"
+	)
+	body := rmattrBody(map[string]any{
+		rmattrAction + "/dv_text":  "action text",
+		instruction + "/narrative": "instruction narrative",
+	})
+	for _, tc := range []struct {
+		name string
+		// key is the owner's FLAT path and the attribute, as the refusal names it.
+		key string
+		set func(t *testing.T, c *rm.Composition, populated bool)
+	}{
+		{
+			name: "PARTICIPATION time",
+			key:  rmattrContext + "/_participation:0|time",
+			set: func(_ *testing.T, c *rm.Composition, populated bool) {
+				p := rm.Participation{Function: rm.DVText{Value: "requester"}, Performer: rm.PartySelf{}}
+				if populated {
+					p.Time = &rm.DVInterval[rm.DVDateTime]{Lower: rm.DVDateTime{Value: secret}}
+				}
+				c.Context.Participations = []rm.Participation{p}
+			},
+		},
+		{
+			name: "FEEDER_AUDIT_DETAILS other_details",
+			key:  rmattrObs + "/_feeder_audit/originating_system_audit/other_details",
+			set: func(t *testing.T, c *rm.Composition, populated bool) {
+				d := rm.FeederAuditDetails{SystemID: "orig"}
+				if populated {
+					d.OtherDetails = &rm.ItemTree{ArchetypeNodeID: "at0001", Name: &rm.DVText{Value: secret}}
+				}
+				firstObservation(t, c).FeederAudit = &rm.FeederAudit{OriginatingSystemAudit: d}
+			},
+		},
+		{
+			name: "ACTION instruction_details",
+			key:  rmattrAction + "/_instruction_details",
+			set: func(t *testing.T, c *rm.Composition, populated bool) {
+				a := firstAction(t, c)
+				a.InstructionDetails = nil
+				if populated {
+					a.InstructionDetails = &rm.InstructionDetails{
+						ActivityID:    secret,
+						InstructionID: rm.LocatableRef{ID: rm.HierObjectID{Value: secret}},
+					}
+				}
+			},
+		},
+		{
+			name: "INSTRUCTION wf_definition",
+			key:  instruction + "/_wf_definition",
+			set: func(t *testing.T, c *rm.Composition, populated bool) {
+				i := firstInstruction(t, c)
+				i.WfDefinition = nil
+				if populated {
+					i.WfDefinition = &rm.DVParsable{Value: secret, Formalism: secret}
+				}
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			absent := decodeRMAttr(t, wt, body)
+			tc.set(t, absent, false)
+			if _, err := MarshalFlat(absent, wt); err != nil {
+				t.Fatalf("MarshalFlat with %s absent: %v, want no error", tc.name, err)
+			}
+
+			populated := decodeRMAttr(t, wt, body)
+			tc.set(t, populated, true)
+			_, err := MarshalFlat(populated, wt)
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("MarshalFlat with %s populated: err = %v, want ErrUnsupportedDatatype", tc.name, err)
+			}
+			if !strings.Contains(err.Error(), tc.key) {
+				t.Errorf("err = %v, want it to name %q", err, tc.key)
+			}
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("err = %v carries the attribute's value", err)
+			}
+		})
+	}
+}
+
+// firstInstruction digs out the corpus template's conformance_instruction.
+func firstInstruction(t *testing.T, comp *rm.Composition) *rm.Instruction {
+	t.Helper()
+	sec, ok := comp.Content[0].(*rm.Section)
+	if !ok {
+		t.Fatalf("content[0] = %T, want *rm.Section", comp.Content[0])
+	}
+	for _, item := range sec.Items {
+		if i, ok := item.(*rm.Instruction); ok {
+			return i
+		}
+	}
+	t.Fatal("no INSTRUCTION found under the section")
+	return nil
+}
+
 // TestRMAttrUnknownSuffixRefused — REQ-140. A recognised family carrying an
 // unrecognised suffix is ErrUnsupportedDatatype naming the offending FLAT key,
 // not ErrUnknownPath: the path resolved, the grammar did not.
