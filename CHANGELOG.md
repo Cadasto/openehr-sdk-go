@@ -10,11 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- **`rm.IsEmptyIntervalBound` (REQ-052).** Reports whether an interval bound is nil, a typed nil or a zero value; the encoders and the RM floor now share it.
-
-### Fixed
-
-- **AOM 1.4 constraint intervals omit an open side's zero bound (REQ-052, REQ-056).** `occurrences` and `existence` no longer write `"upper":0` beside an open flag, and canonical XML uses snake_case names while still decoding the v0.28.0 PascalCase.
+- **The canonical JSON and XML codec covers AOM 1.4 constraint intervals (REQ-052, REQ-056).** An open side omits its zero bound, XML uses snake_case names while still decoding the v0.28.0 PascalCase, and `rm.IsEmptyIntervalBound` is exported.
 - **FLAT encode writes no keys for an unset coded text (REQ-053).** The blank `|code` and `|value` keys are gone, and decode now refuses a second placement on a scalar-filled attribute.
 
 ## [0.28.0] - 2026-09-25
