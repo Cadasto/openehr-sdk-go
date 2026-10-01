@@ -235,8 +235,8 @@ How each P_BMM construct becomes Go code.
 | BMM schema | Go package | v1 |
 |---|---|---|
 | `openehr_base_1.3.0` | shared between `openehr/rm/` (primitives + foundational classes); no dedicated `openehr/base/` package — base types appear in their using packages | ✓ |
-| `openehr_rm_1.2.0` | `openehr/rm/` — one Go file per BMM package, e.g. `openehr/rm/data_types_quantity_gen.go`. The `org.openehr.rm.ehr_extract` package is **skipped** for v1. | ✓ (less ehr_extract) |
-| `openehr_am_1.4.0` | `openehr/aom/aom14/`, one Go file per BMM package, e.g. `openehr/aom/aom14/archetype_gen.go`. The package is a sibling of `openehr/rm/`, **not** a sub-package of `openehr/template/`. Rationale: AOM is the in-memory model of an *archetype*; templates consume archetypes but AOM is the more fundamental sibling of RM. | ✓ |
+| `openehr_rm_1.2.0` | `openehr/rm/` — one struct file per BMM package, e.g. `openehr/rm/data_types_quantity_gen.go`, plus its JSON and XML codec files. The `org.openehr.rm.ehr_extract` package is **skipped** for v1. | ✓ (less ehr_extract) |
+| `openehr_am_1.4.0` | `openehr/aom/aom14/`, one struct file per BMM package, e.g. `openehr/aom/aom14/archetype_gen.go`, plus its JSON and XML codec files. The package is a sibling of `openehr/rm/`, **not** a sub-package of `openehr/template/`. Rationale: AOM is the in-memory model of an *archetype*; templates consume archetypes but AOM is the more fundamental sibling of RM. | ✓ |
 | `openehr_am_2.4.0` | `openehr/aom/aom2/` (when wired in) | deferred |
 | `openehr_lang_1.1.0` | would target `openehr/bmm/` (BMM meta-classes), but v1 hand-writes that loader against the P_BMM persistence shape — generation deferred | deferred |
 | `openehr_term_3.1.0` | would target `openehr/rm/terminology/` (terminology service interface) | deferred |
