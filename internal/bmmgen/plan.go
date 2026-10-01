@@ -528,10 +528,14 @@ func computeAbstractDescendants(p *Plan) {
 		if !pc.Class.IsAbstract() {
 			continue
 		}
-		// Only SimpleClass + Interface get is<X>() markers — and only
-		// SimpleClass concrete descendants implement them. (Enums are
-		// abstract leaves; nothing descends from them in any practical
-		// sense.)
+		// Only SimpleClass + Interface are candidates, and only
+		// SimpleClass concrete descendants implement the marker. The
+		// Interface arm is unreachable today: the IsAbstract check above
+		// skips every P_BMM_INTERFACE because the pinned BMM sets no
+		// is_abstract on one (STRAND-12), so an interface gets no
+		// descendants here and no is<X>() marker on any class. (Enums
+		// are abstract leaves; nothing descends from them in any
+		// practical sense.)
 		switch pc.Class.(type) {
 		case *bmm.SimpleClass, *bmm.Interface:
 			// fall through
