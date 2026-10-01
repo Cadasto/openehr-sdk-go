@@ -301,6 +301,7 @@ requirements:
     tests:
       - internal/bmmgen/aom14_test.go
       - internal/bmmgen/plan_test.go
+      - internal/bmmgen/render_interface_test.go
       - internal/bmmgen/render_test.go
       - internal/bmmgen/sim_bump_test.go
 
