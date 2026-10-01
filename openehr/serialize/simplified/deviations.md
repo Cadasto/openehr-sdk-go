@@ -72,7 +72,11 @@ Concretely:
   allowlist (e.g. a `\|unitt` typo), a misused `\|raw`/`\|other`, or a `\|other` on a closed
   value-set return `ErrUnsupportedDatatype`; a missing **required** suffix is an error, not
   a coerced zero value; trailing JSON after the object and an out-of-bound/over-budget
-  `:index` are rejected.
+  `:index` are rejected. An ISM transition rebuilt at an `ism_transition[atNNNN]` node without a
+  careflow step gets the one the node names (the node id as a `local` code, the node's Web
+  Template name as its value), and a careflow step coded otherwise is `ErrUnsupportedDatatype`.
+  Keys that reach two Web Template nodes standing for one single-valued RM attribute (two
+  transition nodes of one ACTION) are `ErrUnknownPath`, never merged into one object.
 
 Consequence: a payload that uses a not-yet-supported feature (below) is **rejected**,
 not partially/silently accepted.

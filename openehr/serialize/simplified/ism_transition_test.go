@@ -66,7 +66,7 @@ func TestActionIsmTransitionRoundTrips(t *testing.T) {
 func ismNodeName(t *testing.T, wt *webtemplate.WebTemplate, node string) string {
 	t.Helper()
 	n := wt.Tree
-	for _, id := range strings.Split(strings.TrimPrefix(rmattrAction+"/"+node, rmattrRoot+"/"), "/") {
+	for id := range strings.SplitSeq(strings.TrimPrefix(rmattrAction+"/"+node, rmattrRoot+"/"), "/") {
 		if n = childByID(n, id); n == nil {
 			t.Fatalf("corpus template has no %q under %s — fixture changed?", id, rmattrAction)
 		}

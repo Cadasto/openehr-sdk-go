@@ -193,6 +193,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 			return nil, err
 		}
 	}
+	// Every key is placed, so each rebuilt ISM transition can now get the careflow
+	// step its node names, or have the body's checked against it (REQ-053).
+	if err := settleIsmTransitions(compJSON, wt); err != nil {
+		return nil, err
+	}
 	// A sparse :index (":0" and ":2" with no ":1") would have gap-filled an
 	// empty phantom instance in selectElem; reject it before context/completion
 	// can decorate fabricated data into something OPT-valid.
@@ -951,14 +956,26 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 			obj, ok := cur[seg.attr].(map[string]any)
 			if !ok {
 				obj = map[string]any{"_type": childType}
+				// The node id is recorded on a non-LOCATABLE ISM_TRANSITION too,
+				// so the check below can tell its nodes apart while leaves are
+				// placed; settleIsmTransitions removes it before canjson.
 				if seg.pred != "" {
 					obj["archetype_node_id"] = seg.pred
 				}
 				cur[seg.attr] = obj
+			} else if held, _ := obj["archetype_node_id"].(string); held != seg.pred {
+				// Two Web Template nodes stand for this one single-valued
+				// attribute (an ACTION's ism_transition[at0005] and [at0006]).
+				// Merging their keys into one object would re-encode them under
+				// one node only, moving the other's keys there (REQ-053).
+				return nil, "", fmt.Errorf("%w: %s.%s is single-valued, but keys reach it through two Web Template nodes, [%s] and [%s] — refused rather than merged (aqlPath %q)",
+					ErrUnknownPath, curType, seg.attr, held, seg.pred, aqlPath)
 			}
 			cur = obj
 		}
-		if nm := names[namePrefix.String()]; nm != "" {
+		// Only a LOCATABLE has a name. The template's name index also covers an
+		// archetyped ISM_TRANSITION node, which must not gain one.
+		if nm := names[namePrefix.String()]; nm != "" && nameable(childType) {
 			if _, has := cur["name"]; !has {
 				cur["name"] = textJSON(nm)
 			}
@@ -967,6 +984,130 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 	}
 	// Unreachable: the loop returns at i == len(segs)-1 and segs is non-empty.
 	return nil, "", fmt.Errorf("%w: canonical path %q walked past its last segment", ErrUnknownPath, aqlPath)
+}
+
+// nameable reports whether a rebuilt node of this RM type declares a `name`,
+// so decode never adds a member the RM class does not have.
+func nameable(rmType string) bool {
+	_, declared := rminfo.Default.AttributeRMType(bmmtype.Class(rmType), "name")
+	return declared
+}
+
+// ismNode is an archetyped `ism_transition[atNNNN]` Web Template node: its node
+// id, its name, and its FLAT path without indexes (for messages).
+type ismNode struct {
+	id, name, flat string
+}
+
+// ismTransitionNodes indexes the Web Template's archetyped ISM_TRANSITION nodes
+// by the bare spelling of their canonical path, which is the path
+// [settleIsmTransitions] rebuilds from the decoded tree.
+func ismTransitionNodes(wt *webtemplate.WebTemplate) map[string]ismNode {
+	out := make(map[string]ismNode)
+	var walk func(n *webtemplate.Node, flat string)
+	walk = func(n *webtemplate.Node, flat string) {
+		for _, ch := range n.Children {
+			chFlat := flat + "/" + ch.ID
+			if ch.NodeID != "" && nodeRMType(ch) == "ISM_TRANSITION" {
+				out[bareAQLPath(ch.AQLPath)] = ismNode{id: ch.NodeID, name: ch.Name, flat: chFlat}
+			}
+			walk(ch, chFlat)
+		}
+	}
+	if wt.Tree != nil {
+		walk(wt.Tree, wt.Tree.ID)
+	}
+	return out
+}
+
+// settleIsmTransitions finishes each ISM_TRANSITION the placement walk rebuilt
+// at an archetyped `ism_transition[atNNNN]` node, once every key is placed.
+//
+// Encode matches a transition to its node by careflow step code, because an
+// ISM_TRANSITION is not LOCATABLE and has no archetype_node_id (REQ-121). So a
+// transition without a careflow step gets the one its node names: the node id as
+// a `local` code, the node's Web Template name as its value. A careflow step the
+// body carries must be coded with the node id; one coded otherwise belongs to
+// another node, and encode would move the transition there (REQ-053). The node id
+// [walkAQL] recorded on the object is removed here, so it never reaches canjson.
+//
+// The walk rebuilds each object's bare canonical path from the archetype_node_id
+// values placement wrote, which is how [walkAQL] spells the same path.
+func settleIsmTransitions(compJSON map[string]any, wt *webtemplate.WebTemplate) error {
+	nodes := ismTransitionNodes(wt)
+	if len(nodes) == 0 {
+		return nil
+	}
+	return settleIsmTransitionsUnder(compJSON, "", nodes)
+}
+
+// settleIsmTransitionsUnder walks obj, whose bare canonical path is path, in
+// sorted attribute order so a body with two bad transitions names the same one
+// on every run.
+func settleIsmTransitionsUnder(obj map[string]any, path string, nodes map[string]ismNode) error {
+	for _, attr := range slices.Sorted(maps.Keys(obj)) {
+		switch v := obj[attr].(type) {
+		case map[string]any:
+			p := path + "/" + attr + nodePredicate(v)
+			if n, ok := nodes[p]; ok && v["_type"] == "ISM_TRANSITION" {
+				if err := settleIsmTransition(v, n); err != nil {
+					return err
+				}
+				continue
+			}
+			if err := settleIsmTransitionsUnder(v, p, nodes); err != nil {
+				return err
+			}
+		case []any:
+			for _, e := range v {
+				m, ok := e.(map[string]any)
+				if !ok {
+					continue
+				}
+				if err := settleIsmTransitionsUnder(m, path+"/"+attr+nodePredicate(m), nodes); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// nodePredicate is the `[id]` a rebuilt node adds to its canonical path, or ""
+// for a node placed without one.
+func nodePredicate(m map[string]any) string {
+	if id, ok := m["archetype_node_id"].(string); ok && id != "" {
+		return "[" + id + "]"
+	}
+	return ""
+}
+
+// settleIsmTransition gives one rebuilt ISM_TRANSITION the careflow step its node
+// names, or checks the one the body carries.
+func settleIsmTransition(tr map[string]any, n ismNode) error {
+	delete(tr, "archetype_node_id")
+	step, carried := tr["careflow_step"]
+	if !carried {
+		tr["careflow_step"] = map[string]any{
+			"_type": "DV_CODED_TEXT", "value": n.name,
+			"defining_code": codePhraseJSON(n.id, "local"),
+		}
+		return nil
+	}
+	if code := definingCodeOf(step); code != n.id {
+		return fmt.Errorf("%w: %s/careflow_step is coded %q, but its node is ism_transition[%s]; a careflow step coded otherwise names another node",
+			ErrUnsupportedDatatype, n.flat, code, n.id)
+	}
+	return nil
+}
+
+// definingCodeOf returns the code_string of a rebuilt DV_CODED_TEXT, or "" when
+// the value carries none (a DV_TEXT, a |raw fragment of another shape).
+func definingCodeOf(v any) string {
+	dv, _ := v.(map[string]any)
+	dc, _ := dv["defining_code"].(map[string]any)
+	code, _ := dc["code_string"].(string)
+	return code
 }
 
 // compositeLeafGroups siphons the FLAT keys addressed at a **composite** Web

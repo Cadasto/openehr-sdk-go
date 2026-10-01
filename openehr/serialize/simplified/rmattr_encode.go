@@ -70,7 +70,28 @@ func rmattrEncode(owner any, base string, out map[string]any) error {
 	if err := partyProxyRMAttr(out, base+"/_provider", entryProviderOf(owner)); err != nil {
 		return err
 	}
+	if err := deferredEntryRMAttrs(owner, base); err != nil {
+		return err
+	}
 	return participationsRMAttr(out, base, "_other_participation", entryOtherParticipationsOf(owner))
+}
+
+// deferredEntryRMAttrs refuses the two ENTRY attributes whose families stay
+// deferred: ACTION `instruction_details` and INSTRUCTION `wf_definition`. Decode
+// refuses their keys as unknown families, so a value written here could never be
+// read back; and with no grammar there is nothing to write. A populated one is
+// therefore a typed error naming the key, never the value (REQ-140), and an
+// absent one writes nothing.
+func deferredEntryRMAttrs(owner any, base string) error {
+	if a, ok := as[rm.Action](owner); ok && a.InstructionDetails != nil {
+		return fmt.Errorf("%w: %q carries an ACTION.instruction_details, which has no FLAT grammar yet and no |raw carrier — deferred rather than dropped (REQ-140, see deviations.md)",
+			ErrUnsupportedDatatype, base+"/_instruction_details")
+	}
+	if i, ok := as[rm.Instruction](owner); ok && i.WfDefinition != nil {
+		return fmt.Errorf("%w: %q carries an INSTRUCTION.wf_definition, which has no FLAT grammar yet and no |raw carrier — deferred rather than dropped (REQ-140, see deviations.md)",
+			ErrUnsupportedDatatype, base+"/_wf_definition")
+	}
+	return nil
 }
 
 // nullRMAttrs writes an ELEMENT's `_null_flavour` and `_null_reason` — the two

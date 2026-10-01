@@ -1457,6 +1457,7 @@ requirements:
     tests:
       - openehr/rm/rmpath/action_test.go
       - openehr/rm/rmpath/rmpath_test.go
+      - openehr/serialize/simplified/ism_transition_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
       - openehr/template/webtemplate/paths_rmpath_test.go
       - testkit/conformance/webtemplate/runner_test.go
