@@ -797,16 +797,22 @@ func (g *generator) applyPrimitiveExample(
 		v.Value = s
 		return nil
 	case *rm.DVCodedText:
-		ref, ok := ex.(constraints.CodedTermRef)
-		if !ok {
-			return fmt.Errorf("DV_CODED_TEXT example value is %T, want CodedTermRef", ex)
+		// A C_STRING on .value arrives as a string. A code constraint
+		// on the coded text itself arrives as a CodedTermRef.
+		switch ex := ex.(type) {
+		case string:
+			v.Value = ex
+			return nil
+		case constraints.CodedTermRef:
+			v.Value = ex.CodeString
+			v.DefiningCode = rm.CodePhrase{
+				CodeString:    ex.CodeString,
+				TerminologyID: rm.TerminologyID{Value: ex.Terminology},
+			}
+			return nil
+		default:
+			return fmt.Errorf("DV_CODED_TEXT example value is %T, want CodedTermRef or string", ex)
 		}
-		v.Value = ref.CodeString
-		v.DefiningCode = rm.CodePhrase{
-			CodeString:    ref.CodeString,
-			TerminologyID: rm.TerminologyID{Value: ref.Terminology},
-		}
-		return nil
 	case *rm.CodePhrase:
 		ref, ok := ex.(constraints.CodedTermRef)
 		if !ok {
