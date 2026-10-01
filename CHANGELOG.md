@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Generated and built values pass the RM floor on the vendored templates (REQ-107, PROBE-027).** Times, languages, encodings and ordinal symbols are real values, seeded `RandomFill` output differs, and validation now checks STRING leaves and `ism_transition`.
 - **The canonical JSON and XML codec covers AOM 1.4 constraint intervals (REQ-052, REQ-056).** An open side omits its zero bound, XML uses snake_case names while still decoding the v0.28.0 PascalCase, and `rm.IsEmptyIntervalBound` is exported.
 - **FLAT encode writes no keys for an unset coded text (REQ-053).** The blank `|code` and `|value` keys are gone, and decode now refuses a second placement on a scalar-filled attribute.
 
