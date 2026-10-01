@@ -299,6 +299,54 @@ func TestOptionalFieldsThatAreNotPointers(t *testing.T) {
 	}
 }
 
+// TestMandatoryFieldsCarryNoOmitOption pins the "no omit option" half of the
+// JSON tag rule for the three property kinds that choose between a plain tag
+// and an omit option by their mandatory flag or cardinality, each on a real
+// RM field, beside an optional field of the same kind that does carry one.
+//
+// REQ-043: § Mapping rules, Property → Go field. A P_BMM_CONTAINER_PROPERTY
+// whose cardinality lower bound is 1 or more carries no omit option, and
+// neither does a mandatory P_BMM_GENERIC_PROPERTY or a mandatory
+// P_BMM_SINGLE_PROPERTY_OPEN. Without these rows a flip in the generator
+// shows only as a `make codegen-verify` diff.
+func TestMandatoryFieldsCarryNoOmitOption(t *testing.T) {
+	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlan: %v", err)
+	}
+	for _, tc := range []struct {
+		name, fileBase, field string
+	}{
+		{"container, lower bound 1: CLUSTER.items", "data_structures_representation", "Items []Item `json:\"items\"`"},
+		{"container, lower bound 0: PARTY.contacts", "demographic", "Contacts []Contact `json:\"contacts,omitempty\"`"},
+		{"mandatory generic over Hash: RESOURCE_DESCRIPTION.details", "common_resource", "Details map[string]ResourceDescriptionItem `json:\"details\"`"},
+		{"mandatory generic class: OBSERVATION.data", "composition_content_entry", "Data History[ItemStructure] `json:\"data\"`"},
+		{"optional generic: PARTICIPATION.time", "common_generic", "Time *DVInterval[DVDateTime] `json:\"time,omitzero\"`"},
+		{"mandatory open parameter: EVENT.data", "data_structures_history", "Data T `json:\"data\"`"},
+		{"optional open parameter: INTERVAL.lower", "foundation_types_interval", "Lower T `json:\"lower,omitempty\"`"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var file *PlannedFile
+			for _, f := range plan.Files {
+				if f.FileBase == tc.fileBase {
+					file = f
+					break
+				}
+			}
+			if file == nil {
+				t.Fatalf("%s file not in plan", tc.fileBase)
+			}
+			got, err := RenderFile(plan, file)
+			if err != nil {
+				t.Fatalf("RenderFile(%s): %v", tc.fileBase, err)
+			}
+			if !fieldDecl(tc.field).Match(got) {
+				t.Errorf("%s_gen.go does not declare the field %q", tc.fileBase, tc.field)
+			}
+		})
+	}
+}
+
 // fieldDecl matches a struct field written as "Name Type `tag`" on one line,
 // with any run of spaces or tabs between the three parts: gofmt aligns a
 // field's type and tag with its neighbours', so the spacing changes when an
