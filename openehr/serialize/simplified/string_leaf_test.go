@@ -223,9 +223,10 @@ func unreadStringWT() *webtemplate.WebTemplate {
 }
 
 // TestStringLeafOnUnreadAttributeRefused — REQ-053, REQ-140. The builder makes
-// one STRING leaf, ACTIVITY `action_archetype_id`. A STRING leaf anywhere else
-// is refused whenever its owner is there, because whether it holds a value
-// cannot be told; with no owner there is nothing to lose, and it is skipped.
+// one STRING leaf, ACTIVITY `action_archetype_id`. A STRING leaf on an
+// attribute rmpath does not resolve to an RM String is refused whenever its
+// owner is there, because whether it holds a value cannot be told; with no
+// owner there is nothing to lose, and it is skipped.
 func TestStringLeafOnUnreadAttributeRefused(t *testing.T) {
 	_, err := MarshalFlat(stringLeafComp(stringLeafValue), unreadStringWT())
 	if !errors.Is(err, ErrUnsupportedDatatype) {

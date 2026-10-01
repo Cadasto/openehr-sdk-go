@@ -27,10 +27,10 @@ const stringLeafType = "STRING"
 // rmpath resolves an RM String attribute it knows to the string itself, held
 // by value, so whenever the owner is there the attribute resolves (to "" when
 // unset, which writes nothing). The Web Template builder makes one STRING leaf,
-// ACTIVITY `action_archetype_id`. A STRING leaf on any other attribute is
-// therefore refused whenever its owner is there, because whether it holds a
-// value cannot be told; with no owner there is nothing to lose, and it is
-// skipped.
+// ACTIVITY `action_archetype_id`. A STRING leaf on an attribute rmpath does not
+// resolve to an RM String is therefore refused whenever its owner is there,
+// because whether it holds a value cannot be told; with no owner there is
+// nothing to lose, and it is skipped.
 func emitStringLeaf(out map[string]any, flatPath string, root rm.Locatable, relPath string) error {
 	v, err := rmpath.ItemAtPath(root, relPath)
 	if err == nil {
