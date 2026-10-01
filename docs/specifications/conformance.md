@@ -47,7 +47,7 @@ The probe definition is the single source; the runner ([`testkit/probe`](../../t
 
 The class check **MUST** refuse a dot import of a package it would follow, because it cannot tell which names that import declares.
 
-For a backend-facing probe, its **Modes** line is the authoritative statement of which of the three it currently supports, and any mode missing from that line is an open gap in *this* requirement rather than a defect in the probe. Today 12 entries declare all three; the other backend-facing entries are open REQ-082 work, tracked in [roadmap.md](../roadmap.md).
+For a backend-facing probe, its **Modes** line is the authoritative statement of which of the three it currently supports, and any mode missing from that line is an open gap in *this* requirement rather than a defect in the probe. Today 14 entries declare all three; the other backend-facing entries are open REQ-082 work, tracked in [roadmap.md](../roadmap.md).
 
 A **recording** is a captured HTTP exchange — method, URL, request and response headers, status, and both bodies. It is a different artefact from the vendored **fixture documents** under `testkit/corpus/` (§ Vendored fixtures below), which are bodies only and carry no exchange. The two **MUST NOT** share a directory: a fixture is hand-curated input, a recording is captured evidence, and only the second can go stale against a deployment.
 
