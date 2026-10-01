@@ -152,17 +152,44 @@ func TestREQ056AOM14OccurrencesOpenSideXML(t *testing.T) {
 
 // TestREQ052REQ056AOM14IntervalHolders runs the rule through the other AOM 1.4
 // fields that hold an abstract Interval: an optional `range` (a pointer) of an
-// Integer, a Real and a string, and a mandatory `existence`.
+// Integer, a Real and a string, and a mandatory `existence`. Each holds a
+// closed lower side and an open upper side. The wire must keep `lower` (its
+// zero Real or Integer bound is a real bound) and leave out `upper`, in
+// snake_case, and both formats must read it back to the same interval.
 func TestREQ052REQ056AOM14IntervalHolders(t *testing.T) {
 	cases := []struct {
 		name   string
-		value  any
 		member string
+		value  any
+		// fresh returns an empty holder of the same type; interval reads the
+		// holder's interval back as a comparable value.
+		fresh    func() any
+		interval func(any) any
 	}{
-		{"C_INTEGER range", &aom14.CInteger{Range: &rm.Interval[aom14.Integer]{Lower: 0, LowerIncluded: true, UpperUnbounded: true}}, "range"},
-		{"C_REAL range", &aom14.CReal{Range: &rm.Interval[aom14.Real]{Lower: 0, LowerIncluded: true, UpperUnbounded: true}}, "range"},
-		{"C_DATE range", &aom14.CDate{Range: &rm.Interval[string]{Lower: "2026-01-01", LowerIncluded: true, UpperUnbounded: true}}, "range"},
-		{"C_SINGLE_ATTRIBUTE existence", &aom14.CSingleAttribute{RMAttributeName: "items", Existence: rm.Interval[aom14.Integer]{Lower: 0, LowerIncluded: true, UpperUnbounded: true}}, "existence"},
+		{
+			name: "C_INTEGER range", member: "range",
+			value:    &aom14.CInteger{Range: &rm.Interval[aom14.Integer]{Lower: 0, LowerIncluded: true, UpperUnbounded: true}},
+			fresh:    func() any { return &aom14.CInteger{} },
+			interval: func(v any) any { return *v.(*aom14.CInteger).Range },
+		},
+		{
+			name: "C_REAL range", member: "range",
+			value:    &aom14.CReal{Range: &rm.Interval[aom14.Real]{Lower: 0, LowerIncluded: true, UpperUnbounded: true}},
+			fresh:    func() any { return &aom14.CReal{} },
+			interval: func(v any) any { return *v.(*aom14.CReal).Range },
+		},
+		{
+			name: "C_DATE range", member: "range",
+			value:    &aom14.CDate{Range: &rm.Interval[string]{Lower: "2026-01-01", LowerIncluded: true, UpperUnbounded: true}},
+			fresh:    func() any { return &aom14.CDate{} },
+			interval: func(v any) any { return *v.(*aom14.CDate).Range },
+		},
+		{
+			name: "C_SINGLE_ATTRIBUTE existence", member: "existence",
+			value:    &aom14.CSingleAttribute{RMAttributeName: "items", Existence: rm.Interval[aom14.Integer]{Lower: 0, LowerIncluded: true, UpperUnbounded: true}},
+			fresh:    func() any { return &aom14.CSingleAttribute{} },
+			interval: func(v any) any { return v.(*aom14.CSingleAttribute).Existence },
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -170,21 +197,32 @@ func TestREQ052REQ056AOM14IntervalHolders(t *testing.T) {
 			if err != nil {
 				t.Fatalf("canjson.Marshal: %v", err)
 			}
-			if got := jsonMemberNames(t, js, tc.member); slices.Contains(got, "upper") {
-				t.Errorf("%s JSON members = %v: an open upper side with an empty bound must carry no `upper`\nwire: %s", tc.member, got, js)
+			members := jsonMemberNames(t, js, tc.member)
+			if !slices.Contains(members, "lower") || slices.Contains(members, "upper") {
+				t.Errorf("%s JSON members = %v: want `lower` kept on the closed side and no `upper` on the open one\nwire: %s", tc.member, members, js)
 			}
+			backJSON := tc.fresh()
+			if err := canjson.Unmarshal(js, backJSON); err != nil {
+				t.Fatalf("canjson.Unmarshal: %v\nwire: %s", err, js)
+			}
+			if got, want := tc.interval(backJSON), tc.interval(tc.value); got != want {
+				t.Errorf("JSON round trip: %s = %+v, want %+v", tc.member, got, want)
+			}
+
 			xs, err := canxml.Marshal(tc.value)
 			if err != nil {
 				t.Fatalf("canxml.Marshal: %v", err)
 			}
-			got := xmlChildNames(t, xs, tc.member)
-			if slices.Contains(got, "upper") || slices.Contains(got, "Upper") {
-				t.Errorf("%s XML elements = %v: an open upper side with an empty bound must carry no `upper`\nwire: %s", tc.member, got, xs)
+			elements := xmlChildNames(t, xs, tc.member)
+			if want := without(intervalXMLElements, "upper"); !slices.Equal(elements, want) {
+				t.Errorf("%s XML elements = %v, want %v (snake_case, BMM order, no `upper`)\nwire: %s", tc.member, elements, want, xs)
 			}
-			for _, name := range got {
-				if name != "lower" && name != "upper" && name != "lower_unbounded" && name != "upper_unbounded" && name != "lower_included" && name != "upper_included" {
-					t.Errorf("%s XML element %q is not a snake_case BMM property name\nwire: %s", tc.member, name, xs)
-				}
+			backXML := tc.fresh()
+			if err := canxml.Unmarshal(xs, backXML); err != nil {
+				t.Fatalf("canxml.Unmarshal: %v\nwire: %s", err, xs)
+			}
+			if got, want := tc.interval(backXML), tc.interval(tc.value); got != want {
+				t.Errorf("XML round trip: %s = %+v, want %+v", tc.member, got, want)
 			}
 		})
 	}
@@ -235,7 +273,11 @@ func (p *problems) report(t *testing.T) {
 // the interval the corpus states.
 func TestREQ052AOM14CorpusIntervalsJSON(t *testing.T) {
 	var bad problems
+	var checked, openUpper, closedZero int
 	for _, ci := range corpusIntervals(t) {
+		checked++
+		openUpper += b2i(ci.want.UpperUnbounded)
+		closedZero += b2i(ci.hasLower && !ci.want.LowerUnbounded && ci.want.Lower == 0)
 		obj := &aom14.CComplexObject{NodeID: "at0000", RMTypeName: "OBSERVATION", Occurrences: ci.want}
 		js, err := canjson.Marshal(obj)
 		if err != nil {
@@ -257,6 +299,7 @@ func TestREQ052AOM14CorpusIntervalsJSON(t *testing.T) {
 		}
 	}
 	bad.report(t)
+	requireCorpusCoverage(t, checked, openUpper, closedZero)
 }
 
 // TestREQ056AOM14CorpusIntervalsXML is the same walk for canonical XML: the
@@ -264,8 +307,9 @@ func TestREQ052AOM14CorpusIntervalsJSON(t *testing.T) {
 // side's bound, and its output decodes back to the interval the corpus states.
 func TestREQ056AOM14CorpusIntervalsXML(t *testing.T) {
 	var bad problems
-	var openUpper, closedZero int
+	var checked, openUpper, closedZero int
 	for _, ci := range corpusIntervals(t) {
+		checked++
 		openUpper += b2i(ci.want.UpperUnbounded)
 		closedZero += b2i(ci.hasLower && !ci.want.LowerUnbounded && ci.want.Lower == 0)
 		obj := &aom14.CComplexObject{NodeID: "at0000", RMTypeName: "OBSERVATION", Occurrences: ci.want}
@@ -292,9 +336,7 @@ func TestREQ056AOM14CorpusIntervalsXML(t *testing.T) {
 		}
 	}
 	bad.report(t)
-	if openUpper == 0 || closedZero == 0 {
-		t.Fatalf("the corpus held %d open upper sides and %d closed zero lower bounds: the test would pass without exercising the rule", openUpper, closedZero)
-	}
+	requireCorpusCoverage(t, checked, openUpper, closedZero)
 }
 
 // TestREQ056AOM14CorpusXMLSpellingDecodes decodes each corpus interval in the
@@ -302,7 +344,11 @@ func TestREQ056AOM14CorpusIntervalsXML(t *testing.T) {
 // writes them, and expects the interval the corpus states.
 func TestREQ056AOM14CorpusXMLSpellingDecodes(t *testing.T) {
 	var bad problems
+	var checked, openUpper, closedZero int
 	for _, ci := range corpusIntervals(t) {
+		checked++
+		openUpper += b2i(ci.want.UpperUnbounded)
+		closedZero += b2i(ci.hasLower && !ci.want.LowerUnbounded && ci.want.Lower == 0)
 		doc := "<c_complex_object><rm_type_name>OBSERVATION</rm_type_name><occurrences>" + ci.inner +
 			"</occurrences><node_id>at0000</node_id></c_complex_object>"
 		got := &aom14.CComplexObject{}
@@ -314,12 +360,23 @@ func TestREQ056AOM14CorpusXMLSpellingDecodes(t *testing.T) {
 		}
 	}
 	bad.report(t)
+	requireCorpusCoverage(t, checked, openUpper, closedZero)
 }
 
 func sprintInterval(iv rm.Interval[aom14.Integer]) string {
 	return strconv.FormatInt(int64(iv.Lower), 10) + ".." + strconv.FormatInt(int64(iv.Upper), 10) +
 		" lower_included=" + strconv.FormatBool(iv.LowerIncluded) + " upper_included=" + strconv.FormatBool(iv.UpperIncluded) +
 		" lower_unbounded=" + strconv.FormatBool(iv.LowerUnbounded) + " upper_unbounded=" + strconv.FormatBool(iv.UpperUnbounded)
+}
+
+// requireCorpusCoverage fails a corpus walk that did not meet the intervals it
+// exists for: an empty corpus, or one with no open upper side or no closed
+// zero lower bound, would let every check pass without exercising the rule.
+func requireCorpusCoverage(t *testing.T, checked, openUpper, closedZero int) {
+	t.Helper()
+	if checked == 0 || openUpper == 0 || closedZero == 0 {
+		t.Fatalf("the corpus walk saw %d intervals, %d open upper sides and %d closed zero lower bounds: the test would pass without exercising the rule", checked, openUpper, closedZero)
+	}
 }
 
 func b2i(b bool) int {
