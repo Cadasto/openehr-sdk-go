@@ -24,7 +24,7 @@ import (
 // and stripped path (REQ-082).
 const (
 	cassetteSourceTemplateID = "terminology_test.ehrbase.org.v1"
-	cassetteTemplateID       = "sdk_cassette_minimal.v1"
+	cassetteTemplateID       = "sdk_cassette_comp.v1"
 	cassetteStoredQueryName  = "org.cadasto.sdk::cassette_stored"
 	cassetteStoredQueryAQL   = "SELECT e/ehr_id/value FROM EHR e WHERE e/ehr_id/value = $target_ehr"
 )
