@@ -228,7 +228,7 @@ The SDK follows **Semantic Versioning 2.0.0** (REQ-004). A release **MUST** take
 | New public symbol, new package, new spec REQ in `Stable` status | minor |
 | Bug fix that preserves all public contracts | patch |
 | Change confined to `internal/` | patch |
-| Change to `Draft`-status specs | patch — but flag in CHANGELOG |
+| Change to `Draft`-status specs | patch. The CHANGELOG follows [AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions) |
 | Spec `Status:` transition `Draft` → `Stable` | minor |
 | Spec `Status:` transition `Stable` → `Deprecated` | minor |
 | Spec deletion (removing a `Deprecated` spec after a documented cycle) | major |

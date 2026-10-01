@@ -87,4 +87,4 @@ Malformed input **MUST NOT** panic: component accessors and `magnitude()` are be
 
 ## Editing rules
 
-New behavioural functions get a new REQ ([REQ.md § Numbering policy](REQ.md#numbering-policy)); identifiers are stable once published. When code lands, set the `implementation:` field in [traceability.yaml](traceability.yaml), run `make spec-gen`, and link each REQ section to its implementing package(s).
+[README.md § Editing rules](README.md#editing-rules), [§ Identifier scheme](README.md#identifier-scheme) and [§ Traceability](README.md#traceability).

@@ -8,14 +8,12 @@ import (
 )
 
 // TestNoListenerImports guards REQ-082 (docs/specifications/conformance.md
-// § REQ-082, Sandbox mode): sandbox/ serves every backend-facing probe
-// with no network listener and no credentials, and SDK consumers use it
-// as a published building block with no auth/ or live-transport
-// dependency. So the package's own non-test files MUST NOT import:
+// § REQ-082, Sandbox mode). The package's own non-test files must not import:
 //
-//   - net/http/httptest or net, the only listener API. These match
-//     exactly: net/http itself is what the backend implements.
-//   - transport or auth, or any package under them.
+//   - "net" or "net/http/httptest", matched exactly. net/http is not on that
+//     list, so net/http.ListenAndServe is not what this guard denies.
+//   - every import of auth/ or transport/, including every package under
+//     either path.
 //
 // importguard.Imports reads every non-test file that any build compiles,
 // not only the ones this machine builds, and refuses a directory where

@@ -82,5 +82,6 @@ openehr/aql/parse/gen.verify/
 # Python bytecode from importing the vendored SDD gate
 __pycache__/
 
-# SDD findings file per branch (.sdd/findings/<branch>.md); never committed
+# SDD findings file per branch (.sdd/findings/<branch>.md); never committed.
+# The leading slash is deliberate so a later scaffold that looks for a bare `.sdd/` line does not append a second one.
 /.sdd/

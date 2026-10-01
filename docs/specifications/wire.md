@@ -19,7 +19,7 @@ openEHR REST 1.1.0-development partitions the surface into **six** functional ar
 | **Demographic** | parties, relationships, identities (upstream Status: development) | `openehr/client/demographic/` |
 | **Admin** | EHR physical delete, administrative lifecycle (upstream Status: development) | `openehr/client/admin/` |
 
-The split is normative: a consumer who needs only AQL imports `openehr/client/query/` without pulling in the EHR or Definition surface (REQ-013).
+A consumer who needs only AQL imports `openehr/client/query/` without pulling in the EHR or Definition surface.
 
 ## Authoritative source
 

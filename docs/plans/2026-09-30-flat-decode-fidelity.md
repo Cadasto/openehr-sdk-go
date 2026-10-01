@@ -66,10 +66,10 @@ Phase 2 also gained the STRING leaf: the encode backstop cannot land while encod
 ### Phase 2 — no silent drop for padded leaf types
 
 **Tasks:**
-- Trim `rmType` when the Web Template is parsed (decision 3), and add a padded-name fixture test on both encode and decode.
+- Read every leaf type through the codec's one normaliser (settled decision 3), and add a padded-name fixture test on both encode and decode.
 - Make encode report a typed error when a populated value sits on a node it cannot classify, instead of skipping it, as § REQ-140's no-silent-loss rule asks.
 
-**Definition of done:** the padded-name test round-trips all ten interval keys; removing the trim fails it.
+**Definition of done:** the padded-name test round-trips all ten interval keys; removing the normaliser fails it.
 
 ### Phase 3 — no phantom zero bound in canonical JSON
 

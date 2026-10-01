@@ -9,20 +9,21 @@ import (
 )
 
 // AuditType selects the `_type` discriminator emitted on the write-side
-// commit audit. ITS-REST PR 131 / SPECITS-95 say a client should send
-// `UPDATE_AUDIT` while servers should accept `AUDIT_DETAILS` (or an omitted
-// `_type`). The SDK defaults to `AUDIT_DETAILS` (the form the reference CDRs
-// were validated against); callers can switch to `UPDATE_AUDIT` if a
-// non-conformant server rejects `AUDIT_DETAILS`.
+// commit audit. The vendored ITS-REST pin recommends that clients send
+// `_type: "UPDATE_AUDIT"`, and that servers also accept `AUDIT_DETAILS` or an
+// omitted `_type`. The SDK defaults to `AUDIT_DETAILS`; that default is
+// documented in docs/specifications/wire.md under the contribution request
+// shape. Callers can switch to `UPDATE_AUDIT` when a server accepts only that
+// form.
 type AuditType string
 
 const (
 	// AuditTypeAuditDetails emits `_type:"AUDIT_DETAILS"`. This is the SDK
 	// default: the zero value of [UpdateAudit.Type] resolves to it.
 	AuditTypeAuditDetails AuditType = "AUDIT_DETAILS"
-	// AuditTypeUpdateAudit emits `_type:"UPDATE_AUDIT"`, the form ITS-REST
-	// recommends clients send; use it as a fallback when a non-conformant server
-	// refuses AUDIT_DETAILS on contribution create.
+	// AuditTypeUpdateAudit emits `_type:"UPDATE_AUDIT"`, the form the vendored
+	// ITS-REST pin recommends clients send. The SDK's AUDIT_DETAILS default is
+	// documented in docs/specifications/wire.md.
 	AuditTypeUpdateAudit AuditType = "UPDATE_AUDIT"
 )
 
@@ -42,8 +43,9 @@ type UpdateAudit struct {
 	// SystemID is the optional logical EHR system id; omitted when empty.
 	SystemID string
 	// Type selects the emitted `_type`. The zero value emits
-	// AuditTypeAuditDetails (the SDK default); set AuditTypeUpdateAudit to
-	// fall back to the `UPDATE_AUDIT` form for non-conformant servers.
+	// AuditTypeAuditDetails (the SDK default, documented in
+	// docs/specifications/wire.md); set AuditTypeUpdateAudit for the
+	// `UPDATE_AUDIT` form the vendored ITS-REST pin recommends.
 	Type AuditType
 }
 
