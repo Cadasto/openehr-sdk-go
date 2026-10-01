@@ -33,11 +33,13 @@ Each line was reproduced or mutation-checked with `go test -overlay`, not read o
 - `CodeSetAccess` and `TerminologyAccess` are generated marker-only; the BMM declares 4 and 6 functions for them, and the `P_BMM_INTERFACE` row promises methods.
 - The bmmgen package doc omits `interval_bound_gen.go`, and that file, unlike `release_gen.go`, gets no collision check against a BMM package file of the same name.
 
-## Decisions for the maintainer (before Phase 3 and Phase 4)
+## Decisions for the maintainer
 
-1. **Empty STRING error.** Decode refuses an empty STRING with `ErrUnsupportedDatatype`, the gap sentinel, though the payload breaks an RM invariant and the package convention gives such a payload a plain wrapped error. Recommended: return a plain wrapped error, as the not-a-string case already does. The leaf is unreleased, so no consumer matches the sentinel yet. Alternative: keep the sentinel and say so in the REQ-053 STRING row.
+Decision 1 gates Phase 1 task 5, decision 2 gates Phase 2 task 1, and decision 3 gates Phase 4. Phase 1 tasks 1 to 4, the rest of Phase 2, and Phase 3 can start before any decision is made.
+
+1. **Empty STRING error.** Decode refuses an empty STRING with `ErrUnsupportedDatatype`, the gap sentinel, and the package [deviations register](../../openehr/serialize/simplified/deviations.md) records that choice. The payload breaks an RM invariant, and the code comments in `string_leaf.go` and `flat_decode.go` give a malformed value a plain wrapped error without the gap sentinel; that convention is written nowhere else. The STRING row of § REQ-053 requires the refusal and names no error. Recommended: return a plain wrapped error, as the not-a-string case already does, and change the register line and the `string_leaf.go` godoc with it (Phase 1 task 5). The leaf is unreleased, so no consumer matches the sentinel yet. Alternative: keep the sentinel; the register already says so and nothing changes. Writing the sentinel into the § REQ-053 STRING row would be a full-lane edit, which this plan does not propose.
 2. **Embedded flags of `PointInterval`.** Recommended: keep the struct shape and pin the existing "outer flags win" behaviour with a test. Dropping the re-declared flags is a Go API break and a regeneration for no consumer gain.
-3. **Marker-only interfaces.** Recommended: reword the `P_BMM_INTERFACE` row to say abstract interfaces are emitted without methods and name the two classes, since nothing consumes their methods. Alternative: emit the methods, which is a new generated API surface.
+3. **Marker-only interfaces.** The `P_BMM_INTERFACE` mapping row in [bmm-conformance.md § REQ-043](../specifications/bmm-conformance.md#req-043--mapping-rules-p_bmm--go) promises methods translated from the BMM functions, and the generated code emits none, so code and spec disagree today. REQ-043 makes a deviation from its mapping rules depend on an ADR and an update to the section. Recommended: record the deviation in an ADR (an amendment of [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, or a new one), then reword the row to say abstract interfaces are emitted without methods and name the two classes, since nothing consumes their methods. The ADR is accepted before Phase 4 is dispatched. Alternative: emit the methods, which conforms to the row as written and needs no ADR, but adds a generated API surface.
 
 ## Phases
 
@@ -45,8 +47,8 @@ Each line was reproduced or mutation-checked with `go test -overlay`, not read o
 
 **Tasks:**
 
-1. A zero `DV_CODED_TEXT` writes no keys, in the same way an empty STRING and an all-zero `ctx/setting` already write nothing. The PR notes the changed bytes for a consumer.
-2. The placement walk refuses a second placement on an attribute that already holds a scalar, with `ErrUnknownPath`, as `placeLeaf` already does for a slot conflict.
+1. A zero `DV_CODED_TEXT` writes no keys. No sentence governs this today: `codedToFlat` writes `|code` and `|value` unconditionally, and § REQ-053 covers only the empty STRING leaf and the all-zero `ctx/setting`. The PR adds one line to the package [deviations register](../../openehr/serialize/simplified/deviations.md) saying that an unset coded text writes no keys; that keeps the phase in the maintenance lane, and § REQ-053 is not amended. The PR notes the changed bytes for a consumer.
+2. `walkAQL` in `flat_decode.go` refuses a second placement on an attribute that already holds a scalar, with `ErrUnknownPath`. This brings the code in line with the § REQ-053 rule on keys that reach two Web Template nodes for one single-valued RM attribute ([wire.md § REQ-053](../specifications/wire.md#req-053)). The overwrite is in the walk's `!ok` branch, where a slot that holds a scalar is replaced by a fresh map; the guard refuses a slot that is present and not a map, and keeps creating the map when the slot is absent. `placeLeaf`'s duplicate-placement check at the terminal slot stays as it is.
 3. Reword the three stale STRING sentences to "an attribute `rmpath` does not resolve to an RM String". Keep the test name.
 4. Add a table test for `isValueLeafType` covering `STRING`, a padded `" STRING"` and a non-leaf type, plus a STRING node with no inputs through `MarshalFlat`.
 5. If decision 1 goes to a plain error, change `string_leaf.go` and the register line in `deviations.md`; otherwise leave both.
@@ -62,7 +64,7 @@ Each behaviour change is a red commit (failing test) before its fix.
 1. Add `PointInterval[DVQuantity]` and `ProperInterval[DVQuantity]` cases to the canonical JSON and XML open-side tests: both sides open, lower only, upper only, and a flag set on the embedded interval (decision 2).
 2. Pin the same switch in `internal/bmmgen/render_interval_bound_test.go` so removing an arm fails a bmmgen unit test, not only `codegen-verify`.
 3. Add bmmgen render rows for the three "no omit option" halves, using real RM fields, each asserting the tag carries no omit option.
-4. Make the stale-entry checks in `paths_rmpath_test.go` run only when every subtest ran, or move them to a separate test, and pin the expected skip set (the demographic roots and `social.opt`) so any other skip fails.
+4. In `paths_rmpath_test.go`, the attribute-coverage guard of [rm-functions.md § REQ-121](../specifications/rm-functions.md#req-121--locatable-path-read-access) over the vendored templates, make the stale-entry checks run only when every subtest ran, or move them to a separate test. Pin the two skip sets separately, because they come from different branches of the test: the roots that are not a `COMPOSITION` (`Address.v2`, `TestPerson.v2`) and the OPT the parser refuses (`social.opt`), so a new parser refusal cannot pass as an expected skip.
 5. Add the missing line to the bmmgen package doc and give `interval_bound_gen.go` the same collision check as `release_gen.go`, in a loop shared with the other fixed-name files.
 
 **Definition of done:** `go test ./internal/bmmgen/... ./openehr/serialize/... ./openehr/template/webtemplate/...`, then `make ci` and `make codegen-verify`. The three mutations named in Evidence now fail a unit test.
@@ -73,16 +75,16 @@ The AOM 1.4 gap and the duplicated predicates share one cause: the bound-emptine
 
 **Tasks:**
 
-1. Amend [§ REQ-052](../specifications/wire.md#req-052) and the REQ-056 bullet so the open-side omission also binds `Interval[T]` fields of the AOM 1.4 types, and remove the sentence that puts them outside the rule. Name the canonical XML element spelling for the same fields.
+1. Amend [§ REQ-052](../specifications/wire.md#req-052) so the open-side omission also binds `Interval[T]` fields of the AOM 1.4 types: delete the sentence that puts them outside the rule, and re-read the two sentences after it, which tie the rule to the § REQ-112 known gap on a bound beside its own open flag and to the § REQ-140 reading, so they still hold for the wider rule. Read through [clinical-modeling.md § REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) at that known gap and the [flat-decode fidelity plan](2026-09-30-flat-decode-fidelity.md)'s follow-up note, which carry the same reading. Widen the scope of [§ REQ-056](../specifications/wire.md#req-056), which today covers the RM surface only, to the same fields, so canonical XML element names follow its snake_case rule there too; this is a scope change, not a wording fix.
 2. Generate `MarshalJSONTo` and the XML marshaller for `Interval[T]` with the same omission rule, from `internal/bmmgen`. Red tests first: an `occurrences` interval with an open upper side, in JSON and XML, plus a round trip through the vendored archetype corpus.
-3. Export one generic predicate from `openehr/rm` (name to settle in the PR) that treats nil, a typed nil and a zero concrete bound as empty. Replace the nine `isVoidDV*` predicates and four helpers in `rmread` and delete the parity test, or keep the parity test if the helpers must stay.
+3. Add one generic predicate to `openehr/rm` that treats nil, a typed nil and a zero concrete bound as empty, and have `rmread` use it in place of its nine `isVoidDV*` predicates and four helpers (delete the parity test, or keep it if the helpers must stay). Exporting it is a public API shape, so the amended § REQ-052 names it in the sentence on an empty bound, which this phase edits anyway; the name is settled in the PR. If the maintainer would rather add no API, `rmread` keeps its own predicates and only the parity test pins them against the generated `isZero*` functions.
 4. Update `interval_bound_gen.go` golden output and the REQ-052 and REQ-056 traceability rows with `make spec-gen`.
 
-**Definition of done:** `make codegen-verify`, `make ci`, PROBE-030 and PROBE-033 green. The vendored ADL 1.4 corpus round-trips in JSON and XML with no `lower` or `upper` beside an open flag.
+**Definition of done:** `make codegen-verify`, `make ci`. PROBE-030 and PROBE-033 stay green, but they pin RM roots only and never see an AOM 1.4 interval, so the phase adds its own test: the vendored ADL 1.4 corpus round-trips in JSON and XML with no `lower` or `upper` beside an open flag, and removing the omission arm for `Interval[T]` turns it red.
 
 ### Phase 4 — Marker-only interfaces (full lane)
 
-**Tasks:** Apply decision 3. For the recommended reword: change the `P_BMM_INTERFACE` row in [bmm-conformance.md](../specifications/bmm-conformance.md), and add a bmmgen test that the two classes render as marker-only so the sentence stays true. For the alternative: emit the interface methods in `render_function.go` and regenerate.
+**Tasks:** Apply decision 3. For the recommended reword: first the ADR that records the deviation, accepted; then change the `P_BMM_INTERFACE` row in [bmm-conformance.md § REQ-043](../specifications/bmm-conformance.md#req-043--mapping-rules-p_bmm--go) and add a bmmgen test that the two classes render as marker-only so the sentence stays true. For the alternative: emit the interface methods in `render_function.go` and regenerate; no ADR is needed, and the new methods are a consumer-visible addition.
 
 **Definition of done:** `make codegen-verify` and `make ci`.
 
