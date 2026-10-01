@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
@@ -486,6 +487,46 @@ func xmlChildNames(t *testing.T, b []byte, key string) []string {
 				return names
 			}
 			depth--
+		}
+	}
+}
+
+// TestREQ056AOM14IntervalLegacyXMLSpellingDecodes pins the decode tolerance
+// for the spelling SDK v0.28.0 and earlier wrote for an AOM 1.4 constraint
+// interval: Go field names (Lower, LowerIncluded, UpperUnbounded, ...) in place
+// of the snake_case BMM names. The decoder reads both onto the same fields, so
+// a stored document does not decode to an empty interval without an error. The
+// encoder writes snake_case only.
+func TestREQ056AOM14IntervalLegacyXMLSpellingDecodes(t *testing.T) {
+	want := rm.Interval[aom14.Integer]{Lower: 1, LowerIncluded: true, UpperUnbounded: true}
+	legacy := "<c_complex_object><rm_type_name>OBSERVATION</rm_type_name><occurrences>" +
+		"<Lower>1</Lower><LowerIncluded>true</LowerIncluded><LowerUnbounded>false</LowerUnbounded>" +
+		"<Upper>0</Upper><UpperIncluded>false</UpperIncluded><UpperUnbounded>true</UpperUnbounded>" +
+		"</occurrences><node_id>at0000</node_id></c_complex_object>"
+	canonical := "<c_complex_object><rm_type_name>OBSERVATION</rm_type_name><occurrences>" +
+		"<lower>1</lower><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>" +
+		"<upper>0</upper><upper_included>false</upper_included><upper_unbounded>true</upper_unbounded>" +
+		"</occurrences><node_id>at0000</node_id></c_complex_object>"
+	for name, doc := range map[string]string{"legacy PascalCase": legacy, "snake_case twin": canonical} {
+		t.Run(name, func(t *testing.T) {
+			got := &aom14.CComplexObject{}
+			if err := canxml.Unmarshal([]byte(doc), got); err != nil {
+				t.Fatalf("canxml.Unmarshal: %v", err)
+			}
+			if got.Occurrences != want {
+				t.Errorf("occurrences = %+v, want %+v", got.Occurrences, want)
+			}
+		})
+	}
+
+	// The encoder never writes the legacy names.
+	xs, err := canxml.Marshal(&aom14.CComplexObject{NodeID: "at0000", RMTypeName: "OBSERVATION", Occurrences: want})
+	if err != nil {
+		t.Fatalf("canxml.Marshal: %v", err)
+	}
+	for _, name := range xmlChildNames(t, xs, "occurrences") {
+		if name != strings.ToLower(name) {
+			t.Errorf("encoder wrote the legacy element %q: %s", name, xs)
 		}
 	}
 }
