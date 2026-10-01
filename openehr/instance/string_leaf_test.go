@@ -2,12 +2,15 @@ package instance_test
 
 import (
 	"errors"
+	"fmt"
 	mrand "math/rand/v2"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
@@ -178,9 +181,52 @@ func TestREQ107_StringLeafDispatchesOnAttribute(t *testing.T) {
 	}
 }
 
+// stringLeafPath returns the OPT path of the one C_STRING leaf in c.
+func stringLeafPath(t *testing.T, c *templatecompile.Compiled) string {
+	t.Helper()
+	var path string
+	var walk func(n *templatecompile.CompiledNode)
+	walk = func(n *templatecompile.CompiledNode) {
+		if _, ok := n.PrimitiveConstraint().(constraints.CString); ok && path == "" {
+			path = n.AQLPath()
+		}
+		for _, attr := range n.Attributes() {
+			for _, child := range attr.Children() {
+				walk(child)
+			}
+		}
+	}
+	walk(c.Root())
+	if path == "" {
+		t.Fatal("compiled OPT has no C_STRING leaf")
+	}
+	return path
+}
+
+// checkUnsatisfiable fails t unless err is the REQ-107 error for an
+// unsatisfiable primitive constraint on DV_TEXT.value at path: it wraps
+// ErrConstraintUnsatisfiable, not ErrSlotFillUnsupported, and names the
+// RM type, the attribute and the path.
+func checkUnsatisfiable(t *testing.T, call string, err error, path string) {
+	t.Helper()
+	if !errors.Is(err, instance.ErrConstraintUnsatisfiable) {
+		t.Errorf("%s error = %v, want one wrapping ErrConstraintUnsatisfiable", call, err)
+		return
+	}
+	if errors.Is(err, instance.ErrSlotFillUnsupported) {
+		t.Errorf("%s error = %v, want it not to wrap ErrSlotFillUnsupported", call, err)
+	}
+	for _, part := range []string{"DV_TEXT", ".value", path} {
+		if !strings.Contains(err.Error(), part) {
+			t.Errorf("%s error = %q, want it to name %q", call, err, part)
+		}
+	}
+}
+
 // TestREQ107_StringLeafUnsatisfiableErrors is the REQ-107 check that the
-// generator returns an error, and does not write a value the constraint
-// rejects, when no string satisfies a C_STRING.
+// generator returns ErrConstraintUnsatisfiable, naming the RM type, the
+// attribute and the OPT path, and writes nothing, when no string
+// satisfies a C_STRING. The composition builder passes the error on.
 func TestREQ107_StringLeafUnsatisfiableErrors(t *testing.T) {
 	cases := []struct {
 		name string
@@ -193,11 +239,19 @@ func TestREQ107_StringLeafUnsatisfiableErrors(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileSyntheticOPT(t, editOPT(t, textPatternOPT, textValueListXYZ, tc.repl))
+			path := stringLeafPath(t, c)
 			for _, opts := range stringLeafFills() {
-				_, err := instance.Generate(t.Context(), c, opts)
-				if !errors.Is(err, instance.ErrSlotFillUnsupported) {
-					t.Errorf("ValueFill %v: Generate error = %v, want one wrapping ErrSlotFillUnsupported", opts.ValueFill, err)
+				out, err := instance.Generate(t.Context(), c, opts)
+				checkUnsatisfiable(t, fmt.Sprintf("Generate(%v)", opts.ValueFill), err, path)
+				if out != nil {
+					t.Errorf("Generate(%v) returned %T with the error, want no value", opts.ValueFill, out)
 				}
+			}
+			b, err := composition.NewBuilder(t.Context(), c,
+				composition.WithTerritory("NL"), composition.WithComposer(testComposer()))
+			checkUnsatisfiable(t, "composition.NewBuilder", err, path)
+			if b != nil {
+				t.Error("composition.NewBuilder returned a builder with the error, want nil")
 			}
 		})
 	}

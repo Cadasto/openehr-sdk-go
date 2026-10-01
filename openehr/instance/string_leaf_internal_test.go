@@ -3,6 +3,7 @@ package instance
 import (
 	"errors"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -108,11 +109,18 @@ func TestREQ107_StringLeafWritesTheNamedAttribute(t *testing.T) {
 		t.Errorf("DV_TEXT.no_such: applyStringLeaf = %v, value %q; want nil, value unset", err, text.Value)
 	}
 
-	// No satisfying value: the error wraps the generator sentinel and
-	// the field keeps its earlier value.
+	// No satisfying value: the error wraps ErrConstraintUnsatisfiable,
+	// not the slot sentinel, names the RM type and the attribute, and the
+	// field keeps its earlier value.
 	parsable := &rm.DVParsable{Formalism: "text/plain"}
 	err := applyStringLeaf(nil, parsable, "formalism", constraints.NewCString("[0-9]+", []string{"abc"}, ""), "abc")
-	if !errors.Is(err, ErrSlotFillUnsupported) || !errors.Is(err, errNoStringValue) || parsable.Formalism != "text/plain" {
-		t.Errorf("unsatisfiable formalism: err %v, formalism %q; want ErrSlotFillUnsupported and errNoStringValue, text/plain kept", err, parsable.Formalism)
+	if !errors.Is(err, ErrConstraintUnsatisfiable) || errors.Is(err, ErrSlotFillUnsupported) {
+		t.Errorf("unsatisfiable formalism: err %v, want ErrConstraintUnsatisfiable and not ErrSlotFillUnsupported", err)
+	}
+	if err != nil && !strings.Contains(err.Error(), "DV_PARSABLE.formalism") {
+		t.Errorf("unsatisfiable formalism: err %q, want it to name DV_PARSABLE.formalism", err)
+	}
+	if parsable.Formalism != "text/plain" {
+		t.Errorf("unsatisfiable formalism: formalism %q after the error, want text/plain kept", parsable.Formalism)
 	}
 }
