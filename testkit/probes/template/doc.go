@@ -2,8 +2,8 @@
 // the openehr/template/ surface: local ADL 1.4 operational template
 // parsing, path resolution and primitive-constraint validation
 // (PROBE-022, PROBE-024). Probes are plain functions returning
-// (Result, error); the template probes are in-repo probes (no
-// transport, no backend), since the package is a local building block.
+// (Result, error). They need no client or server, because the package
+// is a local building block.
 package templateprobes
 
 import "github.com/cadasto/openehr-sdk-go/testkit/probe"

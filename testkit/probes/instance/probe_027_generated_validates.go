@@ -13,8 +13,8 @@ import (
 
 // Probe027GeneratedValidates asserts that the canonical
 // generator → validator round-trip passes cleanly for the supplied
-// compiled OPT. The probe is in-repo (no transport
-// dependency). For openEHR conformance, another implementation of
+// compiled OPT. The probe needs no client or server. For openEHR
+// conformance, another implementation of
 // the generator and validator against the same fixtures must produce
 // the same OK outcome.
 //

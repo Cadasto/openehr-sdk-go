@@ -43,8 +43,8 @@ type ValidateCase struct {
 
 // Probe024PrimitiveValidate implements PROBE-024: parse the OPT body
 // and exercise its primitive-constraint surface against a
-// fixture-supplied list of validate cases. In-repo, with no
-// transport involvement.
+// fixture-supplied list of validate cases. It needs no client or
+// server.
 //
 // The probe is invariant under any backend / generator that produces
 // the same primitive xsi:type values; consumers should include
