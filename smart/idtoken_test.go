@@ -1,6 +1,7 @@
 package smart_test
 
 import (
+	"cmp"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -12,6 +13,7 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -389,31 +391,127 @@ func TestValidateIDTokenRejectsAlgNone(t *testing.T) {
 }
 
 // TestValidateIDTokenMalformedTokenMatchesSentinel checks that a token refused
-// for its own shape (segments, header, or a key id the JWKS does not publish)
-// reports the JWKS validation sentinel, like every other token rejection.
+// for its own shape (segments, header, a key id the JWKS does not publish, or
+// a key the token selects but that cannot be parsed) reports the JWKS
+// validation sentinel, like every other token rejection.
 func TestValidateIDTokenMalformedTokenMatchesSentinel(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	priv := newRSAKey(t)
 	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+	unknownKty, _ := stubJWKSServer(t, http.StatusOK, []byte(`{"keys":[{"kid":"k1","kty":"XYZ"}]}`))
 	b64 := base64.RawURLEncoding.EncodeToString
 
 	cases := []struct {
 		name string
 		tok  string
+		jwks *authsmart.JWKS // nil means the JWKS serving kid-rs256
 	}{
 		{name: "empty token", tok: ""},
 		{name: "two segments", tok: b64([]byte(`{"alg":"RS256"}`)) + "." + b64([]byte(`{}`))},
 		{name: "header not base64url", tok: "!!!." + b64([]byte(`{}`)) + ".sig"},
 		{name: "header not JSON", tok: b64([]byte("not json")) + "." + b64([]byte(`{}`)) + ".sig"},
 		{name: "kid not in the JWKS", tok: joseSign(t, gojose.RS256, priv, "kid-unknown", defaultIDClaims(now))},
+		{name: "kid selects a JWK of unknown kty", tok: joseSign(t, gojose.RS256, priv, "k1", defaultIDClaims(now)), jwks: unknownKty},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := smart.ValidateIDToken(t.Context(), tc.tok, jwks,
+			set := cmp.Or(tc.jwks, jwks)
+			_, err := smart.ValidateIDToken(t.Context(), tc.tok, set,
 				"https://issuer.example", "client-id", "nonce-xyz", now, nil)
 			// REQ-062: a rejection decided on the token itself matches the JWKS sentinel.
 			if err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed) {
 				t.Fatalf("ValidateIDToken(%s) error = %v, want ErrJWKSValidationFailed", tc.name, err)
+			}
+		})
+	}
+}
+
+// TestValidateIDTokenOutageKeepsItsOwnError checks that a JWKS endpoint that
+// fails or cannot be reached reports its own fetch error, so an outage never
+// reads as a bad token. The token itself is valid and would verify.
+func TestValidateIDTokenOutageKeepsItsOwnError(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", defaultIDClaims(now))
+
+	answering := func(status int) func(t *testing.T) *authsmart.JWKS {
+		return func(t *testing.T) *authsmart.JWKS {
+			jwks, _ := stubJWKSServer(t, status, nil)
+			return jwks
+		}
+	}
+	unreachable := func(t *testing.T) *authsmart.JWKS {
+		srv := httptest.NewServer(http.NotFoundHandler())
+		client, uri := srv.Client(), srv.URL
+		srv.Close()
+		jwks, err := authsmart.NewJWKS(client, uri)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return jwks
+	}
+	statusError := func(status string) func(error) bool {
+		return func(err error) bool { return strings.Contains(err.Error(), "jwks fetch: status "+status) }
+	}
+	transportError := func(err error) bool {
+		ue, ok := errors.AsType[*url.Error](err)
+		return ok && ue != nil
+	}
+
+	cases := []struct {
+		name       string
+		jwks       func(t *testing.T) *authsmart.JWKS
+		algs       []string
+		isFetchErr func(error) bool
+	}{
+		{name: "JWKS answers 500", jwks: answering(http.StatusInternalServerError), isFetchErr: statusError("500")},
+		// The allowlist is checked before the JWKS is fetched; a usable one must not turn the outage into the sentinel.
+		{name: "JWKS answers 503 under a supported allowlist", jwks: answering(http.StatusServiceUnavailable), algs: []string{"RS256"}, isFetchErr: statusError("503")},
+		{name: "JWKS unreachable", jwks: unreachable, isFetchErr: transportError},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := smart.ValidateIDToken(t.Context(), tok, tc.jwks(t),
+				"https://issuer.example", "client-id", "nonce-xyz", now, tc.algs)
+			// REQ-062: a JWKS fetch failure surfaces as the fetch error and never matches the JWKS sentinel.
+			if err == nil || errors.Is(err, auth.ErrJWKSValidationFailed) {
+				t.Fatalf("ValidateIDToken(%s) error = %v, want the fetch error, not ErrJWKSValidationFailed", tc.name, err)
+			}
+			if !tc.isFetchErr(err) {
+				t.Fatalf("ValidateIDToken(%s) error = %v, want the fetch error", tc.name, err)
+			}
+		})
+	}
+}
+
+// TestValidateIDTokenMissingTrustAnchorIsInvalidConfig checks that a missing
+// JWKS, issuer or client ID is reported as a configuration error, not as a bad
+// token. The token itself is valid.
+func TestValidateIDTokenMissingTrustAnchorIsInvalidConfig(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", defaultIDClaims(now))
+
+	cases := []struct {
+		name     string
+		jwks     *authsmart.JWKS
+		issuer   string
+		clientID string
+	}{
+		{name: "no JWKS", issuer: "https://issuer.example", clientID: "client-id"},
+		{name: "no issuer", jwks: jwks, clientID: "client-id"},
+		{name: "no client ID", jwks: jwks, issuer: "https://issuer.example"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := smart.ValidateIDToken(t.Context(), tok, tc.jwks, tc.issuer, tc.clientID, "nonce-xyz", now, nil)
+			// REQ-062 REQ-064: a missing trust anchor is a configuration error and never matches the JWKS sentinel.
+			if err == nil || !errors.Is(err, auth.ErrInvalidConfig) {
+				t.Fatalf("ValidateIDToken(%s) error = %v, want ErrInvalidConfig", tc.name, err)
+			}
+			if errors.Is(err, auth.ErrJWKSValidationFailed) {
+				t.Fatalf("ValidateIDToken(%s) error = %v, want it not to match ErrJWKSValidationFailed", tc.name, err)
 			}
 		})
 	}
@@ -485,8 +583,8 @@ func TestValidateIDTokenVerifiesSignatureBeforeClaims(t *testing.T) {
 }
 
 // TestValidateIDTokenClaimRules walks the SDK's claim rules at their edges:
-// the 30-second skew on exp, nbf and iat, the exact iss match, the aud
-// membership and the expected nonce.
+// the required exp, the 30-second skew on exp, nbf and iat, the exact iss
+// match, the aud membership and the expected nonce.
 func TestValidateIDTokenClaimRules(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	priv := newRSAKey(t)
@@ -502,6 +600,9 @@ func TestValidateIDTokenClaimRules(t *testing.T) {
 	}{
 		{name: "exp 29s ago is inside the skew", set: map[string]any{"exp": at(-29 * time.Second)}},
 		{name: "exp 30s ago is outside the skew", set: map[string]any{"exp": at(-30 * time.Second)}, wantErr: true},
+		// go-oidc skips its own expiry check here, so only the SDK refuses these two.
+		{name: "exp absent", drop: "exp", wantErr: true},
+		{name: "exp as a numeric string", set: map[string]any{"exp": "1800000000"}, wantErr: true},
 		{name: "nbf 30s ahead is inside the skew", set: map[string]any{"nbf": at(30 * time.Second)}},
 		{name: "nbf 31s ahead is outside the skew", set: map[string]any{"nbf": at(31 * time.Second)}, wantErr: true},
 		{name: "iat 30s ahead is inside the skew", set: map[string]any{"iat": at(30 * time.Second)}},
