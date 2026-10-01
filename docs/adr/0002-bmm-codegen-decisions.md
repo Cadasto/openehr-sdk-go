@@ -47,7 +47,7 @@ A `P_BMM_INTERFACE` class is emitted as a Go interface with the unexported `is<X
 
 ### D6 — BMM functions become panic stubs; bodies live in `*_ext.go`
 
-Every BMM `function` becomes a Go method whose body is `panic("not implemented: …")` with BMM documentation propagated as godoc. Real implementations belong in hand-written companion files only (REQ-044) — `*_ext.go`, or `*_funcs.go` for the behavioural-function set realised under [ADR 0011](0011-rm-behavioural-functions-surface.md). The generator never touches non-`_gen.go` files.
+Every BMM `function` of a class becomes a Go method whose body is `panic("not implemented: …")` with BMM documentation propagated as godoc; a `P_BMM_INTERFACE`'s functions get no method (D4). Real implementations belong in hand-written companion files only (REQ-044) — `*_ext.go`, or `*_funcs.go` for the behavioural-function set realised under [ADR 0011](0011-rm-behavioural-functions-surface.md). The generator never touches non-`_gen.go` files.
 
 ### D7 — Manual-implementation skip set suppresses chosen stubs
 
