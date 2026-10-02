@@ -29,7 +29,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 
 ## internal/templateinstance/rmwrite
 - internal/templateinstance/rmwrite/write.go · EnsureSingle has no case for TERMINOLOGY_ID.value or a locatable's archetype_node_id, so the generator's writeBMMString cannot write them and drops the refusal; surfacing write errors in the generator (materialiseImplicitSingle, populateBMMRequiredAttrs, fillEntryCode, materialiseImplicitMultiple) needs this first and would move census outcomes · from: audit-2026-09
-- internal/templateinstance/rmwrite/write_text_like_test.go · the wrong-child-type subtest tries only value and id, so the DV_PARSABLE formalism, charset and language arms and the DV_IDENTIFIER issuer, assigner and type arms are untested · from: pr199
 
 ## openehr/aom
 - openehr/aom/aom14 · no standalone ADL 1.4 archetype corpus is vendored, so the aom14 interval corpus tests read their constraint intervals out of the OPTs instead of real archetype files · from: audit-2026-09
@@ -51,7 +50,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 
 ## openehr/rm
 - openehr/rm/temporal_funcs.go · DVTime.ToTime and DVDateTime.ToTime pass the valid leap second 23:59:60 to time.Date as second 60, so it converts to the next minute's instant with a nil error · from: pr199
-- openehr/rm/rmpath · rmpath navigates no demographic class (PERSON, ADDRESS, PARTY_IDENTITY, CONTACT); this matters only if FLAT encode of demographic resources is ever wanted · from: audit-2026-09
 
 ## openehr/template
 - openehr/template/parse_primitives.go · buildBoolean reads an empty true_valid or false_valid element as false even under ParseOPTStrict, so two empty elements yield the forbidden false/false C_BOOLEAN without an error (no vendored OPT has one) · from: audit-2026-09
