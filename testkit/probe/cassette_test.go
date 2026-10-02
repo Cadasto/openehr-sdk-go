@@ -679,6 +679,17 @@ func TestCassette_ScenarioChecksFailOnAMutatedRecording_REQ082_REQ095_REQ094_REQ
 			want:   "read-back is_modifiable",
 		},
 		{
+			name:      "composition-minimal create recovers no EHR id",
+			recording: "composition-minimal.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				editResponseJSON(t, recordedEntry(t, har, "POST", "/ehr"), func(b map[string]any) {
+					jsonObject(t, b, "ehr_id")["value"] = ""
+				})
+			},
+			replay: compositionMinimal(),
+			want:   "create ehr_id",
+		},
+		{
 			// Under return=minimal the SDK never decodes a body, so no change
 			// to the recording alone can make the default save return a
 			// composition. This row asks for a representation and records
@@ -725,6 +736,17 @@ func TestCassette_ScenarioChecksFailOnAMutatedRecording_REQ082_REQ095_REQ094_REQ
 			},
 			replay: compositionMinimal(),
 			want:   "read-back template_id",
+		},
+		{
+			name:      "stored-query create recovers no EHR id",
+			recording: "stored-query.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				editResponseJSON(t, recordedEntry(t, har, "POST", "/ehr"), func(b map[string]any) {
+					jsonObject(t, b, "ehr_id")["value"] = ""
+				})
+			},
+			replay: storedQuery,
+			want:   "create ehr_id",
 		},
 		{
 			name:      "stored-query store Location names another query",
