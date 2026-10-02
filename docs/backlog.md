@@ -70,9 +70,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 ## testkit/probe
 - testkit/probe/livestatus_test.go · the Live snapshots assert less than the cassette witnesses: createEHRProbe (live_test.go) passes on any non-empty EHR id without comparing it to the per-run id, and the PROBE-065 read-back checks only a non-empty archetype_node_id, not the saved node id or template id · from: pr201
 
-## testkit/probes
-- testkit/probes/probeclass_test.go · TestREQ082ProbeClassMismatch has no accept case for a backend-facing probe whose Modes line lacks Sandbox (Live only), so putting a Sandbox requirement back into classMismatch would stay green · from: audit-2026-09
-
 ## testkit/probes/instance
 - testkit/probes/instance/corpus_ratchet_test.go · the census runs with Language en and one fixed Now, and its placeholder scan flags only the literal example, so a generator that wrote encoding utf8 or read time.Now() would leave it green · from: audit-2026-09
 - testkit/probes/instance/corpus_ratchet_test.go · the hollow_body floor counts every ELEMENT, so a body of null-flavour placeholders passes; counting only ELEMENTs that hold a value adds two rows (clinical_content_validation generate/example/example and generate/example/random) · from: pr199
