@@ -7,7 +7,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
-// TestREQ107_ReadSingle_OptionalString checks that the optional String
+// TestREQ107_ReadSingle_OptionalString (REQ-107) checks that the optional String
 // attributes the generator can fill are readable: set, they read present
 // and give back the pointer; unset, they read absent. Without an arm the
 // floor and the template walker report a filled attribute as absent.

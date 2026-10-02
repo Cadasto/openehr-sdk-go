@@ -39,7 +39,7 @@ func TestUpdateAuditMarshalType(t *testing.T) {
 
 // TestUpdateAuditTypeFallback verifies the zero-value Type emits
 // AUDIT_DETAILS (the SDK default) while AuditTypeUpdateAudit emits
-// UPDATE_AUDIT — the fallback for non-conformant servers (SPECITS-95).
+// UPDATE_AUDIT — the fallback for servers that accept only that form (SPECITS-95).
 func TestUpdateAuditTypeFallback(t *testing.T) {
 	cases := []struct {
 		name string

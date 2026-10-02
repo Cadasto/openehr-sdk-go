@@ -27,7 +27,7 @@ type Submission struct {
 	// endpoint. Uses [UpdateAudit] (not [rm.AuditDetails]) so that
 	// server-assigned time_committed is never emitted; _type defaults to
 	// "AUDIT_DETAILS" (accepted by conformant CDRs); see [UpdateAudit.Type]
-	// to fall back to "UPDATE_AUDIT" for non-conformant servers.
+	// to fall back to "UPDATE_AUDIT" for servers that accept only that form.
 	Audit UpdateAudit
 	// Versions is the closed type-set of inline-data versions to commit.
 	// Each element must be an *[OriginalVersion][T] or *[ImportedVersion][T]

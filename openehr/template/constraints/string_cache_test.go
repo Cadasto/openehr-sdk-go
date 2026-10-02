@@ -76,7 +76,7 @@ func TestCString_ZeroValue_LazyFallback(t *testing.T) {
 	}
 }
 
-// TestREQ103_CString_PatternMatchesWholeString pins the whole-string
+// TestREQ103_CString_PatternMatchesWholeString (REQ-103) pins the whole-string
 // reading of a C_STRING pattern: a value that contains a match but is not
 // matched end to end is refused, on both the pre-compiled path
 // (NewCString) and the lazy path (a literal CString).
@@ -132,7 +132,7 @@ func TestREQ103_CString_PatternMatchesWholeString(t *testing.T) {
 	}
 }
 
-// TestREQ103_CString_UnbalancedPatternStaysInvalid asserts that wrapping a
+// TestREQ103_CString_UnbalancedPatternStaysInvalid (REQ-103) asserts that wrapping a
 // pattern for whole-string matching does not repair a malformed one: a
 // pattern that only parses once wrapped is still CodeInvalidValue, and its
 // detail names the pattern as the OPT wrote it.

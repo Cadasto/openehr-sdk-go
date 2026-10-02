@@ -253,7 +253,8 @@ func embedsMarshalerBearingConcrete(plan *Plan, pc *PlannedClass) bool {
 // encoding/json/v2 promotes a marshaler through an embedded pointer and emits
 // the inner type's payload instead of the wrapper, which is exactly why a
 // class embedding a marshaler-bearing concrete ancestor takes the flat shape
-// rather than the `type rawC C` alias (ADR 0022, ruling R19).
+// rather than the `type rawC C` alias (ADR 0022, ruling R19). Decoding into a
+// wrapper that embeds such a type fails at run time for the same reason.
 func effectiveFields(plan *Plan, pc *PlannedClass) ([]emittedField, error) {
 	var result []emittedField
 	seen := map[string]bool{}

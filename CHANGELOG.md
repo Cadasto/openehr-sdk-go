@@ -10,12 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- **Generated and built values pass the RM floor on the vendored templates (REQ-107, PROBE-027).** UTC times, languages, encodings and ordinal symbols are real, seeded `RandomFill` output differs, and validation checks STRING leaves and `ism_transition`.
+- **Generated and built values pass the RM floor (REQ-107, PROBE-027).** Times, languages, encodings, ordinals and ELEMENTs are RM-valid, constrained optional text is filled, seeded `RandomFill` differs, and validation checks STRING leaves and `ism_transition`.
 - **The canonical JSON and XML codec covers AOM 1.4 constraint intervals (REQ-052, REQ-056).** An open side omits its zero bound, XML uses snake_case names while still decoding the v0.28.0 PascalCase, and `rm.IsEmptyIntervalBound` is exported.
-- **FLAT encode writes no keys for an unset coded text (REQ-053).** The blank `|code` and `|value` keys are gone, and decode now refuses a second placement on a scalar-filled attribute.
+- **FLAT encode writes no keys for an unset coded text (REQ-053).** The blank `|code` and `|value` keys are gone, and decode now refuses a second placement on a scalar-filled attribute or an included open side.
 - **A C_STRING pattern must match the whole string (REQ-103).** `CString.Validate` now refuses a value the pattern matches only in part, and the generator and validator read the pattern the same way.
-- **The RM floor reports invalid temporal values and ELEMENTs with both or neither of `value` and `null_flavour` (REQ-112, REQ-123).** Temporal parsing now accepts the ISO 8601 basic layouts, comma fractions and `±hhmm` zones.
-- **Generated compositions fill constrained optional text fields and give every ELEMENT a value or a null flavour (REQ-107).** An OPT-silent optional `content` is no longer filled with an archetype-root entry that lacks its details.
+- **The RM floor reports invalid temporal values and ELEMENTs with both or neither of `value` and `null_flavour` (REQ-112).**
+- **Temporal parsing accepts ISO 8601 basic layouts, comma fractions and `±hhmm` zones, and refuses malformed durations (REQ-123).** An unparseable value reads as zero.
 
 ## [0.28.0] - 2026-09-25
 

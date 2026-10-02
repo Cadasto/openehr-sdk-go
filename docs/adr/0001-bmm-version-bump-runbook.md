@@ -11,7 +11,7 @@ date: 2026-05-16
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** part of the BMM code generator delivery (drift bot and version-bump runbook), landed on `main` in commit [e1c6633c](https://github.com/Cadasto/openehr-sdk-go/commit/e1c6633c).
+- **Tracks:** part of the BMM code generator delivery (drift bot and version-bump runbook).
 - **Requirements:** [REQ-041](../specifications/bmm-conformance.md#req-041--pinned-bmm-sources) (the pinned BMM sources a version bump moves).
 
 ## Context
@@ -80,7 +80,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 
 ### Roles
 
-- **Author** runs steps 1–9, opens the PR, requests review.
+- **Author** runs the steps, opens the PR, requests review.
 - **Reviewer** confirms the BMM diff (step 4 output is the ideal artefact to paste into the PR body) matches the Go-side diff scope, and that the proposed CHANGELOG bullet describes the change correctly.
 - **The drift bot** (`.github/workflows/codegen-drift.yml`) acts after merge: a green next-Monday run is the definition of "the bump landed cleanly".
 
