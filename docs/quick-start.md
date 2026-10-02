@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # Quick start
 
 Get from zero to a working import in a few minutes. This guide is for application developers integrating the SDK. Contributors editing the normative specs should start with [CONTRIBUTING.md](../CONTRIBUTING.md). For the full contract and package map, see [architecture.md](architecture.md) and [specifications/](specifications/).

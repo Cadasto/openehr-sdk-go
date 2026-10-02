@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Conformance probes
 
 **Status:** Draft

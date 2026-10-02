@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # SDK roadmap — what is not finished
 
 What you can build on today, and what is still open. Per-requirement status is in the [requirements registry](specifications/REQ.md), generated from [`traceability.yaml`](specifications/traceability.yaml); this page adds only the delivery stages, the work that is not finished, and the deployment targets. When this page and the specs disagree, **the specs win** and this page is the one to fix.

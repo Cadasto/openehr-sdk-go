@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Use cases
 
 **Status:** Draft

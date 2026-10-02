@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Wire format
 
 **Status:** Draft

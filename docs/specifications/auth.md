@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Authentication
 
 **Status:** Draft

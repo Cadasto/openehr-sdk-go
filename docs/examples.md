@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # Examples
 
 If you are new to the SDK, run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline: the REST ones use an in-process `httptest` backend, so nothing needs a clinical data repository (CDR).

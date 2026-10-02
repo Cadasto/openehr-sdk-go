@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Glossary
 
 **Status:** Draft

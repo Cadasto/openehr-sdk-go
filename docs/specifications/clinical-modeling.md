@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Clinical modeling
 
 **Status:** Draft

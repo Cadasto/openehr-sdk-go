@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Go idiom
 
 **Status:** Draft

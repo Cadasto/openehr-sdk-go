@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # Architecture
 
 This document is the narrative companion to [`docs/specifications/`](../docs/specifications/). It describes the SDK's structure as prose and diagrams; the normative `MUST / SHOULD / MAY` statements live in [`docs/specifications/`](../docs/specifications/). When the two disagree, `docs/specifications/` wins and this document is the one to update.

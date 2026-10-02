@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # RM behavioural functions
 
 **Status:** Draft
