@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
+	"uuid"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
@@ -19,15 +21,27 @@ import (
 )
 
 // cassetteSourceTemplateID is the EHRbase-origin fixture the composition
-// scenario rewrites. The replacement id is a fixed constant: a fresh
-// random id in a path would miss on replay, because the key is method
-// and stripped path (REQ-082).
+// scenario rewrites. Each capture rewrites it to a template id of its own,
+// cassetteTemplateIDPrefix plus a per-run id. A CDR holds a template id
+// once and answers a second upload of it with 409, so a fixed id would let
+// only the first capture against a server succeed. A fresh id costs replay
+// nothing: the template id travels in the upload body, the save's
+// openehr-template-id header and the composition body, never in a path,
+// and the replay key is method and stripped path (REQ-082).
 const (
 	cassetteSourceTemplateID = "terminology_test.ehrbase.org.v1"
-	cassetteTemplateID       = "sdk_cassette_comp.v1"
+	cassetteTemplateIDPrefix = "sdk_cassette_comp_"
 	cassetteStoredQueryName  = "org.cadasto.sdk::cassette_stored"
 	cassetteStoredQueryAQL   = "SELECT e/ehr_id/value FROM EHR e WHERE e/ehr_id/value = $target_ehr"
 )
+
+// newCassetteTemplateID returns the template id one composition capture
+// uploads and saves under. It carries a fresh per-run id, so the template
+// a capture leaves on the server names the run that created it (REQ-082
+// Live).
+func newCassetteTemplateID() string {
+	return cassetteTemplateIDPrefix + strings.ReplaceAll(uuid.NewV4().String(), "-", "") + ".v1"
+}
 
 // cassetteEHRStatusJSON is a fixed EHR_STATUS. is_modifiable is true so
 // the recorded EHR is not locked. The name is a constant, not a per-run id.
@@ -54,8 +68,9 @@ func captureEHRStatus(ctx context.Context, c *transport.Client) error {
 }
 
 // captureCompositionMinimal records a server-assigned EHR create, an OPT
-// upload under one fixed template id, a minimal composition save, and a
-// GET of the version uid that save returned.
+// upload under a template id minted for this capture, a minimal
+// composition save under the same id, and a GET of the version uid that
+// save returned.
 func captureCompositionMinimal(ctx context.Context, c *transport.Client) error {
 	rec, _, err := ehr.Create(ctx, c)
 	if err != nil {
@@ -64,14 +79,15 @@ func captureCompositionMinimal(ctx context.Context, c *transport.Client) error {
 	if rec == nil || rec.EHRID.Value == "" {
 		return errors.New("create EHR returned no ehr_id")
 	}
-	opt, comp, err := cassetteMinimalComposition()
+	templateID := newCassetteTemplateID()
+	opt, comp, err := cassetteMinimalComposition(templateID)
 	if err != nil {
 		return err
 	}
 	if _, _, err := definition.UploadTemplate(ctx, c, definition.FormatADL14, bytes.NewReader(opt)); err != nil {
 		return fmt.Errorf("upload template: %w", err)
 	}
-	_, meta, err := composition.Save(ctx, c, ehr.EHRID(rec.EHRID.Value), comp, composition.WithTemplateID(cassetteTemplateID))
+	_, meta, err := composition.Save(ctx, c, ehr.EHRID(rec.EHRID.Value), comp, composition.WithTemplateID(templateID))
 	if err != nil {
 		return fmt.Errorf("save composition: %w", err)
 	}
@@ -110,14 +126,14 @@ func captureStoredQuery(ctx context.Context, c *transport.Client) error {
 }
 
 // cassetteMinimalComposition rewrites the terminology_test OPT and
-// canonical composition to cassetteTemplateID. The replacement must not
-// leave the source id in place, and the source id must not be a
-// substring of the replacement or the check cannot tell them apart.
-func cassetteMinimalComposition() ([]byte, *rm.Composition, error) {
+// canonical composition to templateID. The replacement must not leave the
+// source id in place, and the source id must not be a substring of the
+// replacement or the check cannot tell them apart.
+func cassetteMinimalComposition(templateID string) ([]byte, *rm.Composition, error) {
 	src := []byte(cassetteSourceTemplateID)
-	dst := []byte(cassetteTemplateID)
+	dst := []byte(templateID)
 	if bytes.Contains(dst, src) {
-		return nil, nil, fmt.Errorf("cassette template id %s contains the source id", cassetteTemplateID)
+		return nil, nil, fmt.Errorf("cassette template id %s contains the source id", templateID)
 	}
 	opt, err := os.ReadFile(fixtures.TemplateOpt(cassetteSourceTemplateID))
 	if err != nil {
@@ -130,10 +146,10 @@ func cassetteMinimalComposition() ([]byte, *rm.Composition, error) {
 	opt = bytes.ReplaceAll(opt, src, dst)
 	raw = bytes.ReplaceAll(raw, src, dst)
 	if bytes.Contains(opt, src) || !bytes.Contains(opt, dst) {
-		return nil, nil, fmt.Errorf("OPT does not carry the fixed template id %s", cassetteTemplateID)
+		return nil, nil, fmt.Errorf("OPT does not carry the capture's template id %s", templateID)
 	}
 	if bytes.Contains(raw, src) || !bytes.Contains(raw, dst) {
-		return nil, nil, fmt.Errorf("composition fixture does not carry the fixed template id %s", cassetteTemplateID)
+		return nil, nil, fmt.Errorf("composition fixture does not carry the capture's template id %s", templateID)
 	}
 	comp := &rm.Composition{}
 	if err := canjson.Unmarshal(raw, comp); err != nil {
