@@ -212,6 +212,14 @@ func TestREQ082ProbeClassMismatch(t *testing.T) {
 			modes: map[string]string{"PROBE-901": "Sandbox, Cassette, Live."},
 		},
 		{
+			// A Live-only line is enough. Requiring Sandbox here would stay
+			// green without this case, because every other backend-facing
+			// accept case already names Sandbox.
+			name:  "backend-facing declared Live only",
+			funcs: backendFacing,
+			modes: map[string]string{"PROBE-901": "Live."},
+		},
+		{
 			name:  "no Modes line",
 			funcs: backendFree,
 			modes: map[string]string{"PROBE-902": "In-repo."},
