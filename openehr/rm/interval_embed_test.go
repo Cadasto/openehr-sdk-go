@@ -20,13 +20,11 @@ func TestEmbeddedIntervalDropsOuterField(t *testing.T) {
 		Note string `json:"note"`
 	}
 	h := holder{
-		Interval: rm.Interval[int]{
-			Lower:         1,
-			Upper:         9,
-			LowerIncluded: true,
-			UpperIncluded: true,
-		},
-		Note: "outer-note",
+		Lower:         1,
+		Upper:         9,
+		LowerIncluded: true,
+		UpperIncluded: true,
+		Note:          "outer-note",
 	}
 	cases := []struct {
 		name string
