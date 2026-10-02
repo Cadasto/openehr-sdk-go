@@ -9,9 +9,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - cmd/probe-record/scenarios_writes.go · the ehr-status scenario submits is_modifiable true, and the composition-minimal follow-up Get reads the latest composition (EHRbase fills Location with the object id and keeps the full version uid only in ETag), so both recordings would also pass against a server that behaves differently; changing either needs a recapture · from: pr201
 - cmd/probe-record/main_test.go · only the composition-minimal scenario has an offline sandbox capture test; ehr-status and stored-query have none, unlike ehr-lifecycle · from: pr201
 
-## docs
-- docs/architecture.md · 22 Markdown files declare no kind: in their frontmatter (17 under docs/specifications including REQ.md, plus architecture, examples, quick-start, releases and roadmap), so sdd-check warns on each · from: audit-2026-09
-
 ## docs/specifications
 - docs/specifications/traceability.yaml · test files may still cite a REQ they do not pin and so appear in its generated tests list; a sweep over all test files is still to do (the audit estimated 45 to 50 files, not re-counted) · from: audit-2026-09
 - docs/specifications/clinical-modeling.md · § REQ-107 has no spec text for what Options.Now sets (HISTORY.origin, ACTION.time and every DV_DATE_TIME default) or for the generator's placeholder values (the at0000 node id, the local::at0000 code, ehr://example) · from: audit-2026-09
