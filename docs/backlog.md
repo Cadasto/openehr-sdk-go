@@ -53,10 +53,7 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - openehr/instance/locatable.go · a generated COMPOSITION carries a bare UUID uid (stampsUID); reported as refused by EHRbase 2.36.0 on commit while the same body without a uid commits (not re-run here) · from: pr199
 
 ## openehr/rm
-- openehr/rm/foundation_types_interval_jsonmar_gen.go · Interval[T].MarshalJSONTo has a value receiver, so a caller's struct that embeds rm.Interval[T] silently loses its own fields on encode and fails at run time on decode; no godoc or test says so · from: audit-2026-09
 - openehr/rm/temporal_funcs.go · DVTime.ToTime and DVDateTime.ToTime pass the valid leap second 23:59:60 to time.Date as second 60, so it converts to the next minute's instant with a nil error · from: pr199
-- openehr/rm/temporal_funcs.go · DVDuration.ToDuration wraps around with a nil error for a valid duration beyond about 292 years (PT9999999999999H, P400000D), and Magnitude overflows int for PT9999999999999999H; return ErrTemporalConversion on overflow · from: pr199
-- openehr/rm/temporal_funcs.go · the temporal component accessors and inspections (Year, Month, IsPartial and the rest) panic on a nil receiver such as (*rm.DVDate)(nil).Year(), although ValidISO8601 guards against nil · from: pr199
 - openehr/rm/rmpath · rmpath navigates no demographic class (PERSON, ADDRESS, PARTY_IDENTITY, CONTACT); this matters only if FLAT encode of demographic resources is ever wanted · from: audit-2026-09
 
 ## openehr/template

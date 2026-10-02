@@ -10,10 +10,11 @@ package rm
 // partial-form inspection, an idiomatic Compare, and Go-bridge
 // conversions (ToTime / ToDuration).
 //
-// No method panics: a malformed `value` yields zero components, false
-// inspection flags and a zero magnitude, never the parts read before the
-// parse stopped; the fallible Go-bridge conversions return an error
-// (also for partial / calendar-nominal values that cannot map cleanly).
+// No method panics: a nil receiver and a malformed `value` yield zero
+// components, false inspection flags and a zero magnitude, never the
+// parts read before the parse stopped; the fallible Go-bridge conversions
+// return an error (also for partial / calendar-nominal values that cannot
+// map cleanly, and for a definite duration that does not fit time.Duration).
 // See docs/specifications/rm-functions.md § REQ-123 and ADR 0011.
 //
 // Temporal arithmetic (add / subtract / diff / multiply / negative /
@@ -22,6 +23,7 @@ package rm
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -29,7 +31,9 @@ import (
 
 // ErrTemporalConversion is returned (wrapped) by ToTime / ToDuration
 // when a value cannot map cleanly to a Go time.Time / time.Duration:
-// it is malformed, partial, or carries calendar-nominal components.
+// the receiver is nil, the text is malformed or partial, a duration
+// carries calendar-nominal year or month components, or a definite
+// duration does not fit in a time.Duration.
 // Detect with errors.Is(err, rm.ErrTemporalConversion).
 var ErrTemporalConversion = errors.New("rm: temporal value not convertible")
 
@@ -67,26 +71,35 @@ type durationParts struct {
 
 // --- DV_DATE ------------------------------------------------------------
 
+// isoValue is the date text, or "" when the receiver is nil. Empty text
+// does not parse, so nil takes the same path as unparseable input.
+func (d *DVDate) isoValue() string {
+	if d == nil {
+		return ""
+	}
+	return d.Value
+}
+
 // Year returns the year component (0 when unparseable).
-func (d *DVDate) Year() int { p, _ := parseDate(d.Value); return p.year }
+func (d *DVDate) Year() int { p, _ := parseDate(d.isoValue()); return p.year }
 
 // Month returns the month component, or 0 when month-unknown.
-func (d *DVDate) Month() int { p, _ := parseDate(d.Value); return p.month }
+func (d *DVDate) Month() int { p, _ := parseDate(d.isoValue()); return p.month }
 
 // Day returns the day component, or 0 when day-unknown.
-func (d *DVDate) Day() int { p, _ := parseDate(d.Value); return p.day }
+func (d *DVDate) Day() int { p, _ := parseDate(d.isoValue()); return p.day }
 
 // MonthUnknown reports whether the date omits the month (e.g. "2024"). It is
 // false when the value does not parse.
 func (d *DVDate) MonthUnknown() bool {
-	p, err := parseDate(d.Value)
+	p, err := parseDate(d.isoValue())
 	return err == nil && !p.monthKnown
 }
 
 // DayUnknown reports whether the date omits the day (e.g. "2024-03"). It is
 // false when the value does not parse.
 func (d *DVDate) DayUnknown() bool {
-	p, err := parseDate(d.Value)
+	p, err := parseDate(d.isoValue())
 	return err == nil && !p.dayKnown
 }
 
@@ -99,7 +112,7 @@ func (d *DVDate) IsPartial() bool { return d.DayUnknown() }
 // 1). A malformed value returns 0 rather than a fabricated magnitude, so
 // Compare does not silently mis-order garbage.
 func (d *DVDate) Magnitude() Integer {
-	p, err := parseDate(d.Value)
+	p, err := parseDate(d.isoValue())
 	if err != nil {
 		return 0
 	}
@@ -116,41 +129,50 @@ func (d *DVDate) LessThan(other DVDate) bool { return d.Compare(other) < 0 }
 func (d *DVDate) IsStrictlyComparableTo(other DVDate) bool { return true }
 
 // ToTime converts a full date to a time.Time at midnight UTC, or returns
-// ErrTemporalConversion for a partial/malformed value.
+// ErrTemporalConversion when the receiver is nil or the value is partial
+// or malformed.
 func (d *DVDate) ToTime() (time.Time, error) {
-	p, err := parseDate(d.Value)
+	p, err := parseDate(d.isoValue())
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: date %q: %w", ErrTemporalConversion, d.Value, err)
+		return time.Time{}, fmt.Errorf("%w: date %q: %w", ErrTemporalConversion, d.isoValue(), err)
 	}
 	if !p.dayKnown {
-		return time.Time{}, fmt.Errorf("%w: date %q is partial", ErrTemporalConversion, d.Value)
+		return time.Time{}, fmt.Errorf("%w: date %q is partial", ErrTemporalConversion, d.isoValue())
 	}
 	return time.Date(p.year, time.Month(p.month), p.day, 0, 0, 0, 0, time.UTC), nil
 }
 
 // --- DV_TIME ------------------------------------------------------------
 
+// isoValue is the time text, or "" when the receiver is nil.
+func (d *DVTime) isoValue() string {
+	if d == nil {
+		return ""
+	}
+	return d.Value
+}
+
 // Hour returns the hour component (0 when unparseable).
-func (d *DVTime) Hour() int { p, _ := parseTime(d.Value); return p.hour }
+func (d *DVTime) Hour() int { p, _ := parseTime(d.isoValue()); return p.hour }
 
 // Minute returns the minute component, or 0 when minute-unknown.
-func (d *DVTime) Minute() int { p, _ := parseTime(d.Value); return p.minute }
+func (d *DVTime) Minute() int { p, _ := parseTime(d.isoValue()); return p.minute }
 
 // Second returns the second component, or 0 when second-unknown.
-func (d *DVTime) Second() int { p, _ := parseTime(d.Value); return p.second }
+func (d *DVTime) Second() int { p, _ := parseTime(d.isoValue()); return p.second }
 
 // FractionalSecond returns the fractional-second component (0 when
 // absent).
-func (d *DVTime) FractionalSecond() float64 { p, _ := parseTime(d.Value); return p.frac }
+func (d *DVTime) FractionalSecond() float64 { p, _ := parseTime(d.isoValue()); return p.frac }
 
 // Timezone returns the timezone designator (e.g. "Z", "+02:00"), or ""
 // when none is present.
-func (d *DVTime) Timezone() string { p, _ := parseTime(d.Value); return p.tz }
+func (d *DVTime) Timezone() string { p, _ := parseTime(d.isoValue()); return p.tz }
 
 // IsPartial reports whether the time is reduced (second or more missing). It
 // is false when the value does not parse.
 func (d *DVTime) IsPartial() bool {
-	p, err := parseTime(d.Value)
+	p, err := parseTime(d.isoValue())
 	return err == nil && !p.secondKnown
 }
 
@@ -160,7 +182,7 @@ func (d *DVTime) IsPartial() bool {
 // UTC but stated in different zones do not compare equal. A malformed
 // value returns 0.
 func (d *DVTime) Magnitude() Real {
-	p, err := parseTime(d.Value)
+	p, err := parseTime(d.isoValue())
 	if err != nil {
 		return 0
 	}
@@ -179,30 +201,38 @@ func (d *DVTime) LessThan(other DVTime) bool { return d.Compare(other) < 0 }
 func (d *DVTime) IsStrictlyComparableTo(other DVTime) bool { return true }
 
 // ToTime converts a full time-of-day to a time.Time on the reference
-// date 0000-01-01, or returns ErrTemporalConversion for a
-// partial/malformed value.
+// date 0000-01-01, or returns ErrTemporalConversion when the receiver is
+// nil or the value is partial or malformed.
 func (d *DVTime) ToTime() (time.Time, error) {
-	p, err := parseTime(d.Value)
+	p, err := parseTime(d.isoValue())
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: time %q: %w", ErrTemporalConversion, d.Value, err)
+		return time.Time{}, fmt.Errorf("%w: time %q: %w", ErrTemporalConversion, d.isoValue(), err)
 	}
 	if !p.secondKnown {
-		return time.Time{}, fmt.Errorf("%w: time %q is partial", ErrTemporalConversion, d.Value)
+		return time.Time{}, fmt.Errorf("%w: time %q is partial", ErrTemporalConversion, d.isoValue())
 	}
 	loc, err := tzLocation(p)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: time %q: %w", ErrTemporalConversion, d.Value, err)
+		return time.Time{}, fmt.Errorf("%w: time %q: %w", ErrTemporalConversion, d.isoValue(), err)
 	}
 	return time.Date(0, 1, 1, p.hour, p.minute, p.second, int(p.frac*1e9), loc), nil
 }
 
 // --- DV_DATE_TIME -------------------------------------------------------
 
+// isoValue is the date-time text, or "" when the receiver is nil.
+func (d *DVDateTime) isoValue() string {
+	if d == nil {
+		return ""
+	}
+	return d.Value
+}
+
 // split parses the date-time's value into its date and time parts. On an
 // error both parts are zero, so no accessor reports a part read before the
 // parse stopped.
 func (d *DVDateTime) split() (dateParts, timeParts, error) {
-	dp, tp, err := splitDateTime(d.Value)
+	dp, tp, err := splitDateTime(d.isoValue())
 	if err != nil {
 		return dateParts{}, timeParts{}, err
 	}
@@ -307,67 +337,75 @@ func (d *DVDateTime) LessThan(other DVDateTime) bool { return d.Compare(other) <
 func (d *DVDateTime) IsStrictlyComparableTo(other DVDateTime) bool { return true }
 
 // ToTime converts a full date-time to a time.Time (UTC when no timezone
-// is present), or returns ErrTemporalConversion for a partial/malformed
-// value.
+// is present), or returns ErrTemporalConversion when the receiver is nil
+// or the value is partial or malformed.
 func (d *DVDateTime) ToTime() (time.Time, error) {
 	dp, tp, err := d.split()
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: date-time %q: %w", ErrTemporalConversion, d.Value, err)
+		return time.Time{}, fmt.Errorf("%w: date-time %q: %w", ErrTemporalConversion, d.isoValue(), err)
 	}
 	if !dp.dayKnown || !tp.secondKnown {
-		return time.Time{}, fmt.Errorf("%w: date-time %q is partial", ErrTemporalConversion, d.Value)
+		return time.Time{}, fmt.Errorf("%w: date-time %q is partial", ErrTemporalConversion, d.isoValue())
 	}
 	loc, err := tzLocation(tp)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: date-time %q: %w", ErrTemporalConversion, d.Value, err)
+		return time.Time{}, fmt.Errorf("%w: date-time %q: %w", ErrTemporalConversion, d.isoValue(), err)
 	}
 	return time.Date(dp.year, time.Month(dp.month), dp.day, tp.hour, tp.minute, tp.second, int(tp.frac*1e9), loc), nil
 }
 
 // --- DV_DURATION --------------------------------------------------------
 
+// isoValue is the duration text, or "" when the receiver is nil.
+func (d *DVDuration) isoValue() string {
+	if d == nil {
+		return ""
+	}
+	return d.Value
+}
+
 // Years returns the years component.
-func (d *DVDuration) Years() int { p, _ := parseDuration(d.Value); return p.years }
+func (d *DVDuration) Years() int { p, _ := parseDuration(d.isoValue()); return p.years }
 
 // Months returns the months component.
-func (d *DVDuration) Months() int { p, _ := parseDuration(d.Value); return p.months }
+func (d *DVDuration) Months() int { p, _ := parseDuration(d.isoValue()); return p.months }
 
 // Weeks returns the weeks component.
-func (d *DVDuration) Weeks() int { p, _ := parseDuration(d.Value); return p.weeks }
+func (d *DVDuration) Weeks() int { p, _ := parseDuration(d.isoValue()); return p.weeks }
 
 // Days returns the days component.
-func (d *DVDuration) Days() int { p, _ := parseDuration(d.Value); return p.days }
+func (d *DVDuration) Days() int { p, _ := parseDuration(d.isoValue()); return p.days }
 
 // Hours returns the hours component.
-func (d *DVDuration) Hours() int { p, _ := parseDuration(d.Value); return p.hours }
+func (d *DVDuration) Hours() int { p, _ := parseDuration(d.isoValue()); return p.hours }
 
 // Minutes returns the minutes component.
-func (d *DVDuration) Minutes() int { p, _ := parseDuration(d.Value); return p.minutes }
+func (d *DVDuration) Minutes() int { p, _ := parseDuration(d.isoValue()); return p.minutes }
 
 // Seconds returns the whole-seconds component.
-func (d *DVDuration) Seconds() int { p, _ := parseDuration(d.Value); return p.seconds }
+func (d *DVDuration) Seconds() int { p, _ := parseDuration(d.isoValue()); return p.seconds }
 
 // FractionalSeconds returns the fractional-second component.
-func (d *DVDuration) FractionalSeconds() float64 { p, _ := parseDuration(d.Value); return p.frac }
+func (d *DVDuration) FractionalSeconds() float64 { p, _ := parseDuration(d.isoValue()); return p.frac }
 
 // IsNegative reports whether the duration carries a leading minus sign
 // (openEHR deviation from ISO 8601). It is false when the value does not
 // parse.
-func (d *DVDuration) IsNegative() bool { p, _ := parseDuration(d.Value); return p.neg }
+func (d *DVDuration) IsNegative() bool { p, _ := parseDuration(d.isoValue()); return p.neg }
 
 // Magnitude returns the duration as a number of seconds, using the
 // openEHR nominal year (365.24 d) and month (30.42 d) averages for the
 // calendar-nominal components. Negative when the duration is negative.
+// Components are scaled in floating point, so a long duration keeps its
+// length in seconds within float64 precision.
 func (d *DVDuration) Magnitude() float64 {
-	p, err := parseDuration(d.Value)
+	p, err := parseDuration(d.isoValue())
 	if err != nil {
 		return 0
 	}
 	secs := float64(p.years)*nominalDaysInYear*secondsPerDay +
 		float64(p.months)*nominalDaysInMonth*secondsPerDay +
-		float64(p.weeks)*7*secondsPerDay +
-		float64(p.days)*secondsPerDay +
-		float64(p.hours*3600+p.minutes*60+p.seconds) + p.frac
+		definiteSeconds(p)
 	if p.neg {
 		return -secs
 	}
@@ -384,23 +422,124 @@ func (d *DVDuration) LessThan(other DVDuration) bool { return d.Compare(other) <
 func (d *DVDuration) IsStrictlyComparableTo(other DVDuration) bool { return true }
 
 // ToDuration converts a definite duration to a time.Duration, or returns
-// ErrTemporalConversion when it is malformed or carries calendar-nominal
-// years/months (which have no fixed length). Weeks and days are treated
-// as definite (7 d, 24 h).
+// ErrTemporalConversion when the receiver is nil, the value is malformed,
+// it carries calendar-nominal years or months (which have no fixed length),
+// or the length does not fit in a time.Duration. Weeks and days are treated
+// as definite (7 d, 24 h), and the fractional second is rounded to the
+// nearest nanosecond.
 func (d *DVDuration) ToDuration() (time.Duration, error) {
-	p, err := parseDuration(d.Value)
+	p, err := parseDuration(d.isoValue())
 	if err != nil {
-		return 0, fmt.Errorf("%w: duration %q: %w", ErrTemporalConversion, d.Value, err)
+		return 0, fmt.Errorf("%w: duration %q: %w", ErrTemporalConversion, d.isoValue(), err)
 	}
 	if p.years != 0 || p.months != 0 {
-		return 0, fmt.Errorf("%w: duration %q has calendar-nominal Y/M components", ErrTemporalConversion, d.Value)
+		return 0, fmt.Errorf("%w: duration %q has calendar-nominal Y/M components", ErrTemporalConversion, d.isoValue())
 	}
-	secs := float64(p.weeks)*7*secondsPerDay + float64(p.days)*secondsPerDay +
-		float64(p.hours*3600+p.minutes*60+p.seconds) + p.frac
+	ns, ok := definiteNanos(p)
+	if !ok {
+		return 0, fmt.Errorf("%w: duration %q does not fit in a time.Duration", ErrTemporalConversion, d.isoValue())
+	}
+	return time.Duration(ns), nil
+}
+
+// definiteSeconds is the length of the week, day and clock components in
+// seconds. Each component is converted to float64 before it is scaled, so
+// a large hour count is not multiplied in int.
+func definiteSeconds(p durationParts) float64 {
+	return float64(p.weeks)*7*secondsPerDay +
+		float64(p.days)*secondsPerDay +
+		float64(p.hours)*3600 +
+		float64(p.minutes)*60 +
+		float64(p.seconds) + p.frac
+}
+
+// definiteNanos is the week, day and clock length in nanoseconds, with the
+// sign applied. Whole seconds are counted in integers, so a length one
+// nanosecond outside the int64 range is not rounded onto either extreme.
+// The bool is false when that length does not fit.
+func definiteNanos(p durationParts) (int64, bool) {
+	mag, ok := unsignedNanos(p)
+	if !ok {
+		return 0, false
+	}
 	if p.neg {
-		secs = -secs
+		// 2^63 nanoseconds is math.MinInt64; one more does not fit.
+		const minMag = uint64(math.MaxInt64) + 1
+		if mag > minMag {
+			return 0, false
+		}
+		if mag == minMag {
+			return math.MinInt64, true
+		}
+		return -int64(mag), true
 	}
-	return time.Duration(secs * float64(time.Second)), nil
+	if mag > uint64(math.MaxInt64) {
+		return 0, false
+	}
+	return int64(mag), true
+}
+
+// unsignedNanos is the absolute length in nanoseconds. Only the fractional
+// second is a float, rounded to the nearest nanosecond.
+func unsignedNanos(p durationParts) (uint64, bool) {
+	days, ok := mulU(uint64(p.weeks), 7)
+	if !ok {
+		return 0, false
+	}
+	days, ok = addU(days, uint64(p.days))
+	if !ok {
+		return 0, false
+	}
+	secs, ok := mulU(days, 86400)
+	if !ok {
+		return 0, false
+	}
+	hours, ok := mulU(uint64(p.hours), 3600)
+	if !ok {
+		return 0, false
+	}
+	mins, ok := mulU(uint64(p.minutes), 60)
+	if !ok {
+		return 0, false
+	}
+	secs, ok = addU(secs, hours)
+	if !ok {
+		return 0, false
+	}
+	secs, ok = addU(secs, mins)
+	if !ok {
+		return 0, false
+	}
+	secs, ok = addU(secs, uint64(p.seconds))
+	if !ok {
+		return 0, false
+	}
+	ns, ok := mulU(secs, 1_000_000_000)
+	if !ok {
+		return 0, false
+	}
+	// A fraction just below one second can round up to 1e9 nanoseconds, a
+	// whole second; adding it carries that second, and addU catches overflow.
+	return addU(ns, uint64(math.Round(p.frac*1e9)))
+}
+
+func mulU(a, b uint64) (uint64, bool) {
+	if a == 0 || b == 0 {
+		return 0, true
+	}
+	c := a * b
+	if c/a != b {
+		return 0, false
+	}
+	return c, true
+}
+
+func addU(a, b uint64) (uint64, bool) {
+	c := a + b
+	if c < a {
+		return 0, false
+	}
+	return c, true
 }
 
 // --- parsing ------------------------------------------------------------

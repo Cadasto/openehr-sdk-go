@@ -2,6 +2,7 @@ package rm_test
 
 import (
 	"errors"
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -402,5 +403,254 @@ func TestREQ123_ValidISO8601(t *testing.T) {
 				t.Errorf("ValidISO8601() = %v, want %v", tc.got, tc.want)
 			}
 		})
+	}
+}
+
+// REQ-123: a nil receiver does not panic. Accessors, partial-form inspections
+// and Magnitude answer as they do for text that does not parse: zero, the
+// empty string, or false. Compare and LessThan follow that magnitude.
+func TestREQ123_NilReceiver(t *testing.T) {
+	readings := []struct {
+		name string
+		call func() any
+	}{
+		{"DVDate.Year", func() any { return (*rm.DVDate)(nil).Year() }},
+		{"DVDate.Month", func() any { return (*rm.DVDate)(nil).Month() }},
+		{"DVDate.Day", func() any { return (*rm.DVDate)(nil).Day() }},
+		{"DVDate.MonthUnknown", func() any { return (*rm.DVDate)(nil).MonthUnknown() }},
+		{"DVDate.DayUnknown", func() any { return (*rm.DVDate)(nil).DayUnknown() }},
+		{"DVDate.IsPartial", func() any { return (*rm.DVDate)(nil).IsPartial() }},
+		{"DVDate.Magnitude", func() any { return (*rm.DVDate)(nil).Magnitude() }},
+		{"DVTime.Hour", func() any { return (*rm.DVTime)(nil).Hour() }},
+		{"DVTime.Minute", func() any { return (*rm.DVTime)(nil).Minute() }},
+		{"DVTime.Second", func() any { return (*rm.DVTime)(nil).Second() }},
+		{"DVTime.FractionalSecond", func() any { return (*rm.DVTime)(nil).FractionalSecond() }},
+		{"DVTime.Timezone", func() any { return (*rm.DVTime)(nil).Timezone() }},
+		{"DVTime.IsPartial", func() any { return (*rm.DVTime)(nil).IsPartial() }},
+		{"DVTime.Magnitude", func() any { return (*rm.DVTime)(nil).Magnitude() }},
+		{"DVDateTime.Year", func() any { return (*rm.DVDateTime)(nil).Year() }},
+		{"DVDateTime.Month", func() any { return (*rm.DVDateTime)(nil).Month() }},
+		{"DVDateTime.Day", func() any { return (*rm.DVDateTime)(nil).Day() }},
+		{"DVDateTime.Hour", func() any { return (*rm.DVDateTime)(nil).Hour() }},
+		{"DVDateTime.Minute", func() any { return (*rm.DVDateTime)(nil).Minute() }},
+		{"DVDateTime.Second", func() any { return (*rm.DVDateTime)(nil).Second() }},
+		{"DVDateTime.FractionalSecond", func() any { return (*rm.DVDateTime)(nil).FractionalSecond() }},
+		{"DVDateTime.Timezone", func() any { return (*rm.DVDateTime)(nil).Timezone() }},
+		{"DVDateTime.MonthUnknown", func() any { return (*rm.DVDateTime)(nil).MonthUnknown() }},
+		{"DVDateTime.DayUnknown", func() any { return (*rm.DVDateTime)(nil).DayUnknown() }},
+		{"DVDateTime.IsPartial", func() any { return (*rm.DVDateTime)(nil).IsPartial() }},
+		{"DVDateTime.Magnitude", func() any { return (*rm.DVDateTime)(nil).Magnitude() }},
+		{"DVDuration.Years", func() any { return (*rm.DVDuration)(nil).Years() }},
+		{"DVDuration.Months", func() any { return (*rm.DVDuration)(nil).Months() }},
+		{"DVDuration.Weeks", func() any { return (*rm.DVDuration)(nil).Weeks() }},
+		{"DVDuration.Days", func() any { return (*rm.DVDuration)(nil).Days() }},
+		{"DVDuration.Hours", func() any { return (*rm.DVDuration)(nil).Hours() }},
+		{"DVDuration.Minutes", func() any { return (*rm.DVDuration)(nil).Minutes() }},
+		{"DVDuration.Seconds", func() any { return (*rm.DVDuration)(nil).Seconds() }},
+		{"DVDuration.FractionalSeconds", func() any { return (*rm.DVDuration)(nil).FractionalSeconds() }},
+		{"DVDuration.IsNegative", func() any { return (*rm.DVDuration)(nil).IsNegative() }},
+		{"DVDuration.Magnitude", func() any { return (*rm.DVDuration)(nil).Magnitude() }},
+	}
+	for _, tc := range readings {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.call()
+			if !reflect.ValueOf(got).IsZero() {
+				t.Errorf("%s() = %v, want the zero value", tc.name, got)
+			}
+		})
+	}
+
+	order := []struct {
+		name string
+		cmp  func() int
+		less func() bool
+	}{
+		{
+			name: "DVDate",
+			cmp:  func() int { return (*rm.DVDate)(nil).Compare(rm.DVDate{Value: "2024-01-01"}) },
+			less: func() bool { return (*rm.DVDate)(nil).LessThan(rm.DVDate{Value: "2024-01-01"}) },
+		},
+		{
+			name: "DVTime",
+			cmp:  func() int { return (*rm.DVTime)(nil).Compare(rm.DVTime{Value: "00:00:01"}) },
+			less: func() bool { return (*rm.DVTime)(nil).LessThan(rm.DVTime{Value: "00:00:01"}) },
+		},
+		{
+			name: "DVDateTime",
+			cmp:  func() int { return (*rm.DVDateTime)(nil).Compare(rm.DVDateTime{Value: "2024-01-01T00:00:00"}) },
+			less: func() bool { return (*rm.DVDateTime)(nil).LessThan(rm.DVDateTime{Value: "2024-01-01T00:00:00"}) },
+		},
+		{
+			name: "DVDuration",
+			cmp:  func() int { return (*rm.DVDuration)(nil).Compare(rm.DVDuration{Value: "PT1S"}) },
+			less: func() bool { return (*rm.DVDuration)(nil).LessThan(rm.DVDuration{Value: "PT1S"}) },
+		},
+	}
+	for _, tc := range order {
+		t.Run(tc.name+" ordering", func(t *testing.T) {
+			if got := tc.cmp(); got != -1 {
+				t.Errorf("%s.Compare = %d, want -1", tc.name, got)
+			}
+			if !tc.less() {
+				t.Errorf("%s.LessThan = false, want true", tc.name)
+			}
+		})
+	}
+
+	conversions := []struct {
+		name string
+		call func() (bool, error)
+	}{
+		{"DVDate.ToTime", func() (bool, error) {
+			got, err := (*rm.DVDate)(nil).ToTime()
+			return got.IsZero(), err
+		}},
+		{"DVTime.ToTime", func() (bool, error) {
+			got, err := (*rm.DVTime)(nil).ToTime()
+			return got.IsZero(), err
+		}},
+		{"DVDateTime.ToTime", func() (bool, error) {
+			got, err := (*rm.DVDateTime)(nil).ToTime()
+			return got.IsZero(), err
+		}},
+		{"DVDuration.ToDuration", func() (bool, error) {
+			got, err := (*rm.DVDuration)(nil).ToDuration()
+			return got == 0, err
+		}},
+	}
+	for _, tc := range conversions {
+		t.Run(tc.name, func(t *testing.T) {
+			zero, err := tc.call()
+			if !errors.Is(err, rm.ErrTemporalConversion) {
+				t.Errorf("%s() err = %v, want ErrTemporalConversion", tc.name, err)
+			}
+			if !zero {
+				t.Errorf("%s() returned a non-zero value, err = %v", tc.name, err)
+			}
+		})
+	}
+}
+
+// REQ-123: a definite duration that does not fit in time.Duration makes
+// ToDuration return ErrTemporalConversion and a zero duration. A long
+// duration that does fit, such as P100000D, still converts.
+func TestREQ123_ToDurationRejectsOutOfRange(t *testing.T) {
+	for _, value := range []string{"PT9999999999999H", "P400000D", "-PT9999999999999H", "-P400000D"} {
+		t.Run(value, func(t *testing.T) {
+			got, err := (&rm.DVDuration{Value: value}).ToDuration()
+			if !errors.Is(err, rm.ErrTemporalConversion) {
+				t.Errorf("ToDuration(%q) err = %v, want ErrTemporalConversion", value, err)
+			}
+			if got != 0 {
+				t.Errorf("ToDuration(%q) = %v, want 0 (not a wrapped duration)", value, got)
+			}
+		})
+	}
+
+	const days = 100000
+	got, err := (&rm.DVDuration{Value: "P100000D"}).ToDuration()
+	if err != nil {
+		t.Fatalf("ToDuration(P100000D) err = %v, want nil", err)
+	}
+	if want := days * 24 * time.Hour; got != want {
+		t.Errorf("ToDuration(P100000D) = %v, want %v", got, want)
+	}
+
+	// The int64 extremes are exact nanosecond counts. One nanosecond past
+	// either end must be an error, not that end's duration.
+	edges := []struct {
+		value string
+		want  int64
+		ok    bool
+	}{
+		{"PT9223372036.854775807S", math.MaxInt64, true},
+		{"-PT9223372036.854775808S", math.MinInt64, true},
+		{"PT9223372036.854775808S", 0, false},
+		{"-PT9223372036.854775809S", 0, false},
+		// A fraction that rounds up to a whole second carries into the
+		// seconds; it does not make a fitting length fail.
+		{"PT0.9999999999S", int64(time.Second), true},
+		{"PT1.9999999999S", int64(2 * time.Second), true},
+		{"-PT0.9999999999S", -int64(time.Second), true},
+	}
+	for _, tc := range edges {
+		t.Run(tc.value, func(t *testing.T) {
+			got, err := (&rm.DVDuration{Value: tc.value}).ToDuration()
+			if tc.ok {
+				if err != nil {
+					t.Fatalf("ToDuration(%q) err = %v, want nil", tc.value, err)
+				}
+				if int64(got) != tc.want {
+					t.Errorf("ToDuration(%q) = %d, want %d", tc.value, int64(got), tc.want)
+				}
+				return
+			}
+			if !errors.Is(err, rm.ErrTemporalConversion) {
+				t.Errorf("ToDuration(%q) err = %v, want ErrTemporalConversion", tc.value, err)
+			}
+			if got != 0 {
+				t.Errorf("ToDuration(%q) = %d, want 0", tc.value, int64(got))
+			}
+		})
+	}
+
+	// Each input overflows one intermediate sum or product of the
+	// nanosecond count, and its wrapped-around result lands back inside the
+	// int64 range, so only that step's overflow check makes it an error.
+	wraps := []struct{ step, value string }{
+		{"weeks times 7", "P2635249153387078803W"},
+		{"weeks plus days", "P2635249153387078802W3D"},
+		{"days times 86400", "P213503982334602D"},
+		{"hours times 3600", "PT5124095576030432H"},
+		{"minutes times 60", "PT307445734561825861M"},
+		{"days plus hours", "P1DT5124095576030431H"},
+		{"hours plus minutes", "PT1H307445734561825860M"},
+		{"plus seconds", "PT5124095576030431H17S"},
+		{"seconds times 1e9", "PT18446744074S"},
+		{"plus fraction", "PT18446744073.8S"},
+	}
+	for _, tc := range wraps {
+		t.Run(tc.step, func(t *testing.T) {
+			got, err := (&rm.DVDuration{Value: tc.value}).ToDuration()
+			if !errors.Is(err, rm.ErrTemporalConversion) {
+				t.Errorf("ToDuration(%q) = %v, %v, want ErrTemporalConversion", tc.value, got, err)
+			}
+		})
+	}
+}
+
+// REQ-123: a duration component too large for a Go int is unparseable input,
+// so the accessors and magnitude answer zero and ToDuration errors.
+func TestREQ123_DurationComponentPastIntIsUnparseable(t *testing.T) {
+	for _, value := range []string{"PT9999999999999999999H", "P99999999999999999999D"} {
+		t.Run(value, func(t *testing.T) {
+			d := &rm.DVDuration{Value: value}
+			if got := d.Magnitude(); got != 0 {
+				t.Errorf("Magnitude(%q) = %g, want 0", value, got)
+			}
+			if h, dd := d.Hours(), d.Days(); h != 0 || dd != 0 {
+				t.Errorf("Hours, Days of %q = %d, %d, want 0, 0", value, h, dd)
+			}
+			if _, err := d.ToDuration(); !errors.Is(err, rm.ErrTemporalConversion) {
+				t.Errorf("ToDuration(%q) err = %v, want ErrTemporalConversion", value, err)
+			}
+		})
+	}
+}
+
+// REQ-123: magnitude of a duration scales each component in floating point,
+// so PT9999999999999999H is that length in seconds and not the wrapped int product.
+func TestREQ123_DurationMagnitudeNoIntOverflow(t *testing.T) {
+	hours := int64(9999999999999999)
+	got := (&rm.DVDuration{Value: "PT9999999999999999H"}).Magnitude()
+	want := float64(hours) * 3600
+	if rel := math.Abs(got-want) / want; rel > 1e-9 {
+		t.Errorf("Magnitude(PT9999999999999999H) = %g, want %g (relative error %g)", got, want, rel)
+	}
+	// A variable, so the multiply wraps at run time instead of being rejected
+	// as a constant. That wrapped product is what the int multiply used to return.
+	wrapped := float64(hours * 3600)
+	if got == wrapped {
+		t.Errorf("Magnitude(PT9999999999999999H) = %g, the wrapped int product", got)
 	}
 }
