@@ -66,7 +66,7 @@ func (r *Replayer) RoundTrip(req *http.Request) (*http.Response, error) {
 		r.remaining = append(r.remaining[:i], r.remaining[i+1:]...)
 		return entryResponse(e, req), nil
 	}
-	return nil, fmt.Errorf("%w: %s %s", ErrUnmatchedRecording, req.Method, key)
+	return nil, fmt.Errorf("%w: %s", ErrUnmatchedRecording, key)
 }
 
 func requestPath(req *http.Request) string {

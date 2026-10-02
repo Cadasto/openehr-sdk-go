@@ -11,10 +11,8 @@ import (
 // AuditType selects the `_type` discriminator emitted on the write-side
 // commit audit. The vendored ITS-REST pin recommends that clients send
 // `_type: "UPDATE_AUDIT"`, and that servers also accept `AUDIT_DETAILS` or an
-// omitted `_type`. The SDK defaults to `AUDIT_DETAILS`; that default is
-// documented in docs/specifications/wire.md under the contribution request
-// shape. Callers can switch to `UPDATE_AUDIT` when a server accepts only that
-// form.
+// omitted `_type`. The SDK defaults to `AUDIT_DETAILS`. Callers can switch to
+// `UPDATE_AUDIT` when a server accepts only that form.
 type AuditType string
 
 const (
@@ -22,8 +20,7 @@ const (
 	// default: the zero value of [UpdateAudit.Type] resolves to it.
 	AuditTypeAuditDetails AuditType = "AUDIT_DETAILS"
 	// AuditTypeUpdateAudit emits `_type:"UPDATE_AUDIT"`, the form the vendored
-	// ITS-REST pin recommends clients send. The SDK's AUDIT_DETAILS default is
-	// documented in docs/specifications/wire.md.
+	// ITS-REST pin recommends clients send.
 	AuditTypeUpdateAudit AuditType = "UPDATE_AUDIT"
 )
 

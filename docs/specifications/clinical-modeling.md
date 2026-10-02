@@ -716,7 +716,7 @@ The consuming packages reference the public `*templatecompile.Compiled` in their
 The constructor **MUST NOT** live in `openehr/template` (the natural home next to `ParseFile`), for two reasons:
 
 1. **Import cycle.** The compile engine imports `openehr/template`; a `Compile` inside `openehr/template` would import the engine, forming `template → templatecompile → template`.
-2. **REQ-100 import ban.** Compilation needs `openehr/rm/rminfo`, which [§ REQ-100](#req-100--adl-14-operational-template-opt-parse-and-paths) forbids this package to import.
+2. **REQ-100 import ban.** Compilation needs `openehr/rm/rminfo`, which [§ REQ-100](#req-100--adl-14-operational-template-opt-parse-and-paths) forbids `openehr/template` to import.
 
 It therefore lives in the sibling package `openehr/templatecompile`. This supersedes [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2's `template.Compile` / `template.Compiled` proposal; see [ADR 0010](../adr/0010-public-compiled-template-bridge.md).
 
@@ -788,7 +788,7 @@ Templates that **reuse one archetype under a multi-valued slot** (name-distingui
 `openehr/template/webtemplate/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). It imports `openehr/templatecompile` (the compiled input, REQ-111), `openehr/template/constraints` (primitive constraints, REQ-103), `internal/templatecompile` (the shared REQ-116 name-predicate quoting — one rule for both path builders), and the standard library only.
 
 - **Lives in:** [`openehr/template/webtemplate/`](../../openehr/template/webtemplate/).
-- **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against three vendored EHRbase references — `constrain_test` plus the two REQ-116 archetype-reuse oracles. Catalogued in [`conformance.md`](conformance.md).
+- **Verification:** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against three vendored EHRbase references — `constrain_test` plus the two REQ-116 archetype-reuse oracles. Catalogued in [`conformance.md`](conformance.md).
 
 ## REQ-116 — Template-level node naming and name-predicated paths
 
