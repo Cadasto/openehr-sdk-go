@@ -8,14 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-02
+
+Twenty-ninth `v0.x` minor: generated and built compositions now pass the RM floor, the floor checks far more, and FLAT decode rebuilds archetype details. **Breaking:** `ValidateRM`, `CString.Validate`, FLAT decode and interval type names refuse input they accepted, canonical AOM 1.4 interval output changes shape, and a JWKS outage in `smart.ValidateIDToken` no longer matches `ErrJWKSValidationFailed`.
+
 ### Added
 
-- **Generated and built values pass the RM floor (REQ-107, PROBE-027).** Times, languages, encodings, ordinals and ELEMENTs are RM-valid, constrained optional text is filled, seeded `RandomFill` differs, and validation checks STRING leaves and `ism_transition`.
-- **The canonical JSON and XML codec covers AOM 1.4 constraint intervals (REQ-052, REQ-056).** An open side omits its zero bound, XML uses snake_case names while still decoding the v0.28.0 PascalCase, and `rm.IsEmptyIntervalBound` is exported.
-- **FLAT encode writes no keys for an unset coded text (REQ-053).** The blank `|code` and `|value` keys are gone, and decode now refuses a second placement on a scalar-filled attribute or an included open side.
+- **Generated and built values pass the RM floor (REQ-107, PROBE-027).** Times, languages, encodings, ordinals and ELEMENTs are RM-valid, constrained optional text is filled, seeded `RandomFill` differs, `ARCHETYPED` carries `rm.Release`, and validation checks STRING leaves and `ism_transition`.
+- **Generated and built intervals are self-consistent (REQ-107, REQ-140).** A bounded side is closed and included, random bounds are ordered, the builder clears the open flag when it writes a bound, and `instance.Generate` supports `DV_DURATION`, `DV_ORDINAL` and `DV_SCALE` intervals.
+- **FLAT and STRUCTURED decode rebuild `archetype_details` (REQ-053, REQ-121).** Decoded compositions pass `ValidateRM`, and ACTION transitions map onto their archetyped `ism_transition` nodes.
+- **Probe Live snapshots and scenario recordings (REQ-082, PROBE-027).** PROBE-060, 065 and 104 gain opt-in Live snapshots, `cmd/probe-record` captures EHR-status, minimal-composition and stored-query HARs, and the corpus census compiles the normalised Code24 social OPT.
+
+### Changed
+
+- **The RM floor checks archetype roots, typed intervals and four more classes (REQ-112).** `ValidateRM` now fails a root without `archetype_details`, an empty `rm_version`, an invalid temporal value, and an ELEMENT with both or neither of `value` and `null_flavour`.
+- **FLAT and STRUCTURED follow the BASE interval rules (REQ-053, REQ-140).** An absent `|*_included` defaults by side, an included open side is refused both ways, a second placement on a single-valued attribute fails with `ErrUnknownPath`, and an unset coded text writes no keys.
+- **Canonical JSON and XML encode AOM 1.4 constraint intervals with a generated codec (REQ-052, REQ-056).** An open side omits its zero bound, XML uses snake_case names while still decoding the v0.28.0 PascalCase, and `rm.IsEmptyIntervalBound` is exported.
+- **A malformed generic type name is no longer an interval (REQ-100, REQ-102).** `DV_INTERVAL<DV_QUANTITY>>` and unclosed names are refused, a padded name reads as the canonical one, and a compiled interval node carries four more implicit attributes.
 - **A C_STRING pattern must match the whole string (REQ-103).** `CString.Validate` now refuses a value the pattern matches only in part, and the generator and validator read the pattern the same way.
-- **The RM floor reports invalid temporal values and ELEMENTs with both or neither of `value` and `null_flavour` (REQ-112).**
 - **Temporal parsing accepts ISO 8601 basic layouts, comma fractions and `±hhmm` zones, and refuses malformed durations (REQ-123).** An unparseable value reads as zero.
+- **`smart.ValidateIDToken` refuses an allowlist with no supported algorithm before fetching the JWKS (REQ-062, REQ-064).** Missing trust anchors return `auth.ErrInvalidConfig`, and a JWKS fetch failure no longer matches `auth.ErrJWKSValidationFailed`.
+
+### Deprecated
+
+- **`fixtures.CassettesRoot` gives way to `fixtures.CorpusRoot` (REQ-082).** The fixture tree moved from `testkit/cassettes` to `testkit/corpus`; the old function still works and returns the new path.
 
 ## [0.28.0] - 2026-09-25
 
