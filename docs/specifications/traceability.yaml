@@ -574,6 +574,7 @@ requirements:
       - openehr/client/definition/version_trim_test.go
       - openehr/client/query/query_test.go
       - openehr/client/query/version_trim_test.go
+      - testkit/probe/cassette_test.go
       - testkit/probe/livestoredquery_test.go
 
   - id: REQ-058
@@ -810,7 +811,9 @@ requirements:
       - testkit/probe/har_test.go
       - testkit/probe/live_test.go
       - testkit/probe/livecomposition_test.go
+      - testkit/probe/liveexample_test.go
       - testkit/probe/livesnapshot_test.go
+      - testkit/probe/livestatus_test.go
       - testkit/probe/livestoredquery_test.go
       - testkit/probe/mode_test.go
       - testkit/probe/record_test.go
@@ -905,6 +908,8 @@ requirements:
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
       - openehr/client/ehr/resource_test.go
       - openehr/client/ehr/write_test.go
+      - testkit/probe/cassette_test.go
+      - testkit/probe/livestatus_test.go
       - testkit/probes/versioned/probe_065_minimal_return_round_trip.go
       - testkit/probes/versioned/probe_065_test.go
       - testkit/probes/versioned/probe_071_composition_write_response_shape.go
@@ -926,6 +931,9 @@ requirements:
       - openehr/client/ehr/path_encoding_test.go
       - openehr/client/pathencoding_guard_test.go
       - openehr/client/query/path_encoding_test.go
+      - testkit/probe/cassette_test.go
+      - testkit/probe/liveexample_test.go
+      - testkit/probe/livestatus_test.go
       - testkit/probes/rest/probe_060_ehr_creation_round_trip.go
       - testkit/probes/rest/probe_102_system_capabilities.go
       - testkit/probes/rest/probe_104_definition_example.go

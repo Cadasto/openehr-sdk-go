@@ -27,6 +27,21 @@ var scenarios = map[string]scenario{
 		desc:    "POST /ehr, then GET and HEAD the created EHR",
 		capture: captureEHRLifecycle,
 	},
+	"ehr-status": {
+		name:    "ehr-status",
+		desc:    "POST /ehr with a fixed initial EHR_STATUS, then GET that status",
+		capture: captureEHRStatus,
+	},
+	"composition-minimal": {
+		name:    "composition-minimal",
+		desc:    "POST /ehr, upload a fixed OPT, POST a composition, then GET the version the save returned",
+		capture: captureCompositionMinimal,
+	},
+	"stored-query": {
+		name:    "stored-query",
+		desc:    "POST /ehr, PUT a fixed stored query, then POST its execution",
+		capture: captureStoredQuery,
+	},
 }
 
 func scenarioNames() []string {
