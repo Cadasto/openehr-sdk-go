@@ -1061,6 +1061,7 @@ requirements:
       - openehr/template/constraints/constraints_test.go
       - openehr/template/constraints/example_test.go
       - openehr/template/constraints/pure_imports_test.go
+      - openehr/template/constraints/string_cache_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/optional_string_test.go
@@ -1140,6 +1141,7 @@ requirements:
       - openehr/composition/builder_defaults_test.go
       - openehr/instance/accessors_test.go
       - openehr/instance/element_rule_test.go
+      - openehr/instance/element_slot_test.go
       - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/interval_flags_test.go
@@ -1163,6 +1165,8 @@ requirements:
       - openehr/template/constraints/example_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/optional_string_test.go
+      - openehr/validation/rmread/handles_reader_test.go
+      - openehr/validation/rmread/read_optional_string_test.go
       - openehr/validation/walk_primitive_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/instance/corpus_ratchet_test.go
@@ -1282,6 +1286,7 @@ requirements:
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_temporal_element_test.go
       - openehr/validation/rmfloor_test.go
+      - openehr/validation/rmread/handles_reader_test.go
       - openehr/validation/rmread/handles_test.go
       - openehr/validation/rmread/interval_void_parity_test.go
       - openehr/validation/rmread/interval_void_test.go

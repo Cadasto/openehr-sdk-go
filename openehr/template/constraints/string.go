@@ -15,9 +15,10 @@ import (
 // The AOM does not say whether it is a whole-string or a search match;
 // the SDK reads it as whole-string, which is how the specification's own
 // examples (/.+/ for a non-empty string, /km\/h|mi\/h/ for a list of
-// units) only make sense and how the openEHR Java libraries apply it.
+// units) read most naturally and how Archie (String.matches) applies it.
 // Flags and anchors in the Pattern itself keep their meaning inside that
-// group, so a Pattern that is already anchored matches as before.
+// group; a multi-line anchored Pattern such as (?m)^[0-9]+$ no longer
+// matches a value like "12\n34", which the search reading accepted.
 //
 // Default carries the OPT <assumed_value>; empty when omitted.
 type CString struct {

@@ -1679,8 +1679,8 @@ func firstCodedExample(opt *tcimpl.CompiledNode, attrName string) (constraints.C
 // of rmValue, or onto its main string attribute when attr is "". The
 // value is a list member or a pattern match that the constraint accepts.
 // When there is none, it writes nothing and returns an error wrapping
-// ErrConstraintUnsatisfiable. An attribute the generator has no field or
-// no writer for is left alone, like any other unknown primitive target.
+// ErrConstraintUnsatisfiable. An attribute the generator has no field for
+// is left alone, like any other unknown primitive target.
 func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs constraints.CString, ex any) error {
 	if attr == "" {
 		attr = mainStringAttr(rmValue)

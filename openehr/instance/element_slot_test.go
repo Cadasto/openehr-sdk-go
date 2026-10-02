@@ -26,7 +26,7 @@ func optMultipleLowerZero(name string, children ...string) string {
 		`<upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality></attributes>`
 }
 
-// TestREQ107_ElementSlotCarriesExactlyOneOfValueAndNullFlavour pins the two
+// TestREQ107_ElementSlotCarriesExactlyOneOfValueAndNullFlavour (REQ-107) pins the two
 // places the generator fills an ELEMENT archetype slot. A slot body is not in
 // the OPT, so the filled ELEMENT has no value and must carry a null flavour
 // (Inv_null_flavour_indicated), under both policies and both fills.

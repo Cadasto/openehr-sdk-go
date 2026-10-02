@@ -30,7 +30,7 @@ func withMeaning[T rm.DVOrdered](r rm.ReferenceRange[T]) rm.ReferenceRange[T] {
 	return r
 }
 
-// TestHandles_EveryTypeHasAReadArm checks that each type Handles accepts
+// TestHandles_EveryTypeHasAReadArm (REQ-112, REQ-107) checks that each type Handles accepts
 // has a reader arm. A type with a Handles case but no arm in ReadSingle and
 // ReadMultiple reads every attribute as absent, so the RM floor would report
 // each of its RM-mandatory attributes as required. The probe takes every
