@@ -187,7 +187,7 @@ These eight changes make such a file standard OPT 1.4. With them, all seven uplo
 compiles them with the same template ids:
 
 1. **The root element.** `<OPERATIONAL_TEMPLATE … xsi:type="OPERATIONAL_TEMPLATE">` becomes
-   `<template … xsi:type="OPT">`, with the closing tag to match.
+   `<template … xsi:type="OPERATIONAL_TEMPLATE">`, with the closing tag to match. The type value stays `OPERATIONAL_TEMPLATE`; EHRbase accepts that on a `<template>` root and refuses only the element name `OPERATIONAL_TEMPLATE`.
 2. **The template language.** The first `<original_language>` becomes `<language>`
    (`OPERATIONAL_TEMPLATE.language`).
 3. **The top-level `archetype_id`.** It is removed; an OPT has none at the top level.
@@ -206,7 +206,7 @@ compiles them with the same template ids:
 import re, sys, pathlib
 src, dst = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
 s = src.read_text()
-s = re.sub(r'^<OPERATIONAL_TEMPLATE ([^>]*)xsi:type="OPERATIONAL_TEMPLATE">', r'<template \1xsi:type="OPT">', s, count=1)
+s = re.sub(r'^<OPERATIONAL_TEMPLATE ([^>]*)xsi:type="OPERATIONAL_TEMPLATE">', r'<template \1xsi:type="OPERATIONAL_TEMPLATE">', s, count=1)
 s = re.sub(r'</OPERATIONAL_TEMPLATE>\s*$', '</template>\n', s)
 s = s.replace('<original_language>', '<language>', 1).replace('</original_language>', '</language>', 1)
 s = re.sub(r'\n  <archetype_id>\s*<value>[^<]*</value>\s*</archetype_id>', '', s, count=1)

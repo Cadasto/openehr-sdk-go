@@ -1,4 +1,4 @@
-<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="OPT">
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="OPERATIONAL_TEMPLATE">
   <language>
     <terminology_id>
       <value>ISO_639-1</value>
