@@ -567,6 +567,11 @@ func TestREQ123_ToDurationRejectsOutOfRange(t *testing.T) {
 		{"-PT9223372036.854775808S", math.MinInt64, true},
 		{"PT9223372036.854775808S", 0, false},
 		{"-PT9223372036.854775809S", 0, false},
+		// A fraction that rounds up to a whole second carries into the
+		// seconds; it does not make a fitting length fail.
+		{"PT0.9999999999S", int64(time.Second), true},
+		{"PT1.9999999999S", int64(2 * time.Second), true},
+		{"-PT0.9999999999S", -int64(time.Second), true},
 	}
 	for _, tc := range edges {
 		t.Run(tc.value, func(t *testing.T) {
@@ -585,6 +590,49 @@ func TestREQ123_ToDurationRejectsOutOfRange(t *testing.T) {
 			}
 			if got != 0 {
 				t.Errorf("ToDuration(%q) = %d, want 0", tc.value, int64(got))
+			}
+		})
+	}
+
+	// Each input overflows one intermediate sum or product of the
+	// nanosecond count, and its wrapped-around result lands back inside the
+	// int64 range, so only that step's overflow check makes it an error.
+	wraps := []struct{ step, value string }{
+		{"weeks times 7", "P2635249153387078803W"},
+		{"weeks plus days", "P2635249153387078802W3D"},
+		{"days times 86400", "P213503982334602D"},
+		{"hours times 3600", "PT5124095576030432H"},
+		{"minutes times 60", "PT307445734561825861M"},
+		{"days plus hours", "P1DT5124095576030431H"},
+		{"hours plus minutes", "PT1H307445734561825860M"},
+		{"plus seconds", "PT5124095576030431H17S"},
+		{"seconds times 1e9", "PT18446744074S"},
+		{"plus fraction", "PT18446744073.8S"},
+	}
+	for _, tc := range wraps {
+		t.Run(tc.step, func(t *testing.T) {
+			got, err := (&rm.DVDuration{Value: tc.value}).ToDuration()
+			if !errors.Is(err, rm.ErrTemporalConversion) {
+				t.Errorf("ToDuration(%q) = %v, %v, want ErrTemporalConversion", tc.value, got, err)
+			}
+		})
+	}
+}
+
+// REQ-123: a duration component too large for a Go int is unparseable input,
+// so the accessors and magnitude answer zero and ToDuration errors.
+func TestREQ123_DurationComponentPastIntIsUnparseable(t *testing.T) {
+	for _, value := range []string{"PT9999999999999999999H", "P99999999999999999999D"} {
+		t.Run(value, func(t *testing.T) {
+			d := &rm.DVDuration{Value: value}
+			if got := d.Magnitude(); got != 0 {
+				t.Errorf("Magnitude(%q) = %g, want 0", value, got)
+			}
+			if h, dd := d.Hours(), d.Days(); h != 0 || dd != 0 {
+				t.Errorf("Hours, Days of %q = %d, %d, want 0, 0", value, h, dd)
+			}
+			if _, err := d.ToDuration(); !errors.Is(err, rm.ErrTemporalConversion) {
+				t.Errorf("ToDuration(%q) err = %v, want ErrTemporalConversion", value, err)
 			}
 		})
 	}

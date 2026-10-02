@@ -425,7 +425,8 @@ func (d *DVDuration) IsStrictlyComparableTo(other DVDuration) bool { return true
 // ErrTemporalConversion when the receiver is nil, the value is malformed,
 // it carries calendar-nominal years or months (which have no fixed length),
 // or the length does not fit in a time.Duration. Weeks and days are treated
-// as definite (7 d, 24 h).
+// as definite (7 d, 24 h), and the fractional second is rounded to the
+// nearest nanosecond.
 func (d *DVDuration) ToDuration() (time.Duration, error) {
 	p, err := parseDuration(d.isoValue())
 	if err != nil {
@@ -478,8 +479,8 @@ func definiteNanos(p durationParts) (int64, bool) {
 	return int64(mag), true
 }
 
-// unsignedNanos is the absolute length in nanoseconds. The fractional
-// second is below one second, so only that part is a float.
+// unsignedNanos is the absolute length in nanoseconds. Only the fractional
+// second is a float, rounded to the nearest nanosecond.
 func unsignedNanos(p durationParts) (uint64, bool) {
 	days, ok := mulU(uint64(p.weeks), 7)
 	if !ok {
@@ -517,11 +518,9 @@ func unsignedNanos(p durationParts) (uint64, bool) {
 	if !ok {
 		return 0, false
 	}
-	frac := int64(math.Round(p.frac * 1e9))
-	if frac < 0 || frac >= 1_000_000_000 {
-		return 0, false
-	}
-	return addU(ns, uint64(frac))
+	// A fraction just below one second can round up to 1e9 nanoseconds, a
+	// whole second; adding it carries that second, and addU catches overflow.
+	return addU(ns, uint64(math.Round(p.frac*1e9)))
 }
 
 func mulU(a, b uint64) (uint64, bool) {
