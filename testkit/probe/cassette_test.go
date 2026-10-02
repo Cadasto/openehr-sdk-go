@@ -300,9 +300,23 @@ func TestCassette_ReplaysEHRStatus_PROBE060_REQ095_REQ082(t *testing.T) {
 	wantUnmatched(t, err)
 }
 
-// cassetteTemplateID is the template id the composition-minimal recording
-// was captured under.
-const cassetteTemplateID = "sdk_cassette_comp.v1"
+// recordedTemplateID returns the template id the composition-minimal
+// recording was captured under: the openehr-template-id header of its
+// recorded save. Each capture mints its own template id, so the replay
+// reads it from the recording. It reads the request, not the read-back,
+// so a read-back that names another template still fails the
+// template_id check.
+func recordedTemplateID(t *testing.T, har probe.HAR) string {
+	t.Helper()
+	save := recordedEntry(t, &har, "POST", "/composition")
+	for _, h := range save.Request.Headers {
+		if strings.EqualFold(h.Name, "openehr-template-id") && h.Value != "" {
+			return h.Value
+		}
+	}
+	t.Fatal("the recorded composition save carries no openehr-template-id header")
+	return ""
+}
 
 // cassetteComposition rewrites the terminology_test fixture OPT and
 // composition to templateID, the id the composition-minimal recording was
@@ -392,8 +406,9 @@ func replayCompositionMinimal(ctx context.Context, c *transport.Client, template
 // unmatched.
 func TestCassette_ReplaysCompositionMinimal_PROBE065_REQ094_REQ082(t *testing.T) {
 	t.Parallel()
-	c := replayClientFor(t, loadRecording(t, "composition-minimal.har"))
-	id, err := replayCompositionMinimal(t.Context(), c, cassetteTemplateID)
+	har := loadRecording(t, "composition-minimal.har")
+	c := replayClientFor(t, har)
+	id, err := replayCompositionMinimal(t.Context(), c, recordedTemplateID(t, har))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -575,18 +590,18 @@ func dropResponseHeader(t *testing.T, e *probe.HAREntry, name string) {
 func TestCassette_ScenarioChecksFailOnAMutatedRecording_REQ082_REQ095_REQ094_REQ057(t *testing.T) {
 	t.Parallel()
 
-	ehrStatus := func(ctx context.Context, c *transport.Client, _ probe.HAR) error {
-		_, err := replayEHRStatus(ctx, c)
+	ehrStatus := func(t *testing.T, c *transport.Client, _ probe.HAR) error {
+		_, err := replayEHRStatus(t.Context(), c)
 		return err
 	}
-	compositionMinimal := func(saveOpts ...composition.WriteOption) func(context.Context, *transport.Client, probe.HAR) error {
-		return func(ctx context.Context, c *transport.Client, _ probe.HAR) error {
-			_, err := replayCompositionMinimal(ctx, c, cassetteTemplateID, saveOpts...)
+	compositionMinimal := func(saveOpts ...composition.WriteOption) func(*testing.T, *transport.Client, probe.HAR) error {
+		return func(t *testing.T, c *transport.Client, har probe.HAR) error {
+			_, err := replayCompositionMinimal(t.Context(), c, recordedTemplateID(t, har), saveOpts...)
 			return err
 		}
 	}
-	storedQuery := func(ctx context.Context, c *transport.Client, _ probe.HAR) error {
-		_, err := replayStoredQuery(ctx, c)
+	storedQuery := func(t *testing.T, c *transport.Client, _ probe.HAR) error {
+		_, err := replayStoredQuery(t.Context(), c)
 		return err
 	}
 	const otherEHRID = "00000000-0000-4000-8000-000000000000"
@@ -595,7 +610,7 @@ func TestCassette_ScenarioChecksFailOnAMutatedRecording_REQ082_REQ095_REQ094_REQ
 		name      string
 		recording string
 		mutate    func(t *testing.T, har *probe.HAR)
-		replay    func(ctx context.Context, c *transport.Client, har probe.HAR) error
+		replay    func(t *testing.T, c *transport.Client, har probe.HAR) error
 		want      string
 	}{
 		{
@@ -768,7 +783,7 @@ func TestCassette_ScenarioChecksFailOnAMutatedRecording_REQ082_REQ095_REQ094_REQ
 			t.Parallel()
 			har := loadRecording(t, tc.recording)
 			tc.mutate(t, &har)
-			err := tc.replay(t.Context(), replayClientFor(t, har), har)
+			err := tc.replay(t, replayClientFor(t, har), har)
 			if err == nil {
 				t.Fatalf("replay of %s with %s = nil error, want one naming %q", tc.recording, tc.name, tc.want)
 			}
