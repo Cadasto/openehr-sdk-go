@@ -323,7 +323,7 @@ func elementQuantity(e *rm.Element) *rm.DVQuantity {
 // generator end-to-end on the vendored OPT fixture under Example
 // policy (the INSTRUCTION subtree carrying DV_DURATION is beyond the
 // first content entry capped under Minimal — see
-// TestGenerateSocialMinimal_respectsContentUpper).
+// TestREQ107_GenerateSocialMinimal_respectsContentUpper).
 func TestGenerateClinicalNoteExample(t *testing.T) {
 	c := compileFixture(t, "clinical_note")
 	name := "Test Composer"
