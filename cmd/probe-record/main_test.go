@@ -2,11 +2,19 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/sandbox"
@@ -220,6 +228,141 @@ func TestCaptureScenario_RefusesACaptureThatCannotReplay(t *testing.T) {
 			names = append(names, e.Name())
 		}
 		t.Fatalf("an unreplayable capture published %v, want nothing", names)
+	}
+}
+
+// optTemplateID finds the first template_id value in an ADL 1.4 OPT, which
+// is the template's own id.
+var optTemplateID = regexp.MustCompile(`(?s)<template_id>\s*<value>([^<]+)</value>`)
+
+// compositionServer answers the composition-minimal scenario the way a CDR
+// does, on top of the sandbox's EHR surface. Its template store holds each
+// id once: an upload naming an id it already holds gets 409, as the
+// ITS-REST Definition API answers a repeated template_id
+// (409_template_already_exists). A save gets 422 unless its
+// openehr-template-id header and its archetype_details.template_id both
+// name a template the store holds.
+type compositionServer struct {
+	mu        sync.Mutex
+	templates []string          // template ids, in upload order
+	saved     map[string][]byte // composition bodies, by version uid
+}
+
+func newCompositionServer() *compositionServer {
+	return &compositionServer{saved: make(map[string][]byte)}
+}
+
+// backend returns a sandbox serving s's routes. Every call shares s's store,
+// so two captures against two backends from one s meet the same templates.
+func (s *compositionServer) backend() *sandbox.Backend {
+	b := sandbox.New()
+	b.HandleFunc(http.MethodPost, "/definition/template/adl1.4", s.uploadTemplate)
+	b.HandleFunc(http.MethodPost, "/ehr/", s.saveComposition)
+	b.HandleFunc(http.MethodGet, "/ehr/", s.getComposition)
+	return b
+}
+
+// uploaded returns the template ids the store holds, in upload order.
+func (s *compositionServer) uploaded() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.templates)
+}
+
+func (s *compositionServer) uploadTemplate(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	m := optTemplateID.FindSubmatch(body)
+	if m == nil {
+		http.Error(w, "the OPT names no template_id", http.StatusBadRequest)
+		return
+	}
+	id := string(m[1])
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if slices.Contains(s.templates, id) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = io.WriteString(w, `{"message":"template already exists"}`)
+		return
+	}
+	s.templates = append(s.templates, id)
+	w.Header().Set("Location", "https://sandbox.local/openehr/v1/definition/template/adl1.4/"+id)
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *compositionServer) saveComposition(w http.ResponseWriter, r *http.Request) {
+	if !strings.HasSuffix(r.URL.Path, "/composition") {
+		http.NotFound(w, r)
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var comp struct {
+		ArchetypeDetails struct {
+			TemplateID struct {
+				Value string `json:"value"`
+			} `json:"template_id"`
+		} `json:"archetype_details"`
+	}
+	if err := json.Unmarshal(body, &comp); err != nil {
+		http.Error(w, "the body is not a composition", http.StatusBadRequest)
+		return
+	}
+	header := r.Header.Get("openehr-template-id")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if header == "" || header != comp.ArchetypeDetails.TemplateID.Value || !slices.Contains(s.templates, header) {
+		http.Error(w, "the composition names no uploaded template", http.StatusUnprocessableEntity)
+		return
+	}
+	uid := fmt.Sprintf("composition-%d", len(s.saved)+1)
+	s.saved[uid] = body
+	w.Header().Set("Location", "https://sandbox.local"+r.URL.Path+"/"+uid)
+	w.Header().Set("ETag", `"`+uid+`::sandbox.local::1"`)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *compositionServer) getComposition(w http.ResponseWriter, r *http.Request) {
+	dir, uid := path.Split(r.URL.Path)
+	s.mu.Lock()
+	body, ok := s.saved[uid]
+	s.mu.Unlock()
+	if !strings.HasSuffix(dir, "/composition/") || !ok {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(body)
+}
+
+// TestCaptureScenario_CompositionMinimalCapturesTwiceAgainstOneServer_REQ082
+// pins the per-capture template id (REQ-082 Live: the per-run identifier
+// appears in every resource a mutating capture creates). A CDR holds a
+// template id once, so a capture that always uploaded under one fixed id
+// got 409 the second time against the same server and could never refresh
+// the recording. Two captures against one server must both succeed, each
+// under a template id of its own; the server refuses a save that does not
+// name the template its capture uploaded.
+func TestCaptureScenario_CompositionMinimalCapturesTwiceAgainstOneServer_REQ082(t *testing.T) {
+	t.Parallel()
+	srv := newCompositionServer()
+	for i := range 2 {
+		_, err := captureScenario(t.Context(), scenarios["composition-minimal"], "https://sandbox.local/openehr/v1",
+			srv.backend(), nil, validProvenance(), t.TempDir())
+		if err != nil {
+			t.Fatalf("capture %d of composition-minimal against one server = %v, want success", i+1, err)
+		}
+	}
+	got := srv.uploaded()
+	if len(got) != 2 || got[0] == got[1] {
+		t.Fatalf("two captures uploaded template ids %q, want two different ids", got)
 	}
 }
 
