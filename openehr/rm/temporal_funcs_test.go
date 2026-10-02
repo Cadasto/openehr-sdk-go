@@ -555,6 +555,39 @@ func TestREQ123_ToDurationRejectsOutOfRange(t *testing.T) {
 	if want := days * 24 * time.Hour; got != want {
 		t.Errorf("ToDuration(P100000D) = %v, want %v", got, want)
 	}
+
+	// The int64 extremes are exact nanosecond counts. One nanosecond past
+	// either end must be an error, not that end's duration.
+	edges := []struct {
+		value string
+		want  int64
+		ok    bool
+	}{
+		{"PT9223372036.854775807S", math.MaxInt64, true},
+		{"-PT9223372036.854775808S", math.MinInt64, true},
+		{"PT9223372036.854775808S", 0, false},
+		{"-PT9223372036.854775809S", 0, false},
+	}
+	for _, tc := range edges {
+		t.Run(tc.value, func(t *testing.T) {
+			got, err := (&rm.DVDuration{Value: tc.value}).ToDuration()
+			if tc.ok {
+				if err != nil {
+					t.Fatalf("ToDuration(%q) err = %v, want nil", tc.value, err)
+				}
+				if int64(got) != tc.want {
+					t.Errorf("ToDuration(%q) = %d, want %d", tc.value, int64(got), tc.want)
+				}
+				return
+			}
+			if !errors.Is(err, rm.ErrTemporalConversion) {
+				t.Errorf("ToDuration(%q) err = %v, want ErrTemporalConversion", tc.value, err)
+			}
+			if got != 0 {
+				t.Errorf("ToDuration(%q) = %d, want 0", tc.value, int64(got))
+			}
+		})
+	}
 }
 
 // REQ-123: magnitude of a duration scales each component in floating point,

@@ -434,14 +434,11 @@ func (d *DVDuration) ToDuration() (time.Duration, error) {
 	if p.years != 0 || p.months != 0 {
 		return 0, fmt.Errorf("%w: duration %q has calendar-nominal Y/M components", ErrTemporalConversion, d.isoValue())
 	}
-	secs := definiteSeconds(p)
-	if p.neg {
-		secs = -secs
-	}
-	if !fitsTimeDuration(secs) {
+	ns, ok := definiteNanos(p)
+	if !ok {
 		return 0, fmt.Errorf("%w: duration %q does not fit in a time.Duration", ErrTemporalConversion, d.isoValue())
 	}
-	return time.Duration(secs * float64(time.Second)), nil
+	return time.Duration(ns), nil
 }
 
 // definiteSeconds is the length of the week, day and clock components in
@@ -455,15 +452,95 @@ func definiteSeconds(p durationParts) float64 {
 		float64(p.seconds) + p.frac
 }
 
-// fitsTimeDuration reports whether a length in seconds fits in a time.Duration.
-// The largest int64 is not an exact float64, so a nanosecond count at or above
-// that rounded bound is rejected, as is a count below the most negative int64.
-func fitsTimeDuration(secs float64) bool {
-	ns := secs * float64(time.Second)
-	if math.IsNaN(ns) || math.IsInf(ns, 0) {
-		return false
+// definiteNanos is the week, day and clock length in nanoseconds, with the
+// sign applied. Whole seconds are counted in integers, so a length one
+// nanosecond outside the int64 range is not rounded onto either extreme.
+// The bool is false when that length does not fit.
+func definiteNanos(p durationParts) (int64, bool) {
+	mag, ok := unsignedNanos(p)
+	if !ok {
+		return 0, false
 	}
-	return ns < float64(math.MaxInt64) && ns >= float64(math.MinInt64)
+	if p.neg {
+		// 2^63 nanoseconds is math.MinInt64; one more does not fit.
+		const minMag = uint64(math.MaxInt64) + 1
+		if mag > minMag {
+			return 0, false
+		}
+		if mag == minMag {
+			return math.MinInt64, true
+		}
+		return -int64(mag), true
+	}
+	if mag > uint64(math.MaxInt64) {
+		return 0, false
+	}
+	return int64(mag), true
+}
+
+// unsignedNanos is the absolute length in nanoseconds. The fractional
+// second is below one second, so only that part is a float.
+func unsignedNanos(p durationParts) (uint64, bool) {
+	days, ok := mulU(uint64(p.weeks), 7)
+	if !ok {
+		return 0, false
+	}
+	days, ok = addU(days, uint64(p.days))
+	if !ok {
+		return 0, false
+	}
+	secs, ok := mulU(days, 86400)
+	if !ok {
+		return 0, false
+	}
+	hours, ok := mulU(uint64(p.hours), 3600)
+	if !ok {
+		return 0, false
+	}
+	mins, ok := mulU(uint64(p.minutes), 60)
+	if !ok {
+		return 0, false
+	}
+	secs, ok = addU(secs, hours)
+	if !ok {
+		return 0, false
+	}
+	secs, ok = addU(secs, mins)
+	if !ok {
+		return 0, false
+	}
+	secs, ok = addU(secs, uint64(p.seconds))
+	if !ok {
+		return 0, false
+	}
+	ns, ok := mulU(secs, 1_000_000_000)
+	if !ok {
+		return 0, false
+	}
+	frac := int64(math.Round(p.frac * 1e9))
+	if frac < 0 || frac >= 1_000_000_000 {
+		return 0, false
+	}
+	return addU(ns, uint64(frac))
+}
+
+func mulU(a, b uint64) (uint64, bool) {
+	if a == 0 || b == 0 {
+		return 0, true
+	}
+	c := a * b
+	if c/a != b {
+		return 0, false
+	}
+	return c, true
+}
+
+func addU(a, b uint64) (uint64, bool) {
+	c := a + b
+	if c < a {
+		return 0, false
+	}
+	return c, true
 }
 
 // --- parsing ------------------------------------------------------------
