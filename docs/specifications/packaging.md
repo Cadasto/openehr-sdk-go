@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Packaging and module identity
 
 **Status:** Draft

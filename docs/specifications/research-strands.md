@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Research strands
 
 **Status:** Draft

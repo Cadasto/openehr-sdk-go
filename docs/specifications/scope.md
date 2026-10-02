@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Scope
 
 **Status:** Draft

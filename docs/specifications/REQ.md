@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Requirements registry
 
 **Status:** Draft

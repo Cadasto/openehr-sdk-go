@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Transport layer
 
 **Status:** Draft

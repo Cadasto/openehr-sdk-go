@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Reference Model in Go
 
 **Status:** Draft

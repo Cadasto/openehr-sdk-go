@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # Releases
 
 How `github.com/cadasto/openehr-sdk-go` is versioned, tagged, and announced. Quality gate before any tag: [`docs/ci.md`](ci.md).

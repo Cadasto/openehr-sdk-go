@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Service discovery
 
 **Status:** Draft

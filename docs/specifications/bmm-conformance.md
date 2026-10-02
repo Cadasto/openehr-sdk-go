@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # BMM conformance
 
 **Status:** Draft

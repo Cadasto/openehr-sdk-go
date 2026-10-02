@@ -1,3 +1,7 @@
+---
+kind: specification
+---
+
 # Module layout
 
 **Status:** Draft
