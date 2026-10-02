@@ -75,6 +75,9 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 | `Address.v2` | yes | yes | yes | round-trip |
 | `Demonstration.v1` | yes | yes | yes | JSON round-trip, RM floor held out (inverted `DV_INTERVAL` bounds); XML not exercised |
 | `TestPerson.v2` | yes | yes | yes | JSON round-trip, RM floor held out (null `CODE_PHRASE.code_string`); XML not exercised |
+| `SocialeAnamnese.v1` | yes (`social.opt`) | — | — | no patient data |
+
+`social.opt` is an SDK-normalised Code24 export, not a byte-identical upstream pin. The normalisation rewrites the root element to `<template>` and leaves `xsi:type="OPERATIONAL_TEMPLATE"`, and rewrites the document language element, `T_ARCHETYPE_ROOT`, the wrapper template-id suffix, and the top-level archetype id.
 
 ### ehrbase (openEHR_SDK)
 
