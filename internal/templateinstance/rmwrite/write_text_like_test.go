@@ -51,13 +51,26 @@ func TestREQ107_EnsureSingleTextLikeParents(t *testing.T) {
 
 	t.Run("wrong child type", func(t *testing.T) {
 		t.Parallel()
-		for _, parent := range []any{&rm.DVURI{}, &rm.DVEHRURI{}, &rm.DVParsable{}, &rm.DVIdentifier{}} {
-			attr := "value"
-			if _, ok := parent.(*rm.DVIdentifier); ok {
-				attr = "id"
-			}
-			if err := EnsureSingle(parent, "", attr, 42); !errors.Is(err, ErrTypeMismatch) {
-				t.Errorf("EnsureSingle(%T, %q, 42) = %v, want ErrTypeMismatch", parent, attr, err)
+		// REQ-107: every String and CODE_PHRASE arm refuses a child of the
+		// wrong Go type, not only value and id.
+		cases := []struct {
+			parent any
+			attr   string
+		}{
+			{&rm.DVURI{}, "value"},
+			{&rm.DVEHRURI{}, "value"},
+			{&rm.DVParsable{}, "value"},
+			{&rm.DVParsable{}, "formalism"},
+			{&rm.DVParsable{}, "charset"},
+			{&rm.DVParsable{}, "language"},
+			{&rm.DVIdentifier{}, "id"},
+			{&rm.DVIdentifier{}, "issuer"},
+			{&rm.DVIdentifier{}, "assigner"},
+			{&rm.DVIdentifier{}, "type"},
+		}
+		for _, tc := range cases {
+			if err := EnsureSingle(tc.parent, "", tc.attr, 42); !errors.Is(err, ErrTypeMismatch) {
+				t.Errorf("EnsureSingle(%T, %q, 42) = %v, want ErrTypeMismatch", tc.parent, tc.attr, err)
 			}
 		}
 	})
