@@ -1,7 +1,7 @@
 # REQ-116 compiled-path snapshot — templates pinning NO node name.
 # These paths must stay byte-identical for the whole of REQ-116:
 # a diff here is a regression, not an expected delta.
-# corpus: 62 OPTs — 9 pin a name, 51 pin none, 2 do not compile
+# corpus: 62 OPTs — 9 pin a name, 52 pin none, 1 do not compile
 
 ## definition/body_weight
 !! does not compile: template: invalid OPT: missing or empty template_id
@@ -1544,8 +1544,100 @@
 /content[openEHR-EHR-OBSERVATION.minimal.v1]/data/events[at0002]/data/items[at0004]
 /content[openEHR-EHR-OBSERVATION.minimal.v1]/data/events[at0002]/data/items[at0004]/value
 
-## templates/social
-!! does not compile: template: invalid OPT: expected element type <template> but have <OPERATIONAL_TEMPLATE>
+## templates/social  nodes=93
+/
+/category
+/category/defining_code
+/context
+/context/other_context
+/context/other_context/items[at0002]
+/content[openEHR-EHR-OBSERVATION.livingsituation.v1]
+/content[openEHR-EHR-OBSERVATION.livingsituation.v1]/data
+/content[openEHR-EHR-OBSERVATION.livingsituation.v1]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.livingsituation.v1]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.livingsituation.v1]/data/events[at0002]/data/items[at0004]
+/content[openEHR-EHR-OBSERVATION.livingsituation.v1]/data/events[at0002]/data/items[at0004]/value
+/content[openEHR-EHR-OBSERVATION.livingsituation.v1]/data/events[at0002]/data/items[at0004]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.livingsituation.v1]/data/events[at0002]/data/items[at0006]
+/content[openEHR-EHR-OBSERVATION.livingsituation.v1]/data/events[at0002]/data/items[at0006]/value
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0005]
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0005]/value
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0005]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0006]
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0006]/value
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0006]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0007]
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0007]/value
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0007]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0008]
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0008]/value
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0008]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0010]
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0010]/value
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0010]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0009]
+/content[openEHR-EHR-OBSERVATION.languageproficiency.v1]/data/events[at0002]/data/items[at0004]/items[at0009]/value
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]/data
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]/data/events[at0002]/data/items[at0004]
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]/data/events[at0002]/data/items[at0004]/value
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]/data/events[at0002]/data/items[at0005]
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]/data/events[at0002]/data/items[at0005]/value
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]/data/events[at0002]/data/items[at0006]
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]/data/events[at0002]/data/items[at0006]/value
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]/data/events[at0002]/data/items[at0007]
+/content[openEHR-EHR-OBSERVATION.participationinsociety.v1]/data/events[at0002]/data/items[at0007]/value
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[at0004]
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[at0004]/value
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[at0005]
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[at0005]/value
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[at0006]
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[at0006]/value
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[at0006]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[at0008]
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[at0008]/value
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[openEHR-EHR-CLUSTER.contact_persons_context.v1]
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[openEHR-EHR-CLUSTER.contact_persons_context.v1]/items[at0003]
+/content[openEHR-EHR-OBSERVATION.helpfromothers.v1]/data/events[at0002]/data/items[openEHR-EHR-CLUSTER.contact_persons_context.v1]/items[at0003]/value
+/content[openEHR-EHR-EVALUATION.familysituation.v1]
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0002]
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0002]/value
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0002]/value/defining_code
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0010]
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0010]/value
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0011]
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0011]/value
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0005]
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0005]/value
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0006]
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0006]/items[at0007]
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0006]/items[at0007]/value
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0006]/items[at0008]
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0006]/items[at0008]/value
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0006]/items[at0008]/value/defining_code
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0009]
+/content[openEHR-EHR-EVALUATION.familysituation.v1]/data/items[at0009]/value
+/content[openEHR-EHR-EVALUATION.education_summary.v1]
+/content[openEHR-EHR-EVALUATION.education_summary.v1]/data
+/content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0002]
+/content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0002]/value
+/content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0002]/value/defining_code
+/content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0029]
+/content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0030]
+/content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0007]
+/content[openEHR-EHR-EVALUATION.education_summary.v1]/data/items[at0007]/value
 
 ## templates/terminology_test.ehrbase.org.v1  nodes=17
 /

@@ -80,9 +80,7 @@ var nonCompositionRoots = map[string]string{
 // branches of the guard and are pinned apart, so a template that starts to
 // fail to parse cannot hide as an expected non-COMPOSITION skip, and a new
 // refusal in any step fails the guard rather than skipping.
-var refusedOPTs = map[string]string{
-	"social.opt": stageParser,
-}
+var refusedOPTs = map[string]string{}
 
 // The build steps buildVendored runs, in order.
 const (

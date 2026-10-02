@@ -64,7 +64,6 @@ type ratchetFailure struct {
 // is not listed, fails the test.
 var corpusCompileFailures = []string{
 	"definition/body_weight",
-	"templates/social",
 }
 
 // corpusRatchet is the failure set measured on this tree. Policy and fill
@@ -74,10 +73,10 @@ var corpusCompileFailures = []string{
 // Each reason is category plus a stable locator (type, attribute, code
 // and path, or JSON path).
 //
-// hollow_body rows: clinical_content_validation declares its content
-// attribute with lower bound 0, so the Minimal policy rightly generates a
-// composition with no entry, and with it no ELEMENT. The three rows pin that
-// fact so that any other template going hollow fails the ratchet.
+// hollow_body rows: under Minimal, clinical_content_validation builds one
+// content entry, a SECTION that declares no items. That section holds no
+// ELEMENT, so the body is hollow. The three rows pin that fact so that any
+// other template going hollow fails the ratchet.
 var corpusRatchet = []ratchetFailure{
 	{template: "templates/clinical_content_validation", entry: "builder", policy: "minimal", fill: "example", reason: "hollow_body:/"},
 	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "example", reason: "hollow_body:/"},

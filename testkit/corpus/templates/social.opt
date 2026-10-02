@@ -1,10 +1,10 @@
-<OPERATIONAL_TEMPLATE xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="OPERATIONAL_TEMPLATE">
-  <original_language>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="OPT">
+  <language>
     <terminology_id>
       <value>ISO_639-1</value>
     </terminology_id>
     <code_string>nl</code_string>
-  </original_language>
+  </language>
   <description>
     <original_author id="Original Author">Not Specified</original_author>
     <lifecycle_state>Initial</lifecycle_state>
@@ -38,11 +38,8 @@
   <uid>
     <value>00909a5f-0df6-316a-9f34-bddd30c51dda</value>
   </uid>
-  <archetype_id>
-    <value>openEHR-EHR-COMPOSITION.encounter.v1</value>
-  </archetype_id>
   <template_id>
-    <value>SocialeAnamnese.v1::00909a5f-0df6-316a-9f34-bddd30c51dda</value>
+    <value>SocialeAnamnese.v1</value>
   </template_id>
   <concept>Sociale anamnese.v1</concept>
   <definition>
@@ -212,7 +209,7 @@
         <lower>0</lower>
         <upper>1</upper>
       </existence>
-      <children xsi:type="T_ARCHETYPE_ROOT">
+      <children xsi:type="C_ARCHETYPE_ROOT">
         <rm_type_name>OBSERVATION</rm_type_name>
         <occurrences>
           <lower_included>true</lower_included>
@@ -443,7 +440,7 @@
           <items id="text">Toelichting</items>
         </term_definitions>
       </children>
-      <children xsi:type="T_ARCHETYPE_ROOT">
+      <children xsi:type="C_ARCHETYPE_ROOT">
         <rm_type_name>OBSERVATION</rm_type_name>
         <occurrences>
           <lower_included>true</lower_included>
@@ -959,7 +956,7 @@
           <items id="text">Speciale behoeften</items>
         </term_definitions>
       </children>
-      <children xsi:type="T_ARCHETYPE_ROOT">
+      <children xsi:type="C_ARCHETYPE_ROOT">
         <rm_type_name>OBSERVATION</rm_type_name>
         <occurrences>
           <lower_included>true</lower_included>
@@ -1244,7 +1241,7 @@
           <items id="text">Toelichting</items>
         </term_definitions>
       </children>
-      <children xsi:type="T_ARCHETYPE_ROOT">
+      <children xsi:type="C_ARCHETYPE_ROOT">
         <rm_type_name>OBSERVATION</rm_type_name>
         <occurrences>
           <lower_included>true</lower_included>
@@ -1490,7 +1487,7 @@
                           </children>
                         </attributes>
                       </children>
-                      <children xsi:type="T_ARCHETYPE_ROOT">
+                      <children xsi:type="C_ARCHETYPE_ROOT">
                         <rm_type_name>CLUSTER</rm_type_name>
                         <occurrences>
                           <lower_included>true</lower_included>
@@ -1632,7 +1629,7 @@
           <items id="text">Hulpverlener</items>
         </term_definitions>
       </children>
-      <children xsi:type="T_ARCHETYPE_ROOT">
+      <children xsi:type="C_ARCHETYPE_ROOT">
         <rm_type_name>EVALUATION</rm_type_name>
         <occurrences>
           <lower_included>true</lower_included>
@@ -2052,7 +2049,7 @@ Een gezin kan uit één of meer personen bestaan.</items>
           <items id="text">Aantal kinderen inwonend</items>
         </term_definitions>
       </children>
-      <children xsi:type="T_ARCHETYPE_ROOT">
+      <children xsi:type="C_ARCHETYPE_ROOT">
         <rm_type_name>EVALUATION</rm_type_name>
         <occurrences>
           <lower_included>true</lower_included>
@@ -2332,4 +2329,4 @@ Een gezin kan uit één of meer personen bestaan.</items>
       <items id="text">Extensies</items>
     </term_definitions>
   </definition>
-</OPERATIONAL_TEMPLATE>
+</template>

@@ -5,13 +5,13 @@ kind: plan
 # Plan — Generated instances pass the RM floor
 
 **Date:** 2026-09-29
-**Status:** Active — phases 0 to 3 landed; phase 4 (Code24 OPTs) is optional and open
+**Status:** Done — phases 0 to 4 landed
 **Owner:** SDK maintainers
 **Covers:** [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor); evidence for [STRAND-14](../specifications/research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) (REQ-102)
 **Probes:** PROBE-027. PR 196's corpus census already runs `ValidateRM`; this plan makes it see the ELEMENT rule (Phases 2 and 3)
-**Implementation:** landed for phases 0 to 3
-**Depends on:** PR 196, merged: it fixed defects 1 to 4 and 6 in the generator, added the corpus census `TestREQ107_CorpusRatchet`, and bound generated output to the RM floor in REQ-107. PR 188 has landed, and Phase 0's spec edits sit on top of its catalogue. The [generator follow-ups plan](2026-10-01-generator-follow-ups.md) owns PR 196's other leftovers and does not cover the ELEMENT rule
-**Defers:** the STRAND-14 decision (whether `ValidateComposition` runs the floor); strict OPT 1.4 schema checks beyond `T_ARCHETYPE_ROOT` (Phase 4 records them, and they are optional); evaluating `Language_valid` and `Encoding_valid` in the floor, which needs the ISO 639-1 and IANA character-set registers vendored first; whether the lenient `ParseOPT` reports a subtree it drops (Phase 4 decides)
+**Implementation:** landed for phases 0 to 4
+**Depends on:** PR 196, merged: it fixed defects 1 to 4 and 6 in the generator, added the corpus census `TestREQ107_CorpusRatchet`, and bound generated output to the RM floor in REQ-107. PR 188 has landed, and Phase 0's spec edits sit on top of its catalogue.
+**Defers:** the STRAND-14 decision (whether `ValidateComposition` runs the floor); evaluating `Language_valid` and `Encoding_valid` in the floor, which needs the ISO 639-1 and IANA character-set registers vendored first. Phase 4 declined two parser changes: strict mode does not grow checks for a missing language (with original_language in its place), a top-level archetype id, or empty description fields, and the lenient parse stays silent when it drops a nested subtree.
 
 ## Goal
 
@@ -279,20 +279,15 @@ example language code.
 
 **Definition of done:** `make ci` passes with the ratchet in place.
 
-### Phase 4 — Code24 OPTs (optional)
+### Phase 4 — Code24 OPTs
 
-**Tasks:**
-- Add a converted, standard copy of `social.opt` to the corpus, so `ParseFile` accepts it, the census drops its
-  compile-failure allowlist row, and its entries are no longer hollow.
-- Decide whether `ParseOPTStrict` should also refuse three deviations it accepts today:
-  - a missing `OPERATIONAL_TEMPLATE.language`, with `original_language` in its place;
-  - a top-level `archetype_id`;
-  - empty mandatory description fields (`lifecycle_state`, `details`, `original_author`).
-- Decide what the lenient `ParseOPT` does when it discards a subtree: report it, refuse it, or stay silent. Today
-  it is silent by specification (REQ-100 admits an unknown child `xsi:type` as a leaf), so changing it amends
-  REQ-100 through `sdd-specify` first, and it may deserve a plan of its own.
+**Status:** done. `social.opt` was converted in place, so `ParseFile` accepts it, the census drops its compile-failure allowlist row, and a generated body contains ELEMENTs.
 
-**Definition of done:** the decisions are recorded; where the answer is yes, each refusal has a test.
+**Decisions (declined; the parser is unchanged):**
+- Strict mode does not grow checks for a missing language with `original_language` in its place, a top-level archetype id, or empty description fields.
+- The lenient parse stays silent when it admits an unknown child type as a leaf and drops the nested subtree.
+
+**Definition of done:** the decisions are recorded. Neither answer adds a refusal, so there is no new refusal test.
 
 ## Mapping to specs
 
