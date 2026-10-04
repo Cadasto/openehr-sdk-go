@@ -524,9 +524,10 @@ func (c serialisingCache) Put(ctx context.Context, baseURL string, cat *discover
 // issuer's OpenID configuration again. A configuration that now names
 // another issuer, or another jwks_uri than the SMART configuration, fails
 // the renewal with ReasonIssuerMismatch and drops the cached catalog. The
-// jwks_uri is compared as the SMART configuration wrote it, as on a 200,
-// and also when the catalog comes back from a cache that keeps its exported
-// fields only.
+// jwks_uri is compared as the SMART configuration wrote it, as on a 200.
+// A catalog that comes back from a cache that keeps its exported fields only
+// has lost that text, so both values are compared parsed: a real change is
+// still a mismatch, and a scheme the parser lower-cased is not.
 func TestRenewalOnNotModifiedRechecksIssuer(t *testing.T) { // REQ-073
 	const (
 		jwks      = "https://auth.example.com/jwks"
@@ -578,6 +579,13 @@ func TestRenewalOnNotModifiedRechecksIssuer(t *testing.T) { // REQ-073
 			// the parsed URL would spell its scheme in lower case.
 			name:    "jwks_uri unchanged, written with an upper-case scheme",
 			jwksURI: "HTTPS://auth.example.com/jwks",
+		},
+		{
+			// The written text is lost in the cache; the two documents still
+			// agree, so the renewal must not report a mismatch.
+			name:      "jwks_uri unchanged, upper-case scheme, catalog from a serialising cache",
+			jwksURI:   "HTTPS://auth.example.com/jwks",
+			serialise: true,
 		},
 	}
 	for _, tc := range tests {

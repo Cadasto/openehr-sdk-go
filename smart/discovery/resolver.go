@@ -378,7 +378,8 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 		if err := r.validate(c); err != nil {
 			return nil, err
 		}
-		if err := r.checkOpenIDConfiguration(ctx, c, renewedJWKSURI(c)); err != nil {
+		smartJWKSURI, parsed := renewedJWKSURI(c)
+		if err := r.checkOpenIDConfiguration(ctx, c, smartJWKSURI, parsed); err != nil {
 			return nil, err
 		}
 		r.warnInsecure(c)
@@ -406,7 +407,7 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 	if err := r.validate(cat); err != nil {
 		return nil, err
 	}
-	if err := r.checkOpenIDConfiguration(ctx, cat, wire.JWKSURI); err != nil {
+	if err := r.checkOpenIDConfiguration(ctx, cat, wire.JWKSURI, false); err != nil {
 		return nil, err
 	}
 	r.warnInsecure(cat)
@@ -429,11 +430,28 @@ func renewed(cached *ServiceCatalog, h http.Header, ttl time.Duration) *ServiceC
 // renewed by a 304 Not Modified: the value as written when the catalog
 // kept it, or else the parsed Auth.JWKSURI, because a catalog that came
 // back from a cache that keeps exported fields only has lost the former.
-func renewedJWKSURI(c *ServiceCatalog) string {
+// parsed reports the second case, in which the OpenID configuration's
+// jwks_uri must be parsed the same way before the two are compared.
+func renewedJWKSURI(c *ServiceCatalog) (jwksURI string, parsed bool) {
 	if c.smartJWKSURI == "" && c.Auth.JWKSURI != nil {
-		return c.Auth.JWKSURI.String()
+		return c.Auth.JWKSURI.String(), true
 	}
-	return c.smartJWKSURI
+	return c.smartJWKSURI, false
+}
+
+// sameJWKSURI reports whether the OpenID configuration's jwks_uri equals the
+// SMART configuration's. smart is the value as written, or, when parsed is
+// true, a parsed URL's String; then openID is parsed too, so a scheme or host
+// that only the parser rewrote does not count as a difference.
+func sameJWKSURI(openID, smart string, parsed bool) bool {
+	if openID == smart {
+		return true
+	}
+	if !parsed {
+		return false
+	}
+	u, err := url.Parse(openID)
+	return err == nil && u.String() == smart
 }
 
 // checkOpenIDConfiguration confirms a declared issuer that differs from the
@@ -442,8 +460,9 @@ func renewedJWKSURI(c *ServiceCatalog) string {
 // issuer, so its "issuer" must equal the declared one exactly (§4.3); when
 // both documents give a jwks_uri, the two must be equal as well, so ID tokens
 // are checked against the keys the issuer itself publishes. smartJWKSURI is
-// the SMART configuration's jwks_uri as written.
-func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCatalog, smartJWKSURI string) error {
+// the SMART configuration's jwks_uri as written, or its parsed form when
+// parsed is true (see sameJWKSURI).
+func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCatalog, smartJWKSURI string, parsed bool) error {
 	if r.cfg.skipOpenIDCheck || cat.Issuer == cat.BaseURL {
 		return nil
 	}
@@ -487,7 +506,7 @@ func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCat
 	if doc.Issuer != cat.Issuer {
 		return fail(ReasonIssuerMismatch, fmt.Errorf("openid-configuration issuer %q does not equal the declared issuer %q", doc.Issuer, cat.Issuer))
 	}
-	if doc.JWKSURI != "" && smartJWKSURI != "" && doc.JWKSURI != smartJWKSURI {
+	if doc.JWKSURI != "" && smartJWKSURI != "" && !sameJWKSURI(doc.JWKSURI, smartJWKSURI, parsed) {
 		return fail(ReasonIssuerMismatch, fmt.Errorf("openid-configuration jwks_uri %q does not equal the smart-configuration jwks_uri %q", doc.JWKSURI, smartJWKSURI))
 	}
 	return nil
