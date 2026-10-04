@@ -90,6 +90,8 @@ Only files that describe the same instance form a set. The Robot canonical JSON 
 | `vital_signs` | yes | yes | — |
 | `clinical_notes.v0` | yes | yes | — |
 
+`clinical_notes.v0` was made by Medblocks together with CODE24; its OPT names its Medblocks author, and it is credited under CODE24 here.
+
 ### CODE24 (Cadasto)
 
 **License:** MIT — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).

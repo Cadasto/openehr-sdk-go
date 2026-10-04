@@ -82,7 +82,7 @@ Licensed under the Apache License, Version 2.0 (full text: licenses/Apache-2.0.t
 
 ## CODE24 (Cadasto)
 
-**Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)), including the OPT-only `Referral Request.v1`; benchmark `vital_signs` and `clinical_notes.v0`. The `alternative_types.en.v1` and `BMI` compositions are CODE24's, but their OPTs are EHRbase's (above). `body_weight.opt` has its authoring tool's account id replaced by `user=redacted`; nothing else in it is edited.
+**Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)), including the OPT-only `Referral Request.v1`; benchmark `vital_signs` and `clinical_notes.v0` (made by Medblocks together with CODE24). The `alternative_types.en.v1` and `BMI` compositions are CODE24's, but their OPTs are EHRbase's (above). `body_weight.opt` has its authoring tool's account id replaced by `user=redacted`; nothing else in it is edited.
 
 **License:** MIT
 
