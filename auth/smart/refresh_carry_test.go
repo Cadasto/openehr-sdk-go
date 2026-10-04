@@ -288,3 +288,28 @@ func TestRefreshKeepsTheScopeOnTheAccessToken(t *testing.T) { // REQ-064 REQ-063
 		})
 	}
 }
+
+// TestRefreshAddsNoMemberNeitherResponseCarried pins REQ-064: a
+// launch-context parameter or the scope that neither the earlier response
+// nor the refresh response carries stays out of LastTokenResponse().Raw, so
+// keeping the members a refresh leaves out adds none that were never sent.
+func TestRefreshAddsNoMemberNeitherResponseCarried(t *testing.T) { // REQ-064
+	te := newTokenEndpoint(t, "")
+	src := completeSource(t, te, false)
+	exchangeLaunch(t, te, src, launchBody(t, "at-1", map[string]any{"patient": "P1"}, map[string]any{"refresh_token": "rt-1"}))
+
+	te.setBody(launchBody(t, "at-2", nil, nil))
+	if _, err := src.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v, want a refreshed token", err)
+	}
+	last := src.LastTokenResponse()
+	for _, m := range launchMembers {
+		v, ok := last.Raw[m.key]
+		switch {
+		case m.key == "patient" && v != "P1":
+			t.Errorf("LastTokenResponse().Raw[patient] = %#v, want the kept P1", v)
+		case m.key != "patient" && ok:
+			t.Errorf("LastTokenResponse().Raw[%q] = %#v, want no such member: neither response carried it", m.key, v)
+		}
+	}
+}
