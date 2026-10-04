@@ -90,6 +90,7 @@ func authorizeURLForLaunch(launch string) (*url.URL, error) {
 		authsmart.WithHTTPClient(http.DefaultClient),
 		authsmart.WithRedirectURI("https://app.launch.example/callback"),
 		authsmart.WithScopes("openid", "launch", "patient/COMPOSITION.read"),
+		authsmart.WithAudience("https://api.launch.example/openehr/v1"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build Source: %w", err)

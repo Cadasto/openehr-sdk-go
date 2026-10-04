@@ -59,18 +59,33 @@ func run() error {
 	server := httptest.NewServer(stub.mux)
 	defer server.Close()
 
-	endpoints := discovery.AuthEndpoints{
-		AuthorizationEndpoint: discovery.MustParseURL(server.URL + "/authorize"),
-		TokenEndpoint:         discovery.MustParseURL(server.URL + "/token"),
+	// The service catalog. A real app gets it from discovery: Resolve on a
+	// discovery.Resolver reads the SMART configuration published under the
+	// Platform base URL and returns the endpoints together with that URL. The
+	// stub publishes no discovery document, so a static catalog stands in,
+	// with the stub playing both the Platform and its authorization server.
+	catalog, err := discovery.NewStaticCatalog(discovery.StaticConfig{
+		BaseURL: server.URL, // the Platform base URL
+		Issuer:  server.URL, // the OpenID Connect issuer that signs ID tokens
+		Auth: discovery.AuthEndpoints{
+			AuthorizationEndpoint: discovery.MustParseURL(server.URL + "/authorize"),
+			TokenEndpoint:         discovery.MustParseURL(server.URL + "/token"),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("discovery.NewStaticCatalog: %w", err)
 	}
 
 	// Step 1: build the Source for a public client. There is no
 	// WithClientSecret: PKCE alone proves that the app exchanging the code is
-	// the one that started the launch. The *http.Client is injected, as
+	// the one that started the launch. NewFromCatalog sets the audience (the
+	// aud parameter SMART requires) to the catalog's Platform base URL, which
+	// tells the authorization server which Platform the token is for; pass
+	// WithAudience to send another value. The *http.Client is injected, as
 	// everywhere in the SDK; here it is the one that reaches the stub.
-	source, err := authsmart.New(
+	source, err := authsmart.NewFromCatalog(
+		catalog,
 		clientID,
-		endpoints,
 		authsmart.WithHTTPClient(server.Client()),
 		authsmart.WithRedirectURI(redirectURI),
 		authsmart.WithScopes(
@@ -80,7 +95,7 @@ func run() error {
 		),
 	)
 	if err != nil {
-		return fmt.Errorf("smart.New: %w", err)
+		return fmt.Errorf("smart.NewFromCatalog: %w", err)
 	}
 	fmt.Println("step 1: Source built (public client, PKCE, standalone)")
 
@@ -96,8 +111,9 @@ func run() error {
 		authReq.State, preview(authReq.PKCE.Verifier))
 
 	// Step 3: the URL the browser is sent to. It carries the client id, the
-	// redirect URI, the scopes, the state and the PKCE challenge (never the
-	// verifier). The empty launch argument again means standalone.
+	// redirect URI, the scopes, the audience, the state and the PKCE
+	// challenge (never the verifier). The empty launch argument again means
+	// standalone.
 	authorizeURL, err := source.AuthorizeURL(authReq, "")
 	if err != nil {
 		return fmt.Errorf("AuthorizeURL: %w", err)
@@ -254,7 +270,14 @@ func newStubServer() *stubServer {
 // and state in the query. The stub grants at once and returns the pair as
 // JSON, so openAuthorizeURL can read it without following a redirect.
 func (s *stubServer) handleAuthorize(w http.ResponseWriter, r *http.Request) {
-	state := r.URL.Query().Get("state")
+	query := r.URL.Query()
+	// SMART makes aud a required parameter, so the stub refuses a request
+	// without it, as a real server may.
+	if query.Get("aud") == "" {
+		http.Error(w, "missing aud", http.StatusBadRequest)
+		return
+	}
+	state := query.Get("state")
 	if state == "" {
 		http.Error(w, "missing state", http.StatusBadRequest)
 		return

@@ -66,6 +66,7 @@ func Probe007ProactiveTokenRefresh(ctx context.Context) (Result, error) { // PRO
 		"probe007-client",
 		authEP,
 		authsmart.WithHTTPClient(srv.Client()),
+		authsmart.WithAudience("https://api.probe007.example/openehr/v1"),
 	)
 	if err != nil {
 		return r, fmt.Errorf("PROBE-007: build Source: %w", err)

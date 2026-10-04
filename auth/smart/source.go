@@ -107,7 +107,12 @@ func WithScopes(scopes ...string) Option {
 	return func(cfg *Config) { cfg.Scopes = scopes }
 }
 
-// WithAudience sets the `aud` authorization parameter.
+// WithAudience sets the `aud` parameter of the authorization request: the
+// resource server the access token is meant for. SMART requires it, so a
+// source without an audience is refused at construction. Pass the Platform
+// base URL (the `iss` of an embedded launch) or an audience identifier the
+// authorization server knows. [NewFromCatalog] defaults it to the catalog's
+// Platform base URL; set this option to send something else.
 func WithAudience(aud string) Option {
 	return func(cfg *Config) { cfg.Audience = aud }
 }
@@ -145,6 +150,12 @@ type tokenExchange struct {
 }
 
 // New constructs a Source from clientID and discovery auth endpoints.
+//
+// SMART requires the `aud` parameter on every authorization request, and
+// New has no Platform base URL to default it from, so pass [WithAudience];
+// without it New fails with [auth.ErrInvalidConfig]. [NewFromCatalog]
+// fills the audience in from a resolved catalog. The other checks are those
+// of [FromConfig].
 func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Source, error) {
 	cfg := Config{
 		ClientID:         clientID,
@@ -160,6 +171,12 @@ func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Sour
 }
 
 // FromConfig validates cfg and returns a Source.
+//
+// It fails with [auth.ErrInvalidConfig] when cfg has no HTTPClient, no
+// ClientID, no token or authorization endpoint, or no Audience. SMART
+// requires the `aud` parameter on the authorization request, and
+// FromConfig does not guess one: set Audience to the Platform base URL or
+// to an audience identifier the authorization server knows.
 func FromConfig(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
 		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
@@ -172,6 +189,9 @@ func FromConfig(cfg Config) (*Source, error) {
 	}
 	if cfg.Auth.AuthorizationEndpoint == nil {
 		return nil, fmt.Errorf("%w: AuthorizationEndpoint is required", auth.ErrInvalidConfig)
+	}
+	if cfg.Audience == "" {
+		return nil, fmt.Errorf("%w: Audience is required: SMART requires the aud authorization parameter (set WithAudience, or build the source with NewFromCatalog)", auth.ErrInvalidConfig)
 	}
 	if cfg.RefreshThreshold == 0 {
 		cfg.RefreshThreshold = 30 * time.Second
@@ -248,14 +268,27 @@ func configureClientAuth(cfg *Config) error {
 }
 
 // NewFromCatalog builds a Source from a resolved ServiceCatalog.
+//
+// It takes the endpoints from catalog.Auth and records catalog.Issuer, the
+// OpenID Connect issuer, on the tokens it produces. SMART requires the
+// `aud` authorization parameter, and NewFromCatalog sets it to
+// catalog.BaseURL, the Platform base URL, unless opts include
+// [WithAudience]. A catalog with an empty BaseURL gives no default, so the
+// call then fails with [auth.ErrInvalidConfig] unless the caller sets one.
+// The other checks are those of [FromConfig].
 func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID string, opts ...Option) (*Source, error) {
 	if catalog == nil {
 		return nil, fmt.Errorf("%w: catalog is nil", auth.ErrInvalidConfig)
 	}
-	all := append([]Option{
+	// The defaults come first, so an option the caller passes wins.
+	all := []Option{
 		WithAuthEndpoints(catalog.Auth),
 		WithIssuer(catalog.Issuer),
-	}, opts...)
+	}
+	if catalog.BaseURL != "" {
+		all = append(all, WithAudience(catalog.BaseURL))
+	}
+	all = append(all, opts...)
 	return New(clientID, catalog.Auth, all...)
 }
 
@@ -311,9 +344,8 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	if len(s.cfg.Scopes) > 0 {
 		q.Set("scope", strings.Join(s.cfg.Scopes, " "))
 	}
-	if s.cfg.Audience != "" {
-		q.Set("aud", s.cfg.Audience)
-	}
+	// FromConfig refuses a source without an audience, so aud is always set.
+	q.Set("aud", s.cfg.Audience)
 	if launch != "" {
 		q.Set("launch", launch)
 	}

@@ -1098,7 +1098,7 @@ func TestDoReauthWithRealSmartSource(t *testing.T) { // REQ-063
 	src, err := smart.New("client-id", discovery.AuthEndpoints{
 		AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
 		TokenEndpoint:         discovery.MustParseURL(srv.URL + "/token"),
-	}, smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	}, smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"), smart.WithAudience(srv.URL))
 	if err != nil {
 		t.Fatal(err)
 	}

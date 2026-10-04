@@ -682,7 +682,7 @@ go run ./cmd/examples/smart-launch
 ```text
 step 1: Source built (public client, PKCE, standalone)
 step 2: BeginAuthorization → state="…"  verifier="…"
-step 3: authorize URL built (len=306)
+step 3: authorize URL built (len=341)
 step 4: AuthorizationRequest stored in session map (key="…")
 step 5: redirect received  code="stub-code-…"  state="…"
 step 6: AuthorizationRequest retrieved from session map (state validated)
@@ -696,14 +696,15 @@ step 7: token exchange complete
 OK: standalone SMART PKCE launch flow completed (in-process stub)
 ```
 
-The `state`, the verifier and `expires_at` differ on every run (shown as `…` above), so this block is not compared verbatim. The authorize URL carries the client id, the redirect URI, the scopes, the state and the PKCE challenge, never the verifier. The stub skips the login screen and grants at once; a real server also hashes the `code_verifier` it receives on the token endpoint against the `code_challenge` it saw on `/authorize`, which is the PKCE proof.
+The `state`, the verifier and `expires_at` differ on every run (shown as `…` above), so this block is not compared verbatim. The authorize URL carries the client id, the redirect URI, the scopes, the audience, the state and the PKCE challenge, never the verifier. SMART requires the audience (`aud`); `NewFromCatalog` sets it to the catalog's Platform base URL, and a static catalog stands in for discovery here because the stub publishes no discovery document. The stub skips the login screen and grants at once; a real server also hashes the `code_verifier` it receives on the token endpoint against the `code_challenge` it saw on `/authorize`, which is the PKCE proof.
 
 **What to copy into your app:**
 
-1. Call `BeginAuthorization("")` to get an `AuthorizationRequest` with a random `state` and PKCE pair.
-2. Persist the `AuthorizationRequest` in a session store keyed by `state` **before** redirecting the user.
-3. On the redirect callback, retrieve the stored `AuthorizationRequest` by `callbackState` and delete it in the same operation (the program's `sessionStore.take`), so a replayed callback finds nothing; then pass it to `ExchangeAuthorizationCode`.
-4. `ExchangeAuthorizationCode` re-validates `state` internally (CSRF guard) and sends the `code_verifier` to the token endpoint (PKCE proof).
+1. Build the `Source` with `NewFromCatalog` from the catalog that discovery resolved, so the `aud` it sends is the Platform base URL; pass `WithAudience` only when the authorization server expects another value.
+2. Call `BeginAuthorization("")` to get an `AuthorizationRequest` with a random `state` and PKCE pair.
+3. Persist the `AuthorizationRequest` in a session store keyed by `state` **before** redirecting the user.
+4. On the redirect callback, retrieve the stored `AuthorizationRequest` by `callbackState` and delete it in the same operation (the program's `sessionStore.take`), so a replayed callback finds nothing; then pass it to `ExchangeAuthorizationCode`.
+5. `ExchangeAuthorizationCode` re-validates `state` internally (CSRF guard) and sends the `code_verifier` to the token endpoint (PKCE proof).
 
 See [specifications/auth.md § PKCE flow](specifications/auth.md#req-061--pkce-flow) for the normative rules.
 
