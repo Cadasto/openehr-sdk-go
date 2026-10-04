@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -983,6 +984,54 @@ func TestDoReauthOn401(t *testing.T) { // REQ-063
 	}
 	if n := stub.Reauths(); n != 1 {
 		t.Errorf("Reauth called %d times, want exactly 1", n)
+	}
+}
+
+// TestDoReauthOn401RetriesEveryMethod — REQ-063: the one retry after Reauth
+// fires for every HTTP method, non-idempotent writes included, since a 401
+// means the request was not processed; the retry repeats the method and the
+// body.
+func TestDoReauthOn401RetriesEveryMethod(t *testing.T) { // REQ-063
+	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete} {
+		t.Run(method, func(t *testing.T) {
+			var hits atomic.Int32
+			var second atomic.Value // "METHOD body" of the retried request
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if hits.Add(1) == 1 {
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				b, _ := io.ReadAll(r.Body)
+				second.Store(r.Method + " " + string(b))
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			defer srv.Close()
+
+			stub := &stubTokenSource{tokens: []string{"old-tok", "fresh-tok"}}
+			c, _ := New(
+				newCatalog(t, srv),
+				WithHTTPClient(srv.Client()),
+				WithTokenSource(stub),
+				WithReauthOn401(stub),
+			)
+			var body []byte
+			if method == http.MethodPost || method == http.MethodPut {
+				body = []byte(`{"k":"v"}`)
+			}
+			if _, err := c.Do(t.Context(), &Request{Method: method, Path: "/x", Body: body}); err != nil {
+				t.Fatalf("Do(%s) error = %v, want success after the one Reauth and retry", method, err)
+			}
+			if n := stub.Reauths(); n != 1 {
+				t.Errorf("Do(%s): Reauth called %d times, want 1", method, n)
+			}
+			if n := hits.Load(); n != 2 {
+				t.Errorf("Do(%s): upstream calls = %d, want 2 (the request and its one retry)", method, n)
+			}
+			got, _ := second.Load().(string)
+			if want := method + " " + string(body); got != want {
+				t.Errorf("Do(%s): retried request = %q, want %q", method, got, want)
+			}
+		})
 	}
 }
 
