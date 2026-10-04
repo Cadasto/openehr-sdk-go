@@ -9,6 +9,7 @@ date: 2026-06-18
 # ADR 0009 — SMART-on-openEHR auth library scope and dependency model
 
 - **Status:** Accepted, 2026-06-18.
+- **Amended:** 2026-10-04 — PR 210 removed the RFC 7662 introspection client from current SDK scope; discovery continues to surface `introspection_endpoint`.
 - **Supersedes:** —
 - **Superseded by:** —
 - **Tracks:** the SMART-on-openEHR auth conformance audit ([PR 45](https://github.com/Cadasto/openehr-sdk-go/pull/45)). Resolves: [STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library). Amends: REQ-061, REQ-062, REQ-063, REQ-064.
@@ -41,7 +42,7 @@ The audit delivered the following scope across `auth/` and `smart/`:
 | Transport 401→reauth safety net | `transport` | 4b (F-D) |
 | Launch context (`ehrId`, `episodeId`, `fhirUser`, …) | `smart` | REQ-064 |
 | Platform principal claims | `smart` | REQ-067 |
-| RFC 7662 token introspection client (opt-in, resource-server scope) | `auth/introspect` | 5b (F-J) |
+| RFC 7662 token introspection client (opt-in, resource-server scope; removed from current SDK scope by the 2026-10-04 amendment) | `auth/introspect` | 5b (F-J) |
 | Launch-context scope helpers (`ScopeLaunch*`, `ScopeOfflineAccess`, …) | `auth` | 6a (F-F) |
 
 **Four flows** (PKCE public, confidential symmetric, confidential asymmetric, Backend Services / JWT Bearer) and **three launch modes** (standalone, embedded/EHR-launch, backend) are covered and exercised by PROBE-001..009 in the auth conformance probe suite (see `docs/specifications/conformance.md`).
