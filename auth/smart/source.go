@@ -164,6 +164,11 @@ type Source struct {
 	// forceRefresh makes the held access token count as stale until new
 	// tokens replace it. Reauth sets it; setTokensLocked clears it.
 	forceRefresh bool
+	// session counts the times a code exchange or SetTokens installed
+	// tokens. A refresh records it when it starts and discards its result
+	// when it has changed by the time the refresh ends. A refresh does not
+	// advance it.
+	session uint64
 }
 
 // setTokensLocked replaces the held tokens. New tokens are not the ones a
@@ -208,6 +213,12 @@ type tokenExchange struct {
 	done  chan struct{}
 	token auth.Token
 	err   error
+	// session is the session the refresh started in.
+	session uint64
+	// superseded reports that a code exchange or SetTokens replaced the
+	// session while the refresh ran, so its result was discarded and the
+	// callers waiting on it try again. It is written before done is closed.
+	superseded bool
 }
 
 // New constructs a Source from clientID and discovery auth endpoints.
@@ -528,7 +539,8 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 //
 // A successful exchange starts a new session: the source holds the new
 // access token and the response's refresh token, or none when the response
-// has none, never a refresh token from an earlier session.
+// has none, never a refresh token from an earlier session. A refresh still
+// running from the earlier session has its result discarded.
 //
 // The returned [TokenResponse] also carries the SMART launch parameters
 // for smart/.
@@ -553,6 +565,7 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 		tr.IDTokenClaims = claims
 	}
 	s.mu.Lock()
+	s.session++
 	s.setTokensLocked(tok, refresh)
 	s.lastTR = tr
 	// A new authorization starts a new session: without an ID token there
@@ -586,7 +599,8 @@ func (s *Source) LastTokenResponse() TokenResponse {
 }
 
 // SetTokens seeds access and optional refresh tokens (testing / token import).
-// The new tokens end a refresh that [Source.Reauth] forced.
+// The new tokens end a refresh that [Source.Reauth] forced, and a refresh
+// already running when SetTokens is called has its result discarded.
 //
 // SetTokens does not start a new session: it keeps the identity of the last
 // ID token the source verified, and [Source.LastTokenResponse]. A later
@@ -594,29 +608,52 @@ func (s *Source) LastTokenResponse() TokenResponse {
 // tokens for a different user into a new Source.
 func (s *Source) SetTokens(access auth.Token, refresh string) {
 	s.mu.Lock()
+	s.session++
 	s.setTokensLocked(access, refresh)
 	s.mu.Unlock()
 }
 
 // Token returns a valid access token, refreshing when near expiry.
+//
+// A refresh that started before [Source.ExchangeAuthorizationCode] or
+// [Source.SetTokens] replaced the held tokens has its result discarded,
+// success or failure, and Token returns the new tokens instead, refreshing
+// them in turn when they are stale.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
+	for {
+		tok, retry, err := s.tryToken(ctx)
+		if !retry {
+			return tok, err
+		}
+		// New tokens replaced the session the refresh belonged to; read
+		// them. A further retry needs yet another replacement meanwhile.
+	}
+}
+
+// tryToken makes one attempt at Token. retry reports that the refresh it led
+// or waited on was discarded because the session changed, so the caller
+// tries again against the current tokens.
+func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err error) {
 	if err := ctx.Err(); err != nil {
-		return auth.Token{}, err
+		return auth.Token{}, false, err
 	}
 	s.mu.Lock()
 	if !s.staleLocked() {
 		t := s.cur
 		s.mu.Unlock()
-		return t, nil
+		return t, false, nil
 	}
 	if s.inflight != nil {
 		ex := s.inflight
 		s.mu.Unlock()
 		select {
 		case <-ex.done:
-			return ex.token, ex.err
+			if ex.superseded {
+				return auth.Token{}, true, nil
+			}
+			return ex.token, false, ex.err
 		case <-ctx.Done():
-			return auth.Token{}, ctx.Err()
+			return auth.Token{}, false, ctx.Err()
 		}
 	}
 	refreshTok := s.refresh
@@ -626,7 +663,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		// been cleared by a prior terminal failure (F-L). Return immediately
 		// without touching inflight — there is nothing to exchange (REQ-063).
 		s.mu.Unlock()
-		return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
+		return auth.Token{}, false, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
 	}
 	if refreshTok == "" && !cur.IsZero() {
 		s.mu.Unlock()
@@ -636,20 +673,34 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		// re-authentication. A still-valid token (near expiry but not yet past
 		// it) is returned as-is without claiming inflight (REQ-026).
 		if !cur.ExpiresAt.IsZero() && time.Until(cur.ExpiresAt) <= 0 {
-			return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("access token expired and no refresh_token")}
+			return auth.Token{}, false, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("access token expired and no refresh_token")}
 		}
-		return cur, nil
+		return cur, false, nil
 	}
-	ex := &tokenExchange{done: make(chan struct{})}
+	ex := &tokenExchange{done: make(chan struct{}), session: s.session}
+	// The binding is read with the session it belongs to, not after the
+	// network call, when another session's may have replaced it.
+	binding := s.idBinding
 	s.inflight = ex
 	s.mu.Unlock()
 
-	var tok auth.Token
-	var err error
 	var refreshedTR TokenResponse
-	tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok)
+	tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok, binding)
 
 	s.mu.Lock()
+	if s.session != ex.session {
+		// A code exchange or SetTokens replaced the session while the refresh
+		// ran. Its result, success or failure, belongs to the old session:
+		// nothing of it is kept, and no terminal failure clears the new
+		// tokens. Every caller on this refresh tries again.
+		if s.inflight == ex {
+			s.inflight = nil
+		}
+		s.mu.Unlock()
+		ex.superseded = true
+		close(ex.done)
+		return auth.Token{}, true, nil
+	}
 	if err == nil {
 		s.setTokensLocked(tok, refreshTok)
 		if refreshedTR.AccessToken != "" {
@@ -680,7 +731,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	ex.token = tok
 	ex.err = err
 	close(ex.done)
-	return tok, err
+	return tok, false, err
 }
 
 // RefreshIfNeeded refreshes the access token only when it is within the
@@ -762,7 +813,10 @@ func (s *Source) exchangeCode(ctx context.Context, code, verifier string) (auth.
 // refreshGrant redeems refresh at the token endpoint. An ID token in the
 // response is verified before anything is returned; a failure is a
 // refresh failure that is not terminal, so the caller keeps its tokens.
-func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, TokenResponse, string, error) {
+//
+// binding is the identity of the session the refresh belongs to, read when
+// the refresh started; nil when that session has verified no ID token.
+func (s *Source) refreshGrant(ctx context.Context, refresh string, binding *idTokenBinding) (auth.Token, TokenResponse, string, error) {
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refresh},
@@ -779,7 +833,7 @@ func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, 
 	if tr.IDToken == "" {
 		return tok, tr, next, nil
 	}
-	claims, err := s.verifyRefreshedIDToken(ctx, tr.IDToken)
+	claims, err := s.verifyRefreshedIDToken(ctx, tr.IDToken, binding)
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrRefreshFailed, Inner: fmt.Errorf("id_token: %w", err)}
 	}
@@ -788,17 +842,14 @@ func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, 
 }
 
 // verifyRefreshedIDToken verifies an ID token from a refresh response like
-// one from the code exchange, without a nonce, and, once the source has
-// verified an earlier ID token, requires the same subject and audience
-// (OpenID Connect Core 1.0 §12.2).
-func (s *Source) verifyRefreshedIDToken(ctx context.Context, raw string) (*IDTokenClaims, error) {
+// one from the code exchange, without a nonce, and, when prev holds the
+// session's earlier verified ID token, requires the same subject and
+// audience (OpenID Connect Core 1.0 §12.2).
+func (s *Source) verifyRefreshedIDToken(ctx context.Context, raw string, prev *idTokenBinding) (*IDTokenClaims, error) {
 	claims, err := s.verifyIDToken(ctx, raw, "")
 	if err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	prev := s.idBinding
-	s.mu.Unlock()
 	if prev != nil && (claims.Subject != prev.subject || !slices.Equal(audienceSet(claims.Audience), prev.audience)) {
 		return nil, fmt.Errorf("%w: the refreshed ID token names another subject or audience than the session's", auth.ErrJWKSValidationFailed)
 	}
