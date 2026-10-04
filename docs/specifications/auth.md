@@ -100,7 +100,7 @@ The `transport/` package **MUST** check the context for a per-request `TokenSour
 
 ### REQ-068 — Flow and launch-mode coverage
 
-The platform supports four SMART grant flows and three launch modes. The SDK **MUST** cover all of them across the `auth/<provider>/` family:
+The SDK **MUST** cover every flow in this table, and the three launch modes below, across the `auth/<provider>/` family. The first three rows are SMART App Launch flows; the last two serve authorization servers outside the SMART asymmetric profile:
 
 | Flow | Provider | Use |
 |---|---|---|

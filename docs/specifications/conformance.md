@@ -282,16 +282,17 @@ named coverage functions alongside the auth probes in
 - **Embedded (EHR launch)** — an EHR-supplied `launch` parameter is
   forwarded verbatim to the authorization endpoint.
 - **Backend service** — three confidential backend flows produce the
-  expected token request on the wire: `auth/clientcreds` with a symmetric
-  `client_secret` (HTTP Basic), `auth/clientcreds` with
+  expected token request on the wire: `auth/clientcreds` with
   `WithClientAssertion` (`client_credentials` + signed `client_assertion`,
-  no Basic, no `client_secret` — SMART Backend Services asymmetric), and
-  `auth/jwtbearer` (RFC 7523 JWT Bearer grant).
+  no Basic, no `client_secret` — SMART Backend Services), and, outside the
+  SMART asymmetric profile, `auth/clientcreds` with a symmetric
+  `client_secret` (HTTP Basic) and `auth/jwtbearer` (the RFC 7523 §2.1 JWT
+  Bearer authorization grant, not a SMART flow).
 
 Together with the PKCE public flow (PROBE-004) and the confidential-code
 auth-method selection (covered by `auth/smart`'s `TestExchangeWithPrivateKeyJWT`
 / `TestG3CrossCheckRejectsUnsupportedMethod` / `TestExchangeWithClientSecretBasic`
-unit pins), this exercises all four flows across all three launch modes.
+unit pins), this exercises every flow in REQ-068's table across all three launch modes.
 
 ##### Inferno SMART App Launch (STU2.2) Client-suite cross-check
 
@@ -304,7 +305,7 @@ client scenarios to SDK coverage:
 | **Public client** (authorization-code + PKCE, no secret) | PROBE-004 (PKCE + G-7 parity), PROBE-005 (scope), standalone/embedded launch modes | Covered (Sandbox) |
 | **Confidential Symmetric** (`client_secret_basic`) | `auth/smart` `client_secret_basic` selection + backend symmetric arm of `LaunchModeBackend`; positive wire test `TestExchangeWithClientSecretBasic` (asserts `Authorization: Basic base64(clientID:secret)`, `grant_type=authorization_code`, no `client_assertion`) | Covered (Sandbox) |
 | **Confidential Asymmetric** (`private_key_jwt`) | `auth/smart` `WithClientAssertionKey` (`TestExchangeWithPrivateKeyJWT`, G-3 cross-check) + private_key_jwt backend arm of `LaunchModeBackend` | Covered (Sandbox) |
-| **Backend Services Asymmetric** (`client_credentials` + `client_assertion`) | backend arm of `LaunchModeBackend` (`auth/clientcreds.WithClientAssertion`); `auth/jwtbearer` for the RFC 7523 grant | Covered (Sandbox) |
+| **Backend Services Asymmetric** (`client_credentials` + `client_assertion`) | backend arm of `LaunchModeBackend` (`auth/clientcreds.WithClientAssertion`) | Covered (Sandbox) |
 
 **Recorded gaps (follow-ups, not silent skips):**
 
