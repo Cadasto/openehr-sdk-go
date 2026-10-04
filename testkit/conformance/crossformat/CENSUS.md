@@ -52,7 +52,7 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 ### canonical-flat
 
 - Outcome: compared 21, missing 4, extra 0, altered 0
-- Reason: GAP-C INTERVAL_EVENT attributes: the interval event any_event_en:1 has no Web Template node for math_function or width, so FLAT encode writes none of their four keys.
+- Reason: INTERVAL_EVENT attributes: the interval event any_event_en:1 has no Web Template node for math_function or width, so FLAT encode writes none of their four keys.
 - Missing (4):
   - `bericht/körpergewicht:0/any_event_en:1/math_function|code`
   - `bericht/körpergewicht:0/any_event_en:1/math_function|terminology`
@@ -62,7 +62,7 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 ### flat-canonical
 
 - Outcome: compared 115, missing 8, extra 4, altered 13
-- Reason: GAP-C INTERVAL_EVENT attributes: decode refuses math_function and width (4 keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (deviations.md), where the canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.
+- Reason: INTERVAL_EVENT attributes: decode refuses math_function and width (4 keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (deviations.md), where the canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.
 - Missing (8):
   - `/content/0/data/events/2/math_function/_type`
   - `/content/0/data/events/2/math_function/defining_code/_type`
@@ -98,12 +98,12 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 - Outcome: refused
 - Error: `canonical XML decode: decode /content (_type="ADMIN_ENTRY"): canxml: decode /data (_type="ITEM_TREE"): canxml: decode /items (_type="CLUSTER"): canxml: decode /items (_type="ELEMENT"): canxml: decode /value (_type="DV_MULTIMEDIA"): canxml: strconv.ParseUint: parsing "JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PC9UaXR... invalid syntax`
 - Recorded as an error containing `(_type="DV_MULTIMEDIA"): canxml: strconv.ParseUint`
-- Reason: GAP-A canxml Array<Octet>: the canonical XML carries the media file's DV_MULTIMEDIA data as base64 text (ITS-XML xs:base64Binary), and canxml reads that attribute as one element per byte, so it fails parsing the base64 text as a byte.
+- Reason: canxml Array<Octet>: the canonical XML carries the media file's DV_MULTIMEDIA data as base64 text (ITS-XML xs:base64Binary), and canxml reads that attribute as one element per byte, so it fails parsing the base64 text as a byte.
 
 ### canonical-flat
 
 - Outcome: compared 26, missing 5, extra 6, altered 0
-- Reason: GAP-B body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so composer|id, |id_scheme and |id_namespace are missing. LOCATABLE name: the upstream FLAT writes the composition's own name as _name, which the codec does not carry (deviations.md, LOCATABLE.name). Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created. ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and the codec writes context/_location (ADR 0016). ENTRY language and encoding: the upstream FLAT omits them on document_attachment and FLAT encode writes them (4 keys).
+- Reason: body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so composer|id, |id_scheme and |id_namespace are missing. LOCATABLE name: the upstream FLAT writes the composition's own name as _name, which the codec does not carry (deviations.md, LOCATABLE.name). Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created. ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and the codec writes context/_location (ADR 0016). ENTRY language and encoding: the upstream FLAT omits them on document_attachment and FLAT encode writes them (4 keys).
 - Missing (5):
   - `opconsultation/_name`
   - `opconsultation/composer|id`
@@ -121,7 +121,7 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 ### flat-canonical
 
 - Outcome: compared 150, missing 41, extra 27, altered 17
-- Reason: GAP-B body-form composer: decode refuses the composer keys (4), so the composer's name and external_ref are missing and decode fills a PARTY_SELF. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT writes ctx/setting as bare text, which the codec refuses (it takes ctx/setting|code and |value), so decode fills the default 238 other care against the canonical 228 primary medical care. ctx/location: the codec refuses ctx/location (it reads context/_location, ADR 0016), so the location is missing. LOCATABLE name: the codec refuses _name, so decode names the composition OPConsultation from the template against the canonical Routine checkup. Choice element: decode refuses media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
+- Reason: body-form composer: decode refuses the composer keys (4), so the composer's name and external_ref are missing and decode fills a PARTY_SELF. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT writes ctx/setting as bare text, which the codec refuses (it takes ctx/setting|code and |value), so decode fills the default 238 other care against the canonical 228 primary medical care. ctx/location: the codec refuses ctx/location (it reads context/_location, ADR 0016), so the location is missing. LOCATABLE name: the codec refuses _name, so decode names the composition OPConsultation from the template against the canonical Routine checkup. Choice element: decode refuses media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
 - Missing (41, first 10 shown):
   - `/composer/external_ref/_type`
   - `/composer/external_ref/id/_type`
@@ -198,12 +198,12 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 - Outcome: refused
 - Error: `FLAT encode: simplified: resolve "/content[openEHR-EHR-SECTION.adhoc.v1]": rmpath: path resolves to multiple items: "/content[openEHR-EHR-SECTION.adhoc.v1]" (2 items)`
 - Recorded as an error containing `path resolves to multiple items: "/content[openEHR-EHR-SECTION.adhoc.v1]"`
-- Reason: GAP-D reused archetype siblings: the symptome and risikogebiet sections both reuse openEHR-EHR-SECTION.adhoc.v1 under content, and FLAT encode refuses the path that resolves to both.
+- Reason: reused archetype siblings: the symptome and risikogebiet sections both reuse openEHR-EHR-SECTION.adhoc.v1 under content, and FLAT encode refuses the path that resolves to both.
 
 ### flat-canonical
 
 - Outcome: compared 641, missing 565, extra 0, altered 2
-- Reason: GAP-D reused archetype siblings: decode refuses every key under the symptome and risikogebiet sections (94 keys), so both sections are missing from the decoded composition. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (2 leaves).
+- Reason: reused archetype siblings: decode refuses every key under the symptome and risikogebiet sections (94 keys), so both sections are missing from the decoded composition. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (2 leaves).
 - Missing (565, first 10 shown):
   - `/content/1/_type`
   - `/content/1/archetype_details/_type`
@@ -237,7 +237,7 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 ### canonical-flat
 
 - Outcome: compared 31, missing 5, extra 1, altered 0
-- Reason: GAP-B body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so composer|id, |id_scheme and |id_namespace are missing. LOCATABLE name: the upstream FLAT writes the composition's own name as _name, which the codec does not carry (deviations.md, LOCATABLE.name). Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.
+- Reason: body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so composer|id, |id_scheme and |id_namespace are missing. LOCATABLE name: the upstream FLAT writes the composition's own name as _name, which the codec does not carry (deviations.md, LOCATABLE.name). Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.
 - Missing (5):
   - `opconsultation/_name`
   - `opconsultation/composer|id`
@@ -250,7 +250,7 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 ### flat-canonical
 
 - Outcome: compared 150, missing 40, extra 27, altered 15
-- Reason: GAP-B body-form composer: decode refuses the composer keys (4), so the composer's name and external_ref are missing and decode fills a PARTY_SELF. LOCATABLE name: the codec refuses _name, so decode names the composition OPConsultation from the template against the canonical Routine checkup. Choice element: decode refuses media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
+- Reason: body-form composer: decode refuses the composer keys (4), so the composer's name and external_ref are missing and decode fills a PARTY_SELF. LOCATABLE name: the codec refuses _name, so decode names the composition OPConsultation from the template against the canonical Routine checkup. Choice element: decode refuses media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
 - Missing (40, first 10 shown):
   - `/composer/external_ref/_type`
   - `/composer/external_ref/id/_type`
@@ -348,7 +348,7 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 ### canonical-flat
 
 - Outcome: compared 19, missing 5, extra 8, altered 0
-- Reason: GAP-B body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so composer|id and |id_namespace are missing. DV_ORDINAL terminology: the ordinal's symbol is coded in com.cabolabs.openehr.opt, which the |code form (local implied) cannot carry, so FLAT encode writes ordinal|raw where upstream writes |code, |value and |ordinal and loses the terminology. Upstream FLAT omissions: the upstream FLAT carries neither the context participation (6 keys) nor the ACTIVITY action_archetype_id that the canonical XML holds, and FLAT encode writes both.
+- Reason: body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so composer|id and |id_namespace are missing. DV_ORDINAL terminology: the ordinal's symbol is coded in com.cabolabs.openehr.opt, which the |code form (local implied) cannot carry, so FLAT encode writes ordinal|raw where upstream writes |code, |value and |ordinal and loses the terminology. Upstream FLAT omissions: the upstream FLAT carries neither the context participation (6 keys) nor the ACTIVITY action_archetype_id that the canonical XML holds, and FLAT encode writes both.
 - Missing (5):
   - `nesting/composer|id`
   - `nesting/composer|id_namespace`
@@ -368,7 +368,7 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 ### flat-canonical
 
 - Outcome: compared 156, missing 84, extra 48, altered 11
-- Reason: GAP-B body-form composer: decode refuses the composer keys (3), so the composer's name and external_ref are missing and decode fills a PARTY_SELF. Upstream FLAT omissions: the FLAT carries no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded composition has no context and an empty action_archetype_id. Sibling order: FLAT carries no order between the ordinal ELEMENT and the nested CLUSTER of the activity description; decode lists the CLUSTER first, the canonical lists it second, so their leaves compare at shifted positions, and the ordinal decodes in the local terminology its |code form implies. RM-FLOOR archetype_details: the canonical SECTION has none and decode adds it (4 extra leaves), the canonical carries template_id on inner archetype roots where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.
+- Reason: body-form composer: decode refuses the composer keys (3), so the composer's name and external_ref are missing and decode fills a PARTY_SELF. Upstream FLAT omissions: the FLAT carries no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded composition has no context and an empty action_archetype_id. Sibling order: FLAT carries no order between the ordinal ELEMENT and the nested CLUSTER of the activity description; decode lists the CLUSTER first, the canonical lists it second, so their leaves compare at shifted positions, and the ordinal decodes in the local terminology its |code form implies. RM-FLOOR archetype_details: the canonical SECTION has none and decode adds it (4 extra leaves), the canonical carries template_id on inner archetype roots where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.
 - Missing (84, first 10 shown):
   - `/composer/external_ref/_type`
   - `/composer/external_ref/id/_type`
@@ -410,7 +410,7 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 ### canonical-flat
 
 - Outcome: compared 11, missing 2, extra 0, altered 1
-- Reason: GAP-B body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so composer|id and |id_namespace are missing. Upstream date-time spelling: the event time is 21:11:36.700 in the canonical XML and 21:11:36.7 in the upstream FLAT, and the codecs carry the text as written.
+- Reason: body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so composer|id and |id_namespace are missing. Upstream date-time spelling: the event time is 21:11:36.700 in the canonical XML and 21:11:36.7 in the upstream FLAT, and the codecs carry the text as written.
 - Missing (2):
   - `persistent_minimal/composer|id`
   - `persistent_minimal/composer|id_namespace`
@@ -420,7 +420,7 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 ### flat-canonical
 
 - Outcome: compared 72, missing 8, extra 0, altered 5
-- Reason: GAP-B body-form composer: decode refuses the composer keys (3), so the composer's name and external_ref are missing and decode fills a PARTY_SELF. Upstream date-time spelling: the event time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: a persistent composition has no context start time, and decode, which fills origin from it (deviations.md), leaves the origin empty. RM-FLOOR archetype_details: the canonical carries template_id on the inner archetype root where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.
+- Reason: body-form composer: decode refuses the composer keys (3), so the composer's name and external_ref are missing and decode fills a PARTY_SELF. Upstream date-time spelling: the event time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: a persistent composition has no context start time, and decode, which fills origin from it (deviations.md), leaves the origin empty. RM-FLOOR archetype_details: the canonical carries template_id on the inner archetype root where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.
 - Missing (8):
   - `/composer/external_ref/_type`
   - `/composer/external_ref/id/_type`
@@ -444,7 +444,7 @@ An outcome is either a refusal, the codec error that ended the leg, or four coun
 ### canonical-flat
 
 - Outcome: compared 83, missing 11, extra 11, altered 11
-- Reason: GAP-B body-form composer: FLAT encode writes the composer as ctx/composer_name alone (3 missing keys). Web Template projection: the SDK's Web Template has no in-context time or ism_transition node for the section_3 ACTION (webtemplate deviations.md, inContext coverage), and its per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT encode writes neither (4 missing keys). Choice element: upstream spells the value of the choice element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the Real denominator as 1.0 where the codec writes 1. DV_INTERVAL bounds: the canonical omits the RM-mandatory lower_included and upper_included, canjson reads the absence as false, and FLAT encode writes false where upstream writes nothing (6 keys). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (8 leaves). Upstream value disagreement: the canonical (all_types_no_multimedia.json) and the FLAT (test_all_types.json) are separate upstream files that disagree on duration_any (P1Y2M10DT2H30M against PT30M), on a DV_URI only the canonical carries, and on the proportion's precision, which only the canonical carries.
+- Reason: body-form composer: FLAT encode writes the composer as ctx/composer_name alone (3 missing keys). Web Template projection: the SDK's Web Template has no in-context time or ism_transition node for the section_3 ACTION (webtemplate deviations.md, inContext coverage), and its per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT encode writes neither (4 missing keys). Choice element: upstream spells the value of the choice element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the Real denominator as 1.0 where the codec writes 1. DV_INTERVAL bounds: the canonical omits the RM-mandatory lower_included and upper_included, canjson reads the absence as false, and FLAT encode writes false where upstream writes nothing (6 keys). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (8 leaves). Upstream value disagreement: the canonical (all_types_no_multimedia.json) and the FLAT (test_all_types.json) are separate upstream files that disagree on duration_any (P1Y2M10DT2H30M against PT30M), on a DV_URI only the canonical carries, and on the proportion's precision, which only the canonical carries.
 - Missing (11, first 10 shown):
   - `test_all_types/composer|id`
   - `test_all_types/composer|id_namespace`

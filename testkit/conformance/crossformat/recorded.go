@@ -152,17 +152,17 @@ func Verify(res SetResult, recs map[Leg]Record) []string {
 //
 // Reasons name their causes with these labels:
 //
-//   - GAP-A canxml Array<Octet>: canonical XML reads DV_MULTIMEDIA.data and
+//   - canxml Array<Octet>: canonical XML reads DV_MULTIMEDIA.data and
 //     integrity_check as one element per byte, where ITS-XML types them
 //     xs:base64Binary.
-//   - GAP-B body-form composer: FLAT decode refuses the composer's real-path
+//   - body-form composer: FLAT decode refuses the composer's real-path
 //     keys (composer|name and the external_ref composer|id, |id_scheme,
 //     |id_namespace) as an unsupported PARTY_PROXY, and FLAT encode writes the
 //     composer as ctx/composer_name alone, without its external_ref.
-//   - GAP-C INTERVAL_EVENT attributes: the Web Template has no math_function
+//   - INTERVAL_EVENT attributes: the Web Template has no math_function
 //     or width node for the event, so FLAT encode writes neither and decode
 //     refuses both.
-//   - GAP-D reused archetype siblings: several siblings reuse one archetype
+//   - reused archetype siblings: several siblings reuse one archetype
 //     under one attribute, which FLAT encode refuses ("path resolves to
 //     multiple items") and FLAT decode refuses ("not yet decodable").
 //   - RM-FLOOR archetype_details: decode adds archetype_details on archetype
@@ -173,12 +173,12 @@ var Recorded = map[string]map[Leg]Record{
 	"alternative_events": {
 		LegCanonicalFlat: {
 			Outcome: Outcome{Compared: 21, Missing: 4},
-			Reason: "GAP-C INTERVAL_EVENT attributes: the interval event any_event_en:1 has no Web Template node for " +
+			Reason: "INTERVAL_EVENT attributes: the interval event any_event_en:1 has no Web Template node for " +
 				"math_function or width, so FLAT encode writes none of their four keys.",
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Compared: 115, Missing: 8, Extra: 4, Altered: 13},
-			Reason: "GAP-C INTERVAL_EVENT attributes: decode refuses math_function and width (4 keys), so the interval " +
+			Reason: "INTERVAL_EVENT attributes: decode refuses math_function and width (4 keys), so the interval " +
 				"event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the " +
 				"birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists " +
 				"Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the " +
@@ -190,13 +190,13 @@ var Recorded = map[string]map[Leg]Record{
 	"consult_record": {
 		LegJSONXML: {
 			Outcome: Outcome{Refused: `(_type="DV_MULTIMEDIA"): canxml: strconv.ParseUint`},
-			Reason: "GAP-A canxml Array<Octet>: the canonical XML carries the media file's DV_MULTIMEDIA data as " +
+			Reason: "canxml Array<Octet>: the canonical XML carries the media file's DV_MULTIMEDIA data as " +
 				"base64 text (ITS-XML xs:base64Binary), and canxml reads that attribute as one element per byte, " +
 				"so it fails parsing the base64 text as a byte.",
 		},
 		LegCanonicalFlat: {
 			Outcome: Outcome{Compared: 26, Missing: 5, Extra: 6},
-			Reason: "GAP-B body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
+			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
 				"composer|id, |id_scheme and |id_namespace are missing. LOCATABLE name: the upstream FLAT writes the " +
 				"composition's own name as _name, which the codec does not carry (deviations.md, LOCATABLE.name). " +
 				"Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
@@ -207,7 +207,7 @@ var Recorded = map[string]map[Leg]Record{
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Compared: 150, Missing: 41, Extra: 27, Altered: 17},
-			Reason: "GAP-B body-form composer: decode refuses the composer keys (4), so the composer's name and " +
+			Reason: "body-form composer: decode refuses the composer keys (4), so the composer's name and " +
 				"external_ref are missing and decode fills a PARTY_SELF. UPSTREAM consult_record ctx conflict: the " +
 				"FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the " +
 				"harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT " +
@@ -238,12 +238,12 @@ var Recorded = map[string]map[Leg]Record{
 	"corona": {
 		LegCanonicalFlat: {
 			Outcome: Outcome{Refused: `path resolves to multiple items: "/content[openEHR-EHR-SECTION.adhoc.v1]"`},
-			Reason: "GAP-D reused archetype siblings: the symptome and risikogebiet sections both reuse " +
+			Reason: "reused archetype siblings: the symptome and risikogebiet sections both reuse " +
 				"openEHR-EHR-SECTION.adhoc.v1 under content, and FLAT encode refuses the path that resolves to both.",
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Compared: 641, Missing: 565, Altered: 2},
-			Reason: "GAP-D reused archetype siblings: decode refuses every key under the symptome and risikogebiet " +
+			Reason: "reused archetype siblings: decode refuses every key under the symptome and risikogebiet " +
 				"sections (94 keys), so both sections are missing from the decoded composition. RM-FLOOR " +
 				"archetype_details: rm_version is 1.2.0 against 1.0.4 (2 leaves).",
 		},
@@ -253,7 +253,7 @@ var Recorded = map[string]map[Leg]Record{
 	"ehrn_abdm": {
 		LegCanonicalFlat: {
 			Outcome: Outcome{Compared: 31, Missing: 5, Extra: 1},
-			Reason: "GAP-B body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
+			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
 				"composer|id, |id_scheme and |id_namespace are missing. LOCATABLE name: the upstream FLAT writes the " +
 				"composition's own name as _name, which the codec does not carry (deviations.md, LOCATABLE.name). " +
 				"Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
@@ -261,7 +261,7 @@ var Recorded = map[string]map[Leg]Record{
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Compared: 150, Missing: 40, Extra: 27, Altered: 15},
-			Reason: "GAP-B body-form composer: decode refuses the composer keys (4), so the composer's name and " +
+			Reason: "body-form composer: decode refuses the composer keys (4), so the composer's name and " +
 				"external_ref are missing and decode fills a PARTY_SELF. LOCATABLE name: the codec refuses _name, " +
 				"so decode names the composition OPConsultation from the template against the canonical Routine " +
 				"checkup. Choice element: decode refuses media_file/created/date_time_value (the SDK spells it " +
@@ -296,7 +296,7 @@ var Recorded = map[string]map[Leg]Record{
 	"nested": {
 		LegCanonicalFlat: {
 			Outcome: Outcome{Compared: 19, Missing: 5, Extra: 8},
-			Reason: "GAP-B body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
+			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
 				"composer|id and |id_namespace are missing. DV_ORDINAL terminology: the ordinal's symbol is coded in " +
 				"com.cabolabs.openehr.opt, which the |code form (local implied) cannot carry, so FLAT encode writes " +
 				"ordinal|raw where upstream writes |code, |value and |ordinal and loses the terminology. Upstream " +
@@ -305,7 +305,7 @@ var Recorded = map[string]map[Leg]Record{
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Compared: 156, Missing: 84, Extra: 48, Altered: 11},
-			Reason: "GAP-B body-form composer: decode refuses the composer keys (3), so the composer's name and " +
+			Reason: "body-form composer: decode refuses the composer keys (3), so the composer's name and " +
 				"external_ref are missing and decode fills a PARTY_SELF. Upstream FLAT omissions: the FLAT carries " +
 				"no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded " +
 				"composition has no context and an empty action_archetype_id. Sibling order: FLAT carries no order " +
@@ -320,14 +320,14 @@ var Recorded = map[string]map[Leg]Record{
 	"persistent_minimal": {
 		LegCanonicalFlat: {
 			Outcome: Outcome{Compared: 11, Missing: 2, Altered: 1},
-			Reason: "GAP-B body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
+			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
 				"composer|id and |id_namespace are missing. Upstream date-time spelling: the event time is " +
 				"21:11:36.700 in the canonical XML and 21:11:36.7 in the upstream FLAT, and the codecs carry the " +
 				"text as written.",
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Compared: 72, Missing: 8, Altered: 5},
-			Reason: "GAP-B body-form composer: decode refuses the composer keys (3), so the composer's name and " +
+			Reason: "body-form composer: decode refuses the composer keys (3), so the composer's name and " +
 				"external_ref are missing and decode fills a PARTY_SELF. Upstream date-time spelling: the event " +
 				"time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: a persistent " +
 				"composition has no context start time, and decode, which fills origin from it (deviations.md), " +
@@ -338,7 +338,7 @@ var Recorded = map[string]map[Leg]Record{
 	"test_all_types": {
 		LegCanonicalFlat: {
 			Outcome: Outcome{Compared: 83, Missing: 11, Extra: 11, Altered: 11},
-			Reason: "GAP-B body-form composer: FLAT encode writes the composer as ctx/composer_name alone (3 missing " +
+			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone (3 missing " +
 				"keys). Web Template projection: the SDK's Web Template has no in-context time or ism_transition " +
 				"node for the section_3 ACTION (webtemplate deviations.md, inContext coverage), and its " +
 				"per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT " +
