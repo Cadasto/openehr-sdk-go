@@ -23,8 +23,8 @@ import (
 const SpecVersionPin = "1.1.0-development"
 
 // WellKnownPath is the standard SMART configuration path appended to
-// the issuer URL, per SMART App Launch §4.1. Some deployments expose
-// it under a different prefix; callers can override it with
+// the Platform base URL, per SMART App Launch §4.1. Some deployments
+// expose it under a different prefix; callers can override it with
 // WithWellKnownPath when constructing the Resolver.
 const WellKnownPath = "/.well-known/smart-configuration"
 
@@ -32,11 +32,19 @@ const WellKnownPath = "/.well-known/smart-configuration"
 // an explicit Cache-Control max-age.
 const DefaultTTL = 15 * time.Minute
 
+// openIDConfigurationPath is the OpenID Connect discovery path, appended
+// to the issuer's own path (OpenID Connect Discovery 1.0 §4).
+const openIDConfigurationPath = "/.well-known/openid-configuration"
+
+// maxDocumentBytes caps how much of a discovery document the resolver
+// reads.
+const maxDocumentBytes = 1 << 20
+
 // Resolver fetches, validates, caches, and refreshes SMART
-// configuration documents for one or more deployment issuers.
+// configuration documents for one or more Platform base URLs.
 //
 // A single Resolver instance is safe for concurrent use across many
-// goroutines; concurrent Resolve()/Refresh() calls for the same issuer
+// goroutines; concurrent Resolve()/Refresh() calls for the same base URL
 // coalesce around one in-flight fetch.
 type Resolver struct {
 	cfg   resolverConfig
@@ -59,6 +67,7 @@ type resolverConfig struct {
 	acceptedVersionsLocked bool // true when caller explicitly called WithAcceptedSpecVersions
 	defaultTTL             time.Duration
 	allowInsecure          bool
+	skipOpenIDCheck        bool // true when caller called WithoutOpenIDConfigurationCheck
 	logger                 *slog.Logger
 	wellKnownPath          string
 }
@@ -101,10 +110,22 @@ func WithDefaultTTL(d time.Duration) Option {
 	return func(cfg *resolverConfig) { cfg.defaultTTL = d }
 }
 
-// WithAllowInsecure permits http:// issuers and base URLs. Default is
-// to refuse plaintext. Use only for local development.
+// WithAllowInsecure permits http:// base URLs, issuers and auth endpoint
+// URLs. Default is to refuse plaintext. Use only for local development.
 func WithAllowInsecure() Option {
 	return func(cfg *resolverConfig) { cfg.allowInsecure = true }
+}
+
+// WithoutOpenIDConfigurationCheck turns off the check the resolver makes
+// when a SMART configuration names an issuer other than the base URL it
+// was resolved from. By default the resolver then fetches the issuer's
+// own OpenID configuration, <issuer>/.well-known/openid-configuration,
+// and requires it to name the same issuer and, when both documents give
+// one, the same jwks_uri. Turn the check off for a Platform whose identity
+// provider publishes no OpenID configuration; the declared issuer is then
+// accepted as it stands, provided it is a well-formed https URL.
+func WithoutOpenIDConfigurationCheck() Option {
+	return func(cfg *resolverConfig) { cfg.skipOpenIDCheck = true }
 }
 
 // WithLogger sets the slog.Logger that warnings (TLS posture, etc.)
@@ -113,7 +134,7 @@ func WithLogger(l *slog.Logger) Option {
 	return func(cfg *resolverConfig) { cfg.logger = l }
 }
 
-// WithWellKnownPath overrides the path appended to the issuer URL when
+// WithWellKnownPath overrides the path appended to the base URL when
 // fetching the SMART configuration document. Default WellKnownPath.
 func WithWellKnownPath(p string) Option {
 	return func(cfg *resolverConfig) { cfg.wellKnownPath = p }
@@ -149,41 +170,52 @@ func NewResolver(cache Cache, opts ...Option) (*Resolver, error) {
 	}, nil
 }
 
-// Resolve returns the cached catalog for issuer when fresh, or fetches
-// and caches a new one. Concurrent calls coalesce, so exactly one fetch
-// happens per issuer while a fetch is in flight.
-func (r *Resolver) Resolve(ctx context.Context, issuer string) (*ServiceCatalog, error) {
+// Resolve returns the catalog for the Platform at baseURL: the cached one
+// when fresh, otherwise a newly fetched one, which it caches under
+// baseURL. Concurrent calls coalesce, so exactly one fetch happens per
+// base URL while a fetch is in flight.
+//
+// baseURL is the Platform base URL: the SMART configuration is served at
+// <baseURL>/.well-known/smart-configuration, and an embedded SMART launch
+// passes the same URL to the app as its "iss" parameter. It is not
+// necessarily the OpenID Connect issuer. When the document names another
+// issuer, that issuer becomes the catalog's Issuer and baseURL stays its
+// BaseURL; unless the Resolver is built with
+// WithoutOpenIDConfigurationCheck, the issuer must first be confirmed by
+// its own OpenID configuration.
+func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if cat, ok := r.cache.Get(ctx, issuer); ok && !cat.Stale(time.Now()) {
+	if cat, ok := r.cache.Get(ctx, baseURL); ok && !cat.Stale(time.Now()) {
 		return cat, nil
 	}
-	return r.fetchCoalesced(ctx, issuer, "")
+	return r.fetchCoalesced(ctx, baseURL, "")
 }
 
-// Refresh invalidates any cached catalog for issuer and forces a
-// fresh fetch.
-func (r *Resolver) Refresh(ctx context.Context, issuer string) (*ServiceCatalog, error) {
+// Refresh invalidates any cached catalog for baseURL and forces a fresh
+// fetch, with the same checks as Resolve. baseURL is the Platform base
+// URL, as for Resolve.
+func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	var prevETag string
-	if cat, ok := r.cache.Get(ctx, issuer); ok {
+	if cat, ok := r.cache.Get(ctx, baseURL); ok {
 		prevETag = cat.ETag
 	}
-	if err := r.cache.Invalidate(ctx, issuer); err != nil {
+	if err := r.cache.Invalidate(ctx, baseURL); err != nil {
 		return nil, err
 	}
-	return r.fetchCoalesced(ctx, issuer, prevETag)
+	return r.fetchCoalesced(ctx, baseURL, prevETag)
 }
 
-// fetchCoalesced runs at most one in-flight fetch per issuer; other
+// fetchCoalesced runs at most one in-flight fetch per base URL; other
 // callers wait on the result. ctx is honoured for waiting but the
 // fetch itself continues even if the initiating caller bails.
-func (r *Resolver) fetchCoalesced(ctx context.Context, issuer, prevETag string) (*ServiceCatalog, error) {
+func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL, prevETag string) (*ServiceCatalog, error) {
 	r.mu.Lock()
-	if call, ok := r.inflight[issuer]; ok {
+	if call, ok := r.inflight[baseURL]; ok {
 		r.mu.Unlock()
 		select {
 		case <-call.done:
@@ -193,18 +225,18 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, issuer, prevETag string) 
 		}
 	}
 	call := &resolveCall{done: make(chan struct{})}
-	r.inflight[issuer] = call
+	r.inflight[baseURL] = call
 	r.mu.Unlock()
 
-	cat, err := r.fetch(ctx, issuer, prevETag)
+	cat, err := r.fetch(ctx, baseURL, prevETag)
 
 	r.mu.Lock()
-	delete(r.inflight, issuer)
+	delete(r.inflight, baseURL)
 	r.mu.Unlock()
 
 	if err == nil && cat != nil {
-		if perr := r.cache.Put(ctx, issuer, cat); perr != nil {
-			r.cfg.logger.Warn("discovery: cache put failed", "issuer", issuer, "err", perr)
+		if perr := r.cache.Put(ctx, baseURL, cat); perr != nil {
+			r.cfg.logger.Warn("discovery: cache put failed", "base_url", baseURL, "err", perr)
 		}
 	}
 	call.catalog = cat
@@ -213,19 +245,19 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, issuer, prevETag string) 
 	return cat, err
 }
 
-func (r *Resolver) fetch(ctx context.Context, issuer, prevETag string) (*ServiceCatalog, error) {
-	docURL, err := joinURL(issuer, r.cfg.wellKnownPath)
+func (r *Resolver) fetch(ctx context.Context, baseURL, prevETag string) (*ServiceCatalog, error) {
+	docURL, err := joinURL(baseURL, r.cfg.wellKnownPath)
 	if err != nil {
-		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonMalformedURL, Inner: err}
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: err}
 	}
 	// Decide on the parsed scheme, which url.Parse lowercases: URL schemes
 	// are case-insensitive, so "HTTP://" is as plaintext as "http://".
 	if !r.cfg.allowInsecure && docURL.Scheme == "http" {
-		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonInsecureURL, Inner: errors.New("plaintext issuer rejected; use WithAllowInsecure for development")}
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: errors.New("plaintext base URL rejected; use WithAllowInsecure for development")}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, docURL.String(), nil)
 	if err != nil {
-		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonFetchFailed, Inner: err}
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: err}
 	}
 	req.Header.Set("Accept", "application/json")
 	if prevETag != "" {
@@ -234,7 +266,7 @@ func (r *Resolver) fetch(ctx context.Context, issuer, prevETag string) (*Service
 
 	resp, err := r.cfg.httpClient.Do(req)
 	if err != nil {
-		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonFetchFailed, Inner: err}
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -243,16 +275,20 @@ func (r *Resolver) fetch(ctx context.Context, issuer, prevETag string) (*Service
 		// Treat as a fresh fetch with the unchanged body — but we no
 		// longer have the body. Re-issue without If-None-Match so the
 		// server returns the full document.
-		return r.fetch(ctx, issuer, "")
+		return r.fetch(ctx, baseURL, "")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonFetchFailed, Inner: fmt.Errorf("discovery fetch returned %d", resp.StatusCode)}
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: fmt.Errorf("discovery fetch returned %d", resp.StatusCode)}
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentBytes))
 	if err != nil {
-		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonFetchFailed, Inner: err}
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: err}
 	}
-	cat, err := r.parse(issuer, body)
+	var wire smartConfigWire
+	if err := json.Unmarshal(body, &wire); err != nil {
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonParseError, Inner: err}
+	}
+	cat, err := r.parse(baseURL, &wire)
 	if err != nil {
 		return nil, err
 	}
@@ -262,27 +298,81 @@ func (r *Resolver) fetch(ctx context.Context, issuer, prevETag string) (*Service
 	if err := r.validate(cat); err != nil {
 		return nil, err
 	}
+	if err := r.checkOpenIDConfiguration(ctx, cat, wire.JWKSURI); err != nil {
+		return nil, err
+	}
 	r.warnInsecure(cat)
 	return cat, nil
 }
 
-func joinURL(issuer, path string) (*url.URL, error) {
-	base, err := url.Parse(issuer)
+// checkOpenIDConfiguration confirms a declared issuer that differs from the
+// base URL against the issuer's own OpenID configuration (OpenID Connect
+// Discovery 1.0 §4). That document is fetched from a URL built from the
+// issuer, so its "issuer" must equal the declared one exactly (§4.3); when
+// both documents give a jwks_uri, the two must be equal as well, so ID tokens
+// are checked against the keys the issuer itself publishes. smartJWKSURI is
+// the SMART configuration's jwks_uri as written.
+func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCatalog, smartJWKSURI string) error {
+	if r.cfg.skipOpenIDCheck || cat.Issuer == cat.BaseURL {
+		return nil
+	}
+	fail := func(reason DiscoveryErrorReason, err error) error {
+		return &DiscoveryError{Issuer: cat.BaseURL, Reason: reason, Inner: err}
+	}
+	docURL, err := joinURL(cat.Issuer, openIDConfigurationPath)
+	if err != nil {
+		return fail(ReasonMalformedURL, err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, docURL.String(), nil)
+	if err != nil {
+		return fail(ReasonFetchFailed, err)
+	}
+	req.Header.Set("Accept", "application/json")
+	resp, err := r.cfg.httpClient.Do(req)
+	if err != nil {
+		return fail(ReasonFetchFailed, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fail(ReasonFetchFailed, fmt.Errorf("openid-configuration fetch returned %d", resp.StatusCode))
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentBytes))
+	if err != nil {
+		return fail(ReasonFetchFailed, err)
+	}
+	var doc struct {
+		Issuer  string `json:"issuer"`
+		JWKSURI string `json:"jwks_uri"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return fail(ReasonFetchFailed, fmt.Errorf("openid-configuration: %w", err))
+	}
+	if doc.Issuer != cat.Issuer {
+		return fail(ReasonIssuerMismatch, fmt.Errorf("openid-configuration issuer %q does not equal the declared issuer %q", doc.Issuer, cat.Issuer))
+	}
+	if doc.JWKSURI != "" && smartJWKSURI != "" && doc.JWKSURI != smartJWKSURI {
+		return fail(ReasonIssuerMismatch, fmt.Errorf("openid-configuration jwks_uri %q does not equal the smart-configuration jwks_uri %q", doc.JWKSURI, smartJWKSURI))
+	}
+	return nil
+}
+
+func joinURL(rawBase, path string) (*url.URL, error) {
+	base, err := url.Parse(rawBase)
 	if err != nil {
 		return nil, err
 	}
 	if base.Scheme == "" || base.Host == "" {
-		return nil, fmt.Errorf("issuer %q is not an absolute URL", issuer)
+		return nil, fmt.Errorf("%q is not an absolute URL", rawBase)
 	}
 	ref, err := url.Parse(path)
 	if err != nil {
 		return nil, err
 	}
-	// Append the configured path to the issuer's path rather than resolving
+	// Append the configured path to the base's path rather than resolving
 	// it as a reference: resolving an absolute path would replace the
-	// issuer's path, and a deployment whose base URL has a path serves the
+	// base's path, and a deployment whose base URL has a path serves the
 	// document under that path. The query and fragment still come from the
-	// configured path, never from the issuer.
+	// configured path, never from the base.
 	doc := base.JoinPath(ref.EscapedPath())
 	doc.RawQuery, doc.ForceQuery = ref.RawQuery, ref.ForceQuery
 	doc.Fragment, doc.RawFragment = ref.Fragment, ref.RawFragment
@@ -347,12 +437,8 @@ type serviceEntryWire struct {
 	Capabilities  []string `json:"capabilities"`
 }
 
-func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
-	var wire smartConfigWire
-	if err := json.Unmarshal(body, &wire); err != nil {
-		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonParseError, Inner: err}
-	}
-	auth, err := parseAuthEndpoints(issuer, wire, r.cfg.allowInsecure)
+func (r *Resolver) parse(baseURL string, wire *smartConfigWire) (*ServiceCatalog, error) {
+	auth, err := parseAuthEndpoints(baseURL, wire, r.cfg.allowInsecure)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +446,7 @@ func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
 	for id, s := range wire.Services {
 		u, err := url.Parse(s.BaseURL)
 		if err != nil || u.Scheme == "" || u.Host == "" {
-			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q baseUrl %q invalid", id, s.BaseURL)}
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q baseUrl %q invalid", id, s.BaseURL)}
 		}
 		services[id] = ServiceEntry{
 			ID:           id,
@@ -369,29 +455,59 @@ func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
 			Capabilities: append([]string(nil), s.Capabilities...),
 		}
 	}
-	// The caller-supplied issuer is authoritative — it is the URL we
-	// fetched the document from. Per OIDC Discovery §4.3 the document's
-	// "issuer" field MUST equal that URL when present; a mismatch means
-	// a hostile or misconfigured server is responding, and we must reject
-	// it to prevent downstream ID-token iss checks from passing against
-	// the wrong server. An absent "issuer" is allowed and simply resolves
-	// to the caller's value.
-	resolvedIssuer := issuer
-	if wire.Issuer != "" && wire.Issuer != issuer {
-		return nil, &DiscoveryError{
-			Issuer: issuer,
-			Reason: ReasonIssuerMismatch,
-			Inner:  fmt.Errorf("document issuer %q does not match requested issuer %q", wire.Issuer, issuer),
+	// The document's issuer becomes the catalog's Issuer whether or not it
+	// equals the base URL: SMART App Launch does not require the two to
+	// match, and a Platform may delegate sign-in to an identity provider
+	// with its own URL. The base URL stays the catalog's BaseURL and cache
+	// key. fetch confirms a differing issuer against the issuer's OpenID
+	// configuration. An absent issuer resolves to the base URL.
+	issuer := baseURL
+	if wire.Issuer != "" {
+		if err := validateIssuer(baseURL, wire.Issuer, r.cfg.allowInsecure); err != nil {
+			return nil, err
 		}
+		issuer = wire.Issuer
 	}
 	return &ServiceCatalog{
-		Issuer:   resolvedIssuer,
+		BaseURL:  baseURL,
+		Issuer:   issuer,
 		Services: services,
 		Auth:     auth,
 	}, nil
 }
 
-func parseAuthEndpoints(issuer string, w smartConfigWire, allowInsecure bool) (AuthEndpoints, error) {
+// validateIssuer checks the shape OpenID Connect Core 1.0 §2 gives an
+// issuer: an absolute https URL with a host and without a query or
+// fragment. An http issuer passes only with allowInsecure.
+func validateIssuer(baseURL, raw string, allowInsecure bool) error {
+	malformed := func(err error) error {
+		return &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: err}
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return malformed(fmt.Errorf("issuer: %w", err))
+	}
+	// url.Parse lowercases the scheme, so these comparisons ignore case.
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return malformed(fmt.Errorf("issuer %q is not an https URL", raw))
+	}
+	if u.Host == "" {
+		return malformed(fmt.Errorf("issuer %q has no host", raw))
+	}
+	if u.RawQuery != "" || u.ForceQuery {
+		return malformed(fmt.Errorf("issuer %q has a query", raw))
+	}
+	// A "#" can only open a fragment, and url.Parse drops an empty one.
+	if strings.Contains(raw, "#") {
+		return malformed(fmt.Errorf("issuer %q has a fragment", raw))
+	}
+	if u.Scheme == "http" && !allowInsecure {
+		return &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("issuer %q uses http; https required (use WithAllowInsecure for development)", raw)}
+	}
+	return nil
+}
+
+func parseAuthEndpoints(baseURL string, w *smartConfigWire, allowInsecure bool) (AuthEndpoints, error) {
 	var out AuthEndpoints
 	parse := func(name, raw string) (*url.URL, error) {
 		if raw == "" {
@@ -399,10 +515,10 @@ func parseAuthEndpoints(issuer string, w smartConfigWire, allowInsecure bool) (A
 		}
 		u, err := url.Parse(raw)
 		if err != nil || u.Scheme == "" || u.Host == "" {
-			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s %q invalid", name, raw)}
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s %q invalid", name, raw)}
 		}
 		if !allowInsecure && u.Scheme != "https" {
-			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s uses scheme %q; https required (use WithAllowInsecure for development)", name, u.Scheme)}
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s uses scheme %q; https required (use WithAllowInsecure for development)", name, u.Scheme)}
 		}
 		return u, nil
 	}
@@ -449,7 +565,7 @@ func (r *Resolver) validate(cat *ServiceCatalog) error {
 		}
 	}
 	if len(missing) > 0 {
-		return &DiscoveryError{Issuer: cat.Issuer, Reason: ReasonMissingService, MissingServices: missing}
+		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonMissingService, MissingServices: missing}
 	}
 	// 2. Spec-version match per required service (REQ-072, softened per ADR 0008).
 	// When a service entry advertises no spec_version AND the caller has not
@@ -464,7 +580,7 @@ func (r *Resolver) validate(cat *ServiceCatalog) error {
 		}
 		if _, ok := r.cfg.acceptedVersions[e.SpecVersion]; !ok {
 			return &DiscoveryError{
-				Issuer:          cat.Issuer,
+				Issuer:          cat.BaseURL,
 				Reason:          ReasonSpecVersionMismatch,
 				SpecVersionGot:  e.SpecVersion,
 				SpecVersionWant: acceptedVersionsString(r.cfg.acceptedVersions),
@@ -478,7 +594,7 @@ func (r *Resolver) validate(cat *ServiceCatalog) error {
 		return nil
 	}
 	if cat.Auth.AuthorizationEndpoint == nil || cat.Auth.TokenEndpoint == nil {
-		return &DiscoveryError{Issuer: cat.Issuer, Reason: ReasonAuthEndpointsMissing, Inner: errors.New("authorization_endpoint and token_endpoint are required when any auth fields are present")}
+		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonAuthEndpointsMissing, Inner: errors.New("authorization_endpoint and token_endpoint are required when any auth fields are present")}
 	}
 	return nil
 }
@@ -499,7 +615,7 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 			return
 		}
 		if u.Scheme == "http" {
-			r.cfg.logger.Warn("discovery: plaintext URL in catalog (REQ-092)", "issuer", cat.Issuer, "field", name, "url", u.Redacted())
+			r.cfg.logger.Warn("discovery: plaintext URL in catalog (REQ-092)", "base_url", cat.BaseURL, "field", name, "url", u.Redacted())
 		}
 	}
 	check("authorization_endpoint", cat.Auth.AuthorizationEndpoint)

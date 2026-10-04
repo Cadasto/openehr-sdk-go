@@ -338,21 +338,30 @@ func TestStaleCatalog(t *testing.T) {
 	}
 }
 
-// REQ-073: a document whose issuer differs from the one fetched is rejected
-// with ReasonIssuerMismatch.
+// REQ-073: a declared issuer that differs from the base URL is no longer
+// refused for differing; it is refused with ReasonIssuerMismatch when the
+// issuer's own OpenID configuration names another issuer.
 func TestResolveIssuerMismatch(t *testing.T) {
-	// The document's "issuer" field differs from the URL used to fetch it.
-	// Per OIDC Discovery §4.3, Resolve must reject the document and return
-	// a *DiscoveryError with ReasonIssuerMismatch.
-	body := `{
-		"issuer":"https://evil.example.com",
-		"authorization_endpoint":"https://evil.example.com/auth",
-		"token_endpoint":"https://evil.example.com/token",
-		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
-	}`
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, body)
+	// The SMART configuration declares <base>/idp as its issuer; the OpenID
+	// configuration served there claims a different issuer. Per OIDC
+	// Discovery §4.3, Resolve must reject the catalog with ReasonIssuerMismatch.
+	var srv *httptest.Server
+	srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case WellKnownPath:
+			_, _ = io.WriteString(w, `{
+				"issuer":"`+srv.URL+`/idp",
+				"authorization_endpoint":"https://evil.example.com/auth",
+				"token_endpoint":"https://evil.example.com/token",
+				"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
+			}`)
+		case "/idp" + openIDConfigurationPath:
+			_, _ = io.WriteString(w, `{"issuer":"https://evil.example.com"}`)
+		default:
+			http.NotFound(w, r)
+		}
 	}))
+	srv.Start()
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
 	cat, err := r.Resolve(t.Context(), srv.URL)
@@ -365,10 +374,16 @@ func TestResolveIssuerMismatch(t *testing.T) {
 	}
 }
 
+// REQ-070, REQ-073: a declared issuer equal to the base URL resolves without
+// an OpenID configuration check, and both catalog values carry that URL.
 func TestResolveIssuerMatch(t *testing.T) {
 	// Start an unstarted server so we know srv.URL before building the body.
 	var srv *httptest.Server
 	srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != WellKnownPath {
+			http.NotFound(w, r)
+			return
+		}
 		body := `{
 			"issuer":"` + srv.URL + `",
 			"authorization_endpoint":"https://auth.example.com/auth",
@@ -386,6 +401,9 @@ func TestResolveIssuerMatch(t *testing.T) {
 	}
 	if cat.Issuer != srv.URL {
 		t.Errorf("catalog.Issuer = %q, want %q", cat.Issuer, srv.URL)
+	}
+	if cat.BaseURL != srv.URL {
+		t.Errorf("catalog.BaseURL = %q, want %q", cat.BaseURL, srv.URL)
 	}
 }
 

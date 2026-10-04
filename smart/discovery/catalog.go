@@ -9,8 +9,21 @@ import (
 // SMART-on-openEHR deployment, plus metadata for caching and refresh.
 // Pass by pointer; treat as immutable after Resolver
 // produces it.
+//
+// A catalog carries two URLs that are often, but not always, the same.
+// BaseURL is the Platform base URL: the address the SMART configuration
+// was resolved from, which an embedded SMART launch passes to the app as
+// its "iss" parameter. Issuer is the OpenID Connect issuer that signs ID
+// tokens. A Platform whose sign-in is handled by a separate identity
+// provider declares that provider's URL as its issuer, so the two differ.
 type ServiceCatalog struct {
-	// Issuer is the deployment's authoritative issuer URL.
+	// BaseURL is the Platform base URL the catalog was resolved from,
+	// exactly as the caller passed it to Resolver.Resolve or
+	// Resolver.Refresh. The resolver caches the catalog under this URL.
+	BaseURL string
+	// Issuer is the OpenID Connect issuer: the "issuer" member of the
+	// SMART configuration, or BaseURL when the document declares none.
+	// ID tokens are checked against this value.
 	Issuer string
 	// Services maps service identifier (e.g. "org.openehr.rest") to
 	// the resolved entry. A SMART-on-openEHR document advertises both

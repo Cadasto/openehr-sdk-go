@@ -10,7 +10,9 @@ type DiscoveryErrorReason string
 
 const (
 	// ReasonFetchFailed indicates the SMART configuration document
-	// could not be retrieved (network error, non-2xx HTTP status).
+	// could not be retrieved (network error, non-2xx HTTP status), or the
+	// issuer's OpenID configuration document could not be retrieved or
+	// read.
 	ReasonFetchFailed DiscoveryErrorReason = "fetch_failed"
 	// ReasonParseError indicates the response body could not be parsed
 	// as a SMART configuration document.
@@ -23,28 +25,35 @@ const (
 	// set.
 	ReasonSpecVersionMismatch DiscoveryErrorReason = "spec_version_mismatch"
 	// ReasonMalformedURL indicates a URL field (BaseURL,
-	// AuthorizationEndpoint, etc.) failed parsing.
+	// AuthorizationEndpoint, etc.) failed parsing, or the declared issuer
+	// is not an absolute https URL with a host and without a query or
+	// fragment.
 	ReasonMalformedURL DiscoveryErrorReason = "malformed_url"
 	// ReasonAuthEndpointsMissing indicates the authorization or token
 	// endpoint URL is absent from a SMART config that requires them.
 	ReasonAuthEndpointsMissing DiscoveryErrorReason = "auth_endpoints_missing"
-	// ReasonInsecureURL indicates a non-https URL was rejected: either
-	// the issuer fetch or a catalog auth endpoint URL in the discovery
-	// document. Override with WithAllowInsecure to opt into
-	// plaintext URLs in development.
+	// ReasonInsecureURL indicates a non-https URL was rejected: the base
+	// URL passed to the resolver, the issuer the document declares, or a
+	// catalog auth endpoint URL in the discovery document. Override with
+	// WithAllowInsecure to opt into plaintext URLs in development.
 	ReasonInsecureURL DiscoveryErrorReason = "insecure_url"
-	// ReasonIssuerMismatch indicates the discovery document's "issuer"
-	// field does not equal the URL used to fetch it. Per OIDC Discovery
-	// §4.3 this is a hard validation failure, because accepting a
-	// mismatched issuer would let a hostile server impersonate another identity
-	// provider downstream.
+	// ReasonIssuerMismatch indicates the issuer's own OpenID configuration
+	// does not confirm what the SMART configuration declares: its "issuer"
+	// differs from the declared issuer, or its "jwks_uri" differs from the
+	// SMART configuration's. The resolver checks this only when the
+	// declared issuer differs from the base URL, and not at all when built
+	// with WithoutOpenIDConfigurationCheck.
 	ReasonIssuerMismatch DiscoveryErrorReason = "issuer_mismatch"
 )
 
 // DiscoveryError is the typed error every discovery failure surfaces
 // as. Distinguish from transport.WireError via errors.As.
 type DiscoveryError struct {
-	// Issuer is the deployment issuer URL whose discovery failed.
+	// Issuer is the Platform base URL the resolution was for: the URL
+	// passed to Resolver.Resolve or Resolver.Refresh, or the base URL of a
+	// hand-built catalog. Despite its name it is not the OpenID Connect
+	// issuer; ServiceCatalog explains the difference. Error prints it as
+	// "issuer=".
 	Issuer string
 	// Reason classifies the failure.
 	Reason DiscoveryErrorReason
