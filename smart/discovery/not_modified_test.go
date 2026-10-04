@@ -362,3 +362,109 @@ func TestRefreshFailureDropsCachedCatalog(t *testing.T) { // REQ-071
 		})
 	}
 }
+
+// heldCache holds every Put, or every Invalidate, until release is closed,
+// as a slow networked cache can.
+type heldCache struct {
+	*discovery.MemoryCache
+	holdPut bool // hold Put; otherwise hold Invalidate
+	release chan struct{}
+}
+
+func (c *heldCache) Put(ctx context.Context, baseURL string, cat *discovery.ServiceCatalog) error {
+	if c.holdPut {
+		<-c.release
+	}
+	return c.MemoryCache.Put(ctx, baseURL, cat)
+}
+
+func (c *heldCache) Invalidate(ctx context.Context, baseURL string) error {
+	if !c.holdPut {
+		<-c.release
+	}
+	return c.MemoryCache.Invalidate(ctx, baseURL)
+}
+
+// TestFetchSettlesCacheBeforeTheNextFetch pins REQ-071: a fetch writes its
+// result to the cache, storing a success or dropping the entry on a
+// failure, before another fetch for the same base URL can start. A call
+// that arrives while the cache is written joins that fetch and gets its
+// result, so the cache always agrees with what the last call reported: a
+// success stored late does not bring a catalog back after a refresh
+// reported a failure, and a failure dropped late does not remove the
+// catalog a later call reported.
+func TestFetchSettlesCacheBeforeTheNextFetch(t *testing.T) { // REQ-071
+	type call func(ctx context.Context, res *discovery.Resolver, baseURL string) (*discovery.ServiceCatalog, error)
+	tests := []struct {
+		name string
+		// firstOK makes the first request succeed and every later one get
+		// a 503; otherwise the first gets a 503 and every later one succeeds.
+		firstOK bool
+		// second arrives while the first fetch writes the cache.
+		second call
+	}{
+		{
+			name:    "success being stored, then a Refresh",
+			firstOK: true,
+			second: func(ctx context.Context, res *discovery.Resolver, baseURL string) (*discovery.ServiceCatalog, error) {
+				return res.Refresh(ctx, baseURL)
+			},
+		},
+		{
+			name: "failure being dropped, then a Resolve",
+			second: func(ctx context.Context, res *discovery.Resolver, baseURL string) (*discovery.ServiceCatalog, error) {
+				return res.Resolve(ctx, baseURL)
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var hits atomic.Int32
+				srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					if (hits.Add(1) == 1) != tc.firstOK {
+						w.WriteHeader(http.StatusServiceUnavailable)
+						return
+					}
+					w.Header().Set("Cache-Control", "max-age=3600")
+					_, _ = io.WriteString(w, smartDocument("", ""))
+				}))
+				cache := &heldCache{MemoryCache: discovery.NewMemoryCache(), holdPut: tc.firstOK, release: make(chan struct{})}
+				res, err := discovery.NewResolver(cache, discovery.WithHTTPClient(srv.Client()), discovery.WithAllowInsecure())
+				if err != nil {
+					t.Fatal(err)
+				}
+				baseURL := srv.URL + platformPath
+
+				var (
+					wg                  sync.WaitGroup
+					firstErr, secondErr error
+					secondCat           *discovery.ServiceCatalog
+				)
+				wg.Go(func() { _, firstErr = res.Resolve(t.Context(), baseURL) })
+				synctest.Wait() // the first fetch is answered and its cache write held
+				wg.Go(func() { secondCat, secondErr = tc.second(t.Context(), res, baseURL) })
+				synctest.Wait() // the second call has returned, or waits for the first
+				close(cache.release)
+				wg.Wait()
+
+				if (firstErr == nil) != tc.firstOK {
+					t.Fatalf("first Resolve(%q) error = %v, want success %t", baseURL, firstErr, tc.firstOK)
+				}
+				if got := hits.Load(); got != 1 {
+					t.Errorf("server answered %d requests, want 1: a call arriving while the first fetch writes the cache joins it", got)
+				}
+				if (secondErr == nil) != (firstErr == nil) {
+					t.Errorf("second call error = %v, want the result of the fetch it joined (error = %v)", secondErr, firstErr)
+				}
+				cached, ok := cache.Get(t.Context(), baseURL)
+				switch {
+				case secondErr != nil && ok:
+					t.Errorf("cache holds a catalog for %q after the last call reported %v, want it dropped so the next Resolve fetches again", baseURL, secondErr)
+				case secondErr == nil && (!ok || cached != secondCat):
+					t.Errorf("cache.Get(%q) = %p, %t, want the catalog %p the last call returned", baseURL, cached, ok, secondCat)
+				}
+			})
+		})
+	}
+}

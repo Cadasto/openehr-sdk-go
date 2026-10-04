@@ -276,7 +276,10 @@ func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog
 // fetch fails with the context's error and every waiter receives that same
 // error. A waiter whose own context ends first stops waiting and returns
 // its own context's error. A successful fetch is cached under baseURL; a
-// failed one drops whatever was cached there.
+// failed one drops whatever was cached there. The cache is written before
+// the call leaves the in-flight set, so callers that arrive while it is
+// written join the call and get its result, and a later fetch for baseURL
+// never has its cache entry overwritten or dropped by an earlier one.
 //
 // cached is the catalog held for baseURL, or nil; fetch uses its ETag for
 // a conditional request.
@@ -297,10 +300,9 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL string, cached *S
 
 	cat, err := r.fetch(ctx, baseURL, cached)
 
-	r.mu.Lock()
-	delete(r.inflight, baseURL)
-	r.mu.Unlock()
-
+	// Write the cache while this call is still in flight. A caller arriving
+	// meanwhile joins it, so no later fetch for baseURL can write the cache
+	// first and then have this older result overwrite or drop its entry.
 	switch {
 	case err != nil:
 		// Drop what was cached, so the next resolution fetches again and
@@ -315,6 +317,11 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL string, cached *S
 			r.cfg.logger.Warn("discovery: cache put failed", "base_url", baseURL, "err", perr)
 		}
 	}
+
+	r.mu.Lock()
+	delete(r.inflight, baseURL)
+	r.mu.Unlock()
+
 	call.catalog = cat
 	call.err = err
 	close(call.done)
