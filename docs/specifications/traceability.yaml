@@ -1761,3 +1761,5 @@ requirements:
     status: draft
     implementation: planned
     packages: [auth]
+    tests:
+      - auth/openehr_scope_test.go
