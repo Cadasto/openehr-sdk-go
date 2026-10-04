@@ -16,7 +16,12 @@ import (
 // After Revoke, [Source.Token] returns [auth.ErrReauthRequired] until new
 // tokens are installed.
 //
-// Revoke clears the tokens before it sends the request, so the source is
+// Signing out also ends the session: Revoke drops the last token response,
+// so [Source.LastTokenResponse] returns the zero value, and the identity of
+// the last ID token the source verified, so a later refresh is not held to
+// it.
+//
+// Revoke clears all of this before it sends the request, so the source is
 // signed out whatever the outcome. A refresh still running then has its
 // result discarded, and no refresh can start with the token being revoked.
 // The [WithTokenChange] hook is then called once with the zero
@@ -40,9 +45,12 @@ import (
 // when the body holds one, and the cause. When the server advertises no
 // revocation endpoint, Revoke sends nothing: it clears the tokens and
 // returns an error matching [auth.ErrInvalidConfig]. A source that holds no
-// token returns nil without sending a request or calling the hook.
+// token drops its last token response and the identity too, and returns nil
+// without sending a request or calling the hook.
 func (s *Source) Revoke(ctx context.Context) error {
 	s.mu.Lock()
+	s.lastTR = TokenResponse{}
+	s.idBinding = nil
 	token, hint := s.refresh, "refresh_token"
 	if token == "" {
 		token, hint = s.cur.Value, "access_token"
@@ -51,8 +59,8 @@ func (s *Source) Revoke(ctx context.Context) error {
 		s.mu.Unlock()
 		return nil
 	}
-	// Like SetTokens, clearing starts a new session, so a refresh that is
-	// running now does not install its tokens when it ends.
+	// Clearing advances the session counter, as SetTokens does, so a
+	// refresh that is running now does not install its tokens when it ends.
 	s.session++
 	s.setTokensLocked(auth.Token{}, "")
 	s.queueChangeLocked(ctx, TokenChange{})

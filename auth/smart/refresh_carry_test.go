@@ -237,3 +237,54 @@ func TestLaunchContextAfterRefreshKeepsLaunchContext(t *testing.T) { // REQ-064
 		t.Errorf("LaunchContext.Raw[fhirContext] after two refreshes = %#v, want the code exchange's %#v", got, want)
 	}
 }
+
+// TestRefreshKeepsTheScopeOnTheAccessToken pins REQ-064 and REQ-063: the
+// access token a refresh installs carries the scope the session keeps, so
+// when the refresh response leaves the scope out, Token, the held token and
+// the token change all have the earlier grant; a scope the refresh carries
+// replaces it.
+func TestRefreshKeepsTheScopeOnTheAccessToken(t *testing.T) { // REQ-064 REQ-063
+	const earlier = "openid launch/patient patient/*.rs"
+	tests := []struct {
+		name  string
+		extra map[string]any
+		want  string
+	}{
+		{name: "scope left out", want: earlier},
+		{name: "scope carried", extra: map[string]any{"scope": "openid patient/*.rs"}, want: "openid patient/*.rs"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			as := newStubServer(t)
+			var log changeLog
+			src := as.source(t, as.endpoints(), smart.WithTokenChange(log.record))
+			as.answerToken(0, launchBody(t, "at-1", map[string]any{"scope": earlier}, map[string]any{"refresh_token": "rt-1"}))
+			req, err := src.BeginAuthorization("")
+			if err != nil {
+				t.Fatalf("BeginAuthorization: %v", err)
+			}
+			if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req); err != nil {
+				t.Fatalf("ExchangeAuthorizationCode() error = %v", err)
+			}
+			src.SetTokens(staleAccess("at-1"), "rt-1")
+
+			as.answerToken(0, launchBody(t, "at-2", nil, tc.extra))
+			tok, err := src.Token(t.Context())
+			if err != nil {
+				t.Fatalf("Token() error = %v, want a refreshed token", err)
+			}
+			if tok.Scope != tc.want {
+				t.Errorf("Token().Scope = %q, want %q", tok.Scope, tc.want)
+			}
+			if held, _ := src.HeldTokens(); held.Scope != tc.want {
+				t.Errorf("held access token Scope = %q, want %q", held.Scope, tc.want)
+			}
+			if got := src.LastTokenResponse().Scope; got != tc.want {
+				t.Errorf("LastTokenResponse().Scope = %q, want %q", got, tc.want)
+			}
+			if changes := log.all(); len(changes) != 2 || changes[1].Access.Scope != tc.want {
+				t.Errorf("refresh TokenChange.Access.Scope = %+v, want %q", changes, tc.want)
+			}
+		})
+	}
+}

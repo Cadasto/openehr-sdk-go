@@ -20,7 +20,9 @@ import (
 )
 
 // revokeFixture is a source on a stub server whose token-change hook
-// records each change with the tokens the source held when it ran.
+// records each change with the tokens the source held when it ran, and
+// which records what the source holds while each revocation request is on
+// its way.
 type revokeFixture struct {
 	as  *stubServer
 	src *smart.Source
@@ -28,6 +30,27 @@ type revokeFixture struct {
 	mu      sync.Mutex
 	changes []smart.TokenChange
 	held    [][2]string // access and refresh token held when the hook ran
+	atPost  []heldState // what the source held while a revocation request was sent
+}
+
+// heldState is what a source holds at one moment.
+type heldState struct {
+	access, refresh string
+	last            smart.TokenResponse
+}
+
+// observingTransport calls observe for each request to the revocation
+// endpoint, in the goroutine sending it, before passing it on to next.
+type observingTransport struct {
+	next    http.RoundTripper
+	observe func()
+}
+
+func (o observingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if r.URL.Path == "/revoke" {
+		o.observe()
+	}
+	return o.next.RoundTrip(r)
 }
 
 // newRevokeFixture builds the fixture; edit, when not nil, changes the
@@ -39,7 +62,8 @@ func newRevokeFixture(t *testing.T, edit func(*discovery.AuthEndpoints), opts ..
 	if edit != nil {
 		edit(&ep)
 	}
-	f.src = f.as.source(t, ep, append([]smart.Option{smart.WithTokenChange(f.record)}, opts...)...)
+	client := &http.Client{Transport: observingTransport{next: f.as.srv.Client().Transport, observe: f.observe}}
+	f.src = f.as.source(t, ep, append([]smart.Option{smart.WithTokenChange(f.record), smart.WithHTTPClient(client)}, opts...)...)
 	return f
 }
 
@@ -51,19 +75,63 @@ func (f *revokeFixture) record(_ context.Context, c smart.TokenChange) {
 	f.mu.Unlock()
 }
 
+func (f *revokeFixture) observe() {
+	access, refresh := f.src.HeldTokens()
+	last := f.src.LastTokenResponse()
+	f.mu.Lock()
+	f.atPost = append(f.atPost, heldState{access: access.Value, refresh: refresh, last: last})
+	f.mu.Unlock()
+}
+
 func (f *revokeFixture) changeCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return len(f.changes)
 }
 
-// checkSignedOut reports an error unless the source holds no token, Token
-// asks for re-authentication, and the hook ran once, with the zero
-// TokenChange, after the tokens were cleared.
+// signIn completes a code exchange whose response carries launch context,
+// so the source has a last token response, then makes the source hold
+// access and refresh. It forgets the exchange's token change.
+func (f *revokeFixture) signIn(t *testing.T, access auth.Token, refresh string) {
+	t.Helper()
+	f.as.answerToken(0, launchBody(t, "at-0", map[string]any{"patient": "P1", "scope": "openid launch/patient"}, map[string]any{"refresh_token": "rt-0"}))
+	req, err := f.src.BeginAuthorization("")
+	if err != nil {
+		t.Fatalf("BeginAuthorization: %v", err)
+	}
+	if _, _, err := f.src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req); err != nil {
+		t.Fatalf("ExchangeAuthorizationCode() error = %v", err)
+	}
+	if f.src.LastTokenResponse().Patient != "P1" {
+		t.Fatal("sign-in left no last token response")
+	}
+	f.src.SetTokens(access, refresh)
+	f.mu.Lock()
+	f.changes, f.held = nil, nil
+	f.mu.Unlock()
+}
+
+// revokeWithin calls src.Revoke(ctx) and fails the test at once if it does
+// not return, which here means it deadlocked against the source.
+func revokeWithin(t *testing.T, ctx context.Context, src *smart.Source) error {
+	t.Helper()
+	var err error
+	withinDeadline(t, "Revoke", func() { err = src.Revoke(ctx) })
+	return err
+}
+
+// checkSignedOut reports an error unless the source holds no token and no
+// last token response, Token asks for re-authentication, the hook ran once,
+// with the zero TokenChange, after the tokens were cleared, and every
+// revocation request was sent after the tokens and the last token response
+// were dropped.
 func (f *revokeFixture) checkSignedOut(t *testing.T) {
 	t.Helper()
 	if access, refresh := f.src.HeldTokens(); !access.IsZero() || refresh != "" {
 		t.Errorf("after Revoke the source holds %+v, %q; want no token", access, refresh)
+	}
+	if last := f.src.LastTokenResponse(); !reflect.DeepEqual(last, smart.TokenResponse{}) {
+		t.Errorf("LastTokenResponse() after Revoke = %+v, want the zero value", last)
 	}
 	if tok, err := f.src.Token(t.Context()); !errors.Is(err, auth.ErrReauthRequired) {
 		t.Errorf("Token() after Revoke = %q, %v; want ErrReauthRequired", tok.Value, err)
@@ -78,12 +146,19 @@ func (f *revokeFixture) checkSignedOut(t *testing.T) {
 	case f.held[0] != [2]string{}:
 		t.Errorf("the hook ran while the source held %q, want it to run after the tokens were cleared", f.held[0])
 	}
+	for _, st := range f.atPost {
+		if st.access != "" || st.refresh != "" || !reflect.DeepEqual(st.last, smart.TokenResponse{}) {
+			t.Errorf("while the revocation request was sent the source held %q, %q and last token response %+v; want them dropped before it is sent",
+				st.access, st.refresh, st.last)
+		}
+	}
 }
 
 // TestRevokeSendsTheTokenWithItsHint pins REQ-167: Revoke posts the refresh
 // token with token_type_hint refresh_token when the source holds one, and
 // otherwise the access token with access_token, form-encoded; a public
-// client also sends its client_id.
+// client also sends its client_id. The tokens and the last token response
+// are dropped before the request is sent.
 func TestRevokeSendsTheTokenWithItsHint(t *testing.T) { // REQ-167
 	tests := []struct {
 		name      string
@@ -99,8 +174,9 @@ func TestRevokeSendsTheTokenWithItsHint(t *testing.T) { // REQ-167
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newRevokeFixture(t, nil)
-			f.src.SetTokens(tc.access, tc.refresh)
-			if err := f.src.Revoke(t.Context()); err != nil {
+			f.signIn(t, tc.access, tc.refresh)
+			tokenReqs := len(f.as.tokenRequests())
+			if err := revokeWithin(t, t.Context(), f.src); err != nil {
 				t.Fatalf("Revoke() error = %v, want nil on a 200 answer", err)
 			}
 			reqs := f.as.revokeRequests()
@@ -114,8 +190,14 @@ func TestRevokeSendsTheTokenWithItsHint(t *testing.T) { // REQ-167
 			if keys := slices.Sorted(maps.Keys(form)); !slices.Equal(keys, []string{"client_id", "token", "token_type_hint"}) {
 				t.Errorf("revocation form fields = %q, want [client_id token token_type_hint]", keys)
 			}
-			if n := len(f.as.tokenRequests()); n != 0 {
-				t.Errorf("token requests = %d, want none", n)
+			if n := len(f.as.tokenRequests()) - tokenReqs; n != 0 {
+				t.Errorf("token requests during Revoke = %d, want none", n)
+			}
+			f.mu.Lock()
+			observed := len(f.atPost)
+			f.mu.Unlock()
+			if observed != 1 {
+				t.Errorf("revocation requests observed on their way = %d, want 1", observed)
 			}
 			f.checkSignedOut(t)
 		})
@@ -152,7 +234,7 @@ func TestRevokeAuthenticatesLikeTheTokenEndpoint(t *testing.T) { // REQ-167 REQ-
 			if _, err := f.src.Token(t.Context()); err != nil {
 				t.Fatalf("Token() (refresh) error = %v", err)
 			}
-			if err := f.src.Revoke(t.Context()); err != nil {
+			if err := revokeWithin(t, t.Context(), f.src); err != nil {
 				t.Fatalf("Revoke() error = %v", err)
 			}
 			toks, revs := f.as.tokenRequests(), f.as.revokeRequests()
@@ -275,9 +357,9 @@ func TestRevokeOutcome(t *testing.T) { // REQ-167 REQ-063
 		t.Run(tc.name, func(t *testing.T) {
 			f := newRevokeFixture(t, nil)
 			f.as.answerRevoke(tc.status, tc.body)
-			f.src.SetTokens(freshAccess("at-1"), "rt-1")
+			f.signIn(t, freshAccess("at-1"), "rt-1")
 
-			err := f.src.Revoke(t.Context())
+			err := revokeWithin(t, t.Context(), f.src)
 			if tc.wantStatus == 0 {
 				if err != nil {
 					t.Errorf("Revoke() error = %v, want nil", err)
@@ -302,16 +384,16 @@ func TestRevokeTransportFailure(t *testing.T) { // REQ-167
 		f := newRevokeFixture(t, func(ep *discovery.AuthEndpoints) {
 			ep.RevocationEndpoint = discovery.MustParseURL(dead + "/revoke")
 		})
-		f.src.SetTokens(freshAccess("at-1"), "rt-1")
-		checkRevocationError(t, f.src.Revoke(t.Context()), 0, "")
+		f.signIn(t, freshAccess("at-1"), "rt-1")
+		checkRevocationError(t, revokeWithin(t, t.Context(), f.src), 0, "")
 		f.checkSignedOut(t)
 	})
 	t.Run("context ended", func(t *testing.T) {
 		f := newRevokeFixture(t, nil)
-		f.src.SetTokens(freshAccess("at-1"), "rt-1")
+		f.signIn(t, freshAccess("at-1"), "rt-1")
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
-		err := f.src.Revoke(ctx)
+		err := revokeWithin(t, ctx, f.src)
 		checkRevocationError(t, err, 0, "")
 		if !errors.Is(err, context.Canceled) {
 			t.Errorf("Revoke(ended context) error = %v, want it to match context.Canceled", err)
@@ -324,24 +406,25 @@ func TestRevokeTransportFailure(t *testing.T) { // REQ-167
 }
 
 // TestRevokeWithoutEndpoint pins REQ-167: a source whose server advertises
-// no revocation endpoint clears its tokens and fails with
-// auth.ErrInvalidConfig, sending nothing.
+// no revocation endpoint clears its tokens and drops its last token
+// response, then fails with auth.ErrInvalidConfig, sending nothing.
 func TestRevokeWithoutEndpoint(t *testing.T) { // REQ-167
 	f := newRevokeFixture(t, func(ep *discovery.AuthEndpoints) { ep.RevocationEndpoint = nil })
-	f.src.SetTokens(freshAccess("at-1"), "rt-1")
-	err := f.src.Revoke(t.Context())
+	f.signIn(t, freshAccess("at-1"), "rt-1")
+	tokenReqs := len(f.as.tokenRequests())
+	err := revokeWithin(t, t.Context(), f.src)
 	if !errors.Is(err, auth.ErrInvalidConfig) || errors.Is(err, auth.ErrRevocationFailed) {
 		t.Errorf("Revoke() error = %v, want auth.ErrInvalidConfig only", err)
 	}
-	if n, m := len(f.as.revokeRequests()), len(f.as.tokenRequests()); n+m != 0 {
+	if n, m := len(f.as.revokeRequests()), len(f.as.tokenRequests())-tokenReqs; n+m != 0 {
 		t.Errorf("requests sent = %d, want none", n+m)
 	}
 	f.checkSignedOut(t)
 }
 
-// TestRevokeWithoutToken pins REQ-167: a source that holds no token returns
-// nil from Revoke without sending a request or calling the hook, with or
-// without a revocation endpoint.
+// TestRevokeWithoutToken pins REQ-167: a source that holds no token drops
+// its last token response and returns nil from Revoke without sending a
+// request or calling the hook, with or without a revocation endpoint.
 func TestRevokeWithoutToken(t *testing.T) { // REQ-167
 	tests := []struct {
 		name  string
@@ -351,10 +434,19 @@ func TestRevokeWithoutToken(t *testing.T) { // REQ-167
 		{name: "never held a token"},
 		{name: "no revocation endpoint", edit: func(ep *discovery.AuthEndpoints) { ep.RevocationEndpoint = nil }},
 		{
+			name:  "a last token response but no token",
+			setup: func(t *testing.T, f *revokeFixture) { f.signIn(t, auth.Token{}, "") },
+		},
+		{
+			name:  "a last token response but no token, no revocation endpoint",
+			edit:  func(ep *discovery.AuthEndpoints) { ep.RevocationEndpoint = nil },
+			setup: func(t *testing.T, f *revokeFixture) { f.signIn(t, auth.Token{}, "") },
+		},
+		{
 			name: "already revoked",
 			setup: func(t *testing.T, f *revokeFixture) {
-				f.src.SetTokens(freshAccess("at-1"), "rt-1")
-				if err := f.src.Revoke(t.Context()); err != nil {
+				f.signIn(t, freshAccess("at-1"), "rt-1")
+				if err := revokeWithin(t, t.Context(), f.src); err != nil {
 					t.Fatalf("first Revoke() error = %v", err)
 				}
 			},
@@ -367,8 +459,11 @@ func TestRevokeWithoutToken(t *testing.T) { // REQ-167
 				tc.setup(t, f)
 			}
 			reqsBefore, changesBefore := len(f.as.revokeRequests()), f.changeCount()
-			if err := f.src.Revoke(t.Context()); err != nil {
+			if err := revokeWithin(t, t.Context(), f.src); err != nil {
 				t.Errorf("Revoke() error = %v, want nil", err)
+			}
+			if last := f.src.LastTokenResponse(); !reflect.DeepEqual(last, smart.TokenResponse{}) {
+				t.Errorf("LastTokenResponse() after Revoke = %+v, want the zero value", last)
 			}
 			if n := len(f.as.revokeRequests()) - reqsBefore; n != 0 {
 				t.Errorf("revocation requests = %d, want none", n)
@@ -451,6 +546,9 @@ func TestRevokeDiscardsARefreshInFlight(t *testing.T) { // REQ-167 REQ-063
 		if _, err := src.Token(t.Context()); !errors.Is(err, auth.ErrReauthRequired) {
 			t.Errorf("Token() afterwards error = %v, want ErrReauthRequired", err)
 		}
+		if last := src.LastTokenResponse(); !reflect.DeepEqual(last, smart.TokenResponse{}) {
+			t.Errorf("LastTokenResponse() = %+v, want the zero value: nothing of the discarded refresh is kept", last)
+		}
 		if n := len(h.refreshes()); n != 1 {
 			t.Errorf("refresh grants = %d, want 1", n)
 		}
@@ -463,4 +561,36 @@ func TestRevokeDiscardsARefreshInFlight(t *testing.T) { // REQ-167 REQ-063
 			t.Errorf("revocation forms = %v, want one revoking rt-A as a refresh_token", rt.forms)
 		}
 	})
+}
+
+// TestRevokeEndsTheSessionIdentity pins REQ-167 and REQ-064: signing out
+// also ends the identity of the ID token the source verified, so a refresh
+// of tokens imported afterwards may carry an ID token naming another user.
+// Without Revoke, the same refresh is refused.
+func TestRevokeEndsTheSessionIdentity(t *testing.T) { // REQ-167 REQ-064
+	for _, revoke := range []bool{true, false} {
+		name := "after Revoke"
+		if !revoke {
+			name = "control without Revoke"
+		}
+		t.Run(name, func(t *testing.T) {
+			p := newOIDCProvider(t)
+			src := p.source(t, p.endpoints()) // no revocation endpoint
+			exchangeSession(t, p, src, "user-1")
+			if revoke {
+				if err := revokeWithin(t, t.Context(), src); !errors.Is(err, auth.ErrInvalidConfig) {
+					t.Fatalf("Revoke() without an endpoint error = %v, want auth.ErrInvalidConfig", err)
+				}
+			}
+			src.SetTokens(staleAccess("at-9"), "rt-9")
+			p.setBody(tokenBody(t, "at-10", "rt-10", p.sign(t, refreshClaims("user-2"))))
+			tok, err := src.Token(t.Context())
+			switch {
+			case revoke && (err != nil || tok.Value != "at-10"):
+				t.Errorf("Token() = %q, %v; want at-10: Revoke ended user-1's identity", tok.Value, err)
+			case !revoke && !errors.Is(err, auth.ErrJWKSValidationFailed):
+				t.Errorf("Token() = %q, %v; want the user-2 ID token refused while user-1's identity holds", tok.Value, err)
+			}
+		})
+	}
 }

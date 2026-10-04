@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -90,7 +91,9 @@ type TokenChange struct {
 	// the source held before. Empty when the source holds none.
 	RefreshToken string
 	// Response is the token response as [Source.LastTokenResponse] returns
-	// it, so a refresh response's left-out launch context is filled in.
+	// it, so a refresh response's left-out launch context is filled in. Its
+	// Raw map is the hook's own copy. IDTokenClaims and NeedPatientBanner
+	// point at values the source keeps: treat them as read-only.
 	Response TokenResponse
 }
 
@@ -183,9 +186,9 @@ func WithRefreshThreshold(d time.Duration) Option {
 // now holds and the token response. [Source.Revoke] calls fn once with the
 // zero TokenChange after it clears the tokens. fn is not called for a
 // failed exchange or refresh, for a refresh whose result the source
-// discarded because a code exchange or [Source.SetTokens] replaced the
-// session meanwhile, or by SetTokens, whose tokens the application already
-// has. A nil fn sets no hook.
+// discarded because a code exchange, [Source.SetTokens] or Revoke replaced
+// the session meanwhile, or by SetTokens, whose tokens the application
+// already has. A nil fn sets no hook.
 //
 // An application that keeps a session across restarts stores the refresh
 // token from here. RFC 6749 §6 has the client discard its old refresh token
@@ -205,6 +208,10 @@ func WithRefreshThreshold(d time.Duration) Option {
 // returns, by the goroutine already running fn; the call that made the
 // change returns without waiting for that. So fn must not block for long:
 // later changes wait for it.
+//
+// If fn panics, the panic goes up through the source call whose goroutine
+// was running fn. The changes still waiting are then reported from a new
+// goroutine, so none of them waits for a later change of tokens.
 func WithTokenChange(fn func(ctx context.Context, change TokenChange)) Option {
 	return func(cfg *Config) { cfg.tokenChange = fn }
 }
@@ -225,9 +232,9 @@ type Source struct {
 	// tokens replace it. Reauth sets it; setTokensLocked clears it.
 	forceRefresh bool
 	// session counts the times a code exchange or SetTokens installed
-	// tokens. A refresh records it when it starts and discards its result
-	// when it has changed by the time the refresh ends. A refresh does not
-	// advance it.
+	// tokens or Revoke cleared them. A refresh records it when it starts
+	// and discards its result when it has changed by the time the refresh
+	// ends. A refresh does not advance it.
 	session uint64
 	// changes holds the token changes installed but not yet reported to
 	// the token-change hook, oldest first; delivering reports that a
@@ -237,13 +244,16 @@ type Source struct {
 }
 
 // queueChangeLocked records change for the token-change hook, with the
-// context of the call that made it. The caller holds s.mu, has installed the
-// change under it, and calls deliverChanges once it has released s.mu.
+// context of the call that made it. The hook runs without s.mu, so it gets
+// its own copy of the response's Raw map. The caller holds s.mu, has
+// installed the change under it, and calls deliverChanges once it has
+// released s.mu.
 func (s *Source) queueChangeLocked(ctx context.Context, change TokenChange) {
 	hook := s.cfg.tokenChange
 	if hook == nil {
 		return
 	}
+	change.Response.Raw = maps.Clone(change.Response.Raw)
 	s.changes = append(s.changes, func() { hook(ctx, change) })
 }
 
@@ -262,13 +272,22 @@ func (s *Source) deliverChanges() {
 	s.delivering = true
 	locked := true
 	defer func() {
-		// Unlocked here only when the hook panicked: the changes still
-		// queued go to the goroutine that installs the next one.
-		if !locked {
-			s.mu.Lock()
+		if locked {
+			s.delivering = false
+			s.mu.Unlock()
+			return
 		}
+		// Unlocked here only when the hook panicked. The panic goes on up
+		// this goroutine; the changes still queued are reported from a new
+		// one, which ends once the queue is empty or finds another goroutine
+		// reporting.
+		s.mu.Lock()
 		s.delivering = false
+		rest := len(s.changes) > 0
 		s.mu.Unlock()
+		if rest {
+			go s.deliverChanges()
+		}
 	}()
 	for len(s.changes) > 0 {
 		report := s.changes[0]
@@ -326,8 +345,8 @@ type tokenExchange struct {
 	err   error
 	// session is the session the refresh started in.
 	session uint64
-	// superseded reports that a code exchange or SetTokens replaced the
-	// session while the refresh ran, so its result was discarded and the
+	// superseded reports that a code exchange, SetTokens or Revoke replaced
+	// the session while the refresh ran, so its result was discarded and the
 	// callers waiting on it try again. It is written before done is closed.
 	superseded bool
 }
@@ -717,6 +736,9 @@ func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDToken
 // the member is absent from the response body: a member the refresh
 // response carries replaces the earlier value, even when it is an empty
 // string or null. Raw's other members are the refresh response's own.
+//
+// After [Source.Revoke] it is the zero value until a code exchange or a
+// refresh succeeds.
 func (s *Source) LastTokenResponse() TokenResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -744,17 +766,20 @@ func (s *Source) SetTokens(access auth.Token, refresh string) {
 // Token returns a valid access token, refreshing when near expiry.
 //
 // A refresh that started before [Source.ExchangeAuthorizationCode] or
-// [Source.SetTokens] replaced the held tokens has its result discarded,
-// success or failure, and Token returns the new tokens instead, refreshing
-// them in turn when they are stale.
+// [Source.SetTokens] replaced the held tokens, or before [Source.Revoke]
+// cleared them, has its result discarded, success or failure. Token then
+// answers from the tokens the source holds now: it returns them, refreshing
+// them in turn when they are stale, or, after Revoke, returns
+// [auth.ErrReauthRequired].
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	for {
 		tok, retry, err := s.tryToken(ctx)
 		if !retry {
 			return tok, err
 		}
-		// New tokens replaced the session the refresh belonged to; read
-		// them. A further retry needs yet another replacement meanwhile.
+		// A code exchange, SetTokens or Revoke replaced the session the
+		// refresh belonged to; read what the source holds now. A further
+		// retry needs yet another replacement meanwhile.
 	}
 }
 
@@ -817,10 +842,10 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 
 	s.mu.Lock()
 	if s.session != ex.session {
-		// A code exchange or SetTokens replaced the session while the refresh
-		// ran. Its result, success or failure, belongs to the old session:
-		// nothing of it is kept, and no terminal failure clears the new
-		// tokens. Every caller on this refresh tries again.
+		// A code exchange, SetTokens or Revoke replaced the session while the
+		// refresh ran. Its result, success or failure, belongs to the old
+		// session: nothing of it is kept, and no terminal failure clears the
+		// new tokens. Every caller on this refresh tries again.
 		if s.inflight == ex {
 			s.inflight = nil
 		}
@@ -830,17 +855,17 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 		return auth.Token{}, true, nil
 	}
 	if err == nil {
-		s.setTokensLocked(tok, refreshTok)
-		if refreshedTR.AccessToken != "" {
-			if refreshedTR.IDToken == "" {
-				// OpenID Connect Core 1.0 §12.2 lets a refresh leave the ID
-				// token out; the session keeps the identity it verified.
-				refreshedTR.IDTokenClaims = s.lastTR.IDTokenClaims
-			}
-			// Nor does the session lose the launch context or the scope a
-			// refresh response leaves out.
-			s.lastTR = keepSessionMembers(s.lastTR, refreshedTR)
+		if refreshedTR.IDToken == "" {
+			// OpenID Connect Core 1.0 §12.2 lets a refresh leave the ID
+			// token out; the session keeps the identity it verified.
+			refreshedTR.IDTokenClaims = s.lastTR.IDTokenClaims
 		}
+		// Nor does the session lose the launch context or the scope a
+		// refresh response leaves out, and the new access token carries the
+		// scope the session keeps.
+		s.lastTR = keepSessionMembers(s.lastTR, refreshedTR)
+		tok.Scope = s.lastTR.Scope
+		s.setTokensLocked(tok, refreshTok)
 		if refreshedTR.IDTokenClaims != nil {
 			s.idBinding = bindingOf(refreshedTR.IDTokenClaims)
 		}

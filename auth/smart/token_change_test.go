@@ -548,3 +548,105 @@ func TestTokenChangeNilHook(t *testing.T) { // REQ-063
 		t.Fatalf("Token() = %q, %v; want at-2", tok.Value, err)
 	}
 }
+
+// TestTokenChangeQueuedBehindAPanicIsReported pins REQ-063: when the hook
+// panics while a change from another call waits behind it, that change is
+// still reported, without any later install of tokens.
+func TestTokenChangeQueuedBehindAPanicIsReported(t *testing.T) { // REQ-063
+	as := newStubServer(t)
+	entered := make(chan string, 4)
+	release := make(chan struct{})
+	src := as.source(t, as.endpoints(), smart.WithTokenChange(func(_ context.Context, c smart.TokenChange) {
+		entered <- c.Access.Value
+		if c.Access.Value == "at-1" {
+			<-release
+			panic("hook failed")
+		}
+	}))
+	exchange := func(code string) error {
+		req, err := src.BeginAuthorization("")
+		if err != nil {
+			return err
+		}
+		_, _, err = src.ExchangeAuthorizationCode(t.Context(), code, req.State, req)
+		return err
+	}
+
+	as.answerToken(0, tokenBody(t, "at-1", "rt-1", ""))
+	panicked := make(chan any, 1)
+	go func() {
+		defer func() { panicked <- recover() }()
+		_ = exchange("code-1")
+	}()
+	select {
+	case got := <-entered:
+		if got != "at-1" {
+			t.Fatalf("hook entered for %q, want at-1", got)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the hook was not called for the first code exchange")
+	}
+
+	// A second exchange while the hook runs: its change waits behind.
+	as.answerToken(0, tokenBody(t, "at-2", "rt-2", ""))
+	withinDeadline(t, "a code exchange while the hook runs", func() {
+		if err := exchange("code-2"); err != nil {
+			t.Errorf("second ExchangeAuthorizationCode() error = %v", err)
+		}
+	})
+	select {
+	case got := <-entered:
+		t.Fatalf("hook entered for %q while it was still running for at-1", got)
+	default:
+	}
+
+	close(release)
+	if r := <-panicked; r == nil {
+		t.Fatal("the first ExchangeAuthorizationCode returned, want the hook's panic")
+	}
+	select {
+	case got := <-entered:
+		if got != "at-2" {
+			t.Errorf("hook entered for %q, want the waiting at-2", got)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the change queued behind the panicking hook was not reported")
+	}
+}
+
+// TestTokenChangeResponseIsTheHooksOwn pins REQ-063: the hook gets its own
+// copy of the token response's Raw map, so changing it does not change the
+// source's last token response.
+func TestTokenChangeResponseIsTheHooksOwn(t *testing.T) { // REQ-063
+	as := newStubServer(t)
+	src := as.source(t, as.endpoints(), smart.WithTokenChange(func(_ context.Context, c smart.TokenChange) {
+		delete(c.Response.Raw, "patient")
+		c.Response.Raw["added_by_hook"] = true
+	}))
+	as.answerToken(0, launchBody(t, "at-1", map[string]any{"patient": "P1"}, map[string]any{"refresh_token": "rt-1"}))
+	req, err := src.BeginAuthorization("")
+	if err != nil {
+		t.Fatalf("BeginAuthorization: %v", err)
+	}
+	if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req); err != nil {
+		t.Fatalf("ExchangeAuthorizationCode() error = %v", err)
+	}
+	checkRaw := func(when string) {
+		t.Helper()
+		raw := src.LastTokenResponse().Raw
+		if raw["patient"] != "P1" {
+			t.Errorf("after the hook changed its copy (%s), LastTokenResponse().Raw[patient] = %v, want P1", when, raw["patient"])
+		}
+		if _, ok := raw["added_by_hook"]; ok {
+			t.Errorf("after the hook changed its copy (%s), LastTokenResponse().Raw has the hook's added_by_hook", when)
+		}
+	}
+	checkRaw("code exchange")
+
+	src.SetTokens(staleAccess("at-1"), "rt-1")
+	as.answerToken(0, launchBody(t, "at-2", nil, nil))
+	if _, err := src.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	checkRaw("refresh")
+}
