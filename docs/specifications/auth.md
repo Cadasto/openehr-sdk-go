@@ -177,7 +177,7 @@ The HL7 SMART [Backend Services](https://hl7.org/fhir/smart-app-launch/backend-s
 - `token_endpoint_auth_methods_supported` does not contain the configured method (`private_key_jwt` with a client assertion, `client_secret_basic` or `client_secret_post` with a secret);
 - `token_endpoint_auth_signing_alg_values_supported` does not contain the algorithm of a client assertion produced by the SDK's own `jwtbearer.ClaimsSigner` (an assertion source the SDK cannot inspect is not checked).
 
-An absent or empty list **MUST NOT** fail construction, as in § G-3.
+An absent or empty list **MUST NOT** fail construction, as in § G-3. `NewFromCatalog` **MUST NOT** choose the client-assertion signing algorithm from `token_endpoint_auth_signing_alg_values_supported`: a `jwtbearer.ClaimsSigner` signs with the algorithm it was built with.
 
 **Distinction from `auth/jwtbearer`:** `auth/jwtbearer` implements the separate RFC 7523 _JWT Bearer Token Grant_ (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`) — the JWT is the _authorization grant_ itself. `auth/clientcreds` with `WithClientAssertion` uses `grant_type=client_credentials` — the JWT is the _client authentication credential_. Both use `jwtbearer.AssertionSource` / `jwtbearer.ClaimsSigner` for signing.
 
@@ -229,11 +229,11 @@ The authorization request **MUST** carry `aud` (HL7 SMART App Launch lists it as
 
 ### REQ-062 — JWKS rotation
 
-#### Algorithm allowlists (surface-only in v0.8)
+#### Algorithm allowlists
 
 The SMART discovery resolver surfaces two algorithm-selection lists onto `AuthEndpoints` (REQ-070):
 
-- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). `auth/clientcreds.NewFromCatalog` reads this list to refuse a client assertion from the SDK's own `jwtbearer.ClaimsSigner` whose algorithm a non-empty list leaves out ([§ Backend Services from a resolved catalog](#backend-services-from-a-resolved-catalog)); the SDK does not choose an algorithm from it.
+- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). `auth/clientcreds.NewFromCatalog` checks client assertions against this list under [§ Backend Services from a resolved catalog](#backend-services-from-a-resolved-catalog).
 - **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). ID-token verification (REQ-064) consumes this list as the verification allowlist when present (see _ID-token verification algorithm agility_ below).
 
 The SDK validates ID tokens against the deployment's published JWKS. JWKS rotation **MUST** be handled:

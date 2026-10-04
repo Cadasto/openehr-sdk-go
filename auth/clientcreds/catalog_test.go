@@ -4,10 +4,13 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
@@ -310,5 +313,58 @@ func TestConstructorsRefuseNilClaimsSigner(t *testing.T) { // REQ-068
 				t.Errorf("%s(nil ClaimsSigner) Source = %v, want nil on error", tc.name, src)
 			}
 		})
+	}
+}
+
+// TestNewFromCatalogSignsWithTheSignersAlgorithm — REQ-068: NewFromCatalog
+// never picks the client-assertion algorithm from the advertised list. With
+// a list whose first entry is another algorithm, the assertion it posts is
+// still signed with the ClaimsSigner's own ES256.
+func TestNewFromCatalogSignsWithTheSignersAlgorithm(t *testing.T) { // REQ-068
+	var assertion atomic.Value
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("ParseForm: %v", err)
+		}
+		assertion.Store(r.PostForm.Get("client_assertion"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"t","token_type":"Bearer","expires_in":3600}`))
+	}))
+	defer srv.Close()
+
+	cat := &discovery.ServiceCatalog{
+		Issuer: catalogIssuer,
+		Auth: discovery.AuthEndpoints{
+			TokenEndpoint: discovery.MustParseURL(srv.URL + "/token"),
+			TokenEndpointAuthSigningAlgValuesSupported: []string{"RS384", "ES256"},
+		},
+	}
+	src, err := clientcreds.NewFromCatalog(cat, "c", "",
+		clientcreds.WithHTTPClient(srv.Client()),
+		clientcreds.WithClientAssertion(es256Signer(t)),
+	)
+	if err != nil {
+		t.Fatalf("NewFromCatalog() error = %v", err)
+	}
+	if _, err := src.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v", err)
+	}
+	raw, _ := assertion.Load().(string)
+	header, _, ok := strings.Cut(raw, ".")
+	if !ok {
+		t.Fatalf("client_assertion %q is not a compact JWS", raw)
+	}
+	b, err := base64.RawURLEncoding.DecodeString(header)
+	if err != nil {
+		t.Fatalf("decode JWS header: %v", err)
+	}
+	var h struct {
+		Alg string `json:"alg"`
+	}
+	if err := json.Unmarshal(b, &h); err != nil {
+		t.Fatalf("parse JWS header %s: %v", b, err)
+	}
+	if h.Alg != "ES256" {
+		t.Errorf("client_assertion alg = %q, want the signer's ES256, not a pick from the advertised list", h.Alg)
 	}
 }
