@@ -158,6 +158,28 @@ type Source struct {
 	refresh  string
 	lastTR   TokenResponse
 	inflight *tokenExchange
+	// idBinding is what a refreshed ID token must repeat from the last ID
+	// token the source verified; nil until it has verified one (REQ-064).
+	idBinding *idTokenBinding
+}
+
+// idTokenBinding holds the claims of a verified ID token that a later one
+// in the same session must repeat (OpenID Connect Core 1.0 §12.2). The
+// issuer is not kept: every ID token the source accepts is checked against
+// its one configured issuer, so it cannot change.
+type idTokenBinding struct {
+	subject  string
+	audience []string
+}
+
+// bindingOf returns the binding of verified claims, or nil for none. It
+// copies the audience, so a caller changing the claims it was handed does
+// not change the binding.
+func bindingOf(c *IDTokenClaims) *idTokenBinding {
+	if c == nil {
+		return nil
+	}
+	return &idTokenBinding{subject: c.Subject, audience: slices.Clone(c.Audience)}
 }
 
 type tokenExchange struct {
@@ -497,6 +519,9 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 	s.cur = tok
 	s.refresh = refresh
 	s.lastTR = tr
+	// A new authorization starts a new session: without an ID token there
+	// is nothing to bind a refresh to.
+	s.idBinding = bindingOf(tr.IDTokenClaims)
 	s.mu.Unlock()
 	return tok, tr, nil
 }
@@ -585,6 +610,9 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		s.refresh = refreshTok
 		if refreshedTR.AccessToken != "" {
 			s.lastTR = refreshedTR
+		}
+		if refreshedTR.IDTokenClaims != nil {
+			s.idBinding = bindingOf(refreshedTR.IDTokenClaims)
 		}
 	} else {
 		// F-L: on a terminal failure clear the refresh token and the cached
@@ -676,13 +704,44 @@ func (s *Source) exchangeCode(ctx context.Context, code, verifier string) (auth.
 	return s.postToken(ctx, form)
 }
 
+// refreshGrant redeems refresh at the token endpoint. An ID token in the
+// response is verified before anything is returned; a failure is a
+// refresh failure that is not terminal, so the caller keeps its tokens
+// (REQ-064).
 func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, TokenResponse, string, error) {
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refresh},
 		"client_id":     {s.cfg.ClientID},
 	}
-	return s.postToken(ctx, form)
+	tok, tr, next, err := s.postToken(ctx, form)
+	if err != nil || tr.IDToken == "" {
+		return tok, tr, next, err
+	}
+	claims, err := s.verifyRefreshedIDToken(ctx, tr.IDToken)
+	if err != nil {
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrRefreshFailed, Inner: fmt.Errorf("id_token: %w", err)}
+	}
+	tr.IDTokenClaims = claims
+	return tok, tr, next, nil
+}
+
+// verifyRefreshedIDToken verifies an ID token from a refresh response like
+// one from the code exchange, without a nonce, and, once the source has
+// verified an earlier ID token, requires the same subject and audience
+// (OpenID Connect Core 1.0 §12.2).
+func (s *Source) verifyRefreshedIDToken(ctx context.Context, raw string) (*IDTokenClaims, error) {
+	claims, err := s.verifyIDToken(ctx, raw, "")
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	prev := s.idBinding
+	s.mu.Unlock()
+	if prev != nil && (claims.Subject != prev.subject || !slices.Equal(claims.Audience, prev.audience)) {
+		return nil, fmt.Errorf("%w: the refreshed ID token names another subject or audience than the session's", auth.ErrJWKSValidationFailed)
+	}
+	return claims, nil
 }
 
 func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
