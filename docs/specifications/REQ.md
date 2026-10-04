@@ -63,9 +63,9 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-059 | openEHR custom headers | [wire.md](wire.md#req-059) | draft | partial |
 | REQ-060 | TokenSource interface | [auth.md](auth.md#req-060) | draft | landed |
 | REQ-061 | SMART-on-openEHR PKCE | [auth.md](auth.md#req-061--pkce-flow) | draft | landed |
-| REQ-062 | JWKS rotation | [auth.md](auth.md#req-062--jwks-rotation) | draft | landed |
+| REQ-062 | JWKS rotation | [auth.md](auth.md#req-062--jwks-rotation) | draft | partial |
 | REQ-063 | Token refresh | [auth.md](auth.md#req-063--token-refresh) | draft | landed |
-| REQ-064 | Launch context | [auth.md](auth.md#req-064--launch-context) | draft | landed |
+| REQ-064 | Launch context | [auth.md](auth.md#req-064--launch-context) | draft | partial |
 | REQ-065 | Per-client tenant binding | [auth.md](auth.md#req-065) | draft | landed |
 | REQ-066 | Caller attribution | [auth.md](auth.md#req-066) | draft | landed |
 | REQ-067 | Platform principal claims | [auth.md](auth.md#req-067) | draft | landed |
