@@ -19,11 +19,11 @@
 # were checked to carry the same composition.
 #
 # Sources (both Apache-2.0; attribution in testkit/corpus/THIRD_PARTY_LICENSES.md),
-# read from local sibling clones:
+# read from local clones that `ingest` requires:
 #   sdk    https://github.com/ehrbase/openEHR_SDK
-#          clone: $CROSSFORMAT_SDK_CLONE (default /src/ehrbase/openEHR_SDK)
+#          clone: the directory in $CROSSFORMAT_SDK_CLONE
 #   robot  https://github.com/ehrbase/integration-tests
-#          clone: $CROSSFORMAT_ROBOT_CLONE (default /src/ehrbase/integration-tests)
+#          clone: the directory in $CROSSFORMAT_ROBOT_CLONE
 #
 # The pins below are a hard guard: `ingest` refuses to run when a clone's HEAD
 # is not its pin, or when a source file in the clone differs from the blob at
@@ -61,8 +61,8 @@ readonly ROBOT_REPO="https://github.com/ehrbase/integration-tests"
 readonly ROBOT_PIN="fcb3ac4b0a47e51bf23c03c13f86bea8fb0bfb67"
 readonly ROBOT_LICENCE="Apache-2.0"
 
-SDK_CLONE="${CROSSFORMAT_SDK_CLONE:-/src/ehrbase/openEHR_SDK}"
-ROBOT_CLONE="${CROSSFORMAT_ROBOT_CLONE:-/src/ehrbase/integration-tests}"
+SDK_CLONE="${CROSSFORMAT_SDK_CLONE:-}"
+ROBOT_CLONE="${CROSSFORMAT_ROBOT_CLONE:-}"
 
 readonly SDKTD="test-data/src/main/resources"
 readonly ROBOT="tests/robot/_resources/test_data_sets"
@@ -170,6 +170,7 @@ check_clone() {
   local name="$1" clone pin head
   clone="$(clone_of "$name")"
   pin="$(pin_of "$name")"
+  [[ -n "$clone" ]] || die "set CROSSFORMAT_$(tr '[:lower:]' '[:upper:]' <<<"$name")_CLONE to a local clone of the $name source"
   [[ -d "$clone" ]] || die "$name clone not found at $clone (set CROSSFORMAT_$(tr '[:lower:]' '[:upper:]' <<<"$name")_CLONE)"
   head="$(git -C "$clone" rev-parse HEAD 2>/dev/null)" \
     || die "$name clone $clone is not a git checkout; refusing to vendor without provenance"
@@ -275,7 +276,9 @@ cmd_verify() {
 
   local rc=0 kind a b c d e path want listed=""
   local nfiles=0 nopts=0
-  while IFS=$'\t' read -r kind a b c d e; do
+  # A last record without its final newline still counts: read fails at EOF
+  # but has filled the fields.
+  while IFS=$'\t' read -r kind a b c d e || [[ -n "$kind" ]]; do
     case "$kind" in
       file)
         path="$DEST/$a"

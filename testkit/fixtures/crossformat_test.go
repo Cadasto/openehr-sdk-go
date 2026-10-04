@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -483,5 +484,64 @@ func TestListCrossFormatSetsOverScratchCorpus_PROBE105_REQ080(t *testing.T) {
 				t.Errorf("listCrossFormatSets() error = %v, want one containing %q", err, tc.want)
 			}
 		})
+	}
+}
+
+// TestIngestCrossFormatVerifyReadsTheLastRecord_PROBE105_REQ080 pins the
+// offline integrity check of scripts/ingest-crossformat.sh verify, which
+// `make crossformat-verify` runs: a MANIFEST.txt whose last record has no
+// final newline must still have that record checked. The last record here is
+// an opt pointer, which the subtree closure check cannot catch, so a verify
+// that drops the line passes over the altered OPT.
+func TestIngestCrossFormatVerifyReadsTheLastRecord_PROBE105_REQ080(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash not found")
+	}
+	if _, err := exec.LookPath("sha256sum"); err != nil {
+		if _, err := exec.LookPath("shasum"); err != nil {
+			t.Skip("neither sha256sum nor shasum found")
+		}
+	}
+	script, err := os.ReadFile(filepath.Join(CorpusRoot(), "..", "..", "scripts", "ingest-crossformat.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	write := func(rel string, data []byte) {
+		t.Helper()
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	digest := func(data []byte) string {
+		sum := sha256.Sum256(data)
+		return hex.EncodeToString(sum[:])
+	}
+	flat, opt := []byte(`{"ctx/language":"en"}`), []byte("<template/>\n")
+	write("scripts/ingest-crossformat.sh", script)
+	write("testkit/corpus/crossformat/s/flat.json", flat)
+	write("testkit/corpus/templates/s.opt", opt)
+	manifest := "# generated\n" +
+		"source\tsdk\thttps://example.org/sdk\t0123456789abcdef0123456789abcdef01234567\tApache-2.0\n" +
+		"file\ts/flat.json\tsdk\tflat/s.json\t" + digest(flat) + "\n" +
+		"opt\ts\ttemplates/s.opt\tsdk\topt/s.opt\t" + digest(opt) // no final newline
+	write("testkit/corpus/crossformat/MANIFEST.txt", []byte(manifest))
+
+	verify := func() (string, error) {
+		cmd := exec.Command(bash, filepath.Join(root, "scripts", "ingest-crossformat.sh"), "verify")
+		out, err := cmd.CombinedOutput()
+		return string(out), err
+	}
+	if out, err := verify(); err != nil || !strings.Contains(out, "1 OPT pointer(s)") {
+		t.Fatalf("verify over an intact tree = %v, %q; want success that counts the last record's OPT pointer", err, out)
+	}
+	write("testkit/corpus/templates/s.opt", []byte("<template/> \n"))
+	if out, err := verify(); err == nil {
+		t.Errorf("verify over an altered OPT named by the last, newline-less record succeeded: %q", out)
 	}
 }

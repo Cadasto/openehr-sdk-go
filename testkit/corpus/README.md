@@ -79,7 +79,7 @@ JSON and XML here are the canonical formats. Inside a set the files have fixed n
 
 Only files that describe the same instance form a set. The Robot canonical JSON for `nested` and `persistent_minimal`, and the Robot FLAT and STRUCTURED for `family_history`, are other instances of those templates, so they are not vendored.
 
-[`crossformat/MANIFEST.txt`](crossformat/MANIFEST.txt) records both pins, and for every file its source, upstream path and `sha256`. To refresh, check out the pinned commits in the sibling clones (`/src/ehrbase/openEHR_SDK` and `/src/ehrbase/integration-tests`, or set `CROSSFORMAT_SDK_CLONE` and `CROSSFORMAT_ROBOT_CLONE`) and run `bash scripts/ingest-crossformat.sh ingest`. It refuses a clone that is not at its pin. `bash scripts/ingest-crossformat.sh verify` checks the vendored bytes offline. The tests in [`crossformat_test.go`](../fixtures/crossformat_test.go) check the same integrity under `make ci`. Resolve the sets with [`fixtures.ListCrossFormatSets`](../fixtures/crossformat.go).
+[`crossformat/MANIFEST.txt`](crossformat/MANIFEST.txt) records both pins, and for every file its source, upstream path and `sha256`. To refresh, check out the pinned commits in local clones of both upstreams, point `CROSSFORMAT_SDK_CLONE` and `CROSSFORMAT_ROBOT_CLONE` at them, and run `bash scripts/ingest-crossformat.sh ingest`. It refuses a clone that is not at its pin. `bash scripts/ingest-crossformat.sh verify` checks the vendored bytes offline. The tests in [`crossformat_test.go`](../fixtures/crossformat_test.go) check the same integrity under `make ci`. Resolve the sets with [`fixtures.ListCrossFormatSets`](../fixtures/crossformat.go).
 
 ## Index by vendor
 
