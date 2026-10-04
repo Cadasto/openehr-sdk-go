@@ -117,11 +117,12 @@ func crossFormatShapeFindings(m crossFormatManifestData) []string {
 		}
 		hasJSON, hasXML := s.has[crossFormatCanonicalJSON], s.has[crossFormatCanonicalXML]
 		hasFlat, hasStructured := s.has[crossFormatFlat], s.has[crossFormatStructured]
+		sharesLeg := (hasJSON && hasXML) || ((hasJSON || hasXML) && hasFlat) || (hasFlat && hasStructured)
 		switch {
 		case s.formats < 2:
 			out = append(out, fmt.Sprintf("%s: %d formats, want at least 2", name, s.formats))
-		case !(hasJSON && hasXML) && !((hasJSON || hasXML) && hasFlat) && !(hasFlat && hasStructured):
-			out = append(out, fmt.Sprintf("%s: no two of its formats share a leg, want JSON and XML, a canonical document and FLAT, or FLAT and STRUCTURED", name))
+		case !sharesLeg:
+			out = append(out, name+": no two of its formats share a leg, want JSON and XML, a canonical document and FLAT, or FLAT and STRUCTURED")
 		}
 	}
 	return out
@@ -549,7 +550,7 @@ func TestIngestCrossFormatVerifyReadsTheLastRecord_PROBE105_REQ080(t *testing.T)
 	write("testkit/corpus/crossformat/MANIFEST.txt", []byte(manifest))
 
 	verify := func() (string, error) {
-		cmd := exec.Command(bash, filepath.Join(root, "scripts", "ingest-crossformat.sh"), "verify")
+		cmd := exec.CommandContext(t.Context(), bash, filepath.Join(root, "scripts", "ingest-crossformat.sh"), "verify")
 		out, err := cmd.CombinedOutput()
 		return string(out), err
 	}
