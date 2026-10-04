@@ -303,7 +303,7 @@ func (f ReautherFunc) Reauth(ctx context.Context) error { return f(ctx) }
 **Transport-layer opt-in 401→reauth safety net (Phase 4b, F-D).**
 `transport.WithReauthOn401(r auth.Reauther)` installs an opt-in safety net. When a wire `401` is received:
 
-1. If a `Reauther` is configured **and** this `Do` call has not yet reauthed, `transport/` calls `r.Reauth(ctx)` exactly once.
+1. If a `Reauther` is configured, this `Do` call has not yet reauthed, **and** the response's Bearer challenge permits it ([transport.md § REQ-166](transport.md#req-166--bearer-challenge-on-401-and-403): no challenge, no `error`, or `error="invalid_token"`), `transport/` calls `r.Reauth(ctx)` exactly once.
 2. If `Reauth` returns nil, the request is retried once. The retry re-acquires the token via `tokenSourceFor` — now pointing at the refreshed credential.
 3. If the retry also returns `401`, `transport.ErrUnauthorized` is surfaced. If `Reauth` itself returns an error, that error (wrapped) is surfaced. In either case the loop does not repeat.
 
@@ -313,11 +313,11 @@ When `WithReauthOn401` is **not** set, the existing contract is unchanged: a wir
 
 This hook is a **complementary safety net** — proactive expiry-based refresh in `Source.Token()` before the request is issued remains the primary mechanism. The hook covers the residual window where a token expires between the proactive-refresh check and the wire round-trip.
 
-The retry fires for **all HTTP methods**, including non-idempotent writes (`POST`/`PUT`). This is safe because a `401` means the request was rejected at the authentication layer and therefore **not processed** by the resource — re-driving it once after refreshing the credential cannot double-apply a write. A `401` arising from insufficient *scope* (rather than token expiry) will simply `401` again and surface `transport.ErrUnauthorized` after the single retry (one wasted round-trip, no harm). Deployments that signal authorization failures with `403` (reserving `401` for authentication/expiry) get the cleanest behaviour.
+The retry fires for **all HTTP methods**, including non-idempotent writes (`POST`/`PUT`). This is safe because a `401` means the request was rejected at the authentication layer and therefore **not processed** by the resource — re-driving it once after refreshing the credential cannot double-apply a write. A `401` whose challenge names `insufficient_scope` or another error a fresh token cannot fix is surfaced at once without calling `Reauth` (REQ-166); a `401` without a challenge is still re-driven once. Deployments that signal authorization failures with `403` (reserving `401` for authentication/expiry) get the cleanest behaviour.
 
 Out of scope (v1 implementation status):
 
-- `auth/clientcreds` and `auth/jwtbearer` do not implement `Reauther`; they have no refresh path. Callers using those providers may wire a custom `ReautherFunc` closure.
+- `auth/clientcreds` and `auth/jwtbearer` **MUST** implement `Reauther`: `Reauth` drops the cached access token and obtains a new one with a fresh exchange, coalesced with any exchange already in flight (REQ-026), and returns that exchange's error, if any. They have no refresh token; a new exchange is their only way to a new token.
 - MTLS, FAPI, JAR/PAR — out of v1 scope.
 
 ### REQ-064 — Launch context
@@ -488,6 +488,14 @@ Per-request override via `auth.WithTokenSource(ctx, ts)` **MUST** work the same 
 - Map wire-level auth errors onto the `transport/` error hierarchy.
 
 These providers **MUST** support the same JWKS rotation behaviour as `auth/smart` when they need to validate issued tokens (typically less common — service-to-service callers often accept opaque tokens).
+
+`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, opts...)` for SMART Backend Services against a resolved catalog. It takes the token endpoint from `catalog.Auth.TokenEndpoint` (absent: `auth.ErrInvalidConfig`) and records `catalog.Issuer` on the tokens it produces. When the catalog advertises the corresponding list, construction **MUST** fail with `auth.ErrInvalidConfig` when:
+
+- `grant_types_supported` does not contain `client_credentials`;
+- `token_endpoint_auth_methods_supported` does not contain the configured method (`private_key_jwt` with a client assertion, `client_secret_basic` or `client_secret_post` with a secret);
+- `token_endpoint_auth_signing_alg_values_supported` does not contain the algorithm of a client assertion produced by the SDK's own `jwtbearer.ClaimsSigner` (an assertion source the SDK cannot inspect is not checked).
+
+An absent or empty list is not constraining, as for the authorization-code source (REQ-068 § G-3).
 
 ## Scope handling
 

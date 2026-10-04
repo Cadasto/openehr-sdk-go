@@ -656,7 +656,7 @@ requirements:
     title: Token refresh
     canonical: docs/specifications/auth.md#req-063--token-refresh
     status: draft
-    implementation: landed
+    implementation: partial
     packages: [auth, auth/smart, transport, testkit/probes/auth]
     probes: [PROBE-007]
     tests:
@@ -716,7 +716,7 @@ requirements:
     title: SMART flows and launch modes
     canonical: docs/specifications/auth.md#req-068--flow-and-launch-mode-coverage
     status: draft
-    implementation: landed
+    implementation: partial
     packages: [auth/clientcreds, auth/jwtbearer, auth/smart]
     probes: [PROBE-004, PROBE-005]
     tests:
@@ -1796,3 +1796,10 @@ requirements:
     packages: [auth]
     tests:
       - auth/openehr_scope_test.go
+
+  - id: REQ-166
+    title: Bearer challenge on 401 and 403
+    canonical: docs/specifications/transport.md#req-166--bearer-challenge-on-401-and-403
+    status: draft
+    implementation: planned
+    packages: [transport]

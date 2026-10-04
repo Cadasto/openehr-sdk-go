@@ -357,6 +357,31 @@ gated the way REQ-093 gates non-2xx error bodies, is settled in
 
 ---
 
+## REQ-166 — Bearer challenge on 401 and 403
+
+A resource server that refuses a bearer token says why in a `WWW-Authenticate: Bearer` challenge (RFC 6750 §3), and the openEHR REST overview requires services to use that header on 401 and 403. A client needs the reason to tell an expired or revoked token, which a refresh can fix, from a token that lacks a scope, which only a new authorization can fix.
+
+On a 401 or 403 response the transport **MUST** parse the `Bearer` challenge, matching the scheme name case-insensitively, from every `WWW-Authenticate` header line and from a line that lists several challenges (RFC 9110 §11.6.1), and **MUST** attach it to the `*WireError` as `Challenge *BearerChallenge`:
+
+```go
+type BearerChallenge struct {
+    Realm            string
+    Error            string            // "invalid_token", "insufficient_scope", "invalid_request", …
+    ErrorDescription string
+    ErrorURI         string
+    Scope            string            // the scope the resource server says the request needs
+    Params           map[string]string // every other auth-param verbatim, e.g. resource_metadata (RFC 9728)
+}
+```
+
+- A response without a `Bearer` challenge **MUST** leave `Challenge` nil; a challenge the transport cannot parse **MUST** leave it nil too, and the response **MUST** still map to its status sentinel.
+- `WireError.Error()` **MUST NOT** include challenge values; they stay reachable through `errors.As`, under the same discipline as the openEHR error envelope (REQ-093).
+- The opt-in 401 safety net (REQ-063) **MUST** call `Reauth` only for a 401 whose challenge is absent, carries no `error`, or carries `error="invalid_token"` (RFC 6750 §3.1: the token is expired, revoked or malformed, and a new one may succeed). A 401 whose challenge names any other error, `insufficient_scope` included, **MUST** be surfaced without calling `Reauth`, since a fresh token with the same grant cannot fix it.
+
+- **Probes:** none yet; unit tests pin the parser and the reauth gate.
+
+---
+
 ## Coverage
 
 | REQ | Package |
@@ -370,3 +395,4 @@ gated the way REQ-093 gates non-2xx error bodies, is settled in
 | REQ-098 | `transport/` |
 | REQ-150 | `transport/`, `openehr/client/*` |
 | REQ-151 | `transport/`, `openehr/client/*` |
+| REQ-166 | `transport/` |
