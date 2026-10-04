@@ -610,6 +610,9 @@ requirements:
     implementation: landed
     packages: [auth, transport]
     tests:
+      - auth/clientcreds/token_type_test.go
+      - auth/jwtbearer/token_type_test.go
+      - auth/smart/smart_test.go
       - auth/tokensource_test.go
       - transport/client_test.go
 
@@ -732,6 +735,7 @@ requirements:
     packages: [smart/discovery]
     probes: [PROBE-002, PROBE-040]
     tests:
+      - smart/discovery/issuer_path_test.go
       - smart/discovery/resolver_test.go
       - testkit/probes/auth/probe_002_openehr_rest_service.go
       - testkit/probes/auth/probes_test.go

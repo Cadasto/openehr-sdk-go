@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -322,6 +324,74 @@ func TestAuthorizeURLStateReachesURL(t *testing.T) {
 	}
 }
 
+// TestAuthorizeURLKeepsEndpointQuery verifies that the authorization URL keeps
+// the query the advertised authorization_endpoint already carries and sets
+// each SDK parameter exactly once on top of it (REQ-061). It pins RFC 6749
+// §3.1: the endpoint's query component must be retained when parameters are
+// added, and no parameter may be included more than once.
+func TestAuthorizeURLKeepsEndpointQuery(t *testing.T) { // REQ-061
+	tests := []struct {
+		name     string
+		endpoint string
+		kept     url.Values // endpoint parameters the URL must still carry
+	}{
+		{
+			name:     "endpoint query kept",
+			endpoint: "https://as.example/authorize?p=b2c_1_signin&ui=x",
+			kept:     url.Values{"p": {"b2c_1_signin"}, "ui": {"x"}},
+		},
+		{
+			name:     "SDK value wins a name clash",
+			endpoint: "https://as.example/authorize?response_type=token",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			src, err := smart.New(
+				"client-id",
+				discovery.AuthEndpoints{
+					AuthorizationEndpoint: discovery.MustParseURL(tc.endpoint),
+					TokenEndpoint:         discovery.MustParseURL("https://as.example/token"),
+				},
+				smart.WithHTTPClient(&http.Client{}),
+				smart.WithRedirectURI("https://app.example/callback"),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req, err := src.BeginAuthorization("state-123")
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := src.AuthorizeURL(req, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			parsed, err := url.Parse(raw)
+			if err != nil {
+				t.Fatalf("url.Parse(%q): %v", raw, err)
+			}
+
+			want := url.Values{
+				"response_type":         {"code"},
+				"client_id":             {"client-id"},
+				"redirect_uri":          {"https://app.example/callback"},
+				"state":                 {"state-123"},
+				"code_challenge":        {req.PKCE.Challenge},
+				"code_challenge_method": {"S256"},
+			}
+			maps.Copy(want, tc.kept)
+			if got := parsed.Query(); !maps.EqualFunc(got, want, slices.Equal) {
+				t.Errorf("AuthorizeURL with endpoint %q: query = %v, want %v", tc.endpoint, got, want)
+			}
+			parsed.RawQuery = ""
+			if got, want := parsed.String(), "https://as.example/authorize"; got != want {
+				t.Errorf("AuthorizeURL with endpoint %q: URL without query = %q, want %q", tc.endpoint, got, want)
+			}
+		})
+	}
+}
+
 func TestConcurrentLaunchesDoNotClobberPKCE(t *testing.T) {
 	var seen []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -536,8 +606,8 @@ func TestExchangeWithClientSecretBasic(t *testing.T) { // REQ-068
 	capMu.Unlock()
 
 	// The Authorization header must be HTTP Basic with base64(clientID:secret).
-	// http.Request.SetBasicAuth encodes clientID and secret directly (no
-	// url.QueryEscape) and uses standard base64 encoding.
+	// The SDK form-encodes both values first; these two need no escaping, so
+	// the header carries them unchanged, in standard base64.
 	wantBasic := "Basic " + base64.StdEncoding.EncodeToString([]byte(clientID+":"+secret))
 	if gotAuth != wantBasic {
 		t.Fatalf("Authorization header = %q, want %q", gotAuth, wantBasic)
@@ -560,6 +630,91 @@ func TestExchangeWithClientSecretBasic(t *testing.T) { // REQ-068
 	}
 	if got := gotForm.Get("client_assertion_type"); got != "" {
 		t.Fatalf("client_assertion_type = %q, want empty (symmetric client must not send assertion type)", got)
+	}
+}
+
+// TestExchangeClientSecretBasicFormEncodesCredentials verifies that
+// client_secret_basic form-encodes the client identifier and secret before
+// they become the HTTP Basic username and password, on the code exchange and
+// on the refresh (REQ-068). It pins RFC 6749 §2.3.1: both values are encoded
+// with application/x-www-form-urlencoded (Appendix B) and the encoded values
+// are used as the username and the password.
+func TestExchangeClientSecretBasicFormEncodesCredentials(t *testing.T) { // REQ-068
+	const (
+		clientID = "app id:1"
+		secret   = "s3cr:t%+ /é"
+	)
+	wantUser, wantPass := url.QueryEscape(clientID), url.QueryEscape(secret)
+	if wantUser == clientID || wantPass == secret {
+		t.Fatalf("credentials must need form-encoding: QueryEscape(%q) = %q, QueryEscape(%q) = %q", clientID, wantUser, secret, wantPass)
+	}
+
+	type basicCreds struct {
+		grant, user, pass string
+		ok                bool
+	}
+	var (
+		mu  sync.Mutex
+		got []basicCreds
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("ParseForm: %v", err)
+		}
+		user, pass, ok := r.BasicAuth()
+		mu.Lock()
+		got = append(got, basicCreds{grant: r.PostForm.Get("grant_type"), user: user, pass: pass, ok: ok})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"access_token":"at-basic","token_type":"Bearer","expires_in":3600,"refresh_token":"rt-basic"}`)
+	}))
+	defer srv.Close()
+
+	src, err := smart.New(
+		clientID,
+		discovery.AuthEndpoints{
+			AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
+			TokenEndpoint:         discovery.MustParseURL(srv.URL + "/token"),
+		},
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+		smart.WithClientSecret(secret),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := src.BeginAuthorization("state-basic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-basic", "state-basic", req); err != nil {
+		t.Fatalf("ExchangeAuthorizationCode error = %v", err)
+	}
+	if err := src.Reauth(t.Context()); err != nil {
+		t.Fatalf("Reauth (refresh) error = %v", err)
+	}
+
+	mu.Lock()
+	calls := slices.Clone(got)
+	mu.Unlock()
+	if len(calls) != 2 {
+		t.Fatalf("token endpoint calls = %d (%+v), want 2: code exchange and refresh", len(calls), calls)
+	}
+	for i, wantGrant := range []string{"authorization_code", "refresh_token"} {
+		c := calls[i]
+		if c.grant != wantGrant {
+			t.Errorf("call %d grant_type = %q, want %q", i, c.grant, wantGrant)
+		}
+		if !c.ok {
+			t.Errorf("%s: no HTTP Basic credentials on the token request", wantGrant)
+			continue
+		}
+		if c.user != wantUser {
+			t.Errorf("%s: Basic username = %q, want %q (form-encoded %q)", wantGrant, c.user, wantUser, clientID)
+		}
+		if c.pass != wantPass {
+			t.Errorf("%s: Basic password = %q, want %q (form-encoded %q)", wantGrant, c.pass, wantPass, secret)
+		}
 	}
 }
 
@@ -721,6 +876,63 @@ func TestG3CrossCheckRejectsUnsupportedMethod(t *testing.T) { // REQ-068
 	)
 	if err != nil {
 		t.Fatalf("G-3 positive (empty list): expected no error when methods list is empty, got %v", err)
+	}
+}
+
+// TestExchangeNormalisesBearerTokenType verifies that a token_type of bearer in
+// any letter case becomes the "Bearer" Authorization scheme on auth.Token, an
+// absent or empty one defaults to it, and any other scheme passes through
+// unchanged, while TokenResponse keeps the raw wire value (REQ-060). It pins
+// RFC 6749 §5.1: the token_type value is case insensitive.
+func TestExchangeNormalisesBearerTokenType(t *testing.T) { // REQ-060
+	tests := []struct {
+		name     string
+		body     string
+		wantType string // auth.Token.Type
+		wantRaw  string // TokenResponse.TokenType
+	}{
+		{name: "lower-case bearer", body: `{"access_token":"at","token_type":"bearer"}`, wantType: "Bearer", wantRaw: "bearer"},
+		{name: "upper-case bearer", body: `{"access_token":"at","token_type":"BEARER"}`, wantType: "Bearer", wantRaw: "BEARER"},
+		{name: "canonical Bearer", body: `{"access_token":"at","token_type":"Bearer"}`, wantType: "Bearer", wantRaw: "Bearer"},
+		{name: "absent", body: `{"access_token":"at"}`, wantType: "Bearer", wantRaw: ""},
+		{name: "empty", body: `{"access_token":"at","token_type":""}`, wantType: "Bearer", wantRaw: ""},
+		{name: "other scheme unchanged", body: `{"access_token":"at","token_type":"DPoP"}`, wantType: "DPoP", wantRaw: "DPoP"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, tc.body)
+			}))
+			defer srv.Close()
+
+			src, err := smart.New(
+				"client-id",
+				discovery.AuthEndpoints{
+					AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
+					TokenEndpoint:         discovery.MustParseURL(srv.URL + "/token"),
+				},
+				smart.WithHTTPClient(srv.Client()),
+				smart.WithRedirectURI("https://app.example/callback"),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req, err := src.BeginAuthorization("state-type")
+			if err != nil {
+				t.Fatal(err)
+			}
+			tok, tr, err := src.ExchangeAuthorizationCode(t.Context(), "code-type", "state-type", req)
+			if err != nil {
+				t.Fatalf("ExchangeAuthorizationCode with body %s: error = %v", tc.body, err)
+			}
+			if tok.Type != tc.wantType {
+				t.Errorf("ExchangeAuthorizationCode with body %s: Token.Type = %q, want %q", tc.body, tok.Type, tc.wantType)
+			}
+			if tr.TokenType != tc.wantRaw {
+				t.Errorf("ExchangeAuthorizationCode with body %s: TokenResponse.TokenType = %q, want the raw %q", tc.body, tr.TokenType, tc.wantRaw)
+			}
+		})
 	}
 }
 

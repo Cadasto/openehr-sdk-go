@@ -276,7 +276,15 @@ func joinURL(issuer, path string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	return base.ResolveReference(ref), nil
+	// Append the configured path to the issuer's path rather than resolving
+	// it as a reference: resolving an absolute path would replace the
+	// issuer's path, and a deployment whose base URL has a path serves the
+	// document under that path. The query and fragment still come from the
+	// configured path, never from the issuer.
+	doc := base.JoinPath(ref.EscapedPath())
+	doc.RawQuery, doc.ForceQuery = ref.RawQuery, ref.ForceQuery
+	doc.Fragment, doc.RawFragment = ref.Fragment, ref.RawFragment
+	return doc, nil
 }
 
 // computeExpiry inspects Cache-Control max-age and falls through to the
