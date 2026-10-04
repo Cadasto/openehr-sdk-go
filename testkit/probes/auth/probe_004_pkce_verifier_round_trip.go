@@ -17,6 +17,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
 
+// pkceProbeAudience is the audience runPKCEFlow configures; PROBE-004
+// checks the authorization request names it.
+const pkceProbeAudience = "https://api.probe.example/openehr/v1"
+
 // pkceFlowCapture records the wire artefacts of a single SMART
 // authorization-code + PKCE launch: the authorization-request query
 // parameters (from AuthorizeURL) and the token-request form fields
@@ -70,7 +74,7 @@ func runPKCEFlow(ctx context.Context, scopes []string, launch string) (*pkceFlow
 		authsmart.WithHTTPClient(srv.Client()),
 		authsmart.WithRedirectURI("https://app.probe.example/callback"),
 		authsmart.WithScopes(scopes...),
-		authsmart.WithAudience("https://api.probe.example/openehr/v1"),
+		authsmart.WithAudience(pkceProbeAudience),
 	)
 	if err != nil {
 		srv.Close()
@@ -109,9 +113,10 @@ func runPKCEFlow(ctx context.Context, scopes []string, launch string) (*pkceFlow
 }
 
 // Probe004PKCEVerifierRoundTrip implements PROBE-004: a SMART launch using
-// S256 PKCE carries code_challenge + code_challenge_method=S256 on the
-// authorization request and code_verifier on the token exchange, and the
-// token response is a 200 carrying an access_token.
+// S256 PKCE carries code_challenge + code_challenge_method=S256 and exactly
+// one aud naming the configured audience on the authorization request, and
+// code_verifier on the token exchange, and the token response is a 200
+// carrying an access_token.
 //
 // PKCE parity: the probe additionally asserts the SDK's verifier
 // matches RFC 7636 / golang.org/x/oauth2 properties:
@@ -135,6 +140,11 @@ func Probe004PKCEVerifierRoundTrip(ctx context.Context) (Result, error) { // PRO
 	if got := capture.authQuery.Get("code_challenge_method"); got != "S256" {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("code_challenge_method = %q; want S256", got)
+		return r, nil
+	}
+	if got := capture.authQuery["aud"]; len(got) != 1 || got[0] != pkceProbeAudience {
+		r.Status = "fail"
+		r.Detail = fmt.Sprintf("authorization aud = %q; want exactly one aud %q", got, pkceProbeAudience)
 		return r, nil
 	}
 
@@ -188,6 +198,6 @@ func Probe004PKCEVerifierRoundTrip(ctx context.Context) (Result, error) { // PRO
 	}
 
 	r.Status = "pass"
-	r.Detail = fmt.Sprintf("S256 PKCE round-trip: challenge on authz, verifier on token; 200+access_token confirmed; G-7 parity holds (%d-byte verifier, RFC 7636 / x/oauth2)", len(raw))
+	r.Detail = fmt.Sprintf("S256 PKCE round-trip: challenge and aud on authz, verifier on token; 200+access_token confirmed; G-7 parity holds (%d-byte verifier, RFC 7636 / x/oauth2)", len(raw))
 	return r, nil
 }
