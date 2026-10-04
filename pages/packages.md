@@ -78,7 +78,6 @@ The generic `auth.TokenSource` sits at the bottom; the providers build on it.
 | `auth/clientcreds` | OAuth2 client credentials |
 | `auth/jwtbearer` | JWT Bearer (RFC 7523) |
 | `auth/basic` | HTTP Basic |
-| `auth/introspect` | Opt-in RFC 7662 token introspection, for a consumer acting as a resource server |
 
 ## Test and sandbox
 

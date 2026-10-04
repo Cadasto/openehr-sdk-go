@@ -85,8 +85,9 @@ type AuthEndpoints struct {
 	JWKSURI               *url.URL
 	RegistrationEndpoint  *url.URL
 	// IntrospectionEndpoint is the RFC 7662 token-introspection endpoint
-	// advertised by the authorization server. Nil when absent. Pass it to
-	// the auth/introspect client.
+	// advertised by the authorization server. Nil when absent. Discovery
+	// surfaces it, but the SDK does not consume it: token introspection is
+	// a resource-server operation.
 	IntrospectionEndpoint *url.URL
 	// RevocationEndpoint is the RFC 7009 token-revocation endpoint. Nil when
 	// absent.

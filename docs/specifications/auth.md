@@ -218,7 +218,7 @@ The SMART discovery resolver surfaces two algorithm-selection lists onto `AuthEn
 - **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). Phase 3b client-credential selection logic will read this list to choose a signing algorithm; in v0.8 the field is populated but not yet consumed.
 - **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). ID-token verification (REQ-064) consumes this list as the verification allowlist when present (see _ID-token verification algorithm agility_ below). `TokenEndpointAuthSigningAlgValuesSupported` remains surface-only in v0.8 (Phase 3b client-credential alg selection).
 
-The SDK validates ID tokens (and, in some deployments, opaque access tokens via introspection or signature verification) against the deployment's published JWKS. JWKS rotation **MUST** be handled:
+The SDK validates ID tokens against the deployment's published JWKS. JWKS rotation **MUST** be handled:
 
 - The JWKS document **MUST** be fetched on first use and cached.
 - The cache **MUST** honour a documented TTL (default: 5 minutes).
@@ -235,18 +235,6 @@ The SDK validates ID tokens (and, in some deployments, opaque access tokens via 
 - **Verify-before-claims:** the SDK **MUST** verify the signature before it trusts any claim; the claim checks read only the verified payload. `claimsFromMap` then applies the SDK's claim rules. `iss` **MUST** equal the configured issuer exactly, with no URL normalisation (OIDC Core §3.1.3.7), and `aud` **MUST** contain the client ID. A token without `exp` **MUST** be rejected, since OIDC Core 1.0 §2 requires that claim. A token **MUST** be rejected when its `exp` is 30 seconds (`clockSkew`) or more before the validation time, or when its `nbf` or `iat`, if present, is more than 30 seconds after it. When the caller supplies a nonce, the `nonce` claim **MUST** equal it.
 
 **Known gap.** `IDTokenClaims.Nonce` holds the nonce the caller expected, not the token's `nonce` claim, and the claim is also left out of `IDTokenClaims.Extra`. A caller that passes no nonce therefore cannot read the one the token carries.
-
-#### RFC 7662 token introspection client (F-J) — opt-in, resource-server scope — landed in Phase 5b
-
-The `auth/introspect` package provides a standalone, opt-in RFC 7662 token introspection client. It is a **resource-server / MCP-gateway concern**, not wired into the default `auth/smart` client path — reference SMART client SDKs deliberately omit introspection (it is not a client-side operation). Consumers acting as resource servers that need to validate opaque access tokens at runtime can use it independently.
-
-**Standards:** [RFC 7662 — OAuth 2.0 Token Introspection](https://www.rfc-editor.org/rfc/rfc7662) and the [HL7 FHIR SMART App Launch token-introspection profile](https://www.hl7.org/fhir/smart-app-launch/token-introspection.html).
-
-**Construction.** `introspect.New(endpoint string, httpClient *http.Client, opts ...Option) (*Client, error)` — injects the `*http.Client` (REQ-021; nil is rejected with `auth.ErrInvalidConfig`); validates that `endpoint` is a non-empty, parseable absolute URL (also `auth.ErrInvalidConfig` on failure). The `introspection_endpoint` URL is surfaced from the authorization server's discovery document via `smart/discovery` (see REQ-070 / `AuthEndpoints.IntrospectionEndpoint`) and can be passed directly.
-
-**Introspection call.** `(*Client).Introspect(ctx context.Context, token string, bearer string) (Result, error)` — POSTs `token=<value>` form-encoded to the endpoint (RFC 7662 §2.1) with `Authorization: Bearer <bearer>` (the resource server authenticates using its own access credential). `ctx` is threaded (REQ-020). An `{"active":false}` response is a **successful** introspection — returned as `(Result{Active:false}, nil)`; inactive tokens are **not** treated as errors. Non-2xx responses are returned as a wrapped `*auth.ExchangeError` (sentinel `auth.ErrTokenExchangeFailed`; `OAuth2` field populated when the body matches RFC 6749 §5.2).
-
-**`Result` fields (RFC 7662 §2.2).** `Active bool` (required). Optional/conditional: `Scope`, `ClientID`, `Username`, `TokenType`, `Exp`/`Iat`/`Nbf` (RFC 7662 numeric dates parsed to `time.Time` from the float64 JSON number), `Sub`, `Aud` (string or JSON array — array values joined with a space), `Iss`, `Jti`. SMART/openEHR launch-context extras when present: `Patient`, `FHIRUser` (`fhirUser`), `EHRID` (`ehrId`), `EpisodeID` (`episodeId`). `Raw map[string]any` carries the complete decoded body including vendor-extension claims.
 
 ### REQ-063 — Token refresh
 
@@ -537,6 +525,7 @@ Consumers detect classes via `errors.Is`. The underlying wire error is preserved
 - **App-side credential storage** — token storage (encrypted at rest, OS keychain, browser cookie) is application-side.
 - **Refresh-token revocation** — the deployment owns revocation policy; the SDK reacts to the resulting wire errors.
 - **MTLS, FAPI, JAR / PAR** — out of v1 scope; **MAY** be addressed by future provider sub-packages.
+- **Token introspection (RFC 7662)** — a resource-server operation, and the SDK is a client of authorization servers. Discovery still surfaces `introspection_endpoint` (REQ-070), but the SDK ships no introspection client.
 
 ## Coverage matrix
 
