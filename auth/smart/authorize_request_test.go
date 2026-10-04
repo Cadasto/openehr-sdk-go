@@ -214,3 +214,36 @@ func TestAuthorizeURLLaunchScopeLeavesConfigAlone(t *testing.T) { // REQ-061
 		t.Errorf("scope after an earlier embedded launch = %q, want [openid]", got)
 	}
 }
+
+// TestAuthorizeURLFallsBackToRequestLaunch pins REQ-061: with no launch
+// argument AuthorizeURL sends the request's Launch, with the launch scope
+// it needs; a launch argument wins over it.
+func TestAuthorizeURLFallsBackToRequestLaunch(t *testing.T) { // REQ-061
+	tests := []struct {
+		name       string
+		reqLaunch  string
+		argLaunch  string
+		wantLaunch string
+	}{
+		{name: "request launch only", reqLaunch: "from-request", wantLaunch: "from-request"},
+		{name: "argument wins", reqLaunch: "from-request", argLaunch: "from-argument", wantLaunch: "from-argument"},
+		{name: "argument only", argLaunch: "from-argument", wantLaunch: "from-argument"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			src := launchSource(t, "https://idp.example", "openid")
+			req, err := src.BeginAuthorization("state-1")
+			if err != nil {
+				t.Fatalf("BeginAuthorization: %v", err)
+			}
+			req.Launch = tc.reqLaunch
+			q := authorizeQueryFor(t, src, req, tc.argLaunch)
+			if got := q["launch"]; !slices.Equal(got, []string{tc.wantLaunch}) {
+				t.Errorf("AuthorizeURL(req.Launch=%q, launch=%q) launch = %q, want [%q]", tc.reqLaunch, tc.argLaunch, got, tc.wantLaunch)
+			}
+			if got := strings.Fields(q.Get("scope")); !slices.Contains(got, "launch") {
+				t.Errorf("AuthorizeURL(req.Launch=%q, launch=%q) scope = %q, want it to contain launch", tc.reqLaunch, tc.argLaunch, got)
+			}
+		})
+	}
+}
