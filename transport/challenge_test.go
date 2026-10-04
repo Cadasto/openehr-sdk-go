@@ -8,6 +8,7 @@ import (
 	"errors"
 	"maps"
 	"reflect"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -103,6 +104,7 @@ var bearerChallengeCases = []struct {
 	{name: "token68 with slash and plus", lines: []string{`Negotiate a/b+c==, Bearer realm="x"`}, want: &BearerChallenge{Realm: "x"}},
 	{name: "Bearer on the second header line", lines: []string{`Basic realm="b"`, `Bearer error="invalid_token"`}, want: &BearerChallenge{Error: "invalid_token"}},
 	{name: "first Bearer wins", lines: []string{`Bearer error="invalid_token"`, `Bearer error="insufficient_scope"`}, want: &BearerChallenge{Error: "invalid_token"}},
+	{name: "first Bearer on one line wins", lines: []string{`Bearer error="invalid_token", Bearer error="insufficient_scope", realm="r"`}, want: &BearerChallenge{Error: "invalid_token"}},
 	{name: "DPoP only", lines: []string{`DPoP error="invalid_token", algs="ES256 PS256"`}, want: nil},
 	{name: "Basic only", lines: []string{`Basic realm="b"`}, want: nil},
 	{name: "scheme that starts with Bearer", lines: []string{`BearerX error="invalid_token"`}, want: nil},
@@ -200,6 +202,104 @@ func TestChallengePermitsReauthToleratesABoxedNilWireError(t *testing.T) { // RE
 	if got := challengePermitsReauth(scoped); got {
 		t.Errorf("challengePermitsReauth(401 insufficient_scope) = true, want false")
 	}
+}
+
+// TestParseBearerChallengeLineLimit — REQ-166: a header line longer than
+// 8 KiB is skipped without being parsed, one of exactly 8 KiB still parses,
+// and the lines beside a skipped one are still read.
+func TestParseBearerChallengeLineLimit(t *testing.T) { // REQ-166
+	// challengeOfLen returns a valid Bearer challenge exactly n bytes long.
+	challengeOfLen := func(n int) string {
+		const prefix = `Bearer error="insufficient_scope", realm="`
+		return prefix + strings.Repeat("r", n-len(prefix)-1) + `"`
+	}
+	atLimit, overLimit := challengeOfLen(8192), challengeOfLen(8193)
+	if len(atLimit) != 8192 || len(overLimit) != 8193 {
+		t.Fatalf("premise gone: built lines of %d and %d bytes, want 8192 and 8193", len(atLimit), len(overLimit))
+	}
+	cases := []struct {
+		name      string
+		lines     []string
+		wantError string // "" means a nil challenge
+	}{
+		{name: "8192-byte line parses", lines: []string{atLimit}, wantError: "insufficient_scope"},
+		{name: "8193-byte line is skipped", lines: []string{overLimit}},
+		{name: "line after a skipped one is read", lines: []string{overLimit, `Bearer error="invalid_token"`}, wantError: "invalid_token"},
+		{name: "line before a skipped one is read", lines: []string{`Basic realm="b"`, overLimit, `Bearer error="invalid_token"`}, wantError: "invalid_token"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseBearerChallenge(tc.lines)
+			switch {
+			case tc.wantError == "" && got != nil:
+				t.Errorf("parseBearerChallenge(lines of %v bytes) = challenge with Error %q, want nil", lineLens(tc.lines), got.Error)
+			case tc.wantError != "" && got == nil:
+				t.Errorf("parseBearerChallenge(lines of %v bytes) = nil, want Error %q", lineLens(tc.lines), tc.wantError)
+			case tc.wantError != "" && got.Error != tc.wantError:
+				t.Errorf("parseBearerChallenge(lines of %v bytes) = challenge with Error %q, want Error %q", lineLens(tc.lines), got.Error, tc.wantError)
+			}
+		})
+	}
+}
+
+// TestParseBearerChallengeBoundedWork — REQ-166: hostile header lines cost
+// a bounded amount of memory. A line over the limit is skipped unread, and
+// a line within it is scanned one challenge at a time, building only the
+// Bearer challenge it returns, so a line full of other challenges
+// allocates nothing.
+func TestParseBearerChallengeBoundedWork(t *testing.T) { // REQ-166
+	distinctParams := func(n int) string {
+		var b strings.Builder
+		b.WriteString("Bearer ")
+		for i := 0; b.Len() < n; i++ {
+			b.WriteString("p" + strconv.Itoa(i) + "=1, ")
+		}
+		return b.String()
+	}
+	cases := []struct {
+		name string
+		line string
+	}{
+		{name: "1 MiB of bare schemes", line: strings.Repeat("a,", 1<<19)},
+		{name: "1 MiB of distinct Bearer params", line: distinctParams(1 << 20)},
+		{name: "8 KiB of bare schemes", line: strings.Repeat("a,", 4096)},
+		{name: "8 KiB of Basic challenges with quoted params", line: strings.Repeat(`Basic realm="a\"b", `, 8192/20)},
+	}
+	const maxBytesPerParse = 1 << 10
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			lines := []string{tc.line}
+			if got := parseBearerChallenge(lines); got != nil {
+				t.Errorf("parseBearerChallenge(%d-byte hostile line) = challenge with Error %q, want nil", len(tc.line), got.Error)
+			}
+			if got := heapBytesPerRun(20, func() { _ = parseBearerChallenge(lines) }); got > maxBytesPerParse {
+				t.Errorf("parseBearerChallenge(%d-byte hostile line) allocates %d bytes per call, want at most %d", len(tc.line), got, maxBytesPerParse)
+			}
+		})
+	}
+}
+
+// heapBytesPerRun reports the average heap bytes one call of f allocates,
+// measured the way testing.AllocsPerRun counts allocations: one warm-up
+// call, then runs calls with GOMAXPROCS at 1 so other goroutines add little.
+func heapBytesPerRun(runs int, f func()) uint64 {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
+	f()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	for range runs {
+		f()
+	}
+	runtime.ReadMemStats(&after)
+	return (after.TotalAlloc - before.TotalAlloc) / uint64(runs)
+}
+
+func lineLens(lines []string) []int {
+	out := make([]int, len(lines))
+	for i, l := range lines {
+		out[i] = len(l)
+	}
+	return out
 }
 
 // formatBearerChallenge writes c as one Bearer challenge, every value as a

@@ -44,87 +44,31 @@ func (c *BearerChallenge) permitsReauth() bool {
 	return c == nil || c.Error == "" || c.Error == "invalid_token"
 }
 
+// maxChallengeLineLen is the longest WWW-Authenticate line the parser
+// reads (REQ-166). Real Bearer challenges are far shorter; a longer line is
+// treated as unparseable without being scanned (RFC 9110 §5.4).
+const maxChallengeLineLen = 8 << 10
+
 // parseBearerChallenge returns the first well-formed Bearer challenge in
 // the WWW-Authenticate header lines, or nil when there is none (REQ-166).
-//
-// Each line is a comma-separated list of challenges (RFC 9110 §11.6.1).
-// A line that breaks that grammar anywhere is dropped whole: once a
-// quoted-string or a separator is out of place, the boundaries between
-// challenges cannot be trusted, so neither can a Bearer challenge that
-// looked complete before the fault. A Bearer challenge that the line
-// grammar allows but RFC 6750 does not, a token68 or a repeated parameter,
-// is skipped in favour of a later one.
+// A line longer than maxChallengeLineLen is skipped unread; the other lines
+// are still read.
 func parseBearerChallenge(lines []string) *BearerChallenge {
 	for _, line := range lines {
-		challenges, ok := parseChallenges(line)
-		if !ok {
+		if len(line) > maxChallengeLineLen {
 			continue
 		}
-		for _, ch := range challenges {
-			if !strings.EqualFold(ch.scheme, "Bearer") {
-				continue
-			}
-			if bc, ok := ch.bearer(); ok {
-				return bc
-			}
+		if bc := bearerFromLine(line); bc != nil {
+			return bc
 		}
 	}
 	return nil
 }
 
-// authChallenge is one challenge of a WWW-Authenticate line: the scheme and
-// either a token68 or a list of auth-params, in the order they appeared.
-type authChallenge struct {
-	scheme  string
-	token68 string
-	params  []authParam
-}
-
-type authParam struct {
-	name, value string
-}
-
-// bearer maps ch onto a BearerChallenge. It refuses a token68, which the
-// Bearer scheme does not use, and a parameter that appears twice in any
-// letter case: RFC 9110 §11.2 allows each name once per challenge, and a
-// repeated error would leave the reauth decision to whichever copy won.
-func (ch authChallenge) bearer() (*BearerChallenge, bool) {
-	if ch.token68 != "" {
-		return nil, false
-	}
-	bc := &BearerChallenge{}
-	seen := make(map[string]bool, len(ch.params))
-	for _, p := range ch.params {
-		// Names are tokens, so ASCII: ToLower cannot fold a non-ASCII
-		// letter onto a known name.
-		name := strings.ToLower(p.name)
-		if seen[name] {
-			return nil, false
-		}
-		seen[name] = true
-		switch name {
-		case "realm":
-			bc.Realm = p.value
-		case "error":
-			bc.Error = p.value
-		case "error_description":
-			bc.ErrorDescription = p.value
-		case "error_uri":
-			bc.ErrorURI = p.value
-		case "scope":
-			bc.Scope = p.value
-		default:
-			if bc.Params == nil {
-				bc.Params = make(map[string]string)
-			}
-			bc.Params[name] = p.value
-		}
-	}
-	return bc, true
-}
-
-// parseChallenges splits one WWW-Authenticate line into its challenges per
-// RFC 9110 §11.6.1:
+// bearerFromLine returns the first well-formed Bearer challenge on one
+// WWW-Authenticate line, or nil when there is none.
+//
+// The line is a comma-separated list of challenges (RFC 9110 §11.6.1):
 //
 //	challenge  = auth-scheme [ 1*SP ( token68 / #auth-param ) ]
 //	auth-param = token BWS "=" BWS ( token / quoted-string )
@@ -132,51 +76,123 @@ func (ch authChallenge) bearer() (*BearerChallenge, bool) {
 // Commas separate both challenges and the params inside one, so after each
 // comma a lookahead decides: a token followed by "=" is another param of
 // the current challenge, any other token starts the next challenge. Empty
-// list elements are skipped (RFC 9110 §5.6.1). ok is false when the line
-// breaks the grammar. The lookahead rereads at most the one token after a
-// comma, so every byte is read a bounded number of times and the cost stays
-// linear in the line length whatever the input.
-func parseChallenges(line string) (challenges []authChallenge, ok bool) {
+// list elements are skipped (RFC 9110 §5.6.1.2).
+//
+// A line that breaks that grammar anywhere yields nil: once a quoted-string
+// or a separator is out of place, the boundaries between challenges cannot
+// be trusted, so neither can a Bearer challenge that looked complete before
+// the fault. A Bearer challenge that the line grammar allows but RFC 6750
+// does not, a token68 or a repeated parameter, is skipped in favour of a
+// later one.
+//
+// Challenges are read one at a time. Only a Bearer challenge is built, and
+// only until one is accepted; every other challenge is checked and passed
+// over without copying anything, so a line full of them allocates nothing.
+// The lookahead rereads at most the one token after a comma, so the work
+// is linear in the line length.
+func bearerFromLine(line string) *BearerChallenge {
 	s := &headerScanner{s: line}
+	var found *BearerChallenge
 	s.skipSeparators()
 	for !s.done() {
-		ch := authChallenge{scheme: s.token()}
-		if ch.scheme == "" {
-			return nil, false
+		scheme := s.token()
+		if scheme == "" {
+			return nil
 		}
-		if !s.done() && s.peek() != ',' {
-			// The scheme ends at a space, a comma or the end of the line.
-			if !isOWS(s.peek()) {
-				return nil, false
-			}
-			s.skipOWS()
+		var b bearerBuilder
+		sink := &b
+		if found != nil || !strings.EqualFold(scheme, "Bearer") {
+			sink = nil
 		}
-		switch {
-		case s.done():
-			// A scheme with no parameters ends the line.
-		case s.peek() == ',':
-			// Empty list elements may open the auth-param list, as in
-			// "Bearer , error=…" (RFC 9110 §5.6.1.2). Only an auth-param
-			// can follow them there; anything else is the next challenge.
-			comma := s.pos
-			s.skipSeparators()
-			if s.done() || !s.atAuthParam() {
-				s.pos = comma
-			} else if ch.params, ok = s.authParams(); !ok {
-				return nil, false
-			}
-		default:
-			if tok, ok := s.token68(); ok {
-				ch.token68 = tok
-			} else if ch.params, ok = s.authParams(); !ok {
-				return nil, false
-			}
+		if !s.challengeBody(sink) {
+			return nil
 		}
-		// Each branch above stops at a comma or the end of the line.
-		challenges = append(challenges, ch)
+		if sink != nil && !b.rejected {
+			bc := b.bc
+			found = &bc
+		}
+		// challengeBody stops at a comma or the end of the line.
 		s.skipSeparators()
 	}
-	return challenges, true
+	return found
+}
+
+// bearerBuilder collects the params of one Bearer challenge. Its methods
+// accept a nil receiver, which stands for a challenge that is only being
+// checked, not built.
+type bearerBuilder struct {
+	bc       BearerChallenge
+	seen     uint8 // the named params already set, one bit each
+	rejected bool
+}
+
+// rejectToken68 records a token68, which the Bearer scheme does not use.
+func (b *bearerBuilder) rejectToken68() {
+	if b != nil {
+		b.rejected = true
+	}
+}
+
+// add records one param. raw is the token, or the content of the
+// quoted-string still escaped. A name seen before in any letter case
+// rejects the challenge: RFC 9110 §11.2 allows each name once per
+// challenge, and a repeated error would leave the reauth decision to
+// whichever copy won.
+func (b *bearerBuilder) add(name, raw string, quoted bool) {
+	if b == nil || b.rejected {
+		return
+	}
+	// Names are tokens, so ASCII: EqualFold and ToLower cannot fold a
+	// non-ASCII letter onto a known name.
+	var field *string
+	var bit uint8
+	switch {
+	case strings.EqualFold(name, "realm"):
+		field, bit = &b.bc.Realm, 1<<0
+	case strings.EqualFold(name, "error"):
+		field, bit = &b.bc.Error, 1<<1
+	case strings.EqualFold(name, "error_description"):
+		field, bit = &b.bc.ErrorDescription, 1<<2
+	case strings.EqualFold(name, "error_uri"):
+		field, bit = &b.bc.ErrorURI, 1<<3
+	case strings.EqualFold(name, "scope"):
+		field, bit = &b.bc.Scope, 1<<4
+	default:
+		key := strings.ToLower(name)
+		if _, dup := b.bc.Params[key]; dup {
+			b.rejected = true
+			return
+		}
+		if b.bc.Params == nil {
+			b.bc.Params = make(map[string]string)
+		}
+		b.bc.Params[key] = paramValue(raw, quoted)
+		return
+	}
+	if b.seen&bit != 0 {
+		b.rejected = true
+		return
+	}
+	b.seen |= bit
+	*field = paramValue(raw, quoted)
+}
+
+// paramValue returns a param's value: a token as it stands, a
+// quoted-string's content with its quoted-pairs unescaped. raw has been
+// checked, so a backslash in it is always followed by the escaped byte.
+func paramValue(raw string, quoted bool) string {
+	if !quoted || strings.IndexByte(raw, '\\') < 0 {
+		return raw
+	}
+	var b strings.Builder
+	b.Grow(len(raw))
+	for i := 0; i < len(raw); i++ {
+		if raw[i] == '\\' {
+			i++
+		}
+		b.WriteByte(raw[i])
+	}
+	return b.String()
 }
 
 // headerScanner walks a header line byte by byte.
@@ -214,59 +230,92 @@ func (h *headerScanner) token() string {
 	return h.s[start:h.pos]
 }
 
-// token68 consumes and returns a token68 when one fills the rest of the
-// list element, that is when only whitespace stands between it and the
-// next comma or the end of the line. Otherwise it leaves the cursor alone,
-// so "realm=x" and `realm="x"` fall through to the auth-param reading.
-func (h *headerScanner) token68() (string, bool) {
+// challengeBody reads what follows a scheme, up to the comma that ends the
+// challenge or the end of the line. The params go to b, which is nil when
+// the challenge is only being checked. It returns false when the line
+// breaks the grammar.
+func (h *headerScanner) challengeBody(b *bearerBuilder) bool {
+	if !h.done() && h.peek() != ',' {
+		// The scheme ends at a space, a comma or the end of the line.
+		if !isOWS(h.peek()) {
+			return false
+		}
+		h.skipOWS()
+	}
+	switch {
+	case h.done():
+		// A scheme with no parameters ends the line.
+		return true
+	case h.peek() == ',':
+		// Empty list elements may open the auth-param list, as in
+		// "Bearer , error=…" (RFC 9110 §5.6.1.2). Only an auth-param can
+		// follow them there; anything else is the next challenge.
+		comma := h.pos
+		h.skipSeparators()
+		if h.done() || !h.atAuthParam() {
+			h.pos = comma
+			return true
+		}
+		return h.authParams(b)
+	case h.token68():
+		b.rejectToken68()
+		return true
+	default:
+		return h.authParams(b)
+	}
+}
+
+// token68 consumes a token68 when one fills the rest of the list element,
+// that is when only whitespace stands between it and the next comma or the
+// end of the line. Otherwise it leaves the cursor alone, so "realm=x" and
+// `realm="x"` fall through to the auth-param reading.
+func (h *headerScanner) token68() bool {
 	i := h.pos
 	for i < len(h.s) && isToken68Char(h.s[i]) {
 		i++
 	}
 	if i == h.pos {
-		return "", false
+		return false
 	}
 	for i < len(h.s) && h.s[i] == '=' {
 		i++
 	}
-	end := i
 	for i < len(h.s) && isOWS(h.s[i]) {
 		i++
 	}
 	if i < len(h.s) && h.s[i] != ',' {
-		return "", false
+		return false
 	}
-	tok := h.s[h.pos:end]
 	h.pos = i
-	return tok, true
+	return true
 }
 
-// authParams consumes the comma-separated auth-params of one challenge. It
-// stops at the end of the line, or at a comma whose next element starts a
-// new challenge, leaving the cursor on that comma. ok is false on a
-// malformed param.
-func (h *headerScanner) authParams() (params []authParam, ok bool) {
+// authParams consumes the comma-separated auth-params of one challenge,
+// handing each to b. It stops at the end of the line, or at a comma whose
+// next element starts a new challenge, leaving the cursor on that comma.
+// It returns false on a malformed param.
+func (h *headerScanner) authParams(b *bearerBuilder) bool {
 	for {
-		p, ok := h.authParam()
+		name, raw, quoted, ok := h.authParam()
 		if !ok {
-			return nil, false
+			return false
 		}
-		params = append(params, p)
+		b.add(name, raw, quoted)
 		h.skipOWS()
 		if h.done() {
-			return params, true
+			return true
 		}
 		if h.peek() != ',' {
-			return nil, false
+			return false
 		}
 		comma := h.pos
 		h.skipSeparators()
 		if h.done() {
-			return params, true
+			return true
 		}
 		if !h.atAuthParam() {
 			h.pos = comma
-			return params, true
+			return true
 		}
 	}
 }
@@ -287,51 +336,50 @@ func (h *headerScanner) atAuthParam() bool {
 	return i < len(h.s) && h.s[i] == '='
 }
 
-// authParam consumes one name=value pair; the value is a token or a
-// quoted-string.
-func (h *headerScanner) authParam() (authParam, bool) {
-	name := h.token()
+// authParam consumes one name=value pair. raw is the token, or the content
+// of the quoted-string still escaped, and quoted says which; neither is
+// copied.
+func (h *headerScanner) authParam() (name, raw string, quoted, ok bool) {
+	name = h.token()
 	if name == "" {
-		return authParam{}, false
+		return "", "", false, false
 	}
 	h.skipOWS()
 	if h.done() || h.peek() != '=' {
-		return authParam{}, false
+		return "", "", false, false
 	}
 	h.pos++
 	h.skipOWS()
 	if h.done() {
-		return authParam{}, false
+		return "", "", false, false
 	}
 	if h.peek() == '"' {
-		v, ok := h.quotedString()
-		return authParam{name: name, value: v}, ok
+		raw, ok = h.quotedString()
+		return name, raw, true, ok
 	}
-	v := h.token()
-	return authParam{name: name, value: v}, v != ""
+	raw = h.token()
+	return name, raw, false, raw != ""
 }
 
 // quotedString consumes a quoted-string starting at the opening quote and
-// returns its unescaped content. It fails on a control character or a line
-// that ends before the closing quote.
+// returns its content between the quotes, still escaped. It fails on a
+// control character or a line that ends before the closing quote.
 func (h *headerScanner) quotedString() (string, bool) {
 	h.pos++ // the opening quote
-	var b strings.Builder
+	start := h.pos
 	for !h.done() {
 		c := h.peek()
 		switch {
 		case c == '"':
+			raw := h.s[start:h.pos]
 			h.pos++
-			return b.String(), true
+			return raw, true
 		case c == '\\':
 			h.pos++
 			if h.done() || !isQuotedPairChar(h.peek()) {
 				return "", false
 			}
-			b.WriteByte(h.peek())
-		case isQdtext(c):
-			b.WriteByte(c)
-		default:
+		case !isQdtext(c):
 			return "", false
 		}
 		h.pos++
