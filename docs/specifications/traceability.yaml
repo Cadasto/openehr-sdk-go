@@ -712,6 +712,7 @@ requirements:
     tests:
       - auth/clientcreds/clientcreds_test.go
       - auth/jwtbearer/jwtbearer_test.go
+      - auth/smart/confidential_pkce_test.go
       - auth/smart/smart_test.go
       - testkit/probes/auth/launch_modes.go
       - testkit/probes/auth/probes_test.go
