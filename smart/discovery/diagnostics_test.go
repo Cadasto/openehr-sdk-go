@@ -2,6 +2,7 @@ package discovery_test
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"slices"
 	"strings"
@@ -38,7 +39,8 @@ func (h *fieldRecorder) WithGroup(string) slog.Handler      { return h }
 // TestResolveWarnsOnEveryPlaintextAuthEndpoint pins REQ-073: under
 // WithAllowInsecure a plaintext auth endpoint is accepted with a warning,
 // and that holds for every endpoint the catalog carries, the optional
-// introspection, revocation and management endpoints included.
+// introspection, revocation and management endpoints included. A plaintext
+// service baseUrl is warned the same way.
 func TestResolveWarnsOnEveryPlaintextAuthEndpoint(t *testing.T) { // REQ-073
 	endpoints := []string{
 		"authorization_endpoint",
@@ -53,7 +55,17 @@ func TestResolveWarnsOnEveryPlaintextAuthEndpoint(t *testing.T) { // REQ-073
 	for _, name := range endpoints {
 		members[name] = "http://auth.example.com/" + name
 	}
-	body := documentWith("https://api.example.com/openehr/v1", members)
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(documentWith("https://api.example.com/openehr/v1", members)), &doc); err != nil {
+		t.Fatalf("unmarshal discovery document: %v", err)
+	}
+	services, ok := doc["services"].(map[string]any)
+	if !ok {
+		t.Fatalf("services = %T, want an object", doc["services"])
+	}
+	const plaintextService = "org.example.plaintext"
+	services[plaintextService] = map[string]any{"baseUrl": "http://svc.example.com/extra"}
+	body := mustJSON(doc)
 	p := startPlatform(t, false, serve(func(string) string { return body }), notFound)
 	rec := &fieldRecorder{}
 	res := p.resolver(t, discovery.WithAllowInsecure(), discovery.WithLogger(slog.New(rec)))
@@ -67,6 +79,10 @@ func TestResolveWarnsOnEveryPlaintextAuthEndpoint(t *testing.T) { // REQ-073
 		if !slices.Contains(warned, name) {
 			t.Errorf("no plaintext warning for %s; warned fields %q", name, warned)
 		}
+	}
+	wantService := "services[" + plaintextService + "].baseUrl"
+	if !slices.Contains(warned, wantService) {
+		t.Errorf("no plaintext warning for %s; warned fields %q", wantService, warned)
 	}
 }
 
