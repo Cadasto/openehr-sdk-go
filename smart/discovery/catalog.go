@@ -158,7 +158,14 @@ type AuthEndpoints struct {
 	// automatically; pass it to smart.WithIDTokenSigningAlgs to constrain
 	// ID-token verification.
 	IDTokenSigningAlgValuesSupported []string
-	Capabilities                     []string
+	// AuthorizationResponseIssParameterSupported reports whether the
+	// authorization server adds an "iss" parameter, naming itself, to every
+	// authorization response it sends to the redirect URI. It comes from the
+	// authorization_response_iss_parameter_supported member (RFC 9207 §3)
+	// and is false when the document leaves it out. When it is true,
+	// auth/smart refuses a redirect that arrives without "iss".
+	AuthorizationResponseIssParameterSupported bool
+	Capabilities                               []string
 }
 
 // Service identifier constants. The SDK consumes only the openEHR

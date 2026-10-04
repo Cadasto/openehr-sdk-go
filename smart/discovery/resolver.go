@@ -582,6 +582,7 @@ type smartConfigWire struct {
 	TokenEndpointAuthMethodsSupported          []string                    `json:"token_endpoint_auth_methods_supported"`
 	TokenEndpointAuthSigningAlgValuesSupported []string                    `json:"token_endpoint_auth_signing_alg_values_supported"`
 	IDTokenSigningAlgValuesSupported           []string                    `json:"id_token_signing_alg_values_supported"`
+	AuthorizationResponseIssParameterSupported bool                        `json:"authorization_response_iss_parameter_supported"`
 	Capabilities                               []string                    `json:"capabilities"`
 	Services                                   map[string]serviceEntryWire `json:"services"`
 }
@@ -723,6 +724,7 @@ func parseAuthEndpoints(baseURL string, w *smartConfigWire, allowInsecure bool) 
 	out.TokenEndpointAuthMethodsSupported = append([]string(nil), w.TokenEndpointAuthMethodsSupported...)
 	out.TokenEndpointAuthSigningAlgValuesSupported = append([]string(nil), w.TokenEndpointAuthSigningAlgValuesSupported...)
 	out.IDTokenSigningAlgValuesSupported = append([]string(nil), w.IDTokenSigningAlgValuesSupported...)
+	out.AuthorizationResponseIssParameterSupported = w.AuthorizationResponseIssParameterSupported
 	out.Capabilities = append([]string(nil), w.Capabilities...)
 	return out, nil
 }
