@@ -695,6 +695,7 @@ requirements:
       - auth/smart/refresh_idtoken_test.go
       - smart/idtoken_test.go
       - smart/launch_claims_test.go
+      - smart/launch_seam_test.go
       - smart/launch_test.go
 
   - id: REQ-065
