@@ -315,10 +315,9 @@ This hook is a **complementary safety net** — proactive expiry-based refresh i
 
 The retry fires for **all HTTP methods**, including non-idempotent writes (`POST`/`PUT`). This is safe because a `401` means the request was rejected at the authentication layer and therefore **not processed** by the resource — re-driving it once after refreshing the credential cannot double-apply a write. A `401` whose challenge names `insufficient_scope` or another error a fresh token cannot fix is surfaced at once without calling `Reauth` (REQ-166); a `401` without a challenge is still re-driven once. Deployments that signal authorization failures with `403` (reserving `401` for authentication/expiry) get the cleanest behaviour.
 
-Out of scope (v1 implementation status):
+**Backend providers.** `auth/clientcreds` and `auth/jwtbearer` **MUST** implement `Reauther`: `Reauth` drops the cached access token and obtains a new one with a fresh exchange, coalesced with any exchange already in flight (REQ-026), and returns that exchange's error, if any. They have no refresh token; a new exchange is their only way to a new token.
 
-- `auth/clientcreds` and `auth/jwtbearer` **MUST** implement `Reauther`: `Reauth` drops the cached access token and obtains a new one with a fresh exchange, coalesced with any exchange already in flight (REQ-026), and returns that exchange's error, if any. They have no refresh token; a new exchange is their only way to a new token.
-- MTLS, FAPI, JAR/PAR — out of v1 scope.
+Out of scope (v1 implementation status): MTLS, FAPI, JAR/PAR.
 
 ### REQ-064 — Launch context
 
@@ -489,7 +488,7 @@ Per-request override via `auth.WithTokenSource(ctx, ts)` **MUST** work the same 
 
 These providers **MUST** support the same JWKS rotation behaviour as `auth/smart` when they need to validate issued tokens (typically less common — service-to-service callers often accept opaque tokens).
 
-`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, opts...)` for SMART Backend Services against a resolved catalog. It takes the token endpoint from `catalog.Auth.TokenEndpoint` (absent: `auth.ErrInvalidConfig`) and records `catalog.Issuer` on the tokens it produces. When the catalog advertises the corresponding list, construction **MUST** fail with `auth.ErrInvalidConfig` when:
+`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, clientSecret, opts...)` (the secret empty when a client assertion is configured) for SMART Backend Services against a resolved catalog. It takes the token endpoint from `catalog.Auth.TokenEndpoint` (absent: `auth.ErrInvalidConfig`) and records `catalog.Issuer` on the tokens it produces. When the catalog advertises the corresponding list, construction **MUST** fail with `auth.ErrInvalidConfig` when:
 
 - `grant_types_supported` does not contain `client_credentials`;
 - `token_endpoint_auth_methods_supported` does not contain the configured method (`private_key_jwt` with a client assertion, `client_secret_basic` or `client_secret_post` with a secret);
