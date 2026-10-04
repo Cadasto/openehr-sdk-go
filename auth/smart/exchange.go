@@ -1,10 +1,10 @@
 package smart
 
 import (
-	"cmp"
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
@@ -103,7 +103,7 @@ func rawJSONToAny(raw map[string]json.RawMessage) map[string]any {
 func tokenFromResponse(tr TokenResponse, issuer string) auth.Token {
 	tok := auth.Token{
 		Value:  tr.AccessToken,
-		Type:   cmp.Or(tr.TokenType, auth.TokenTypeBearer),
+		Type:   authScheme(tr.TokenType),
 		Scope:  tr.Scope,
 		Issuer: issuer,
 	}
@@ -111,6 +111,17 @@ func tokenFromResponse(tr TokenResponse, issuer string) auth.Token {
 		tok.ExpiresAt = time.Now().Add(time.Duration(tr.ExpiresIn) * time.Second)
 	}
 	return tok
+}
+
+// authScheme maps a token endpoint's token_type to the Authorization scheme.
+// The value is case insensitive (RFC 6749 §5.1), so any spelling of bearer,
+// or no value at all, becomes "Bearer"; any other scheme passes through
+// unchanged.
+func authScheme(tokenType string) string {
+	if tokenType == "" || strings.EqualFold(tokenType, auth.TokenTypeBearer) {
+		return auth.TokenTypeBearer
+	}
+	return tokenType
 }
 
 type tokenResponse struct {
