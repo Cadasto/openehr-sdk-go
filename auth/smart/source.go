@@ -297,14 +297,16 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	if req.State == "" || req.PKCE.Verifier == "" {
 		return "", fmt.Errorf("%w: call BeginAuthorization first or supply State and PKCE", auth.ErrInvalidConfig)
 	}
-	q := url.Values{
-		"response_type":         {"code"},
-		"client_id":             {s.cfg.ClientID},
-		"redirect_uri":          {s.cfg.RedirectURI},
-		"code_challenge":        {req.PKCE.Challenge},
-		"code_challenge_method": {challengeMethod},
-		"state":                 {req.State},
-	}
+	u := *s.cfg.Auth.AuthorizationEndpoint
+	// Start from the endpoint's own query, which RFC 6749 §3.1 says must be
+	// kept, and set each SDK parameter over it so none appears twice.
+	q := u.Query()
+	q.Set("response_type", "code")
+	q.Set("client_id", s.cfg.ClientID)
+	q.Set("redirect_uri", s.cfg.RedirectURI)
+	q.Set("code_challenge", req.PKCE.Challenge)
+	q.Set("code_challenge_method", challengeMethod)
+	q.Set("state", req.State)
 	if len(s.cfg.Scopes) > 0 {
 		q.Set("scope", strings.Join(s.cfg.Scopes, " "))
 	}
@@ -314,7 +316,6 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	if launch != "" {
 		q.Set("launch", launch)
 	}
-	u := *s.cfg.Auth.AuthorizationEndpoint
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
