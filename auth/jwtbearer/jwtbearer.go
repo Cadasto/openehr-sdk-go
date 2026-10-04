@@ -117,13 +117,43 @@ func FromConfig(cfg Config) (*Source, error) {
 	return &Source{cfg: cfg, tokenURL: u}, nil
 }
 
+var _ auth.Reauther = (*Source)(nil)
+
 // Token returns the current access token, refreshing transparently
 // when the cached token is within RefreshThreshold of expiry.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
+	return s.token(ctx, false)
+}
+
+// Reauth drops the cached access token and obtains a new one with a fresh
+// exchange, signing a new assertion, even when the cached token is not yet
+// near expiry. Use it to recover from a wire 401, for example through
+// transport.WithReauthOn401. The JWT bearer grant issues no refresh token, so
+// a new exchange is the only way to a new token.
+//
+// When an exchange is already in flight, Reauth waits for that exchange
+// instead of starting another, so concurrent Reauth and Token calls send one
+// request to the token endpoint. Reauth returns that exchange's error, an
+// [*auth.ExchangeError] wrapping [auth.ErrTokenExchangeFailed], or the
+// context's error when ctx ends first. After a failed exchange no token is
+// cached, and the next Token call tries again.
+func (s *Source) Reauth(ctx context.Context) error {
+	_, err := s.token(ctx, true)
+	return err
+}
+
+// token returns the cached access token while it is fresh, or the result of
+// an exchange. Callers that find an exchange in flight wait for it rather
+// than starting another. When force is set the cached token is dropped first,
+// so the caller always gets the result of an exchange.
+func (s *Source) token(ctx context.Context, force bool) (auth.Token, error) {
 	if err := ctx.Err(); err != nil {
 		return auth.Token{}, err
 	}
 	s.mu.Lock()
+	if force {
+		s.cur = auth.Token{}
+	}
 	if !s.stale() {
 		t := s.cur
 		s.mu.Unlock()
