@@ -606,6 +606,14 @@ func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDToken
 // A refresh response without an ID token keeps the session's identity: its
 // IDTokenClaims are the verified claims the session had before, so a
 // launch context rebuilt from it still names the same user.
+//
+// Likewise, a refresh response that leaves out a launch-context parameter
+// (patient, encounter, ehrId, episodeId, fhirContext, intent,
+// need_patient_banner, smart_style_url, tenant) or the scope keeps the value
+// the earlier response had, in the typed field and in Raw. Left out means
+// the member is absent from the response body: a member the refresh
+// response carries replaces the earlier value, even when it is an empty
+// string or null. Raw's other members are the refresh response's own.
 func (s *Source) LastTokenResponse() TokenResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -723,7 +731,9 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 				// token out; the session keeps the identity it verified.
 				refreshedTR.IDTokenClaims = s.lastTR.IDTokenClaims
 			}
-			s.lastTR = refreshedTR
+			// Nor does the session lose the launch context or the scope a
+			// refresh response leaves out.
+			s.lastTR = keepSessionMembers(s.lastTR, refreshedTR)
 		}
 		if refreshedTR.IDTokenClaims != nil {
 			s.idBinding = bindingOf(refreshedTR.IDTokenClaims)

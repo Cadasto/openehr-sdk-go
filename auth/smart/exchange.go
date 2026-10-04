@@ -3,6 +3,7 @@ package smart
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 	"time"
@@ -93,6 +94,54 @@ func ParseTokenResponse(body []byte) (TokenResponse, error) {
 		}
 	}
 	return out, nil
+}
+
+// sessionMembers are the token-response members a refresh response may
+// leave out while the session keeps them: the SMART launch-context
+// parameters and the granted scope. keep copies the member's typed field;
+// fhirContext has none and lives in Raw only.
+var sessionMembers = []struct {
+	key  string
+	keep func(dst *TokenResponse, src TokenResponse)
+}{
+	{"patient", func(d *TokenResponse, s TokenResponse) { d.Patient = s.Patient }},
+	{"encounter", func(d *TokenResponse, s TokenResponse) { d.Encounter = s.Encounter }},
+	{"ehrId", func(d *TokenResponse, s TokenResponse) { d.EHRID = s.EHRID }},
+	{"episodeId", func(d *TokenResponse, s TokenResponse) { d.EpisodeID = s.EpisodeID }},
+	{"fhirContext", nil},
+	{"intent", func(d *TokenResponse, s TokenResponse) { d.Intent = s.Intent }},
+	{"need_patient_banner", func(d *TokenResponse, s TokenResponse) { d.NeedPatientBanner = s.NeedPatientBanner }},
+	{"smart_style_url", func(d *TokenResponse, s TokenResponse) { d.SMARTStyleURL = s.SMARTStyleURL }},
+	{"tenant", func(d *TokenResponse, s TokenResponse) { d.Tenant = s.Tenant }},
+	{"scope", func(d *TokenResponse, s TokenResponse) { d.Scope = s.Scope }},
+}
+
+// keepSessionMembers returns next, a refresh response, with each
+// launch-context parameter and the scope that prev, the session's last
+// token response, carried and next leaves out taken from prev: SMART App
+// Launch lets a refresh response omit the launch context, and RFC 6749 §6
+// reads an omitted scope as the original grant.
+//
+// A member counts as left out only when its key is absent from next's
+// body, so a member next carries, even as an empty string or null, stays as
+// next has it. A kept member goes into the typed field and into Raw, which
+// is how fhirContext is kept; Raw's other members are next's own. The
+// result has its own Raw map, so neither prev nor next is changed.
+func keepSessionMembers(prev, next TokenResponse) TokenResponse {
+	raw := make(map[string]any, len(next.Raw)+len(sessionMembers))
+	maps.Copy(raw, next.Raw)
+	for _, m := range sessionMembers {
+		v, had := prev.Raw[m.key]
+		if _, has := next.Raw[m.key]; has || !had {
+			continue
+		}
+		raw[m.key] = v
+		if m.keep != nil {
+			m.keep(&next, prev)
+		}
+	}
+	next.Raw = raw
+	return next
 }
 
 func rawJSONToAny(raw map[string]json.RawMessage) map[string]any {
