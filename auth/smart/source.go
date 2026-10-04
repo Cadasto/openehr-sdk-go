@@ -184,6 +184,13 @@ func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Sour
 // not among them, FromConfig fails with [auth.ErrInvalidConfig], since such
 // a server cannot check the challenge. An empty list is accepted: a
 // hand-built catalog often leaves it out.
+//
+// FromConfig also fails with [auth.ErrInvalidConfig] on client credentials
+// that conflict or do not fit the server: both a client secret and a
+// client assertion key; a nil signing key, an unsupported algorithm, or a
+// key that does not suit the algorithm; or a client authentication method
+// that a non-empty TokenEndpointAuthMethodsSupported does not list. A
+// JWKSURI it cannot build a key-set fetcher from fails the same way.
 func FromConfig(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
 		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
@@ -198,7 +205,7 @@ func FromConfig(cfg Config) (*Source, error) {
 		return nil, fmt.Errorf("%w: AuthorizationEndpoint is required", auth.ErrInvalidConfig)
 	}
 	if cfg.Audience == "" {
-		return nil, fmt.Errorf("%w: Audience is required: SMART requires the aud authorization parameter (set WithAudience, or build the source with NewFromCatalog)", auth.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: Audience is required: SMART requires the aud authorization parameter (set WithAudience, or use NewFromCatalog with a catalog that has a BaseURL)", auth.ErrInvalidConfig)
 	}
 	// The SDK sends only S256 challenges, so a server that lists its PKCE
 	// methods without S256 cannot verify them. An empty list says nothing.
