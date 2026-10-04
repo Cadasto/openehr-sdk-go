@@ -879,6 +879,63 @@ func TestG3CrossCheckRejectsUnsupportedMethod(t *testing.T) { // REQ-068
 	}
 }
 
+// TestExchangeNormalisesBearerTokenType verifies that a token_type of bearer in
+// any letter case becomes the "Bearer" Authorization scheme on auth.Token, an
+// absent or empty one defaults to it, and any other scheme passes through
+// unchanged, while TokenResponse keeps the raw wire value (REQ-060). It pins
+// RFC 6749 §5.1: the token_type value is case insensitive.
+func TestExchangeNormalisesBearerTokenType(t *testing.T) { // REQ-060
+	tests := []struct {
+		name     string
+		body     string
+		wantType string // auth.Token.Type
+		wantRaw  string // TokenResponse.TokenType
+	}{
+		{name: "lower-case bearer", body: `{"access_token":"at","token_type":"bearer"}`, wantType: "Bearer", wantRaw: "bearer"},
+		{name: "upper-case bearer", body: `{"access_token":"at","token_type":"BEARER"}`, wantType: "Bearer", wantRaw: "BEARER"},
+		{name: "canonical Bearer", body: `{"access_token":"at","token_type":"Bearer"}`, wantType: "Bearer", wantRaw: "Bearer"},
+		{name: "absent", body: `{"access_token":"at"}`, wantType: "Bearer", wantRaw: ""},
+		{name: "empty", body: `{"access_token":"at","token_type":""}`, wantType: "Bearer", wantRaw: ""},
+		{name: "other scheme unchanged", body: `{"access_token":"at","token_type":"DPoP"}`, wantType: "DPoP", wantRaw: "DPoP"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, tc.body)
+			}))
+			defer srv.Close()
+
+			src, err := smart.New(
+				"client-id",
+				discovery.AuthEndpoints{
+					AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
+					TokenEndpoint:         discovery.MustParseURL(srv.URL + "/token"),
+				},
+				smart.WithHTTPClient(srv.Client()),
+				smart.WithRedirectURI("https://app.example/callback"),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req, err := src.BeginAuthorization("state-type")
+			if err != nil {
+				t.Fatal(err)
+			}
+			tok, tr, err := src.ExchangeAuthorizationCode(t.Context(), "code-type", "state-type", req)
+			if err != nil {
+				t.Fatalf("ExchangeAuthorizationCode with body %s: error = %v", tc.body, err)
+			}
+			if tok.Type != tc.wantType {
+				t.Errorf("ExchangeAuthorizationCode with body %s: Token.Type = %q, want %q", tc.body, tok.Type, tc.wantType)
+			}
+			if tr.TokenType != tc.wantRaw {
+				t.Errorf("ExchangeAuthorizationCode with body %s: TokenResponse.TokenType = %q, want the raw %q", tc.body, tr.TokenType, tc.wantRaw)
+			}
+		})
+	}
+}
+
 func TestTokenStaleWithoutRefreshDoesNotDeadlock(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
