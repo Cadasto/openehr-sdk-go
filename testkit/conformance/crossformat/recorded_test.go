@@ -41,9 +41,10 @@ func cleanRecords() map[crossformat.Leg]crossformat.Record {
 }
 
 // TestProbe105CheckSetRecords pins each record rule PROBE-105 states: a
-// refusal or difference states why it exists, a leg that is not refused
-// compares at least one key, a leg the set runs has a record and a record names
-// only a leg the set runs.
+// refusal, difference or non-zero excluded count states why it exists, a
+// refusal carries no counts, a leg that is not refused compares at least one
+// key, a leg the set runs has a record and a record names only a leg the set
+// runs.
 func TestProbe105CheckSetRecords(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -62,6 +63,19 @@ func TestProbe105CheckSetRecords(t *testing.T) {
 			change: func(r map[crossformat.Leg]crossformat.Record) {
 				r[crossformat.LegFlatStructured] = crossformat.Record{Outcome: crossformat.Outcome{Refused: "boom"}, Reason: "why"}
 			},
+		},
+		{
+			name: "excluded keys with a reason",
+			change: func(r map[crossformat.Leg]crossformat.Record) {
+				r[crossformat.LegStructuredFlat] = crossformat.Record{Outcome: crossformat.Outcome{Compared: 2, Excluded: 4}, Reason: "why"}
+			},
+		},
+		{
+			name: "excluded keys without a reason",
+			change: func(r map[crossformat.Leg]crossformat.Record) {
+				r[crossformat.LegStructuredFlat] = crossformat.Record{Outcome: crossformat.Outcome{Compared: 2, Excluded: 4}}
+			},
+			wantErr: "non-zero excluded count must state why",
 		},
 		{
 			name: "difference without a reason",
@@ -97,6 +111,20 @@ func TestProbe105CheckSetRecords(t *testing.T) {
 				r[crossformat.LegFlatStructured] = crossformat.Record{Outcome: crossformat.Outcome{Refused: "boom", Compared: 2}, Reason: "why"}
 			},
 			wantErr: "no counts",
+		},
+		{
+			name: "refusal with an excluded count",
+			change: func(r map[crossformat.Leg]crossformat.Record) {
+				r[crossformat.LegStructuredFlat] = crossformat.Record{Outcome: crossformat.Outcome{Refused: "boom", Excluded: 3}, Reason: "why"}
+			},
+			wantErr: "no counts",
+		},
+		{
+			name: "negative excluded count",
+			change: func(r map[crossformat.Leg]crossformat.Record) {
+				r[crossformat.LegStructuredFlat] = crossformat.Record{Outcome: crossformat.Outcome{Compared: 2, Excluded: -1}, Reason: "why"}
+			},
+			wantErr: "negative",
 		},
 		{
 			name: "negative count",
@@ -159,7 +187,7 @@ func TestProbe105CheckRecords(t *testing.T) {
 // exactly, a refusal matches by a substring of the error, and a refusal never
 // matches counts or the other way round.
 func TestProbe105RecordMatches(t *testing.T) {
-	counts := crossformat.Outcome{Compared: 5, Missing: 1, Extra: 2, Altered: 3}
+	counts := crossformat.Outcome{Compared: 5, Missing: 1, Extra: 2, Altered: 3, Excluded: 4}
 	refused := crossformat.Outcome{Refused: "decode: strconv.ParseUint: parsing \"x\": invalid syntax"}
 	tests := []struct {
 		name string
@@ -168,10 +196,12 @@ func TestProbe105RecordMatches(t *testing.T) {
 		want bool
 	}{
 		{"same counts", counts, counts, true},
-		{"one more compared", counts, crossformat.Outcome{Compared: 6, Missing: 1, Extra: 2, Altered: 3}, false},
-		{"one fewer missing", counts, crossformat.Outcome{Compared: 5, Extra: 2, Altered: 3}, false},
-		{"one more extra", counts, crossformat.Outcome{Compared: 5, Missing: 1, Extra: 3, Altered: 3}, false},
-		{"one fewer altered", counts, crossformat.Outcome{Compared: 5, Missing: 1, Extra: 2, Altered: 2}, false},
+		{"one more compared", counts, crossformat.Outcome{Compared: 6, Missing: 1, Extra: 2, Altered: 3, Excluded: 4}, false},
+		{"one fewer missing", counts, crossformat.Outcome{Compared: 5, Extra: 2, Altered: 3, Excluded: 4}, false},
+		{"one more extra", counts, crossformat.Outcome{Compared: 5, Missing: 1, Extra: 3, Altered: 3, Excluded: 4}, false},
+		{"one fewer altered", counts, crossformat.Outcome{Compared: 5, Missing: 1, Extra: 2, Altered: 2, Excluded: 4}, false},
+		{"one more excluded", counts, crossformat.Outcome{Compared: 5, Missing: 1, Extra: 2, Altered: 3, Excluded: 5}, false},
+		{"nothing excluded", counts, crossformat.Outcome{Compared: 5, Missing: 1, Extra: 2, Altered: 3}, false},
 		{"refusal containing the record", crossformat.Outcome{Refused: "strconv.ParseUint"}, refused, true},
 		{"refusal not containing the record", crossformat.Outcome{Refused: "path resolves to multiple items"}, refused, false},
 		{"counts recorded, refusal measured", counts, refused, false},
@@ -212,9 +242,20 @@ func TestProbe105Verify(t *testing.T) {
 	recs[crossformat.LegJSONXML] = crossformat.Record{Outcome: crossformat.Outcome{Compared: 1}}
 	got := crossformat.Verify(res, recs)
 	want := []string{
-		"s flat-structured: recorded compared 3, missing 1, extra 0, altered 0, measured compared 3, missing 0, extra 0, altered 0",
-		"s structured-flat: no record, measured compared 2, missing 0, extra 0, altered 0",
-		"s json-xml: recorded compared 1, missing 0, extra 0, altered 0, but the leg did not run",
+		"s flat-structured: recorded compared 3, missing 1, extra 0, altered 0, excluded 0, measured compared 3, missing 0, extra 0, altered 0, excluded 0",
+		"s structured-flat: no record, measured compared 2, missing 0, extra 0, altered 0, excluded 0",
+		"s json-xml: recorded compared 1, missing 0, extra 0, altered 0, excluded 0, but the leg did not run",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("Verify(changed records) =\n%q\nwant\n%q", got, want)
+	}
+
+	// A change in the excluded count alone is a disagreement too.
+	recs = cleanRecords()
+	recs[crossformat.LegStructuredFlat] = crossformat.Record{Outcome: crossformat.Outcome{Compared: 2, Excluded: 3}, Reason: "why"}
+	got = crossformat.Verify(res, recs)
+	want = []string{
+		"s structured-flat: recorded compared 2, missing 0, extra 0, altered 0, excluded 3, measured compared 2, missing 0, extra 0, altered 0, excluded 0",
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("Verify(changed records) =\n%q\nwant\n%q", got, want)

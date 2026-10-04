@@ -6,7 +6,9 @@ package webtemplate
 
 import (
 	"errors"
+	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"testing"
 
@@ -82,6 +84,87 @@ func TestDecodeReducingNotAGap(t *testing.T) {
 	if len(body) != before {
 		t.Errorf("body has %d keys after the refusal, want the %d it had: an irreducible error removes nothing", len(body), before)
 	}
+}
+
+// TestDecodeReducingKeepsRefusalsOnError pins that the key families the loop
+// already removed come back with the error that stops it, an irreducible
+// decode or a breach of the refusal budget, rather than being lost with it.
+// PROBE-105 reports them for a refused leg.
+func TestDecodeReducingKeepsRefusalsOnError(t *testing.T) {
+	target, err := NewTarget()
+	if err != nil {
+		t.Fatalf("NewTarget() error = %v", err)
+	}
+
+	base, leaf := modelledQuantityLeaf(t, target)
+	// Decode reads leaf groups in sorted key order and checks the context
+	// after them, so this unknown path, sorting first, is refused and removed
+	// before the irreducible error stops the loop.
+	unknown := target.Root + "/0_no_such_node"
+	if unknown >= base {
+		t.Fatalf("unknown path %q does not sort before the leaf %q; pick another", unknown, base)
+	}
+	irreducible := []struct {
+		name    string
+		mode    ContextMode
+		change  func(map[string]any)
+		wantKey string
+	}{
+		{
+			name:    "keyed error outside the gap sentinels",
+			mode:    InjectContext,
+			change:  func(b map[string]any) { b[base+"|accuracy"] = "not a number" },
+			wantKey: base,
+		},
+		{
+			name:   "error that names no key",
+			mode:   KeepContext,
+			change: func(map[string]any) {}, // no ctx/language or ctx/territory
+		},
+	}
+	for _, tt := range irreducible {
+		t.Run(tt.name, func(t *testing.T) {
+			body := maps.Clone(leaf)
+			body[unknown+"|code"], body[unknown+"|value"] = "x", "y"
+			tt.change(body)
+
+			_, refusals, err := DecodeReducing(target, body, tt.mode)
+			if ie, ok := errors.AsType[*IrreducibleError](err); !ok || ie == nil || ie.Key != tt.wantKey {
+				t.Fatalf("DecodeReducing() error = %v, want an *IrreducibleError with key %q", err, tt.wantKey)
+			}
+			want := []Refusal{{
+				Key:     unknown,
+				Reason:  "path not in web template",
+				Message: `simplified: path not in web template: "<key>"`,
+				Keys:    2,
+			}}
+			if !slices.Equal(refusals, want) {
+				t.Errorf("DecodeReducing() refusals = %+v, want %+v", refusals, want)
+			}
+			if _, ok := body[unknown+"|code"]; ok {
+				t.Errorf("body still carries %s|code; the refusal that removed it must have been applied", unknown)
+			}
+		})
+	}
+
+	t.Run("refusal budget breached", func(t *testing.T) {
+		// One unknown path more than the budget allows, each its own family.
+		body := make(map[string]any, maxRefusals+1)
+		for i := range maxRefusals + 1 {
+			body[fmt.Sprintf("%s/no_such_node_%03d", target.Root, i)] = "x"
+		}
+		_, refusals, err := DecodeReducing(target, body, InjectContext)
+		if err == nil || !strings.Contains(err.Error(), "did not converge") {
+			t.Fatalf("DecodeReducing(%d unknown paths) error = %v, want the budget breach", maxRefusals+1, err)
+		}
+		if _, ok := errors.AsType[*IrreducibleError](err); ok {
+			t.Errorf("DecodeReducing(%d unknown paths) error = %v, want a harness fault, not an *IrreducibleError", maxRefusals+1, err)
+		}
+		if len(refusals) != maxRefusals || len(body) != 1 {
+			t.Errorf("DecodeReducing(%d unknown paths) = %d refusals, %d keys left; want %d refusals and 1 key left",
+				maxRefusals+1, len(refusals), len(body), maxRefusals)
+		}
+	})
 }
 
 // TestDecodeReducingUnknownMode pins that a mode outside the two is a harness

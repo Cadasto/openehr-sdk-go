@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/cadasto/openehr-sdk-go/testkit/conformance/webtemplate"
 )
 
 // censusExamples is how many example keys or leaves the census lists per
@@ -60,9 +62,9 @@ Each set under testkit/corpus/crossformat/ gives one composition in two or more 
 | flat-structured | the upstream FLAT restructured as STRUCTURED without a template, compared leaf by leaf | the upstream STRUCTURED |
 | structured-flat | the upstream STRUCTURED flattened, decoded and encoded as FLAT, compared key by key | the upstream FLAT decoded and encoded the same way |
 
-A leaf is a JSON pointer to a scalar, an empty object or an empty array, with its value as JSON text. Every FLAT comparison holds composition metadata out on both sides with the PROBE-086 hold-out. Every FLAT decode removes each key family the codec refuses and retries; the keys it removed are listed as information, since a removed key shows up in the comparison as missing.
+A leaf is a JSON pointer to a scalar, an empty object or an empty array, with its value as JSON text. Every FLAT comparison holds composition metadata out on both sides with the PROBE-086 hold-out. Every FLAT decode removes each key family the codec refuses and retries. The census lists the removed keys of each decoded side, grouped by the codec's own refusal text with the key shown as ` + "`<key>`" + `.
 
-An outcome is either a refusal, the codec error that ended the leg, or four counts: compared (the size of the reference side), missing (reference keys absent from ours), extra (our keys absent from the reference) and altered (keys on both sides with different values). Each outcome must equal the one recorded in recorded.go, and the reason shown is the recorded one.
+An outcome is either a refusal, the codec error that ended the leg, or five counts: compared (the size of the reference side), missing (reference keys absent from ours), extra (our keys absent from the reference), altered (keys on both sides with different values) and excluded (upstream FLAT keys the reducing decode removed before the comparison). Excluded is counted in flat-canonical and structured-flat, the legs that decode the upstream FLAT. In flat-canonical a removed key's value is also absent from the decoded composition, so it shows up in the comparison. In structured-flat both sides are decoded, so a key family the codec refuses can drop out of both sides and leave no difference: only excluded shows it. Keys removed from the STRUCTURED side are listed but not counted. A refused leg carries no counts; the keys removed before the refusal are listed as information. Each outcome must equal the one recorded in recorded.go, and the reason shown is the recorded one.
 
 `
 
@@ -93,7 +95,8 @@ func writeLeg(b *bytes.Buffer, lr LegResult, recs map[Leg]Record) {
 			fmt.Fprintf(b, "  - %s: reference %s, ours %s\n", code(a.Key), code(abbreviateValue(a.Reference)), code(abbreviateValue(a.Ours)))
 		}
 	}
-	writeRefusals(b, lr)
+	writeRefusals(b, "the upstream FLAT", lr.Refusals)
+	writeRefusals(b, "the flattened upstream STRUCTURED", lr.StructuredRefusals)
 }
 
 // writeKeys renders one difference class's example keys.
@@ -107,21 +110,21 @@ func writeKeys(b *bytes.Buffer, label string, keys []string) {
 	}
 }
 
-// writeRefusals renders what the leg's reducing decodes removed, grouped by
-// reason.
-func writeRefusals(b *bytes.Buffer, lr LegResult) {
-	if len(lr.Refusals) == 0 {
+// writeRefusals renders what the reducing decode removed from one side,
+// grouped by the codec's own refusal text.
+func writeRefusals(b *bytes.Buffer, side string, refusals []webtemplate.Refusal) {
+	if len(refusals) == 0 {
 		return
 	}
 	keys := map[string]int{}
-	for _, r := range lr.Refusals {
-		keys[r.Reason] += r.Keys
+	for _, r := range refusals {
+		keys[Abbreviate(StableError(r.Message))] += r.Keys
 	}
-	reasons := slices.Collect(maps.Keys(keys))
-	slices.SortFunc(reasons, func(x, y string) int { return cmp.Or(cmp.Compare(keys[y], keys[x]), strings.Compare(x, y)) })
-	fmt.Fprintf(b, "- Reducing decode removed %s:\n", plural(lr.Excluded(), "key"))
-	for _, r := range reasons {
-		fmt.Fprintf(b, "  - %d: %s\n", keys[r], r)
+	messages := slices.Collect(maps.Keys(keys))
+	slices.SortFunc(messages, func(x, y string) int { return cmp.Or(cmp.Compare(keys[y], keys[x]), strings.Compare(x, y)) })
+	fmt.Fprintf(b, "- Reducing decode removed %s from %s:\n", plural(keysRemoved(refusals), "key"), side)
+	for _, m := range messages {
+		fmt.Fprintf(b, "  - %d: %s\n", keys[m], code(m))
 	}
 }
 

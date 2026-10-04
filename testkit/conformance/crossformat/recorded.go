@@ -14,14 +14,16 @@ import (
 // is.
 //
 // Four rules hold for every record, and [CheckRecords] enforces them: a
-// refusal or a difference states its Reason; a clean record carries none, so
-// a closed gap cannot leave a stale reason behind; a record that is not a
+// refusal, a difference or a non-zero excluded count states its Reason; a
+// clean record, one with every count but compared zero, carries none, so a
+// closed gap cannot leave a stale reason behind; a record that is not a
 // refusal compares at least one key or leaf; and a refusal carries no counts.
 type Record struct {
 	// Outcome is the expected outcome. For a refusal, Refused is a stable
 	// substring of the codec's error rather than the whole message.
 	Outcome Outcome
-	// Reason names the cause of every refusal and difference.
+	// Reason names the cause of every refusal, difference and non-zero
+	// excluded count.
 	Reason string
 }
 
@@ -46,11 +48,11 @@ func StableError(msg string) string {
 func (r Record) check() error {
 	o := r.Outcome
 	var errs []error
-	if o.Compared < 0 || o.Missing < 0 || o.Extra < 0 || o.Altered < 0 {
+	if o.Compared < 0 || o.Missing < 0 || o.Extra < 0 || o.Altered < 0 || o.Excluded < 0 {
 		errs = append(errs, errors.New("a count is negative"))
 	}
 	if o.Refused != "" {
-		if o.Compared != 0 || o.Missing != 0 || o.Extra != 0 || o.Altered != 0 {
+		if o.Compared != 0 || o.Missing != 0 || o.Extra != 0 || o.Altered != 0 || o.Excluded != 0 {
 			errs = append(errs, errors.New("a refusal carries no counts"))
 		}
 	} else {
@@ -64,7 +66,7 @@ func (r Record) check() error {
 	}
 	switch reason := strings.TrimSpace(r.Reason); {
 	case !o.Clean() && reason == "":
-		errs = append(errs, errors.New("a refusal or difference must state why it exists"))
+		errs = append(errs, errors.New("a refusal, difference or non-zero excluded count must state why it exists"))
 	case o.Clean() && reason != "":
 		errs = append(errs, errors.New("a clean record carries no reason; remove the stale one"))
 	}
@@ -145,10 +147,11 @@ func Verify(res SetResult, recs map[Leg]Record) []string {
 }
 
 // Recorded is the outcome expected for every set and leg of the cross-format
-// corpus, with the reason for every refusal and difference. A leg whose
-// measured outcome changes fails PROBE-105 until its record here changes in
-// the same commit, so a gap opens or closes only deliberately; CENSUS.md
-// publishes this table beside the harness that regenerates it.
+// corpus, with the reason for every refusal, difference and non-zero excluded
+// count. A leg whose measured outcome changes fails PROBE-105 until its record
+// here changes in the same commit, so a gap opens or closes only
+// deliberately; CENSUS.md publishes this table beside the harness that
+// regenerates it.
 //
 // Reasons name their causes with these labels:
 //
@@ -177,10 +180,10 @@ var Recorded = map[string]map[Leg]Record{
 				"math_function or width, so FLAT encode writes none of their four keys.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 115, Missing: 8, Extra: 4, Altered: 13},
-			Reason: "INTERVAL_EVENT attributes: decode refuses math_function and width (4 keys), so the interval " +
-				"event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the " +
-				"birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists " +
+			Outcome: Outcome{Compared: 115, Missing: 8, Extra: 4, Altered: 13, Excluded: 4},
+			Reason: "INTERVAL_EVENT attributes: decode refuses math_function and width (the 4 excluded keys), so " +
+				"the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order " +
+				"between the birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists " +
 				"Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the " +
 				"FLAT has no origin key and decode fills it from the context start time (deviations.md), where the " +
 				"canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, " +
@@ -206,8 +209,10 @@ var Recorded = map[string]map[Leg]Record{
 				"them on document_attachment and FLAT encode writes them (4 keys).",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 41, Extra: 27, Altered: 17},
-			Reason: "body-form composer: decode refuses the composer keys (4), so the composer's name and " +
+			Outcome: Outcome{Compared: 150, Missing: 41, Extra: 27, Altered: 17, Excluded: 9},
+			Reason: "The 9 excluded keys are the composer's 4, ctx/time, ctx/setting, ctx/location, _name and " +
+				"created/date_time_value, each refused as follows. " +
+				"body-form composer: decode refuses the composer keys (4), so the composer's name and " +
 				"external_ref are missing and decode fills a PARTY_SELF. UPSTREAM consult_record ctx conflict: the " +
 				"FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the " +
 				"harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT " +
@@ -229,10 +234,12 @@ var Recorded = map[string]map[Leg]Record{
 				"the ENTRY language and encoding of document_attachment that the upstream STRUCTURED carries.",
 		},
 		LegStructuredFlat: {
-			Outcome: Outcome{Compared: 25, Extra: 1},
+			Outcome: Outcome{Compared: 25, Extra: 1, Excluded: 5},
 			Reason: "ctx/location: the upstream FLAT spells the location ctx/location, which the hold-out removes, " +
 				"while the upstream STRUCTURED spells it context/_location (ADR 0016), which decodes and re-encodes, " +
-				"so only our side carries it.",
+				"so only our side carries it. Excluded: decode refuses the same three families on both sides and " +
+				"they drop out of the comparison: the composer's external_ref (3 keys, body-form composer), the " +
+				"composition's _name (LOCATABLE name) and media_file/created/date_time_value (choice element).",
 		},
 	},
 	"corona": {
@@ -242,13 +249,19 @@ var Recorded = map[string]map[Leg]Record{
 				"openEHR-EHR-SECTION.adhoc.v1 under content, and FLAT encode refuses the path that resolves to both.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 641, Missing: 565, Altered: 2},
+			Outcome: Outcome{Compared: 641, Missing: 565, Altered: 2, Excluded: 94},
 			Reason: "reused archetype siblings: decode refuses every key under the symptome and risikogebiet " +
-				"sections (94 keys), so both sections are missing from the decoded composition. RM-FLOOR " +
-				"archetype_details: rm_version is 1.2.0 against 1.0.4 (2 leaves).",
+				"sections (the 94 excluded keys, 70 and 24), so both sections are missing from the decoded " +
+				"composition. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (2 leaves).",
 		},
 		LegFlatStructured: {Outcome: Outcome{Compared: 113}},
-		LegStructuredFlat: {Outcome: Outcome{Compared: 10}},
+		LegStructuredFlat: {
+			Outcome: Outcome{Compared: 10, Excluded: 94},
+			Reason: "reused archetype siblings: the symptome and risikogebiet sections both reuse " +
+				"openEHR-EHR-SECTION.adhoc.v1 under content, and decode refuses every key under them on both sides " +
+				"(the 94 excluded keys of the upstream FLAT, 70 and 24), so both sections drop out of the " +
+				"comparison and the 10 keys compared are what remains.",
+		},
 	},
 	"ehrn_abdm": {
 		LegCanonicalFlat: {
@@ -260,8 +273,9 @@ var Recorded = map[string]map[Leg]Record{
 				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 40, Extra: 27, Altered: 15},
-			Reason: "body-form composer: decode refuses the composer keys (4), so the composer's name and " +
+			Outcome: Outcome{Compared: 150, Missing: 40, Extra: 27, Altered: 15, Excluded: 6},
+			Reason: "The 6 excluded keys are the composer's 4, _name and created/date_time_value, each refused as " +
+				"follows. body-form composer: decode refuses the composer keys (4), so the composer's name and " +
 				"external_ref are missing and decode fills a PARTY_SELF. LOCATABLE name: the codec refuses _name, " +
 				"so decode names the composition OPConsultation from the template against the canonical Routine " +
 				"checkup. Choice element: decode refuses media_file/created/date_time_value (the SDK spells it " +
@@ -304,10 +318,10 @@ var Recorded = map[string]map[Leg]Record{
 				"ACTIVITY action_archetype_id that the canonical XML holds, and FLAT encode writes both.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 156, Missing: 84, Extra: 48, Altered: 11},
-			Reason: "body-form composer: decode refuses the composer keys (3), so the composer's name and " +
-				"external_ref are missing and decode fills a PARTY_SELF. Upstream FLAT omissions: the FLAT carries " +
-				"no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded " +
+			Outcome: Outcome{Compared: 156, Missing: 84, Extra: 48, Altered: 11, Excluded: 3},
+			Reason: "body-form composer: decode refuses the composer keys (the 3 excluded keys), so the " +
+				"composer's name and external_ref are missing and decode fills a PARTY_SELF. Upstream FLAT " +
+				"omissions: the FLAT carries no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded " +
 				"composition has no context and an empty action_archetype_id. Sibling order: FLAT carries no order " +
 				"between the ordinal ELEMENT and the nested CLUSTER of the activity description; decode lists the " +
 				"CLUSTER first, the canonical lists it second, so their leaves compare at shifted positions, and the " +
@@ -326,10 +340,10 @@ var Recorded = map[string]map[Leg]Record{
 				"text as written.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 72, Missing: 8, Altered: 5},
-			Reason: "body-form composer: decode refuses the composer keys (3), so the composer's name and " +
-				"external_ref are missing and decode fills a PARTY_SELF. Upstream date-time spelling: the event " +
-				"time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: a persistent " +
+			Outcome: Outcome{Compared: 72, Missing: 8, Altered: 5, Excluded: 3},
+			Reason: "body-form composer: decode refuses the composer keys (the 3 excluded keys), so the " +
+				"composer's name and external_ref are missing and decode fills a PARTY_SELF. Upstream date-time " +
+				"spelling: the event time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: a persistent " +
 				"composition has no context start time, and decode, which fills origin from it (deviations.md), " +
 				"leaves the origin empty. RM-FLOOR archetype_details: the canonical carries template_id on the " +
 				"inner archetype root where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.",
@@ -350,10 +364,12 @@ var Recorded = map[string]map[Leg]Record{
 				"RM-mandatory lower_included and upper_included, canjson reads the absence as false, and FLAT encode " +
 				"writes false where upstream writes nothing (6 keys). Upstream date and time spelling: the canonical " +
 				"writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the " +
-				"extended format with a full stop and Z (8 leaves). Upstream value disagreement: the canonical " +
-				"(all_types_no_multimedia.json) and the FLAT (test_all_types.json) are separate upstream files that " +
-				"disagree on duration_any (P1Y2M10DT2H30M against PT30M), on a DV_URI only the canonical carries, " +
-				"and on the proportion's precision, which only the canonical carries.",
+				"extended format with a full stop and Z (8 leaves). Upstream conversion differences: upstream " +
+				"openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical " +
+				"(all_types_no_multimedia.json) as FLAT and expects these differences against this FLAT " +
+				"(test_all_types.json): duration_any (P1Y2M10DT2H30M against PT30M), a DV_URI only the canonical " +
+				"carries and the proportion's precision, which only the canonical carries, besides the DV_IDENTIFIER " +
+				"and proportion type spellings above.",
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Refused: "unmarshal JSON number 1.0 into Go int32"},

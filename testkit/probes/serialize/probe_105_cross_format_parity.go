@@ -34,8 +34,9 @@ import (
 // [fixtures.ListCrossFormatSets] once and pass each set in.
 //
 // Status is "pass" when every leg the set runs matches its record and the
-// set's records obey the record rules (a reason for every refusal and
-// difference, at least one key compared by every leg that is not refused). It
+// set's records obey the record rules (a reason for every refusal, difference
+// and non-zero excluded count, at least one key compared by every leg that is
+// not refused). It
 // is "fail" otherwise, with a Detail naming each set and leg whose recorded
 // and measured outcomes differ: a gap that opened or closed without its record
 // changing in the same commit. A harness fault, such as an OPT that does not

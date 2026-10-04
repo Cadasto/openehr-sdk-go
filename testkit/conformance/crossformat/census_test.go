@@ -53,9 +53,10 @@ func TestCensusHasNoEmDash(t *testing.T) {
 // TestProbe105CensusRendering pins what the census shows for a leg over
 // synthetic results: sets in name order, at most ten examples per difference
 // class, the recorded reason or "no record", a refusal's error shortened and
-// its recorded substring, the reducing decode's removals by reason, the same
-// wording whichever modal verb encoding/json/v2 picked for the run, and no em
-// dash even when a codec error carries one.
+// its recorded substring, the reducing decode's removals from each side
+// grouped by the codec's own refusal text, the same wording whichever modal
+// verb encoding/json/v2 picked for the run, and no em dash even when a codec
+// error carries one.
 func TestProbe105CensusRendering(t *testing.T) {
 	var missing []string
 	for i := range 12 {
@@ -63,23 +64,29 @@ func TestProbe105CensusRendering(t *testing.T) {
 	}
 	results := []crossformat.SetResult{
 		{Set: "zeta", Legs: []crossformat.LegResult{{
-			Leg:         crossformat.LegFlatStructured,
-			Outcome:     crossformat.Outcome{Compared: 20, Missing: 12, Altered: 1},
+			Leg:         crossformat.LegStructuredFlat,
+			Outcome:     crossformat.Outcome{Compared: 20, Missing: 12, Altered: 1, Excluded: 7},
 			MissingKeys: missing,
 			Alterations: []crossformat.Alteration{{Key: "r/x", Reference: `"a"`, Ours: `"b"`}},
 			Refusals: []webtemplate.Refusal{
-				{Key: "r/a", Reason: "path not in web template", Keys: 2},
-				{Key: "r/c", Reason: "unsupported datatype: PARTY_PROXY", Keys: 4},
-				{Key: "r/b", Reason: "path not in web template", Keys: 1},
+				{Key: "r/a", Reason: "path not in web template", Message: `path not in web template: "<key>"`, Keys: 2},
+				{Key: "r/c", Reason: "path not in web template", Message: "\"<key>\": reused sibling \u2014 not yet decodable", Keys: 4},
+				{Key: "r/b", Reason: "path not in web template", Message: `path not in web template: "<key>"`, Keys: 1},
+			},
+			StructuredRefusals: []webtemplate.Refusal{
+				{Key: "r/c:0", Reason: "unsupported datatype: PARTY_PROXY", Message: `decode "<key>": unable to read PARTY_PROXY`, Keys: 5},
 			},
 		}}},
 		{Set: "alpha", Legs: []crossformat.LegResult{{
-			Leg:     crossformat.LegJSONXML,
+			Leg:     crossformat.LegFlatCanonical,
 			Outcome: crossformat.Outcome{Refused: "canonical XML decode: unable to parse \"" + strings.Repeat("A", 200) + "\" \u2014 invalid"},
+			// A refused leg keeps what the reducing decode removed before the
+			// refusal, as information.
+			Refusals: []webtemplate.Refusal{{Key: "r/q", Message: `path not in web template: "<key>"`, Keys: 15}},
 		}}},
 	}
 	table := map[string]map[crossformat.Leg]crossformat.Record{
-		"alpha": {crossformat.LegJSONXML: {Outcome: crossformat.Outcome{Refused: "parsing"}, Reason: "a recorded reason"}},
+		"alpha": {crossformat.LegFlatCanonical: {Outcome: crossformat.Outcome{Refused: "parsing"}, Reason: "a recorded reason"}},
 	}
 	got := string(crossformat.Census(results, table))
 
@@ -87,8 +94,11 @@ func TestProbe105CensusRendering(t *testing.T) {
 		t.Errorf("Census() does not list the sets in name order:\n%s", got)
 	}
 	for _, want := range []string{
-		"| alpha | json-xml | refused |",
-		"| zeta | flat-structured | compared 20, missing 12, extra 0, altered 1 |",
+		"| alpha | flat-canonical | refused |",
+		"- Recorded as an error containing `parsing`\n- Reason: a recorded reason\n" +
+			"- Reducing decode removed 15 keys from the upstream FLAT:\n" +
+			"  - 15: `path not in web template: \"<key>\"`\n",
+		"| zeta | structured-flat | compared 20, missing 12, extra 0, altered 1, excluded 7 |",
 		"- Reason: a recorded reason",
 		"- Recorded as an error containing `parsing`",
 		"- Error: `canonical XML decode: cannot parse",
@@ -96,7 +106,11 @@ func TestProbe105CensusRendering(t *testing.T) {
 		"- Missing (12, first 10 shown):",
 		"  - `r/k09`",
 		"  - `r/x`: reference `\"a\"`, ours `\"b\"`",
-		"- Reducing decode removed 7 keys:\n  - 4: unsupported datatype: PARTY_PROXY\n  - 3: path not in web template\n",
+		"- Reducing decode removed 7 keys from the upstream FLAT:\n" +
+			"  - 4: `\"<key>\": reused sibling - not yet decodable`\n" +
+			"  - 3: `path not in web template: \"<key>\"`\n" +
+			"- Reducing decode removed 5 keys from the flattened upstream STRUCTURED:\n" +
+			"  - 5: `decode \"<key>\": cannot read PARTY_PROXY`\n",
 		strings.Repeat("A", 39) + "...",
 	} {
 		if !strings.Contains(got, want) {

@@ -31,10 +31,13 @@
 // # Outcomes and the ratchet
 //
 // A leg's [Outcome] is either a refusal, the codec error that ended it, or
-// the counts compared, missing, extra and altered. [Recorded] holds the
-// outcome expected for every set and leg, with the reason for every refusal
-// and difference. [Verify] compares a measured result with its record, and a
-// change in either direction fails until the record changes with it.
+// the counts compared, missing, extra, altered and excluded. Excluded counts
+// the upstream FLAT keys the reducing decode removed in the two legs that
+// decode the upstream FLAT, [LegFlatCanonical] and [LegStructuredFlat].
+// [Recorded] holds the outcome expected for every set and leg, with the reason
+// for every refusal, difference and non-zero excluded count. [Verify] compares
+// a measured result with its record, and a change in either direction fails
+// until the record changes with it.
 // CENSUS.md beside this file publishes the outcomes and reasons; the package
 // tests regenerate it and fail when the committed copy differs.
 package crossformat
@@ -98,7 +101,8 @@ func Legs(set fixtures.CrossFormatSet) []Leg {
 // Outcome is what one leg measured: either a refusal or the counts of a
 // comparison. Compared is the size of the reference side; Missing counts its
 // keys or leaves absent from the side under test, Extra the reverse, and
-// Altered those present on both with different values.
+// Altered those present on both with different values. Excluded counts the
+// upstream FLAT keys the reducing decode removed before the comparison.
 type Outcome struct {
 	// Refused is the codec error that ended the leg, or "" when the leg ran
 	// to a comparison. In a [Record] it is a stable substring of that error.
@@ -113,11 +117,18 @@ type Outcome struct {
 	// Altered is how many keys or leaves both sides have with different
 	// values.
 	Altered int
+	// Excluded is how many upstream FLAT keys the reducing decode removed
+	// before the comparison, in [LegFlatCanonical] and [LegStructuredFlat].
+	// It is zero in the other legs, which decode no upstream FLAT. In
+	// LegStructuredFlat both sides are decoded, so a refused key family drops
+	// out of both and no other count shows it.
+	Excluded int
 }
 
-// Clean reports whether the leg ran to a comparison and found no difference.
+// Clean reports whether the leg ran to a comparison, found no difference and
+// excluded nothing.
 func (o Outcome) Clean() bool {
-	return o.Refused == "" && o.Missing == 0 && o.Extra == 0 && o.Altered == 0
+	return o.Refused == "" && o.Missing == 0 && o.Extra == 0 && o.Altered == 0 && o.Excluded == 0
 }
 
 // String renders the outcome on one line.
@@ -125,7 +136,8 @@ func (o Outcome) String() string {
 	if o.Refused != "" {
 		return "refused: " + o.Refused
 	}
-	return fmt.Sprintf("compared %d, missing %d, extra %d, altered %d", o.Compared, o.Missing, o.Extra, o.Altered)
+	return fmt.Sprintf("compared %d, missing %d, extra %d, altered %d, excluded %d",
+		o.Compared, o.Missing, o.Extra, o.Altered, o.Excluded)
 }
 
 // LegResult is one leg's measured outcome and the detail behind it.
@@ -138,10 +150,15 @@ type LegResult struct {
 	// Alterations list the keys or leaves behind the Altered count, sorted by
 	// key.
 	Alterations []Alteration
-	// Refusals are the key families the leg's reducing FLAT decodes removed,
-	// in the order they surfaced. They are information, not part of the
-	// outcome: a removed key shows up in the comparison as missing.
+	// Refusals are the key families the reducing decode removed from the
+	// upstream FLAT, in the order they surfaced. Outcome.Excluded counts their
+	// keys. When the leg ends in a refusal they are kept as information, and
+	// the outcome carries no counts.
 	Refusals []webtemplate.Refusal
+	// StructuredRefusals are, in [LegStructuredFlat], the key families the
+	// reducing decode removed from the flattened upstream STRUCTURED. They
+	// are information, not part of the outcome.
+	StructuredRefusals []webtemplate.Refusal
 }
 
 // Alteration is one key or leaf both sides carry with different values, each
@@ -150,11 +167,11 @@ type Alteration struct {
 	Key, Reference, Ours string
 }
 
-// Excluded is how many keys the leg's reducing decodes removed.
-func (r LegResult) Excluded() int {
+// keysRemoved is how many keys refusals removed.
+func keysRemoved(refusals []webtemplate.Refusal) int {
 	n := 0
-	for _, f := range r.Refusals {
-		n += f.Keys
+	for _, r := range refusals {
+		n += r.Keys
 	}
 	return n
 }
@@ -275,7 +292,7 @@ func runLeg(leg Leg, t *webtemplate.Target, in inputs) (LegResult, error) {
 		return LegResult{}, fmt.Errorf("unknown leg %q", leg)
 	}
 	if r, ok := errors.AsType[errRefused](err); ok {
-		return LegResult{Outcome: Outcome{Refused: r.msg}, Refusals: lr.Refusals}, nil
+		return LegResult{Outcome: Outcome{Refused: r.msg}, Refusals: lr.Refusals, StructuredRefusals: lr.StructuredRefusals}, nil
 	}
 	return lr, err
 }
@@ -317,7 +334,9 @@ func legCanonicalFlat(t *webtemplate.Target, in inputs) (LegResult, error) {
 }
 
 // legFlatCanonical is leg (c): the upstream FLAT, decoded with its metadata
-// kept, against the decoded canonical document, both in canonical JSON.
+// kept, against the decoded canonical document, both in canonical JSON. A key
+// the reducing decode removed is absent from the decoded composition, so its
+// value shows up in the comparison as well as in Excluded.
 func legFlatCanonical(t *webtemplate.Target, in inputs) (LegResult, error) {
 	comp, err := decodeCanonical(in)
 	if err != nil {
@@ -337,6 +356,7 @@ func legFlatCanonical(t *webtemplate.Target, in inputs) (LegResult, error) {
 	}
 	lr := compareLeaves(ref, ours)
 	lr.Refusals = refusals
+	lr.Outcome.Excluded = keysRemoved(refusals)
 	return lr, nil
 }
 
@@ -360,7 +380,10 @@ func legFlatStructured(in inputs) (LegResult, error) {
 
 // legStructuredFlat is leg (e): the upstream STRUCTURED, flattened, decoded
 // and encoded as FLAT, against the upstream FLAT taken through the same
-// decode and encode, metadata held out of both.
+// decode and encode, metadata held out of both. Both sides go through the
+// reducing decode, so a key family the codec refuses can drop out of both
+// and leave no difference behind: Excluded, counted on the upstream FLAT side,
+// is what keeps it visible.
 func legStructuredFlat(t *webtemplate.Target, in inputs) (LegResult, error) {
 	ref, refRefusals, err := reencodeFlat(t, in.flat)
 	if err != nil {
@@ -375,12 +398,12 @@ func legStructuredFlat(t *webtemplate.Target, in inputs) (LegResult, error) {
 		return LegResult{Refusals: refRefusals}, fmt.Errorf("STRUCTURED to FLAT produced no FLAT body: %w", err)
 	}
 	ours, oursRefusals, err := reencodeFlat(t, body)
-	refusals := slices.Concat(refRefusals, oursRefusals)
 	if err != nil {
-		return LegResult{Refusals: refusals}, err
+		return LegResult{Refusals: refRefusals, StructuredRefusals: oursRefusals}, err
 	}
 	lr, err := compareFlat(ref, ours, t.Root)
-	lr.Refusals = refusals
+	lr.Refusals, lr.StructuredRefusals = refRefusals, oursRefusals
+	lr.Outcome.Excluded = keysRemoved(refRefusals)
 	return lr, err
 }
 

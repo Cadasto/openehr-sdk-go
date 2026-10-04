@@ -156,6 +156,55 @@ func TestProbe105LegJSONXMLComparesDecodedLeaves(t *testing.T) {
 // canonical document.
 const motherPointer = "/content/0/data/items/0/items/1/value/value"
 
+// TestProbe105ExcludedCountsTheUpstreamFlat pins, over the corpus, what the
+// excluded count covers: in flat-canonical and structured-flat it is the
+// number of upstream FLAT keys the reducing decode removed, the keys removed
+// from the STRUCTURED side are kept apart and not counted, the other legs
+// remove nothing, and a refused leg carries no count but keeps the refusals
+// made before it. test_all_types flat-canonical is such a refused leg, and
+// corona structured-flat removes keys from both sides.
+func TestProbe105ExcludedCountsTheUpstreamFlat(t *testing.T) {
+	sets, err := fixtures.ListCrossFormatSets()
+	if err != nil {
+		t.Fatalf("ListCrossFormatSets() error = %v", err)
+	}
+	seen := map[string]LegResult{}
+	for _, set := range sets {
+		res, err := Run(set)
+		if err != nil {
+			t.Fatalf("Run(%s) error = %v", set.Name, err)
+		}
+		for _, lr := range res.Legs {
+			seen[set.Name+" "+string(lr.Leg)] = lr
+			decodesFlat := lr.Leg == LegFlatCanonical || lr.Leg == LegStructuredFlat
+			switch {
+			case lr.Outcome.Refused != "" && lr.Outcome != (Outcome{Refused: lr.Outcome.Refused}):
+				t.Errorf("%s %s: refused outcome %+v carries counts", set.Name, lr.Leg, lr.Outcome)
+			case lr.Outcome.Refused == "" && lr.Outcome.Excluded != keysRemoved(lr.Refusals):
+				t.Errorf("%s %s: Excluded = %d, want the %d keys removed from the upstream FLAT",
+					set.Name, lr.Leg, lr.Outcome.Excluded, keysRemoved(lr.Refusals))
+			case !decodesFlat && len(lr.Refusals) > 0:
+				t.Errorf("%s %s: a leg that decodes no upstream FLAT removed %d keys", set.Name, lr.Leg, keysRemoved(lr.Refusals))
+			}
+			if lr.Leg != LegStructuredFlat && len(lr.StructuredRefusals) > 0 {
+				t.Errorf("%s %s: only structured-flat decodes the STRUCTURED side, got %d removed keys",
+					set.Name, lr.Leg, keysRemoved(lr.StructuredRefusals))
+			}
+		}
+	}
+
+	refused := seen["test_all_types "+string(LegFlatCanonical)]
+	if refused.Outcome.Refused == "" || len(refused.Refusals) == 0 {
+		t.Errorf("test_all_types flat-canonical = %+v with %d refusals, want a refusal that keeps the keys removed before it",
+			refused.Outcome, len(refused.Refusals))
+	}
+	both := seen["corona "+string(LegStructuredFlat)]
+	if len(both.Refusals) == 0 || len(both.StructuredRefusals) == 0 || both.Outcome.Excluded != keysRemoved(both.Refusals) {
+		t.Errorf("corona structured-flat = %+v, removed %d upstream FLAT and %d STRUCTURED keys; want both sides reduced and only the FLAT side counted",
+			both.Outcome, keysRemoved(both.Refusals), keysRemoved(both.StructuredRefusals))
+	}
+}
+
 // TestProbe105CompareFlatHoldsMetadataOutOnBothSides pins the PROBE-086
 // hold-out on both FLAT sides: a ctx/ short form on one side and the real-path
 // spelling on the other are not a difference, while the composer's

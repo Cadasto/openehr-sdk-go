@@ -73,6 +73,9 @@ type Refusal struct {
 	// Reason is the normalised cause, e.g. "path not in web template" or
 	// "unsupported datatype: DV_MULTIMEDIA".
 	Reason string
+	// Message is the codec's own error text with Key replaced by "<key>", so
+	// refusals of one kind read the same whatever key they name.
+	Message string
 	// Keys is how many concrete FLAT entries this refusal removed (a leaf
 	// contributes one per |suffix).
 	Keys int
@@ -260,7 +263,9 @@ func (e *IrreducibleError) Unwrap() error { return e.Err }
 //
 // A decode error the loop cannot reduce comes back as an [*IrreducibleError]
 // carrying the codec's error. Any other error is a harness fault: an unknown
-// mode, or a decode that does not converge within the refusal budget.
+// mode, or a decode that does not converge within the refusal budget. With
+// either error the refusals made before it come back too, and the keys they
+// removed are already gone from candidate.
 func DecodeReducing(t *Target, candidate map[string]any, mode ContextMode) (*rm.Composition, []Refusal, error) {
 	var decode func(*Target, map[string]any) (*rm.Composition, error)
 	switch mode {
@@ -279,22 +284,27 @@ func DecodeReducing(t *Target, candidate map[string]any, mode ContextMode) (*rm.
 		}
 		key := offendingKey(err)
 		if key == "" {
-			return nil, nil, &IrreducibleError{Err: err, why: "decode failed with no attributable key"}
+			return nil, refusals, &IrreducibleError{Err: err, why: "decode failed with no attributable key"}
 		}
 		removed, gap := dropRefused(candidate, key, err)
 		if !gap {
-			return nil, nil, &IrreducibleError{Key: key, Err: err, why: fmt.Sprintf(
+			return nil, refusals, &IrreducibleError{Key: key, Err: err, why: fmt.Sprintf(
 				"decode error on key %q is neither an unmodelled path nor an "+
 					"unmodelled datatype, so it is a harness fault rather than a codec gap — "+
 					"do not let it be counted as excluded surface", key)}
 		}
 		if removed == 0 {
-			return nil, nil, &IrreducibleError{Key: key, Err: err, why: fmt.Sprintf(
+			return nil, refusals, &IrreducibleError{Key: key, Err: err, why: fmt.Sprintf(
 				"decode named key %q but it is not in the body", key)}
 		}
-		refusals = append(refusals, Refusal{Key: key, Reason: reasonOf(err, key), Keys: removed})
+		refusals = append(refusals, Refusal{
+			Key:     key,
+			Reason:  reasonOf(err, key),
+			Message: strings.ReplaceAll(err.Error(), key, "<key>"),
+			Keys:    removed,
+		})
 	}
-	return nil, nil, fmt.Errorf("decode did not converge after %d refusals", maxRefusals)
+	return nil, refusals, fmt.Errorf("decode did not converge after %d refusals", maxRefusals)
 }
 
 // decodeAsGiven decodes the given keys with the template attached and nothing
