@@ -214,12 +214,14 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, issuer, prevETag string) 
 }
 
 func (r *Resolver) fetch(ctx context.Context, issuer, prevETag string) (*ServiceCatalog, error) {
-	if !r.cfg.allowInsecure && strings.HasPrefix(issuer, "http://") {
-		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonInsecureURL, Inner: errors.New("plaintext issuer rejected; use WithAllowInsecure for development")}
-	}
 	docURL, err := joinURL(issuer, r.cfg.wellKnownPath)
 	if err != nil {
 		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonMalformedURL, Inner: err}
+	}
+	// Decide on the parsed scheme, which url.Parse lowercases: URL schemes
+	// are case-insensitive, so "HTTP://" is as plaintext as "http://".
+	if !r.cfg.allowInsecure && docURL.Scheme == "http" {
+		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonInsecureURL, Inner: errors.New("plaintext issuer rejected; use WithAllowInsecure for development")}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, docURL.String(), nil)
 	if err != nil {
