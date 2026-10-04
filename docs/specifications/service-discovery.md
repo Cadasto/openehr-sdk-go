@@ -264,6 +264,7 @@ These fields are **consumed**, not merely surfaced:
 
 - `id_token_signing_alg_values_supported` → the ID-token verifier's accepted-algorithm allowlist (Phase 3e; pass via `smart.WithIDTokenSigningAlgs`).
 - `token_endpoint_auth_methods_supported` → `auth/smart.FromConfig` cross-checks it against the configured credential's implied method (G-3; a mismatch is rejected with `auth.ErrInvalidConfig`), and `auth/clientcreds.NewFromCatalog` against the configured client-auth method ([auth.md § Backend Services from a resolved catalog](auth.md#backend-services-from-a-resolved-catalog), REQ-068).
+- `authorization_response_iss_parameter_supported` → when true, `auth/smart.CompleteAuthorization` refuses a redirect without `iss` ([auth.md § REQ-061](auth.md#req-061--pkce-flow), RFC 9207 §2.4).
 - `token_endpoint_auth_signing_alg_values_supported` → `auth/clientcreds.NewFromCatalog` checks client assertions against it ([auth.md § Backend Services from a resolved catalog](auth.md#backend-services-from-a-resolved-catalog), REQ-068).
 
 The rest remain **surface-only** (populated but with no consuming logic wired): `revocation_endpoint` / `management_endpoint` (no revocation/management client yet) and `introspection_endpoint` (introspection is a resource-server operation outside the SDK's client scope).
