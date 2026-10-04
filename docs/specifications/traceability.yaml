@@ -654,6 +654,7 @@ requirements:
     packages: [auth/smart, smart/discovery]
     probes: [PROBE-006]
     tests:
+      - auth/smart/idtoken_subject_test.go
       - auth/smart/idtoken_test.go
       - auth/smart/jwks_kidless_test.go
       - auth/smart/smart_test.go
@@ -673,6 +674,8 @@ requirements:
       - auth/clientcreds/reauth_test.go
       - auth/errors_test.go
       - auth/jwtbearer/reauth_test.go
+      - auth/smart/reauth_test.go
+      - auth/smart/refresh_idtoken_test.go
       - auth/smart/smart_test.go
       - auth/tokensource_test.go
       - testkit/probes/auth/probe_007_proactive_refresh.go
@@ -692,6 +695,7 @@ requirements:
       - auth/smart/exchange_idtoken_test.go
       - auth/smart/exchange_test.go
       - auth/smart/idtoken_test.go
+      - auth/smart/reauth_test.go
       - auth/smart/refresh_idtoken_test.go
       - smart/idtoken_test.go
       - smart/launch_claims_test.go
