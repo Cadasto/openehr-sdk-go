@@ -737,6 +737,11 @@ func TestValidateIDTokenExtraAudienceAndAzp(t *testing.T) {
 		{name: "aud lists the client and a trusted audience", set: map[string]any{"aud": []string{"client-id", "api"}}, trusted: []string{"api"}},
 		{name: "aud lists a trusted and an untrusted audience", set: map[string]any{"aud": []string{"client-id", "api", "other"}}, trusted: []string{"api"}, wantErr: true},
 		{name: "a trusted audience does not stand in for the client", set: map[string]any{"aud": []string{"api"}}, trusted: []string{"api"}, wantErr: true},
+		{name: "aud lists the client twice", set: map[string]any{"aud": []string{"client-id", "client-id"}}},
+		// go-oidc reads both of these as the client plus an empty audience, so only the SDK's check of every raw entry refuses them.
+		{name: "aud lists the client and an empty string", set: map[string]any{"aud": []any{"client-id", ""}}, wantErr: true},
+		{name: "aud lists the client and null", set: map[string]any{"aud": []any{"client-id", nil}}, wantErr: true},
+		{name: "an empty string is refused even when trusted", set: map[string]any{"aud": []any{"client-id", ""}}, trusted: []string{""}, wantErr: true},
 		{name: "azp names the client", set: map[string]any{"azp": "client-id"}},
 		{name: "azp names the client beside a trusted audience", set: map[string]any{"aud": []string{"client-id", "api"}, "azp": "client-id"}, trusted: []string{"api"}},
 		{name: "azp names another party", set: map[string]any{"azp": "other-client"}, wantErr: true},
@@ -756,9 +761,9 @@ func TestValidateIDTokenExtraAudienceAndAzp(t *testing.T) {
 			// REQ-062: an untrusted extra audience or a foreign azp refuses the token with the JWKS sentinel.
 			switch {
 			case tc.wantErr && (err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed)):
-				t.Fatalf("ValidateIDToken(%s, trusted %v) error = %v, want ErrJWKSValidationFailed", tc.name, tc.trusted, err)
+				t.Fatalf("ValidateIDToken(%s, trusted %q) error = %v, want ErrJWKSValidationFailed", tc.name, tc.trusted, err)
 			case !tc.wantErr && err != nil:
-				t.Fatalf("ValidateIDToken(%s, trusted %v) error = %v, want nil", tc.name, tc.trusted, err)
+				t.Fatalf("ValidateIDToken(%s, trusted %q) error = %v, want nil", tc.name, tc.trusted, err)
 			}
 		})
 	}
