@@ -6,7 +6,7 @@ kind: specification
 
 **Status:** Draft
 
-Normative contract for the `auth/` package family and the application-level `smart/` package. Covers REQ-060 through REQ-064 and REQ-069.
+Normative contract for the `auth/` package family and the application-level `smart/` package. Covers REQ-060 through REQ-069 and REQ-165.
 
 The SDK supports authenticated requests through a layered model:
 
@@ -105,9 +105,14 @@ The platform supports four SMART grant flows and three launch modes. The SDK **M
 | Flow | Provider | Use |
 |---|---|---|
 | Authorization Code + **PKCE** (public clients) | `auth/smart` | Interactive end-user app, no client secret stored on device |
-| Authorization Code + **client_secret** (confidential web apps) | `auth/smart` (same flow, secret-based client auth) | Server-rendered web app holding a server-side secret |
-| **Client Credentials** (backend services) | `auth/clientcreds` | Service-to-service callers (benchmark, seeder, MCP server backend) |
-| **JWT Bearer** (confidential clients with asymmetric keys) | `auth/jwtbearer` | Systems holding a signed assertion |
+| Authorization Code + **PKCE** + client authentication (confidential web apps) | `auth/smart` (same flow, with `client_secret` or a signed client assertion) | Server-rendered web app holding a server-side secret or key |
+| **SMART Backend Services**: Client Credentials + signed client assertion | `auth/clientcreds` (`WithClientAssertion`) | Service-to-service callers (benchmark, seeder, MCP server backend) |
+| **Client Credentials** + `client_secret` | `auth/clientcreds` | Service-to-service callers of an authorization server that accepts a shared secret, outside the SMART asymmetric profile |
+| **JWT Bearer authorization grant** (RFC 7523 §2.1) | `auth/jwtbearer` | Systems holding an assertion issued by a trusted party; not a SMART flow |
+
+A confidential client uses PKCE **and** authenticates: HL7 SMART App Launch requires PKCE from every app, and PKCE does not replace client authentication. The openEHR SMART specification's Flow Recommendations present the two as alternatives; this SDK follows HL7 SMART.
+
+The openEHR SMART specification names a "JWT Bearer Token Grant" as the preferred flow for backend services. HL7 SMART App Launch Backend Services, which that specification builds on, uses the `client_credentials` grant with an RFC 7523 §2.2 client assertion, and that is the flow `auth/clientcreds` with `WithClientAssertion` implements. The RFC 7523 §2.1 authorization grant in `auth/jwtbearer` is a separate flow for deployments that issue authorization assertions; it is not SMART Backend Services.
 
 #### JWT Bearer — client_assertion signing algorithms (Phase 3a)
 
@@ -183,7 +188,7 @@ Three launch modes the SDK **MUST** support — each is a way the SMART flow sta
 |---|---|
 | **Standalone** | The SDK initiates the launch by redirecting the user to the authorization endpoint. No EHR-side launch parameter. |
 | **Embedded** (iFrame) | The SDK is launched from inside an EHR or portal that has already authenticated the user; the EHR provides a `launch` parameter that the SDK forwards to the authorization endpoint to obtain launch context. |
-| **Backend service** | No user interaction. Uses Client Credentials or JWT Bearer. No launch context. |
+| **Backend service** | No user interaction. Uses SMART Backend Services (`auth/clientcreds` with a client assertion); the RFC 7523 §2.1 grant in `auth/jwtbearer` serves deployments outside SMART. No launch context. |
 
 The launch mode is determined by configuration at construction time and **MAY** also be derived per call (e.g. an MCP server that accepts both standalone and embedded launches from different transports).
 
@@ -495,11 +500,38 @@ These providers **MUST** support the same JWKS rotation behaviour as `auth/smart
 
 ## Scope handling
 
-The SDK **MUST NOT** enforce, parse, or validate scope strings as application policy — that is the deployment's responsibility. The SDK **MUST**:
+### REQ-165 — openEHR scope syntax
+
+The SDK **MUST NOT** apply scope strings as application policy: which scopes to grant, and whether a granted scope covers a request, is decided by the authorization server and the resource server. Building or reading the syntax of one scope token is not policy. The SDK **MUST**:
 
 - Pass scope strings verbatim from configuration through to the authorization request.
 - Round-trip the granted scope from the token response back to the application via `LaunchContext.Scopes`.
-- Provide a small helper (`auth.BuildScope(compartment, resource, permission)`) for composing openEHR-formatted scopes (`<compartment>/<resource>.<permission>`) without forcing the application to template strings.
+- Provide a small helper (`auth.BuildScope(compartment, resource, permission)`) for composing scopes of the shape `<compartment>/<resource>.<permission>` without templating strings. `BuildScope` is lexical: it **MUST NOT** validate its parts, so it serves SMART on FHIR scopes as well.
+- Provide a typed builder and reader for the openEHR resource scopes of SMART on openEHR § Resource Scopes, `<compartment>/<resource>-<pattern>.<permissions>`:
+
+```go
+// auth/scope.go (sketch)
+
+type OpenEHRScope struct {
+    Compartment string // "patient", "user" or "system"
+    Resource    string // "template", "composition" or "aql"
+    Pattern     string // a template id or stored-query name, "*" wildcards allowed
+    Permissions string // a non-empty subset of "cruds", in that order
+}
+
+var ErrInvalidScope = errors.New("auth: invalid scope")
+
+func (s OpenEHRScope) Token() (string, error)
+func ParseOpenEHRScope(token string) (OpenEHRScope, bool)
+```
+
+`Token` **MUST** return the single scope token, or an error that `errors.Is` matches to `auth.ErrInvalidScope` when any of these holds:
+
+- the compartment is not `patient`, `user` or `system`, or the resource is not `template`, `composition` or `aql`;
+- the permissions are empty, repeat a letter, use a letter outside `cruds`, or are out of the order `c`, `r`, `u`, `d`, `s` (HL7 SMART App Launch v2 permission syntax, which the openEHR scopes follow);
+- the pattern is empty, or contains a character outside the RFC 6749 §3.3 scope-token set (`%x21 / %x23-5B / %x5D-7E`: printable ASCII other than space, `"` and `\`). A template id that contains a space or a non-ASCII character therefore cannot be written as a scope; the SDK **MUST NOT** escape or rewrite it.
+
+`ParseOpenEHRScope` **MUST** read one token with the same grammar: the compartment ends at the first `/`, the permissions start after the last `.`, and the resource ends at the first `-`, so dotted template ids and query names (`org.openehr::bloodpressure.v1`) survive. It **MUST** return `false`, never an error, for a token that is not an openEHR resource scope, such as `openid`, `launch/patient` or the SMART on FHIR scope `patient/Observation.rs`. Neither function interprets the wildcards in a pattern; their matching rules belong to the authorization server.
 
 ## Error mapping
 
@@ -554,3 +586,4 @@ Consumers detect classes via `errors.Is`. The underlying wire error is preserved
 | Platform principal claims | REQ-067 | `auth/smart/`, `smart/` |
 | Flow + launch-mode coverage | REQ-068 | `auth/smart/`, `auth/clientcreds/`, `auth/jwtbearer/` |
 | HTTP Basic on openEHR REST | REQ-069 | `auth/basic/`, consumed by `transport/` |
+| openEHR scope syntax | REQ-165 | `auth/` |

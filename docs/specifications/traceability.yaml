@@ -1754,3 +1754,10 @@ requirements:
       - testkit/probes/aql/probe_099_path_shape_lint.go
       - testkit/probes/aql/probes_test.go
     probes: [PROBE-099]
+
+  - id: REQ-165
+    title: openEHR scope syntax
+    canonical: docs/specifications/auth.md#req-165--openehr-scope-syntax
+    status: draft
+    implementation: planned
+    packages: [auth]
