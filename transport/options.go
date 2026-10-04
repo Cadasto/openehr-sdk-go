@@ -138,13 +138,19 @@ func WithMaxResponseBody(n int64) Option {
 // (or when Reauth returns an error) the error is surfaced to the caller.
 //
 // The server's Bearer challenge decides whether a 401 is worth a new
-// token. Reauth runs only when the 401 carries no Bearer challenge, or one
+// token. Reauth runs only when the 401 carries no Bearer challenge the
+// transport can read (a challenge it cannot read counts as absent), or one
 // that names no error or the error "invalid_token" (the token expired, was
 // revoked or is malformed, RFC 6750 §3.1). A 401 whose challenge names any
 // other error, such as "insufficient_scope", comes back at once without
 // calling Reauth and without a retry, because a fresh token from the same
 // grant would be refused for the same reason. The reason is in
 // [WireError.Challenge].
+//
+// The retry policy comes first: a [RetryPolicy] whose RetriableStatus
+// lists 401 still retries a 401 under that policy, whatever its challenge
+// says, and this safety net is consulted only once the policy has given
+// up.
 //
 // When this option is not set, a wire 401 returns ErrUnauthorized
 // immediately.

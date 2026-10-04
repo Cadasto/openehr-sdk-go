@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -207,6 +208,13 @@ func TestReauthOn401FollowsBearerChallenge(t *testing.T) { // REQ-166
 		},
 		{name: "Bearer invalid_request", lines: []string{`Bearer error="invalid_request"`}, wantError: "invalid_request"},
 		{
+			// The error code is compared exactly as RFC 6750 §3.1 spells it,
+			// so a different spelling counts as another error.
+			name:      "Bearer Invalid_Token in another case",
+			lines:     []string{`Bearer error="Invalid_Token"`},
+			wantError: "Invalid_Token",
+		},
+		{
 			name:      "Basic then Bearer insufficient_scope on one line",
 			lines:     []string{`Basic realm="x", Bearer error="insufficient_scope"`},
 			wantError: "insufficient_scope",
@@ -266,6 +274,61 @@ func TestReauthOn401FollowsBearerChallenge(t *testing.T) { // REQ-166
 			we, ok := errors.AsType[*transport.WireError](err)
 			if !ok || we == nil || we.Challenge == nil || we.Challenge.Error != tc.wantError {
 				t.Errorf("surfaced error = %v, want a *WireError whose Challenge.Error is %q", err, tc.wantError)
+			}
+		})
+	}
+}
+
+// TestReauthOn401RetryPolicyComesFirst — REQ-166, REQ-063, REQ-091: a
+// RetryPolicy that lists 401 retries it under that policy whatever the
+// challenge says; the challenge gate is consulted only once the policy has
+// given up.
+func TestReauthOn401RetryPolicyComesFirst(t *testing.T) { // REQ-166
+	cases := []struct {
+		name         string
+		line         string
+		wantReauths  int32
+		wantUpstream int32
+	}{
+		// Three policy attempts, then the gate refuses.
+		{name: "insufficient_scope", line: `Bearer error="insufficient_scope"`, wantReauths: 0, wantUpstream: 3},
+		// Three policy attempts, then one Reauth and its one retry.
+		{name: "invalid_token", line: `Bearer error="invalid_token"`, wantReauths: 1, wantUpstream: 4},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var upstream, reauths atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				upstream.Add(1)
+				w.Header().Set("WWW-Authenticate", tc.line)
+				w.WriteHeader(http.StatusUnauthorized)
+			}))
+			t.Cleanup(srv.Close)
+			c, err := transport.New(newDecodeCatalog(t, srv),
+				transport.WithHTTPClient(srv.Client()),
+				transport.WithRetry(transport.RetryPolicy{
+					MaxAttempts:     3,
+					InitialBackoff:  time.Millisecond,
+					RetriableStatus: []int{http.StatusUnauthorized},
+				}),
+				transport.WithReauthOn401(auth.ReautherFunc(func(context.Context) error {
+					reauths.Add(1)
+					return nil
+				})),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = c.Do(t.Context(), &transport.Request{Path: "/x"})
+			if !errors.Is(err, transport.ErrUnauthorized) {
+				t.Fatalf("Do() error = %v, want errors.Is ErrUnauthorized", err)
+			}
+			if got := reauths.Load(); got != tc.wantReauths {
+				t.Errorf("Reauth calls = %d, want %d", got, tc.wantReauths)
+			}
+			if got := upstream.Load(); got != tc.wantUpstream {
+				t.Errorf("upstream requests = %d, want %d", got, tc.wantUpstream)
 			}
 		})
 	}
