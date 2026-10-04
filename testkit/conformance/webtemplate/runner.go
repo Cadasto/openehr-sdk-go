@@ -41,7 +41,13 @@ type Target struct {
 
 // NewTarget parses, compiles, and exports the corpus OPT.
 func NewTarget() (*Target, error) {
-	opt, err := template.ParseFile(fixtures.FlatConformanceOpt())
+	return NewTargetFromOPT(fixtures.FlatConformanceOpt())
+}
+
+// NewTargetFromOPT parses, compiles, and exports the OPT at path, for a
+// harness whose bodies instantiate a template other than the FLAT corpus's.
+func NewTargetFromOPT(path string) (*Target, error) {
+	opt, err := template.ParseFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("parse corpus OPT: %w", err)
 	}
@@ -137,7 +143,7 @@ func Run(t *Target, c Case) (Report, error) {
 		candidate[k] = v
 	}
 
-	comp, refusals, err := decodeReducing(t, candidate)
+	comp, refusals, err := DecodeReducing(t, candidate, InjectContext)
 	if err != nil {
 		return Report{}, fmt.Errorf("%s: %w", c.Name, err)
 	}
@@ -201,36 +207,104 @@ func compare(candidate, emitted map[string]any, root string) (missing, extra, mi
 	return missing, extra, mismatched
 }
 
-// decodeReducing decodes candidate, removing each key family the codec
-// refuses until what remains decodes. It mutates candidate down to the
-// modelled subset and returns the refusals in the order they surfaced.
+// ParseFlat decodes a FLAT JSON body with every number kept as its literal
+// text ([json.Number]), and refuses a `null` body and content after the body
+// object, so a comparison never runs over less than it reports.
+func ParseFlat(raw []byte) (map[string]any, error) {
+	return parseFlat(raw)
+}
+
+// ContextMode says how [DecodeReducing] supplies the composition context that
+// FLAT decode requires.
+type ContextMode int
+
+const (
+	// InjectContext adds a synthetic ctx/language and ctx/territory to every
+	// decode, for a body whose composition metadata was held out before the
+	// call ([IsCompositionMeta]). PROBE-086 decodes this way.
+	InjectContext ContextMode = iota
+	// KeepContext decodes the body as given, its own metadata spellings
+	// included, and adds nothing. A body without its mandatory context then
+	// fails as the codec says.
+	KeepContext
+)
+
+// IrreducibleError is a decode failure [DecodeReducing] cannot reduce: the
+// codec's error names no key, names a key the body does not carry, or is not
+// one of the codec's two gap sentinels (simplified.ErrUnknownPath and
+// simplified.ErrUnsupportedDatatype). Err is the codec's own error.
+type IrreducibleError struct {
+	// Key is the token the codec's error quoted first, or "" when it quoted
+	// none.
+	Key string
+	// Err is the codec's decode error.
+	Err error
+	// why is the harness's account of the failure, without Err.
+	why string
+}
+
+// Error gives the harness's account of the failure, then the codec's error.
+func (e *IrreducibleError) Error() string { return e.why + ": " + e.Err.Error() }
+
+// Unwrap returns the codec's error.
+func (e *IrreducibleError) Unwrap() error { return e.Err }
+
+// DecodeReducing decodes candidate with the target's template, removing each
+// key family the codec refuses until what remains decodes. It mutates
+// candidate down to the modelled subset and returns the refusals in the order
+// they surfaced. mode says whether to inject the mandatory context.
 //
 // This is what keeps the skip inventory honest: the excluded set is whatever
 // the codec itself declines, so closing a gap shrinks it automatically and no
 // hand-kept list can drift from the code.
-func decodeReducing(t *Target, candidate map[string]any) (*rm.Composition, []Refusal, error) {
+//
+// A decode error the loop cannot reduce comes back as an [*IrreducibleError]
+// carrying the codec's error. Any other error is a harness fault: an unknown
+// mode, or a decode that does not converge within the refusal budget.
+func DecodeReducing(t *Target, candidate map[string]any, mode ContextMode) (*rm.Composition, []Refusal, error) {
+	var decode func(*Target, map[string]any) (*rm.Composition, error)
+	switch mode {
+	case InjectContext:
+		decode = decodeSubset
+	case KeepContext:
+		decode = decodeAsGiven
+	default:
+		return nil, nil, fmt.Errorf("unknown context mode %d", mode)
+	}
 	var refusals []Refusal
 	for range maxRefusals {
-		comp, err := decodeSubset(t, candidate)
+		comp, err := decode(t, candidate)
 		if err == nil {
 			return comp, refusals, nil
 		}
 		key := offendingKey(err)
 		if key == "" {
-			return nil, nil, fmt.Errorf("decode failed with no attributable key: %w", err)
+			return nil, nil, &IrreducibleError{Err: err, why: "decode failed with no attributable key"}
 		}
 		removed, gap := dropRefused(candidate, key, err)
 		if !gap {
-			return nil, nil, fmt.Errorf("decode error on key %q is neither an unmodelled path nor an "+
-				"unmodelled datatype, so it is a harness fault rather than a codec gap — "+
-				"do not let it be counted as excluded surface: %w", key, err)
+			return nil, nil, &IrreducibleError{Key: key, Err: err, why: fmt.Sprintf(
+				"decode error on key %q is neither an unmodelled path nor an "+
+					"unmodelled datatype, so it is a harness fault rather than a codec gap — "+
+					"do not let it be counted as excluded surface", key)}
 		}
 		if removed == 0 {
-			return nil, nil, fmt.Errorf("decode named key %q but it is not in the body: %w", key, err)
+			return nil, nil, &IrreducibleError{Key: key, Err: err, why: fmt.Sprintf(
+				"decode named key %q but it is not in the body", key)}
 		}
 		refusals = append(refusals, Refusal{Key: key, Reason: reasonOf(err, key), Keys: removed})
 	}
 	return nil, nil, fmt.Errorf("decode did not converge after %d refusals", maxRefusals)
+}
+
+// decodeAsGiven decodes the given keys with the template attached and nothing
+// added, for [KeepContext].
+func decodeAsGiven(t *Target, keys map[string]any) (*rm.Composition, error) {
+	b, err := json.Marshal(keys)
+	if err != nil {
+		return nil, err
+	}
+	return simplified.UnmarshalFlat(b, t.Web, simplified.WithTemplate(t.Compiled))
 }
 
 // decodeSubset decodes the given keys with the template attached.
