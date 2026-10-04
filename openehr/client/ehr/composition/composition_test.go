@@ -451,26 +451,38 @@ func TestSaveIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
 	}
 }
 
-// TestSaveIdentifierPrefersLocation pins that Location stays canonical
-// (REQ-094): with both a Location header and an Identifier body present,
-// the Location-derived VersionUID wins; the body is a fallback only.
-func TestSaveIdentifierPrefersLocation(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(compositionVUID))
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"uid":"different-uid::cdr.example::9"}`))
-	}))
-	defer srv.Close()
-
-	_, meta, err := composition.Save(
-		t.Context(), newClient(t, srv), ehrIDFixture, readComposition(t),
-		composition.WithPrefer(transport.PreferIdentifier),
-	)
-	if err != nil {
-		t.Fatal(err)
+// TestSaveIdentifierHeadersOutrankBody pins that the ETag and Location
+// headers stay canonical (REQ-094, REQ-054): when either header alone
+// names the version and an Identifier body names another, the
+// header-derived VersionUID wins; the body is a fallback only.
+func TestSaveIdentifierHeadersOutrankBody(t *testing.T) {
+	cases := []struct {
+		header, value string
+	}{
+		{header: "ETag", value: `"` + string(compositionVUID) + `"`},
+		{header: "Location", value: "/ehr/" + string(ehrIDFixture) + "/composition/" + string(compositionVUID)},
 	}
-	if meta.VersionUID != compositionVUID {
-		t.Errorf("expected Location-derived VersionUID %q, got %q", compositionVUID, meta.VersionUID)
+	for _, tc := range cases {
+		t.Run(tc.header, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set(tc.header, tc.value)
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(`{"uid":"different-uid::cdr.example::9"}`))
+			}))
+			defer srv.Close()
+
+			_, meta, err := composition.Save(
+				t.Context(), newClient(t, srv), ehrIDFixture, readComposition(t),
+				composition.WithPrefer(transport.PreferIdentifier),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if meta.VersionUID != compositionVUID {
+				t.Errorf("Save with %s %q and a differing Identifier body: VersionUID = %q, want %q from the header",
+					tc.header, tc.value, meta.VersionUID, compositionVUID)
+			}
+		})
 	}
 }
 
