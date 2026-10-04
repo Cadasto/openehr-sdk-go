@@ -123,6 +123,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-162 | Builder containment verification | [clinical-modeling.md](clinical-modeling.md#req-162--builder-containment-verification) | draft | landed |
 | REQ-163 | AQL write-side expressivity parity | [clinical-modeling.md](clinical-modeling.md#req-163--aql-write-side-expressivity-parity) | draft | landed |
 | REQ-164 | AQL path-shape and paging lint | [clinical-modeling.md](clinical-modeling.md#req-164--aql-path-shape-and-paging-lint) | draft | landed |
+| REQ-165 | openEHR scope syntax | [auth.md](auth.md#req-165--openehr-scope-syntax) | draft | planned |
 <!-- END GENERATED: registry -->
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `retired` (a withdrawn requirement, **Stability** `deprecated`: normative text retained, implementation removed or not shipped; removal target in canonical spec).

@@ -7,8 +7,9 @@ package auth_test
 // (errors.AsType[*auth.OAuth2Error], plus ParseOAuth2Error, which returns nil
 // for a body that is not an RFC 6749 §5.2 envelope). The rest of the exported
 // surface is off-axis: ReautherFunc is a func type, TokenSource and Reauther
-// are interfaces — neither kind has a nil receiver of its own — and Token is a
-// plain struct with no methods.
+// are interfaces — neither kind has a nil receiver of its own — Token is a
+// plain struct with no methods, and OpenEHRScope is a plain struct whose
+// methods take a value receiver.
 
 import (
 	"errors"
