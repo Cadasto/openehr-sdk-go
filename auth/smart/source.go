@@ -28,6 +28,9 @@ const (
 	methodPrivateKeyJWT     = "private_key_jwt"
 	methodClientSecretBasic = "client_secret_basic"
 	methodClientSecretPost  = "client_secret_post"
+	// nonceLen is the number of random bytes in an OpenID Connect nonce
+	// (REQ-061), the same 256 bits as the state.
+	nonceLen = 32
 )
 
 // clientAssertionKey holds the asymmetric credential for private_key_jwt
@@ -314,14 +317,29 @@ func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID string, opts ...
 	return New(clientID, catalog.Auth, all...)
 }
 
-// AuthorizationRequest holds inputs for building an authorization URL.
+// AuthorizationRequest holds the values one launch carries from
+// [Source.BeginAuthorization] to the redirect back to the app. Keep it, for
+// example in the user's session, and pass it unchanged to
+// [Source.AuthorizeURL] and then to [Source.CompleteAuthorization] or
+// [Source.ExchangeAuthorizationCode].
 type AuthorizationRequest struct {
 	State  string
 	Launch string
 	PKCE   PKCEPair
+	// Issuer is the issuer the source is bound to: its configured issuer,
+	// the OpenID Connect issuer from discovery. When the redirect names an
+	// issuer, [Source.CompleteAuthorization] requires it to equal this one,
+	// so a response from another authorization server is refused.
+	Issuer string
+	// Nonce is the OpenID Connect nonce sent on the authorization request.
+	// BeginAuthorization sets it when the configured scopes include openid
+	// and leaves it empty otherwise. The ID token returned by the code
+	// exchange has to carry the same value.
+	Nonce string
 }
 
-// BeginAuthorization generates PKCE material for a single launch.
+// BeginAuthorization starts one launch: it generates the PKCE pair and
+// records what the redirect back to the app will be checked against.
 //
 // If state is empty, a cryptographically random state value is generated
 // (stateLen bytes of entropy, base64url-encoded) and returned in
@@ -329,10 +347,17 @@ type AuthorizationRequest struct {
 // verbatim, and the caller takes responsibility for its strength and
 // session binding.
 //
+// The request also records the source's issuer, the OpenID Connect issuer
+// from discovery, in [AuthorizationRequest].Issuer. When the configured
+// scopes include openid, it carries a fresh random nonce (32 random bytes,
+// base64url-encoded) in [AuthorizationRequest].Nonce; without openid the
+// nonce is empty and none is sent.
+//
 // Callers must retain the returned [AuthorizationRequest] and pass it
-// unchanged to [Source.ExchangeAuthorizationCode], which compares the
-// state received at the redirect URI against req.State. A Source supports
-// many concurrent launches when each flow keeps its own request value.
+// unchanged to [Source.CompleteAuthorization] (or
+// [Source.ExchangeAuthorizationCode]), which compare the redirect against
+// it. A Source supports many concurrent launches when each flow keeps its
+// own request value.
 func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) {
 	if state == "" {
 		var err error
@@ -345,10 +370,36 @@ func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) 
 	if err != nil {
 		return AuthorizationRequest{}, err
 	}
-	return AuthorizationRequest{State: state, PKCE: pkce}, nil
+	req := AuthorizationRequest{State: state, PKCE: pkce, Issuer: s.cfg.Issuer}
+	if hasScope(s.cfg.Scopes, auth.ScopeOpenID) {
+		// OpenID Connect Core 1.0 §3.1.2.1: the nonce binds the ID token
+		// to this launch, so a replayed token is refused (REQ-061).
+		req.Nonce, err = randBase64URL(nonceLen)
+		if err != nil {
+			return AuthorizationRequest{}, fmt.Errorf("smart: generate nonce: %w", err)
+		}
+	}
+	return req, nil
 }
 
-// AuthorizeURL builds the SMART authorization redirect URL.
+// hasScope reports whether scopes contain want. Each configured value may
+// itself hold several scopes separated by spaces.
+func hasScope(scopes []string, want string) bool {
+	for _, s := range scopes {
+		if slices.Contains(strings.Fields(s), want) {
+			return true
+		}
+	}
+	return false
+}
+
+// AuthorizeURL builds the SMART authorization redirect URL for req.
+//
+// launch is the launch value an EHR passed to the app (see
+// [ParseEHRLaunch]), or empty for a standalone launch. When it is set, the
+// URL forwards it unchanged and the scope it sends includes launch, added
+// when the configured scopes lack it. The URL sends req.Nonce as nonce when
+// the request has one.
 func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {
 		return "", fmt.Errorf("%w: call BeginAuthorization first or supply State and PKCE", auth.ErrInvalidConfig)
@@ -363,13 +414,22 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	q.Set("code_challenge", req.PKCE.Challenge)
 	q.Set("code_challenge_method", challengeMethod)
 	q.Set("state", req.State)
-	if len(s.cfg.Scopes) > 0 {
-		q.Set("scope", strings.Join(s.cfg.Scopes, " "))
+	scopes := s.cfg.Scopes
+	if launch != "" && !hasScope(scopes, auth.ScopeLaunch) {
+		// HL7 SMART App Launch: an app launched from an EHR asks for the
+		// launch scope. Concat copies, so the configuration stays as it was.
+		scopes = slices.Concat(scopes, []string{auth.ScopeLaunch})
+	}
+	if len(scopes) > 0 {
+		q.Set("scope", strings.Join(scopes, " "))
 	}
 	// FromConfig refuses a source without an audience, so aud is always set.
 	q.Set("aud", s.cfg.Audience)
 	if launch != "" {
 		q.Set("launch", launch)
+	}
+	if req.Nonce != "" {
+		q.Set("nonce", req.Nonce)
 	}
 	u.RawQuery = q.Encode()
 	return u.String(), nil
