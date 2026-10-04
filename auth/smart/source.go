@@ -54,6 +54,10 @@ type Config struct {
 	Issuer           string
 	RefreshThreshold time.Duration
 	JWKS             *JWKS
+	// IDTokenTrustedAudiences names the audiences an ID token's aud claim
+	// may list besides ClientID when the source verifies it. Empty means
+	// only ClientID is accepted. See [WithIDTokenTrustedAudiences].
+	IDTokenTrustedAudiences []string
 
 	// clientAssertion carries the asymmetric private_key_jwt credential, set
 	// via WithClientAssertionKey. Mutually exclusive with ClientSecret.
@@ -128,6 +132,16 @@ func WithAuthEndpoints(a discovery.AuthEndpoints) Option {
 // WithIssuer records the deployment issuer on produced tokens.
 func WithIssuer(iss string) Option {
 	return func(cfg *Config) { cfg.Issuer = iss }
+}
+
+// WithIDTokenTrustedAudiences names the audiences, besides the client ID,
+// that an ID token's aud claim may list when the source verifies it at the
+// code exchange or on refresh. A token whose aud lists any other audience
+// is refused, so without this option only the client ID is accepted. A
+// later call replaces an earlier one.
+func WithIDTokenTrustedAudiences(aud ...string) Option {
+	trusted := slices.Clone(aud)
+	return func(cfg *Config) { cfg.IDTokenTrustedAudiences = trusted }
 }
 
 // WithRefreshThreshold overrides proactive refresh window (default 30s).
@@ -435,13 +449,30 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	return u.String(), nil
 }
 
-// ExchangeAuthorizationCode completes the PKCE flow. req must be
-// the [AuthorizationRequest] returned by [Source.BeginAuthorization] for this
-// launch. callbackState is the state query parameter received at the redirect
-// URI; it is compared against req.State and [ErrLaunchInvalidState] is
-// returned on mismatch before any network call is made, defending against
-// CSRF. The returned [TokenResponse] carries SMART launch parameters for
-// smart/.
+// ExchangeAuthorizationCode completes the PKCE flow: it trades the
+// authorization code for tokens at the token endpoint. Most apps call
+// [Source.CompleteAuthorization] instead, which also checks the issuer and
+// error parameters of the redirect before calling this.
+//
+// req must be the [AuthorizationRequest] returned by
+// [Source.BeginAuthorization] for this launch. callbackState is the state
+// query parameter received at the redirect URI; it is compared against
+// req.State and [ErrLaunchInvalidState] is returned on mismatch before any
+// network call is made, defending against CSRF.
+//
+// When the token response carries an ID token, ExchangeAuthorizationCode
+// verifies it before returning: the signature against the source's JWKS,
+// using only the algorithms the server lists in
+// id_token_signing_alg_values_supported when it lists any; the issuer
+// against the source's issuer; the audience against the client ID and
+// [WithIDTokenTrustedAudiences]; and the nonce against req.Nonce. A token
+// that fails matches [auth.ErrJWKSValidationFailed]. A source without a
+// JWKS fails with [auth.ErrInvalidConfig], so an unverified ID token is
+// never returned. The verified claims are in [TokenResponse].IDTokenClaims.
+// When the call fails, the source keeps the tokens it held before.
+//
+// The returned [TokenResponse] also carries the SMART launch parameters
+// for smart/.
 func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, callbackState string, req AuthorizationRequest) (auth.Token, TokenResponse, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {
 		return auth.Token{}, TokenResponse{}, fmt.Errorf("%w: AuthorizationRequest from BeginAuthorization is required", auth.ErrInvalidConfig)
@@ -453,12 +484,30 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, err
 	}
+	if tr.IDToken != "" {
+		// OpenID Connect Core 1.0 §3.1.3.7: the ID token is checked before
+		// anything from this response is kept or returned (REQ-064).
+		claims, err := s.verifyIDToken(ctx, tr.IDToken, req.Nonce)
+		if err != nil {
+			return auth.Token{}, TokenResponse{}, fmt.Errorf("smart: id_token: %w", err)
+		}
+		tr.IDTokenClaims = claims
+	}
 	s.mu.Lock()
 	s.cur = tok
 	s.refresh = refresh
 	s.lastTR = tr
 	s.mu.Unlock()
 	return tok, tr, nil
+}
+
+// verifyIDToken checks an ID token from the token endpoint against the
+// source's JWKS, issuer, client ID, trusted audiences and the server's
+// advertised signing algorithms (REQ-064). nonce is the launch's nonce at
+// the code exchange, and empty on refresh, where none is checked.
+func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDTokenClaims, error) {
+	return ValidateIDToken(ctx, raw, s.cfg.JWKS, s.cfg.Issuer, s.cfg.ClientID, nonce, time.Time{},
+		s.cfg.Auth.IDTokenSigningAlgValuesSupported, WithTrustedAudiences(s.cfg.IDTokenTrustedAudiences...))
 }
 
 // LastTokenResponse returns SMART fields from the most recent successful
