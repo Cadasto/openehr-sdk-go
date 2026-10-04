@@ -253,11 +253,10 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 		return nil, fmt.Errorf("%w: aud mismatch", auth.ErrJWKSValidationFailed)
 	}
 	// OIDC Core 1.0 §3.1.3.7 step 3: any audience besides the client must be
-	// one the caller trusts (REQ-062).
-	for _, a := range aud {
-		if a != clientID && !slices.Contains(trustedAudiences, a) {
-			return nil, fmt.Errorf("%w: aud lists an untrusted audience", auth.ErrJWKSValidationFailed)
-		}
+	// one the caller trusts. Every raw entry is checked, so an empty or
+	// non-string entry, which aud above leaves out, is refused too (REQ-062).
+	if !audienceEntriesTrusted(claims["aud"], clientID, trustedAudiences) {
+		return nil, fmt.Errorf("%w: aud lists an untrusted or malformed audience", auth.ErrJWKSValidationFailed)
 	}
 	// An azp claim, when present, must name the client (REQ-062).
 	if v, ok := claims["azp"]; ok {
@@ -316,6 +315,24 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 func claimString(claims map[string]any, key string) (string, bool) {
 	s, ok := claims[key].(string)
 	return s, ok
+}
+
+// audienceEntriesTrusted reports whether every entry of the raw aud claim v
+// (a string or an array) is a non-empty string that is clientID or one of
+// trusted.
+func audienceEntriesTrusted(v any, clientID string, trusted []string) bool {
+	entries, ok := v.([]any)
+	if !ok {
+		entries = []any{v}
+	}
+	for _, e := range entries {
+		// A non-string entry reads as "", so it is refused with the empty one.
+		s, _ := e.(string)
+		if s == "" || (s != clientID && !slices.Contains(trusted, s)) {
+			return false
+		}
+	}
+	return true
 }
 
 func audienceStrings(v any) []string {
