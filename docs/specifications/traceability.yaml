@@ -740,6 +740,7 @@ requirements:
     packages: [smart/discovery]
     probes: [PROBE-002, PROBE-040]
     tests:
+      - smart/discovery/diagnostics_test.go
       - smart/discovery/issuer_path_test.go
       - smart/discovery/issuer_test.go
       - smart/discovery/resolver_test.go
@@ -757,6 +758,7 @@ requirements:
     probes: [PROBE-041]
     tests:
       - smart/discovery/issuer_test.go
+      - smart/discovery/not_modified_test.go
       - testkit/probes/discovery/probe_041_catalog_refresh_on_401.go
 
   - id: REQ-072
@@ -770,6 +772,7 @@ requirements:
       - smart/discovery/auth_members_test.go
       - smart/discovery/resolver_test.go
       - smart/discovery/service_entry_test.go
+      - smart/discovery/url_shape_test.go
       - testkit/probes/auth/probe_003_spec_version_mismatch.go
       - testkit/probes/auth/probes_test.go
       - testkit/probes/discovery/probe_040_catalog_ttl.go
@@ -782,9 +785,12 @@ requirements:
     implementation: partial
     packages: [smart/discovery]
     tests:
+      - smart/discovery/diagnostics_test.go
       - smart/discovery/insecure_baseurl_test.go
       - smart/discovery/issuer_test.go
+      - smart/discovery/redirect_test.go
       - smart/discovery/resolver_test.go
+      - smart/discovery/url_shape_test.go
 
   - id: REQ-080
     title: openEHR wire conformance
