@@ -301,6 +301,26 @@ func TestResolveCrossChecksAnotherIssuer(t *testing.T) { // REQ-073
 			wantReason: discovery.ReasonFetchFailed,
 		},
 		{
+			// The body would confirm the issuer and its keys, so only the
+			// status refuses it.
+			name:      "OpenID configuration 404 with a confirming body",
+			smartJWKS: jwks,
+			openID: func(o string) (int, string) {
+				return http.StatusNotFound, openIDDocument(o+idpPath, jwks)
+			},
+			wantReason: discovery.ReasonFetchFailed,
+			wantInner:  "404",
+		},
+		{
+			name:      "OpenID configuration 503 with a confirming body",
+			smartJWKS: jwks,
+			openID: func(o string) (int, string) {
+				return http.StatusServiceUnavailable, openIDDocument(o+idpPath, jwks)
+			},
+			wantReason: discovery.ReasonFetchFailed,
+			wantInner:  "503",
+		},
+		{
 			name:       "OpenID configuration not JSON",
 			openID:     serve(func(string) string { return "<html>sign in</html>" }),
 			wantReason: discovery.ReasonFetchFailed,
