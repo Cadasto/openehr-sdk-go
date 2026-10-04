@@ -12,9 +12,9 @@ import (
 
 // probe065Backend serves the minimal-return round trip: POST answers 201 with
 // an empty body (per return=minimal), asserting the SDK sent that Prefer, and a
-// Location naming the new version; GET answers getStatus with getBody, but
+// ETag and Location naming the new version; GET answers getStatus with getBody, but
 // only for the version the POST named — any other path 404s, so a probe that
-// mis-parsed the Location into the wrong VersionUID fails here instead of
+// mis-parsed the headers into the wrong VersionUID fails here instead of
 // passing against a path-blind fake. The withLocation and getStatus/getBody
 // knobs let the can-fail tests strip each half of the contract.
 //
@@ -76,11 +76,11 @@ func TestProbe065FlagsBrokenRoundTrip(t *testing.T) { // PROBE-065
 		wantDetail   string
 	}{
 		{
-			name:         "minimal write carried no Location",
+			name:         "minimal write carried no ETag or Location",
 			withLocation: false,
 			getStatus:    http.StatusOK,
 			getBody:      bareCompositionBody,
-			wantDetail:   "no usable Location",
+			wantDetail:   "no usable ETag or Location",
 		},
 		{
 			name:         "committed version cannot be read back",

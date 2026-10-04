@@ -330,7 +330,10 @@ func (s *compositionServer) saveComposition(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *compositionServer) getComposition(w http.ResponseWriter, r *http.Request) {
-	dir, uid := path.Split(r.URL.Path)
+	// A read names the versioned object or one of its versions, as on a
+	// real server; the store keys bodies by the versioned object.
+	dir, ref := path.Split(r.URL.Path)
+	uid, _, _ := strings.Cut(ref, "::")
 	s.mu.Lock()
 	body, ok := s.saved[uid]
 	s.mu.Unlock()

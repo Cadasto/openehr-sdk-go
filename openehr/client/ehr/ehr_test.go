@@ -1,6 +1,7 @@
 package ehr_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -284,6 +285,71 @@ func TestCreateServerAssigned(t *testing.T) {
 	}
 	if meta == nil || meta.Location == "" {
 		t.Errorf("expected Location captured, got %+v", meta)
+	}
+}
+
+// TestEHRRootVersionUIDIsTheEHRID pins REQ-054's EHR-root rule on every
+// call that returns EHR metadata, the failed create included: the
+// VersionUID is the ehr_id from Location, and empty when the response
+// has no Location, even when the server puts the EHR_STATUS version id
+// in the ETag.
+func TestEHRRootVersionUIDIsTheEHRID(t *testing.T) {
+	const statusVersion = "d6052572-53b8-4900-9f4f-b782eca91528::cdr.example::1"
+	body := readFixture(t, "ehr", "ehr.json")
+	calls := []struct {
+		name   string
+		status int
+		call   func(ctx context.Context, c *transport.Client) (*openehrclient.VersionMetadata, error)
+	}{
+		{name: "Create", status: http.StatusCreated, call: func(ctx context.Context, c *transport.Client) (*openehrclient.VersionMetadata, error) {
+			_, meta, err := openehrclient.Create(ctx, c)
+			return meta, err
+		}},
+		{name: "Create conflict", status: http.StatusConflict, call: func(ctx context.Context, c *transport.Client) (*openehrclient.VersionMetadata, error) {
+			_, meta, err := openehrclient.Create(ctx, c)
+			return meta, err
+		}},
+		{name: "Get", status: http.StatusOK, call: func(ctx context.Context, c *transport.Client) (*openehrclient.VersionMetadata, error) {
+			_, meta, err := openehrclient.Get(ctx, c, ehrIDFixture)
+			return meta, err
+		}},
+		{name: "GetBySubject", status: http.StatusOK, call: func(ctx context.Context, c *transport.Client) (*openehrclient.VersionMetadata, error) {
+			_, meta, err := openehrclient.GetBySubject(ctx, c, "demographic", "patient-123")
+			return meta, err
+		}},
+	}
+	for _, tc := range calls {
+		for _, withLocation := range []bool{true, false} {
+			name, want := tc.name+" without Location", openehrclient.VersionUID("")
+			if withLocation {
+				name, want = tc.name+" with Location", openehrclient.VersionUID(ehrIDFixture)
+			}
+			t.Run(name, func(t *testing.T) {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if withLocation {
+						w.Header().Set("Location", "/ehr/"+ehrIDFixture)
+					}
+					w.Header().Set("ETag", `"`+statusVersion+`"`)
+					w.WriteHeader(tc.status)
+					if tc.status < http.StatusMultipleChoices {
+						_, _ = w.Write(body)
+					}
+				}))
+				defer srv.Close()
+
+				meta, err := tc.call(t.Context(), newClient(t, srv))
+				if failed := tc.status >= http.StatusMultipleChoices; failed != (err != nil) {
+					t.Fatalf("%s: err = %v, want an error only for status %d", tc.name, err, http.StatusConflict)
+				}
+				if meta == nil {
+					t.Fatalf("%s: meta = nil, want the response metadata", tc.name)
+				}
+				if meta.VersionUID != want {
+					t.Errorf("%s: VersionUID = %q, want %q (the ETag %q is the EHR_STATUS version, not the EHR's id)",
+						tc.name, meta.VersionUID, want, statusVersion)
+				}
+			})
+		}
 	}
 }
 

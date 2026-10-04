@@ -27,7 +27,7 @@ func Get(ctx context.Context, c *transport.Client, id EHRID) (*rm.EHR, *VersionM
 		Route:  "/ehr/{ehr_id}",
 	}
 	out, meta, err := transport.Decode[rm.EHR](ctx, c, req)
-	return out, NewVersionMetadata(meta), err
+	return out, newEHRMetadata(meta), err
 }
 
 // Exists reports whether the EHR identified by id is present on the
@@ -73,7 +73,7 @@ func GetBySubject(ctx context.Context, c *transport.Client, subjectNamespace, su
 		},
 	}
 	out, meta, err := transport.Decode[rm.EHR](ctx, c, req)
-	return out, NewVersionMetadata(meta), err
+	return out, newEHRMetadata(meta), err
 }
 
 // createConfig is the resolved option set for [Create].
@@ -157,11 +157,11 @@ func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm
 	resp, err := c.Do(ctx, req)
 	if err != nil {
 		if resp != nil {
-			return nil, NewVersionMetadata(resp.Metadata), err
+			return nil, newEHRMetadata(resp.Metadata), err
 		}
 		return nil, nil, err
 	}
-	meta := NewVersionMetadata(resp.Metadata)
+	meta := newEHRMetadata(resp.Metadata)
 
 	// REQ-094: an empty, whitespace-only, or JSON-null 2xx body commits
 	// the EHR but carries no usable representation. Classified against
