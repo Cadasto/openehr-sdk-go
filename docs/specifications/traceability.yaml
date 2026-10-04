@@ -506,9 +506,12 @@ requirements:
     canonical: docs/specifications/wire.md#req-054
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
+    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
     probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013]
     tests:
+      - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/ehr_test.go
+      - openehr/client/ehr/ids_test.go
       - testkit/probes/versioned/probe_010_put_without_if_match.go
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
       - testkit/probes/versioned/probe_012_etag_round_trip.go

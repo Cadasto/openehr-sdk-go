@@ -385,6 +385,8 @@ Rules the SDK **MUST** enforce:
 
 ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a response and expose it on the typed return value so the caller can use it for the next PUT.
 
+**Version identifier on a response.** For a versioned resource the SDK **MUST** take the reported version identifier (`VersionUID`) from the `ETag` when its value is a well-formed `object_version_id`, and **MUST** fall back to the last path segment of `Location` otherwise. ITS-REST Release 1.1.0 names the `ETag` as the version identifier (`ETag_VERSION`, `ETag_COMPOSITION`, `ETag_FOLDER` in the EHR API OAS) and allows `Location` only on resource creation and redirects (overview § HTTP headers, retrieved 2026-10-04). A server may also leave the version out of `Location`: EHRbase 2.36.0 names only the versioned object there on a composition create. The EHR root is the exception: its `VersionUID` **MUST** be the `ehr_id` from `Location`, because an EHR's `ETag` names no version (`ETag_EHR`) and a server may put the EHR_STATUS version there instead.
+
 ## REST leaf operations
 
 When a leaf gains an operation or an option, its package's `Repository` interface **MUST** grow with it. That is no break for callers of the package functions but a compile-time break for interface implementers (precedent: `UploadTemplate`), so the PR that grows the interface calls it out as a consumer-visible change, for the maintainer to fold into the CHANGELOG under the rule in [AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions).
