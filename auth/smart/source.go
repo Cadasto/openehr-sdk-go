@@ -180,18 +180,28 @@ func (s *Source) setTokensLocked(access auth.Token, refresh string) {
 // issuer is not kept: every ID token the source accepts is checked against
 // its one configured issuer, so it cannot change.
 type idTokenBinding struct {
-	subject  string
+	subject string
+	// audience is the token's aud as a set: sorted, each value once.
 	audience []string
 }
 
 // bindingOf returns the binding of verified claims, or nil for none. It
-// copies the audience, so a caller changing the claims it was handed does
-// not change the binding.
+// keeps its own copy of the audience, so a caller changing the claims it
+// was handed does not change the binding.
 func bindingOf(c *IDTokenClaims) *idTokenBinding {
 	if c == nil {
 		return nil
 	}
-	return &idTokenBinding{subject: c.Subject, audience: slices.Clone(c.Audience)}
+	return &idTokenBinding{subject: c.Subject, audience: audienceSet(c.Audience)}
+}
+
+// audienceSet returns a sorted copy of aud with each value once. RFC 7519
+// §4.1.3 gives aud no order, so two tokens list the same audiences when
+// their sets are equal.
+func audienceSet(aud []string) []string {
+	set := slices.Clone(aud)
+	slices.Sort(set)
+	return slices.Compact(set)
 }
 
 type tokenExchange struct {
@@ -557,6 +567,10 @@ func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDToken
 // token-endpoint call (authorization_code or refresh_token). After
 // [Source.Token] refreshes, callers that need an updated [LaunchContext]
 // should re-run smart.LaunchContextFromTokenResponse with this value.
+//
+// A refresh response without an ID token keeps the session's identity: its
+// IDTokenClaims are the verified claims the session had before, so a
+// launch context rebuilt from it still names the same user.
 func (s *Source) LastTokenResponse() TokenResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -625,6 +639,11 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	if err == nil {
 		s.setTokensLocked(tok, refreshTok)
 		if refreshedTR.AccessToken != "" {
+			if refreshedTR.IDToken == "" {
+				// OpenID Connect Core 1.0 §12.2 lets a refresh leave the ID
+				// token out; the session keeps the identity it verified.
+				refreshedTR.IDTokenClaims = s.lastTR.IDTokenClaims
+			}
 			s.lastTR = refreshedTR
 		}
 		if refreshedTR.IDTokenClaims != nil {
@@ -766,7 +785,7 @@ func (s *Source) verifyRefreshedIDToken(ctx context.Context, raw string) (*IDTok
 	s.mu.Lock()
 	prev := s.idBinding
 	s.mu.Unlock()
-	if prev != nil && (claims.Subject != prev.subject || !slices.Equal(claims.Audience, prev.audience)) {
+	if prev != nil && (claims.Subject != prev.subject || !slices.Equal(audienceSet(claims.Audience), prev.audience)) {
 		return nil, fmt.Errorf("%w: the refreshed ID token names another subject or audience than the session's", auth.ErrJWKSValidationFailed)
 	}
 	return claims, nil
