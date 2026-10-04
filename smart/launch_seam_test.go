@@ -63,7 +63,7 @@ func (s *seamServer) setTokenBody(t *testing.T, body map[string]any) {
 // signed ID token, and LaunchContextFromTokenResponse, given no options at
 // all, builds the context from the claims the Source verified. The key set
 // is fetched once, by the Source, and never again. A body fhirUser never
-// names the user, even when the verified token names nobody.
+// names the user.
 func TestLaunchContextFromCompletedAuthorization(t *testing.T) { // REQ-064
 	priv, jwksBody := testRSAKey(t)
 
@@ -75,7 +75,6 @@ func TestLaunchContextFromCompletedAuthorization(t *testing.T) { // REQ-064
 	}{
 		{name: "verified fhirUser", sub: "user-seam", fhirUser: "Practitioner/verified", wantUser: "Practitioner/verified"},
 		{name: "verified sub only", sub: "user-seam", wantUser: "user-seam"},
-		{name: "neither fhirUser nor sub", wantUser: ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -107,9 +106,7 @@ func TestLaunchContextFromCompletedAuthorization(t *testing.T) { // REQ-064
 				"iat":   now.Unix(),
 				"nonce": req.Nonce,
 			}
-			if tc.sub != "" {
-				claims["sub"] = tc.sub
-			}
+			claims["sub"] = tc.sub
 			if tc.fhirUser != "" {
 				claims["fhirUser"] = tc.fhirUser
 			}
@@ -152,5 +149,30 @@ func TestLaunchContextFromCompletedAuthorization(t *testing.T) { // REQ-064
 				t.Errorf("LaunchContextFromTokenResponse Patient = %q, Issuer = %q, want patient-1, %s", lc.Patient, lc.Issuer, claimsIssuer)
 			}
 		})
+	}
+}
+
+// TestLaunchContextVerifiedClaimsNamingNobody pins REQ-064: verified claims
+// that name no user, with neither fhirUser nor sub, leave User empty, and a
+// fhirUser member in the token-endpoint body does not fill it in. auth/smart
+// refuses an ID token without sub, so the claims are supplied directly, as a
+// Source would hand them over.
+func TestLaunchContextVerifiedClaimsNamingNobody(t *testing.T) { // REQ-064
+	claims := &smart.IDTokenClaims{Issuer: claimsIssuer, Audience: []string{claimsClientID}}
+	tr := authsmart.TokenResponse{
+		AccessToken:   "at",
+		FHIRUser:      "Practitioner/body",
+		Raw:           map[string]any{"fhirUser": "Practitioner/body"},
+		IDTokenClaims: claims,
+	}
+	lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr)
+	if err != nil {
+		t.Fatalf("LaunchContextFromTokenResponse(claims naming nobody) error = %v, want nil", err)
+	}
+	if lc.IDToken != claims {
+		t.Errorf("LaunchContextFromTokenResponse IDToken = %#v, want the supplied claims %#v", lc.IDToken, claims)
+	}
+	if lc.User != "" {
+		t.Errorf("LaunchContextFromTokenResponse User = %q, want empty: the verified claims name nobody (body fhirUser %q)", lc.User, tr.FHIRUser)
 	}
 }
