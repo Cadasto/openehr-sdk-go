@@ -169,6 +169,16 @@ The HL7 SMART [Backend Services](https://hl7.org/fhir/smart-app-launch/backend-s
 
 `auth/clientcreds` implements this via `WithClientAssertion(src jwtbearer.AssertionSource)`. When configured, `fetch` calls `src.Assertion(ctx)` on every token exchange, adds the two `client_assertion*` form fields, and omits Basic auth and `client_secret`. Signing errors are wrapped as `auth.ErrTokenExchangeFailed` with the message prefix `"client_assertion signing: ..."`.
 
+##### Backend Services from a resolved catalog
+
+`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, clientSecret, opts...)` (the secret empty when a client assertion is configured) for SMART Backend Services against a resolved catalog. It takes the token endpoint from `catalog.Auth.TokenEndpoint` (absent: `auth.ErrInvalidConfig`) and records `catalog.Issuer` on the tokens it produces unless the caller passes `WithIssuer`. When the catalog advertises the corresponding list, construction **MUST** fail with `auth.ErrInvalidConfig` when:
+
+- `grant_types_supported` does not contain `client_credentials`;
+- `token_endpoint_auth_methods_supported` does not contain the configured method (`private_key_jwt` with a client assertion, `client_secret_basic` or `client_secret_post` with a secret);
+- `token_endpoint_auth_signing_alg_values_supported` does not contain the algorithm of a client assertion produced by the SDK's own `jwtbearer.ClaimsSigner` (an assertion source the SDK cannot inspect is not checked).
+
+An absent or empty list is not constraining, as in § G-3.
+
 **Distinction from `auth/jwtbearer`:** `auth/jwtbearer` implements the separate RFC 7523 _JWT Bearer Token Grant_ (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`) — the JWT is the _authorization grant_ itself. `auth/clientcreds` with `WithClientAssertion` uses `grant_type=client_credentials` — the JWT is the _client authentication credential_. Both use `jwtbearer.AssertionSource` / `jwtbearer.ClaimsSigner` for signing.
 
 **Configuration rules** (enforced at `FromConfig`):
@@ -487,14 +497,6 @@ Per-request override via `auth.WithTokenSource(ctx, ts)` **MUST** work the same 
 - Map wire-level auth errors onto the `transport/` error hierarchy.
 
 These providers **MUST** support the same JWKS rotation behaviour as `auth/smart` when they need to validate issued tokens (typically less common — service-to-service callers often accept opaque tokens).
-
-`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, clientSecret, opts...)` (the secret empty when a client assertion is configured) for SMART Backend Services against a resolved catalog. It takes the token endpoint from `catalog.Auth.TokenEndpoint` (absent: `auth.ErrInvalidConfig`) and records `catalog.Issuer` on the tokens it produces unless the caller passes `WithIssuer`, as `auth/smart.NewFromCatalog` allows. When the catalog advertises the corresponding list, construction **MUST** fail with `auth.ErrInvalidConfig` when:
-
-- `grant_types_supported` does not contain `client_credentials`;
-- `token_endpoint_auth_methods_supported` does not contain the configured method (`private_key_jwt` with a client assertion, `client_secret_basic` or `client_secret_post` with a secret);
-- `token_endpoint_auth_signing_alg_values_supported` does not contain the algorithm of a client assertion produced by the SDK's own `jwtbearer.ClaimsSigner` (an assertion source the SDK cannot inspect is not checked).
-
-An absent or empty list is not constraining, as for the authorization-code source (REQ-068 § G-3).
 
 ## Scope handling
 
