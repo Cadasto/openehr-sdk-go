@@ -785,3 +785,46 @@ func TestWithTrustedAudiencesKeepsItsOwnCopy(t *testing.T) {
 		t.Fatalf("ValidateIDToken(aud [client-id api], trusted [other] then edited to [api]) error = %v, want ErrJWKSValidationFailed", err)
 	}
 }
+
+// TestValidateIDTokenSurfacesOwnNonce checks that IDTokenClaims.Nonce holds the
+// token's own nonce claim, whether or not the caller expected one, and is
+// empty when the token has none. The claim stays out of Extra. REQ-062
+func TestValidateIDTokenSurfacesOwnNonce(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+
+	cases := []struct {
+		name     string
+		claim    string // the token's nonce claim; empty means the token has none
+		expected string // the nonce the caller passes
+		want     string
+	}{
+		{name: "expected and present", claim: "nonce-xyz", expected: "nonce-xyz", want: "nonce-xyz"},
+		{name: "present but not expected", claim: "nonce-xyz", want: "nonce-xyz"},
+		{name: "neither expected nor present"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			claims := defaultIDClaims(now)
+			delete(claims, "nonce")
+			if tc.claim != "" {
+				claims["nonce"] = tc.claim
+			}
+			tok := joseSign(t, gojose.RS256, priv, "kid-rs256", claims)
+
+			got, err := smart.ValidateIDToken(t.Context(), tok, jwks,
+				"https://issuer.example", "client-id", tc.expected, now, nil)
+			if err != nil {
+				t.Fatalf("ValidateIDToken(nonce claim %q, expected %q) error = %v, want nil", tc.claim, tc.expected, err)
+			}
+			// REQ-062: Nonce is the token's own claim, not the caller's expectation.
+			if got.Nonce != tc.want {
+				t.Fatalf("ValidateIDToken(nonce claim %q, expected %q) Nonce = %q, want %q", tc.claim, tc.expected, got.Nonce, tc.want)
+			}
+			if v, ok := got.Extra["nonce"]; ok {
+				t.Fatalf("ValidateIDToken(nonce claim %q) Extra[nonce] = %v, want the claim kept out of Extra", tc.claim, v)
+			}
+		})
+	}
+}
