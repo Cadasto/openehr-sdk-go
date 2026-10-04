@@ -3,6 +3,7 @@ package jwtbearer
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rsa"
 	"errors"
@@ -100,6 +101,8 @@ func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 		{name: "nil signer", clientID: "c1", tokenURL: "https://as.example/token", alg: "RS384", kid: "k1"},
 		{name: "nil RSA key", clientID: "c1", tokenURL: "https://as.example/token", signer: (*rsa.PrivateKey)(nil), alg: "RS384", kid: "k1"},
 		{name: "nil ECDSA key", clientID: "c1", tokenURL: "https://as.example/token", signer: (*ecdsa.PrivateKey)(nil), alg: "ES384", kid: "k1"},
+		{name: "nil Ed25519 key", clientID: "c1", tokenURL: "https://as.example/token", signer: ed25519.PrivateKey(nil), alg: "RS384", kid: "k1"},
+		{name: "nil custom signer", clientID: "c1", tokenURL: "https://as.example/token", signer: (*opaqueRSASigner)(nil), alg: "RS384", kid: "k1"},
 		{name: "empty alg", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, kid: "k1"},
 		{name: "empty kid", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, alg: "RS384", wantInMsg: "kid"},
 		{name: "RSA key for ES384", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, alg: "ES384", kid: "k1"},
@@ -109,6 +112,12 @@ func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("NewClientAssertion(%q, %q, %T, %q, %q) panicked: %v, want auth.ErrInvalidConfig",
+						tc.clientID, tc.tokenURL, tc.signer, tc.alg, tc.kid, r)
+				}
+			}()
 			s, err := NewClientAssertion(tc.clientID, tc.tokenURL, tc.signer, tc.alg, tc.kid)
 			if !errors.Is(err, auth.ErrInvalidConfig) {
 				t.Errorf("NewClientAssertion(%q, %q, %T, %q, %q) error = %v, want auth.ErrInvalidConfig",

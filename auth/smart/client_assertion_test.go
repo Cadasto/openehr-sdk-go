@@ -3,6 +3,7 @@ package smart_test
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -21,6 +22,16 @@ import (
 	"github.com/cadasto/openehr-sdk-go/auth/smart"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
+
+// keyHoldingSigner is a crypto.Signer of the application's own that reads
+// its key in every method, so a nil one panics when used.
+type keyHoldingSigner struct{ key *rsa.PrivateKey }
+
+func (k *keyHoldingSigner) Public() crypto.PublicKey { return k.key.Public() }
+
+func (k *keyHoldingSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	return k.key.Sign(rand, digest, opts)
+}
 
 // assertionTestEndpoints returns endpoints on as.example that list signAlgs
 // as the server's token_endpoint_auth_signing_alg_values_supported.
@@ -77,8 +88,9 @@ func TestClientAssertionKeyNeedsKeyID(t *testing.T) { // REQ-068
 }
 
 // TestClientAssertionKeyRefusesNilKey pins that WithClientAssertionKey
-// with a nil key of a concrete type, a nil *rsa.PrivateKey or a nil
-// *ecdsa.PrivateKey passed as a crypto.Signer, fails construction with
+// with a nil key of a concrete type passed as a crypto.Signer, a nil
+// *rsa.PrivateKey, *ecdsa.PrivateKey, ed25519.PrivateKey or pointer to a
+// signer type of the application's own, fails construction with
 // auth.ErrInvalidConfig instead of panicking.
 func TestClientAssertionKeyRefusesNilKey(t *testing.T) { // REQ-068
 	tests := []struct {
@@ -88,6 +100,8 @@ func TestClientAssertionKeyRefusesNilKey(t *testing.T) { // REQ-068
 	}{
 		{name: "nil RSA key", key: (*rsa.PrivateKey)(nil), alg: "RS384"},
 		{name: "nil ECDSA key", key: (*ecdsa.PrivateKey)(nil), alg: "ES384"},
+		{name: "nil Ed25519 key", key: ed25519.PrivateKey(nil), alg: "RS384"},
+		{name: "nil custom signer", key: (*keyHoldingSigner)(nil), alg: "RS384"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

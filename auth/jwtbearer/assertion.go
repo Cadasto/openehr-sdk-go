@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"reflect"
 	"sync/atomic"
 	"time"
 
@@ -103,9 +104,11 @@ type ClaimsSigner struct {
 }
 
 // NewClaimsSigner constructs a ClaimsSigner. Returns ErrInvalidConfig
-// when required fields are missing, the signer is nil (including a nil
-// *rsa.PrivateKey or *ecdsa.PrivateKey), the algorithm is unsupported, or the
-// signer's key type does not match the algorithm family.
+// when required fields are missing, the signer is nil (including a nil value
+// of any pointer, slice, map, func or channel type, such as a nil
+// *rsa.PrivateKey, ed25519.PrivateKey or pointer to a signer type of the
+// caller's own), the algorithm is unsupported, or the signer's key type does
+// not match the algorithm family.
 //
 // Key requirements per algorithm:
 //   - RS256, RS384: *rsa.PrivateKey
@@ -122,7 +125,7 @@ func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...Sign
 		return nil, fmt.Errorf("%w: signer is required", auth.ErrInvalidConfig)
 	}
 	// A nil key of a concrete type passes the check above, and its Public
-	// method would panic, so refuse it before calling any method on it.
+	// method may panic, so refuse it before calling any method on it.
 	if isNilKey(s.Signer) {
 		return nil, fmt.Errorf("%w: signer is a nil %T", auth.ErrInvalidConfig, s.Signer)
 	}
@@ -156,8 +159,9 @@ const clientAssertionLifetime = 5 * time.Minute
 // kid, a unique jti, and an exp five minutes after its iat.
 //
 // It fails with [auth.ErrInvalidConfig] when clientID, tokenURL, alg or kid
-// is empty, signer is nil (including a nil *rsa.PrivateKey or
-// *ecdsa.PrivateKey), alg is not supported, or the key does not fit alg.
+// is empty, signer is nil (including a nil value of a concrete type, as
+// [NewClaimsSigner] describes), alg is not supported, or the key does not
+// fit alg.
 // [NewClaimsSigner] lists the key each algorithm needs.
 func NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, kid string) (*ClaimsSigner, error) {
 	if clientID == "" {
@@ -179,16 +183,21 @@ func NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, ki
 	}, signer, WithAlgorithm(alg), WithKeyID(kid))
 }
 
-// isNilKey reports whether signer is a nil *rsa.PrivateKey or
-// *ecdsa.PrivateKey: a nil key held in a non-nil crypto.Signer.
+// isNilKey reports whether signer holds a nil value of a pointer, slice,
+// map, func or channel type in a non-nil crypto.Signer: a nil
+// *rsa.PrivateKey, a nil ed25519.PrivateKey, a nil pointer to a signer type
+// of the caller's own. Such a signer is refused whether or not its methods
+// would work, since none of them can stand for a key. A nil value is found
+// by reflection rather than by calling Public and catching a panic, so
+// every one is refused, also one whose Public would not panic.
 func isNilKey(signer crypto.Signer) bool {
-	switch k := signer.(type) {
-	case *rsa.PrivateKey:
-		return k == nil
-	case *ecdsa.PrivateKey:
-		return k == nil
+	v := reflect.ValueOf(signer)
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Slice, reflect.Map, reflect.Func, reflect.Chan, reflect.Interface, reflect.UnsafePointer:
+		return v.IsNil()
+	default:
+		return false
 	}
-	return false
 }
 
 // SignerOption configures a ClaimsSigner.
