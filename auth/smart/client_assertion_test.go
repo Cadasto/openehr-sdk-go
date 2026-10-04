@@ -33,6 +33,16 @@ func (k *keyHoldingSigner) Sign(rand io.Reader, digest []byte, opts crypto.Signe
 	return k.key.Sign(rand, digest, opts)
 }
 
+// ecKeyP384 returns a new P-384 key.
+func ecKeyP384(t *testing.T) *ecdsa.PrivateKey {
+	t.Helper()
+	k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
 // publicKeySigner is a crypto.Signer of the application's own whose Public
 // returns pub as it is.
 type publicKeySigner struct{ pub crypto.PublicKey }
@@ -113,6 +123,7 @@ func TestClientAssertionKeyRefusesNilKey(t *testing.T) { // REQ-068
 		{name: "nil Ed25519 key", key: ed25519.PrivateKey(nil), alg: "RS384"},
 		{name: "nil custom signer", key: (*keyHoldingSigner)(nil), alg: "RS384"},
 		{name: "custom signer reporting a nil ECDSA public key", key: publicKeySigner{pub: (*ecdsa.PublicKey)(nil)}, alg: "ES384"},
+		{name: "ECDSA private key without its scalar", key: &ecdsa.PrivateKey{PublicKey: ecKeyP384(t).PublicKey}, alg: "ES384"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

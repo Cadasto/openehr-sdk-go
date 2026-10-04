@@ -101,17 +101,59 @@ func (fixedPublicSigner) Sign(io.Reader, []byte, crypto.SignerOpts) ([]byte, err
 	return nil, errors.New("not used")
 }
 
+// withoutPoint returns a copy of key's private scalar on its curve, with no
+// public point.
+func withoutPoint(t *testing.T, key *ecdsa.PrivateKey) *ecdsa.PrivateKey {
+	t.Helper()
+	raw, err := key.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	k, err := ecdsa.ParseRawPrivateKey(key.Curve, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k.X, k.Y = nil, nil
+	return k
+}
+
+// onGenericCurve returns a copy of key on the generic
+// *elliptic.CurveParams of its curve, which crypto/ecdsa cannot sign with.
+func onGenericCurve(t *testing.T, key *ecdsa.PrivateKey) *ecdsa.PrivateKey {
+	t.Helper()
+	raw, err := key.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	k, err := ecdsa.ParseRawPrivateKey(key.Curve, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k.Curve = key.Params()
+	return k
+}
+
+// nilParamsCurve is a curve of the caller's own whose Params reports
+// nothing.
+type nilParamsCurve struct{ elliptic.Curve }
+
+func (nilParamsCurve) Params() *elliptic.CurveParams { return nil }
+
 // TestNewClientAssertionRefusesBadArguments pins that NewClientAssertion
 // fails with auth.ErrInvalidConfig, and returns no signer, when an argument
 // is empty or the key does not fit the algorithm. For the signer, empty
 // means nil, a nil key of a concrete type, a Public method that panics, or a
 // Public that reports no usable public key: nil, or an RSA or ECDSA public
-// key that is nil or lacks its modulus or curve. It never panics itself. An
+// key that is nil or lacks its modulus or curve, where a curve whose
+// parameters are missing or cannot be read counts as missing. An ECDSA
+// private key without its private scalar or public point is refused too,
+// since signing with it would panic. It never panics itself. An
 // empty clientID, tokenURL or kid is refused with a message that names the
 // argument.
 func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 	rsaKey := newKey(t)
 	p256Key := newECKey(t, elliptic.P256())
+	p384Key := newECKey(t, elliptic.P384())
 	tests := []struct {
 		name               string
 		clientID, tokenURL string
@@ -131,7 +173,10 @@ func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 			name: "signer whose Public panics", clientID: "c1", tokenURL: "https://as.example/token", signer: unusableSigner{}, alg: "RS384", kid: "k1",
 			wantInMsg: "Public method panicked",
 		},
-		{name: "Public reports no key", clientID: "c1", tokenURL: "https://as.example/token", signer: fixedPublicSigner{}, alg: "RS256", kid: "k1"},
+		{
+			name: "Public reports no key", clientID: "c1", tokenURL: "https://as.example/token", signer: fixedPublicSigner{}, alg: "RS256", kid: "k1",
+			wantInMsg: "reports no public key",
+		},
 		{
 			name: "Public reports a nil RSA key", clientID: "c1", tokenURL: "https://as.example/token",
 			signer: fixedPublicSigner{pub: (*rsa.PublicKey)(nil)}, alg: "RS384", kid: "k1",
@@ -155,6 +200,41 @@ func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 		{
 			name: "Public reports an ECDSA key without curve for ES384", clientID: "c1", tokenURL: "https://as.example/token",
 			signer: fixedPublicSigner{pub: &ecdsa.PublicKey{}}, alg: "ES384", kid: "k1",
+		},
+		{
+			name: "Public reports an ECDSA key on a nil CurveParams for ES256", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: fixedPublicSigner{pub: &ecdsa.PublicKey{Curve: (*elliptic.CurveParams)(nil)}}, alg: "ES256", kid: "k1",
+			wantInMsg: "without its curve",
+		},
+		{
+			name: "Public reports an ECDSA key on a nil CurveParams for ES384", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: fixedPublicSigner{pub: &ecdsa.PublicKey{Curve: (*elliptic.CurveParams)(nil)}}, alg: "ES384", kid: "k1",
+			wantInMsg: "without its curve",
+		},
+		{
+			name: "Public reports an ECDSA key on a curve whose Params is nil", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: fixedPublicSigner{pub: &ecdsa.PublicKey{Curve: nilParamsCurve{}}}, alg: "ES256", kid: "k1",
+			wantInMsg: "without its curve",
+		},
+		{
+			name: "Public reports an ECDSA key on a curve that wraps none", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: fixedPublicSigner{pub: &ecdsa.PublicKey{Curve: struct{ elliptic.Curve }{}}}, alg: "ES384", kid: "k1",
+			wantInMsg: "without its curve",
+		},
+		{
+			name: "ECDSA private key without its scalar", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: &ecdsa.PrivateKey{PublicKey: p384Key.PublicKey}, alg: "ES384", kid: "k1", // no D
+			wantInMsg: "lacks its private scalar",
+		},
+		{
+			name: "ECDSA private key without its public point", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: withoutPoint(t, p384Key), alg: "ES384", kid: "k1",
+			wantInMsg: "lacks its private scalar",
+		},
+		{
+			name: "ECDSA private key on a curve crypto/ecdsa cannot use", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: onGenericCurve(t, p384Key), alg: "ES384", kid: "k1",
+			wantInMsg: "crypto/ecdsa cannot use it",
 		},
 		{name: "empty alg", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, kid: "k1"},
 		{name: "empty kid", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, alg: "RS384", wantInMsg: "kid"},

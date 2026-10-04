@@ -104,10 +104,13 @@ type ClaimsSigner struct {
 
 // NewClaimsSigner constructs a ClaimsSigner. Returns ErrInvalidConfig, and
 // never panics, when required fields are missing, the signer is nil or a
-// nil *rsa.PrivateKey or *ecdsa.PrivateKey, the algorithm is unsupported,
-// the signer's Public method panics or reports no usable public key (nil,
-// or an RSA or ECDSA public key without its modulus or curve), or the
-// signer's key type does not match the algorithm family. A Public method
+// nil *rsa.PrivateKey or *ecdsa.PrivateKey, an *ecdsa.PrivateKey lacks its
+// private scalar or public point (or crypto/ecdsa cannot otherwise use it),
+// the algorithm is unsupported, the
+// signer's Public method panics or reports no usable public key (nil, or an
+// RSA or ECDSA public key without its modulus or curve, where a curve whose
+// parameters are missing or cannot be read counts as none), or the signer's
+// key type does not match the algorithm family. A Public method
 // panics for a nil key of most other types held in a non-nil crypto.Signer,
 // such as a nil ed25519.PrivateKey or a nil pointer to a signer type of the
 // caller's own whose Public reads its key, so such a signer is refused
@@ -135,6 +138,14 @@ func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...Sign
 	// method would panic, so refuse it before calling any method on it.
 	if isNilKey(s.Signer) {
 		return nil, fmt.Errorf("%w: signer is a nil %T", auth.ErrInvalidConfig, s.Signer)
+	}
+	// An ECDSA private key without its scalar or its public point passes
+	// every check below and panics inside crypto/ecdsa on the first
+	// signature, on the goroutine of whoever asks for an assertion.
+	if k, ok := s.Signer.(*ecdsa.PrivateKey); ok {
+		if err := usableECDSAPrivateKey(k); err != nil {
+			return nil, err
+		}
 	}
 	if template.Issuer == "" {
 		return nil, fmt.Errorf("%w: ClaimsTemplate.Issuer is required", auth.ErrInvalidConfig)
@@ -167,8 +178,9 @@ const clientAssertionLifetime = 5 * time.Minute
 //
 // It fails with [auth.ErrInvalidConfig], and never panics, when clientID,
 // tokenURL, alg or kid is empty, signer is empty (nil, a nil RSA or ECDSA
-// private key, or a signer whose Public method panics or reports no usable
-// public key), alg is not supported, or the key does not fit alg, as
+// private key, an ECDSA private key without its scalar or point, or a
+// signer whose Public method panics or reports no usable public key), alg
+// is not supported, or the key does not fit alg, as
 // [NewClaimsSigner] describes. A signer of the caller's own type that
 // reports a usable public key is accepted as it is.
 // [NewClaimsSigner] lists the key each algorithm needs.
@@ -343,23 +355,70 @@ func validateKeyAlg(signer crypto.Signer, alg string) error {
 			return fmt.Errorf("%w: %s requires an RSA signer, got %T", auth.ErrInvalidConfig, alg, pub)
 		}
 	case "ES256":
-		ecPub, ok := pub.(*ecdsa.PublicKey)
-		if !ok {
-			return fmt.Errorf("%w: ES256 requires an ECDSA signer, got %T", auth.ErrInvalidConfig, pub)
-		}
-		if ecPub.Curve != elliptic.P256() {
-			return fmt.Errorf("%w: ES256 requires a P-256 key, got %s", auth.ErrInvalidConfig, ecPub.Curve.Params().Name)
-		}
+		return checkCurve(pub, alg, elliptic.P256())
 	case "ES384":
-		ecPub, ok := pub.(*ecdsa.PublicKey)
-		if !ok {
-			return fmt.Errorf("%w: ES384 requires an ECDSA signer, got %T", auth.ErrInvalidConfig, pub)
-		}
-		if ecPub.Curve != elliptic.P384() {
-			return fmt.Errorf("%w: ES384 requires a P-384 key, got %s", auth.ErrInvalidConfig, ecPub.Curve.Params().Name)
-		}
+		return checkCurve(pub, alg, elliptic.P384())
 	}
 	return nil
+}
+
+// checkCurve checks that pub is an ECDSA public key on want. It reads the
+// curve's parameters once, through curveName, and builds every message from
+// what it has checked.
+func checkCurve(pub crypto.PublicKey, alg string, want elliptic.Curve) error {
+	ecPub, ok := pub.(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("%w: %s requires an ECDSA signer, got %T", auth.ErrInvalidConfig, alg, pub)
+	}
+	name, err := curveName(ecPub.Curve)
+	if err != nil {
+		return err
+	}
+	if ecPub.Curve != want {
+		return fmt.Errorf("%w: %s requires a %s key, got %s (%T)", auth.ErrInvalidConfig, alg, want.Params().Name, name, ecPub.Curve)
+	}
+	return nil
+}
+
+// usableECDSAPrivateKey refuses an ECDSA private key that crypto/ecdsa
+// cannot use: one without its private scalar or public point, with a zero
+// scalar, or on a curve it does not support. It asks crypto/ecdsa to encode
+// the key, which checks those, and treats a panic there, as a missing
+// scalar or point causes, as a refusal too. The encoded key is discarded.
+func usableECDSAPrivateKey(k *ecdsa.PrivateKey) (err error) {
+	refused := fmt.Errorf("%w: the ECDSA private key lacks its private scalar or public point, or crypto/ecdsa cannot use it", auth.ErrInvalidConfig)
+	defer func() {
+		if recover() != nil {
+			err = refused
+		}
+	}()
+	if _, err := k.Bytes(); err != nil {
+		return refused
+	}
+	return nil
+}
+
+// errNoCurve is the error for an ECDSA public key whose curve is missing or
+// cannot be read.
+func errNoCurve() error {
+	return fmt.Errorf("%w: the signer's Public method reports an ECDSA public key without its curve", auth.ErrInvalidConfig)
+}
+
+// curveName returns the name in curve's parameters. A curve that reports no
+// parameters, such as a nil *elliptic.CurveParams, or whose Params method
+// panics, such as a type of the caller's own that wraps no curve, counts as
+// no curve and is refused with auth.ErrInvalidConfig.
+func curveName(curve elliptic.Curve) (name string, err error) {
+	defer func() {
+		if recover() != nil {
+			name, err = "", errNoCurve()
+		}
+	}()
+	params := curve.Params()
+	if params == nil {
+		return "", errNoCurve()
+	}
+	return params.Name, nil
 }
 
 // usablePublicKey refuses a public key the algorithm checks cannot read: no
@@ -375,7 +434,7 @@ func usablePublicKey(pub crypto.PublicKey) error {
 		}
 	case *ecdsa.PublicKey:
 		if k == nil || k.Curve == nil {
-			return fmt.Errorf("%w: the signer's Public method reports an ECDSA public key without its curve", auth.ErrInvalidConfig)
+			return errNoCurve()
 		}
 	}
 	return nil
