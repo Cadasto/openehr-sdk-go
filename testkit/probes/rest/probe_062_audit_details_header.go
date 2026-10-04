@@ -100,10 +100,10 @@ func Probe062AuditDetailsHeader(ctx context.Context, c *transport.Client, captur
 		return r, nil
 	}
 	// The version uid the write returned is what binds the read-back below to
-	// this write; without a Location there is nothing to bind to.
+	// this write; without an ETag or Location there is nothing to bind to.
 	if wmeta == nil || wmeta.VersionUID == "" {
 		r.Status = "fail"
-		r.Detail = "the write returned no usable Location, so no version uid can bind the Contribution read-back to it"
+		r.Detail = "the write returned no usable ETag or Location, so no version uid can bind the Contribution read-back to it"
 		return r, nil
 	}
 	versionUID := string(wmeta.VersionUID)

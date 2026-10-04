@@ -5,8 +5,8 @@ Some fixtures under this directory are vendored from upstream projects. Per the 
 ## ehrbase/openEHR_SDK
 
 **Source:** https://github.com/ehrbase/openEHR_SDK  
-**Commit:** `4b5a710d3ddc3529a45222fb0398a2440bf83a9b` (2026-05-17)  
-**Path within source:** `test-data/src/main/resources/`
+**Commit:** `8a5dae6fd82a5f0aa23b25681a13df79bfc21d2b` (2026-09-28) for `rm/` and the template triplets; the `webtemplate/` and `flat-conformance/` entries carry their own pin below  
+**Path within source:** `test-data/src/main/resources/` and `validation/src/test/resources/`
 
 ```
 Copyright 2021–2026 vitasystems GmbH and Hannover Medical School.
@@ -26,9 +26,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-**RM-only (`rm/`):** `minimal_evaluation.json`, `compo_with_nested_party_related.json`, `ehr_status_other_details_simple.json`, `nested_folder.json`, `test_all_types.v1.xml`, `simple_empty_folder.xml` — from `composition/canonical_json/`, `ehr/canonical_json/`, `folder/canonical_json/`, and `composition/canonical_xml/` in the commit above.
+**RM-only (`rm/`):** `minimal_evaluation.json`, `compo_with_nested_party_related.json`, `ehr_status_other_details_simple.json`, `nested_folder.json`, `test_all_types.v1.xml`, `simple_empty_folder.xml` — from `test-data/src/main/resources/{composition,ehr,folder}/canonical_json/` and `{composition,folder}/canonical_xml/` in the commit above. Every file is byte-identical to its upstream copy at that commit; `minimal_evaluation.json` was refreshed to it (upstream commit `66845f98` rewrote its `start_time` zone from `+0000` to `+00:00`).
 
-**Template triplets (`templates/` + `compositions/`):** `cluster-slot.ehrbase.org.v0`, `nested.en.v1`, `IDCR Problem List.v1`, `IDCR - Laboratory Test Report.v0`, `IDCR -  Adverse Reaction List.v1` — OPT from `operationaltemplate/` (or equivalent) and matching canonical JSON/XML from `composition/` in the same upstream tree.
+**Template triplets (`templates/` + `compositions/`):** `nested.en.v1` from `test-data/src/main/resources/operationaltemplate/` and `composition/canonical_json/`. The other four come from the SDK's validation tests, `validation/src/test/resources/operational_templates/` and `validation/src/test/resources/composition/`: `IDCR Problem List.v1` under the same file names, and three under different ones: `cluster-slot.ehrbase.org.v0` (`cluster-slot.ehrbase.or.v0.json`), `IDCR - Laboratory Test Report.v0` (`IDCR-LaboratoryTestReport.opt` + `IDCR-LabReportRAW1.xml`), and `IDCR -  Adverse Reaction List.v1` (`IDCR - Adverse Reaction List.v1.*`, one space after the dash upstream).
 
 **WebTemplate parity reference (`webtemplate/`):** `constrain_test.opt` (from `operationaltemplate/constrain_test.opt`) + `constrain_test.webtemplate.json` (from `webtemplate/constrain_test.json`), pinned at commit `e57511c6aca27ed501d31d663762c37c3491e74e` (byte-identical to the previous `22b01e0c…` pin). Vendored unmodified as the REQ-106 / PROBE-075 WebTemplate structural-parity oracle (ADR-0014); chosen because it pins no template-level node name anywhere, so its golden carries zero name predicates and it exports cleanly, and because it exercises the core datatype set (DV_TEXT / CODED_TEXT / QUANTITY / COUNT / ORDINAL / DATE_TIME / DURATION / PROPORTION). Not part of the SDK runtime.
 
@@ -56,13 +56,29 @@ You may obtain a copy of the License at
 (full text: licenses/Apache-2.0.txt)
 ```
 
-**Vendored:** Minimal-entry and `Test_dv_*` template triplets under `templates/` + `compositions/`; `persistent_minimal.en.v1`; `family_history.v.1.2.3`, `my_spanish_template_v0`, `terminology_test.ehrbase.org.v1`, `terminology_test2.ehrbase.org.v1` (added at pin `b4625fc`); flat `rm/ehr_status_*` and `rm/folder_*` JSON; `submissions/*.json` CONTRIBUTION create wire from `contributions/`; the FROM-family AQL combination CSVs under `aql/conformance/`.
+**Vendored:** Minimal-entry and `Test_dv_*` template triplets under `templates/` + `compositions/`; `persistent_minimal.en.v1`; `family_history.v.1.2.3`, `my_spanish_template_v0`, `terminology_test.ehrbase.org.v1`, `terminology_test2.ehrbase.org.v1` (added at pin `b4625fc`); the `alternative_types.en.v1` OPT, byte-identical to `valid_templates/alternative_types/alternative_types.opt` (in EHRbase since 2019; copied by hand and renamed, so `scripts/ingest-robot-fixtures.sh` does not reproduce it; its compositions are CODE24's, below); flat `rm/ehr_status_*` and `rm/folder_*` JSON; `submissions/*.json` CONTRIBUTION create wire from `contributions/`; the FROM-family AQL combination CSVs under `aql/conformance/`.
 
 **Modifications:** Flat `rm/` and `submissions/` filenames; composition JSON stems match operational `template_id`; no clinical content edits. Re-ingest via `scripts/ingest-robot-fixtures.sh`, which stamps the source commit into [`ROBOT_SOURCE.txt`](ROBOT_SOURCE.txt). The `aql/conformance/` CSVs are unmodified upstream bytes, only regrouped into a directory per consuming Robot suite family; re-ingest via `scripts/ingest-robot-aql.sh`, which stamps [`aql/conformance/AQL_SOURCE.txt`](aql/conformance/AQL_SOURCE.txt).
 
+## ehrbase/ehrbase (server test resources)
+
+**Source:** https://github.com/ehrbase/ehrbase  
+**Commit:** `040b483d6c53bd15660c37f15a5f6ee8a5fa3b1f` (2026-09-23); the file is unchanged since `296a1693d` (2019-10-08)  
+**Path within source:** `service/src/test/resources/knowledge/operational_templates/`
+
+```
+Copyright (c) 2019 Vitasystems GmbH and Hannover Medical School.
+
+Licensed under the Apache License, Version 2.0 (full text: licenses/Apache-2.0.txt)
+```
+
+**Vendored:** the `BMI` OPT (`templates/BMI.opt`, upstream `BMI.opt`); its compositions are CODE24's, below.
+
+**Modifications:** the leading byte-order mark and the CRLF line endings are removed; the content is otherwise identical.
+
 ## CODE24 (Cadasto)
 
-**Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)); benchmark `vital_signs` and `clinical_notes.v0`.
+**Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)), including the OPT-only `Referral Request.v1`; benchmark `vital_signs` and `clinical_notes.v0`. The `alternative_types.en.v1` and `BMI` compositions are CODE24's, but their OPTs are EHRbase's (above). `body_weight.opt` has its authoring tool's account id replaced by `user=redacted`; nothing else in it is edited.
 
 **License:** MIT
 

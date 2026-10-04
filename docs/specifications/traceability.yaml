@@ -119,7 +119,6 @@ requirements:
     implementation: landed
     packages: [transport]
     tests:
-      - auth/introspect/introspect_test.go
       - transport/client_test.go
 
   - id: REQ-022
@@ -506,9 +505,12 @@ requirements:
     canonical: docs/specifications/wire.md#req-054
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
+    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
     probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013]
     tests:
+      - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/ehr_test.go
+      - openehr/client/ehr/ids_test.go
       - testkit/probes/versioned/probe_010_put_without_if_match.go
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
       - testkit/probes/versioned/probe_012_etag_round_trip.go
@@ -638,10 +640,9 @@ requirements:
     canonical: docs/specifications/auth.md#req-062--jwks-rotation
     status: draft
     implementation: landed
-    packages: [auth/smart, smart/discovery, auth/introspect]
+    packages: [auth/smart, smart/discovery]
     probes: [PROBE-006]
     tests:
-      - auth/introspect/introspect_test.go
       - auth/smart/smart_test.go
       - smart/discovery/resolver_test.go
       - smart/idtoken_test.go
@@ -718,6 +719,7 @@ requirements:
     tests:
       - auth/clientcreds/clientcreds_test.go
       - auth/jwtbearer/jwtbearer_test.go
+      - auth/smart/confidential_pkce_test.go
       - auth/smart/smart_test.go
       - testkit/probes/auth/launch_modes.go
       - testkit/probes/auth/probes_test.go
@@ -1774,3 +1776,12 @@ requirements:
       - testkit/probes/aql/probe_099_path_shape_lint.go
       - testkit/probes/aql/probes_test.go
     probes: [PROBE-099]
+
+  - id: REQ-165
+    title: openEHR scope syntax
+    canonical: docs/specifications/auth.md#req-165--openehr-scope-syntax
+    status: draft
+    implementation: landed
+    packages: [auth]
+    tests:
+      - auth/openehr_scope_test.go

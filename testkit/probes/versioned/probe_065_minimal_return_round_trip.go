@@ -12,12 +12,12 @@ import (
 )
 
 // Probe065MinimalReturnRoundTrip implements PROBE-065: a Composition write
-// under the SDK's default `Prefer: return=minimal` returns an empty body and a
-// Location header, so the SDK surfaces only the version metadata (a nil
+// under the SDK's default `Prefer: return=minimal` returns an empty body and the
+// ETag and Location headers, so the SDK surfaces only the version metadata (a nil
 // Composition), and a follow-up GET returns the full Composition.
 //
-// It pins two facts a deployment must satisfy on the minimal path: the write's
-// Location is recovered into the VersionUID (a write that names nothing leaves
+// It pins two facts a deployment must satisfy on the minimal path: the version
+// id the write's ETag or Location names is recovered into the VersionUID (a write that names nothing leaves
 // the caller unable to read what it just committed), and that committed version
 // reads back in full. The "surfaces only metadata" half is the SDK's own
 // contract (a minimal write never decodes a body); asserting it here catches a
@@ -28,7 +28,7 @@ func Probe065MinimalReturnRoundTrip(ctx context.Context, c *transport.Client, eh
 		return r, errors.New("PROBE-065: missing required inputs (client/ehr/comp)")
 	}
 
-	// POST arm — the default minimal write: empty body, Location only.
+	// POST arm — the default minimal write: empty body, ETag and Location only.
 	out, meta, err := composition.Save(ctx, c, ehrID, comp)
 	if err != nil {
 		r.Status = "fail"
@@ -42,7 +42,7 @@ func Probe065MinimalReturnRoundTrip(ctx context.Context, c *transport.Client, eh
 	}
 	if meta == nil || meta.VersionUID == "" {
 		r.Status = "fail"
-		r.Detail = "minimal Save surfaced no VersionUID; the write carried no usable Location"
+		r.Detail = "minimal Save surfaced no VersionUID; the write carried no usable ETag or Location"
 		return r, nil
 	}
 

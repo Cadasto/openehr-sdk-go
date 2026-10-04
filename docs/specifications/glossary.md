@@ -80,7 +80,7 @@ The structured `{message, code, coded_text[]}` JSON body returned on non-2xx res
 ## Authentication and authorisation
 
 **SMART-on-openEHR**
-The SMART App Launch protocol adapted to openEHR. Defines an OAuth2 authorization-code-with-PKCE flow with openEHR-specific scope syntax (`<compartment>/<resource>.<permission>`), launch context (patient, user, encounter), and a service catalog discovery document.
+The SMART App Launch protocol adapted to openEHR. Defines an OAuth2 authorization-code-with-PKCE flow with openEHR resource scopes (`<compartment>/<resource>-<pattern>.<permissions>`, [REQ-165](auth.md#req-165--openehr-scope-syntax)), launch context (patient, user, encounter), and a service catalog discovery document.
 
 **PKCE (Proof Key for Code Exchange)**
 RFC 7636. The mandatory OAuth2 extension SMART-on-openEHR uses to bind an authorization code to the client without a shared secret. Implemented in `auth/smart`.
