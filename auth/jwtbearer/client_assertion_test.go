@@ -91,12 +91,24 @@ func (unusableSigner) Sign(io.Reader, []byte, crypto.SignerOpts) ([]byte, error)
 	return nil, errors.New("key store unavailable")
 }
 
+// fixedPublicSigner is a crypto.Signer of the caller's own whose Public
+// returns pub as it is.
+type fixedPublicSigner struct{ pub crypto.PublicKey }
+
+func (f fixedPublicSigner) Public() crypto.PublicKey { return f.pub }
+
+func (fixedPublicSigner) Sign(io.Reader, []byte, crypto.SignerOpts) ([]byte, error) {
+	return nil, errors.New("not used")
+}
+
 // TestNewClientAssertionRefusesBadArguments pins that NewClientAssertion
 // fails with auth.ErrInvalidConfig, and returns no signer, when an argument
-// is empty (a nil signer, or a nil key of a concrete type, counts as empty),
-// the signer's Public method panics, or the key does not fit the algorithm.
-// It never panics itself. An empty clientID, tokenURL or kid is refused with
-// a message that names the argument.
+// is empty or the key does not fit the algorithm. For the signer, empty
+// means nil, a nil key of a concrete type, a Public method that panics, or a
+// Public that reports no usable public key: nil, or an RSA or ECDSA public
+// key that is nil or lacks its modulus or curve. It never panics itself. An
+// empty clientID, tokenURL or kid is refused with a message that names the
+// argument.
 func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 	rsaKey := newKey(t)
 	p256Key := newECKey(t, elliptic.P256())
@@ -118,6 +130,31 @@ func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 		{
 			name: "signer whose Public panics", clientID: "c1", tokenURL: "https://as.example/token", signer: unusableSigner{}, alg: "RS384", kid: "k1",
 			wantInMsg: "Public method panicked",
+		},
+		{name: "Public reports no key", clientID: "c1", tokenURL: "https://as.example/token", signer: fixedPublicSigner{}, alg: "RS256", kid: "k1"},
+		{
+			name: "Public reports a nil RSA key", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: fixedPublicSigner{pub: (*rsa.PublicKey)(nil)}, alg: "RS384", kid: "k1",
+		},
+		{
+			name: "Public reports an RSA key without modulus", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: fixedPublicSigner{pub: &rsa.PublicKey{E: 65537}}, alg: "RS256", kid: "k1",
+		},
+		{
+			name: "Public reports a nil ECDSA key for ES256", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: fixedPublicSigner{pub: (*ecdsa.PublicKey)(nil)}, alg: "ES256", kid: "k1",
+		},
+		{
+			name: "Public reports a nil ECDSA key for ES384", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: fixedPublicSigner{pub: (*ecdsa.PublicKey)(nil)}, alg: "ES384", kid: "k1",
+		},
+		{
+			name: "Public reports an ECDSA key without curve for ES256", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: fixedPublicSigner{pub: &ecdsa.PublicKey{}}, alg: "ES256", kid: "k1",
+		},
+		{
+			name: "Public reports an ECDSA key without curve for ES384", clientID: "c1", tokenURL: "https://as.example/token",
+			signer: fixedPublicSigner{pub: &ecdsa.PublicKey{}}, alg: "ES384", kid: "k1",
 		},
 		{name: "empty alg", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, kid: "k1"},
 		{name: "empty kid", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, alg: "RS384", wantInMsg: "kid"},

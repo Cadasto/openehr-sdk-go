@@ -33,6 +33,16 @@ func (k *keyHoldingSigner) Sign(rand io.Reader, digest []byte, opts crypto.Signe
 	return k.key.Sign(rand, digest, opts)
 }
 
+// publicKeySigner is a crypto.Signer of the application's own whose Public
+// returns pub as it is.
+type publicKeySigner struct{ pub crypto.PublicKey }
+
+func (p publicKeySigner) Public() crypto.PublicKey { return p.pub }
+
+func (publicKeySigner) Sign(io.Reader, []byte, crypto.SignerOpts) ([]byte, error) {
+	return nil, errors.New("not used")
+}
+
 // assertionTestEndpoints returns endpoints on as.example that list signAlgs
 // as the server's token_endpoint_auth_signing_alg_values_supported.
 func assertionTestEndpoints(signAlgs []string) discovery.AuthEndpoints {
@@ -102,6 +112,7 @@ func TestClientAssertionKeyRefusesNilKey(t *testing.T) { // REQ-068
 		{name: "nil ECDSA key", key: (*ecdsa.PrivateKey)(nil), alg: "ES384"},
 		{name: "nil Ed25519 key", key: ed25519.PrivateKey(nil), alg: "RS384"},
 		{name: "nil custom signer", key: (*keyHoldingSigner)(nil), alg: "RS384"},
+		{name: "custom signer reporting a nil ECDSA public key", key: publicKeySigner{pub: (*ecdsa.PublicKey)(nil)}, alg: "ES384"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

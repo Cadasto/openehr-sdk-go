@@ -102,15 +102,20 @@ type ClaimsSigner struct {
 	jtiCounter atomic.Uint64
 }
 
-// NewClaimsSigner constructs a ClaimsSigner. Returns ErrInvalidConfig
-// when required fields are missing, the signer is nil or a nil
-// *rsa.PrivateKey or *ecdsa.PrivateKey, the algorithm is unsupported, the
-// signer's Public method panics, or the signer's key type does not match the
-// algorithm family. A Public method panics for a nil key of most other types
-// held in a non-nil crypto.Signer, such as a nil ed25519.PrivateKey or a nil
-// pointer to a signer type of the caller's own whose Public reads its key,
-// so such a signer is refused instead of crashing the caller. A nil signer
-// whose Public method works is not detected.
+// NewClaimsSigner constructs a ClaimsSigner. Returns ErrInvalidConfig, and
+// never panics, when required fields are missing, the signer is nil or a
+// nil *rsa.PrivateKey or *ecdsa.PrivateKey, the algorithm is unsupported,
+// the signer's Public method panics or reports no usable public key (nil,
+// or an RSA or ECDSA public key without its modulus or curve), or the
+// signer's key type does not match the algorithm family. A Public method
+// panics for a nil key of most other types held in a non-nil crypto.Signer,
+// such as a nil ed25519.PrivateKey or a nil pointer to a signer type of the
+// caller's own whose Public reads its key, so such a signer is refused
+// instead of crashing the caller.
+//
+// A signer of the caller's own type whose Public reports a usable public key
+// of the right type is accepted as it is: the SDK cannot see inside it, so
+// whether it can sign is known only when it signs.
 //
 // Key requirements per algorithm:
 //   - RS256, RS384: *rsa.PrivateKey
@@ -160,9 +165,12 @@ const clientAssertionLifetime = 5 * time.Minute
 // sub set to clientID, aud set to tokenURL, the JOSE headers typ JWT and
 // kid, a unique jti, and an exp five minutes after its iat.
 //
-// It fails with [auth.ErrInvalidConfig] when clientID, tokenURL, alg or kid
-// is empty, signer is nil, alg is not supported, signer's Public method
-// panics, or the key does not fit alg, as [NewClaimsSigner] describes.
+// It fails with [auth.ErrInvalidConfig], and never panics, when clientID,
+// tokenURL, alg or kid is empty, signer is empty (nil, a nil RSA or ECDSA
+// private key, or a signer whose Public method panics or reports no usable
+// public key), alg is not supported, or the key does not fit alg, as
+// [NewClaimsSigner] describes. A signer of the caller's own type that
+// reports a usable public key is accepted as it is.
 // [NewClaimsSigner] lists the key each algorithm needs.
 func NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, kid string) (*ClaimsSigner, error) {
 	if clientID == "" {
@@ -314,8 +322,9 @@ func toJoseAlg(alg string) (gojose.SignatureAlgorithm, error) {
 // validateKeyAlg checks that the signer's public key fits alg: RS256 and
 // RS384 need an *rsa.PublicKey, ES256 an *ecdsa.PublicKey on P-256, and
 // ES384 one on P-384. It inspects only Public(), so an opaque crypto.Signer
-// (e.g. a KMS or HSM adapter) passes when its Public() returns the key type
-// alg needs, and is refused when it returns any other type. At signing time
+// (e.g. a KMS or HSM adapter) passes when its Public() returns a usable key
+// of the type alg needs, and is refused when it returns any other type, no
+// key, or an RSA or ECDSA key without its modulus or curve. At signing time
 // a signer that is not a concrete *rsa.PrivateKey or *ecdsa.PrivateKey is
 // wrapped with github.com/go-jose/go-jose/v4/cryptosigner, which handles
 // both RSA and ECDSA (including ES256/ES384). An alg outside the four is not
@@ -323,6 +332,9 @@ func toJoseAlg(alg string) (gojose.SignatureAlgorithm, error) {
 func validateKeyAlg(signer crypto.Signer, alg string) error {
 	pub, err := publicKey(signer)
 	if err != nil {
+		return err
+	}
+	if err := usablePublicKey(pub); err != nil {
 		return err
 	}
 	switch alg {
@@ -345,6 +357,25 @@ func validateKeyAlg(signer crypto.Signer, alg string) error {
 		}
 		if ecPub.Curve != elliptic.P384() {
 			return fmt.Errorf("%w: ES384 requires a P-384 key, got %s", auth.ErrInvalidConfig, ecPub.Curve.Params().Name)
+		}
+	}
+	return nil
+}
+
+// usablePublicKey refuses a public key the algorithm checks cannot read: no
+// key at all, or an RSA or ECDSA key that is nil or lacks its modulus or
+// curve. Any other key passes here and is judged against the algorithm.
+func usablePublicKey(pub crypto.PublicKey) error {
+	switch k := pub.(type) {
+	case nil:
+		return fmt.Errorf("%w: the signer's Public method reports no public key", auth.ErrInvalidConfig)
+	case *rsa.PublicKey:
+		if k == nil || k.N == nil {
+			return fmt.Errorf("%w: the signer's Public method reports an RSA public key without its modulus", auth.ErrInvalidConfig)
+		}
+	case *ecdsa.PublicKey:
+		if k == nil || k.Curve == nil {
+			return fmt.Errorf("%w: the signer's Public method reports an ECDSA public key without its curve", auth.ErrInvalidConfig)
 		}
 	}
 	return nil
