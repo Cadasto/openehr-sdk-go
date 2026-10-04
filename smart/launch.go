@@ -25,6 +25,10 @@ type ValidateConfig struct {
 	// id_token_signing_alg_values_supported from discovery. When empty the
 	// SDK default set (RS256/RS384/ES256/ES384) applies.
 	AllowedIDTokenAlgs []string
+	// TrustedAudiences names the audiences the ID token's aud claim may list
+	// besides ClientID. When empty, a token whose aud lists any other
+	// audience is rejected.
+	TrustedAudiences []string
 }
 
 // ValidateOption mutates [ValidateConfig].
@@ -56,6 +60,13 @@ func WithExpectedNonce(nonce string) ValidateOption {
 // (RS256/RS384/ES256/ES384).
 func WithIDTokenSigningAlgs(algs []string) ValidateOption {
 	return func(c *ValidateConfig) { c.AllowedIDTokenAlgs = algs }
+}
+
+// WithTrustedAudiences names the audiences the ID token's aud claim may list
+// besides the client ID. Without it, a token whose aud lists any other
+// audience is rejected.
+func WithTrustedAudiences(aud ...string) ValidateOption {
+	return func(c *ValidateConfig) { c.TrustedAudiences = aud }
 }
 
 // WithPrincipalClaimNames overrides principal_uid / principal_type keys.
@@ -96,7 +107,8 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 	if tr.IDToken != "" {
 		// ValidateIDToken checks the trust anchors (JWKS, issuer, client ID)
 		// before the token, so a missing one is a configuration error (REQ-064).
-		claims, err := ValidateIDToken(ctx, tr.IDToken, cfg.JWKS, cfg.Issuer, cfg.ClientID, cfg.Nonce, cfg.Now, cfg.AllowedIDTokenAlgs)
+		claims, err := ValidateIDToken(ctx, tr.IDToken, cfg.JWKS, cfg.Issuer, cfg.ClientID, cfg.Nonce, cfg.Now, cfg.AllowedIDTokenAlgs,
+			authsmart.WithTrustedAudiences(cfg.TrustedAudiences...))
 		if err != nil {
 			return nil, fmt.Errorf("smart: id_token: %w", err)
 		}
