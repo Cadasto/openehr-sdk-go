@@ -1,11 +1,13 @@
 package serializeprobes_test
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/testkit/conformance/crossformat"
 	conformance "github.com/cadasto/openehr-sdk-go/testkit/conformance/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
@@ -440,5 +442,180 @@ func TestProbe086FrameworkMisuse(t *testing.T) {
 	}
 	if _, err := serializeprobes.Probe086UpstreamFlatParity(target, conformance.Case{Name: "x"}); err == nil {
 		t.Error("case with empty Flat: err = nil; want a framework error")
+	}
+}
+
+// TestProbe105 runs upstream cross-format parity over every set of the vendored
+// cross-format corpus. Every leg a set runs must match the outcome recorded for
+// it, so a gap that opens or closes without its record changing in the same
+// commit fails here (REQ-080).
+func TestProbe105(t *testing.T) {
+	sets, err := fixtures.ListCrossFormatSets()
+	if err != nil {
+		t.Fatalf("enumerate cross-format corpus: %v", err)
+	}
+	if len(sets) == 0 {
+		t.Fatal("PROBE-105 found no cross-format sets; check the vendored corpus and its MANIFEST.txt")
+	}
+	var passes int
+	for _, set := range sets {
+		t.Run(set.Name, func(t *testing.T) {
+			r, err := serializeprobes.Probe105CrossFormatParity(set)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
+				return
+			}
+			passes++
+		})
+	}
+	if passes != len(sets) {
+		t.Errorf("PROBE-105 passed %d/%d sets", passes, len(sets))
+	}
+}
+
+// TestProbe105FailsOnChangedOutcome pins the ratchet from outside the harness:
+// a record that no longer matches what the codecs measure must turn the probe
+// to "fail" and name the set, the leg and both outcomes. It changes one
+// record of a real set for the length of the test; nothing here runs in
+// parallel.
+func TestProbe105FailsOnChangedOutcome(t *testing.T) {
+	sets, err := fixtures.ListCrossFormatSets()
+	if err != nil {
+		t.Fatalf("enumerate cross-format corpus: %v", err)
+	}
+	set, ok := setWithCountedLeg(sets)
+	if !ok {
+		t.Fatal("no cross-format set has a leg recorded with counts; the ratchet cannot be exercised")
+	}
+	orig := crossformat.Recorded[set.Name]
+	t.Cleanup(func() { crossformat.Recorded[set.Name] = orig })
+
+	for _, leg := range crossformat.Legs(set) {
+		rec := orig[leg]
+		if rec.Outcome.Refused != "" {
+			continue
+		}
+		tests := []struct {
+			name   string
+			change func(*crossformat.Record)
+		}{
+			{"one more compared", func(r *crossformat.Record) { r.Outcome.Compared++ }},
+			{"one more missing", func(r *crossformat.Record) { r.Outcome.Missing++; r.Reason = "test" }},
+			{"recorded as a refusal", func(r *crossformat.Record) {
+				r.Outcome = crossformat.Outcome{Refused: "an error the codecs never return"}
+				r.Reason = "test"
+			}},
+		}
+		for _, tt := range tests {
+			t.Run(string(leg)+"/"+tt.name, func(t *testing.T) {
+				changed := maps.Clone(orig)
+				r := changed[leg]
+				tt.change(&r)
+				changed[leg] = r
+				crossformat.Recorded[set.Name] = changed
+
+				got, err := serializeprobes.Probe105CrossFormatParity(set)
+				if err != nil {
+					t.Fatalf("probe framework error: %v", err)
+				}
+				if got.Status != "fail" {
+					t.Fatalf("status = %q (detail: %s); want fail for a record the codecs do not match", got.Status, got.Detail)
+				}
+				for _, want := range []string{set.Name, string(leg), "recorded", "measured"} {
+					if !strings.Contains(got.Detail, want) {
+						t.Errorf("detail = %q; want it to name %q", got.Detail, want)
+					}
+				}
+			})
+		}
+		return
+	}
+}
+
+// setWithCountedLeg returns a set with at least one leg recorded with counts
+// rather than as a refusal.
+func setWithCountedLeg(sets []fixtures.CrossFormatSet) (fixtures.CrossFormatSet, bool) {
+	for _, set := range sets {
+		for _, leg := range crossformat.Legs(set) {
+			if rec, ok := crossformat.Recorded[set.Name][leg]; ok && rec.Outcome.Refused == "" {
+				return set, true
+			}
+		}
+	}
+	return fixtures.CrossFormatSet{}, false
+}
+
+// TestProbe105RecordRules: a set whose records break the record rules fails
+// even when every measured outcome matches its record. Here a recorded
+// difference loses its reason, which PROBE-105 requires every refusal and
+// difference to state; and a set with no records at all fails rather than
+// passing on nothing.
+func TestProbe105RecordRules(t *testing.T) {
+	sets, err := fixtures.ListCrossFormatSets()
+	if err != nil {
+		t.Fatalf("enumerate cross-format corpus: %v", err)
+	}
+	set, leg, ok := setWithRecordedDifference(sets)
+	if !ok {
+		t.Fatal("no cross-format set records a difference; the reason rule cannot be exercised")
+	}
+	orig := crossformat.Recorded[set.Name]
+	t.Cleanup(func() { crossformat.Recorded[set.Name] = orig })
+
+	unexplained := maps.Clone(orig)
+	rec := unexplained[leg]
+	rec.Reason = ""
+	unexplained[leg] = rec
+	crossformat.Recorded[set.Name] = unexplained
+	got, err := serializeprobes.Probe105CrossFormatParity(set)
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
+	}
+	if got.Status != "fail" || !strings.Contains(got.Detail, string(leg)) || !strings.Contains(got.Detail, "state why") {
+		t.Errorf("with the reason of %s %s removed: status = %q (detail: %s); want fail naming the leg and the missing reason",
+			set.Name, leg, got.Status, got.Detail)
+	}
+
+	delete(crossformat.Recorded, set.Name)
+	got, err = serializeprobes.Probe105CrossFormatParity(set)
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
+	}
+	if got.Status != "fail" || !strings.Contains(got.Detail, "no recorded outcomes") {
+		t.Errorf("with set %s unrecorded: status = %q (detail: %s); want fail naming the missing records", set.Name, got.Status, got.Detail)
+	}
+}
+
+// setWithRecordedDifference returns a set and one of its legs recorded with
+// counts that are not clean.
+func setWithRecordedDifference(sets []fixtures.CrossFormatSet) (fixtures.CrossFormatSet, crossformat.Leg, bool) {
+	for _, set := range sets {
+		for _, leg := range crossformat.Legs(set) {
+			rec, ok := crossformat.Recorded[set.Name][leg]
+			if ok && rec.Outcome.Refused == "" && !rec.Outcome.Clean() {
+				return set, leg, true
+			}
+		}
+	}
+	return fixtures.CrossFormatSet{}, "", false
+}
+
+// TestProbe105FrameworkMisuse: a set with no name, no OPT, or no pair of
+// formats that share a leg is framework misuse (a non-nil error), not a probe
+// failure, so a harness can tell "the probe could not run" from "the codecs
+// moved".
+func TestProbe105FrameworkMisuse(t *testing.T) {
+	for name, set := range map[string]fixtures.CrossFormatSet{
+		"no name":                         {OPT: "x.opt", FLAT: "flat.json", STRUCTURED: "structured.json"},
+		"no OPT":                          {Name: "x", FLAT: "flat.json", STRUCTURED: "structured.json"},
+		"one format":                      {Name: "x", OPT: "x.opt", FLAT: "flat.json"},
+		"XML and STRUCTURED share no leg": {Name: "x", OPT: "x.opt", CanonicalXML: "c.xml", STRUCTURED: "s.json"},
+	} {
+		if _, err := serializeprobes.Probe105CrossFormatParity(set); err == nil {
+			t.Errorf("%s: err = nil; want a framework error", name)
+		}
 	}
 }
