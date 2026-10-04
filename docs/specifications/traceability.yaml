@@ -201,6 +201,8 @@ requirements:
     implementation: landed
     packages: [transport]
     tests:
+      - auth/clientcreds/reauth_test.go
+      - auth/jwtbearer/reauth_test.go
       - sandbox/roundtrip_test.go
 
   - id: REQ-030
@@ -660,13 +662,16 @@ requirements:
     packages: [auth, auth/smart, transport, testkit/probes/auth]
     probes: [PROBE-007]
     tests:
+      - auth/clientcreds/reauth_test.go
       - auth/errors_test.go
+      - auth/jwtbearer/reauth_test.go
       - auth/smart/smart_test.go
       - auth/tokensource_test.go
       - testkit/probes/auth/probe_007_proactive_refresh.go
       - testkit/probes/auth/probe_007_transport_refresh.go
       - testkit/probes/auth/probes_test.go
       - transport/client_test.go
+      - transport/reauth_backend_test.go
 
   - id: REQ-064
     title: Launch context
@@ -720,6 +725,7 @@ requirements:
     packages: [auth/clientcreds, auth/jwtbearer, auth/smart]
     probes: [PROBE-004, PROBE-005]
     tests:
+      - auth/clientcreds/catalog_test.go
       - auth/clientcreds/clientcreds_test.go
       - auth/jwtbearer/jwtbearer_test.go
       - auth/smart/confidential_pkce_test.go
