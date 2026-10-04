@@ -11,8 +11,7 @@ import (
 )
 
 // TokenResponse is the SMART token-endpoint payload. The
-// application-level smart/ package maps this into LaunchContext after
-// optional ID-token validation.
+// application-level smart/ package maps this into LaunchContext.
 type TokenResponse struct {
 	AccessToken  string
 	TokenType    string
@@ -20,6 +19,18 @@ type TokenResponse struct {
 	RefreshToken string
 	Scope        string
 	IDToken      string
+	// IDTokenClaims holds the verified claims of the session's ID token.
+	// Only a [Source] sets it, after verifying the ID token the token
+	// endpoint returned to [Source.ExchangeAuthorizationCode],
+	// [Source.CompleteAuthorization] or a refresh; a refresh without an
+	// ID token carries the session's earlier claims. It is nil when the
+	// session has no verified ID token, and on a value built by
+	// [ParseTokenResponse], which verifies nothing.
+	//
+	// smart.LaunchContextFromTokenResponse trusts these claims as they are:
+	// it does not verify them again or check their expiry. Treat them as
+	// read-only; the value is shared with [Source.LastTokenResponse].
+	IDTokenClaims *IDTokenClaims
 	// FHIR-compat launch-context claims.
 	Patient   string
 	Encounter string

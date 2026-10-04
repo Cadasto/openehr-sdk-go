@@ -75,6 +75,7 @@ Each phase is one pull request in its own worktree under `.worktrees/`. Phases 1
 - S6: a SMART client assertion carries a `kid` and expires at most five minutes after issue (HL7 SMART asymmetric profile).
 - O6: a token-change callback lets an application persist a rotated refresh token (RFC 6749 §6, RFC 9700 §4.14).
 - O8: sign-out revokes the refresh token at the advertised `revocation_endpoint` (RFC 7009); new requirement.
+- A refresh response that omits the launch context (`ehrId`, `patient`, `episodeId` and the rest, which SMART lets a server leave out) keeps the earlier context on the source's last token response, so a launch context rebuilt after a refresh does not lose it.
 
 **Definition of done:** as phase 1.
 

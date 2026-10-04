@@ -19,9 +19,11 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 
 ## docs
 - docs/examples.md:619 · "holds none" can be read as an empty ETag, while REQ-054 falls back to Location whenever the ETag is not a well-formed object_version_id · by: sdd-doc-reviewer · from: fix/version-uid-from-etag
+- docs/architecture.md:42 · ID-token verification is placed in auth/smart here, while the normative auth/smart taxonomy row still names only PKCE, the launch flow, refresh, and JWKS rotation. · by: sdd-doc-reviewer · from: feat/smart-authorization-completion
 
 ## docs/adr
 - docs/adr/0023-smart-platform-base-url-and-oidc-issuer.md:36 · "A hand-built catalog that sets only Issuer keeps working" holds only for NewStaticCatalog; a ServiceCatalog literal with only Issuer now fails NewFromCatalog with auth.ErrInvalidConfig (auth/smart/source.go:297-298, pinned by auth/smart/audience_test.go:123); narrow the consequence to NewStaticCatalog or list the new construction error · by: sdd-doc-reviewer, sdd-spec-conformance-reviewer · from: feat/smart-discovery-model
+- docs/adr/0009-smart-auth-library-scope.md:40 · This row now places ID-token verification in auth/smart, and the Amended line still records only the introspection removal. · by: sdd-doc-reviewer · from: feat/smart-authorization-completion
 
 ## docs/specifications
 - docs/specifications/traceability.yaml · test files may still cite a REQ they do not pin and so appear in its generated tests list; a sweep over all test files is still to do (the audit estimated 45 to 50 files, not re-counted) · from: audit-2026-09
@@ -61,6 +63,13 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - docs/specifications/transport.md:373 · The Params comment says other auth-params are kept verbatim, while challenge.go stores those names in lower case. · by: sdd-doc-reviewer · from: feat/smart-backend-transport
 - docs/specifications/auth.md:174 · The parenthetical that the client secret is empty when a client assertion is configured has no RFC-2119 keyword and does not say what NewFromCatalog does when both are set. · by: sdd-doc-reviewer · from: feat/smart-backend-transport
 - docs/specifications/service-discovery.md:257 · The methods row still says that list feeds Phase 3b G-3 selection, while the new consumed-fields bullet says NewFromCatalog checks it as well. · by: sdd-doc-reviewer · from: feat/smart-backend-transport
+- docs/specifications/auth.md:262 · The kid rule verifies with one signing key even beside an encryption key, while the citation says an issuer may omit kid only when the set holds one key. · by: sdd-doc-reviewer · from: feat/smart-authorization-completion
+- docs/specifications/auth.md:579 · The new launch sentinels are added under a lead that still names only the state-mismatch sentinel. · by: sdd-doc-reviewer · from: feat/smart-authorization-completion
+- docs/specifications/auth.md:239 · Otherwise places the missing-iss refusal on the branch where the server does not advertise the parameter, while that refusal's own condition is that the server does advertise it. · by: sdd-doc-reviewer · from: feat/smart-authorization-completion
+- docs/specifications/auth.md:245 · The claim that EHRLaunch.Launch is passed unchanged to AuthorizeURL has no RFC-2119 keyword. · by: sdd-doc-reviewer · from: feat/smart-authorization-completion
+- docs/specifications/auth.md:266 · The prohibition on hand-rolled signature verification and JWK parsing has no MUST NOT. · by: sdd-doc-reviewer · from: feat/smart-authorization-completion
+- docs/specifications/auth.md:390 · The coverage matrix still says REQ-064 lives in smart/ while this paragraph binds the auth/smart exchange and refresh. · by: sdd-doc-reviewer · from: feat/smart-authorization-completion
+- docs/specifications/auth.md:394 · The LaunchContext sketch still glosses User as fhirUser or an openEHR equivalent, while this paragraph requires fhirUser else sub. · by: sdd-doc-reviewer · from: feat/smart-authorization-completion
 
 ## internal/bmmtype
 - internal/bmmtype/bmmtype.go · Substitute leaves a formal parameter unresolved for a bare generic owner, so the data attribute of an OPT's EVENT, POINT_EVENT or INTERVAL_EVENT compiles with RM type T (the row is pinned in bmmtype_test.go) · from: audit-2026-09

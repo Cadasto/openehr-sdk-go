@@ -30,8 +30,10 @@ import (
 //     only), then, after one rotation, serves the set containing
 //     "kid-rotated". This mirrors silent server-side rotation: the SDK's
 //     cached JWKS does not contain the token's kid.
-//   - The SDK's JWKS.Key refreshes once on the cache miss; ValidateIDToken
-//     then verifies the signature and the claims succeed.
+//   - Asked for the token's kid, the SDK's JWKS.Key refreshes once on the
+//     cache miss (a kid-less lookup instead returns the set's only signing
+//     key); ValidateIDToken then verifies the signature and the claims
+//     succeed.
 //
 // Pass conditions (all must hold):
 //  1. ValidateIDToken (via LaunchContextFromTokenResponse) succeeds.

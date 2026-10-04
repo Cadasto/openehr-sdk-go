@@ -37,7 +37,7 @@ The audit delivered the following scope across `auth/` and `smart/`:
 | Confidential asymmetric `private_key_jwt` (authorization-code) | `auth/smart` | 3b (F-C) |
 | SMART Backend Services (`client_credentials` + `private_key_jwt`) | `auth/clientcreds` | 3c (F-C) |
 | JWT Bearer Token Grant (RFC 7523) | `auth/jwtbearer` | 3a (F-I) |
-| ID-token verification (RS256/RS384/ES256/ES384) | `smart/idtoken` | 3e (F-M) |
+| ID-token verification (RS256/RS384/ES256/ES384) | `auth/smart` (re-exported by `smart`) | 3e (F-M) |
 | Token refresh + F-L terminal/transient classification | `auth/smart` | 4a (REQ-063) |
 | Transport 401→reauth safety net | `transport` | 4b (F-D) |
 | Launch context (`ehrId`, `episodeId`, `fhirUser`, …) | `smart` | REQ-064 |
@@ -57,7 +57,7 @@ The SDK adopts three new runtime dependencies, scoped to `auth/` and `smart/`:
 | `github.com/coreos/go-oidc/v3` | ID-token signature verification (RS256/RS384/ES256/ES384 via `go-jose`) |
 | `github.com/go-jose/go-jose/v4` _(direct; also required by `go-oidc/v3`)_ | JWS signing for `client_assertion` / JWT Bearer grant; JWK→`crypto.PublicKey` parsing; ECDSA r‖s byte-padding |
 
-> **Note — dependency classification.** `go-jose/v4` is a **direct** dependency in `go.mod`: `auth/jwtbearer` and `smart/idtoken` import it directly for JWS signing and JWK parsing. It is *also* required by `go-oidc/v3`, so adopting it added no separate supply-chain surface. (An earlier draft of this table tagged the row *transitive*, capturing only the latter fact.)
+> **Note — dependency classification.** `go-jose/v4` is a **direct** dependency in `go.mod`: `auth/jwtbearer` and `auth/smart` import it directly for JWS signing and JWK parsing. It is *also* required by `go-oidc/v3`, so adopting it added no separate supply-chain surface. (An earlier draft of this table tagged the row *transitive*, capturing only the latter fact.)
 
 **Rationale for adoption.** The pre-audit implementation hand-rolled RSA signature verification and JWK parsing. This was a correctness and coverage risk:
 

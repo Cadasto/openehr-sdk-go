@@ -28,6 +28,9 @@ const (
 	methodPrivateKeyJWT     = "private_key_jwt"
 	methodClientSecretBasic = "client_secret_basic"
 	methodClientSecretPost  = "client_secret_post"
+	// nonceLen is the number of random bytes in an OpenID Connect nonce,
+	// the same 256 bits as the state.
+	nonceLen = 32
 )
 
 // clientAssertionKey holds the asymmetric credential for private_key_jwt
@@ -51,6 +54,10 @@ type Config struct {
 	Issuer           string
 	RefreshThreshold time.Duration
 	JWKS             *JWKS
+	// IDTokenTrustedAudiences names the audiences an ID token's aud claim
+	// may list besides ClientID when the source verifies it. Empty means
+	// only ClientID is accepted. See [WithIDTokenTrustedAudiences].
+	IDTokenTrustedAudiences []string
 
 	// clientAssertion carries the asymmetric private_key_jwt credential, set
 	// via WithClientAssertionKey. Mutually exclusive with ClientSecret.
@@ -127,6 +134,16 @@ func WithIssuer(iss string) Option {
 	return func(cfg *Config) { cfg.Issuer = iss }
 }
 
+// WithIDTokenTrustedAudiences names the audiences, besides the client ID,
+// that an ID token's aud claim may list when the source verifies it at the
+// code exchange or on refresh. A token whose aud lists any other audience
+// is refused, so without this option only the client ID is accepted. A
+// later call replaces an earlier one.
+func WithIDTokenTrustedAudiences(aud ...string) Option {
+	trusted := slices.Clone(aud)
+	return func(cfg *Config) { cfg.IDTokenTrustedAudiences = trusted }
+}
+
 // WithRefreshThreshold overrides proactive refresh window (default 30s).
 func WithRefreshThreshold(d time.Duration) Option {
 	return func(cfg *Config) { cfg.RefreshThreshold = d }
@@ -141,12 +158,67 @@ type Source struct {
 	refresh  string
 	lastTR   TokenResponse
 	inflight *tokenExchange
+	// idBinding is what a refreshed ID token must repeat from the last ID
+	// token the source verified; nil until it has verified one.
+	idBinding *idTokenBinding
+	// forceRefresh makes the held access token count as stale until new
+	// tokens replace it. Reauth sets it; setTokensLocked clears it.
+	forceRefresh bool
+	// session counts the times a code exchange or SetTokens installed
+	// tokens. A refresh records it when it starts and discards its result
+	// when it has changed by the time the refresh ends. A refresh does not
+	// advance it.
+	session uint64
+}
+
+// setTokensLocked replaces the held tokens. New tokens are not the ones a
+// Reauth asked to replace, so it also ends a forced refresh. The caller
+// holds s.mu.
+func (s *Source) setTokensLocked(access auth.Token, refresh string) {
+	s.cur = access
+	s.refresh = refresh
+	s.forceRefresh = false
+}
+
+// idTokenBinding holds the claims of a verified ID token that a later one
+// in the same session must repeat (OpenID Connect Core 1.0 §12.2). The
+// issuer is not kept: every ID token the source accepts is checked against
+// its one configured issuer, so it cannot change.
+type idTokenBinding struct {
+	subject string
+	// audience is the token's aud as a set: sorted, each value once.
+	audience []string
+}
+
+// bindingOf returns the binding of verified claims, or nil for none. It
+// keeps its own copy of the audience, so a caller changing the claims it
+// was handed does not change the binding.
+func bindingOf(c *IDTokenClaims) *idTokenBinding {
+	if c == nil {
+		return nil
+	}
+	return &idTokenBinding{subject: c.Subject, audience: audienceSet(c.Audience)}
+}
+
+// audienceSet returns a sorted copy of aud with each value once. RFC 7519
+// §4.1.3 gives aud no order, so two tokens list the same audiences when
+// their sets are equal.
+func audienceSet(aud []string) []string {
+	set := slices.Clone(aud)
+	slices.Sort(set)
+	return slices.Compact(set)
 }
 
 type tokenExchange struct {
 	done  chan struct{}
 	token auth.Token
 	err   error
+	// session is the session the refresh started in.
+	session uint64
+	// superseded reports that a code exchange or SetTokens replaced the
+	// session while the refresh ran, so its result was discarded and the
+	// callers waiting on it try again. It is written before done is closed.
+	superseded bool
 }
 
 // New constructs a Source from clientID and discovery auth endpoints.
@@ -314,14 +386,33 @@ func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID string, opts ...
 	return New(clientID, catalog.Auth, all...)
 }
 
-// AuthorizationRequest holds inputs for building an authorization URL.
+// AuthorizationRequest holds the values one launch carries from
+// [Source.BeginAuthorization] to the redirect back to the app. Keep it, for
+// example in the user's session, and pass it unchanged to
+// [Source.AuthorizeURL] and then to [Source.CompleteAuthorization] or
+// [Source.ExchangeAuthorizationCode].
 type AuthorizationRequest struct {
-	State  string
+	State string
+	// Launch is the launch value an EHR passed to the app (see
+	// [ParseEHRLaunch]), kept here so the request carries the whole
+	// launch. BeginAuthorization leaves it empty; [Source.AuthorizeURL]
+	// sends it when its own launch argument is empty.
 	Launch string
 	PKCE   PKCEPair
+	// Issuer is the issuer the source is bound to: its configured issuer,
+	// the OpenID Connect issuer from discovery. When the redirect names an
+	// issuer, [Source.CompleteAuthorization] requires it to equal this one,
+	// so a response from another authorization server is refused.
+	Issuer string
+	// Nonce is the OpenID Connect nonce sent on the authorization request.
+	// BeginAuthorization sets it when the configured scopes include openid
+	// and leaves it empty otherwise. The ID token returned by the code
+	// exchange has to carry the same value.
+	Nonce string
 }
 
-// BeginAuthorization generates PKCE material for a single launch.
+// BeginAuthorization starts one launch: it generates the PKCE pair and
+// records what the redirect back to the app will be checked against.
 //
 // If state is empty, a cryptographically random state value is generated
 // (stateLen bytes of entropy, base64url-encoded) and returned in
@@ -329,10 +420,17 @@ type AuthorizationRequest struct {
 // verbatim, and the caller takes responsibility for its strength and
 // session binding.
 //
+// The request also records the source's issuer, the OpenID Connect issuer
+// from discovery, in [AuthorizationRequest].Issuer. When the configured
+// scopes include openid, it carries a fresh random nonce (32 random bytes,
+// base64url-encoded) in [AuthorizationRequest].Nonce; without openid the
+// nonce is empty and none is sent.
+//
 // Callers must retain the returned [AuthorizationRequest] and pass it
-// unchanged to [Source.ExchangeAuthorizationCode], which compares the
-// state received at the redirect URI against req.State. A Source supports
-// many concurrent launches when each flow keeps its own request value.
+// unchanged to [Source.CompleteAuthorization] (or
+// [Source.ExchangeAuthorizationCode]), which compare the redirect against
+// it. A Source supports many concurrent launches when each flow keeps its
+// own request value.
 func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) {
 	if state == "" {
 		var err error
@@ -345,10 +443,38 @@ func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) 
 	if err != nil {
 		return AuthorizationRequest{}, err
 	}
-	return AuthorizationRequest{State: state, PKCE: pkce}, nil
+	req := AuthorizationRequest{State: state, PKCE: pkce, Issuer: s.cfg.Issuer}
+	if hasScope(s.cfg.Scopes, auth.ScopeOpenID) {
+		// OpenID Connect Core 1.0 §3.1.2.1: the nonce binds the ID token
+		// to this launch, so a replayed token is refused.
+		req.Nonce, err = randBase64URL(nonceLen)
+		if err != nil {
+			return AuthorizationRequest{}, fmt.Errorf("smart: generate nonce: %w", err)
+		}
+	}
+	return req, nil
 }
 
-// AuthorizeURL builds the SMART authorization redirect URL.
+// hasScope reports whether scopes contain want. Each configured value may
+// itself hold several scopes separated by spaces.
+func hasScope(scopes []string, want string) bool {
+	for _, s := range scopes {
+		if slices.Contains(strings.Fields(s), want) {
+			return true
+		}
+	}
+	return false
+}
+
+// AuthorizeURL builds the SMART authorization redirect URL for req.
+//
+// launch is the launch value an EHR passed to the app (see
+// [ParseEHRLaunch]), or empty for a standalone launch; when it is empty,
+// req.Launch is used instead. When a launch value is set, the URL forwards
+// it unchanged and the scope it sends includes launch, added when the
+// configured scopes lack it. The URL sends req.Nonce as nonce when the
+// request has one and the configured scopes include openid; without openid
+// it sends none, even when the caller set req.Nonce.
 func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {
 		return "", fmt.Errorf("%w: call BeginAuthorization first or supply State and PKCE", auth.ErrInvalidConfig)
@@ -363,25 +489,62 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	q.Set("code_challenge", req.PKCE.Challenge)
 	q.Set("code_challenge_method", challengeMethod)
 	q.Set("state", req.State)
-	if len(s.cfg.Scopes) > 0 {
-		q.Set("scope", strings.Join(s.cfg.Scopes, " "))
+	if launch == "" {
+		launch = req.Launch
+	}
+	scopes := s.cfg.Scopes
+	if launch != "" && !hasScope(scopes, auth.ScopeLaunch) {
+		// HL7 SMART App Launch: an app launched from an EHR asks for the
+		// launch scope. Concat copies, so the configuration stays as it was.
+		scopes = slices.Concat(scopes, []string{auth.ScopeLaunch})
+	}
+	if len(scopes) > 0 {
+		q.Set("scope", strings.Join(scopes, " "))
 	}
 	// FromConfig refuses a source without an audience, so aud is always set.
 	q.Set("aud", s.cfg.Audience)
 	if launch != "" {
 		q.Set("launch", launch)
 	}
+	if req.Nonce != "" && hasScope(s.cfg.Scopes, auth.ScopeOpenID) {
+		q.Set("nonce", req.Nonce)
+	}
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
 
-// ExchangeAuthorizationCode completes the PKCE flow. req must be
-// the [AuthorizationRequest] returned by [Source.BeginAuthorization] for this
-// launch. callbackState is the state query parameter received at the redirect
-// URI; it is compared against req.State and [ErrLaunchInvalidState] is
-// returned on mismatch before any network call is made, defending against
-// CSRF. The returned [TokenResponse] carries SMART launch parameters for
-// smart/.
+// ExchangeAuthorizationCode completes the PKCE flow: it trades the
+// authorization code for tokens at the token endpoint. Most apps call
+// [Source.CompleteAuthorization] instead, which also checks the issuer and
+// error parameters of the redirect before calling this.
+//
+// req must be the [AuthorizationRequest] returned by
+// [Source.BeginAuthorization] for this launch. callbackState is the state
+// query parameter received at the redirect URI; it is compared against
+// req.State and [ErrLaunchInvalidState] is returned on mismatch before any
+// network call is made, defending against CSRF.
+//
+// When the token response carries an ID token, ExchangeAuthorizationCode
+// verifies it before returning: the signature against the source's JWKS,
+// using only the algorithms the server lists in
+// id_token_signing_alg_values_supported when it lists any; the issuer
+// against the source's issuer; the audience against the client ID and
+// [WithIDTokenTrustedAudiences]; and the nonce against req.Nonce. Any
+// failure there is an [*auth.ExchangeError] matching
+// [auth.ErrTokenExchangeFailed] that also matches its cause: a token that
+// fails its checks matches [auth.ErrJWKSValidationFailed], a source without
+// a JWKS matches [auth.ErrInvalidConfig], and a key set that cannot be
+// fetched keeps its fetch error. An unverified ID token is never returned.
+// The verified claims are in [TokenResponse].IDTokenClaims. When the call
+// fails, the source keeps the tokens it held before.
+//
+// A successful exchange starts a new session: the source holds the new
+// access token and the response's refresh token, or none when the response
+// has none, never a refresh token from an earlier session. A refresh still
+// running from the earlier session has its result discarded.
+//
+// The returned [TokenResponse] also carries the SMART launch parameters
+// for smart/.
 func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, callbackState string, req AuthorizationRequest) (auth.Token, TokenResponse, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {
 		return auth.Token{}, TokenResponse{}, fmt.Errorf("%w: AuthorizationRequest from BeginAuthorization is required", auth.ErrInvalidConfig)
@@ -393,18 +556,43 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, err
 	}
+	if tr.IDToken != "" {
+		// OpenID Connect Core 1.0 §3.1.3.7: the ID token is checked before
+		// anything from this response is kept or returned.
+		claims, err := s.verifyIDToken(ctx, tr.IDToken, req.Nonce)
+		if err != nil {
+			return auth.Token{}, TokenResponse{}, &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: fmt.Errorf("id_token: %w", err)}
+		}
+		tr.IDTokenClaims = claims
+	}
 	s.mu.Lock()
-	s.cur = tok
-	s.refresh = refresh
+	s.session++
+	s.setTokensLocked(tok, refresh)
 	s.lastTR = tr
+	// A new authorization starts a new session: without an ID token there
+	// is nothing to bind a refresh to.
+	s.idBinding = bindingOf(tr.IDTokenClaims)
 	s.mu.Unlock()
 	return tok, tr, nil
+}
+
+// verifyIDToken checks an ID token from the token endpoint against the
+// source's JWKS, issuer, client ID, trusted audiences and the server's
+// advertised signing algorithms. nonce is the launch's nonce at
+// the code exchange, and empty on refresh, where none is checked.
+func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDTokenClaims, error) {
+	return ValidateIDToken(ctx, raw, s.cfg.JWKS, s.cfg.Issuer, s.cfg.ClientID, nonce, time.Time{},
+		s.cfg.Auth.IDTokenSigningAlgValuesSupported, WithTrustedAudiences(s.cfg.IDTokenTrustedAudiences...))
 }
 
 // LastTokenResponse returns SMART fields from the most recent successful
 // token-endpoint call (authorization_code or refresh_token). After
 // [Source.Token] refreshes, callers that need an updated [LaunchContext]
 // should re-run smart.LaunchContextFromTokenResponse with this value.
+//
+// A refresh response without an ID token keeps the session's identity: its
+// IDTokenClaims are the verified claims the session had before, so a
+// launch context rebuilt from it still names the same user.
 func (s *Source) LastTokenResponse() TokenResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -412,32 +600,61 @@ func (s *Source) LastTokenResponse() TokenResponse {
 }
 
 // SetTokens seeds access and optional refresh tokens (testing / token import).
+// The new tokens end a refresh that [Source.Reauth] forced, and a refresh
+// already running when SetTokens is called has its result discarded.
+//
+// SetTokens does not start a new session: it keeps the identity of the last
+// ID token the source verified, and [Source.LastTokenResponse]. A later
+// refresh whose ID token names another user is then refused, so import
+// tokens for a different user into a new Source.
 func (s *Source) SetTokens(access auth.Token, refresh string) {
 	s.mu.Lock()
-	s.cur = access
-	s.refresh = refresh
+	s.session++
+	s.setTokensLocked(access, refresh)
 	s.mu.Unlock()
 }
 
 // Token returns a valid access token, refreshing when near expiry.
+//
+// A refresh that started before [Source.ExchangeAuthorizationCode] or
+// [Source.SetTokens] replaced the held tokens has its result discarded,
+// success or failure, and Token returns the new tokens instead, refreshing
+// them in turn when they are stale.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
+	for {
+		tok, retry, err := s.tryToken(ctx)
+		if !retry {
+			return tok, err
+		}
+		// New tokens replaced the session the refresh belonged to; read
+		// them. A further retry needs yet another replacement meanwhile.
+	}
+}
+
+// tryToken makes one attempt at Token. retry reports that the refresh it led
+// or waited on was discarded because the session changed, so the caller
+// tries again against the current tokens.
+func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err error) {
 	if err := ctx.Err(); err != nil {
-		return auth.Token{}, err
+		return auth.Token{}, false, err
 	}
 	s.mu.Lock()
 	if !s.staleLocked() {
 		t := s.cur
 		s.mu.Unlock()
-		return t, nil
+		return t, false, nil
 	}
 	if s.inflight != nil {
 		ex := s.inflight
 		s.mu.Unlock()
 		select {
 		case <-ex.done:
-			return ex.token, ex.err
+			if ex.superseded {
+				return auth.Token{}, true, nil
+			}
+			return ex.token, false, ex.err
 		case <-ctx.Done():
-			return auth.Token{}, ctx.Err()
+			return auth.Token{}, false, ctx.Err()
 		}
 	}
 	refreshTok := s.refresh
@@ -447,7 +664,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		// been cleared by a prior terminal failure (F-L). Return immediately
 		// without touching inflight — there is nothing to exchange (REQ-063).
 		s.mu.Unlock()
-		return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
+		return auth.Token{}, false, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
 	}
 	if refreshTok == "" && !cur.IsZero() {
 		s.mu.Unlock()
@@ -457,25 +674,46 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		// re-authentication. A still-valid token (near expiry but not yet past
 		// it) is returned as-is without claiming inflight (REQ-026).
 		if !cur.ExpiresAt.IsZero() && time.Until(cur.ExpiresAt) <= 0 {
-			return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("access token expired and no refresh_token")}
+			return auth.Token{}, false, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("access token expired and no refresh_token")}
 		}
-		return cur, nil
+		return cur, false, nil
 	}
-	ex := &tokenExchange{done: make(chan struct{})}
+	ex := &tokenExchange{done: make(chan struct{}), session: s.session}
+	// The binding is read with the session it belongs to, not after the
+	// network call, when another session's may have replaced it.
+	binding := s.idBinding
 	s.inflight = ex
 	s.mu.Unlock()
 
-	var tok auth.Token
-	var err error
 	var refreshedTR TokenResponse
-	tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok)
+	tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok, binding)
 
 	s.mu.Lock()
+	if s.session != ex.session {
+		// A code exchange or SetTokens replaced the session while the refresh
+		// ran. Its result, success or failure, belongs to the old session:
+		// nothing of it is kept, and no terminal failure clears the new
+		// tokens. Every caller on this refresh tries again.
+		if s.inflight == ex {
+			s.inflight = nil
+		}
+		s.mu.Unlock()
+		ex.superseded = true
+		close(ex.done)
+		return auth.Token{}, true, nil
+	}
 	if err == nil {
-		s.cur = tok
-		s.refresh = refreshTok
+		s.setTokensLocked(tok, refreshTok)
 		if refreshedTR.AccessToken != "" {
+			if refreshedTR.IDToken == "" {
+				// OpenID Connect Core 1.0 §12.2 lets a refresh leave the ID
+				// token out; the session keeps the identity it verified.
+				refreshedTR.IDTokenClaims = s.lastTR.IDTokenClaims
+			}
 			s.lastTR = refreshedTR
+		}
+		if refreshedTR.IDTokenClaims != nil {
+			s.idBinding = bindingOf(refreshedTR.IDTokenClaims)
 		}
 	} else {
 		// F-L: on a terminal failure clear the refresh token and the cached
@@ -485,8 +723,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		// may retry (REQ-063).
 		ex2, ok := errors.AsType[*auth.ExchangeError](err)
 		if ok && ex2.Terminal() {
-			s.refresh = ""
-			s.cur = auth.Token{}
+			s.setTokensLocked(auth.Token{}, "")
 			err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: err}
 		}
 	}
@@ -495,7 +732,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	ex.token = tok
 	ex.err = err
 	close(ex.done)
-	return tok, err
+	return tok, false, err
 }
 
 // RefreshIfNeeded refreshes the access token only when it is within the
@@ -521,6 +758,12 @@ func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 // terminal refresh failure it clears the refresh token and returns
 // ErrReauthRequired.
 //
+// Any other failed refresh (a server or network error, or an ID token the
+// source refuses) keeps both the access token and the refresh token, and the
+// access token stays stale, so the next [Source.Token] call tries the
+// refresh again. New tokens, from a refresh, a code exchange or
+// [Source.SetTokens], end the forced refresh.
+//
 // When no refresh_token is available there is nothing to exchange, so Reauth
 // does not discard the cached access token (a wire 401 may be scope-related
 // rather than an expiry, and a public client has no other credential to fall
@@ -539,15 +782,16 @@ func (s *Source) Reauth(ctx context.Context) error {
 	}
 	// A refresh_token is available: mark the current token stale so the next
 	// Token() executes the refresh even if it has not yet crossed the
-	// proactive-refresh threshold.
-	s.cur = auth.Token{}
+	// proactive-refresh threshold. The token itself is kept, so a failed
+	// refresh leaves the source as it was.
+	s.forceRefresh = true
 	s.mu.Unlock()
 	_, err := s.Token(ctx)
 	return err
 }
 
 func (s *Source) staleLocked() bool {
-	if s.cur.IsZero() {
+	if s.forceRefresh || s.cur.IsZero() {
 		return true
 	}
 	if s.cur.ExpiresAt.IsZero() {
@@ -567,13 +811,50 @@ func (s *Source) exchangeCode(ctx context.Context, code, verifier string) (auth.
 	return s.postToken(ctx, form)
 }
 
-func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, TokenResponse, string, error) {
+// refreshGrant redeems refresh at the token endpoint. An ID token in the
+// response is verified before anything is returned; a failure is a
+// refresh failure that is not terminal, so the caller keeps its tokens.
+//
+// binding is the identity of the session the refresh belongs to, read when
+// the refresh started; nil when that session has verified no ID token.
+func (s *Source) refreshGrant(ctx context.Context, refresh string, binding *idTokenBinding) (auth.Token, TokenResponse, string, error) {
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refresh},
 		"client_id":     {s.cfg.ClientID},
 	}
-	return s.postToken(ctx, form)
+	tok, tr, next, err := s.postToken(ctx, form)
+	if err != nil {
+		return auth.Token{}, TokenResponse{}, "", err
+	}
+	if next == "" {
+		// RFC 6749 §6: the server may keep the refresh token it was sent.
+		next = refresh
+	}
+	if tr.IDToken == "" {
+		return tok, tr, next, nil
+	}
+	claims, err := s.verifyRefreshedIDToken(ctx, tr.IDToken, binding)
+	if err != nil {
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrRefreshFailed, Inner: fmt.Errorf("id_token: %w", err)}
+	}
+	tr.IDTokenClaims = claims
+	return tok, tr, next, nil
+}
+
+// verifyRefreshedIDToken verifies an ID token from a refresh response like
+// one from the code exchange, without a nonce, and, when prev holds the
+// session's earlier verified ID token, requires the same subject and
+// audience (OpenID Connect Core 1.0 §12.2).
+func (s *Source) verifyRefreshedIDToken(ctx context.Context, raw string, prev *idTokenBinding) (*IDTokenClaims, error) {
+	claims, err := s.verifyIDToken(ctx, raw, "")
+	if err != nil {
+		return nil, err
+	}
+	if prev != nil && (claims.Subject != prev.subject || !slices.Equal(audienceSet(claims.Audience), prev.audience)) {
+		return nil, fmt.Errorf("%w: the refreshed ID token names another subject or audience than the session's", auth.ErrJWKSValidationFailed)
+	}
+	return claims, nil
 }
 
 func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
@@ -643,16 +924,7 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: errors.New("empty access_token")}
 	}
 	tok := tokenFromResponse(parsed, s.cfg.Issuer)
-	refresh := parsed.RefreshToken
-	if refresh == "" {
-		// Keep prior refresh when the server omits a new one.
-		s.mu.Lock()
-		if s.refresh != "" {
-			refresh = s.refresh
-		}
-		s.mu.Unlock()
-	}
-	return tok, parsed, refresh, nil
+	return tok, parsed, parsed.RefreshToken, nil
 }
 
 // JWKS returns the JWKS helper when configured.
