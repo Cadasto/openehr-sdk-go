@@ -62,19 +62,19 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-058 | Datamap V2 | [module-layout.md](module-layout.md#req-058--datamap-v2) | draft | planned |
 | REQ-059 | openEHR custom headers | [wire.md](wire.md#req-059) | draft | partial |
 | REQ-060 | TokenSource interface | [auth.md](auth.md#req-060) | draft | landed |
-| REQ-061 | SMART-on-openEHR PKCE | [auth.md](auth.md#req-061--pkce-flow) | draft | landed |
+| REQ-061 | SMART-on-openEHR PKCE | [auth.md](auth.md#req-061--pkce-flow) | draft | partial |
 | REQ-062 | JWKS rotation | [auth.md](auth.md#req-062--jwks-rotation) | draft | landed |
 | REQ-063 | Token refresh | [auth.md](auth.md#req-063--token-refresh) | draft | landed |
 | REQ-064 | Launch context | [auth.md](auth.md#req-064--launch-context) | draft | landed |
-| REQ-065 | Per-client tenant binding | [auth.md](auth.md#req-065) | draft | landed |
+| REQ-065 | Per-client tenant binding | [auth.md](auth.md#req-065) | draft | partial |
 | REQ-066 | Caller attribution | [auth.md](auth.md#req-066) | draft | landed |
 | REQ-067 | Platform principal claims | [auth.md](auth.md#req-067) | draft | landed |
 | REQ-068 | SMART flows and launch modes | [auth.md](auth.md#req-068--flow-and-launch-mode-coverage) | draft | landed |
 | REQ-069 | HTTP Basic on openEHR REST | [auth.md](auth.md#req-069) | draft | landed |
-| REQ-070 | First-class discovery | [service-discovery.md](service-discovery.md#req-070) | draft | landed |
-| REQ-071 | Discovery cache | [service-discovery.md](service-discovery.md#req-071) | draft | landed |
-| REQ-072 | Discovery validation | [service-discovery.md](service-discovery.md#req-072) | draft | landed |
-| REQ-073 | Discovery trust posture | [service-discovery.md](service-discovery.md#req-073--discovery-trust-posture) | draft | landed |
+| REQ-070 | First-class discovery | [service-discovery.md](service-discovery.md#req-070) | draft | partial |
+| REQ-071 | Discovery cache | [service-discovery.md](service-discovery.md#req-071) | draft | partial |
+| REQ-072 | Discovery validation | [service-discovery.md](service-discovery.md#req-072) | draft | partial |
+| REQ-073 | Discovery trust posture | [service-discovery.md](service-discovery.md#req-073--discovery-trust-posture) | draft | partial |
 | REQ-080 | openEHR wire conformance | [conformance.md](conformance.md#conformance-scope) | draft | partial |
 | REQ-081 | Wire-level parity (retired) | [conformance.md](conformance.md#req-081--wire-level-parity-retired) | deprecated | retired |
 | REQ-082 | Probe runnability | [conformance.md](conformance.md#req-082--runnability) | draft | partial |

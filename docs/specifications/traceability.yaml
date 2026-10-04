@@ -621,7 +621,7 @@ requirements:
     title: SMART-on-openEHR PKCE
     canonical: docs/specifications/auth.md#req-061--pkce-flow
     status: draft
-    implementation: landed
+    implementation: partial
     packages: [auth/smart, auth]
     probes: [PROBE-001, PROBE-004, PROBE-005]
     tests:
@@ -678,7 +678,7 @@ requirements:
     title: Per-client tenant binding
     canonical: docs/specifications/auth.md#req-065
     status: draft
-    implementation: landed
+    implementation: partial
     packages: [transport]
 
   - id: REQ-066
@@ -733,7 +733,7 @@ requirements:
     title: First-class discovery
     canonical: docs/specifications/service-discovery.md#req-070
     status: draft
-    implementation: landed
+    implementation: partial
     packages: [smart/discovery]
     probes: [PROBE-002, PROBE-040]
     tests:
@@ -747,7 +747,7 @@ requirements:
     title: Discovery cache
     canonical: docs/specifications/service-discovery.md#req-071
     status: draft
-    implementation: landed
+    implementation: partial
     packages: [smart/discovery]
     probes: [PROBE-041]
     tests:
@@ -757,7 +757,7 @@ requirements:
     title: Discovery validation
     canonical: docs/specifications/service-discovery.md#req-072
     status: draft
-    implementation: landed
+    implementation: partial
     packages: [smart/discovery]
     probes: [PROBE-002, PROBE-003, PROBE-040, PROBE-041]
     tests:
@@ -771,7 +771,7 @@ requirements:
     title: Discovery trust posture
     canonical: docs/specifications/service-discovery.md#req-073--discovery-trust-posture
     status: draft
-    implementation: landed
+    implementation: partial
     packages: [smart/discovery]
     tests:
       - smart/discovery/resolver_test.go

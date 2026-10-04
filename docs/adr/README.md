@@ -34,6 +34,7 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | ADR-0020 | Cassette recordings are HTTP Archive 1.2 | Accepted | 2026-09-07 | — |
 | ADR-0021 | Encoded JSON member order is not part of the canonical JSON contract | Accepted | 2026-09-14 | — |
 | ADR-0022 | Canonical JSON is encoded by `encoding/json/v2` | Accepted | 2026-09-14 | — |
+| ADR-0023 | SMART discovery: the Platform base URL and the OIDC issuer are separate values | Proposed | 2026-10-04 | — |
 
 <!-- /sdd:generated -->
 
