@@ -233,8 +233,8 @@ The authorization request **MUST** carry `aud` (HL7 SMART App Launch lists it as
 
 The SMART discovery resolver surfaces two algorithm-selection lists onto `AuthEndpoints` (REQ-070):
 
-- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). Phase 3b client-credential selection logic will read this list to choose a signing algorithm; in v0.8 the field is populated but not yet consumed.
-- **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). ID-token verification (REQ-064) consumes this list as the verification allowlist when present (see _ID-token verification algorithm agility_ below). `TokenEndpointAuthSigningAlgValuesSupported` remains surface-only in v0.8 (Phase 3b client-credential alg selection).
+- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). `auth/clientcreds.NewFromCatalog` reads this list to refuse a client assertion from the SDK's own `jwtbearer.ClaimsSigner` whose algorithm a non-empty list leaves out ([§ Backend Services from a resolved catalog](#backend-services-from-a-resolved-catalog)); the SDK does not choose an algorithm from it.
+- **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). ID-token verification (REQ-064) consumes this list as the verification allowlist when present (see _ID-token verification algorithm agility_ below).
 
 The SDK validates ID tokens against the deployment's published JWKS. JWKS rotation **MUST** be handled:
 
