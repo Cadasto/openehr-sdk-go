@@ -18,8 +18,8 @@ import (
 
 // SpecVersionPin is the SDK's pinned openEHR REST contract version.
 // The Resolver checks the spec_version a required service advertises
-// against this version unless the caller widens the accepted set via
-// WithAcceptedSpecVersions.
+// against this version, unless the caller sets WithAcceptedSpecVersions,
+// whose list then replaces it.
 const SpecVersionPin = "1.1.0-development"
 
 // WellKnownPath is the standard SMART configuration path appended to
@@ -89,8 +89,11 @@ func WithRequiredServices(ids ...string) Option {
 	}
 }
 
-// WithAcceptedSpecVersions widens the version set the resolver accepts
-// on a required service. Default is {SpecVersionPin}.
+// WithAcceptedSpecVersions sets the versions the resolver accepts on a
+// required service, which are {SpecVersionPin} by default. The list
+// replaces the pinned version rather than adding to it, so a caller who
+// still accepts SpecVersionPin names it too:
+// WithAcceptedSpecVersions(SpecVersionPin, "1.1.0").
 //
 // Without this option the resolver compares a required service's
 // spec_version only when the entry advertises one, and never compares its

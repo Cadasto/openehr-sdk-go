@@ -118,6 +118,7 @@ func TestNewStaticCatalogKeepsServiceEntryMembers(t *testing.T) { // REQ-070
 // an advertised spec_version is compared and the canonical version member
 // never is; with it, the compared value is spec_version when the entry
 // advertises one and version otherwise, and an entry with neither fails.
+// The list given to WithAcceptedSpecVersions replaces SpecVersionPin.
 func TestResolveVersionGate(t *testing.T) { // REQ-072
 	tests := []struct {
 		name     string
@@ -167,6 +168,19 @@ func TestResolveVersionGate(t *testing.T) { // REQ-072
 			members:  map[string]any{"spec_version": "1.0.3", "version": "2.0.0"},
 			refused:  true,
 			wantGot:  "1.0.3",
+		},
+		{
+			// The list replaces the pinned target rather than adding to it.
+			name:     "strict: a list without the pin refuses the pin",
+			accepted: []string{"1.1.0"},
+			members:  map[string]any{"spec_version": discovery.SpecVersionPin},
+			refused:  true,
+			wantGot:  discovery.SpecVersionPin,
+		},
+		{
+			name:     "strict: a list naming the pin accepts it",
+			accepted: []string{discovery.SpecVersionPin, "1.1.0"},
+			members:  map[string]any{"spec_version": discovery.SpecVersionPin},
 		},
 		{
 			name:     "strict: neither member",
