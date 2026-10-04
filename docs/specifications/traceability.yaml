@@ -1765,7 +1765,7 @@ requirements:
     title: openEHR scope syntax
     canonical: docs/specifications/auth.md#req-165--openehr-scope-syntax
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [auth]
     tests:
       - auth/openehr_scope_test.go
