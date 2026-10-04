@@ -1,0 +1,147 @@
+<composition archetype_node_id="openEHR-EHR-COMPOSITION.family_history.v0" xmlns:ns2="http://schemas.openehr.org/v1">
+    <name>
+        <value>Family history</value>
+    </name>
+    <archetype_details>
+        <archetype_id>
+            <value>openEHR-EHR-COMPOSITION.family_history.v0</value>
+            <qualifiedRmEntity>openEHR-EHR-COMPOSITION</qualifiedRmEntity>
+            <domainConcept>family_history</domainConcept>
+            <rmOriginator>openEHR</rmOriginator>
+            <rmName>EHR</rmName>
+            <rmEntity>COMPOSITION</rmEntity>
+            <versionId>0</versionId>
+        </archetype_id>
+        <template_id>
+            <value>family_history</value>
+        </template_id>
+        <rm_version>1.0.4</rm_version>
+    </archetype_details>
+    <language>
+        <terminology_id>
+            <value>ISO_639-1</value>
+        </terminology_id>
+        <code_string>en</code_string>
+    </language>
+    <territory>
+        <terminology_id>
+            <value>ISO_3166-1</value>
+        </terminology_id>
+        <code_string>AU</code_string>
+    </territory>
+    <category>
+        <value>event</value>
+        <defining_code>
+            <terminology_id>
+                <value>openehr</value>
+            </terminology_id>
+            <code_string>433</code_string>
+        </defining_code>
+    </category>
+    <composer xsi:type="PARTY_IDENTIFIED" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <name>Doctor</name>
+    </composer>
+    <context>
+        <start_time>
+            <value>2021-12-10T15:03:00</value>
+        </start_time>
+        <setting>
+            <value>home</value>
+            <defining_code>
+                <terminology_id>
+                    <value>openehr</value>
+                </terminology_id>
+                <code_string>225</code_string>
+            </defining_code>
+        </setting>
+    </context>
+    <content xsi:type="EVALUATION" archetype_node_id="openEHR-EHR-EVALUATION.family_history.v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+        <name>
+            <value>Family history</value>
+        </name>
+        <archetype_details>
+            <archetype_id>
+                <value>openEHR-EHR-EVALUATION.family_history.v2</value>
+                <qualifiedRmEntity>openEHR-EHR-EVALUATION</qualifiedRmEntity>
+                <domainConcept>family_history</domainConcept>
+                <rmOriginator>openEHR</rmOriginator>
+                <rmName>EHR</rmName>
+                <rmEntity>EVALUATION</rmEntity>
+                <versionId>2</versionId>
+            </archetype_id>
+            <rm_version>1.0.4</rm_version>
+        </archetype_details>
+        <language>
+            <terminology_id>
+                <value>ISO_639-1</value>
+            </terminology_id>
+            <code_string>en</code_string>
+        </language>
+        <encoding>
+            <terminology_id>
+                <value>IANA_character-sets</value>
+            </terminology_id>
+            <code_string>UTF-8</code_string>
+        </encoding>
+        <subject xsi:type="PARTY_IDENTIFIED">
+            <name>Patient</name>
+        </subject>
+        <data xsi:type="ITEM_TREE" archetype_node_id="at0001">
+            <name>
+                <value>Tree</value>
+            </name>
+            <items xsi:type="CLUSTER" archetype_node_id="at0003">
+                <name>
+                    <value>Per family member</value>
+                </name>
+                <items xsi:type="ELEMENT" archetype_node_id="at0060">
+                    <name>
+                        <value>Biological sex</value>
+                    </name>
+                    <value xsi:type="DV_CODED_TEXT">
+                        <value>Female</value>
+                        <defining_code>
+                            <terminology_id>
+                                <value>SNOMED-CT</value>
+                            </terminology_id>
+                            <code_string>248152002</code_string>
+                        </defining_code>
+                    </value>
+                </items>
+                <items xsi:type="ELEMENT" archetype_node_id="at0016">
+                    <name>
+                        <value>Relationship</value>
+                    </name>
+                    <value xsi:type="DV_CODED_TEXT">
+                        <value>Mother</value>
+                        <defining_code>
+                            <terminology_id>
+                                <value>SNOMED-CT</value>
+                            </terminology_id>
+                            <code_string>444301002</code_string>
+                        </defining_code>
+                    </value>
+                </items>
+                <items xsi:type="CLUSTER" archetype_node_id="at0008">
+                    <name>
+                        <value>Clinical history</value>
+                    </name>
+                    <items xsi:type="ELEMENT" archetype_node_id="at0009">
+                        <name>
+                            <value>Problem/diagnosis name</value>
+                        </name>
+                        <value xsi:type="DV_CODED_TEXT">
+                            <value>"Section" examination - social worker (procedure)</value>
+                            <defining_code>
+                                <terminology_id>
+                                    <value>SNOMED-CT</value>
+                                </terminology_id>
+                                <code_string>148648004</code_string>
+                            </defining_code>
+                        </value>
+                    </items>
+                </items>
+            </items>
+        </data>
+    </content>
+</composition>

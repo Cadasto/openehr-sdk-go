@@ -1,0 +1,194 @@
+{
+    "_type": "COMPOSITION",
+    "name": {
+        "_type": "DV_TEXT",
+        "value": "Family history"
+    },
+    "archetype_details": {
+        "archetype_id": {
+            "value": "openEHR-EHR-COMPOSITION.family_history.v0"
+        },
+        "template_id": {
+            "value": "family_history"
+        },
+        "rm_version": "1.0.4"
+    },
+    "language": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": "ISO_639-1"
+        },
+        "code_string": "en"
+    },
+    "territory": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": "ISO_3166-1"
+        },
+        "code_string": "AU"
+    },
+    "category": {
+        "_type": "DV_CODED_TEXT",
+        "value": "event",
+        "defining_code": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {
+                "_type": "TERMINOLOGY_ID",
+                "value": "openehr"
+            },
+            "code_string": "433"
+        }
+    },
+    "composer": {
+        "_type": "PARTY_IDENTIFIED",
+        "name": "Doctor"
+    },
+    "context": {
+        "_type": "EVENT_CONTEXT",
+        "start_time": {
+            "_type": "DV_DATE_TIME",
+            "value": "2021-12-10T15:03:00"
+        },
+        "setting": {
+            "_type": "DV_CODED_TEXT",
+            "value": "home",
+            "defining_code": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                    "_type": "TERMINOLOGY_ID",
+                    "value": "openehr"
+                },
+                "code_string": "225"
+            }
+        }
+    },
+    "content": [
+        {
+            "_type": "EVALUATION",
+            "name": {
+                "_type": "DV_TEXT",
+                "value": "Family history"
+            },
+            "archetype_details": {
+                "archetype_id": {
+                    "value": "openEHR-EHR-EVALUATION.family_history.v2"
+                },
+                "rm_version": "1.0.4"
+            },
+            "language": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                    "_type": "TERMINOLOGY_ID",
+                    "value": "ISO_639-1"
+                },
+                "code_string": "en"
+            },
+            "encoding": {
+                "_type": "CODE_PHRASE",
+                "terminology_id": {
+                    "_type": "TERMINOLOGY_ID",
+                    "value": "IANA_character-sets"
+                },
+                "code_string": "UTF-8"
+            },
+            "subject": {
+                "_type": "PARTY_IDENTIFIED",
+                "name": "Patient"
+            },
+            "data": {
+                "_type": "ITEM_TREE",
+                "name": {
+                    "_type": "DV_TEXT",
+                    "value": "Tree"
+                },
+                "items": [
+                    {
+                        "_type": "CLUSTER",
+                        "name": {
+                            "_type": "DV_TEXT",
+                            "value": "Per family member"
+                        },
+                        "items": [
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Biological sex"
+                                },
+                                "value": {
+                                    "_type": "DV_CODED_TEXT",
+                                    "value": "Female",
+                                    "defining_code": {
+                                        "_type": "CODE_PHRASE",
+                                        "terminology_id": {
+                                            "_type": "TERMINOLOGY_ID",
+                                            "value": "SNOMED-CT"
+                                        },
+                                        "code_string": "248152002"
+                                    }
+                                },
+                                "archetype_node_id": "at0060"
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Relationship"
+                                },
+                                "value": {
+                                    "_type": "DV_CODED_TEXT",
+                                    "value": "Mother",
+                                    "defining_code": {
+                                        "_type": "CODE_PHRASE",
+                                        "terminology_id": {
+                                            "_type": "TERMINOLOGY_ID",
+                                            "value": "SNOMED-CT"
+                                        },
+                                        "code_string": "444301002"
+                                    }
+                                },
+                                "archetype_node_id": "at0016"
+                            },
+                            {
+                                "_type": "CLUSTER",
+                                "name": {
+                                    "_type": "DV_TEXT",
+                                    "value": "Clinical history"
+                                },
+                                "items": [
+                                    {
+                                        "_type": "ELEMENT",
+                                        "name": {
+                                            "_type": "DV_TEXT",
+                                            "value": "Problem/diagnosis name"
+                                        },
+                                        "value": {
+                                            "_type": "DV_CODED_TEXT",
+                                            "value": "\"Section\" examination - social worker (procedure)",
+                                            "defining_code": {
+                                                "_type": "CODE_PHRASE",
+                                                "terminology_id": {
+                                                    "_type": "TERMINOLOGY_ID",
+                                                    "value": "SNOMED-CT"
+                                                },
+                                                "code_string": "148648004"
+                                            }
+                                        },
+                                        "archetype_node_id": "at0009"
+                                    }
+                                ],
+                                "archetype_node_id": "at0008"
+                            }
+                        ],
+                        "archetype_node_id": "at0003"
+                    }
+                ],
+                "archetype_node_id": "at0001"
+            },
+            "archetype_node_id": "openEHR-EHR-EVALUATION.family_history.v2"
+        }
+    ],
+    "archetype_node_id": "openEHR-EHR-COMPOSITION.family_history.v0"
+}
