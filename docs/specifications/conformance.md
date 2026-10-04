@@ -277,7 +277,7 @@ The catalog is the normative list. Each entry has:
 - **Wire assertion:** The revocation endpoint receives exactly one form-encoded `POST` carrying `token=<refresh token>` and `token_type_hint=refresh_token`, authenticated as the token endpoint authenticates the same client (a public client sends `client_id`); a `200` answer makes `Revoke` return nil, and afterwards the source holds no token and its next `Token` call fails with `auth.ErrReauthRequired` without a token-endpoint request.
 - **Effect:** mutating (the revoked grant).
 - **Modes:** Sandbox.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — [`testkit/probes/auth/probe_106_token_revocation.go`](../../testkit/probes/auth/probe_106_token_revocation.go).
 - **Satisfies:** REQ-167.
 
 #### Launch-mode coverage (REQ-068)

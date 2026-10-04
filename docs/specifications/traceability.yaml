@@ -1852,6 +1852,10 @@ requirements:
     canonical: docs/specifications/auth.md#req-167--token-revocation
     status: draft
     implementation: partial
-    packages: [auth/smart, auth]
+    packages: [auth/smart, auth, testkit/probes/auth]
+    probes: [PROBE-106]
     tests:
       - auth/smart/revoke_test.go
+      - auth/smart/token_change_test.go
+      - testkit/probes/auth/probe_106_token_revocation.go
+      - testkit/probes/auth/probes_test.go
