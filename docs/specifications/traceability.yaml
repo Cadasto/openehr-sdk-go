@@ -660,7 +660,7 @@ requirements:
     canonical: docs/specifications/auth.md#req-063--token-refresh
     status: draft
     implementation: landed
-    packages: [auth, auth/smart, transport, testkit/probes/auth]
+    packages: [auth, auth/clientcreds, auth/jwtbearer, auth/smart, transport, testkit/probes/auth]
     probes: [PROBE-007]
     tests:
       - auth/clientcreds/reauth_test.go
