@@ -988,7 +988,15 @@ func (s *Source) verifyRefreshedIDToken(ctx context.Context, raw string, prev *i
 	return claims, nil
 }
 
-func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
+// maxResponseBody is how much of a token- or revocation-endpoint response
+// the source reads.
+const maxResponseBody = 1 << 20
+
+// clientRequest builds the form POST to endpoint, a token or revocation
+// endpoint, and adds to it the client authentication both take, so the two
+// cannot differ. A failure to sign a client assertion is wrapped; the caller
+// gives every error its own sentinel.
+func (s *Source) clientRequest(ctx context.Context, endpoint string, form url.Values) (*http.Request, error) {
 	// Client authentication is selected deterministically (REQ-068):
 	//   - assertion signer configured → private_key_jwt (signed client_assertion)
 	//   - else client secret set      → client_secret_basic (HTTP Basic) or
@@ -1001,10 +1009,7 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 	if s.cfg.assertionSource != nil {
 		assertion, err := s.cfg.assertionSource.Assertion(ctx)
 		if err != nil {
-			return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{
-				Sentinel: auth.ErrTokenExchangeFailed,
-				Inner:    fmt.Errorf("client_assertion signing: %w", err),
-			}
+			return nil, fmt.Errorf("client_assertion signing: %w", err)
 		}
 		form.Set("client_assertion_type", clientAssertionType)
 		form.Set("client_assertion", assertion)
@@ -1019,9 +1024,9 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 		form.Set("client_id", s.cfg.ClientID)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.Auth.TokenEndpoint.String(), strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
-		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
@@ -1030,12 +1035,20 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 		// (Appendix B) before use as the Basic username and password.
 		req.SetBasicAuth(url.QueryEscape(s.cfg.ClientID), url.QueryEscape(s.cfg.ClientSecret))
 	}
+	return req, nil
+}
+
+func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
+	req, err := s.clientRequest(ctx, s.cfg.Auth.TokenEndpoint.String(), form)
+	if err != nil {
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
+	}
 	resp, err := s.cfg.HTTPClient.Do(req)
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: err}
 	}

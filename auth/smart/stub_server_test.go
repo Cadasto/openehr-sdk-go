@@ -24,14 +24,17 @@ type stubRequest struct {
 	user, pass string
 }
 
-// stubServer is a stub authorization server whose token endpoint answers
-// with what the test sets and records every request it receives.
+// stubServer is a stub authorization server whose token and revocation
+// endpoints answer with what the test sets and record every request they
+// receive.
 type stubServer struct {
 	srv *httptest.Server
 
-	mu        sync.Mutex
-	token     stubAnswer
-	tokenReqs []stubRequest
+	mu         sync.Mutex
+	token      stubAnswer
+	tokenReqs  []stubRequest
+	revoke     stubAnswer
+	revokeReqs []stubRequest
 }
 
 func newStubServer(t *testing.T) *stubServer {
@@ -50,6 +53,9 @@ func newStubServer(t *testing.T) *stubServer {
 		case "/token":
 			s.tokenReqs = append(s.tokenReqs, got)
 			ans = s.token
+		case "/revoke":
+			s.revokeReqs = append(s.revokeReqs, got)
+			ans = s.revoke
 		default:
 			s.mu.Unlock()
 			http.NotFound(w, r)
@@ -80,11 +86,27 @@ func (s *stubServer) tokenRequests() []stubRequest {
 	return append([]stubRequest(nil), s.tokenReqs...)
 }
 
-// endpoints returns the server's endpoints; it publishes no key set.
+// answerRevoke sets what the revocation endpoint answers from now on.
+func (s *stubServer) answerRevoke(status int, body string) {
+	s.mu.Lock()
+	s.revoke = stubAnswer{status: status, body: body}
+	s.mu.Unlock()
+}
+
+// revokeRequests returns the requests the revocation endpoint has received.
+func (s *stubServer) revokeRequests() []stubRequest {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]stubRequest(nil), s.revokeReqs...)
+}
+
+// endpoints returns the server's endpoints, including its revocation
+// endpoint; it publishes no key set.
 func (s *stubServer) endpoints() discovery.AuthEndpoints {
 	return discovery.AuthEndpoints{
 		AuthorizationEndpoint: discovery.MustParseURL(s.srv.URL + "/authorize"),
 		TokenEndpoint:         discovery.MustParseURL(s.srv.URL + "/token"),
+		RevocationEndpoint:    discovery.MustParseURL(s.srv.URL + "/revoke"),
 	}
 }
 

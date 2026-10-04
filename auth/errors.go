@@ -34,6 +34,11 @@ var (
 	// ErrInvalidScope indicates an [OpenEHRScope] whose parts cannot be
 	// written as an openEHR resource scope token.
 	ErrInvalidScope = errors.New("auth: invalid scope")
+
+	// ErrRevocationFailed indicates a token-revocation request (RFC 7009)
+	// failed: the revocation endpoint could not be reached or did not
+	// answer 200.
+	ErrRevocationFailed = errors.New("auth: token revocation failed")
 )
 
 // OAuth2Error is the parsed error response from an OAuth2 token endpoint.
@@ -66,16 +71,17 @@ func (e *OAuth2Error) Error() string {
 	}
 }
 
-// ExchangeError wraps a token-exchange or refresh failure with the
-// parsed OAuth2 error (if any), the HTTP status, and the underlying
+// ExchangeError wraps a token-exchange, refresh or revocation failure with
+// the parsed OAuth2 error (if any), the HTTP status, and the underlying
 // transport error. Detection uses errors.Is against the sentinels above;
 // extraction uses errors.AsType[*auth.ExchangeError](err) (or errors.As).
 type ExchangeError struct {
 	// Sentinel is the categorical error class (one of the package
 	// sentinels). errors.Is returns true against this value.
 	Sentinel error
-	// StatusCode is the HTTP status of the token-endpoint response, or
-	// 0 when the failure was pre-flight (network, marshal, ctx).
+	// StatusCode is the HTTP status of the token- or revocation-endpoint
+	// response, or 0 when the failure was pre-flight (network, marshal,
+	// ctx).
 	StatusCode int
 	// OAuth2 is the parsed error envelope, if the response shape
 	// matched. Nil when the response was not parseable.
