@@ -634,8 +634,13 @@ requirements:
     probes: [PROBE-001, PROBE-004, PROBE-005]
     tests:
       - auth/smart/audience_test.go
+      - auth/smart/authorize_request_test.go
+      - auth/smart/complete_test.go
+      - auth/smart/exchange_idtoken_test.go
+      - auth/smart/launch_test.go
       - auth/smart/smart_test.go
       - auth/tokensource_test.go
+      - smart/discovery/iss_parameter_test.go
       - testkit/probes/auth/probe_001_discovery_code_pkce.go
       - testkit/probes/auth/probe_004_pkce_verifier_round_trip.go
       - testkit/probes/auth/probe_005_scope_round_trip.go
@@ -684,8 +689,10 @@ requirements:
     implementation: partial
     packages: [smart, auth/smart]
     tests:
+      - auth/smart/exchange_idtoken_test.go
       - auth/smart/exchange_test.go
       - auth/smart/idtoken_test.go
+      - auth/smart/refresh_idtoken_test.go
       - smart/idtoken_test.go
       - smart/launch_test.go
 
@@ -757,6 +764,7 @@ requirements:
     probes: [PROBE-002, PROBE-040]
     tests:
       - smart/discovery/diagnostics_test.go
+      - smart/discovery/iss_parameter_test.go
       - smart/discovery/issuer_path_test.go
       - smart/discovery/issuer_test.go
       - smart/discovery/resolver_test.go
