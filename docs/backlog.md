@@ -6,8 +6,11 @@ kind: plan
 Leftovers of merged branches, by directory: suggestions, and findings the maintainer deferred here. Each line is a lead, not a finding: verify it before acting. A delivery whose `Files` touch a line's path folds it in and deletes the line. `sdd-pr flip --carry` appends; edit freely.
 
 ## cmd/probe-record
-- cmd/probe-record/scenarios_writes.go · the ehr-status scenario submits is_modifiable true, and the composition-minimal follow-up Get reads the latest composition (EHRbase fills Location with the object id and keeps the full version uid only in ETag), so both recordings would also pass against a server that behaves differently; changing either needs a recapture · from: pr201
+- cmd/probe-record/scenarios_writes.go · the ehr-status scenario submits is_modifiable true, so its recording would also pass against a server that behaves differently; changing it needs a recapture · from: pr201
 - cmd/probe-record/main_test.go · only the composition-minimal scenario has an offline sandbox capture test; ehr-status and stored-query have none, unlike ehr-lifecycle · from: pr201
+
+## docs
+- docs/examples.md:619 · "holds none" can be read as an empty ETag, while REQ-054 falls back to Location whenever the ETag is not a well-formed object_version_id · by: sdd-doc-reviewer · from: fix/version-uid-from-etag
 
 ## docs/specifications
 - docs/specifications/traceability.yaml · test files may still cite a REQ they do not pin and so appear in its generated tests list; a sweep over all test files is still to do (the audit estimated 45 to 50 files, not re-counted) · from: audit-2026-09
@@ -23,6 +26,14 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - docs/specifications/module-layout.md · § Versioning says a field added to an exported struct is not a breaking change with no RFC-2119 keyword, so it cannot relax the table row that makes a breaking change to a public type a major bump · from: audit-2026-09
 - docs/specifications/conformance.md · § Adding probes still says a backend-facing probe must be runnable in at least Sandbox mode, but nothing checks it and § REQ-082 treats a missing mode as an open gap; the retired REQ-081 and the Launch-mode coverage (REQ-068) sections also carry no keyword · from: audit-2026-09
 - docs/specifications/transport.md · the deprecated REQ-097 section carries no RFC-2119 keyword, so sdd-check warns on it; so does the service-discovery.md section Surfaced authorization-server metadata (REQ-070, REQ-062) · from: audit-2026-09
+- docs/specifications/conformance.md:724 · The status recovers the version id "from the ETag or Location", which drops REQ-054's well-formedness order; cite that rule instead of restating it. · by: sdd-doc-reviewer · from: fix/version-uid-from-etag
+- docs/specifications/wire.md:388 · The previous sentence still says the exposed ETag is what the caller uses for the next PUT, while this paragraph's VersionUID may be the Location tail. · by: sdd-doc-reviewer · from: fix/version-uid-from-etag
+- docs/specifications/transport.md:118 · "the ETag and Location headers staying canonical" can be read as equal rank, while the cited REQ-054 orders ETag before Location and both ahead of the identifier body. · by: sdd-doc-reviewer · from: fix/version-uid-from-etag
+- docs/specifications/wire.md:388 · "its `VersionUID` MUST be the `ehr_id` from `Location`" is unconditional, yet ITS-REST sends no `Location` on `GET /ehr/{ehr_id}` (overview-validation.openapi.yaml:303) and `ehr.Get` and `ehr.GetBySubject` use the same `newEHRMetadata`, leaving `VersionUID` empty; say "when the response carries a `Location`" · by: sdd-doc-reviewer · from: fix/version-uid-from-etag
+- docs/specifications/conformance.md:725 · PROBE-065 now pins REQ-054's version-id rule but its Satisfies line lists only REQ-094, and the REQ-054 row in traceability.yaml lists only PROBE-010 to PROBE-013, so the new MUST has no catalogued probe · by: sdd-doc-reviewer · from: fix/version-uid-from-etag
+- docs/specifications/wire.md:388 · the evidence sentence is firmer than the vendored sources: only `ETag_VERSION` says "the VERSION identifier", while `ETag_COMPOSITION` and `ETag_FOLDER` say "an identifier (e.g. a `version_uid` ...)" (ehr-validation.openapi.yaml:4383, 4402); soften "names the ETag as the version identifier" · by: sdd-doc-reviewer · from: fix/version-uid-from-etag
+- docs/specifications/wire.md:388 · "a server may put the EHR_STATUS version there instead" has no recorded evidence: all five `POST /ehr` responses in testkit/recordings/*.har carry the bare ehr_id in the ETag; cite the server or soften it · by: sdd-spec-conformance-reviewer · from: fix/version-uid-from-etag
+- docs/specifications/conformance.md:696 · PROBE-062's Wire assertion still says the Contribution `versions` list names the version uid "the write's `Location` returned", while the probe now binds on the ETag-first `VersionUID` (probe_062_audit_details_header.go:103); say "the version uid the write returned (REQ-054)" · by: sdd-doc-reviewer, sdd-spec-conformance-reviewer, go-reviewer · from: fix/version-uid-from-etag
 
 ## internal/bmmtype
 - internal/bmmtype/bmmtype.go · Substitute leaves a formal parameter unresolved for a bare generic owner, so the data attribute of an OPT's EVENT, POINT_EVENT or INTERVAL_EVENT compiles with RM type T (the row is pinned in bmmtype_test.go) · from: audit-2026-09
@@ -32,6 +43,10 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 
 ## openehr/aom
 - openehr/aom/aom14 · no standalone ADL 1.4 archetype corpus is vendored, so the aom14 interval corpus tests read their constraint intervals out of the OPTs instead of real archetype files · from: audit-2026-09
+
+## openehr/client/ehr
+- openehr/client/ehr/metadata.go:37 · on a 409 or 412 the OAS puts the server's current version_uid in the `ETag`, so every versioned leaf's error-path metadata now reports that version as `VersionUID` where it was empty before (scratch run: `composition.Update` with a 412 and ETag "...::7" returns the error plus VersionUID "...::7"); neither the PR's consumer-visible note nor the `VersionMetadata` doc says it is the conflicting current version, not one the caller wrote · by: go-reviewer · from: fix/version-uid-from-etag
+- openehr/client/ehr/ids_test.go:82 · the "bare id in the ETag" case passes with the well-formedness guard in `versionUIDFromETag` removed, because its `Location` tail equals the ETag; give it a `Location` tail that differs so it pins the MUST as well · by: sdd-spec-conformance-reviewer · from: fix/version-uid-from-etag
 
 ## openehr/instance
 - openehr/instance/interval_order.go · an interval whose two sides' OPT constraints admit no ordered pair is left inverted with no error, as § REQ-107 prescribes; reporting it needs a spec change first, and ErrConstraintUnsatisfiable is raised only for C_STRING leaves · from: audit-2026-09
@@ -74,5 +89,12 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - testkit/probes/instance/corpus_ratchet_test.go · the census runs with Language en and one fixed Now, and its placeholder scan flags only the literal example, so a generator that wrote encoding utf8 or read time.Now() would leave it green · from: audit-2026-09
 - testkit/probes/instance/corpus_ratchet_test.go · the hollow_body floor counts every ELEMENT, so a body of null-flavour placeholders passes; counting only ELEMENTs that hold a value adds two rows (clinical_content_validation generate/example/example and generate/example/random) · from: pr199
 
+## testkit/probes/versioned
+- testkit/probes/versioned/probe_065_test.go:34 · the harness sets `Location` to the same full version id as the ETag, so PROBE-065's sandbox run cannot tell the ETag from `Location` (ignoring the ETag leaves ./testkit/probes/versioned green) and does not exercise the EHRbase shape this PR fixes; the `withLocation` knob now also controls the ETag · by: go-reviewer · from: fix/version-uid-from-etag
+- testkit/probes/versioned/probe_012_etag_round_trip.go:19 · the doc comment ("the Location-derived VersionUID") and the failure detail at line 41 ("Location header missing or unparseable") describe the old rule now that `VersionUID` is ETag-first · by: sdd-spec-conformance-reviewer, go-reviewer · from: fix/version-uid-from-etag
+
 ## testkit/recordings
 - testkit/recordings/composition-minimal.har · the captured OPT keeps its authoring tool's Generated By entry with an account name, as the vendored corpus OPTs do; strip it at capture if recordings are to carry no account names · from: pr201
+
+## transport
+- transport/response.go:61 · only the first `ETag` header is read, but overview-validation.openapi.yaml:352 lets servers add further opaque `ETag` headers, so an opaque one sent first sends `VersionUID` to the `Location` fallback; outside this range · by: sdd-spec-conformance-reviewer · from: fix/version-uid-from-etag
