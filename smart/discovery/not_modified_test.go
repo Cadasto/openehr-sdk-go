@@ -97,9 +97,26 @@ func TestResolveStopsOnUnaskedNotModified(t *testing.T) { // REQ-071
 // It records the If-None-Match of every SMART request and counts the
 // OpenID configuration fetches.
 type conditionalPlatform struct {
+	// jwksURI, when not empty, is the jwks_uri that the SMART documents and
+	// the OpenID configuration declare. It is set before the server starts.
+	jwksURI string
+
 	mu          sync.Mutex
 	ifNoneMatch []string
-	openIDHits  atomic.Int32
+	// openIDIssuer and openIDJWKS, when not empty, replace the issuer and
+	// the jwks_uri that the OpenID configuration declares.
+	openIDIssuer string
+	openIDJWKS   string
+	openIDHits   atomic.Int32
+}
+
+// changeOpenID makes the later OpenID configuration responses declare
+// issuer and jwksURI instead of the values that confirm the SMART
+// configuration; an empty value leaves that member as it was.
+func (p *conditionalPlatform) changeOpenID(issuer, jwksURI string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.openIDIssuer, p.openIDJWKS = issuer, jwksURI
 }
 
 const (
@@ -114,10 +131,23 @@ func (p *conditionalPlatform) handler(notModifiedCacheControl string) http.Handl
 			scheme = "http"
 		}
 		issuer := scheme + "://" + r.Host + idpPath
+		members := map[string]string{"issuer": issuer, "token_endpoint": "https://auth.example.com/token"}
+		if p.jwksURI != "" {
+			members["jwks_uri"] = p.jwksURI
+		}
 		switch r.URL.Path {
 		case openIDDocPath:
 			p.openIDHits.Add(1)
-			_, _ = io.WriteString(w, openIDDocument(issuer, ""))
+			p.mu.Lock()
+			openIDIssuer, openIDJWKS := issuer, p.jwksURI
+			if p.openIDIssuer != "" {
+				openIDIssuer = p.openIDIssuer
+			}
+			if p.openIDJWKS != "" {
+				openIDJWKS = p.openIDJWKS
+			}
+			p.mu.Unlock()
+			_, _ = io.WriteString(w, openIDDocument(openIDIssuer, openIDJWKS))
 		case smartDocPath:
 			p.mu.Lock()
 			p.ifNoneMatch = append(p.ifNoneMatch, r.Header.Get("If-None-Match"))
@@ -133,10 +163,10 @@ func (p *conditionalPlatform) handler(notModifiedCacheControl string) http.Handl
 			case first:
 				w.Header().Set("ETag", `"v1"`)
 				w.Header().Set("Cache-Control", "max-age=60")
-				_, _ = io.WriteString(w, documentWith(firstAPIBaseURL, map[string]string{"issuer": issuer, "token_endpoint": "https://auth.example.com/token"}))
+				_, _ = io.WriteString(w, documentWith(firstAPIBaseURL, members))
 			default:
 				w.Header().Set("ETag", `"v2"`)
-				_, _ = io.WriteString(w, documentWith(secondAPIBaseURL, map[string]string{"issuer": issuer, "token_endpoint": "https://auth.example.com/token"}))
+				_, _ = io.WriteString(w, documentWith(secondAPIBaseURL, members))
 			}
 		default:
 			http.NotFound(w, r)
@@ -172,9 +202,8 @@ func sameDocument(cached, renewed *discovery.ServiceCatalog) string {
 // an ETag sends one conditional request, and a 304 Not Modified keeps the
 // cached document, services and auth members while renewing the expiry
 // from the 304's Cache-Control, or the default TTL when it has none. The
-// issuer's OpenID configuration, confirmed when the catalog was built, is
-// not fetched again, and the catalog the caller already holds is not
-// changed.
+// issuer's OpenID configuration is fetched again, as on every refresh, and
+// the catalog the caller already holds is not changed.
 func TestRefreshExtendsOnNotModified(t *testing.T) { // REQ-071
 	tests := []struct {
 		name         string
@@ -227,8 +256,8 @@ func TestRefreshExtendsOnNotModified(t *testing.T) { // REQ-071
 			if cached, ok := cache.Get(t.Context(), baseURL); !ok || !cached.ExpiresAt.Equal(renewed.ExpiresAt) {
 				t.Errorf("cache.Get(%q) = %v, %t, want the renewed catalog", baseURL, cached, ok)
 			}
-			if got := p.openIDHits.Load(); got != 1 {
-				t.Errorf("OpenID configuration fetched %d times, want 1: a 304 does not repeat the issuer check", got)
+			if got := p.openIDHits.Load(); got != 2 {
+				t.Errorf("OpenID configuration fetched %d times, want 2: once for the Resolve and again for the Refresh answered 304", got)
 			}
 		})
 	}

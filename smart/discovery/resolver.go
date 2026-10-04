@@ -236,7 +236,8 @@ func requestFailure(err error) DiscoveryErrorReason {
 //
 // When the cached catalog has expired and carries an ETag, the fetch is
 // conditional, as for Refresh: a 304 Not Modified renews the cached
-// catalog. A failed fetch drops the cached catalog.
+// catalog once it passes the same checks as a new document, the issuer
+// check included. A failed fetch or check drops the cached catalog.
 func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -255,11 +256,12 @@ func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog
 // When the cached catalog carries an ETag, the request is conditional. A
 // 304 Not Modified keeps the cached document, services and auth members
 // and renews the expiry from the response's Cache-Control max-age, or the
-// default TTL; the issuer check is not repeated, because the cached
-// catalog passed it when it was built. A new document replaces the cached
-// catalog. When the refresh fails, the cached catalog is dropped, so the
-// next Resolve fetches again and reports the failure. Until the refresh
-// completes, Resolve keeps returning the cached catalog while it is fresh.
+// default TTL, once the catalog passes the same checks as a new document:
+// this Resolver's validation, and the issuer check against the issuer's
+// OpenID configuration. A new document replaces the cached catalog. When
+// the refresh fails, the cached catalog is dropped, so the next Resolve
+// fetches again and reports the failure. Until the refresh completes,
+// Resolve keeps returning the cached catalog while it is fresh.
 func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -321,7 +323,8 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL string, cached *S
 
 // fetch retrieves, validates and confirms the SMART configuration at
 // baseURL. When cached carries an ETag, the request is conditional, and a
-// 304 Not Modified renews cached instead of building a new catalog.
+// 304 Not Modified renews cached instead of building a new catalog; the
+// renewed copy is validated and confirmed as a new catalog is.
 func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCatalog) (*ServiceCatalog, error) {
 	var etag string
 	if cached != nil {
@@ -357,11 +360,19 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 		if etag == "" {
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: errors.New("discovery fetch returned 304 to a request without If-None-Match")}
 		}
-		// The document is the one cached was built from. That catalog was
-		// validated and its issuer confirmed against the issuer's OpenID
-		// configuration when it was built, so neither check runs again;
-		// only its freshness is renewed.
-		return renewed(cached, resp.Header, r.cfg.defaultTTL), nil
+		// The document is the one cached was built from, but it still goes
+		// through this Resolver's checks, as on a 200: the catalog may have
+		// been cached by a Resolver with other options, and the issuer's
+		// OpenID configuration may have changed since it was confirmed.
+		c := renewed(cached, resp.Header, r.cfg.defaultTTL)
+		if err := r.validate(c); err != nil {
+			return nil, err
+		}
+		if err := r.checkOpenIDConfiguration(ctx, c, renewedJWKSURI(c)); err != nil {
+			return nil, err
+		}
+		r.warnInsecure(c)
+		return c, nil
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: fmt.Errorf("discovery fetch returned %d", resp.StatusCode)}
@@ -379,6 +390,7 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 		return nil, err
 	}
 	cat.ETag = resp.Header.Get("ETag")
+	cat.smartJWKSURI = wire.JWKSURI
 	cat.ResolvedAt = time.Now()
 	cat.ExpiresAt = computeExpiry(resp.Header, r.cfg.defaultTTL, cat.ResolvedAt)
 	if err := r.validate(cat); err != nil {
@@ -392,15 +404,26 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 }
 
 // renewed returns a copy of cached that is fresh again after a 304 Not
-// Modified: the same document, services and auth members, a new
-// ResolvedAt, and an ExpiresAt from the response's Cache-Control max-age,
-// or the default TTL. cached itself is not changed, because callers may
-// hold it.
+// Modified: the same document, services and auth members, the same
+// jwks_uri as written, a new ResolvedAt, and an ExpiresAt from the
+// response's Cache-Control max-age, or the default TTL. cached itself is
+// not changed, because callers may hold it.
 func renewed(cached *ServiceCatalog, h http.Header, ttl time.Duration) *ServiceCatalog {
 	c := *cached
 	c.ResolvedAt = time.Now()
 	c.ExpiresAt = computeExpiry(h, ttl, c.ResolvedAt)
 	return &c
+}
+
+// renewedJWKSURI returns the SMART configuration's jwks_uri for a catalog
+// renewed by a 304 Not Modified: the value as written when the catalog
+// kept it, or else the parsed Auth.JWKSURI, because a catalog that came
+// back from a cache that keeps exported fields only has lost the former.
+func renewedJWKSURI(c *ServiceCatalog) string {
+	if c.smartJWKSURI == "" && c.Auth.JWKSURI != nil {
+		return c.Auth.JWKSURI.String()
+	}
+	return c.smartJWKSURI
 }
 
 // checkOpenIDConfiguration confirms a declared issuer that differs from the

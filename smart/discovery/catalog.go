@@ -43,6 +43,12 @@ type ServiceCatalog struct {
 	// ETag is the source's ETag for conditional refresh; empty when
 	// the source did not advertise one.
 	ETag string
+
+	// smartJWKSURI is the SMART configuration's jwks_uri as written, which
+	// the resolver compares with the issuer's OpenID configuration again
+	// when a 304 Not Modified renews the catalog. A catalog that went
+	// through a cache that keeps exported fields only comes back without it.
+	smartJWKSURI string
 }
 
 // Service returns the entry for serviceID and ok=true when present.

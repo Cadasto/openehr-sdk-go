@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -497,6 +498,142 @@ func TestResolveCrossCheckOnEveryResolutionAndRefresh(t *testing.T) { // REQ-071
 	_, err = res.Refresh(ctx, p.baseURL())
 	if derr, ok := errors.AsType[*discovery.DiscoveryError](err); !ok || derr.Reason != discovery.ReasonIssuerMismatch {
 		t.Errorf("Refresh(%q) after the issuer's OpenID configuration changed: error = %v, want Reason %q", p.baseURL(), err, discovery.ReasonIssuerMismatch)
+	}
+}
+
+// serialisingCache stores each catalog as JSON and keeps the decoded copy,
+// as a file-backed or distributed cache does, so a catalog comes back with
+// its exported fields only.
+type serialisingCache struct{ *discovery.MemoryCache }
+
+func (c serialisingCache) Put(ctx context.Context, baseURL string, cat *discovery.ServiceCatalog) error {
+	b, err := json.Marshal(cat)
+	if err != nil {
+		return err
+	}
+	var stored discovery.ServiceCatalog
+	if err := json.Unmarshal(b, &stored); err != nil {
+		return err
+	}
+	return c.MemoryCache.Put(ctx, baseURL, &stored)
+}
+
+// TestRenewalOnNotModifiedRechecksIssuer pins REQ-073: when a conditional
+// request for a cached catalog is answered 304 Not Modified, whether Refresh
+// sent it or Resolve of the expired catalog did, the resolver fetches the
+// issuer's OpenID configuration again. A configuration that now names
+// another issuer, or another jwks_uri than the SMART configuration, fails
+// the renewal with ReasonIssuerMismatch and drops the cached catalog. The
+// jwks_uri is compared as the SMART configuration wrote it, as on a 200,
+// and also when the catalog comes back from a cache that keeps its exported
+// fields only.
+func TestRenewalOnNotModifiedRechecksIssuer(t *testing.T) { // REQ-073
+	const (
+		jwks      = "https://auth.example.com/jwks"
+		otherJWKS = "https://other.example.com/jwks"
+	)
+	renewals := []struct {
+		name  string
+		renew func(ctx context.Context, res *discovery.Resolver, baseURL string) (*discovery.ServiceCatalog, error)
+	}{
+		{name: "Refresh", renew: func(ctx context.Context, res *discovery.Resolver, baseURL string) (*discovery.ServiceCatalog, error) {
+			return res.Refresh(ctx, baseURL)
+		}},
+		{name: "Resolve after expiry", renew: func(ctx context.Context, res *discovery.Resolver, baseURL string) (*discovery.ServiceCatalog, error) {
+			synctest.Sleep(61 * time.Second) // past the first response's max-age=60
+			return res.Resolve(ctx, baseURL)
+		}},
+	}
+	tests := []struct {
+		name       string
+		jwksURI    string // declared by both documents until change runs
+		serialise  bool   // cache the catalog through serialisingCache
+		change     func(p *conditionalPlatform)
+		wantReason discovery.DiscoveryErrorReason // empty means the renewal succeeds
+		wantInner  string                         // a member the error names
+	}{
+		{
+			name:       "OpenID issuer changes",
+			change:     func(p *conditionalPlatform) { p.changeOpenID("https://evil.example.com", "") },
+			wantReason: discovery.ReasonIssuerMismatch,
+			wantInner:  "issuer",
+		},
+		{
+			name:       "OpenID jwks_uri changes",
+			jwksURI:    jwks,
+			change:     func(p *conditionalPlatform) { p.changeOpenID("", otherJWKS) },
+			wantReason: discovery.ReasonIssuerMismatch,
+			wantInner:  "jwks_uri",
+		},
+		{
+			name:       "OpenID jwks_uri changes, catalog from a serialising cache",
+			jwksURI:    jwks,
+			serialise:  true,
+			change:     func(p *conditionalPlatform) { p.changeOpenID("", otherJWKS) },
+			wantReason: discovery.ReasonIssuerMismatch,
+			wantInner:  "jwks_uri",
+		},
+		{
+			// Both documents write the same text, which the 200 accepted;
+			// the parsed URL would spell its scheme in lower case.
+			name:    "jwks_uri unchanged, written with an upper-case scheme",
+			jwksURI: "HTTPS://auth.example.com/jwks",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, rn := range renewals {
+				t.Run(rn.name, func(t *testing.T) {
+					synctest.Test(t, func(t *testing.T) {
+						p := &conditionalPlatform{jwksURI: tc.jwksURI}
+						srv := httptest.NewTestServer(t, p.handler(""))
+						var cache discovery.Cache = discovery.NewMemoryCache()
+						if tc.serialise {
+							cache = serialisingCache{discovery.NewMemoryCache()}
+						}
+						res, err := discovery.NewResolver(cache, discovery.WithHTTPClient(srv.Client()), discovery.WithAllowInsecure())
+						if err != nil {
+							t.Fatal(err)
+						}
+						baseURL := srv.URL + platformPath
+						if _, err := res.Resolve(t.Context(), baseURL); err != nil {
+							t.Fatalf("Resolve(%q) error = %v", baseURL, err)
+						}
+						if tc.change != nil {
+							tc.change(p)
+						}
+
+						_, err = rn.renew(t.Context(), res, baseURL)
+
+						if got, want := p.requests(), []string{"", `"v1"`}; !slices.Equal(got, want) {
+							t.Errorf("If-None-Match of the SMART requests = %q, want %q: the renewal is a conditional request answered 304", got, want)
+						}
+						if got := p.openIDHits.Load(); got != 2 {
+							t.Errorf("OpenID configuration fetched %d times, want 2: once when the catalog was built and again on the 304", got)
+						}
+						if tc.wantReason == "" {
+							if err != nil {
+								t.Fatalf("%s(%q) error = %v, want the 304 to renew the catalog", rn.name, baseURL, err)
+							}
+							if _, ok := cache.Get(t.Context(), baseURL); !ok {
+								t.Errorf("cache holds no catalog for %q after the renewal", baseURL)
+							}
+							return
+						}
+						derr, ok := errors.AsType[*discovery.DiscoveryError](err)
+						if !ok || derr.Reason != tc.wantReason {
+							t.Fatalf("%s(%q) after the OpenID configuration changed: error = %v, want a DiscoveryError with Reason %q", rn.name, baseURL, err, tc.wantReason)
+						}
+						if derr.Inner == nil || !strings.Contains(derr.Inner.Error(), tc.wantInner) {
+							t.Errorf("DiscoveryError.Inner = %v, want it to name %q", derr.Inner, tc.wantInner)
+						}
+						if _, ok := cache.Get(t.Context(), baseURL); ok {
+							t.Errorf("cache still holds a catalog for %q after the failed renewal", baseURL)
+						}
+					})
+				})
+			}
+		})
 	}
 }
 

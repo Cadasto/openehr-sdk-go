@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -230,6 +231,84 @@ func TestResolveMissingServiceRequired(t *testing.T) {
 	}
 	if len(derr.MissingServices) != 1 || derr.MissingServices[0] != ServiceIDOpenEHRRest {
 		t.Errorf("MissingServices = %v", derr.MissingServices)
+	}
+}
+
+// TestNotModifiedRevalidatesForEachResolver pins REQ-072: a catalog renewed
+// by a 304 Not Modified must pass the checks of the Resolver that renews it.
+// Two Resolvers share one Cache, and the second requires a service the
+// document does not advertise. When the second one renews the catalog the
+// first one cached, whether by Refresh or by Resolve of the expired catalog,
+// the 304 fails with ReasonMissingService naming that service, and the
+// cached catalog is dropped.
+func TestNotModifiedRevalidatesForEachResolver(t *testing.T) { // REQ-072
+	const extraService = "org.example.cdr"
+	renewals := []struct {
+		name  string
+		renew func(ctx context.Context, r *Resolver, baseURL string) (*ServiceCatalog, error)
+	}{
+		{name: "Refresh", renew: func(ctx context.Context, r *Resolver, baseURL string) (*ServiceCatalog, error) {
+			return r.Refresh(ctx, baseURL)
+		}},
+		{name: "Resolve after expiry", renew: func(ctx context.Context, r *Resolver, baseURL string) (*ServiceCatalog, error) {
+			synctest.Sleep(61 * time.Second) // past the first response's max-age=60
+			return r.Resolve(ctx, baseURL)
+		}},
+	}
+	for _, rn := range renewals {
+		t.Run(rn.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				body := fixtureBytes(t, "smart-configuration.json")
+				var (
+					mu          sync.Mutex
+					ifNoneMatch []string
+				)
+				srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					mu.Lock()
+					ifNoneMatch = append(ifNoneMatch, r.Header.Get("If-None-Match"))
+					mu.Unlock()
+					w.Header().Set("ETag", `"v1"`)
+					w.Header().Set("Cache-Control", "max-age=60")
+					if r.Header.Get("If-None-Match") == `"v1"` {
+						w.WriteHeader(http.StatusNotModified)
+						return
+					}
+					_, _ = w.Write(body)
+				}))
+				cache := NewMemoryCache()
+				first, err := NewResolver(cache, WithHTTPClient(srv.Client()), WithAllowInsecure())
+				if err != nil {
+					t.Fatal(err)
+				}
+				second, err := NewResolver(cache, WithHTTPClient(srv.Client()), WithAllowInsecure(),
+					WithRequiredServices(ServiceIDOpenEHRRest, extraService))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := first.Resolve(t.Context(), srv.URL); err != nil {
+					t.Fatalf("first Resolver: Resolve(%q) error = %v", srv.URL, err)
+				}
+
+				_, err = rn.renew(t.Context(), second, srv.URL)
+
+				mu.Lock()
+				got := slices.Clone(ifNoneMatch)
+				mu.Unlock()
+				if want := []string{"", `"v1"`}; !slices.Equal(got, want) {
+					t.Errorf("If-None-Match of the requests = %q, want %q: the renewal is a conditional request answered 304", got, want)
+				}
+				derr, ok := errors.AsType[*DiscoveryError](err)
+				if !ok || derr.Reason != ReasonMissingService {
+					t.Fatalf("second Resolver: %s(%q) answered 304: error = %v, want a DiscoveryError with Reason %q", rn.name, srv.URL, err, ReasonMissingService)
+				}
+				if want := []string{extraService}; !slices.Equal(derr.MissingServices, want) {
+					t.Errorf("MissingServices = %q, want %q", derr.MissingServices, want)
+				}
+				if _, ok := cache.Get(t.Context(), srv.URL); ok {
+					t.Errorf("cache still holds a catalog for %q after the failed renewal", srv.URL)
+				}
+			})
+		})
 	}
 }
 
