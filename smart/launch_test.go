@@ -19,20 +19,26 @@ import (
 	"github.com/cadasto/openehr-sdk-go/smart"
 )
 
-func TestLaunchContextFromTokenResponse(t *testing.T) {
+// TestLaunchContextFromTokenResponse maps a body without an ID token. Its
+// fhirUser member is not an identity claim, so User stays empty and the
+// value stays readable on Raw.
+func TestLaunchContextFromTokenResponse(t *testing.T) { // REQ-064
 	tr := authsmart.TokenResponse{
 		Patient:   "patient-1",
 		Encounter: "enc-1",
 		Scope:     "openid patient/*.read",
 		FHIRUser:  "Practitioner/abc",
-		Raw:       map[string]any{"patient": "patient-1"},
+		Raw:       map[string]any{"patient": "patient-1", "fhirUser": "Practitioner/abc"},
 	}
 	lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lc.Patient != "patient-1" || lc.User != "Practitioner/abc" || len(lc.Scopes) != 2 {
-		t.Fatalf("lc = %#v", lc)
+	if lc.Patient != "patient-1" || lc.User != "" || len(lc.Scopes) != 2 {
+		t.Fatalf("LaunchContextFromTokenResponse(no id_token) = %#v, want Patient patient-1, User empty, 2 scopes", lc)
+	}
+	if lc.Raw["fhirUser"] != "Practitioner/abc" {
+		t.Fatalf("LaunchContextFromTokenResponse(no id_token) Raw[fhirUser] = %v, want Practitioner/abc", lc.Raw["fhirUser"])
 	}
 	ctx := smart.WithLaunchContext(t.Context(), lc)
 	got, ok := smart.LaunchContextFromContext(ctx)
