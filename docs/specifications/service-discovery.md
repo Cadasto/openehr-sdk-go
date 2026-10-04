@@ -137,7 +137,7 @@ The resolver defers closing the response body before it branches on the status, 
 
 ```go
 transport.WithReauthOn401(auth.ReautherFunc(func(ctx context.Context) error {
-    _, err := resolver.Refresh(ctx, issuer)
+    _, err := resolver.Refresh(ctx, baseURL)
     return err
 }))
 ```
@@ -151,9 +151,9 @@ Cache implementation:
 
 ```go
 type Cache interface {
-    Get(ctx context.Context, issuer string) (*ServiceCatalog, bool)
-    Put(ctx context.Context, issuer string, c *ServiceCatalog) error
-    Invalidate(ctx context.Context, issuer string) error
+    Get(ctx context.Context, baseURL string) (*ServiceCatalog, bool)
+    Put(ctx context.Context, baseURL string, c *ServiceCatalog) error
+    Invalidate(ctx context.Context, baseURL string) error
 }
 ```
 
@@ -185,6 +185,7 @@ SMART configuration documents and their auth endpoints are untrusted input until
 - **Issuer ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).** When the fetched document declares an `"issuer"` member, the SDK **MUST** accept it as the catalog's `Issuer` whether or not it equals the Platform base URL, provided it is an absolute URL with the `https` scheme and no query or fragment (OIDC Core 1.0 §2). A malformed issuer **MUST** produce `DiscoveryError{Reason: ReasonMalformedURL}`; an `http` issuer **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}` unless the resolver is constructed with `WithAllowInsecure()`. The document's issuer **MUST NOT** replace the base URL: the base URL the caller resolved stays the catalog's `BaseURL` and its cache key.
 - **OIDC cross-check.** When the document declares an `issuer` that differs from the Platform base URL, the resolver **MUST**, on every resolution and refresh, fetch `<issuer>/.well-known/openid-configuration` (OIDC Discovery 1.0 §4, the path appended to the issuer's own path) and require its `issuer` member to equal the catalog's `Issuer` exactly (OIDC Discovery 1.0 §4.3) and, when both documents declare `jwks_uri`, the two values to be equal. A mismatch **MUST** produce `DiscoveryError{Reason: ReasonIssuerMismatch}`, and a failed fetch `DiscoveryError{Reason: ReasonFetchFailed}`. The resolver **MUST NOT** fetch the OIDC document when it is constructed with `WithoutOpenIDConfigurationCheck()`, or when the document declares no `issuer` or an `issuer` equal to the base URL.
 - **HTTPS on auth endpoints.** `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `registration_endpoint` (when present) **MUST** use the `https` scheme unless the resolver is constructed with `WithAllowInsecure()`. Plaintext URLs **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`. The `allowInsecure` path **MAY** log a warning instead of failing for development deployments.
+- **No downgrade on redirect.** While fetching the SMART configuration document or the OIDC document of the cross-check, the resolver **MUST NOT** follow a redirect to a URL whose scheme is not `https`, unless it is constructed with `WithAllowInsecure()`; such a redirect **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`. Otherwise the injected client's own redirect policy applies.
 - **Service `base_url` entries.** Plaintext `services[].base_url` values **SHOULD** emit the REQ-092 warning when not explicitly marked insecure; hard rejection remains a product decision beyond the auth-endpoint floor ([PR 31](https://github.com/Cadasto/openehr-sdk-go/pull/31)).
 
 Same-origin JWKS enforcement (rejecting `jwks_uri` hosts that differ from the issuer host) is **deferred** — HTTPS-only is the v1 floor.
@@ -201,7 +202,7 @@ catalog, err := sdk.RefreshDiscovery(ctx)
 
 This:
 
-- Invalidates the cached catalog for the configured issuer.
+- Invalidates the cached catalog for the configured Platform base URL.
 - Re-runs the resolve / validate / cache pipeline.
 - Returns the new catalog (or an error if resolution fails).
 
