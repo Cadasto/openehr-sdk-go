@@ -64,12 +64,12 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-060 | TokenSource interface | [auth.md](auth.md#req-060) | draft | landed |
 | REQ-061 | SMART-on-openEHR PKCE | [auth.md](auth.md#req-061--pkce-flow) | draft | landed |
 | REQ-062 | JWKS rotation | [auth.md](auth.md#req-062--jwks-rotation) | draft | landed |
-| REQ-063 | Token refresh | [auth.md](auth.md#req-063--token-refresh) | draft | partial |
+| REQ-063 | Token refresh | [auth.md](auth.md#req-063--token-refresh) | draft | landed |
 | REQ-064 | Launch context | [auth.md](auth.md#req-064--launch-context) | draft | landed |
 | REQ-065 | Per-client tenant binding | [auth.md](auth.md#req-065) | draft | landed |
 | REQ-066 | Caller attribution | [auth.md](auth.md#req-066) | draft | landed |
 | REQ-067 | Platform principal claims | [auth.md](auth.md#req-067) | draft | landed |
-| REQ-068 | SMART flows and launch modes | [auth.md](auth.md#req-068--flow-and-launch-mode-coverage) | draft | partial |
+| REQ-068 | SMART flows and launch modes | [auth.md](auth.md#req-068--flow-and-launch-mode-coverage) | draft | landed |
 | REQ-069 | HTTP Basic on openEHR REST | [auth.md](auth.md#req-069) | draft | landed |
 | REQ-070 | First-class discovery | [service-discovery.md](service-discovery.md#req-070) | draft | landed |
 | REQ-071 | Discovery cache | [service-discovery.md](service-discovery.md#req-071) | draft | landed |
@@ -124,7 +124,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-163 | AQL write-side expressivity parity | [clinical-modeling.md](clinical-modeling.md#req-163--aql-write-side-expressivity-parity) | draft | landed |
 | REQ-164 | AQL path-shape and paging lint | [clinical-modeling.md](clinical-modeling.md#req-164--aql-path-shape-and-paging-lint) | draft | landed |
 | REQ-165 | openEHR scope syntax | [auth.md](auth.md#req-165--openehr-scope-syntax) | draft | landed |
-| REQ-166 | Bearer challenge on 401 and 403 | [transport.md](transport.md#req-166--bearer-challenge-on-401-and-403) | draft | planned |
+| REQ-166 | Bearer challenge on 401 and 403 | [transport.md](transport.md#req-166--bearer-challenge-on-401-and-403) | draft | landed |
 <!-- END GENERATED: registry -->
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `retired` (a withdrawn requirement, **Stability** `deprecated`: normative text retained, implementation removed or not shipped; removal target in canonical spec).

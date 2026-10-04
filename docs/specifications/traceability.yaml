@@ -659,7 +659,7 @@ requirements:
     title: Token refresh
     canonical: docs/specifications/auth.md#req-063--token-refresh
     status: draft
-    implementation: partial
+    implementation: landed
     packages: [auth, auth/smart, transport, testkit/probes/auth]
     probes: [PROBE-007]
     tests:
@@ -723,7 +723,7 @@ requirements:
     title: SMART flows and launch modes
     canonical: docs/specifications/auth.md#req-068--flow-and-launch-mode-coverage
     status: draft
-    implementation: partial
+    implementation: landed
     packages: [auth/clientcreds, auth/jwtbearer, auth/smart]
     probes: [PROBE-004, PROBE-005]
     tests:
@@ -1811,7 +1811,7 @@ requirements:
     title: Bearer challenge on 401 and 403
     canonical: docs/specifications/transport.md#req-166--bearer-challenge-on-401-and-403
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [transport]
     tests:
       - transport/challenge_test.go
