@@ -381,7 +381,11 @@ func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID string, opts ...
 // [Source.AuthorizeURL] and then to [Source.CompleteAuthorization] or
 // [Source.ExchangeAuthorizationCode].
 type AuthorizationRequest struct {
-	State  string
+	State string
+	// Launch is the launch value an EHR passed to the app (see
+	// [ParseEHRLaunch]), kept here so the request carries the whole
+	// launch. BeginAuthorization leaves it empty; [Source.AuthorizeURL]
+	// sends it when its own launch argument is empty.
 	Launch string
 	PKCE   PKCEPair
 	// Issuer is the issuer the source is bound to: its configured issuer,
@@ -454,10 +458,11 @@ func hasScope(scopes []string, want string) bool {
 // AuthorizeURL builds the SMART authorization redirect URL for req.
 //
 // launch is the launch value an EHR passed to the app (see
-// [ParseEHRLaunch]), or empty for a standalone launch. When it is set, the
-// URL forwards it unchanged and the scope it sends includes launch, added
-// when the configured scopes lack it. The URL sends req.Nonce as nonce when
-// the request has one.
+// [ParseEHRLaunch]), or empty for a standalone launch; when it is empty,
+// req.Launch is used instead. When a launch value is set, the URL forwards
+// it unchanged and the scope it sends includes launch, added when the
+// configured scopes lack it. The URL sends req.Nonce as nonce when the
+// request has one.
 func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {
 		return "", fmt.Errorf("%w: call BeginAuthorization first or supply State and PKCE", auth.ErrInvalidConfig)
@@ -472,6 +477,9 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	q.Set("code_challenge", req.PKCE.Challenge)
 	q.Set("code_challenge_method", challengeMethod)
 	q.Set("state", req.State)
+	if launch == "" {
+		launch = req.Launch
+	}
 	scopes := s.cfg.Scopes
 	if launch != "" && !hasScope(scopes, auth.ScopeLaunch) {
 		// HL7 SMART App Launch: an app launched from an EHR asks for the
@@ -578,6 +586,12 @@ func (s *Source) LastTokenResponse() TokenResponse {
 }
 
 // SetTokens seeds access and optional refresh tokens (testing / token import).
+// The new tokens end a refresh that [Source.Reauth] forced.
+//
+// SetTokens does not start a new session: it keeps the identity of the last
+// ID token the source verified, and [Source.LastTokenResponse]. A later
+// refresh whose ID token names another user is then refused, so import
+// tokens for a different user into a new Source.
 func (s *Source) SetTokens(access auth.Token, refresh string) {
 	s.mu.Lock()
 	s.setTokensLocked(access, refresh)

@@ -3,10 +3,14 @@
 // verification, returning a TokenSource compatible with the parent auth
 // package.
 //
-// Each SMART launch keeps its own [AuthorizationRequest] (state + PKCE
-// verifier) from [Source.BeginAuthorization] through
-// [Source.ExchangeAuthorizationCode] (returns [TokenResponse] for
-// smart/); the Source does not store per-launch handshake state.
+// A launch from an EHR starts with [ParseEHRLaunch], which reads the
+// issuer and launch value from the app's launch URL and checks the issuer
+// against the app's allowlist. Each launch then keeps its own
+// [AuthorizationRequest] from [Source.BeginAuthorization] through
+// [Source.AuthorizeURL] to [Source.CompleteAuthorization], which checks the
+// redirect back to the app and exchanges its code (returning the
+// [TokenResponse] for smart/); the Source does not store per-launch
+// handshake state.
 // [Source.LastTokenResponse] holds the latest token-endpoint SMART
 // fields, including after a [Source.Token] refresh; re-derive
 // smart.LaunchContext when launch context may have changed.
