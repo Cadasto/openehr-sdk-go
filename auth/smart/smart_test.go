@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -319,6 +321,74 @@ func TestAuthorizeURLStateReachesURL(t *testing.T) {
 	}
 	if got := parsed.Query().Get("state"); got != req.State {
 		t.Fatalf("authorize URL state = %q, want %q", got, req.State)
+	}
+}
+
+// TestAuthorizeURLKeepsEndpointQuery verifies that the authorization URL keeps
+// the query the advertised authorization_endpoint already carries and sets
+// each SDK parameter exactly once on top of it (REQ-061). It pins RFC 6749
+// §3.1: the endpoint's query component must be retained when parameters are
+// added, and no parameter may be included more than once.
+func TestAuthorizeURLKeepsEndpointQuery(t *testing.T) { // REQ-061
+	tests := []struct {
+		name     string
+		endpoint string
+		kept     url.Values // endpoint parameters the URL must still carry
+	}{
+		{
+			name:     "endpoint query kept",
+			endpoint: "https://as.example/authorize?p=b2c_1_signin&ui=x",
+			kept:     url.Values{"p": {"b2c_1_signin"}, "ui": {"x"}},
+		},
+		{
+			name:     "SDK value wins a name clash",
+			endpoint: "https://as.example/authorize?response_type=token",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			src, err := smart.New(
+				"client-id",
+				discovery.AuthEndpoints{
+					AuthorizationEndpoint: discovery.MustParseURL(tc.endpoint),
+					TokenEndpoint:         discovery.MustParseURL("https://as.example/token"),
+				},
+				smart.WithHTTPClient(&http.Client{}),
+				smart.WithRedirectURI("https://app.example/callback"),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req, err := src.BeginAuthorization("state-123")
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := src.AuthorizeURL(req, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			parsed, err := url.Parse(raw)
+			if err != nil {
+				t.Fatalf("url.Parse(%q): %v", raw, err)
+			}
+
+			want := url.Values{
+				"response_type":         {"code"},
+				"client_id":             {"client-id"},
+				"redirect_uri":          {"https://app.example/callback"},
+				"state":                 {"state-123"},
+				"code_challenge":        {req.PKCE.Challenge},
+				"code_challenge_method": {"S256"},
+			}
+			maps.Copy(want, tc.kept)
+			if got := parsed.Query(); !maps.EqualFunc(got, want, slices.Equal) {
+				t.Errorf("AuthorizeURL with endpoint %q: query = %v, want %v", tc.endpoint, got, want)
+			}
+			parsed.RawQuery = ""
+			if got, want := parsed.String(), "https://as.example/authorize"; got != want {
+				t.Errorf("AuthorizeURL with endpoint %q: URL without query = %q, want %q", tc.endpoint, got, want)
+			}
+		})
 	}
 }
 
