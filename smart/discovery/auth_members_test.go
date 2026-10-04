@@ -9,10 +9,11 @@ import (
 )
 
 // TestResolveConditionalAuthMembers pins REQ-072: when a SMART configuration
-// declares any of authorization_endpoint, token_endpoint or jwks_uri, it
-// needs token_endpoint; authorization_endpoint when capabilities lists
-// launch-ehr or launch-standalone; and jwks_uri when it lists
-// sso-openid-connect. A document with none of the three is an anonymous-only
+// declares any of authorization_endpoint, token_endpoint or jwks_uri, or
+// advertises any of the capabilities launch-ehr, launch-standalone or
+// sso-openid-connect, it needs token_endpoint; authorization_endpoint when
+// capabilities lists launch-ehr or launch-standalone; and jwks_uri when it
+// lists sso-openid-connect. A document with neither is an anonymous-only
 // deployment and passes, and a backend-only document without
 // authorization_endpoint passes. A missing member is
 // ReasonAuthEndpointsMissing, naming the member and the capability that
@@ -34,8 +35,26 @@ func TestResolveConditionalAuthMembers(t *testing.T) { // REQ-072
 			name: "anonymous-only: no authorization-server members",
 		},
 		{
-			name:         "anonymous-only with a launch capability",
+			name:         "anonymous-only with unrelated capabilities",
+			capabilities: []string{"permission-v2", "client-public"},
+		},
+		{
+			name:         "launch-ehr and sso-openid-connect without any endpoint",
 			capabilities: []string{"launch-ehr", "sso-openid-connect"},
+			wantMissing:  "token_endpoint",
+			wantCapName:  "launch-ehr",
+		},
+		{
+			name:         "launch-standalone without any endpoint",
+			capabilities: []string{"permission-v2", "launch-standalone"},
+			wantMissing:  "token_endpoint",
+			wantCapName:  "launch-standalone",
+		},
+		{
+			name:         "sso-openid-connect without any endpoint",
+			capabilities: []string{"sso-openid-connect"},
+			wantMissing:  "token_endpoint",
+			wantCapName:  "sso-openid-connect",
 		},
 		{
 			name:    "backend-only: token_endpoint alone",

@@ -685,16 +685,28 @@ const (
 
 // missingAuthMember names the first authorization-server member the
 // document needs but omits, or returns nil. A document that declares none
-// of authorization_endpoint, token_endpoint and jwks_uri is an
+// of authorization_endpoint, token_endpoint and jwks_uri, and advertises
+// none of launch-ehr, launch-standalone and sso-openid-connect, is an
 // anonymous-only deployment and needs none of them. Otherwise
 // token_endpoint is always needed; authorization_endpoint only for a user
 // launch (launch-ehr, launch-standalone), so a backend-only document may
 // leave it out; and jwks_uri for sso-openid-connect.
 func missingAuthMember(a AuthEndpoints) error {
-	if a.AuthorizationEndpoint == nil && a.TokenEndpoint == nil && a.JWKSURI == nil {
+	declared := a.AuthorizationEndpoint != nil || a.TokenEndpoint != nil || a.JWKSURI != nil
+	authCapability := ""
+	for _, c := range []string{capabilityLaunchEHR, capabilityLaunchStandalone, capabilitySSOOpenIDConnect} {
+		if slices.Contains(a.Capabilities, c) {
+			authCapability = c
+			break
+		}
+	}
+	if !declared && authCapability == "" {
 		return nil
 	}
 	if a.TokenEndpoint == nil {
+		if !declared {
+			return fmt.Errorf("token_endpoint is required by capability %q", authCapability)
+		}
 		return errors.New("token_endpoint is required when the document declares authorization_endpoint or jwks_uri")
 	}
 	if a.AuthorizationEndpoint == nil {
