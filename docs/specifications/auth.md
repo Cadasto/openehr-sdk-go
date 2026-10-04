@@ -547,6 +547,7 @@ var (
     ErrRefreshFailed        = errors.New("auth: token refresh failed")
     ErrReauthRequired       = errors.New("auth: re-authentication required")
     ErrJWKSValidationFailed = errors.New("auth: JWKS validation failed")
+    ErrInvalidScope         = errors.New("auth: invalid scope") // REQ-165
 )
 
 // package smart — SMART App Launch specific
