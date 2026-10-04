@@ -634,7 +634,7 @@ requirements:
     canonical: docs/specifications/auth.md#req-062--jwks-rotation
     status: draft
     implementation: landed
-    packages: [auth/smart, smart/discovery, auth/introspect]
+    packages: [auth/smart, smart/discovery]
     probes: [PROBE-006]
     tests:
       - auth/introspect/introspect_test.go
