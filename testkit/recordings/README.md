@@ -12,7 +12,7 @@ than `true` is discarded, not replayed ([ValidateHAR](../probe/har.go)).
 | [ehr-create.har](ehr-create.har) | Live EHRbase 2.35.1 `POST /ehr` (STRAND-11 evidence, byte-identical to [`docs/plans/strand-11-evidence/ehr-create.har`](../../docs/plans/strand-11-evidence/ehr-create.har)) | hand-captured before the harness existed; no `-scenario` covers it |
 | [ehr-lifecycle.har](ehr-lifecycle.har) | Live EHRbase 2.35.1 `POST /ehr`, then `GET` and `HEAD` the created id (the create-then-read path) | `-scenario ehr-lifecycle` |
 | [ehr-status.har](ehr-status.har) | Live EHRbase 2.36.0 `POST /ehr` with a fixed initial EHR_STATUS, then `GET` that status | `-scenario ehr-status` |
-| [composition-minimal.har](composition-minimal.har) | Live EHRbase 2.36.0 `POST /ehr`, upload the fixture OPT under a per-capture template id (`sdk_cassette_comp.v1` in this recording), `POST` a composition, then `GET` the version the save returned | `-scenario composition-minimal` |
+| [composition-minimal.har](composition-minimal.har) | Live EHRbase 2.36.0 `POST /ehr`, upload the fixture OPT under a per-capture template id (`sdk_cassette_comp_cee0ccd903be449d94dc4919055ff8aa.v1` in this recording), `POST` a composition, then `GET` the version the save returned | `-scenario composition-minimal` |
 | [stored-query.har](stored-query.har) | Live EHRbase 2.36.0 `POST /ehr`, `PUT` a fixed stored query, then `POST` its execution | `-scenario stored-query` |
 
 Replay through [`probe.NewReplayer`](../probe/replay.go).
