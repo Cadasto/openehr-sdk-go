@@ -81,7 +81,8 @@ type Config struct {
 	// ClientAssertion, when set, enables SMART Backend Services asymmetric
 	// client authentication (RFC 7523). The source is called once per token
 	// exchange to produce a freshly signed JWT. Mutually exclusive with
-	// ClientSecret.
+	// ClientSecret. A nil *jwtbearer.ClaimsSigner is refused, as it can
+	// never sign.
 	ClientAssertion jwtbearer.AssertionSource
 	// RefreshThreshold is how long before ExpiresAt the source treats
 	// the cached token as stale and triggers a refresh. Default 30s.
@@ -175,6 +176,10 @@ func FromConfig(cfg Config) (*Source, error) {
 	if cfg.ClientID == "" {
 		return nil, fmt.Errorf("%w: ClientID is required", auth.ErrInvalidConfig)
 	}
+	if signer, ok := cfg.ClientAssertion.(*jwtbearer.ClaimsSigner); ok && signer == nil {
+		// A nil signer passes the nil-interface checks below but can never sign.
+		return nil, fmt.Errorf("%w: ClientAssertion is a nil *jwtbearer.ClaimsSigner", auth.ErrInvalidConfig)
+	}
 	if cfg.ClientSecret != "" && cfg.ClientAssertion != nil {
 		return nil, fmt.Errorf("%w: ClientSecret and ClientAssertion are mutually exclusive", auth.ErrInvalidConfig)
 	}
@@ -251,8 +256,9 @@ func checkAdvertised(a discovery.AuthEndpoints, cfg Config) error {
 			auth.ErrInvalidConfig, method, l)
 	}
 	// Only the SDK's own signer exposes its algorithm; any other assertion
-	// source is opaque and is not checked.
-	if signer, ok := cfg.ClientAssertion.(*jwtbearer.ClaimsSigner); ok && signer != nil {
+	// source is opaque and is not checked. FromConfig has already refused a
+	// nil signer.
+	if signer, ok := cfg.ClientAssertion.(*jwtbearer.ClaimsSigner); ok {
 		if l := a.TokenEndpointAuthSigningAlgValuesSupported; len(l) > 0 && !slices.Contains(l, signer.Algorithm) {
 			return fmt.Errorf("%w: client assertion algorithm %q is not in the server's advertised token_endpoint_auth_signing_alg_values_supported %v",
 				auth.ErrInvalidConfig, signer.Algorithm, l)

@@ -225,6 +225,19 @@ func TestNewFromCatalogChecksAdvertisedMetadata(t *testing.T) { // REQ-068
 			},
 			opts: assertion(signer),
 		},
+
+		// a nil ClaimsSigner can never sign, whatever the catalog lists
+		{
+			name:    "nil ClaimsSigner with an alg list",
+			auth:    discovery.AuthEndpoints{TokenEndpointAuthSigningAlgValuesSupported: []string{"RS384"}},
+			opts:    assertion((*jwtbearer.ClaimsSigner)(nil)),
+			wantErr: []string{"nil", "ClaimsSigner"},
+		},
+		{
+			name:    "nil ClaimsSigner with no lists",
+			opts:    assertion((*jwtbearer.ClaimsSigner)(nil)),
+			wantErr: []string{"nil", "ClaimsSigner"},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -253,6 +266,48 @@ func TestNewFromCatalogChecksAdvertisedMetadata(t *testing.T) { // REQ-068
 			}
 			if strings.Contains(err.Error(), catalogSecret) {
 				t.Errorf("NewFromCatalog() error = %q, must not carry the client secret", err)
+			}
+		})
+	}
+}
+
+// TestConstructorsRefuseNilClaimsSigner — REQ-068: a client assertion that is
+// a nil *jwtbearer.ClaimsSigner can never sign, so New and FromConfig refuse
+// it with auth.ErrInvalidConfig instead of failing on the first Token call.
+func TestConstructorsRefuseNilClaimsSigner(t *testing.T) { // REQ-068
+	var nilSigner *jwtbearer.ClaimsSigner
+	tests := []struct {
+		name  string
+		build func() (*clientcreds.Source, error)
+	}{
+		{
+			name: "New",
+			build: func() (*clientcreds.Source, error) {
+				return clientcreds.New("c", "", catalogTokenURL,
+					clientcreds.WithHTTPClient(&http.Client{}),
+					clientcreds.WithClientAssertion(nilSigner))
+			},
+		},
+		{
+			name: "FromConfig",
+			build: func() (*clientcreds.Source, error) {
+				return clientcreds.FromConfig(clientcreds.Config{
+					HTTPClient:      &http.Client{},
+					TokenURL:        catalogTokenURL,
+					ClientID:        "c",
+					ClientAssertion: nilSigner,
+				})
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			src, err := tc.build()
+			if !errors.Is(err, auth.ErrInvalidConfig) {
+				t.Fatalf("%s(nil ClaimsSigner) error = %v, want auth.ErrInvalidConfig", tc.name, err)
+			}
+			if src != nil {
+				t.Errorf("%s(nil ClaimsSigner) Source = %v, want nil on error", tc.name, src)
 			}
 		})
 	}
