@@ -127,7 +127,7 @@ The full flow when discovery is in play:
 The discovery cache **MUST**:
 
 - Honour the TTL declared in the discovery response. If no TTL is declared, a default TTL (default: 15 minutes) **MUST** apply.
-- Honour `ETag` / `If-None-Match` for conditional refresh — a `304 Not Modified` on refresh extends the cached entry's TTL without replacing the body.
+- Honour `ETag` / `If-None-Match` for conditional refresh: a `304 Not Modified` to a conditional request extends the cached entry's TTL without replacing the body, and a `304 Not Modified` to a request without `If-None-Match` is a failed fetch ([§ Refresh API](#refresh-api)).
 - Be invalidated on `401` / `403` against a previously-working endpoint, after at most one refresh attempt.
 - Coalesce concurrent resolution attempts (REQ-026) — one goroutine fetches; the others wait.
 - Key every entry by the Platform base URL the caller resolved, never by the document's `issuer` ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).
