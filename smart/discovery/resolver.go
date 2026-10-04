@@ -366,8 +366,10 @@ func joinURL(rawBase, path string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	if base.Scheme == "" || base.Host == "" {
-		return nil, fmt.Errorf("%q is not an absolute URL", rawBase)
+	// Hostname, not Host: url.Parse keeps a lone port such as ":8443" in
+	// Host, which leaves no host name to connect to.
+	if base.Scheme == "" || base.Hostname() == "" {
+		return nil, fmt.Errorf("%q is not an absolute URL with a host", rawBase)
 	}
 	ref, err := url.Parse(path)
 	if err != nil {
@@ -451,7 +453,7 @@ func (r *Resolver) parse(baseURL string, wire *smartConfigWire) (*ServiceCatalog
 	services := map[string]ServiceEntry{}
 	for id, s := range wire.Services {
 		u, err := url.Parse(s.BaseURL)
-		if err != nil || u.Scheme == "" || u.Host == "" {
+		if err != nil || u.Scheme == "" || u.Hostname() == "" {
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q baseUrl %q invalid", id, s.BaseURL)}
 		}
 		services[id] = ServiceEntry{
@@ -501,7 +503,7 @@ func validateIssuer(baseURL, raw string, allowInsecure bool) error {
 	if u.Scheme != "https" && u.Scheme != "http" {
 		return malformed(fmt.Errorf("issuer %q is not an https URL", raw))
 	}
-	if u.Host == "" {
+	if u.Hostname() == "" {
 		return malformed(fmt.Errorf("issuer %q has no host", raw))
 	}
 	if u.RawQuery != "" || u.ForceQuery {
@@ -524,11 +526,19 @@ func parseAuthEndpoints(baseURL string, w *smartConfigWire, allowInsecure bool) 
 			return nil, nil
 		}
 		u, err := url.Parse(raw)
-		if err != nil || u.Scheme == "" || u.Host == "" {
+		if err != nil || u.Hostname() == "" {
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s %q invalid", name, raw)}
 		}
-		if !allowInsecure && u.Scheme != "https" {
-			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s uses scheme %q; https required (use WithAllowInsecure for development)", name, u.Scheme)}
+		// url.Parse lowercases the scheme. https is always accepted, http
+		// only with allowInsecure, and anything else is not an endpoint.
+		switch u.Scheme {
+		case "https":
+		case "http":
+			if !allowInsecure {
+				return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s uses scheme %q; https required (use WithAllowInsecure for development)", name, u.Scheme)}
+			}
+		default:
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s uses scheme %q; https required", name, u.Scheme)}
 		}
 		return u, nil
 	}
