@@ -203,9 +203,9 @@ catalog, err := sdk.RefreshDiscovery(ctx)
 
 This:
 
-- Invalidates the cached catalog for the configured Platform base URL.
-- Re-runs the resolve / validate / cache pipeline.
-- Returns the new catalog (or an error if resolution fails).
+- Sends a conditional request with the cached entry's `ETag`, keeping that entry in place meanwhile.
+- On a `304 Not Modified`, renews the cached entry's TTL without replacing it (REQ-071); on a `200`, re-runs the resolve / validate / cache pipeline and replaces it; on a failure, invalidates it.
+- Returns the current catalog (or an error if resolution fails).
 
 The refresh API **MUST NOT** block other in-flight requests beyond the coalescing window — they continue with the stale catalog until the refresh completes (typical) or fails (in which case the next request after refresh fails with the discovery error).
 
