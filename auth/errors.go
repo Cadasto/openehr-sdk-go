@@ -30,6 +30,10 @@ var (
 	// ErrJWKSValidationFailed indicates a JWT could not be validated
 	// against the deployment's JWKS even after one refresh.
 	ErrJWKSValidationFailed = errors.New("auth: JWKS validation failed")
+
+	// ErrInvalidScope indicates an [OpenEHRScope] whose parts cannot be
+	// written as an openEHR resource scope token.
+	ErrInvalidScope = errors.New("auth: invalid scope")
 )
 
 // OAuth2Error is the parsed error response from an OAuth2 token endpoint.
