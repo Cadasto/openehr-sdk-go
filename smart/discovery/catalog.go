@@ -137,16 +137,21 @@ type AuthEndpoints struct {
 	ScopesSupported               []string
 	ResponseTypesSupported        []string
 	CodeChallengeMethodsSupported []string
-	GrantTypesSupported           []string
+	// GrantTypesSupported lists the OAuth2 grant types the authorization
+	// server accepts (e.g. "authorization_code", "client_credentials").
+	// clientcreds.NewFromCatalog refuses to build a source when the list is
+	// non-empty and leaves out "client_credentials".
+	GrantTypesSupported []string
 	// TokenEndpointAuthMethodsSupported lists the client-authentication methods
 	// the authorization server accepts (e.g. "private_key_jwt",
-	// "client_secret_basic"). auth/smart checks the configured client
-	// credential against this list when it is non-empty.
+	// "client_secret_basic"). auth/smart and clientcreds.NewFromCatalog check
+	// the configured client credential against this list when it is non-empty.
 	TokenEndpointAuthMethodsSupported []string
 	// TokenEndpointAuthSigningAlgValuesSupported lists the JWS algorithms
 	// accepted for client-assertion JWTs at the token endpoint
-	// (e.g. "RS384", "ES384"). The SDK exposes it but does not use it to
-	// select an algorithm.
+	// (e.g. "RS384", "ES384"). clientcreds.NewFromCatalog refuses a
+	// jwtbearer.ClaimsSigner client assertion whose algorithm a non-empty list
+	// leaves out. The SDK does not use the list to select an algorithm.
 	TokenEndpointAuthSigningAlgValuesSupported []string
 	// IDTokenSigningAlgValuesSupported lists the JWS algorithms used to sign
 	// ID tokens (e.g. "RS256", "ES384"). The SDK does not apply it

@@ -107,7 +107,8 @@ func WithObserver(o Observer) Option {
 }
 
 // WithRawErrorBodies opts in to preserving server error payloads on
-// WireError (the OpenEHR envelope message and the raw response body).
+// WireError (the OpenEHR envelope message, the raw response body and the
+// Bearer challenge's ErrorDescription).
 // These may contain PHI; leave disabled (the default) whenever error
 // values can reach logs, traces, or observers. The openEHR error code
 // is always preserved regardless of this setting.
@@ -136,6 +137,21 @@ func WithMaxResponseBody(n int64) Option {
 // the request one time with the freshly acquired token. On a second 401
 // (or when Reauth returns an error) the error is surfaced to the caller.
 //
+// The server's Bearer challenge decides whether a 401 is worth a new
+// token. Reauth runs only when the 401 carries no Bearer challenge the
+// transport can read (a challenge it cannot read counts as absent), or one
+// that names no error or the error "invalid_token" (the token expired, was
+// revoked or is malformed, RFC 6750 §3.1). A 401 whose challenge names any
+// other error, such as "insufficient_scope", comes back at once without
+// calling Reauth and without a retry, because a fresh token from the same
+// grant would be refused for the same reason. The reason is in
+// [WireError.Challenge].
+//
+// The retry policy comes first: a [RetryPolicy] whose RetriableStatus
+// lists 401 still retries a 401 under that policy, whatever its challenge
+// says, and this safety net is consulted only once the policy has given
+// up.
+//
 // When this option is not set, a wire 401 returns ErrUnauthorized
 // immediately.
 //
@@ -145,12 +161,11 @@ func WithMaxResponseBody(n int64) Option {
 // All HTTP methods are retried, including non-idempotent writes (POST/PUT).
 // This is safe because a 401 means the request was rejected at the
 // authentication layer and therefore not processed by the resource, so re-driving
-// it once after refreshing the credential cannot double-apply a write. Note,
-// however, that a 401 may also indicate insufficient scope rather than an
-// expired token; in that case the reauth-and-retry simply 401s again and the
-// caller still receives ErrUnauthorized (one wasted round-trip, no harm). Enable
-// the hook when your deployment returns 401 for token expiry; if a server
-// distinguishes expiry (401) from authorization (403), this targets the former.
+// it once after refreshing the credential cannot double-apply a write. A 401
+// without a challenge may still mean a missing permission rather than an
+// expired token; then the retry simply 401s again and the caller still
+// receives ErrUnauthorized (one wasted round-trip, no harm). A server that
+// answers a missing permission with 403 never triggers the hook for it.
 //
 // A discovery-catalog-refresh closure can satisfy the interface via
 // auth.ReautherFunc.

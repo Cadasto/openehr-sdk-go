@@ -169,6 +169,16 @@ The HL7 SMART [Backend Services](https://hl7.org/fhir/smart-app-launch/backend-s
 
 `auth/clientcreds` implements this via `WithClientAssertion(src jwtbearer.AssertionSource)`. When configured, `fetch` calls `src.Assertion(ctx)` on every token exchange, adds the two `client_assertion*` form fields, and omits Basic auth and `client_secret`. Signing errors are wrapped as `auth.ErrTokenExchangeFailed` with the message prefix `"client_assertion signing: ..."`.
 
+##### Backend Services from a resolved catalog
+
+`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, clientSecret, opts...)` (the secret empty when a client assertion is configured) for SMART Backend Services against a resolved catalog. It **MUST** post to the token endpoint in `catalog.Auth.TokenEndpoint`, and **MUST** fail with `auth.ErrInvalidConfig` when the catalog is nil or names no token endpoint. It **MUST** record `catalog.Issuer` on the tokens it produces, unless the caller passes `WithIssuer`, whose issuer then wins. When the catalog advertises the corresponding list, construction **MUST** fail with `auth.ErrInvalidConfig` when:
+
+- `grant_types_supported` does not contain `client_credentials`;
+- `token_endpoint_auth_methods_supported` does not contain the configured method (`private_key_jwt` with a client assertion, `client_secret_basic` or `client_secret_post` with a secret);
+- `token_endpoint_auth_signing_alg_values_supported` does not contain the algorithm of a client assertion produced by the SDK's own `jwtbearer.ClaimsSigner` (an assertion source the SDK cannot inspect is not checked).
+
+An absent or empty list **MUST NOT** fail construction, as in § G-3. `NewFromCatalog` **MUST NOT** choose the client-assertion signing algorithm from `token_endpoint_auth_signing_alg_values_supported`: a `jwtbearer.ClaimsSigner` signs with the algorithm it was built with.
+
 **Distinction from `auth/jwtbearer`:** `auth/jwtbearer` implements the separate RFC 7523 _JWT Bearer Token Grant_ (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`) — the JWT is the _authorization grant_ itself. `auth/clientcreds` with `WithClientAssertion` uses `grant_type=client_credentials` — the JWT is the _client authentication credential_. Both use `jwtbearer.AssertionSource` / `jwtbearer.ClaimsSigner` for signing.
 
 **Configuration rules** (enforced at `FromConfig`):
@@ -219,12 +229,12 @@ The authorization request **MUST** carry `aud` (HL7 SMART App Launch lists it as
 
 ### REQ-062 — JWKS rotation
 
-#### Algorithm allowlists (surface-only in v0.8)
+#### Algorithm allowlists
 
 The SMART discovery resolver surfaces two algorithm-selection lists onto `AuthEndpoints` (REQ-070):
 
-- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). Phase 3b client-credential selection logic will read this list to choose a signing algorithm; in v0.8 the field is populated but not yet consumed.
-- **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). ID-token verification (REQ-064) consumes this list as the verification allowlist when present (see _ID-token verification algorithm agility_ below). `TokenEndpointAuthSigningAlgValuesSupported` remains surface-only in v0.8 (Phase 3b client-credential alg selection).
+- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). `auth/clientcreds.NewFromCatalog` checks client assertions against this list under [§ Backend Services from a resolved catalog](#backend-services-from-a-resolved-catalog).
+- **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). ID-token verification (REQ-064) consumes this list as the verification allowlist when present (see _ID-token verification algorithm agility_ below).
 
 The SDK validates ID tokens against the deployment's published JWKS. JWKS rotation **MUST** be handled:
 
@@ -303,9 +313,9 @@ func (f ReautherFunc) Reauth(ctx context.Context) error { return f(ctx) }
 **Transport-layer opt-in 401→reauth safety net (Phase 4b, F-D).**
 `transport.WithReauthOn401(r auth.Reauther)` installs an opt-in safety net. When a wire `401` is received:
 
-1. If a `Reauther` is configured **and** this `Do` call has not yet reauthed, `transport/` calls `r.Reauth(ctx)` exactly once.
-2. If `Reauth` returns nil, the request is retried once. The retry re-acquires the token via `tokenSourceFor` — now pointing at the refreshed credential.
-3. If the retry also returns `401`, `transport.ErrUnauthorized` is surfaced. If `Reauth` itself returns an error, that error (wrapped) is surfaced. In either case the loop does not repeat.
+1. If a `Reauther` is configured, this `Do` call has not yet reauthed, **and** the response's Bearer challenge permits it under [transport.md § REQ-166](transport.md#req-166--bearer-challenge-on-401-and-403), `transport/` **MUST** call `r.Reauth(ctx)` exactly once.
+2. If `Reauth` returns nil, the request **MUST** be retried once. The retry re-acquires the token via `tokenSourceFor` — now pointing at the refreshed credential.
+3. If the retry also returns `401`, `transport.ErrUnauthorized` **MUST** be surfaced; if `Reauth` itself returns an error, that error, wrapped, **MUST** be surfaced and the request not retried. In either case the loop does not repeat.
 
 A per-`Do` boolean guards against infinite loops; `Reauth` is called at most once per `Do` invocation regardless of retry policy.
 
@@ -313,12 +323,11 @@ When `WithReauthOn401` is **not** set, the existing contract is unchanged: a wir
 
 This hook is a **complementary safety net** — proactive expiry-based refresh in `Source.Token()` before the request is issued remains the primary mechanism. The hook covers the residual window where a token expires between the proactive-refresh check and the wire round-trip.
 
-The retry fires for **all HTTP methods**, including non-idempotent writes (`POST`/`PUT`). This is safe because a `401` means the request was rejected at the authentication layer and therefore **not processed** by the resource — re-driving it once after refreshing the credential cannot double-apply a write. A `401` arising from insufficient *scope* (rather than token expiry) will simply `401` again and surface `transport.ErrUnauthorized` after the single retry (one wasted round-trip, no harm). Deployments that signal authorization failures with `403` (reserving `401` for authentication/expiry) get the cleanest behaviour.
+The retry **MUST** fire for **all HTTP methods**, including non-idempotent writes (`POST`/`PUT`), and repeat the request's method and body. This is safe because a `401` means the request was rejected at the authentication layer and therefore **not processed** by the resource — re-driving it once after refreshing the credential cannot double-apply a write; [REQ-166](transport.md#req-166--bearer-challenge-on-401-and-403) says which `401`s are re-driven. Deployments that signal authorization failures with `403` (reserving `401` for authentication/expiry) get the cleanest behaviour.
 
-Out of scope (v1 implementation status):
+**Backend providers.** `auth/clientcreds` and `auth/jwtbearer` **MUST** implement `Reauther`: `Reauth` drops the cached access token and obtains a new one with a fresh exchange, coalesced with any exchange already in flight (REQ-026), and returns that exchange's error, if any. They have no refresh token; a new exchange is their only way to a new token.
 
-- `auth/clientcreds` and `auth/jwtbearer` do not implement `Reauther`; they have no refresh path. Callers using those providers may wire a custom `ReautherFunc` closure.
-- MTLS, FAPI, JAR/PAR — out of v1 scope.
+Out of scope (v1 implementation status): MTLS, FAPI, JAR/PAR.
 
 ### REQ-064 — Launch context
 

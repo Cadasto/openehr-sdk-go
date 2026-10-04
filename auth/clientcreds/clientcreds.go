@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +17,19 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
+	"github.com/cadasto/openehr-sdk-go/smart/discovery"
+)
+
+// grantClientCredentials is the grant_type value of this grant, as sent to
+// the token endpoint and as listed in a server's grant_types_supported.
+const grantClientCredentials = "client_credentials"
+
+// Client authentication method names, as listed in a server's
+// token_endpoint_auth_methods_supported (RFC 8414).
+const (
+	methodClientSecretBasic = "client_secret_basic"
+	methodClientSecretPost  = "client_secret_post"
+	methodPrivateKeyJWT     = "private_key_jwt"
 )
 
 // AuthMethod selects how the client authenticates to the token
@@ -67,7 +81,8 @@ type Config struct {
 	// ClientAssertion, when set, enables SMART Backend Services asymmetric
 	// client authentication (RFC 7523). The source is called once per token
 	// exchange to produce a freshly signed JWT. Mutually exclusive with
-	// ClientSecret.
+	// ClientSecret. A nil *jwtbearer.ClaimsSigner is refused, as it can
+	// never sign.
 	ClientAssertion jwtbearer.AssertionSource
 	// RefreshThreshold is how long before ExpiresAt the source treats
 	// the cached token as stale and triggers a refresh. Default 30s.
@@ -128,6 +143,9 @@ type exchange struct {
 	done  chan struct{}
 	token auth.Token
 	err   error
+	// abandoned reports that the exchange failed after the context of the
+	// caller running it had ended. That failure belongs to that caller only.
+	abandoned bool
 }
 
 // New constructs a Source from clientID, clientSecret, tokenURL plus
@@ -158,6 +176,10 @@ func FromConfig(cfg Config) (*Source, error) {
 	if cfg.ClientID == "" {
 		return nil, fmt.Errorf("%w: ClientID is required", auth.ErrInvalidConfig)
 	}
+	if signer, ok := cfg.ClientAssertion.(*jwtbearer.ClaimsSigner); ok && signer == nil {
+		// A nil signer passes the nil-interface checks below but can never sign.
+		return nil, fmt.Errorf("%w: ClientAssertion is a nil *jwtbearer.ClaimsSigner", auth.ErrInvalidConfig)
+	}
 	if cfg.ClientSecret != "" && cfg.ClientAssertion != nil {
 		return nil, fmt.Errorf("%w: ClientSecret and ClientAssertion are mutually exclusive", auth.ErrInvalidConfig)
 	}
@@ -183,33 +205,153 @@ func FromConfig(cfg Config) (*Source, error) {
 	return &Source{cfg: cfg, tokenURL: u}, nil
 }
 
+// NewFromCatalog builds a Source for SMART Backend Services from a resolved
+// catalog. It sends token requests to catalog.Auth.TokenEndpoint and records
+// catalog.Issuer on the tokens it produces, unless opts include
+// [WithIssuer]. clientSecret must be empty when opts include
+// [WithClientAssertion], as [FromConfig] refuses both together.
+//
+// A nil catalog, or one without a token endpoint, is refused with
+// [auth.ErrInvalidConfig]. So is a configuration the catalog says the server
+// does not accept: grant_types_supported leaves out client_credentials,
+// token_endpoint_auth_methods_supported leaves out the configured method
+// (private_key_jwt with a client assertion, otherwise client_secret_basic or
+// client_secret_post as [WithAuthMethod] selects), or
+// token_endpoint_auth_signing_alg_values_supported leaves out the algorithm
+// of a [jwtbearer.ClaimsSigner] client assertion. A list the catalog leaves
+// empty does not constrain anything, and a client assertion from any other
+// source is not checked against the algorithm list. The other checks are
+// those of [FromConfig].
+func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID, clientSecret string, opts ...Option) (*Source, error) {
+	if catalog == nil {
+		return nil, fmt.Errorf("%w: catalog is nil", auth.ErrInvalidConfig)
+	}
+	if catalog.Auth.TokenEndpoint == nil {
+		return nil, fmt.Errorf("%w: catalog has no token endpoint", auth.ErrInvalidConfig)
+	}
+	// The issuer default comes first, so an option the caller passes wins.
+	all := append([]Option{WithIssuer(catalog.Issuer)}, opts...)
+	s, err := New(clientID, clientSecret, catalog.Auth.TokenEndpoint.String(), all...)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkAdvertised(catalog.Auth, s.cfg); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// checkAdvertised refuses cfg when a list the server advertises leaves out
+// the grant, the client auth method, or the client-assertion algorithm cfg
+// would use. An empty list does not constrain. The errors name only public
+// metadata: the list and the configured value, never a credential.
+func checkAdvertised(a discovery.AuthEndpoints, cfg Config) error {
+	if l := a.GrantTypesSupported; len(l) > 0 && !slices.Contains(l, grantClientCredentials) {
+		return fmt.Errorf("%w: grant type %q is not in the server's advertised grant_types_supported %v",
+			auth.ErrInvalidConfig, grantClientCredentials, l)
+	}
+	method := authMethodName(cfg)
+	if l := a.TokenEndpointAuthMethodsSupported; len(l) > 0 && !slices.Contains(l, method) {
+		return fmt.Errorf("%w: configured client auth method %q is not in the server's advertised token_endpoint_auth_methods_supported %v",
+			auth.ErrInvalidConfig, method, l)
+	}
+	// Only the SDK's own signer exposes its algorithm; any other assertion
+	// source is opaque and is not checked. FromConfig has already refused a
+	// nil signer.
+	if signer, ok := cfg.ClientAssertion.(*jwtbearer.ClaimsSigner); ok {
+		if l := a.TokenEndpointAuthSigningAlgValuesSupported; len(l) > 0 && !slices.Contains(l, signer.Algorithm) {
+			return fmt.Errorf("%w: client assertion algorithm %q is not in the server's advertised token_endpoint_auth_signing_alg_values_supported %v",
+				auth.ErrInvalidConfig, signer.Algorithm, l)
+		}
+	}
+	return nil
+}
+
+// authMethodName returns the token_endpoint_auth_methods_supported name of
+// the client authentication fetch sends for cfg. It follows fetch's own
+// choice: a client assertion first, then client_secret_post when selected,
+// and HTTP Basic otherwise.
+func authMethodName(cfg Config) string {
+	switch {
+	case cfg.ClientAssertion != nil:
+		return methodPrivateKeyJWT
+	case cfg.AuthMethod == AuthPost:
+		return methodClientSecretPost
+	default:
+		return methodClientSecretBasic
+	}
+}
+
+var _ auth.Reauther = (*Source)(nil)
+
 // Token returns the current access token, refreshing transparently
 // when the cached token is within RefreshThreshold of expiry.
-// Concurrent callers share the in-flight exchange.
+// Concurrent callers share the in-flight exchange. If the caller running
+// that exchange gives up first, a caller whose own context is still live
+// starts a new exchange rather than returning that caller's cancellation.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
-	if err := ctx.Err(); err != nil {
-		return auth.Token{}, err
-	}
-	s.mu.Lock()
-	if !s.stale() {
-		t := s.cur
-		s.mu.Unlock()
-		return t, nil
-	}
-	if s.inflight != nil {
+	for {
+		if err := ctx.Err(); err != nil {
+			return auth.Token{}, err
+		}
+		s.mu.Lock()
+		if !s.stale() {
+			t := s.cur
+			s.mu.Unlock()
+			return t, nil
+		}
 		ex := s.inflight
+		if ex == nil {
+			ex = &exchange{done: make(chan struct{})}
+			s.inflight = ex
+			s.mu.Unlock()
+			return s.lead(ctx, ex)
+		}
 		s.mu.Unlock()
 		select {
 		case <-ex.done:
-			return ex.token, ex.err
 		case <-ctx.Done():
 			return auth.Token{}, ctx.Err()
 		}
+		if !ex.abandoned {
+			return ex.token, ex.err
+		}
+		// The caller running ex gave up, and this caller's context is live:
+		// go round again to run a new exchange or wait on a newer one. A new
+		// round follows only an exchange whose caller gave up, so the loop
+		// never spins.
 	}
-	ex := &exchange{done: make(chan struct{})}
-	s.inflight = ex
-	s.mu.Unlock()
+}
 
+// Reauth drops the cached access token and obtains a new one with a fresh
+// exchange, even when the cached token is not yet near expiry. Use it to
+// recover from a wire 401, for example through transport.WithReauthOn401.
+// The client credentials grant issues no refresh token, so a new exchange is
+// the only way to a new token.
+//
+// When an exchange is already in flight, Reauth waits for that exchange
+// instead of starting another, so concurrent Reauth and Token calls send one
+// request to the token endpoint. If the caller running that exchange gives up
+// first, Reauth starts a new exchange rather than returning that caller's
+// cancellation. Reauth returns the exchange's error, an
+// [*auth.ExchangeError] wrapping [auth.ErrTokenExchangeFailed], or the
+// context's error when ctx ends first. A Reauth whose context has already
+// ended keeps the cached token. After a failed exchange no token is cached,
+// and the next Token call tries again.
+func (s *Source) Reauth(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.cur = auth.Token{}
+	s.mu.Unlock()
+	_, err := s.Token(ctx)
+	return err
+}
+
+// lead runs the exchange ex on behalf of every caller waiting on it, caches
+// the token it obtains, and publishes the result to those callers.
+func (s *Source) lead(ctx context.Context, ex *exchange) (auth.Token, error) {
 	tok, err := s.fetch(ctx)
 
 	s.mu.Lock()
@@ -220,6 +362,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	s.mu.Unlock()
 	ex.token = tok
 	ex.err = err
+	ex.abandoned = err != nil && ctx.Err() != nil
 	close(ex.done)
 
 	return tok, err
@@ -230,9 +373,9 @@ func (s *Source) stale() bool {
 		return true
 	}
 	if s.cur.ExpiresAt.IsZero() {
-		// No declared expiry — cache until the consumer replaces the
-		// TokenSource or a wire 401 surfaces (transport does not
-		// auto-refresh; the application must obtain a new token).
+		// No declared expiry: cache until Reauth drops the token, for
+		// example after a wire 401 through transport.WithReauthOn401, or
+		// until the consumer replaces the TokenSource.
 		return false
 	}
 	return time.Until(s.cur.ExpiresAt) <= s.cfg.RefreshThreshold
@@ -250,7 +393,7 @@ type tokenResponse struct {
 
 func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 	form := url.Values{
-		"grant_type": {"client_credentials"},
+		"grant_type": {grantClientCredentials},
 	}
 	if s.cfg.Scope != "" {
 		form.Set("scope", s.cfg.Scope)

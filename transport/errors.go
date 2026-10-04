@@ -101,6 +101,16 @@ type WireError struct {
 	// May contain PHI; only populated when the client is built with
 	// WithRawErrorBodies(true). Empty by default.
 	RawBody []byte
+	// Challenge is the Bearer challenge from the response's
+	// WWW-Authenticate header, which says why the server refused the
+	// token. It is set only on a 401 or 403 whose header carries a Bearer
+	// challenge the transport can read, and is nil otherwise; the status
+	// maps to ErrUnauthorized or ErrForbidden either way. Error never
+	// includes its values, so read them here after errors.AsType. Its
+	// ErrorDescription, free text from the server, is kept only when the
+	// client is built with WithRawErrorBodies(true); the other fields are
+	// always set.
+	Challenge *BearerChallenge
 	// Sentinel is the categorical class for errors.Is.
 	Sentinel error
 }
@@ -108,8 +118,9 @@ type WireError struct {
 // Error implements error. The returned string includes the HTTP status,
 // the openEHR error code, and the request route, all of which are
 // non-PHI fields.
-// The server message and raw body are deliberately omitted so WireError
-// values are safe to include in logs, traces, and observer callbacks.
+// The server message, the raw body and the Bearer challenge are
+// deliberately omitted so WireError values are safe to include in logs,
+// traces, and observer callbacks.
 // Callers that need the message (e.g. for user-facing error reporting in
 // a controlled environment) should use errors.As to extract the full
 // WireError after opting in via WithRawErrorBodies.
