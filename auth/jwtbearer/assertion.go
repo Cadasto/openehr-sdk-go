@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"reflect"
 	"sync/atomic"
 	"time"
 
@@ -104,11 +103,14 @@ type ClaimsSigner struct {
 }
 
 // NewClaimsSigner constructs a ClaimsSigner. Returns ErrInvalidConfig
-// when required fields are missing, the signer is nil (including a nil value
-// of any pointer, slice, map, func or channel type, such as a nil
-// *rsa.PrivateKey, ed25519.PrivateKey or pointer to a signer type of the
-// caller's own), the algorithm is unsupported, or the signer's key type does
-// not match the algorithm family.
+// when required fields are missing, the signer is nil or a nil
+// *rsa.PrivateKey or *ecdsa.PrivateKey, the algorithm is unsupported, the
+// signer's Public method panics, or the signer's key type does not match the
+// algorithm family. A Public method panics for a nil key of most other types
+// held in a non-nil crypto.Signer, such as a nil ed25519.PrivateKey or a nil
+// pointer to a signer type of the caller's own whose Public reads its key,
+// so such a signer is refused instead of crashing the caller. A nil signer
+// whose Public method works is not detected.
 //
 // Key requirements per algorithm:
 //   - RS256, RS384: *rsa.PrivateKey
@@ -125,7 +127,7 @@ func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...Sign
 		return nil, fmt.Errorf("%w: signer is required", auth.ErrInvalidConfig)
 	}
 	// A nil key of a concrete type passes the check above, and its Public
-	// method may panic, so refuse it before calling any method on it.
+	// method would panic, so refuse it before calling any method on it.
 	if isNilKey(s.Signer) {
 		return nil, fmt.Errorf("%w: signer is a nil %T", auth.ErrInvalidConfig, s.Signer)
 	}
@@ -159,9 +161,8 @@ const clientAssertionLifetime = 5 * time.Minute
 // kid, a unique jti, and an exp five minutes after its iat.
 //
 // It fails with [auth.ErrInvalidConfig] when clientID, tokenURL, alg or kid
-// is empty, signer is nil (including a nil value of a concrete type, as
-// [NewClaimsSigner] describes), alg is not supported, or the key does not
-// fit alg.
+// is empty, signer is nil, alg is not supported, signer's Public method
+// panics, or the key does not fit alg, as [NewClaimsSigner] describes.
 // [NewClaimsSigner] lists the key each algorithm needs.
 func NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, kid string) (*ClaimsSigner, error) {
 	if clientID == "" {
@@ -183,21 +184,31 @@ func NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, ki
 	}, signer, WithAlgorithm(alg), WithKeyID(kid))
 }
 
-// isNilKey reports whether signer holds a nil value of a pointer, slice,
-// map, func or channel type in a non-nil crypto.Signer: a nil
-// *rsa.PrivateKey, a nil ed25519.PrivateKey, a nil pointer to a signer type
-// of the caller's own. Such a signer is refused whether or not its methods
-// would work, since none of them can stand for a key. A nil value is found
-// by reflection rather than by calling Public and catching a panic, so
-// every one is refused, also one whose Public would not panic.
+// isNilKey reports whether signer is a nil *rsa.PrivateKey or
+// *ecdsa.PrivateKey: a nil key held in a non-nil crypto.Signer. It names the
+// two key types the supported algorithms take; a nil value of any other
+// type is caught when its Public method panics (see publicKey).
 func isNilKey(signer crypto.Signer) bool {
-	v := reflect.ValueOf(signer)
-	switch v.Kind() {
-	case reflect.Pointer, reflect.Slice, reflect.Map, reflect.Func, reflect.Chan, reflect.Interface, reflect.UnsafePointer:
-		return v.IsNil()
-	default:
-		return false
+	switch k := signer.(type) {
+	case *rsa.PrivateKey:
+		return k == nil
+	case *ecdsa.PrivateKey:
+		return k == nil
 	}
+	return false
+}
+
+// publicKey returns signer.Public(). A Public method that panics, as it
+// does for a nil key of most types held in a non-nil crypto.Signer, is
+// refused with auth.ErrInvalidConfig instead of crashing the caller.
+func publicKey(signer crypto.Signer) (pub crypto.PublicKey, err error) {
+	defer func() {
+		if recover() != nil {
+			pub = nil
+			err = fmt.Errorf("%w: the signer's Public method panicked: a nil or unusable %T key", auth.ErrInvalidConfig, signer)
+		}
+	}()
+	return signer.Public(), nil
 }
 
 // SignerOption configures a ClaimsSigner.
@@ -310,7 +321,10 @@ func toJoseAlg(alg string) (gojose.SignatureAlgorithm, error) {
 // both RSA and ECDSA (including ES256/ES384). An alg outside the four is not
 // checked here; toJoseAlg refuses it. (REQ-068)
 func validateKeyAlg(signer crypto.Signer, alg string) error {
-	pub := signer.Public()
+	pub, err := publicKey(signer)
+	if err != nil {
+		return err
+	}
 	switch alg {
 	case "RS256", "RS384":
 		if _, ok := pub.(*rsa.PublicKey); !ok {

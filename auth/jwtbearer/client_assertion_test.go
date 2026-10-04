@@ -7,6 +7,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rsa"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -80,11 +81,22 @@ func TestNewClientAssertionClaims(t *testing.T) { // REQ-068
 	}
 }
 
+// unusableSigner is a non-nil crypto.Signer whose Public panics, as a
+// broken key-store adapter might.
+type unusableSigner struct{}
+
+func (unusableSigner) Public() crypto.PublicKey { panic("key store unavailable") }
+
+func (unusableSigner) Sign(io.Reader, []byte, crypto.SignerOpts) ([]byte, error) {
+	return nil, errors.New("key store unavailable")
+}
+
 // TestNewClientAssertionRefusesBadArguments pins that NewClientAssertion
 // fails with auth.ErrInvalidConfig, and returns no signer, when an argument
-// is empty (a nil signer, or a nil key of a concrete type, counts as empty)
-// or the key does not fit the algorithm. An empty clientID, tokenURL or kid
-// is refused with a message that names the argument.
+// is empty (a nil signer, or a nil key of a concrete type, counts as empty),
+// the signer's Public method panics, or the key does not fit the algorithm.
+// It never panics itself. An empty clientID, tokenURL or kid is refused with
+// a message that names the argument.
 func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 	rsaKey := newKey(t)
 	p256Key := newECKey(t, elliptic.P256())
@@ -103,6 +115,10 @@ func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 		{name: "nil ECDSA key", clientID: "c1", tokenURL: "https://as.example/token", signer: (*ecdsa.PrivateKey)(nil), alg: "ES384", kid: "k1"},
 		{name: "nil Ed25519 key", clientID: "c1", tokenURL: "https://as.example/token", signer: ed25519.PrivateKey(nil), alg: "RS384", kid: "k1"},
 		{name: "nil custom signer", clientID: "c1", tokenURL: "https://as.example/token", signer: (*opaqueRSASigner)(nil), alg: "RS384", kid: "k1"},
+		{
+			name: "signer whose Public panics", clientID: "c1", tokenURL: "https://as.example/token", signer: unusableSigner{}, alg: "RS384", kid: "k1",
+			wantInMsg: "Public method panicked",
+		},
 		{name: "empty alg", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, kid: "k1"},
 		{name: "empty kid", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, alg: "RS384", wantInMsg: "kid"},
 		{name: "RSA key for ES384", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, alg: "ES384", kid: "k1"},
