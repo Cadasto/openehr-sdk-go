@@ -717,9 +717,9 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 #### PROBE-065 — `Prefer: return=minimal` on POST returns identifier only
 
-- **Title:** `POST /ehr/{ehr_id}/composition` with `Prefer: return=minimal` returns an empty body and a `Location` header; a follow-up GET returns the full payload.
+- **Title:** `POST /ehr/{ehr_id}/composition` with `Prefer: return=minimal` returns an empty body and names the committed version in its `ETag` or `Location` header; a follow-up GET of that version returns the full payload.
 - **Preconditions:** Backend honours `Prefer: return=minimal`.
-- **Wire assertion:** POST response body is empty; `Location` is set; SDK surfaces only `*VersionMetadata`. Subsequent GET returns the full Composition.
+- **Wire assertion:** POST response body is empty; the `ETag` or `Location` names the committed version, read under [REQ-054](wire.md#req-054); SDK surfaces only `*VersionMetadata`. Subsequent GET of that version returns the full Composition.
 - **Modes:** Sandbox, Live (snapshot); Cassette not yet served by the runner.
 - **Status:** Implemented (Sandbox) — [`testkit/probes/versioned/probe_065_minimal_return_round_trip.go`](../../testkit/probes/versioned/probe_065_minimal_return_round_trip.go); harness in [`probe_065_test.go`](../../testkit/probes/versioned/probe_065_test.go) (shared fixtures in [`probes_test.go`](../../testkit/probes/versioned/probes_test.go)). The default `Save` (Prefer `return=minimal`) recovers the version id from the `ETag` or `Location` into the `VersionUID` and returns a nil Composition; a follow-up `Get` — which the harness answers only on the path naming that `VersionUID` — returns the full body. Can-fail plants strip the `ETag` and `Location`, 404 the read-back, and serve a read-back with no `archetype_node_id`; each pins the failure detail it expects. A Live snapshot of the default minimal save and the follow-up GET runs in [`testkit/probe/livestatus_test.go`](../../testkit/probe/livestatus_test.go). A scenario recording of that save and GET, [`testkit/recordings/composition-minimal.har`](../../testkit/recordings/composition-minimal.har), is replayed by its own test in [`cassette_test.go`](../../testkit/probe/cassette_test.go), outside the runner, so it is not yet this probe's Cassette mode.
 - **Satisfies:** REQ-094.
