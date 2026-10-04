@@ -13,11 +13,13 @@ import (
 // Record is the outcome expected for one set and leg, and why it is what it
 // is.
 //
-// Four rules hold for every record, and [CheckRecords] enforces them: a
-// refusal, a difference or a non-zero excluded count states its Reason; a
-// clean record, one with every count but compared zero, carries none, so a
-// closed gap cannot leave a stale reason behind; a record that is not a
-// refusal compares at least one key or leaf; and a refusal carries no counts.
+// Six rules hold for every record, and [CheckRecords] enforces them. A count
+// is never negative. A refusal carries no counts. A record that is not a
+// refusal compares at least one key or leaf, since agreement over an empty
+// set is vacuous. Missing plus altered do not exceed compared. A refusal, a
+// difference, or a non-zero excluded count states its Reason. A clean record,
+// one with every count but compared zero, carries no Reason, so a closed gap
+// cannot leave a stale reason behind.
 type Record struct {
 	// Outcome is the expected outcome. For a refusal, Refused is a stable
 	// substring of the codec's error rather than the whole message.
@@ -185,7 +187,7 @@ var Recorded = map[string]map[Leg]Record{
 				"the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order " +
 				"between the birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists " +
 				"Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the " +
-				"FLAT has no origin key and decode fills it from the context start time (deviations.md), where the " +
+				"FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the " +
 				"canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, " +
 				"decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.",
 		},
@@ -201,7 +203,7 @@ var Recorded = map[string]map[Leg]Record{
 			Outcome: Outcome{Compared: 26, Missing: 5, Extra: 6},
 			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
 				"composer|id, |id_scheme and |id_namespace are missing. LOCATABLE name: the upstream FLAT writes the " +
-				"composition's own name as _name, which the codec does not carry (deviations.md, LOCATABLE.name). " +
+				"composition's own name as _name, which the codec does not carry (openehr/serialize/simplified/deviations.md, LOCATABLE.name). " +
 				"Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
 				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created. " +
 				"ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and " +
@@ -268,7 +270,7 @@ var Recorded = map[string]map[Leg]Record{
 			Outcome: Outcome{Compared: 31, Missing: 5, Extra: 1},
 			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
 				"composer|id, |id_scheme and |id_namespace are missing. LOCATABLE name: the upstream FLAT writes the " +
-				"composition's own name as _name, which the codec does not carry (deviations.md, LOCATABLE.name). " +
+				"composition's own name as _name, which the codec does not carry (openehr/serialize/simplified/deviations.md, LOCATABLE.name). " +
 				"Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
 				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.",
 		},
@@ -304,7 +306,7 @@ var Recorded = map[string]map[Leg]Record{
 				"extra leaves), and rm_version is 1.2.0 against 1.0.4. Upstream date-time spelling: the FLAT writes " +
 				"the four event times and the context start and end times with a full stop before the fraction, " +
 				"the canonical with a comma. HISTORY.origin: the FLAT has no origin key and decode fills both " +
-				"origins from the context start time (deviations.md), where the canonical sets them otherwise.",
+				"origins from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets them otherwise.",
 		},
 	},
 	"nested": {
@@ -344,7 +346,7 @@ var Recorded = map[string]map[Leg]Record{
 			Reason: "body-form composer: decode refuses the composer keys (the 3 excluded keys), so the " +
 				"composer's name and external_ref are missing and decode fills a PARTY_SELF. Upstream date-time " +
 				"spelling: the event time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: a persistent " +
-				"composition has no context start time, and decode, which fills origin from it (deviations.md), " +
+				"composition has no context start time, and decode, which fills origin from it (openehr/serialize/simplified/deviations.md), " +
 				"leaves the origin empty. RM-FLOOR archetype_details: the canonical carries template_id on the " +
 				"inner archetype root where decode adds it on the root only, and rm_version is 1.2.0 against 1.0.2.",
 		},
@@ -354,7 +356,7 @@ var Recorded = map[string]map[Leg]Record{
 			Outcome: Outcome{Compared: 83, Missing: 11, Extra: 11, Altered: 11},
 			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone (3 missing " +
 				"keys). Web Template projection: the SDK's Web Template has no in-context time or ism_transition " +
-				"node for the section_3 ACTION (webtemplate deviations.md, inContext coverage), and its " +
+				"node for the section_3 ACTION (openehr/template/webtemplate/deviations.md, inContext coverage), and its " +
 				"per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT " +
 				"encode writes neither (4 missing keys). Choice element: upstream spells the value of the choice " +
 				"element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as " +

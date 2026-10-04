@@ -259,14 +259,33 @@ cmd_ingest() {
     printf '%s' "$body"
   } >"$stage/MANIFEST.txt"
 
-  rm -rf -- "$DEST"
-  mv -- "$stage" "$DEST"
-  chmod 0755 "$DEST"
+  # Land the stage in place of the vendored tree. Move the previous tree
+  # aside first: if the mv fails, put it back and die, so a refusal leaves
+  # the previous tree in place. Drop the aside copy only after the stage
+  # has landed and the EXIT trap no longer points at the stage.
+  local aside=""
+  if [[ -e "$DEST" ]]; then
+    aside="${DEST}.aside.$$"
+    mv -- "$DEST" "$aside"
+  fi
+  if ! mv -- "$stage" "$DEST"; then
+    if [[ -n "$aside" ]]; then
+      mv -- "$aside" "$DEST" || die "replacing $DEST failed and restoring the previous tree failed"
+      die "replacing $DEST failed; the previous tree is in place"
+    fi
+    die "replacing $DEST failed"
+  fi
   trap - EXIT
+  if [[ -n "$aside" ]]; then
+    rm -rf -- "$aside"
+  fi
+  chmod 0755 "$DEST"
 
   local nfiles nopts
-  nfiles="$(grep -c $'^file\t' "$MANIFEST")"
-  nopts="$(grep -c $'^opt\t' "$MANIFEST")"
+  # grep -c exits 1 when the count is zero; under set -e that would abort
+  # after the tree is already replaced.
+  nfiles="$(grep -c $'^file\t' "$MANIFEST" || true)"
+  nopts="$(grep -c $'^opt\t' "$MANIFEST" || true)"
   echo "Ingested $nfiles file(s) and $nopts OPT pointer(s) into testkit/corpus/crossformat/ (sdk ${SDK_PIN:0:12}, robot ${ROBOT_PIN:0:12})"
 }
 

@@ -345,7 +345,7 @@ func decodeSubset(t *Target, keys map[string]any) (*rm.Composition, error) {
 //
 // Only the two REQ-053 gap sentinels are refusals. Any other keyed error —
 // a bug in the codec, a malformed fixture, a budget breach — returns
-// gap = false so [decodeReducing] fails on it, because reclassifying an
+// gap = false so [DecodeReducing] returns an error, because reclassifying an
 // unrecognised error as unmodelled surface would let a genuine regression
 // present as a bigger Excluded count instead of a red test.
 //
@@ -432,9 +432,11 @@ func refusedSuffix(err error) (string, bool) {
 // quotes the failing *segment* id, and parseFlatKey's invalid-`:index` refusal
 // quotes the bad index substring — so the token this returns is not always a
 // key. What protects the harness is not the quoting order but the fail-loud
-// guard in [decodeReducing]: a token that matches nothing in the body aborts
-// the run instead of dropping something arbitrary, and an unrecognised error
-// class is rejected by [dropRefused] before any drop happens. The residual
+// guard in [DecodeReducing]: a token that matches nothing in the body makes
+// DecodeReducing return an error instead of dropping something arbitrary.
+// PROBE-105 records that error as the leg's refusal rather than failing the
+// process. An unrecognised error class is rejected by [dropRefused] before
+// any drop happens. The residual
 // risk is narrow and real: a first token that coincidentally equals some
 // *other* key present in the body would drop that key undetected. Closing it
 // properly needs a typed key on the codec's errors, not a better regexp.

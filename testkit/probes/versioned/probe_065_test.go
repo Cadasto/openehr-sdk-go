@@ -11,12 +11,14 @@ import (
 )
 
 // probe065Backend serves the minimal-return round trip: POST answers 201 with
-// an empty body (per return=minimal), asserting the SDK sent that Prefer, and a
-// ETag and Location naming the new version; GET answers getStatus with getBody, but
-// only for the version the POST named — any other path 404s, so a probe that
-// mis-parsed the headers into the wrong VersionUID fails here instead of
-// passing against a path-blind fake. The withLocation and getStatus/getBody
-// knobs let the can-fail tests strip each half of the contract.
+// an empty body (per return=minimal), asserting the SDK sent that Prefer.
+// When withLocation is true, the ETag is the quoted initial version id and
+// Location's last segment is not that version id. When withLocation is false,
+// neither header is set. GET answers getStatus with getBody, but only for
+// the initial version id — any other path 404s, so a probe that mis-parsed
+// the headers into the wrong VersionUID fails here instead of passing
+// against a path-blind fake. The withLocation and getStatus/getBody knobs
+// let the can-fail tests strip each half of the contract.
 //
 // Not planted, deliberately: a "201 with a body on the minimal path" case. On
 // PreferMinimal, ehr.WriteResult returns metadata only without ever reading
@@ -32,8 +34,8 @@ func probe065Backend(t *testing.T, withLocation bool, getStatus int, getBody str
 				t.Errorf("POST Prefer = %q, want return=minimal (the SDK write default)", p)
 			}
 			if withLocation {
-				w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(initialVUID))
 				w.Header().Set("ETag", `"`+string(initialVUID)+`"`)
+				w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(updatedVUID))
 			}
 			w.WriteHeader(http.StatusCreated) // return=minimal: no body
 		case http.MethodGet:
