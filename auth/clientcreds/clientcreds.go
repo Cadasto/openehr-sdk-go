@@ -142,6 +142,9 @@ type exchange struct {
 	done  chan struct{}
 	token auth.Token
 	err   error
+	// abandoned reports that the exchange failed after the context of the
+	// caller running it had ended. That failure belongs to that caller only.
+	abandoned bool
 }
 
 // New constructs a Source from clientID, clientSecret, tokenURL plus
@@ -200,8 +203,8 @@ func FromConfig(cfg Config) (*Source, error) {
 // NewFromCatalog builds a Source for SMART Backend Services from a resolved
 // catalog. It sends token requests to catalog.Auth.TokenEndpoint and records
 // catalog.Issuer on the tokens it produces, unless opts include
-// [WithIssuer]. clientSecret may be empty when opts include
-// [WithClientAssertion].
+// [WithIssuer]. clientSecret must be empty when opts include
+// [WithClientAssertion], as [FromConfig] refuses both together.
 //
 // A nil catalog, or one without a token endpoint, is refused with
 // [auth.ErrInvalidConfig]. So is a configuration the catalog says the server
@@ -277,9 +280,41 @@ var _ auth.Reauther = (*Source)(nil)
 
 // Token returns the current access token, refreshing transparently
 // when the cached token is within RefreshThreshold of expiry.
-// Concurrent callers share the in-flight exchange.
+// Concurrent callers share the in-flight exchange. If the caller running
+// that exchange gives up first, a caller whose own context is still live
+// starts a new exchange rather than returning that caller's cancellation.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
-	return s.token(ctx, false)
+	for {
+		if err := ctx.Err(); err != nil {
+			return auth.Token{}, err
+		}
+		s.mu.Lock()
+		if !s.stale() {
+			t := s.cur
+			s.mu.Unlock()
+			return t, nil
+		}
+		ex := s.inflight
+		if ex == nil {
+			ex = &exchange{done: make(chan struct{})}
+			s.inflight = ex
+			s.mu.Unlock()
+			return s.lead(ctx, ex)
+		}
+		s.mu.Unlock()
+		select {
+		case <-ex.done:
+		case <-ctx.Done():
+			return auth.Token{}, ctx.Err()
+		}
+		if !ex.abandoned {
+			return ex.token, ex.err
+		}
+		// The caller running ex gave up, and this caller's context is live:
+		// go round again to run a new exchange or wait on a newer one. A new
+		// round follows only an exchange whose caller gave up, so the loop
+		// never spins.
+	}
 }
 
 // Reauth drops the cached access token and obtains a new one with a fresh
@@ -290,46 +325,27 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 //
 // When an exchange is already in flight, Reauth waits for that exchange
 // instead of starting another, so concurrent Reauth and Token calls send one
-// request to the token endpoint. Reauth returns that exchange's error, an
+// request to the token endpoint. If the caller running that exchange gives up
+// first, Reauth starts a new exchange rather than returning that caller's
+// cancellation. Reauth returns the exchange's error, an
 // [*auth.ExchangeError] wrapping [auth.ErrTokenExchangeFailed], or the
-// context's error when ctx ends first. After a failed exchange no token is
-// cached, and the next Token call tries again.
+// context's error when ctx ends first. A Reauth whose context has already
+// ended keeps the cached token. After a failed exchange no token is cached,
+// and the next Token call tries again.
 func (s *Source) Reauth(ctx context.Context) error {
-	_, err := s.token(ctx, true)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.cur = auth.Token{}
+	s.mu.Unlock()
+	_, err := s.Token(ctx)
 	return err
 }
 
-// token returns the cached access token while it is fresh, or the result of
-// an exchange. Callers that find an exchange in flight wait for it rather
-// than starting another. When force is set the cached token is dropped first,
-// so the caller always gets the result of an exchange.
-func (s *Source) token(ctx context.Context, force bool) (auth.Token, error) {
-	if err := ctx.Err(); err != nil {
-		return auth.Token{}, err
-	}
-	s.mu.Lock()
-	if force {
-		s.cur = auth.Token{}
-	}
-	if !s.stale() {
-		t := s.cur
-		s.mu.Unlock()
-		return t, nil
-	}
-	if s.inflight != nil {
-		ex := s.inflight
-		s.mu.Unlock()
-		select {
-		case <-ex.done:
-			return ex.token, ex.err
-		case <-ctx.Done():
-			return auth.Token{}, ctx.Err()
-		}
-	}
-	ex := &exchange{done: make(chan struct{})}
-	s.inflight = ex
-	s.mu.Unlock()
-
+// lead runs the exchange ex on behalf of every caller waiting on it, caches
+// the token it obtains, and publishes the result to those callers.
+func (s *Source) lead(ctx context.Context, ex *exchange) (auth.Token, error) {
 	tok, err := s.fetch(ctx)
 
 	s.mu.Lock()
@@ -340,6 +356,7 @@ func (s *Source) token(ctx context.Context, force bool) (auth.Token, error) {
 	s.mu.Unlock()
 	ex.token = tok
 	ex.err = err
+	ex.abandoned = err != nil && ctx.Err() != nil
 	close(ex.done)
 
 	return tok, err
@@ -350,9 +367,9 @@ func (s *Source) stale() bool {
 		return true
 	}
 	if s.cur.ExpiresAt.IsZero() {
-		// No declared expiry — cache until the consumer replaces the
-		// TokenSource or a wire 401 surfaces (transport does not
-		// auto-refresh; the application must obtain a new token).
+		// No declared expiry: cache until Reauth drops the token, for
+		// example after a wire 401 through transport.WithReauthOn401, or
+		// until the consumer replaces the TokenSource.
 		return false
 	}
 	return time.Until(s.cur.ExpiresAt) <= s.cfg.RefreshThreshold
