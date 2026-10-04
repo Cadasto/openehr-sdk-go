@@ -33,7 +33,7 @@ The catalog records the Platform base URL and the OIDC issuer as two values. The
 ## Consequences
 
 - Platforms with an external or separately hosted authorization server resolve. Platforms that align the two URLs, as SMART on openEHR recommends, see no change: their `BaseURL` and `Issuer` are equal.
-- `ServiceCatalog.Issuer` keeps its name and now means the OIDC issuer; `ServiceCatalog.BaseURL` and `StaticConfig.BaseURL` are added. A caller that used `Issuer` as "the URL I resolved" moves to `BaseURL`. A hand-built catalog that sets only `Issuer` keeps working, because `BaseURL` defaults to it.
+- `ServiceCatalog.Issuer` keeps its name and now means the OIDC issuer; `ServiceCatalog.BaseURL` and `StaticConfig.BaseURL` are added. A caller that used `Issuer` as "the URL I resolved" moves to `BaseURL`. A hand-built catalog from `NewStaticCatalog` that sets only `Issuer` keeps working, because `BaseURL` defaults to it.
 - The resolver no longer refuses a document for naming another issuer, but by default it confirms that issuer against the issuer's own OIDC discovery document, at the cost of one extra fetch per resolution or refresh when the two URLs differ. A Platform whose authorization server publishes no `openid-configuration` (SMART App Launch does not require one) is refused until the caller turns the confirmation off.
 - The authorization request always carries `aud`. A source built without a catalog has to name its audience, which is a new construction error for callers that relied on omitting it.
 - Binding each authorization request to its issuer, which is what actually defends a multi-Platform client against mix-up, becomes possible with a stable issuer value; this decision does not deliver it.

@@ -119,7 +119,9 @@ func WithDefaultTTL(d time.Duration) Option {
 }
 
 // WithAllowInsecure permits http:// base URLs, issuers and auth endpoint
-// URLs. Default is to refuse plaintext. Use only for local development.
+// URLs. It also turns off the refusal of a redirect to a URL that is not
+// https. Default is to refuse plaintext and that downgrade. Use only for
+// local development.
 func WithAllowInsecure() Option {
 	return func(cfg *resolverConfig) { cfg.allowInsecure = true }
 }
@@ -313,7 +315,10 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL string, cached *S
 			r.cfg.logger.Warn("discovery: cache invalidate failed", "base_url", baseURL, "err", ierr)
 		}
 	case cat != nil:
-		if perr := r.cache.Put(ctx, baseURL, cat); perr != nil {
+		// The caller may have cancelled after the fetch succeeded. The
+		// write still has to land, or the entry from before this fetch
+		// stays. Cancellation must not refuse it, as with Invalidate above.
+		if perr := r.cache.Put(context.WithoutCancel(ctx), baseURL, cat); perr != nil {
 			r.cfg.logger.Warn("discovery: cache put failed", "base_url", baseURL, "err", perr)
 		}
 	}
