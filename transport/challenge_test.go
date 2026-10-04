@@ -65,6 +65,15 @@ var bearerChallengeCases = []struct {
 	{name: "empty quoted value", lines: []string{`Bearer realm=""`}, want: &BearerChallenge{}},
 	{name: "whitespace around equals", lines: []string{"Bearer realm = \"x\" ,\terror=\tinvalid_token"}, want: &BearerChallenge{Realm: "x", Error: "invalid_token"}},
 	{name: "empty list elements", lines: []string{`, Bearer realm="x",, error="invalid_token" ,`}, want: &BearerChallenge{Realm: "x", Error: "invalid_token"}},
+	{name: "empty element opens the param list", lines: []string{`Bearer , error="insufficient_scope"`}, want: &BearerChallenge{Error: "insufficient_scope"}},
+	{name: "empty elements open the param list", lines: []string{"Bearer ,, ,\t, error=\"insufficient_scope\", scope=\"s\""}, want: &BearerChallenge{Error: "insufficient_scope", Scope: "s"}},
+	{name: "empty element straight after the scheme", lines: []string{`Bearer, error="insufficient_scope"`}, want: &BearerChallenge{Error: "insufficient_scope"}},
+	{name: "doubled empty element between params", lines: []string{`Bearer error="x",, scope="y"`}, want: &BearerChallenge{Error: "x", Scope: "y"}},
+	{name: "spaced empty elements between params", lines: []string{"Bearer error=\"x\" , ,\t, scope=\"y\""}, want: &BearerChallenge{Error: "x", Scope: "y"}},
+	{name: "trailing empty elements", lines: []string{`Bearer error="x", scope="y",, ,`}, want: &BearerChallenge{Error: "x", Scope: "y"}},
+	{name: "empty elements between challenges", lines: []string{`Basic realm="b",, ,Bearer error="x"`}, want: &BearerChallenge{Error: "x"}},
+	{name: "empty elements before the next scheme", lines: []string{`Bearer ,, Basic realm="b"`}, want: &BearerChallenge{}},
+	{name: "empty elements after a token68", lines: []string{`Basic abc==,, Bearer error="x"`}, want: &BearerChallenge{Error: "x"}},
 	{
 		name:  "Bearer after Basic on one line",
 		lines: []string{`Basic realm="b", Bearer error="insufficient_scope", scope="s"`},
@@ -112,6 +121,7 @@ var bearerChallengeCases = []struct {
 	{name: "no space after scheme", lines: []string{`Bearer"x"`}, want: nil},
 	{name: "equals straight after scheme", lines: []string{`Bearer=x`}, want: nil},
 	{name: "token68 then auth-param", lines: []string{`Bearer abc=, realm="x"`}, want: nil},
+	{name: "token68 then empty element then auth-param", lines: []string{`Bearer abc==,, realm="x"`}, want: nil},
 	{name: "non-token scheme", lines: []string{`"Bearer" realm="x"`}, want: nil},
 
 	// Well-formed lines whose Bearer challenge breaks RFC 6750.

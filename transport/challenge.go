@@ -151,8 +151,21 @@ func parseChallenges(line string) (challenges []authChallenge, ok bool) {
 			}
 			s.skipOWS()
 		}
-		// At a comma or the end of the line the scheme has no parameters.
-		if !s.done() && s.peek() != ',' {
+		switch {
+		case s.done():
+			// A scheme with no parameters ends the line.
+		case s.peek() == ',':
+			// Empty list elements may open the auth-param list, as in
+			// "Bearer , error=…" (RFC 9110 §5.6.1.2). Only an auth-param
+			// can follow them there; anything else is the next challenge.
+			comma := s.pos
+			s.skipSeparators()
+			if s.done() || !s.atAuthParam() {
+				s.pos = comma
+			} else if ch.params, ok = s.authParams(); !ok {
+				return nil, false
+			}
+		default:
 			if tok, ok := s.token68(); ok {
 				ch.token68 = tok
 			} else if ch.params, ok = s.authParams(); !ok {
