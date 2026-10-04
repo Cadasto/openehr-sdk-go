@@ -5,7 +5,7 @@ kind: plan
 # Plan — SMART client conformance
 
 **Date:** 2026-10-04
-**Status:** Draft — phase 0 in delivery
+**Status:** Draft — phases 0, 1 and 5 delivered (PRs 209, 212 and 211); phases 2 to 4 open
 **Covers:** [REQ-060](../specifications/auth.md#req-060) through [REQ-068](../specifications/auth.md#req-068--flow-and-launch-mode-coverage), [REQ-070](../specifications/service-discovery.md#req-070) through [REQ-073](../specifications/service-discovery.md#req-073--discovery-trust-posture), the unnumbered [Scope handling](../specifications/auth.md#scope-handling) section, and new requirements at the next free numbers for token revocation, scope syntax and the bearer challenge
 **Depends on:** nothing outside this plan
 **Defers:** discovery and JWKS HTTP caching semantics, relative endpoint URLs, the `launch-base64-json` decoder, the future of `auth/introspect`, and the watch list at the end
