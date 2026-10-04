@@ -598,9 +598,13 @@ func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string)
 // can name (LOCATABLE, ITEM, ITEM_STRUCTURE, DATA_VALUE, EVENT,
 // CONTENT_ITEM, ENTRY, CARE_ENTRY, PARTY_PROXY); concrete
 // subtypes admitted under each.
+//
+// A parameterised name such as "DV_INTERVAL<DV_COUNT>" is looked up by
+// its class, "DV_INTERVAL", because the generic parameter does not
+// change which abstract types the class conforms to.
 func rmTypeIsSubtypeOf(concrete, abstract string) bool {
 	subtypes := bmmSubtypes[abstract]
-	return slices.Contains(subtypes, concrete)
+	return slices.Contains(subtypes, bmmtype.Class(concrete))
 }
 
 // intervalRMTypeMatches reports whether a concrete interval RM type
@@ -710,10 +714,11 @@ func primitiveValueMatchesShortName(shortName string, val any) bool {
 // surface as the same false positive on a polymorphic OPT slot.
 // Extend in lock-step.
 //
-// Out of scope for v2: DV_INTERVAL / DV_PARSABLE / DV_MULTIMEDIA /
-// DV_PROPORTION / DV_SCALE / DV_STATE / time-specifications (DataValue
-// subtypes outside the closed REQ-103 primitive set). Add when an OPT
-// surfaces a real consumer for them.
+// The DATA_VALUE row is not hand-listed. It is every concrete
+// DATA_VALUE descendant of the pinned BMM, read through rminfo, so a
+// BMM bump that adds a data value type is admitted without an edit
+// here. describeRMType names each of them, since it delegates to the
+// generated rm.RMTypeName.
 //
 // REQ-110 added the demographic PARTY hierarchy (+ sub-components) and
 // the EHR-IM roots FOLDER / EHR_STATUS so non-COMPOSITION OPTs validate
@@ -761,12 +766,7 @@ var bmmSubtypes = map[string][]string{
 	"PARTY_PROXY": {
 		"PARTY_SELF", "PARTY_IDENTIFIED", "PARTY_RELATED",
 	},
-	"DATA_VALUE": {
-		"DV_TEXT", "DV_CODED_TEXT", "DV_QUANTITY", "DV_COUNT",
-		"DV_BOOLEAN", "DV_ORDINAL", "DV_DATE", "DV_TIME",
-		"DV_DATE_TIME", "DV_DURATION",
-		"DV_IDENTIFIER", "DV_URI", "DV_EHR_URI",
-	},
+	"DATA_VALUE": concreteDescendants("DATA_VALUE"),
 	// AOM 1.4 primitive short names (used under C_PRIMITIVE_OBJECT)
 	// admit the canonical DV wrapper carrying the primitive value.
 	// Lockstep with instance.concreteFor — surfaced by clinical_note.opt
@@ -777,4 +777,17 @@ var bmmSubtypes = map[string][]string{
 	"TIME":      {"DV_TIME"},
 	"DATE_TIME": {"DV_DATE_TIME"},
 	"BOOLEAN":   {"DV_BOOLEAN"},
+}
+
+// concreteDescendants returns every non-abstract class the pinned BMM
+// derives from rmType, sorted. It returns nil when rminfo cannot answer,
+// so every value under rmType then fails the type check instead of
+// passing it silently.
+func concreteDescendants(rmType string) []string {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return nil
+	}
+	descendants, _ := h.ConcreteDescendants(rmType)
+	return descendants
 }
