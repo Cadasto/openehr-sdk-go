@@ -161,6 +161,18 @@ type Source struct {
 	// idBinding is what a refreshed ID token must repeat from the last ID
 	// token the source verified; nil until it has verified one.
 	idBinding *idTokenBinding
+	// forceRefresh makes the held access token count as stale until new
+	// tokens replace it. Reauth sets it; setTokensLocked clears it.
+	forceRefresh bool
+}
+
+// setTokensLocked replaces the held tokens. New tokens are not the ones a
+// Reauth asked to replace, so it also ends a forced refresh. The caller
+// holds s.mu.
+func (s *Source) setTokensLocked(access auth.Token, refresh string) {
+	s.cur = access
+	s.refresh = refresh
+	s.forceRefresh = false
 }
 
 // idTokenBinding holds the claims of a verified ID token that a later one
@@ -523,8 +535,7 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 		tr.IDTokenClaims = claims
 	}
 	s.mu.Lock()
-	s.cur = tok
-	s.refresh = refresh
+	s.setTokensLocked(tok, refresh)
 	s.lastTR = tr
 	// A new authorization starts a new session: without an ID token there
 	// is nothing to bind a refresh to.
@@ -555,8 +566,7 @@ func (s *Source) LastTokenResponse() TokenResponse {
 // SetTokens seeds access and optional refresh tokens (testing / token import).
 func (s *Source) SetTokens(access auth.Token, refresh string) {
 	s.mu.Lock()
-	s.cur = access
-	s.refresh = refresh
+	s.setTokensLocked(access, refresh)
 	s.mu.Unlock()
 }
 
@@ -613,8 +623,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 
 	s.mu.Lock()
 	if err == nil {
-		s.cur = tok
-		s.refresh = refreshTok
+		s.setTokensLocked(tok, refreshTok)
 		if refreshedTR.AccessToken != "" {
 			s.lastTR = refreshedTR
 		}
@@ -629,8 +638,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		// may retry (REQ-063).
 		ex2, ok := errors.AsType[*auth.ExchangeError](err)
 		if ok && ex2.Terminal() {
-			s.refresh = ""
-			s.cur = auth.Token{}
+			s.setTokensLocked(auth.Token{}, "")
 			err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: err}
 		}
 	}
@@ -665,6 +673,12 @@ func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 // terminal refresh failure it clears the refresh token and returns
 // ErrReauthRequired.
 //
+// Any other failed refresh (a server or network error, or an ID token the
+// source refuses) keeps both the access token and the refresh token, and the
+// access token stays stale, so the next [Source.Token] call tries the
+// refresh again. New tokens, from a refresh, a code exchange or
+// [Source.SetTokens], end the forced refresh.
+//
 // When no refresh_token is available there is nothing to exchange, so Reauth
 // does not discard the cached access token (a wire 401 may be scope-related
 // rather than an expiry, and a public client has no other credential to fall
@@ -683,15 +697,16 @@ func (s *Source) Reauth(ctx context.Context) error {
 	}
 	// A refresh_token is available: mark the current token stale so the next
 	// Token() executes the refresh even if it has not yet crossed the
-	// proactive-refresh threshold.
-	s.cur = auth.Token{}
+	// proactive-refresh threshold. The token itself is kept, so a failed
+	// refresh leaves the source as it was.
+	s.forceRefresh = true
 	s.mu.Unlock()
 	_, err := s.Token(ctx)
 	return err
 }
 
 func (s *Source) staleLocked() bool {
-	if s.cur.IsZero() {
+	if s.forceRefresh || s.cur.IsZero() {
 		return true
 	}
 	if s.cur.ExpiresAt.IsZero() {

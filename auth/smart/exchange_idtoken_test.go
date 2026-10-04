@@ -30,9 +30,10 @@ type oidcProvider struct {
 	srv *httptest.Server
 	key *rsa.PrivateKey
 
-	mu    sync.Mutex
-	body  string
-	forms []url.Values
+	mu     sync.Mutex
+	body   string
+	status int // 0 answers 200
+	forms  []url.Values
 }
 
 func newOIDCProvider(t *testing.T) *oidcProvider {
@@ -55,8 +56,11 @@ func newOIDCProvider(t *testing.T) *oidcProvider {
 			}
 			p.mu.Lock()
 			p.forms = append(p.forms, r.PostForm)
-			body := p.body
+			body, status := p.body, p.status
 			p.mu.Unlock()
+			if status != 0 {
+				w.WriteHeader(status)
+			}
 			_, _ = w.Write([]byte(body))
 		default:
 			http.NotFound(w, r)
@@ -66,10 +70,15 @@ func newOIDCProvider(t *testing.T) *oidcProvider {
 	return p
 }
 
-// setBody sets what /token answers from now on.
+// setBody sets what /token answers from now on, with status 200.
 func (p *oidcProvider) setBody(body string) {
+	p.setResponse(0, body)
+}
+
+// setResponse sets the status and body /token answers from now on.
+func (p *oidcProvider) setResponse(status int, body string) {
 	p.mu.Lock()
-	p.body = body
+	p.status, p.body = status, body
 	p.mu.Unlock()
 }
 
