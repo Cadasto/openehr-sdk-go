@@ -805,7 +805,6 @@ func (s *Source) exchangeCode(ctx context.Context, code, verifier string) (auth.
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
 		"redirect_uri":  {s.cfg.RedirectURI},
-		"client_id":     {s.cfg.ClientID},
 		"code_verifier": {verifier},
 	}
 	return s.postToken(ctx, form)
@@ -821,7 +820,6 @@ func (s *Source) refreshGrant(ctx context.Context, refresh string, binding *idTo
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refresh},
-		"client_id":     {s.cfg.ClientID},
 	}
 	tok, tr, next, err := s.postToken(ctx, form)
 	if err != nil {
@@ -864,6 +862,8 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 	//     client_secret_post (credentials in the form body), per the method
 	//     resolved by configureClientAuth from the server's advertised methods
 	//   - else                        → public client (no client auth)
+	// Only a public client and client_secret_post put client_id in the form:
+	// a confidential client is identified by its credential (REQ-068).
 	useBasic := false
 	if s.cfg.assertionSource != nil {
 		assertion, err := s.cfg.assertionSource.Assertion(ctx)
@@ -882,6 +882,8 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 		} else {
 			useBasic = true
 		}
+	} else {
+		form.Set("client_id", s.cfg.ClientID)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.Auth.TokenEndpoint.String(), strings.NewReader(form.Encode()))
