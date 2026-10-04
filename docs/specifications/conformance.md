@@ -189,7 +189,7 @@ The catalog is the normative list. Each entry has:
 
 - **Title:** SMART configuration document declares `code` response type and `S256` PKCE method.
 - **Preconditions:** A SMART-on-openEHR deployment is reachable.
-- **Wire assertion:** GET `<issuer>/.well-known/smart-configuration` (or equivalent) returns 200 with a JSON body containing `"response_types_supported"` including `"code"` and `"code_challenge_methods_supported"` including `"S256"`.
+- **Wire assertion:** GET `<base URL>/.well-known/smart-configuration` (or equivalent) returns 200 with a JSON body containing `"response_types_supported"` including `"code"` and `"code_challenge_methods_supported"` including `"S256"`.
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_001_discovery_code_pkce.go`](../../testkit/probes/auth/probe_001_discovery_code_pkce.go). Resolves the canonical SMART configuration fixture through the real `discovery.Resolver` and asserts `code` + `S256` on the resolved `AuthEndpoints`.
 - **Satisfies:** REQ-061.

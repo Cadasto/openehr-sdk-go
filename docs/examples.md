@@ -620,7 +620,7 @@ The fake backend answers the way an openEHR server does: `201 Created`, a `Locat
 
 **What to copy into your app:**
 
-1. Build a `discovery.ServiceCatalog` (static, or fetched from a SMART issuer).
+1. Build a `discovery.ServiceCatalog` (static, or resolved from a Platform base URL).
 2. `transport.New(catalog, transport.WithHTTPClient(yourClient))`; the SDK never allocates an `*http.Client`, so connection pooling, TLS and timeouts stay under your control.
 3. Call leaf clients (`ehr.Create`, `query.Execute`, …) with a `context.Context`.
 
