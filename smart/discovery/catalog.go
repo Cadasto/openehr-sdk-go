@@ -20,6 +20,8 @@ type ServiceCatalog struct {
 	// BaseURL is the Platform base URL the catalog was resolved from,
 	// exactly as the caller passed it to Resolver.Resolve or
 	// Resolver.Refresh. The resolver caches the catalog under this URL.
+	// For a catalog built by NewStaticCatalog it is StaticConfig.BaseURL,
+	// or StaticConfig.Issuer when that is empty.
 	BaseURL string
 	// Issuer is the OpenID Connect issuer: the "issuer" member of the
 	// SMART configuration, or BaseURL when the document declares none.

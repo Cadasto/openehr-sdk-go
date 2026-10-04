@@ -26,10 +26,13 @@ const (
 	// set. With WithAcceptedSpecVersions, an entry without spec_version is
 	// judged by its version member instead.
 	ReasonSpecVersionMismatch DiscoveryErrorReason = "spec_version_mismatch"
-	// ReasonMalformedURL indicates a URL field (BaseURL,
-	// AuthorizationEndpoint, etc.) failed parsing, or the declared issuer
-	// is not an absolute https URL with a host and without a query or
-	// fragment.
+	// ReasonMalformedURL indicates a URL the resolver cannot use. The base
+	// URL passed to the resolver, the issuer the document declares, an
+	// auth endpoint URL or a service baseUrl failed parsing, is not
+	// absolute or has no host name; the declared issuer or an auth endpoint
+	// uses a scheme other than https or http; or the declared issuer has a
+	// query or fragment. A plaintext http URL where https is required is
+	// ReasonInsecureURL instead.
 	ReasonMalformedURL DiscoveryErrorReason = "malformed_url"
 	// ReasonAuthEndpointsMissing indicates the SMART configuration
 	// declares authorization-server members but omits one it needs:
@@ -39,10 +42,12 @@ const (
 	// sso-openid-connect. A document with none of the three is an
 	// anonymous-only deployment and is not refused.
 	ReasonAuthEndpointsMissing DiscoveryErrorReason = "auth_endpoints_missing"
-	// ReasonInsecureURL indicates a non-https URL was rejected: the base
-	// URL passed to the resolver, the issuer the document declares, or a
-	// catalog auth endpoint URL in the discovery document. Override with
-	// WithAllowInsecure to opt into plaintext URLs in development.
+	// ReasonInsecureURL indicates a plaintext URL was refused where https
+	// is required: an http base URL passed to the resolver, an http issuer
+	// the document declares, an http auth endpoint URL, or a redirect to a
+	// URL that is not https while fetching the SMART configuration or the
+	// issuer's OpenID configuration. Override with WithAllowInsecure to opt
+	// into plaintext URLs in development.
 	ReasonInsecureURL DiscoveryErrorReason = "insecure_url"
 	// ReasonIssuerMismatch indicates the issuer's own OpenID configuration
 	// does not confirm what the SMART configuration declares: its "issuer"
@@ -60,7 +65,7 @@ type DiscoveryError struct {
 	// passed to Resolver.Resolve or Resolver.Refresh, or the base URL of a
 	// hand-built catalog. Despite its name it is not the OpenID Connect
 	// issuer; ServiceCatalog explains the difference. Error prints it as
-	// "issuer=".
+	// "base_url=".
 	Issuer string
 	// Reason classifies the failure.
 	Reason DiscoveryErrorReason
@@ -90,7 +95,7 @@ func (e *DiscoveryError) Error() string {
 	}
 	fmt.Fprintf(&b, "discovery: %s", reason)
 	if e.Issuer != "" {
-		fmt.Fprintf(&b, " issuer=%s", e.Issuer)
+		fmt.Fprintf(&b, " base_url=%s", e.Issuer)
 	}
 	switch e.Reason {
 	case ReasonMissingService:

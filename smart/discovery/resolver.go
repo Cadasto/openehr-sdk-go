@@ -128,7 +128,8 @@ func WithAllowInsecure() Option {
 // and requires it to name the same issuer and, when both documents give
 // one, the same jwks_uri. Turn the check off for a Platform whose identity
 // provider publishes no OpenID configuration; the declared issuer is then
-// accepted as it stands, provided it is a well-formed https URL.
+// accepted as it stands, provided it is well formed and uses https, or
+// http with WithAllowInsecure.
 func WithoutOpenIDConfigurationCheck() Option {
 	return func(cfg *resolverConfig) { cfg.skipOpenIDCheck = true }
 }
@@ -257,8 +258,11 @@ func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog
 }
 
 // fetchCoalesced runs at most one in-flight fetch per base URL; other
-// callers wait on the result. ctx is honoured for waiting but the
-// fetch itself continues even if the initiating caller bails.
+// callers for the same base URL wait for its result. The fetch runs under
+// the context of the caller that started it: if that context ends, the
+// fetch fails with the context's error and every waiter receives that same
+// error. A waiter whose own context ends first stops waiting and returns
+// its own context's error.
 func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL, prevETag string) (*ServiceCatalog, error) {
 	r.mu.Lock()
 	if call, ok := r.inflight[baseURL]; ok {
@@ -710,12 +714,13 @@ func acceptedVersionsString(m map[string]struct{}) string {
 	return strings.Join(slices.Sorted(maps.Keys(m)), ",")
 }
 
-// warnInsecure emits a logger warning when any catalog URL uses
-// plaintext http://. It only runs for catalogs that passed parsing: in
-// strict mode non-https auth endpoints are rejected there, so warnings
-// here cover the allowInsecure path plus service base_url entries,
-// which are warn-only — the consumer is authoritative on which
-// deployments they want to talk to.
+// warnInsecure emits a logger warning for each catalog URL that uses
+// plaintext http: every auth endpoint and every service baseUrl. It only
+// runs for catalogs that passed parsing: without WithAllowInsecure a
+// plaintext auth endpoint is refused there, so the auth-endpoint warnings
+// cover the WithAllowInsecure path, while service baseUrl entries are
+// warn-only — the consumer is authoritative on which deployments they
+// want to talk to.
 func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 	check := func(name string, u *url.URL) {
 		if u == nil {
@@ -729,6 +734,9 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 	check("token_endpoint", cat.Auth.TokenEndpoint)
 	check("jwks_uri", cat.Auth.JWKSURI)
 	check("registration_endpoint", cat.Auth.RegistrationEndpoint)
+	check("introspection_endpoint", cat.Auth.IntrospectionEndpoint)
+	check("revocation_endpoint", cat.Auth.RevocationEndpoint)
+	check("management_endpoint", cat.Auth.ManagementEndpoint)
 	for id, s := range cat.Services {
 		check("services["+id+"].baseUrl", s.BaseURL)
 	}
