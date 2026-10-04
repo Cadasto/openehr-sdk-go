@@ -74,9 +74,10 @@ func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *Config) { cfg.HTTPClient = c }
 }
 
-// WithClientSecret enables confidential-client token exchange using
-// client_secret_basic (symmetric secret). Mutually exclusive with
-// WithClientAssertionKey.
+// WithClientSecret enables confidential-client token exchange with a
+// symmetric secret: client_secret_basic by default, or client_secret_post
+// when the server advertises that method and not client_secret_basic.
+// Mutually exclusive with WithClientAssertionKey.
 func WithClientSecret(secret string) Option {
 	return func(cfg *Config) { cfg.ClientSecret = secret }
 }
