@@ -36,9 +36,12 @@ type IDTokenClaims struct {
 	Issuer    string
 	IssuedAt  time.Time
 	ExpiresAt time.Time
-	Nonce     string
-	FHIRUser  string
-	Extra     map[string]any
+	// Nonce is the token's own nonce claim, empty when the token has none,
+	// whether or not the caller expected a nonce.
+	Nonce    string
+	FHIRUser string
+	// Extra holds the claims not named by the other fields.
+	Extra map[string]any
 }
 
 // IDTokenOption adjusts the claim checks of [ValidateIDToken].
@@ -283,11 +286,9 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 	if ok && iat.After(now.Add(clockSkew)) {
 		return nil, fmt.Errorf("%w: iat in future", auth.ErrJWKSValidationFailed)
 	}
-	if nonce != "" {
-		n, _ := claimString(claims, "nonce")
-		if n != nonce {
-			return nil, fmt.Errorf("%w: nonce mismatch", auth.ErrJWKSValidationFailed)
-		}
+	tokenNonce, _ := claimString(claims, "nonce")
+	if nonce != "" && tokenNonce != nonce {
+		return nil, fmt.Errorf("%w: nonce mismatch", auth.ErrJWKSValidationFailed)
 	}
 	sub, _ := claimString(claims, "sub")
 	fhirUser, _ := claimString(claims, "fhirUser")
@@ -306,7 +307,7 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 		Issuer:    iss,
 		IssuedAt:  iat,
 		ExpiresAt: exp,
-		Nonce:     nonce,
+		Nonce:     tokenNonce,
 		FHIRUser:  fhirUser,
 		Extra:     extra,
 	}, nil
