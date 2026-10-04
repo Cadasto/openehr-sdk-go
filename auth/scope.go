@@ -27,7 +27,7 @@ const (
 
 // BuildScope joins a compartment, a resource and a permission into one
 // scope string of the shape "<compartment>/<resource>.<permission>", after
-// trimming surrounding spaces from each part.
+// trimming surrounding white space from each part.
 //
 // Empty parts collapse to omitted segments: BuildScope("", "launch", "")
 // returns "launch". BuildScope does not validate its parts against any
@@ -89,11 +89,11 @@ const permissionOrder = "cruds"
 // "template", "composition" or "aql"; when the permissions are empty, repeat
 // a letter, use a letter other than c, r, u, d and s, or break the order
 // c, r, u, d, s (the permission syntax of HL7 SMART App Launch v2); or when
-// the pattern is empty or holds a character that RFC 6749 §3.3 does not
-// allow in a scope token, which is anything but printable ASCII other than
-// space, double quote and backslash. Token does not escape or rewrite the
-// pattern, so a template id with a space or a non-ASCII character cannot be
-// written as a scope. The error names the part that is wrong.
+// the pattern is empty or holds a space, a double quote, a backslash, or any
+// character that is not printable ASCII (the RFC 6749 §3.3 scope-token set).
+// Token does not escape or rewrite the pattern, so a template id with a
+// space or a non-ASCII character cannot be written as a scope. The error
+// names the part that is wrong.
 func (s OpenEHRScope) Token() (string, error) {
 	if err := s.check(); err != nil {
 		return "", err

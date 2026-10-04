@@ -97,8 +97,9 @@ func withPart(mod func(*auth.OpenEHRScope)) auth.OpenEHRScope {
 	return s
 }
 
-// TestREQ165_TokenWritesValidScopes pins the token Token returns for every
-// part combination the openEHR resource-scope grammar allows (REQ-165).
+// TestREQ165_TokenWritesValidScopes pins the token Token returns for each
+// compartment, each resource, a spread of permission strings and every edge
+// of the pattern byte set (REQ-165).
 func TestREQ165_TokenWritesValidScopes(t *testing.T) {
 	t.Parallel()
 	for _, tc := range validScopes {
@@ -160,6 +161,10 @@ func TestREQ165_TokenRefusesInvalidParts(t *testing.T) {
 		{"SMART v1 word", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "read" }), outside},
 		{"repeated letter", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "rr" }), repeat},
 		{"out of order", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "sr" }), order},
+		{"swapped neighbours c and r", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "rc" }), order},
+		{"swapped neighbours r and u", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "ur" }), order},
+		{"swapped neighbours u and d", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "du" }), order},
+		{"swapped neighbours d and s", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "sd" }), order},
 		{"repeat after another letter", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "rsr" }), order},
 	}
 	for _, tc := range cases {
@@ -230,47 +235,52 @@ func TestREQ165_ParseReadsScopeTokens(t *testing.T) {
 	}
 }
 
+// notOpenEHRScopes are tokens ParseOpenEHRScope must refuse: other kinds of
+// scope, and openEHR-looking tokens that break one rule of the grammar.
+var notOpenEHRScopes = []string{
+	"openid",
+	"launch/patient",
+	"offline_access",
+	"patient/Observation.rs",
+	"patient/*.read",
+	"patient/composition-.rs",
+	"patient/composition-x.sr",
+	"patient/composition-x.rc",
+	"patient/composition-x.sd",
+	"patient/composition-x.rr",
+	"patient/composition-x",
+	"patient/composition-x.",
+	"patient/composition",
+	"patient/compositionx.r",
+	"Patient/composition-x.r",
+	"patient/Composition-x.r",
+	"launch/composition-x.r",
+	"patient//composition-x.r",
+	"patient.rs/composition-x",
+	"a.b/c",
+	" patient/composition-x.r",
+	"patient/composition-x.r ",
+	"patient/composition-x.r\n",
+	"patient/composition-a b.r",
+	"patient/composition-x.rs openid",
+	`patient/composition-"x".r`,
+	`patient/composition-a\b.r`,
+	"patient/composition-é.r",
+	"",
+	"/",
+	".",
+	"-",
+	"/-.",
+	"patient/-.r",
+	"patient/.r",
+}
+
 // TestREQ165_ParseRefusesOtherTokens pins that ParseOpenEHRScope answers
 // false with the zero scope, and never panics, for anything that is not an
 // openEHR resource scope (REQ-165).
 func TestREQ165_ParseRefusesOtherTokens(t *testing.T) {
 	t.Parallel()
-	tokens := []string{
-		"openid",
-		"launch/patient",
-		"offline_access",
-		"patient/Observation.rs",
-		"patient/*.read",
-		"patient/composition-.rs",
-		"patient/composition-x.sr",
-		"patient/composition-x.rr",
-		"patient/composition-x",
-		"patient/composition-x.",
-		"patient/composition",
-		"patient/compositionx.r",
-		"Patient/composition-x.r",
-		"patient/Composition-x.r",
-		"launch/composition-x.r",
-		"patient//composition-x.r",
-		"patient.rs/composition-x",
-		"a.b/c",
-		" patient/composition-x.r",
-		"patient/composition-x.r ",
-		"patient/composition-x.r\n",
-		"patient/composition-a b.r",
-		"patient/composition-x.rs openid",
-		`patient/composition-"x".r`,
-		`patient/composition-a\b.r`,
-		"patient/composition-é.r",
-		"",
-		"/",
-		".",
-		"-",
-		"/-.",
-		"patient/-.r",
-		"patient/.r",
-	}
-	for _, tok := range tokens {
+	for _, tok := range notOpenEHRScopes {
 		t.Run(tok, func(t *testing.T) {
 			t.Parallel()
 			got, ok := auth.ParseOpenEHRScope(tok)
@@ -303,6 +313,32 @@ func TestREQ165_TokenAndParseRoundTrip(t *testing.T) {
 			}
 		})
 	}
+}
+
+// FuzzREQ165_ParseRoundTrip checks that ParseOpenEHRScope accepts only what
+// Token writes back unchanged: whenever it reports true, Token on the result
+// must return the input and no error, and whenever it reports false the
+// scope must be the zero value. Plain go test runs the seeds only (REQ-165).
+func FuzzREQ165_ParseRoundTrip(f *testing.F) {
+	for _, tc := range validScopes {
+		f.Add(tc.want)
+	}
+	for _, tok := range notOpenEHRScopes {
+		f.Add(tok)
+	}
+	f.Fuzz(func(t *testing.T, token string) {
+		s, ok := auth.ParseOpenEHRScope(token)
+		if !ok {
+			if s != (auth.OpenEHRScope{}) {
+				t.Fatalf("ParseOpenEHRScope(%q) = %#v, false; want the zero scope with false", token, s)
+			}
+			return
+		}
+		back, err := s.Token()
+		if err != nil || back != token {
+			t.Fatalf("ParseOpenEHRScope(%q) = %#v, true, but its Token() = %q, %v; want %q, nil", token, s, back, err, token)
+		}
+	})
 }
 
 func ExampleOpenEHRScope_Token() {
