@@ -11,6 +11,9 @@ type LaunchContext struct {
 	// FHIR-compat launch-context claims.
 	Patient   string
 	Encounter string
+	// User is the verified ID token's fhirUser claim, else its sub. It is
+	// empty without a verified ID token: a fhirUser member in the
+	// token-endpoint body is not an identity claim and never sets it.
 	User      string
 	Scopes    []string
 	IDToken   *IDTokenClaims

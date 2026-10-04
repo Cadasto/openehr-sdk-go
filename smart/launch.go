@@ -83,6 +83,24 @@ func WithValidationTime(t time.Time) ValidateOption {
 
 // LaunchContextFromTokenResponse maps a SMART token-endpoint payload into
 // a typed [LaunchContext].
+//
+// When tr.IDTokenClaims is set, the claims are taken as verified and are
+// not checked again. auth/smart sets them only after it has verified the
+// ID token, at the code exchange or on a refresh, so pass the value that
+// [authsmart.Source.ExchangeAuthorizationCode],
+// [authsmart.Source.CompleteAuthorization] or
+// [authsmart.Source.LastTokenResponse] returned, unchanged. Claims put
+// there by anything else are trusted all the same, so never fill
+// IDTokenClaims yourself.
+//
+// When tr carries an ID token but no verified claims, as a value from
+// [authsmart.ParseTokenResponse] does, the token is verified here with the
+// options. [WithJWKS], [WithIssuer] and [WithClientID] are then required;
+// without one the call fails with auth.ErrInvalidConfig.
+//
+// User is the verified ID token's fhirUser claim, else its sub, and is empty
+// without a verified ID token. A fhirUser member in the token-endpoint body
+// does not set it; it stays readable on tr.FHIRUser and on Raw.
 func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenResponse, opts ...ValidateOption) (*LaunchContext, error) {
 	cfg := ValidateConfig{}
 	for _, o := range opts {
@@ -93,7 +111,6 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 	lc := &LaunchContext{
 		Patient:           tr.Patient,
 		Encounter:         tr.Encounter,
-		User:              tr.FHIRUser,
 		Issuer:            cfg.Issuer,
 		EHRID:             tr.EHRID,
 		EpisodeID:         tr.EpisodeID,
@@ -106,16 +123,24 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 	if tr.Scope != "" {
 		lc.Scopes = strings.Fields(tr.Scope)
 	}
-	if tr.IDToken != "" {
+	// Claims auth/smart verified at the exchange or refresh are used as they
+	// are; only an ID token without them is verified here.
+	claims := tr.IDTokenClaims
+	if claims == nil && tr.IDToken != "" {
 		// ValidateIDToken checks the trust anchors (JWKS, issuer, client ID)
-		// before the token, so a missing one is a configuration error (REQ-064).
-		claims, err := authsmart.ValidateIDToken(ctx, tr.IDToken, cfg.JWKS, cfg.Issuer, cfg.ClientID, cfg.Nonce, cfg.Now, cfg.AllowedIDTokenAlgs,
+		// before the token, so a missing one is a configuration error.
+		var err error
+		claims, err = authsmart.ValidateIDToken(ctx, tr.IDToken, cfg.JWKS, cfg.Issuer, cfg.ClientID, cfg.Nonce, cfg.Now, cfg.AllowedIDTokenAlgs,
 			authsmart.WithTrustedAudiences(cfg.TrustedAudiences...))
 		if err != nil {
 			return nil, fmt.Errorf("smart: id_token: %w", err)
 		}
+	}
+	if claims != nil {
 		lc.IDToken = claims
-		lc.User = cmp.Or(lc.User, claims.FHIRUser, claims.Subject)
+		// The user is named by the verified ID token only, never by the
+		// unsigned token-endpoint body.
+		lc.User = cmp.Or(claims.FHIRUser, claims.Subject)
 		lc.Issuer = cmp.Or(lc.Issuer, claims.Issuer)
 		lc.Principal = principalFromClaims(idTokenClaimMap(claims), cfg.PrincipalClaims)
 	}
