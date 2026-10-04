@@ -317,10 +317,14 @@ func (r *Resolver) fetch(ctx context.Context, baseURL, prevETag string) (*Servic
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotModified {
-		// Caller invalidated then refreshed; the cache entry is gone.
-		// Treat as a fresh fetch with the unchanged body — but we no
-		// longer have the body. Re-issue without If-None-Match so the
-		// server returns the full document.
+		// A 304 answers only a conditional request. Without If-None-Match
+		// the server sent no document, and asking again would loop.
+		if prevETag == "" {
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: errors.New("discovery fetch returned 304 to a request without If-None-Match")}
+		}
+		// Refresh invalidated the cache entry the ETag came from, so the
+		// unchanged document is no longer at hand. Ask once more without
+		// If-None-Match; a second 304 ends in the branch above.
 		return r.fetch(ctx, baseURL, "")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -392,6 +396,12 @@ func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCat
 	}
 	if err := json.Unmarshal(body, &doc); err != nil {
 		return fail(ReasonFetchFailed, fmt.Errorf("openid-configuration: %w", err))
+	}
+	// Every OpenID configuration names its issuer. Without one the body is
+	// something else, such as a gateway's JSON error page, so the fetch
+	// failed; it is not a mismatch.
+	if doc.Issuer == "" {
+		return fail(ReasonFetchFailed, errors.New("openid-configuration has no issuer"))
 	}
 	if doc.Issuer != cat.Issuer {
 		return fail(ReasonIssuerMismatch, fmt.Errorf("openid-configuration issuer %q does not equal the declared issuer %q", doc.Issuer, cat.Issuer))

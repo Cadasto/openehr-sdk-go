@@ -269,10 +269,24 @@ func TestResolveCrossChecksAnotherIssuer(t *testing.T) { // REQ-073
 			wantInner:  "issuer",
 		},
 		{
+			// A document without an issuer is not an OpenID configuration, so
+			// the fetch failed; a mismatch needs a present, different issuer.
 			name:       "OpenID issuer absent",
 			openID:     serve(func(string) string { return openIDDocument("", "") }),
-			wantReason: discovery.ReasonIssuerMismatch,
-			wantInner:  "issuer",
+			wantReason: discovery.ReasonFetchFailed,
+			wantInner:  "no issuer",
+		},
+		{
+			name:       "OpenID configuration an empty object",
+			openID:     serve(func(string) string { return `{}` }),
+			wantReason: discovery.ReasonFetchFailed,
+			wantInner:  "no issuer",
+		},
+		{
+			name:       "JSON error page answered with 200",
+			openID:     serve(func(string) string { return `{"error":"upstream unavailable","status":502}` }),
+			wantReason: discovery.ReasonFetchFailed,
+			wantInner:  "no issuer",
 		},
 		{
 			name:       "jwks_uri differs",

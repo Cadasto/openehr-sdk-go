@@ -10,9 +10,10 @@ type DiscoveryErrorReason string
 
 const (
 	// ReasonFetchFailed indicates the SMART configuration document
-	// could not be retrieved (network error, non-2xx HTTP status), or the
-	// issuer's OpenID configuration document could not be retrieved or
-	// read.
+	// could not be retrieved (network error, non-2xx HTTP status, or a
+	// 304 Not Modified the resolver did not ask for), or the issuer's
+	// OpenID configuration document could not be retrieved or read, or
+	// names no issuer.
 	ReasonFetchFailed DiscoveryErrorReason = "fetch_failed"
 	// ReasonParseError indicates the response body could not be parsed
 	// as a SMART configuration document.
