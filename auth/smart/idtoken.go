@@ -41,6 +41,22 @@ type IDTokenClaims struct {
 	Extra     map[string]any
 }
 
+// IDTokenOption adjusts the claim checks of [ValidateIDToken].
+type IDTokenOption func(*idTokenConfig)
+
+type idTokenConfig struct {
+	trustedAudiences []string
+}
+
+// WithTrustedAudiences names the audiences an ID token's aud claim may list
+// besides the client ID. A token whose aud lists any other audience is
+// rejected, so with no trusted audiences only the client ID is accepted. A
+// later WithTrustedAudiences replaces an earlier one.
+func WithTrustedAudiences(aud ...string) IDTokenOption {
+	trusted := slices.Clone(aud)
+	return func(c *idTokenConfig) { c.trustedAudiences = trusted }
+}
+
 // ValidateIDToken verifies a JWT ID token against jwks and returns parsed
 // claims.
 //
@@ -50,15 +66,19 @@ type IDTokenClaims struct {
 // server's advertised id_token_signing_alg_values_supported) it is
 // intersected with the supported set; when empty the full supported set
 // is used. The unsecured "none" algorithm is always rejected. The
-// signature is always verified before any claim is trusted; claim
-// checks (iss/aud/exp/nbf/iat with the SDK's 30s skew, plus nonce) run
-// after that.
+// signature is always verified before any claim is trusted; the claim
+// checks run after that. iss must equal issuer exactly. aud must contain
+// clientID, and any other audience it lists must be one named by
+// [WithTrustedAudiences]. An azp claim, when present, must equal clientID.
+// exp is required, and exp, nbf and iat are checked with a 30-second
+// allowance for clock skew. When nonce is not empty the nonce claim must
+// equal it.
 //
 // A token rejected on its own content matches [auth.ErrJWKSValidationFailed].
 // A missing jwks, issuer or clientID matches [auth.ErrInvalidConfig], and a
 // failed JWKS fetch is returned as the fetch error, so an outage never reads
 // as a bad token.
-func ValidateIDToken(ctx context.Context, raw string, jwks *JWKS, issuer, clientID, nonce string, now time.Time, allowedAlgs []string) (*IDTokenClaims, error) {
+func ValidateIDToken(ctx context.Context, raw string, jwks *JWKS, issuer, clientID, nonce string, now time.Time, allowedAlgs []string, opts ...IDTokenOption) (*IDTokenClaims, error) {
 	// The trust anchors are the caller's configuration, so they are checked
 	// before the token: a configuration error must not read as a bad token,
 	// even when the token is empty too (REQ-064).
@@ -133,7 +153,13 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *JWKS, issuer, client
 	if err := idt.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("%w: claims: %w", auth.ErrJWKSValidationFailed, err)
 	}
-	return claimsFromMap(claims, issuer, clientID, nonce, now)
+	var cfg idTokenConfig
+	for _, o := range opts {
+		if o != nil {
+			o(&cfg)
+		}
+	}
+	return claimsFromMap(claims, issuer, clientID, nonce, now, cfg.trustedAudiences)
 }
 
 // requireIDTokenTrustAnchors enforces OIDC trust binding when validating
@@ -211,7 +237,7 @@ func decodeJWTPart(b64 string, dest any) error {
 	return nil
 }
 
-func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now time.Time) (*IDTokenClaims, error) {
+func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now time.Time, trustedAudiences []string) (*IDTokenClaims, error) {
 	if now.IsZero() {
 		now = time.Now()
 	}
@@ -222,6 +248,19 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 	aud := audienceStrings(claims["aud"])
 	if !slices.Contains(aud, clientID) {
 		return nil, fmt.Errorf("%w: aud mismatch", auth.ErrJWKSValidationFailed)
+	}
+	// OIDC Core 1.0 §3.1.3.7 step 3: any audience besides the client must be
+	// one the caller trusts (REQ-062).
+	for _, a := range aud {
+		if a != clientID && !slices.Contains(trustedAudiences, a) {
+			return nil, fmt.Errorf("%w: aud lists an untrusted audience", auth.ErrJWKSValidationFailed)
+		}
+	}
+	// An azp claim, when present, must name the client (REQ-062).
+	if v, ok := claims["azp"]; ok {
+		if azp, _ := v.(string); azp != clientID {
+			return nil, fmt.Errorf("%w: azp is not the client", auth.ErrJWKSValidationFailed)
+		}
 	}
 	exp, err := claimNumericTime(claims, "exp")
 	if err != nil {

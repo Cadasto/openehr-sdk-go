@@ -686,7 +686,8 @@ func TestValidateIDTokenClaimRules(t *testing.T) {
 		// go-oidc lets this one pair through; only the SDK's exact match refuses it.
 		{name: "exact iss accounts.google.com", issuer: "https://accounts.google.com", set: map[string]any{"iss": "https://accounts.google.com"}},
 		{name: "scheme-less iss accounts.google.com", issuer: "https://accounts.google.com", set: map[string]any{"iss": "accounts.google.com"}, wantErr: true},
-		{name: "aud lists the client among others", set: map[string]any{"aud": []string{"other", "client-id"}}},
+		// Another audience is refused unless the caller trusts it; TestValidateIDTokenExtraAudienceAndAzp covers the trusted set.
+		{name: "aud lists the client among untrusted others", set: map[string]any{"aud": []string{"other", "client-id"}}, wantErr: true},
 		// go-oidc and the SDK both check aud on purpose, so removing either check alone stays green.
 		{name: "aud without the client", set: map[string]any{"aud": []string{"other"}}, wantErr: true},
 		{name: "nonce absent when one is expected", drop: "nonce", wantErr: true},
@@ -713,5 +714,74 @@ func TestValidateIDTokenClaimRules(t *testing.T) {
 				t.Fatalf("ValidateIDToken(%s) error = %v, want nil", tc.name, err)
 			}
 		})
+	}
+}
+
+// TestValidateIDTokenExtraAudienceAndAzp walks the audience rules beyond the
+// client ID: every other aud value must be in the caller's trusted set, which
+// is empty by default, and an azp claim must name the client. Each refused
+// case is otherwise valid, so only these rules refuse it. REQ-062
+func TestValidateIDTokenExtraAudienceAndAzp(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+
+	cases := []struct {
+		name    string
+		set     map[string]any
+		trusted []string
+		wantErr bool
+	}{
+		{name: "aud is the client alone", set: map[string]any{"aud": "client-id"}},
+		{name: "aud lists the client and an untrusted audience", set: map[string]any{"aud": []string{"client-id", "api"}}, wantErr: true},
+		{name: "aud lists the client and a trusted audience", set: map[string]any{"aud": []string{"client-id", "api"}}, trusted: []string{"api"}},
+		{name: "aud lists a trusted and an untrusted audience", set: map[string]any{"aud": []string{"client-id", "api", "other"}}, trusted: []string{"api"}, wantErr: true},
+		{name: "a trusted audience does not stand in for the client", set: map[string]any{"aud": []string{"api"}}, trusted: []string{"api"}, wantErr: true},
+		{name: "azp names the client", set: map[string]any{"azp": "client-id"}},
+		{name: "azp names the client beside a trusted audience", set: map[string]any{"aud": []string{"client-id", "api"}, "azp": "client-id"}, trusted: []string{"api"}},
+		{name: "azp names another party", set: map[string]any{"azp": "other-client"}, wantErr: true},
+		{name: "azp names a trusted audience", set: map[string]any{"aud": []string{"client-id", "api"}, "azp": "api"}, trusted: []string{"api"}, wantErr: true},
+		{name: "azp is empty", set: map[string]any{"azp": ""}, wantErr: true},
+		{name: "azp is not a string", set: map[string]any{"azp": 42}, wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			claims := defaultIDClaims(now)
+			maps.Copy(claims, tc.set)
+			tok := joseSign(t, gojose.RS256, priv, "kid-rs256", claims)
+
+			_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
+				"https://issuer.example", "client-id", "nonce-xyz", now, nil,
+				smart.WithTrustedAudiences(tc.trusted...))
+			// REQ-062: an untrusted extra audience or a foreign azp refuses the token with the JWKS sentinel.
+			switch {
+			case tc.wantErr && (err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed)):
+				t.Fatalf("ValidateIDToken(%s, trusted %v) error = %v, want ErrJWKSValidationFailed", tc.name, tc.trusted, err)
+			case !tc.wantErr && err != nil:
+				t.Fatalf("ValidateIDToken(%s, trusted %v) error = %v, want nil", tc.name, tc.trusted, err)
+			}
+		})
+	}
+}
+
+// TestWithTrustedAudiencesKeepsItsOwnCopy checks that changing the caller's
+// slice after building the option does not change the trusted set, and that a
+// nil option is ignored. REQ-062
+func TestWithTrustedAudiencesKeepsItsOwnCopy(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+	claims := defaultIDClaims(now)
+	claims["aud"] = []string{"client-id", "api"}
+	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", claims)
+
+	trusted := []string{"other"}
+	opt := smart.WithTrustedAudiences(trusted...)
+	trusted[0] = "api"
+	_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
+		"https://issuer.example", "client-id", "nonce-xyz", now, nil, nil, opt)
+	// REQ-062: the trusted set is the one given when the option was built.
+	if err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed) {
+		t.Fatalf("ValidateIDToken(aud [client-id api], trusted [other] then edited to [api]) error = %v, want ErrJWKSValidationFailed", err)
 	}
 }

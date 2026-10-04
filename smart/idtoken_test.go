@@ -93,3 +93,47 @@ func TestValidateIDTokenWrapperMatchesAuthSmart(t *testing.T) {
 		})
 	}
 }
+
+// TestTrustedAudiencesReachVerification checks that a trusted extra audience
+// reaches the verification through smart.ValidateIDToken's options and through
+// LaunchContextFromTokenResponse's WithTrustedAudiences, and that without it the
+// same token is refused. REQ-062 REQ-064
+func TestTrustedAudiencesReachVerification(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv, body := testRSAKey(t)
+	jwks := idTokenJWKS(t, body)
+	tok := signJWT(t, priv, "test-kid", map[string]any{
+		"iss": "https://issuer.example",
+		"sub": "user-1",
+		"aud": []string{"client-id", "api"},
+		"exp": now.Add(time.Hour).Unix(),
+	})
+
+	t.Run("ValidateIDToken", func(t *testing.T) {
+		if _, err := smart.ValidateIDToken(t.Context(), tok, jwks, "https://issuer.example", "client-id", "", now, nil); !errors.Is(err, auth.ErrJWKSValidationFailed) {
+			t.Fatalf("ValidateIDToken(aud [client-id api], no trusted audience) error = %v, want ErrJWKSValidationFailed", err)
+		}
+		if _, err := smart.ValidateIDToken(t.Context(), tok, jwks, "https://issuer.example", "client-id", "", now, nil, authsmart.WithTrustedAudiences("api")); err != nil {
+			t.Fatalf("ValidateIDToken(aud [client-id api], trusted [api]) error = %v, want nil", err)
+		}
+	})
+	t.Run("LaunchContextFromTokenResponse", func(t *testing.T) {
+		tr := authsmart.TokenResponse{AccessToken: "at", IDToken: tok}
+		base := []smart.ValidateOption{
+			smart.WithJWKS(jwks),
+			smart.WithIssuer("https://issuer.example"),
+			smart.WithClientID("client-id"),
+			smart.WithValidationTime(now),
+		}
+		if _, err := smart.LaunchContextFromTokenResponse(t.Context(), tr, base...); !errors.Is(err, auth.ErrJWKSValidationFailed) {
+			t.Fatalf("LaunchContextFromTokenResponse(aud [client-id api], no trusted audience) error = %v, want ErrJWKSValidationFailed", err)
+		}
+		lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr, append(base, smart.WithTrustedAudiences("api"))...)
+		if err != nil {
+			t.Fatalf("LaunchContextFromTokenResponse(aud [client-id api], trusted [api]) error = %v, want nil", err)
+		}
+		if lc.IDToken == nil || lc.IDToken.Subject != "user-1" {
+			t.Fatalf("LaunchContextFromTokenResponse(trusted [api]) IDToken = %#v, want sub user-1", lc.IDToken)
+		}
+	})
+}
