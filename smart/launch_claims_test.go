@@ -201,3 +201,49 @@ func TestLaunchContextUserFromVerifiedIDTokenOnly(t *testing.T) { // REQ-064
 		})
 	}
 }
+
+// TestLaunchContextVerifiesNonceAndAlgorithms pins REQ-062 and REQ-064: an
+// ID token without verified claims is verified with the options the caller
+// passed, so a nonce other than the expected one, or an algorithm the
+// allowlist leaves out, refuses it with auth.ErrJWKSValidationFailed, while
+// the same token passes with the matching nonce and algorithm.
+func TestLaunchContextVerifiesNonceAndAlgorithms(t *testing.T) { // REQ-062 REQ-064
+	priv, jwksBody := testRSAKey(t)
+	now := time.Unix(1_700_000_000, 0)
+	idTok := signJWT(t, priv, "test-kid", map[string]any{
+		"iss":   claimsIssuer,
+		"sub":   "user-1",
+		"aud":   claimsClientID,
+		"exp":   now.Add(time.Hour).Unix(),
+		"iat":   now.Unix(),
+		"nonce": "nonce-launch",
+	})
+	tests := []struct {
+		name    string
+		opts    []smart.ValidateOption
+		wantErr bool
+	}{
+		{name: "expected nonce, allowed algorithm", opts: []smart.ValidateOption{smart.WithExpectedNonce("nonce-launch"), smart.WithIDTokenSigningAlgs([]string{"RS256"})}},
+		{name: "another nonce expected", opts: []smart.ValidateOption{smart.WithExpectedNonce("nonce-other")}, wantErr: true},
+		{name: "allowlist without the token's algorithm", opts: []smart.ValidateOption{smart.WithIDTokenSigningAlgs([]string{"ES256"})}, wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			jwks, _ := countingJWKS(t, jwksBody)
+			tr := authsmart.TokenResponse{AccessToken: "at", IDToken: idTok}
+			lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr, append(claimsTrustAnchors(jwks, now), tc.opts...)...)
+			if !tc.wantErr {
+				if err != nil || lc.IDToken == nil || lc.IDToken.Subject != "user-1" {
+					t.Fatalf("LaunchContextFromTokenResponse(%s) = %+v, %v; want the verified token for user-1", tc.name, lc, err)
+				}
+				return
+			}
+			if !errors.Is(err, auth.ErrJWKSValidationFailed) {
+				t.Errorf("LaunchContextFromTokenResponse(%s) error = %v, want auth.ErrJWKSValidationFailed", tc.name, err)
+			}
+			if lc != nil {
+				t.Errorf("LaunchContextFromTokenResponse(%s) = %+v on failure, want nil", tc.name, lc)
+			}
+		})
+	}
+}

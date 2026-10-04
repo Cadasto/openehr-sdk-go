@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -231,16 +232,41 @@ func readJWKS() []byte {
 	return []byte(`{"keys":[{"kty":"RSA","kid":"key-2026-04","n":"abc","e":"AQAB"}]}`)
 }
 
-func TestExchangeRequiresAuthorizationRequest(t *testing.T) {
-	srv := httptest.NewServer(http.NotFoundHandler())
-	defer srv.Close()
-	src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
-	if err != nil {
-		t.Fatalf("newSource: %v", err)
+// TestExchangeRequiresAuthorizationRequest pins REQ-061: a request without
+// a state or without a PKCE verifier is refused with auth.ErrInvalidConfig
+// before the state check and before any token-endpoint call, even when the
+// callback state matches the request's.
+func TestExchangeRequiresAuthorizationRequest(t *testing.T) { // REQ-061
+	tests := []struct {
+		name          string
+		req           smart.AuthorizationRequest
+		callbackState string
+	}{
+		{name: "empty request"},
+		{name: "state only", req: smart.AuthorizationRequest{State: "s"}, callbackState: "s"},
+		{name: "verifier only", req: smart.AuthorizationRequest{PKCE: smart.PKCEPair{Verifier: "v"}}},
 	}
-	_, _, err = src.ExchangeAuthorizationCode(t.Context(), "code", "", smart.AuthorizationRequest{})
-	if !errors.Is(err, auth.ErrInvalidConfig) {
-		t.Fatalf("err = %v, want ErrInvalidConfig (empty-request guard, not state mismatch)", err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				calls.Add(1)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"access_token":"at-1","token_type":"Bearer"}`))
+			}))
+			defer srv.Close()
+			src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+			if err != nil {
+				t.Fatalf("newSource: %v", err)
+			}
+			_, _, err = src.ExchangeAuthorizationCode(t.Context(), "code", tc.callbackState, tc.req)
+			if !errors.Is(err, auth.ErrInvalidConfig) {
+				t.Errorf("ExchangeAuthorizationCode(callback state %q, %+v) error = %v, want auth.ErrInvalidConfig", tc.callbackState, tc.req, err)
+			}
+			if n := calls.Load(); n != 0 {
+				t.Errorf("ExchangeAuthorizationCode(callback state %q, %+v) made %d token-endpoint calls, want none", tc.callbackState, tc.req, n)
+			}
+		})
 	}
 }
 

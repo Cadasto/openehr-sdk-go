@@ -660,6 +660,7 @@ requirements:
       - auth/smart/smart_test.go
       - smart/discovery/resolver_test.go
       - smart/idtoken_test.go
+      - smart/launch_claims_test.go
       - testkit/probes/auth/probe_006_jwks_rotation.go
       - testkit/probes/auth/probes_test.go
 
@@ -697,6 +698,7 @@ requirements:
       - auth/smart/idtoken_test.go
       - auth/smart/reauth_test.go
       - auth/smart/refresh_idtoken_test.go
+      - auth/smart/refresh_race_test.go
       - smart/idtoken_test.go
       - smart/launch_claims_test.go
       - smart/launch_seam_test.go
