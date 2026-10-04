@@ -233,31 +233,39 @@ func requestFailure(err error) DiscoveryErrorReason {
 // BaseURL; unless the Resolver is built with
 // WithoutOpenIDConfigurationCheck, the issuer must first be confirmed by
 // its own OpenID configuration.
+//
+// When the cached catalog has expired and carries an ETag, the fetch is
+// conditional, as for Refresh: a 304 Not Modified renews the cached
+// catalog. A failed fetch drops the cached catalog.
 func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if cat, ok := r.cache.Get(ctx, baseURL); ok && !cat.Stale(time.Now()) {
-		return cat, nil
+	cached, ok := r.cache.Get(ctx, baseURL)
+	if ok && !cached.Stale(time.Now()) {
+		return cached, nil
 	}
-	return r.fetchCoalesced(ctx, baseURL, "")
+	return r.fetchCoalesced(ctx, baseURL, cached)
 }
 
-// Refresh invalidates any cached catalog for baseURL and forces a fresh
-// fetch, with the same checks as Resolve. baseURL is the Platform base
+// Refresh fetches the catalog for baseURL again even when the cached one
+// is fresh, with the same checks as Resolve. baseURL is the Platform base
 // URL, as for Resolve.
+//
+// When the cached catalog carries an ETag, the request is conditional. A
+// 304 Not Modified keeps the cached document, services and auth members
+// and renews the expiry from the response's Cache-Control max-age, or the
+// default TTL; the issuer check is not repeated, because the cached
+// catalog passed it when it was built. A new document replaces the cached
+// catalog. When the refresh fails, the cached catalog is dropped, so the
+// next Resolve fetches again and reports the failure. Until the refresh
+// completes, Resolve keeps returning the cached catalog while it is fresh.
 func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	var prevETag string
-	if cat, ok := r.cache.Get(ctx, baseURL); ok {
-		prevETag = cat.ETag
-	}
-	if err := r.cache.Invalidate(ctx, baseURL); err != nil {
-		return nil, err
-	}
-	return r.fetchCoalesced(ctx, baseURL, prevETag)
+	cached, _ := r.cache.Get(ctx, baseURL)
+	return r.fetchCoalesced(ctx, baseURL, cached)
 }
 
 // fetchCoalesced runs at most one in-flight fetch per base URL; other
@@ -265,8 +273,12 @@ func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog
 // the context of the caller that started it: if that context ends, the
 // fetch fails with the context's error and every waiter receives that same
 // error. A waiter whose own context ends first stops waiting and returns
-// its own context's error.
-func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL, prevETag string) (*ServiceCatalog, error) {
+// its own context's error. A successful fetch is cached under baseURL; a
+// failed one drops whatever was cached there.
+//
+// cached is the catalog held for baseURL, or nil; fetch uses its ETag for
+// a conditional request.
+func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL string, cached *ServiceCatalog) (*ServiceCatalog, error) {
 	r.mu.Lock()
 	if call, ok := r.inflight[baseURL]; ok {
 		r.mu.Unlock()
@@ -281,13 +293,22 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL, prevETag string)
 	r.inflight[baseURL] = call
 	r.mu.Unlock()
 
-	cat, err := r.fetch(ctx, baseURL, prevETag)
+	cat, err := r.fetch(ctx, baseURL, cached)
 
 	r.mu.Lock()
 	delete(r.inflight, baseURL)
 	r.mu.Unlock()
 
-	if err == nil && cat != nil {
+	switch {
+	case err != nil:
+		// Drop what was cached, so the next resolution fetches again and
+		// reports the failure instead of serving a catalog the Platform no
+		// longer vouches for. The caller's context may be the reason for the
+		// failure, so it must not stop the invalidation.
+		if ierr := r.cache.Invalidate(context.WithoutCancel(ctx), baseURL); ierr != nil {
+			r.cfg.logger.Warn("discovery: cache invalidate failed", "base_url", baseURL, "err", ierr)
+		}
+	case cat != nil:
 		if perr := r.cache.Put(ctx, baseURL, cat); perr != nil {
 			r.cfg.logger.Warn("discovery: cache put failed", "base_url", baseURL, "err", perr)
 		}
@@ -298,7 +319,14 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL, prevETag string)
 	return cat, err
 }
 
-func (r *Resolver) fetch(ctx context.Context, baseURL, prevETag string) (*ServiceCatalog, error) {
+// fetch retrieves, validates and confirms the SMART configuration at
+// baseURL. When cached carries an ETag, the request is conditional, and a
+// 304 Not Modified renews cached instead of building a new catalog.
+func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCatalog) (*ServiceCatalog, error) {
+	var etag string
+	if cached != nil {
+		etag = cached.ETag
+	}
 	docURL, err := joinURL(baseURL, r.cfg.wellKnownPath)
 	if err != nil {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: err}
@@ -313,8 +341,8 @@ func (r *Resolver) fetch(ctx context.Context, baseURL, prevETag string) (*Servic
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: err}
 	}
 	req.Header.Set("Accept", "application/json")
-	if prevETag != "" {
-		req.Header.Set("If-None-Match", prevETag)
+	if etag != "" {
+		req.Header.Set("If-None-Match", etag)
 	}
 
 	resp, err := r.cfg.httpClient.Do(req)
@@ -325,14 +353,15 @@ func (r *Resolver) fetch(ctx context.Context, baseURL, prevETag string) (*Servic
 
 	if resp.StatusCode == http.StatusNotModified {
 		// A 304 answers only a conditional request. Without If-None-Match
-		// the server sent no document, and asking again would loop.
-		if prevETag == "" {
+		// the server sent no document, and asking again could loop.
+		if etag == "" {
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: errors.New("discovery fetch returned 304 to a request without If-None-Match")}
 		}
-		// Refresh invalidated the cache entry the ETag came from, so the
-		// unchanged document is no longer at hand. Ask once more without
-		// If-None-Match; a second 304 ends in the branch above.
-		return r.fetch(ctx, baseURL, "")
+		// The document is the one cached was built from. That catalog was
+		// validated and its issuer confirmed against the issuer's OpenID
+		// configuration when it was built, so neither check runs again;
+		// only its freshness is renewed.
+		return renewed(cached, resp.Header, r.cfg.defaultTTL), nil
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: fmt.Errorf("discovery fetch returned %d", resp.StatusCode)}
@@ -360,6 +389,18 @@ func (r *Resolver) fetch(ctx context.Context, baseURL, prevETag string) (*Servic
 	}
 	r.warnInsecure(cat)
 	return cat, nil
+}
+
+// renewed returns a copy of cached that is fresh again after a 304 Not
+// Modified: the same document, services and auth members, a new
+// ResolvedAt, and an ExpiresAt from the response's Cache-Control max-age,
+// or the default TTL. cached itself is not changed, because callers may
+// hold it.
+func renewed(cached *ServiceCatalog, h http.Header, ttl time.Duration) *ServiceCatalog {
+	c := *cached
+	c.ResolvedAt = time.Now()
+	c.ExpiresAt = computeExpiry(h, ttl, c.ResolvedAt)
+	return &c
 }
 
 // checkOpenIDConfiguration confirms a declared issuer that differs from the
