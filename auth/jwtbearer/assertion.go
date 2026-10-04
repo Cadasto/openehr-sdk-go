@@ -138,6 +138,34 @@ func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...Sign
 	return s, nil
 }
 
+// clientAssertionLifetime is how long a client assertion stays valid. The HL7
+// SMART asymmetric client profile allows at most five minutes after issue.
+const clientAssertionLifetime = 5 * time.Minute
+
+// NewClientAssertion builds the client assertion of the HL7 SMART asymmetric
+// client profile: the signed JWT that a SMART Backend Services client, or a
+// confidential app holding a private key, sends as client_assertion to
+// authenticate at the token endpoint. Each assertion it signs has iss and
+// sub set to clientID, aud set to tokenURL, the JOSE headers typ JWT and
+// kid, a unique jti, and an exp five minutes after its iat.
+//
+// It fails with [auth.ErrInvalidConfig] when clientID, tokenURL, alg or kid
+// is empty, signer is nil, alg is not supported, or the key does not fit
+// alg. [NewClaimsSigner] lists the key each algorithm needs.
+func NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, kid string) (*ClaimsSigner, error) {
+	if kid == "" {
+		return nil, fmt.Errorf("%w: a SMART client assertion needs a kid", auth.ErrInvalidConfig)
+	}
+	// NewClaimsSigner refuses an empty clientID or tokenURL, a nil signer, an
+	// empty or unsupported alg, and a key that does not fit alg.
+	return NewClaimsSigner(ClaimsTemplate{
+		Issuer:   clientID,
+		Subject:  clientID,
+		Audience: tokenURL,
+		Lifetime: clientAssertionLifetime,
+	}, signer, WithAlgorithm(alg), WithKeyID(kid))
+}
+
 // SignerOption configures a ClaimsSigner.
 type SignerOption func(*ClaimsSigner)
 

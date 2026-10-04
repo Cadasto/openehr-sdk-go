@@ -1,6 +1,7 @@
 package smart
 
 import (
+	"cmp"
 	"context"
 	"crypto"
 	"errors"
@@ -28,6 +29,10 @@ const (
 	methodPrivateKeyJWT     = "private_key_jwt"
 	methodClientSecretBasic = "client_secret_basic"
 	methodClientSecretPost  = "client_secret_post"
+	// defaultAssertionAlg is the client-assertion algorithm used when
+	// WithClientAssertionKey names none: RS384, the HL7 SMART asymmetric
+	// baseline.
+	defaultAssertionAlg = "RS384"
 	// nonceLen is the number of random bytes in an OpenID Connect nonce,
 	// the same 256 bits as the state.
 	nonceLen = 32
@@ -92,12 +97,17 @@ func WithClientSecret(secret string) Option {
 // WithClientAssertionKey enables confidential-client token exchange using
 // private_key_jwt (RFC 7523 / SMART client-confidential-asymmetric).
 // The signed client_assertion authenticates the client at the token endpoint
-// in place of an HTTP Basic header. alg is the JOSE algorithm (RS384 default
-// per SMART; RS256/ES256/ES384 also supported by jwtbearer.ClaimsSigner); kid,
-// when set, is emitted as the JWS "kid" header. Mutually exclusive with
-// WithClientSecret; configuring both is rejected at construction.
-// signer must be non-nil; a nil signer is rejected at construction with
-// [auth.ErrInvalidConfig].
+// in place of an HTTP Basic header. Each assertion is built by
+// [jwtbearer.NewClientAssertion], so it expires five minutes after issue.
+//
+// alg is the JOSE algorithm: RS384 when empty (the SMART baseline), or
+// ES384, RS256 or ES256. kid is required: the HL7 SMART asymmetric profile
+// has the assertion name its key in the JWS "kid" header. Construction fails
+// with [auth.ErrInvalidConfig] on an empty kid, a nil signer, a key that does
+// not fit alg, or an alg that the server's non-empty
+// token_endpoint_auth_signing_alg_values_supported does not list. Mutually
+// exclusive with WithClientSecret; configuring both is rejected at
+// construction the same way.
 func WithClientAssertionKey(signer crypto.Signer, alg, kid string) Option {
 	return func(cfg *Config) {
 		cfg.clientAssertion = &clientAssertionKey{signer: signer, alg: alg, kid: kid}
@@ -259,10 +269,12 @@ func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Sour
 //
 // FromConfig also fails with [auth.ErrInvalidConfig] on client credentials
 // that conflict or do not fit the server: both a client secret and a
-// client assertion key; a nil signing key, an unsupported algorithm, or a
-// key that does not suit the algorithm; or a client authentication method
-// that a non-empty TokenEndpointAuthMethodsSupported does not list. A
-// JWKSURI it cannot build a key-set fetcher from fails the same way.
+// client assertion key; a nil signing key, an empty key ID, an unsupported
+// algorithm, or a key that does not suit the algorithm; an assertion
+// algorithm that a non-empty TokenEndpointAuthSigningAlgValuesSupported does
+// not list; or a client authentication method that a non-empty
+// TokenEndpointAuthMethodsSupported does not list. A JWKSURI it cannot build
+// a key-set fetcher from fails the same way.
 func FromConfig(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
 		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
@@ -304,11 +316,12 @@ func FromConfig(cfg Config) (*Source, error) {
 
 // configureClientAuth resolves the confidential-client authentication method
 // for the token endpoint (REQ-068). It rejects ambiguous configuration (both an
-// assertion key and a client secret), builds the jwtbearer.ClaimsSigner for
-// private_key_jwt, and performs the G-3 discovery cross-check: when the
-// authorization server advertises token_endpoint_auth_methods_supported, the
-// method implied by the configured credential MUST be listed; an empty/absent
-// list is not constraining (skip).
+// assertion key and a client secret), builds the private_key_jwt assertion
+// with jwtbearer.NewClientAssertion after checking its algorithm against the
+// server's token_endpoint_auth_signing_alg_values_supported, and performs the
+// G-3 discovery cross-check: when the authorization server advertises
+// token_endpoint_auth_methods_supported, the method implied by the configured
+// credential MUST be listed. An empty or absent list is not constraining.
 func configureClientAuth(cfg *Config) error {
 	hasSecret := cfg.ClientSecret != ""
 	hasAssertion := cfg.clientAssertion != nil
@@ -320,16 +333,16 @@ func configureClientAuth(cfg *Config) error {
 	switch {
 	case hasAssertion:
 		method = methodPrivateKeyJWT
-		signer, err := jwtbearer.NewClaimsSigner(
-			jwtbearer.ClaimsTemplate{
-				Issuer:   cfg.ClientID,
-				Subject:  cfg.ClientID,
-				Audience: cfg.Auth.TokenEndpoint.String(),
-			},
-			cfg.clientAssertion.signer,
-			jwtbearer.WithAlgorithm(cfg.clientAssertion.alg),
-			jwtbearer.WithKeyID(cfg.clientAssertion.kid),
-		)
+		alg := cmp.Or(cfg.clientAssertion.alg, defaultAssertionAlg)
+		// The algorithm must be one the server accepts for client
+		// assertions, when it says which. An empty list says nothing.
+		if advertised := cfg.Auth.TokenEndpointAuthSigningAlgValuesSupported; len(advertised) > 0 &&
+			!slices.Contains(advertised, alg) {
+			return fmt.Errorf("%w: client assertion algorithm %q is not in the server's advertised token_endpoint_auth_signing_alg_values_supported %q",
+				auth.ErrInvalidConfig, alg, advertised)
+		}
+		signer, err := jwtbearer.NewClientAssertion(cfg.ClientID, cfg.Auth.TokenEndpoint.String(),
+			cfg.clientAssertion.signer, alg, cfg.clientAssertion.kid)
 		if err != nil {
 			return err
 		}
