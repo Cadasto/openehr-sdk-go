@@ -2,6 +2,7 @@ package validation_test
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,9 +44,11 @@ func TestValidateComposition_ConstraintFixtures_NoPrimitiveViolations(t *testing
 		"Test_dv_count_range_constraint.v0": "magnitude 25 outside [10..20]",
 		// OPT pins formalism to [text/plain] while the instance carries abc.
 		// Surfaced once STRING became an AOM primitive short name (REQ-107).
+		// Pinned in TestValidateComposition_ConstraintFixture_ParsableViolation.
 		"Test_dv_parsable_open_constraint.v0": "formalism abc not in [text/plain]",
 		// OPT name lists are shorter than the instance's runtime names, and
 		// one list entry is itself misspelled. Surfaced with the STRING check.
+		// Pinned in TestValidateComposition_ConstraintFixture_ClinicalContentViolations.
 		"clinical_content_validation": "name/value not in the OPT's closed list",
 	}
 	for _, id := range ids {
@@ -157,5 +160,73 @@ func TestValidateComposition_ConstraintFixture_CountRangeViolation(t *testing.T)
 	}
 	if !found {
 		t.Errorf("expected a primitive count range violation, got %+v", r.Issues)
+	}
+}
+
+// Test_dv_parsable_open_constraint.v0 pins DV_PARSABLE.formalism to the
+// closed list [text/plain] (the C_STRING sets no list_open), while its
+// instance carries abc. The instance has three events, all at at0002, and
+// each holds the same element, so the one path is reported three times.
+// The report is exactly those three violations.
+func TestValidateComposition_ConstraintFixture_ParsableViolation(t *testing.T) {
+	const id = "Test_dv_parsable_open_constraint.v0"
+	const formalism = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0028]/value/formalism"
+	want := []string{
+		"primitive_not_in_list " + formalism,
+		"primitive_not_in_list " + formalism,
+		"primitive_not_in_list " + formalism,
+	}
+	assertFixtureIssues(t, id, want)
+}
+
+// clinical_content_validation's report is exactly these eight issues, each a
+// real defect of the instance against its OPT:
+//
+//   - four EVALUATION names outside the OPT's one-entry closed lists (the
+//     C_STRING sets no list_open, and the v1 entry is itself misspelled
+//     "evaliation");
+//   - ITEM_TABLE.rotated, which the OPT requires (existence 1..1) but which
+//     the pinned RM does not define, so no instance can carry it;
+//   - three content items whose archetype ids are not among the OPT's
+//     content children (the OPT names valiadation_instruction_test,
+//     validation_action_test and validation_observation_test).
+func TestValidateComposition_ConstraintFixture_ClinicalContentViolations(t *testing.T) {
+	const id = "clinical_content_validation"
+	want := []string{
+		"primitive_not_in_list /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0]/name/value",
+		"primitive_not_in_list /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v2]/name/value",
+		"primitive_not_in_list /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v1]/name/value",
+		"required /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated",
+		"primitive_not_in_list /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/name/value",
+		"slot_fill /content[openEHR-EHR-INSTRUCTION.instruction_test.v0]",
+		"slot_fill /content[openEHR-EHR-ACTION.action_test.v0]",
+		"slot_fill /content[openEHR-EHR-OBSERVATION.observation_test.v0]",
+	}
+	assertFixtureIssues(t, id, want)
+}
+
+// assertFixtureIssues validates the vendored composition of template id
+// against its OPT and fails unless the issues, each read as "code path",
+// are exactly want in any order.
+func assertFixtureIssues(t *testing.T, id string, want []string) {
+	t.Helper()
+	c := mustCompile(t, id)
+	raw, err := os.ReadFile(fixtures.CompositionJSON(id))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var comp rm.Composition
+	if err := canjson.Unmarshal(raw, &comp); err != nil {
+		t.Fatalf("decode composition: %v", err)
+	}
+	r := validation.ValidateComposition(&comp, c)
+	got := make([]string, 0, len(r.Issues))
+	for _, issue := range r.Issues {
+		got = append(got, issue.Code+" "+issue.Path)
+	}
+	slices.Sort(got)
+	want = slices.Sorted(slices.Values(want))
+	if !slices.Equal(got, want) {
+		t.Errorf("ValidateComposition(%s) issues (code path):\n got  %q\n want %q\nfull issues: %+v", id, got, want, r.Issues)
 	}
 }
