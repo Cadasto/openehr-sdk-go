@@ -86,19 +86,30 @@ var completeSentinels = []error{
 	auth.ErrTokenExchangeFailed,
 }
 
-// TestCompleteAuthorizationRefusesBeforeExchange pins REQ-061: the redirect
-// is checked for state, then for the RFC 9207 issuer, then for an error
+// TestCompleteAuthorizationRefusesBeforeExchange pins REQ-061: a redirect
+// that repeats state, iss, code or error is rejected first; then it is
+// checked for state, then for the RFC 9207 issuer, then for an error
 // response, and a redirect that fails any check is refused with that
 // check's sentinel and no token-endpoint call. Where a redirect fails more
-// than one check, the earlier check decides.
+// than one check, the earlier check decides. An empty iss counts as absent,
+// and a request without an issuer cannot check one that is sent or
+// advertised, which is a configuration error.
 func TestCompleteAuthorizationRefusesBeforeExchange(t *testing.T) { // REQ-061
 	const state = "state-1"
 	tests := []struct {
 		name          string
 		callback      url.Values
 		issAdvertised bool
+		noIssuer      bool // the source, and so the request, has no issuer
 		want          error
 	}{
+		{name: "state repeated", callback: url.Values{"state": {state, state}, "code": {"c"}}, want: smart.ErrAuthorizationRejected},
+		{name: "state repeated, the first one wrong", callback: url.Values{"state": {"other", state}, "code": {"c"}}, want: smart.ErrAuthorizationRejected},
+		{name: "iss repeated", callback: url.Values{"state": {state}, "code": {"c"}, "iss": {completeIssuer, completeIssuer}}, want: smart.ErrAuthorizationRejected},
+		{name: "iss repeated, the second one foreign", callback: url.Values{"state": {state}, "code": {"c"}, "iss": {completeIssuer, "https://evil.example"}}, want: smart.ErrAuthorizationRejected},
+		{name: "code repeated", callback: url.Values{"state": {state}, "code": {"c1", "c2"}}, want: smart.ErrAuthorizationRejected},
+		{name: "error repeated", callback: url.Values{"state": {state}, "error": {"access_denied", "server_error"}}, want: smart.ErrAuthorizationRejected},
+		{name: "error repeated with a wrong state", callback: url.Values{"state": {"other"}, "error": {"access_denied", "access_denied"}}, want: smart.ErrAuthorizationRejected},
 		{name: "state differs", callback: url.Values{"state": {"other"}, "code": {"c"}, "iss": {completeIssuer}}, want: smart.ErrLaunchInvalidState},
 		{name: "state missing", callback: url.Values{"code": {"c"}, "iss": {completeIssuer}}, want: smart.ErrLaunchInvalidState},
 		{name: "state differs and issuer differs", callback: url.Values{"state": {"other"}, "code": {"c"}, "iss": {"https://evil.example"}}, want: smart.ErrLaunchInvalidState},
@@ -106,7 +117,10 @@ func TestCompleteAuthorizationRefusesBeforeExchange(t *testing.T) { // REQ-061
 		{name: "issuer differs", callback: url.Values{"state": {state}, "code": {"c"}, "iss": {"https://evil.example"}}, want: smart.ErrLaunchIssuerMismatch},
 		{name: "issuer differs by a trailing slash", callback: url.Values{"state": {state}, "code": {"c"}, "iss": {completeIssuer + "/"}}, want: smart.ErrLaunchIssuerMismatch},
 		{name: "issuer differs in letter case", callback: url.Values{"state": {state}, "code": {"c"}, "iss": {"https://IDP.example/realms/clinic"}}, want: smart.ErrLaunchIssuerMismatch},
-		{name: "issuer empty", callback: url.Values{"state": {state}, "code": {"c"}, "iss": {""}}, want: smart.ErrLaunchIssuerMismatch},
+		{name: "issuer empty where the server advertises it", callback: url.Values{"state": {state}, "code": {"c"}, "iss": {""}}, issAdvertised: true, want: smart.ErrLaunchIssuerMismatch},
+		{name: "no issuer configured, iss sent", callback: url.Values{"state": {state}, "code": {"c"}, "iss": {completeIssuer}}, noIssuer: true, want: auth.ErrInvalidConfig},
+		{name: "no issuer configured, parameter advertised", callback: url.Values{"state": {state}, "code": {"c"}}, issAdvertised: true, noIssuer: true, want: auth.ErrInvalidConfig},
+		{name: "no issuer configured, state differs", callback: url.Values{"state": {"other"}, "code": {"c"}, "iss": {completeIssuer}}, noIssuer: true, want: smart.ErrLaunchInvalidState},
 		{name: "issuer differs and an error response", callback: url.Values{"state": {state}, "error": {"access_denied"}, "iss": {"https://evil.example"}}, want: smart.ErrLaunchIssuerMismatch},
 		{name: "issuer missing where the server advertises it", callback: url.Values{"state": {state}, "code": {"c"}}, issAdvertised: true, want: smart.ErrLaunchIssuerMismatch},
 		{name: "issuer missing where advertised, with an error response", callback: url.Values{"state": {state}, "error": {"access_denied"}}, issAdvertised: true, want: smart.ErrLaunchIssuerMismatch},
@@ -119,7 +133,11 @@ func TestCompleteAuthorizationRefusesBeforeExchange(t *testing.T) { // REQ-061
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			te := newTokenEndpoint(t, `{"access_token":"at-1","token_type":"Bearer","expires_in":3600}`)
-			src := completeSource(t, te, tc.issAdvertised)
+			var opts []smart.Option
+			if tc.noIssuer {
+				opts = append(opts, smart.WithIssuer(""))
+			}
+			src := completeSource(t, te, tc.issAdvertised, opts...)
 			req, err := src.BeginAuthorization(state)
 			if err != nil {
 				t.Fatalf("BeginAuthorization: %v", err)
@@ -184,22 +202,31 @@ func TestCompleteAuthorizationErrorResponse(t *testing.T) { // REQ-061
 // TestCompleteAuthorizationExchanges pins REQ-061: a redirect that passes
 // every check exchanges its code as ExchangeAuthorizationCode does, with
 // the request's PKCE verifier, and the source then holds the token. An
-// issuer is accepted when it equals the request's exactly, and its absence
-// is accepted when the server does not advertise the parameter.
+// issuer is accepted when it equals the request's exactly, and its absence,
+// or an empty value, is accepted when the server does not advertise the
+// parameter, also by a source that has no issuer to compare with.
 func TestCompleteAuthorizationExchanges(t *testing.T) { // REQ-061
 	tests := []struct {
 		name          string
 		iss           []string // nil leaves iss out
 		issAdvertised bool
+		noIssuer      bool // the source, and so the request, has no issuer
 	}{
 		{name: "matching issuer", iss: []string{completeIssuer}},
 		{name: "matching issuer, advertised", iss: []string{completeIssuer}, issAdvertised: true},
 		{name: "no issuer, not advertised"},
+		{name: "empty issuer, not advertised", iss: []string{""}},
+		{name: "no issuer configured, none sent or advertised", noIssuer: true},
+		{name: "no issuer configured, empty iss, not advertised", iss: []string{""}, noIssuer: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			te := newTokenEndpoint(t, `{"access_token":"at-1","token_type":"Bearer","expires_in":3600}`)
-			src := completeSource(t, te, tc.issAdvertised)
+			var opts []smart.Option
+			if tc.noIssuer {
+				opts = append(opts, smart.WithIssuer(""))
+			}
+			src := completeSource(t, te, tc.issAdvertised, opts...)
 			req, err := src.BeginAuthorization("")
 			if err != nil {
 				t.Fatalf("BeginAuthorization: %v", err)
@@ -239,6 +266,7 @@ func TestCompleteAuthorizationRequiresRequest(t *testing.T) { // REQ-061
 	for _, callback := range []url.Values{
 		{"code": {"c"}},
 		{"error": {"access_denied"}},
+		{"code": {"c1", "c2"}},
 		{},
 	} {
 		te := newTokenEndpoint(t, `{"access_token":"at-1"}`)
