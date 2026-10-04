@@ -899,6 +899,7 @@ requirements:
     packages: [transport]
     tests:
       - transport/client_test.go
+      - transport/reauth_challenge_test.go
 
   - id: REQ-092
     title: TLS posture
