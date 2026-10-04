@@ -125,7 +125,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-164 | AQL path-shape and paging lint | [clinical-modeling.md](clinical-modeling.md#req-164--aql-path-shape-and-paging-lint) | draft | landed |
 | REQ-165 | openEHR scope syntax | [auth.md](auth.md#req-165--openehr-scope-syntax) | draft | landed |
 | REQ-166 | Bearer challenge on 401 and 403 | [transport.md](transport.md#req-166--bearer-challenge-on-401-and-403) | draft | landed |
-| REQ-167 | Token revocation | [auth.md](auth.md#req-167--token-revocation) | draft | partial |
+| REQ-167 | Token revocation | [auth.md](auth.md#req-167--token-revocation) | draft | landed |
 <!-- END GENERATED: registry -->
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `retired` (a withdrawn requirement, **Stability** `deprecated`: normative text retained, implementation removed or not shipped; removal target in canonical spec).
