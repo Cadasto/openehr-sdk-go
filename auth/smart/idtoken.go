@@ -73,6 +73,7 @@ func WithTrustedAudiences(aud ...string) IDTokenOption {
 // checks run after that. iss must equal issuer exactly. aud must contain
 // clientID, and any other audience it lists must be one named by
 // [WithTrustedAudiences]. An azp claim, when present, must equal clientID.
+// sub must be a non-empty string, naming the user the token is about.
 // exp is required, and exp, nbf and iat are checked with a 30-second
 // allowance for clock skew. When nonce is not empty the nonce claim must
 // equal it.
@@ -323,7 +324,12 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 	if nonce != "" && tokenNonce != nonce {
 		return nil, fmt.Errorf("%w: nonce mismatch", auth.ErrJWKSValidationFailed)
 	}
+	// OIDC Core 1.0 §2 requires sub, a non-empty string; claimString gives
+	// "" for a missing or non-string one.
 	sub, _ := claimString(claims, "sub")
+	if sub == "" {
+		return nil, fmt.Errorf("%w: missing or empty sub", auth.ErrJWKSValidationFailed)
+	}
 	fhirUser, _ := claimString(claims, "fhirUser")
 	extra := make(map[string]any, len(claims))
 	for k, v := range claims {
