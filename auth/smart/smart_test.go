@@ -606,8 +606,8 @@ func TestExchangeWithClientSecretBasic(t *testing.T) { // REQ-068
 	capMu.Unlock()
 
 	// The Authorization header must be HTTP Basic with base64(clientID:secret).
-	// http.Request.SetBasicAuth encodes clientID and secret directly (no
-	// url.QueryEscape) and uses standard base64 encoding.
+	// The SDK form-encodes both values first; these two need no escaping, so
+	// the header carries them unchanged, in standard base64.
 	wantBasic := "Basic " + base64.StdEncoding.EncodeToString([]byte(clientID+":"+secret))
 	if gotAuth != wantBasic {
 		t.Fatalf("Authorization header = %q, want %q", gotAuth, wantBasic)

@@ -555,7 +555,9 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 	if useBasic {
-		req.SetBasicAuth(s.cfg.ClientID, s.cfg.ClientSecret)
+		// RFC 6749 §2.3.1: client_id and client_secret are form-encoded
+		// (Appendix B) before use as the Basic username and password.
+		req.SetBasicAuth(url.QueryEscape(s.cfg.ClientID), url.QueryEscape(s.cfg.ClientSecret))
 	}
 	resp, err := s.cfg.HTTPClient.Do(req)
 	if err != nil {
