@@ -36,6 +36,14 @@ type BearerChallenge struct {
 	Params map[string]string
 }
 
+// permitsReauth reports whether a 401 carrying c may be answered with one
+// Reauth and a retry (REQ-166, REQ-063): only when there is no challenge,
+// it names no error, or it names invalid_token, the one RFC 6750 §3.1
+// error a new token can fix. A nil receiver is the "no challenge" case.
+func (c *BearerChallenge) permitsReauth() bool {
+	return c == nil || c.Error == "" || c.Error == "invalid_token"
+}
+
 // parseBearerChallenge returns the first well-formed Bearer challenge in
 // the WWW-Authenticate header lines, or nil when there is none (REQ-166).
 //

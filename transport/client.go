@@ -205,12 +205,13 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		resp, lastErr = c.doOnce(ctx, req, target)
 		if !c.shouldRetry(req, resp, lastErr, attempt) {
 			// 401→reauth safety net (REQ-063, opt-in): if the final error is
-			// a wire 401, a Reauther is configured, and this Do call has not
-			// yet reauthed, invoke Reauth once and retry the request once.
+			// a wire 401, a Reauther is configured, this Do call has not yet
+			// reauthed, and the 401's Bearer challenge allows it (REQ-166),
+			// invoke Reauth once and retry the request once.
 			// The retry re-fetches the token via tokenSourceFor → now fresh.
 			// On a second 401 (or if Reauth itself fails) the error is
 			// surfaced unchanged. This guard fires at most once per Do call.
-			if !reauthed && c.cfg.reauther != nil && isWire401(lastErr) {
+			if !reauthed && c.cfg.reauther != nil && isWire401(lastErr) && challengePermitsReauth(lastErr) {
 				reauthed = true
 				if raErr := c.cfg.reauther.Reauth(ctx); raErr != nil {
 					lastErr = fmt.Errorf("transport: reauth: %w", raErr)
@@ -515,6 +516,17 @@ func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 func isWire401(err error) bool {
 	we, ok := errors.AsType[*WireError](err)
 	return ok && we != nil && we.StatusCode == 401
+}
+
+// challengePermitsReauth reports whether the Bearer challenge on err's
+// *WireError lets the opt-in 401 safety net call Reauth (REQ-166, REQ-063).
+// A 401 whose challenge names insufficient_scope or any error other than
+// invalid_token is surfaced at once, since a fresh token from the same
+// grant cannot fix it. A boxed typed-nil *WireError answers false, so the
+// nil check is load-bearing (REQ-025 nil-receiver axis).
+func challengePermitsReauth(err error) bool {
+	we, ok := errors.AsType[*WireError](err)
+	return ok && we != nil && we.Challenge.permitsReauth()
 }
 
 // shouldRetry consults the configured RetryPolicy. Network errors are

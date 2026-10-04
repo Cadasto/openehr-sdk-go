@@ -8,12 +8,16 @@ package transport_test
 // challenge_test.go.
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -129,6 +133,93 @@ func TestWireErrorErrorOmitsChallenge(t *testing.T) { // REQ-166
 			}
 			if we.Challenge.ErrorDescription != values["error_description"] || we.Challenge.Params["resource_metadata"] != values["resource_metadata"] {
 				t.Errorf("WireError.Challenge = %+v, want the values reachable through errors.AsType", we.Challenge)
+			}
+		})
+	}
+}
+
+// TestReauthOn401FollowsBearerChallenge — REQ-166, REQ-063: the opt-in 401
+// safety net calls Reauth and retries once only when the 401 has no Bearer
+// challenge, or one that names no error or invalid_token. Any other error,
+// insufficient_scope included, comes back at once: no Reauth, no retry.
+func TestReauthOn401FollowsBearerChallenge(t *testing.T) { // REQ-166
+	cases := []struct {
+		name      string
+		lines     []string
+		reauth    bool   // whether Reauth runs and the request is retried
+		wantError string // Challenge.Error on the surfaced 401, when refused
+	}{
+		{name: "no header", reauth: true},
+		{name: "Bearer without error", lines: []string{`Bearer realm="x"`}, reauth: true},
+		{name: "Bearer invalid_token", lines: []string{`Bearer error="invalid_token"`}, reauth: true},
+		{name: "non-Bearer challenge only", lines: []string{`Basic realm="x"`}, reauth: true},
+		{name: "unparseable Bearer challenge", lines: []string{`Bearer error="insufficient_scope`}, reauth: true},
+		{
+			name:      "Bearer insufficient_scope",
+			lines:     []string{`Bearer error="insufficient_scope", scope="patient/composition-*.r"`},
+			wantError: "insufficient_scope",
+		},
+		{name: "Bearer invalid_request", lines: []string{`Bearer error="invalid_request"`}, wantError: "invalid_request"},
+		{
+			name:      "Basic then Bearer insufficient_scope on one line",
+			lines:     []string{`Basic realm="x", Bearer error="insufficient_scope"`},
+			wantError: "insufficient_scope",
+		},
+		{
+			name:      "Bearer insufficient_scope on the second line",
+			lines:     []string{`DPoP algs="ES256"`, `bearer ERROR="insufficient_scope"`},
+			wantError: "insufficient_scope",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var upstream, reauths atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				if upstream.Add(1) == 1 {
+					for _, l := range tc.lines {
+						w.Header().Add("WWW-Authenticate", l)
+					}
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			t.Cleanup(srv.Close)
+			c, err := transport.New(newDecodeCatalog(t, srv),
+				transport.WithHTTPClient(srv.Client()),
+				transport.WithReauthOn401(auth.ReautherFunc(func(context.Context) error {
+					reauths.Add(1)
+					return nil
+				})),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = c.Do(t.Context(), &transport.Request{Path: "/x"})
+
+			wantReauths, wantUpstream := int32(0), int32(1)
+			if tc.reauth {
+				wantReauths, wantUpstream = 1, 2
+			}
+			if got := reauths.Load(); got != wantReauths {
+				t.Errorf("Reauth calls = %d, want %d", got, wantReauths)
+			}
+			if got := upstream.Load(); got != wantUpstream {
+				t.Errorf("upstream requests = %d, want %d", got, wantUpstream)
+			}
+			if tc.reauth {
+				if err != nil {
+					t.Errorf("Do() error = %v, want success after the one Reauth and retry", err)
+				}
+				return
+			}
+			if !errors.Is(err, transport.ErrUnauthorized) {
+				t.Fatalf("Do() error = %v, want errors.Is ErrUnauthorized", err)
+			}
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok || we == nil || we.Challenge == nil || we.Challenge.Error != tc.wantError {
+				t.Errorf("surfaced error = %v, want a *WireError whose Challenge.Error is %q", err, tc.wantError)
 			}
 		})
 	}

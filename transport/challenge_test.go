@@ -5,6 +5,7 @@ package transport
 // consumer sees on a real 401 or 403 is pinned in reauth_challenge_test.go.
 
 import (
+	"errors"
 	"maps"
 	"reflect"
 	"slices"
@@ -168,6 +169,27 @@ func FuzzParseBearerChallenge(f *testing.F) { // REQ-166
 			t.Fatalf("round trip changed the challenge\n in:   %q\n got:  %s\n wire: %q\n back: %s", lines, describeChallenge(got), wire, describeChallenge(again))
 		}
 	})
+}
+
+// TestChallengePermitsReauthToleratesABoxedNilWireError — REQ-166, REQ-025:
+// the reauth gate reads a field off the extracted *WireError, so a boxed
+// typed nil answers false instead of panicking, while a real 401 still
+// reaches the challenge check.
+func TestChallengePermitsReauthToleratesABoxedNilWireError(t *testing.T) { // REQ-166
+	if got := challengePermitsReauth(boxedNilWireError()); got {
+		t.Errorf("challengePermitsReauth(boxed typed-nil WireError) = true, want false")
+	}
+	if got := challengePermitsReauth(errors.New("not a wire error")); got {
+		t.Errorf("challengePermitsReauth(plain error) = true, want false")
+	}
+	noChallenge := &WireError{StatusCode: 401, Sentinel: ErrUnauthorized}
+	if got := challengePermitsReauth(noChallenge); !got {
+		t.Errorf("challengePermitsReauth(401 without a challenge) = false, want true")
+	}
+	scoped := &WireError{StatusCode: 401, Sentinel: ErrUnauthorized, Challenge: &BearerChallenge{Error: "insufficient_scope"}}
+	if got := challengePermitsReauth(scoped); got {
+		t.Errorf("challengePermitsReauth(401 insufficient_scope) = true, want false")
+	}
 }
 
 // formatBearerChallenge writes c as one Bearer challenge, every value as a
