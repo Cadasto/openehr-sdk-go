@@ -312,6 +312,55 @@ func TestNotModifiedRevalidatesForEachResolver(t *testing.T) { // REQ-072
 	}
 }
 
+// TestNotModifiedRefusesPlaintextForAStrictResolver pins REQ-073 on a 304
+// renewal: a Resolver built without WithAllowInsecure refuses a plaintext
+// auth endpoint in a catalog that a Resolver built with it cached, as it
+// would refuse the same document on a 200.
+func TestNotModifiedRefusesPlaintextForAStrictResolver(t *testing.T) { // REQ-073
+	cases := []struct {
+		name   string
+		member string // a plaintext member added to the document
+	}{
+		{name: "auth endpoint", member: `"token_endpoint":"http://auth.example.test/token"`},
+		{name: "issuer", member: `"issuer":"http://idp.example.test"`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var srv *httptest.Server
+			srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("ETag", `"v1"`)
+				if r.Header.Get("If-None-Match") == `"v1"` {
+					w.WriteHeader(http.StatusNotModified)
+					return
+				}
+				_, _ = fmt.Fprintf(w, `{"services":{"org.openehr.rest":{"baseUrl":%q}},%s}`, srv.URL+"/openehr/v1", tc.member)
+			}))
+			t.Cleanup(srv.Close)
+			cache := NewMemoryCache()
+			insecure, err := NewResolver(cache, WithHTTPClient(srv.Client()), WithAllowInsecure(), WithoutOpenIDConfigurationCheck())
+			if err != nil {
+				t.Fatal(err)
+			}
+			strict, err := NewResolver(cache, WithHTTPClient(srv.Client()), WithoutOpenIDConfigurationCheck())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := insecure.Resolve(t.Context(), srv.URL); err != nil {
+				t.Fatalf("insecure Resolver: Resolve(%q) error = %v", srv.URL, err)
+			}
+
+			_, err = strict.Refresh(t.Context(), srv.URL)
+
+			if derr, ok := errors.AsType[*DiscoveryError](err); !ok || derr.Reason != ReasonInsecureURL {
+				t.Fatalf("strict Resolver: Refresh(%q) answered 304: error = %v, want a DiscoveryError with Reason %q", srv.URL, err, ReasonInsecureURL)
+			}
+			if _, ok := cache.Get(t.Context(), srv.URL); ok {
+				t.Errorf("cache still holds a catalog for %q after the refused renewal", srv.URL)
+			}
+		})
+	}
+}
+
 // REQ-072: a malformed URL in the document fails resolution with a typed
 // DiscoveryError.
 func TestResolveMalformedURL(t *testing.T) {

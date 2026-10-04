@@ -372,6 +372,9 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 		// been cached by a Resolver with other options, and the issuer's
 		// OpenID configuration may have changed since it was confirmed.
 		c := renewed(cached, resp.Header, r.cfg.defaultTTL)
+		if err := r.refusePlaintext(c); err != nil {
+			return nil, err
+		}
 		if err := r.validate(c); err != nil {
 			return nil, err
 		}
@@ -816,14 +819,52 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 			r.cfg.logger.Warn("discovery: plaintext URL in catalog (REQ-092)", "base_url", cat.BaseURL, "field", name, "url", u.Redacted())
 		}
 	}
-	check("authorization_endpoint", cat.Auth.AuthorizationEndpoint)
-	check("token_endpoint", cat.Auth.TokenEndpoint)
-	check("jwks_uri", cat.Auth.JWKSURI)
-	check("registration_endpoint", cat.Auth.RegistrationEndpoint)
-	check("introspection_endpoint", cat.Auth.IntrospectionEndpoint)
-	check("revocation_endpoint", cat.Auth.RevocationEndpoint)
-	check("management_endpoint", cat.Auth.ManagementEndpoint)
+	for _, e := range authURLs(cat.Auth) {
+		check(e.name, e.url)
+	}
 	for id, s := range cat.Services {
 		check("services["+id+"].baseUrl", s.BaseURL)
+	}
+}
+
+// refusePlaintext applies the parser's https rule to a catalog this Resolver
+// did not parse: unless it allows insecure URLs, an http issuer or auth
+// endpoint is a ReasonInsecureURL. A 304 renewal needs it, because the
+// cached catalog may come from a Resolver built with WithAllowInsecure.
+func (r *Resolver) refusePlaintext(cat *ServiceCatalog) error {
+	if r.cfg.allowInsecure {
+		return nil
+	}
+	refuse := func(name, raw string) error {
+		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s %q uses http; https required (use WithAllowInsecure for development)", name, raw)}
+	}
+	if u, err := url.Parse(cat.Issuer); err == nil && u.Scheme == "http" {
+		return refuse("issuer", cat.Issuer)
+	}
+	for _, e := range authURLs(cat.Auth) {
+		if e.url != nil && e.url.Scheme == "http" {
+			return refuse(e.name, e.url.Redacted())
+		}
+	}
+	return nil
+}
+
+// authURLs lists the auth endpoints of a, each with the name of its member
+// in the SMART configuration document; an absent endpoint is nil.
+func authURLs(a AuthEndpoints) []struct {
+	name string
+	url  *url.URL
+} {
+	return []struct {
+		name string
+		url  *url.URL
+	}{
+		{"authorization_endpoint", a.AuthorizationEndpoint},
+		{"token_endpoint", a.TokenEndpoint},
+		{"jwks_uri", a.JWKSURI},
+		{"registration_endpoint", a.RegistrationEndpoint},
+		{"introspection_endpoint", a.IntrospectionEndpoint},
+		{"revocation_endpoint", a.RevocationEndpoint},
+		{"management_endpoint", a.ManagementEndpoint},
 	}
 }
