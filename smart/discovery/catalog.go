@@ -82,9 +82,26 @@ type ServiceEntry struct {
 	// BaseURL is the parsed, validated base URL for this service.
 	// Always absolute; transport/ joins paths onto this URL.
 	BaseURL *url.URL
-	// SpecVersion is the declared spec version (e.g. "1.1.0-development").
-	// Validated against the SDK's pinned spec version at resolution time.
+	// Version is the entry's "version" member, verbatim, usually the
+	// Platform's own API version; empty when absent. The resolver compares
+	// it only when the entry has no SpecVersion and the caller set
+	// WithAcceptedSpecVersions.
+	Version string
+	// SpecVersion is the entry's "spec_version" member, verbatim (e.g.
+	// "1.1.0-development"); empty when absent. This member is not part of
+	// the SMART on openEHR document but is accepted when present. When the
+	// entry advertises it, the resolver checks it against the accepted
+	// versions at resolution time.
 	SpecVersion string
+	// Description is the entry's "description" member, verbatim; empty
+	// when absent.
+	Description string
+	// Documentation is the entry's "documentation" link, verbatim; empty
+	// when absent. The SDK neither fetches nor validates it.
+	Documentation string
+	// OpenAPI is the entry's "openapi" link, verbatim; empty when absent.
+	// The SDK neither fetches nor validates it.
+	OpenAPI string
 	// Capabilities is an optional capability flag list the deployment
 	// advertised. Opaque to the SDK; consumers may inspect it.
 	Capabilities []string

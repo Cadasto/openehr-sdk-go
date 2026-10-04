@@ -17,9 +17,9 @@ import (
 )
 
 // SpecVersionPin is the SDK's pinned openEHR REST contract version.
-// The Resolver requires the discovery document to advertise
-// this version on every required service unless the caller widens the
-// accepted set via WithAcceptedSpecVersions.
+// The Resolver checks the spec_version a required service advertises
+// against this version unless the caller widens the accepted set via
+// WithAcceptedSpecVersions.
 const SpecVersionPin = "1.1.0-development"
 
 // WellKnownPath is the standard SMART configuration path appended to
@@ -90,10 +90,15 @@ func WithRequiredServices(ids ...string) Option {
 }
 
 // WithAcceptedSpecVersions widens the version set the resolver accepts
-// on a required service. Default is {SpecVersionPin} (strict).
-// Without this option, a required service that advertises no spec_version
-// is accepted. Calling it makes the check strict: an empty advertised
-// version is then rejected unless it is in the accepted set.
+// on a required service. Default is {SpecVersionPin}.
+//
+// Without this option the resolver compares a required service's
+// spec_version only when the entry advertises one, and never compares its
+// version member, which is usually the Platform's own API version. Calling
+// it makes the check strict: the compared value is the entry's
+// spec_version, or its version when it advertises no spec_version, and an
+// entry that advertises neither is rejected unless "" is in the accepted
+// set.
 func WithAcceptedSpecVersions(versions ...string) Option {
 	return func(cfg *resolverConfig) {
 		cfg.acceptedVersions = map[string]struct{}{}
@@ -430,6 +435,7 @@ type smartConfigWire struct {
 
 type serviceEntryWire struct {
 	BaseURL       string   `json:"baseUrl"`
+	Version       string   `json:"version"`
 	SpecVersion   string   `json:"spec_version"` // non-canonical extension; tolerated when present
 	Description   string   `json:"description"`
 	Documentation string   `json:"documentation"`
@@ -449,10 +455,14 @@ func (r *Resolver) parse(baseURL string, wire *smartConfigWire) (*ServiceCatalog
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q baseUrl %q invalid", id, s.BaseURL)}
 		}
 		services[id] = ServiceEntry{
-			ID:           id,
-			BaseURL:      u,
-			SpecVersion:  s.SpecVersion,
-			Capabilities: append([]string(nil), s.Capabilities...),
+			ID:            id,
+			BaseURL:       u,
+			Version:       s.Version,
+			SpecVersion:   s.SpecVersion,
+			Description:   s.Description,
+			Documentation: s.Documentation,
+			OpenAPI:       s.OpenAPI,
+			Capabilities:  append([]string(nil), s.Capabilities...),
 		}
 	}
 	// The document's issuer becomes the catalog's Issuer whether or not it
@@ -567,22 +577,27 @@ func (r *Resolver) validate(cat *ServiceCatalog) error {
 	if len(missing) > 0 {
 		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonMissingService, MissingServices: missing}
 	}
-	// 2. Spec-version match per required service (REQ-072, softened per ADR 0008).
-	// When a service entry advertises no spec_version AND the caller has not
-	// explicitly locked the accepted set via WithAcceptedSpecVersions, skip the
-	// check — the entry's absence of a version is treated as acceptable. Strict
-	// enforcement applies when (a) the entry advertises a version, or (b) the
-	// caller explicitly narrowed the accepted set.
+	// 2. Version match per required service (REQ-072, softened per ADR 0008).
+	// An advertised spec_version is always compared. Without one, the entry
+	// passes unless the caller locked the accepted set via
+	// WithAcceptedSpecVersions; then its canonical version member is
+	// compared instead, and an entry with neither fails. The version member
+	// is never compared by default, because a Platform advertises its own
+	// API version there.
 	for _, id := range r.cfg.requiredServices {
 		e := cat.Services[id]
-		if e.SpecVersion == "" && !r.cfg.acceptedVersionsLocked {
-			continue
+		got := e.SpecVersion
+		if got == "" {
+			if !r.cfg.acceptedVersionsLocked {
+				continue
+			}
+			got = e.Version
 		}
-		if _, ok := r.cfg.acceptedVersions[e.SpecVersion]; !ok {
+		if _, ok := r.cfg.acceptedVersions[got]; !ok {
 			return &DiscoveryError{
 				Issuer:          cat.BaseURL,
 				Reason:          ReasonSpecVersionMismatch,
-				SpecVersionGot:  e.SpecVersion,
+				SpecVersionGot:  got,
 				SpecVersionWant: acceptedVersionsString(r.cfg.acceptedVersions),
 			}
 		}

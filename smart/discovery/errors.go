@@ -22,7 +22,8 @@ const (
 	ReasonMissingService DiscoveryErrorReason = "missing_service"
 	// ReasonSpecVersionMismatch indicates a required service's declared
 	// spec_version does not match the SDK's pinned target or accepted
-	// set.
+	// set. With WithAcceptedSpecVersions, an entry without spec_version is
+	// judged by its version member instead.
 	ReasonSpecVersionMismatch DiscoveryErrorReason = "spec_version_mismatch"
 	// ReasonMalformedURL indicates a URL field (BaseURL,
 	// AuthorizationEndpoint, etc.) failed parsing, or the declared issuer
