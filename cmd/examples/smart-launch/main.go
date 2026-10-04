@@ -101,8 +101,9 @@ func run() error {
 
 	// Step 2: begin the launch. The empty state asks the SDK to generate a
 	// random one; the returned AuthorizationRequest also holds the fresh PKCE
-	// verifier and challenge. A standalone launch has no "launch" token from
-	// an EHR session, so nothing else goes in.
+	// verifier and challenge, a nonce for the ID token (the scopes include
+	// openid), and the issuer the answer must come from. A standalone launch
+	// has no "launch" token from an EHR session, so nothing else goes in.
 	authReq, err := source.BeginAuthorization("")
 	if err != nil {
 		return fmt.Errorf("BeginAuthorization: %w", err)
@@ -137,36 +138,42 @@ func run() error {
 	// Step 5: the user's turn. In a real app the browser opens authorizeURL,
 	// the user logs in, and the authorization server redirects the browser to
 	// the app's callback with ?code=...&state=... in the query. The stub skips
-	// the login screen and answers at once, so the program plays the browser.
+	// the login screen and answers at once, so the program plays the browser
+	// and returns the query the callback would receive.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	callbackCode, callbackState, err := openAuthorizeURL(ctx, server.Client(), authorizeURL)
+	callback, err := openAuthorizeURL(ctx, server.Client(), authorizeURL)
 	if err != nil {
 		return fmt.Errorf("play the user's browser: %w", err)
 	}
-	fmt.Printf("step 5: redirect received  code=%q  state=%q\n", callbackCode, callbackState)
+	fmt.Printf("step 5: redirect received  code=%q  state=%q\n", callback.Get("code"), callback.Get("state"))
 
 	// Step 6: the callback. Look the request up by the state the browser
 	// brought back, and remove it in the same move so a replayed callback
 	// finds nothing. An unknown state is rejected before any code is exchanged.
-	storedReq, found := sessions.take(callbackState)
+	storedReq, found := sessions.take(callback.Get("state"))
 	if !found {
-		return fmt.Errorf("callback state %q not in session map (possible CSRF)", callbackState)
+		return fmt.Errorf("callback state %q not in session map (possible CSRF)", callback.Get("state"))
 	}
 	fmt.Println("step 6: AuthorizationRequest retrieved from session map (state validated)")
 
-	// Step 7: exchange the code for tokens. The SDK compares callbackState with
-	// storedReq.State once more (ErrLaunchInvalidState on mismatch, before any
-	// network call) and then posts the code together with the PKCE verifier to
-	// the token endpoint. The server hashes the verifier and checks it against
-	// the challenge it saw in step 5; that is the PKCE proof.
-	token, tokenResp, err := source.ExchangeAuthorizationCode(ctx, callbackCode, callbackState, storedReq)
+	// Step 7: complete the authorization. Hand CompleteAuthorization the
+	// whole callback query (in an HTTP handler, r.URL.Query()) and the stored
+	// request. Before it contacts the token endpoint it checks the redirect:
+	// the state must match storedReq.State (ErrLaunchInvalidState), an iss
+	// parameter, if the server sends one, must name the server the user was
+	// sent to (ErrLaunchIssuerMismatch), and an error parameter, such as a
+	// user who declined, fails with ErrAuthorizationRejected. Then it posts
+	// the code together with the PKCE verifier to the token endpoint. The
+	// server hashes the verifier and checks it against the challenge it saw
+	// in step 5; that is the PKCE proof.
+	token, tokenResp, err := source.CompleteAuthorization(ctx, callback, storedReq)
 	if err != nil {
-		return fmt.Errorf("ExchangeAuthorizationCode: %w", err)
+		return fmt.Errorf("CompleteAuthorization: %w", err)
 	}
 	// Tokens and the verifier are secrets: print only a short prefix, and
 	// never write the full values to a log in a real app.
-	fmt.Println("step 7: token exchange complete")
+	fmt.Println("step 7: authorization completed, code exchanged for tokens")
 	fmt.Printf("  access_token : %s\n", preview(token.Value))
 	fmt.Printf("  token_type   : %s\n", token.Type)
 	fmt.Printf("  scope        : %s\n", token.Scope)
@@ -214,34 +221,36 @@ func (s *sessionStore) take(state string) (authsmart.AuthorizationRequest, bool)
 	return req, ok
 }
 
-// openAuthorizeURL plays the user's browser: it opens the authorize URL
-// and returns the code and state the authorization server sends back to the
-// app's callback.
-func openAuthorizeURL(ctx context.Context, client *http.Client, authorizeURL string) (code, state string, err error) {
+// openAuthorizeURL plays the user's browser: it opens the authorize URL and
+// returns the query the browser would deliver to the app's callback, with
+// the code and state the authorization server sent back.
+func openAuthorizeURL(ctx context.Context, client *http.Client, authorizeURL string) (url.Values, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, authorizeURL, nil)
 	if err != nil {
-		return "", "", fmt.Errorf("build authorize request: %w", err)
+		return nil, fmt.Errorf("build authorize request: %w", err)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("GET authorize: %w", err)
+		return nil, fmt.Errorf("GET authorize: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("authorize returned %d", resp.StatusCode)
+		return nil, fmt.Errorf("authorize returned %d", resp.StatusCode)
 	}
-	var callback struct {
+	var grant struct {
 		Code  string `json:"code"`
 		State string `json:"state"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&callback); err != nil {
-		return "", "", fmt.Errorf("decode authorize response: %w", err)
+	if err := json.NewDecoder(resp.Body).Decode(&grant); err != nil {
+		return nil, fmt.Errorf("decode authorize response: %w", err)
 	}
-	if callback.Code == "" || callback.State == "" {
-		return "", "", errors.New("authorize response is missing code or state")
+	if grant.Code == "" || grant.State == "" {
+		return nil, errors.New("authorize response is missing code or state")
 	}
-	return callback.Code, callback.State, nil
+	// A real redirect lands on redirect_uri?code=...&state=...; these are
+	// the values the callback handler reads from that query.
+	return url.Values{"code": {grant.Code}, "state": {grant.State}}, nil
 }
 
 // stubServer is a minimal authorization server, just enough to complete one
@@ -268,7 +277,8 @@ func newStubServer() *stubServer {
 // handleAuthorize stands in for the login screen. A real server authenticates
 // the user and then redirects the browser to the app's redirect_uri with code
 // and state in the query. The stub grants at once and returns the pair as
-// JSON, so openAuthorizeURL can read it without following a redirect.
+// JSON, so openAuthorizeURL can read it without following a redirect and
+// turn it into the callback query.
 func (s *stubServer) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	// SMART makes aud a required parameter, so the stub refuses a request
