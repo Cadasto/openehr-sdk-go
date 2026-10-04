@@ -26,8 +26,8 @@ type Identifier struct {
 
 // ResolveIdentifierBody decodes an ITS-REST [Identifier] write-response
 // body (sent when `Prefer: return=identifier` is honoured) and, when
-// VersionUID was not already parsed from the Location header, populates
-// it from the body's uid. Location stays canonical; the body
+// VersionUID was not already parsed from the ETag or Location header,
+// populates it from the body's uid. The headers stay canonical; the body
 // is the documented fallback noted on [VersionMetadata].
 //
 // It never silently downgrades the identifier mode: a non-empty body that does not decode to an

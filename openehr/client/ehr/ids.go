@@ -68,6 +68,18 @@ func (v VersionUID) VersionNumber() string {
 	return ovID.VersionTreeID().Value
 }
 
+// versionUIDFromETag returns an ETag value (quotes and weak prefix
+// already stripped by the transport) as a VersionUID when it is a
+// well-formed object_version_id, and empty otherwise: the ETag of an
+// EHR or a Contribution is a bare id, and a server may send an opaque
+// ETag that names no version.
+func versionUIDFromETag(etag string) VersionUID {
+	if _, err := rm.ParseObjectVersionID(etag); err != nil {
+		return ""
+	}
+	return VersionUID(etag)
+}
+
 // extractVersionUIDFromLocation parses a Location header value to a
 // VersionUID by taking the last path segment. Tolerates leading or
 // trailing slashes. Returns empty when the header is absent or has no

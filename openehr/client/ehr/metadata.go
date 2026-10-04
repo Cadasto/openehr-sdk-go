@@ -10,20 +10,25 @@ import (
 // Location, LastModified, openehr-* response headers) and adds the
 // parsed VersionUID extracted from the response.
 //
-// VersionUID is preferred from the Location header (which the server
-// canonically sets to the resource path) and falls back to body
-// inspection in leaf clients where applicable.
+// VersionUID comes from the ETag header when it holds a version id,
+// and from the last segment of the Location header otherwise; leaf
+// clients may also fill it from the response body where applicable.
+// The ETag comes first because openEHR REST names the ETag as the
+// version id, sends Location only on a create, and some servers leave
+// the version out of Location.
 type VersionMetadata struct {
 	*transport.Metadata
 	// VersionUID is the parsed identifier for the returned version,
-	// empty when the resource is not versioned (the EHR root) or when
-	// the response provided no Location header.
+	// empty when the response named none in its ETag or Location
+	// header. For the EHR root it is the ehr_id from Location.
 	VersionUID VersionUID
 }
 
-// NewVersionMetadata builds a VersionMetadata by extracting the
-// VersionUID from the transport metadata's Location header. Returns
-// nil if m itself is nil so caller error paths propagate naturally.
+// NewVersionMetadata builds a VersionMetadata for a versioned resource.
+// VersionUID is the ETag when the ETag is a well-formed version id
+// (object_id::creating_system_id::version_tree_id), and the last path
+// segment of Location otherwise. Returns nil if m itself is nil so
+// caller error paths propagate naturally.
 //
 // Exported so sub-leaf packages (`openehr/client/ehr/composition`,
 // `.../ehrstatus`, `.../directory`) can adopt the same parsing rule
@@ -32,8 +37,20 @@ func NewVersionMetadata(m *transport.Metadata) *VersionMetadata {
 	if m == nil {
 		return nil
 	}
-	return &VersionMetadata{
-		Metadata:   m,
-		VersionUID: extractVersionUIDFromLocation(m.Location),
+	uid := versionUIDFromETag(m.ETag)
+	if uid == "" {
+		uid = extractVersionUIDFromLocation(m.Location)
 	}
+	return &VersionMetadata{Metadata: m, VersionUID: uid}
+}
+
+// newEHRMetadata builds the metadata of an EHR root response, whose
+// VersionUID is the ehr_id taken from Location. It never reads the
+// ETag: openEHR REST makes an EHR's ETag its ehr_id, but some servers
+// send the EHR_STATUS version id there, which is not the EHR's id.
+func newEHRMetadata(m *transport.Metadata) *VersionMetadata {
+	if m == nil {
+		return nil
+	}
+	return &VersionMetadata{Metadata: m, VersionUID: extractVersionUIDFromLocation(m.Location)}
 }

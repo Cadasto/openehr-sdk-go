@@ -710,7 +710,9 @@ func TestCassette_ScenarioChecksFailOnAMutatedRecording_REQ082_REQ095_REQ094_REQ
 			name:      "composition-minimal save carries no version uid",
 			recording: "composition-minimal.har",
 			mutate: func(t *testing.T, har *probe.HAR) {
-				dropResponseHeader(t, recordedEntry(t, har, "POST", "/composition"), "Location")
+				save := recordedEntry(t, har, "POST", "/composition")
+				dropResponseHeader(t, save, "Location")
+				dropResponseHeader(t, save, "ETag")
 			},
 			replay: compositionMinimal(),
 			want:   "save version uid",

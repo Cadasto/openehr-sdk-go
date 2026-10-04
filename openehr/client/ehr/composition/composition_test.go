@@ -267,6 +267,45 @@ func TestSaveMinimal(t *testing.T) {
 	}
 }
 
+// TestWriteTakesVersionUIDFromETag pins REQ-054: the version id comes from
+// the ETag, so a save whose Location names only the versioned object (as
+// EHRbase sends it) and an update with no Location at all both report the
+// committed version.
+func TestWriteTakesVersionUIDFromETag(t *testing.T) {
+	const updatedVUID openehrclient.VersionUID = "1234abcd-5678-9012-3456-7890abcdef00::cdr.example::2"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			w.Header().Set("ETag", `"`+string(compositionVUID)+`"`)
+			w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(compositionVOID))
+			w.WriteHeader(http.StatusCreated)
+		case http.MethodPut:
+			w.Header().Set("ETag", `W/"`+string(updatedVUID)+`"`)
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Errorf("unexpected method %q", r.Method)
+		}
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	_, saved, err := composition.Save(t.Context(), c, ehrIDFixture, readComposition(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.VersionUID != compositionVUID {
+		t.Errorf("Save VersionUID = %q, want %q (from the ETag)", saved.VersionUID, compositionVUID)
+	}
+
+	_, updated, err := composition.Update(t.Context(), c, ehrIDFixture, compositionVOID, string(compositionVUID), readComposition(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.VersionUID != updatedVUID {
+		t.Errorf("Update VersionUID = %q, want %q (from the ETag)", updated.VersionUID, updatedVUID)
+	}
+}
+
 // TestSaveRepresentationDecodesBareComposition pins REQ-094:
 // `Prefer: return=representation` on POST returns a bare COMPOSITION
 // (not an ORIGINAL_VERSION<COMPOSITION>) per the ITS-REST OpenAPI

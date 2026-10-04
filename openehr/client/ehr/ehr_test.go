@@ -287,6 +287,27 @@ func TestCreateServerAssigned(t *testing.T) {
 	}
 }
 
+// TestCreateVersionUIDIsTheEHRID pins REQ-054's EHR-root rule: the
+// VersionUID of an EHR create is the ehr_id from Location, even when the
+// server puts the EHR_STATUS version id in the ETag.
+func TestCreateVersionUIDIsTheEHRID(t *testing.T) {
+	body := readFixture(t, "ehr", "ehr.json")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/"+ehrIDFixture)
+		w.Header().Set("ETag", `"d6052572-53b8-4900-9f4f-b782eca91528::cdr.example::1"`)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+	_, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta.VersionUID != ehrIDFixture {
+		t.Errorf("Create VersionUID = %q, want the ehr_id %q", meta.VersionUID, ehrIDFixture)
+	}
+}
+
 func TestCreateClientSupplied(t *testing.T) {
 	var captured *http.Request
 	body := readFixture(t, "ehr", "ehr.json")

@@ -61,6 +61,42 @@ func TestNewVersionMetadataAbsoluteLocation(t *testing.T) {
 	}
 }
 
+// TestNewVersionMetadataPrefersETag pins where the version id comes from
+// (REQ-054): the ETag when it is a well-formed version id, the Location
+// tail otherwise.
+func TestNewVersionMetadataPrefersETag(t *testing.T) {
+	const (
+		vuid = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2"
+		voID = "8849182c-82ad-4088-a07f-48ead4180515"
+	)
+	tests := []struct {
+		name     string
+		etag     string
+		location string
+		want     VersionUID
+	}{
+		{name: "Location without the version", etag: vuid, location: "/ehr/e/composition/" + voID, want: vuid},
+		{name: "no Location on an update", etag: vuid, want: vuid},
+		{name: "ETag and Location disagree", etag: vuid, location: "/ehr/e/composition/" + voID + "::cdr.example::1", want: vuid},
+		{name: "no ETag", location: "/ehr/e/composition/" + vuid, want: vuid},
+		{name: "bare id in the ETag", etag: voID, location: "/ehr/e/contribution/" + voID, want: voID},
+		{name: "opaque ETag", etag: "33a64df551425fcc55e4d42a148795d9f25f89d4", location: "/ehr/e/composition/" + vuid, want: vuid},
+		{name: "neither header"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			meta := NewVersionMetadata(&transport.Metadata{ETag: tc.etag, Location: tc.location})
+			if meta.VersionUID != tc.want {
+				t.Errorf("NewVersionMetadata(ETag=%q, Location=%q).VersionUID = %q, want %q",
+					tc.etag, tc.location, meta.VersionUID, tc.want)
+			}
+		})
+	}
+	if NewVersionMetadata(nil) != nil {
+		t.Error("NewVersionMetadata(nil) != nil")
+	}
+}
+
 // TestVersionUIDMalformedSegments asserts the stricter (canonical-parser)
 // behaviour: a non-three-part version-uid yields empty segments (REQ-120).
 func TestVersionUIDMalformedSegments(t *testing.T) {
