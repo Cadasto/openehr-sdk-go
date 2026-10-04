@@ -6,6 +6,7 @@ package crossformat
 // both FLAT sides: these tests pin each of those on its own.
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"maps"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 	"github.com/cadasto/openehr-sdk-go/testkit/conformance/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // TestProbe105Leaves pins the leaf form REQ-080 asks for: a semantic
@@ -99,6 +101,60 @@ func TestProbe105CompareLeaves(t *testing.T) {
 		t.Errorf("compareLeaves(ref, ref).Outcome = %+v, want clean over 4 leaves", clean.Outcome)
 	}
 }
+
+// TestProbe105LegJSONXMLComparesDecodedLeaves pins leg (a) on the vendored
+// family_history set: the canonical XML is decoded and compared with the
+// canonical JSON leaf by leaf, never by bytes and never with itself. The
+// unchanged set agrees over every leaf, and one XML value changed in memory
+// is reported as one altered leaf at its JSON pointer.
+func TestProbe105LegJSONXMLComparesDecodedLeaves(t *testing.T) {
+	sets, err := fixtures.ListCrossFormatSets()
+	if err != nil {
+		t.Fatalf("ListCrossFormatSets() error = %v", err)
+	}
+	i := slices.IndexFunc(sets, func(s fixtures.CrossFormatSet) bool { return s.Name == "family_history" })
+	if i < 0 {
+		t.Fatal("the cross-format corpus has no family_history set")
+	}
+	in, err := readInputs(sets[i])
+	if err != nil {
+		t.Fatalf("readInputs(family_history) error = %v", err)
+	}
+
+	got, err := legJSONXML(in)
+	if err != nil {
+		t.Fatalf("legJSONXML(family_history) error = %v", err)
+	}
+	if want := (Outcome{Compared: 95}); got.Outcome != want {
+		t.Errorf("legJSONXML(family_history).Outcome = %+v, want %+v (missing %v, extra %v, altered %v)",
+			got.Outcome, want, got.MissingKeys, got.ExtraKeys, got.Alterations)
+	}
+
+	// "Mother" is the value of exactly one leaf in each canonical document.
+	const from, to = "<value>Mother</value>", "<value>Father</value>"
+	if n := bytes.Count(in.canonicalXML, []byte(from)); n != 1 {
+		t.Fatalf("family_history canonical.xml carries %q %d times, want once", from, n)
+	}
+	changed := in
+	changed.canonicalXML = bytes.Replace(in.canonicalXML, []byte(from), []byte(to), 1)
+	got, err = legJSONXML(changed)
+	if err != nil {
+		t.Fatalf("legJSONXML(family_history, XML %s) error = %v", to, err)
+	}
+	if want := (Outcome{Compared: 95, Altered: 1}); got.Outcome != want {
+		t.Errorf("legJSONXML(family_history, XML %s).Outcome = %+v, want %+v", to, got.Outcome, want)
+	}
+	want := []Alteration{{Key: motherPointer, Reference: `"Mother"`, Ours: `"Father"`}}
+	if !slices.Equal(got.Alterations, want) {
+		t.Errorf("legJSONXML(family_history, XML %s).Alterations = %v, want %v", to, got.Alterations, want)
+	}
+}
+
+// motherPointer is the JSON pointer of the family_history leaf whose value is
+// "Mother", the Relationship element of the family member: the same pointer
+// in the upstream canonical JSON and in the canjson re-encode of either
+// canonical document.
+const motherPointer = "/content/0/data/items/0/items/1/value/value"
 
 // TestProbe105CompareFlatHoldsMetadataOutOnBothSides pins the PROBE-086
 // hold-out on both FLAT sides: a ctx/ short form on one side and the real-path
