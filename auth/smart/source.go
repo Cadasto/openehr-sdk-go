@@ -87,8 +87,9 @@ type TokenChange struct {
 	// Access is the access token the source now holds.
 	Access auth.Token
 	// RefreshToken is the refresh token the source now holds: the
-	// response's, or after a refresh whose response carried none, the one
-	// the source held before. Empty when the source holds none.
+	// response's; after a refresh whose response carried none, the one the
+	// source held before; after a code exchange whose response carried
+	// none, empty.
 	RefreshToken string
 	// Response is the token response as [Source.LastTokenResponse] returns
 	// it, so a refresh response's left-out launch context is filled in. Its
@@ -211,9 +212,13 @@ func WithRefreshThreshold(d time.Duration) Option {
 // change returns without waiting for that. So fn must not block for long:
 // later changes wait for it.
 //
-// If fn panics, the panic goes up through the source call whose goroutine
-// was running fn. The changes still waiting are then reported from a new
-// goroutine, so none of them waits for a later change of tokens.
+// If fn panics on the goroutine of a source call, which is the call that
+// made the change or a call reporting changes others made, the panic goes
+// up through that call. The changes still waiting are then reported from a
+// new goroutine the source starts, so none of them waits for a later change
+// of tokens. No caller could recover a panic on that goroutine, so there
+// the source recovers it, drops the change fn panicked on, and goes on with
+// the rest.
 func WithTokenChange(fn func(ctx context.Context, change TokenChange)) Option {
 	return func(cfg *Config) { cfg.tokenChange = fn }
 }
@@ -265,7 +270,17 @@ func (s *Source) queueChangeLocked(ctx context.Context, change TokenChange) {
 // hook never runs in two goroutines at once and sees the changes in the
 // order they were installed, including a change the hook itself causes
 // through the source, which it sees after it returns.
-func (s *Source) deliverChanges() {
+func (s *Source) deliverChanges() { s.reportChanges(false) }
+
+// reportChanges is deliverChanges. handedOn reports that it runs on a
+// goroutine the source started, not on the goroutine of a source call.
+//
+// On a caller's goroutine a panic of the hook goes on up to that caller, and
+// the changes still queued are handed on to a new goroutine. On a handed-on
+// goroutine no caller could recover a panic, and an unrecovered one would
+// end the program, so a change whose hook panics there is dropped and the
+// rest are reported.
+func (s *Source) reportChanges(handedOn bool) {
 	s.mu.Lock()
 	if s.delivering {
 		s.mu.Unlock()
@@ -279,16 +294,16 @@ func (s *Source) deliverChanges() {
 			s.mu.Unlock()
 			return
 		}
-		// Unlocked here only when the hook panicked. The panic goes on up
-		// this goroutine; the changes still queued are reported from a new
-		// one, which ends once the queue is empty or finds another goroutine
-		// reporting.
+		// Unlocked here only when the hook panicked on a caller's
+		// goroutine. The panic goes on up to that caller; the changes still
+		// queued are reported from a new goroutine, which ends once the
+		// queue is empty or finds another goroutine reporting.
 		s.mu.Lock()
 		s.delivering = false
 		rest := len(s.changes) > 0
 		s.mu.Unlock()
 		if rest {
-			go s.deliverChanges()
+			go s.reportChanges(true)
 		}
 	}()
 	for len(s.changes) > 0 {
@@ -297,10 +312,21 @@ func (s *Source) deliverChanges() {
 		s.changes = s.changes[1:]
 		s.mu.Unlock()
 		locked = false
-		report()
+		if handedOn {
+			reportRecovering(report)
+		} else {
+			report()
+		}
 		s.mu.Lock()
 		locked = true
 	}
+}
+
+// reportRecovering runs report and drops a panic from it. It is for a
+// goroutine the source started, where nobody could recover the panic.
+func reportRecovering(report func()) {
+	defer func() { _ = recover() }()
+	report()
 }
 
 // setTokensLocked replaces the held tokens. New tokens are not the ones a

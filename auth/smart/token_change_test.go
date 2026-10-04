@@ -3,6 +3,7 @@ package smart_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -649,4 +650,86 @@ func TestTokenChangeResponseIsTheHooksOwn(t *testing.T) { // REQ-063
 		t.Fatalf("Token() error = %v", err)
 	}
 	checkRaw("refresh")
+}
+
+// TestTokenChangeHandedOnRecoversItsPanics pins REQ-063: the changes handed
+// on to a new goroutine after the hook panicked on a caller's goroutine are
+// all reported. There no caller could recover a panic, so a hook that
+// panics on that goroutine does not end the program: the source drops that
+// change and goes on with the rest.
+func TestTokenChangeHandedOnRecoversItsPanics(t *testing.T) { // REQ-063
+	as := newStubServer(t)
+	attempts := make(chan string, 8)
+	release := make(chan struct{})
+	src := as.source(t, as.endpoints(), smart.WithTokenChange(func(_ context.Context, c smart.TokenChange) {
+		attempts <- c.Access.Value
+		if c.Access.Value == "at-1" {
+			<-release
+		}
+		panic("hook failed on " + c.Access.Value)
+	}))
+	exchange := func(code, access string) error {
+		as.answerToken(0, tokenBody(t, access, "", ""))
+		req, err := src.BeginAuthorization("")
+		if err != nil {
+			return err
+		}
+		_, _, err = src.ExchangeAuthorizationCode(t.Context(), code, req.State, req)
+		return err
+	}
+	next := func(want string) {
+		t.Helper()
+		select {
+		case got := <-attempts:
+			if got != want {
+				t.Fatalf("hook called for %q, want %q", got, want)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatalf("hook not called for %q", want)
+		}
+	}
+
+	panicked := make(chan any, 1)
+	go func() {
+		defer func() { panicked <- recover() }()
+		_ = exchange("code-1", "at-1")
+	}()
+	next("at-1")
+	// Two more changes wait behind the blocked hook.
+	withinDeadline(t, "two code exchanges while the hook runs", func() {
+		for i, access := range []string{"at-2", "at-3"} {
+			if err := exchange(fmt.Sprintf("code-%d", i+2), access); err != nil {
+				t.Errorf("ExchangeAuthorizationCode(%s) error = %v", access, err)
+			}
+		}
+	})
+	close(release)
+	if r := <-panicked; r == nil {
+		t.Fatal("the first ExchangeAuthorizationCode returned, want the hook's panic")
+	}
+	next("at-2") // handed on; the hook panics here too
+	next("at-3") // still reported after that panic
+}
+
+// TestTokenChangeAfterCodeExchangeWithoutRefreshToken pins REQ-063 and
+// REQ-064: a code exchange whose response carries no refresh token reports
+// an empty refresh token, even when the source held one before, since a new
+// session never keeps an earlier session's refresh token.
+func TestTokenChangeAfterCodeExchangeWithoutRefreshToken(t *testing.T) { // REQ-063 REQ-064
+	as := newStubServer(t)
+	var log changeLog
+	src := as.source(t, as.endpoints(), smart.WithTokenChange(log.record))
+	src.SetTokens(freshAccess("at-0"), "rt-earlier")
+	as.answerToken(0, tokenBody(t, "at-1", "", ""))
+	req, err := src.BeginAuthorization("")
+	if err != nil {
+		t.Fatalf("BeginAuthorization: %v", err)
+	}
+	if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req); err != nil {
+		t.Fatalf("ExchangeAuthorizationCode() error = %v", err)
+	}
+	changes := log.all()
+	if len(changes) != 1 || changes[0].Access.Value != "at-1" || changes[0].RefreshToken != "" {
+		t.Errorf("token changes = %+v, want one with at-1 and an empty refresh token", changes)
+	}
 }
