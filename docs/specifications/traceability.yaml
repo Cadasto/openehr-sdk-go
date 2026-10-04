@@ -457,6 +457,7 @@ requirements:
       - testkit/probes/serialize/probe_031_typereg_unknown_type.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
       - testkit/probes/serialize/probe_038_guard_internal_test.go
+      - testkit/probes/serialize/probe_105_cross_format_parity.go
       - testkit/probes/serialize/probes_test.go
       - testkit/wireequiv/wireequiv_test.go
 
@@ -499,6 +500,7 @@ requirements:
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
       - testkit/probes/serialize/probe_086_upstream_flat_parity.go
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
+      - testkit/probes/serialize/probe_105_cross_format_parity.go
 
   - id: REQ-054
     title: Optimistic concurrency
@@ -563,6 +565,7 @@ requirements:
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
       - testkit/probes/serialize/probe_033_canxml_round_trip_test.go
       - testkit/probes/serialize/probe_034_typereg_xsi_unknown.go
+      - testkit/probes/serialize/probe_105_cross_format_parity.go
 
   - id: REQ-057
     title: Stored AQL queries
@@ -787,12 +790,20 @@ requirements:
       - testkit/probes
       - testkit/corpus/flat-conformance
       - testkit/conformance/webtemplate
-    probes: [PROBE-086, PROBE-089]
+      - testkit/corpus/crossformat
+      - testkit/conformance/crossformat
+    probes: [PROBE-086, PROBE-089, PROBE-105]
     tests:
+      - testkit/conformance/crossformat/census_test.go
+      - testkit/conformance/crossformat/harness_internal_test.go
+      - testkit/conformance/crossformat/recorded_test.go
+      - testkit/conformance/webtemplate/decode_reducing_test.go
       - testkit/conformance/webtemplate/runner_test.go
+      - testkit/fixtures/crossformat_test.go
       - testkit/probe/livecomposition_test.go
       - testkit/probes/serialize/probe_086_upstream_flat_parity.go
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
+      - testkit/probes/serialize/probe_105_cross_format_parity.go
       - testkit/probes/serialize/probes_test.go
 
   - id: REQ-081

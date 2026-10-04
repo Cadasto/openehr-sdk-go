@@ -20,6 +20,10 @@ corpus/
     MANIFEST.txt                      #   commit pin + per-file sha256
     templates/{name}.opt
     compositions/{name}.json          #   upstream-authored FLAT bodies
+  crossformat/                        # pinned upstream cross-format sets (PROBE-105)
+    MANIFEST.txt                      #   commit pins, per-file sha256, OPT pointers
+    {set}/template.opt                #   absent when the OPT is vendored elsewhere
+    {set}/canonical.json | canonical.xml | flat.json | structured.json
   aql/lint/{name}.aql                 # hand-written AQL lint inputs
   aql/conformance/                    # pinned upstream AQL FROM corpus (PROBE-100)
     AQL_SOURCE.txt                    #   commit pin (authoritative — byte copies)
@@ -45,11 +49,37 @@ CSVs are byte copies of the upstream files, so its pin
 content. Refresh with [`scripts/ingest-robot-aql.sh`](../../scripts/ingest-robot-aql.sh),
 which also regenerates `EXCLUDED.txt`.
 
-Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`, `WebTemplateOpt`, `WebTemplateReference`).
+`crossformat/` is a third pinned subtree; do not hand-edit it either. See
+[Cross-format sets](#cross-format-sets) below.
+
+Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`, `WebTemplateOpt`, `WebTemplateReference`, `ListCrossFormatSets`).
 
 Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
 **Probe vs on-disk.** Every vendored `*.json` under `compositions/` is in [`ListCompositionJSON`](../fixtures/discover.go) and PROBE-030. A file whose content carries a genuine RM-floor finding is held out of the `validation.ValidateRM` leg only (see Conventions). Vendored `*.xml` may be omitted from [`ListRMXML`](../fixtures/discover.go) via `compositionXMLExcluded` when canxml cannot round-trip it yet; the file stays for template and instance work.
+
+## Cross-format sets
+
+Each directory under [`crossformat/`](crossformat/) is one upstream composition given in two or more of canonical JSON, canonical XML, FLAT and STRUCTURED, with the OPT of its template. They are the input to PROBE-105. Both upstreams are Apache-2.0 (see [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)).
+
+| Set | Template id | Formats | Source | Pin |
+|---|---|---|---|---|
+| `alternative_events` | `AlternativeEvents` | JSON, FLAT | openEHR_SDK | `8a5dae6f` |
+| `consult_record` | `EHRN-ABDM-OPConsultRecord.v2.0` | JSON, XML, FLAT, STRUCTURED | integration-tests | `fcb3ac4b` |
+| `corona` | `Corona_Anamnese` | JSON, FLAT, STRUCTURED | openEHR_SDK | `8a5dae6f` |
+| `ehrn_abdm` | `EHRN-ABDM-OPConsultRecord.v2.0` | JSON, FLAT | openEHR_SDK | `8a5dae6f` |
+| `family_history` | `family_history` | JSON, XML | integration-tests | `fcb3ac4b` |
+| `multi_list` | `Multi_list` | FLAT, STRUCTURED | openEHR_SDK | `8a5dae6f` |
+| `multi_occurrence` | `ehrbase_multi_occurrence.de.v1` | JSON, FLAT | openEHR_SDK | `8a5dae6f` |
+| `nested` | `nested.en.v1` | XML, FLAT | integration-tests | `fcb3ac4b` |
+| `persistent_minimal` | `persistent_minimal.en.v1` | XML, FLAT | integration-tests | `fcb3ac4b` |
+| `test_all_types` | `test_all_types.en.v1` | JSON, FLAT | openEHR_SDK | `8a5dae6f` |
+
+JSON and XML here are the canonical formats. Inside a set the files have fixed names: `template.opt`, `canonical.json`, `canonical.xml`, `flat.json` and `structured.json`. Three sets have no `template.opt`, because their OPT is already vendored in this tree byte for byte. `corona` uses `webtemplate/Corona_Anamnese.opt`, `nested` uses `templates/nested.en.v1.opt` and `persistent_minimal` uses `templates/persistent_minimal.en.v1.opt`; the manifest records each pointer and its `sha256`. `consult_record` and `ehrn_abdm` share a template id but not an OPT: the two upstreams carry different copies of it, and each set keeps its own.
+
+Only files that describe the same instance form a set. The Robot canonical JSON for `nested` and `persistent_minimal`, and the Robot FLAT and STRUCTURED for `family_history`, are other instances of those templates, so they are not vendored.
+
+[`crossformat/MANIFEST.txt`](crossformat/MANIFEST.txt) records both pins, and for every file its source, upstream path and `sha256`. To refresh, check out the pinned commits in local clones of both upstreams, point `CROSSFORMAT_SDK_CLONE` and `CROSSFORMAT_ROBOT_CLONE` at them, and run `bash scripts/ingest-crossformat.sh ingest`. It refuses a clone that is not at its pin. `bash scripts/ingest-crossformat.sh verify` checks the vendored bytes offline. The tests in [`crossformat_test.go`](../fixtures/crossformat_test.go) check the same integrity under `make ci`. Resolve the sets with [`fixtures.ListCrossFormatSets`](../fixtures/crossformat.go).
 
 ## Index by vendor
 
@@ -59,6 +89,8 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 |---|---|:---:|:---:|
 | `vital_signs` | yes | yes | — |
 | `clinical_notes.v0` | yes | yes | — |
+
+`clinical_notes.v0` was made by Medblocks together with CODE24; its OPT names its Medblocks author, and it is credited under CODE24 here.
 
 ### CODE24 (Cadasto)
 

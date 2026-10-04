@@ -178,6 +178,12 @@ flat-conformance-check: ## Verify the vendored FLAT conformance corpus matches M
 flat-conformance-verify: ## Offline sha256 integrity of the vendored FLAT corpus (no network, no curl/jq) — run by `make ci`
 	@./scripts/sync-flat-conformance.sh verify
 
+crossformat-ingest: ## Vendor the upstream cross-format sets into testkit/corpus/crossformat/ from the pinned local EHRbase clones (PROBE-105)
+	@./scripts/ingest-crossformat.sh ingest
+
+crossformat-verify: ## Offline sha256 integrity of the vendored cross-format sets (the same check runs in `make test`)
+	@./scripts/ingest-crossformat.sh verify
+
 terminology-sync: ## Vendor the openEHR Terminology (openehr_terminology.xml) into resources/terminology/ and regenerate the accessor (needs network; TERMINOLOGY_REF to pin)
 	@./scripts/sync-terminology.sh sync
 

@@ -16,6 +16,8 @@
 //	  compositions/{name}.json
 //	aql/conformance/              # pinned upstream AQL FROM corpus (AQL_SOURCE.txt)
 //	  {family}/{name}.csv
+//	crossformat/{set}/            # pinned upstream cross-format sets (MANIFEST.txt)
+//	  template.opt | canonical.json | canonical.xml | flat.json | structured.json
 //
 // Vendor provenance is indexed in testkit/corpus/README.md (not in paths).
 package fixtures

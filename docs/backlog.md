@@ -78,9 +78,21 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - openehr/instance/locatable.go · a generated COMPOSITION carries a bare UUID uid (stampsUID); reported as refused by EHRbase 2.36.0 on commit while the same body without a uid commits (not re-run here) · from: pr199
 
 ## openehr/rm
+- openehr/rm/foundation_types_interval_gen.go · LowerIncluded and UpperIncluded are plain bools, so a canonical document that omits the RM-mandatory flag decodes it as false (excluded), the opposite of EHRbase's reading, and FLAT encode then writes `false` (PROBE-105 test_all_types canonical-flat) · from: pr-crossformat
+- openehr/rm/data_types_encapsulated_xmlmar_gen.go · canonical XML writes and reads the Array<Octet> attributes (DV_MULTIMEDIA.data, integrity_check) as one element per byte, where ITS-XML DataTypes.xsd types them xs:base64Binary, so an openEHR XML multimedia payload does not decode (PROBE-105 consult_record); the generator in internal/bmmgen owns the fix · from: pr-crossformat
+- openehr/rm/temporal_iso_test.go · REQ-123 accepts `2019-01-28T21:22:19,979+0000`, an extended date and time with a basic-format zone, a mixed representation; upstream openEHR_SDK replaced exactly that value in 66845f98 "CDR-541 fix mixed date formats", so whether REQ-123 should refuse mixed forms is open · from: pr208
 - openehr/rm/temporal_funcs.go · DVTime.ToTime and DVDateTime.ToTime pass the valid leap second 23:59:60 to time.Date as second 60, so it converts to the next minute's instant with a nil error · from: pr199
 
+## openehr/serialize/simplified
+- openehr/serialize/simplified/flat_decode.go · decode aliases only `<root>/language|code` and `territory|code`; the indexed spellings StructuredToFlat writes (`<root>/language:0|code`) are neither applied nor refused but overwritten by the ctx values, a silent drop (PROBE-105 structured-flat) · from: pr-crossformat
+- openehr/serialize/simplified/flat_decode.go · DV_PROPORTION `|type` (and numerator, denominator) reach canjson unchecked, so EHRbase's `1.0` fails as a canjson error naming no FLAT key, where deviations.md promises a refusal naming the key (PROBE-105 test_all_types flat-canonical) · from: pr-crossformat
+- openehr/serialize/simplified/flat_decode.go · the WithTemplate completion of RM-mandatory attributes skips ACTIVITY.action_archetype_id, so a FLAT that omits it decodes to an empty string that breaks Action_archetype_id_valid although the OPT constrains it (PROBE-105 nested) · from: pr-crossformat
+- openehr/serialize/simplified · EHRbase writes a renamed composition as `<root>/_name`; encode drops it and decode refuses it, while deviations.md says the formats carry no names (PROBE-105 consult_record, ehrn_abdm) · from: pr-crossformat
+- openehr/serialize/simplified · FLAT and STRUCTURED decode refuse the body-form composer keys `<root>/composer|name`, `|id`, `|id_scheme` and `|id_namespace` as an unsupported PARTY_PROXY datatype, and most EHRbase-produced FLAT carries them (PROBE-105 census) · from: pr-crossformat
+
 ## openehr/template
+- openehr/template/webtemplate/build.go · ACTION gets no in-context `time` or `ism_transition` node, so FLAT encode drops ACTION.time and any transition without a careflow_step (PROBE-105 test_all_types canonical-flat) · from: pr-crossformat
+- openehr/template/webtemplate · INTERVAL_EVENT `math_function` and `width` are not Web Template nodes, so FLAT neither emits nor decodes them (PROBE-105 alternative_events) · from: pr-crossformat
 - openehr/template/parse_primitives.go · buildBoolean reads an empty true_valid or false_valid element as false even under ParseOPTStrict, so two empty elements yield the forbidden false/false C_BOOLEAN without an error (no vendored OPT has one) · from: audit-2026-09
 - openehr/template/webtemplate · the Web Template builder keeps only the first value alternative of the corpus CLUSTER's labresult ELEMENT and projects one collapsed DV_TEXT leaf, so the reference's labresult/text_value key in ehrbase_conformance_cluster.json is refused on decode (PROBE-086 census) · from: audit-2026-09
 - openehr/template/webtemplate · the Web Template builder spells an archetyped ACTION transition as the nodes transition and transition2 where the reference emits one in-context ism_transition, so 10 of the action body's 14 excluded keys are still refused on decode (PROBE-086 census) · from: audit-2026-09
@@ -95,6 +107,9 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - openehr/validation/constraint_fixtures_test.go · the skip-listed fixtures Test_dv_parsable_open_constraint.v0 and clinical_content_validation are excluded from the no-violation test, but no test pins their violations, unlike the multimedia, boolean and count fixtures · from: audit-2026-09
 - openehr/validation/rmfloor_temporal_element_test.go · no test pins that the Value_valid and Inv_null_flavour_indicated details stay value-free (REQ-093), or sends a JSON-null temporal value through the floor · from: pr199
 - openehr/validation/rmread · rmread does not read the optional String fields magnitude_status on DV_COUNT, DV_PROPORTION and the temporal types, units_display_name and units_system on DV_QUANTITY, PARTY_IDENTIFIED.name or ATTESTATION.proof; the generator writes none of them, so no template can constrain them yet · from: pr199
+
+## testkit/conformance/webtemplate
+- testkit/conformance/webtemplate/case.go · IsCompositionMeta matches only unindexed spellings, so StructuredToFlat's `language:0|code`, `composer:0|name` and `context:0/start_time:0` reach decode in PROBE-105's structured-flat leg instead of being held out; changing it moves PROBE-086 · from: pr-crossformat
 
 ## testkit/probe
 - testkit/probe/livestatus_test.go · the Live snapshots assert less than the cassette witnesses: createEHRProbe (live_test.go) passes on any non-empty EHR id without comparing it to the per-run id, and the PROBE-065 read-back checks only a non-empty archetype_node_id, not the saved node id or template id · from: pr201
