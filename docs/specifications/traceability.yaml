@@ -189,6 +189,7 @@ requirements:
       - testkit/probe/run_test.go
       - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probes_test.go
+      - transport/challenge_test.go
       - transport/client_test.go
       - transport/decode_error_test.go
       - transport/nilwiredereference_internal_test.go
@@ -672,6 +673,7 @@ requirements:
       - testkit/probes/auth/probes_test.go
       - transport/client_test.go
       - transport/reauth_backend_test.go
+      - transport/reauth_challenge_test.go
 
   - id: REQ-064
     title: Launch context
@@ -927,6 +929,7 @@ requirements:
       - transport/client_test.go
       - transport/decode_error_test.go
       - transport/errors_test.go
+      - transport/reauth_challenge_test.go
 
   - id: REQ-094
     title: "`Prefer` negotiation"
@@ -1809,3 +1812,6 @@ requirements:
     status: draft
     implementation: planned
     packages: [transport]
+    tests:
+      - transport/challenge_test.go
+      - transport/reauth_challenge_test.go
