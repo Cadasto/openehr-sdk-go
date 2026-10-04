@@ -119,7 +119,9 @@ func TestREQ165_TokenWritesValidScopes(t *testing.T) {
 // TestREQ165_TokenRefusesInvalidParts pins every refusal rule of Token: each
 // row breaks one rule, and the error must match ErrInvalidScope, name the
 // broken rule, and come with no token. Deleting any one check lets its rows
-// through or changes the rule they report (REQ-165).
+// through or changes the rule they report. The padded rows pin that Token
+// refuses surrounding white space instead of trimming it, because the SDK
+// must not rewrite a part (REQ-165).
 func TestREQ165_TokenRefusesInvalidParts(t *testing.T) {
 	t.Parallel()
 	const (
@@ -146,8 +148,12 @@ func TestREQ165_TokenRefusesInvalidParts(t *testing.T) {
 		{"FHIR resource", withPart(func(s *auth.OpenEHRScope) { s.Resource = "Observation" }), resource},
 		{"ehr resource", withPart(func(s *auth.OpenEHRScope) { s.Resource = "ehr" }), resource},
 		{"resource carrying a dash", withPart(func(s *auth.OpenEHRScope) { s.Resource = "template-x" }), resource},
+		{"resource with a leading space", withPart(func(s *auth.OpenEHRScope) { s.Resource = " composition" }), resource},
+		{"resource with a trailing space", withPart(func(s *auth.OpenEHRScope) { s.Resource = "composition " }), resource},
 		{"empty pattern", withPart(func(s *auth.OpenEHRScope) { s.Pattern = "" }), emptyPat},
 		{"space 0x20", withPart(func(s *auth.OpenEHRScope) { s.Pattern = "Vital signs" }), badPat},
+		{"pattern with a leading space", withPart(func(s *auth.OpenEHRScope) { s.Pattern = " x" }), badPat},
+		{"pattern with a trailing space", withPart(func(s *auth.OpenEHRScope) { s.Pattern = "x " }), badPat},
 		{"double quote 0x22", withPart(func(s *auth.OpenEHRScope) { s.Pattern = `a"b` }), badPat},
 		{"backslash 0x5C", withPart(func(s *auth.OpenEHRScope) { s.Pattern = `a\b` }), badPat},
 		{"delete 0x7F", withPart(func(s *auth.OpenEHRScope) { s.Pattern = "a\x7f" }), badPat},
@@ -159,6 +165,8 @@ func TestREQ165_TokenRefusesInvalidParts(t *testing.T) {
 		{"capital letter", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "R" }), outside},
 		{"wildcard permission", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "*" }), outside},
 		{"SMART v1 word", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "read" }), outside},
+		{"permissions with a leading space", withPart(func(s *auth.OpenEHRScope) { s.Permissions = " rs" }), outside},
+		{"permissions with a trailing space", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "rs " }), outside},
 		{"repeated letter", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "rr" }), repeat},
 		{"out of order", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "sr" }), order},
 		{"swapped neighbours c and r", withPart(func(s *auth.OpenEHRScope) { s.Permissions = "rc" }), order},
@@ -262,6 +270,8 @@ var notOpenEHRScopes = []string{
 	"patient/composition-x.r ",
 	"patient/composition-x.r\n",
 	"patient/composition-a b.r",
+	"patient/composition- x.r",
+	"patient/composition-x .r",
 	"patient/composition-x.rs openid",
 	`patient/composition-"x".r`,
 	`patient/composition-a\b.r`,
