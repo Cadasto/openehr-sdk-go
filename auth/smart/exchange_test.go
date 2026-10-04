@@ -28,6 +28,11 @@ func TestParseTokenResponse(t *testing.T) {
 	if tr.Raw["patient"] != "p1" {
 		t.Fatalf("raw = %#v", tr.Raw)
 	}
+	// REQ-064: a token-body fhirUser sets no identity, yet Raw still
+	// carries it beside the FHIRUser field.
+	if tr.Raw["fhirUser"] != "Practitioner/x" {
+		t.Errorf("Raw[fhirUser] = %#v, want %q", tr.Raw["fhirUser"], "Practitioner/x")
+	}
 }
 
 // TestParseTokenResponseOpenEHRClaims asserts that the openEHR-native EHR and
