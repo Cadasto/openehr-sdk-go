@@ -76,6 +76,22 @@ type Config struct {
 	// client_secret_post (credentials in the form body). Resolved by
 	// configureClientAuth from the server's advertised methods (REQ-068).
 	secretAuthMethod string
+	// tokenChange is the hook set by WithTokenChange; nil means none.
+	tokenChange func(context.Context, TokenChange)
+}
+
+// TokenChange is what the source reports to the [WithTokenChange] hook when
+// its tokens change. [Source.Revoke] reports the zero TokenChange.
+type TokenChange struct {
+	// Access is the access token the source now holds.
+	Access auth.Token
+	// RefreshToken is the refresh token the source now holds: the
+	// response's, or after a refresh whose response carried none, the one
+	// the source held before. Empty when the source holds none.
+	RefreshToken string
+	// Response is the token response as [Source.LastTokenResponse] returns
+	// it, so a refresh response's left-out launch context is filled in.
+	Response TokenResponse
 }
 
 // Option mutates Config during construction.
@@ -159,6 +175,40 @@ func WithRefreshThreshold(d time.Duration) Option {
 	return func(cfg *Config) { cfg.RefreshThreshold = d }
 }
 
+// WithTokenChange sets fn as the hook the source calls each time it holds
+// new tokens: after every successful code exchange
+// ([Source.ExchangeAuthorizationCode], and so
+// [Source.CompleteAuthorization]) and every successful refresh. The
+// [TokenChange] carries the new access token, the refresh token the source
+// now holds and the token response. [Source.Revoke] calls fn once with the
+// zero TokenChange after it clears the tokens. fn is not called for a
+// failed exchange or refresh, for a refresh whose result the source
+// discarded because a code exchange or [Source.SetTokens] replaced the
+// session meanwhile, or by SetTokens, whose tokens the application already
+// has. A nil fn sets no hook.
+//
+// An application that keeps a session across restarts stores the refresh
+// token from here. RFC 6749 §6 has the client discard its old refresh token
+// when the server issues a new one, and RFC 9700 §4.14 makes rotating it
+// one of the two ways a public client's refresh token is protected.
+//
+// The source calls fn without holding its lock, so fn may call the
+// source's methods. ctx is the context of the call that changed the tokens,
+// which may have ended by the time fn runs; a hook that must finish a write
+// regardless can use [context.WithoutCancel].
+//
+// fn sees the changes one at a time, in the order the source installed
+// them. Callers waiting on the same refresh as the one that made it get the
+// new token without waiting for fn, and that refresh is reported once.
+// When the tokens change again while fn is running, from another goroutine
+// or from fn itself through the source, the change is reported after fn
+// returns, by the goroutine already running fn; the call that made the
+// change returns without waiting for that. So fn must not block for long:
+// later changes wait for it.
+func WithTokenChange(fn func(ctx context.Context, change TokenChange)) Option {
+	return func(cfg *Config) { cfg.tokenChange = fn }
+}
+
 // Source implements auth.TokenSource for SMART authorization-code + PKCE.
 type Source struct {
 	cfg Config
@@ -179,6 +229,57 @@ type Source struct {
 	// when it has changed by the time the refresh ends. A refresh does not
 	// advance it.
 	session uint64
+	// changes holds the token changes installed but not yet reported to
+	// the token-change hook, oldest first; delivering reports that a
+	// goroutine is reporting them. See deliverChanges.
+	changes    []func()
+	delivering bool
+}
+
+// queueChangeLocked records change for the token-change hook, with the
+// context of the call that made it. The caller holds s.mu, has installed the
+// change under it, and calls deliverChanges once it has released s.mu.
+func (s *Source) queueChangeLocked(ctx context.Context, change TokenChange) {
+	hook := s.cfg.tokenChange
+	if hook == nil {
+		return
+	}
+	s.changes = append(s.changes, func() { hook(ctx, change) })
+}
+
+// deliverChanges reports the queued token changes to the hook, oldest
+// first, without holding s.mu. When another goroutine is already reporting
+// them, it returns at once and leaves its changes to that goroutine. So the
+// hook never runs in two goroutines at once and sees the changes in the
+// order they were installed, including a change the hook itself causes
+// through the source, which it sees after it returns.
+func (s *Source) deliverChanges() {
+	s.mu.Lock()
+	if s.delivering {
+		s.mu.Unlock()
+		return
+	}
+	s.delivering = true
+	locked := true
+	defer func() {
+		// Unlocked here only when the hook panicked: the changes still
+		// queued go to the goroutine that installs the next one.
+		if !locked {
+			s.mu.Lock()
+		}
+		s.delivering = false
+		s.mu.Unlock()
+	}()
+	for len(s.changes) > 0 {
+		report := s.changes[0]
+		s.changes[0] = nil
+		s.changes = s.changes[1:]
+		s.mu.Unlock()
+		locked = false
+		report()
+		s.mu.Lock()
+		locked = true
+	}
 }
 
 // setTokensLocked replaces the held tokens. New tokens are not the ones a
@@ -585,7 +686,9 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 	// A new authorization starts a new session: without an ID token there
 	// is nothing to bind a refresh to.
 	s.idBinding = bindingOf(tr.IDTokenClaims)
+	s.queueChangeLocked(ctx, TokenChange{Access: tok, RefreshToken: refresh, Response: tr})
 	s.mu.Unlock()
+	s.deliverChanges()
 	return tok, tr, nil
 }
 
@@ -628,6 +731,9 @@ func (s *Source) LastTokenResponse() TokenResponse {
 // ID token the source verified, and [Source.LastTokenResponse]. A later
 // refresh whose ID token names another user is then refused, so import
 // tokens for a different user into a new Source.
+//
+// SetTokens does not call the [WithTokenChange] hook: the application
+// already has the tokens it passes.
 func (s *Source) SetTokens(access auth.Token, refresh string) {
 	s.mu.Lock()
 	s.session++
@@ -738,6 +844,7 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 		if refreshedTR.IDTokenClaims != nil {
 			s.idBinding = bindingOf(refreshedTR.IDTokenClaims)
 		}
+		s.queueChangeLocked(ctx, TokenChange{Access: tok, RefreshToken: refreshTok, Response: s.lastTR})
 	} else {
 		// F-L: on a terminal failure clear the refresh token and the cached
 		// access token so that subsequent Token() calls deterministically
@@ -755,6 +862,9 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 	ex.token = tok
 	ex.err = err
 	close(ex.done)
+	// The waiters have their token; the change is reported after them, in
+	// the order it was installed whatever the hook does meanwhile.
+	s.deliverChanges()
 	return tok, false, err
 }
 
