@@ -12,7 +12,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/iotest"
 	"testing/synctest"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/smart"
@@ -403,6 +405,122 @@ func TestRevokeTransportFailure(t *testing.T) { // REQ-167
 		}
 		f.checkSignedOut(t)
 	})
+	t.Run("client assertion cannot be signed", func(t *testing.T) {
+		f := newRevokeFixture(t, nil, smart.WithClientAssertionKey(newRSAKey(t), "RS384", "kid-1"))
+		f.signIn(t, freshAccess("at-1"), "rt-1")
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel() // the assertion is refused before any request is built
+		err := revokeWithin(t, ctx, f.src)
+		checkRevocationError(t, err, 0, "")
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("Revoke(ended context) error = %v, want it to match context.Canceled", err)
+		}
+		f.mu.Lock()
+		sent := len(f.atPost)
+		f.mu.Unlock()
+		if sent != 0 {
+			t.Errorf("revocation requests on their way = %d, want none: the request cannot be built", sent)
+		}
+		f.checkSignedOut(t)
+	})
+	t.Run("answer whose body cannot be read", func(t *testing.T) {
+		errBody := errors.New("connection reset while reading the body")
+		var f *revokeFixture
+		f = newRevokeFixture(t, nil, smart.WithHTTPClient(&http.Client{Transport: brokenBodyTransport{
+			next: observingTransport{next: http.DefaultTransport, observe: func() { f.observe() }},
+			err:  errBody,
+		}}))
+		f.signIn(t, freshAccess("at-1"), "rt-1")
+		err := revokeWithin(t, t.Context(), f.src)
+		checkRevocationError(t, err, http.StatusServiceUnavailable, "")
+		if !errors.Is(err, errBody) {
+			t.Errorf("Revoke() error = %v, want it to keep the body read error", err)
+		}
+		f.checkSignedOut(t)
+	})
+}
+
+// brokenBodyTransport answers the revocation endpoint with 503 and a body
+// whose read fails with err, after passing the request through next; it
+// passes every other request on to next.
+type brokenBodyTransport struct {
+	next http.RoundTripper
+	err  error
+}
+
+func (b brokenBodyTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := b.next.RoundTrip(r)
+	if err != nil || r.URL.Path != "/revoke" {
+		return resp, err
+	}
+	_ = resp.Body.Close()
+	return &http.Response{
+		StatusCode: http.StatusServiceUnavailable,
+		Header:     http.Header{"Content-Type": {"application/json"}},
+		Body:       io.NopCloser(iotest.ErrReader(b.err)),
+		Request:    r,
+	}, nil
+}
+
+// TestRevokeSendsBeforeTheHookRuns pins REQ-063 and REQ-167: Revoke reports
+// its token change only after the revocation request has been sent, so a
+// hook that blocks or panics cannot stop the request.
+func TestRevokeSendsBeforeTheHookRuns(t *testing.T) { // REQ-063 REQ-167
+	signedOut := func(c smart.TokenChange) bool { return reflect.DeepEqual(c, smart.TokenChange{}) }
+
+	t.Run("hook that blocks", func(t *testing.T) {
+		entered := make(chan struct{}, 1)
+		release := make(chan struct{})
+		f := newRevokeFixture(t, nil, smart.WithTokenChange(func(_ context.Context, c smart.TokenChange) {
+			if signedOut(c) {
+				entered <- struct{}{}
+				<-release
+			}
+		}))
+		f.signIn(t, freshAccess("at-1"), "rt-1")
+		done := make(chan error, 1)
+		go func() { done <- f.src.Revoke(t.Context()) }()
+		select {
+		case <-entered:
+		case <-time.After(10 * time.Second):
+			t.Fatal("Revoke did not call the token-change hook")
+		}
+		if n := len(f.as.revokeRequests()); n != 1 {
+			t.Errorf("revocation requests while the hook blocks = %d, want 1: the request goes out before the hook runs", n)
+		}
+		close(release)
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Errorf("Revoke() error = %v, want nil", err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("Revoke did not return after the hook was released")
+		}
+	})
+
+	t.Run("hook that panics", func(t *testing.T) {
+		f := newRevokeFixture(t, nil, smart.WithTokenChange(func(_ context.Context, c smart.TokenChange) {
+			if signedOut(c) {
+				panic("hook failed")
+			}
+		}))
+		f.signIn(t, freshAccess("at-1"), "rt-1")
+		var recovered any
+		withinDeadline(t, "Revoke", func() {
+			defer func() { recovered = recover() }()
+			_ = f.src.Revoke(t.Context())
+		})
+		if recovered == nil {
+			t.Error("Revoke returned, want the hook's panic to reach its caller")
+		}
+		if n := len(f.as.revokeRequests()); n != 1 {
+			t.Errorf("revocation requests = %d, want 1: a panicking hook does not stop the request", n)
+		}
+		if access, refresh := f.src.HeldTokens(); !access.IsZero() || refresh != "" {
+			t.Errorf("held tokens = %+v, %q; want none", access, refresh)
+		}
+	})
 }
 
 // TestRevokeWithoutEndpoint pins REQ-167: a source whose server advertises
@@ -568,27 +686,38 @@ func TestRevokeDiscardsARefreshInFlight(t *testing.T) { // REQ-167 REQ-063
 // of tokens imported afterwards may carry an ID token naming another user.
 // Without Revoke, the same refresh is refused.
 func TestRevokeEndsTheSessionIdentity(t *testing.T) { // REQ-167 REQ-064
-	for _, revoke := range []bool{true, false} {
-		name := "after Revoke"
-		if !revoke {
-			name = "control without Revoke"
-		}
-		t.Run(name, func(t *testing.T) {
+	tests := []struct {
+		name   string
+		revoke bool
+		// noToken makes the source hold no token when Revoke is called.
+		noToken bool
+		wantErr error
+	}{
+		{name: "after Revoke", revoke: true, wantErr: auth.ErrInvalidConfig},
+		{name: "after Revoke on a source holding no token", revoke: true, noToken: true},
+		{name: "control without Revoke"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			p := newOIDCProvider(t)
 			src := p.source(t, p.endpoints()) // no revocation endpoint
 			exchangeSession(t, p, src, "user-1")
-			if revoke {
-				if err := revokeWithin(t, t.Context(), src); !errors.Is(err, auth.ErrInvalidConfig) {
-					t.Fatalf("Revoke() without an endpoint error = %v, want auth.ErrInvalidConfig", err)
+			if tc.noToken {
+				src.SetTokens(auth.Token{}, "")
+			}
+			if tc.revoke {
+				err := revokeWithin(t, t.Context(), src)
+				if (tc.wantErr == nil && err != nil) || (tc.wantErr != nil && !errors.Is(err, tc.wantErr)) {
+					t.Fatalf("Revoke() error = %v, want %v", err, tc.wantErr)
 				}
 			}
 			src.SetTokens(staleAccess("at-9"), "rt-9")
 			p.setBody(tokenBody(t, "at-10", "rt-10", p.sign(t, refreshClaims("user-2"))))
 			tok, err := src.Token(t.Context())
 			switch {
-			case revoke && (err != nil || tok.Value != "at-10"):
+			case tc.revoke && (err != nil || tok.Value != "at-10"):
 				t.Errorf("Token() = %q, %v; want at-10: Revoke ended user-1's identity", tok.Value, err)
-			case !revoke && !errors.Is(err, auth.ErrJWKSValidationFailed):
+			case !tc.revoke && !errors.Is(err, auth.ErrJWKSValidationFailed):
 				t.Errorf("Token() = %q, %v; want the user-2 ID token refused while user-1's identity holds", tok.Value, err)
 			}
 		})

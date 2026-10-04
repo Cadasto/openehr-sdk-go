@@ -184,7 +184,9 @@ func WithRefreshThreshold(d time.Duration) Option {
 // [Source.CompleteAuthorization]) and every successful refresh. The
 // [TokenChange] carries the new access token, the refresh token the source
 // now holds and the token response. [Source.Revoke] calls fn once with the
-// zero TokenChange after it clears the tokens. fn is not called for a
+// zero TokenChange when it clears the tokens, after its revocation request
+// has been sent or has failed, and not at all on a source that holds no
+// token. fn is not called for a
 // failed exchange or refresh, for a refresh whose result the source
 // discarded because a code exchange, [Source.SetTokens] or Revoke replaced
 // the session meanwhile, or by SetTokens, whose tokens the application

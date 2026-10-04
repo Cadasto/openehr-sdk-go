@@ -24,8 +24,12 @@ import (
 // Revoke clears all of this before it sends the request, so the source is
 // signed out whatever the outcome. A refresh still running then has its
 // result discarded, and no refresh can start with the token being revoked.
-// The [WithTokenChange] hook is then called once with the zero
-// [TokenChange].
+// The [WithTokenChange] hook is called once with the zero [TokenChange],
+// after the request has been sent or has failed, so a hook that panics or
+// blocks cannot stop the request. Its place among the changes is the moment
+// the tokens were cleared: when another goroutine is already reporting
+// changes, that goroutine reports it in turn, which may be before the
+// request has ended.
 //
 // The request is a form POST to the server's revocation_endpoint carrying
 // the token and its token_type_hint, refresh_token or access_token (RFC 7009
@@ -43,10 +47,11 @@ import (
 // or a request that gets none, is an [*auth.ExchangeError] matching
 // [auth.ErrRevocationFailed], with the status code, the RFC 6749 §5.2 error
 // when the body holds one, and the cause. When the server advertises no
-// revocation endpoint, Revoke sends nothing: it clears the tokens and
-// returns an error matching [auth.ErrInvalidConfig]. A source that holds no
-// token drops its last token response and the identity too, and returns nil
-// without sending a request or calling the hook.
+// revocation endpoint, Revoke sends nothing: it clears the tokens, calls
+// the hook and returns an error matching [auth.ErrInvalidConfig]. A source
+// that holds no token drops its last token response and the identity too,
+// and returns nil without sending a request or calling the hook, whether or
+// not a revocation endpoint is advertised.
 func (s *Source) Revoke(ctx context.Context) error {
 	s.mu.Lock()
 	s.lastTR = TokenResponse{}
@@ -63,9 +68,12 @@ func (s *Source) Revoke(ctx context.Context) error {
 	// refresh that is running now does not install its tokens when it ends.
 	s.session++
 	s.setTokensLocked(auth.Token{}, "")
+	// The change is queued now, so it keeps its place among the changes
+	// installed before and after it, but reported only once the request has
+	// been sent or has failed: a hook that panics or blocks cannot stop it.
 	s.queueChangeLocked(ctx, TokenChange{})
 	s.mu.Unlock()
-	s.deliverChanges()
+	defer s.deliverChanges()
 
 	endpoint := s.cfg.Auth.RevocationEndpoint
 	if endpoint == nil {
