@@ -253,7 +253,7 @@ The resolver parses and surfaces the following SMART authorization-server metada
 | Wire field | `AuthEndpoints` field | Notes |
 |---|---|---|
 | `introspection_endpoint` | `IntrospectionEndpoint *url.URL` | RFC 7662 token introspection, a resource-server operation; surfaced only |
-| `revocation_endpoint` | `RevocationEndpoint *url.URL` | RFC 7009 token revocation |
+| `revocation_endpoint` | `RevocationEndpoint *url.URL` | RFC 7009 token revocation; `auth/smart.Source.Revoke` posts to it (REQ-167) |
 | `management_endpoint` | `ManagementEndpoint *url.URL` | SMART management endpoint |
 | `token_endpoint_auth_methods_supported` | `TokenEndpointAuthMethodsSupported []string` | Client-auth method list; feeds Phase 3b G-3 selection |
 | `token_endpoint_auth_signing_alg_values_supported` | `TokenEndpointAuthSigningAlgValuesSupported []string` | Client-assertion (client-auth) JWS alg list; checked by `auth/smart` and `auth/clientcreds.NewFromCatalog` (REQ-068) |
@@ -266,8 +266,9 @@ These fields are **consumed**, not merely surfaced:
 - `token_endpoint_auth_methods_supported` → `auth/smart.FromConfig` cross-checks it against the configured credential's implied method (G-3; a mismatch is rejected with `auth.ErrInvalidConfig`), and `auth/clientcreds.NewFromCatalog` against the configured client-auth method ([auth.md § Backend Services from a resolved catalog](auth.md#backend-services-from-a-resolved-catalog), REQ-068).
 - `authorization_response_iss_parameter_supported` → when true, `auth/smart.CompleteAuthorization` refuses a redirect without `iss` ([auth.md § REQ-061](auth.md#req-061--pkce-flow), RFC 9207 §2.4).
 - `token_endpoint_auth_signing_alg_values_supported` → `auth/smart.FromConfig` checks the configured client-assertion algorithm against it ([auth.md § REQ-068](auth.md#req-068--flow-and-launch-mode-coverage)), and `auth/clientcreds.NewFromCatalog` checks client assertions against it ([auth.md § Backend Services from a resolved catalog](auth.md#backend-services-from-a-resolved-catalog), REQ-068).
+- `revocation_endpoint` → `auth/smart.Source.Revoke` signs out there (RFC 7009; REQ-167).
 
-The rest remain **surface-only** (populated but with no consuming logic wired): `revocation_endpoint` / `management_endpoint` (no revocation/management client yet) and `introspection_endpoint` (introspection is a resource-server operation outside the SDK's client scope).
+The rest remain **surface-only** (populated but with no consuming logic wired): `management_endpoint` (no management client yet) and `introspection_endpoint` (introspection is a resource-server operation outside the SDK's client scope).
 
 The `smart/discovery` package also exports openEHR SMART capability string constants (`CapabilityContextOpenEHREHR`, `CapabilityContextOpenEHREpisode`, `CapabilityOpenEHRPermissionV1`, `CapabilityLaunchBase64JSON`) for consumers that need to branch on the `capabilities` array.
 

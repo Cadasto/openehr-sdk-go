@@ -1840,5 +1840,5 @@ requirements:
     title: Token revocation
     canonical: docs/specifications/auth.md#req-167--token-revocation
     status: draft
-    implementation: planned
+    implementation: partial
     packages: [auth/smart, auth]
