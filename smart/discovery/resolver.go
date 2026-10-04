@@ -165,6 +165,7 @@ func NewResolver(cache Cache, opts ...Option) (*Resolver, error) {
 	if cfg.logger == nil {
 		cfg.logger = slog.Default()
 	}
+	cfg.httpClient = refuseDowngrade(cfg.httpClient, cfg.allowInsecure)
 	if cache == nil {
 		cache = NewMemoryCache()
 	}
@@ -173,6 +174,46 @@ func NewResolver(cache Cache, opts ...Option) (*Resolver, error) {
 		cache:    cache,
 		inflight: map[string]*resolveCall{},
 	}, nil
+}
+
+// errInsecureRedirect marks a redirect the resolver refused because its
+// target is not an https URL.
+var errInsecureRedirect = errors.New("redirect to a non-https URL refused; use WithAllowInsecure for development")
+
+// refuseDowngrade returns the client the resolver fetches with. Unless
+// allowInsecure, it is a shallow copy of c whose redirect policy refuses a
+// redirect to a URL that is not https, and otherwise applies c's own
+// CheckRedirect, or net/http's default limit of 10 redirects when c has
+// none. c itself is never modified.
+func refuseDowngrade(c *http.Client, allowInsecure bool) *http.Client {
+	if allowInsecure {
+		return c
+	}
+	cp := *c
+	callerPolicy := c.CheckRedirect
+	cp.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if req.URL.Scheme != "https" {
+			return errInsecureRedirect
+		}
+		if callerPolicy != nil {
+			return callerPolicy(req, via)
+		}
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return nil
+	}
+	return &cp
+}
+
+// requestFailure classifies a request that returned no usable response: a
+// redirect refused for leaving https is ReasonInsecureURL, anything else
+// ReasonFetchFailed.
+func requestFailure(err error) DiscoveryErrorReason {
+	if errors.Is(err, errInsecureRedirect) {
+		return ReasonInsecureURL
+	}
+	return ReasonFetchFailed
 }
 
 // Resolve returns the catalog for the Platform at baseURL: the cached one
@@ -271,7 +312,7 @@ func (r *Resolver) fetch(ctx context.Context, baseURL, prevETag string) (*Servic
 
 	resp, err := r.cfg.httpClient.Do(req)
 	if err != nil {
-		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: err}
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: requestFailure(err), Inner: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -335,7 +376,7 @@ func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCat
 	req.Header.Set("Accept", "application/json")
 	resp, err := r.cfg.httpClient.Do(req)
 	if err != nil {
-		return fail(ReasonFetchFailed, err)
+		return fail(requestFailure(err), err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
