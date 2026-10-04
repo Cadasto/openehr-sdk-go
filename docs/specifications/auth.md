@@ -110,7 +110,7 @@ The SDK **MUST** cover every flow in this table, and the three launch modes belo
 | **Client Credentials** + `client_secret` | `auth/clientcreds` | Service-to-service callers of an authorization server that accepts a shared secret, outside the SMART asymmetric profile |
 | **JWT Bearer authorization grant** (RFC 7523 §2.1) | `auth/jwtbearer` | Systems holding an assertion issued by a trusted party; not a SMART flow |
 
-A confidential client uses PKCE **and** authenticates: HL7 SMART App Launch requires PKCE from every app, and PKCE does not replace client authentication. The openEHR SMART specification's Flow Recommendations present the two as alternatives; this SDK follows HL7 SMART.
+For a confidential client, `auth/smart` **MUST** send the PKCE `code_challenge` and `code_verifier` as well as its client authentication: HL7 SMART App Launch requires PKCE from every app, and PKCE does not replace client authentication. The openEHR SMART specification's Flow Recommendations present the two as alternatives; this SDK follows HL7 SMART.
 
 The openEHR SMART specification names a "JWT Bearer Token Grant" as the preferred flow for backend services. HL7 SMART App Launch Backend Services, which that specification builds on, uses the `client_credentials` grant with an RFC 7523 §2.2 client assertion, and that is the flow `auth/clientcreds` with `WithClientAssertion` implements. The RFC 7523 §2.1 authorization grant in `auth/jwtbearer` is a separate flow for deployments that issue authorization assertions; it is not SMART Backend Services.
 
@@ -202,7 +202,7 @@ The flow (standalone launch, summarised):
 
 1. **Discovery.** Fetch the SMART configuration document from the deployment's well-known URL (see [service-discovery.md](service-discovery.md)). Extract `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `registration_endpoint` (if dynamic registration is used), and `scopes_supported`.
 2. **PKCE pair.** Generate a `code_verifier` (cryptographically random, 43–128 chars per RFC 7636) and derive `code_challenge` = `S256(code_verifier)`.
-3. **Authorization request.** Redirect the user to `authorization_endpoint` with `response_type=code`, `client_id`, `redirect_uri`, `scope` (openEHR-formatted, e.g. `<compartment>/<resource>.<permission>`), `aud` (the openEHR REST base or an explicit audience identifier), `state`, `code_challenge`, `code_challenge_method=S256`, plus SMART-specific `launch` parameter if EHR-launch.
+3. **Authorization request.** Redirect the user to `authorization_endpoint` with `response_type=code`, `client_id`, `redirect_uri`, `scope` (for openEHR resources, the [REQ-165](#req-165--openehr-scope-syntax) shape `<compartment>/<resource>-<pattern>.<permissions>`, e.g. `patient/composition-*.rs`), `aud` (the openEHR REST base or an explicit audience identifier), `state`, `code_challenge`, `code_challenge_method=S256`, plus SMART-specific `launch` parameter if EHR-launch.
 4. **Authorization response.** Receive the `code` and `state` at the redirect URI. The SDK **MUST** verify the `state` matches the value sent in step 3.
 5. **Token exchange.** POST to `token_endpoint` with `grant_type=authorization_code`, `code`, `redirect_uri`, `client_id`, `code_verifier`. Receive `access_token`, `refresh_token` (if granted), `expires_in`, `scope`, plus SMART-specific `patient`, `encounter`, `id_token`, etc.
 6. **Launch context capture.** Surface the SMART launch parameters to the application via `smart/` (see § Launch context below).

@@ -66,9 +66,9 @@ func confidentialTokenEndpoint(t *testing.T) (*httptest.Server, func() (confiden
 	}
 }
 
-// TestREQ068_ConfidentialClientUsesPKCE pins REQ-068: "A confidential client
-// uses PKCE and authenticates: HL7 SMART App Launch requires PKCE from every
-// app, and PKCE does not replace client authentication." For a client secret
+// TestREQ068_ConfidentialClientUsesPKCE pins REQ-068: "For a confidential
+// client, auth/smart MUST send the PKCE code_challenge and code_verifier as
+// well as its client authentication." For a client secret
 // sent by HTTP Basic, a client secret sent in the form body, and a signed
 // client assertion, the authorization URL must carry the S256 code_challenge
 // and the token request must carry the matching code_verifier next to the

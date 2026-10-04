@@ -224,7 +224,7 @@ The catalog is the normative list. Each entry has:
 
 #### PROBE-005 — Scope round-trip
 
-- **Title:** Configured openEHR scope (`<compartment>/<resource>.<permission>`) survives token exchange and lands in the JWT scope claim or the response `scope` field.
+- **Title:** A configured scope string survives token exchange verbatim and lands in the JWT scope claim or the response `scope` field. The SDK passes scopes through whatever their syntax ([REQ-165](auth.md#req-165--openehr-scope-syntax)), so the probe's scope is not an openEHR resource scope.
 - **Preconditions:** Scope `patient/COMPOSITION.read` is requested.
 - **Wire assertion:** Authorization request `scope` parameter contains `patient/COMPOSITION.read`; token response `scope` field contains it (or the JWT `scope` claim does).
 - **Modes:** Sandbox, Cassette, Live.
@@ -269,7 +269,7 @@ The catalog is the normative list. Each entry has:
 
 #### Launch-mode coverage (REQ-068)
 
-The four SMART grant flows × three launch modes (REQ-068) are exercised as
+The three launch modes of REQ-068 are exercised as
 named coverage functions alongside the auth probes in
 [`testkit/probes/auth/launch_modes.go`](../../testkit/probes/auth/launch_modes.go)
 (run via `TestLaunchModeStandalone` / `TestLaunchModeEmbedded` /
