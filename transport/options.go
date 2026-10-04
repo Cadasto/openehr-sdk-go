@@ -107,7 +107,8 @@ func WithObserver(o Observer) Option {
 }
 
 // WithRawErrorBodies opts in to preserving server error payloads on
-// WireError (the OpenEHR envelope message and the raw response body).
+// WireError (the OpenEHR envelope message, the raw response body and the
+// Bearer challenge's ErrorDescription).
 // These may contain PHI; leave disabled (the default) whenever error
 // values can reach logs, traces, or observers. The openEHR error code
 // is always preserved regardless of this setting.

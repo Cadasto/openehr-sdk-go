@@ -22,7 +22,11 @@ type BearerChallenge struct {
 	// challenge names no error, which is what a server sends when the
 	// request carried no token at all.
 	Error string
-	// ErrorDescription is the server's human-readable explanation.
+	// ErrorDescription is the server's human-readable explanation. On a
+	// WireError it is set only when the client is built with
+	// WithRawErrorBodies(true), and empty otherwise: it is free text, so it
+	// may name a patient or quote a request value, like the message of the
+	// openEHR error envelope.
 	ErrorDescription string
 	// ErrorURI is the address of a web page about the error.
 	ErrorURI string
