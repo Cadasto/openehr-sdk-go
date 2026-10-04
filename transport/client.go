@@ -459,6 +459,12 @@ func (c *Client) mapWireError(req *Request, target *url.URL, resp *Response) err
 	if c.cfg.rawErrorBodies {
 		we.RawBody = append([]byte(nil), resp.Body...)
 	}
+	// REQ-166: the challenge is read on 401 and 403 only, from every
+	// WWW-Authenticate line. It never feeds Error(), so it is attached
+	// whatever WithRawErrorBodies says.
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		we.Challenge = parseBearerChallenge(resp.Header.Values("WWW-Authenticate"))
+	}
 	return we
 }
 
