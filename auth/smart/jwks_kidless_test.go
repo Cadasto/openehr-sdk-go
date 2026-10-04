@@ -4,8 +4,10 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -250,4 +252,137 @@ func TestJWKSKeyWithoutKidRefetchesAfterTTL(t *testing.T) {
 		time.Sleep(time.Second)
 		lookup("once the set is TTL old", 2)
 	})
+}
+
+// rotatingJWKS serves before until rotate is called and after from then on,
+// and reports how many times the set was fetched. Its TTL is an hour, so only
+// a forced refresh fetches the set again.
+func rotatingJWKS(t *testing.T, before, after []byte) (jwks *smart.JWKS, fetches *atomic.Int32, rotate func()) {
+	t.Helper()
+	var rotated atomic.Bool
+	fetches = new(atomic.Int32)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fetches.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		if rotated.Load() {
+			_, _ = w.Write(after)
+			return
+		}
+		_, _ = w.Write(before)
+	}))
+	t.Cleanup(srv.Close)
+	jwks, err := smart.NewJWKS(srv.Client(), srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jwks.TTL = time.Hour
+	return jwks, fetches, func() { rotated.Store(true) }
+}
+
+// TestValidateIDTokenWithoutKidFollowsRotation checks that a token without a
+// kid, signed by a key the server rotated to after the set was cached, is
+// accepted after exactly one refetch, while a token the cached key verifies
+// causes none. REQ-062
+func TestValidateIDTokenWithoutKidFollowsRotation(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	keyA, keyB := newRSAKey(t), newRSAKey(t)
+	jwks, fetches, rotate := rotatingJWKS(t, keySetBody(t, publishedKey{key: keyA}), keySetBody(t, publishedKey{key: keyB}))
+	validate := func(signer *rsa.PrivateKey) error {
+		_, err := smart.ValidateIDToken(t.Context(), joseSign(t, gojose.RS256, signer, "", defaultIDClaims(now)), jwks,
+			"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+		return err
+	}
+
+	if err := validate(keyA); err != nil {
+		t.Fatalf("ValidateIDToken(no kid, signed by the cached key) error = %v, want nil", err)
+	}
+	if n := fetches.Load(); n != 1 {
+		t.Fatalf("a token the cached key verifies: JWKS fetched %d time(s), want 1", n)
+	}
+
+	rotate()
+	// REQ-062: a token without kid that the cached key does not verify refreshes the set once.
+	if err := validate(keyB); err != nil {
+		t.Fatalf("ValidateIDToken(no kid, signed by the rotated key) error = %v, want nil", err)
+	}
+	if n := fetches.Load(); n != 2 {
+		t.Fatalf("a token signed by the rotated key: JWKS fetched %d time(s), want 2: the first fetch and one refresh", n)
+	}
+}
+
+// TestValidateIDTokenWithoutKidBadSignatureRefreshesOnce checks that a token
+// without a kid whose signature no published key verifies is refused after one
+// refetch, not a loop, and that neither a claim failure on a good signature nor
+// a bad signature under a kid the set holds refetches the set. REQ-062
+func TestValidateIDTokenWithoutKidBadSignatureRefreshesOnce(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	served, other := newRSAKey(t), newRSAKey(t)
+	set := keySetBody(t, publishedKey{key: served, kid: "kid-a"})
+	jwks, fetches, _ := rotatingJWKS(t, set, set)
+
+	steps := []struct {
+		name    string
+		signer  *rsa.PrivateKey
+		kid     string
+		claims  map[string]any
+		wantErr bool
+		fetches int32
+	}{
+		{name: "no kid, signed by the served key", signer: served, fetches: 1},
+		{name: "no kid, signed by an unpublished key", signer: other, wantErr: true, fetches: 2},
+		{name: "no kid, good signature, wrong issuer", signer: served, claims: map[string]any{"iss": "https://other.example"}, wantErr: true, fetches: 2},
+		{name: "kid the set holds, signed by an unpublished key", signer: other, kid: "kid-a", wantErr: true, fetches: 2},
+	}
+	for _, st := range steps {
+		claims := defaultIDClaims(now)
+		maps.Copy(claims, st.claims)
+		_, err := smart.ValidateIDToken(t.Context(), joseSign(t, gojose.RS256, st.signer, st.kid, claims), jwks,
+			"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+		// REQ-062: only a kid-less signature the cached key does not verify refreshes the set, and only once.
+		switch {
+		case st.wantErr && (err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed)):
+			t.Fatalf("ValidateIDToken(%s) error = %v, want ErrJWKSValidationFailed", st.name, err)
+		case !st.wantErr && err != nil:
+			t.Fatalf("ValidateIDToken(%s) error = %v, want nil", st.name, err)
+		}
+		if n := fetches.Load(); n != st.fetches {
+			t.Fatalf("after ValidateIDToken(%s): JWKS fetched %d time(s) in all, want %d", st.name, n, st.fetches)
+		}
+	}
+}
+
+// TestValidateIDTokenWithoutKidRefetchOutageKeepsItsOwnError checks that when
+// the refetch a kid-less signature miss causes fails, the fetch error is
+// returned and does not match the JWKS sentinel, so the outage never reads as
+// a bad token. REQ-062
+func TestValidateIDTokenWithoutKidRefetchOutageKeepsItsOwnError(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	cached, rotated := newRSAKey(t), newRSAKey(t)
+	set := keySetBody(t, publishedKey{key: cached})
+	var down atomic.Bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if down.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(set)
+	}))
+	t.Cleanup(srv.Close)
+	jwks, err := smart.NewJWKS(srv.Client(), srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jwks.TTL = time.Hour
+	if _, err := jwks.Key(t.Context(), ""); err != nil {
+		t.Fatalf("Key(no kid) error = %v, want nil", err)
+	}
+
+	down.Store(true)
+	_, err = smart.ValidateIDToken(t.Context(), joseSign(t, gojose.RS256, rotated, "", defaultIDClaims(now)), jwks,
+		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+	// REQ-062: a failed refetch surfaces as the fetch error, never as the JWKS sentinel.
+	if err == nil || errors.Is(err, auth.ErrJWKSValidationFailed) || !strings.Contains(err.Error(), "jwks fetch: status 503") {
+		t.Fatalf("ValidateIDToken(no kid, rotated key, refetch answers 503) error = %v, want the fetch error, not ErrJWKSValidationFailed", err)
+	}
 }
