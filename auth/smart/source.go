@@ -28,8 +28,8 @@ const (
 	methodPrivateKeyJWT     = "private_key_jwt"
 	methodClientSecretBasic = "client_secret_basic"
 	methodClientSecretPost  = "client_secret_post"
-	// nonceLen is the number of random bytes in an OpenID Connect nonce
-	// (REQ-061), the same 256 bits as the state.
+	// nonceLen is the number of random bytes in an OpenID Connect nonce,
+	// the same 256 bits as the state.
 	nonceLen = 32
 )
 
@@ -159,7 +159,7 @@ type Source struct {
 	lastTR   TokenResponse
 	inflight *tokenExchange
 	// idBinding is what a refreshed ID token must repeat from the last ID
-	// token the source verified; nil until it has verified one (REQ-064).
+	// token the source verified; nil until it has verified one.
 	idBinding *idTokenBinding
 }
 
@@ -409,7 +409,7 @@ func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) 
 	req := AuthorizationRequest{State: state, PKCE: pkce, Issuer: s.cfg.Issuer}
 	if hasScope(s.cfg.Scopes, auth.ScopeOpenID) {
 		// OpenID Connect Core 1.0 §3.1.2.1: the nonce binds the ID token
-		// to this launch, so a replayed token is refused (REQ-061).
+		// to this launch, so a replayed token is refused.
 		req.Nonce, err = randBase64URL(nonceLen)
 		if err != nil {
 			return AuthorizationRequest{}, fmt.Errorf("smart: generate nonce: %w", err)
@@ -508,7 +508,7 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 	}
 	if tr.IDToken != "" {
 		// OpenID Connect Core 1.0 §3.1.3.7: the ID token is checked before
-		// anything from this response is kept or returned (REQ-064).
+		// anything from this response is kept or returned.
 		claims, err := s.verifyIDToken(ctx, tr.IDToken, req.Nonce)
 		if err != nil {
 			return auth.Token{}, TokenResponse{}, fmt.Errorf("smart: id_token: %w", err)
@@ -528,7 +528,7 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 
 // verifyIDToken checks an ID token from the token endpoint against the
 // source's JWKS, issuer, client ID, trusted audiences and the server's
-// advertised signing algorithms (REQ-064). nonce is the launch's nonce at
+// advertised signing algorithms. nonce is the launch's nonce at
 // the code exchange, and empty on refresh, where none is checked.
 func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDTokenClaims, error) {
 	return ValidateIDToken(ctx, raw, s.cfg.JWKS, s.cfg.Issuer, s.cfg.ClientID, nonce, time.Time{},
@@ -706,8 +706,7 @@ func (s *Source) exchangeCode(ctx context.Context, code, verifier string) (auth.
 
 // refreshGrant redeems refresh at the token endpoint. An ID token in the
 // response is verified before anything is returned; a failure is a
-// refresh failure that is not terminal, so the caller keeps its tokens
-// (REQ-064).
+// refresh failure that is not terminal, so the caller keeps its tokens.
 func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, TokenResponse, string, error) {
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
