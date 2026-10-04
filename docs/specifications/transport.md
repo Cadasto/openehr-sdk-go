@@ -375,7 +375,7 @@ type BearerChallenge struct {
 ```
 
 - A response without a `Bearer` challenge **MUST** leave `Challenge` nil; a challenge the transport cannot parse **MUST** leave it nil too, and the response **MUST** still map to its status sentinel. The parser **MUST** ignore empty list elements (RFC 9110 §5.6.1.2).
-- The work spent on a challenge **MUST** stay bounded: a `WWW-Authenticate` field line longer than 8 KiB **MUST** be treated as unparseable without being parsed (RFC 9110 §5.4 lets a recipient ignore a field line it does not wish to process; real Bearer challenges are far shorter).
+- The work spent on a challenge **MUST** stay bounded: a `WWW-Authenticate` field value longer than 8 KiB **MUST** be treated as unparseable without being parsed (RFC 9110 §5.4 lets a recipient ignore a field line it does not wish to process; real Bearer challenges are far shorter).
 - `WireError.Error()` **MUST NOT** include challenge values; they stay reachable through `errors.As`, under the same discipline as the openEHR error envelope (REQ-093): `Error`, `Scope`, `Realm`, `ErrorURI` and `Params` are always populated, while `ErrorDescription`, free text from the server, **MUST** be populated only when the client is built with `WithRawErrorBodies(true)`.
 - The opt-in 401 safety net (REQ-063) **MUST** call `Reauth` only for a 401 whose challenge is absent, carries no `error`, or carries `error="invalid_token"` (RFC 6750 §3.1: the token is expired, revoked or malformed, and a new one may succeed). A 401 whose challenge names any other error, `insufficient_scope` included, **MUST** be surfaced without calling `Reauth`, since a fresh token with the same grant cannot fix it.
 
