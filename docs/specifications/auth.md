@@ -171,13 +171,13 @@ The HL7 SMART [Backend Services](https://hl7.org/fhir/smart-app-launch/backend-s
 
 ##### Backend Services from a resolved catalog
 
-`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, clientSecret, opts...)` (the secret empty when a client assertion is configured) for SMART Backend Services against a resolved catalog. It takes the token endpoint from `catalog.Auth.TokenEndpoint` (absent: `auth.ErrInvalidConfig`) and records `catalog.Issuer` on the tokens it produces unless the caller passes `WithIssuer`. When the catalog advertises the corresponding list, construction **MUST** fail with `auth.ErrInvalidConfig` when:
+`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, clientSecret, opts...)` (the secret empty when a client assertion is configured) for SMART Backend Services against a resolved catalog. It **MUST** post to the token endpoint in `catalog.Auth.TokenEndpoint`, and **MUST** fail with `auth.ErrInvalidConfig` when the catalog is nil or names no token endpoint. It **MUST** record `catalog.Issuer` on the tokens it produces, unless the caller passes `WithIssuer`, whose issuer then wins. When the catalog advertises the corresponding list, construction **MUST** fail with `auth.ErrInvalidConfig` when:
 
 - `grant_types_supported` does not contain `client_credentials`;
 - `token_endpoint_auth_methods_supported` does not contain the configured method (`private_key_jwt` with a client assertion, `client_secret_basic` or `client_secret_post` with a secret);
 - `token_endpoint_auth_signing_alg_values_supported` does not contain the algorithm of a client assertion produced by the SDK's own `jwtbearer.ClaimsSigner` (an assertion source the SDK cannot inspect is not checked).
 
-An absent or empty list is not constraining, as in § G-3.
+An absent or empty list **MUST NOT** fail construction, as in § G-3.
 
 **Distinction from `auth/jwtbearer`:** `auth/jwtbearer` implements the separate RFC 7523 _JWT Bearer Token Grant_ (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`) — the JWT is the _authorization grant_ itself. `auth/clientcreds` with `WithClientAssertion` uses `grant_type=client_credentials` — the JWT is the _client authentication credential_. Both use `jwtbearer.AssertionSource` / `jwtbearer.ClaimsSigner` for signing.
 
