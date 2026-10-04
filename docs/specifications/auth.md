@@ -213,7 +213,7 @@ The flow (standalone launch, summarised):
 1. **Discovery.** Fetch the SMART configuration document from the Platform base URL's well-known URL (see [service-discovery.md](service-discovery.md)). Extract `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `registration_endpoint` (if dynamic registration is used), and `scopes_supported`.
 2. **PKCE pair.** Generate a `code_verifier` (cryptographically random, 43–128 chars per RFC 7636) and derive `code_challenge` = `S256(code_verifier)`.
 3. **Authorization request.** Redirect the user to `authorization_endpoint` with `response_type=code`, `client_id`, `redirect_uri`, `scope` (for openEHR resources, the [REQ-165](#req-165--openehr-scope-syntax) shape `<compartment>/<resource>-<pattern>.<permissions>`, e.g. `patient/composition-*.rs`), `aud` (the Platform base URL, which is the `iss` of an embedded launch, or an explicit audience identifier), `state`, `code_challenge`, `code_challenge_method=S256`, plus SMART-specific `launch` parameter if EHR-launch.
-4. **Authorization response.** Receive the `code` and `state` at the redirect URI. The SDK **MUST** verify the `state` matches the value sent in step 3.
+4. **Authorization response.** Receive the redirect at the redirect URI and complete it with `CompleteAuthorization` (§ Completing the authorization below), which checks `state`, the RFC 9207 `iss` and an error response before any token-endpoint call.
 5. **Token exchange.** POST to `token_endpoint` with `grant_type=authorization_code`, `code`, `redirect_uri`, `client_id`, `code_verifier`. Receive `access_token`, `refresh_token` (if granted), `expires_in`, `scope`, plus SMART-specific `patient`, `encounter`, `id_token`, etc.
 6. **Launch context capture.** Surface the SMART launch parameters to the application via `smart/` (see § Launch context below).
 7. **Use.** Subsequent requests carry the access token as `Authorization: Bearer …`; the SDK's `TokenSource` implementation refreshes transparently (REQ-063).
@@ -226,6 +226,23 @@ The PKCE implementation **MUST**:
 - **Refuse a server that cannot verify `S256`.** When the authorization server advertises `code_challenge_methods_supported` and the list does not contain `S256`, constructing the `auth/smart` source **MUST** fail with `auth.ErrInvalidConfig` (HL7 SMART App Launch requires servers to support `S256`; RFC 9700 §2.1.1 makes PKCE support detectable from this metadata). An absent or empty list **MUST NOT** fail construction, since a hand-built catalog commonly omits it.
 
 The authorization request **MUST** carry `aud` (HL7 SMART App Launch lists it as required; the openEHR SMART specification does not define its value). A source built from a resolved catalog **MUST** default `aud` to the catalog's `BaseURL` when the caller sets no audience; constructing a source that has no audience at all **MUST** fail with `auth.ErrInvalidConfig`.
+
+When the configured scopes contain `openid`, `BeginAuthorization` **MUST** generate a nonce from at least 32 random bytes (base64url-encoded), record it on the returned `AuthorizationRequest`, and `AuthorizeURL` **MUST** send it as `nonce` (OpenID Connect Core 1.0 §3.1.2.1); without `openid` no nonce is sent. `BeginAuthorization` **MUST** also record on the request the issuer the source is bound to (its `Issuer`, the OIDC issuer from discovery), so each authorization response is checked against the authorization server the user was sent to (RFC 9700 §4.4, the mix-up defence a client of several Platforms owes).
+
+When `AuthorizeURL` is given a `launch` value, the request's `scope` **MUST** contain `launch` (HL7 SMART App Launch: an app launched from an EHR requests the `launch` scope); the SDK **MUST** add it when the configured scopes lack it.
+
+#### Completing the authorization
+
+`auth/smart` **MUST** provide `(*Source).CompleteAuthorization(ctx, callback url.Values, req AuthorizationRequest)`, taking the query the redirect URI received and the request the launch started with. It **MUST** apply these checks in this order and make no token-endpoint call until all of them pass:
+
+1. `state` **MUST** equal `req.State`; otherwise the call fails with `ErrLaunchInvalidState`.
+2. When the callback carries `iss` (RFC 9207), it **MUST** equal `req.Issuer` exactly; otherwise the call fails with `ErrLaunchIssuerMismatch`. When the authorization server advertises `authorization_response_iss_parameter_supported: true`, a callback without `iss` **MUST** fail the same way (RFC 9207 §2.4).
+3. When the callback carries `error` (RFC 6749 §4.1.2.1), the call **MUST** fail with an error that `errors.Is` matches to `ErrAuthorizationRejected` and from which `errors.As` extracts an `*auth.OAuth2Error` holding `error`, `error_description` and `error_uri`. A callback with neither `error` nor `code` **MUST** fail with `ErrAuthorizationRejected` as well.
+4. The code is then exchanged exactly as `ExchangeAuthorizationCode` exchanges it, including the ID-token rules of § REQ-064.
+
+#### Embedded launch
+
+`auth/smart` **MUST** provide `ParseEHRLaunch(query url.Values, allow func(iss string) bool) (EHRLaunch, error)`, which reads the `iss` and `launch` parameters a Launcher appends to the app's launch URL. It **MUST** fail with `ErrLaunchIssuerNotAllowed` when `allow` is nil or returns false for `iss`, so a client never resolves discovery for a Platform it has not chosen to trust, and with `ErrLaunchInvalidRequest` when `iss` is missing or not an absolute URL with a host, or `launch` is missing. `EHRLaunch.Issuer` is the Platform base URL to resolve ([service-discovery.md § REQ-070](service-discovery.md#req-070)); `EHRLaunch.Launch` is passed unchanged to `AuthorizeURL`.
 
 ### REQ-062 — JWKS rotation
 
@@ -242,17 +259,18 @@ The SDK validates ID tokens against the deployment's published JWKS. JWKS rotati
 - The cache **MUST** honour a documented TTL (default: 5 minutes).
 - On a verification miss (`kid` not in cache), the SDK **MUST** refresh the JWKS once before reporting the verification as failed. This handles silent rotation by the authorization server.
 - The refresh path **MUST** coalesce concurrent attempts (REQ-026).
+- A key published without a `kid` **MUST** be kept. When an ID token's header carries no `kid`, the SDK **MUST** verify it with the set's only signing key when the set holds exactly one key whose `use`, if present, is `sig`, and **MUST** reject the token otherwise (OpenID Connect Core 1.0 §10.1 lets an issuer omit `kid` only when its set holds one key).
 
 #### ID-token verification algorithm agility (REQ-062, REQ-064) — landed in Phase 3e
 
-`smart.ValidateIDToken` verifies the `id_token` signature against the deployment's JWKS and then applies the SDK's claim semantics. Signature verification is delegated to **`github.com/coreos/go-oidc/v3`** (which uses `go-jose/v4`); the SDK does **not** hand-roll signature verification or JWK→key parsing.
+`auth/smart.ValidateIDToken` verifies the `id_token` signature against the deployment's JWKS and then applies the SDK's claim semantics. It lives beside the token exchange so the exchange and the refresh can verify the ID token they receive (§ REQ-064); `smart.ValidateIDToken` and `smart.IDTokenClaims` **MUST** remain as the same function and type for existing callers. Signature verification is delegated to **`github.com/coreos/go-oidc/v3`** (which uses `go-jose/v4`); the SDK does **not** hand-roll signature verification or JWK→key parsing.
 
 - **Supported algorithms:** the SDK **MUST** support `RS256`, `RS384`, `ES256` and `ES384`, and **MUST NOT** treat any other algorithm as supported. RS384/ES384 are the HL7 SMART asymmetric baseline; RS256/ES256 cover the widely deployed remainder. Both RSA and ECDSA keys published in the JWKS are honoured.
 - **Allowlist:** the caller passes the deployment's `id_token_signing_alg_values_supported` (via `smart.WithIDTokenSigningAlgs` / `ValidateConfig.AllowedIDTokenAlgs`). A non-empty allowlist **MUST** be intersected with the supported set: it can narrow the SDK's support and **MUST NOT** widen it. An empty intersection (the deployment advertises only algorithms the SDK does not support) **MUST** fail closed with `auth.ErrJWKSValidationFailed` before the JWKS is fetched, with no fallback to the full supported set. With no allowlist, the full supported set **MUST** apply.
 - **Rejected:** the SDK **MUST** reject the unsecured `none` algorithm in any letter case, even when the allowlist names it, and **MUST** reject any algorithm outside the effective allowlist. An `alg`/key-type mismatch is rejected by go-jose key matching. Every rejection decided on the token itself (its segments, header, algorithm, key, signature or claims), here and under the claim rules below, **MUST** surface as an error that `errors.Is` matches to `auth.ErrJWKSValidationFailed`. A missing issuer, client ID or JWKS **MUST** surface as `auth.ErrInvalidConfig`, and a failed JWKS fetch **MUST** surface as the fetch error. Such a failure **MUST NOT** match `auth.ErrJWKSValidationFailed`, so an outage never reads as a bad token.
-- **Verify-before-claims:** the SDK **MUST** verify the signature before it trusts any claim; the claim checks read only the verified payload. `claimsFromMap` then applies the SDK's claim rules. `iss` **MUST** equal the configured issuer exactly, with no URL normalisation (OIDC Core §3.1.3.7), and `aud` **MUST** contain the client ID. A token without `exp` **MUST** be rejected, since OIDC Core 1.0 §2 requires that claim. A token **MUST** be rejected when its `exp` is 30 seconds (`clockSkew`) or more before the validation time, or when its `nbf` or `iat`, if present, is more than 30 seconds after it. When the caller supplies a nonce, the `nonce` claim **MUST** equal it.
+- **Verify-before-claims:** the SDK **MUST** verify the signature before it trusts any claim; the claim checks read only the verified payload. `claimsFromMap` then applies the SDK's claim rules. `iss` **MUST** equal the configured issuer exactly, with no URL normalisation (OIDC Core §3.1.3.7), and `aud` **MUST** contain the client ID. When `aud` lists any other audience, the token **MUST** be rejected unless each of them is in the caller's trusted set, empty by default (OIDC Core 1.0 §3.1.3.7 step 3); when the token carries `azp`, it **MUST** equal the client ID. A token without `exp` **MUST** be rejected, since OIDC Core 1.0 §2 requires that claim. A token **MUST** be rejected when its `exp` is 30 seconds (`clockSkew`) or more before the validation time, or when its `nbf` or `iat`, if present, is more than 30 seconds after it. When the caller supplies a nonce, the `nonce` claim **MUST** equal it.
 
-**Known gap.** `IDTokenClaims.Nonce` holds the nonce the caller expected, not the token's `nonce` claim, and the claim is also left out of `IDTokenClaims.Extra`. A caller that passes no nonce therefore cannot read the one the token carries.
+`IDTokenClaims.Nonce` **MUST** hold the token's own `nonce` claim, empty when the token has none, whether or not the caller expected one.
 
 ### REQ-063 — Token refresh
 
@@ -367,7 +385,13 @@ func WithLaunchContext(ctx context.Context, lc *LaunchContext) context.Context
 func LaunchContextFromContext(ctx context.Context) (*LaunchContext, bool)
 ```
 
-Consumers **MUST NOT** be required to parse JWT claims by hand. `IDTokenClaims` carries the standard claims plus a typed map for deployment-extension claims; the SDK validates the signature, exp, iss, aud, nonce as part of the token exchange. Signature verification supports RS256/RS384/ES256/ES384 and is constrained by the deployment's advertised `id_token_signing_alg_values_supported` when supplied — see _ID-token verification algorithm agility_ under REQ-062.
+Consumers **MUST NOT** be required to parse JWT claims by hand. `IDTokenClaims` carries the standard claims plus a typed map for deployment-extension claims.
+
+When a token response carries an `id_token`, `ExchangeAuthorizationCode`, and so `CompleteAuthorization`, **MUST** validate it before returning: against the source's JWKS, its `Issuer`, its client ID, the request's nonce and the discovery `id_token_signing_alg_values_supported` (OpenID Connect Core 1.0 §3.1.3.7). A source without a JWKS **MUST** fail such an exchange with `auth.ErrInvalidConfig` instead of returning an unverified ID token. The verified claims **MUST** be returned on `TokenResponse.IDTokenClaims`, and `LaunchContextFromTokenResponse` **MUST** use them without validating again; it validates a token response that carries an `id_token` but no verified claims as before.
+
+A refresh response that carries an `id_token` **MUST** be validated the same way except for the nonce; when the source has verified an earlier ID token, the new one's `iss`, `sub` and `aud` **MUST** equal that token's (OpenID Connect Core 1.0 §12.2). A failure **MUST** fail the refresh with an error that matches both `auth.ErrRefreshFailed` and `auth.ErrJWKSValidationFailed`, and the source **MUST** keep its previous access and refresh tokens.
+
+`LaunchContext.User` **MUST** come from a verified ID token only: its `fhirUser` claim, else its `sub`. Without a verified ID token `User` **MUST** be empty. A `fhirUser` member in the token-endpoint body is not an identity claim and **MUST NOT** set it; it stays readable on `TokenResponse.FHIRUser` and `Raw`. Signature verification supports RS256/RS384/ES256/ES384 and is constrained by the deployment's advertised `id_token_signing_alg_values_supported` when supplied — see _ID-token verification algorithm agility_ under REQ-062.
 
 The `EHRID` and `EpisodeID` fields are populated from the `ehrId` and `episodeId` token claims defined in the canonical openEHR SMART App Launch specification. The SMART-compat extras (`Intent`, `SMARTStyleURL`, `NeedPatientBanner`, `Tenant`) are populated when present. All of these fields are also available untyped via `Raw`.
 
@@ -551,7 +575,13 @@ var (
 )
 
 // package smart — SMART App Launch specific
-var ErrLaunchInvalidState = errors.New("SMART launch: state mismatch")
+var (
+    ErrLaunchInvalidState     = errors.New("SMART launch: state mismatch")
+    ErrLaunchIssuerMismatch   = errors.New("SMART launch: authorization response issuer mismatch")
+    ErrAuthorizationRejected  = errors.New("SMART launch: authorization rejected")
+    ErrLaunchIssuerNotAllowed = errors.New("SMART launch: issuer not allowed")
+    ErrLaunchInvalidRequest   = errors.New("SMART launch: invalid launch request")
+)
 ```
 
 A PKCE `code_verifier` mismatch is **not** a separate client-side sentinel: the
