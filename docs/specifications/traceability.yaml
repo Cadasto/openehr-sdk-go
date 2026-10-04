@@ -1835,3 +1835,10 @@ requirements:
     tests:
       - transport/challenge_test.go
       - transport/reauth_challenge_test.go
+
+  - id: REQ-167
+    title: Token revocation
+    canonical: docs/specifications/auth.md#req-167--token-revocation
+    status: draft
+    implementation: planned
+    packages: [auth/smart, auth]

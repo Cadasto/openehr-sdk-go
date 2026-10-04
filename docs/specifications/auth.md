@@ -140,7 +140,7 @@ The HL7 SMART `client-confidential-asymmetric` profile lets a confidential clien
 - Send form fields `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer` and a freshly signed `client_assertion`.
 - **Omit** the HTTP Basic `Authorization` header (no `client_secret_basic`).
 
-The assertion is produced by reusing `auth/jwtbearer.ClaimsSigner` (the same RS384-default signer as the JWT Bearer flow above) with `iss = sub = client_id`, `aud = token_endpoint`, and an auto-generated unique `jti` and short `exp` (default 5 minutes). The signing algorithm and `kid` are caller-supplied; key/alg mismatches are rejected at construction with `auth.ErrInvalidConfig`.
+The assertion is produced by reusing `auth/jwtbearer.ClaimsSigner` (the same RS384-default signer as the JWT Bearer flow above) with `iss = sub = client_id`, `aud = token_endpoint`, and an auto-generated unique `jti` and short `exp` (default 5 minutes). The signing algorithm and `kid` are caller-supplied; key/alg mismatches are rejected at construction with `auth.ErrInvalidConfig`. The HL7 SMART asymmetric profile requires a `kid` header and an `exp` at most five minutes after issue, so `WithClientAssertionKey` with an empty `kid` **MUST** fail construction with `auth.ErrInvalidConfig`, and the assertion's lifetime **MUST NOT** exceed five minutes. When the authorization server advertises `token_endpoint_auth_signing_alg_values_supported`, the configured algorithm **MUST** be in it, or construction fails with `auth.ErrInvalidConfig`; an absent or empty list is not constraining.
 
 Client-authentication method selection is **deterministic** (no trial-and-error):
 
@@ -153,6 +153,8 @@ Client-authentication method selection is **deterministic** (no trial-and-error)
 For a symmetric secret the SDK defaults to `client_secret_basic`. When the server advertises `token_endpoint_auth_methods_supported` but **not** `client_secret_basic`, and **does** advertise `client_secret_post`, the SDK falls back to `client_secret_post` (credentials in the form body) so deployments that accept only the post-style method still work.
 
 Configuring **both** an assertion key and a client secret is ambiguous and is rejected at construction with `auth.ErrInvalidConfig`.
+
+A confidential client **MUST NOT** send `client_id` as a form field in the code exchange or the refresh, except as part of the `client_secret_post` credential; a public client **MUST** send it (HL7 SMART App Launch token request: `client_id` is "required for public apps" and confidential apps omit it, because they authenticate).
 
 ##### G-3 — discovery-driven method cross-check
 
@@ -168,6 +170,8 @@ The HL7 SMART [Backend Services](https://hl7.org/fhir/smart-app-launch/backend-s
 - **No** HTTP Basic `Authorization` header and **no** `client_secret`
 
 `auth/clientcreds` implements this via `WithClientAssertion(src jwtbearer.AssertionSource)`. When configured, `fetch` calls `src.Assertion(ctx)` on every token exchange, adds the two `client_assertion*` form fields, and omits Basic auth and `client_secret`. Signing errors are wrapped as `auth.ErrTokenExchangeFailed` with the message prefix `"client_assertion signing: ..."`.
+
+`auth/jwtbearer` **MUST** provide `NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, kid string) (*ClaimsSigner, error)`, which builds the assertion source of the HL7 SMART asymmetric profile: `iss = sub = clientID`, `aud = tokenURL`, `typ: JWT`, a unique `jti`, and an `exp` five minutes after issue. It **MUST** fail with `auth.ErrInvalidConfig` when any argument is empty or the key does not fit `alg`. `auth/smart` builds its own client assertion with it.
 
 ##### Backend Services from a resolved catalog
 
@@ -214,7 +218,7 @@ The flow (standalone launch, summarised):
 2. **PKCE pair.** Generate a `code_verifier` (cryptographically random, 43–128 chars per RFC 7636) and derive `code_challenge` = `S256(code_verifier)`.
 3. **Authorization request.** Redirect the user to `authorization_endpoint` with `response_type=code`, `client_id`, `redirect_uri`, `scope` (for openEHR resources, the [REQ-165](#req-165--openehr-scope-syntax) shape `<compartment>/<resource>-<pattern>.<permissions>`, e.g. `patient/composition-*.rs`), `aud` (the Platform base URL, which is the `iss` of an embedded launch, or an explicit audience identifier), `state`, `code_challenge`, `code_challenge_method=S256`, plus SMART-specific `launch` parameter if EHR-launch.
 4. **Authorization response.** Receive the redirect at the redirect URI and complete it with `CompleteAuthorization` (§ Completing the authorization below), which checks `state`, the RFC 9207 `iss` and an error response before any token-endpoint call.
-5. **Token exchange.** POST to `token_endpoint` with `grant_type=authorization_code`, `code`, `redirect_uri`, `client_id`, `code_verifier`. Receive `access_token`, `refresh_token` (if granted), `expires_in`, `scope`, plus SMART-specific `patient`, `encounter`, `id_token`, etc.
+5. **Token exchange.** POST to `token_endpoint` with `grant_type=authorization_code`, `code`, `redirect_uri`, `code_verifier`, and `client_id` for a public client (a confidential client authenticates instead; § REQ-068). Receive `access_token`, `refresh_token` (if granted), `expires_in`, `scope`, plus SMART-specific `patient`, `encounter`, `id_token`, etc.
 6. **Launch context capture.** Surface the SMART launch parameters to the application via `smart/` (see § Launch context below).
 7. **Use.** Subsequent requests carry the access token as `Authorization: Bearer …`; the SDK's `TokenSource` implementation refreshes transparently (REQ-063).
 
@@ -292,6 +296,16 @@ Refresh uses the stored `refresh_token` against the deployment's `token_endpoint
 
 If no `refresh_token` is available (the deployment did not grant one), the `TokenSource` **MUST** return a typed error directing the consumer to restart the launch flow.
 
+**Token changes.** `auth/smart` **MUST** provide the option `WithTokenChange(func(ctx context.Context, change TokenChange))`. The source **MUST** call it after every successful code exchange and refresh, once it holds the new tokens and outside its lock, with the new access token, the refresh token it now holds (the previous one when the response carried none) and the token response; it **MUST NOT** call it for a failed exchange. An application that keeps a session across restarts stores a rotated refresh token from it: RFC 6749 §6 has the client discard the old refresh token when a new one is issued, and RFC 9700 §4.14 makes rotation one of the two ways a public client's refresh token is protected. `Revoke` (§ REQ-167) **MUST** call it once with an empty change after clearing the tokens.
+
+```go
+type TokenChange struct {
+    Access       auth.Token
+    RefreshToken string
+    Response     TokenResponse
+}
+```
+
 #### Implementation — Phase 4a + 4b (Source/error side + transport hook)
 
 **Terminal vs. transient refresh classification (`ExchangeError.Terminal()`).**
@@ -346,6 +360,12 @@ The retry **MUST** fire for **all HTTP methods**, including non-idempotent write
 **Backend providers.** `auth/clientcreds` and `auth/jwtbearer` **MUST** implement `Reauther`: `Reauth` drops the cached access token and obtains a new one with a fresh exchange, coalesced with any exchange already in flight (REQ-026), and returns that exchange's error, if any. They have no refresh token; a new exchange is their only way to a new token.
 
 Out of scope (v1 implementation status): MTLS, FAPI, JAR/PAR.
+
+### REQ-167 — Token revocation
+
+`auth/smart` **MUST** provide `(*Source).Revoke(ctx)` for signing out (RFC 7009). When the source's catalog advertises `revocation_endpoint`, `Revoke` **MUST** POST the form-encoded `token` with its `token_type_hint` (RFC 7009 §2.1): the refresh token when the source holds one (`refresh_token`), otherwise the access token (`access_token`). It **MUST** authenticate exactly as the token endpoint does (§ REQ-068), so a public client sends `client_id`.
+
+Whatever the outcome, `Revoke` **MUST** then clear the source's access and refresh tokens, so a failed call never leaves a signed-out session usable, and **MUST** report the outcome: nil on a 200 response (RFC 7009 §2.2 answers 200 for an unknown or already invalid token too), otherwise an `*auth.ExchangeError` matching `auth.ErrRevocationFailed`. A source without a revocation endpoint **MUST** clear its tokens and return an error matching `auth.ErrInvalidConfig`. A source that holds no token **MUST** return nil without sending a request.
 
 ### REQ-064 — Launch context
 
@@ -572,6 +592,7 @@ var (
     ErrReauthRequired       = errors.New("auth: re-authentication required")
     ErrJWKSValidationFailed = errors.New("auth: JWKS validation failed")
     ErrInvalidScope         = errors.New("auth: invalid scope") // REQ-165
+    ErrRevocationFailed     = errors.New("auth: token revocation failed")
 )
 
 // package smart — SMART App Launch specific
@@ -598,7 +619,7 @@ Consumers detect classes via `errors.Is`. The underlying wire error is preserved
 
 - **OAuth2 dynamic client registration** — the SDK consumes a pre-registered client. Dynamic registration **MAY** be added as a helper in `smart/` later.
 - **App-side credential storage** — token storage (encrypted at rest, OS keychain, browser cookie) is application-side.
-- **Refresh-token revocation** — the deployment owns revocation policy; the SDK reacts to the resulting wire errors.
+- **Revocation policy** — when tokens expire or are revoked on the server is the deployment's decision; the SDK reacts to the resulting wire errors and offers only the client's own sign-out revocation (REQ-167).
 - **MTLS, FAPI, JAR / PAR** — out of v1 scope; **MAY** be addressed by future provider sub-packages.
 - **Token introspection (RFC 7662)** — a resource-server operation, and the SDK is a client of authorization servers. Discovery still surfaces `introspection_endpoint` (REQ-070), but the SDK ships no introspection client.
 
