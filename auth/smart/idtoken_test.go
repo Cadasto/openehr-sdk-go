@@ -434,6 +434,7 @@ func TestValidateIDTokenOutageKeepsItsOwnError(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	priv := newRSAKey(t)
 	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", defaultIDClaims(now))
+	kidless := joseSign(t, gojose.RS256, priv, "", defaultIDClaims(now))
 
 	answering := func(status int) func(t *testing.T) *smart.JWKS {
 		return func(t *testing.T) *smart.JWKS {
@@ -463,16 +464,23 @@ func TestValidateIDTokenOutageKeepsItsOwnError(t *testing.T) {
 		name       string
 		jwks       func(t *testing.T) *smart.JWKS
 		algs       []string
+		noKid      bool // the token's header carries no kid, so the lookup takes the single-key path
 		isFetchErr func(error) bool
 	}{
 		{name: "JWKS answers 500", jwks: answering(http.StatusInternalServerError), isFetchErr: statusError("500")},
 		// The allowlist is checked before the JWKS is fetched; a usable one must not turn the outage into the sentinel.
 		{name: "JWKS answers 503 under a supported allowlist", jwks: answering(http.StatusServiceUnavailable), algs: []string{"RS256"}, isFetchErr: statusError("503")},
 		{name: "JWKS unreachable", jwks: unreachable, isFetchErr: transportError},
+		{name: "JWKS answers 503, token without kid", jwks: answering(http.StatusServiceUnavailable), noKid: true, isFetchErr: statusError("503")},
+		{name: "JWKS unreachable, token without kid", jwks: unreachable, noKid: true, isFetchErr: transportError},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := smart.ValidateIDToken(t.Context(), tok, tc.jwks(t),
+			raw := tok
+			if tc.noKid {
+				raw = kidless
+			}
+			_, err := smart.ValidateIDToken(t.Context(), raw, tc.jwks(t),
 				"https://issuer.example", "client-id", "nonce-xyz", now, tc.algs)
 			// REQ-062: a JWKS fetch failure surfaces as the fetch error and never matches the JWKS sentinel.
 			if err == nil || errors.Is(err, auth.ErrJWKSValidationFailed) {

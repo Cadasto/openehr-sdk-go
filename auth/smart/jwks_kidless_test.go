@@ -197,3 +197,57 @@ func TestJWKSConcurrentLookupsCoalesce(t *testing.T) {
 		}
 	})
 }
+
+// TestJWKSKeyWithoutKidReusesCachedSet checks that a second lookup without a
+// kid inside the TTL reads the cached set instead of fetching it again.
+// REQ-062
+func TestJWKSKeyWithoutKidReusesCachedSet(t *testing.T) {
+	jwks, fetches := stubJWKSServer(t, http.StatusOK, keySetBody(t, publishedKey{key: newRSAKey(t)}))
+
+	for i := range 2 {
+		if _, err := jwks.Key(t.Context(), ""); err != nil {
+			t.Fatalf("Key(no kid) call %d error = %v, want nil", i+1, err)
+		}
+	}
+	// REQ-062: the set is fetched on first use and cached.
+	if n := fetches.Load(); n != 1 {
+		t.Fatalf("two lookups without a kid fetched the JWKS %d time(s), want 1", n)
+	}
+}
+
+// TestJWKSKeyWithoutKidRefetchesAfterTTL checks that a lookup without a kid
+// fetches the set again once it is TTL old, and not a second earlier. REQ-062
+func TestJWKSKeyWithoutKidRefetchesAfterTTL(t *testing.T) {
+	body := keySetBody(t, publishedKey{key: newRSAKey(t)})
+	synctest.Test(t, func(t *testing.T) {
+		var fetches atomic.Int32
+		srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			fetches.Add(1)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(body)
+		}))
+		// Client() starts the in-memory server and sets srv.URL.
+		cli := srv.Client()
+		jwks, err := smart.NewJWKS(cli, srv.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		jwks.TTL = time.Minute
+
+		lookup := func(after string, want int32) {
+			t.Helper()
+			if _, err := jwks.Key(t.Context(), ""); err != nil {
+				t.Fatalf("Key(no kid) %s error = %v, want nil", after, err)
+			}
+			// REQ-062: the cache honours the TTL.
+			if n := fetches.Load(); n != want {
+				t.Fatalf("Key(no kid) %s: JWKS fetched %d time(s), want %d", after, n, want)
+			}
+		}
+		lookup("on first use", 1)
+		time.Sleep(time.Minute - time.Second)
+		lookup("a second before the TTL ends", 1)
+		time.Sleep(time.Second)
+		lookup("once the set is TTL old", 2)
+	})
+}
