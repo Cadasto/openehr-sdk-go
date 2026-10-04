@@ -77,6 +77,12 @@ func WithTrustedAudiences(aud ...string) IDTokenOption {
 // allowance for clock skew. When nonce is not empty the nonce claim must
 // equal it.
 //
+// The signing key is the one the token's kid names. A token without a kid is
+// verified with the set's only signing key (see [JWKS.Key]); when that key
+// does not verify the signature, the set is fetched once more, in case the
+// server has rotated its key, and the token is checked against the key it
+// then holds.
+//
 // A token rejected on its own content matches [auth.ErrJWKSValidationFailed].
 // A missing jwks, issuer or clientID matches [auth.ErrInvalidConfig], and a
 // failed JWKS fetch is returned as the fetch error, so an outage never reads
@@ -133,18 +139,35 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *JWKS, issuer, client
 		return nil, fmt.Errorf("%w: %w", auth.ErrJWKSValidationFailed, err)
 	}
 
-	keySet := &oidc.StaticKeySet{PublicKeys: []crypto.PublicKey{pub}}
-	verifier := oidc.NewVerifier(issuer, keySet, &oidc.Config{
-		ClientID:             clientID,
-		SupportedSigningAlgs: algs,
-		Now:                  func() time.Time { return now },
-		// SkipExpiryCheck delegates expiry enforcement (with 30s clockSkew) to
-		// claimsFromMap below, avoiding go-oidc's zero-tolerance expiry check
-		// which would reject tokens in the [exp, exp+30s) skew window. Issuer,
-		// audience, and signature checks remain active.
-		SkipExpiryCheck: true,
-	})
-	idt, err := verifier.Verify(ctx, raw)
+	verify := func(pub crypto.PublicKey) (*oidc.IDToken, error) {
+		keySet := &oidc.StaticKeySet{PublicKeys: []crypto.PublicKey{pub}}
+		verifier := oidc.NewVerifier(issuer, keySet, &oidc.Config{
+			ClientID:             clientID,
+			SupportedSigningAlgs: algs,
+			Now:                  func() time.Time { return now },
+			// SkipExpiryCheck delegates expiry enforcement (with 30s clockSkew) to
+			// claimsFromMap below, avoiding go-oidc's zero-tolerance expiry check
+			// which would reject tokens in the [exp, exp+30s) skew window. Issuer,
+			// audience, and signature checks remain active.
+			SkipExpiryCheck: true,
+		})
+		return verifier.Verify(ctx, raw)
+	}
+	idt, err := verify(pub)
+	if err != nil && hdr.Kid == "" && !signatureVerifies(ctx, raw, pub) {
+		// A token without a kid cannot name a rotated key, so a signature the
+		// cached key does not verify refreshes the set once, as a kid miss
+		// does, and the token is verified once more against the key the set
+		// then holds (REQ-062). A fetch failure keeps its own error.
+		jwkRaw, ferr := jwks.refreshedSigningKey(ctx)
+		if ferr != nil {
+			return nil, ferr
+		}
+		if pub, err = publicKeyFromJWK(jwkRaw); err != nil {
+			return nil, fmt.Errorf("%w: %w", auth.ErrJWKSValidationFailed, err)
+		}
+		idt, err = verify(pub)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", auth.ErrJWKSValidationFailed, err)
 	}
@@ -163,6 +186,14 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *JWKS, issuer, client
 		}
 	}
 	return claimsFromMap(claims, issuer, clientID, nonce, now, cfg.trustedAudiences)
+}
+
+// signatureVerifies reports whether pub verifies raw's signature, whatever its
+// claims say. It separates a key that does not match the token from a claim
+// failure on a token pub did sign.
+func signatureVerifies(ctx context.Context, raw string, pub crypto.PublicKey) bool {
+	_, err := (&oidc.StaticKeySet{PublicKeys: []crypto.PublicKey{pub}}).VerifySignature(ctx, raw)
+	return err == nil
 }
 
 // requireIDTokenTrustAnchors enforces OIDC trust binding when validating
@@ -202,8 +233,11 @@ func resolveIDTokenAlgs(allowedAlgs []string) []string {
 }
 
 // publicKeyFromJWK parses a single JWK document into its crypto.PublicKey
-// (RSA or ECDSA) via go-jose, so go-oidc can verify the signature without any
-// hand-rolled JWK→key conversion.
+// (RSA, ECDSA or Ed25519) via go-jose, so go-oidc can verify the signature
+// without any hand-rolled JWK→key conversion. Any other key, a symmetric one
+// included, is refused. Which algorithms a key may verify is decided by the
+// allowlist, not here: an Ed25519 key verifies nothing while EdDSA is not
+// supported.
 func publicKeyFromJWK(jwkRaw json.RawMessage) (crypto.PublicKey, error) {
 	var k gojose.JSONWebKey
 	if err := k.UnmarshalJSON(jwkRaw); err != nil {

@@ -18,7 +18,10 @@ const defaultJWKSTTL = 5 * time.Minute
 type JWKS struct {
 	HTTPClient *http.Client
 	URI        string
-	TTL        time.Duration
+	// TTL is how long a fetched set is used before a lookup fetches it again.
+	// [NewJWKS] sets five minutes. Zero or a negative value keeps the set
+	// until a lookup misses: it never goes stale by time.
+	TTL time.Duration
 
 	mu   sync.Mutex
 	keys map[string]json.RawMessage // keys published with a kid, by kid
@@ -97,6 +100,21 @@ func (j *JWKS) onlySigningKey(ctx context.Context) (json.RawMessage, error) {
 			return nil, err
 		}
 	}
+	return j.cachedSigningKey()
+}
+
+// refreshedSigningKey refreshes the set, sharing a refresh already in flight,
+// and returns its only signing key. It serves a token without a kid that the
+// cached key did not verify (REQ-062).
+func (j *JWKS) refreshedSigningKey(ctx context.Context) (json.RawMessage, error) {
+	if err := j.refresh(ctx); err != nil {
+		return nil, err
+	}
+	return j.cachedSigningKey()
+}
+
+// cachedSigningKey returns the cached set's only signing key without fetching.
+func (j *JWKS) cachedSigningKey() (json.RawMessage, error) {
 	j.mu.Lock()
 	signing := j.signing
 	j.mu.Unlock()
