@@ -2,8 +2,11 @@ package jwtbearer
 
 import (
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rsa"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
@@ -78,8 +81,9 @@ func TestNewClientAssertionClaims(t *testing.T) { // REQ-068
 
 // TestNewClientAssertionRefusesBadArguments pins that NewClientAssertion
 // fails with auth.ErrInvalidConfig, and returns no signer, when an argument
-// is empty (a nil signer counts as empty) or the key does not fit the
-// algorithm.
+// is empty (a nil signer, or a nil key of a concrete type, counts as empty)
+// or the key does not fit the algorithm. An empty clientID, tokenURL or kid
+// is refused with a message that names the argument.
 func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 	rsaKey := newKey(t)
 	p256Key := newECKey(t, elliptic.P256())
@@ -88,12 +92,16 @@ func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 		clientID, tokenURL string
 		signer             crypto.Signer
 		alg, kid           string
+		// wantInMsg, when set, must appear in the error message.
+		wantInMsg string
 	}{
-		{name: "empty clientID", tokenURL: "https://as.example/token", signer: rsaKey, alg: "RS384", kid: "k1"},
-		{name: "empty tokenURL", clientID: "c1", signer: rsaKey, alg: "RS384", kid: "k1"},
+		{name: "empty clientID", tokenURL: "https://as.example/token", signer: rsaKey, alg: "RS384", kid: "k1", wantInMsg: "clientID"},
+		{name: "empty tokenURL", clientID: "c1", signer: rsaKey, alg: "RS384", kid: "k1", wantInMsg: "tokenURL"},
 		{name: "nil signer", clientID: "c1", tokenURL: "https://as.example/token", alg: "RS384", kid: "k1"},
+		{name: "nil RSA key", clientID: "c1", tokenURL: "https://as.example/token", signer: (*rsa.PrivateKey)(nil), alg: "RS384", kid: "k1"},
+		{name: "nil ECDSA key", clientID: "c1", tokenURL: "https://as.example/token", signer: (*ecdsa.PrivateKey)(nil), alg: "ES384", kid: "k1"},
 		{name: "empty alg", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, kid: "k1"},
-		{name: "empty kid", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, alg: "RS384"},
+		{name: "empty kid", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, alg: "RS384", wantInMsg: "kid"},
 		{name: "RSA key for ES384", clientID: "c1", tokenURL: "https://as.example/token", signer: rsaKey, alg: "ES384", kid: "k1"},
 		{name: "P-256 key for ES384", clientID: "c1", tokenURL: "https://as.example/token", signer: p256Key, alg: "ES384", kid: "k1"},
 		{name: "ECDSA key for RS384", clientID: "c1", tokenURL: "https://as.example/token", signer: p256Key, alg: "RS384", kid: "k1"},
@@ -109,6 +117,10 @@ func TestNewClientAssertionRefusesBadArguments(t *testing.T) { // REQ-068
 			if s != nil {
 				t.Errorf("NewClientAssertion(%q, %q, %T, %q, %q) returned a signer with its error, want nil",
 					tc.clientID, tc.tokenURL, tc.signer, tc.alg, tc.kid)
+			}
+			if tc.wantInMsg != "" && (err == nil || !strings.Contains(err.Error(), tc.wantInMsg)) {
+				t.Errorf("NewClientAssertion(%q, %q, %T, %q, %q) error = %v, want a message naming %s",
+					tc.clientID, tc.tokenURL, tc.signer, tc.alg, tc.kid, err, tc.wantInMsg)
 			}
 		})
 	}

@@ -149,9 +149,9 @@ type AuthEndpoints struct {
 	TokenEndpointAuthMethodsSupported []string
 	// TokenEndpointAuthSigningAlgValuesSupported lists the JWS algorithms
 	// accepted for client-assertion JWTs at the token endpoint
-	// (e.g. "RS384", "ES384"). clientcreds.NewFromCatalog refuses a
-	// jwtbearer.ClaimsSigner client assertion whose algorithm a non-empty list
-	// leaves out. The SDK does not use the list to select an algorithm.
+	// (e.g. "RS384", "ES384"). auth/smart and clientcreds.NewFromCatalog
+	// refuse a client assertion whose algorithm a non-empty list leaves out.
+	// The SDK does not use the list to select an algorithm.
 	TokenEndpointAuthSigningAlgValuesSupported []string
 	// IDTokenSigningAlgValuesSupported lists the JWS algorithms used to sign
 	// ID tokens (e.g. "RS256", "ES384"). When it is not empty, auth/smart

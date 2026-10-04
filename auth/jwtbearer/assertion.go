@@ -103,7 +103,8 @@ type ClaimsSigner struct {
 }
 
 // NewClaimsSigner constructs a ClaimsSigner. Returns ErrInvalidConfig
-// when required fields are missing, the algorithm is unsupported, or the
+// when required fields are missing, the signer is nil (including a nil
+// *rsa.PrivateKey or *ecdsa.PrivateKey), the algorithm is unsupported, or the
 // signer's key type does not match the algorithm family.
 //
 // Key requirements per algorithm:
@@ -119,6 +120,11 @@ func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...Sign
 	}
 	if s.Signer == nil {
 		return nil, fmt.Errorf("%w: signer is required", auth.ErrInvalidConfig)
+	}
+	// A nil key of a concrete type passes the check above, and its Public
+	// method would panic, so refuse it before calling any method on it.
+	if isNilKey(s.Signer) {
+		return nil, fmt.Errorf("%w: signer is a nil %T", auth.ErrInvalidConfig, s.Signer)
 	}
 	if template.Issuer == "" {
 		return nil, fmt.Errorf("%w: ClaimsTemplate.Issuer is required", auth.ErrInvalidConfig)
@@ -150,20 +156,39 @@ const clientAssertionLifetime = 5 * time.Minute
 // kid, a unique jti, and an exp five minutes after its iat.
 //
 // It fails with [auth.ErrInvalidConfig] when clientID, tokenURL, alg or kid
-// is empty, signer is nil, alg is not supported, or the key does not fit
-// alg. [NewClaimsSigner] lists the key each algorithm needs.
+// is empty, signer is nil (including a nil *rsa.PrivateKey or
+// *ecdsa.PrivateKey), alg is not supported, or the key does not fit alg.
+// [NewClaimsSigner] lists the key each algorithm needs.
 func NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, kid string) (*ClaimsSigner, error) {
+	if clientID == "" {
+		return nil, fmt.Errorf("%w: a SMART client assertion needs a clientID", auth.ErrInvalidConfig)
+	}
+	if tokenURL == "" {
+		return nil, fmt.Errorf("%w: a SMART client assertion needs a tokenURL", auth.ErrInvalidConfig)
+	}
 	if kid == "" {
 		return nil, fmt.Errorf("%w: a SMART client assertion needs a kid", auth.ErrInvalidConfig)
 	}
-	// NewClaimsSigner refuses an empty clientID or tokenURL, a nil signer, an
-	// empty or unsupported alg, and a key that does not fit alg.
+	// NewClaimsSigner refuses a nil signer, an empty or unsupported alg, and
+	// a key that does not fit alg.
 	return NewClaimsSigner(ClaimsTemplate{
 		Issuer:   clientID,
 		Subject:  clientID,
 		Audience: tokenURL,
 		Lifetime: clientAssertionLifetime,
 	}, signer, WithAlgorithm(alg), WithKeyID(kid))
+}
+
+// isNilKey reports whether signer is a nil *rsa.PrivateKey or
+// *ecdsa.PrivateKey: a nil key held in a non-nil crypto.Signer.
+func isNilKey(signer crypto.Signer) bool {
+	switch k := signer.(type) {
+	case *rsa.PrivateKey:
+		return k == nil
+	case *ecdsa.PrivateKey:
+		return k == nil
+	}
+	return false
 }
 
 // SignerOption configures a ClaimsSigner.
@@ -266,18 +291,15 @@ func toJoseAlg(alg string) (gojose.SignatureAlgorithm, error) {
 	}
 }
 
-// validateKeyAlg checks that the signer's public key type and curve match
-// the requested algorithm family. For opaque crypto.Signer implementations
-// whose Public() does not return a concrete *rsa.PublicKey or *ecdsa.PublicKey
-// (e.g. KMS handles wrapped in an adapter), validation is skipped here.
-//
-// Opaque crypto.Signer implementations (e.g. KMS/HSM adapters) are supported:
-// at signing time a non-concrete signer is wrapped with
-// github.com/go-jose/go-jose/v4/cryptosigner, which handles both RSA and
-// ECDSA (including ES256/ES384). validateKeyAlg only inspects Public(); when
-// Public() returns a concrete *rsa.PublicKey / *ecdsa.PublicKey the key/alg
-// pairing is checked here, otherwise the pairing is enforced by go-jose at
-// sign time. (REQ-068)
+// validateKeyAlg checks that the signer's public key fits alg: RS256 and
+// RS384 need an *rsa.PublicKey, ES256 an *ecdsa.PublicKey on P-256, and
+// ES384 one on P-384. It inspects only Public(), so an opaque crypto.Signer
+// (e.g. a KMS or HSM adapter) passes when its Public() returns the key type
+// alg needs, and is refused when it returns any other type. At signing time
+// a signer that is not a concrete *rsa.PrivateKey or *ecdsa.PrivateKey is
+// wrapped with github.com/go-jose/go-jose/v4/cryptosigner, which handles
+// both RSA and ECDSA (including ES256/ES384). An alg outside the four is not
+// checked here; toJoseAlg refuses it. (REQ-068)
 func validateKeyAlg(signer crypto.Signer, alg string) error {
 	pub := signer.Public()
 	switch alg {

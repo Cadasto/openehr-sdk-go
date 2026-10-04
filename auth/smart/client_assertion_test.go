@@ -76,6 +76,40 @@ func TestClientAssertionKeyNeedsKeyID(t *testing.T) { // REQ-068
 	}
 }
 
+// TestClientAssertionKeyRefusesNilKey pins that WithClientAssertionKey
+// with a nil key of a concrete type, a nil *rsa.PrivateKey or a nil
+// *ecdsa.PrivateKey passed as a crypto.Signer, fails construction with
+// auth.ErrInvalidConfig instead of panicking.
+func TestClientAssertionKeyRefusesNilKey(t *testing.T) { // REQ-068
+	tests := []struct {
+		name string
+		key  crypto.Signer
+		alg  string
+	}{
+		{name: "nil RSA key", key: (*rsa.PrivateKey)(nil), alg: "RS384"},
+		{name: "nil ECDSA key", key: (*ecdsa.PrivateKey)(nil), alg: "ES384"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("New with WithClientAssertionKey(%T(nil), %s, kid-1) panicked: %v, want auth.ErrInvalidConfig", tc.key, tc.alg, r)
+				}
+			}()
+			src, err := newSource("client-asym", assertionTestEndpoints(nil),
+				smart.WithHTTPClient(&http.Client{}),
+				smart.WithClientAssertionKey(tc.key, tc.alg, "kid-1"),
+			)
+			if !errors.Is(err, auth.ErrInvalidConfig) {
+				t.Errorf("New with WithClientAssertionKey(%T(nil), %s, kid-1) error = %v, want auth.ErrInvalidConfig", tc.key, tc.alg, err)
+			}
+			if src != nil {
+				t.Errorf("New with WithClientAssertionKey(%T(nil), %s, kid-1) returned a source, want nil", tc.key, tc.alg)
+			}
+		})
+	}
+}
+
 // TestClientAssertionAlgMustBeAdvertised pins the check of the assertion
 // algorithm against the server's token_endpoint_auth_signing_alg_values_supported:
 // a non-empty list that leaves the algorithm out fails construction with
