@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/cryptotest"
 
 	"github.com/cadasto/openehr-sdk-go/auth/smart"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -127,6 +128,34 @@ func TestBeginAuthorizationNoNonceWithoutOpenID(t *testing.T) { // REQ-061
 	}
 	if q := authorizeQueryFor(t, src, req, ""); q.Has("nonce") {
 		t.Errorf("authorization URL carries nonce %q, want none without openid", q["nonce"])
+	}
+	// A nonce the caller sets on the request is not sent either.
+	req.Nonce = "caller-supplied-nonce"
+	if q := authorizeQueryFor(t, src, req, ""); q.Has("nonce") {
+		t.Errorf("authorization URL carries the caller's nonce %q, want none without openid", q["nonce"])
+	}
+}
+
+// TestBeginAuthorizationNonceDrawsFromCryptoRand pins REQ-061: the nonce is
+// drawn from crypto/rand. Under a fixed global random source the same seed
+// gives the same nonce and another seed a different one, which a nonce from
+// any other source (a counter, the clock) does not.
+func TestBeginAuthorizationNonceDrawsFromCryptoRand(t *testing.T) { // REQ-061
+	src := launchSource(t, "https://idp.example", "openid")
+	nonceWith := func(seed uint64) string {
+		cryptotest.SetGlobalRandom(t, seed)
+		req, err := src.BeginAuthorization("")
+		if err != nil {
+			t.Fatalf("BeginAuthorization: %v", err)
+		}
+		return req.Nonce
+	}
+	first, again, other := nonceWith(1), nonceWith(1), nonceWith(2)
+	if again != first {
+		t.Errorf("nonce under seed 1 = %q, then %q; want the same value from the same crypto/rand stream", first, again)
+	}
+	if other == first {
+		t.Errorf("nonce under seeds 1 and 2 = %q both; want values that follow the crypto/rand stream", first)
 	}
 }
 

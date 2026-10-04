@@ -473,7 +473,8 @@ func hasScope(scopes []string, want string) bool {
 // req.Launch is used instead. When a launch value is set, the URL forwards
 // it unchanged and the scope it sends includes launch, added when the
 // configured scopes lack it. The URL sends req.Nonce as nonce when the
-// request has one.
+// request has one and the configured scopes include openid; without openid
+// it sends none, even when the caller set req.Nonce.
 func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {
 		return "", fmt.Errorf("%w: call BeginAuthorization first or supply State and PKCE", auth.ErrInvalidConfig)
@@ -505,7 +506,7 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	if launch != "" {
 		q.Set("launch", launch)
 	}
-	if req.Nonce != "" {
+	if req.Nonce != "" && hasScope(s.cfg.Scopes, auth.ScopeOpenID) {
 		q.Set("nonce", req.Nonce)
 	}
 	u.RawQuery = q.Encode()
