@@ -216,7 +216,7 @@ The catalog is the normative list. Each entry has:
 
 - **Title:** A SMART launch using `S256` PKCE successfully exchanges code for token.
 - **Preconditions:** Deployment registers the SDK as a SMART app with PKCE required.
-- **Wire assertion:** Authorization request carries `code_challenge` and `code_challenge_method=S256`; token exchange carries `code_verifier`; token response is 200 with an `access_token`.
+- **Wire assertion:** Authorization request carries `code_challenge`, `code_challenge_method=S256` and exactly one `aud` naming the configured audience (REQ-061); token exchange carries `code_verifier`; token response is 200 with an `access_token`.
 - **G-7 PKCE parity:** the SDK's verifier additionally satisfies RFC 7636 / `x/oauth2`: ≥ 32 bytes of decoded entropy, `base64.RawURLEncoding` (URL-safe, unpadded), and `code_challenge == base64url(SHA256(verifier))` with method `S256` — cross-checked against `golang.org/x/oauth2.S256ChallengeFromVerifier`.
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_004_pkce_verifier_round_trip.go`](../../testkit/probes/auth/probe_004_pkce_verifier_round_trip.go). Drives a full `auth/smart` authorization-code + PKCE launch against an httptest token endpoint and asserts the wire round-trip plus the G-7 parity properties.
