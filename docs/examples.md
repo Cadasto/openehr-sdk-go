@@ -616,7 +616,7 @@ created EHR: id=f0e1d2c3-b4a5-6789-0123-456789abcdef
 OK: end-to-end EHR creation against in-process httptest backend
 ```
 
-The fake backend answers the way an openEHR server does: `201 Created`, a `Location` header for the new EHR, and the EHR itself in the body (because `ehr.Create` sends `Prefer: return=representation` by default). `Location` is the new resource's path as the server sent it. For an EHR, `VersionUID` is its last path segment, the ehr_id. For versioned resources such as compositions, `VersionUID` is the version uid, taken from the `ETag` and from `Location` only when the `ETag` holds none.
+The fake backend answers the way an openEHR server does: `201 Created`, a `Location` header for the new EHR, and the EHR itself in the body (because `ehr.Create` sends `Prefer: return=representation` by default). `Location` is the new resource's path as the server sent it. For an EHR, `VersionUID` is its last path segment, the ehr_id. For versioned resources such as compositions, `VersionUID` is the version uid, taken from the `ETag` when that value is a well-formed object_version_id, and from `Location` otherwise.
 
 **What to copy into your app:**
 

@@ -114,7 +114,7 @@ func TestREQ068_ConfidentialClientUsesPKCE(t *testing.T) {
 			name:       "private_key_jwt ES384",
 			credential: smart.WithClientAssertionKey(key, "ES384", "kid-es384"),
 			authenticates: func(r confidentialTokenRequest) bool {
-				return r.form.Get("client_assertion_type") == assertion && r.form.Get("client_assertion") != ""
+				return r.form.Get("client_assertion_type") == assertion && r.form.Get("client_assertion") != "" && !r.basicAuth
 			},
 		},
 	}

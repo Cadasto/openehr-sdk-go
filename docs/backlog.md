@@ -10,7 +10,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - auth/scope.go:32 · The sentence "Empty parts collapse to omitted segments" holds for the compartment and the permission but not the resource, since BuildScope("patient", "", "rs") returns "patient/.rs" and BuildScope("patient", "", "") returns "patient/" (seen with an overlay probe), so say that an empty compartment or permission is left out together with its separator · by: go-reviewer · from: feat/openehr-scope-syntax
 
 ## auth/smart
-- auth/smart/confidential_pkce_test.go:117 · The private_key_jwt row only checks for a non-empty client_assertion and does not check that Basic auth is absent, unlike the client_secret_post row, so a client sending two authentication methods at once (RFC 6749 §2.3 forbids that) would still pass, and adding !r.basicAuth would close the gap · by: go-reviewer · from: feat/openehr-scope-syntax
 - auth/smart/source.go:508 · HL7 SMART App Launch v2.2 says the token-request client_id is "Required for public apps. Omit for confidential apps.", but exchangeCode always sends client_id in the form, even alongside Basic or a client_assertion; REQ-068 now says the SDK follows HL7 SMART for confidential clients, so either omit client_id or record the deviation · by: sdd-spec-conformance-reviewer · from: feat/openehr-scope-syntax
 
 ## cmd/probe-record
@@ -18,7 +17,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - cmd/probe-record/main_test.go · only the composition-minimal scenario has an offline sandbox capture test; ehr-status and stored-query have none, unlike ehr-lifecycle · from: pr201
 
 ## docs
-- docs/examples.md:619 · "holds none" can be read as an empty ETag, while REQ-054 falls back to Location whenever the ETag is not a well-formed object_version_id · by: sdd-doc-reviewer · from: fix/version-uid-from-etag
 - docs/architecture.md:42 · ID-token verification is placed in auth/smart here, while the normative auth/smart taxonomy row still names only PKCE, the launch flow, refresh, and JWKS rotation. · by: sdd-doc-reviewer · from: feat/smart-authorization-completion
 
 ## docs/adr
@@ -80,10 +78,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 ## openehr/aom
 - openehr/aom/aom14 · no standalone ADL 1.4 archetype corpus is vendored, so the aom14 interval corpus tests read their constraint intervals out of the OPTs instead of real archetype files · from: audit-2026-09
 
-## openehr/client/ehr
-- openehr/client/ehr/metadata.go:37 · on a 409 or 412 the OAS puts the server's current version_uid in the `ETag`, so every versioned leaf's error-path metadata now reports that version as `VersionUID` where it was empty before (scratch run: `composition.Update` with a 412 and ETag "...::7" returns the error plus VersionUID "...::7"); neither the PR's consumer-visible note nor the `VersionMetadata` doc says it is the conflicting current version, not one the caller wrote · by: go-reviewer · from: fix/version-uid-from-etag
-- openehr/client/ehr/ids_test.go:82 · the "bare id in the ETag" case passes with the well-formedness guard in `versionUIDFromETag` removed, because its `Location` tail equals the ETag; give it a `Location` tail that differs so it pins the MUST as well · by: sdd-spec-conformance-reviewer · from: fix/version-uid-from-etag
-
 ## openehr/instance
 - openehr/instance/interval_order.go · an interval whose two sides' OPT constraints admit no ordered pair is left inverted with no error, as § REQ-107 prescribes; reporting it needs a spec change first, and ErrConstraintUnsatisfiable is raised only for C_STRING leaves · from: audit-2026-09
 - openehr/instance/generate.go · settleIntervalEndpoints never reads a C_BOOLEAN on lower_unbounded or upper_unbounded, and a true-only C_BOOLEAN on lower_included or upper_included is not honoured on an open side (no vendored OPT constrains either flag) · from: audit-2026-09
@@ -130,10 +124,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - openehr/validation/rmfloor_temporal_element_test.go · no test pins that the Value_valid and Inv_null_flavour_indicated details stay value-free (REQ-093), or sends a JSON-null temporal value through the floor · from: pr199
 - openehr/validation/rmread · rmread does not read the optional String fields magnitude_status on DV_COUNT, DV_PROPORTION and the temporal types, units_display_name and units_system on DV_QUANTITY, PARTY_IDENTIFIED.name or ATTESTATION.proof; the generator writes none of them, so no template can constrain them yet · from: pr199
 
-## scripts
-- scripts/ingest-crossformat.sh:261 · The script deletes the old tree with rm -rf before the mv, so if the mv fails the EXIT trap also deletes the staged copy and neither tree is left, which contradicts the header's promise that a refusal leaves the vendored tree untouched; move the old tree aside first and delete it only after the mv succeeds · by: go-reviewer · from: test/cross-format-goldens
-- scripts/ingest-crossformat.sh:268 · If OPT_POINTERS is ever emptied, grep -c finds no opt line and exits 1, so under set -e ingest stops with status 1 and no summary after it has already replaced the vendored tree; use || true on both counts · by: go-reviewer · from: test/cross-format-goldens
-
 ## smart/discovery
 - smart/discovery/resolver.go:312 · Put still uses the caller's cancellable ctx while the Invalidate two lines above uses context.WithoutCancel, so if the starting caller gives up just after a successful fetch or a 304 renewal, MemoryCache.Put refuses it and the stale entry stays; no test covers this (switching Put to WithoutCancel leaves the suite green); use context.WithoutCancel(ctx) for Put as well · by: go-reviewer · from: feat/smart-discovery-model
 - smart/discovery/resolver.go:296 · The shared fetch runs under the starting caller's context, so one caller's cancellation fails every waiter that joined it with a context error those waiters did not cause, and now also drops a fresh cached catalog; consider running the shared fetch under context.WithoutCancel plus the client timeout, or letting a waiter whose own ctx is still live retry · by: go-reviewer · from: feat/smart-discovery-model
@@ -143,17 +133,8 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - smart/discovery/errors.go:73 · DiscoveryError.Issuer now holds the Platform base URL while ServiceCatalog.Issuer holds the OpenID Connect issuer, so one field name means two things on neighbouring types; this PR already breaks the Error() text, so adding a BaseURL field (and deprecating Issuer) costs less now than later · by: go-reviewer · from: feat/smart-discovery-model
 - smart/discovery/resolver.go:246 · A fresh cache hit returns the cached catalog without the calling Resolver's own checks, so with a Cache shared between Resolvers built with different options a stricter Resolver gets a catalog its checks would refuse until the entry expires; this predates the branch (main returned a fresh hit unchecked too) · by: sdd-implementer · from: feat/smart-discovery-model
 
-## testkit/conformance/crossformat
-- testkit/conformance/crossformat/recorded.go:16 · The Record doc says four rules hold and CheckRecords enforces them, but check() enforces six (it also rejects negative counts, and missing plus altered above compared); list all six so the doc matches the code · by: go-reviewer · from: test/cross-format-goldens
-- testkit/conformance/crossformat/CENSUS.md:65 · The recorded reasons cite a bare "deviations.md" here and in the consult_record, corona, multi_occurrence and persistent_minimal reasons, but the tree has two (openehr/serialize/simplified/ and openehr/template/webtemplate/), so name the path in recorded.go · by: sdd-doc-reviewer · from: test/cross-format-goldens
-
 ## testkit/conformance/webtemplate
 - testkit/conformance/webtemplate/case.go · IsCompositionMeta matches only unindexed spellings, so StructuredToFlat's `language:0|code`, `composer:0|name` and `context:0/start_time:0` reach decode in PROBE-105's structured-flat leg instead of being held out; changing it moves PROBE-086 · from: pr-crossformat
-- testkit/conformance/webtemplate/runner.go:435 · The doc comments at lines 348 and 435 still link [decodeReducing], which this change renamed to DecodeReducing, and line 435's "aborts the run" is no longer true for PROBE-105, where the same error now ends the leg as a recorded refusal · by: go-reviewer · from: test/cross-format-goldens
-
-## testkit/corpus
-- testkit/corpus/THIRD_PARTY_LICENSES.md:63 · "they point at templates/nested.en.v1.opt ... above" reads as a Robot-vendored OPT, but nested.en.v1 is the openEHR_SDK triplet (line 31) and MANIFEST.txt records its pointer against the robot copy, so say which upstream the vendored file came from · by: sdd-doc-reviewer · from: test/cross-format-goldens
-- testkit/corpus/README.md:82 · Refresh and verify are given as `bash scripts/ingest-crossformat.sh ingest` and `verify`, while the Makefile has `make crossformat-ingest` and `make crossformat-verify` and the flat-conformance paragraph above uses make targets (descriptor build_entrypoint: make) · by: sdd-doc-reviewer · from: test/cross-format-goldens
 
 ## testkit/probe
 - testkit/probe/livestatus_test.go · the Live snapshots assert less than the cassette witnesses: createEHRProbe (live_test.go) passes on any non-empty EHR id without comparing it to the per-run id, and the PROBE-065 read-back checks only a non-empty archetype_node_id, not the saved node id or template id · from: pr201
@@ -161,10 +142,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 ## testkit/probes/instance
 - testkit/probes/instance/corpus_ratchet_test.go · the census runs with Language en and one fixed Now, and its placeholder scan flags only the literal example, so a generator that wrote encoding utf8 or read time.Now() would leave it green · from: audit-2026-09
 - testkit/probes/instance/corpus_ratchet_test.go · the hollow_body floor counts every ELEMENT, so a body of null-flavour placeholders passes; counting only ELEMENTs that hold a value adds two rows (clinical_content_validation generate/example/example and generate/example/random) · from: pr199
-
-## testkit/probes/versioned
-- testkit/probes/versioned/probe_065_test.go:34 · the harness sets `Location` to the same full version id as the ETag, so PROBE-065's sandbox run cannot tell the ETag from `Location` (ignoring the ETag leaves ./testkit/probes/versioned green) and does not exercise the EHRbase shape this PR fixes; the `withLocation` knob now also controls the ETag · by: go-reviewer · from: fix/version-uid-from-etag
-- testkit/probes/versioned/probe_012_etag_round_trip.go:19 · the doc comment ("the Location-derived VersionUID") and the failure detail at line 41 ("Location header missing or unparseable") describe the old rule now that `VersionUID` is ETag-first · by: sdd-spec-conformance-reviewer, go-reviewer · from: fix/version-uid-from-etag
 
 ## testkit/recordings
 - testkit/recordings/composition-minimal.har · the captured OPT keeps its authoring tool's Generated By entry with an account name, as the vendored corpus OPTs do; strip it at capture if recordings are to carry no account names · from: pr201

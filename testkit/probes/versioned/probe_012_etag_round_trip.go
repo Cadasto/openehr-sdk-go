@@ -16,7 +16,8 @@ import (
 // returns a fresh version identifier distinct from the input.
 //
 // The probe exercises the [openehrclient.VersionMetadata] round-trip
-// contract: the Location-derived VersionUID on read becomes If-Match on
+// contract: VersionUID on read, the ETag when that header is a well-formed
+// object_version_id and the Location tail otherwise, becomes If-Match on
 // the follow-up write without consumer-side string surgery. It closes
 // the read-modify-write loop that every leaf client in
 // `openehr/client/ehr/*` is shaped around.
@@ -38,7 +39,7 @@ func Probe012ETagRoundTrip(ctx context.Context, c *transport.Client, ehrID opene
 	}
 	if meta == nil || meta.VersionUID == "" {
 		r.Status = "fail"
-		r.Detail = "initial Get returned no VersionUID (Location header missing or unparseable)"
+		r.Detail = "initial Get returned no VersionUID (ETag was not a well-formed object_version_id, and Location had no usable tail)"
 		return r, nil
 	}
 	initialVUID := meta.VersionUID

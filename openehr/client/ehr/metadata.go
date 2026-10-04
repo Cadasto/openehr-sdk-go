@@ -15,7 +15,9 @@ import (
 // clients may also fill it from the response body where applicable.
 // The ETag comes first because openEHR REST names the ETag as the
 // version id, sends Location only on a create, and some servers leave
-// the version out of Location.
+// the version out of Location. On an error return, VersionUID still
+// comes from that response's headers, so a 409 or 412 can name the
+// server's current version rather than a version this call wrote.
 type VersionMetadata struct {
 	*transport.Metadata
 	// VersionUID is the parsed identifier for the returned version,

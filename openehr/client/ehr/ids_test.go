@@ -79,7 +79,7 @@ func TestNewVersionMetadataPrefersETag(t *testing.T) {
 		{name: "no Location on an update", etag: vuid, want: vuid},
 		{name: "ETag and Location disagree", etag: vuid, location: "/ehr/e/composition/" + voID + "::cdr.example::1", want: vuid},
 		{name: "no ETag", location: "/ehr/e/composition/" + vuid, want: vuid},
-		{name: "bare id in the ETag", etag: voID, location: "/ehr/e/contribution/" + voID, want: voID},
+		{name: "bare id in the ETag", etag: voID, location: "/ehr/e/contribution/" + vuid, want: vuid},
 		{name: "opaque ETag", etag: "33a64df551425fcc55e4d42a148795d9f25f89d4", location: "/ehr/e/composition/" + vuid, want: vuid},
 		{name: "neither header"},
 	}
