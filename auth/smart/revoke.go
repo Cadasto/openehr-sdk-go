@@ -49,9 +49,10 @@ import (
 // when the body holds one, and the cause. When the server advertises no
 // revocation endpoint, Revoke sends nothing: it clears the tokens, calls
 // the hook and returns an error matching [auth.ErrInvalidConfig]. A source
-// that holds no token drops its last token response and the identity too,
-// and returns nil without sending a request or calling the hook, whether or
-// not a revocation endpoint is advertised.
+// that holds no token, which means no refresh token and no access-token
+// value, clears whatever is left of its access token, drops its last token
+// response and the identity too, and returns nil without sending a request
+// or calling the hook, whether or not a revocation endpoint is advertised.
 func (s *Source) Revoke(ctx context.Context) error {
 	s.mu.Lock()
 	s.lastTR = TokenResponse{}
@@ -61,6 +62,9 @@ func (s *Source) Revoke(ctx context.Context) error {
 		token, hint = s.cur.Value, "access_token"
 	}
 	if token == "" {
+		// Nothing to revoke, but an access token without a value may still
+		// carry other fields: clear it, so Token does not hand it out.
+		s.setTokensLocked(auth.Token{}, "")
 		s.mu.Unlock()
 		return nil
 	}

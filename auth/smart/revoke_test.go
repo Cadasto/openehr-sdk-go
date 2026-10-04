@@ -542,7 +542,9 @@ func TestRevokeWithoutEndpoint(t *testing.T) { // REQ-167
 
 // TestRevokeWithoutToken pins REQ-167: a source that holds no token drops
 // its last token response and returns nil from Revoke without sending a
-// request or calling the hook, with or without a revocation endpoint.
+// request or calling the hook, with or without a revocation endpoint. An
+// access token without a value counts as no token, and Revoke clears what
+// is left of it, so Token asks for re-authentication.
 func TestRevokeWithoutToken(t *testing.T) { // REQ-167
 	tests := []struct {
 		name  string
@@ -559,6 +561,12 @@ func TestRevokeWithoutToken(t *testing.T) { // REQ-167
 			name:  "a last token response but no token, no revocation endpoint",
 			edit:  func(ep *discovery.AuthEndpoints) { ep.RevocationEndpoint = nil },
 			setup: func(t *testing.T, f *revokeFixture) { f.signIn(t, auth.Token{}, "") },
+		},
+		{
+			name: "an access token without a value",
+			setup: func(t *testing.T, f *revokeFixture) {
+				f.signIn(t, auth.Token{Type: auth.TokenTypeBearer, Scope: "openid", ExpiresAt: time.Now().Add(time.Hour)}, "")
+			},
 		},
 		{
 			name: "already revoked",
@@ -582,6 +590,12 @@ func TestRevokeWithoutToken(t *testing.T) { // REQ-167
 			}
 			if last := f.src.LastTokenResponse(); !reflect.DeepEqual(last, smart.TokenResponse{}) {
 				t.Errorf("LastTokenResponse() after Revoke = %+v, want the zero value", last)
+			}
+			if access, refresh := f.src.HeldTokens(); access != (auth.Token{}) || refresh != "" {
+				t.Errorf("after Revoke the source holds %+v, %q; want nothing", access, refresh)
+			}
+			if tok, err := f.src.Token(t.Context()); !errors.Is(err, auth.ErrReauthRequired) {
+				t.Errorf("Token() after Revoke = %+v, %v; want auth.ErrReauthRequired", tok, err)
 			}
 			if n := len(f.as.revokeRequests()) - reqsBefore; n != 0 {
 				t.Errorf("revocation requests = %d, want none", n)

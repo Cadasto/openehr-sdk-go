@@ -733,3 +733,96 @@ func TestTokenChangeAfterCodeExchangeWithoutRefreshToken(t *testing.T) { // REQ-
 		t.Errorf("token changes = %+v, want one with at-1 and an empty refresh token", changes)
 	}
 }
+
+// TestTokenChangesKeepInstallOrderAcrossRevoke pins REQ-063 and REQ-167:
+// changes reach the hook in the order the source installed them, Revoke's
+// empty change included. While the hook is busy on another goroutine with
+// an earlier change, Revoke clears the tokens and sends its request, and a
+// code exchange installs new tokens before that request ends; the hook then
+// sees the earlier change, Revoke's empty one and the new session's, in
+// that order.
+func TestTokenChangesKeepInstallOrderAcrossRevoke(t *testing.T) { // REQ-063 REQ-167
+	as := newStubServer(t)
+	as.answerRevoke(0, "")
+	var (
+		mu   sync.Mutex
+		seen []string
+	)
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	revokeSent := make(chan struct{}, 1)
+	revokeEnd := make(chan struct{})
+	client := &http.Client{Transport: observingTransport{
+		next:    as.srv.Client().Transport,
+		observe: func() { revokeSent <- struct{}{}; <-revokeEnd }, // holds the revocation request
+	}}
+	src := as.source(t, as.endpoints(), smart.WithHTTPClient(client), smart.WithTokenChange(func(_ context.Context, c smart.TokenChange) {
+		mu.Lock()
+		seen = append(seen, c.Access.Value) // "" for Revoke's empty change
+		mu.Unlock()
+		if c.Access.Value == "at-1" {
+			entered <- struct{}{}
+			<-release
+		}
+	}))
+	exchange := func(code, access string) error {
+		as.answerToken(0, tokenBody(t, access, "rt-"+access, ""))
+		req, err := src.BeginAuthorization("")
+		if err != nil {
+			return err
+		}
+		_, _, err = src.ExchangeAuthorizationCode(t.Context(), code, req.State, req)
+		return err
+	}
+	wait := func(what string, ch <-chan struct{}) {
+		t.Helper()
+		select {
+		case <-ch:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("timed out waiting for %s", what)
+		}
+	}
+
+	// The hook is busy with the first session's change on its own goroutine.
+	first := make(chan struct{})
+	go func() {
+		defer close(first)
+		if err := exchange("code-1", "at-1"); err != nil {
+			t.Errorf("first ExchangeAuthorizationCode() error = %v", err)
+		}
+	}()
+	wait("the hook to start on at-1", entered)
+
+	// Revoke clears the tokens and its request is held on its way.
+	revoked := make(chan error, 1)
+	go func() { revoked <- src.Revoke(t.Context()) }()
+	wait("the revocation request", revokeSent)
+
+	// A new session is installed before the revocation request ends.
+	withinDeadline(t, "a code exchange while Revoke's request is on its way", func() {
+		if err := exchange("code-2", "at-2"); err != nil {
+			t.Errorf("second ExchangeAuthorizationCode() error = %v", err)
+		}
+	})
+	close(revokeEnd)
+	select {
+	case err := <-revoked:
+		if err != nil {
+			t.Errorf("Revoke() error = %v, want nil", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Revoke did not return although another goroutine is reporting changes")
+	}
+
+	close(release)
+	wait("the first code exchange to return", first)
+	mu.Lock()
+	got := slices.Clone(seen)
+	mu.Unlock()
+	if want := []string{"at-1", "", "at-2"}; !slices.Equal(got, want) {
+		t.Errorf("hook saw access tokens %q, want %q: the earlier change, Revoke's empty one, then the new session's", got, want)
+	}
+	if access, _ := src.HeldTokens(); access.Value != "at-2" {
+		t.Errorf("held access token = %q, want the new session's at-2", access.Value)
+	}
+}
