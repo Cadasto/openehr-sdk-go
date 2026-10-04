@@ -29,8 +29,13 @@ const (
 	// is not an absolute https URL with a host and without a query or
 	// fragment.
 	ReasonMalformedURL DiscoveryErrorReason = "malformed_url"
-	// ReasonAuthEndpointsMissing indicates the authorization or token
-	// endpoint URL is absent from a SMART config that requires them.
+	// ReasonAuthEndpointsMissing indicates the SMART configuration
+	// declares authorization-server members but omits one it needs:
+	// token_endpoint whenever any of authorization_endpoint, token_endpoint
+	// or jwks_uri is present; authorization_endpoint when capabilities
+	// lists launch-ehr or launch-standalone; jwks_uri when it lists
+	// sso-openid-connect. A document with none of the three is an
+	// anonymous-only deployment and is not refused.
 	ReasonAuthEndpointsMissing DiscoveryErrorReason = "auth_endpoints_missing"
 	// ReasonInsecureURL indicates a non-https URL was rejected: the base
 	// URL passed to the resolver, the issuer the document declares, or a

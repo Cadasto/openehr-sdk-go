@@ -587,14 +587,45 @@ func (r *Resolver) validate(cat *ServiceCatalog) error {
 			}
 		}
 	}
-	// 3. Required auth endpoints present, when any auth fields are
-	//    present at all. A deployment with no auth (anonymous-only)
-	//    legitimately ships zero auth endpoints.
-	if cat.Auth.AuthorizationEndpoint == nil && cat.Auth.TokenEndpoint == nil && cat.Auth.JWKSURI == nil {
+	// 3. The authorization-server members SMART App Launch 2.2.0 makes
+	//    conditional on what the document advertises.
+	if err := missingAuthMember(cat.Auth); err != nil {
+		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonAuthEndpointsMissing, Inner: err}
+	}
+	return nil
+}
+
+// SMART App Launch capabilities that make an authorization-server member
+// required.
+const (
+	capabilityLaunchEHR        = "launch-ehr"
+	capabilityLaunchStandalone = "launch-standalone"
+	capabilitySSOOpenIDConnect = "sso-openid-connect"
+)
+
+// missingAuthMember names the first authorization-server member the
+// document needs but omits, or returns nil. A document that declares none
+// of authorization_endpoint, token_endpoint and jwks_uri is an
+// anonymous-only deployment and needs none of them. Otherwise
+// token_endpoint is always needed; authorization_endpoint only for a user
+// launch (launch-ehr, launch-standalone), so a backend-only document may
+// leave it out; and jwks_uri for sso-openid-connect.
+func missingAuthMember(a AuthEndpoints) error {
+	if a.AuthorizationEndpoint == nil && a.TokenEndpoint == nil && a.JWKSURI == nil {
 		return nil
 	}
-	if cat.Auth.AuthorizationEndpoint == nil || cat.Auth.TokenEndpoint == nil {
-		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonAuthEndpointsMissing, Inner: errors.New("authorization_endpoint and token_endpoint are required when any auth fields are present")}
+	if a.TokenEndpoint == nil {
+		return errors.New("token_endpoint is required when the document declares authorization_endpoint or jwks_uri")
+	}
+	if a.AuthorizationEndpoint == nil {
+		for _, c := range []string{capabilityLaunchEHR, capabilityLaunchStandalone} {
+			if slices.Contains(a.Capabilities, c) {
+				return fmt.Errorf("authorization_endpoint is required by capability %q", c)
+			}
+		}
+	}
+	if a.JWKSURI == nil && slices.Contains(a.Capabilities, capabilitySSOOpenIDConnect) {
+		return fmt.Errorf("jwks_uri is required by capability %q", capabilitySSOOpenIDConnect)
 	}
 	return nil
 }
