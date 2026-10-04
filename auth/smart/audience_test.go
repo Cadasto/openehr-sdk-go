@@ -147,7 +147,7 @@ func TestSourceWithoutAudienceRefused(t *testing.T) { // REQ-061
 // TestCodeChallengeMethodsWithoutS256Refused pins that a server advertising
 // PKCE methods without S256 is refused at construction, and that an absent
 // or empty list is accepted. Method names are case-sensitive (RFC 7636
-// §4.2), so "s256" is not S256. REQ-061
+// §6.2.1), so "s256" is not S256. REQ-061
 func TestCodeChallengeMethodsWithoutS256Refused(t *testing.T) { // REQ-061
 	tests := []struct {
 		name    string

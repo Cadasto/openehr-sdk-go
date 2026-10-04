@@ -234,8 +234,11 @@ func readJWKS() []byte {
 func TestExchangeRequiresAuthorizationRequest(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	src, _ := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
-	_, _, err := src.ExchangeAuthorizationCode(t.Context(), "code", "", smart.AuthorizationRequest{})
+	src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	if err != nil {
+		t.Fatalf("newSource: %v", err)
+	}
+	_, _, err = src.ExchangeAuthorizationCode(t.Context(), "code", "", smart.AuthorizationRequest{})
 	if !errors.Is(err, auth.ErrInvalidConfig) {
 		t.Fatalf("err = %v, want ErrInvalidConfig (empty-request guard, not state mismatch)", err)
 	}
@@ -353,6 +356,12 @@ func TestAuthorizeURLKeepsEndpointQuery(t *testing.T) { // REQ-061
 		{
 			name:     "SDK value wins a name clash",
 			endpoint: "https://as.example/authorize?response_type=token",
+		},
+		{
+			// The configured audience replaces an aud the endpoint already
+			// carries, so the request names exactly one audience.
+			name:     "configured aud wins a clash",
+			endpoint: "https://as.example/authorize?aud=other",
 		},
 	}
 	for _, tc := range tests {
@@ -950,7 +959,10 @@ func TestExchangeNormalisesBearerTokenType(t *testing.T) { // REQ-060
 func TestTokenStaleWithoutRefreshDoesNotDeadlock(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	src, _ := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	if err != nil {
+		t.Fatalf("newSource: %v", err)
+	}
 	// Stale but NOT expired (within the 30s proactive-refresh threshold), no
 	// refresh token: Token() returns the still-valid cached token without
 	// deadlocking on concurrent calls.
@@ -979,7 +991,10 @@ func TestTokenStaleWithoutRefreshDoesNotDeadlock(t *testing.T) {
 func TestTokenExpiredWithoutRefreshReturnsReauthRequired(t *testing.T) { // REQ-063
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	src, _ := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	if err != nil {
+		t.Fatalf("newSource: %v", err)
+	}
 	src.SetTokens(auth.Token{Value: "stale", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "")
 
 	tok, err := src.Token(t.Context())
