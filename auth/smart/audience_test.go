@@ -143,3 +143,45 @@ func TestSourceWithoutAudienceRefused(t *testing.T) { // REQ-061
 		})
 	}
 }
+
+// TestCodeChallengeMethodsWithoutS256Refused pins that a server advertising
+// PKCE methods without S256 is refused at construction, and that an absent
+// or empty list is accepted. Method names are case-sensitive (RFC 7636
+// §4.2), so "s256" is not S256. REQ-061
+func TestCodeChallengeMethodsWithoutS256Refused(t *testing.T) { // REQ-061
+	tests := []struct {
+		name    string
+		methods []string
+		refused bool
+	}{
+		{name: "plain only", methods: []string{"plain"}, refused: true},
+		{name: "lower-case s256", methods: []string{"s256"}, refused: true},
+		{name: "S256 only", methods: []string{"S256"}},
+		{name: "plain and S256", methods: []string{"plain", "S256"}},
+		{name: "nil list", methods: nil},
+		{name: "empty list", methods: []string{}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ep := audienceTestEndpoints()
+			ep.CodeChallengeMethodsSupported = tc.methods
+			_, err := smart.New("client-id", ep,
+				smart.WithHTTPClient(&http.Client{}),
+				smart.WithRedirectURI("https://app.example/callback"),
+				smart.WithAudience("https://platform.example/openehr"),
+			)
+			if !tc.refused {
+				if err != nil {
+					t.Fatalf("New with code_challenge_methods_supported %q: %v, want success", tc.methods, err)
+				}
+				return
+			}
+			if !errors.Is(err, auth.ErrInvalidConfig) {
+				t.Fatalf("New with code_challenge_methods_supported %q: err = %v, want auth.ErrInvalidConfig", tc.methods, err)
+			}
+			if !strings.Contains(err.Error(), "S256") {
+				t.Errorf("New with code_challenge_methods_supported %q: error %q does not name S256", tc.methods, err)
+			}
+		})
+	}
+}

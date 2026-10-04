@@ -154,8 +154,9 @@ type tokenExchange struct {
 // SMART requires the `aud` parameter on every authorization request, and
 // New has no Platform base URL to default it from, so pass [WithAudience];
 // without it New fails with [auth.ErrInvalidConfig]. [NewFromCatalog]
-// fills the audience in from a resolved catalog. The other checks are those
-// of [FromConfig].
+// fills the audience in from a resolved catalog. A server whose advertised
+// PKCE methods leave out S256 is refused the same way. The other checks are
+// those of [FromConfig].
 func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Source, error) {
 	cfg := Config{
 		ClientID:         clientID,
@@ -177,6 +178,12 @@ func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Sour
 // requires the `aud` parameter on the authorization request, and
 // FromConfig does not guess one: set Audience to the Platform base URL or
 // to an audience identifier the authorization server knows.
+//
+// The SDK always uses the S256 PKCE method. When cfg.Auth lists the
+// server's supported methods (CodeChallengeMethodsSupported) and S256 is
+// not among them, FromConfig fails with [auth.ErrInvalidConfig], since such
+// a server cannot check the challenge. An empty list is accepted: a
+// hand-built catalog often leaves it out.
 func FromConfig(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
 		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
@@ -192,6 +199,13 @@ func FromConfig(cfg Config) (*Source, error) {
 	}
 	if cfg.Audience == "" {
 		return nil, fmt.Errorf("%w: Audience is required: SMART requires the aud authorization parameter (set WithAudience, or build the source with NewFromCatalog)", auth.ErrInvalidConfig)
+	}
+	// The SDK sends only S256 challenges, so a server that lists its PKCE
+	// methods without S256 cannot verify them. An empty list says nothing.
+	if advertised := cfg.Auth.CodeChallengeMethodsSupported; len(advertised) > 0 &&
+		!slices.Contains(advertised, challengeMethod) {
+		return nil, fmt.Errorf("%w: the server's code_challenge_methods_supported %q does not list %s, the only PKCE method the SDK sends",
+			auth.ErrInvalidConfig, advertised, challengeMethod)
 	}
 	if cfg.RefreshThreshold == 0 {
 		cfg.RefreshThreshold = 30 * time.Second
@@ -275,7 +289,8 @@ func configureClientAuth(cfg *Config) error {
 // catalog.BaseURL, the Platform base URL, unless opts include
 // [WithAudience]. A catalog with an empty BaseURL gives no default, so the
 // call then fails with [auth.ErrInvalidConfig] unless the caller sets one.
-// The other checks are those of [FromConfig].
+// A catalog whose code_challenge_methods_supported leaves out S256 is
+// refused with the same error. The other checks are those of [FromConfig].
 func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID string, opts ...Option) (*Source, error) {
 	if catalog == nil {
 		return nil, fmt.Errorf("%w: catalog is nil", auth.ErrInvalidConfig)
