@@ -444,7 +444,7 @@ This is the SDK's contribution to platform-side audit. The platform decides what
 
 Each SDK client instance **MUST** bind to exactly one Platform base URL and therefore one tenant context:
 
-- Discovery cache (`smart/discovery`) is keyed by Platform base URL; the OIDC issuer the document names is a property of that entry ([service-discovery.md § REQ-070](service-discovery.md#req-070)).
+- Discovery cache (`smart/discovery`) entries are keyed as [service-discovery.md § REQ-071](service-discovery.md#req-071) requires; the OIDC issuer the document names is a property of the entry.
 - `TokenSource` is per-client (or per-request via ctx, REQ-060).
 - Connection pool, retry budget, OTel spans are per-client.
 

@@ -130,6 +130,7 @@ The discovery cache **MUST**:
 - Honour `ETag` / `If-None-Match` for conditional refresh — a `304 Not Modified` on refresh extends the cached entry's TTL without replacing the body.
 - Be invalidated on `401` / `403` against a previously-working endpoint, after at most one refresh attempt.
 - Coalesce concurrent resolution attempts (REQ-026) — one goroutine fetches; the others wait.
+- Key every entry by the Platform base URL the caller resolved, never by the document's `issuer` ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).
 
 The resolver defers closing the response body before it branches on the status, so the `304` path closes it too.
 
@@ -146,7 +147,7 @@ transport.WithReauthOn401(auth.ReautherFunc(func(ctx context.Context) error {
 
 Cache implementation:
 
-- The default cache is in-process, keyed by Platform base URL.
+- The default cache is in-process.
 - A `Cache` interface **MAY** be injected for file-backed or distributed caching:
 
 ```go
@@ -164,8 +165,8 @@ type Cache interface {
 On every resolution and every refresh, the SDK **MUST**:
 
 - Verify required services are present. Missing required services **MUST** produce a typed `DiscoveryError` with the missing service IDs enumerated.
-- Verify spec-version compatibility. When a service entry advertises a `spec_version`, it **MUST** match the SDK's pinned target (REQ-050) or the caller-widened set; a mismatch **MUST** produce a typed `DiscoveryError`. When a service entry does **not** advertise `spec_version` (field absent or empty) and the caller has not explicitly narrowed the accepted set via `WithAcceptedSpecVersions`, the check is **skipped** — absence is treated as acceptable (ADR 0008). This preserves strict behaviour for callers that pin versions explicitly. Without `WithAcceptedSpecVersions` the canonical `version` member **MUST NOT** be compared, so a Platform that advertises its own API version is not refused by default. With `WithAcceptedSpecVersions`, the compared value **MUST** be `spec_version` when the entry advertises it and `version` otherwise.
-- Verify the authorization-server members SMART App Launch 2.2.0 makes conditional, whenever the document declares any of `authorization_endpoint`, `token_endpoint` or `jwks_uri` (a document with none of them is an anonymous-only deployment and passes): `token_endpoint` **MUST** be present; `authorization_endpoint` **MUST** be present when `capabilities` contains `launch-ehr` or `launch-standalone`; `jwks_uri` **MUST** be present when `capabilities` contains `sso-openid-connect`. A document that omits a member it needs **MUST** produce `DiscoveryError{Reason: ReasonAuthEndpointsMissing}`; a backend-only document without `authorization_endpoint` **MUST** be accepted.
+- Verify spec-version compatibility. When a service entry advertises a `spec_version`, it **MUST** match the SDK's pinned target (REQ-050) or, when the caller sets `WithAcceptedSpecVersions`, one of the versions it names; that list replaces the pinned target, so a caller who still accepts the pin names it too. A mismatch **MUST** produce a typed `DiscoveryError`. When a service entry does **not** advertise `spec_version` (field absent or empty) and the caller has not explicitly narrowed the accepted set via `WithAcceptedSpecVersions`, the check is **skipped** — absence is treated as acceptable (ADR 0008). This preserves strict behaviour for callers that pin versions explicitly. Without `WithAcceptedSpecVersions` the canonical `version` member **MUST NOT** be compared, so a Platform that advertises its own API version is not refused by default. With `WithAcceptedSpecVersions`, the compared value **MUST** be `spec_version` when the entry advertises it and `version` otherwise.
+- Verify the authorization-server members SMART App Launch 2.2.0 makes conditional, whenever the document declares any of `authorization_endpoint`, `token_endpoint` or `jwks_uri`, or advertises any of the capabilities `launch-ehr`, `launch-standalone` or `sso-openid-connect` (a document with neither is an anonymous-only deployment and passes): `token_endpoint` **MUST** be present; `authorization_endpoint` **MUST** be present when `capabilities` contains `launch-ehr` or `launch-standalone`; `jwks_uri` **MUST** be present when `capabilities` contains `sso-openid-connect`. A document that omits a member it needs **MUST** produce `DiscoveryError{Reason: ReasonAuthEndpointsMissing}`; a backend-only document without `authorization_endpoint` **MUST** be accepted.
 - Validate URL well-formedness. Malformed `BaseURL` / `AuthorizationEndpoint` / etc. **MUST** produce a typed `DiscoveryError`.
 
 Soft compatibility (forward-compatible spec micro-versions) **MAY** be allowed via a functional option:
