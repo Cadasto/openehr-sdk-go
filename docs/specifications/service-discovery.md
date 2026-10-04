@@ -73,7 +73,7 @@ type AuthEndpoints struct {
     CodeChallengeMethodsSupported []string
     GrantTypesSupported   []string
     TokenEndpointAuthMethodsSupported          []string // G-3 cross-check; NewFromCatalog method check (REQ-068)
-    TokenEndpointAuthSigningAlgValuesSupported []string // NewFromCatalog client-assertion alg check (REQ-068)
+    TokenEndpointAuthSigningAlgValuesSupported []string // auth/smart and NewFromCatalog client-assertion alg check (REQ-068)
     IDTokenSigningAlgValuesSupported           []string // ID-token verify allowlist, consumed by ValidateIDToken (REQ-062, REQ-064)
     AuthorizationResponseIssParameterSupported bool     // RFC 9207 authorization_response_iss_parameter_supported (REQ-061)
     Capabilities []string

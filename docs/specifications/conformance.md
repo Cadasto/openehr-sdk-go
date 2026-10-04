@@ -47,7 +47,7 @@ Every probe that asserts against a **backend** **MUST** be runnable in three mod
 
 The probe definition is the single source; the runner ([`testkit/probe`](../../testkit/probe/)) picks the backend at invocation time.
 
-**Not every probe is backend-facing.** An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output — the AQL round-trip and catalogue properties, the upstream FLAT parity harness, the codec and validation multiset probes — and reaches no server in any mode. Such a probe **MUST** declare `In-repo` in its **Modes** line, and the three-mode rule above does **not** bind it: there is no backend for a recording to capture or a deployment to confirm. This is a declared class, not a shortfall, and it is why a blanket three-mode reading of this requirement is wrong — 34 of the 76 catalog entries are in-repo by construction.
+**Not every probe is backend-facing.** An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output — the AQL round-trip and catalogue properties, the upstream FLAT parity harness, the codec and validation multiset probes — and reaches no server in any mode. Such a probe **MUST** declare `In-repo` in its **Modes** line, and the three-mode rule above does **not** bind it: there is no backend for a recording to capture or a deployment to confirm. This is a declared class, not a shortfall, and it is why a blanket three-mode reading of this requirement is wrong — 34 of the 77 catalog entries are in-repo by construction.
 
 The class check **MUST** refuse a dot import of a package it would follow, because it cannot tell which names that import declares.
 
@@ -269,6 +269,16 @@ The catalog is the normative list. Each entry has:
 - **Modes:** Sandbox, Cassette.
 - **Status:** Implemented (Sandbox) — both halves. The transport-side safety net (wire 401 → `Reauth` → retry once with refreshed bearer) is asserted in [`testkit/probes/auth/probe_007_transport_refresh.go`](../../testkit/probes/auth/probe_007_transport_refresh.go) (REQ-063, Phase 4b). The proactive expiry-based half — `Source.Token` refreshing a stale token via a `grant_type=refresh_token` exchange on the wire — landed in Phase 5 as [`testkit/probes/auth/probe_007_proactive_refresh.go`](../../testkit/probes/auth/probe_007_proactive_refresh.go); it seeds an expired access token + valid refresh token and asserts the token endpoint receives exactly one `grant_type=refresh_token` request and the SDK returns the freshly issued bearer. (`auth/smart` unit tests `TestRefreshIfNeeded` / `TestSourceReauthForcesRefresh` remain.) Full cassette/live ratification is deferred.
 - **Satisfies:** REQ-063
+
+#### PROBE-106 — Sign-out revokes at the advertised revocation endpoint
+
+- **Title:** `Source.Revoke` sends the source's refresh token to the advertised `revocation_endpoint` (RFC 7009) and leaves the source signed out.
+- **Preconditions:** The SMART configuration advertises `revocation_endpoint`; the source holds an access token and a refresh token from a code exchange.
+- **Wire assertion:** The revocation endpoint receives exactly one form-encoded `POST` carrying `token=<refresh token>` and `token_type_hint=refresh_token`, authenticated as the token endpoint authenticates the same client (a public client sends `client_id`); a `200` answer makes `Revoke` return nil, and afterwards the source holds no token and its next `Token` call fails with `auth.ErrReauthRequired` without a token-endpoint request.
+- **Effect:** mutating (the revoked grant).
+- **Modes:** Sandbox.
+- **Status:** Draft.
+- **Satisfies:** REQ-167.
 
 #### Launch-mode coverage (REQ-068)
 
