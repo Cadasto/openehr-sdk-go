@@ -188,13 +188,15 @@ func TestWireErrorChallengeDescriptionNeedsRawErrorBodies(t *testing.T) { // REQ
 // TestReauthOn401FollowsBearerChallenge — REQ-166, REQ-063: the opt-in 401
 // safety net calls Reauth and retries once only when the 401 has no Bearer
 // challenge, or one that names no error or invalid_token. Any other error,
-// insufficient_scope included, comes back at once: no Reauth, no retry.
+// insufficient_scope included, comes back at once: no Reauth, no retry. A
+// 403 never reaches Reauth, even with a challenge a 401 would act on.
 func TestReauthOn401FollowsBearerChallenge(t *testing.T) { // REQ-166
 	cases := []struct {
 		name      string
+		status    int // the first response's status; zero means 401
 		lines     []string
 		reauth    bool   // whether Reauth runs and the request is retried
-		wantError string // Challenge.Error on the surfaced 401, when refused
+		wantError string // Challenge.Error on the surfaced response, when refused
 	}{
 		{name: "no header", reauth: true},
 		{name: "Bearer without error", lines: []string{`Bearer realm="x"`}, reauth: true},
@@ -224,16 +226,26 @@ func TestReauthOn401FollowsBearerChallenge(t *testing.T) { // REQ-166
 			lines:     []string{`DPoP algs="ES256"`, `bearer ERROR="insufficient_scope"`},
 			wantError: "insufficient_scope",
 		},
+		{
+			name:      "403 Bearer invalid_token",
+			status:    http.StatusForbidden,
+			lines:     []string{`Bearer error="invalid_token"`},
+			wantError: "invalid_token",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			status, sentinel := http.StatusUnauthorized, transport.ErrUnauthorized
+			if tc.status == http.StatusForbidden {
+				status, sentinel = http.StatusForbidden, transport.ErrForbidden
+			}
 			var upstream, reauths atomic.Int32
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				if upstream.Add(1) == 1 {
 					for _, l := range tc.lines {
 						w.Header().Add("WWW-Authenticate", l)
 					}
-					w.WriteHeader(http.StatusUnauthorized)
+					w.WriteHeader(status)
 					return
 				}
 				_, _ = w.Write([]byte(`{}`))
@@ -268,8 +280,8 @@ func TestReauthOn401FollowsBearerChallenge(t *testing.T) { // REQ-166
 				}
 				return
 			}
-			if !errors.Is(err, transport.ErrUnauthorized) {
-				t.Fatalf("Do() error = %v, want errors.Is ErrUnauthorized", err)
+			if !errors.Is(err, sentinel) {
+				t.Fatalf("Do() error = %v, want errors.Is %v", err, sentinel)
 			}
 			we, ok := errors.AsType[*transport.WireError](err)
 			if !ok || we == nil || we.Challenge == nil || we.Challenge.Error != tc.wantError {
