@@ -97,10 +97,10 @@ func TestCorpusOPTBooleansAreLexicallyValid(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		// The flat-conformance subtree is pinned upstream data, integrity-checked
-		// by its MANIFEST.txt and synced by a script. It must not be hand-edited,
-		// so a finding there would have no allowed fix.
-		if d.IsDir() && d.Name() == "flat-conformance" && p != fixtures.CorpusRoot() {
+		// The flat-conformance and crossformat subtrees are pinned upstream data,
+		// integrity-checked by their MANIFEST.txt and written by a script. They
+		// must not be hand-edited, so a finding there would have no allowed fix.
+		if d.IsDir() && (d.Name() == "flat-conformance" || d.Name() == "crossformat") && p != fixtures.CorpusRoot() {
 			return fs.SkipDir
 		}
 		if !d.IsDir() && strings.HasSuffix(p, ".opt") {

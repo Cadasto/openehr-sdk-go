@@ -784,6 +784,7 @@ requirements:
     probes: [PROBE-086, PROBE-089]
     tests:
       - testkit/conformance/webtemplate/runner_test.go
+      - testkit/fixtures/crossformat_test.go
       - testkit/probe/livecomposition_test.go
       - testkit/probes/serialize/probe_086_upstream_flat_parity.go
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
