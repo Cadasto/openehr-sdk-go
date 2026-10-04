@@ -107,7 +107,12 @@ func WithScopes(scopes ...string) Option {
 	return func(cfg *Config) { cfg.Scopes = scopes }
 }
 
-// WithAudience sets the `aud` authorization parameter.
+// WithAudience sets the `aud` parameter of the authorization request: the
+// resource server the access token is meant for. SMART requires it, so a
+// source without an audience is refused at construction. Pass the Platform
+// base URL (the `iss` of an embedded launch) or an audience identifier the
+// authorization server knows. [NewFromCatalog] defaults it to the catalog's
+// Platform base URL; set this option to send something else.
 func WithAudience(aud string) Option {
 	return func(cfg *Config) { cfg.Audience = aud }
 }
@@ -145,6 +150,13 @@ type tokenExchange struct {
 }
 
 // New constructs a Source from clientID and discovery auth endpoints.
+//
+// SMART requires the `aud` parameter on every authorization request, and
+// New has no Platform base URL to default it from, so pass [WithAudience];
+// without it New fails with [auth.ErrInvalidConfig]. [NewFromCatalog]
+// fills the audience in from a resolved catalog. A server whose advertised
+// PKCE methods leave out S256 is refused the same way. The other checks are
+// those of [FromConfig].
 func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Source, error) {
 	cfg := Config{
 		ClientID:         clientID,
@@ -160,6 +172,25 @@ func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Sour
 }
 
 // FromConfig validates cfg and returns a Source.
+//
+// It fails with [auth.ErrInvalidConfig] when cfg has no HTTPClient, no
+// ClientID, no token or authorization endpoint, or no Audience. SMART
+// requires the `aud` parameter on the authorization request, and
+// FromConfig does not guess one: set Audience to the Platform base URL or
+// to an audience identifier the authorization server knows.
+//
+// The SDK always uses the S256 PKCE method. When cfg.Auth lists the
+// server's supported methods (CodeChallengeMethodsSupported) and S256 is
+// not among them, FromConfig fails with [auth.ErrInvalidConfig], since such
+// a server cannot check the challenge. An empty list is accepted: a
+// hand-built catalog often leaves it out.
+//
+// FromConfig also fails with [auth.ErrInvalidConfig] on client credentials
+// that conflict or do not fit the server: both a client secret and a
+// client assertion key; a nil signing key, an unsupported algorithm, or a
+// key that does not suit the algorithm; or a client authentication method
+// that a non-empty TokenEndpointAuthMethodsSupported does not list. A
+// JWKSURI it cannot build a key-set fetcher from fails the same way.
 func FromConfig(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
 		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
@@ -172,6 +203,16 @@ func FromConfig(cfg Config) (*Source, error) {
 	}
 	if cfg.Auth.AuthorizationEndpoint == nil {
 		return nil, fmt.Errorf("%w: AuthorizationEndpoint is required", auth.ErrInvalidConfig)
+	}
+	if cfg.Audience == "" {
+		return nil, fmt.Errorf("%w: Audience is required: SMART requires the aud authorization parameter (set WithAudience, or use NewFromCatalog with a catalog that has a BaseURL)", auth.ErrInvalidConfig)
+	}
+	// The SDK sends only S256 challenges, so a server that lists its PKCE
+	// methods without S256 cannot verify them. An empty list says nothing.
+	if advertised := cfg.Auth.CodeChallengeMethodsSupported; len(advertised) > 0 &&
+		!slices.Contains(advertised, challengeMethod) {
+		return nil, fmt.Errorf("%w: the server's code_challenge_methods_supported %q does not list %s, the only PKCE method the SDK sends",
+			auth.ErrInvalidConfig, advertised, challengeMethod)
 	}
 	if cfg.RefreshThreshold == 0 {
 		cfg.RefreshThreshold = 30 * time.Second
@@ -248,14 +289,28 @@ func configureClientAuth(cfg *Config) error {
 }
 
 // NewFromCatalog builds a Source from a resolved ServiceCatalog.
+//
+// It takes the endpoints from catalog.Auth and records catalog.Issuer, the
+// OpenID Connect issuer, on the tokens it produces. SMART requires the
+// `aud` authorization parameter, and NewFromCatalog sets it to
+// catalog.BaseURL, the Platform base URL, unless opts include
+// [WithAudience]. A catalog with an empty BaseURL gives no default, so the
+// call then fails with [auth.ErrInvalidConfig] unless the caller sets one.
+// A catalog whose code_challenge_methods_supported leaves out S256 is
+// refused with the same error. The other checks are those of [FromConfig].
 func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID string, opts ...Option) (*Source, error) {
 	if catalog == nil {
 		return nil, fmt.Errorf("%w: catalog is nil", auth.ErrInvalidConfig)
 	}
-	all := append([]Option{
+	// The defaults come first, so an option the caller passes wins.
+	all := []Option{
 		WithAuthEndpoints(catalog.Auth),
 		WithIssuer(catalog.Issuer),
-	}, opts...)
+	}
+	if catalog.BaseURL != "" {
+		all = append(all, WithAudience(catalog.BaseURL))
+	}
+	all = append(all, opts...)
 	return New(clientID, catalog.Auth, all...)
 }
 
@@ -311,9 +366,8 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	if len(s.cfg.Scopes) > 0 {
 		q.Set("scope", strings.Join(s.cfg.Scopes, " "))
 	}
-	if s.cfg.Audience != "" {
-		q.Set("aud", s.cfg.Audience)
-	}
+	// FromConfig refuses a source without an audience, so aud is always set.
+	q.Set("aud", s.cfg.Audience)
 	if launch != "" {
 		q.Set("launch", launch)
 	}

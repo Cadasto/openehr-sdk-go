@@ -39,7 +39,8 @@ import (
 // ServiceCatalog is the resolved set of service base URLs for a SMART-on-openEHR
 // deployment, plus metadata for caching and refresh.
 type ServiceCatalog struct {
-    Issuer     string                  // deployment issuer URL
+    BaseURL    string                  // Platform base URL: the discovery root, and the "iss" of an embedded launch
+    Issuer     string                  // OIDC issuer: the document's "issuer", or BaseURL when the document declares none
     Services   map[string]ServiceEntry // keyed by service identifier (e.g. "org.openehr.rest")
     Auth       AuthEndpoints           // authorization_endpoint, token_endpoint, jwks_uri, registration_endpoint
     ResolvedAt time.Time               // when the catalog was resolved
@@ -50,7 +51,11 @@ type ServiceCatalog struct {
 type ServiceEntry struct {
     ID            string   // canonical identifier (e.g. "org.openehr.rest")
     BaseURL       *url.URL // resolved base URL
-    SpecVersion   string   // declared spec version, e.g. "1.1.0-development"
+    Version       string   // the entry's "version" member, verbatim
+    SpecVersion   string   // the non-canonical "spec_version" member, verbatim (tolerated, ADR 0008)
+    Description   string   // the entry's "description" member, verbatim
+    Documentation string   // the entry's "documentation" member, verbatim
+    OpenAPI       string   // the entry's "openapi" member, verbatim
     Capabilities  []string // optional capability flags
 }
 
@@ -76,6 +81,10 @@ type AuthEndpoints struct {
 
 Every typed client (`openehr/client/ehr`, `openehr/client/query`, `cadasto/extra`, etc.) **MUST** resolve its base URL from the catalog by service ID, not from a top-level "base URL" config field.
 
+The catalog **MUST** carry the Platform base URL and the OIDC issuer as two values ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)). `BaseURL` is the URL the document was resolved from: in SMART App Launch the embedded-launch `iss` parameter names this API base, not the OIDC issuer. `Issuer` is the document's `issuer` member, the value ID tokens are checked against; when the document declares no `issuer`, `Issuer` **MUST** equal `BaseURL`.
+
+Each `ServiceEntry` **MUST** surface the canonical `version`, `description`, `documentation` and `openapi` members of its `services` entry verbatim, empty when absent. The SDK **MUST NOT** fetch or validate the `documentation` and `openapi` links.
+
 ### Hand-built catalogs
 
 For non-discovering openEHR backends (a static EHRbase deployment, a Cadasto deployment with a pinned configuration, a local CDR for testing), consumers **MUST** be able to construct a `ServiceCatalog` directly without going through a discovery transport:
@@ -96,13 +105,13 @@ catalog := discovery.NewStaticCatalog(discovery.StaticConfig{
 })
 ```
 
-The `NewStaticCatalog` constructor **MUST NOT** require a network round trip; the resulting catalog has `ResolvedAt = time.Now()` and `ExpiresAt = time.Time{}` (no TTL).
+The `NewStaticCatalog` constructor **MUST NOT** require a network round trip; the resulting catalog has `ResolvedAt = time.Now()` and `ExpiresAt = time.Time{}` (no TTL). `StaticConfig.BaseURL` is optional: when empty, the catalog's `BaseURL` **MUST** equal `StaticConfig.Issuer`.
 
 ## Resolution flow
 
 The full flow when discovery is in play:
 
-1. **Resolve.** On client construction (or first I/O if construction is lazy), fetch the SMART configuration document at the issuer's well-known URL — typically **`<issuer>/.well-known/smart-configuration`**. Parse it; validate required fields (`authorization_endpoint`, `token_endpoint`, `jwks_uri`, the openEHR-REST service catalog).
+1. **Resolve.** On client construction (or first I/O if construction is lazy), fetch the SMART configuration document at the Platform base URL's well-known URL, **`<base URL>/.well-known/smart-configuration`**, the well-known path appended to the base URL's own path. Parse it; validate the members REQ-072 requires and the openEHR-REST service catalog.
 2. **Cache.** Store the resolved `ServiceCatalog`. The cache **MAY** be in-process (default), file-backed, or an injected `Cache` interface (for distributed deployments).
 3. **Validate.** Confirm every service the client intends to use is advertised. `org.openehr.rest` **MUST** be present for openEHR-REST consumers; Cadasto-extra services **MUST** be present for Cadasto clients. Spec-version compatibility is checked **here**, not after the first request.
 4. **Route.** Each typed client resolves its base URL from the catalog by service ID at request time.
@@ -118,9 +127,10 @@ The full flow when discovery is in play:
 The discovery cache **MUST**:
 
 - Honour the TTL declared in the discovery response. If no TTL is declared, a default TTL (default: 15 minutes) **MUST** apply.
-- Honour `ETag` / `If-None-Match` for conditional refresh — a `304 Not Modified` on refresh extends the cached entry's TTL without replacing the body.
+- Honour `ETag` / `If-None-Match` for conditional refresh: a `304 Not Modified` to a conditional request extends the cached entry's TTL without replacing the body, and a `304 Not Modified` to a request without `If-None-Match` is a failed fetch ([§ Refresh API](#refresh-api)).
 - Be invalidated on `401` / `403` against a previously-working endpoint, after at most one refresh attempt.
 - Coalesce concurrent resolution attempts (REQ-026) — one goroutine fetches; the others wait.
+- Key every entry by the Platform base URL the caller resolved, never by the document's `issuer` ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).
 
 The resolver defers closing the response body before it branches on the status, so the `304` path closes it too.
 
@@ -128,7 +138,7 @@ The resolver defers closing the response body before it branches on the status, 
 
 ```go
 transport.WithReauthOn401(auth.ReautherFunc(func(ctx context.Context) error {
-    _, err := resolver.Refresh(ctx, issuer)
+    _, err := resolver.Refresh(ctx, baseURL)
     return err
 }))
 ```
@@ -137,14 +147,14 @@ transport.WithReauthOn401(auth.ReautherFunc(func(ctx context.Context) error {
 
 Cache implementation:
 
-- The default cache is in-process (a `sync.Map` keyed by issuer URL).
+- The default cache is in-process.
 - A `Cache` interface **MAY** be injected for file-backed or distributed caching:
 
 ```go
 type Cache interface {
-    Get(ctx context.Context, issuer string) (*ServiceCatalog, bool)
-    Put(ctx context.Context, issuer string, c *ServiceCatalog) error
-    Invalidate(ctx context.Context, issuer string) error
+    Get(ctx context.Context, baseURL string) (*ServiceCatalog, bool)
+    Put(ctx context.Context, baseURL string, c *ServiceCatalog) error
+    Invalidate(ctx context.Context, baseURL string) error
 }
 ```
 
@@ -155,7 +165,8 @@ type Cache interface {
 On every resolution and every refresh, the SDK **MUST**:
 
 - Verify required services are present. Missing required services **MUST** produce a typed `DiscoveryError` with the missing service IDs enumerated.
-- Verify spec-version compatibility. When a service entry advertises a `spec_version`, it **MUST** match the SDK's pinned target (REQ-050) or the caller-widened set; a mismatch **MUST** produce a typed `DiscoveryError`. When a service entry does **not** advertise `spec_version` (field absent or empty) and the caller has not explicitly narrowed the accepted set via `WithAcceptedSpecVersions`, the check is **skipped** — absence is treated as acceptable (ADR 0008). This preserves strict behaviour for callers that pin versions explicitly.
+- Verify spec-version compatibility. When a service entry advertises a `spec_version`, it **MUST** match the SDK's pinned target (REQ-050) or, when the caller sets `WithAcceptedSpecVersions`, one of the versions it names; that list replaces the pinned target, so a caller who still accepts the pin names it too. A mismatch **MUST** produce a typed `DiscoveryError`. When a service entry does **not** advertise `spec_version` (field absent or empty) and the caller has not explicitly narrowed the accepted set via `WithAcceptedSpecVersions`, the check is **skipped** — absence is treated as acceptable (ADR 0008). This preserves strict behaviour for callers that pin versions explicitly. Without `WithAcceptedSpecVersions` the canonical `version` member **MUST NOT** be compared, so a Platform that advertises its own API version is not refused by default. With `WithAcceptedSpecVersions`, the compared value **MUST** be `spec_version` when the entry advertises it and `version` otherwise.
+- Verify the authorization-server members SMART App Launch 2.2.0 makes conditional, whenever the document declares any of `authorization_endpoint`, `token_endpoint` or `jwks_uri`, or advertises any of the capabilities `launch-ehr`, `launch-standalone` or `sso-openid-connect` (a document with neither is an anonymous-only deployment and passes): `token_endpoint` **MUST** be present; `authorization_endpoint` **MUST** be present when `capabilities` contains `launch-ehr` or `launch-standalone`; `jwks_uri` **MUST** be present when `capabilities` contains `sso-openid-connect`. A document that omits a member it needs **MUST** produce `DiscoveryError{Reason: ReasonAuthEndpointsMissing}`; a backend-only document without `authorization_endpoint` **MUST** be accepted.
 - Validate URL well-formedness. Malformed `BaseURL` / `AuthorizationEndpoint` / etc. **MUST** produce a typed `DiscoveryError`.
 
 Soft compatibility (forward-compatible spec micro-versions) **MAY** be allowed via a functional option:
@@ -172,8 +183,10 @@ The default is **strict** — only the pinned version is accepted.
 
 SMART configuration documents and their auth endpoints are untrusted input until validated. On every resolution and refresh the SDK **MUST**:
 
-- **Issuer match (OIDC Discovery §4.3).** When the fetched document declares an `"issuer"` field, it **MUST** equal the issuer URL used to fetch the document. A mismatch **MUST** reject the catalog with `DiscoveryError{Reason: ReasonIssuerMismatch}` — the document's issuer **MUST NOT** silently override the caller's requested issuer (that would let a hostile or misconfigured server impersonate another identity provider downstream).
+- **Issuer ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).** When the fetched document declares an `"issuer"` member, the SDK **MUST** accept it as the catalog's `Issuer` whether or not it equals the Platform base URL, provided it is an absolute URL with the `https` scheme and no query or fragment (OIDC Core 1.0 §2). A malformed issuer **MUST** produce `DiscoveryError{Reason: ReasonMalformedURL}`; an `http` issuer **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}` unless the resolver is constructed with `WithAllowInsecure()`. The document's issuer **MUST NOT** replace the base URL: the base URL the caller resolved stays the catalog's `BaseURL` and its cache key.
+- **OIDC cross-check.** When the document declares an `issuer` that differs from the Platform base URL, the resolver **MUST**, on every resolution and refresh, fetch `<issuer>/.well-known/openid-configuration` (OIDC Discovery 1.0 §4, the path appended to the issuer's own path) and require its `issuer` member to equal the catalog's `Issuer` exactly (OIDC Discovery 1.0 §4.3) and, when both documents declare `jwks_uri`, the two values to be equal. A mismatch **MUST** produce `DiscoveryError{Reason: ReasonIssuerMismatch}`, and a failed fetch `DiscoveryError{Reason: ReasonFetchFailed}`; an OIDC document that does not parse, or names no `issuer`, is a failed fetch, not a mismatch. The resolver **MUST NOT** fetch the OIDC document when it is constructed with `WithoutOpenIDConfigurationCheck()`, or when the document declares no `issuer` or an `issuer` equal to the base URL.
 - **HTTPS on auth endpoints.** `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `registration_endpoint` (when present) **MUST** use the `https` scheme unless the resolver is constructed with `WithAllowInsecure()`. Plaintext URLs **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`. The `allowInsecure` path **MAY** log a warning instead of failing for development deployments.
+- **No downgrade on redirect.** While fetching the SMART configuration document or the OIDC document of the cross-check, the resolver **MUST NOT** follow a redirect to a URL whose scheme is not `https`, unless it is constructed with `WithAllowInsecure()`; such a redirect **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`. Otherwise the injected client's own redirect policy applies.
 - **Service `base_url` entries.** Plaintext `services[].base_url` values **SHOULD** emit the REQ-092 warning when not explicitly marked insecure; hard rejection remains a product decision beyond the auth-endpoint floor ([PR 31](https://github.com/Cadasto/openehr-sdk-go/pull/31)).
 
 Same-origin JWKS enforcement (rejecting `jwks_uri` hosts that differ from the issuer host) is **deferred** — HTTPS-only is the v1 floor.
@@ -188,11 +201,11 @@ Consumers **MUST** be able to trigger a refresh explicitly:
 catalog, err := sdk.RefreshDiscovery(ctx)
 ```
 
-This:
+A refresh **MUST**:
 
-- Invalidates the cached catalog for the configured issuer.
-- Re-runs the resolve / validate / cache pipeline.
-- Returns the new catalog (or an error if resolution fails).
+- Send a conditional request (`If-None-Match`) when the cached entry carries an `ETag`, and a plain request when it carries none, keeping that entry in place meanwhile.
+- On a `304 Not Modified` to a conditional request, re-run the REQ-072 checks and the REQ-073 trust checks, the OIDC cross-check included, on the cached document, and renew the cached entry's TTL without replacing its document (REQ-071); on a `200`, re-run the resolve / validate / cache pipeline and replace the entry; on a failure, invalidate the entry. A `304 Not Modified` to a plain request is a failed fetch: no document came back.
+- Return the current catalog (or an error if resolution fails).
 
 The refresh API **MUST NOT** block other in-flight requests beyond the coalescing window — they continue with the stale catalog until the refresh completes (typical) or fails (in which case the next request after refresh fails with the discovery error).
 
@@ -200,7 +213,7 @@ The refresh API **MUST NOT** block other in-flight requests beyond the coalescin
 
 ```go
 type DiscoveryError struct {
-    Issuer  string
+    Issuer  string // the Platform base URL the resolution was for
     Reason  DiscoveryErrorReason
     Inner   error
 }
@@ -229,7 +242,7 @@ Discovery errors **MUST** be distinguishable from wire errors via `errors.As(err
 - **Service registration.** The SDK consumes discovery output; it does not publish or maintain the discovery document.
 - **DNS resolution caching.** That belongs to the injected `*http.Client`'s transport configuration.
 - **Health probing.** Discovery validates the catalog *structure*; whether the advertised endpoints are reachable is checked on first use, not at resolution time.
-- **Cross-issuer aggregation.** The federator use case constructs one client per issuer (REQ-065); the SDK does not aggregate catalogs across issuers.
+- **Cross-Platform aggregation.** The federator use case constructs one client per Platform base URL (REQ-065); the SDK does not aggregate catalogs across Platforms.
 - **FHIR-side service consumption.** Even when the discovery document advertises `org.fhir.rest`, the SDK ignores it. A sibling FHIR SDK consumes that service.
 
 ## Surfaced authorization-server metadata (REQ-070, REQ-062)

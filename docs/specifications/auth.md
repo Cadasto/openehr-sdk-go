@@ -200,9 +200,9 @@ The launch mode is determined by configuration at construction time and **MAY** 
 
 The flow (standalone launch, summarised):
 
-1. **Discovery.** Fetch the SMART configuration document from the deployment's well-known URL (see [service-discovery.md](service-discovery.md)). Extract `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `registration_endpoint` (if dynamic registration is used), and `scopes_supported`.
+1. **Discovery.** Fetch the SMART configuration document from the Platform base URL's well-known URL (see [service-discovery.md](service-discovery.md)). Extract `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `registration_endpoint` (if dynamic registration is used), and `scopes_supported`.
 2. **PKCE pair.** Generate a `code_verifier` (cryptographically random, 43–128 chars per RFC 7636) and derive `code_challenge` = `S256(code_verifier)`.
-3. **Authorization request.** Redirect the user to `authorization_endpoint` with `response_type=code`, `client_id`, `redirect_uri`, `scope` (for openEHR resources, the [REQ-165](#req-165--openehr-scope-syntax) shape `<compartment>/<resource>-<pattern>.<permissions>`, e.g. `patient/composition-*.rs`), `aud` (the openEHR REST base or an explicit audience identifier), `state`, `code_challenge`, `code_challenge_method=S256`, plus SMART-specific `launch` parameter if EHR-launch.
+3. **Authorization request.** Redirect the user to `authorization_endpoint` with `response_type=code`, `client_id`, `redirect_uri`, `scope` (for openEHR resources, the [REQ-165](#req-165--openehr-scope-syntax) shape `<compartment>/<resource>-<pattern>.<permissions>`, e.g. `patient/composition-*.rs`), `aud` (the Platform base URL, which is the `iss` of an embedded launch, or an explicit audience identifier), `state`, `code_challenge`, `code_challenge_method=S256`, plus SMART-specific `launch` parameter if EHR-launch.
 4. **Authorization response.** Receive the `code` and `state` at the redirect URI. The SDK **MUST** verify the `state` matches the value sent in step 3.
 5. **Token exchange.** POST to `token_endpoint` with `grant_type=authorization_code`, `code`, `redirect_uri`, `client_id`, `code_verifier`. Receive `access_token`, `refresh_token` (if granted), `expires_in`, `scope`, plus SMART-specific `patient`, `encounter`, `id_token`, etc.
 6. **Launch context capture.** Surface the SMART launch parameters to the application via `smart/` (see § Launch context below).
@@ -213,6 +213,9 @@ The PKCE implementation **MUST**:
 - Use `S256` as the challenge method; `plain` is prohibited.
 - Generate cryptographically random verifiers (`crypto/rand`).
 - **Generate or validate OAuth `state`.** When the application calls `BeginAuthorization` with an empty `state`, the SDK **MUST** generate a cryptographically random value (minimum 32 bytes before base64url encoding). When exchanging the authorization code, the SDK **MUST** verify that the callback `state` equals the value sent in step 3 **before** any token-endpoint call; mismatch **MUST** return `ErrLaunchInvalidState`.
+- **Refuse a server that cannot verify `S256`.** When the authorization server advertises `code_challenge_methods_supported` and the list does not contain `S256`, constructing the `auth/smart` source **MUST** fail with `auth.ErrInvalidConfig` (HL7 SMART App Launch requires servers to support `S256`; RFC 9700 §2.1.1 makes PKCE support detectable from this metadata). An absent or empty list **MUST NOT** fail construction, since a hand-built catalog commonly omits it.
+
+The authorization request **MUST** carry `aud` (HL7 SMART App Launch lists it as required; the openEHR SMART specification does not define its value). A source built from a resolved catalog **MUST** default `aud` to the catalog's `BaseURL` when the caller sets no audience; constructing a source that has no audience at all **MUST** fail with `auth.ErrInvalidConfig`.
 
 ### REQ-062 — JWKS rotation
 
@@ -432,13 +435,13 @@ This is the SDK's contribution to platform-side audit. The platform decides what
 
 ### REQ-065
 
-Each SDK client instance **MUST** bind to exactly one issuer and therefore one tenant context:
+Each SDK client instance **MUST** bind to exactly one Platform base URL and therefore one tenant context:
 
-- Discovery cache (`smart/discovery`) is keyed by issuer.
+- Discovery cache (`smart/discovery`) entries are keyed as [service-discovery.md § REQ-071](service-discovery.md#req-071) requires; the OIDC issuer the document names is a property of the entry.
 - `TokenSource` is per-client (or per-request via ctx, REQ-060).
 - Connection pool, retry budget, OTel spans are per-client.
 
-Multi-issuer / multi-tenant fan-out is achieved by constructing **one client per issuer**. The SDK **MUST NOT** internally multiplex issuers behind a single client. This matters most for the federator use case ([use-cases.md § Federative API client](use-cases.md#federative-api-client)).
+Multi-Platform / multi-tenant fan-out is achieved by constructing **one client per Platform base URL**. The SDK **MUST NOT** internally multiplex Platforms behind a single client. This matters most for the federator use case ([use-cases.md § Federative API client](use-cases.md#federative-api-client)).
 
 ## HTTP Basic on openEHR REST
 

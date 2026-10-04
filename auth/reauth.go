@@ -16,7 +16,8 @@ type Reauther interface {
 // Example:
 //
 //	transport.WithReauthOn401(auth.ReautherFunc(func(ctx context.Context) error {
-//	    return resolver.Refresh(ctx, issuer)
+//	    _, err := resolver.Refresh(ctx, baseURL) // the Platform base URL
+//	    return err
 //	}))
 type ReautherFunc func(ctx context.Context) error
 

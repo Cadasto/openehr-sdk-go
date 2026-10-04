@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -233,6 +234,133 @@ func TestResolveMissingServiceRequired(t *testing.T) {
 	}
 }
 
+// TestNotModifiedRevalidatesForEachResolver pins REQ-072: a catalog renewed
+// by a 304 Not Modified must pass the checks of the Resolver that renews it.
+// Two Resolvers share one Cache, and the second requires a service the
+// document does not advertise. When the second one renews the catalog the
+// first one cached, whether by Refresh or by Resolve of the expired catalog,
+// the 304 fails with ReasonMissingService naming that service, and the
+// cached catalog is dropped.
+func TestNotModifiedRevalidatesForEachResolver(t *testing.T) { // REQ-072
+	const extraService = "org.example.cdr"
+	renewals := []struct {
+		name  string
+		renew func(ctx context.Context, r *Resolver, baseURL string) (*ServiceCatalog, error)
+	}{
+		{name: "Refresh", renew: func(ctx context.Context, r *Resolver, baseURL string) (*ServiceCatalog, error) {
+			return r.Refresh(ctx, baseURL)
+		}},
+		{name: "Resolve after expiry", renew: func(ctx context.Context, r *Resolver, baseURL string) (*ServiceCatalog, error) {
+			synctest.Sleep(61 * time.Second) // past the first response's max-age=60
+			return r.Resolve(ctx, baseURL)
+		}},
+	}
+	for _, rn := range renewals {
+		t.Run(rn.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				body := fixtureBytes(t, "smart-configuration.json")
+				var (
+					mu          sync.Mutex
+					ifNoneMatch []string
+				)
+				srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					mu.Lock()
+					ifNoneMatch = append(ifNoneMatch, r.Header.Get("If-None-Match"))
+					mu.Unlock()
+					w.Header().Set("ETag", `"v1"`)
+					w.Header().Set("Cache-Control", "max-age=60")
+					if r.Header.Get("If-None-Match") == `"v1"` {
+						w.WriteHeader(http.StatusNotModified)
+						return
+					}
+					_, _ = w.Write(body)
+				}))
+				cache := NewMemoryCache()
+				first, err := NewResolver(cache, WithHTTPClient(srv.Client()), WithAllowInsecure())
+				if err != nil {
+					t.Fatal(err)
+				}
+				second, err := NewResolver(cache, WithHTTPClient(srv.Client()), WithAllowInsecure(),
+					WithRequiredServices(ServiceIDOpenEHRRest, extraService))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := first.Resolve(t.Context(), srv.URL); err != nil {
+					t.Fatalf("first Resolver: Resolve(%q) error = %v", srv.URL, err)
+				}
+
+				_, err = rn.renew(t.Context(), second, srv.URL)
+
+				mu.Lock()
+				got := slices.Clone(ifNoneMatch)
+				mu.Unlock()
+				if want := []string{"", `"v1"`}; !slices.Equal(got, want) {
+					t.Errorf("If-None-Match of the requests = %q, want %q: the renewal is a conditional request answered 304", got, want)
+				}
+				derr, ok := errors.AsType[*DiscoveryError](err)
+				if !ok || derr.Reason != ReasonMissingService {
+					t.Fatalf("second Resolver: %s(%q) answered 304: error = %v, want a DiscoveryError with Reason %q", rn.name, srv.URL, err, ReasonMissingService)
+				}
+				if want := []string{extraService}; !slices.Equal(derr.MissingServices, want) {
+					t.Errorf("MissingServices = %q, want %q", derr.MissingServices, want)
+				}
+				if _, ok := cache.Get(t.Context(), srv.URL); ok {
+					t.Errorf("cache still holds a catalog for %q after the failed renewal", srv.URL)
+				}
+			})
+		})
+	}
+}
+
+// TestNotModifiedRefusesPlaintextForAStrictResolver pins REQ-073 on a 304
+// renewal: a Resolver built without WithAllowInsecure refuses a plaintext
+// auth endpoint in a catalog that a Resolver built with it cached, as it
+// would refuse the same document on a 200.
+func TestNotModifiedRefusesPlaintextForAStrictResolver(t *testing.T) { // REQ-073
+	cases := []struct {
+		name   string
+		member string // a plaintext member added to the document
+	}{
+		{name: "auth endpoint", member: `"token_endpoint":"http://auth.example.test/token"`},
+		{name: "issuer", member: `"issuer":"http://idp.example.test"`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var srv *httptest.Server
+			srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("ETag", `"v1"`)
+				if r.Header.Get("If-None-Match") == `"v1"` {
+					w.WriteHeader(http.StatusNotModified)
+					return
+				}
+				_, _ = fmt.Fprintf(w, `{"services":{"org.openehr.rest":{"baseUrl":%q}},%s}`, srv.URL+"/openehr/v1", tc.member)
+			}))
+			t.Cleanup(srv.Close)
+			cache := NewMemoryCache()
+			insecure, err := NewResolver(cache, WithHTTPClient(srv.Client()), WithAllowInsecure(), WithoutOpenIDConfigurationCheck())
+			if err != nil {
+				t.Fatal(err)
+			}
+			strict, err := NewResolver(cache, WithHTTPClient(srv.Client()), WithoutOpenIDConfigurationCheck())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := insecure.Resolve(t.Context(), srv.URL); err != nil {
+				t.Fatalf("insecure Resolver: Resolve(%q) error = %v", srv.URL, err)
+			}
+
+			_, err = strict.Refresh(t.Context(), srv.URL)
+
+			if derr, ok := errors.AsType[*DiscoveryError](err); !ok || derr.Reason != ReasonInsecureURL {
+				t.Fatalf("strict Resolver: Refresh(%q) answered 304: error = %v, want a DiscoveryError with Reason %q", srv.URL, err, ReasonInsecureURL)
+			}
+			if _, ok := cache.Get(t.Context(), srv.URL); ok {
+				t.Errorf("cache still holds a catalog for %q after the refused renewal", srv.URL)
+			}
+		})
+	}
+}
+
 // REQ-072: a malformed URL in the document fails resolution with a typed
 // DiscoveryError.
 func TestResolveMalformedURL(t *testing.T) {
@@ -338,21 +466,30 @@ func TestStaleCatalog(t *testing.T) {
 	}
 }
 
-// REQ-073: a document whose issuer differs from the one fetched is rejected
-// with ReasonIssuerMismatch.
+// REQ-073: a declared issuer that differs from the base URL is no longer
+// refused for differing; it is refused with ReasonIssuerMismatch when the
+// issuer's own OpenID configuration names another issuer.
 func TestResolveIssuerMismatch(t *testing.T) {
-	// The document's "issuer" field differs from the URL used to fetch it.
-	// Per OIDC Discovery §4.3, Resolve must reject the document and return
-	// a *DiscoveryError with ReasonIssuerMismatch.
-	body := `{
-		"issuer":"https://evil.example.com",
-		"authorization_endpoint":"https://evil.example.com/auth",
-		"token_endpoint":"https://evil.example.com/token",
-		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
-	}`
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, body)
+	// The SMART configuration declares <base>/idp as its issuer; the OpenID
+	// configuration served there claims a different issuer. Per OIDC
+	// Discovery §4.3, Resolve must reject the catalog with ReasonIssuerMismatch.
+	var srv *httptest.Server
+	srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case WellKnownPath:
+			_, _ = io.WriteString(w, `{
+				"issuer":"`+srv.URL+`/idp",
+				"authorization_endpoint":"https://evil.example.com/auth",
+				"token_endpoint":"https://evil.example.com/token",
+				"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
+			}`)
+		case "/idp" + openIDConfigurationPath:
+			_, _ = io.WriteString(w, `{"issuer":"https://evil.example.com"}`)
+		default:
+			http.NotFound(w, r)
+		}
 	}))
+	srv.Start()
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
 	cat, err := r.Resolve(t.Context(), srv.URL)
@@ -365,10 +502,16 @@ func TestResolveIssuerMismatch(t *testing.T) {
 	}
 }
 
+// REQ-070, REQ-073: a declared issuer equal to the base URL resolves without
+// an OpenID configuration check, and both catalog values carry that URL.
 func TestResolveIssuerMatch(t *testing.T) {
 	// Start an unstarted server so we know srv.URL before building the body.
 	var srv *httptest.Server
 	srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != WellKnownPath {
+			http.NotFound(w, r)
+			return
+		}
 		body := `{
 			"issuer":"` + srv.URL + `",
 			"authorization_endpoint":"https://auth.example.com/auth",
@@ -386,6 +529,9 @@ func TestResolveIssuerMatch(t *testing.T) {
 	}
 	if cat.Issuer != srv.URL {
 		t.Errorf("catalog.Issuer = %q, want %q", cat.Issuer, srv.URL)
+	}
+	if cat.BaseURL != srv.URL {
+		t.Errorf("catalog.BaseURL = %q, want %q", cat.BaseURL, srv.URL)
 	}
 }
 

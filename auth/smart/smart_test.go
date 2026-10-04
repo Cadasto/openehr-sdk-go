@@ -23,6 +23,16 @@ import (
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
 
+// testAudience is the aud value the sources in these tests send. SMART
+// requires one, so smart.New refuses a source without it.
+const testAudience = "https://platform.example/openehr"
+
+// newSource calls smart.New with testAudience set before opts, so a test
+// that passes its own smart.WithAudience still wins.
+func newSource(clientID string, ep discovery.AuthEndpoints, opts ...smart.Option) (*smart.Source, error) {
+	return smart.New(clientID, ep, append([]smart.Option{smart.WithAudience(testAudience)}, opts...)...)
+}
+
 func testAuthEndpoints(srv *httptest.Server) discovery.AuthEndpoints {
 	return discovery.AuthEndpoints{
 		AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
@@ -35,7 +45,7 @@ func TestBeginAuthorizationEmptyStateGeneratesRandom(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 
-	src, err := smart.New(
+	src, err := newSource(
 		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
@@ -72,7 +82,7 @@ func TestBeginAuthorizationNonEmptyStatePreserved(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 
-	src, err := smart.New(
+	src, err := newSource(
 		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
@@ -95,7 +105,7 @@ func TestPKCEAndAuthorizeURL(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 
-	src, err := smart.New(
+	src, err := newSource(
 		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
@@ -151,7 +161,7 @@ func TestExchangeAndRefresh(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	src, err := smart.New(
+	src, err := newSource(
 		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
@@ -224,8 +234,11 @@ func readJWKS() []byte {
 func TestExchangeRequiresAuthorizationRequest(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
-	_, _, err := src.ExchangeAuthorizationCode(t.Context(), "code", "", smart.AuthorizationRequest{})
+	src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	if err != nil {
+		t.Fatalf("newSource: %v", err)
+	}
+	_, _, err = src.ExchangeAuthorizationCode(t.Context(), "code", "", smart.AuthorizationRequest{})
 	if !errors.Is(err, auth.ErrInvalidConfig) {
 		t.Fatalf("err = %v, want ErrInvalidConfig (empty-request guard, not state mismatch)", err)
 	}
@@ -241,7 +254,7 @@ func TestExchangeAuthorizationCodeStateMismatch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	src, err := smart.New(
+	src, err := newSource(
 		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
@@ -272,7 +285,7 @@ func TestExchangeAuthorizationCodeStateMatch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	src, err := smart.New(
+	src, err := newSource(
 		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
@@ -299,7 +312,7 @@ func TestAuthorizeURLStateReachesURL(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 
-	src, err := smart.New(
+	src, err := newSource(
 		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
@@ -344,10 +357,16 @@ func TestAuthorizeURLKeepsEndpointQuery(t *testing.T) { // REQ-061
 			name:     "SDK value wins a name clash",
 			endpoint: "https://as.example/authorize?response_type=token",
 		},
+		{
+			// The configured audience replaces an aud the endpoint already
+			// carries, so the request names exactly one audience.
+			name:     "configured aud wins a clash",
+			endpoint: "https://as.example/authorize?aud=other",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			src, err := smart.New(
+			src, err := newSource(
 				"client-id",
 				discovery.AuthEndpoints{
 					AuthorizationEndpoint: discovery.MustParseURL(tc.endpoint),
@@ -379,6 +398,7 @@ func TestAuthorizeURLKeepsEndpointQuery(t *testing.T) { // REQ-061
 				"state":                 {"state-123"},
 				"code_challenge":        {req.PKCE.Challenge},
 				"code_challenge_method": {"S256"},
+				"aud":                   {testAudience},
 			}
 			maps.Copy(want, tc.kept)
 			if got := parsed.Query(); !maps.EqualFunc(got, want, slices.Equal) {
@@ -407,7 +427,7 @@ func TestConcurrentLaunchesDoNotClobberPKCE(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -463,7 +483,7 @@ func TestExchangeWithPrivateKeyJWT(t *testing.T) {
 	defer srv.Close()
 
 	const clientID = "confidential-asym-client"
-	src, err := smart.New(
+	src, err := newSource(
 		clientID, testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
@@ -577,7 +597,7 @@ func TestExchangeWithClientSecretBasic(t *testing.T) { // REQ-068
 		clientID = "sym-client"
 		secret   = "s3cret"
 	)
-	src, err := smart.New(
+	src, err := newSource(
 		clientID, testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
@@ -670,7 +690,7 @@ func TestExchangeClientSecretBasicFormEncodesCredentials(t *testing.T) { // REQ-
 	}))
 	defer srv.Close()
 
-	src, err := smart.New(
+	src, err := newSource(
 		clientID,
 		discovery.AuthEndpoints{
 			AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
@@ -759,7 +779,7 @@ func TestExchangeWithClientSecretPost(t *testing.T) { // REQ-068
 		JWKSURI:                           discovery.MustParseURL(srv.URL + "/jwks"),
 		TokenEndpointAuthMethodsSupported: []string{"client_secret_post"},
 	}
-	src, err := smart.New(
+	src, err := newSource(
 		clientID, eps,
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
@@ -809,7 +829,7 @@ func TestClientAssertionAndSecretBothRejected(t *testing.T) { // REQ-068
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 
-	_, err = smart.New(
+	_, err = newSource(
 		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithClientSecret("some-secret"),
@@ -840,7 +860,7 @@ func TestG3CrossCheckRejectsUnsupportedMethod(t *testing.T) { // REQ-068
 		TokenEndpoint:                     discovery.MustParseURL(srv.URL + "/token"),
 		TokenEndpointAuthMethodsSupported: []string{"client_secret_basic"},
 	}
-	_, err = smart.New(
+	_, err = newSource(
 		"client-id", epReject,
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithClientAssertionKey(key, "RS384", "kid-1"),
@@ -855,7 +875,7 @@ func TestG3CrossCheckRejectsUnsupportedMethod(t *testing.T) { // REQ-068
 		TokenEndpoint:                     discovery.MustParseURL(srv.URL + "/token"),
 		TokenEndpointAuthMethodsSupported: []string{"client_secret_basic", "private_key_jwt"},
 	}
-	_, err = smart.New(
+	_, err = newSource(
 		"client-id", epAllow,
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithClientAssertionKey(key, "RS384", "kid-1"),
@@ -869,7 +889,7 @@ func TestG3CrossCheckRejectsUnsupportedMethod(t *testing.T) { // REQ-068
 		AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
 		TokenEndpoint:         discovery.MustParseURL(srv.URL + "/token"),
 	}
-	_, err = smart.New(
+	_, err = newSource(
 		"client-id", epEmpty,
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithClientAssertionKey(key, "RS384", "kid-1"),
@@ -906,7 +926,7 @@ func TestExchangeNormalisesBearerTokenType(t *testing.T) { // REQ-060
 			}))
 			defer srv.Close()
 
-			src, err := smart.New(
+			src, err := newSource(
 				"client-id",
 				discovery.AuthEndpoints{
 					AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
@@ -939,7 +959,10 @@ func TestExchangeNormalisesBearerTokenType(t *testing.T) { // REQ-060
 func TestTokenStaleWithoutRefreshDoesNotDeadlock(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	if err != nil {
+		t.Fatalf("newSource: %v", err)
+	}
 	// Stale but NOT expired (within the 30s proactive-refresh threshold), no
 	// refresh token: Token() returns the still-valid cached token without
 	// deadlocking on concurrent calls.
@@ -968,7 +991,10 @@ func TestTokenStaleWithoutRefreshDoesNotDeadlock(t *testing.T) {
 func TestTokenExpiredWithoutRefreshReturnsReauthRequired(t *testing.T) { // REQ-063
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	if err != nil {
+		t.Fatalf("newSource: %v", err)
+	}
 	src.SetTokens(auth.Token{Value: "stale", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "")
 
 	tok, err := src.Token(t.Context())
@@ -1005,7 +1031,7 @@ func TestRefreshFailureClearsRefreshTokenOnlyWhenTerminal(t *testing.T) { // REQ
 		}))
 		defer srv.Close()
 
-		src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+		src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1044,7 +1070,7 @@ func TestRefreshFailureClearsRefreshTokenOnlyWhenTerminal(t *testing.T) { // REQ
 		}))
 		defer srv.Close()
 
-		src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+		src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1082,7 +1108,7 @@ func TestRefreshIfNeeded(t *testing.T) { // REQ-063
 		}))
 		defer srv.Close()
 
-		src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+		src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1110,7 +1136,7 @@ func TestRefreshIfNeeded(t *testing.T) { // REQ-063
 		}))
 		defer srv.Close()
 
-		src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+		src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1145,7 +1171,7 @@ func TestRefreshThresholdConfigurable(t *testing.T) { // REQ-063
 	}))
 	defer srv.Close()
 
-	src, err := smart.New(
+	src, err := newSource(
 		"c", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://cb"),
@@ -1193,7 +1219,7 @@ func TestSourceReauthForcesRefresh(t *testing.T) { // REQ-063
 	}))
 	defer srv.Close()
 
-	src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1232,7 +1258,7 @@ func TestSourceReauthNoRefreshTokenKeepsValidToken(t *testing.T) { // REQ-063
 	}))
 	defer srv.Close()
 
-	src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	src, err := newSource("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
 	if err != nil {
 		t.Fatal(err)
 	}

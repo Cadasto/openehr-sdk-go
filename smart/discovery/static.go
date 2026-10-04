@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"net/url"
@@ -11,6 +12,10 @@ import (
 // StaticConfig is the input to NewStaticCatalog, a hand-built catalog
 // for openEHR backends that do not publish a discovery document.
 type StaticConfig struct {
+	// BaseURL is the Platform base URL. Leave it empty when it is the same
+	// as Issuer; the catalog's BaseURL then takes the value of Issuer.
+	BaseURL string
+	// Issuer is the OpenID Connect issuer. Required.
 	Issuer   string
 	Services map[string]ServiceEntry
 	Auth     AuthEndpoints
@@ -25,6 +30,9 @@ type StaticConfig struct {
 // tests. It validates that every Services entry has a parseable BaseURL;
 // callers should pre-parse URLs when possible.
 //
+// The catalog's BaseURL is StaticConfig.BaseURL, or StaticConfig.Issuer
+// when BaseURL is empty.
+//
 // Hand-built catalogs are exempt from spec-version validation at
 // construction (callers are presumed to know what they configured);
 // transport-level mismatch surfaces as a wire error rather than a
@@ -33,17 +41,19 @@ func NewStaticCatalog(cfg StaticConfig) (*ServiceCatalog, error) {
 	if cfg.Issuer == "" {
 		return nil, &DiscoveryError{Reason: ReasonParseError, Inner: errors.New("StaticConfig.Issuer is required")}
 	}
+	baseURL := cmp.Or(cfg.BaseURL, cfg.Issuer)
 	for id, e := range cfg.Services {
 		if e.BaseURL == nil {
-			return nil, &DiscoveryError{Issuer: cfg.Issuer, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q has nil BaseURL", id)}
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q has nil BaseURL", id)}
 		}
 		if !e.BaseURL.IsAbs() {
-			return nil, &DiscoveryError{Issuer: cfg.Issuer, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q BaseURL %q is not absolute", id, e.BaseURL.String())}
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q BaseURL %q is not absolute", id, e.BaseURL.String())}
 		}
 		e.ID = id
 		cfg.Services[id] = e
 	}
 	return &ServiceCatalog{
+		BaseURL:    baseURL,
 		Issuer:     cfg.Issuer,
 		Services:   cloneServices(cfg.Services),
 		Auth:       cfg.Auth,
