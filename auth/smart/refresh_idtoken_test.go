@@ -207,3 +207,19 @@ func TestRefreshBindingIgnoresCallerChanges(t *testing.T) { // REQ-064
 		t.Fatalf("Token() error = %v, want the refresh compared with the claims as verified", err)
 	}
 }
+
+// TestRefreshKeepsTheRedeemedRefreshToken pins REQ-063 and REQ-064: a
+// refresh response without a refresh_token leaves the source holding the
+// refresh token it just redeemed, which the server may keep valid.
+func TestRefreshKeepsTheRedeemedRefreshToken(t *testing.T) { // REQ-063 REQ-064
+	p := newOIDCProvider(t)
+	src := p.source(t, p.endpoints())
+	src.SetTokens(staleAccess("at-1"), "rt-1")
+	p.setBody(tokenBody(t, "at-2", "", ""))
+	if _, err := src.Token(t.Context()); err != nil {
+		t.Fatalf("Token() error = %v, want a refreshed token", err)
+	}
+	if access, refresh := src.HeldTokens(); access.Value != "at-2" || refresh != "rt-1" {
+		t.Errorf("held tokens = %q, %q; want at-2 and the redeemed rt-1", access.Value, refresh)
+	}
+}

@@ -127,11 +127,14 @@ func idClaims(nonce string) map[string]any {
 	return c
 }
 
-// tokenBody is a token-endpoint success body; an empty idToken leaves the
-// member out.
+// tokenBody is a token-endpoint success body; an empty refresh or idToken
+// leaves that member out.
 func tokenBody(t *testing.T, access, refresh, idToken string) string {
 	t.Helper()
-	m := map[string]any{"access_token": access, "token_type": "Bearer", "expires_in": 3600, "refresh_token": refresh}
+	m := map[string]any{"access_token": access, "token_type": "Bearer", "expires_in": 3600}
+	if refresh != "" {
+		m["refresh_token"] = refresh
+	}
 	if idToken != "" {
 		m["id_token"] = idToken
 	}
@@ -175,7 +178,8 @@ func TestExchangeVerifiesIDToken(t *testing.T) { // REQ-064
 
 // TestExchangeRefusesBadIDToken pins REQ-064: an ID token that fails
 // verification (nonce, issuer, audience, signature, or an algorithm the
-// server does not advertise) fails the exchange with an error matching
+// server does not advertise) fails the exchange with an *auth.ExchangeError
+// matching auth.ErrTokenExchangeFailed and, through its cause,
 // auth.ErrJWKSValidationFailed. Nothing unverified is returned, and the
 // source keeps the tokens and token response of the session it had.
 func TestExchangeRefusesBadIDToken(t *testing.T) { // REQ-064
@@ -241,8 +245,11 @@ func TestExchangeRefusesBadIDToken(t *testing.T) { // REQ-064
 			p.setBody(tokenBody(t, "at-2", "rt-2", bad))
 
 			tok, tr, err := src.ExchangeAuthorizationCode(t.Context(), "code-2", req.State, req)
-			if !errors.Is(err, auth.ErrJWKSValidationFailed) {
-				t.Fatalf("ExchangeAuthorizationCode() error = %v, want auth.ErrJWKSValidationFailed", err)
+			if !errors.Is(err, auth.ErrTokenExchangeFailed) || !errors.Is(err, auth.ErrJWKSValidationFailed) {
+				t.Fatalf("ExchangeAuthorizationCode() error = %v, want auth.ErrTokenExchangeFailed and auth.ErrJWKSValidationFailed", err)
+			}
+			if _, ok := errors.AsType[*auth.ExchangeError](err); !ok {
+				t.Errorf("ExchangeAuthorizationCode() error = %T, want an *auth.ExchangeError", err)
 			}
 			if !tok.IsZero() || tr.AccessToken != "" || tr.IDToken != "" || tr.IDTokenClaims != nil {
 				t.Errorf("ExchangeAuthorizationCode() returned token %q, access_token %q, an ID token: %t, claims %v on failure; want zero values",
@@ -305,8 +312,8 @@ func TestWithIDTokenTrustedAudiencesKeepsItsOwnCopy(t *testing.T) { // REQ-064
 
 // TestExchangeIDTokenWithoutJWKS pins REQ-064: a source without a JWKS
 // fails an exchange whose response carries an ID token with
-// auth.ErrInvalidConfig, not as a bad token, and returns and stores
-// nothing.
+// auth.ErrTokenExchangeFailed and auth.ErrInvalidConfig, not as a bad
+// token, and returns and stores nothing.
 func TestExchangeIDTokenWithoutJWKS(t *testing.T) { // REQ-064
 	p := newOIDCProvider(t)
 	ep := p.endpoints()
@@ -319,8 +326,8 @@ func TestExchangeIDTokenWithoutJWKS(t *testing.T) { // REQ-064
 	p.setBody(tokenBody(t, "at-1", "rt-1", p.sign(t, idClaims(req.Nonce))))
 
 	tok, tr, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req)
-	if !errors.Is(err, auth.ErrInvalidConfig) || errors.Is(err, auth.ErrJWKSValidationFailed) {
-		t.Fatalf("ExchangeAuthorizationCode() error = %v, want auth.ErrInvalidConfig and not auth.ErrJWKSValidationFailed", err)
+	if !errors.Is(err, auth.ErrTokenExchangeFailed) || !errors.Is(err, auth.ErrInvalidConfig) || errors.Is(err, auth.ErrJWKSValidationFailed) {
+		t.Fatalf("ExchangeAuthorizationCode() error = %v, want auth.ErrTokenExchangeFailed and auth.ErrInvalidConfig, not auth.ErrJWKSValidationFailed", err)
 	}
 	if !tok.IsZero() || tr.IDToken != "" || tr.IDTokenClaims != nil {
 		t.Errorf("ExchangeAuthorizationCode() returned token %q, an ID token: %t, claims %v; want zero values", tok.Value, tr.IDToken != "", tr.IDTokenClaims)
@@ -358,5 +365,82 @@ func TestCompleteAuthorizationVerifiesIDToken(t *testing.T) { // REQ-061 REQ-064
 	}
 	if n := len(p.tokenForms()); n != 2 {
 		t.Errorf("token-endpoint calls = %d, want 2", n)
+	}
+}
+
+// unreachableURL returns the URL of a server that has already shut down, so
+// a request to it fails to connect.
+func unreachableURL(t *testing.T) string {
+	t.Helper()
+	srv := httptest.NewServer(http.NotFoundHandler())
+	u := srv.URL
+	srv.Close()
+	return u
+}
+
+// TestExchangeIDTokenKeySetOutage pins REQ-064: when the key set cannot be
+// fetched, the exchange fails with auth.ErrTokenExchangeFailed and keeps the
+// fetch error reachable, never as a bad token or a configuration error, and
+// the source keeps the tokens it had.
+func TestExchangeIDTokenKeySetOutage(t *testing.T) { // REQ-064
+	tests := []struct {
+		name    string
+		jwksURI func(p *oidcProvider) string
+		wantURL bool // the fetch error is a *url.Error
+	}{
+		{name: "key set answers 404", jwksURI: func(p *oidcProvider) string { return p.srv.URL + "/missing-jwks" }},
+		{name: "key set unreachable", jwksURI: func(*oidcProvider) string { return unreachableURL(t) }, wantURL: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newOIDCProvider(t)
+			ep := p.endpoints()
+			ep.JWKSURI = discovery.MustParseURL(tc.jwksURI(p))
+			src := p.source(t, ep)
+			src.SetTokens(auth.Token{Value: "at-0"}, "rt-0")
+			req, err := src.BeginAuthorization("")
+			if err != nil {
+				t.Fatalf("BeginAuthorization: %v", err)
+			}
+			p.setBody(tokenBody(t, "at-1", "rt-1", p.sign(t, idClaims(req.Nonce))))
+
+			tok, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req)
+			if !errors.Is(err, auth.ErrTokenExchangeFailed) {
+				t.Fatalf("ExchangeAuthorizationCode() error = %v, want auth.ErrTokenExchangeFailed", err)
+			}
+			if errors.Is(err, auth.ErrJWKSValidationFailed) || errors.Is(err, auth.ErrInvalidConfig) {
+				t.Errorf("ExchangeAuthorizationCode() error = %v reads as a bad token or a configuration error, want an outage", err)
+			}
+			if _, ok := errors.AsType[*url.Error](err); ok != tc.wantURL {
+				t.Errorf("ExchangeAuthorizationCode() error = %v; carries a *url.Error = %t, want %t", err, ok, tc.wantURL)
+			}
+			if !tok.IsZero() {
+				t.Errorf("ExchangeAuthorizationCode() returned token %q, want none", tok.Value)
+			}
+			if access, refresh := src.HeldTokens(); access.Value != "at-0" || refresh != "rt-0" {
+				t.Errorf("held tokens = %q, %q; want the earlier at-0, rt-0", access.Value, refresh)
+			}
+		})
+	}
+}
+
+// TestExchangeStartsWithoutTheEarlierRefreshToken pins REQ-064: a code
+// exchange starts a new session, so when its response has no refresh_token
+// the source holds none, rather than the earlier session's.
+func TestExchangeStartsWithoutTheEarlierRefreshToken(t *testing.T) { // REQ-064
+	p := newOIDCProvider(t)
+	src := p.source(t, p.endpoints())
+	for i, refresh := range []string{"rt-1", ""} {
+		req, err := src.BeginAuthorization("")
+		if err != nil {
+			t.Fatalf("BeginAuthorization: %v", err)
+		}
+		p.setBody(tokenBody(t, "at-new", refresh, ""))
+		if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code", req.State, req); err != nil {
+			t.Fatalf("exchange %d: error = %v, want success", i+1, err)
+		}
+	}
+	if _, refresh := src.HeldTokens(); refresh != "" {
+		t.Errorf("refresh token after an exchange that returned none = %q, want none kept from the earlier session", refresh)
 	}
 }
