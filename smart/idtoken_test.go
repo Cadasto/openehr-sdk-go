@@ -1,6 +1,7 @@
 package smart_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,10 @@ import (
 // The algorithm and claim rules of ID-token verification are tested in
 // auth/smart, where the verification lives. These tests pin only that the
 // smart names stay the same function and type. REQ-062 REQ-064
+
+// smart.ValidateIDToken keeps the function type it had before verification
+// moved to auth/smart, so a variable of that type still accepts it. REQ-062
+var _ func(context.Context, string, *authsmart.JWKS, string, string, string, time.Time, []string) (*smart.IDTokenClaims, error) = smart.ValidateIDToken
 
 // idTokenJWKS serves the testRSAKey set (kid "test-kid") and returns its JWKS.
 func idTokenJWKS(t *testing.T, body []byte) *authsmart.JWKS {
@@ -94,10 +99,10 @@ func TestValidateIDTokenWrapperMatchesAuthSmart(t *testing.T) {
 	}
 }
 
-// TestTrustedAudiencesReachVerification checks that a trusted extra audience
-// reaches the verification through smart.ValidateIDToken's options and through
-// LaunchContextFromTokenResponse's WithTrustedAudiences, and that without it the
-// same token is refused. REQ-062 REQ-064
+// TestTrustedAudiencesReachVerification checks that smart.ValidateIDToken,
+// which takes no trusted audiences, refuses a token with an extra audience, and
+// that LaunchContextFromTokenResponse accepts it only with
+// WithTrustedAudiences naming that audience. REQ-062 REQ-064
 func TestTrustedAudiencesReachVerification(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	priv, body := testRSAKey(t)
@@ -112,9 +117,6 @@ func TestTrustedAudiencesReachVerification(t *testing.T) {
 	t.Run("ValidateIDToken", func(t *testing.T) {
 		if _, err := smart.ValidateIDToken(t.Context(), tok, jwks, "https://issuer.example", "client-id", "", now, nil); !errors.Is(err, auth.ErrJWKSValidationFailed) {
 			t.Fatalf("ValidateIDToken(aud [client-id api], no trusted audience) error = %v, want ErrJWKSValidationFailed", err)
-		}
-		if _, err := smart.ValidateIDToken(t.Context(), tok, jwks, "https://issuer.example", "client-id", "", now, nil, authsmart.WithTrustedAudiences("api")); err != nil {
-			t.Fatalf("ValidateIDToken(aud [client-id api], trusted [api]) error = %v, want nil", err)
 		}
 	})
 	t.Run("LaunchContextFromTokenResponse", func(t *testing.T) {
@@ -136,4 +138,34 @@ func TestTrustedAudiencesReachVerification(t *testing.T) {
 			t.Fatalf("LaunchContextFromTokenResponse(trusted [api]) IDToken = %#v, want sub user-1", lc.IDToken)
 		}
 	})
+}
+
+// TestWithTrustedAudiencesKeepsItsOwnCopy checks that changing the caller's
+// slice after building smart.WithTrustedAudiences does not change the trusted
+// set LaunchContextFromTokenResponse passes to the verification. REQ-062
+func TestWithTrustedAudiencesKeepsItsOwnCopy(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv, body := testRSAKey(t)
+	jwks := idTokenJWKS(t, body)
+	tok := signJWT(t, priv, "test-kid", map[string]any{
+		"iss": "https://issuer.example",
+		"sub": "user-1",
+		"aud": []string{"client-id", "api"},
+		"exp": now.Add(time.Hour).Unix(),
+	})
+
+	trusted := []string{"other"}
+	opt := smart.WithTrustedAudiences(trusted...)
+	trusted[0] = "api"
+	_, err := smart.LaunchContextFromTokenResponse(t.Context(), authsmart.TokenResponse{AccessToken: "at", IDToken: tok},
+		smart.WithJWKS(jwks),
+		smart.WithIssuer("https://issuer.example"),
+		smart.WithClientID("client-id"),
+		smart.WithValidationTime(now),
+		opt,
+	)
+	// REQ-062: the trusted set is the one given when the option was built.
+	if !errors.Is(err, auth.ErrJWKSValidationFailed) {
+		t.Fatalf("LaunchContextFromTokenResponse(aud [client-id api], trusted [other] then edited to [api]) error = %v, want ErrJWKSValidationFailed", err)
+	}
 }

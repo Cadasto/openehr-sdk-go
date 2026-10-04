@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -66,7 +67,8 @@ func WithIDTokenSigningAlgs(algs []string) ValidateOption {
 // besides the client ID. Without it, a token whose aud lists any other
 // audience is rejected.
 func WithTrustedAudiences(aud ...string) ValidateOption {
-	return func(c *ValidateConfig) { c.TrustedAudiences = aud }
+	trusted := slices.Clone(aud)
+	return func(c *ValidateConfig) { c.TrustedAudiences = trusted }
 }
 
 // WithPrincipalClaimNames overrides principal_uid / principal_type keys.
@@ -107,7 +109,7 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 	if tr.IDToken != "" {
 		// ValidateIDToken checks the trust anchors (JWKS, issuer, client ID)
 		// before the token, so a missing one is a configuration error (REQ-064).
-		claims, err := ValidateIDToken(ctx, tr.IDToken, cfg.JWKS, cfg.Issuer, cfg.ClientID, cfg.Nonce, cfg.Now, cfg.AllowedIDTokenAlgs,
+		claims, err := authsmart.ValidateIDToken(ctx, tr.IDToken, cfg.JWKS, cfg.Issuer, cfg.ClientID, cfg.Nonce, cfg.Now, cfg.AllowedIDTokenAlgs,
 			authsmart.WithTrustedAudiences(cfg.TrustedAudiences...))
 		if err != nil {
 			return nil, fmt.Errorf("smart: id_token: %w", err)
