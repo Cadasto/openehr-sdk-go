@@ -20,8 +20,11 @@ type JWKS struct {
 	URI        string
 	TTL        time.Duration
 
-	mu        sync.Mutex
-	keys      map[string]json.RawMessage
+	mu   sync.Mutex
+	keys map[string]json.RawMessage // keys published with a kid, by kid
+	// signing holds every key whose use, if present, is "sig", with or
+	// without a kid, in document order. A lookup without a kid reads it.
+	signing   []json.RawMessage
 	fetchedAt time.Time
 	inflight  *jwksRefresh
 }
@@ -52,9 +55,16 @@ func NewJWKS(httpClient *http.Client, uri string) (*JWKS, error) {
 
 // Key returns the JWK document for kid. On cache miss the JWKS document
 // is refreshed once before failing.
+//
+// An empty kid asks for the key that verifies a token whose header carries
+// no kid: the set's only signing key, which is a key whose use, if present,
+// is "sig", published with or without a kid. When the set holds no signing
+// key or more than one, Key fails with [auth.ErrJWKSValidationFailed]; it
+// fetches the set when the cache is empty or older than TTL, but does not
+// refresh it on that failure.
 func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
 	if kid == "" {
-		return nil, fmt.Errorf("%w: empty kid", auth.ErrJWKSValidationFailed)
+		return j.onlySigningKey(ctx)
 	}
 	var refreshed bool
 	for {
@@ -74,6 +84,26 @@ func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
 		refreshed = true
 	}
 	return nil, fmt.Errorf("%w: kid %q not found after refresh", auth.ErrJWKSValidationFailed, kid)
+}
+
+// onlySigningKey returns the set's only signing key, for a token without a
+// kid (OpenID Connect Core 1.0 §10.1, REQ-062).
+func (j *JWKS) onlySigningKey(ctx context.Context) (json.RawMessage, error) {
+	j.mu.Lock()
+	stale := j.staleLocked()
+	j.mu.Unlock()
+	if stale {
+		if err := j.refresh(ctx); err != nil {
+			return nil, err
+		}
+	}
+	j.mu.Lock()
+	signing := j.signing
+	j.mu.Unlock()
+	if len(signing) != 1 {
+		return nil, fmt.Errorf("%w: no kid given and the JWKS holds %d signing keys, want exactly one", auth.ErrJWKSValidationFailed, len(signing))
+	}
+	return signing[0], nil
 }
 
 func (j *JWKS) staleLocked() bool {
@@ -142,17 +172,27 @@ func (j *JWKS) fetch(ctx context.Context) error {
 		return fmt.Errorf("jwks decode: %w", err)
 	}
 	keys := make(map[string]json.RawMessage, len(doc.Keys))
+	var signing []json.RawMessage
 	for _, raw := range doc.Keys {
-		var meta struct {
+		// A pointer stays nil for a null entry, which is not a key.
+		var meta *struct {
 			Kid string `json:"kid"`
+			Use any    `json:"use"`
 		}
-		if err := json.Unmarshal(raw, &meta); err != nil || meta.Kid == "" {
+		if err := json.Unmarshal(raw, &meta); err != nil || meta == nil {
 			continue
 		}
-		keys[meta.Kid] = raw
+		// A key without a kid is kept for a token without a kid (REQ-062).
+		if meta.Use == nil || meta.Use == "sig" {
+			signing = append(signing, raw)
+		}
+		if meta.Kid != "" {
+			keys[meta.Kid] = raw
+		}
 	}
 	j.mu.Lock()
 	j.keys = keys
+	j.signing = signing
 	j.fetchedAt = time.Now()
 	j.mu.Unlock()
 	return nil
