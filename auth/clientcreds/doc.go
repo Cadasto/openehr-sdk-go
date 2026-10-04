@@ -12,4 +12,9 @@
 // Callers must inject the *http.Client whose timeouts and TLS roots they
 // want to apply to the token endpoint. A nil http.Client is rejected at
 // construction.
+//
+// A backend service that has resolved the deployment's SMART configuration
+// builds its Source with [NewFromCatalog], which takes the token endpoint and
+// issuer from the catalog and refuses, at construction, a configuration the
+// catalog says the server does not accept.
 package clientcreds

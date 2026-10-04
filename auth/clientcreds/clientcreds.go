@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +17,19 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
+	"github.com/cadasto/openehr-sdk-go/smart/discovery"
+)
+
+// grantClientCredentials is the grant_type value of this grant, as sent to
+// the token endpoint and as listed in a server's grant_types_supported.
+const grantClientCredentials = "client_credentials"
+
+// Client authentication method names, as listed in a server's
+// token_endpoint_auth_methods_supported (RFC 8414).
+const (
+	methodClientSecretBasic = "client_secret_basic"
+	methodClientSecretPost  = "client_secret_post"
+	methodPrivateKeyJWT     = "private_key_jwt"
 )
 
 // AuthMethod selects how the client authenticates to the token
@@ -183,6 +197,82 @@ func FromConfig(cfg Config) (*Source, error) {
 	return &Source{cfg: cfg, tokenURL: u}, nil
 }
 
+// NewFromCatalog builds a Source for SMART Backend Services from a resolved
+// catalog. It sends token requests to catalog.Auth.TokenEndpoint and records
+// catalog.Issuer on the tokens it produces, unless opts include
+// [WithIssuer]. clientSecret may be empty when opts include
+// [WithClientAssertion].
+//
+// A nil catalog, or one without a token endpoint, is refused with
+// [auth.ErrInvalidConfig]. So is a configuration the catalog says the server
+// does not accept: grant_types_supported leaves out client_credentials,
+// token_endpoint_auth_methods_supported leaves out the configured method
+// (private_key_jwt with a client assertion, otherwise client_secret_basic or
+// client_secret_post as [WithAuthMethod] selects), or
+// token_endpoint_auth_signing_alg_values_supported leaves out the algorithm
+// of a [jwtbearer.ClaimsSigner] client assertion. A list the catalog leaves
+// empty does not constrain anything, and a client assertion from any other
+// source is not checked against the algorithm list. The other checks are
+// those of [FromConfig].
+func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID, clientSecret string, opts ...Option) (*Source, error) {
+	if catalog == nil {
+		return nil, fmt.Errorf("%w: catalog is nil", auth.ErrInvalidConfig)
+	}
+	if catalog.Auth.TokenEndpoint == nil {
+		return nil, fmt.Errorf("%w: catalog has no token endpoint", auth.ErrInvalidConfig)
+	}
+	// The issuer default comes first, so an option the caller passes wins.
+	all := append([]Option{WithIssuer(catalog.Issuer)}, opts...)
+	s, err := New(clientID, clientSecret, catalog.Auth.TokenEndpoint.String(), all...)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkAdvertised(catalog.Auth, s.cfg); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// checkAdvertised refuses cfg when a list the server advertises leaves out
+// the grant, the client auth method, or the client-assertion algorithm cfg
+// would use. An empty list does not constrain. The errors name only public
+// metadata: the list and the configured value, never a credential.
+func checkAdvertised(a discovery.AuthEndpoints, cfg Config) error {
+	if l := a.GrantTypesSupported; len(l) > 0 && !slices.Contains(l, grantClientCredentials) {
+		return fmt.Errorf("%w: grant type %q is not in the server's advertised grant_types_supported %v",
+			auth.ErrInvalidConfig, grantClientCredentials, l)
+	}
+	method := authMethodName(cfg)
+	if l := a.TokenEndpointAuthMethodsSupported; len(l) > 0 && !slices.Contains(l, method) {
+		return fmt.Errorf("%w: configured client auth method %q is not in the server's advertised token_endpoint_auth_methods_supported %v",
+			auth.ErrInvalidConfig, method, l)
+	}
+	// Only the SDK's own signer exposes its algorithm; any other assertion
+	// source is opaque and is not checked.
+	if signer, ok := cfg.ClientAssertion.(*jwtbearer.ClaimsSigner); ok && signer != nil {
+		if l := a.TokenEndpointAuthSigningAlgValuesSupported; len(l) > 0 && !slices.Contains(l, signer.Algorithm) {
+			return fmt.Errorf("%w: client assertion algorithm %q is not in the server's advertised token_endpoint_auth_signing_alg_values_supported %v",
+				auth.ErrInvalidConfig, signer.Algorithm, l)
+		}
+	}
+	return nil
+}
+
+// authMethodName returns the token_endpoint_auth_methods_supported name of
+// the client authentication fetch sends for cfg. It follows fetch's own
+// choice: a client assertion first, then client_secret_post when selected,
+// and HTTP Basic otherwise.
+func authMethodName(cfg Config) string {
+	switch {
+	case cfg.ClientAssertion != nil:
+		return methodPrivateKeyJWT
+	case cfg.AuthMethod == AuthPost:
+		return methodClientSecretPost
+	default:
+		return methodClientSecretBasic
+	}
+}
+
 var _ auth.Reauther = (*Source)(nil)
 
 // Token returns the current access token, refreshing transparently
@@ -280,7 +370,7 @@ type tokenResponse struct {
 
 func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 	form := url.Values{
-		"grant_type": {"client_credentials"},
+		"grant_type": {grantClientCredentials},
 	}
 	if s.cfg.Scope != "" {
 		form.Set("scope", s.cfg.Scope)
