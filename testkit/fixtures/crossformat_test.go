@@ -81,14 +81,20 @@ func crossFormatClosureFindings(corpusRoot string, m crossFormatManifestData) ([
 }
 
 // crossFormatShapeFindings returns one message per set of m that does not
-// have exactly one OPT (a template.opt file or an opt pointer, never both) or
-// that has fewer than two of the four formats.
+// have exactly one OPT (a template.opt file or an opt pointer, never both),
+// that has fewer than two of the four formats, or whose formats share no
+// PROBE-105 leg. The pairs are those of crossformat.Legs, which this package
+// cannot import: canonical JSON with canonical XML, a canonical document with
+// FLAT, and FLAT with STRUCTURED.
 func crossFormatShapeFindings(m crossFormatManifestData) []string {
-	type shape struct{ opts, formats int }
+	type shape struct {
+		opts, formats int
+		has           map[string]bool
+	}
 	sets := map[string]*shape{}
 	get := func(name string) *shape {
 		if sets[name] == nil {
-			sets[name] = &shape{}
+			sets[name] = &shape{has: map[string]bool{}}
 		}
 		return sets[name]
 	}
@@ -97,6 +103,7 @@ func crossFormatShapeFindings(m crossFormatManifestData) []string {
 			get(f.set).opts++
 		} else {
 			get(f.set).formats++
+			get(f.set).has[f.local] = true
 		}
 	}
 	for _, p := range m.opts {
@@ -108,8 +115,13 @@ func crossFormatShapeFindings(m crossFormatManifestData) []string {
 		if s.opts != 1 {
 			out = append(out, fmt.Sprintf("%s: %d OPTs (template.opt and opt pointers), want exactly 1", name, s.opts))
 		}
-		if s.formats < 2 {
+		hasJSON, hasXML := s.has[crossFormatCanonicalJSON], s.has[crossFormatCanonicalXML]
+		hasFlat, hasStructured := s.has[crossFormatFlat], s.has[crossFormatStructured]
+		switch {
+		case s.formats < 2:
 			out = append(out, fmt.Sprintf("%s: %d formats, want at least 2", name, s.formats))
+		case !(hasJSON && hasXML) && !((hasJSON || hasXML) && hasFlat) && !(hasFlat && hasStructured):
+			out = append(out, fmt.Sprintf("%s: no two of its formats share a leg, want JSON and XML, a canonical document and FLAT, or FLAT and STRUCTURED", name))
 		}
 	}
 	return out
@@ -374,7 +386,11 @@ func TestCrossFormatShapeFindsBadSets_PROBE105_REQ080(t *testing.T) {
 		want     []string // the prefix of each finding
 	}{
 		{name: "own template and two formats", manifest: ok},
-		{name: "pointer and two formats", manifest: file("s/canonical.xml") + file("s/structured.json") + pointer("s")},
+		{name: "pointer and two formats", manifest: file("s/canonical.xml") + file("s/flat.json") + pointer("s")},
+		{name: "FLAT and STRUCTURED", manifest: file("s/flat.json") + file("s/structured.json") + pointer("s")},
+		{name: "JSON and XML", manifest: file("s/canonical.json") + file("s/canonical.xml") + pointer("s")},
+		{name: "canonical and STRUCTURED share no leg", manifest: file("s/canonical.xml") + file("s/structured.json") + pointer("s"), want: []string{"s: no two of its formats share a leg"}},
+		{name: "both canonical forms and STRUCTURED", manifest: file("s/canonical.json") + file("s/canonical.xml") + file("s/structured.json") + pointer("s")},
 		{name: "template and pointer", manifest: ok + pointer("s"), want: []string{"s: 2 OPTs"}},
 		{name: "no OPT", manifest: file("s/canonical.json") + file("s/flat.json"), want: []string{"s: 0 OPTs"}},
 		{name: "one format", manifest: file("s/template.opt") + file("s/canonical.json"), want: []string{"s: 1 formats"}},
