@@ -154,9 +154,11 @@ type AuthEndpoints struct {
 	// leaves out. The SDK does not use the list to select an algorithm.
 	TokenEndpointAuthSigningAlgValuesSupported []string
 	// IDTokenSigningAlgValuesSupported lists the JWS algorithms used to sign
-	// ID tokens (e.g. "RS256", "ES384"). The SDK does not apply it
-	// automatically; pass it to smart.WithIDTokenSigningAlgs to constrain
-	// ID-token verification.
+	// ID tokens (e.g. "RS256", "ES384"). When it is not empty, auth/smart
+	// applies it as it verifies the ID token at the code exchange and on a
+	// refresh, accepting only the listed algorithms the SDK supports. To
+	// verify an ID token yourself with the same limit, pass it to
+	// smart.WithIDTokenSigningAlgs.
 	IDTokenSigningAlgValuesSupported []string
 	// AuthorizationResponseIssParameterSupported reports whether the
 	// authorization server adds an "iss" parameter, naming itself, to every

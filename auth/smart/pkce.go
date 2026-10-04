@@ -37,7 +37,8 @@ func base64URLEncode(b []byte) string {
 }
 
 // randBase64URL returns n cryptographically random bytes encoded as an
-// unpadded base64url string. Used for the OAuth `state` (CSRF) value.
+// unpadded base64url string. It generates the OAuth `state` (CSRF) value
+// and the OpenID Connect nonce.
 func randBase64URL(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
