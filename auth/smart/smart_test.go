@@ -633,6 +633,91 @@ func TestExchangeWithClientSecretBasic(t *testing.T) { // REQ-068
 	}
 }
 
+// TestExchangeClientSecretBasicFormEncodesCredentials verifies that
+// client_secret_basic form-encodes the client identifier and secret before
+// they become the HTTP Basic username and password, on the code exchange and
+// on the refresh (REQ-068). It pins RFC 6749 §2.3.1: both values are encoded
+// with application/x-www-form-urlencoded (Appendix B) and the encoded values
+// are used as the username and the password.
+func TestExchangeClientSecretBasicFormEncodesCredentials(t *testing.T) { // REQ-068
+	const (
+		clientID = "app id:1"
+		secret   = "s3cr:t%+ /é"
+	)
+	wantUser, wantPass := url.QueryEscape(clientID), url.QueryEscape(secret)
+	if wantUser == clientID || wantPass == secret {
+		t.Fatalf("credentials must need form-encoding: QueryEscape(%q) = %q, QueryEscape(%q) = %q", clientID, wantUser, secret, wantPass)
+	}
+
+	type basicCreds struct {
+		grant, user, pass string
+		ok                bool
+	}
+	var (
+		mu  sync.Mutex
+		got []basicCreds
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("ParseForm: %v", err)
+		}
+		user, pass, ok := r.BasicAuth()
+		mu.Lock()
+		got = append(got, basicCreds{grant: r.PostForm.Get("grant_type"), user: user, pass: pass, ok: ok})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"access_token":"at-basic","token_type":"Bearer","expires_in":3600,"refresh_token":"rt-basic"}`)
+	}))
+	defer srv.Close()
+
+	src, err := smart.New(
+		clientID,
+		discovery.AuthEndpoints{
+			AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
+			TokenEndpoint:         discovery.MustParseURL(srv.URL + "/token"),
+		},
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+		smart.WithClientSecret(secret),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := src.BeginAuthorization("state-basic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-basic", "state-basic", req); err != nil {
+		t.Fatalf("ExchangeAuthorizationCode error = %v", err)
+	}
+	if err := src.Reauth(t.Context()); err != nil {
+		t.Fatalf("Reauth (refresh) error = %v", err)
+	}
+
+	mu.Lock()
+	calls := slices.Clone(got)
+	mu.Unlock()
+	if len(calls) != 2 {
+		t.Fatalf("token endpoint calls = %d (%+v), want 2: code exchange and refresh", len(calls), calls)
+	}
+	for i, wantGrant := range []string{"authorization_code", "refresh_token"} {
+		c := calls[i]
+		if c.grant != wantGrant {
+			t.Errorf("call %d grant_type = %q, want %q", i, c.grant, wantGrant)
+		}
+		if !c.ok {
+			t.Errorf("%s: no HTTP Basic credentials on the token request", wantGrant)
+			continue
+		}
+		if c.user != wantUser {
+			t.Errorf("%s: Basic username = %q, want %q (form-encoded %q)", wantGrant, c.user, wantUser, clientID)
+		}
+		if c.pass != wantPass {
+			t.Errorf("%s: Basic password = %q, want %q (form-encoded %q)", wantGrant, c.pass, wantPass, secret)
+		}
+	}
+}
+
 // TestExchangeWithClientSecretPost verifies that, when the authorization
 // server advertises only client_secret_post (and not client_secret_basic), a
 // Source configured with WithClientSecret presents its credential in the form
