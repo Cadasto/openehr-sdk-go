@@ -258,25 +258,40 @@ func TestCompleteAuthorizationExchanges(t *testing.T) { // REQ-061
 	}
 }
 
-// TestCompleteAuthorizationRequiresRequest pins that CompleteAuthorization
-// refuses a request that did not come from BeginAuthorization before it
+// TestCompleteAuthorizationRequiresRequest pins REQ-061: CompleteAuthorization
+// refuses a request without a state or without a PKCE verifier before it
 // reads the redirect, so an empty state on both sides cannot pass the state
-// check and the redirect's content does not decide the error.
+// check and the redirect's content does not decide the error. A request
+// with only one of the two is refused too, even when the redirect matches
+// its state and then carries an error or a foreign issuer.
 func TestCompleteAuthorizationRequiresRequest(t *testing.T) { // REQ-061
-	for _, callback := range []url.Values{
-		{"code": {"c"}},
-		{"error": {"access_denied"}},
-		{"code": {"c1", "c2"}},
-		{},
-	} {
-		te := newTokenEndpoint(t, `{"access_token":"at-1"}`)
-		src := completeSource(t, te, false)
-		_, _, err := src.CompleteAuthorization(t.Context(), callback, smart.AuthorizationRequest{})
-		if !errors.Is(err, auth.ErrInvalidConfig) {
-			t.Errorf("CompleteAuthorization(%v, empty request) error = %v, want auth.ErrInvalidConfig", callback, err)
-		}
-		if n := len(te.forms()); n != 0 {
-			t.Errorf("CompleteAuthorization(%v, empty request) made %d token-endpoint calls, want none", callback, n)
-		}
+	stateOnly := smart.AuthorizationRequest{State: "s", Issuer: completeIssuer}
+	verifierOnly := smart.AuthorizationRequest{PKCE: smart.PKCEPair{Verifier: "v"}, Issuer: completeIssuer}
+	tests := []struct {
+		name     string
+		req      smart.AuthorizationRequest
+		callback url.Values
+	}{
+		{name: "empty request, code", callback: url.Values{"code": {"c"}}},
+		{name: "empty request, error", callback: url.Values{"error": {"access_denied"}}},
+		{name: "empty request, repeated code", callback: url.Values{"code": {"c1", "c2"}}},
+		{name: "empty request, empty redirect", callback: url.Values{}},
+		{name: "state only, matching state and an error", req: stateOnly, callback: url.Values{"state": {"s"}, "error": {"access_denied"}}},
+		{name: "state only, matching state and a foreign issuer", req: stateOnly, callback: url.Values{"state": {"s"}, "code": {"c"}, "iss": {"https://evil.example"}}},
+		{name: "verifier only, matching empty state and an error", req: verifierOnly, callback: url.Values{"state": {""}, "error": {"access_denied"}}},
+		{name: "verifier only, matching empty state and a foreign issuer", req: verifierOnly, callback: url.Values{"state": {""}, "code": {"c"}, "iss": {"https://evil.example"}}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			te := newTokenEndpoint(t, `{"access_token":"at-1"}`)
+			src := completeSource(t, te, false)
+			_, _, err := src.CompleteAuthorization(t.Context(), tc.callback, tc.req)
+			if !errors.Is(err, auth.ErrInvalidConfig) {
+				t.Errorf("CompleteAuthorization(%v, %+v) error = %v, want auth.ErrInvalidConfig", tc.callback, tc.req, err)
+			}
+			if n := len(te.forms()); n != 0 {
+				t.Errorf("CompleteAuthorization(%v, %+v) made %d token-endpoint calls, want none", tc.callback, tc.req, n)
+			}
+		})
 	}
 }

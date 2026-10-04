@@ -50,7 +50,10 @@ func TestIDTokenClaimsIsTheAuthSmartType(t *testing.T) {
 // TestValidateIDTokenWrapperMatchesAuthSmart checks that smart.ValidateIDToken
 // returns what auth/smart.ValidateIDToken returns for the same arguments: the
 // same claims for a valid token, and the same error class for a rejected token
-// and for a missing trust anchor. REQ-062 REQ-064
+// and for a missing trust anchor. It passes the allowlist through, so an
+// allowlist that leaves out the token's algorithm, or names only algorithms
+// the SDK does not support, refuses the token through both names, never
+// widened to the default set. REQ-062 REQ-064
 func TestValidateIDTokenWrapperMatchesAuthSmart(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	priv, body := testRSAKey(t)
@@ -70,16 +73,23 @@ func TestValidateIDTokenWrapperMatchesAuthSmart(t *testing.T) {
 		name    string
 		issuer  string
 		nonce   string
-		wantErr error // nil means the token verifies
+		algs    []string // nil means RS256, the token's algorithm
+		wantErr error    // nil means the token verifies
 	}{
 		{name: "valid token", issuer: "https://issuer.example", nonce: "nonce-xyz"},
 		{name: "nonce mismatch", issuer: "https://issuer.example", nonce: "other-nonce", wantErr: auth.ErrJWKSValidationFailed},
 		{name: "no issuer configured", nonce: "nonce-xyz", wantErr: auth.ErrInvalidConfig},
+		{name: "allowlist without the token's algorithm", issuer: "https://issuer.example", nonce: "nonce-xyz", algs: []string{"ES256"}, wantErr: auth.ErrJWKSValidationFailed},
+		{name: "allowlist of unsupported algorithms only", issuer: "https://issuer.example", nonce: "nonce-xyz", algs: []string{"PS512", "HS256"}, wantErr: auth.ErrJWKSValidationFailed},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			viaSmart, errSmart := smart.ValidateIDToken(t.Context(), tok, jwks, tc.issuer, "client-id", tc.nonce, now, []string{"RS256"})
-			viaAuth, errAuth := authsmart.ValidateIDToken(t.Context(), tok, jwks, tc.issuer, "client-id", tc.nonce, now, []string{"RS256"})
+			algs := tc.algs
+			if algs == nil {
+				algs = []string{"RS256"}
+			}
+			viaSmart, errSmart := smart.ValidateIDToken(t.Context(), tok, jwks, tc.issuer, "client-id", tc.nonce, now, algs)
+			viaAuth, errAuth := authsmart.ValidateIDToken(t.Context(), tok, jwks, tc.issuer, "client-id", tc.nonce, now, algs)
 			if tc.wantErr == nil {
 				if errSmart != nil || errAuth != nil {
 					t.Fatalf("ValidateIDToken(%s): smart error = %v, auth/smart error = %v, want nil", tc.name, errSmart, errAuth)
