@@ -487,11 +487,18 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 // using only the algorithms the server lists in
 // id_token_signing_alg_values_supported when it lists any; the issuer
 // against the source's issuer; the audience against the client ID and
-// [WithIDTokenTrustedAudiences]; and the nonce against req.Nonce. A token
-// that fails matches [auth.ErrJWKSValidationFailed]. A source without a
-// JWKS fails with [auth.ErrInvalidConfig], so an unverified ID token is
-// never returned. The verified claims are in [TokenResponse].IDTokenClaims.
-// When the call fails, the source keeps the tokens it held before.
+// [WithIDTokenTrustedAudiences]; and the nonce against req.Nonce. Any
+// failure there is an [*auth.ExchangeError] matching
+// [auth.ErrTokenExchangeFailed] that also matches its cause: a token that
+// fails its checks matches [auth.ErrJWKSValidationFailed], a source without
+// a JWKS matches [auth.ErrInvalidConfig], and a key set that cannot be
+// fetched keeps its fetch error. An unverified ID token is never returned.
+// The verified claims are in [TokenResponse].IDTokenClaims. When the call
+// fails, the source keeps the tokens it held before.
+//
+// A successful exchange starts a new session: the source holds the new
+// access token and the response's refresh token, or none when the response
+// has none, never a refresh token from an earlier session.
 //
 // The returned [TokenResponse] also carries the SMART launch parameters
 // for smart/.
@@ -511,7 +518,7 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 		// anything from this response is kept or returned.
 		claims, err := s.verifyIDToken(ctx, tr.IDToken, req.Nonce)
 		if err != nil {
-			return auth.Token{}, TokenResponse{}, fmt.Errorf("smart: id_token: %w", err)
+			return auth.Token{}, TokenResponse{}, &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: fmt.Errorf("id_token: %w", err)}
 		}
 		tr.IDTokenClaims = claims
 	}
@@ -714,8 +721,15 @@ func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, 
 		"client_id":     {s.cfg.ClientID},
 	}
 	tok, tr, next, err := s.postToken(ctx, form)
-	if err != nil || tr.IDToken == "" {
-		return tok, tr, next, err
+	if err != nil {
+		return auth.Token{}, TokenResponse{}, "", err
+	}
+	if next == "" {
+		// RFC 6749 §6: the server may keep the refresh token it was sent.
+		next = refresh
+	}
+	if tr.IDToken == "" {
+		return tok, tr, next, nil
 	}
 	claims, err := s.verifyRefreshedIDToken(ctx, tr.IDToken)
 	if err != nil {
@@ -810,16 +824,7 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: errors.New("empty access_token")}
 	}
 	tok := tokenFromResponse(parsed, s.cfg.Issuer)
-	refresh := parsed.RefreshToken
-	if refresh == "" {
-		// Keep prior refresh when the server omits a new one.
-		s.mu.Lock()
-		if s.refresh != "" {
-			refresh = s.refresh
-		}
-		s.mu.Unlock()
-	}
-	return tok, parsed, refresh, nil
+	return tok, parsed, parsed.RefreshToken, nil
 }
 
 // JWKS returns the JWKS helper when configured.
