@@ -650,7 +650,7 @@ requirements:
     title: JWKS rotation
     canonical: docs/specifications/auth.md#req-062--jwks-rotation
     status: draft
-    implementation: partial
+    implementation: landed
     packages: [auth/smart, smart/discovery]
     probes: [PROBE-006]
     tests:
@@ -690,7 +690,7 @@ requirements:
     title: Launch context
     canonical: docs/specifications/auth.md#req-064--launch-context
     status: draft
-    implementation: partial
+    implementation: landed
     packages: [smart, auth/smart]
     tests:
       - auth/smart/exchange_idtoken_test.go
