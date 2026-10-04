@@ -705,20 +705,22 @@ func primitiveValueMatchesShortName(shortName string, val any) bool {
 // bmmSubtypes is the closed lookup of abstract → concrete RM type
 // admission rules used by checkRMType. Sourced from
 // openehr_rm_1.2.0.bmm: concrete classes that satisfy each
-// abstract slot. Entries are limited to the RM types the rest of
-// the validator routes — describeRMType, locatableArchetypeNodeID,
-// and the rmread table. Adding an abstract→concrete row here
-// without the corresponding routing rows would surface as a false
-// rm_type_mismatch (the walker would not recognise the concrete);
-// the inverse — concretes whose abstract slot is missing — would
-// surface as the same false positive on a polymorphic OPT slot.
-// Extend in lock-step.
+// abstract slot. Every row is written by hand.
 //
-// The DATA_VALUE row is not hand-listed. It is every concrete
-// DATA_VALUE descendant of the pinned BMM, read through rminfo, so a
-// BMM bump that adds a data value type is admitted without an edit
-// here. describeRMType names each of them, since it delegates to the
-// generated rm.RMTypeName.
+// A concrete class missing from its abstract row is refused with a
+// false rm_type_mismatch wherever an OPT node declares that abstract
+// type. Adding a class to a row needs no naming table elsewhere:
+// describeRMType names every class the generated type registry holds
+// (rm.RMTypeName), and locatableArchetypeNodeID reads
+// archetype_node_id through rm.Locatable. What the walker reads below
+// a node still comes from rmread, so an OPT that constrains attributes
+// of a newly admitted class also needs rmread readers for them. Extend
+// the rows in lock-step with the BMM and with rmread.
+//
+// The DATA_VALUE row holds every concrete DATA_VALUE descendant of the
+// pinned BMM. TestDataValueSubtypesMatchBMM compares it with rminfo, so
+// a BMM bump that adds or drops a data value type fails that test until
+// the row follows it.
 //
 // REQ-110 added the demographic PARTY hierarchy (+ sub-components) and
 // the EHR-IM roots FOLDER / EHR_STATUS so non-COMPOSITION OPTs validate
@@ -766,7 +768,14 @@ var bmmSubtypes = map[string][]string{
 	"PARTY_PROXY": {
 		"PARTY_SELF", "PARTY_IDENTIFIED", "PARTY_RELATED",
 	},
-	"DATA_VALUE": concreteDescendants("DATA_VALUE"),
+	"DATA_VALUE": {
+		"DV_BOOLEAN", "DV_CODED_TEXT", "DV_COUNT", "DV_DATE",
+		"DV_DATE_TIME", "DV_DURATION", "DV_EHR_URI",
+		"DV_GENERAL_TIME_SPECIFICATION", "DV_IDENTIFIER", "DV_INTERVAL",
+		"DV_MULTIMEDIA", "DV_ORDINAL", "DV_PARAGRAPH", "DV_PARSABLE",
+		"DV_PERIODIC_TIME_SPECIFICATION", "DV_PROPORTION", "DV_QUANTITY",
+		"DV_SCALE", "DV_STATE", "DV_TEXT", "DV_TIME", "DV_URI",
+	},
 	// AOM 1.4 primitive short names (used under C_PRIMITIVE_OBJECT)
 	// admit the canonical DV wrapper carrying the primitive value.
 	// Lockstep with instance.concreteFor — surfaced by clinical_note.opt
@@ -777,17 +786,4 @@ var bmmSubtypes = map[string][]string{
 	"TIME":      {"DV_TIME"},
 	"DATE_TIME": {"DV_DATE_TIME"},
 	"BOOLEAN":   {"DV_BOOLEAN"},
-}
-
-// concreteDescendants returns every non-abstract class the pinned BMM
-// derives from rmType, sorted. It returns nil when rminfo cannot answer,
-// so every value under rmType then fails the type check instead of
-// passing it silently.
-func concreteDescendants(rmType string) []string {
-	h, ok := rminfo.Default.(rminfo.Hierarchy)
-	if !ok {
-		return nil
-	}
-	descendants, _ := h.ConcreteDescendants(rmType)
-	return descendants
 }
