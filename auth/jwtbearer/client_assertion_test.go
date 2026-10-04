@@ -81,6 +81,54 @@ func TestNewClientAssertionClaims(t *testing.T) { // REQ-068
 	}
 }
 
+// callerSigner is a crypto.Signer of the caller's own type, as a key-store
+// adapter would be, that hides the key it signs with.
+type callerSigner struct{ key crypto.Signer }
+
+func (c callerSigner) Public() crypto.PublicKey { return c.key.Public() }
+
+func (c callerSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	return c.key.Sign(rand, digest, opts)
+}
+
+// TestNewClientAssertionAcceptsCallerSigner pins that NewClientAssertion
+// accepts a signer of the caller's own type whose Public method reports a
+// usable public key of the type alg needs, and that the assertions it signs
+// verify against that key.
+func TestNewClientAssertionAcceptsCallerSigner(t *testing.T) { // REQ-068
+	const (
+		clientID = "c1"
+		tokenURL = "https://as.example/token"
+		kid      = "k1"
+	)
+	rsaKey := newKey(t)
+	p256Key := newECKey(t, elliptic.P256())
+	p384Key := newECKey(t, elliptic.P384())
+	tests := []struct {
+		alg    string
+		key    crypto.Signer
+		verify func(t *testing.T, jwt string)
+	}{
+		{alg: "RS256", key: rsaKey, verify: func(t *testing.T, jwt string) { verifyRSA(t, "RS256", &rsaKey.PublicKey, jwt) }},
+		{alg: "RS384", key: rsaKey, verify: func(t *testing.T, jwt string) { verifyRSA(t, "RS384", &rsaKey.PublicKey, jwt) }},
+		{alg: "ES256", key: p256Key, verify: func(t *testing.T, jwt string) { verifyECDSA(t, "ES256", &p256Key.PublicKey, jwt) }},
+		{alg: "ES384", key: p384Key, verify: func(t *testing.T, jwt string) { verifyECDSA(t, "ES384", &p384Key.PublicKey, jwt) }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.alg, func(t *testing.T) {
+			s, err := NewClientAssertion(clientID, tokenURL, callerSigner{key: tc.key}, tc.alg, kid)
+			if err != nil {
+				t.Fatalf("NewClientAssertion(%q, %q, callerSigner, %q, %q): %v", clientID, tokenURL, tc.alg, kid, err)
+			}
+			jwt, err := s.Assertion(t.Context())
+			if err != nil {
+				t.Fatalf("Assertion: %v", err)
+			}
+			tc.verify(t, jwt)
+		})
+	}
+}
+
 // unusableSigner is a non-nil crypto.Signer whose Public panics, as a
 // broken key-store adapter might.
 type unusableSigner struct{}

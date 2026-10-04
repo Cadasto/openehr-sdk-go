@@ -181,8 +181,9 @@ const clientAssertionLifetime = 5 * time.Minute
 // private key, an ECDSA private key without its scalar or point, or a
 // signer whose Public method panics or reports no usable public key), alg
 // is not supported, or the key does not fit alg, as
-// [NewClaimsSigner] describes. A signer of the caller's own type that
-// reports a usable public key is accepted as it is.
+// [NewClaimsSigner] describes. A signer of the caller's own type whose
+// Public method reports a usable public key of the type alg needs is
+// accepted as it is.
 // [NewClaimsSigner] lists the key each algorithm needs.
 func NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, kid string) (*ClaimsSigner, error) {
 	if clientID == "" {
