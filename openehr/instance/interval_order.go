@@ -196,8 +196,9 @@ func boundNodes(optNode *tcimpl.CompiledNode) (lower, upper *tcimpl.CompiledNode
 	return firstChild(optNode, "lower"), firstChild(optNode, "upper")
 }
 
-// firstChild returns the first child of node's attrName, the alternative
-// materialiseSingle builds, or nil when node or the attribute has none.
+// firstChild returns the first child of node's attrName the OPT does not
+// prohibit, the alternative materialiseSingle builds, or nil when node or
+// the attribute has none.
 func firstChild(node *tcimpl.CompiledNode, attrName string) *tcimpl.CompiledNode {
 	if node == nil {
 		return nil
@@ -206,7 +207,7 @@ func firstChild(node *tcimpl.CompiledNode, attrName string) *tcimpl.CompiledNode
 	if attr == nil {
 		return nil
 	}
-	children := attr.Children()
+	children := allowedChildren(attr)
 	if len(children) == 0 {
 		return nil
 	}

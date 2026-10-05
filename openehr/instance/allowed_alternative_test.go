@@ -29,6 +29,25 @@ func optCodedTextOccurring(lower, upper int, terminologyID string, codes ...stri
 		optSingle("defining_code", optCodePhrase(terminologyID, codes...)))
 }
 
+// optPrimitiveOccurring is optPrimitive with occurrences lower..upper.
+func optPrimitiveOccurring(lower, upper int, rmType, itemType, body string) string {
+	return `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>` + rmType + `</rm_type_name>` +
+		`<occurrences>` + optInterval(lower, upper) + `</occurrences>` +
+		`<node_id></node_id><item xsi:type="` + itemType + `">` + body + `</item></children>`
+}
+
+// optCodePhraseOccurring is a C_CODE_PHRASE under terminologyID listing
+// codes, with occurrences lower..upper.
+func optCodePhraseOccurring(lower, upper int, terminologyID string, codes ...string) string {
+	var list strings.Builder
+	for _, code := range codes {
+		list.WriteString(`<code_list>` + code + `</code_list>`)
+	}
+	return `<children xsi:type="C_CODE_PHRASE"><rm_type_name>CODE_PHRASE</rm_type_name>` +
+		`<occurrences>` + optInterval(lower, upper) + `</occurrences><node_id></node_id>` +
+		`<terminology_id><value>` + terminologyID + `</value></terminology_id>` + list.String() + `</children>`
+}
+
 // TestREQ107_ProhibitedFirstAlternativeSuppliesNothing is the REQ-107 check
 // that where the first OPT alternative of a single attribute is prohibited
 // (occurrences 0..0), the generator reads the next allowed one, the
@@ -98,6 +117,42 @@ func TestREQ107_ProhibitedFirstAlternativeSuppliesNothing(t *testing.T) {
 			}, "")),
 			check: func(t *testing.T, out any) {
 				checkOpenEHRCode(t, "ISM_TRANSITION.current_state", out.(*rm.Action).IsmTransition.CurrentState, terminology.InstructionStates, "524")
+			},
+		},
+		{
+			// The prohibited code phrase sits one level down, under the
+			// coded text's defining_code.
+			name: "ISM_TRANSITION current_state, nested code phrase",
+			opt: yieldAction("", "", optNode("DV_CODED_TEXT", "", optSingle("defining_code",
+				optCodePhraseOccurring(0, 0, terminology.ID, "526"), optCodePhraseOccurring(0, 1, terminology.ID)))),
+			check: func(t *testing.T, out any) {
+				checkOpenEHRCode(t, "ISM_TRANSITION.current_state", out.(*rm.Action).IsmTransition.CurrentState, terminology.InstructionStates, "524")
+			},
+		},
+		{
+			// The built code_string alternative's pattern rejects
+			// text/plain; the prohibited one, read first, would admit it.
+			name: "DV_MULTIMEDIA media_type code_string",
+			opt: yieldMultimedia(optSingle("media_type", optNode("CODE_PHRASE", "", optSingle("code_string",
+				optPrimitiveOccurring(0, 0, "STRING", "C_STRING", "<pattern>.*</pattern>"),
+				optPrimitiveOccurring(0, 1, "STRING", "C_STRING", "<pattern>at[0-9]{4}</pattern>"))))),
+			check: func(t *testing.T, out any) {
+				if got := rootElementValue[*rm.DVMultimedia](t, out).MediaType.CodeString; got == "text/plain" {
+					t.Errorf("DV_MULTIMEDIA.media_type code = %q, want the walk's at-code", got)
+				}
+			},
+		},
+		{
+			// The built TERMINOLOGY_ID alternative names openEHR, which
+			// rejects IANA_media-types; the prohibited one, read first,
+			// would admit it.
+			name: "DV_MULTIMEDIA media_type terminology_id",
+			opt: yieldMultimedia(optSingle("media_type", optNode("CODE_PHRASE", "", optSingle("terminology_id",
+				optOccurring("C_COMPLEX_OBJECT", "TERMINOLOGY_ID", "", 0, 0, optStringAttr("value", "<list>IANA_media-types</list>")),
+				optOccurring("C_COMPLEX_OBJECT", "TERMINOLOGY_ID", "", 0, 1, optStringAttr("value", "<list>openEHR</list>")))))),
+			check: func(t *testing.T, out any) {
+				want := rm.CodePhrase{CodeString: "at0000", TerminologyID: rm.TerminologyID{Value: "openEHR"}}
+				checkCode(t, "DV_MULTIMEDIA.media_type", rootElementValue[*rm.DVMultimedia](t, out).MediaType, want)
 			},
 		},
 	}

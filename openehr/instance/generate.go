@@ -1800,11 +1800,11 @@ func codedTextAdmitted(opt *tcimpl.CompiledNode, attrName string, ct rm.DVCodedT
 }
 
 // defaultAdmitted reports whether the OPT's own constraint on attrName of
-// opt admits an RM default, as admits says of the first OPT child, the
-// one the walk builds the attribute from. An attribute the OPT prohibits
-// admits nothing. opt is nil for a value built from the BMM alone, and an
-// attribute the OPT does not name, or names with no child, admits any
-// default.
+// opt admits an RM default, as admits says of the first OPT child the OPT
+// does not prohibit, the one the walk builds the attribute from. An
+// attribute the OPT prohibits admits nothing. opt is nil for a value built
+// from the BMM alone, and an attribute the OPT does not name, or names
+// with no allowed child, admits any default.
 func defaultAdmitted(opt *tcimpl.CompiledNode, attrName string, admits func(*tcimpl.CompiledNode) bool) bool {
 	if opt == nil {
 		return true
@@ -1816,42 +1816,48 @@ func defaultAdmitted(opt *tcimpl.CompiledNode, attrName string, admits func(*tci
 	if attrProhibited(attr) {
 		return false
 	}
-	if len(attr.Children()) == 0 {
-		return true
+	if node := firstChild(opt, attrName); node != nil {
+		return admits(node)
 	}
-	return admits(attr.Children()[0])
+	return true
 }
 
 // phraseAdmitted reports whether the OPT node that constrains a code
 // phrase, or a coded text through its defining_code, admits phrase. It
 // reads the two shapes an OPT gives that constraint, as the template
 // validator does: a C_CODE_PHRASE, and a CODE_PHRASE node whose
-// code_string, or whose terminology_id's value, carries a C_STRING.
+// code_string, or whose terminology_id's value, carries a C_STRING. Below
+// node it reads, like the walk, the first alternative the OPT does not
+// prohibit.
 func phraseAdmitted(node *tcimpl.CompiledNode, phrase rm.CodePhrase) bool {
 	if cp, ok := node.PrimitiveConstraint().(constraints.CodePhrase); ok {
 		ref := constraints.CodedTermRef{Terminology: phrase.TerminologyID.Value, CodeString: phrase.CodeString}
 		return len(cp.Validate(ref)) == 0
 	}
-	if dc := node.Attribute("defining_code"); dc != nil && len(dc.Children()) > 0 {
-		return phraseAdmitted(dc.Children()[0], phrase)
+	if dc := firstChild(node, "defining_code"); dc != nil {
+		return phraseAdmitted(dc, phrase)
 	}
 	if !stringAdmitted(node.Attribute("code_string"), phrase.CodeString) {
 		return false
 	}
-	if tid := node.Attribute("terminology_id"); tid != nil && len(tid.Children()) > 0 {
-		return stringAdmitted(tid.Children()[0].Attribute("value"), phrase.TerminologyID.Value)
+	if tid := firstChild(node, "terminology_id"); tid != nil {
+		return stringAdmitted(tid.Attribute("value"), phrase.TerminologyID.Value)
 	}
 	return true
 }
 
 // stringAdmitted reports whether the C_STRING the OPT puts on attr, its
-// first child, accepts s. An attribute the OPT does not name, or
-// constrains with no C_STRING, accepts any string.
+// first child the OPT does not prohibit, accepts s. An attribute the OPT
+// does not name, or constrains with no C_STRING, accepts any string.
 func stringAdmitted(attr *tcimpl.CompiledAttribute, s string) bool {
-	if attr == nil || len(attr.Children()) == 0 {
+	if attr == nil {
 		return true
 	}
-	cs, ok := attr.Children()[0].PrimitiveConstraint().(constraints.CString)
+	children := allowedChildren(attr)
+	if len(children) == 0 {
+		return true
+	}
+	cs, ok := children[0].PrimitiveConstraint().(constraints.CString)
 	return !ok || len(cs.Validate(s)) == 0
 }
 
@@ -2086,6 +2092,10 @@ func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
 	}
 }
 
+// firstCodedExample returns the first code, in OPT order, that a
+// C_CODE_PHRASE anywhere under attrName of opt gives as its example value,
+// skipping the placeholder at0000 (noCode). An alternative the OPT
+// prohibits, at any depth, supplies none. ok is false when there is none.
 func firstCodedExample(opt *tcimpl.CompiledNode, attrName string) (constraints.CodedTermRef, bool) {
 	if opt == nil {
 		return constraints.CodedTermRef{}, false
@@ -2111,12 +2121,12 @@ func firstCodedExample(opt *tcimpl.CompiledNode, attrName string) (constraints.C
 			}
 		}
 		for _, a := range n.Attributes() {
-			for _, child := range a.Children() {
+			for _, child := range allowedChildren(a) {
 				walk(child)
 			}
 		}
 	}
-	for _, child := range attr.Children() {
+	for _, child := range allowedChildren(attr) {
 		walk(child)
 	}
 	return found, ok
