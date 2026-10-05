@@ -513,8 +513,11 @@ requirements:
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
     probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-065]
     tests:
+      - openehr/client/demographic/party_test.go
       - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/directory/directory_test.go
       - openehr/client/ehr/ehr_test.go
+      - openehr/client/ehr/ehrstatus/ehrstatus_test.go
       - openehr/client/ehr/ids_test.go
       - testkit/probes/versioned/probe_010_put_without_if_match.go
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
@@ -960,6 +963,7 @@ requirements:
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
       - transport/client_test.go
       - transport/decode_error_test.go
+      - transport/error_envelope_test.go
       - transport/errors_test.go
       - transport/reauth_challenge_test.go
 
