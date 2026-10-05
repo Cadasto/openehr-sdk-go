@@ -1378,10 +1378,15 @@ func readAgentMultiple(a *rm.Agent, attr string) ([]any, bool) {
 	return readActorMultiple(a.Identities, a.Contacts, a.Relationships, a.Languages, a.Roles, attr)
 }
 
-// ROLE is a PARTY but not an ACTOR — it carries capabilities and a
-// performer reference rather than identities-as-ACTOR; it still has
-// identities / contacts / relationships.
+// ROLE is a PARTY but not an ACTOR: it has no languages or roles, and
+// carries capabilities and the RM-mandatory performer reference instead;
+// it still has identities / contacts / relationships. Like a
+// PARTY_RELATIONSHIP's source and target, an empty performer reads as
+// absent.
 func readRoleSingle(r *rm.Role, attr string) (any, bool) {
+	if attr == "performer" {
+		return objectRefPresent(r.Performer.ObjectRef)
+	}
 	return readActorLikeSingle(r.ArchetypeNodeID, r.Name, r.Details, attr)
 }
 
