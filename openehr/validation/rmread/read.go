@@ -1393,13 +1393,16 @@ func readAgentMultiple(a *rm.Agent, attr string) ([]any, bool) {
 }
 
 // ROLE is a PARTY but not an ACTOR: it has no languages or roles, and
-// carries capabilities and the RM-mandatory performer reference instead;
-// it still has identities / contacts / relationships. Like a
-// PARTY_RELATIONSHIP's source and target, an empty performer reads as
-// absent.
+// carries capabilities, the RM-mandatory performer reference and an
+// optional time_validity instead; it still has identities / contacts /
+// relationships. Like a PARTY_RELATIONSHIP's source and target, an empty
+// performer reads as absent.
 func readRoleSingle(r *rm.Role, attr string) (any, bool) {
-	if attr == "performer" {
+	switch attr {
+	case "performer":
 		return partyRefPresent(r.Performer)
+	case "time_validity":
+		return ptrPresent(r.TimeValidity)
 	}
 	return readActorLikeSingle(r.ArchetypeNodeID, r.Name, r.Details, attr)
 }
@@ -1461,7 +1464,8 @@ func readContactMultiple(c *rm.Contact, attr string) ([]any, bool) {
 	return nil, false
 }
 
-// CAPABILITY (under ROLE) carries `credentials` (ITEM_STRUCTURE).
+// CAPABILITY (under ROLE) carries `credentials` (ITEM_STRUCTURE) and an
+// optional `time_validity` (DV_INTERVAL<DV_DATE>).
 func readCapabilitySingle(c *rm.Capability, attr string) (any, bool) {
 	switch attr {
 	case "archetype_node_id":
@@ -1470,6 +1474,8 @@ func readCapabilitySingle(c *rm.Capability, attr string) (any, bool) {
 		return dvTextPresent(c.Name)
 	case "credentials":
 		return ifacePresent(c.Credentials)
+	case "time_validity":
+		return ptrPresent(c.TimeValidity)
 	}
 	return nil, false
 }
