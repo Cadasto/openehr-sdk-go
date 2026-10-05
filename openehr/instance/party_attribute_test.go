@@ -181,23 +181,26 @@ var partyRefTypes = []string{"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
 // C_STRING the template pins on a ROLE performer's type yields a type BASE
 // PARTY_REF Type_validity admits, at either policy and either value fill.
 // Neither validator evaluates that invariant, so the test reads the value.
-// An open C_STRING or a pattern that also admits other strings still gives
-// a PARTY class name; a list pin keeps its member; and a pin that admits no
-// class name makes Generate return an error wrapping
-// ErrConstraintUnsatisfiable, and no root.
+// An open C_STRING or a pattern that also admits other strings gives the
+// default PERSON; a list pin keeps its member, and ExampleFill its first
+// member when the list has several; and a pin that admits no class name
+// makes Generate return an error wrapping ErrConstraintUnsatisfiable, and
+// no root.
 func TestREQ107_PinnedPerformerTypeIsAPartyClass(t *testing.T) {
 	cases := []struct {
 		name string
 		pin  string // the C_STRING body
-		// want is the type every setting must give; "" accepts any class
-		// name Type_validity admits.
-		want          string
-		unsatisfiable bool
+		// want is the type every setting must give, and wantExample the
+		// type ExampleFill must give; "" accepts any class name
+		// Type_validity admits.
+		want, wantExample string
+		unsatisfiable     bool
 	}{
-		{name: "open C_STRING", pin: ""},
-		{name: "pattern .*", pin: "<pattern>.*</pattern>"},
-		{name: "pattern [A-Z]+", pin: "<pattern>[A-Z]+</pattern>"},
+		{name: "open C_STRING", pin: "", want: "PERSON"},
+		{name: "pattern .*", pin: "<pattern>.*</pattern>", want: "PERSON"},
+		{name: "pattern [A-Z]+", pin: "<pattern>[A-Z]+</pattern>", want: "PERSON"},
 		{name: "list pin", pin: "<list>ORGANISATION</list>", want: "ORGANISATION"},
+		{name: "list pin with two class names", pin: "<list>ROLE</list><list>ORGANISATION</list>", wantExample: "ROLE"},
 		{name: "list that admits no class name", pin: "<list>CLINICIAN</list>", unsatisfiable: true},
 		{name: "pattern that admits no class name", pin: "<pattern>[a-z]+</pattern>", unsatisfiable: true},
 	}
@@ -230,6 +233,9 @@ func TestREQ107_PinnedPerformerTypeIsAPartyClass(t *testing.T) {
 				}
 				if tc.want != "" && got != tc.want {
 					t.Errorf("%s: performer type = %q, want %q", call, got, tc.want)
+				}
+				if tc.wantExample != "" && opts.ValueFill == instance.ExampleFill && got != tc.wantExample {
+					t.Errorf("%s: performer type = %q, want the list's first member %q", call, got, tc.wantExample)
 				}
 				checkBothValidators(t, call, out, c)
 			}
