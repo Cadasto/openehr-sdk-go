@@ -202,7 +202,7 @@ Three launch modes the SDK **MUST** support — each is a way the SMART flow sta
 |---|---|
 | **Standalone** | The SDK initiates the launch by redirecting the user to the authorization endpoint. No EHR-side launch parameter. |
 | **Embedded** (iFrame) | The SDK is launched from inside an EHR or portal that has already authenticated the user; the EHR provides a `launch` parameter that the SDK forwards to the authorization endpoint to obtain launch context. |
-| **Backend service** | No user interaction. Uses SMART Backend Services (`auth/clientcreds` with a client assertion); the RFC 7523 §2.1 grant in `auth/jwtbearer` serves deployments outside SMART. No launch context. |
+| **Backend service** | No user interaction. Three confidential backend flows: `auth/clientcreds` with a client assertion (`client_credentials` + signed `client_assertion`, no Basic, no `client_secret` — SMART Backend Services), and, outside the SMART asymmetric profile, `auth/clientcreds` with a symmetric `client_secret` (HTTP Basic) and `auth/jwtbearer` (the RFC 7523 §2.1 JWT Bearer authorization grant, not a SMART flow). No launch context. |
 
 The launch mode is determined by configuration at construction time and **MAY** also be derived per call (e.g. an MCP server that accepts both standalone and embedded launches from different transports).
 
@@ -240,13 +240,13 @@ When `AuthorizeURL` is given a `launch` value, the request's `scope` **MUST** co
 `auth/smart` **MUST** provide `(*Source).CompleteAuthorization(ctx, callback url.Values, req AuthorizationRequest)`, taking the query the redirect URI received and the request the launch started with. A request without `State` or a PKCE verifier **MUST** fail with `auth.ErrInvalidConfig` before any check, so an empty state never matches an empty state. A callback that repeats `state`, `iss`, `code` or `error` **MUST** fail with `ErrAuthorizationRejected` (RFC 6749 §3.1 forbids a repeated response parameter). Otherwise it **MUST** apply these checks in this order and make no token-endpoint call until all of them pass:
 
 1. `state` **MUST** equal `req.State`; otherwise the call fails with `ErrLaunchInvalidState`.
-2. An empty `iss` value **MUST** be treated as absent. When the callback carries an `iss` (RFC 9207) or the authorization server advertises `authorization_response_iss_parameter_supported: true`, a request whose `Issuer` is empty **MUST** fail with `auth.ErrInvalidConfig`, not `ErrLaunchIssuerMismatch`, because there is nothing to compare with. Otherwise the callback's `iss` **MUST** equal `req.Issuer` exactly, and a callback without `iss` where the server advertises the parameter **MUST** be refused (RFC 9207 §2.4); either failure is `ErrLaunchIssuerMismatch`.
+2. An empty `iss` value **MUST** be treated as absent. The issuer check **MUST** run when the callback carries an `iss` (RFC 9207) or the authorization server advertises `authorization_response_iss_parameter_supported: true`. When it runs, a request whose `Issuer` is empty **MUST** fail with `auth.ErrInvalidConfig`, not `ErrLaunchIssuerMismatch`, because there is nothing to compare with. When `Issuer` is set, the callback's `iss` **MUST** equal `req.Issuer` exactly, and a callback without `iss` **MUST** be refused, because that callback is missing `iss` where the server advertises the parameter (RFC 9207 §2.4); either failure is `ErrLaunchIssuerMismatch`. When the callback carries no `iss` and the server does not advertise the parameter, the check **MUST NOT** run.
 3. When the callback carries `error` (RFC 6749 §4.1.2.1), the call **MUST** fail with an error that `errors.Is` matches to `ErrAuthorizationRejected` and from which `errors.As` extracts an `*auth.OAuth2Error` holding `error`, `error_description` and `error_uri`. A callback with neither `error` nor `code` **MUST** fail with `ErrAuthorizationRejected` as well.
 4. The code is then exchanged exactly as `ExchangeAuthorizationCode` exchanges it, including the ID-token rules of § REQ-064.
 
 #### Embedded launch
 
-`auth/smart` **MUST** provide `ParseEHRLaunch(query url.Values, allow func(iss string) bool) (EHRLaunch, error)`, which reads the `iss` and `launch` parameters a Launcher appends to the app's launch URL. It **MUST** fail with `ErrLaunchInvalidRequest` when `iss` is missing or not an absolute URL with a host, or `launch` is missing, without consulting `allow`. Otherwise it **MUST** fail with `ErrLaunchIssuerNotAllowed` when `allow` is nil or returns false for `iss`, so a client never resolves discovery for a Platform it has not chosen to trust. `EHRLaunch.Issuer` is the Platform base URL to resolve ([service-discovery.md § REQ-070](service-discovery.md#req-070)); `EHRLaunch.Launch` is passed unchanged to `AuthorizeURL`.
+`auth/smart` **MUST** provide `ParseEHRLaunch(query url.Values, allow func(iss string) bool) (EHRLaunch, error)`, which reads the `iss` and `launch` parameters a Launcher appends to the app's launch URL. It **MUST** fail with `ErrLaunchInvalidRequest` when `iss` is missing or not an absolute URL with a host, or `launch` is missing, without consulting `allow`. Otherwise it **MUST** fail with `ErrLaunchIssuerNotAllowed` when `allow` is nil or returns false for `iss`, so a client never resolves discovery for a Platform it has not chosen to trust. `EHRLaunch.Issuer` is the Platform base URL to resolve ([service-discovery.md § REQ-070](service-discovery.md#req-070)); `EHRLaunch.Launch` **MUST** be passed unchanged to `AuthorizeURL`.
 
 ### REQ-062 — JWKS rotation
 
@@ -263,11 +263,11 @@ The SDK validates ID tokens against the deployment's published JWKS. JWKS rotati
 - The cache **MUST** honour a documented TTL (default: 5 minutes).
 - On a verification miss (`kid` not in cache), the SDK **MUST** refresh the JWKS once before reporting the verification as failed. This handles silent rotation by the authorization server.
 - The refresh path **MUST** coalesce concurrent attempts (REQ-026).
-- A key published without a `kid` **MUST** be kept. When an ID token's header carries no `kid`, the SDK **MUST** verify it with the set's only signing key when the set holds exactly one key whose `use`, if present, is `sig`, and **MUST** reject the token otherwise (OpenID Connect Core 1.0 §10.1 lets an issuer omit `kid` only when its set holds one key).
+- A key published without a `kid` **MUST** be kept. When an ID token's header carries no `kid`, the SDK **MUST** verify it with the set's only signing key when the set holds exactly one key whose `use`, if present, is `sig`, and **MUST** reject the token otherwise (OpenID Connect Core 1.0 §10.1 lets an issuer omit `kid` only when its set holds one signing key).
 
 #### ID-token verification algorithm agility (REQ-062, REQ-064) — landed in Phase 3e
 
-`auth/smart.ValidateIDToken` verifies the `id_token` signature against the deployment's JWKS and then applies the SDK's claim semantics. It lives beside the token exchange so the exchange and the refresh can verify the ID token they receive (§ REQ-064); `smart.ValidateIDToken` and `smart.IDTokenClaims` **MUST** remain as the same function and type for existing callers. Signature verification is delegated to **`github.com/coreos/go-oidc/v3`** (which uses `go-jose/v4`); the SDK does **not** hand-roll signature verification or JWK→key parsing.
+`auth/smart.ValidateIDToken` verifies the `id_token` signature against the deployment's JWKS and then applies the SDK's claim semantics. It lives beside the token exchange so the exchange and the refresh can verify the ID token they receive (§ REQ-064); `smart.ValidateIDToken` and `smart.IDTokenClaims` **MUST** remain as the same function and type for existing callers. Signature verification is delegated to **`github.com/coreos/go-oidc/v3`** (which uses `go-jose/v4`); the SDK **MUST NOT** hand-roll signature verification or JWK parsing.
 
 - **Supported algorithms:** the SDK **MUST** support `RS256`, `RS384`, `ES256` and `ES384`, and **MUST NOT** treat any other algorithm as supported. RS384/ES384 are the HL7 SMART asymmetric baseline; RS256/ES256 cover the widely deployed remainder. Both RSA and ECDSA keys published in the JWKS are honoured.
 - **Allowlist:** the caller passes the deployment's `id_token_signing_alg_values_supported` (via `smart.WithIDTokenSigningAlgs` / `ValidateConfig.AllowedIDTokenAlgs`). A non-empty allowlist **MUST** be intersected with the supported set: it can narrow the SDK's support and **MUST NOT** widen it. An empty intersection (the deployment advertises only algorithms the SDK does not support) **MUST** fail closed with `auth.ErrJWKSValidationFailed` before the JWKS is fetched, with no fallback to the full supported set. With no allowlist, the full supported set **MUST** apply.
@@ -382,7 +382,7 @@ type LaunchContext struct {
     // FHIR-compat launch-context claims (SMART App Launch §7.1).
     Patient     string         // SMART "patient" launch parameter — opaque to SDK
     Encounter   string         // SMART "encounter" launch parameter
-    User        string         // SMART "fhirUser" / openEHR equivalent
+    User        string         // verified ID token's fhirUser claim, else its sub
     Scopes      []string       // granted scopes (post-token-exchange)
     IDToken     *IDTokenClaims // parsed ID-token claims (sub, aud, iss, iat, exp, custom)
     Issuer      string         // deployment issuer URL
@@ -582,8 +582,8 @@ func ParseOpenEHRScope(token string) (OpenEHRScope, bool)
 ## Error mapping
 
 Auth errors **MUST** surface as typed sentinels. The shared classes live in
-package `auth` (`auth/errors.go`); the SMART-launch-specific state-mismatch
-sentinel lives in package `smart` (`auth/smart/errors.go`):
+package `auth` (`auth/errors.go`); the SMART-launch sentinels live in
+package `smart` (`auth/smart/errors.go`):
 
 ```go
 // package auth — shared across all providers
@@ -635,7 +635,7 @@ Consumers detect classes via `errors.Is`. The underlying wire error is preserved
 | SMART PKCE flow | REQ-061 | `auth/smart/` |
 | JWKS rotation | REQ-062 | `auth/smart/`, optionally `auth/clientcreds/`, `auth/jwtbearer/` |
 | Token refresh | REQ-063 | `auth/smart/` (primary), `auth/<provider>/` (as applicable) |
-| Launch context | REQ-064 | `smart/` |
+| Launch context | REQ-064 | `auth/smart/`, `smart/` |
 | Per-client / tenant binding | REQ-065 | `auth/<provider>/`, `smart/discovery/` |
 | AI caller attribution | REQ-066 | `transport/`, `auth/context.go` |
 | Platform principal claims | REQ-067 | `auth/smart/`, `smart/` |
