@@ -1,5 +1,6 @@
 ---
 kind: plan
+harvested_through: 2026-10-05T10:59:37Z
 ---
 # Backlog
 
@@ -99,6 +100,7 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - openehr/template/webtemplate · the Web Template builder keeps only the first value alternative of the corpus CLUSTER's labresult ELEMENT and projects one collapsed DV_TEXT leaf, so the reference's labresult/text_value key in ehrbase_conformance_cluster.json is refused on decode (PROBE-086 census) · from: audit-2026-09
 - openehr/template/webtemplate · the Web Template builder spells an archetyped ACTION transition as the nodes transition and transition2 where the reference emits one in-context ism_transition, so 10 of the action body's 14 excluded keys are still refused on decode (PROBE-086 census) · from: audit-2026-09
 - openehr/template/parse.go:411 · Strict parsing keeps an unrecognised leaf node type (CONSTRAINT_REF, for one) as a bare leaf and drops its constraint without error, so a strictly parsed template can still lose constraints; out of this range, a lead for the parser · evidence: Demonstration.v1.opt (8 CONSTRAINT_REF nodes) parses under ParseFileStrict with a nil error (go-reviewer overlay test) · fix: decide whether strict mode should reject or support CONSTRAINT_REF; backlog · by: go-reviewer · from: docs/examples-validation-path
+- openehr/template/parse_primitives.go:116 · Strict mode also refuses malformed C_INTEGER/C_REAL bounds and list items and a C_PRIMITIVE_OBJECT with no <item> (ErrInvalidOPT), which the ParseOPTStrict godoc does not mention · by: sdd-implementer · from: #225
 
 ## openehr/template/constraints
 - openehr/template/constraints/temporal.go · CTime, CDateTime and CDuration Validate refuse forms the REQ-123 parse and the RM floor accept (20251024T121033, 10:30:00+0100, -P1D, PT1,5S); align them or record the gap · from: pr199
@@ -108,6 +110,9 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - openehr/validation/rmfloor.go · the RM floor does not evaluate Interval Limits_comparable, DV_ORDERED Other_reference_ranges_validity, REFERENCE_RANGE Range_is_simple, EHR_ACCESS Scheme_valid, DV_AMOUNT Accuracy_is_percent_validity and Accuracy_validity, or DV_QUANTIFIED Magnitude_status_valid, and checkDVInterval walks a bound beside its own *_unbounded flag without reporting the contradiction · from: audit-2026-09
 - openehr/validation/rmfloor.go · an empty or absent temporal value is reported twice, as required at <path>/value and as rm_invariant (Value_valid) at <path>, and § REQ-112 does not state the pair as it does for TERM_MAPPING; also a typed-nil element inside a container such as COMPOSITION.content is skipped without any report · from: pr199
 - openehr/validation/rmread · rmread does not read the optional String fields magnitude_status on DV_COUNT, DV_PROPORTION and the temporal types, units_display_name and units_system on DV_QUANTITY, PARTY_IDENTIFIED.name or ATTESTATION.proof; the generator writes none of them, so no template can constrain them yet · from: pr199
+
+## pages
+- pages/examples.md:51 · The heading still says "against a template", and the at-a-glance row at docs/examples.md:29 still says "vs OPT", while the rewritten sections say both the RM floor and the template constraints are required · by: sdd-doc-reviewer · from: #225
 
 ## scripts
 - scripts/probe-status.sh · the test-file column is a filename heuristic (its header says so), not the runner's per-mode state the runnability work wanted `make probe-status` to show · from: probe-runnability plan
