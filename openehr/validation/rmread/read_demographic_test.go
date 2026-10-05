@@ -1,6 +1,7 @@
 package rmread_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -86,36 +87,99 @@ func TestReadRole(t *testing.T) {
 	}
 }
 
-// TestREQ112_ReadRolePerformer is the REQ-112 and REQ-102 check that the
-// reader sees ROLE.performer, which the RM makes mandatory: a PARTY_REF
-// with its id, namespace and type reads as present, so the floor and the
-// template validator accept it, and one missing any of the three reads as
-// absent, so they report it, as for a PARTY_RELATIONSHIP's source and
-// target. Both the pointer and the value form of ROLE are read.
-func TestREQ112_ReadRolePerformer(t *testing.T) {
+// TestREQ112_ReadPartyRefAttributes is the REQ-112 and REQ-102 check that the
+// reader sees the PARTY_REF attributes the RM makes mandatory: a ROLE's
+// performer and a PARTY_RELATIONSHIP's source and target. Each reads as
+// the PARTY_REF itself, so a template that constrains it as PARTY_REF
+// matches its type, and reads as present when the reference has its id,
+// namespace and type, so the floor and the template validator accept it.
+// One missing any of the three reads as absent, so they report it. Both
+// the pointer and the value form of the holder are read.
+func TestREQ112_ReadPartyRefAttributes(t *testing.T) {
 	full := func() rm.PartyRef {
 		return rm.PartyRef{ID: &rm.HierObjectID{Value: "00000000-0000-0000-0000-000000000001"}, Namespace: "local", Type: "PERSON"}
 	}
-	cases := []struct {
-		name      string
-		performer rm.PartyRef
-		present   bool
+	refs := []struct {
+		name    string
+		ref     rm.PartyRef
+		present bool
 	}{
-		{name: "full reference", performer: full(), present: true},
-		{name: "empty reference", performer: rm.PartyRef{}, present: false},
-		{name: "no id", performer: func() rm.PartyRef { r := full(); r.ID = nil; return r }(), present: false},
-		{name: "no namespace", performer: func() rm.PartyRef { r := full(); r.Namespace = ""; return r }(), present: false},
-		{name: "no type", performer: func() rm.PartyRef { r := full(); r.Type = ""; return r }(), present: false},
+		{name: "full reference", ref: full(), present: true},
+		{name: "empty reference", ref: rm.PartyRef{}, present: false},
+		{name: "no id", ref: func() rm.PartyRef { r := full(); r.ID = nil; return r }(), present: false},
+		{name: "no namespace", ref: func() rm.PartyRef { r := full(); r.Namespace = ""; return r }(), present: false},
+		{name: "no type", ref: func() rm.PartyRef { r := full(); r.Type = ""; return r }(), present: false},
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			role := rm.Role{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ROLE.role.v1", Performer: tc.performer}
-			for _, v := range []any{&role, role} {
-				if _, ok := rmread.ReadSingle(v, "ROLE", "performer"); ok != tc.present {
-					t.Errorf("ReadSingle(%T, performer) ok=%v, want %v", v, ok, tc.present)
+	holders := []struct {
+		attr    string
+		rmType  string
+		holding func(rm.PartyRef) []any
+	}{
+		{attr: "performer", rmType: "ROLE", holding: func(ref rm.PartyRef) []any {
+			role := rm.Role{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ROLE.role.v1", Performer: ref}
+			return []any{&role, role}
+		}},
+		{attr: "source", rmType: "PARTY_RELATIONSHIP", holding: func(ref rm.PartyRef) []any {
+			rel := rm.PartyRelationship{ArchetypeNodeID: "at0001", Source: ref, Target: full()}
+			return []any{&rel, rel}
+		}},
+		{attr: "target", rmType: "PARTY_RELATIONSHIP", holding: func(ref rm.PartyRef) []any {
+			rel := rm.PartyRelationship{ArchetypeNodeID: "at0001", Source: full(), Target: ref}
+			return []any{&rel, rel}
+		}},
+	}
+	for _, h := range holders {
+		for _, tc := range refs {
+			t.Run(h.rmType+"."+h.attr+"/"+tc.name, func(t *testing.T) {
+				for _, v := range h.holding(tc.ref) {
+					got, ok := rmread.ReadSingle(v, h.rmType, h.attr)
+					if ok != tc.present {
+						t.Errorf("ReadSingle(%T, %s) ok=%v, want %v", v, h.attr, ok, tc.present)
+					}
+					ref, isRef := got.(rm.PartyRef)
+					if !isRef {
+						t.Errorf("ReadSingle(%T, %s) = %T, want rm.PartyRef", v, h.attr, got)
+						continue
+					}
+					if !reflect.DeepEqual(ref, tc.ref) {
+						t.Errorf("ReadSingle(%T, %s) = %+v, want %+v", v, h.attr, ref, tc.ref)
+					}
 				}
+			})
+		}
+	}
+}
+
+// TestREQ112_ReadPartyRef is the REQ-112 and REQ-102 check that the reader
+// reads a PARTY_REF's own attributes, so a template that names a
+// PARTY_REF finds the id, namespace and type the RM makes mandatory: each
+// reads as present when set and as absent when empty or nil.
+func TestREQ112_ReadPartyRef(t *testing.T) {
+	full := rm.PartyRef{ID: &rm.HierObjectID{Value: "00000000-0000-0000-0000-000000000001"}, Namespace: "demographic", Type: "ORGANISATION"}
+	for _, attr := range []string{"id", "namespace", "type"} {
+		for _, v := range []any{&full, full} {
+			if _, ok := rmread.ReadSingle(v, "PARTY_REF", attr); !ok {
+				t.Errorf("ReadSingle(%T, %s) ok=false on a full reference, want true", v, attr)
 			}
-		})
+		}
+		empty := rm.PartyRef{}
+		for _, v := range []any{&empty, empty} {
+			if _, ok := rmread.ReadSingle(v, "PARTY_REF", attr); ok {
+				t.Errorf("ReadSingle(%T, %s) ok=true on an empty reference, want false", v, attr)
+			}
+		}
+	}
+	if got, ok := rmread.ReadSingle(full, "PARTY_REF", "id"); !ok || got != full.ID {
+		t.Errorf("ReadSingle(PARTY_REF, id) = %v, %v, want the reference's id", got, ok)
+	}
+	if got, ok := rmread.ReadSingle(full, "PARTY_REF", "namespace"); !ok || got != "demographic" {
+		t.Errorf("ReadSingle(PARTY_REF, namespace) = %v, %v, want \"demographic\"", got, ok)
+	}
+	if got, ok := rmread.ReadSingle(full, "PARTY_REF", "type"); !ok || got != "ORGANISATION" {
+		t.Errorf("ReadSingle(PARTY_REF, type) = %v, %v, want \"ORGANISATION\"", got, ok)
+	}
+	if _, ok := rmread.ReadSingle(full, "PARTY_REF", "no_such_attr"); ok {
+		t.Error("ReadSingle(PARTY_REF, no_such_attr) ok=true, want false")
 	}
 }
 
