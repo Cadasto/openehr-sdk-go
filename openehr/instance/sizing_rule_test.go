@@ -286,3 +286,31 @@ func TestREQ107_MultipleSizedByOccurrencesAndCardinality(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_FirstAllowedAlternativeWins is the REQ-107 check that a
+// C_SINGLE_ATTRIBUTE with two allowed alternatives of different RM types is
+// built from the first, in OPT order, under both policies, both value
+// fills and both compile modes.
+func TestREQ107_FirstAllowedAlternativeWins(t *testing.T) {
+	for _, order := range [][2]string{{"DV_TEXT", "DV_COUNT"}, {"DV_COUNT", "DV_TEXT"}} {
+		opt := optTemplate("ELEMENT", optSingle("value", optNode(order[0], ""), optNode(order[1], "")))
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, opt, implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s,%s/implicit=%t/%v/%v", order[0], order[1], implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					v := out.(*rm.Element).Value
+					if v == nil || rm.IsTypedNil(v) {
+						t.Fatalf("ELEMENT.value absent, want a %s", order[0])
+					}
+					if got := rmTypeName(v); got != order[0] {
+						t.Errorf("ELEMENT.value is %s, want the first alternative %s", got, order[0])
+					}
+				})
+			}
+		}
+	}
+}
