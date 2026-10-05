@@ -16,7 +16,7 @@ import (
 // returns a fresh version identifier distinct from the input.
 //
 // The probe exercises the [openehrclient.VersionMetadata] round-trip
-// contract: the VersionUID from the read (the ETag when that header is a
+// contract: the VersionUID from the read (the first ETag value that is a
 // well-formed object_version_id, the Location tail otherwise) becomes
 // If-Match on the follow-up write without consumer-side string surgery. It
 // closes
