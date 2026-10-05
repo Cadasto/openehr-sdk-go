@@ -3,6 +3,7 @@ package instance_test
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
@@ -52,11 +53,11 @@ var openehrAt0000 = rm.CodePhrase{CodeString: "at0000", TerminologyID: rm.Termin
 // a C_STRING listing texts, and whose defining_code it constrains to
 // terminology openehr with an empty code list, so the code has no value.
 func codedTextWithValue(texts ...string) string {
-	var list string
+	var list strings.Builder
 	for _, text := range texts {
-		list += "<list>" + text + "</list>"
+		list.WriteString("<list>" + text + "</list>")
 	}
-	return optNode("DV_CODED_TEXT", "", optStringAttr("value", list),
+	return optNode("DV_CODED_TEXT", "", optStringAttr("value", list.String()),
 		optSingle("defining_code", optCodePhrase(terminology.ID)))
 }
 
