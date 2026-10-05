@@ -1487,6 +1487,17 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		if v.Item.GetArchetypeNodeID() == "" && (v.Item.Value == nil || rm.IsTypedNil(v.Item.Value)) {
 			v.Item = *g.placeholderElement()
 		}
+	case *rm.DVCodedText:
+		// Backstop for a coded text the primitive default did not reach,
+		// such as a generation root with no attribute to walk: it gets
+		// the text and the code a nested one gets.
+		if v.Value == "" {
+			v.Value = "example"
+		}
+		fillBlankCode(&v.DefiningCode)
+	case *rm.CodePhrase:
+		// The same backstop for a code phrase.
+		fillBlankCode(v)
 	case *rm.DVEHRURI:
 		// Backstop for a DV_EHR_URI the primitive default did not reach;
 		// every one the generator emits is walked.
@@ -1603,6 +1614,19 @@ func noInformation() *rm.DVCodedText {
 			CodeString:    code,
 			TerminologyID: rm.TerminologyID{Value: terminology.ID},
 		},
+	}
+}
+
+// fillBlankCode gives a code phrase with no code the placeholder code
+// at0000, in terminology local when it names none. A code phrase that has
+// a code is left alone.
+func fillBlankCode(c *rm.CodePhrase) {
+	if c.CodeString != "" {
+		return
+	}
+	c.CodeString = "at0000"
+	if c.TerminologyID.Value == "" {
+		c.TerminologyID = rm.TerminologyID{Value: "local"}
 	}
 }
 
