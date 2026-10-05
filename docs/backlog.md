@@ -142,9 +142,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - testkit/probes/instance/corpus_ratchet_test.go · the census runs with Language en and one fixed Now, and its placeholder scan flags only the literal example, so a generator that wrote encoding utf8 or read time.Now() would leave it green · from: audit-2026-09
 - testkit/probes/instance/corpus_ratchet_test.go · the hollow_body floor counts every ELEMENT, so a body of null-flavour placeholders passes; counting only ELEMENTs that hold a value adds two rows (clinical_content_validation generate/example/example and generate/example/random) · from: pr199
 
-## testkit/probes/versioned
-- testkit/probes/versioned/probe_011_put_stale_if_match.go:28 · PROBE-011 accepts 412 or 409 for a stale If-Match; the vendored ITS-REST pin answers 412 only, so the probe could hold servers to 412 · by: sdd-implementer · from: fix/composition-write-errors
-
 ## transport
 - transport/errors.go:62 · OpenEHRErrorDetail decodes `coded_text`, but the ITS-REST overview example names the coded list `errors` (DV_CODED_TEXT entries with defining_code); the list is not decoded, so a server that follows the overview example gets no coded detail on the error; decide whether to read `errors` into CodedText · by: sdd-implementer · from: fix/composition-write-errors
 - transport/options.go:51 · The WithTokenSource doc comment has one unwrapped overlong line, unlike its neighbours · by: go-reviewer · from: docs/pkg-go-dev-examples
