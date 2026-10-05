@@ -79,7 +79,7 @@ Given a parsed `Path`, `NodeAt`:
 
 ### Strict parse mode (optional)
 
-The default `ParseOPT` / `ParseFile` entry points remain forward-compatible: unknown child `xsi:type` values are admitted as leaf `*ComplexObject` nodes. `ParseOPTStrict` / `ParseFileStrict` opt into stricter behaviour — an unknown child `xsi:type` that carries nested `<attributes>` is rejected with `ErrUnsupportedNode` (the only case where lenient mode would silently drop a non-trivial subtree). Use strict mode in validators and code generators that must surface unsupported shapes rather than silently truncate them.
+The default `ParseOPT` / `ParseFile` entry points remain forward-compatible: unknown child `xsi:type` values are admitted as leaf `*ComplexObject` nodes. `ParseOPTStrict` / `ParseFileStrict` opt into stricter behaviour — an unknown child `xsi:type` that carries nested `<attributes>` is rejected with `ErrUnsupportedNode` (the only case where lenient mode would silently drop a non-trivial subtree). Strict mode stops there: it does not check a missing `language` with `original_language` in its place, a top-level archetype id, or empty description fields. Use strict mode in validators and code generators that must surface unsupported shapes rather than silently truncate them.
 
 ### Error taxonomy
 
@@ -783,7 +783,7 @@ Conformance against the reference is **structural, not byte-exact**: PROBE-075 c
 
 The exact per-field enumeration behind these categories — the informative catalogue pinned by the parity tests — is maintained in [`openehr/template/webtemplate/deviations.md`](../../openehr/template/webtemplate/deviations.md) beside those tests. This section is the normative contract; that file elaborates it.
 
-The media type for the format is `application/openehr.wt+json` (documented for consumers). Emitting the export over a REST endpoint / content negotiation is **out of scope** for this REQ — the package produces the bytes only. Also out of scope: the WebTemplate → OPT round-trip (the format is lossy by design); the Better camelCase `id` variant; multi-version output; and the shared simplified-template model abstraction (extracted with REQ-053 when a second consumer exists).
+The media type for the format is `application/openehr.wt+json` (documented for consumers). Emitting the export over a REST endpoint / content negotiation is **out of scope** for this REQ — the package produces the bytes only. Also out of scope: the WebTemplate → OPT round-trip (the format is lossy by design); the Better camelCase `id` variant; multi-version output; and the shared simplified-template model abstraction. REQ-053 was the second consumer, and the extraction was left for a third.
 
 Templates that **reuse one archetype under a multi-valued slot** (name-distinguished instances) **are exported**, closing what was this REQ's last deferral. Two things had to land, both specified by [REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths) ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)): `openehr/templatecompile` admits shared-path subtrees, and node **identity** now comes from the template-level node name — with `aqlPath` carrying the matching name predicate — so each reused sibling is distinct by construction instead of colliding on the shared concept term.
 
