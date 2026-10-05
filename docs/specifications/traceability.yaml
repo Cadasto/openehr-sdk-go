@@ -1207,6 +1207,7 @@ requirements:
       - openehr/instance
       - openehr/templatecompile
       - internal/templateinstance/rmwrite
+      - internal/rmroots
       - testkit/fixtures
       - testkit/probes/instance
     probes: [PROBE-027]
@@ -1353,6 +1354,7 @@ requirements:
       - openehr/rm/rminfo
       - openehr/validation/rmread
       - openehr/internal/rmnames
+      - internal/rmroots
     probes: [PROBE-081]
     tests:
       - internal/rmroots/rmroots_test.go
