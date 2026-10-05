@@ -132,8 +132,12 @@ func WithLifecycleState(s openehrclient.LifecycleState) PutOption {
 // PreferRepresentation, an empty or undecodable body is a
 // [*openehrclient.NoRepresentationError] carrying commit metadata.
 //
-// Errors: 409 → [transport.ErrVersionConflict], 412 →
-// [transport.ErrPreconditionFailed], 428 → [transport.ErrPreconditionRequired].
+// Errors: 412 (the If-Match is not the latest version) →
+// [transport.ErrPreconditionFailed], 404 → [transport.ErrNotFound]. (409 →
+// [transport.ErrVersionConflict] and 428 →
+// [transport.ErrPreconditionRequired] are defensive mappings only: the
+// openEHR contract signals a stale If-Match as 412 and a missing one as
+// 400.)
 func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ifMatch string, status *rm.EHRStatus, opts ...PutOption) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.Put: %w: empty EHRID", transport.ErrInvalidConfig)

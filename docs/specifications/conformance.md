@@ -337,9 +337,9 @@ client scenarios to SDK coverage:
 
 #### PROBE-010 — PUT Composition without If-Match
 
-- **Title:** A PUT against a versioned Composition without an `If-Match` header is rejected with `428 Precondition Required`.
+- **Title:** A PUT against a versioned resource without an `If-Match` is never sent: the SDK refuses it at the call site.
 - **Preconditions:** An existing Composition with a known `version_uid`.
-- **Wire assertion:** PUT `/ehr/{ehr_id}/composition/{versioned_object_id}` without `If-Match` returns `428`; the SDK maps this to `transport.ErrPreconditionRequired`. The Go SDK additionally short-circuits empty `ifMatch` at the call site with `transport.ErrInvalidConfig` per the typed-write-path guard.
+- **Wire assertion:** The Go SDK short-circuits an empty `ifMatch` at the call site with `transport.ErrInvalidConfig`, per the typed-write-path guard, so no request leaves the process. A backend signals a missing `If-Match` as `400` (a bare `WireError`); a `428` maps to `transport.ErrPreconditionRequired` only as a defensive mapping.
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_010_put_without_if_match.go`](../../testkit/probes/versioned/probe_010_put_without_if_match.go).
 - **Satisfies:** REQ-054, REQ-093

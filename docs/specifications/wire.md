@@ -377,10 +377,11 @@ openEHR versioned resources (Composition, EHR_STATUS, Directory, Contribution) a
 
 Rules the SDK **MUST** enforce:
 
-- A PUT against a versioned resource **MUST** include `If-Match: "<preceding_version_uid>"` (the canonical form per the openEHR REST envelope). Omitting it **MUST** result in `428 Precondition Required` from the backend; the SDK **MUST NOT** retry without an `If-Match`.
-- A `409 Conflict` response (stale `If-Match`) **MUST** map to `transport.ErrVersionConflict`.
-- A `412 Precondition Failed` response **MUST** map to `transport.ErrPreconditionFailed`.
-- A `428 Precondition Required` response **MUST** map to `transport.ErrPreconditionRequired`.
+- A PUT against a versioned resource **MUST** include `If-Match: "<preceding_version_uid>"` (the canonical form per the openEHR REST envelope). The SDK **MUST NOT** retry without an `If-Match`. A backend signals a missing `If-Match` as `400`.
+- A `412 Precondition Failed` response (a stale `If-Match`: the preceding version is no longer the latest) **MUST** map to `transport.ErrPreconditionFailed`. The latest `version_uid` is in the response `ETag` and **MUST** stay reachable beside the error through the returned `VersionMetadata`.
+- A `409 Conflict` response **MUST** map to `transport.ErrVersionConflict`. The vendored ITS-REST pin answers `409` for deleting a Composition version that is not the latest; a stale `If-Match` on a PUT is `412`, not `409`.
+- A `428 Precondition Required` response **MUST** map to `transport.ErrPreconditionRequired`. It is a defensive mapping for non-conformant servers, not an openEHR status.
+- The Composition delete takes no `If-Match`: the `version_uid` in its path is the preceding version, so the SDK **MUST NOT** require or send one for it.
 - The SDK **MUST NOT** synthesise these statuses client-side — they come from the backend.
 
 ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a response and expose it on the typed return value. The value the caller sends on the next PUT is the `VersionUID` from the version-identifier rule below, which is that `ETag` only when the rule selects it.

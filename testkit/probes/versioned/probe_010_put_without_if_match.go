@@ -11,15 +11,13 @@ import (
 )
 
 // Probe010PutWithoutIfMatch implements PROBE-010: a PUT against a
-// versioned resource without an If-Match header is rejected with 428
-// Precondition Required and surfaces as
-// [transport.ErrPreconditionRequired].
+// versioned resource without an If-Match header is never sent.
 //
 // The probe uses [ehrstatus.Put] with an empty ifMatch and asserts
 // that the SDK refuses to issue the request, short-circuiting with
-// [transport.ErrInvalidConfig] before any network call. The
-// wire-level 428 path is asserted by [Probe011PutStaleIfMatch] via a fake
-// server, since the SDK guards correct usage at compile/runtime time.
+// [transport.ErrInvalidConfig] before any network call. A backend
+// signals a missing If-Match as 400; a 428 maps to
+// [transport.ErrPreconditionRequired] only as a defensive mapping.
 func Probe010PutWithoutIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (Result, error) { // PROBE-010 (REQ-054, REQ-093)
 	r := Result{Probe: "PROBE-010"}
 	if c == nil {
