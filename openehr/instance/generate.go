@@ -355,7 +355,7 @@ func (g *generator) materialiseImplicitSingle(
 			return nil
 		}
 	}
-	if g.fillEntryCode(parentRM, optNode.RMTypeName(), attr.Name()) {
+	if g.fillEntryCode(optNode, parentRM, optNode.RMTypeName(), attr.Name()) {
 		return nil
 	}
 	rmType := attr.RMTypeName()
@@ -431,7 +431,7 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 		if !ok || rmType == "" {
 			continue
 		}
-		if g.fillEntryCode(parent, parentRMType, attrName) {
+		if g.fillEntryCode(nil, parent, parentRMType, attrName) {
 			continue
 		}
 		isContainer, _ := rminfo.Default.IsContainer(parentRMType, attrName)
@@ -705,15 +705,17 @@ func optionalString(f **string) (func() string, func(string), bool) {
 }
 
 // fillEntryCode sets ENTRY.language from Options.Language and
-// ENTRY.encoding to UTF-8 when that field has no code (noCode). It
+// ENTRY.encoding to UTF-8 when that field has no code (noCode) and the
+// OPT's constraint on it admits the default (codeAdmitted); opt is the
+// OPT node of parent, or nil for an entry built from the BMM alone. It
 // reports whether attr is one of those two fields, so the caller does
 // not also build a generic code phrase.
-func (g *generator) fillEntryCode(parent any, parentType, attr string) bool {
+func (g *generator) fillEntryCode(opt *tcimpl.CompiledNode, parent any, parentType, attr string) bool {
 	phrase, ok := g.entryCodePhrase(parentType, attr)
 	if !ok {
 		return false
 	}
-	if !entryCodeEmpty(parent, attr) {
+	if !entryCodeEmpty(parent, attr) || !codeAdmitted(opt, attr, phrase) {
 		return true
 	}
 	// Best-effort: every ENTRY parent type is addressed by rmwrite, and an
@@ -1407,41 +1409,42 @@ func ordinalSymbolText(ref constraints.CodedTermRef) rm.DVCodedText {
 
 // applyCompositionDefaults sets the COMPOSITION-specific fields
 // per REQ-107: category 433|event|, language, territory, composer,
-// context.start_time. Called once after the OPT-driven walk so the
-// values land regardless of whether the OPT pinned them.
+// and an EVENT_CONTEXT with start_time and setting. Called once after
+// the OPT-driven walk so the values land regardless of whether the OPT
+// pinned them. Each coded default yields to the OPT: it is written only
+// where the OPT's own constraint on that attribute admits it
+// (codeAdmitted), and no EVENT_CONTEXT is created where the OPT
+// prohibits context. The OPT node of c is the template root.
 func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
+	root := g.compiled.Root()
+	event := rm.CodePhrase{CodeString: "433", TerminologyID: rm.TerminologyID{Value: terminology.ID}}
 	if noCode(c.Category.DefiningCode.CodeString) {
-		// The rubric comes from the pinned `composition category` group, never
-		// typed beside the code (REQ-034).
-		value, _ := terminology.CompositionCategory.Rubric("433")
-		c.Category = rm.DVCodedText{
-			Value: value,
-			DefiningCode: rm.CodePhrase{
-				CodeString:    "433",
-				TerminologyID: rm.TerminologyID{Value: terminology.ID},
-			},
+		if codeAdmitted(root, "category", event) {
+			// The rubric comes from the pinned `composition category`
+			// group, never typed beside the code (REQ-034).
+			value, _ := terminology.CompositionCategory.Rubric(event.CodeString)
+			c.Category = rm.DVCodedText{Value: value, DefiningCode: event}
 		}
 	} else {
 		// The OPT pinned the code, and the walk left the synthesiser's text
 		// beside it.
 		useGroupRubric(&c.Category, terminology.CompositionCategory)
 	}
-	if noCode(c.Language.CodeString) {
-		c.Language = rm.CodePhrase{
-			CodeString:    g.opts.Language,
-			TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
-		}
+	language := rm.CodePhrase{CodeString: g.opts.Language, TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
+	if noCode(c.Language.CodeString) && codeAdmitted(root, "language", language) {
+		c.Language = language
 	}
-	if noCode(c.Territory.CodeString) {
-		c.Territory = rm.CodePhrase{
-			CodeString:    g.opts.Territory,
-			TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"},
-		}
+	territory := rm.CodePhrase{CodeString: g.opts.Territory, TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"}}
+	if noCode(c.Territory.CodeString) && codeAdmitted(root, "territory", territory) {
+		c.Territory = territory
 	}
 	if c.Composer == nil {
 		c.Composer = g.opts.Composer
 	}
 	if c.Context == nil {
+		if prohibited(root, "context") {
+			return nil
+		}
 		c.Context = &rm.EventContext{}
 	}
 	if c.Context.StartTime.Value == "" {
@@ -1454,22 +1457,21 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	// unconstrained lets the generic example synthesiser invent an
 	// archetype-local code (`local`/`example`), which reads as populated and
 	// still violates the invariant. Nor is "openehr-coded" enough: a template
-	// can pin an `openehr` code that is not in the group. All three cases now
-	// take the documented default, because the pinned terminology tables
-	// (REQ-034) answer membership directly — so the generator cannot emit a
-	// composition that breaks Setting_valid (REQ-107). Checking the invariant on
-	// a composition the generator did not build stays a REQ-112 RM-floor job.
-	if c.Context.Setting.DefiningCode.CodeString == "" ||
+	// can pin an `openehr` code that is not in the group. All three cases
+	// take the documented default where the template's own constraint on
+	// setting admits it, because the pinned terminology tables (REQ-034)
+	// answer membership directly (REQ-107). Where that constraint rejects
+	// the default, such as a pin of one non-member code or of another
+	// terminology, the walk's value stays and Setting_valid can fail.
+	// Checking the invariant on a composition the generator did not build
+	// stays a REQ-112 RM-floor job.
+	otherCare := rm.CodePhrase{CodeString: "238", TerminologyID: rm.TerminologyID{Value: terminology.ID}}
+	if (c.Context.Setting.DefiningCode.CodeString == "" ||
 		c.Context.Setting.DefiningCode.TerminologyID.Value != terminology.ID ||
-		!terminology.Setting.Has(c.Context.Setting.DefiningCode.CodeString) {
-		rubric, _ := terminology.Setting.Rubric("238")
-		c.Context.Setting = rm.DVCodedText{
-			Value: rubric,
-			DefiningCode: rm.CodePhrase{
-				CodeString:    "238",
-				TerminologyID: rm.TerminologyID{Value: terminology.ID},
-			},
-		}
+		!terminology.Setting.Has(c.Context.Setting.DefiningCode.CodeString)) &&
+		codeAdmitted(firstChild(root, "context"), "setting", otherCare) {
+		rubric, _ := terminology.Setting.Rubric(otherCare.CodeString)
+		c.Context.Setting = rm.DVCodedText{Value: rubric, DefiningCode: otherCare}
 	}
 	return nil
 }
@@ -1558,10 +1560,11 @@ func firstCollidingOptionalSibling(child *tcimpl.CompiledNode, siblings []*tcimp
 // REQ-107: generated output has to pass the template-less floor.
 func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	// An OPT can name an ENTRY's language or encoding without a code; the
-	// walk then leaves the placeholder there for the RM default to replace.
+	// walk then leaves the placeholder there for the RM default to replace,
+	// where the OPT's constraint on that attribute admits the default.
 	if _, _, ok := entryCodes(rmValue); ok {
-		g.fillEntryCode(rmValue, opt.RMTypeName(), "language")
-		g.fillEntryCode(rmValue, opt.RMTypeName(), "encoding")
+		g.fillEntryCode(opt, rmValue, opt.RMTypeName(), "language")
+		g.fillEntryCode(opt, rmValue, opt.RMTypeName(), "encoding")
 	}
 	switch v := rmValue.(type) {
 	case *rm.Action:
@@ -1572,7 +1575,7 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		fillCurrentState(opt, v)
 	case *rm.IntervalEvent[rm.ItemStructure]:
 		// typereg builds every INTERVAL_EVENT with this instantiation.
-		fillMathFunction(&v.MathFunction)
+		fillMathFunction(opt, &v.MathFunction)
 	case *rm.DVMultimedia:
 		settleMultimedia(opt, v)
 	case *rm.Cluster:
@@ -1586,7 +1589,7 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.Role:
 		fillPerformer(&v.Performer)
 	case *rm.Element:
-		settleElement(v)
+		settleElement(opt, v)
 	case *rm.Activity:
 		if v.ActionArchetypeID == "" {
 			v.ActionArchetypeID = "openEHR-EHR-ACTION.example.v1"
@@ -1614,31 +1617,27 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 
 // fillMathFunction gives an INTERVAL_EVENT's math function the code 146
 // (mean) of the openEHR event math function group, with that code's
-// rubric, when the OPT gave it no code (noCode), so RM
-// Math_function_validity holds. A code the OPT gave is kept.
-func fillMathFunction(mf *rm.DVCodedText) {
-	if !noCode(mf.DefiningCode.CodeString) {
+// rubric, when the OPT gave it no code (noCode) and the OPT's constraint
+// on it admits that code (codeAdmitted), so RM Math_function_validity
+// holds. A code the OPT gave is kept. opt is the OPT node of the event.
+func fillMathFunction(opt *tcimpl.CompiledNode, mf *rm.DVCodedText) {
+	const code = "146"
+	mean := rm.CodePhrase{CodeString: code, TerminologyID: rm.TerminologyID{Value: terminology.ID}}
+	if !noCode(mf.DefiningCode.CodeString) || !codeAdmitted(opt, "math_function", mean) {
 		return
 	}
-	const code = "146"
 	rubric, _ := terminology.EventMathFunction.Rubric(code)
-	*mf = rm.DVCodedText{
-		Value: rubric,
-		DefiningCode: rm.CodePhrase{
-			CodeString:    code,
-			TerminologyID: rm.TerminologyID{Value: terminology.ID},
-		},
-	}
+	*mf = rm.DVCodedText{Value: rubric, DefiningCode: mean}
 }
 
 // settleMultimedia gives a DV_MULTIMEDIA the RM defaults the OPT left it
-// without. A media type with no code (noCode) becomes text/plain in
-// IANA_media-types, so RM Media_type_valid holds; a code the OPT gave is
-// kept. The default is not written where the C_CODE_PHRASE the OPT puts on
-// media_type rejects it, such as one that names the terminology openEHR:
-// the OPT's own constraint then keeps the walk's value. A value with
+// without, where the OPT's own constraint admits them. A media type with
+// no code (noCode) becomes text/plain in IANA_media-types, so RM
+// Media_type_valid holds, unless the OPT's constraint on media_type
+// rejects that, such as a C_CODE_PHRASE that names the terminology
+// openEHR (codeAdmitted); a code the OPT gave is kept. A value with
 // neither uri nor data gets the uri http://example.com, so RM Not_empty
-// holds. opt is the OPT node of m.
+// holds, unless the OPT prohibits uri. opt is the OPT node of m.
 func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
 	textPlain := rm.CodePhrase{
 		CodeString:    "text/plain",
@@ -1647,26 +1646,77 @@ func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
 	if noCode(m.MediaType.CodeString) && codeAdmitted(opt, "media_type", textPlain) {
 		m.MediaType = textPlain
 	}
-	if (m.URI == nil || rm.IsTypedNil(m.URI)) && len(m.Data) == 0 {
+	if (m.URI == nil || rm.IsTypedNil(m.URI)) && len(m.Data) == 0 && !prohibited(opt, "uri") {
 		m.URI = &rm.DVURI{Value: "http://example.com"}
 	}
 }
 
-// codeAdmitted reports whether the C_CODE_PHRASE the OPT puts on attrName
-// of opt accepts phrase. The walk builds an attribute from its first OPT
-// child, so that child's constraint is the one read. An attribute the OPT
-// does not name, or names without a C_CODE_PHRASE, admits any phrase.
-func codeAdmitted(opt *tcimpl.CompiledNode, attrName string, phrase rm.CodePhrase) bool {
+// prohibited reports whether the OPT prohibits attrName of opt with an
+// existence of 0..0. opt is nil for a value built from the BMM alone,
+// which no OPT constrains.
+func prohibited(opt *tcimpl.CompiledNode, attrName string) bool {
+	if opt == nil {
+		return false
+	}
 	attr := opt.Attribute(attrName)
+	return attr != nil && attrProhibited(attr)
+}
+
+// codeAdmitted reports whether the OPT's own constraint on attrName of opt
+// admits phrase as the attribute's code, so an RM default may be written
+// there. An attribute the OPT prohibits admits nothing. Otherwise the
+// first OPT child is read, the one the walk builds the attribute from
+// (phraseAdmitted). opt is nil for a value built from the BMM alone, and
+// an attribute the OPT does not name, or names with no child, admits any
+// phrase.
+func codeAdmitted(opt *tcimpl.CompiledNode, attrName string, phrase rm.CodePhrase) bool {
+	if opt == nil {
+		return true
+	}
+	attr := opt.Attribute(attrName)
+	if attr == nil {
+		return true
+	}
+	if attrProhibited(attr) {
+		return false
+	}
+	if len(attr.Children()) == 0 {
+		return true
+	}
+	return phraseAdmitted(attr.Children()[0], phrase)
+}
+
+// phraseAdmitted reports whether the OPT node that constrains a code
+// phrase, or a coded text through its defining_code, admits phrase. It
+// reads the two shapes an OPT gives that constraint, as the template
+// validator does: a C_CODE_PHRASE, and a CODE_PHRASE node whose
+// code_string, or whose terminology_id's value, carries a C_STRING.
+func phraseAdmitted(node *tcimpl.CompiledNode, phrase rm.CodePhrase) bool {
+	if cp, ok := node.PrimitiveConstraint().(constraints.CodePhrase); ok {
+		ref := constraints.CodedTermRef{Terminology: phrase.TerminologyID.Value, CodeString: phrase.CodeString}
+		return len(cp.Validate(ref)) == 0
+	}
+	if dc := node.Attribute("defining_code"); dc != nil && len(dc.Children()) > 0 {
+		return phraseAdmitted(dc.Children()[0], phrase)
+	}
+	if !stringAdmitted(node.Attribute("code_string"), phrase.CodeString) {
+		return false
+	}
+	if tid := node.Attribute("terminology_id"); tid != nil && len(tid.Children()) > 0 {
+		return stringAdmitted(tid.Children()[0].Attribute("value"), phrase.TerminologyID.Value)
+	}
+	return true
+}
+
+// stringAdmitted reports whether the C_STRING the OPT puts on attr, its
+// first child, accepts s. An attribute the OPT does not name, or
+// constrains with no C_STRING, accepts any string.
+func stringAdmitted(attr *tcimpl.CompiledAttribute, s string) bool {
 	if attr == nil || len(attr.Children()) == 0 {
 		return true
 	}
-	cp, ok := attr.Children()[0].PrimitiveConstraint().(constraints.CodePhrase)
-	if !ok {
-		return true
-	}
-	ref := constraints.CodedTermRef{Terminology: phrase.TerminologyID.Value, CodeString: phrase.CodeString}
-	return len(cp.Validate(ref)) == 0
+	cs, ok := attr.Children()[0].PrimitiveConstraint().(constraints.CString)
+	return !ok || len(cs.Validate(s)) == 0
 }
 
 // ensureItems puts one member in an RM-mandatory items list. When the
@@ -1710,7 +1760,7 @@ func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
 func (g *generator) placeholderElement() *rm.Element {
 	el := &rm.Element{}
 	applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
-	settleElement(el)
+	settleElement(nil, el)
 	return el
 }
 
@@ -1720,17 +1770,22 @@ func (g *generator) placeholderElement() *rm.Element {
 // and either null attribute, the null flavour and the null reason are both
 // dropped. An ELEMENT with no value, because the OPT constrains none or none
 // could be generated, keeps any null reason and gets the null flavour
-// "no information" when it has none. A null flavour the OPT filled keeps its
-// code, and takes the pinned rubric of that code when the code is in the
-// openEHR null flavours group.
-func settleElement(e *rm.Element) {
+// "no information" when it has none, unless the OPT's constraint on
+// null_flavour rejects that code, as a prohibited null_flavour does
+// (codeAdmitted); it then has neither. A null flavour the OPT filled keeps
+// its code, and takes the pinned rubric of that code when the code is in
+// the openEHR null flavours group. opt is the OPT node of e, or nil for an
+// ELEMENT built from the BMM alone.
+func settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 	if e.Value != nil && !rm.IsTypedNil(e.Value) {
 		e.NullFlavour = nil
 		e.NullReason = nil
 		return
 	}
 	if e.NullFlavour == nil {
-		e.NullFlavour = noInformation()
+		if nf := noInformation(); codeAdmitted(opt, "null_flavour", nf.DefiningCode) {
+			e.NullFlavour = nf
+		}
 		return
 	}
 	useGroupRubric(e.NullFlavour, terminology.NullFlavours)
@@ -1791,7 +1846,7 @@ func (g *generator) stampIfLocatable(rmValue any, rmType string) {
 	}
 	applyLocatableIdentity(rmValue, "at0000", name, nil, g.nextUID)
 	if el, ok := rmValue.(*rm.Element); ok {
-		settleElement(el)
+		settleElement(nil, el)
 	}
 }
 
@@ -1870,6 +1925,11 @@ func partyRefType(cs constraints.CString, chosen string) (string, error) {
 	return "", errNoPartyRefType
 }
 
+// fillCurrentState gives an ISM_TRANSITION whose current state has no
+// code (noCode) the first code the OPT gives under current_state, or else
+// the code 524 (initial) of the openEHR instruction states group where the
+// OPT's constraint on current_state admits it (codeAdmitted). opt is the
+// OPT node of iv.
 func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
 	if !noCode(iv.CurrentState.DefiningCode.CodeString) {
 		return
@@ -1877,6 +1937,10 @@ func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
 	ref, ok := firstCodedExample(opt, "current_state")
 	if !ok {
 		ref = constraints.CodedTermRef{Terminology: terminology.ID, CodeString: "524"}
+		initial := rm.CodePhrase{CodeString: ref.CodeString, TerminologyID: rm.TerminologyID{Value: ref.Terminology}}
+		if !codeAdmitted(opt, "current_state", initial) {
+			return
+		}
 	}
 	rubric := ref.CodeString
 	if text, found := terminology.InstructionStates.Rubric(ref.CodeString); found {

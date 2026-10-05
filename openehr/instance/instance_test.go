@@ -154,30 +154,24 @@ func TestGenerateVitalSignsExamplePopulatesPrimitives(t *testing.T) {
 
 // TestGenerateSettingMembershipAgainstThePin — REQ-107 / REQ-034.
 // EVENT_CONTEXT.setting carries the RM invariant Setting_valid: the defining
-// code MUST be a member of the openEHR `setting` group. A template can pin an
-// `openehr`-coded setting that is not a member (the OPT below constrains
-// context/setting/defining_code to one code), which reads as populated and
-// openehr-coded and is still RM-invalid. Since the generator reads the pinned
-// terminology it replaces a non-member with the 238 default and leaves a real
-// member alone.
+// code MUST be a member of the openEHR `setting` group. The setting default,
+// 238, yields to the template: the OPT below constrains
+// context/setting/defining_code to one code, so it rejects 238 unless that
+// code is 238, and the generator keeps the pinned code, a member or not, in
+// whatever terminology the pin names. A pin that also admits 238 has its
+// non-member replaced (TestREQ107_RMDefaultsYieldToTheOPT).
 //
-// wantRubric says the default fired, so the value must be 238's own rubric read
-// back from the pin — never a string typed beside the code (REQ-034). Where it
-// did not fire, the OPT-driven walk's own value stands and is not pinned here:
-// this OPT constrains `defining_code` only, so the walk leaves the DV_CODED_TEXT
-// carrying the generic example sentinel, which is a separate matter for the
-// example generator.
+// The walk's own text stands beside the kept code and is not pinned here:
+// this OPT constrains `defining_code` only, so the walk leaves the
+// DV_CODED_TEXT carrying the generic example sentinel, which is a separate
+// matter for the example generator.
 func TestGenerateSettingMembershipAgainstThePin(t *testing.T) {
 	for _, tc := range []struct {
-		name, terminology, pinned, wantCode string
-		wantRubric                          bool
+		name, terminology, pinned string
 	}{
-		{name: "non-member replaced by the default", terminology: "openehr", pinned: "999", wantCode: "238", wantRubric: true},
-		{name: "member kept", terminology: "openehr", pinned: "227", wantCode: "227"},
-		// 227 IS a `setting` member, but coded in a foreign terminology it
-		// still violates Setting_valid, so the terminology arm — not the
-		// membership arm — must replace it with the 238 default.
-		{name: "foreign-terminology setting replaced by the default", terminology: "SNOMED-CT", pinned: "227", wantCode: "238", wantRubric: true},
+		{name: "non-member pin kept", terminology: "openehr", pinned: "999"},
+		{name: "member kept", terminology: "openehr", pinned: "227"},
+		{name: "foreign-terminology pin kept", terminology: "SNOMED-CT", pinned: "227"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileSyntheticOPT(t, fmt.Sprintf(settingCodedOPT, tc.terminology, tc.pinned))
@@ -194,28 +188,12 @@ func TestGenerateSettingMembershipAgainstThePin(t *testing.T) {
 				t.Fatalf("AsComposition: %v", err)
 			}
 			got := comp.Context.Setting.DefiningCode
-			if got.CodeString != tc.wantCode {
-				t.Errorf("setting pinned to openehr::%s generated code %q, want %q",
-					tc.pinned, got.CodeString, tc.wantCode)
+			if got.CodeString != tc.pinned || got.TerminologyID.Value != tc.terminology {
+				t.Errorf("setting pinned to %s::%s generated %s::%s, want the pin",
+					tc.terminology, tc.pinned, got.TerminologyID.Value, got.CodeString)
 			}
-			if got.TerminologyID.Value != "openehr" {
-				t.Errorf("setting terminology = %q, want openehr", got.TerminologyID.Value)
-			}
-			if !terminology.Setting.Has(got.CodeString) {
-				t.Errorf("generated setting code %q is not a member of the `setting` group (Setting_valid)", got.CodeString)
-			}
-			if tc.wantRubric {
-				want, ok := terminology.Setting.Rubric(tc.wantCode)
-				if !ok {
-					t.Fatalf("code %q is not in the `setting` group, so it cannot be the default", tc.wantCode)
-				}
-				if comp.Context.Setting.Value != want {
-					t.Errorf("setting value = %q, want the pin's rubric for %s (%q)",
-						comp.Context.Setting.Value, tc.wantCode, want)
-				}
-			}
-			// The category default fires too — this OPT constrains nothing on it —
-			// so its rubric also comes from the pin rather than a typed string.
+			// The category default fires — this OPT constrains nothing on it —
+			// so its rubric comes from the pin rather than a typed string.
 			if want, _ := terminology.CompositionCategory.Rubric("433"); comp.Category.Value != want {
 				t.Errorf("category value = %q, want the pin's rubric for 433 (%q)", comp.Category.Value, want)
 			}
