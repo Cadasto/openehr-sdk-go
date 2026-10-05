@@ -43,13 +43,7 @@ func optPrimitive(rmType, itemType, body string) string {
 // codes of terminologyID with a C_CODE_PHRASE. The OPT says nothing about
 // the text.
 func optCodedText(terminologyID string, codes ...string) string {
-	var list strings.Builder
-	for _, code := range codes {
-		list.WriteString(`<code_list>` + code + `</code_list>`)
-	}
-	phrase := `<children xsi:type="C_CODE_PHRASE"><rm_type_name>CODE_PHRASE</rm_type_name><node_id></node_id>` +
-		`<terminology_id><value>` + terminologyID + `</value></terminology_id>` + list.String() + `</children>`
-	return optNode("DV_CODED_TEXT", "", optSingle("defining_code", phrase))
+	return optNode("DV_CODED_TEXT", "", optSingle("defining_code", optCodePhrase(terminologyID, codes...)))
 }
 
 // walkText is the text the walk gives a DV_CODED_TEXT built by

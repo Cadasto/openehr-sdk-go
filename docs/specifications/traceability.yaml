@@ -1239,6 +1239,7 @@ requirements:
       - openehr/instance/placeholder_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/instance/realworld_opt_synthesis_test.go
+      - openehr/instance/rm_defaults_named_test.go
       - openehr/instance/rm_defaults_test.go
       - openehr/instance/rm_release_test.go
       - openehr/instance/rmtype_test.go
