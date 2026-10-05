@@ -384,7 +384,10 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 		// spelling of the same shape, not an unknown type, so it builds
 		// the same *ArchetypeRoot in both parse modes. Only this named
 		// spelling is added: other unknown types still reach the
-		// default branch below.
+		// default branch below. Under either spelling, a child element
+		// the parser does not map, such as one Template.xsd does not
+		// define for C_ARCHETYPE_ROOT, is skipped in both modes, not
+		// refused, so strict mode does not report it.
 		co, err := buildComplexObject(o, strict, depth)
 		if err != nil {
 			return nil, err
