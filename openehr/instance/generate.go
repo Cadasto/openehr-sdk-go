@@ -553,13 +553,16 @@ func stringAttr(parent any, attr string) (string, bool) {
 // attr of parent. It covers every String attribute of the data values the
 // generator builds, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value
 // and a PARTY_REF's namespace and type, so the walk writes a C_STRING the
-// OPT pins on any of them. A pin on a PARTY_REF is kept only where no later
-// default replaces the reference: a ROLE's performer keeps it, because
-// fillPerformer fills only the empty parts, but a PARTY_RELATIONSHIP's
-// source or target loses it, because fillPartyRelationship replaces a
-// reference with any empty part whole, and the walk cannot build the id.
-// An optional attribute reads as "" while unset, and its writer sets it. ok is false when parent has no such field; when ok is
-// true, get and set are both non-nil.
+// OPT pins on any of them. A pin on a PARTY_REF holds where the reference
+// can be attached and no later default replaces it: a ROLE's performer
+// keeps it, because fillPerformer fills only the empty parts. A template
+// that names a PARTY_RELATIONSHIP's source or target makes Generate fail
+// today, because rmwrite cannot attach either; once it can, a pin there
+// would still be lost, because fillPartyRelationship replaces a reference
+// with any empty part whole, and the walk cannot build the id. An optional
+// attribute reads as "" while unset, and its writer sets it. ok is false
+// when parent has no such field; when ok is true, get and set are both
+// non-nil.
 func stringField(parent any, attr string) (get func() string, set func(string), ok bool) {
 	switch p := parent.(type) {
 	case *rm.DVText:
