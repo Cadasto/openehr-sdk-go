@@ -17,6 +17,7 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - auth/smart/source.go:948 · The token and revocation POSTs follow a caller client's 307/308 redirects with the token still in the body; discovery guards its redirects, auth/smart does not (predates the range for the token endpoint) · by: go-reviewer · from: feat/smart-token-lifecycle
 - auth/smart/source.go:866 · A session restored with SetTokens on a new Source has no last token response, so a refresh response that leaves out scope gives an access token with an empty Scope although the imported token had one; consider falling back to the held token's Scope · by: go-reviewer · from: feat/smart-token-lifecycle
 - auth/smart/source.go:95 · The TokenChange.Response doc says "Its Raw map is the hook's own copy", but maps.Clone copies only the top level: nested values such as fhirContext objects stay shared with LastTokenResponse; add the values inside Raw to the read-only list · by: go-reviewer · from: feat/smart-token-lifecycle
+- auth/smart/jwks.go:15 · the JWKS cache uses a fixed five-minute TTL; Cache-Control on the JWKS response and stale-if-error are not honoured · from: smart-client-conformance plan
 
 ## cmd/probe-record
 - cmd/probe-record/scenarios_writes.go · the ehr-status scenario submits is_modifiable true, so its recording would also pass against a server that behaves differently; changing it needs a recapture · from: pr201
@@ -77,6 +78,10 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - docs/specifications/auth.md:368 · § REQ-167 does not define "holds no token" (no refresh token and no access-token value) nor say that Revoke then clears a valueless access token without calling the hook; revoke.go defines both · by: sdd-spec-conformance-reviewer · from: feat/smart-token-lifecycle
 - docs/specifications/conformance.md:112 · PROBE-106 starts its own server instead of receiving a configured client, like PROBE-001 to 009, so the REQ-082 Known gaps bullet should name it and a Cassette or Live mode would need the probe rewritten · by: sdd-doc-reviewer, sdd-spec-conformance-reviewer · from: feat/smart-token-lifecycle
 - docs/specifications/traceability.yaml:1840 · REQ-166 (the Bearer challenge on 401 and 403, a newly found gap worked under a new REQ like REQ-167) cites no PROBE for its wire behaviour, which development-process.md asks of a gap; it lives on PR 215, outside this branch · by: claude-opus-5-5 · from: feat/smart-token-lifecycle
+- docs/specifications/auth.md:22 · § Canonical sources lists the two SMART specifications but not the rule the SMART client work followed: each gap belongs to the standard that owns it (the OAuth 2.0 family, OIDC, JOSE, HL7 SMART 2.1.0 as floor and 2.2.0 as target), and where SMART on openEHR disagrees or is silent the upstream standard decides · from: smart-client-conformance plan
+- docs/specifications/auth.md:618 · nothing records the SMART client watch list: the RFC 7523 update (assertion aud as the issuer, typ client-authentication+jwt), URI forms of the openEHR capability names, DPoP, and SMART 2.2.0 associated_endpoints and authorization_details · from: smart-client-conformance plan
+- docs/specifications/clinical-modeling.md:786 · the shared simplified-template model is to be "extracted with REQ-053 when a second consumer exists", but REQ-053 was that second consumer and the extraction was left on purpose for a third; say so · from: simplified-formats plan
+- docs/specifications/clinical-modeling.md:80 · § Strict parse mode does not record the decision to stop where it is: no check for a missing language with original_language in its place, a top-level archetype id, or empty description fields, and the lenient parse stays silent when it drops the nested subtree · from: generated-instances plan
 
 ## internal/bmmtype
 - internal/bmmtype/bmmtype.go · Substitute leaves a formal parameter unresolved for a bare generic owner, so the data attribute of an OPT's EVENT, POINT_EVENT or INTERVAL_EVENT compiles with RM type T (the row is pinned in bmmtype_test.go) · from: audit-2026-09
@@ -133,15 +138,22 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - openehr/validation/rmfloor_temporal_element_test.go · no test pins that the Value_valid and Inv_null_flavour_indicated details stay value-free (REQ-093), or sends a JSON-null temporal value through the floor · from: pr199
 - openehr/validation/rmread · rmread does not read the optional String fields magnitude_status on DV_COUNT, DV_PROPORTION and the temporal types, units_display_name and units_system on DV_QUANTITY, PARTY_IDENTIFIED.name or ATTESTATION.proof; the generator writes none of them, so no template can constrain them yet · from: pr199
 
+## scripts
+- scripts/probe-status.sh · the test-file column is a filename heuristic (its header says so), not the runner's per-mode state the runnability work wanted `make probe-status` to show · from: probe-runnability plan
+
 ## smart/discovery
 - smart/discovery/resolver.go:296 · The shared fetch runs under the starting caller's context, so one caller's cancellation fails every waiter that joined it with a context error those waiters did not cause, and now also drops a fresh cached catalog; consider running the shared fetch under context.WithoutCancel plus the client timeout, or letting a waiter whose own ctx is still live retry · by: go-reviewer · from: feat/smart-discovery-model
 - smart/discovery/static.go:44 · cmp.Or(cfg.BaseURL, cfg.Issuer) means an existing StaticConfig whose Issuer names a separate identity provider now quietly sends that provider's URL as aud through NewFromCatalog, and the mistake only shows when the authorization server rejects it; say so in the upgrade notes, or require BaseURL whenever a caller means a separate provider · by: go-reviewer · from: feat/smart-discovery-model
 - smart/discovery/errors.go:73 · DiscoveryError.Issuer now holds the Platform base URL while ServiceCatalog.Issuer holds the OpenID Connect issuer, so one field name means two things on neighbouring types; this PR already breaks the Error() text, so adding a BaseURL field (and deprecating Issuer) costs less now than later · by: go-reviewer · from: feat/smart-discovery-model
 - smart/discovery/resolver.go:246 · A fresh cache hit returns the cached catalog without the calling Resolver's own checks, so with a Cache shared between Resolvers built with different options a stricter Resolver gets a catalog its checks would refuse until the entry expires; this predates the branch (main returned a fresh hit unchecked too) · by: sdd-implementer · from: feat/smart-discovery-model
 - smart/discovery/catalog.go:129 · The RevocationEndpoint field doc does not say that auth/smart's Source.Revoke posts to it, unlike the signing-algorithm list doc updated in this range · by: go-reviewer · from: feat/smart-token-lifecycle
+- smart/discovery/catalog.go:207 · only the launch-base64-json capability constant exists; no decoder reads a base64-JSON launch context, and the SMART client plan's watch list also named relative endpoint URLs in the discovery document, not yet checked · from: smart-client-conformance plan
 
 ## testkit/conformance/webtemplate
 - testkit/conformance/webtemplate/case.go · IsCompositionMeta matches only unindexed spellings, so StructuredToFlat's `language:0|code`, `composer:0|name` and `context:0/start_time:0` reach decode in PROBE-105's structured-flat leg instead of being held out; changing it moves PROBE-086 · from: pr-crossformat
+
+## testkit/corpus
+- testkit/corpus/README.md:117 · lists only the rewrites applied to social.opt; the full recipe for normalising Code24 OPT exports (eight steps, a script, and FerroEHR accepting all seven converted exports) is in git history at `f649aae4:docs/plans/2026-09-29-generated-instances-pass-the-rm-floor.md`; move it here if more Code24 exports are vendored · from: generated-instances plan
 
 ## testkit/probe
 - testkit/probe/livestatus_test.go · the Live snapshots assert less than the cassette witnesses: createEHRProbe (live_test.go) passes on any non-empty EHR id without comparing it to the per-run id, and the PROBE-065 read-back checks only a non-empty archetype_node_id, not the saved node id or template id · from: pr201
