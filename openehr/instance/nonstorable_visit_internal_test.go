@@ -71,11 +71,12 @@ func visitAttribute(t *testing.T, opt, name string) (*tcimpl.CompiledNode, *tcim
 
 // TestREQ107_VisitsSkipsNonStorableAttributes is the REQ-107 check of the
 // walk's visit predicate: it never visits offset on POINT_EVENT or
-// INTERVAL_EVENT, or is_integral on DV_QUANTITY or DV_PROPORTION, under
-// either policy, also when the OPT spells the class as a generic
-// instantiation. A storable sibling is visited as the policy says. The
-// visit of DV_PROPORTION.is_integral writes nothing, so this check reads
-// the predicate rather than the output.
+// INTERVAL_EVENT, is_integral on DV_QUANTITY or DV_PROPORTION, or a
+// locatable's uid, even a required one, under either policy, also when
+// the OPT spells the class as a generic instantiation. A storable sibling
+// is visited as the policy says. The visit of DV_PROPORTION.is_integral
+// writes nothing, so this check reads the predicate rather than the
+// output.
 func TestREQ107_VisitsSkipsNonStorableAttributes(t *testing.T) {
 	cases := []struct {
 		rmType, attr, child string
@@ -89,6 +90,9 @@ func TestREQ107_VisitsSkipsNonStorableAttributes(t *testing.T) {
 		{rmType: "DV_PROPORTION", attr: "is_integral", child: visitBoolean},
 		{rmType: "POINT_EVENT<ITEM_TREE>", attr: "offset", child: visitDuration},
 		{rmType: "INTERVAL_EVENT<ITEM_LIST>", attr: "offset", child: visitDuration},
+		// A locatable's uid: the identity rule decides it, not the walk.
+		{rmType: "CLUSTER", attr: "uid", child: ""},
+		{rmType: "OBSERVATION", attr: "uid", child: ""},
 		{rmType: "DV_PROPORTION", attr: "numerator", child: visitReal, minimal: true, example: true},
 		{rmType: "POINT_EVENT", attr: "time", child: "", minimal: true, example: true},
 	}

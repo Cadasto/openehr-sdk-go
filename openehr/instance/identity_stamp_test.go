@@ -305,3 +305,131 @@ func TestREQ107_ProhibitedUIDYieldsExceptOnAParty(t *testing.T) {
 		}
 	}
 }
+
+// optRequiredSingle is a C_SINGLE_ATTRIBUTE called name with existence
+// 1..1 over children.
+func optRequiredSingle(name string, children ...string) string {
+	return optSingle(name, children...)
+}
+
+// TestREQ107_UIDIsNotVisited is the REQ-107 check that the walk never
+// visits a locatable's uid, which the identity rule decides: a COMPOSITION
+// or an ENTRY whose OPT names its uid, with no child or with a
+// HIER_OBJECT_ID child, keeps the uid the generator stamps from
+// Options.UIDSource, and a CLUSTER whose OPT names an optional uid gets
+// none. It holds under both policies, both value fills and both compile
+// modes.
+func TestREQ107_UIDIsNotVisited(t *testing.T) {
+	hier := optNode("HIER_OBJECT_ID", "", optStringAttr("value", "<list>from-the-opt</list>"))
+	uidAttrs := map[string]string{
+		"optional, no child":         optOptionalSingle("uid"),
+		"optional, a HIER_OBJECT_ID": optOptionalSingleOver("uid", hier),
+		"required, a HIER_OBJECT_ID": optRequiredSingle("uid", hier),
+	}
+	for shape, attr := range uidAttrs {
+		for _, class := range []string{"COMPOSITION", "OBSERVATION", "CLUSTER"} {
+			wantStamp := class != "CLUSTER" || shape == "required, a HIER_OBJECT_ID"
+			for _, implicit := range []bool{true, false} {
+				c := compileOPTText(t, optTemplate(class, attr), implicit)
+				for _, opts := range defaultsOptions() {
+					uids := &recordingUIDs{}
+					opts.UIDSource = uids.next
+					opts.Territory, opts.Composer = "NL", testComposer()
+					t.Run(fmt.Sprintf("%s/%s/implicit=%t/%v/%v", class, shape, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+						out, err := instance.Generate(t.Context(), c, opts)
+						if err != nil {
+							t.Fatalf("Generate: %v", err)
+						}
+						uid, _ := out.(rm.Locatable).GetUID().(*rm.HierObjectID)
+						switch {
+						case wantStamp && (uid == nil || !slices.Contains(uids.issued, uid.Value)):
+							t.Errorf("%s.uid = %v, want the uid UIDSource issued", class, out.(rm.Locatable).GetUID())
+						case !wantStamp && out.(rm.Locatable).GetUID() != nil:
+							t.Errorf("%s.uid = %v, want none", class, out.(rm.Locatable).GetUID())
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
+// TestREQ107_RequiredUIDOnOtherLocatables is the REQ-107 check that a
+// locatable outside the classes the identity rule names gets a uid only
+// where its OPT requires one (an existence lower bound of at least 1),
+// drawn from Options.UIDSource, or from the random fallback when that is
+// nil, and none where its OPT names the uid optional, under Example too.
+// It holds for a CLUSTER and an ELEMENT, at the root and nested, under
+// both policies, both value fills and both compile modes, and the output
+// passes the RM floor.
+func TestREQ107_RequiredUIDOnOtherLocatables(t *testing.T) {
+	type place struct {
+		name   string
+		opt    func(uid string) string
+		target func(t *testing.T, out any) rm.Locatable
+	}
+	places := []place{
+		{
+			name: "CLUSTER root",
+			opt: func(uid string) string {
+				return optTemplate("CLUSTER", uid, optMultiple("items", optNode("ELEMENT", "at0001")))
+			},
+			target: func(_ *testing.T, out any) rm.Locatable { return out.(rm.Locatable) },
+		},
+		{
+			name:   "ELEMENT root",
+			opt:    func(uid string) string { return optTemplate("ELEMENT", uid) },
+			target: func(_ *testing.T, out any) rm.Locatable { return out.(rm.Locatable) },
+		},
+		{
+			name: "ELEMENT in CLUSTER.items",
+			opt: func(uid string) string {
+				return optTemplate("CLUSTER", optMultiple("items", optNode("ELEMENT", "at0001", uid)))
+			},
+			target: func(t *testing.T, out any) rm.Locatable {
+				items := out.(*rm.Cluster).Items
+				if len(items) != 1 {
+					t.Fatalf("CLUSTER.items has %d members, want 1", len(items))
+				}
+				return items[0].(rm.Locatable)
+			},
+		},
+	}
+	for _, p := range places {
+		for _, required := range []bool{true, false} {
+			uidAttr := optOptionalSingle("uid")
+			if required {
+				uidAttr = optRequiredSingle("uid")
+			}
+			for _, implicit := range []bool{true, false} {
+				c := compileOPTText(t, p.opt(uidAttr), implicit)
+				for _, opts := range defaultsOptions() {
+					for _, source := range []string{"UIDSource", "random fallback"} {
+						uids := &recordingUIDs{}
+						if source == "UIDSource" {
+							opts.UIDSource = uids.next
+						} else {
+							opts.UIDSource = nil
+						}
+						t.Run(fmt.Sprintf("%s/required=%t/%s/implicit=%t/%v/%v", p.name, required, source, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+							out, err := instance.Generate(t.Context(), c, opts)
+							if err != nil {
+								t.Fatalf("Generate: %v", err)
+							}
+							uid, _ := p.target(t, out).GetUID().(*rm.HierObjectID)
+							switch {
+							case !required && uid != nil:
+								t.Errorf("uid = %v, want none: the OPT names it optional", uid)
+							case required && uid == nil:
+								t.Errorf("uid absent, want one: the OPT requires it")
+							case required && source == "UIDSource" && !slices.Contains(uids.issued, uid.Value):
+								t.Errorf("uid = %q, want one UIDSource issued (%v)", uid.Value, uids.issued)
+							}
+							noFloorErrors(t, out)
+						})
+					}
+				}
+			}
+		}
+	}
+}
