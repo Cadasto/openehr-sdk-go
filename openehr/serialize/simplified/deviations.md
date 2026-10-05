@@ -6,10 +6,9 @@ deviates from, or has not yet implemented, part of the spec. Each entry says wha
 current behaviour is and where the full behaviour lands.
 
 Status legend: **Deviation** = deliberate, permanent-ish choice; **Deferred** = not yet
-implemented — residual scope tracked by the
-[simplified-formats umbrella plan](../../../docs/plans/2026-06-23-simplified-formats.md)
-(the Phase 3 work that built this package landed in
-[PR 76](https://github.com/Cadasto/openehr-sdk-go/pull/76)).
+implemented; each is recorded in the rows below, and the refusals the upstream corpus
+meets are counted in [SKIPPED.md](../../../testkit/conformance/webtemplate/SKIPPED.md).
+This package landed in [PR 76](https://github.com/Cadasto/openehr-sdk-go/pull/76).
 
 ## Strict, fail-loud posture
 

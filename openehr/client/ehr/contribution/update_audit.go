@@ -40,9 +40,8 @@ type UpdateAudit struct {
 	// SystemID is the optional logical EHR system id; omitted when empty.
 	SystemID string
 	// Type selects the emitted `_type`. The zero value emits
-	// AuditTypeAuditDetails (the SDK default, documented in
-	// docs/specifications/wire.md); set AuditTypeUpdateAudit for the
-	// `UPDATE_AUDIT` form the vendored ITS-REST pin recommends.
+	// AuditTypeAuditDetails, the SDK default; set AuditTypeUpdateAudit for
+	// the `UPDATE_AUDIT` form the vendored ITS-REST pin recommends.
 	Type AuditType
 }
 

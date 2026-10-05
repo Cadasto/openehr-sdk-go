@@ -26,14 +26,15 @@ const (
 // cross-format corpus: one directory per set, each giving one composition in
 // two or more of canonical JSON, canonical XML, FLAT and STRUCTURED. The
 // MANIFEST.txt there records every file's upstream repository, commit, path
-// and sha256; scripts/ingest-crossformat.sh regenerates it. Vendored
-// Apache-2.0; provenance in THIRD_PARTY_LICENSES.md.
+// and sha256; scripts/ingest-crossformat.sh regenerates it. The files are
+// vendored under Apache-2.0, with provenance in
+// testkit/corpus/THIRD_PARTY_LICENSES.md.
 func CrossFormatRoot() string {
 	return filepath.Join(CorpusRoot(), "crossformat")
 }
 
 // CrossFormatSet is one upstream composition given in two or more formats,
-// with the operational template of its template. Every path is absolute. A
+// with the operational template it instantiates. Every path is absolute. A
 // format the set does not carry is "".
 type CrossFormatSet struct {
 	// Name is the set's directory name under [CrossFormatRoot], such as

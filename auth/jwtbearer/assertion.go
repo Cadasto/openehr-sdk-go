@@ -102,19 +102,22 @@ type ClaimsSigner struct {
 	jtiCounter atomic.Uint64
 }
 
-// NewClaimsSigner constructs a ClaimsSigner. Returns ErrInvalidConfig, and
-// never panics, when required fields are missing, the signer is nil or a
-// nil *rsa.PrivateKey or *ecdsa.PrivateKey, an *ecdsa.PrivateKey lacks its
-// private scalar or public point (or crypto/ecdsa cannot otherwise use it),
-// the algorithm is unsupported, the
-// signer's Public method panics or reports no usable public key (nil, or an
-// RSA or ECDSA public key without its modulus or curve, where a curve whose
-// parameters are missing or cannot be read counts as none), or the signer's
-// key type does not match the algorithm family. A Public method
-// panics for a nil key of most other types held in a non-nil crypto.Signer,
-// such as a nil ed25519.PrivateKey or a nil pointer to a signer type of the
-// caller's own whose Public reads its key, so such a signer is refused
-// instead of crashing the caller.
+// NewClaimsSigner constructs a ClaimsSigner. It returns
+// [auth.ErrInvalidConfig], and never panics, when:
+//   - required fields are missing;
+//   - the signer is nil, or a nil *rsa.PrivateKey or *ecdsa.PrivateKey;
+//   - an *ecdsa.PrivateKey lacks its private scalar or public point, or
+//     crypto/ecdsa cannot otherwise use it;
+//   - the algorithm is unsupported;
+//   - the signer's Public method panics or reports no usable public key:
+//     nil, or an RSA or ECDSA public key without its modulus or curve (a
+//     curve whose parameters are missing or cannot be read counts as none);
+//   - the signer's key type does not match the algorithm family.
+//
+// A Public method panics for a nil key of most other types held in a
+// non-nil crypto.Signer, such as a nil ed25519.PrivateKey or a nil pointer
+// to a signer type of the caller's own whose Public reads its key.
+// NewClaimsSigner refuses such a signer instead of crashing the caller.
 //
 // A signer of the caller's own type whose Public reports a usable public key
 // of the right type is accepted as it is: the SDK cannot see inside it, so
@@ -176,15 +179,17 @@ const clientAssertionLifetime = 5 * time.Minute
 // sub set to clientID, aud set to tokenURL, the JOSE headers typ JWT and
 // kid, a unique jti, and an exp five minutes after its iat.
 //
-// It fails with [auth.ErrInvalidConfig], and never panics, when clientID,
-// tokenURL, alg or kid is empty, signer is empty (nil, a nil RSA or ECDSA
-// private key, an ECDSA private key without its scalar or point, or a
-// signer whose Public method panics or reports no usable public key), alg
-// is not supported, or the key does not fit alg, as
-// [NewClaimsSigner] describes. A signer of the caller's own type whose
-// Public method reports a usable public key of the type alg needs is
-// accepted as it is.
-// [NewClaimsSigner] lists the key each algorithm needs.
+// It fails with [auth.ErrInvalidConfig], and never panics, when:
+//   - clientID, tokenURL, alg or kid is empty;
+//   - signer is nil, a nil RSA or ECDSA private key, an ECDSA private key
+//     without its scalar or point, or a signer whose Public method panics
+//     or reports no usable public key;
+//   - alg is not supported;
+//   - the key does not fit alg.
+//
+// [NewClaimsSigner] describes these checks and lists the key each algorithm
+// needs. A signer of the caller's own type whose Public method reports a
+// usable public key of the type alg needs is accepted as it is.
 func NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, kid string) (*ClaimsSigner, error) {
 	if clientID == "" {
 		return nil, fmt.Errorf("%w: a SMART client assertion needs a clientID", auth.ErrInvalidConfig)
@@ -243,7 +248,7 @@ func WithKeyID(kid string) SignerOption {
 // WithAlgorithm overrides the JOSE "alg" name. Supported values:
 // RS384 (default, SMART baseline), ES384, RS256 (back-compat), ES256.
 // The key type must match the algorithm family; mismatches are rejected
-// at construction with ErrInvalidConfig.
+// at construction with [auth.ErrInvalidConfig].
 func WithAlgorithm(alg string) SignerOption {
 	return func(s *ClaimsSigner) { s.Algorithm = alg }
 }

@@ -11,9 +11,9 @@ type DiscoveryErrorReason string
 const (
 	// ReasonFetchFailed indicates the SMART configuration document
 	// could not be retrieved (network error, non-2xx HTTP status, or a
-	// 304 Not Modified the resolver did not ask for), or the issuer's
-	// OpenID configuration document could not be retrieved or read, or
-	// names no issuer.
+	// 304 Not Modified the resolver did not ask for). It also covers an
+	// issuer's OpenID configuration document that could not be retrieved
+	// or read, or that names no issuer.
 	ReasonFetchFailed DiscoveryErrorReason = "fetch_failed"
 	// ReasonParseError indicates the response body could not be parsed
 	// as a SMART configuration document.
@@ -27,24 +27,29 @@ const (
 	// WithAcceptedSpecVersions, an entry without spec_version is judged by
 	// its version member instead.
 	ReasonSpecVersionMismatch DiscoveryErrorReason = "spec_version_mismatch"
-	// ReasonMalformedURL indicates a URL the resolver cannot use. The base
-	// URL passed to the resolver, the issuer the document declares, an
-	// auth endpoint URL or a service baseUrl failed parsing, is not
-	// absolute or has no host name; the declared issuer or an auth endpoint
-	// uses a scheme other than https or http; or the declared issuer has a
-	// query or fragment. A plaintext http URL where https is required is
-	// ReasonInsecureURL instead.
+	// ReasonMalformedURL indicates a URL the resolver cannot use:
+	//   - the base URL passed to the resolver, the issuer the document
+	//     declares, an auth endpoint URL or a service baseUrl failed
+	//     parsing, is not absolute or has no host name;
+	//   - the declared issuer or an auth endpoint uses a scheme other than
+	//     https or http;
+	//   - the declared issuer has a query or fragment.
+	//
+	// A plaintext http URL where https is required is ReasonInsecureURL
+	// instead.
 	ReasonMalformedURL DiscoveryErrorReason = "malformed_url"
 	// ReasonAuthEndpointsMissing indicates the SMART configuration
 	// declares authorization-server members, or advertises a capability
-	// that needs them, but omits one it needs: token_endpoint whenever any
-	// of authorization_endpoint, token_endpoint or jwks_uri is present or
-	// capabilities lists launch-ehr, launch-standalone or
-	// sso-openid-connect; authorization_endpoint when capabilities lists
-	// launch-ehr or launch-standalone; jwks_uri when it lists
-	// sso-openid-connect. A document with none of those members and none of
-	// those capabilities is an anonymous-only deployment and is not
-	// refused.
+	// that needs them, but omits one it needs:
+	//   - token_endpoint, whenever any of authorization_endpoint,
+	//     token_endpoint or jwks_uri is present or capabilities lists
+	//     launch-ehr, launch-standalone or sso-openid-connect;
+	//   - authorization_endpoint, when capabilities lists launch-ehr or
+	//     launch-standalone;
+	//   - jwks_uri, when capabilities lists sso-openid-connect.
+	//
+	// A document with none of those members and none of those capabilities
+	// is an anonymous-only deployment and is not refused.
 	ReasonAuthEndpointsMissing DiscoveryErrorReason = "auth_endpoints_missing"
 	// ReasonInsecureURL indicates a plaintext URL was refused where https
 	// is required: an http base URL passed to the resolver, an http issuer

@@ -211,8 +211,8 @@ func compare(candidate, emitted map[string]any, root string) (missing, extra, mi
 }
 
 // ParseFlat decodes a FLAT JSON body with every number kept as its literal
-// text ([json.Number]), and refuses a `null` body and content after the body
-// object, so a comparison never runs over less than it reports.
+// text ([json.Number]). It refuses a `null` body and any content after the
+// body object, so a comparison never checks less of the body than it reports.
 func ParseFlat(raw []byte) (map[string]any, error) {
 	return parseFlat(raw)
 }
@@ -235,7 +235,7 @@ const (
 // IrreducibleError is a decode failure [DecodeReducing] cannot reduce: the
 // codec's error names no key, names a key the body does not carry, or is not
 // one of the codec's two gap sentinels (simplified.ErrUnknownPath and
-// simplified.ErrUnsupportedDatatype). Err is the codec's own error.
+// simplified.ErrUnsupportedDatatype).
 type IrreducibleError struct {
 	// Key is the token the codec's error quoted first, or "" when it quoted
 	// none.
@@ -257,9 +257,9 @@ func (e *IrreducibleError) Unwrap() error { return e.Err }
 // candidate down to the modelled subset and returns the refusals in the order
 // they surfaced. mode says whether to inject the mandatory context.
 //
-// This is what keeps the skip inventory honest: the excluded set is whatever
-// the codec itself declines, so closing a gap shrinks it automatically and no
-// hand-kept list can drift from the code.
+// The excluded set is whatever the codec itself refuses. Closing a gap
+// shrinks it automatically, and there is no hand-kept list to drift from the
+// code.
 //
 // A decode error the loop cannot reduce comes back as an [*IrreducibleError]
 // carrying the codec's error. Any other error is a harness fault: an unknown

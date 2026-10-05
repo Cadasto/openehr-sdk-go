@@ -4,8 +4,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-// VersionMetadata is the typed response metadata every versioned-
-// resource GET in `openehr/client/ehr/*` returns alongside the
+// VersionMetadata is the typed response metadata every
+// versioned-resource GET in `openehr/client/ehr/*` returns alongside the
 // decoded body. It embeds the transport-level metadata (ETag,
 // Location, LastModified, openehr-* response headers) and adds the
 // parsed VersionUID extracted from the response.

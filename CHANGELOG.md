@@ -8,6 +8,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-05
+
+Thirtieth `v0.x` minor: the SMART client completes the authorization itself, verifies ID tokens, manages tokens up to revocation and builds backend services from discovery, which now keeps the Platform base URL apart from the OIDC issuer. **Breaking:** `auth/introspect` is removed; `auth/smart` and `smart/discovery` refuse configurations, ID tokens and redirects they accepted; confidential clients stop sending `client_id` and form-encode Basic credentials; `WithReauthOn401` retries only an `invalid_token` challenge; `VersionUID` prefers the `ETag`; and an over-long duration returns an error.
+
+### Added
+
+- **A SMART launch completes inside the SDK (REQ-061, REQ-062, REQ-064).** `CompleteAuthorization` checks the redirect's state, RFC 9207 `iss` and error before spending the code, `ParseEHRLaunch` reads an embedded launch, and ID tokens are verified at the exchange and on every refresh.
+- **SMART token lifecycle (REQ-063, REQ-068, REQ-167, PROBE-106).** `WithTokenChange` reports each new token in order, `Source.Revoke` signs out at the RFC 7009 revocation endpoint, and `jwtbearer.NewClientAssertion` builds the HL7 SMART asymmetric client assertion.
+- **SMART Backend Services from discovery (REQ-063, REQ-068, REQ-166).** `clientcreds.NewFromCatalog` builds a source from a resolved catalog and checks what it advertises, backend sources re-authenticate on a 401, and `WireError.Challenge` carries the RFC 6750 Bearer challenge.
+- **openEHR scope syntax (REQ-165).** `auth.OpenEHRScope` builds SMART on openEHR resource scopes and `auth.ParseOpenEHRScope` reads them; a malformed scope fails with `auth.ErrInvalidScope`.
+- **Discovery keeps the Platform base URL apart from the OIDC issuer (REQ-070, REQ-073, ADR 0023).** A Platform whose authorization server lives elsewhere now resolves, and its issuer is checked against the issuer's own OpenID configuration unless the caller passes `WithoutOpenIDConfigurationCheck`.
+- **Cross-format parity probe (REQ-080, PROBE-105).** Ten vendored upstream sets give one composition in canonical JSON, canonical XML, FLAT and STRUCTURED, and PROBE-105 runs the SDK codecs across them and records each difference with its cause.
+- **Fixture corpus provenance corrected.** The vendored fixtures' sources, pins, counts and licence notes are corrected, one upstream fixture is refreshed, and an authoring account id is redacted from an OPT.
+
+### Changed
+
+- **`auth/smart` asks more of a source and of an ID token (REQ-061, REQ-062, REQ-064).** A source needs an audience and S256 PKCE; an ID token needs a `sub`, a JWKS and issuer to check it, and no untrusted audience or foreign `azp`.
+- **SMART client authentication follows HL7 SMART (REQ-068).** A confidential client no longer sends `client_id` beside its credential, `client_secret_basic` form-encodes the id and secret, and `WithClientAssertionKey` refuses an empty key id or an algorithm the server does not advertise.
+- **SMART session state follows the token responses (REQ-064).** A refresh keeps the launch context and `scope` its response omits, a code exchange without a `refresh_token` drops the previous one, and `LaunchContext.User` comes only from a verified ID token.
+- **SMART requests keep the server's URLs as advertised (REQ-060, REQ-061, REQ-070).** Discovery keeps a path on the Platform base URL, the authorize URL keeps the endpoint's own query, and a `bearer` token type in any letter case becomes the `Bearer` scheme.
+- **Discovery re-checks renewals and refuses unsafe redirects (REQ-071, REQ-073).** A `304 Not Modified` renewal runs the full checks, an https-to-http redirect and a port without a host are refused, and `DiscoveryError.Error()` labels the base URL `base_url=`.
+- **`WithReauthOn401` follows the Bearer challenge (REQ-063, REQ-166).** A 401 whose challenge names `insufficient_scope`, or any error other than `invalid_token`, is no longer retried.
+- **A versioned resource's `VersionUID` comes from the `ETag` (REQ-054).** The `Location` tail is used only when the `ETag` holds no well-formed version id, and after a 409 or 412 the value is the server's current version.
+- **Temporal helpers no longer panic on a nil receiver (REQ-123).** A definite duration too long for `time.Duration` returns `ErrTemporalConversion` instead of a wrapped value.
+
+### Removed
+
+- **`auth/introspect` (REQ-062).** Token introspection is a resource-server operation and the SDK is a client of authorization servers; discovery still surfaces `introspection_endpoint`.
+
 ## [0.29.0] - 2026-10-02
 
 Twenty-ninth `v0.x` minor: generated and built compositions now pass the RM floor, the floor checks far more, and FLAT decode rebuilds archetype details. **Breaking:** `ValidateRM`, `CString.Validate`, FLAT decode and interval type names refuse input they accepted, canonical AOM 1.4 interval output changes shape, and a JWKS outage in `smart.ValidateIDToken` no longer matches `ErrJWKSValidationFailed`.

@@ -18,11 +18,11 @@ type LaunchContext struct {
 	Scopes []string
 	// IDToken holds the verified ID-token claims, nil without an ID token.
 	// For a token response from the auth/smart Source it is that response's
-	// IDTokenClaims, the claims the Source verified, shared rather than
-	// copied: read it, never modify it. smart trusts these claims as they
-	// are, without verifying the token again or checking exp again, so a
-	// context rebuilt after the token expired still carries them. Only the
-	// Source sets IDTokenClaims; never fill it in yourself.
+	// IDTokenClaims: the claims the Source verified, shared rather than
+	// copied, so read it and never modify it. smart trusts these claims as
+	// they are, without verifying the token again or checking exp again, so
+	// a context rebuilt after the token expired still carries them. Only the
+	// Source sets a TokenResponse's IDTokenClaims; never fill them in yourself.
 	IDToken   *IDTokenClaims
 	Issuer    string
 	Principal *PrincipalIdentity

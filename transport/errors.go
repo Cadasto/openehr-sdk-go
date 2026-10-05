@@ -105,11 +105,12 @@ type WireError struct {
 	// WWW-Authenticate header, which says why the server refused the
 	// token. It is set only on a 401 or 403 whose header carries a Bearer
 	// challenge the transport can read, and is nil otherwise; the status
-	// maps to ErrUnauthorized or ErrForbidden either way. Error never
-	// includes its values, so read them here after errors.AsType. Its
-	// ErrorDescription, free text from the server, is kept only when the
-	// client is built with WithRawErrorBodies(true); the other fields are
-	// always set.
+	// maps to ErrUnauthorized or ErrForbidden either way. [WireError.Error]
+	// never includes the challenge's values, so read them here after
+	// errors.AsType. The challenge's ErrorDescription, free text from the
+	// server, is kept only when the client is built with
+	// WithRawErrorBodies(true); the other fields are kept regardless of that
+	// option.
 	Challenge *BearerChallenge
 	// Sentinel is the categorical class for errors.Is.
 	Sentinel error

@@ -30,16 +30,17 @@ type Identifier struct {
 // populates it from the body's uid. The headers stay canonical; the body
 // is the documented fallback noted on [VersionMetadata].
 //
-// It never silently downgrades the identifier mode: a non-empty body that does not decode to an
-// Identifier carrying a uid is returned as a [transport.ErrInvalidShape]
-// error rather than silently discarded. An empty body is not an error;
-// the identifier remains available via Location/ETag → VersionUID.
+// A non-empty body that does not decode to an Identifier carrying a uid is
+// returned as a [transport.ErrInvalidShape] error, never silently
+// discarded, so the identifier mode is not downgraded.
 //
-// No-op (returns nil) when m is nil or the body carries no representation:
-// zero bytes, whitespace, or JSON `null`, as [transport.IsNoRepresentationBody]
+// An empty body is not an error. ResolveIdentifierBody does nothing and
+// returns nil when m is nil or the body carries no representation: zero
+// bytes, whitespace, or JSON `null`, as [transport.IsNoRepresentationBody]
 // defines empty for every 2xx response. A server honouring
 // `Prefer: return=identifier` with `null` sent no identifier rather than a
-// malformed one, so Location/ETag stays the identifier of record.
+// malformed one, so the ETag or Location header stays the identifier of
+// record.
 func (m *VersionMetadata) ResolveIdentifierBody(body []byte) error {
 	if m == nil || transport.IsNoRepresentationBody(body) {
 		return nil

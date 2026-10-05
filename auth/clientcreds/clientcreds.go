@@ -213,15 +213,18 @@ func FromConfig(cfg Config) (*Source, error) {
 //
 // A nil catalog, or one without a token endpoint, is refused with
 // [auth.ErrInvalidConfig]. So is a configuration the catalog says the server
-// does not accept: grant_types_supported leaves out client_credentials,
-// token_endpoint_auth_methods_supported leaves out the configured method
-// (private_key_jwt with a client assertion, otherwise client_secret_basic or
-// client_secret_post as [WithAuthMethod] selects), or
-// token_endpoint_auth_signing_alg_values_supported leaves out the algorithm
-// of a [jwtbearer.ClaimsSigner] client assertion. A list the catalog leaves
-// empty does not constrain anything, and a client assertion from any other
-// source is not checked against the algorithm list. The other checks are
-// those of [FromConfig].
+// does not accept:
+//   - grant_types_supported leaves out client_credentials;
+//   - token_endpoint_auth_methods_supported leaves out the configured
+//     method: private_key_jwt with a client assertion, otherwise
+//     client_secret_basic or client_secret_post as [WithAuthMethod] selects;
+//   - token_endpoint_auth_signing_alg_values_supported leaves out the
+//     algorithm of a [jwtbearer.ClaimsSigner] client assertion.
+//
+// A list the catalog leaves empty does not constrain anything, and a client
+// assertion from a source other than a [jwtbearer.ClaimsSigner] is not
+// checked against the algorithm list. The other checks are those of
+// [FromConfig].
 func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID, clientSecret string, opts ...Option) (*Source, error) {
 	if catalog == nil {
 		return nil, fmt.Errorf("%w: catalog is nil", auth.ErrInvalidConfig)
@@ -288,7 +291,8 @@ var _ auth.Reauther = (*Source)(nil)
 // when the cached token is within RefreshThreshold of expiry.
 // Concurrent callers share the in-flight exchange. If the caller running
 // that exchange gives up first, a caller whose own context is still live
-// starts a new exchange rather than returning that caller's cancellation.
+// starts a new exchange rather than returning the cancellation of the
+// caller that gave up.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	for {
 		if err := ctx.Err(); err != nil {
@@ -333,7 +337,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 // instead of starting another, so concurrent Reauth and Token calls send one
 // request to the token endpoint. If the caller running that exchange gives up
 // first, Reauth starts a new exchange rather than returning that caller's
-// cancellation. Reauth returns the exchange's error, an
+// cancellation. Reauth returns the exchange's error, which is an
 // [*auth.ExchangeError] wrapping [auth.ErrTokenExchangeFailed], or the
 // context's error when ctx ends first. A Reauth whose context has already
 // ended keeps the cached token. After a failed exchange no token is cached,

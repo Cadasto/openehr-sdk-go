@@ -26,7 +26,8 @@ var ErrLaunchInvalidRequest = errors.New("SMART launch: invalid launch request")
 var ErrLaunchIssuerMismatch = errors.New("SMART launch: authorization response issuer mismatch")
 
 // ErrAuthorizationRejected indicates the redirect back to the app carried
-// an error instead of an authorization code, for example because the user
-// declined, or carried neither. When the authorization server sent an
+// an error instead of an authorization code (for example because the user
+// declined), carried neither an error nor a code, or repeated the state,
+// iss, code or error parameter. When the authorization server sent an
 // error, errors.As extracts it as an *auth.OAuth2Error.
 var ErrAuthorizationRejected = errors.New("SMART launch: authorization rejected")

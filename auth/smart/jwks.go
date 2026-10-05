@@ -60,11 +60,11 @@ func NewJWKS(httpClient *http.Client, uri string) (*JWKS, error) {
 // is refreshed once before failing.
 //
 // An empty kid asks for the key that verifies a token whose header carries
-// no kid: the set's only signing key, which is a key whose use, if present,
-// is "sig", published with or without a kid. When the set holds no signing
-// key or more than one, Key fails with [auth.ErrJWKSValidationFailed]; it
-// fetches the set when the cache is empty or older than TTL, but does not
-// refresh it on that failure.
+// no kid: the set's only signing key. A signing key is one whose use, if
+// present, is "sig", published with or without a kid. When the set holds
+// no signing key or more than one, Key fails with
+// [auth.ErrJWKSValidationFailed]. It fetches the set when the cache is empty
+// or older than TTL, but does not refresh it on that failure.
 func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
 	if kid == "" {
 		return j.onlySigningKey(ctx)

@@ -28,19 +28,19 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// Probe105CrossFormatParity runs every leg set carries and compares each
+// Probe105CrossFormatParity runs every leg the set carries and compares each
 // leg's outcome with the outcome recorded for it in
 // [crossformat.Recorded]. The caller owns corpus I/O: enumerate with
 // [fixtures.ListCrossFormatSets] once and pass each set in.
 //
 // Status is "pass" when every leg the set runs matches its record and the
-// set's records obey the record rules (a reason for every refusal, difference
-// and non-zero excluded count, at least one key compared by every leg that is
-// not refused). It
-// is "fail" otherwise, with a Detail naming each set and leg whose recorded
-// and measured outcomes differ: a gap that opened or closed without its record
-// changing in the same commit. A harness fault, such as an OPT that does not
-// compile or an upstream document that is not JSON, is a "fail" too.
+// set's records obey the record rules: a reason for every refusal,
+// difference and non-zero excluded count, and at least one key compared by
+// every leg that is not refused. Otherwise it is "fail", with a Detail
+// naming each set and leg whose recorded and measured outcomes differ: a
+// gap that opened or closed without its record changing with it. A harness
+// fault, such as an OPT that does not compile or an upstream document that
+// is not JSON, is a "fail" too.
 //
 // Framework misuse (a set with no name, no OPT, or fewer than two formats
 // that share a leg) returns a non-nil error.
