@@ -55,7 +55,8 @@ Reference Model objects, compiles the operational template (OPT), and runs two
 checks. The RM floor checks the Reference Model's own rules and needs no
 template. The template constraints check what the OPT declares. Each check
 prints its verdict and any issues it found. The exit status is 1 when either
-check finds an issue, so the command can gate a pipeline.
+check finds an issue or the program cannot run, and 2 on a bad flag, so the
+command can gate a pipeline.
 
 ```bash
 go run ./cmd/examples/validate-from-json
