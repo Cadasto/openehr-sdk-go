@@ -379,7 +379,9 @@ func (g *generator) materialiseSingle(
 	parentRM any,
 ) error {
 	// An alternative the OPT prohibits is skipped: the next allowed one
-	// wins, and with none allowed the attribute is treated as silent.
+	// wins. With none allowed the attribute is prohibited and not visited
+	// (attrProhibited), unless the BMM marks it mandatory: then it gets
+	// here and is built as one the OPT leaves silent.
 	children := allowedChildren(attr)
 	if len(children) == 0 {
 		// Implicit / OPT-silent attribute. When the attribute carries
@@ -1074,8 +1076,10 @@ func (g *generator) materialiseMultiple(
 	parentRM any,
 ) error {
 	// A child the OPT prohibits gets no member, neither from the
-	// per-child fill nor as the seed of the top-up; with every child
-	// prohibited the attribute is treated as silent.
+	// per-child fill nor as the seed of the top-up. With every child
+	// prohibited the attribute is prohibited and not visited
+	// (attrProhibited), unless the BMM marks it mandatory: then it gets
+	// here and is built as one the OPT leaves silent.
 	children := allowedChildren(attr)
 	if len(children) == 0 {
 		// Implicit / OPT-silent multi-valued attribute. A required one
