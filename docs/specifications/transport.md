@@ -370,7 +370,7 @@ type BearerChallenge struct {
     ErrorDescription string
     ErrorURI         string
     Scope            string            // the scope the resource server says the request needs
-    Params           map[string]string // every other auth-param verbatim, e.g. resource_metadata (RFC 9728)
+    Params           map[string]string // every other auth-param, names in lower case, e.g. resource_metadata (RFC 9728)
 }
 ```
 

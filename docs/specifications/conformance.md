@@ -109,7 +109,7 @@ For a backend-facing probe, a mode absent from its **Modes** line is an open gap
 
 **Known gaps.**
 
-- The auth probes (PROBE-001 to PROBE-009) and the discovery probes (PROBE-040, PROBE-041) start their own `httptest` server from a fixture instead of receiving an already-configured client, so their **Modes** lines claim Cassette and Live modes the runner cannot yet serve them in.
+- The auth probes (PROBE-001 to PROBE-009) and the discovery probes (PROBE-040, PROBE-041) start their own `httptest` server from a fixture instead of receiving an already-configured client, so their **Modes** lines claim Cassette and Live modes the runner cannot yet serve them in. PROBE-106 starts its own server the same way, and a Cassette or Live mode would need that probe rewritten to take a configured client.
 - `probe.ParseModes` refuses the spelling `Sandbox; Cassette, Live not yet scoped.` with `ErrInvalidEntry`, and four entries use it (PROBE-062, PROBE-078, PROBE-102, PROBE-103).
 - `TestREQ082ProbeClassMatchesModes` classifies only the probes that have a `ProbeNNN` function under `testkit/probes`. The **Modes** lines of in-repo probes implemented as unit tests elsewhere are checked by review alone.
 
