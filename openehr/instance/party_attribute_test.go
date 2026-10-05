@@ -1,9 +1,11 @@
 package instance_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
@@ -144,5 +146,28 @@ func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 				checkBothValidators(t, call, out, c)
 			}
 		})
+	}
+}
+
+// TestREQ107_PinnedActorLanguagesAreRefused is the REQ-107 check that a
+// PERSON template that pins languages makes Generate return an error
+// wrapping rmwrite.ErrUnknownAttribute, and no root, at either policy and
+// either value fill. The generator does not write ACTOR languages: the
+// template validator matches a multi-valued attribute's members by
+// archetype_node_id, which a DV_TEXT lacks, so it would reject every
+// member written.
+func TestREQ107_PinnedActorLanguagesAreRefused(t *testing.T) {
+	c := compileOPTText(t, guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
+		guardMultiple("languages", guardExistence11,
+			guardChild("C_COMPLEX_OBJECT", "DV_TEXT", "", guardOccurrences11, ""))), true)
+	for _, opts := range guardOptions() {
+		call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+		out, err := instance.Generate(t.Context(), c, opts)
+		if !errors.Is(err, rmwrite.ErrUnknownAttribute) {
+			t.Errorf("%s error = %v, want one wrapping rmwrite.ErrUnknownAttribute", call, err)
+		}
+		if out != nil {
+			t.Errorf("%s returned %T, want no root", call, out)
+		}
 	}
 }

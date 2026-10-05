@@ -29,10 +29,16 @@ func partyCommonWrites() []partyWrite {
 	}
 }
 
-// actorWrites adds the ACTOR attribute rmwrite builds a member for.
-func actorWrites() []partyWrite {
-	return append(partyCommonWrites(),
-		partyWrite{attr: "languages", multi: true, child: &rm.DVText{Value: "nl"}, field: "Languages"})
+// actorRefused are the ACTOR attributes rmwrite leaves unwritten: the
+// template validator matches a multi-valued attribute's members by
+// archetype_node_id, and a DV_TEXT language or a PARTY_REF role has none.
+func actorRefused() []partyWrite {
+	return []partyWrite{
+		{attr: "languages", multi: true, child: &rm.DVText{Value: "nl"}},
+		{attr: "roles", multi: true, child: &rm.PartyRef{
+			ID: &rm.HierObjectID{Value: "00000000-0000-0000-0000-000000000001"}, Namespace: "local", Type: "ROLE",
+		}},
+	}
 }
 
 // roleWrites adds the attributes ROLE declares beyond PARTY.
@@ -50,18 +56,20 @@ func roleWrites() []partyWrite {
 // the generator can give a party template root its RM-mandatory
 // identities and a ROLE its performer, and on CAPABILITY, so a ROLE's
 // capability can carry its RM-mandatory credentials. An attribute the
-// class does not have stays ErrUnknownAttribute.
+// class does not have stays ErrUnknownAttribute, and so do ACTOR languages
+// and roles, which rmwrite leaves unwritten.
 func TestREQ107_PartyParentsAddressTheirAttributes(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		class  string
-		parent func() any
-		writes []partyWrite
+		class   string
+		parent  func() any
+		writes  []partyWrite
+		refused []partyWrite
 	}{
-		{class: "PERSON", parent: func() any { return &rm.Person{} }, writes: actorWrites()},
-		{class: "AGENT", parent: func() any { return &rm.Agent{} }, writes: actorWrites()},
-		{class: "GROUP", parent: func() any { return &rm.Group{} }, writes: actorWrites()},
-		{class: "ORGANISATION", parent: func() any { return &rm.Organisation{} }, writes: actorWrites()},
+		{class: "PERSON", parent: func() any { return &rm.Person{} }, writes: partyCommonWrites(), refused: actorRefused()},
+		{class: "AGENT", parent: func() any { return &rm.Agent{} }, writes: partyCommonWrites(), refused: actorRefused()},
+		{class: "GROUP", parent: func() any { return &rm.Group{} }, writes: partyCommonWrites(), refused: actorRefused()},
+		{class: "ORGANISATION", parent: func() any { return &rm.Organisation{} }, writes: partyCommonWrites(), refused: actorRefused()},
 		{class: "ROLE", parent: func() any { return &rm.Role{} }, writes: roleWrites()},
 		{class: "CAPABILITY", parent: func() any { return &rm.Capability{} }, writes: []partyWrite{
 			{attr: "name", child: &rm.DVText{Value: "capability"}, field: "Name"},
@@ -93,6 +101,11 @@ func TestREQ107_PartyParentsAddressTheirAttributes(t *testing.T) {
 			for _, write := range []func(any, string, string, any) error{EnsureSingle, AppendMultiple} {
 				if err := write(tc.parent(), tc.class, "not_an_attribute", &rm.DVText{Value: "x"}); !errors.Is(err, ErrUnknownAttribute) {
 					t.Errorf("write(%s, not_an_attribute) = %v, want ErrUnknownAttribute", tc.class, err)
+				}
+			}
+			for _, w := range tc.refused {
+				if err := AppendMultiple(tc.parent(), tc.class, w.attr, w.child); !errors.Is(err, ErrUnknownAttribute) {
+					t.Errorf("AppendMultiple(%s, %q) = %v, want ErrUnknownAttribute", tc.class, w.attr, err)
 				}
 			}
 		})
