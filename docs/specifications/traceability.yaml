@@ -1118,6 +1118,7 @@ requirements:
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/interval_open_side_test.go
       - openehr/validation/rmread/interval_void_test.go
+      - openehr/validation/rmread/read_demographic_test.go
       - openehr/validation/rmread/read_test.go
       - openehr/validation/walk_primitive_test.go
       - testkit/probes/validation/probe_025_composition_validate.go
@@ -1379,6 +1380,7 @@ requirements:
       - openehr/validation/rmread/interval_void_test.go
       - openehr/validation/rmread/read_archetyped_test.go
       - openehr/validation/rmread/read_datavalues_test.go
+      - openehr/validation/rmread/read_demographic_test.go
       - openehr/validation/rmread/read_ordered_test.go
       - openehr/validation/rmread/read_test.go
       - openehr/validation/strand14_nonchaining_test.go
