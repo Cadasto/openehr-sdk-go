@@ -26,8 +26,9 @@ import (
 // root type.
 //
 // The walk is template-driven: the compiled OPT drives traversal,
-// rmwrite materialises RM values, and primitive leaves call
-// PrimitiveConstraint.ExampleValue. The returned root is typed as
+// rmwrite materialises RM values, and primitive leaves are valued as
+// [Options.ValueFill] says: the constraint's example value, or an
+// in-constraint draw. The returned root is typed as
 // any; use [AsComposition], [AsObservation], etc. for the concrete
 // access path.
 //
@@ -170,7 +171,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		g.finishNode(optNode, rmValue)
 		return nil
 	}
-	// Primitive leaves: ExampleValue if policy allows, then return —
+	// Primitive leaves: valued as the ValueFill says, then return —
 	// the primitive's RM-mandatory child attributes are implicitly
 	// captured by the value (e.g. DV_QUANTITY embeds magnitude and
 	// units). Validation v2 does not descend into primitive subtrees
@@ -233,13 +234,13 @@ func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAt
 
 // shouldVisit decides whether an attribute is in scope under the
 // current policy. Under Example: every attribute. Under Minimal:
-// every attribute that is required (BMM-mandatory OR existence ≥ 1)
-// OR has OPT-pinned children. The "has OPT children" arm captures
-// the case where the OPT explicitly constrains a structurally
-// optional attribute (e.g. COMPOSITION.content with archetype-root
-// pins) — the act of pinning is itself a signal that the resulting
-// tree should carry those children even under the smallest viable
-// build.
+// every attribute that is required (BMM-mandatory OR existence ≥ 1),
+// whose cardinality lower bound is 1 or more, OR that has OPT-pinned
+// children. The "has OPT children" arm captures the case where the
+// OPT explicitly constrains a structurally optional attribute (e.g.
+// COMPOSITION.content with archetype-root pins) — the act of pinning
+// is itself a signal that the resulting tree should carry those
+// children even under the smallest viable build.
 func (g *generator) shouldVisit(attr *tcimpl.CompiledAttribute) bool {
 	if g.opts.Policy == Example {
 		return true

@@ -8,16 +8,24 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// Policy controls how much of the OPT tree is materialised.
+// Policy controls how much of the OPT tree is materialised. Under
+// either policy the generator never visits an attribute the RM computes
+// rather than stores (offset on POINT_EVENT and INTERVAL_EVENT,
+// is_integral on DV_QUANTITY and DV_PROPORTION), and [ValueFill], not
+// the policy, decides how a primitive leaf is valued.
 type Policy int
 
 const (
-	// Minimal materialises only attributes with existence lower ≥ 1
-	// and BMM-mandatory implicits. Smallest valid tree.
+	// Minimal materialises an attribute only when its existence lower
+	// bound is bounded and at least 1, the BMM marks it mandatory, its
+	// cardinality lower bound is bounded and at least 1, or the OPT pins
+	// children under it. Another generator rule can need more, such as
+	// the RM rule that an ELEMENT carry a value or a null_flavour, or the
+	// uid of an entry. Smallest valid tree.
 	Minimal Policy = iota
-	// Example materialises Minimal plus every primitive leaf
-	// populated with its PrimitiveConstraint.ExampleValue. Suited to
-	// fixtures.
+	// Example visits every attribute, the optional ones the OPT names
+	// included, and values every primitive leaf the way the ValueFill in
+	// force says. Suited to fixtures.
 	Example
 )
 
