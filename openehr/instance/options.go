@@ -85,11 +85,12 @@ type Options struct {
 	// ErrComposerRequired. Non-COMPOSITION roots ignore it.
 	Composer rm.PartyProxy
 
-	// Now is the clock for EVENT.time / EventContext.start_time
-	// defaults. Zero value falls back to time.Now() inside Generate so
-	// callers that don't pin the clock get a sensible default; tests pin
-	// it for determinism. Generate writes every date-time it takes from
-	// Now in UTC, whatever zone Now carries.
+	// Now is the clock for every date-time the OPT leaves unset and no
+	// primitive constraint values, such as HISTORY.origin, EVENT.time,
+	// ACTION.time and EventContext.start_time. Zero value falls back to
+	// time.Now() inside Generate so callers that don't pin the clock get
+	// a sensible default; tests pin it for determinism. Generate writes
+	// every date-time it takes from Now in UTC, whatever zone Now carries.
 	Now time.Time
 
 	// UIDSource is the optional generator for LOCATABLE.uid values.

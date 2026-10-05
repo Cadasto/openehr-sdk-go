@@ -74,9 +74,10 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	if err != nil {
 		return nil, fmt.Errorf("Generate: root %q: %w", rootType, err)
 	}
-	// A data-value root gets the primitive default a child of its type
-	// gets when it is built, so a root and a nested value of one type get
-	// the same placeholder. No-op for a root that is not a data value.
+	// A data-value or code-phrase root gets the primitive default a child
+	// of its type gets when it is built, so a root and a nested value of
+	// one type get the same placeholder. It does nothing for any other
+	// root.
 	g.populatePrimitiveDefault(root)
 
 	// The root carries the template_id; nested archetype roots only

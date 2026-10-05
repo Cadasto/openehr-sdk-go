@@ -13,6 +13,11 @@ import (
 // Options.Now is read as the current time: a date-time the generator takes
 // from the clock lies between the time before and after the call, and is
 // written in UTC as RFC 3339, which has whole seconds.
+//
+// The UTC check cannot fail on a host whose local zone is UTC, because the
+// current time is then already in UTC. TestREQ107_RootPlaceholders and
+// TestREQ107_GeneratedDateTimesInUTC catch a date-time written in the
+// zone of Now on any host: they set Now two hours east of UTC.
 func TestREQ107_ZeroNowIsCurrentTime(t *testing.T) {
 	cases := []struct {
 		name     string
