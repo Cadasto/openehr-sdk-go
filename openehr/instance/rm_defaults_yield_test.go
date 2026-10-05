@@ -184,12 +184,29 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
+			// With its null flavour prohibited, the ELEMENT takes a value
+			// instead (TestREQ107_ProhibitedNullFlavourTakesAValue).
 			name: "ELEMENT null_flavour, prohibited",
 			opt:  optTemplate("ELEMENT", optProhibitedSingle("null_flavour")),
 			check: func(t *testing.T, out any) {
-				if nf := out.(*rm.Element).NullFlavour; nf != nil {
-					t.Errorf("ELEMENT.null_flavour = %+v, want none", nf)
+				el := out.(*rm.Element)
+				if el.NullFlavour != nil {
+					t.Errorf("ELEMENT.null_flavour = %+v, want none", el.NullFlavour)
 				}
+				if el.Value == nil || rm.IsTypedNil(el.Value) {
+					t.Errorf("ELEMENT.value absent, want the value an ELEMENT takes in place of a prohibited null flavour")
+				}
+			},
+		},
+		{
+			name: "ELEMENT null_flavour, C_CODE_PHRASE local",
+			opt:  optTemplate("ELEMENT", optSingle("null_flavour", optCodedText("local"))),
+			check: func(t *testing.T, out any) {
+				el := out.(*rm.Element)
+				if el.NullFlavour == nil {
+					t.Fatal("ELEMENT.null_flavour absent, want the walk's local::at0000")
+				}
+				checkCode(t, "ELEMENT.null_flavour", el.NullFlavour.DefiningCode, localAt0000)
 			},
 		},
 		{
