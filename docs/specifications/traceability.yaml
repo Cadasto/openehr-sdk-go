@@ -1218,6 +1218,8 @@ requirements:
       - internal/templateinstance/rmwrite/write_text_like_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/instance/accessors_test.go
+      - openehr/instance/archetype_root_guard_internal_test.go
+      - openehr/instance/archetype_root_guard_test.go
       - openehr/instance/element_rule_test.go
       - openehr/instance/element_slot_test.go
       - openehr/instance/imports_test.go
@@ -1250,6 +1252,7 @@ requirements:
       - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/instance/probe_027_generated_validates.go
       - testkit/probes/instance/probes_test.go
+      - testkit/probes/instance/ratchet_categories_test.go
       - testkit/probes/instance/t_archetype_root_test.go
       - testkit/probes/template/constraint_fixtures_test.go
 
@@ -1352,6 +1355,7 @@ requirements:
       - openehr/internal/rmnames
     probes: [PROBE-081]
     tests:
+      - internal/rmroots/rmroots_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/temporal_iso_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
