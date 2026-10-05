@@ -86,6 +86,39 @@ func TestReadRole(t *testing.T) {
 	}
 }
 
+// TestREQ112_ReadRolePerformer is the REQ-112 and REQ-102 check that the
+// reader sees ROLE.performer, which the RM makes mandatory: a PARTY_REF
+// with its id, namespace and type reads as present, so the floor and the
+// template validator accept it, and one missing any of the three reads as
+// absent, so they report it, as for a PARTY_RELATIONSHIP's source and
+// target. Both the pointer and the value form of ROLE are read.
+func TestREQ112_ReadRolePerformer(t *testing.T) {
+	full := func() rm.PartyRef {
+		return rm.PartyRef{ID: &rm.HierObjectID{Value: "00000000-0000-0000-0000-000000000001"}, Namespace: "local", Type: "PERSON"}
+	}
+	cases := []struct {
+		name      string
+		performer rm.PartyRef
+		present   bool
+	}{
+		{name: "full reference", performer: full(), present: true},
+		{name: "empty reference", performer: rm.PartyRef{}, present: false},
+		{name: "no id", performer: func() rm.PartyRef { r := full(); r.ID = nil; return r }(), present: false},
+		{name: "no namespace", performer: func() rm.PartyRef { r := full(); r.Namespace = ""; return r }(), present: false},
+		{name: "no type", performer: func() rm.PartyRef { r := full(); r.Type = ""; return r }(), present: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			role := rm.Role{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ROLE.role.v1", Performer: tc.performer}
+			for _, v := range []any{&role, role} {
+				if _, ok := rmread.ReadSingle(v, "ROLE", "performer"); ok != tc.present {
+					t.Errorf("ReadSingle(%T, performer) ok=%v, want %v", v, ok, tc.present)
+				}
+			}
+		})
+	}
+}
+
 func TestReadContactAndAddress(t *testing.T) {
 	c := &rm.Contact{
 		ArchetypeNodeID: "openEHR-DEMOGRAPHIC-CONTACT.person.v1",
