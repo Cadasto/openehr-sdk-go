@@ -241,11 +241,12 @@ func compositionDefaultOwns(class, attrName string) bool {
 
 // visits decides whether the walk descends into attr of optNode. Under
 // either policy it never visits an attribute the OPT prohibits (an
-// existence of 0..0), whatever children the OPT names under it, nor one
-// the RM computes rather than stores (offset on POINT_EVENT and
-// INTERVAL_EVENT, is_integral on DV_QUANTITY and DV_PROPORTION): the
-// generator has nothing to write there. Any other attribute is visited
-// when the policy says so (shouldVisit).
+// existence of 0..0) that no RM rule needs (attrProhibited), whatever
+// children the OPT names under it, nor one the RM computes rather than
+// stores (offset on POINT_EVENT and INTERVAL_EVENT, is_integral on
+// DV_QUANTITY and DV_PROPORTION): the generator has nothing to write
+// there. Any other attribute is visited when the policy says so
+// (shouldVisit).
 func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	if attrProhibited(attr) {
 		return false
@@ -1775,8 +1776,8 @@ func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
 }
 
 // prohibited reports whether the OPT prohibits attrName of opt with an
-// existence of 0..0. opt is nil for a value built from the BMM alone,
-// which no OPT constrains.
+// existence of 0..0 and no RM rule needs it (attrProhibited). opt is nil
+// for a value built from the BMM alone, which no OPT constrains.
 func prohibited(opt *tcimpl.CompiledNode, attrName string) bool {
 	if opt == nil {
 		return false

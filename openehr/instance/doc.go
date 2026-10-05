@@ -20,8 +20,10 @@
 //
 // # Policies
 //
-// Under either policy the generator does not visit an attribute the
-// template prohibits (an existence of 0..0), nor one the RM computes
+// Under either policy the generator skips an attribute the template
+// prohibits (an existence of 0..0), unless an RM rule needs it, such as
+// an attribute the BMM marks mandatory, which it then writes as one the
+// template leaves silent; and it never visits one the RM computes
 // rather than stores (offset on an event, is_integral on DV_QUANTITY
 // and DV_PROPORTION).
 //
@@ -31,8 +33,8 @@
 //     children under it, unless another rule needs more, such as the
 //     RM rule that an ELEMENT carry a value or a null flavour. Smallest
 //     valid tree.
-//   - Example: every other attribute is visited. Useful for fixtures
-//     and demos.
+//   - Example: every attribute the visit rule allows is visited.
+//     Useful for fixtures and demos.
 //
 // Under both, every primitive leaf the walk reaches is valued as
 // [Options.ValueFill] says: the constraint's example value under

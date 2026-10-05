@@ -9,11 +9,12 @@ import (
 )
 
 // Policy controls how much of the OPT tree is materialised. Under
-// either policy the generator never visits an attribute the OPT
-// prohibits (an existence of 0..0), nor one the RM computes rather than
-// stores (offset on POINT_EVENT and INTERVAL_EVENT, is_integral on
-// DV_QUANTITY and DV_PROPORTION), and [ValueFill], not the policy,
-// decides how a primitive leaf is valued.
+// either policy the generator skips an attribute the OPT prohibits (an
+// existence of 0..0), unless an RM rule needs it, such as an attribute
+// the BMM marks mandatory, and never visits one the RM computes rather
+// than stores (offset on POINT_EVENT and INTERVAL_EVENT, is_integral on
+// DV_QUANTITY and DV_PROPORTION). [ValueFill], not the policy, decides
+// how a primitive leaf is valued.
 type Policy int
 
 const (
@@ -24,9 +25,9 @@ const (
 	// the RM rule that an ELEMENT carry a value or a null_flavour, or the
 	// uid of an entry. Smallest valid tree.
 	Minimal Policy = iota
-	// Example visits every attribute, the optional ones the OPT names
-	// included, and values every primitive leaf the way the ValueFill in
-	// force says. Suited to fixtures.
+	// Example visits every attribute the visit rule allows, the
+	// optional ones the OPT names included, and values every primitive
+	// leaf the way the ValueFill in force says. Suited to fixtures.
 	Example
 )
 
