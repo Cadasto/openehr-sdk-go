@@ -1230,6 +1230,7 @@ requirements:
       - openehr/instance/accessors_test.go
       - openehr/instance/archetype_root_guard_internal_test.go
       - openehr/instance/archetype_root_guard_test.go
+      - openehr/instance/clock_defaults_test.go
       - openehr/instance/clock_test.go
       - openehr/instance/code_phrase_terminology_internal_test.go
       - openehr/instance/code_phrase_terminology_test.go
