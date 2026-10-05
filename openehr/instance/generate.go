@@ -612,11 +612,30 @@ func attrType(parentType, declared string) string {
 
 // settleBuilt gives a value built from the BMM alone, which the walk
 // never reaches, the RM default finishNode gives a walked one where no
-// other pass does: an ISM_TRANSITION's current state.
+// other pass does: an ISM_TRANSITION's current state, and a party's
+// name.
 func settleBuilt(v any) {
-	if iv, ok := v.(*rm.IsmTransition); ok {
-		fillCurrentState(nil, iv)
+	switch b := v.(type) {
+	case *rm.IsmTransition:
+		fillCurrentState(nil, b)
+	case *rm.PartyIdentified:
+		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
+	case *rm.PartyRelated:
+		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
 	}
+}
+
+// fillPartyName gives a PARTY_IDENTIFIED, or a PARTY_RELATED, with no
+// name, identifiers or external_ref the name "example", so RM
+// Basic_validity holds. The RM rule wins over the OPT, whether the OPT
+// prohibits name or Minimal would not visit it; a name the walk wrote,
+// one a C_STRING admits, stays.
+func fillPartyName(name **string, identifiers int, externalRef *rm.PartyRef) {
+	if *name != nil || identifiers > 0 || externalRef != nil {
+		return
+	}
+	example := "example"
+	*name = &example
 }
 
 // populatePrimitiveDefault stamps a minimal-valid sentinel on a
@@ -710,25 +729,61 @@ func (g *generator) temporalSentinel(v any) string {
 
 // writeBMMString stores a BMM String attribute. A field that already
 // holds a value is left alone: populatePrimitiveDefault may have set
-// a clock or a code before this pass. An empty value of a temporal
-// data value takes its temporal sentinel, so it stays a valid ISO 8601
-// value; every other empty string keeps the open-string example
-// sentinel.
+// a clock or a code before this pass. The value is bmmStringDefault's.
+// It is written through stringField's setter where that covers the
+// attribute, which reaches the String attributes the template-instance
+// writer has no field for (a text's formatting, a code phrase's
+// preferred_term, a quantity's magnitude_status, a party's name), and
+// through the writer otherwise.
 func (g *generator) writeBMMString(parent any, parentType, attr string) {
-	cur, known := stringAttr(parent, attr)
-	if known && cur != "" {
+	get, set, covered := stringField(parent, attr)
+	if covered && get() != "" {
 		return
 	}
-	val := "example"
-	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
-		val = s
+	val, ok := g.bmmStringDefault(parent, attr)
+	if !ok {
+		return
+	}
+	if covered {
+		set(val)
+		return
 	}
 	// Best-effort, on purpose: the write is refused for a String
-	// attribute rmwrite does not address (TERMINOLOGY_ID.value, a
-	// locatable's archetype_node_id), and those are filled by another
-	// default or reported by the validator. Returning the error would
-	// fail Generate on every OPT.
+	// attribute rmwrite does not address (a locatable's
+	// archetype_node_id), which another default fills or the validator
+	// reports. Returning the error would fail Generate on every OPT.
 	_ = rmwrite.EnsureSingle(parent, parentType, attr, val)
+}
+
+// bmmStringDefault is the value writeBMMString gives an empty String
+// attribute attr of parent: a temporal value's sentinel, so it stays a
+// valid ISO 8601 value; "=" for a quantity's magnitude_status, the value
+// its RM invariant Magnitude_status_valid admits; a PARTY_REF's own
+// defaults (partyRef); and the open-string example otherwise. ok is false
+// for a TERMINOLOGY_ID's value, which stays empty: the code phrase it
+// belongs to keeps the terminology it already carries
+// (replacesTerminology).
+func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
+	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
+		return s, true
+	}
+	switch parent.(type) {
+	case *rm.DVQuantity:
+		if attr == "magnitude_status" {
+			return "=", true
+		}
+	case *rm.TerminologyID:
+		return "", false
+	case *rm.PartyRef:
+		def := partyRef(nil)
+		switch attr {
+		case "namespace":
+			return def.Namespace, true
+		case "type":
+			return def.Type, true
+		}
+	}
+	return "example", true
 }
 
 // stringAttr reads a BMM String field the generator itself writes.
@@ -743,9 +798,10 @@ func stringAttr(parent any, attr string) (string, bool) {
 
 // stringField returns a reader and a writer for the BMM String attribute
 // attr of parent. It covers every String attribute of the data values the
-// generator builds, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value
-// and a PARTY_REF's namespace and type, so the walk writes a C_STRING the
-// OPT pins on any of them. A pin on a PARTY_REF holds where the reference
+// generator builds, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value,
+// a PARTY_REF's namespace and type, and a PARTY_IDENTIFIED's or
+// PARTY_RELATED's name, so the walk writes a C_STRING the OPT pins on any
+// of them. A pin on a PARTY_REF holds where the reference
 // can be attached and no later default replaces it: a ROLE's performer
 // keeps it, because fillPerformer fills only the empty parts. A template
 // that names a PARTY_RELATIONSHIP's source or target makes Generate fail
@@ -821,6 +877,14 @@ func stringField(parent any, attr string) (get func() string, set func(string), 
 			return requiredString(&p.Namespace)
 		case "type":
 			return requiredString(&p.Type)
+		}
+	case *rm.PartyIdentified:
+		if attr == "name" {
+			return optionalString(&p.Name)
+		}
+	case *rm.PartyRelated:
+		if attr == "name" {
+			return optionalString(&p.Name)
 		}
 	}
 	return nil, nil, false
@@ -1753,6 +1817,10 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		g.fillPartyRelationship(opt, v)
 	case *rm.Role:
 		fillPerformer(&v.Performer)
+	case *rm.PartyIdentified:
+		fillPartyName(&v.Name, len(v.Identifiers), v.ExternalRef)
+	case *rm.PartyRelated:
+		fillPartyName(&v.Name, len(v.Identifiers), v.ExternalRef)
 	case *rm.Element:
 		g.settleElement(opt, v)
 	case *rm.DVEHRURI:
