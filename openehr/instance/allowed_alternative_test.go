@@ -214,3 +214,62 @@ func TestREQ107_IncludedFlagFromAllowedAlternative(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_CurrentStateDefaultReadsTheWalkedAlternative is the REQ-107
+// check that an ISM_TRANSITION's current_state takes its RM default,
+// openehr 524|initial|, where the alternative the walk builds (the first
+// allowed one) gives no code, whatever code a later alternative names: a
+// later alternative is not the OPT's value for the attribute. Where the
+// walked alternative names a code, the walk writes it and no default
+// replaces it. It holds under both policies, both value fills and both
+// compile modes.
+func TestREQ107_CurrentStateDefaultReadsTheWalkedAlternative(t *testing.T) {
+	cases := []struct {
+		name         string
+		currentState string
+		want         string
+	}{
+		{
+			name:         "bare coded text, then 526",
+			currentState: optNode("DV_CODED_TEXT", "") + optCodedText(terminology.ID, "526"),
+			want:         "524",
+		},
+		{
+			name:         "coded text with no code, then 526",
+			currentState: optCodedText(terminology.ID) + optCodedText(terminology.ID, "526"),
+			want:         "524",
+		},
+		{
+			name: "nested code phrase with no code, then 526",
+			currentState: optNode("DV_CODED_TEXT", "", optSingle("defining_code",
+				optCodePhrase(terminology.ID), optCodePhrase(terminology.ID, "526"))),
+			want: "524",
+		},
+		{
+			name:         "526, then a bare coded text",
+			currentState: optCodedText(terminology.ID, "526") + optNode("DV_CODED_TEXT", ""),
+			want:         "526",
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, yieldAction("", "", tc.currentState), implicit)
+			for _, opts := range defaultsOptions() {
+				opts.Language, opts.Territory, opts.Composer = "en", "NL", testComposer()
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					cs := out.(*rm.Action).IsmTransition.CurrentState
+					if tc.want == "524" {
+						checkOpenEHRCode(t, "ISM_TRANSITION.current_state", cs, terminology.InstructionStates, tc.want)
+						return
+					}
+					checkCode(t, "ISM_TRANSITION.current_state", cs.DefiningCode,
+						rm.CodePhrase{CodeString: tc.want, TerminologyID: rm.TerminologyID{Value: terminology.ID}})
+				})
+			}
+		}
+	}
+}
