@@ -37,12 +37,16 @@ func contentOPT(lower int) string {
 // attribute the template leaves without children, whose default would be an
 // archetype root, is refused with ErrArchetypeIDMissing. An optional one is
 // not refused, and the generator builds nothing for it, so no archetype
-// root appears without archetype_details.
+// root appears without archetype_details. The refusal wraps neither
+// ErrSlotFillUnsupported nor ErrConstraintUnsatisfiable.
 //
-// No single attribute of the pinned RM has a default that is an archetype
-// root (TestREQ107_SingleAttributeDefaultsAreNoArchetypeRoot), so no
-// template reaches this path. The test hands it COMPOSITION.content
-// instead, whose default is an OBSERVATION.
+// No attribute the pinned RM declares single-valued has a default that is
+// an archetype root (TestREQ107_SingleAttributeDefaultsAreNoArchetypeRoot).
+// A template reaches this path when it writes a multi-valued attribute such
+// as COMPOSITION.content as a C_SINGLE_ATTRIBUTE, which the external
+// TestREQ107_UnnamedArchetypeRootIsRefused covers through Generate. This
+// test hands the path COMPOSITION.content directly, whose default is an
+// OBSERVATION, so the optional case can count what the path builds.
 func TestREQ107_ImplicitSingleArchetypeRootRefusedWhenRequired(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -89,6 +93,11 @@ func TestREQ107_ImplicitSingleArchetypeRootRefusedWhenRequired(t *testing.T) {
 			if !errors.Is(err, ErrArchetypeIDMissing) {
 				t.Fatalf("materialiseImplicitSingle(required content) = %v, want an error wrapping ErrArchetypeIDMissing", err)
 			}
+			for _, other := range []error{ErrSlotFillUnsupported, ErrConstraintUnsatisfiable} {
+				if errors.Is(err, other) {
+					t.Errorf("materialiseImplicitSingle(required content) = %v, want it not to wrap %v", err, other)
+				}
+			}
 			if got, ok := strings.CutPrefix(err.Error(), ErrArchetypeIDMissing.Error()+": "); !ok || got != tc.detail {
 				t.Errorf("materialiseImplicitSingle(required content) = %q, want %q followed by %q", err, ErrArchetypeIDMissing, tc.detail)
 			}
@@ -96,12 +105,14 @@ func TestREQ107_ImplicitSingleArchetypeRootRefusedWhenRequired(t *testing.T) {
 	}
 }
 
-// TestREQ107_SingleAttributeDefaultsAreNoArchetypeRoot pins why no template
-// reaches the archetype-root refusal on the single-attribute path of the
-// generator's BMM fill (REQ-107). For every single-valued attribute rminfo
-// knows, the value the generator builds for the attribute's RM type, by the
-// mapping that path uses, is not of an archetype-root class. A BMM bump that
-// breaks this makes the refusal reachable and fails here.
+// TestREQ107_SingleAttributeDefaultsAreNoArchetypeRoot pins that only a
+// template that writes a multi-valued attribute as single reaches the
+// archetype-root refusal on the single-attribute path of the generator's
+// BMM fill (REQ-107). For every attribute rminfo knows as single-valued,
+// the value the generator builds for the attribute's RM type, by the
+// mapping that path uses, is not of an archetype-root class. A BMM bump
+// that breaks this makes the refusal reachable from a well-formed template
+// and fails here.
 func TestREQ107_SingleAttributeDefaultsAreNoArchetypeRoot(t *testing.T) {
 	lister, ok := rminfo.Default.(rminfo.AttributeLister)
 	if !ok {

@@ -11,15 +11,16 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
-// The OPTs below are small COMPOSITION templates for the REQ-107 rule on
-// archetype roots: an object of a class that is always an archetype root
-// needs an archetype id from the template, or the generator refuses it.
-// Each template differs from the others only in its root's archetype id and
-// in its content attribute.
+// The OPTs below are small templates for the REQ-107 rule on archetype
+// roots: an object of a class that is always an archetype root needs an
+// archetype id from the template, or the generator refuses it. Most are
+// COMPOSITION templates that differ only in their root's archetype id and in
+// their content attribute.
 
 const (
 	guardExistence11 = `<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +
@@ -44,9 +45,9 @@ const (
 	guardObservationID = "openEHR-EHR-OBSERVATION.example.v1"
 )
 
-// guardOPT is a COMPOSITION template with one content attribute. An empty
-// rootArchetypeID leaves the archetype id off the template root.
-func guardOPT(rootArchetypeID, content string) string {
+// guardRootOPT is a template whose root is of rmType and holds attrs. An
+// empty rootArchetypeID leaves the archetype id off the template root.
+func guardRootOPT(rmType, rootArchetypeID string, attrs ...string) string {
 	id := ""
 	if rootArchetypeID != "" {
 		id = `<archetype_id><value>` + rootArchetypeID + `</value></archetype_id>`
@@ -55,8 +56,14 @@ func guardOPT(rootArchetypeID, content string) string {
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
 <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
 <template_id><value>archetype_root_guard</value></template_id><concept>archetype_root_guard</concept>
-<definition><rm_type_name>COMPOSITION</rm_type_name><node_id>at0000</node_id>` + content + id + `</definition>
+<definition><rm_type_name>` + rmType + `</rm_type_name><node_id>at0000</node_id>` + strings.Join(attrs, "") + id + `</definition>
 </template>`
+}
+
+// guardOPT is a COMPOSITION template with one content attribute. An empty
+// rootArchetypeID leaves the archetype id off the template root.
+func guardOPT(rootArchetypeID, content string) string {
+	return guardRootOPT("COMPOSITION", rootArchetypeID, content)
 }
 
 // guardMultiple is a C_MULTIPLE_ATTRIBUTE called name with the given
@@ -64,6 +71,13 @@ func guardOPT(rootArchetypeID, content string) string {
 func guardMultiple(name, existence string, children ...string) string {
 	return `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
 		existence + guardOpenCardinality + strings.Join(children, "") + `</attributes>`
+}
+
+// guardSingle is a C_SINGLE_ATTRIBUTE called name with the given existence
+// and children.
+func guardSingle(name, existence string, children ...string) string {
+	return `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
+		existence + strings.Join(children, "") + `</attributes>`
 }
 
 // guardChild is an OPT child of the given xsi:type and RM type. An empty
@@ -100,26 +114,72 @@ func guardOptions() []instance.Options {
 	return out
 }
 
+// guardRootClasses are the classes whose objects are always archetype
+// roots, and guardEntryClasses the concrete ENTRY classes among them. Both
+// lists are checked against internal/rmroots and rminfo, so a class the
+// shared list gains or loses fails the test until the lists follow.
+var (
+	guardRootClasses = []string{
+		"ACTION", "ADMIN_ENTRY", "AGENT", "COMPOSITION", "EHR_ACCESS", "EHR_STATUS", "EVALUATION",
+		"GROUP", "INSTRUCTION", "OBSERVATION", "ORGANISATION", "PERSON", "ROLE",
+	}
+	guardEntryClasses = []string{"ACTION", "ADMIN_ENTRY", "EVALUATION", "INSTRUCTION", "OBSERVATION"}
+)
+
+// checkGuardClasses fails t unless guardRootClasses names exactly the
+// classes rminfo knows that rmroots.IsArchetypeRoot accepts, and
+// guardEntryClasses exactly the concrete descendants of ENTRY.
+func checkGuardClasses(t *testing.T) {
+	t.Helper()
+	var roots []string
+	for _, name := range rminfo.Default.KnownRMTypes() {
+		if rmroots.IsArchetypeRoot(name) {
+			roots = append(roots, name)
+		}
+	}
+	if !slices.Equal(roots, guardRootClasses) {
+		t.Fatalf("archetype-root classes rminfo knows = %v, want %v", roots, guardRootClasses)
+	}
+	hierarchy, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		t.Fatal("rminfo.Default does not answer class-hierarchy questions")
+	}
+	if entries, _ := hierarchy.ConcreteDescendants("ENTRY"); !slices.Equal(entries, guardEntryClasses) {
+		t.Fatalf("concrete ENTRY classes = %v, want %v", entries, guardEntryClasses)
+	}
+}
+
+// guardCase is one row of TestREQ107_UnnamedArchetypeRootIsRefused.
+type guardCase struct {
+	name string
+	opt  string
+	// detail is what the error says after the sentinel's own text; ""
+	// marks a control row, which must generate.
+	detail string
+	// check, when set, replaces the RM-floor check on a control row's
+	// output.
+	check func(t *testing.T, call string, out any)
+}
+
 // TestREQ107_UnnamedArchetypeRootIsRefused is the REQ-107 check that an
 // object of an archetype-root class (an ENTRY, a COMPOSITION, a PARTY,
 // EHR_STATUS or EHR_ACCESS) for which the OPT names no archetype id makes
 // Generate return an error wrapping ErrArchetypeIDMissing, and no root, at
 // either policy and either value fill. That covers an OPT node without an
 // archetype id, a required attribute the OPT leaves without children, and
-// the template root. The error names the RM type and the OPT path, and it
-// wraps neither ErrSlotFillUnsupported nor ErrConstraintUnsatisfiable.
+// the template root. It runs every archetype-root class as the template
+// root and every ENTRY class as a content child. The error names the RM
+// type and the OPT path, and it wraps neither ErrSlotFillUnsupported nor
+// ErrConstraintUnsatisfiable.
 //
 // The control rows still generate, and their output passes the RM floor:
 // an entry the OPT names, and an optional content attribute the OPT leaves
-// silent, which gets no child at all.
+// silent, written as multiple or as single, which gets no child at all. A
+// required slot is no such node: the slot-fill rule stamps it with the
+// RM-type-prefix archetype id instead.
 func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
-	cases := []struct {
-		name string
-		opt  string
-		// detail is what the error says after the sentinel's own text; ""
-		// marks a control row, which must generate.
-		detail string
-	}{
+	checkGuardClasses(t)
+	cases := []guardCase{
 		{
 			name: "content child of an unknown xsi:type",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
@@ -127,16 +187,10 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			detail: "OBSERVATION at /content[at0000]",
 		},
 		{
-			name: "C_COMPLEX_OBJECT entry without an archetype id",
+			name: "archetype id under an xsi:type the parser does not recognise",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
-				guardChild("C_COMPLEX_OBJECT", "OBSERVATION", "at0000", guardOccurrences11, ""))),
+				guardChild("ARCHETYPE_ROOT", "OBSERVATION", "at0000", guardOccurrences11, guardObservationID))),
 			detail: "OBSERVATION at /content[at0000]",
-		},
-		{
-			name: "abstract ENTRY without an archetype id",
-			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
-				guardChild("C_COMPLEX_OBJECT", "ENTRY", "at0000", guardOccurrences11, ""))),
-			detail: "ENTRY (built as OBSERVATION) at /content[at0000]",
 		},
 		{
 			name: "abstract CONTENT_ITEM without an archetype id",
@@ -150,17 +204,16 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			detail: "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)",
 		},
 		{
+			name:   "required content written as a single attribute without children",
+			opt:    guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
+			detail: "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)",
+		},
+		{
 			name: "required SECTION items the template leaves without children",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
 				guardChild("C_COMPLEX_OBJECT", "SECTION", "at0001", guardOccurrences11, "",
 					guardMultiple("items", guardExistence11)))),
 			detail: "OBSERVATION for SECTION.items at /content[at0001] (required, but the template names no child)",
-		},
-		{
-			name: "template root without an archetype id",
-			opt: guardOPT("", guardMultiple("content", guardExistence11,
-				guardChild("C_ARCHETYPE_ROOT", "OBSERVATION", "at0000", guardOccurrences11, guardObservationID))),
-			detail: "COMPOSITION at / (the template root)",
 		},
 		{
 			name: "optional content whose only child is an unnamed entry",
@@ -177,6 +230,35 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			name: "control: optional content the template leaves silent",
 			opt:  guardOPT(guardCompositionID, guardMultiple("content", guardExistence01)),
 		},
+		{
+			name: "control: optional content written as a single attribute and left silent",
+			opt:  guardOPT(guardCompositionID, guardSingle("content", guardExistence01)),
+		},
+		{
+			name: "control: a required slot of an entry class with no includes",
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+				guardChild("ARCHETYPE_SLOT", "OBSERVATION", "at0000", guardOccurrences11, ""))),
+			check: checkSlotFallbackStamp,
+		},
+	}
+	for _, class := range guardRootClasses {
+		cases = append(cases, guardCase{
+			name:   "template root " + class + " without an archetype id",
+			opt:    guardRootOPT(class, ""),
+			detail: class + " at / (the template root)",
+		})
+	}
+	for _, class := range append(slices.Clone(guardEntryClasses), "ENTRY", "CARE_ENTRY") {
+		detail := class + " at /content[at0000]"
+		if class == "ENTRY" || class == "CARE_ENTRY" {
+			detail = class + " (built as OBSERVATION) at /content[at0000]"
+		}
+		cases = append(cases, guardCase{
+			name: "content child " + class + " without an archetype id",
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+				guardChild("C_COMPLEX_OBJECT", class, "at0000", guardOccurrences11, ""))),
+			detail: detail,
+		})
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -187,6 +269,10 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 				if tc.detail == "" {
 					if err != nil {
 						t.Fatalf("%s: %v, want a root", call, err)
+					}
+					if tc.check != nil {
+						tc.check(t, call, out)
+						continue
 					}
 					if r := validation.ValidateRM(out); !r.OK {
 						t.Errorf("%s: ValidateRM issues %+v, want none", call, r.Issues)
@@ -199,6 +285,33 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// checkSlotFallbackStamp fails t unless out is a COMPOSITION whose first
+// content item carries the RM-type-prefix archetype id the slot-fill rule
+// gives a slot without parsed includes, as its node id and in its
+// archetype_details.
+func checkSlotFallbackStamp(t *testing.T, call string, out any) {
+	t.Helper()
+	const want = "openEHR-EHR-OBSERVATION.example.v1"
+	comp, err := instance.AsComposition(out)
+	if err != nil {
+		t.Fatalf("%s: AsComposition: %v", call, err)
+	}
+	if len(comp.Content) == 0 {
+		t.Fatalf("%s: content is empty, want the stamped slot fill", call)
+	}
+	item, ok := comp.Content[0].(rm.Locatable)
+	if !ok {
+		t.Fatalf("%s: content[0] is %T, want a LOCATABLE", call, comp.Content[0])
+	}
+	if got := item.GetArchetypeNodeID(); got != want {
+		t.Errorf("%s: content[0].archetype_node_id = %q, want %q", call, got, want)
+	}
+	ad := item.GetArchetypeDetails()
+	if ad == nil || ad.ArchetypeID.Value != want {
+		t.Errorf("%s: content[0].archetype_details = %+v, want archetype_id %q", call, ad, want)
 	}
 }
 
