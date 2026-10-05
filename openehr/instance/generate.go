@@ -1557,8 +1557,10 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.IsmTransition:
 		fillCurrentState(opt, v)
 	case *rm.Cluster:
-		g.ensureItems(opt, &v.Items)
-	case *rm.ItemTree:
+		// CLUSTER.items is RM-mandatory. ITEM_TREE.items and ITEM_LIST.items
+		// are optional, so they get no member here: the walk gives them one
+		// when the OPT requires it, and none when the OPT leaves them
+		// optional.
 		g.ensureItems(opt, &v.Items)
 	case *rm.PartyRelationship:
 		g.fillPartyRelationship(v)
@@ -1566,10 +1568,6 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		fillPerformer(&v.Performer)
 	case *rm.Element:
 		settleElement(v)
-	case *rm.ItemList:
-		if len(v.Items) == 0 {
-			v.Items = append(v.Items, *g.placeholderElement())
-		}
 	case *rm.Activity:
 		if v.ActionArchetypeID == "" {
 			v.ActionArchetypeID = "openEHR-EHR-ACTION.example.v1"

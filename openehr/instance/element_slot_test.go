@@ -35,9 +35,9 @@ func optMultipleLowerZero(name string, children ...string) string {
 //     so the top-up fill of the attribute walks the slot.
 //   - optional, CLUSTER: CLUSTER.items is mandatory in the RM, so the
 //     attribute is topped up to one item even with a lower bound of 0.
-//   - optional, ITEM_TREE: ITEM_TREE.items is optional in the RM, so nothing
-//     is appended while the attribute is walked and the RM floor fills the
-//     list from the slot afterwards.
+//
+// An optional slot in ITEM_TREE.items, which the RM makes optional, gets no
+// fill (TestREQ107_OptionalItemsGetNoMember).
 func TestREQ107_ElementSlotCarriesExactlyOneOfValueAndNullFlavour(t *testing.T) {
 	cases := []struct {
 		name string
@@ -45,7 +45,6 @@ func TestREQ107_ElementSlotCarriesExactlyOneOfValueAndNullFlavour(t *testing.T) 
 	}{
 		{"required slot", optTemplate("CLUSTER", optMultiple("items", optSlot("ELEMENT", "at9000")))},
 		{"optional slot", optTemplate("CLUSTER", optMultipleLowerZero("items", optSlot("ELEMENT", "at9000")))},
-		{"optional slot in ITEM_TREE", optTemplate("ITEM_TREE", optMultipleLowerZero("items", optSlot("ELEMENT", "at9000")))},
 	}
 	policies := []struct {
 		name string
@@ -73,11 +72,8 @@ func TestREQ107_ElementSlotCarriesExactlyOneOfValueAndNullFlavour(t *testing.T) 
 						t.Fatalf("Generate: %v", err)
 					}
 					var items []rm.Item
-					switch v := out.(type) {
-					case *rm.Cluster:
-						items = v.Items
-					case *rm.ItemTree:
-						items = v.Items
+					if cl, ok := out.(*rm.Cluster); ok {
+						items = cl.Items
 					}
 					if len(items) != 1 {
 						t.Fatalf("Generate = %T %+v, want one item, the slot fill", out, out)

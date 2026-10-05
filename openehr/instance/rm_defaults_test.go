@@ -122,8 +122,8 @@ var defaultsNow = time.Date(2021, 3, 4, 5, 6, 7, 0, time.UTC)
 // without children, so the generator's implicit fills supply them.
 var entryAttrs = []string{optSingle("language"), optSingle("encoding"), optSingle("subject")}
 
-// emptyTree is an ITEM_TREE the OPT names with no attributes, so its
-// items list is left to the generator.
+// emptyTree is an ITEM_TREE the OPT names with no attributes. Its items
+// list is optional in the RM, so the generator gives it no member.
 var emptyTree = optNode("ITEM_TREE", "at0001")
 
 // TestREQ107_RMDefaultsFillOPTSilentFields is the REQ-107 check that
@@ -163,14 +163,16 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 			},
 		},
 		{
-			name: "ITEM_TREE items",
+			// ITEM_TREE.items is optional in the RM and the OPT does not
+			// name it, so the tree gets no member.
+			name: "ITEM_TREE items stay empty",
 			opt: optTemplate("ACTION", append(entryAttrs,
 				optSingle("ism_transition", optNode("ISM_TRANSITION", "")),
 				optSingle("description", emptyTree))...),
 			check: func(t *testing.T, out any) {
 				tree, _ := out.(*rm.Action).Description.(*rm.ItemTree)
-				if tree == nil || len(tree.Items) != 1 || nodeID(tree.Items[0]) != "at0000" {
-					t.Errorf("ACTION.description = %+v, want an ITEM_TREE with one at0000 item", out.(*rm.Action).Description)
+				if tree == nil || len(tree.Items) != 0 {
+					t.Errorf("ACTION.description = %+v, want an ITEM_TREE with no items", out.(*rm.Action).Description)
 				}
 			},
 		},
@@ -185,12 +187,13 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 			},
 		},
 		{
-			name: "ITEM_LIST items",
+			// ITEM_LIST.items is optional in the RM and the OPT does not
+			// name it, so the list gets no member.
+			name: "ITEM_LIST items stay empty",
 			opt:  optTemplate("ITEM_LIST"),
 			check: func(t *testing.T, out any) {
-				l := out.(*rm.ItemList)
-				if len(l.Items) != 1 || l.Items[0].ArchetypeNodeID != "at0000" {
-					t.Errorf("ITEM_LIST.items = %+v, want one at0000 ELEMENT", l.Items)
+				if l := out.(*rm.ItemList); len(l.Items) != 0 {
+					t.Errorf("ITEM_LIST.items = %+v, want none", l.Items)
 				}
 			},
 		},

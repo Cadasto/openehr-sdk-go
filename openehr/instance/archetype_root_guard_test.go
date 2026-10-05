@@ -406,15 +406,15 @@ func TestREQ107_RequiredSlotFillPassesTheFloor(t *testing.T) {
 			},
 		},
 		slotCase{
-			name: "optional items slot of CLUSTER in an ITEM_TREE",
-			opt: guardRootOPT("ITEM_TREE", "", guardMultiple("items", guardExistence01,
+			name: "optional items slot of CLUSTER in a CLUSTER",
+			opt: guardRootOPT("CLUSTER", "", guardMultiple("items", guardExistence01,
 				guardChild("ARCHETYPE_SLOT", "CLUSTER", "at0001", guardOccurrences01, ""))),
 			rmType: "CLUSTER",
 			fill: func(t *testing.T, call string, out any) any {
 				t.Helper()
-				root, ok := out.(*rm.ItemTree)
+				root, ok := out.(*rm.Cluster)
 				if !ok || len(root.Items) != 1 {
-					t.Fatalf("%s returned %T %+v, want an ITEM_TREE with one item", call, out, out)
+					t.Fatalf("%s returned %T %+v, want a CLUSTER with one item", call, out, out)
 				}
 				return root.Items[0]
 			},
