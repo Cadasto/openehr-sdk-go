@@ -3,6 +3,7 @@ package instance_test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -15,19 +16,22 @@ var localPlaceholder = rm.CodePhrase{
 	TerminologyID: rm.TerminologyID{Value: "local"},
 }
 
-// nestedCodedTextValue is the text the generator writes on a nested
+// nestedTextValue is the text the generator writes on a nested DV_TEXT or
 // DV_CODED_TEXT the OPT gives no value: the open-string example.
-const nestedCodedTextValue = "example"
+const nestedTextValue = "example"
 
 // TestREQ107_RootPlaceholders is the REQ-107 check that a generation root
-// gets the same placeholders as a nested value: the URI ehr://example on a
-// DV_EHR_URI, the code at0000 in terminology local on a CODE_PHRASE, and
-// that code with the text of a nested one on a DV_CODED_TEXT. A code
+// gets the values a nested one gets: the URI ehr://example on a
+// DV_EHR_URI, the code at0000 in terminology local on a CODE_PHRASE, that
+// code and the nested text on a DV_CODED_TEXT, the nested text on a
+// DV_TEXT, and the clock, in UTC as RFC 3339, on a DV_DATE_TIME. A code
 // phrase whose OPT names a terminology keeps it. The root is compiled with
 // the implicit attributes, whose String attributes are filled by the pass
 // that writes the open-string example, and without them, when the root has
-// no attribute to walk.
+// no attribute to walk. Now is set east of UTC, so a value written in its
+// own zone fails.
 func TestREQ107_RootPlaceholders(t *testing.T) {
+	now := time.Date(2021, 3, 4, 7, 6, 7, 0, time.FixedZone("UTC+2", 2*60*60))
 	// The OPT names the terminology of a code phrase and no code.
 	snomed := optSingle("terminology_id", optNode("TERMINOLOGY_ID", "",
 		optSingle("value", optPrimitive("STRING", "C_STRING", "<list>SNOMED-CT</list>"))))
@@ -63,8 +67,26 @@ func TestREQ107_RootPlaceholders(t *testing.T) {
 				if ct.DefiningCode != localPlaceholder {
 					t.Errorf("DV_CODED_TEXT.defining_code = %+v, want %+v", ct.DefiningCode, localPlaceholder)
 				}
-				if ct.Value != nestedCodedTextValue {
-					t.Errorf("DV_CODED_TEXT.value = %q, want %q", ct.Value, nestedCodedTextValue)
+				if ct.Value != nestedTextValue {
+					t.Errorf("DV_CODED_TEXT.value = %q, want %q", ct.Value, nestedTextValue)
+				}
+			},
+		},
+		{
+			name: "DV_TEXT text",
+			root: "DV_TEXT",
+			check: func(t *testing.T, out any) {
+				if got := out.(*rm.DVText).Value; got != nestedTextValue {
+					t.Errorf("DV_TEXT.value = %q, want %q", got, nestedTextValue)
+				}
+			},
+		},
+		{
+			name: "DV_DATE_TIME value from the clock",
+			root: "DV_DATE_TIME",
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.DVDateTime).Value, now.UTC().Format(time.RFC3339); got != want {
+					t.Errorf("DV_DATE_TIME.value = %q, want %q", got, want)
 				}
 			},
 		},
@@ -85,7 +107,7 @@ func TestREQ107_RootPlaceholders(t *testing.T) {
 			c := compileOPTText(t, optTemplate(tc.root, tc.attrs...), implicit)
 			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
 				t.Run(fmt.Sprintf("%s/implicit=%t/%v", tc.name, implicit, policy), func(t *testing.T) {
-					out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+					out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: now})
 					if err != nil {
 						t.Fatalf("Generate: %v", err)
 					}
