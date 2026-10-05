@@ -21,8 +21,9 @@ import (
 // Deliberate widening vs the previous 18-arm switch:
 // every LOCATABLE concrete the template compiler can yield (FOLDER,
 // EHR_STATUS, the demographic PARTY family, …) now gets its identity
-// stamped rather than silently skipped; the uid policy below is
-// unchanged.
+// stamped rather than silently skipped. The uid goes on the classes
+// stampsUID names, from uidSource; a nil uidSource stamps none, for a
+// value whose OPT prohibits its uid (setLocatableIdentity).
 func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *rm.Archetyped, uidSource func() *rm.HierObjectID) {
 	m, ok := rmValue.(rm.MutableLocatable)
 	if !ok || rm.IsTypedNil(rmValue) {
@@ -33,13 +34,24 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 	if archetypeDetails != nil {
 		m.SetArchetypeDetails(archetypeDetails)
 	}
-	if stampsUID(rmValue) {
+	if uidSource != nil && stampsUID(rmValue) {
 		// Set-only-if-unset: an explicitly provided UID (e.g. a fixture
 		// replay) wins over the generator's uidSource.
 		if l := rmValue.(rm.Locatable); l.GetUID() == nil {
 			m.SetUID(uidSource())
 		}
 	}
+}
+
+// partyNeedsUID reports whether v is a PARTY, whose uid the RM needs
+// (PARTY Uid_mandatory), so the generator stamps it even where the OPT
+// prohibits uid.
+func partyNeedsUID(v any) bool {
+	switch v.(type) {
+	case *rm.Person, *rm.Organisation, *rm.Group, *rm.Agent, *rm.Role:
+		return true
+	}
+	return false
 }
 
 // stampsUID lists the classes whose generated instances carry a fresh

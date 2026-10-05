@@ -13,7 +13,7 @@ import (
 // reach this write.
 func TestREQ107_PartyRelationshipNodeIDPlaceholder(t *testing.T) {
 	rel := &rm.PartyRelationship{}
-	(&generator{}).fillPartyRelationship(rel)
+	(&generator{}).fillPartyRelationship(nil, rel)
 	if got := rel.GetArchetypeNodeID(); got != "at0000" {
 		t.Errorf("fillPartyRelationship: archetype_node_id = %q, want %q", got, "at0000")
 	}

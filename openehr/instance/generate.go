@@ -524,7 +524,7 @@ func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth
 	g.populatePrimitiveDefault(rmChild)
 	g.stampIfLocatable(rmChild, concrete)
 	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-		g.fillPartyRelationship(rel)
+		g.fillPartyRelationship(nil, rel)
 	}
 	// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE inside
 	// DV_CODED_TEXT) get filled.
@@ -1139,7 +1139,7 @@ func (g *generator) materialiseImplicitMultiple(
 		g.populatePrimitiveDefault(rmChild)
 		g.stampIfLocatable(rmChild, concreteFor(rmType))
 		if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-			g.fillPartyRelationship(rel)
+			g.fillPartyRelationship(nil, rel)
 		}
 		g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
 		_ = rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild)
@@ -1194,7 +1194,7 @@ func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 	}
 	g.setLocatableIdentity(child, rmChild, false /* isTemplateRoot */)
 	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-		g.fillPartyRelationship(rel)
+		g.fillPartyRelationship(child, rel)
 	}
 	return rmChild, nil
 }
@@ -1254,11 +1254,11 @@ func concreteFor(rmType string) string {
 	return rmType
 }
 
-// setLocatableIdentity stamps archetype_node_id, name, uid (when
-// mandated by RM), and archetype_details on the freshly-built RM
-// value. The isTemplateRoot flag controls whether template_id is
-// stamped on archetype_details — only the very top-level root
-// carries it.
+// setLocatableIdentity stamps archetype_node_id, name, uid (on the
+// classes stampsUID names, unless opt prohibits uid on one that is not a
+// PARTY), and archetype_details on the freshly-built RM value. The
+// isTemplateRoot flag controls whether template_id is stamped on
+// archetype_details — only the very top-level root carries it.
 func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, isTemplateRoot bool) {
 	if opt == nil || rmValue == nil {
 		return
@@ -1308,7 +1308,11 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 		archetypeDetails = ad
 	}
 
-	applyLocatableIdentity(rmValue, id, name, archetypeDetails, g.nextUID)
+	uidSource := g.nextUID
+	if prohibited(opt, "uid") && !partyNeedsUID(rmValue) {
+		uidSource = nil
+	}
+	applyLocatableIdentity(rmValue, id, name, archetypeDetails, uidSource)
 }
 
 // applyPrimitiveExample materialises a primitive leaf's ExampleValue
@@ -1701,7 +1705,7 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		// optional.
 		g.ensureItems(&v.Items)
 	case *rm.PartyRelationship:
-		g.fillPartyRelationship(v)
+		g.fillPartyRelationship(opt, v)
 	case *rm.Role:
 		fillPerformer(&v.Performer)
 	case *rm.Element:
@@ -1999,11 +2003,16 @@ func (g *generator) stampIfLocatable(rmValue any, rmType string) {
 	}
 }
 
-func (g *generator) fillPartyRelationship(rel *rm.PartyRelationship) {
+// fillPartyRelationship gives a PARTY_RELATIONSHIP what the RM requires
+// and the walk leaves empty: its node id, its uid unless the OPT
+// prohibits it, and a source and a target reference, each with an id
+// from Options.UIDSource. opt is the relationship's OPT node, or nil for
+// one built from the BMM alone.
+func (g *generator) fillPartyRelationship(opt *tcimpl.CompiledNode, rel *rm.PartyRelationship) {
 	if rel.GetArchetypeNodeID() == "" {
 		applyLocatableIdentity(rel, "at0000", "relationship", nil, g.nextUID)
 	}
-	if rel.GetUID() == nil {
+	if rel.GetUID() == nil && !prohibited(opt, "uid") {
 		rel.SetUID(g.nextUID())
 	}
 	if rel.Source.Namespace == "" || rel.Source.Type == "" || rel.Source.ID == nil {
