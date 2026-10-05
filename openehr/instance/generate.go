@@ -258,11 +258,14 @@ func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAt
 	return g.shouldVisit(attr)
 }
 
-// attrProhibited reports whether the OPT prohibits attr: its existence
-// upper bound is bounded and 0.
+// attrProhibited reports whether the OPT prohibits attr, with an
+// existence upper bound that is bounded and 0, and no RM rule needs it.
+// An attribute the BMM marks mandatory is never prohibited: the RM rule
+// wins over the prohibition, so it is visited and filled as an attribute
+// the OPT leaves silent is.
 func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 	e := attr.Existence()
-	return e != nil && !e.UpperUnbounded() && e.Upper() == 0
+	return e != nil && !e.UpperUnbounded() && e.Upper() == 0 && !attr.Required()
 }
 
 // shouldVisit decides whether an attribute is in scope under the
@@ -1696,7 +1699,7 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		// are optional, so they get no member here: the walk gives them one
 		// when the OPT requires it, and none when the OPT leaves them
 		// optional.
-		g.ensureItems(opt, &v.Items)
+		g.ensureItems(&v.Items)
 	case *rm.PartyRelationship:
 		g.fillPartyRelationship(v)
 	case *rm.Role:
@@ -1862,11 +1865,10 @@ func stringAdmitted(attr *tcimpl.CompiledAttribute, s string) bool {
 // ensureItems puts the placeholder ELEMENT in an RM-mandatory items list
 // the walk left empty: a slot fill's, whose body the OPT does not
 // describe. A list the OPT itself sizes is filled by the walk, from its
-// OPT children or from its BMM type, and is never empty here, unless the
-// OPT prohibits items; the list then stays empty, though the RM requires
-// a member.
-func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
-	if len(*items) > 0 || prohibited(opt, "items") {
+// OPT children or from its BMM type, and is never empty here, a
+// prohibited one included, since the RM requires a member.
+func (g *generator) ensureItems(items *[]rm.Item) {
+	if len(*items) > 0 {
 		return
 	}
 	*items = append(*items, g.placeholderElement())
@@ -1891,10 +1893,10 @@ func (g *generator) placeholderElement() *rm.Element {
 // "no information" when it has none, or one with no code (noCode), unless
 // the OPT's constraint on null_flavour rejects that code (codeAdmitted).
 // Where a code-phrase constraint rejects it, the walk's null flavour stays.
-// Where the OPT prohibits null_flavour, the RM rule wins over Minimal: the
-// ELEMENT takes a value built as for an ELEMENT.value the OPT leaves
-// silent, unless the OPT prohibits value as well, a template the RM
-// rule cannot hold for. A null flavour with a code keeps it, and takes the
+// Where the OPT prohibits null_flavour, the RM rule wins: the ELEMENT
+// takes a value built as for an ELEMENT.value the OPT leaves silent, or,
+// where the OPT prohibits value as well, the null flavour "no information"
+// all the same. A null flavour with a code keeps it, and takes the
 // pinned rubric of that code when the code is in the openEHR null flavours
 // group. opt is the OPT node of e, or nil for an ELEMENT built from the
 // BMM alone.
@@ -1912,7 +1914,18 @@ func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 		e.NullFlavour = nf
 		return
 	}
-	if e.NullFlavour == nil && !prohibited(opt, "value") && g.fillElementValue(e) {
+	if e.NullFlavour != nil {
+		return
+	}
+	// The OPT prohibits null_flavour, and the RM rule that an ELEMENT
+	// carry one of value and null_flavour wins: a value as for a silent
+	// ELEMENT.value, or, where the OPT prohibits value too, the null
+	// flavour after all.
+	if prohibited(opt, "value") {
+		e.NullFlavour = noInformation()
+		return
+	}
+	if g.fillElementValue(e) {
 		e.NullReason = nil
 	}
 }
