@@ -55,21 +55,19 @@ func TestREQ107_NamedNullFlavourWithoutCodeGetsNoInformation(t *testing.T) {
 // takes a value built as for an ELEMENT.value the OPT leaves silent: the
 // RM rule that an ELEMENT carry exactly one of value and null_flavour wins
 // over Minimal. A null_reason the walk wrote then goes, because an ELEMENT
-// with a value carries none. Where the OPT prohibits value as well, the
-// template contradicts the RM, and the ELEMENT carries neither.
+// with a value carries none. Where the OPT prohibits value as well, the RM
+// rule wins over that prohibition too, with the null flavour (the
+// both-prohibited row of TestREQ107_RMDefaultsYieldToTheOPT).
 func TestREQ107_ProhibitedNullFlavourTakesAValue(t *testing.T) {
 	cases := []struct {
-		name      string
-		attrs     []string
-		wantValue bool
+		name  string
+		attrs []string
 	}{
-		{name: "null_flavour prohibited", attrs: []string{optProhibitedSingle("null_flavour")}, wantValue: true},
+		{name: "null_flavour prohibited", attrs: []string{optProhibitedSingle("null_flavour")}},
 		{
-			name:      "null_flavour prohibited, null_reason named",
-			attrs:     []string{optProhibitedSingle("null_flavour"), optOptionalSingle("null_reason")},
-			wantValue: true,
+			name:  "null_flavour prohibited, null_reason named",
+			attrs: []string{optProhibitedSingle("null_flavour"), optOptionalSingle("null_reason")},
 		},
-		{name: "null_flavour and value prohibited", attrs: []string{optProhibitedSingle("null_flavour"), optProhibitedSingle("value")}},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
@@ -84,12 +82,8 @@ func TestREQ107_ProhibitedNullFlavourTakesAValue(t *testing.T) {
 					if el.NullFlavour != nil {
 						t.Errorf("ELEMENT.null_flavour = %+v, want none: the OPT prohibits it", el.NullFlavour)
 					}
-					hasValue := el.Value != nil && !rm.IsTypedNil(el.Value)
-					if hasValue != tc.wantValue {
-						t.Fatalf("ELEMENT.value present = %t, want %t", hasValue, tc.wantValue)
-					}
-					if !tc.wantValue {
-						return
+					if el.Value == nil || rm.IsTypedNil(el.Value) {
+						t.Fatal("ELEMENT.value absent, want the value built in place of the null flavour")
 					}
 					if el.NullReason != nil {
 						t.Errorf("ELEMENT.null_reason = %+v, want none beside a value", el.NullReason)

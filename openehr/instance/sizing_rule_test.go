@@ -72,7 +72,7 @@ func itemIDs(t *testing.T, out any) []string {
 // child whose occurrences upper bound is 0 gets no member of a
 // multi-valued attribute: not from the per-child fill, and not as the
 // seed of the top-up to the cardinality lower bound. A CLUSTER whose items
-// the OPT prohibits gets no member at all, not even from finishNode. It
+// the OPT prohibits still gets its members: the RM requires them. It
 // holds under both policies, both value fills and both compile modes. A
 // slot is not covered: the template parser keeps no occurrences for an
 // ARCHETYPE_SLOT.
@@ -84,9 +84,6 @@ func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 		// valid says the template validator must find no error; the
 		// CLUSTER whose only child is prohibited contradicts the RM.
 		valid bool
-		// floorExempt marks a template that prohibits what the RM
-		// requires, whose output the RM floor rejects.
-		floorExempt bool
 	}{
 		{
 			name: "per-child fill",
@@ -110,13 +107,12 @@ func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 			want: []string{"at0000"},
 		},
 		{
-			// The OPT prohibits items, which the RM requires: the
-			// generator yields, so the list stays empty and the RM floor
-			// reports it.
-			name:        "CLUSTER items prohibited, an ELEMENT child",
-			opt:         optTemplate("CLUSTER", optProhibitedMultiple("items", optNode("ELEMENT", "at0001"))),
-			want:        []string{},
-			floorExempt: true,
+			// The OPT prohibits items, which the RM requires: the RM rule
+			// wins, and the walk fills the list as it would an allowed one.
+			name:  "CLUSTER items prohibited, an ELEMENT child",
+			opt:   optTemplate("CLUSTER", optProhibitedMultiple("items", optNode("ELEMENT", "at0001"))),
+			want:  []string{"at0001"},
+			valid: true,
 		},
 	}
 	for _, tc := range cases {
@@ -131,9 +127,7 @@ func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 					if got := itemIDs(t, out); !slices.Equal(got, tc.want) {
 						t.Errorf("items = %v, want %v", got, tc.want)
 					}
-					if !tc.floorExempt {
-						noFloorErrors(t, out)
-					}
+					noFloorErrors(t, out)
 					if !tc.valid {
 						return
 					}

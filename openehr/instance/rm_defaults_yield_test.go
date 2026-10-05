@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -131,11 +132,7 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 		// it reports rm_type_mismatch on a code phrase's terminology_id
 		// whatever the value, because it reads that attribute as a string.
 		validatorBlind bool
-		// requiredAt is the path of an RM-required attribute the OPT
-		// prohibits: the template validator reports it required there,
-		// and that is the only error the row allows.
-		requiredAt string
-		check      func(t *testing.T, out any)
+		check          func(t *testing.T, out any)
 	}{
 		{
 			name: "ENTRY language, C_CODE_PHRASE local",
@@ -247,26 +244,139 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 				checkCode(t, "INTERVAL_EVENT.math_function", out.(*rm.IntervalEvent[rm.ItemStructure]).MathFunction.DefiningCode, localAt0000)
 			},
 		},
+		// The rows marked RM wins prohibit an attribute the BMM marks
+		// mandatory: the RM rule wins over the prohibition, and the
+		// generator writes the attribute as it writes a silent one.
 		{
-			name:       "EVENT_CONTEXT start_time, prohibited",
-			opt:        optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optProhibitedSingle("start_time")))),
-			requiredAt: "/context/start_time",
+			name: "RM wins: EVENT_CONTEXT start_time, prohibited",
+			opt:  optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optProhibitedSingle("start_time")))),
 			check: func(t *testing.T, out any) {
-				if got := generatedComposition(t, out).Context.StartTime.Value; got != "" {
-					t.Errorf("EVENT_CONTEXT.start_time = %q, want none", got)
+				if got, want := generatedComposition(t, out).Context.StartTime.Value, defaultsNow.Format(time.RFC3339); got != want {
+					t.Errorf("EVENT_CONTEXT.start_time = %q, want the clock %q", got, want)
 				}
 			},
 		},
 		{
-			name: "ACTION time, prohibited",
+			name: "RM wins: ACTION time, prohibited",
 			opt: optTemplate("ACTION", optSingle("language"), optSingle("encoding"), optSingle("subject"),
 				optSingle("ism_transition", optNode("ISM_TRANSITION", "")), optSingle("description", emptyTree),
 				optProhibitedSingle("time")),
-			requiredAt: "/time",
 			check: func(t *testing.T, out any) {
-				if got := out.(*rm.Action).Time.Value; got != "" {
-					t.Errorf("ACTION.time = %q, want none", got)
+				if got, want := out.(*rm.Action).Time.Value, defaultsNow.Format(time.RFC3339); got != want {
+					t.Errorf("ACTION.time = %q, want the clock %q", got, want)
 				}
+			},
+		},
+		{
+			name: "RM wins: ENTRY language, prohibited",
+			opt: optTemplate("ACTION", optProhibitedSingle("language"), optSingle("encoding"), optSingle("subject"),
+				optSingle("ism_transition", optNode("ISM_TRANSITION", "")), optSingle("description", emptyTree)),
+			check: func(t *testing.T, out any) {
+				checkCode(t, "ACTION.language", out.(*rm.Action).Language, rm.CodePhrase{CodeString: "en", TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}})
+			},
+		},
+		{
+			name: "RM wins: ENTRY encoding, prohibited",
+			opt: optTemplate("ACTION", optSingle("language"), optProhibitedSingle("encoding"), optSingle("subject"),
+				optSingle("ism_transition", optNode("ISM_TRANSITION", "")), optSingle("description", emptyTree)),
+			check: func(t *testing.T, out any) {
+				checkCode(t, "ACTION.encoding", out.(*rm.Action).Encoding, rm.CodePhrase{CodeString: "UTF-8", TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}})
+			},
+		},
+		{
+			name: "RM wins: ISM_TRANSITION current_state, prohibited",
+			opt: optTemplate("ACTION", optSingle("language"), optSingle("encoding"), optSingle("subject"),
+				optSingle("ism_transition", optNode("ISM_TRANSITION", "", optProhibitedSingle("current_state"))),
+				optSingle("description", emptyTree)),
+			check: func(t *testing.T, out any) {
+				checkOpenEHRCode(t, "ISM_TRANSITION.current_state", out.(*rm.Action).IsmTransition.CurrentState, terminology.InstructionStates, "524")
+			},
+		},
+		{
+			name: "RM wins: COMPOSITION category, prohibited",
+			opt:  optTemplate("COMPOSITION", optProhibitedSingle("category")),
+			check: func(t *testing.T, out any) {
+				checkOpenEHRCode(t, "COMPOSITION.category", generatedComposition(t, out).Category, terminology.CompositionCategory, "433")
+			},
+		},
+		{
+			name: "RM wins: COMPOSITION language, prohibited",
+			opt:  optTemplate("COMPOSITION", optProhibitedSingle("language")),
+			check: func(t *testing.T, out any) {
+				checkCode(t, "COMPOSITION.language", generatedComposition(t, out).Language, rm.CodePhrase{CodeString: "en", TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}})
+			},
+		},
+		{
+			name: "RM wins: COMPOSITION territory, prohibited",
+			opt:  optTemplate("COMPOSITION", optProhibitedSingle("territory")),
+			check: func(t *testing.T, out any) {
+				checkCode(t, "COMPOSITION.territory", generatedComposition(t, out).Territory, rm.CodePhrase{CodeString: "NL", TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"}})
+			},
+		},
+		{
+			name: "RM wins: COMPOSITION composer, prohibited",
+			opt:  optTemplate("COMPOSITION", optProhibitedSingle("composer")),
+			check: func(t *testing.T, out any) {
+				if p, ok := generatedComposition(t, out).Composer.(*rm.PartyIdentified); !ok || p.Name == nil || *p.Name != *testComposer().Name {
+					t.Errorf("COMPOSITION.composer = %#v, want the Options composer", generatedComposition(t, out).Composer)
+				}
+			},
+		},
+		{
+			name: "RM wins: EVENT_CONTEXT setting, prohibited",
+			opt:  optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optProhibitedSingle("setting")))),
+			check: func(t *testing.T, out any) {
+				checkOpenEHRCode(t, "EVENT_CONTEXT.setting", setting(out), terminology.Setting, "238")
+			},
+		},
+		{
+			name: "RM wins: INTERVAL_EVENT math_function, prohibited",
+			opt: optTemplate("INTERVAL_EVENT", append([]string{optProhibitedSingle("math_function")},
+				intervalEventAttrs...)...),
+			check: func(t *testing.T, out any) {
+				checkOpenEHRCode(t, "INTERVAL_EVENT.math_function", out.(*rm.IntervalEvent[rm.ItemStructure]).MathFunction, terminology.EventMathFunction, "146")
+			},
+		},
+		{
+			name: "RM wins: DV_MULTIMEDIA media_type, prohibited",
+			opt:  yieldMultimedia(optProhibitedSingle("media_type")),
+			check: func(t *testing.T, out any) {
+				want := rm.CodePhrase{CodeString: "text/plain", TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}}
+				checkCode(t, "DV_MULTIMEDIA.media_type", rootElementValue[*rm.DVMultimedia](t, out).MediaType, want)
+			},
+		},
+		{
+			name: "RM wins: HISTORY origin, prohibited",
+			opt:  optTemplate("OBSERVATION", optSingle("data", optNode("HISTORY", "at0001", optProhibitedSingle("origin")))),
+			check: func(t *testing.T, out any) {
+				if got, want := out.(*rm.Observation).Data.Origin.Value, defaultsNow.Format(time.RFC3339); got != want {
+					t.Errorf("HISTORY.origin = %q, want the clock %q", got, want)
+				}
+			},
+		},
+		{
+			name: "RM wins: DV_TEXT value, prohibited",
+			opt:  optTemplate("ELEMENT", optSingle("value", optNode("DV_TEXT", "", optProhibitedSingle("value")))),
+			check: func(t *testing.T, out any) {
+				if got := rootElementValue[*rm.DVText](t, out).Value; got == "" {
+					t.Errorf("DV_TEXT.value is empty, want the silent default")
+				}
+			},
+		},
+		{
+			// value and null_flavour are both prohibited: the RM rule that
+			// an ELEMENT carry one of them wins, with the null flavour.
+			name: "RM wins: ELEMENT value and null_flavour, prohibited",
+			opt:  optTemplate("ELEMENT", optProhibitedSingle("null_flavour"), optProhibitedSingle("value")),
+			check: func(t *testing.T, out any) {
+				el := out.(*rm.Element)
+				if el.Value != nil {
+					t.Errorf("ELEMENT.value = %#v, want none", el.Value)
+				}
+				if el.NullFlavour == nil {
+					t.Fatal("ELEMENT.null_flavour absent, want openehr::271")
+				}
+				checkOpenEHRCode(t, "ELEMENT.null_flavour", *el.NullFlavour, terminology.NullFlavours, "271")
 			},
 		},
 		{
@@ -387,9 +497,6 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 						return
 					}
 					for _, iss := range templateErrors(out, c) {
-						if iss.Code == "required" && iss.Path == tc.requiredAt {
-							continue
-						}
 						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
 					}
 				})
