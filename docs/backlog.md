@@ -51,10 +51,7 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 
 ## openehr/instance
 - openehr/instance/rmtype.go · Generate refuses a generic non-interval rm_type_name such as POINT_EVENT<ITEM_TREE> with ErrUnknownRMType because newGenericRM builds only DV_INTERVAL instantiations, and the template validator reports the matching node as rm_type_mismatch (pinned by nonstorable_generic_test.go) · from: audit-2026-09
-- openehr/instance/generate.go · finishNode gives an empty ITEM_LIST an at0000 placeholder ELEMENT while CLUSTER and ITEM_TREE fill from the OPT child, so an ITEM_LIST whose OPT items are only an ELEMENT slot gets slot_fill at /items[at0000] from the template validator · from: audit-2026-09
-- openehr/instance/generate.go · ensureItems skips a child when makeChild, stampSlotFill or walkNode fails, so an unsatisfiable slot yields no ErrSlotFillUnsupported and CLUSTER.items can stay empty (latent, no vendored OPT reaches it) · from: audit-2026-09
 - openehr/instance/generate.go · an OPT-pinned context setting, ACTION current_state or INTERVAL_EVENT math_function keeps the DV_CODED_TEXT text example beside its code, as the category and null flavour did before their rubrics; each needs its own terminology group · from: chore/backlog-round3
-- openehr/instance/generate.go · when the OPT leaves ACTION.ism_transition silent, the BMM-built ISM_TRANSITION carries current_state local::at0000|example|, which breaks RM Current_state_valid because fillCurrentState runs only on nodes the walk visits; the floor does not evaluate that invariant · from: pr199
 - openehr/instance/locatable.go · a generated COMPOSITION carries a bare UUID uid (stampsUID); reported as refused by EHRbase 2.36.0 on commit while the same body without a uid commits (not re-run here) · from: pr199
 - openehr/instance/archetype_root_guard_test.go:298 · The unnamed non-root template-root check samples CLUSTER, SECTION, GENERIC_ENTRY, ELEMENT and ITEM_TREE, so a FOLDER-only regression that writes empty archetype_details stays green while that test still passes. · by: sdd-spec-conformance-reviewer · from: fix/generator-entry-archetype-details
 
