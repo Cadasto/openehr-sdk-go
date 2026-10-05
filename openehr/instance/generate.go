@@ -1589,7 +1589,7 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.Role:
 		fillPerformer(&v.Performer)
 	case *rm.Element:
-		settleElement(opt, v)
+		g.settleElement(opt, v)
 	case *rm.Activity:
 		if v.ActionArchetypeID == "" {
 			v.ActionArchetypeID = "openEHR-EHR-ACTION.example.v1"
@@ -1760,7 +1760,7 @@ func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
 func (g *generator) placeholderElement() *rm.Element {
 	el := &rm.Element{}
 	applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
-	settleElement(nil, el)
+	g.settleElement(nil, el)
 	return el
 }
 
@@ -1770,25 +1770,50 @@ func (g *generator) placeholderElement() *rm.Element {
 // and either null attribute, the null flavour and the null reason are both
 // dropped. An ELEMENT with no value, because the OPT constrains none or none
 // could be generated, keeps any null reason and gets the null flavour
-// "no information" when it has none, unless the OPT's constraint on
-// null_flavour rejects that code, as a prohibited null_flavour does
-// (codeAdmitted); it then has neither. A null flavour the OPT filled keeps
-// its code, and takes the pinned rubric of that code when the code is in
-// the openEHR null flavours group. opt is the OPT node of e, or nil for an
-// ELEMENT built from the BMM alone.
-func settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
+// "no information" when it has none, or one with no code (noCode), unless
+// the OPT's constraint on null_flavour rejects that code (codeAdmitted).
+// Where a code-phrase constraint rejects it, the walk's null flavour stays.
+// Where the OPT prohibits null_flavour, the RM rule wins over Minimal: the
+// ELEMENT takes a value built as for an ELEMENT.value the OPT leaves
+// silent, unless the OPT prohibits value as well, a template the RM
+// rule cannot hold for. A null flavour with a code keeps it, and takes the
+// pinned rubric of that code when the code is in the openEHR null flavours
+// group. opt is the OPT node of e, or nil for an ELEMENT built from the
+// BMM alone.
+func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 	if e.Value != nil && !rm.IsTypedNil(e.Value) {
 		e.NullFlavour = nil
 		e.NullReason = nil
 		return
 	}
-	if e.NullFlavour == nil {
-		if nf := noInformation(); codeAdmitted(opt, "null_flavour", nf.DefiningCode) {
-			e.NullFlavour = nf
-		}
+	if e.NullFlavour != nil && !noCode(e.NullFlavour.DefiningCode.CodeString) {
+		useGroupRubric(e.NullFlavour, terminology.NullFlavours)
 		return
 	}
-	useGroupRubric(e.NullFlavour, terminology.NullFlavours)
+	if nf := noInformation(); codeAdmitted(opt, "null_flavour", nf.DefiningCode) {
+		e.NullFlavour = nf
+		return
+	}
+	if e.NullFlavour == nil && !prohibited(opt, "value") && g.fillElementValue(e) {
+		e.NullReason = nil
+	}
+}
+
+// fillElementValue gives e the value the generator builds for an
+// ELEMENT.value the OPT leaves silent: a default of the attribute's BMM
+// type. It reports whether it wrote one.
+func (g *generator) fillElementValue(e *rm.Element) bool {
+	rmType, ok := rminfo.Default.AttributeRMType("ELEMENT", "value")
+	if !ok {
+		return false
+	}
+	value, err := newRMForOPTType(rmType)
+	if err != nil {
+		return false
+	}
+	g.populatePrimitiveDefault(value)
+	g.populateBMMRequiredAttrs(value, concreteFor(rmType), 0)
+	return rmwrite.EnsureSingle(e, "ELEMENT", "value", value) == nil
 }
 
 // useGroupRubric sets the text of a coded text to the pinned rubric of its
@@ -1846,7 +1871,7 @@ func (g *generator) stampIfLocatable(rmValue any, rmType string) {
 	}
 	applyLocatableIdentity(rmValue, "at0000", name, nil, g.nextUID)
 	if el, ok := rmValue.(*rm.Element); ok {
-		settleElement(nil, el)
+		g.settleElement(nil, el)
 	}
 }
 
