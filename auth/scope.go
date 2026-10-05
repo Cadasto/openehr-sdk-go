@@ -29,12 +29,15 @@ const (
 // scope string of the shape "<compartment>/<resource>.<permission>", after
 // trimming surrounding white space from each part.
 //
-// Empty parts collapse to omitted segments: BuildScope("", "launch", "")
-// returns "launch". BuildScope does not validate its parts against any
-// scope grammar, so it also serves SMART on FHIR scopes such as
-// BuildScope("patient", "Observation", "rs"); use [OpenEHRScope] for
-// checked openEHR resource scopes. The deployment decides which scopes it
-// accepts.
+// An empty compartment or permission is left out together with its
+// separator. An empty resource is kept, separator included.
+// BuildScope("patient", "", "rs") returns "patient/.rs",
+// BuildScope("patient", "", "") returns "patient/", and
+// BuildScope("", "launch", "") returns "launch". BuildScope does not
+// validate its parts against any scope grammar, so it also serves SMART
+// on FHIR scopes such as BuildScope("patient", "Observation", "rs"); use
+// [OpenEHRScope] for checked openEHR resource scopes. The deployment
+// decides which scopes it accepts.
 //
 // Callers can pass raw scopes to providers when they need shapes
 // BuildScope does not cover.
