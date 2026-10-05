@@ -198,11 +198,14 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 			},
 		},
 		{
+			// The compiled ACTIVITY carries no action_archetype_id, a BMM
+			// String the generator fills as an attribute the OPT leaves
+			// silent, so RM Action_archetype_id_valid (not empty) holds.
 			name: "ACTIVITY action_archetype_id",
 			opt:  optTemplate("ACTIVITY", optSingle("description", emptyTree)),
 			check: func(t *testing.T, out any) {
-				if got := out.(*rm.Activity).ActionArchetypeID; got != "openEHR-EHR-ACTION.example.v1" {
-					t.Errorf("ACTIVITY.action_archetype_id = %q, want openEHR-EHR-ACTION.example.v1", got)
+				if got := out.(*rm.Activity).ActionArchetypeID; got == "" {
+					t.Errorf("ACTIVITY.action_archetype_id is empty, want a value")
 				}
 			},
 		},

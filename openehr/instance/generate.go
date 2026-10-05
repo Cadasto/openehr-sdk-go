@@ -201,10 +201,42 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 			}
 		}
 	}
+	g.fillUncarriedRequired(optNode, rmValue)
 	orderIntervalBounds(optNode, rmValue)
 	settleIntervalEndpoints(optNode, rmValue)
 	g.finishNode(optNode, rmValue)
 	return nil
+}
+
+// fillUncarriedRequired fills each attribute the BMM marks mandatory on
+// rmValue's class that optNode does not carry, as under
+// templatecompile.WithoutImplicitAttributes, the way an attribute the OPT
+// leaves silent is filled. An attribute optNode carries is the walk's
+// business, a prohibited one included. A COMPOSITION's language,
+// territory, composer and category are left to applyCompositionDefaults,
+// as materialiseImplicitSingle leaves them.
+func (g *generator) fillUncarriedRequired(optNode *tcimpl.CompiledNode, rmValue any) {
+	class := bmmtype.Class(rmTypeOf(rmValue))
+	for _, attrName := range rminfo.Default.RequiredAttributes(class) {
+		if optNode.Attribute(attrName) != nil || compositionDefaultOwns(class, attrName) {
+			continue
+		}
+		g.fillBMMAttr(rmValue, class, attrName, 0)
+	}
+}
+
+// compositionDefaultOwns reports whether attrName of class is one
+// applyCompositionDefaults fills, from Options or its RM default, so no
+// generic default is built for it first.
+func compositionDefaultOwns(class, attrName string) bool {
+	if class != "COMPOSITION" {
+		return false
+	}
+	switch attrName {
+	case "language", "territory", "composer", "category", "context":
+		return true
+	}
+	return false
 }
 
 // visits decides whether the walk descends into attr of optNode. Under
@@ -358,16 +390,13 @@ func (g *generator) materialiseImplicitSingle(
 	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
-	if optNode.RMTypeName() == "COMPOSITION" {
-		switch attr.Name() {
-		case "language", "territory", "composer", "category", "context":
-			return nil
-		}
+	if compositionDefaultOwns(optNode.RMTypeName(), attr.Name()) {
+		return nil
 	}
 	if g.fillEntryCode(optNode, parentRM, optNode.RMTypeName(), attr.Name()) {
 		return nil
 	}
-	rmType := attr.RMTypeName()
+	rmType := attrType(optNode.RMTypeName(), attr.RMTypeName())
 	if rmType == "" {
 		return nil
 	}
@@ -406,6 +435,7 @@ func (g *generator) materialiseImplicitSingle(
 	// requires.
 	g.stampIfLocatable(rmChild, concreteFor(rmType))
 	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
+	settleBuilt(rmChild)
 	if replacesTerminology(parentRM, attr.Name(), rmChild) {
 		return nil
 	}
@@ -432,47 +462,92 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 		return
 	}
 	for _, attrName := range rminfo.Default.RequiredAttributes(parentRMType) {
-		// Skip identity / link metadata we already stamped or never
-		// validate as "required".
-		switch attrName {
-		case "archetype_node_id", "name", "uid", "archetype_details",
-			"links", "feeder_audit":
-			continue
-		}
-		rmType, ok := rminfo.Default.AttributeRMType(parentRMType, attrName)
-		if !ok || rmType == "" {
-			continue
-		}
-		if g.fillEntryCode(nil, parent, parentRMType, attrName) {
-			continue
-		}
-		isContainer, _ := rminfo.Default.IsContainer(parentRMType, attrName)
-		if rmType == "String" {
-			g.writeBMMString(parent, parentRMType, attrName)
-			continue
-		}
-		concrete := concreteFor(rmType)
-		rmChild, err := rmwrite.NewRM(concrete)
-		if err != nil {
-			continue
-		}
-		g.populatePrimitiveDefault(rmChild)
-		g.stampIfLocatable(rmChild, concrete)
-		if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-			g.fillPartyRelationship(rel)
-		}
-		// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE
-		// inside DV_CODED_TEXT) get filled.
-		g.populateBMMRequiredAttrs(rmChild, concrete, depth+1)
-		// Best-effort attach: a default the slot rejects (a polymorphic
-		// attribute the BMM cannot narrow) is left to the validator, as in
-		// materialiseImplicitSingle.
-		switch {
-		case isContainer:
-			_ = rmwrite.AppendMultiple(parent, parentRMType, attrName, rmChild)
-		case !replacesTerminology(parent, attrName, rmChild):
-			_ = rmwrite.EnsureSingle(parent, parentRMType, attrName, rmChild)
-		}
+		g.fillBMMAttr(parent, parentRMType, attrName, depth)
+	}
+}
+
+// fillBMMAttr builds a default for attrName of parent from its BMM type
+// alone, fills that default's own BMM-mandatory attributes, and attaches
+// it. A multi-valued attribute gets one member. Identity and link
+// metadata is skipped: the generator stamps it, or the RM does not
+// require it.
+func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth int) {
+	switch attrName {
+	case "archetype_node_id", "name", "uid", "archetype_details",
+		"links", "feeder_audit":
+		return
+	}
+	rmType, ok := rminfo.Default.AttributeRMType(parentRMType, attrName)
+	if !ok || rmType == "" {
+		return
+	}
+	rmType = attrType(parentRMType, rmType)
+	if g.fillEntryCode(nil, parent, parentRMType, attrName) {
+		return
+	}
+	isContainer, _ := rminfo.Default.IsContainer(parentRMType, attrName)
+	if rmType == "String" {
+		g.writeBMMString(parent, parentRMType, attrName)
+		return
+	}
+	concrete := concreteFor(rmType)
+	rmChild, err := rmwrite.NewRM(concrete)
+	if err != nil {
+		return
+	}
+	g.populatePrimitiveDefault(rmChild)
+	g.stampIfLocatable(rmChild, concrete)
+	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
+		g.fillPartyRelationship(rel)
+	}
+	// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE inside
+	// DV_CODED_TEXT) get filled.
+	g.populateBMMRequiredAttrs(rmChild, concrete, depth+1)
+	settleBuilt(rmChild)
+	// Best-effort attach: a default the slot rejects (a polymorphic
+	// attribute the BMM cannot narrow) is left to the validator, as in
+	// materialiseImplicitSingle.
+	switch {
+	case isContainer:
+		_ = rmwrite.AppendMultiple(parent, parentRMType, attrName, rmChild)
+	case !replacesTerminology(parent, attrName, rmChild):
+		_ = rmwrite.EnsureSingle(parent, parentRMType, attrName, rmChild)
+	}
+}
+
+// builtTypeArgument is the type argument the typereg constructor gives a
+// generic class the generator builds from its bare name: a HISTORY or an
+// event is built over ITEM_STRUCTURE. An abstract EVENT is built as a
+// POINT_EVENT (concreteFor).
+var builtTypeArgument = map[string]string{
+	"HISTORY":        "ITEM_STRUCTURE",
+	"EVENT":          "ITEM_STRUCTURE",
+	"POINT_EVENT":    "ITEM_STRUCTURE",
+	"INTERVAL_EVENT": "ITEM_STRUCTURE",
+}
+
+// attrType resolves declared, the BMM type of an attribute on a value of
+// parentType, where it is a formal generic parameter such as the T of
+// EVENT.data: to the actual type parentType names, or else to the type
+// argument the generator builds parentType's class with. Any other type
+// is returned unchanged.
+func attrType(parentType, declared string) string {
+	if actual := bmmtype.Substitute(parentType, declared); actual != declared {
+		return actual
+	}
+	class := bmmtype.Class(parentType)
+	if arg, ok := builtTypeArgument[class]; ok {
+		return bmmtype.Substitute(class+"<"+arg+">", declared)
+	}
+	return declared
+}
+
+// settleBuilt gives a value built from the BMM alone, which the walk
+// never reaches, the RM default finishNode gives a walked one where no
+// other pass does: an ISM_TRANSITION's current state.
+func settleBuilt(v any) {
+	if iv, ok := v.(*rm.IsmTransition); ok {
+		fillCurrentState(nil, iv)
 	}
 }
 
