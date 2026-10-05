@@ -1701,10 +1701,6 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		fillPerformer(&v.Performer)
 	case *rm.Element:
 		g.settleElement(opt, v)
-	case *rm.Activity:
-		if v.ActionArchetypeID == "" {
-			v.ActionArchetypeID = "openEHR-EHR-ACTION.example.v1"
-		}
 	case *rm.DVEHRURI:
 		// Backstop for a DV_EHR_URI the primitive default did not reach;
 		// every one the generator emits is walked.
