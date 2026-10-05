@@ -285,6 +285,12 @@ func generateReason(t *testing.T, err error) string {
 			t.Fatalf("slot fill without a path: %v", err)
 		}
 		return reasonRefusalOther + ":slot_fill:" + path
+	case errors.Is(err, instance.ErrArchetypeIDMissing):
+		path, ok := archetypeIDMissingPath(err.Error())
+		if !ok {
+			t.Fatalf("archetype id missing without a path: %v", err)
+		}
+		return reasonRefusalOther + ":archetype_id_missing:" + path
 	case errors.Is(err, instance.ErrTypeMismatch):
 		return reasonRefusalOther + ":type_mismatch"
 	default:
@@ -461,6 +467,28 @@ func trailingPath(msg string) (string, bool) {
 	}
 	p := msg[i+len(mark)-1:]
 	if p == "/" || strings.Contains(p, "\t") {
+		return "", false
+	}
+	return p, true
+}
+
+// archetypeIDMissingPath returns the OPT path an ErrArchetypeIDMissing error
+// names: the text from the first " at /", without the parenthesised note
+// that may follow it. A path never ends in ")", and no note holds " (", so
+// the last " (" of a message ending in ")" starts the note even when a name
+// predicate in the path holds one. A tab means the text is not a path.
+func archetypeIDMissingPath(msg string) (string, bool) {
+	_, rest, ok := strings.Cut(msg, " at /")
+	if !ok {
+		return "", false
+	}
+	p := "/" + rest
+	if strings.HasSuffix(p, ")") {
+		if i := strings.LastIndex(p, " ("); i >= 0 {
+			p = p[:i]
+		}
+	}
+	if strings.Contains(p, "\t") {
 		return "", false
 	}
 	return p, true
