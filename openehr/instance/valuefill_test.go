@@ -159,3 +159,40 @@ func TestGeneratedSubjectSatisfiesBasicValidity(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ107_OtherValueFillDegradesToExampleFill is the REQ-107 check that a
+// ValueFill other than RandomFill degrades to ExampleFill rather than
+// error: ValueFill(7), with a ValueSource set, gives output byte-identical
+// to ExampleFill's, under both policies.
+func TestREQ107_OtherValueFillDegradesToExampleFill(t *testing.T) {
+	c := compileFixture(t, "vital_signs")
+	name := "Test Composer"
+	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		gen := func(vf instance.ValueFill, src mrand.Source) []byte {
+			t.Helper()
+			out, err := instance.Generate(t.Context(), c, instance.Options{
+				Policy:      policy,
+				Territory:   "NL",
+				Composer:    &rm.PartyIdentified{Name: &name},
+				Now:         time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				UIDSource:   counterUID(),
+				ValueFill:   vf,
+				ValueSource: src,
+			})
+			if err != nil {
+				t.Fatalf("Generate(%v, %v): %v", policy, vf, err)
+			}
+			b, err := canjson.Marshal(out)
+			if err != nil {
+				t.Fatalf("Marshal: %v", err)
+			}
+			return b
+		}
+		want := gen(instance.ExampleFill, nil)
+		for seed := uint64(1); seed <= 3; seed++ {
+			if got := gen(instance.ValueFill(7), mrand.NewPCG(seed, seed)); !bytes.Equal(got, want) {
+				t.Errorf("Generate(%v, ValueFill(7)) with seed %d differs from ExampleFill", policy, seed)
+			}
+		}
+	}
+}
