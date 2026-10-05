@@ -21,7 +21,7 @@ Get from zero to a working import in a few minutes. This guide is for applicatio
 Add the module to your project:
 
 ```bash
-go get github.com/cadasto/openehr-sdk-go@latest   # pre-1.0: pin an exact tag (see releases.md)
+go get github.com/cadasto/openehr-sdk-go@v0.30.0   # pre-1.0: pin an exact tag (see releases.md)
 ```
 
 Clone this repository if you want to run the bundled examples or contribute:
@@ -151,8 +151,8 @@ Replace the static catalog URL with your deployment's openEHR REST base (usually
 import "github.com/cadasto/openehr-sdk-go/auth/clientcreds"
 
 ts, err := clientcreds.New(
-	os.Getenv("CLIENT_ID"),
-	os.Getenv("CLIENT_SECRET"),
+	os.Getenv("OPENEHR_CLIENT_ID"),
+	os.Getenv("OPENEHR_CLIENT_SECRET"),
 	"https://auth.example/oauth/token",
 	clientcreds.WithHTTPClient(hc),
 )
@@ -165,6 +165,8 @@ c, err := transport.New(cat,
 	transport.WithTokenSource(ts),
 )
 ```
+
+The [`service-auth`](examples.md#service-auth) example shows the full wiring, including `clientcreds.NewFromCatalog`, which takes the token endpoint from the service catalog.
 
 For SMART-on-openEHR launches, use `auth/smart` and the application-level helpers under `smart/`. Details: [specifications/auth.md](specifications/auth.md).
 
