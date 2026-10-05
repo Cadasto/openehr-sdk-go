@@ -123,6 +123,10 @@ func TestJoinScopesWithConstants(t *testing.T) {
 	}
 }
 
+// TestBuildScope pins BuildScope (REQ-165). Surrounding white space on each
+// part is trimmed. Parts outside the openEHR scope grammar are joined as
+// given. An empty compartment or permission is left out with its separator,
+// and an empty resource stays, separator included.
 func TestBuildScope(t *testing.T) {
 	tests := []struct {
 		compartment, resource, permission string
@@ -133,6 +137,9 @@ func TestBuildScope(t *testing.T) {
 		{"patient", "COMPOSITION", "", "patient/COMPOSITION"},
 		{"", "COMPOSITION", "", "COMPOSITION"},
 		{" patient ", " * ", " write ", "patient/*.write"},
+		{"patient", "", "rs", "patient/.rs"},
+		{"patient", "", "", "patient/"},
+		{"", "launch", "", "launch"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.want, func(t *testing.T) {

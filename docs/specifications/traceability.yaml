@@ -1836,6 +1836,9 @@ requirements:
     packages: [auth]
     tests:
       - auth/openehr_scope_test.go
+      - auth/tokensource_test.go
+      - smart/launch_test.go
+      - testkit/probes/auth/probes_test.go
 
   - id: REQ-166
     title: Bearer challenge on 401 and 403

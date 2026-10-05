@@ -550,7 +550,7 @@ The SDK **MUST NOT** apply scope strings as application policy: which scopes to 
 
 - Pass scope strings verbatim from configuration through to the authorization request.
 - Round-trip the granted scope from the token response back to the application via `LaunchContext.Scopes`.
-- Provide a small helper (`auth.BuildScope(compartment, resource, permission)`) for composing scopes of the shape `<compartment>/<resource>.<permission>` without templating strings. `BuildScope` is lexical: it **MUST NOT** validate its parts, so it serves SMART on FHIR scopes as well.
+- Provide a small helper (`auth.BuildScope(compartment, resource, permission)`) for composing scopes of the shape `<compartment>/<resource>.<permission>` without templating strings. `BuildScope` is lexical: it **MUST** trim surrounding white space on each part and **MUST NOT** validate its parts, so it serves SMART on FHIR scopes as well. An empty compartment or permission **MUST** be left out together with its separator. An empty resource **MUST** be kept, separator included: `BuildScope("patient", "", "rs")` is `patient/.rs`, `BuildScope("patient", "", "")` is `patient/`, and `BuildScope("", "launch", "")` is `launch`.
 - Provide a typed builder and reader for the openEHR resource scopes of SMART on openEHR § Resource Scopes, `<compartment>/<resource>-<pattern>.<permissions>`:
 
 ```go
@@ -563,11 +563,11 @@ type OpenEHRScope struct {
     Permissions string // a non-empty subset of "cruds", in that order
 }
 
-var ErrInvalidScope = errors.New("auth: invalid scope")
-
 func (s OpenEHRScope) Token() (string, error)
 func ParseOpenEHRScope(token string) (OpenEHRScope, bool)
 ```
+
+`ErrInvalidScope` is declared once, in [Error mapping](#error-mapping).
 
 `Token` **MUST** return the single scope token, or an error that `errors.Is` matches to `auth.ErrInvalidScope` when any of these holds:
 
@@ -575,7 +575,9 @@ func ParseOpenEHRScope(token string) (OpenEHRScope, bool)
 - the permissions are empty, repeat a letter, use a letter outside `cruds`, or are out of the order `c`, `r`, `u`, `d`, `s` (HL7 SMART App Launch v2 permission syntax, which the openEHR scopes follow);
 - the pattern is empty, or contains a character outside the RFC 6749 §3.3 scope-token set (`%x21 / %x23-5B / %x5D-7E`: printable ASCII other than space, `"` and `\`). A template id that contains a space or a non-ASCII character therefore cannot be written as a scope; the SDK **MUST NOT** escape or rewrite it.
 
-`ParseOpenEHRScope` **MUST** read one token with the same grammar: the compartment ends at the first `/`, the permissions start after the last `.`, and the resource ends at the first `-`, so dotted template ids and query names (`org.openehr::bloodpressure.v1`) survive. It **MUST** return `false`, never an error, for a token that is not an openEHR resource scope, such as `openid`, `launch/patient` or the SMART on FHIR scope `patient/Observation.rs`. Neither function interprets the wildcards in a pattern; their matching rules belong to the authorization server.
+`Token` **MUST NOT** trim or otherwise rewrite a part.
+
+`ParseOpenEHRScope` **MUST** read one token with the same grammar: the compartment ends at the first `/`, the permissions start after the last `.`, and the resource ends at the first `-`, so dotted template ids and query names (`org.openehr::bloodpressure.v1`) survive. It **MUST** return `false`, never an error, for a token that is not an openEHR resource scope, such as `openid`, `launch/patient` or the SMART on FHIR scope `patient/Observation.rs`. `Token` and `ParseOpenEHRScope` **MUST NOT** interpret the wildcards in a pattern; their matching rules belong to the authorization server.
 
 ## Error mapping
 

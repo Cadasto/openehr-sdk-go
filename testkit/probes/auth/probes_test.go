@@ -82,6 +82,7 @@ func TestProbe004(t *testing.T) {
 
 // TestProbe005 runs PROBE-005 and asserts a configured openEHR scope
 // survives the authorize -> token-response round trip (REQ-061).
+// The authorization request carries that configured scope verbatim (REQ-165).
 func TestProbe005(t *testing.T) {
 	r, err := probes.Probe005ScopeRoundTrip(context.Background())
 	assertPass(t, r, err)

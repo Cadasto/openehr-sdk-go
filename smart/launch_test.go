@@ -22,7 +22,7 @@ import (
 // TestLaunchContextFromTokenResponse maps a body without an ID token. Its
 // fhirUser member is not an identity claim, so User stays empty and the
 // value stays readable on Raw.
-func TestLaunchContextFromTokenResponse(t *testing.T) { // REQ-064
+func TestLaunchContextFromTokenResponse(t *testing.T) { // REQ-064, REQ-165
 	tr := authsmart.TokenResponse{
 		Patient:   "patient-1",
 		Encounter: "enc-1",
