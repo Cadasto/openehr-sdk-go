@@ -22,14 +22,19 @@ const nestedCodedTextValue = "example"
 // TestREQ107_RootPlaceholders is the REQ-107 check that a generation root
 // gets the same placeholders as a nested value: the URI ehr://example on a
 // DV_EHR_URI, the code at0000 in terminology local on a CODE_PHRASE, and
-// that code with the text of a nested one on a DV_CODED_TEXT. The root is
-// compiled with the implicit attributes, whose String attributes are
-// filled by the pass that writes the open-string example, and without
-// them, when the root has no attribute to walk.
+// that code with the text of a nested one on a DV_CODED_TEXT. A code
+// phrase whose OPT names a terminology keeps it. The root is compiled with
+// the implicit attributes, whose String attributes are filled by the pass
+// that writes the open-string example, and without them, when the root has
+// no attribute to walk.
 func TestREQ107_RootPlaceholders(t *testing.T) {
+	// The OPT names the terminology of a code phrase and no code.
+	snomed := optSingle("terminology_id", optNode("TERMINOLOGY_ID", "",
+		optSingle("value", optPrimitive("STRING", "C_STRING", "<list>SNOMED-CT</list>"))))
 	cases := []struct {
 		name  string
 		root  string
+		attrs []string
 		check func(t *testing.T, out any)
 	}{
 		{
@@ -63,10 +68,21 @@ func TestREQ107_RootPlaceholders(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:  "CODE_PHRASE code under the terminology the OPT names",
+			root:  "CODE_PHRASE",
+			attrs: []string{snomed},
+			check: func(t *testing.T, out any) {
+				want := rm.CodePhrase{CodeString: "at0000", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}}
+				if got := *out.(*rm.CodePhrase); got != want {
+					t.Errorf("CODE_PHRASE = %+v, want %+v", got, want)
+				}
+			},
+		},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
-			c := compileOPTText(t, optTemplate(tc.root), implicit)
+			c := compileOPTText(t, optTemplate(tc.root, tc.attrs...), implicit)
 			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
 				t.Run(fmt.Sprintf("%s/implicit=%t/%v", tc.name, implicit, policy), func(t *testing.T) {
 					out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
