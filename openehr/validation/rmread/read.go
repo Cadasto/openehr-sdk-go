@@ -452,7 +452,6 @@ func Handles(parent any) bool {
 		*rm.PartyIdentity, rm.PartyIdentity,
 		*rm.PartyRelationship, rm.PartyRelationship,
 		*rm.Capability, rm.Capability,
-		*rm.PartyRef, rm.PartyRef,
 		*rm.Folder, rm.Folder,
 		*rm.EHRStatus, rm.EHRStatus,
 		*rm.EHRAccess, rm.EHRAccess,
@@ -1482,7 +1481,10 @@ func readCapabilitySingle(c *rm.Capability, attr string) (any, bool) {
 
 // PARTY_REF is the reference a ROLE's performer, a PARTY_RELATIONSHIP's
 // source and target and an ACTOR's roles hold. Its id, namespace and type
-// are RM-mandatory; each reads as absent while unset.
+// are RM-mandatory; each reads as absent while unset. The template walker
+// reads them here when an OPT constrains a reference's parts. PARTY_REF is
+// not in Handles: the RM floor checks a reference with its own evaluator
+// and does not descend into it, so a missing part is reported once.
 func readPartyRefSingle(r *rm.PartyRef, attr string) (any, bool) {
 	switch attr {
 	case "id":
