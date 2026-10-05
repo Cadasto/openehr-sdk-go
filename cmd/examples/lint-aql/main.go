@@ -84,8 +84,15 @@ func run() error {
 
 // loadTemplate parses the OPT file and compiles it. The compiled form is what
 // every template-aware SDK entry point takes, ValidateAQL included.
+//
+// ParseFileStrict rejects a node type the parser does not support. The
+// lenient ParseFile would keep such a node as a leaf and silently drop
+// everything beneath it, and every path into that subtree would then lint as
+// unknown to the template. A linter fails closed instead: it stops on a
+// template it cannot read in full rather than report findings against part
+// of it.
 func loadTemplate(optPath string) (*templatecompile.Compiled, error) {
-	opt, err := template.ParseFile(optPath)
+	opt, err := template.ParseFileStrict(optPath)
 	if err != nil {
 		return nil, fmt.Errorf("parse OPT %q: %w", optPath, err)
 	}

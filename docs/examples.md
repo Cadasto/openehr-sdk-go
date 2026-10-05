@@ -6,11 +6,13 @@ kind: guide
 
 If you are new to the SDK, run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline: the REST ones use an in-process `httptest` backend, so nothing needs a clinical data repository (CDR).
 
-The 17 runnable programs under [`cmd/examples/`](../cmd/examples/) demonstrate each major SDK surface. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
+The 17 runnable programs under [`cmd/examples/`](../cmd/examples/) cover the major offline clinical-modeling and AQL workflows, plus selected REST and SMART flows. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
 
 Each entry says what the program shows, which packages it uses, how to run it, and what the output means. Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<name>` works from any working directory inside a clone. Build them all with `make build` (or `go build ./cmd/examples/...`).
 
 A few openEHR terms recur throughout. A **COMPOSITION** is the top-level clinical document. An **OPT** (operational template) is the deployable form of a template: every archetype it uses, flattened into one XML file with the template's constraints applied; it fixes which archetypes, nodes and value constraints a composition may contain. **Canonical JSON** is the openEHR REST wire format for those documents. **AQL** (Archetype Query Language) is the openEHR query language. A **Web Template** is the JSON form of a compiled OPT that form renderers and the FLAT / STRUCTURED simplified formats work from.
+
+The examples that read an OPT file parse it with `template.ParseFileStrict`, so a program that validates, builds, generates, exports or lints stops on a template it cannot read in full. `template-explore` is the one exception: it parses leniently with `template.ParseFile` by choice, to show the parts of a template it understands. [opt-parse](#opt-parse) covers both modes and how they differ.
 
 ---
 
@@ -278,14 +280,14 @@ go run ./cmd/examples/generate-example \
 
 **Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/instance`, `openehr/rm`, `openehr/serialize/canjson`. **No `internal/` import.**
 
-The output is one line of JSON. Each run gets fresh uids and a wall-clock context start time, so two runs are never byte-identical; that is why this entry shows no sample block. Pipe the output to a file or into `validate-from-json` to see that generated data passes the same template:
+The output is one line of JSON. Each run gets fresh uids and a wall-clock context start time, so two runs are never byte-identical; that is why this entry shows no sample block. Pipe the output to a file or into `validate-from-json` to see that generated data passes both of its checks, the RM floor and the template constraints:
 
 ```bash
 go run ./cmd/examples/generate-example --policy minimal > /tmp/generated.json
 go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/corpus/templates/vital_signs.opt
 ```
 
-**What to copy into your app:** `instance.Generate(ctx, compiled, instance.Options{Policy: ..., Territory: ..., Composer: ...})`. It returns the root as `any`, because a template can be rooted on any archetypeable type; `canjson.Marshal` encodes it as is, and `instance.AsComposition` (with siblings for the other root types) gives you the typed value. Optional RM strings are pointers, hence `new(name)` for the composer name. An unknown policy name is an error, so a typo on the command line does not silently pick a default.
+**What to copy into your app:** `template.ParseFileStrict` plus `templatecompile.Compile`, then `instance.Generate(ctx, compiled, instance.Options{Policy: ..., Territory: ..., Composer: ...})`. Parse strictly: the lenient `ParseFile` keeps a node type it does not support as a leaf and drops everything beneath it, so the generated instance would lack that subtree. `Generate` returns the root as `any`, because a template can be rooted on any archetypeable type; `canjson.Marshal` encodes it as is, and `instance.AsComposition` (with siblings for the other root types) gives you the typed value. Optional RM strings are pointers, hence `new(name)` for the composer name. An unknown policy name is an error, so a typo on the command line does not silently pick a default.
 
 ---
 
@@ -467,7 +469,7 @@ result   : OK — no errors, 3 advisories
 
 Four queries: a clean one; a broken one, where an archetype missing from the template and an unbound `$threshold` are errors while an unpredicated `events` step and a missing alias are advisories; a well-formed query that can never match, because under the RM an OBSERVATION never contains a COMPOSITION; and one that is OK yet not issue-free, because a FOLDER reaches a COMPOSITION only through a reference. `Result.OK` is false only when an error-severity issue is present, so an OK result can still carry warnings.
 
-**What to copy into your app:** for CI or pre-flight checks call `lint.LintString(q, nil)` (syntax, shape and RM checks, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or call `validation.ValidateAQL`) to add the archetype and path checks. Dispatch on `Issue.Code` and treat only `Error`-severity issues as hard failures. Still read `Result.Issues`, not only `Result.OK`: OK means *no errors*, not *no issues*. Most of the portability codes and all of the path-shape codes are advisory (the last block above).
+**What to copy into your app:** for CI or pre-flight checks call `lint.LintString(q, nil)` (syntax, shape and RM checks, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or call `validation.ValidateAQL`) to add the archetype and path checks. Parse that OPT with `template.ParseFileStrict`, as the program does, so the lint fails closed: after a lenient `ParseFile`, every archetype and path under a node type the parser does not support would be reported as not in the template. Dispatch on `Issue.Code` and treat only `Error`-severity issues as hard failures. Still read `Result.Issues`, not only `Result.OK`: OK means *no errors*, not *no issues*. Most of the portability codes and all of the path-shape codes are advisory (the last block above).
 
 ---
 
@@ -530,7 +532,7 @@ addressable primitive-leaf paths (6) — Builder.Set targets:
 
 In the structure view, `[1]` marks a single-valued attribute and `[*]` a multi-valued one; `required` means the Reference Model makes the attribute mandatory on that type. The bracketed identity is the archetype id where an archetype is plugged in, otherwise the at-code from the archetype's own definition; a data value such as DV_QUANTITY has neither. `(slot)` marks an opaque fill point another archetype plugs into, and `·primitive` marks a node with a value constraint, the editable leaf. The quoted text is the term the archetype defines for the node's at-code.
 
-**What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker. `node.RMTypeName()` plus `attr.Cardinality()` / `Required()` drive widget choice and required markers, and `node.Term(code, "")` gives the label. `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path.
+**What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker. `node.RMTypeName()` plus `attr.Cardinality()` / `Required()` drive widget choice and required markers, and `node.Term(code, "")` gives the label. `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path. The program parses with the lenient `template.ParseFile` on purpose, so it still shows the parts of a template it understands; the cost is that a node type the parser does not support shows as a leaf with nothing beneath it. Use `template.ParseFileStrict` when that has to be an error.
 
 ---
 
@@ -567,7 +569,7 @@ encounter [COMPOSITION] 1..1
 
 Each line is one node as a form renderer reads it: the `id` is the segment a FLAT path is built from, then the RM type and the min..max occurrences (`*` for unbounded). After the dash come the inputs a data-entry client draws for a leaf, as `suffix:type` pairs; the suffix is the FLAT-path suffix the value is posted under (`|magnitude`, `|unit`, `|code`), and a coded input also reports how many codes its list offers. A hint to rerun with `-json` goes to stderr, so stdout stays the summary alone.
 
-**What to copy into your app:** `webtemplate.Marshal(compiled)` for the bytes (`application/openehr.wt+json`), or `webtemplate.Build(compiled)` when you post-process the typed tree first. Each `Node.ID` is the FLAT-path segment consumers bind to, and each leaf's `Inputs` (`suffix` / `type` / `list` / `validation`) drives the widget. Both fail loudly (`ErrEmptyTemplate` / `ErrNoDefaultLanguage` / `ErrIDCollision`) instead of emitting ambiguous output. The package's `deviations.md` lists the accepted reference deltas.
+**What to copy into your app:** parse the OPT with `template.ParseFileStrict` and compile it; after a lenient `ParseFile`, a node type the parser does not support loses everything beneath it, and the export would be an incomplete Web Template. Then `webtemplate.Marshal(compiled)` for the bytes (`application/openehr.wt+json`), or `webtemplate.Build(compiled)` when you post-process the typed tree first. Each `Node.ID` is the FLAT-path segment consumers bind to, and each leaf's `Inputs` (`suffix` / `type` / `list` / `validation`) drives the widget. Both fail loudly (`ErrEmptyTemplate` / `ErrNoDefaultLanguage` / `ErrIDCollision`) instead of emitting ambiguous output. The package's `deviations.md` lists the accepted reference deltas.
 
 ---
 
@@ -739,7 +741,7 @@ Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf co
 
 ## Fixtures and testkit
 
-Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and fixtures under `testkit/corpus/`. These are stable, checked-in artefacts, not generated at runtime. The exception is `validate-from-json/testdata/`, produced once via `gen_fixture.go`.
+Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and fixtures under `testkit/corpus/`. These are stable, checked-in artefacts, not generated at runtime. The exception is `validate-from-json/testdata/`, which is checked in but generated: `gen_fixture.go` in that directory writes it. Regenerate it whenever the generator changes, with `go run gen_fixture.go` from `cmd/examples/validate-from-json/`; the generator refuses to write a fixture that fails either validation pass.
 
 When writing your own tests, prefer importing fixtures from `testkit` rather than copying paths by hand.
 

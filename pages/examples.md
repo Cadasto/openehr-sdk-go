@@ -51,9 +51,11 @@ Packages: `openehr/rm`, `openehr/serialize/canjson`. Fixture:
 ## Validate JSON against a template {#validate-from-json}
 
 A CI check has this shape. The program reads the bytes, decodes them into
-Reference Model objects, compiles the operational template (OPT), and prints
-either `OK` or the constraint violations it found. The exit status is 1 when
-the composition does not validate, so the command can gate a pipeline.
+Reference Model objects, compiles the operational template (OPT), and runs two
+checks. The RM floor checks the Reference Model's own rules and needs no
+template. The template constraints check what the OPT declares. Each check
+prints its verdict and any issues it found. The exit status is 1 when either
+check finds an issue, so the command can gate a pipeline.
 
 ```bash
 go run ./cmd/examples/validate-from-json

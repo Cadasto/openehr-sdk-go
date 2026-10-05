@@ -13,10 +13,12 @@
 // comments describe which lint layers a nil template drops and how
 // to supply the RM containment relation.
 //
-// Public entry:
+// Public entry, with the RM floor beside the template constraints:
 //
-//	r := validation.ValidateComposition(comp, compiled)
-//	if !r.OK {
+//	for _, r := range []validation.Result{
+//	    validation.ValidateRM(comp),                    // RM floor, no template
+//	    validation.ValidateComposition(comp, compiled), // template constraints
+//	} {
 //	    for _, issue := range r.Issues {
 //	        log.Printf("%s: %s: %s", issue.Path, issue.Code, issue.Detail)
 //	    }
