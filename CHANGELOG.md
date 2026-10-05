@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Thirty-first `v0.x` minor: offline REST examples and pkg.go.dev Examples, generated instances that pass the RM floor for more templates, and composition deletes and error bodies that follow ITS-REST Release-1.1.0. **Breaking:** `composition.Delete` drops its `ifMatch` parameter, `instance.Generate` refuses an archetype root with no archetype id, the template validator checks party references it skipped, and PROBE-011 fails a server that answers a stale `If-Match` with 409.
+
+### Added
+
+- **Offline REST examples and pkg.go.dev Examples.** Four programs save and query compositions, manage templates and authenticate a service against a `sandbox` fake, and the validation examples now run the RM floor and the template check.
+- **Transport reads every ETag and more error bodies (REQ-054, REQ-093).** `Metadata.ETags` lists the response's ETags in wire order, and an error body with a numeric `code` or a `validationErrors` list now decodes.
+- **OPT parsing reads `T_ARCHETYPE_ROOT` exports (REQ-100).** Both parse modes read it as `C_ARCHETYPE_ROOT`, `ArchetypeRoot.TemplateID` returns a root's optional template id, and an empty C_BOOLEAN flag element reads as omitted.
+- **The instance generator covers party roots and slot fills (REQ-107).** ORGANISATION, GROUP, AGENT and ROLE roots and required entry slot fills now pass the RM floor, and PARTY_RELATIONSHIP ids come from `Options.UIDSource`.
+- **`Source.Revoke` ends the session at once (REQ-063, REQ-167).** A `Token` call right after `Revoke` returns `auth.ErrReauthRequired` without waiting on the token exchange that was still in flight.
+
+### Changed
+
+- **`composition.Delete` takes no `If-Match` (REQ-054).** The version in its path is the precondition, as in ITS-REST Release-1.1.0, and a 409 returns `ErrVersionConflict` with the latest version uid beside it.
+- **`instance.Generate` refuses an archetype root with no archetype id (REQ-107).** It returns `instance.ErrArchetypeIDMissing` where it used to emit a hollow object, and a pinned category or null flavour now carries its openEHR rubric.
+- **The validators check more (REQ-102, REQ-112).** The template validator now checks `ROLE.performer`, PARTY_REF and OBJECT_ID values, the RM floor walks ROLE and CAPABILITY `time_validity`, and a `DATA_VALUE` node admits every concrete type.
+- **Two probes are stricter (PROBE-011, PROBE-106).** PROBE-011 expects 412 for a stale `If-Match`, so a 409 now fails it, and PROBE-106 compares the revocation request's client authentication with the token request's.
+
 ## [0.30.0] - 2026-10-05
 
 Thirtieth `v0.x` minor: the SMART client completes the authorization itself, verifies ID tokens, manages tokens up to revocation and builds backend services from discovery, which now keeps the Platform base URL apart from the OIDC issuer. **Breaking:** `auth/introspect` is removed; `auth/smart` and `smart/discovery` refuse configurations, ID tokens and redirects they accepted; confidential clients stop sending `client_id` and form-encode Basic credentials; `WithReauthOn401` retries only an `invalid_token` challenge; `VersionUID` prefers the `ETag`; and an over-long duration returns an error.
