@@ -1234,6 +1234,7 @@ requirements:
       - openehr/instance/constrained_datetime_test.go
       - openehr/instance/element_rule_test.go
       - openehr/instance/element_slot_test.go
+      - openehr/instance/event_multimedia_defaults_test.go
       - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/interval_flags_test.go
