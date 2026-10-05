@@ -347,6 +347,93 @@ func TestMandatoryFieldsCarryNoOmitOption(t *testing.T) {
 	}
 }
 
+// TestAnyPropertyType pins the Go type of a single property whose BMM type
+// is the primitive Any, on a property built for the test and on the real
+// AOM 1.4 fields of each kind.
+//
+// REQ-043: § Mapping rules, Property → Go field. A non-mandatory property
+// whose BMM type is Any is emitted as *any, because Any is a primitive and
+// not a class the interface exception covers. A mandatory one is any.
+func TestAnyPropertyType(t *testing.T) {
+	rmPlan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+	aomPlan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(AOM14): %v", err)
+	}
+	// built is a property of type Any on a real owner, so the owner's
+	// generic parameters and cycles are those the generator meets.
+	built := func(mandatory bool) *bmm.SingleProperty {
+		p := &bmm.SingleProperty{TypeName: "Any"}
+		p.Name = "test_any"
+		p.IsMandatory = mandatory
+		return p
+	}
+	for _, tc := range []struct {
+		name  string
+		plan  *Plan
+		owner string
+		prop  func(t *testing.T, owner *bmm.SimpleClass) *bmm.SingleProperty
+		want  string
+	}{
+		{
+			name: "optional, built", plan: rmPlan, owner: "ELEMENT", want: "*any",
+			prop: func(*testing.T, *bmm.SimpleClass) *bmm.SingleProperty { return built(false) },
+		},
+		{
+			name: "mandatory, built", plan: rmPlan, owner: "ELEMENT", want: "any",
+			prop: func(*testing.T, *bmm.SimpleClass) *bmm.SingleProperty { return built(true) },
+		},
+		{
+			name: "optional: C_DEFINED_OBJECT.assumed_value", plan: aomPlan, owner: "C_DEFINED_OBJECT", want: "*any",
+			prop: func(t *testing.T, owner *bmm.SimpleClass) *bmm.SingleProperty {
+				return anyProperty(t, owner, "assumed_value", false)
+			},
+		},
+		{
+			name: "mandatory: EXPR_LEAF.item", plan: aomPlan, owner: "EXPR_LEAF", want: "any",
+			prop: func(t *testing.T, owner *bmm.SimpleClass) *bmm.SingleProperty {
+				return anyProperty(t, owner, "item", true)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pc, ok := tc.plan.Classes[tc.owner]
+			if !ok {
+				t.Fatalf("%s is not in the plan", tc.owner)
+			}
+			owner, ok := pc.Class.(*bmm.SimpleClass)
+			if !ok {
+				t.Fatalf("%s is %T, want a simple class", tc.owner, pc.Class)
+			}
+			p := tc.prop(t, owner)
+			got, err := singlePropTypeExpr(tc.plan, owner, tc.owner, p)
+			if err != nil {
+				t.Fatalf("singlePropTypeExpr(%s.%s): %v", tc.owner, p.Name, err)
+			}
+			if got != tc.want {
+				t.Errorf("singlePropTypeExpr(%s.%s, mandatory %t) = %q, want %q", tc.owner, p.Name, p.IsMandatory, got, tc.want)
+			}
+		})
+	}
+}
+
+// anyProperty returns owner's single property name, and stops the test
+// unless it is typed Any with the given mandatory flag.
+func anyProperty(t *testing.T, owner *bmm.SimpleClass, name string, mandatory bool) *bmm.SingleProperty {
+	t.Helper()
+	p, ok := owner.Properties[name].(*bmm.SingleProperty)
+	if !ok {
+		t.Fatalf("%s is %T, want a single property", name, owner.Properties[name])
+	}
+	if p.TypeName != "Any" || p.IsMandatory != mandatory {
+		t.Fatalf("%s is %s, mandatory %t; want Any, mandatory %t", name, p.TypeName, p.IsMandatory, mandatory)
+	}
+	return p
+}
+
 // fieldDecl matches a struct field written as "Name Type `tag`" on one line,
 // with any run of spaces or tabs between the three parts: gofmt aligns a
 // field's type and tag with its neighbours', so the spacing changes when an
