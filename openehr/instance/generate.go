@@ -93,6 +93,15 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 		if err := g.applyCompositionDefaults(root.(*rm.Composition)); err != nil {
 			return nil, err
 		}
+	case "CODE_PHRASE":
+		// The implicit terminology_id attribute replaces the terminology
+		// the primitive default wrote with an empty TERMINOLOGY_ID, whose
+		// value the generator cannot write. A nested code phrase gets its
+		// terminology when rmwrite attaches it (local on a coded text,
+		// IANA_media-types on a media type); a root is not attached.
+		if cp := root.(*rm.CodePhrase); cp.TerminologyID.Value == "" {
+			cp.TerminologyID = rm.TerminologyID{Value: "local"}
+		}
 	}
 
 	return root, nil
@@ -1471,15 +1480,6 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.ItemSingle:
 		if v.Item.GetArchetypeNodeID() == "" && (v.Item.Value == nil || rm.IsTypedNil(v.Item.Value)) {
 			v.Item = *g.placeholderElement()
-		}
-	case *rm.CodePhrase:
-		// The implicit terminology_id attribute replaces the terminology
-		// the primitive default wrote with an empty TERMINOLOGY_ID, whose
-		// value the generator cannot write. rmwrite puts local back when
-		// it attaches a code phrase to a coded text; a root code phrase is
-		// not attached, so it is put back here.
-		if v.TerminologyID.Value == "" {
-			v.TerminologyID = rm.TerminologyID{Value: "local"}
 		}
 	case *rm.DVEHRURI:
 		// Backstop for a DV_EHR_URI the primitive default did not reach;
