@@ -1073,8 +1073,10 @@ requirements:
       - openehr/template/node_name_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/template/path_test.go
+      - openehr/template/t_archetype_root_test.go
       - openehr/template/template_test.go
       - testkit/fixtures/corpus_xml_booleans_test.go
+      - testkit/probes/instance/t_archetype_root_test.go
       - testkit/probes/template/probe_022_opt_path_resolution.go
       - testkit/probes/template/probes_test.go
 
@@ -1248,6 +1250,7 @@ requirements:
       - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/instance/probe_027_generated_validates.go
       - testkit/probes/instance/probes_test.go
+      - testkit/probes/instance/t_archetype_root_test.go
       - testkit/probes/template/constraint_fixtures_test.go
 
   - id: REQ-108
