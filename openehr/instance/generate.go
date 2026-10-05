@@ -1102,18 +1102,16 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 
 	// Archetype-root pins also get a populated archetype_details
 	// block with the archetype id; the template id rides on the
-	// top-level root only.
+	// top-level root only. A node the OPT names no archetype for, the
+	// template root included, gets none: an ARCHETYPED needs an
+	// archetype id, and the generator does not invent one. Generate has
+	// already refused such a template root when its class is always an
+	// archetype root; any other class may leave archetype_details out.
 	var archetypeDetails *rm.Archetyped
-	if arch := opt.ArchetypeID(); arch != "" || isTemplateRoot {
-		ad := &rm.Archetyped{RMVersion: rm.Release}
-		if arch != "" {
-			ad.ArchetypeID = rm.ArchetypeID{Value: arch}
-		} else if id != "" {
-			// Template root with no explicit ArchetypeID on the OPT
-			// node — leave the slot empty rather than fabricating one.
-			// Generate has already refused such a root when its class
-			// is always an archetype root.
-			ad.ArchetypeID = rm.ArchetypeID{Value: ""}
+	if arch := opt.ArchetypeID(); arch != "" {
+		ad := &rm.Archetyped{
+			ArchetypeID: rm.ArchetypeID{Value: arch},
+			RMVersion:   rm.Release,
 		}
 		if isTemplateRoot && g.compiled.TemplateID() != "" {
 			ad.TemplateID = &rm.TemplateID{Value: g.compiled.TemplateID()}
