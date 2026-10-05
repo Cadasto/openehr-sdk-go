@@ -2,8 +2,8 @@
 // operational template. It is the inverse of openehr/validation:
 // where validation walks an OPT and an existing RM tree in lockstep
 // emitting issues, this package walks an OPT and constructs the RM
-// tree, materialising primitive example values from the template's
-// primitive constraints at leaf nodes.
+// tree, valuing each primitive leaf from the template's primitive
+// constraint the way [Options.ValueFill] says.
 //
 // The public entry point is [Generate]:
 //
@@ -20,12 +20,26 @@
 //
 // # Policies
 //
-//   - Minimal: only attributes with existence lower ≥ 1 (and
-//     BMM-mandatory implicits). Smallest valid tree; primitive leaves
-//     still receive [constraints.PrimitiveConstraint.ExampleValue]
-//     so the result is structurally complete.
-//   - Example: Minimal plus every primitive leaf populated with its
-//     ExampleValue. Useful for fixtures and demos.
+// Under either policy the generator does not visit an attribute the
+// template prohibits (an existence of 0..0), nor one the RM computes
+// rather than stores (offset on an event, is_integral on DV_QUANTITY
+// and DV_PROPORTION).
+//
+//   - Minimal: an attribute is materialised only when its existence
+//     lower bound is 1 or more, the BMM marks it mandatory, its
+//     cardinality lower bound is 1 or more, or the template pins
+//     children under it, unless another rule needs more, such as the
+//     RM rule that an ELEMENT carry a value or a null flavour. Smallest
+//     valid tree.
+//   - Example: every other attribute is visited. Useful for fixtures
+//     and demos.
+//
+// Under both, every primitive leaf the walk reaches is valued as
+// [Options.ValueFill] says: the constraint's example value under
+// [ExampleFill], an in-constraint draw under [RandomFill]. Where the
+// template gives an RM attribute no value, the generator writes an
+// RM-valid default, unless the template's own constraint on that
+// attribute rejects it.
 //
 // # Trust model
 //

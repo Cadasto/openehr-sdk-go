@@ -9,10 +9,11 @@ import (
 )
 
 // Policy controls how much of the OPT tree is materialised. Under
-// either policy the generator never visits an attribute the RM computes
-// rather than stores (offset on POINT_EVENT and INTERVAL_EVENT,
-// is_integral on DV_QUANTITY and DV_PROPORTION), and [ValueFill], not
-// the policy, decides how a primitive leaf is valued.
+// either policy the generator never visits an attribute the OPT
+// prohibits (an existence of 0..0), nor one the RM computes rather than
+// stores (offset on POINT_EVENT and INTERVAL_EVENT, is_integral on
+// DV_QUANTITY and DV_PROPORTION), and [ValueFill], not the policy,
+// decides how a primitive leaf is valued.
 type Policy int
 
 const (
