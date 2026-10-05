@@ -21,7 +21,7 @@ Get from zero to a working import in a few minutes. This guide is for applicatio
 Add the module to your project:
 
 ```bash
-go get github.com/cadasto/openehr-sdk-go@v0.30.0   # pre-1.0: pin an exact tag (see releases.md)
+go get github.com/cadasto/openehr-sdk-go@v0.31.0   # pre-1.0: pin an exact tag (see releases.md)
 ```
 
 Clone this repository if you want to run the bundled examples or contribute:

@@ -44,7 +44,7 @@ OK: canonical-JSON Composition decoded from body_weight.json
 To use it in your own project, pin an exact tag. The SDK is pre-1.0, so a minor release can change the public API:
 
 ```bash
-go get github.com/cadasto/openehr-sdk-go@v0.30.0
+go get github.com/cadasto/openehr-sdk-go@v0.31.0
 ```
 
 The version policy is in [releases.md](docs/releases.md), and the [roadmap](docs/roadmap.md) says what has actually landed.
