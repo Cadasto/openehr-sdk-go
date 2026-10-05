@@ -13,12 +13,15 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// handledTypes pins the RM types Handles must report as modelled — the same
-// set ReadSingle/ReadMultiple dispatch. It is a golden checklist: when a new
-// readXxxSingle/readXxxMultiple reader is added, its type MUST be added here
-// AND to Handles. Removing a type from Handles without removing it here trips
-// TestHandles_ModelledTypes; the reverse (a reader added but omitted from
-// Handles) is caught by a reviewer noticing this list is stale.
+// handledTypes pins the RM types Handles must report as modelled: the set
+// ReadSingle/ReadMultiple dispatch, minus the reference types listed in
+// readerOnlyTypes, which ReadSingle serves for the template walker but the
+// RM floor leaves to checkObjectRef (REQ-112). It is a golden checklist:
+// when a new readXxxSingle/readXxxMultiple reader is added, its type MUST
+// be added here AND to Handles, or to readerOnlyTypes when the floor must
+// not walk into it. Removing a type from Handles without removing it here
+// trips TestHandles_ModelledTypes; the reverse (a reader added but omitted
+// from both lists) is caught by a reviewer noticing this list is stale.
 //
 // Value form only — Handles covers `*rm.T` and `rm.T` identically, and the
 // pointer form is spot-checked in TestHandles_PointerForm.

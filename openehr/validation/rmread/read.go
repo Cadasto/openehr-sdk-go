@@ -399,20 +399,24 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	return nil, false
 }
 
-// Handles reports whether rmread models parent's RM type for attribute
-// reading, i.e. whether [ReadSingle] / [ReadMultiple] dispatch to a typed
-// reader rather than falling through to (nil, false). A BMM-driven walker
-// (e.g. the RM-floor validator, validation.ValidateRM) uses this to avoid
-// descending into or required-checking the attributes of a type rmread
-// does not model (OBJECT_REF, PARTICIPATION, LINK, …): those are opaque
-// leaves here and must be validated by their own evaluators, not by
-// reading their members (which would all read back as absent and
-// fabricate `required`).
+// Handles reports whether the RM floor (validation.ValidateRM, REQ-112)
+// walks into the attributes of parent's RM type: whether it reads and
+// required-checks each of them through [ReadSingle] / [ReadMultiple]. A
+// type it does not handle (OBJECT_REF, PARTICIPATION, LINK, …) is an
+// opaque leaf to the floor and is validated by its own evaluator, not by
+// reading its members, which would all read back as absent and fabricate
+// `required`.
 //
-// Handles tracks the type set of ReadSingle/ReadMultiple. A type added
-// there but omitted here is treated as a leaf: its RM-mandatory
-// attributes go unchecked (a missed check, never a false positive), so
-// erring toward omission is the safe failure mode.
+// The handled set is the reader set minus the reference types: PARTY_REF
+// and the OBJECT_ID family a reference's id holds (HIER_OBJECT_ID,
+// OBJECT_VERSION_ID, GENERIC_ID, ARCHETYPE_ID, TEMPLATE_ID,
+// TERMINOLOGY_ID). ReadSingle serves those for the template walker, which
+// calls it without Handles when an OPT constrains a reference's parts; the
+// floor checks a reference with checkObjectRef instead, so a missing part
+// is reported once. A reader type omitted here by mistake is treated as a
+// leaf as well: its RM-mandatory attributes go unchecked (a missed check,
+// never a false positive), so erring toward omission is the safe failure
+// mode.
 func Handles(parent any) bool {
 	switch parent.(type) {
 	case *rm.Composition, rm.Composition,
