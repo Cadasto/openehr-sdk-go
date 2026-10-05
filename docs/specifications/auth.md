@@ -254,7 +254,7 @@ When `AuthorizeURL` is given a `launch` value, the request's `scope` **MUST** co
 
 The SMART discovery resolver surfaces two algorithm-selection lists onto `AuthEndpoints` (REQ-070):
 
-- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). When the list is non-empty, `auth/smart` and `auth/clientcreds.NewFromCatalog` **MUST** refuse a client assertion whose algorithm is not in it. They **MUST NOT** choose an algorithm from the list (§ REQ-068).
+- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). When the list is non-empty, `auth/smart` **MUST** refuse a client assertion whose algorithm is not in it, and `auth/clientcreds.NewFromCatalog` **MUST** refuse a `jwtbearer.ClaimsSigner` whose algorithm is not in it. An assertion source the SDK cannot inspect is not checked, as the [Backend Services bullet](#backend-services-from-a-resolved-catalog) says. They **MUST NOT** choose an algorithm from the list (§ REQ-068).
 - **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). ID-token verification (REQ-064) consumes this list as the verification allowlist when present (see _ID-token verification algorithm agility_ below).
 
 The SDK validates ID tokens against the deployment's published JWKS. JWKS rotation **MUST** be handled:
