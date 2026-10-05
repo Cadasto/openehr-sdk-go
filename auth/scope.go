@@ -36,9 +36,8 @@ const (
 // checked openEHR resource scopes. The deployment decides which scopes it
 // accepts.
 //
-// The helper saves callers from templating scope strings by hand in the
-// most common case; callers can pass raw scopes to providers when they
-// need shapes BuildScope does not cover.
+// Callers can pass raw scopes to providers when they need shapes
+// BuildScope does not cover.
 func BuildScope(compartment, resource, permission string) string {
 	resource = strings.TrimSpace(resource)
 	permission = strings.TrimSpace(permission)
@@ -63,8 +62,8 @@ func BuildScope(compartment, resource, permission string) string {
 //
 // The zero value is not a valid scope. [OpenEHRScope.Token] writes a scope
 // and [ParseOpenEHRScope] reads one. Neither interprets the "*" wildcards in
-// Pattern: which requests a granted scope covers is decided by the
-// authorization server and the resource server, not by the SDK.
+// Pattern: the authorization server and the resource server, not the SDK,
+// decide which requests a granted scope covers.
 type OpenEHRScope struct {
 	// Compartment is "patient", "user" or "system".
 	Compartment string
@@ -84,13 +83,16 @@ const permissionOrder = "cruds"
 
 // Token returns the scope token "<compartment>/<resource>-<pattern>.<permissions>".
 //
-// Token returns an error matching [ErrInvalidScope], and no token, when the
-// compartment is not "patient", "user" or "system"; when the resource is not
-// "template", "composition" or "aql"; when the permissions are empty, repeat
-// a letter, use a letter other than c, r, u, d and s, or break the order
-// c, r, u, d, s (the permission syntax of HL7 SMART App Launch v2); or when
-// the pattern is empty or holds a space, a double quote, a backslash, or any
-// character that is not printable ASCII (the RFC 6749 §3.3 scope-token set).
+// Token returns an error matching [ErrInvalidScope], and no token, when:
+//   - the compartment is not "patient", "user" or "system";
+//   - the resource is not "template", "composition" or "aql";
+//   - the permissions are empty, repeat a letter, use a letter other than
+//     c, r, u, d and s, or break the order c, r, u, d, s (the permission
+//     syntax of HL7 SMART App Launch v2);
+//   - the pattern is empty or holds a space, a double quote, a backslash,
+//     or any character that is not printable ASCII (the RFC 6749 §3.3
+//     scope-token set).
+//
 // Token does not escape or rewrite the pattern, so a template id with a
 // space or a non-ASCII character cannot be written as a scope. The error
 // names the part that is wrong.

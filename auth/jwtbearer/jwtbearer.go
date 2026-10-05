@@ -126,7 +126,8 @@ var _ auth.Reauther = (*Source)(nil)
 // when the cached token is within RefreshThreshold of expiry.
 // Concurrent callers share the in-flight exchange. If the caller running
 // that exchange gives up first, a caller whose own context is still live
-// starts a new exchange rather than returning that caller's cancellation.
+// starts a new exchange rather than returning the cancellation of the
+// caller that gave up.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	for {
 		if err := ctx.Err(); err != nil {
@@ -173,7 +174,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 // instead of starting another, so concurrent Reauth and Token calls send one
 // request to the token endpoint. If the caller running that exchange gives up
 // first, Reauth starts a new exchange rather than returning that caller's
-// cancellation. Reauth returns the exchange's error, an
+// cancellation. Reauth returns the exchange's error, which is an
 // [*auth.ExchangeError] wrapping [auth.ErrTokenExchangeFailed], or the
 // context's error when ctx ends first. A Reauth whose context has already
 // ended keeps the cached token. After a failed exchange no token is cached,

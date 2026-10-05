@@ -16,21 +16,21 @@ import (
 // After Revoke, [Source.Token] returns [auth.ErrReauthRequired] until new
 // tokens are installed.
 //
-// Signing out also ends the session: Revoke drops the last token response,
-// so [Source.LastTokenResponse] returns the zero value, and the identity of
-// the last ID token the source verified, so a later refresh is not held to
-// it.
+// Signing out also ends the session. Revoke drops the last token response,
+// so [Source.LastTokenResponse] returns the zero value, and it drops the
+// identity of the last ID token the source verified, so a later refresh is
+// not held to that identity.
 //
 // Revoke clears all of this before it sends the request, so the source is
 // signed out whatever the outcome. A refresh still running then has its
 // result discarded, and no refresh can start with the token being revoked.
-// The [WithTokenChange] hook sees the zero [TokenChange] once. Its place
-// among the changes is the moment the tokens were cleared, and Revoke
-// itself reports it only after the request has been sent or has failed, so
-// a hook that panics or blocks cannot stop the request. Another call that
-// reports changes, one already reporting or one that installs new tokens
-// while the request is out, reports it in turn, which may be before the
-// request has ended or after Revoke has returned.
+// The [WithTokenChange] hook sees the zero [TokenChange] once, in its place
+// among the changes: the moment the tokens were cleared. Revoke itself
+// reports it only after the request has been sent or has failed, so a hook
+// that panics or blocks cannot stop the request. If another call is already
+// reporting changes, or installs new tokens while the request is out, that
+// call reports the zero TokenChange in its turn instead, which may be before
+// the request has ended or after Revoke has returned.
 //
 // The request is a form POST to the server's revocation_endpoint carrying
 // the token and its token_type_hint, refresh_token or access_token (RFC 7009
@@ -39,21 +39,21 @@ import (
 // header or, for client_secret_post, in the form, and a private_key_jwt
 // client sends a new client assertion. That assertion is built like the
 // token endpoint's, so its aud is the token endpoint URL. RFC 7523 §3 asks
-// for a value that identifies the authorization server, and authorization
-// servers commonly accept their token endpoint URL at the revocation
-// endpoint too.
+// for a value that identifies the authorization server and allows the token
+// endpoint URL as that value.
 //
-// Revoke returns nil when the server answers 200, which RFC 7009 §2.2 also
-// answers for a token that is unknown or already invalid. Any other answer,
+// Revoke returns nil when the server answers 200; under RFC 7009 §2.2 the
+// server also answers 200 for a token that is unknown or already invalid.
+// Any other answer,
 // or a request that gets none, is an [*auth.ExchangeError] matching
 // [auth.ErrRevocationFailed], with the status code, the RFC 6749 §5.2 error
 // when the body holds one, and the cause. When the server advertises no
 // revocation endpoint, Revoke sends nothing: it clears the tokens, calls
 // the hook and returns an error matching [auth.ErrInvalidConfig]. A source
-// that holds no token, which means no refresh token and no access-token
-// value, clears whatever is left of its access token, drops its last token
-// response and the identity too, and returns nil without sending a request
-// or calling the hook, whether or not a revocation endpoint is advertised.
+// that holds no token (no refresh token and no access-token value) sends no
+// request, does not call the hook and returns nil, whether or not a
+// revocation endpoint is advertised. It still clears whatever is left of its
+// access token and drops its last token response and the identity.
 func (s *Source) Revoke(ctx context.Context) error {
 	s.mu.Lock()
 	s.lastTR = TokenResponse{}

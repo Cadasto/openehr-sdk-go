@@ -1,7 +1,7 @@
 // Package crossformat runs the PROBE-105 upstream cross-format parity
 // harness. Each set of the vendored cross-format corpus gives one composition
 // in two or more of canonical JSON, canonical XML, FLAT and STRUCTURED. For
-// every pair of formats a set carries, the harness carries the composition
+// every leg whose two formats a set carries, the harness takes the composition
 // from one format to the other through the SDK codecs and compares the result
 // with the upstream sibling.
 //
@@ -19,18 +19,18 @@
 //   - [LegFlatStructured]: the upstream FLAT, restructured without a template,
 //     is compared leaf by leaf with the upstream STRUCTURED, the reference.
 //   - [LegStructuredFlat]: the upstream STRUCTURED, flattened, decoded and
-//     encoded as FLAT, is compared key by key with the upstream FLAT taken
-//     through the same decode and encode, the reference.
+//     encoded as FLAT, is compared key by key with the reference: the
+//     upstream FLAT taken through the same decode and encode.
 //
-// Every FLAT comparison holds composition metadata out on both sides with the
-// hold-out of the upstream FLAT parity harness (webtemplate.IsCompositionMeta).
-// Every FLAT decode is that harness's reducing decode
-// (webtemplate.DecodeReducing): a key family the codec refuses is removed, no
-// wider than the refusal names, and the decode retried.
+// Every FLAT comparison holds composition metadata out of both sides, using
+// the hold-out of the upstream FLAT parity harness (webtemplate.IsCompositionMeta).
+// All FLAT decodes go through that harness's reducing decode
+// (webtemplate.DecodeReducing): it removes each key family the codec refuses,
+// and no key beyond what the refusal names, then retries the decode.
 //
 // # Outcomes and the ratchet
 //
-// A leg's [Outcome] is either a refusal, the codec error that ended it, or
+// A leg's [Outcome] is either a refusal (the codec error that ended it) or
 // the counts compared, missing, extra, altered and excluded. Excluded counts
 // the upstream FLAT keys the reducing decode removed in the two legs that
 // decode the upstream FLAT, [LegFlatCanonical] and [LegStructuredFlat].
@@ -99,10 +99,7 @@ func Legs(set fixtures.CrossFormatSet) []Leg {
 }
 
 // Outcome is what one leg measured: either a refusal or the counts of a
-// comparison. Compared is the size of the reference side; Missing counts its
-// keys or leaves absent from the side under test, Extra the reverse, and
-// Altered those present on both with different values. Excluded counts the
-// upstream FLAT keys the reducing decode removed before the comparison.
+// comparison.
 type Outcome struct {
 	// Refused is the codec error that ended the leg, or "" when the leg ran
 	// to a comparison. In a [Record] it is a stable substring of that error.
@@ -185,8 +182,8 @@ type SetResult struct {
 // Run builds the set's Web Template from its OPT and runs every leg the set
 // carries. It returns an error only for a harness fault: a set with no name or
 // no leg, an OPT that is missing or does not compile, an unreadable file, an
-// upstream FLAT or STRUCTURED document that is not JSON, or a reducing decode
-// that does not converge. A codec error is a leg's refusal, recorded in its
+// upstream FLAT or STRUCTURED document that is not JSON, SDK output that is
+// not JSON or not a FLAT body, or a reducing decode that does not converge. A codec error is a leg's refusal, recorded in its
 // outcome.
 func Run(set fixtures.CrossFormatSet) (SetResult, error) {
 	legs := Legs(set)

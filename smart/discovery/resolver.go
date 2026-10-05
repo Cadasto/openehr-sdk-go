@@ -119,9 +119,8 @@ func WithDefaultTTL(d time.Duration) Option {
 }
 
 // WithAllowInsecure permits http:// base URLs, issuers and auth endpoint
-// URLs. It also turns off the refusal of a redirect to a URL that is not
-// https. Default is to refuse plaintext and that downgrade. Use only for
-// local development.
+// URLs, and redirects to a URL that is not https. By default the resolver
+// refuses both. Use only for local development.
 func WithAllowInsecure() Option {
 	return func(cfg *resolverConfig) { cfg.allowInsecure = true }
 }
@@ -224,8 +223,8 @@ func requestFailure(err error) DiscoveryErrorReason {
 
 // Resolve returns the catalog for the Platform at baseURL: the cached one
 // when fresh, otherwise a newly fetched one, which it caches under
-// baseURL. Concurrent calls coalesce, so exactly one fetch happens per
-// base URL while a fetch is in flight.
+// baseURL. Concurrent calls for the same base URL share one in-flight
+// fetch.
 //
 // baseURL is the Platform base URL: the SMART configuration is served at
 // <baseURL>/.well-known/smart-configuration, and an embedded SMART launch
@@ -256,13 +255,14 @@ func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog
 // URL, as for Resolve.
 //
 // When the cached catalog carries an ETag, the request is conditional. A
-// 304 Not Modified keeps the cached document, services and auth members
-// and renews the expiry from the response's Cache-Control max-age, or the
-// default TTL, once the catalog passes the same checks as a new document:
-// this Resolver's validation, and the issuer check against the issuer's
-// OpenID configuration. A new document replaces the cached catalog. When
-// the refresh fails, the cached catalog is dropped, so the next Resolve
-// fetches again and reports the failure. Until the refresh completes,
+// 304 Not Modified keeps the cached document, services and auth members,
+// and renews the expiry from the response's Cache-Control max-age or the
+// default TTL. It does so only once the catalog passes the same checks as
+// a new document: this Resolver's validation, and the issuer check against
+// the issuer's OpenID configuration. A new document replaces the cached
+// catalog. When the refresh fails, the cached catalog is dropped, so the
+// next Resolve fetches again and reports the error if that fetch fails
+// too. Until the refresh completes,
 // Resolve keeps returning the cached catalog while it is fresh.
 func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {

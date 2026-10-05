@@ -86,10 +86,9 @@ type Config struct {
 type TokenChange struct {
 	// Access is the access token the source now holds.
 	Access auth.Token
-	// RefreshToken is the refresh token the source now holds: the
-	// response's; after a refresh whose response carried none, the one the
-	// source held before; after a code exchange whose response carried
-	// none, empty.
+	// RefreshToken is the refresh token the source now holds, which is the
+	// response's. When the response carried none, it is empty after a code
+	// exchange and, after a refresh, the one the source held before.
 	RefreshToken string
 	// Response is the token response as [Source.LastTokenResponse] returns
 	// it, so a refresh response's left-out launch context is filled in. Its
@@ -186,13 +185,14 @@ func WithRefreshThreshold(d time.Duration) Option {
 // [TokenChange] carries the new access token, the refresh token the source
 // now holds and the token response. When [Source.Revoke] clears the
 // tokens, fn sees the zero TokenChange once, in its place among the
-// changes: Revoke itself reports it only after its revocation request has
-// been sent or has failed, though another call reporting changes may report
-// it earlier. A Revoke that finds no token reports nothing. fn is not called for a
-// failed exchange or refresh, for a refresh whose result the source
-// discarded because a code exchange, [Source.SetTokens] or Revoke replaced
-// the session meanwhile, or by SetTokens, whose tokens the application
-// already has. A nil fn sets no hook.
+// changes. Revoke itself reports it only after its revocation request has
+// been sent or has failed; another call reporting changes may report it in
+// its turn instead, before the request has ended or after Revoke has
+// returned. A Revoke that finds no token reports nothing. fn is not called
+// for a failed exchange or refresh, or for a refresh whose result the
+// source discarded because a code exchange, [Source.SetTokens] or Revoke
+// replaced or cleared the tokens meanwhile. SetTokens does not call fn
+// either: the application already has its tokens. A nil fn sets no hook.
 //
 // An application that keeps a session across restarts stores the refresh
 // token from here. RFC 6749 §6 has the client discard its old refresh token
@@ -205,17 +205,17 @@ func WithRefreshThreshold(d time.Duration) Option {
 // regardless can use [context.WithoutCancel].
 //
 // fn sees the changes one at a time, in the order the source installed
-// them. Callers waiting on the same refresh as the one that made it get the
-// new token without waiting for fn, and that refresh is reported once.
+// them. Callers that wait on a refresh another call started get the new
+// token without waiting for fn, and that refresh is reported once.
 // When the tokens change again while fn is running, from another goroutine
 // or from fn itself through the source, the change is reported after fn
 // returns, by the goroutine already running fn; the call that made the
 // change returns without waiting for that. So fn must not block for long:
 // later changes wait for it.
 //
-// If fn panics on the goroutine of a source call, which is the call that
-// made the change or a call reporting changes others made, the panic goes
-// up through that call. The changes still waiting are then reported from a
+// If fn panics on the goroutine of a source call (the call that made the
+// change, or a call reporting changes that others made), the panic goes up
+// through that call. The changes still waiting are then reported from a
 // new goroutine the source starts, so none of them waits for a later change
 // of tokens. No caller could recover a panic on that goroutine, so there
 // the source recovers it, drops the change fn panicked on, and goes on with
@@ -384,10 +384,10 @@ type tokenExchange struct {
 //
 // SMART requires the `aud` parameter on every authorization request, and
 // New has no Platform base URL to default it from, so pass [WithAudience];
-// without it New fails with [auth.ErrInvalidConfig]. [NewFromCatalog]
-// fills the audience in from a resolved catalog. A server whose advertised
-// PKCE methods leave out S256 is refused the same way. The other checks are
-// those of [FromConfig].
+// [NewFromCatalog] fills the audience in from a resolved catalog. New
+// applies the checks of [FromConfig], so it fails with
+// [auth.ErrInvalidConfig] without an audience, or when the server's
+// advertised PKCE methods leave out S256.
 func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Source, error) {
 	cfg := Config{
 		ClientID:         clientID,
@@ -417,13 +417,16 @@ func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Sour
 // hand-built catalog often leaves it out.
 //
 // FromConfig also fails with [auth.ErrInvalidConfig] on client credentials
-// that conflict or do not fit the server: both a client secret and a
-// client assertion key; a nil signing key, an empty key ID, an unsupported
-// algorithm, or a key that does not suit the algorithm; an assertion
-// algorithm that a non-empty TokenEndpointAuthSigningAlgValuesSupported does
-// not list; or a client authentication method that a non-empty
-// TokenEndpointAuthMethodsSupported does not list. A JWKSURI it cannot build
-// a key-set fetcher from fails the same way.
+// that conflict or do not fit the server:
+//   - both a client secret and a client assertion key;
+//   - a nil signing key, an empty key ID, an unsupported algorithm, or a
+//     key that does not suit the algorithm;
+//   - an assertion algorithm that a non-empty
+//     TokenEndpointAuthSigningAlgValuesSupported does not list;
+//   - a client authentication method that a non-empty
+//     TokenEndpointAuthMethodsSupported does not list.
+//
+// A JWKSURI it cannot build a key-set fetcher from fails the same way.
 func FromConfig(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
 		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
@@ -530,8 +533,8 @@ func configureClientAuth(cfg *Config) error {
 // catalog.BaseURL, the Platform base URL, unless opts include
 // [WithAudience]. A catalog with an empty BaseURL gives no default, so the
 // call then fails with [auth.ErrInvalidConfig] unless the caller sets one.
-// A catalog whose code_challenge_methods_supported leaves out S256 is
-// refused with the same error. The other checks are those of [FromConfig].
+// A catalog whose code_challenge_methods_supported leaves out S256 fails
+// with the same error; that check and the others are those of [FromConfig].
 func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID string, opts ...Option) (*Source, error) {
 	if catalog == nil {
 		return nil, fmt.Errorf("%w: catalog is nil", auth.ErrInvalidConfig)
@@ -561,8 +564,8 @@ type AuthorizationRequest struct {
 	// sends it when its own launch argument is empty.
 	Launch string
 	PKCE   PKCEPair
-	// Issuer is the issuer the source is bound to: its configured issuer,
-	// the OpenID Connect issuer from discovery. When the redirect names an
+	// Issuer is the source's configured issuer, the OpenID Connect issuer
+	// from discovery. When the redirect names an
 	// issuer, [Source.CompleteAuthorization] requires it to equal this one,
 	// so a response from another authorization server is refused.
 	Issuer string
@@ -631,8 +634,9 @@ func hasScope(scopes []string, want string) bool {
 // AuthorizeURL builds the SMART authorization redirect URL for req.
 //
 // launch is the launch value an EHR passed to the app (see
-// [ParseEHRLaunch]), or empty for a standalone launch; when it is empty,
-// req.Launch is used instead. When a launch value is set, the URL forwards
+// [ParseEHRLaunch]). When it is empty, req.Launch is used instead; leave
+// both empty for a standalone launch. When a launch value is set, the URL
+// forwards
 // it unchanged and the scope it sends includes launch, added when the
 // configured scopes lack it. The URL sends req.Nonce as nonce when the
 // request has one and the configured scopes include openid; without openid
@@ -687,12 +691,15 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 // network call is made, defending against CSRF.
 //
 // When the token response carries an ID token, ExchangeAuthorizationCode
-// verifies it before returning: the signature against the source's JWKS,
-// using only the algorithms the server lists in
-// id_token_signing_alg_values_supported when it lists any; the issuer
-// against the source's issuer; the audience against the client ID and
-// [WithIDTokenTrustedAudiences]; and the nonce against req.Nonce. Any
-// failure there is an [*auth.ExchangeError] matching
+// verifies it before returning:
+//   - the signature against the source's JWKS, using only the algorithms
+//     the server lists in id_token_signing_alg_values_supported when it
+//     lists any;
+//   - the issuer against the source's issuer;
+//   - the audience against the client ID and [WithIDTokenTrustedAudiences];
+//   - the nonce against req.Nonce.
+//
+// Any failure there is an [*auth.ExchangeError] matching
 // [auth.ErrTokenExchangeFailed] that also matches its cause: a token that
 // fails its checks matches [auth.ErrJWKSValidationFailed], a source without
 // a JWKS matches [auth.ErrInvalidConfig], and a key set that cannot be
@@ -758,10 +765,11 @@ func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDToken
 // IDTokenClaims are the verified claims the session had before, so a
 // launch context rebuilt from it still names the same user.
 //
-// Likewise, a refresh response that leaves out a launch-context parameter
-// (patient, encounter, ehrId, episodeId, fhirContext, intent,
-// need_patient_banner, smart_style_url, tenant) or the scope keeps the value
-// the earlier response had, in the typed field and in Raw. Left out means
+// Likewise, a refresh response that leaves out the scope or a
+// launch-context parameter keeps the value the earlier response had, in its
+// typed field (fhirContext has none) and in Raw. The launch-context
+// parameters are patient, encounter, ehrId, episodeId, fhirContext, intent,
+// need_patient_banner, smart_style_url and tenant. Left out means
 // the member is absent from the response body: a member the refresh
 // response carries replaces the earlier value, even when it is an empty
 // string or null. Raw's other members are the refresh response's own.

@@ -86,10 +86,10 @@ func WithValidationTime(t time.Time) ValidateOption {
 //
 // When tr.IDTokenClaims is set, the claims are taken as verified and are
 // not checked again. auth/smart sets them only after it has verified the
-// ID token, at the code exchange or on a refresh, so pass the value that
-// [authsmart.Source.ExchangeAuthorizationCode],
+// ID token, at the code exchange or on a refresh, so pass on unchanged the
+// value that [authsmart.Source.ExchangeAuthorizationCode],
 // [authsmart.Source.CompleteAuthorization] or
-// [authsmart.Source.LastTokenResponse] returned, unchanged. Claims put
+// [authsmart.Source.LastTokenResponse] returned. Claims put
 // there by anything else are trusted all the same, so never fill
 // IDTokenClaims yourself.
 //

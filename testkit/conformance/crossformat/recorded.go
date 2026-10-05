@@ -18,7 +18,7 @@ import (
 // refusal compares at least one key or leaf, since agreement over an empty
 // set is vacuous. Missing plus altered do not exceed compared. A refusal, a
 // difference, or a non-zero excluded count states its Reason. A clean record,
-// one with every count but compared zero, carries no Reason, so a closed gap
+// one with no refusal and every count except compared at zero, carries no Reason, so a closed gap
 // cannot leave a stale reason behind.
 type Record struct {
 	// Outcome is the expected outcome. For a refusal, Refused is a stable
@@ -76,9 +76,8 @@ func (r Record) check() error {
 }
 
 // CheckRecords reports every way table breaks the record rules for sets: a
-// set without records or a record for a set the corpus lacks, a leg the set
-// runs without a record or a record for a leg it cannot run, and any record
-// that breaks the rules of [Record].
+// set without records, a record for a set the corpus lacks, and, for each
+// set that has records, every problem [CheckSetRecords] reports.
 func CheckRecords(sets []fixtures.CrossFormatSet, table map[string]map[Leg]Record) error {
 	var errs []error
 	known := make(map[string]bool, len(sets))
@@ -152,10 +151,10 @@ func Verify(res SetResult, recs map[Leg]Record) []string {
 // corpus, with the reason for every refusal, difference and non-zero excluded
 // count. A leg whose measured outcome changes fails PROBE-105 until its record
 // here changes in the same commit, so a gap opens or closes only
-// deliberately; CENSUS.md publishes this table beside the harness that
-// regenerates it.
+// deliberately. The harness regenerates CENSUS.md, which sits beside it and
+// publishes this table.
 //
-// Reasons name their causes with these labels:
+// Reasons name their causes with labels, including these:
 //
 //   - canxml Array<Octet>: canonical XML reads DV_MULTIMEDIA.data and
 //     integrity_check as one element per byte, where ITS-XML types them
@@ -172,7 +171,7 @@ func Verify(res SetResult, recs map[Leg]Record) []string {
 //     multiple items") and FLAT decode refuses ("not yet decodable").
 //   - RM-FLOOR archetype_details: decode adds archetype_details on archetype
 //     roots and stamps the SDK's RM release in rm_version; upstream canonical
-//     documents lack some of them, say 1.0.4 or 1.0.2, or carry a template_id
+//     documents lack some of them, give rm_version as 1.0.4 or 1.0.2, or carry a template_id
 //     below the root that decode does not add.
 var Recorded = map[string]map[Leg]Record{
 	"alternative_events": {

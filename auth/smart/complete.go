@@ -12,8 +12,8 @@ import (
 // callback is the query the redirect URI received, and req is the
 // [AuthorizationRequest] the launch started with.
 //
-// A req that did not come from [Source.BeginAuthorization] fails with
-// [auth.ErrInvalidConfig] before the redirect is read. A redirect that
+// A req with no State or PKCE verifier fails with [auth.ErrInvalidConfig]
+// before the redirect is read; [Source.BeginAuthorization] sets both. A redirect that
 // repeats the state, iss, code or error parameter fails with
 // [ErrAuthorizationRejected], since only one value of each may be sent.
 // Otherwise CompleteAuthorization checks the redirect in this order and does

@@ -161,9 +161,10 @@ func code(s string) string {
 // [Abbreviate] shortens it.
 const longToken = 100
 
-// Abbreviate shortens every run of non-space characters longer than 100
-// runes in msg, such as an encoded payload a codec error quotes, to its first
-// 40 runes and "...", so a message stays readable in a report.
+// Abbreviate shortens every run of non-space characters in msg that is
+// longer than 100 runes to its first 40 runes and "...", so a message stays
+// readable in a report. An encoded payload quoted in a codec error is one
+// such run.
 func Abbreviate(msg string) string {
 	fields := strings.Split(msg, " ")
 	for i, f := range fields {

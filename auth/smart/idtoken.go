@@ -63,23 +63,26 @@ func WithTrustedAudiences(aud ...string) IDTokenOption {
 // ValidateIDToken verifies a JWT ID token against jwks and returns parsed
 // claims.
 //
-// Signature verification is delegated to go-oidc/v3 (which uses go-jose),
-// supporting RS256, RS384, ES256, and ES384. allowedAlgs constrains the
-// accepted signature algorithms: when non-empty (e.g. the authorization
+// Signature verification is delegated to go-oidc/v3 (which uses go-jose).
+// The supported algorithms are RS256, RS384, ES256 and ES384. allowedAlgs
+// constrains the accepted signature algorithms: when non-empty (e.g. the authorization
 // server's advertised id_token_signing_alg_values_supported) it is
 // intersected with the supported set; when empty the full supported set
-// is used. The unsecured "none" algorithm is always rejected. The
-// signature is always verified before any claim is trusted; the claim
-// checks run after that. iss must equal issuer exactly. aud must contain
-// clientID, and any other audience it lists must be one named by
-// [WithTrustedAudiences]. An azp claim, when present, must equal clientID.
-// sub must be a non-empty string, naming the user the token is about.
-// exp is required, and exp, nbf and iat are checked with a 30-second
-// allowance for clock skew. When nonce is not empty the nonce claim must
-// equal it.
+// is used. The unsecured "none" algorithm is always rejected.
+//
+// The signature is always verified before any claim is trusted or checked.
+// The claim checks are:
+//   - iss must equal issuer exactly;
+//   - aud must contain clientID, and any other audience it lists must be
+//     one named by [WithTrustedAudiences];
+//   - an azp claim, when present, must equal clientID;
+//   - sub must be a non-empty string, naming the user the token is about;
+//   - exp is required, and exp, nbf and iat are checked with a 30-second
+//     allowance for clock skew;
+//   - when nonce is not empty, the nonce claim must equal it.
 //
 // The signing key is the one the token's kid names. A token without a kid is
-// verified with the set's only signing key (see [JWKS.Key]); when that key
+// verified with the set's only signing key (see [JWKS.Key]). When that key
 // does not verify the signature, the set is fetched once more, in case the
 // server has rotated its key, and the token is checked against the key it
 // then holds.

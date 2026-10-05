@@ -91,15 +91,15 @@ type ServiceEntry struct {
 	// Always absolute; transport/ joins paths onto this URL.
 	BaseURL *url.URL
 	// Version is the entry's "version" member, verbatim, usually the
-	// Platform's own API version; empty when absent. The resolver compares
-	// it only when the entry has no SpecVersion and the caller set
-	// WithAcceptedSpecVersions.
+	// Platform's own API version; empty when absent. On a required service,
+	// the resolver compares it only when the entry has no SpecVersion and the
+	// caller set WithAcceptedSpecVersions.
 	Version string
 	// SpecVersion is the entry's "spec_version" member, verbatim (e.g.
 	// "1.1.0-development"); empty when absent. This member is not part of
-	// the SMART on openEHR document but is accepted when present. When the
-	// entry advertises it, the resolver checks it against the accepted
-	// versions at resolution time.
+	// the SMART on openEHR document, but the resolver reads it when present
+	// and, on a required service, checks it against the accepted versions
+	// at resolution time.
 	SpecVersion string
 	// Description is the entry's "description" member, verbatim; empty
 	// when absent.
@@ -149,15 +149,16 @@ type AuthEndpoints struct {
 	TokenEndpointAuthMethodsSupported []string
 	// TokenEndpointAuthSigningAlgValuesSupported lists the JWS algorithms
 	// accepted for client-assertion JWTs at the token endpoint
-	// (e.g. "RS384", "ES384"). auth/smart and clientcreds.NewFromCatalog
-	// refuse a client assertion whose algorithm a non-empty list leaves out.
+	// (e.g. "RS384", "ES384"). When the list is non-empty, auth/smart and
+	// clientcreds.NewFromCatalog refuse a client assertion whose algorithm
+	// is not in it.
 	// The SDK does not use the list to select an algorithm.
 	TokenEndpointAuthSigningAlgValuesSupported []string
 	// IDTokenSigningAlgValuesSupported lists the JWS algorithms used to sign
-	// ID tokens (e.g. "RS256", "ES384"). When it is not empty, auth/smart
-	// applies it as it verifies the ID token at the code exchange and on a
-	// refresh, accepting only the listed algorithms the SDK supports. To
-	// verify an ID token yourself with the same limit, pass it to
+	// ID tokens (e.g. "RS256", "ES384"). When the list is not empty,
+	// auth/smart accepts only the listed algorithms the SDK supports as it
+	// verifies the ID token at the code exchange and on a refresh. To verify
+	// an ID token yourself with the same limit, pass the list to
 	// smart.WithIDTokenSigningAlgs.
 	IDTokenSigningAlgValuesSupported []string
 	// AuthorizationResponseIssParameterSupported reports whether the
