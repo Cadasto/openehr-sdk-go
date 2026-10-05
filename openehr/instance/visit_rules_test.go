@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
@@ -17,9 +18,10 @@ func optOptionalSingle(name string) string {
 		`<lower>0</lower><upper>1</upper></existence></attributes>`
 }
 
-// visitCases are single-valued attributes the BMM does not mark mandatory.
-// The OPT names each with no children, so only the visit rule decides
-// whether the generator writes it, and present reports whether it did.
+// visitCases are single-valued attributes the BMM does not mark mandatory,
+// structures and data values alike. The OPT names each with no children,
+// so only the visit rule decides whether the generator writes it, and
+// present reports whether it did.
 var visitCases = []struct {
 	name    string
 	root    string
@@ -43,6 +45,20 @@ var visitCases = []struct {
 			p := out.(*rm.Observation).Provider
 			return p != nil && !rm.IsTypedNil(p)
 		},
+	},
+	{
+		// A data value: a DV_DATE_TIME.
+		name:    "INSTRUCTION expiry_time",
+		root:    "INSTRUCTION",
+		attr:    "expiry_time",
+		present: func(out any) bool { return out.(*rm.Instruction).ExpiryTime != nil },
+	},
+	{
+		// A data value: a DV_TEXT, which an ELEMENT with no value keeps.
+		name:    "ELEMENT null_reason",
+		root:    "ELEMENT",
+		attr:    "null_reason",
+		present: func(out any) bool { return out.(*rm.Element).NullReason != nil },
 	},
 }
 
@@ -113,5 +129,29 @@ func requireAttribute(t *testing.T, c *templatecompile.Compiled, name string, ex
 	e := attr.Existence()
 	if e == nil || e.LowerUnbounded() || e.Lower() != existenceLower {
 		t.Fatalf("%s existence = %+v, want lower %d", name, e, existenceLower)
+	}
+}
+
+// TestREQ107_OptionalSilentEventsGetNoMember is the REQ-107 check that a
+// multi-valued attribute that is not archetype-rooted, optional, and named
+// by the OPT without children gets no member, also under Example, which
+// visits it: an optional attribute the OPT leaves silent MUST get no child.
+// HISTORY.events is optional in the RM, and its member would be an event,
+// not an archetype root. It holds in both compile modes.
+func TestREQ107_OptionalSilentEventsGetNoMember(t *testing.T) {
+	opt := optTemplate("OBSERVATION", optSingle("data", optNode("HISTORY", "at0001", optOptionalMultiple("events"))))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, opts := range defaultsOptions() {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				if events := out.(*rm.Observation).Data.Events; len(events) != 0 {
+					t.Errorf("HISTORY.events has %d members, want none", len(events))
+				}
+			})
+		}
 	}
 }

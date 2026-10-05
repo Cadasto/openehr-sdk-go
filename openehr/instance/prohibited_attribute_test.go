@@ -60,6 +60,14 @@ func TestREQ107_ProhibitedAttributeIsNotVisited(t *testing.T) {
 			},
 		},
 		{
+			name: "OBSERVATION provider, no children",
+			opt:  optTemplate("OBSERVATION", optProhibitedSingle("provider")),
+			present: func(out any) bool {
+				p := out.(*rm.Observation).Provider
+				return p != nil && !rm.IsTypedNil(p)
+			},
+		},
+		{
 			name:    "ITEM_TREE items, no children",
 			opt:     optTemplate("ITEM_TREE", optProhibitedMultiple("items")),
 			present: func(out any) bool { return len(out.(*rm.ItemTree).Items) > 0 },
