@@ -97,3 +97,114 @@ func TestREQ107_ProhibitedNullFlavourTakesAValue(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_BothProhibitedNullFlavourIsWalked is the REQ-107 check that an
+// ELEMENT whose OPT prohibits both value and null_flavour, which the RM
+// rule Inv_null_flavour_indicated then needs, has its null_flavour written
+// as if the OPT allowed it: the walk takes the prohibited attribute's own
+// child, so a pinned code stays, and the RM default 271 applies only where
+// that leaves no code and the child admits 271. It holds under both
+// policies, both value fills and both compile modes.
+func TestREQ107_BothProhibitedNullFlavourIsWalked(t *testing.T) {
+	cases := []struct {
+		name string
+		nf   string
+		want rm.CodePhrase
+	}{
+		{name: "no child", nf: optProhibitedSingle("null_flavour"),
+			want: rm.CodePhrase{CodeString: "271", TerminologyID: rm.TerminologyID{Value: terminology.ID}}},
+		{name: "a C_CODE_PHRASE pinning 253", nf: optProhibitedSingle("null_flavour", optCodedText(terminology.ID, "253")),
+			want: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: terminology.ID}}},
+		{name: "an empty-list C_CODE_PHRASE under openehr", nf: optProhibitedSingle("null_flavour", optCodedText(terminology.ID)),
+			want: rm.CodePhrase{CodeString: "271", TerminologyID: rm.TerminologyID{Value: terminology.ID}}},
+		{name: "an empty-list C_CODE_PHRASE under local", nf: optProhibitedSingle("null_flavour", optCodedText("local")),
+			want: localAt0000},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, optTemplate("ELEMENT", optProhibitedSingle("value"), tc.nf), implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					el := out.(*rm.Element)
+					if el.Value != nil {
+						t.Errorf("ELEMENT.value = %#v, want none: the OPT prohibits it", el.Value)
+					}
+					if el.NullFlavour == nil {
+						t.Fatalf("ELEMENT.null_flavour absent, want %+v", tc.want)
+					}
+					checkCode(t, "ELEMENT.null_flavour", el.NullFlavour.DefiningCode, tc.want)
+				})
+			}
+		}
+	}
+}
+
+// TestREQ107_ValueGivesWayToARequiredNullAttribute is the REQ-107 check of
+// the ELEMENT precedence where the OPT allows both a value and a
+// null_flavour: the value gives way when the OPT requires the null_flavour
+// or the null_reason but not the value, so the ELEMENT has no value and
+// keeps or takes its null_flavour (271 when the walk wrote none), and the
+// value wins otherwise, the null attributes then dropped. Both directions,
+// and an OPT that requires both, under both policies, both value fills and
+// both compile modes. Where the OPT does not contradict itself, the
+// template validator finds no error.
+func TestREQ107_ValueGivesWayToARequiredNullAttribute(t *testing.T) {
+	optionalText := optOptionalSingleOver("value", optNode("DV_TEXT", ""))
+	cases := []struct {
+		name      string
+		attrs     []string
+		wantValue bool
+		wantNF    string // the null flavour code, "" for none
+		wantNR    bool   // a null_reason
+		contra    bool   // the OPT contradicts itself
+	}{
+		{name: "null_flavour required, pinned 253", attrs: []string{optionalText, optSingle("null_flavour", optCodedText(terminology.ID, "253"))},
+			wantNF: "253"},
+		{name: "null_flavour required, no child", attrs: []string{optionalText, optSingle("null_flavour")},
+			wantNF: "271"},
+		{name: "null_reason required", attrs: []string{optionalText, optSingle("null_reason", optNode("DV_TEXT", ""))},
+			wantNF: "271", wantNR: true},
+		{name: "neither required", attrs: []string{optionalText, optOptionalSingleOver("null_flavour", optCodedText(terminology.ID, "253"))},
+			wantValue: true},
+		{name: "value and null_flavour required", attrs: []string{optSingle("value", optNode("DV_TEXT", "")), optSingle("null_flavour", optCodedText(terminology.ID, "253"))},
+			wantValue: true, contra: true},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, optTemplate("ELEMENT", tc.attrs...), implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					el := out.(*rm.Element)
+					if has := el.Value != nil && !rm.IsTypedNil(el.Value); has != tc.wantValue {
+						t.Errorf("ELEMENT.value present = %t, want %t", has, tc.wantValue)
+					}
+					gotNF := ""
+					if el.NullFlavour != nil {
+						gotNF = el.NullFlavour.DefiningCode.CodeString
+					}
+					if gotNF != tc.wantNF {
+						t.Errorf("ELEMENT.null_flavour code = %q, want %q", gotNF, tc.wantNF)
+					}
+					if has := el.NullReason != nil; has != tc.wantNR {
+						t.Errorf("ELEMENT.null_reason present = %t, want %t", has, tc.wantNR)
+					}
+					noFloorErrors(t, out)
+					if tc.contra {
+						return
+					}
+					for _, iss := range templateErrors(out, c) {
+						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+				})
+			}
+		}
+	}
+}
