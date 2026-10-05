@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // bmmArchetypeRoots reads the vendored RM BMM and returns every class it
 // defines, the classes that declare the Is_archetype_root invariant, and the
 // concrete classes that are archetype roots: a declaring class or any
-// descendant of one, abstract classes left out. It walks the BMM the way the
-// RM floor's own test does (openehr/validation/rmfloor_archetype_test.go).
+// descendant of one, abstract classes left out.
 func bmmArchetypeRoots(t *testing.T) (classes, declarers, concrete []string) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "resources", "bmm", "openehr_rm_1.2.0.bmm.json"))
@@ -71,16 +72,29 @@ func bmmArchetypeRoots(t *testing.T) (classes, declarers, concrete []string) {
 }
 
 // TestREQ112_IsArchetypeRootMatchesBMM pins the closed list of archetype-root
-// classes to the vendored BMM (REQ-112, ADR 0001). For every class the BMM
-// defines, IsArchetypeRoot must answer true exactly when the class is
-// concrete and declares Is_archetype_root or descends from a class that
-// does. The abstract declarers (PARTY, ENTRY) and every other class answer
-// false, as does any name the BMM does not define. A BMM bump that adds a
-// root class fails here until the list gains it.
+// classes to the vendored BMM (REQ-112, ADR 0001). It is the one test that
+// reads the BMM for the list; the RM floor's own test and the generator's
+// tests take their expectations from IsArchetypeRoot.
+//
+// The BMM must give the declaring classes and concrete roots the spec names.
+// For every class the BMM defines, IsArchetypeRoot must answer true exactly
+// when the class is concrete and declares Is_archetype_root or descends from a
+// class that does; the abstract declarers (PARTY, ENTRY) and every other class
+// answer false, as does any name the BMM does not define. Every root class
+// must have a registered LOCATABLE Go type, or neither the floor nor the
+// generator can reach it. A BMM bump that adds a root class fails here until
+// the list and the spec gain it.
 func TestREQ112_IsArchetypeRootMatchesBMM(t *testing.T) {
 	classes, declarers, roots := bmmArchetypeRoots(t)
-	if len(declarers) == 0 || len(roots) == 0 {
-		t.Fatalf("BMM gives %d Is_archetype_root declarers and %d concrete roots; want some of each, or the check below is vacuous", len(declarers), len(roots))
+	if want := []string{"COMPOSITION", "EHR_ACCESS", "EHR_STATUS", "ENTRY", "PARTY"}; !slices.Equal(declarers, want) {
+		t.Errorf("BMM Is_archetype_root declarers = %v, want %v: update the list and the spec together (ADR 0001)", declarers, want)
+	}
+	wantRoots := []string{
+		"ACTION", "ADMIN_ENTRY", "AGENT", "COMPOSITION", "EHR_ACCESS", "EHR_STATUS", "EVALUATION",
+		"GROUP", "INSTRUCTION", "OBSERVATION", "ORGANISATION", "PERSON", "ROLE",
+	}
+	if !slices.Equal(roots, wantRoots) {
+		t.Errorf("BMM concrete archetype-root classes = %v, want %v: update the list and the spec together (ADR 0001)", roots, wantRoots)
 	}
 	for _, name := range classes {
 		want := slices.Contains(roots, name)
@@ -93,4 +107,21 @@ func TestREQ112_IsArchetypeRootMatchesBMM(t *testing.T) {
 			t.Errorf("IsArchetypeRoot(%q) = true, want false: the BMM defines no class of that name", name)
 		}
 	}
+	for _, name := range roots {
+		ctor, ok := typereg.Default.Lookup(name)
+		if !ok {
+			t.Errorf("archetype root %s has no registered Go type, so neither the floor nor the generator can reach it", name)
+			continue
+		}
+		if v := ctor(); !isLocatable(v) {
+			t.Errorf("archetype root %s is registered as %T, which is not a LOCATABLE", name, v)
+		}
+	}
+}
+
+// isLocatable reports whether v is a LOCATABLE that can carry
+// archetype_details.
+func isLocatable(v any) bool {
+	_, ok := v.(rm.MutableLocatable)
+	return ok
 }
