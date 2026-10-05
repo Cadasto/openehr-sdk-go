@@ -1721,8 +1721,9 @@ func partyRef(id string) rm.PartyRef {
 const defaultPartyRefType = "PERSON"
 
 // partyRefTypes are the class names BASE PARTY_REF Type_validity admits as
-// a reference's type.
-var partyRefTypes = []string{"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE", "PARTY", "ACTOR"}
+// a reference's type, in the invariant's order, which starts with the
+// default type, so a pin that accepts the default gets it.
+var partyRefTypes = []string{defaultPartyRefType, "ORGANISATION", "GROUP", "AGENT", "ROLE", "PARTY", "ACTOR"}
 
 // errNoPartyRefType reports a C_STRING on a PARTY_REF's type that accepts
 // none of the class names PARTY_REF Type_validity admits.
@@ -1732,20 +1733,16 @@ var errNoPartyRefType = errors.New("the C_STRING accepts no class name PARTY_REF
 // OPT constrains it with cs, so BASE PARTY_REF Type_validity holds, which
 // neither validator evaluates. It is chosen, the string the C_STRING path
 // picked, when that is an admitted class name, so a list pin keeps its
-// example value and RandomFill its draw; else the default type when cs
-// accepts it; else the first admitted class name cs accepts. chosen is ""
-// when the C_STRING path found no string. It returns errNoPartyRefType
+// example value and RandomFill its draw; else the first admitted class
+// name cs accepts, which is the default type when cs accepts it. chosen is
+// "" when the C_STRING path found no string. It returns errNoPartyRefType
 // when cs accepts no admitted class name.
 func partyRefType(cs constraints.CString, chosen string) (string, error) {
 	if slices.Contains(partyRefTypes, chosen) {
 		return chosen, nil
 	}
-	accepts := func(v string) bool { return len(cs.Validate(v)) == 0 }
-	if accepts(defaultPartyRefType) {
-		return defaultPartyRefType, nil
-	}
 	for _, class := range partyRefTypes {
-		if accepts(class) {
+		if len(cs.Validate(class)) == 0 {
 			return class, nil
 		}
 	}
