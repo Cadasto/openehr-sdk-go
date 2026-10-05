@@ -9,6 +9,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -83,6 +84,51 @@ func TestNewSkeleton_requiresComposer(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatal("expected error for missing Composer, got nil")
+	}
+}
+
+// unnamedEntryOPT is a COMPOSITION template whose one content entry is an
+// OBSERVATION the template names no archetype for.
+const unnamedEntryOPT = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>unnamed_entry</value></template_id><concept>unnamed_entry</concept>
+<definition><rm_type_name>COMPOSITION</rm_type_name><node_id>at0000</node_id>
+<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>content</rm_attribute_name>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>OBSERVATION</rm_type_name><node_id>at0000</node_id></children>
+<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality>
+</attributes>
+<archetype_id><value>openEHR-EHR-COMPOSITION.encounter.v1</value></archetype_id></definition>
+</template>`
+
+// TestREQ101_REQ107_BuilderRefusesUnnamedArchetypeRoot checks that
+// NewSkeleton and NewBuilder, which build through instance.Generate, pass
+// on its refusal of an archetype-root object the template names no
+// archetype for, and return nothing with it.
+func TestREQ101_REQ107_BuilderRefusesUnnamedArchetypeRoot(t *testing.T) {
+	opt, err := template.ParseOPT(strings.NewReader(unnamedEntryOPT))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	opts := []composition.Option{composition.WithTerritory("NL"), composition.WithComposer(testComposer())}
+
+	comp, err := composition.NewSkeleton(t.Context(), c, opts...)
+	if !errors.Is(err, instance.ErrArchetypeIDMissing) {
+		t.Errorf("NewSkeleton error = %v, want one wrapping instance.ErrArchetypeIDMissing", err)
+	}
+	if comp != nil {
+		t.Error("NewSkeleton returned a composition with the error, want nil")
+	}
+	b, err := composition.NewBuilder(t.Context(), c, opts...)
+	if !errors.Is(err, instance.ErrArchetypeIDMissing) {
+		t.Errorf("NewBuilder error = %v, want one wrapping instance.ErrArchetypeIDMissing", err)
+	}
+	if b != nil {
+		t.Error("NewBuilder returned a builder with the error, want nil")
 	}
 }
 

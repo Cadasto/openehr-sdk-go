@@ -22,6 +22,13 @@ import (
 // forward-compatible leaf *ComplexObject nodes; use ParseOPTStrict to
 // reject unknown xsi:type values that carry nested attributes (i.e.
 // values the lenient mode would silently flatten).
+//
+// An archetype root is read from xsi:type="C_ARCHETYPE_ROOT" and also
+// from xsi:type="T_ARCHETYPE_ROOT", because some exporters write the
+// second spelling. openEHR Template.xsd defines only C_ARCHETYPE_ROOT.
+// Both spellings give the same *ArchetypeRoot, with its archetype id,
+// optional template id, term definitions and full subtree, so neither
+// is an unknown type.
 func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, false)
 }
@@ -33,6 +40,9 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 // validators that need to fail loudly on shapes outside the supported
 // taxonomy (e.g. AOM 2 / ADL 2 inputs, primitive constraint trees).
 // Returns ErrUnsupportedNode (wrapped) on the first such occurrence.
+//
+// T_ARCHETYPE_ROOT is not such a value. Strict mode reads it as an
+// archetype root, exactly as ParseOPT does, and accepts it.
 func ParseOPTStrict(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, true)
 }
@@ -223,8 +233,10 @@ type xmlCObject struct {
 	Occurrences *xmlInterval     `xml:"occurrences"`
 	Attributes  []*xmlCAttribute `xml:"attributes"`
 	// C_ARCHETYPE_ROOT extras — the archetype_id element wraps a
-	// <value> child in the openEHR OPT shape.
+	// <value> child in the openEHR OPT shape, and so does the optional
+	// template_id Template.xsd allows after it.
 	ArchetypeID     string               `xml:"archetype_id>value"`
+	TemplateID      string               `xml:"template_id>value"`
 	TermDefinitions []xmlTermDefSection  `xml:"term_definitions"`
 	TermBindings    []xmlTermBindSection `xml:"term_bindings"`
 	// ARCHETYPE_SLOT extras (raw text — assertion grammar not
@@ -369,13 +381,23 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 	switch o.Type {
 	case "C_COMPLEX_OBJECT", "":
 		return buildComplexObject(o, strict, depth)
-	case "C_ARCHETYPE_ROOT":
+	case "C_ARCHETYPE_ROOT", "T_ARCHETYPE_ROOT":
+		// REQ-100: some exporters write T_ARCHETYPE_ROOT for the node
+		// openEHR Template.xsd calls C_ARCHETYPE_ROOT. It is a second
+		// spelling of the same shape, not an unknown type, so it builds
+		// the same *ArchetypeRoot in both parse modes. Only this named
+		// spelling is added: other unknown types still reach the
+		// default branch below. Under either spelling, a child element
+		// the parser does not map, such as one Template.xsd does not
+		// define for C_ARCHETYPE_ROOT, is skipped in both modes, not
+		// refused, so strict mode does not report it.
 		co, err := buildComplexObject(o, strict, depth)
 		if err != nil {
 			return nil, err
 		}
 		return &ArchetypeRoot{
 			archetypeID:   strings.TrimSpace(o.ArchetypeID),
+			templateID:    strings.TrimSpace(o.TemplateID),
 			ComplexObject: *co,
 			terms:         collectTermDefs(o.TermDefinitions),
 			termBindings:  collectTermBindings(o.TermBindings),

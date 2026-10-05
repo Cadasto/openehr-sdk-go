@@ -3,6 +3,7 @@ package rmread
 import (
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -12,12 +13,15 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// handledTypes pins the RM types Handles must report as modelled — the same
-// set ReadSingle/ReadMultiple dispatch. It is a golden checklist: when a new
-// readXxxSingle/readXxxMultiple reader is added, its type MUST be added here
-// AND to Handles. Removing a type from Handles without removing it here trips
-// TestHandles_ModelledTypes; the reverse (a reader added but omitted from
-// Handles) is caught by a reviewer noticing this list is stale.
+// handledTypes pins the RM types Handles must report as modelled: the set
+// ReadSingle/ReadMultiple dispatch, minus the reference types listed in
+// readerOnlyTypes, which ReadSingle serves for the template walker but the
+// RM floor leaves to checkObjectRef (REQ-112). It is a golden checklist:
+// when a new readXxxSingle/readXxxMultiple reader is added, its type MUST
+// be added here AND to Handles, or to readerOnlyTypes when the floor must
+// not walk into it. Removing a type from Handles without removing it here
+// trips TestHandles_ModelledTypes; the reverse (a reader added but omitted
+// from both lists) is caught by a reviewer noticing this list is stale.
 //
 // Value form only — Handles covers `*rm.T` and `rm.T` identically, and the
 // pointer form is spot-checked in TestHandles_PointerForm.
@@ -104,6 +108,41 @@ func TestHandles_ModelledTypes(t *testing.T) {
 	for _, v := range handledTypes {
 		if !Handles(v) {
 			t.Errorf("Handles(%T) = false, want true (modelled by ReadSingle/ReadMultiple)", v)
+		}
+	}
+}
+
+// readerOnlyTypes have ReadSingle arms but are not in Handles. PARTY_REF is
+// a reference, which the RM floor checks with its own evaluator
+// (checkObjectRef) and must not descend into, or it reports a missing part
+// twice; the OBJECT_ID types are what a reference's id holds, which the
+// floor does not descend into either, so their arms leave it unchanged. The
+// template walker reads them all through ReadSingle, which does not
+// consult Handles, so a template that constrains a reference's parts finds
+// them.
+var readerOnlyTypes = []any{
+	rm.PartyRef{},
+	rm.HierObjectID{},
+	rm.ObjectVersionID{},
+	rm.GenericID{},
+	rm.ArchetypeID{},
+	rm.TemplateID{},
+	rm.TerminologyID{},
+}
+
+// TestHandles_ReaderOnlyTypes (REQ-112, REQ-102) checks that each reader-only
+// type is served by ReadSingle and left out of Handles, in pointer and value
+// form.
+func TestHandles_ReaderOnlyTypes(t *testing.T) {
+	for _, v := range readerOnlyTypes {
+		if !servesAnAttribute(v) {
+			t.Errorf("%T: ReadSingle and ReadMultiple serve none of its attributes, want its reader arms", v)
+		}
+		ptr := reflect.New(reflect.TypeOf(v)).Interface()
+		for _, form := range []any{v, ptr} {
+			if Handles(form) {
+				t.Errorf("Handles(%T) = true, want false: the floor checks a reference with checkObjectRef", form)
+			}
 		}
 	}
 }

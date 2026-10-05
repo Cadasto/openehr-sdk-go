@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"regexp/syntax"
+	"slices"
 	"strings"
 	"time"
 	"uuid"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -28,6 +30,13 @@ import (
 // PrimitiveConstraint.ExampleValue. The returned root is typed as
 // any; use [AsComposition], [AsObservation], etc. for the concrete
 // access path.
+//
+// When the template asks for an object of a class that is always an
+// archetype root but names no archetype for it, Generate returns an
+// error wrapping [ErrArchetypeIDMissing] and no root. A slot is not
+// such an object: the slot-fill rule gives a required slot an
+// archetype id from its includes, or the RM-type-prefix example id
+// when it has none, or refuses it with [ErrSlotFillUnsupported].
 func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -37,6 +46,12 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	}
 
 	rootType := c.Root().RMTypeName()
+
+	// A root of an archetype-root class needs the archetype id the
+	// template names for it; the generator does not invent one.
+	if rmroots.IsArchetypeRoot(rootType) && c.Root().ArchetypeID() == "" {
+		return nil, fmt.Errorf("%w: %s at %s (the template root)", ErrArchetypeIDMissing, rootType, c.Root().AQLPath())
+	}
 
 	// COMPOSITION roots require Composer + Territory; fail fast
 	// before constructing any RM tree.
@@ -122,21 +137,23 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	if optNode == nil || rmValue == nil {
 		return nil
 	}
-	// Slots are leaf fill-points: the synthesiser leaves slot bodies
-	// empty and the caller composes them via REQ-101 builder Set
-	// calls. The parsed REQ-104 grammar is used only to stamp a
-	// conforming archetype id when a lower-bound top-up forces a
-	// slot fill and a safe example can be derived (see stampSlotFill).
+	// Slots are leaf fill-points: the slot body is not in this OPT, and
+	// the caller composes it via REQ-101 builder Set calls. A slot the
+	// walk must fill has been stamped by stampSlotFill with an archetype
+	// id from the parsed REQ-104 grammar, or the RM-type-prefix example.
+	// The fill then gets the RM-mandatory attributes of its class, with
+	// the defaults an attribute the OPT leaves silent gets, so it passes
+	// the RM floor: an entry's language, encoding, subject and its own
+	// mandatory attributes. The fill holds only its identity here, which
+	// the BMM fill skips, so nothing is filled twice. A CLUSTER or ELEMENT
+	// fill takes finishNode's item defaults alone: one placeholder
+	// element in CLUSTER.items, its only mandatory attribute, and a null
+	// flavour on an ELEMENT, which has none.
 	if optNode.IsSlot() {
-		// The slot body is not in this OPT. A cluster slot is still an
-		// RM CLUSTER, and CLUSTER.items is mandatory, so it gets one element.
-		if c, ok := rmValue.(*rm.Cluster); ok && len(c.Items) == 0 {
-			c.Items = []rm.Item{g.placeholderElement()}
+		if _, isItem := rmValue.(rm.Item); !isItem {
+			g.populateBMMRequiredAttrs(rmValue, concreteFor(optNode.RMTypeName()), 0)
 		}
-		// An element slot has no value constraint to fill either.
-		if el, ok := rmValue.(*rm.Element); ok {
-			settleElement(el)
-		}
+		g.finishNode(optNode, rmValue)
 		return nil
 	}
 	// Primitive leaves: ExampleValue if policy allows, then return —
@@ -321,6 +338,19 @@ func (g *generator) materialiseImplicitSingle(
 		// the attribute is outside the current registry, both of
 		// which the validator will flag.
 		return nil //nolint:nilerr // intentional: defer to validator
+	}
+	// A default built from the BMM alone has no archetype to name, so it
+	// must not be an archetype root: an optional attribute gets nothing,
+	// and a required one is refused, as in materialiseImplicitMultiple.
+	// No attribute the pinned RM declares single-valued has such a
+	// default; a template reaches this by writing a multi-valued one,
+	// such as COMPOSITION.content, as a single attribute.
+	if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
+		if !isRequired(attr) {
+			return nil
+		}
+		return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
+			ErrArchetypeIDMissing, built, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
 	}
 	// Stamp documented sentinel values on DV primitives so the
 	// validator's "required attribute absent" check passes for
@@ -521,10 +551,18 @@ func stringAttr(parent any, attr string) (string, bool) {
 
 // stringField returns a reader and a writer for the BMM String attribute
 // attr of parent. It covers every String attribute of the data values the
-// generator builds, plus ACTIVITY.action_archetype_id and
-// TERMINOLOGY_ID.value. An optional attribute reads as "" while unset, and
-// its writer sets it. ok is false when parent has no such field; when ok is
-// true, get and set are both non-nil.
+// generator builds, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value
+// and a PARTY_REF's namespace and type, so the walk writes a C_STRING the
+// OPT pins on any of them. A pin on a PARTY_REF holds where the reference
+// can be attached and no later default replaces it: a ROLE's performer
+// keeps it, because fillPerformer fills only the empty parts. A template
+// that names a PARTY_RELATIONSHIP's source or target makes Generate fail
+// today, because rmwrite cannot attach either; once it can, a pin there
+// would still be lost, because fillPartyRelationship replaces a reference
+// with any empty part whole, and the walk cannot build the id. An optional
+// attribute reads as "" while unset, and its writer sets it. ok is false
+// when parent has no such field; when ok is true, get and set are both
+// non-nil.
 func stringField(parent any, attr string) (get func() string, set func(string), ok bool) {
 	switch p := parent.(type) {
 	case *rm.DVText:
@@ -585,6 +623,13 @@ func stringField(parent any, attr string) (get func() string, set func(string), 
 		}
 	case *rm.TerminologyID:
 		return valueField(&p.Value, attr)
+	case *rm.PartyRef:
+		switch attr {
+		case "namespace":
+			return requiredString(&p.Namespace)
+		case "type":
+			return requiredString(&p.Type)
+		}
 	}
 	return nil, nil, false
 }
@@ -891,7 +936,9 @@ func firstNonSlot(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
 // the attribute's BMM element type via [concreteFor]; silently no-op
 // when the type is outside the typereg registry — the validator
 // will flag it. An attribute that is optional (neither BMM-mandatory,
-// nor existence or cardinality lower ≥ 1) gets no child.
+// nor existence or cardinality lower ≥ 1) gets no child. A required
+// one whose child would be an archetype root is refused with
+// [ErrArchetypeIDMissing].
 func (g *generator) materialiseImplicitMultiple(
 	optNode *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -911,6 +958,13 @@ func (g *generator) materialiseImplicitMultiple(
 	rmChild, err := newRMForOPTType(rmType)
 	if err != nil {
 		return nil //nolint:nilerr // intentional: defer to validator
+	}
+	// A required attribute whose child would be an archetype root is
+	// refused instead, for the same reason: the generator does not
+	// invent an archetype id.
+	if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
+		return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
+			ErrArchetypeIDMissing, built, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
 	}
 	g.populatePrimitiveDefault(rmChild)
 	g.stampIfLocatable(rmChild, concreteFor(rmType))
@@ -949,10 +1003,23 @@ func remainingLowerNeeded(attr *tcimpl.CompiledAttribute, current int) int {
 // OPT (EVENT, ITEM_STRUCTURE, DATA_VALUE, ITEM, CONTENT_ITEM,
 // CARE_ENTRY, ENTRY, LOCATABLE) resolve to a documented concrete
 // substitute — see [concreteFor].
+//
+// A child that would be an archetype root, but for which the OPT
+// names no archetype id, is refused with [ErrArchetypeIDMissing]. A
+// slot is left to its own path: [generator.stampSlotFill] gives it an
+// archetype id, or its caller refuses it with ErrSlotFillUnsupported.
 func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 	rmChild, err := newRMForOPTType(child.RMTypeName())
 	if err != nil {
 		return nil, fmt.Errorf("makeChild %s: %w", child.RMTypeName(), err)
+	}
+	if built := rmTypeOf(rmChild); !child.IsSlot() && child.ArchetypeID() == "" && rmroots.IsArchetypeRoot(built) {
+		declared := child.RMTypeName()
+		if strings.TrimSpace(declared) != built {
+			// An abstract declared type is built as a concrete class.
+			declared += " (built as " + built + ")"
+		}
+		return nil, fmt.Errorf("%w: %s at %s", ErrArchetypeIDMissing, declared, child.AQLPath())
 	}
 	g.setLocatableIdentity(child, rmChild, false /* isTemplateRoot */)
 	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
@@ -1053,16 +1120,16 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 
 	// Archetype-root pins also get a populated archetype_details
 	// block with the archetype id; the template id rides on the
-	// top-level root only.
+	// top-level root only. A node the OPT names no archetype for, the
+	// template root included, gets none: an ARCHETYPED needs an
+	// archetype id, and the generator does not invent one. Generate has
+	// already refused such a template root when its class is always an
+	// archetype root; any other class may leave archetype_details out.
 	var archetypeDetails *rm.Archetyped
-	if arch := opt.ArchetypeID(); arch != "" || isTemplateRoot {
-		ad := &rm.Archetyped{RMVersion: rm.Release}
-		if arch != "" {
-			ad.ArchetypeID = rm.ArchetypeID{Value: arch}
-		} else if id != "" {
-			// Template root with no explicit ArchetypeID on the OPT
-			// node — leave the slot empty rather than fabricating one.
-			ad.ArchetypeID = rm.ArchetypeID{Value: ""}
+	if arch := opt.ArchetypeID(); arch != "" {
+		ad := &rm.Archetyped{
+			ArchetypeID: rm.ArchetypeID{Value: arch},
+			RMVersion:   rm.Release,
 		}
 		if isTemplateRoot && g.compiled.TemplateID() != "" {
 			ad.TemplateID = &rm.TemplateID{Value: g.compiled.TemplateID()}
@@ -1454,6 +1521,8 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		g.ensureItems(opt, &v.Items)
 	case *rm.PartyRelationship:
 		g.fillPartyRelationship(v)
+	case *rm.Role:
+		fillPerformer(&v.Performer)
 	case *rm.Element:
 		settleElement(v)
 	case *rm.ItemList:
@@ -1499,19 +1568,12 @@ func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
 				if err != nil {
 					continue
 				}
-				if child.IsSlot() {
-					if !g.stampSlotFill(made, child) {
-						continue
-					}
-					// A slot is not walked: its body is not in this OPT.
-					// A cluster slot still needs one item for the RM floor.
-					if slot, ok := made.(*rm.Cluster); ok && len(slot.Items) == 0 {
-						slot.Items = []rm.Item{g.placeholderElement()}
-					}
-					if slot, ok := made.(*rm.Element); ok {
-						settleElement(slot)
-					}
-				} else if err := g.walkNode(child, made); err != nil {
+				// A slot fill takes the walk's slot branch, like the fills
+				// materialiseSingle and materialiseMultiple make.
+				if child.IsSlot() && !g.stampSlotFill(made, child) {
+					continue
+				}
+				if err := g.walkNode(child, made); err != nil {
 					continue
 				}
 				item, ok := made.(rm.Item)
@@ -1633,12 +1695,64 @@ func (g *generator) fillPartyRelationship(rel *rm.PartyRelationship) {
 	}
 }
 
+// fillPerformer gives a ROLE the performer the RM requires, a reference
+// to the actor that plays the role, with partyRef's namespace and type:
+// the generator cannot build the abstract OBJECT_ID a PARTY_REF needs.
+// Only the parts the template left empty are filled. The id is a fixed
+// one, where a PARTY_RELATIONSHIP's source and target ids are drawn from
+// Options.UIDSource.
+func fillPerformer(ref *rm.PartyRef) {
+	def := partyRef(&rm.HierObjectID{Value: "00000000-0000-0000-0000-000000000001"})
+	if ref.ID == nil || rm.IsTypedNil(ref.ID) {
+		ref.ID = def.ID
+	}
+	if ref.Namespace == "" {
+		ref.Namespace = def.Namespace
+	}
+	if ref.Type == "" {
+		ref.Type = def.Type
+	}
+}
+
 func partyRef(id *rm.HierObjectID) rm.PartyRef {
 	return rm.PartyRef{
 		ID:        id,
 		Namespace: "local",
-		Type:      "PERSON",
+		Type:      defaultPartyRefType,
 	}
+}
+
+// defaultPartyRefType is the type of the references the generator builds
+// itself: a PARTY_RELATIONSHIP's source and target, a ROLE's performer.
+const defaultPartyRefType = "PERSON"
+
+// partyRefTypes are the class names BASE PARTY_REF Type_validity admits as
+// a reference's type, in the invariant's order, which starts with the
+// default type, so a pin that accepts the default gets it.
+var partyRefTypes = []string{defaultPartyRefType, "ORGANISATION", "GROUP", "AGENT", "ROLE", "PARTY", "ACTOR"}
+
+// errNoPartyRefType reports a C_STRING on a PARTY_REF's type that accepts
+// none of the class names PARTY_REF Type_validity admits.
+var errNoPartyRefType = errors.New("the C_STRING accepts no class name PARTY_REF Type_validity admits")
+
+// partyRefType returns the type the generator writes on a PARTY_REF whose
+// OPT constrains it with cs, so BASE PARTY_REF Type_validity holds, which
+// neither validator evaluates. It is chosen, the string the C_STRING path
+// picked, when that is an admitted class name, so a list pin keeps its
+// example value and RandomFill its draw; else the first admitted class
+// name cs accepts, which is the default type when cs accepts it. chosen is
+// "" when the C_STRING path found no string. It returns errNoPartyRefType
+// when cs accepts no admitted class name.
+func partyRefType(cs constraints.CString, chosen string) (string, error) {
+	if slices.Contains(partyRefTypes, chosen) {
+		return chosen, nil
+	}
+	for _, class := range partyRefTypes {
+		if len(cs.Validate(class)) == 0 {
+			return class, nil
+		}
+	}
+	return "", errNoPartyRefType
 }
 
 func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
@@ -1700,10 +1814,12 @@ func firstCodedExample(opt *tcimpl.CompiledNode, attrName string) (constraints.C
 
 // applyStringLeaf writes a C_STRING leaf onto the String attribute attr
 // of rmValue, or onto its main string attribute when attr is "". The
-// value is a list member or a pattern match that the constraint accepts.
-// When there is none, it writes nothing and returns an error wrapping
-// ErrConstraintUnsatisfiable. An attribute the generator has no field for
-// is left alone, like any other unknown primitive target.
+// value is a list member or a pattern match that the constraint accepts;
+// on a PARTY_REF's type it is also a class name PARTY_REF Type_validity
+// admits (see partyRefType). When there is none, it writes nothing and
+// returns an error wrapping ErrConstraintUnsatisfiable. An attribute the
+// generator has no field for is left alone, like any other unknown
+// primitive target.
 func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs constraints.CString, ex any) error {
 	if attr == "" {
 		attr = mainStringAttr(rmValue)
@@ -1713,6 +1829,9 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 		return nil
 	}
 	s, err := stringForConstraint(cs, ex)
+	if _, isRef := rmValue.(*rm.PartyRef); isRef && attr == "type" {
+		s, err = partyRefType(cs, s)
+	}
 	if err != nil {
 		return fmt.Errorf("%w: %s.%s at %s: %w", ErrConstraintUnsatisfiable, rmTypeOf(rmValue), attr, leafPath(leaf), err)
 	}

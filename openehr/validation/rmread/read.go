@@ -343,6 +343,37 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	case rm.Capability:
 		return readCapabilitySingle(&p, attrName)
 
+	case *rm.PartyRef:
+		return readPartyRefSingle(p, attrName)
+	case rm.PartyRef:
+		return readPartyRefSingle(&p, attrName)
+
+	// --- OBJECT_ID: what a reference's id holds ---
+	case *rm.HierObjectID:
+		return readObjectIDSingle(p.Value, attrName)
+	case rm.HierObjectID:
+		return readObjectIDSingle(p.Value, attrName)
+	case *rm.ObjectVersionID:
+		return readObjectIDSingle(p.Value, attrName)
+	case rm.ObjectVersionID:
+		return readObjectIDSingle(p.Value, attrName)
+	case *rm.ArchetypeID:
+		return readObjectIDSingle(p.Value, attrName)
+	case rm.ArchetypeID:
+		return readObjectIDSingle(p.Value, attrName)
+	case *rm.TemplateID:
+		return readObjectIDSingle(p.Value, attrName)
+	case rm.TemplateID:
+		return readObjectIDSingle(p.Value, attrName)
+	case *rm.TerminologyID:
+		return readObjectIDSingle(p.Value, attrName)
+	case rm.TerminologyID:
+		return readObjectIDSingle(p.Value, attrName)
+	case *rm.GenericID:
+		return readGenericIDSingle(p, attrName)
+	case rm.GenericID:
+		return readGenericIDSingle(&p, attrName)
+
 	// --- EHR-IM roots ---
 	case *rm.Folder:
 		return readFolderSingle(p, attrName)
@@ -368,20 +399,24 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	return nil, false
 }
 
-// Handles reports whether rmread models parent's RM type for attribute
-// reading, i.e. whether [ReadSingle] / [ReadMultiple] dispatch to a typed
-// reader rather than falling through to (nil, false). A BMM-driven walker
-// (e.g. the RM-floor validator, validation.ValidateRM) uses this to avoid
-// descending into or required-checking the attributes of a type rmread
-// does not model (OBJECT_REF, PARTICIPATION, LINK, …): those are opaque
-// leaves here and must be validated by their own evaluators, not by
-// reading their members (which would all read back as absent and
-// fabricate `required`).
+// Handles reports whether the RM floor (validation.ValidateRM, REQ-112)
+// walks into the attributes of parent's RM type: whether it reads and
+// required-checks each of them through [ReadSingle] / [ReadMultiple]. A
+// type it does not handle (OBJECT_REF, PARTICIPATION, LINK, …) is an
+// opaque leaf to the floor and is validated by its own evaluator, not by
+// reading its members, which would all read back as absent and fabricate
+// `required`.
 //
-// Handles tracks the type set of ReadSingle/ReadMultiple. A type added
-// there but omitted here is treated as a leaf: its RM-mandatory
-// attributes go unchecked (a missed check, never a false positive), so
-// erring toward omission is the safe failure mode.
+// The handled set is the reader set minus the reference types: PARTY_REF
+// and the OBJECT_ID family a reference's id holds (HIER_OBJECT_ID,
+// OBJECT_VERSION_ID, GENERIC_ID, ARCHETYPE_ID, TEMPLATE_ID,
+// TERMINOLOGY_ID). ReadSingle serves those for the template walker, which
+// calls it without Handles when an OPT constrains a reference's parts; the
+// floor checks a reference with checkObjectRef instead, so a missing part
+// is reported once. A reader type omitted here by mistake is treated as a
+// leaf as well: its RM-mandatory attributes go unchecked (a missed check,
+// never a false positive), so erring toward omission is the safe failure
+// mode.
 func Handles(parent any) bool {
 	switch parent.(type) {
 	case *rm.Composition, rm.Composition,
@@ -754,6 +789,14 @@ func objectRefPresent(r rm.ObjectRef) (any, bool) {
 		return r, false
 	}
 	return r, true
+}
+
+// partyRefPresent reads a PARTY_REF attribute as the PARTY_REF itself, so a
+// walker matches it against a PARTY_REF constraint, with the presence
+// objectRefPresent gives its reference.
+func partyRefPresent(r rm.PartyRef) (any, bool) {
+	_, ok := objectRefPresent(r.ObjectRef)
+	return r, ok
 }
 
 func readActionSingle(a *rm.Action, attr string) (any, bool) {
@@ -1378,10 +1421,18 @@ func readAgentMultiple(a *rm.Agent, attr string) ([]any, bool) {
 	return readActorMultiple(a.Identities, a.Contacts, a.Relationships, a.Languages, a.Roles, attr)
 }
 
-// ROLE is a PARTY but not an ACTOR — it carries capabilities and a
-// performer reference rather than identities-as-ACTOR; it still has
-// identities / contacts / relationships.
+// ROLE is a PARTY but not an ACTOR: it has no languages or roles, and
+// carries capabilities, the RM-mandatory performer reference and an
+// optional time_validity instead; it still has identities / contacts /
+// relationships. Like a PARTY_RELATIONSHIP's source and target, an empty
+// performer reads as absent.
 func readRoleSingle(r *rm.Role, attr string) (any, bool) {
+	switch attr {
+	case "performer":
+		return partyRefPresent(r.Performer)
+	case "time_validity":
+		return ptrPresent(r.TimeValidity)
+	}
 	return readActorLikeSingle(r.ArchetypeNodeID, r.Name, r.Details, attr)
 }
 
@@ -1414,9 +1465,9 @@ func readPartyIdentitySingle(p *rm.PartyIdentity, attr string) (any, bool) {
 func readPartyRelationshipSingle(p *rm.PartyRelationship, attr string) (any, bool) {
 	switch attr {
 	case "source":
-		return objectRefPresent(p.Source.ObjectRef)
+		return partyRefPresent(p.Source)
 	case "target":
-		return objectRefPresent(p.Target.ObjectRef)
+		return partyRefPresent(p.Target)
 	default:
 		return readActorLikeSingle(p.ArchetypeNodeID, p.Name, p.Details, attr)
 	}
@@ -1442,7 +1493,8 @@ func readContactMultiple(c *rm.Contact, attr string) ([]any, bool) {
 	return nil, false
 }
 
-// CAPABILITY (under ROLE) carries `credentials` (ITEM_STRUCTURE).
+// CAPABILITY (under ROLE) carries `credentials` (ITEM_STRUCTURE) and an
+// optional `time_validity` (DV_INTERVAL<DV_DATE>).
 func readCapabilitySingle(c *rm.Capability, attr string) (any, bool) {
 	switch attr {
 	case "archetype_node_id":
@@ -1451,8 +1503,47 @@ func readCapabilitySingle(c *rm.Capability, attr string) (any, bool) {
 		return dvTextPresent(c.Name)
 	case "credentials":
 		return ifacePresent(c.Credentials)
+	case "time_validity":
+		return ptrPresent(c.TimeValidity)
 	}
 	return nil, false
+}
+
+// PARTY_REF is the reference a ROLE's performer, a PARTY_RELATIONSHIP's
+// source and target and an ACTOR's roles hold. Its id, namespace and type
+// are RM-mandatory; each reads as absent while unset. The template walker
+// reads them here when an OPT constrains a reference's parts. PARTY_REF is
+// not in Handles: the RM floor checks a reference with its own evaluator
+// and does not descend into it, so a missing part is reported once.
+func readPartyRefSingle(r *rm.PartyRef, attr string) (any, bool) {
+	switch attr {
+	case "id":
+		return ifacePresent(r.ID)
+	case "namespace":
+		return strPresent(r.Namespace)
+	case "type":
+		return strPresent(r.Type)
+	}
+	return nil, false
+}
+
+// readObjectIDSingle reads the value every OBJECT_ID carries, absent while
+// empty. Like PARTY_REF, the OBJECT_ID types are read for the template
+// walker and left out of Handles, so the floor does not descend into a
+// reference's id.
+func readObjectIDSingle(value, attr string) (any, bool) {
+	if attr == "value" {
+		return strPresent(value)
+	}
+	return nil, false
+}
+
+// readGenericIDSingle adds the scheme a GENERIC_ID carries beside its value.
+func readGenericIDSingle(g *rm.GenericID, attr string) (any, bool) {
+	if attr == "scheme" {
+		return strPresent(g.Scheme)
+	}
+	return readObjectIDSingle(g.Value, attr)
 }
 
 // --- EHR-IM roots: FOLDER, EHR_STATUS, EHR_ACCESS ------------------------------------

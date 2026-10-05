@@ -143,5 +143,21 @@ var ErrSlotFillUnsupported = errors.New("instance.Generate: required slot fill c
 // whose pattern and list admit no string. The error names the RM type,
 // the attribute and the OPT path of the leaf, and Generate returns no
 // root. It is never wrapped together with [ErrSlotFillUnsupported], which
-// concerns slots only.
+// concerns slots only, nor with [ErrArchetypeIDMissing], which concerns
+// archetype roots only.
 var ErrConstraintUnsatisfiable = errors.New("instance.Generate: no value satisfies the primitive constraint")
+
+// ErrArchetypeIDMissing signals that the template asks for an object of an
+// RM class that is always an archetype root (an ENTRY, a COMPOSITION, a
+// PARTY, EHR_STATUS or EHR_ACCESS) but names no archetype for it. Such an
+// object could not carry valid archetype_details, so the RM floor would
+// reject it, and the generator does not invent an archetype id to avoid
+// that. A slot is not such an object: the slot-fill rule stamps it with an
+// archetype id, or refuses it with [ErrSlotFillUnsupported]. An archetype
+// id the template carries under an xsi:type the parser does not recognise
+// is dropped by lenient parsing, so this error covers that case too. The
+// error names the RM type and the OPT path, and Generate returns no root.
+// It wraps neither [ErrSlotFillUnsupported] nor
+// [ErrConstraintUnsatisfiable], and ErrConstraintUnsatisfiable never wraps
+// it.
+var ErrArchetypeIDMissing = errors.New("instance.Generate: the template names no archetype for an archetype root")

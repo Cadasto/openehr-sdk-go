@@ -1073,12 +1073,15 @@ requirements:
       - internal/templatecompile/registerpath_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/rm/rminfo/lookup_test.go
+      - openehr/template/archetype_root_template_id_test.go
       - openehr/template/imports_test.go
       - openehr/template/node_name_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/template/path_test.go
+      - openehr/template/t_archetype_root_test.go
       - openehr/template/template_test.go
       - testkit/fixtures/corpus_xml_booleans_test.go
+      - testkit/probes/instance/t_archetype_root_test.go
       - testkit/probes/template/probe_022_opt_path_resolution.go
       - testkit/probes/template/probes_test.go
 
@@ -1112,13 +1115,16 @@ requirements:
     tests:
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/node_primitive_test.go
+      - openehr/instance/party_attribute_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/data_value_subtypes_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/interval_open_side_test.go
+      - openehr/validation/rmread/handles_test.go
       - openehr/validation/rmread/interval_void_test.go
+      - openehr/validation/rmread/read_demographic_test.go
       - openehr/validation/rmread/read_test.go
       - openehr/validation/walk_primitive_test.go
       - testkit/probes/validation/probe_025_composition_validate.go
@@ -1209,6 +1215,7 @@ requirements:
       - openehr/instance
       - openehr/templatecompile
       - internal/templateinstance/rmwrite
+      - internal/rmroots
       - testkit/fixtures
       - testkit/probes/instance
     probes: [PROBE-027]
@@ -1216,10 +1223,13 @@ requirements:
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - internal/templateinstance/rmwrite/write_item_single_test.go
       - internal/templateinstance/rmwrite/write_parent_test.go
+      - internal/templateinstance/rmwrite/write_party_test.go
       - internal/templateinstance/rmwrite/write_test.go
       - internal/templateinstance/rmwrite/write_text_like_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/instance/accessors_test.go
+      - openehr/instance/archetype_root_guard_internal_test.go
+      - openehr/instance/archetype_root_guard_test.go
       - openehr/instance/element_rule_test.go
       - openehr/instance/element_slot_test.go
       - openehr/instance/imports_test.go
@@ -1230,6 +1240,7 @@ requirements:
       - openehr/instance/interval_ordinal_pairs_internal_test.go
       - openehr/instance/interval_temporal_internal_test.go
       - openehr/instance/interval_zone_test.go
+      - openehr/instance/party_attribute_test.go
       - openehr/instance/party_relationship_uid_test.go
       - openehr/instance/phase4_test.go
       - openehr/instance/placeholder_test.go
@@ -1253,6 +1264,8 @@ requirements:
       - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/instance/probe_027_generated_validates.go
       - testkit/probes/instance/probes_test.go
+      - testkit/probes/instance/ratchet_categories_test.go
+      - testkit/probes/instance/t_archetype_root_test.go
       - testkit/probes/template/constraint_fixtures_test.go
 
   - id: REQ-108
@@ -1352,8 +1365,10 @@ requirements:
       - openehr/rm/rminfo
       - openehr/validation/rmread
       - openehr/internal/rmnames
+      - internal/rmroots
     probes: [PROBE-081]
     tests:
+      - internal/rmroots/rmroots_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/temporal_iso_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
@@ -1364,6 +1379,7 @@ requirements:
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_ordered_test.go
+      - openehr/validation/rmfloor_party_ref_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_temporal_element_test.go
       - openehr/validation/rmfloor_test.go
@@ -1373,6 +1389,7 @@ requirements:
       - openehr/validation/rmread/interval_void_test.go
       - openehr/validation/rmread/read_archetyped_test.go
       - openehr/validation/rmread/read_datavalues_test.go
+      - openehr/validation/rmread/read_demographic_test.go
       - openehr/validation/rmread/read_ordered_test.go
       - openehr/validation/rmread/read_test.go
       - openehr/validation/strand14_nonchaining_test.go

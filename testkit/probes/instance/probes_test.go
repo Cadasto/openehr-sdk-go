@@ -90,8 +90,8 @@ func TestProbe027MissingTerritoryFails(t *testing.T) {
 }
 
 // TestProbe027_RealWorldCorpus extends PROBE-027 to the real-world OPTs
-// filed against REQ-107. The assertion below is the Minimal policy.
-// Example on social.opt validates as well.
+// filed against REQ-107. The assertion below is the Minimal policy;
+// TestREQ107_CorpusRatchet runs the other settings over the same OPTs.
 func TestProbe027_RealWorldCorpus(t *testing.T) {
 	opts := instance.Options{
 		Policy:    instance.Minimal,
