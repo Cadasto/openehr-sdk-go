@@ -399,7 +399,7 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	return nil, false
 }
 
-// Handles reports whether the RM floor (validation.ValidateRM, REQ-112)
+// Handles reports whether the RM floor (validation.ValidateRM)
 // walks into the attributes of parent's RM type: whether it reads and
 // required-checks each of them through [ReadSingle] / [ReadMultiple]. A
 // type it does not handle (OBJECT_REF, PARTICIPATION, LINK, …) is an

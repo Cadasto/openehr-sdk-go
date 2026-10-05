@@ -18,8 +18,8 @@ import (
 // only the If-Match guard can refuse the call, and asserts that the SDK
 // refuses to issue the request, short-circuiting with
 // [transport.ErrInvalidConfig] before any network call. It sends nothing,
-// so it cannot observe how a backend answers a missing If-Match; that
-// status mapping is REQ-093's.
+// so it cannot observe how a backend answers a missing If-Match; the
+// transport's status-to-error mapping covers that answer.
 func Probe010PutWithoutIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (Result, error) { // PROBE-010 (REQ-054, REQ-093)
 	r := Result{Probe: "PROBE-010"}
 	if c == nil {
