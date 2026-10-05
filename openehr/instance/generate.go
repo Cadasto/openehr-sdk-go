@@ -488,25 +488,44 @@ func (g *generator) temporalSentinel(v any) string {
 
 // writeBMMString stores a BMM String attribute. A field that already
 // holds a value is left alone: populatePrimitiveDefault may have set
-// a clock or a code before this pass. An empty value of a temporal
-// data value takes its temporal sentinel, so it stays a valid ISO 8601
-// value; every other empty string keeps the open-string example
-// sentinel.
+// a clock or a code before this pass. An empty field takes the value
+// stringSentinel gives it.
 func (g *generator) writeBMMString(parent any, parentType, attr string) {
 	cur, known := stringAttr(parent, attr)
 	if known && cur != "" {
 		return
-	}
-	val := "example"
-	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
-		val = s
 	}
 	// Best-effort, on purpose: the write is refused for a String
 	// attribute rmwrite does not address (TERMINOLOGY_ID.value, a
 	// locatable's archetype_node_id), and those are filled by another
 	// default or reported by the validator. Returning the error would
 	// fail Generate on every OPT.
-	_ = rmwrite.EnsureSingle(parent, parentType, attr, val)
+	_ = rmwrite.EnsureSingle(parent, parentType, attr, g.stringSentinel(parent, attr))
+}
+
+// stringSentinel is the value writeBMMString gives an empty String
+// attribute. The value of a temporal data value takes its temporal
+// sentinel, so it stays a valid ISO 8601 value. The value of a DV_EHR_URI
+// and the code of a code phrase take the placeholders
+// populatePrimitiveDefault writes on a nested one, so a generation root,
+// which that pass does not reach, gets the same placeholder; rmwrite puts
+// the code in terminology local when the code phrase names none. Every
+// other attribute takes the open-string example sentinel.
+func (g *generator) stringSentinel(parent any, attr string) string {
+	switch parent.(type) {
+	case *rm.DVEHRURI:
+		if attr == "value" {
+			return "ehr://example"
+		}
+	case *rm.CodePhrase:
+		if attr == "code_string" {
+			return "at0000"
+		}
+	}
+	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
+		return s
+	}
+	return "example"
 }
 
 // stringAttr reads a BMM String field the generator itself writes.
