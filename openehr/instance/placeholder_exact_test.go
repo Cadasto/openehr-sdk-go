@@ -126,7 +126,8 @@ func TestREQ107_RootPlaceholders(t *testing.T) {
 // terminology it names, or under local. Each OPT is compiled with and
 // without the implicit attributes, because the two take different paths
 // through the generator, and generated under both value fills: a
-// RandomFill draw from an empty code list keeps the named terminology.
+// RandomFill draw from an empty code list keeps the named terminology, and
+// a C_DV_ORDINAL that lists no ordinal gets the placeholder symbol.
 func TestREQ107_ExactPlaceholders(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -176,6 +177,19 @@ func TestREQ107_ExactPlaceholders(t *testing.T) {
 		{
 			name: "DV_ORDINAL under ELEMENT",
 			opt:  optTemplate("ELEMENT", optSingle("value", optNode("DV_ORDINAL", ""))),
+			check: func(t *testing.T, out any) {
+				ord := rootElementValue[*rm.DVOrdinal](t, out)
+				if ord.Symbol.DefiningCode != localPlaceholder {
+					t.Errorf("DV_ORDINAL.symbol.defining_code = %+v, want %+v", ord.Symbol.DefiningCode, localPlaceholder)
+				}
+			},
+		},
+		{
+			// A C_DV_ORDINAL that lists no ordinal leaves nothing to draw
+			// from, under RandomFill too, so the placeholder decides.
+			name: "C_DV_ORDINAL with no ordinal listed",
+			opt: optTemplate("ELEMENT", optSingle("value",
+				`<children xsi:type="C_DV_ORDINAL"><rm_type_name>DV_ORDINAL</rm_type_name><node_id></node_id></children>`)),
 			check: func(t *testing.T, out any) {
 				ord := rootElementValue[*rm.DVOrdinal](t, out)
 				if ord.Symbol.DefiningCode != localPlaceholder {
