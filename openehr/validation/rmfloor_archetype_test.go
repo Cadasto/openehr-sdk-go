@@ -21,18 +21,18 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
-// TestValidateRM_ArchetypeRootClassesMatchBMM checks that the floor reports
-// the archetype-root rule on exactly the classes of the shared closed list
-// (REQ-112, ADR 0001), which internal/rmroots pins to the vendored BMM's
-// Is_archetype_root declarations. It runs the floor over every registered
-// LOCATABLE concrete: a zero value of a root class must report
-// `is_archetype_root` at /archetype_details, any other LOCATABLE must not
-// (the spec's MUST NOT: FOLDER, PARTY_RELATIONSHIP, GENERIC_ENTRY,
-// PARTY_IDENTITY, CONTACT, ADDRESS, CAPABILITY and the data structures), and
-// a value of either kind carrying archetype_details must not. A floor that
-// stops reporting a root class, or reports a class the list leaves out,
-// fails here.
-func TestValidateRM_ArchetypeRootClassesMatchBMM(t *testing.T) {
+// TestValidateRM_ArchetypeRootClassesMatchSharedList checks that the floor
+// reports the archetype-root rule on exactly the classes of the shared
+// closed list (REQ-112, ADR 0001), which internal/rmroots pins to the
+// vendored BMM's Is_archetype_root declarations. It runs the floor over
+// every registered LOCATABLE concrete: a zero value of a root class must
+// report `is_archetype_root` at /archetype_details, any other LOCATABLE
+// must not (the spec's MUST NOT: FOLDER, PARTY_RELATIONSHIP, GENERIC_ENTRY,
+// PARTY_IDENTITY, CONTACT, ADDRESS, CAPABILITY and the data structures),
+// and a value of either kind carrying archetype_details must not. A floor
+// that stops reporting a root class, or reports a class the list leaves
+// out, fails here.
+func TestValidateRM_ArchetypeRootClassesMatchSharedList(t *testing.T) {
 	swept := map[string]bool{}
 	var roots []string
 	for _, name := range typereg.Default.Names() {
