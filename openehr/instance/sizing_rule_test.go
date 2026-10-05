@@ -274,6 +274,13 @@ func TestREQ107_MultipleSizedByOccurrencesAndCardinality(t *testing.T) {
 				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, -1))),
 			want: []string{"at0001", "at0001"},
 		},
+		{
+			// The top-up adds two members, not one.
+			name: "top-up to cardinality lower 3 from one optional child",
+			opt: optTemplate("CLUSTER", optCardinal("items", 3, -1,
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, -1))),
+			want: []string{"at0001", "at0001", "at0001"},
+		},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
