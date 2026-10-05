@@ -259,6 +259,15 @@ func TestREQ107_MultipleSizedByOccurrencesAndCardinality(t *testing.T) {
 			want: []string{"at0001", "at0001"},
 		},
 		{
+			// The first allowed child is a slot: the top-up takes the
+			// first allowed child that is not a slot.
+			name: "top-up from the first non-slot child after a slot",
+			opt: optTemplate("CLUSTER", optCardinal("items", 2, -1,
+				optOccurring("ARCHETYPE_SLOT", "ELEMENT", "at0001", 0, 1),
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0002", 0, -1))),
+			want: []string{"at0002", "at0002"},
+		},
+		{
 			name: "top-up to cardinality lower 2 from one optional child",
 			opt: optTemplate("CLUSTER", optCardinal("items", 2, -1,
 				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, -1))),
@@ -311,6 +320,45 @@ func TestREQ107_FirstAllowedAlternativeWins(t *testing.T) {
 					}
 				})
 			}
+		}
+	}
+}
+
+// TestREQ107_MinimalSkipsCollidingOptionalSiblings is the REQ-107 check
+// that, under Minimal, an optional child whose node_id an earlier optional
+// sibling shares gets no member, so validator node-id binding stays
+// unambiguous, while Example gives each its member. The two siblings are
+// ELEMENTs, not archetype roots, told apart by their value's RM type. It
+// holds under both value fills and both compile modes.
+func TestREQ107_MinimalSkipsCollidingOptionalSiblings(t *testing.T) {
+	opt := optTemplate("CLUSTER", optCardinal("items", 1, -1,
+		optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 1, optSingle("value", optNode("DV_TEXT", ""))),
+		optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 1, optSingle("value", optNode("DV_COUNT", "")))))
+	want := map[instance.Policy][]string{
+		instance.Minimal: {"DV_TEXT"},
+		instance.Example: {"DV_TEXT", "DV_COUNT"},
+	}
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, opts := range defaultsOptions() {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				var got []string
+				for _, item := range out.(*rm.Cluster).Items {
+					el, ok := item.(*rm.Element)
+					if !ok || el.Value == nil {
+						t.Fatalf("CLUSTER.items member is %#v, want an ELEMENT with a value", item)
+					}
+					got = append(got, rmTypeName(el.Value))
+				}
+				if !slices.Equal(got, want[opts.Policy]) {
+					t.Errorf("CLUSTER.items values = %v, want %v", got, want[opts.Policy])
+				}
+				noFloorErrors(t, out)
+			})
 		}
 	}
 }

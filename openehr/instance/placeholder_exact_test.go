@@ -125,7 +125,8 @@ func TestREQ107_RootPlaceholders(t *testing.T) {
 // C_CODE_PHRASE with an empty code list gives the code at0000 under the
 // terminology it names, or under local. Each OPT is compiled with and
 // without the implicit attributes, because the two take different paths
-// through the generator.
+// through the generator, and generated under both value fills: a
+// RandomFill draw from an empty code list keeps the named terminology.
 func TestREQ107_ExactPlaceholders(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -223,9 +224,9 @@ func TestREQ107_ExactPlaceholders(t *testing.T) {
 	for _, tc := range cases {
 		for _, implicit := range []bool{false, true} {
 			c := compileOPTText(t, tc.opt, implicit)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
-				t.Run(fmt.Sprintf("%s/implicit=%t/%v", tc.name, implicit, policy), func(t *testing.T) {
-					out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
 					if err != nil {
 						t.Fatalf("Generate: %v", err)
 					}
