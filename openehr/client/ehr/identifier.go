@@ -26,9 +26,9 @@ type Identifier struct {
 
 // ResolveIdentifierBody decodes an ITS-REST [Identifier] write-response
 // body (sent when `Prefer: return=identifier` is honoured) and, when
-// VersionUID was not already parsed from the ETag or Location header,
-// populates it from the body's uid. The headers stay canonical; the body
-// is the documented fallback noted on [VersionMetadata].
+// VersionUID was not already taken from a well-formed ETag, and then
+// from Location, populates it from the body's uid. That order is the
+// one [VersionMetadata] documents; the body is the fallback after it.
 //
 // A non-empty body that does not decode to an Identifier carrying a uid is
 // returned as a [transport.ErrInvalidShape] error, never silently
@@ -39,8 +39,8 @@ type Identifier struct {
 // bytes, whitespace, or JSON `null`, as [transport.IsNoRepresentationBody]
 // defines empty for every 2xx response. A server honouring
 // `Prefer: return=identifier` with `null` sent no identifier rather than a
-// malformed one, so the ETag or Location header stays the identifier of
-// record.
+// malformed one, so the version id already chosen — a well-formed ETag,
+// then Location — stays in place.
 func (m *VersionMetadata) ResolveIdentifierBody(body []byte) error {
 	if m == nil || transport.IsNoRepresentationBody(body) {
 		return nil

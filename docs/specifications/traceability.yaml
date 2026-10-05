@@ -511,7 +511,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
-    probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013]
+    probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-065]
     tests:
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/ehr_test.go
@@ -520,6 +520,7 @@ requirements:
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
       - testkit/probes/versioned/probe_012_etag_round_trip.go
       - testkit/probes/versioned/probe_013_cross_ehr_isolation.go
+      - testkit/probes/versioned/probe_065_minimal_return_round_trip.go
 
   - id: REQ-055
     title: AQL wire boundary

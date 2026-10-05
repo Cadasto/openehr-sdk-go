@@ -24,10 +24,15 @@ type Response struct {
 // Metadata extracts the headers leaf clients consume most often,
 // parsed into typed values.
 type Metadata struct {
-	// ETag is the response ETag, with surrounding quotes stripped so
-	// the value round-trips into a future If-Match without double
-	// quoting. Empty when the response carried no ETag.
+	// ETag is the first response ETag, with surrounding quotes stripped
+	// so the value round-trips into a future If-Match without double
+	// quoting. Empty when the response carried no ETag. It stays that
+	// first value when a later ETag is the one used as a version id.
 	ETag string
+	// ETags holds every ETag from the response, with surrounding quotes
+	// stripped, in the order the response sent them. ETag is the first
+	// entry when there is one. Empty when the response carried no ETag.
+	ETags []string
 	// Location captures the response Location header verbatim.
 	Location string
 	// LastModified is the parsed HTTP Last-Modified header. Zero
@@ -57,8 +62,14 @@ type Metadata struct {
 // headers — populated fields surface what the wire provided, missing
 // fields stay zero.
 func parseMetadata(h http.Header) *Metadata {
+	etags := etagValues(h)
+	var etag string
+	if len(etags) > 0 {
+		etag = etags[0]
+	}
 	m := &Metadata{
-		ETag:               unquoteETag(h.Get("ETag")),
+		ETag:               etag,
+		ETags:              etags,
 		Location:           h.Get("Location"),
 		RMVersion:          h.Get("openehr-version"),
 		AuditDetails:       h.Get("openehr-audit-details"),
@@ -74,6 +85,21 @@ func parseMetadata(h http.Header) *Metadata {
 		}
 	}
 	return m
+}
+
+// etagValues returns every ETag header value, quotes and a weak
+// prefix stripped, in wire order. The slice is a copy. Nil when the
+// response carried no ETag.
+func etagValues(h http.Header) []string {
+	raw := h.Values("ETag")
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make([]string, len(raw))
+	for i, v := range raw {
+		out[i] = unquoteETag(v)
+	}
+	return out
 }
 
 // joinHeaderField returns one logical openEHR header value. When a
