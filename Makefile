@@ -340,6 +340,10 @@ docs-check: docs-build ## Build the site and assert the published output is comp
 	  || { echo "docs-check: pages/install.md does not pin 'go get …@v$(DOCS_RELEASE)', the latest release in CHANGELOG.md"; exit 1; }; \
 	grep -q 'openehr-sdk-go@v$(DOCS_RELEASE)' "$(DOCS_BUILD)/index.html" \
 	  || { echo "docs-check: pages/index.md (the landing quick start) does not pin 'go get …@v$(DOCS_RELEASE)', the latest release in CHANGELOG.md"; exit 1; }; \
+	grep -q 'openehr-sdk-go@v$(DOCS_RELEASE)' README.md \
+	  || { echo "docs-check: README.md does not pin 'go get …@v$(DOCS_RELEASE)', the latest release in CHANGELOG.md"; exit 1; }; \
+	grep -q 'openehr-sdk-go@v$(DOCS_RELEASE)' docs/quick-start.md \
+	  || { echo "docs-check: docs/quick-start.md does not pin 'go get …@v$(DOCS_RELEASE)', the latest release in CHANGELOG.md"; exit 1; }; \
 	grep -q 'specifications.openehr.org' "$(DOCS_BUILD)/index.html" \
 	  || { echo "docs-check: landing page is missing the openEHR spec links"; exit 1; }; \
 	test -n "$(ITS_REST_PIN)" \
