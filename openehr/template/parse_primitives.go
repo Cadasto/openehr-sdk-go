@@ -1,6 +1,7 @@
 package template
 
 import (
+	"encoding/xml"
 	"fmt"
 	"strconv"
 	"strings"
@@ -27,6 +28,41 @@ type xmlNumericInterval struct {
 	// which xsi:type owns the range.
 	Lower string `xml:"lower"`
 	Upper string `xml:"upper"`
+}
+
+// xmlBoolFlag is the true_valid or false_valid element of a C_BOOLEAN.
+// A plain bool field would read an empty element as false. This type
+// leaves an empty or whitespace-only element unset instead, so it reads
+// exactly like an omitted one. Any other text is parsed with
+// strconv.ParseBool, as a bool field would be, and text that is not a
+// boolean still fails the parse.
+type xmlBoolFlag struct {
+	set   bool
+	value bool
+}
+
+// UnmarshalXML reads the element's text into the flag.
+func (f *xmlBoolFlag) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	var text string
+	if err := d.DecodeElement(&text, &start); err != nil {
+		return err
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	v, err := strconv.ParseBool(text)
+	if err != nil {
+		return err
+	}
+	*f = xmlBoolFlag{set: true, value: v}
+	return nil
+}
+
+// orTrue returns the flag's value, or true when the element was omitted
+// or empty.
+func (f xmlBoolFlag) orTrue() bool {
+	return !f.set || f.value
 }
 
 // xmlPrimitiveListItem captures one <list> entry inside a primitive
@@ -129,13 +165,13 @@ func buildBoolean(o *xmlCObject) constraints.CBoolean {
 	// AOM 1.4 declares both true_valid and false_valid as mandatory on
 	// C_BOOLEAN, with the invariant "Both attributes cannot be set to
 	// False" (an unsatisfiable constraint). When the OPT XML omits one
-	// or both elements, default each flag *independently* to true —
-	// the safe direction, since the spec's only invariant forbids the
-	// {false,false} case. A literal nil → false default on a single
-	// omitted element would actively synthesise that forbidden case.
+	// or both elements, or leaves one empty, default each flag
+	// *independently* to true. That is the safe direction, since the
+	// spec's only invariant forbids the {false,false} case. Reading a
+	// missing or empty element as false would synthesise that case.
 	c := constraints.CBoolean{
-		TrueValid:  o.TrueValid == nil || *o.TrueValid,
-		FalseValid: o.FalseValid == nil || *o.FalseValid,
+		TrueValid:  o.TrueValid.orTrue(),
+		FalseValid: o.FalseValid.orTrue(),
 	}
 	if v, ok := parseBool(o.AssumedValue); ok {
 		c.Default = &v

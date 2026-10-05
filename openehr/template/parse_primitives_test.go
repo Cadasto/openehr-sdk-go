@@ -2,6 +2,7 @@ package template_test
 
 import (
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -165,6 +166,79 @@ func TestParse_CBoolean_DefaultsAreIndependent(t *testing.T) {
 				t.Errorf("unsatisfiable {false,false} synthesised — violates AOM 1.4 C_BOOLEAN invariant")
 			}
 		})
+	}
+}
+
+// An empty or whitespace-only true_valid or false_valid element reads like
+// an omitted one, so its flag defaults to true in both parse modes. Two
+// empty elements must never yield the {false,false} C_BOOLEAN that AOM 1.4
+// forbids. A non-empty element keeps its parsed value.
+func TestREQ103_CBoolean_EmptyFlagReadsAsOmitted(t *testing.T) {
+	parsers := []struct {
+		name  string
+		parse func(io.Reader) (*template.OperationalTemplate, error)
+	}{
+		{name: "ParseOPT", parse: template.ParseOPT},
+		{name: "ParseOPTStrict", parse: template.ParseOPTStrict},
+	}
+	cases := []struct {
+		name      string
+		flags     string
+		wantTrue  bool
+		wantFalse bool
+	}{
+		{name: "both_self_closing", flags: `<true_valid/><false_valid/>`, wantTrue: true, wantFalse: true},
+		{name: "both_empty", flags: `<true_valid></true_valid><false_valid></false_valid>`, wantTrue: true, wantFalse: true},
+		{name: "both_whitespace", flags: "<true_valid> \n\t</true_valid><false_valid>  </false_valid>", wantTrue: true, wantFalse: true},
+		{name: "true_empty_false_false", flags: `<true_valid/><false_valid>false</false_valid>`, wantTrue: true, wantFalse: false},
+		{name: "true_false_false_empty", flags: `<true_valid>false</true_valid><false_valid></false_valid>`, wantTrue: false, wantFalse: true},
+		{name: "true_whitespace_false_true", flags: `<true_valid>  </true_valid><false_valid>true</false_valid>`, wantTrue: true, wantFalse: true},
+		{name: "explicit_true_false", flags: `<true_valid>true</true_valid><false_valid>false</false_valid>`, wantTrue: true, wantFalse: false},
+		{name: "explicit_false_true", flags: `<true_valid>false</true_valid><false_valid>true</false_valid>`, wantTrue: false, wantFalse: true},
+		{name: "padded_shorthand", flags: `<true_valid> 1 </true_valid><false_valid>F</false_valid>`, wantTrue: true, wantFalse: false},
+	}
+	for _, p := range parsers {
+		for _, tc := range cases {
+			t.Run(p.name+"/"+tc.name, func(t *testing.T) {
+				child := `<children xsi:type="C_BOOLEAN">
+					<rm_type_name>BOOLEAN</rm_type_name>
+					<node_id />
+					` + tc.flags + `
+				</children>`
+				body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+				tmpl, err := p.parse(strings.NewReader(body))
+				if err != nil {
+					t.Fatalf("%s(%s) error = %v, want nil", p.name, tc.flags, err)
+				}
+				prim := firstChildPrimitive(t, tmpl)
+				c, ok := prim.(constraints.CBoolean)
+				if !ok {
+					t.Fatalf("%s(%s) constraint = %T, want CBoolean", p.name, tc.flags, prim)
+				}
+				if c.TrueValid != tc.wantTrue || c.FalseValid != tc.wantFalse {
+					t.Errorf("%s(%s) flags = (%v, %v), want (%v, %v)",
+						p.name, tc.flags, c.TrueValid, c.FalseValid, tc.wantTrue, tc.wantFalse)
+				}
+			})
+		}
+	}
+}
+
+// A true_valid or false_valid element whose text is not a boolean still
+// fails the parse in both modes, as it did before empty elements were
+// read as omitted.
+func TestREQ103_CBoolean_NonBooleanFlagStillRefused(t *testing.T) {
+	child := `<children xsi:type="C_BOOLEAN">
+		<rm_type_name>BOOLEAN</rm_type_name>
+		<node_id />
+		<true_valid>yes</true_valid>
+	</children>`
+	body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+	if _, err := template.ParseOPT(strings.NewReader(body)); !errors.Is(err, template.ErrInvalidOPT) {
+		t.Errorf("ParseOPT(<true_valid>yes</true_valid>) error = %v, want errors.Is(err, ErrInvalidOPT)", err)
+	}
+	if _, err := template.ParseOPTStrict(strings.NewReader(body)); !errors.Is(err, template.ErrInvalidOPT) {
+		t.Errorf("ParseOPTStrict(<true_valid>yes</true_valid>) error = %v, want errors.Is(err, ErrInvalidOPT)", err)
 	}
 }
 
