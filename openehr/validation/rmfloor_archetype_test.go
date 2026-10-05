@@ -9,128 +9,59 @@ package validation_test
 // (rmfloor_bytes_test.go).
 
 import (
-	"encoding/json"
 	"maps"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
-// bmmArchetypeRoots reads the vendored RM BMM and returns the classes that
-// declare the Is_archetype_root invariant, and the concrete classes that are
-// archetype roots: a declaring class or any descendant of one, abstract
-// classes left out.
-func bmmArchetypeRoots(t *testing.T) (declarers, concrete []string) {
-	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "resources", "bmm", "openehr_rm_1.2.0.bmm.json"))
-	if err != nil {
-		t.Fatalf("read vendored RM BMM: %v", err)
-	}
-	var schema struct {
-		ClassDefinitions map[string]struct {
-			Ancestors  []string          `json:"ancestors"`
-			IsAbstract bool              `json:"is_abstract"`
-			Invariants map[string]string `json:"invariants"`
-		} `json:"class_definitions"`
-	}
-	if err := json.Unmarshal(raw, &schema); err != nil {
-		t.Fatalf("decode vendored RM BMM: %v", err)
-	}
-	classes := schema.ClassDefinitions
-	for name, c := range classes {
-		expr, ok := c.Invariants["Is_archetype_root"]
-		if !ok {
-			continue
-		}
-		if expr != "is_archetype_root" {
-			t.Errorf("BMM %s.Is_archetype_root = %q, want %q: the floor reads the invariant as fixing is_archetype_root true", name, expr, "is_archetype_root")
-		}
-		declarers = append(declarers, name)
-	}
-	memo := map[string]bool{}
-	var isRoot func(string) bool
-	isRoot = func(name string) bool {
-		if v, seen := memo[name]; seen {
-			return v
-		}
-		memo[name] = false // guards a cyclic ancestry
-		c, ok := classes[name]
-		if !ok {
-			return false
-		}
-		_, declares := c.Invariants["Is_archetype_root"]
-		root := declares || slices.ContainsFunc(c.Ancestors, isRoot)
-		memo[name] = root
-		return root
-	}
-	for name, c := range classes {
-		if !c.IsAbstract && isRoot(name) {
-			concrete = append(concrete, name)
-		}
-	}
-	slices.Sort(declarers)
-	slices.Sort(concrete)
-	return declarers, concrete
-}
-
-// TestValidateRM_ArchetypeRootClassesMatchBMM pins the floor's closed list of
-// archetype-root classes to the vendored BMM (REQ-112, ADR 0001). The BMM gives
-// the declaring classes and their concrete descendants; this test checks that
-// they are the ones the spec names, and then runs the floor over every
-// registered LOCATABLE concrete: a zero value of a root class must report
-// `is_archetype_root` at /archetype_details, any other LOCATABLE must not
-// (the spec's MUST NOT: FOLDER, PARTY_RELATIONSHIP, GENERIC_ENTRY,
-// PARTY_IDENTITY, CONTACT, ADDRESS, CAPABILITY and the data structures), and
-// a value of either kind carrying archetype_details must not. A BMM bump that
-// adds a root class fails here until the floor's list gains it.
-func TestValidateRM_ArchetypeRootClassesMatchBMM(t *testing.T) {
-	declarers, roots := bmmArchetypeRoots(t)
-	if want := []string{"COMPOSITION", "EHR_ACCESS", "EHR_STATUS", "ENTRY", "PARTY"}; !slices.Equal(declarers, want) {
-		t.Errorf("BMM Is_archetype_root declarers = %v, want %v: update the floor's closed list and the spec together (ADR 0001)", declarers, want)
-	}
-	wantRoots := []string{
-		"ACTION", "ADMIN_ENTRY", "AGENT", "COMPOSITION", "EHR_ACCESS", "EHR_STATUS", "EVALUATION",
-		"GROUP", "INSTRUCTION", "OBSERVATION", "ORGANISATION", "PERSON", "ROLE",
-	}
-	if !slices.Equal(roots, wantRoots) {
-		t.Errorf("BMM concrete archetype-root classes = %v, want %v: update the floor's closed list and the spec together (ADR 0001)", roots, wantRoots)
-	}
-
-	isRoot := map[string]bool{}
-	for _, name := range roots {
-		isRoot[name] = true
-	}
+// TestValidateRM_ArchetypeRootClassesMatchSharedList checks that the floor
+// reports the archetype-root rule on exactly the classes of the shared
+// closed list (REQ-112, ADR 0001), which internal/rmroots pins to the
+// vendored BMM's Is_archetype_root declarations. It runs the floor over
+// every registered LOCATABLE concrete: a zero value of a root class must
+// report `is_archetype_root` at /archetype_details, any other LOCATABLE
+// must not (the spec's MUST NOT: FOLDER, PARTY_RELATIONSHIP, GENERIC_ENTRY,
+// PARTY_IDENTITY, CONTACT, ADDRESS, CAPABILITY and the data structures),
+// and a value of either kind carrying archetype_details must not. A floor
+// that stops reporting a root class, or reports a class the list leaves
+// out, fails here.
+func TestValidateRM_ArchetypeRootClassesMatchSharedList(t *testing.T) {
 	swept := map[string]bool{}
+	var roots []string
 	for _, name := range typereg.Default.Names() {
 		ctor, _ := typereg.Default.Lookup(name)
 		v := ctor()
+		root := rmroots.IsArchetypeRoot(name)
 		loc, ok := v.(rm.MutableLocatable)
 		if !ok {
-			if isRoot[name] {
-				t.Errorf("%s is a BMM archetype root but its registered Go type %T is not a LOCATABLE", name, v)
+			if root {
+				t.Errorf("%s is an archetype root but its registered Go type %T is not a LOCATABLE", name, v)
 			}
 			continue
 		}
 		swept[name] = true
-		if got := reportsArchetypeRoot(validation.ValidateRM(v)); got != isRoot[name] {
-			t.Errorf("ValidateRM(zero %s) reports is_archetype_root at /archetype_details = %v, want %v", name, got, isRoot[name])
+		if root {
+			roots = append(roots, name)
+		}
+		if got := reportsArchetypeRoot(validation.ValidateRM(v)); got != root {
+			t.Errorf("ValidateRM(zero %s) reports is_archetype_root at /archetype_details = %v, want %v", name, got, root)
 		}
 		loc.SetArchetypeDetails(&rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-" + name + ".x.v1"}, RMVersion: "1.1.0"})
 		if reportsArchetypeRoot(validation.ValidateRM(v)) {
 			t.Errorf("ValidateRM(%s with archetype_details) reports is_archetype_root; want none", name)
 		}
 	}
-	for _, name := range roots {
-		if !swept[name] {
-			t.Errorf("BMM archetype root %s has no registered LOCATABLE concrete, so the floor cannot reach it", name)
-		}
+	// internal/rmroots checks that every root class has a registered
+	// LOCATABLE Go type; this sweep must have reached at least one.
+	if len(roots) == 0 {
+		t.Fatalf("swept %d LOCATABLE concretes (%v) and no archetype root, so the rule above is vacuous", len(swept), slices.Sorted(maps.Keys(swept)))
 	}
 	// The spec's named non-roots the SDK models must have been swept, so the
 	// MUST NOT above is not vacuous. EXTRACT is not registered by the SDK.
@@ -139,12 +70,9 @@ func TestValidateRM_ArchetypeRootClassesMatchBMM(t *testing.T) {
 		"SECTION", "ACTIVITY", "HISTORY", "POINT_EVENT", "INTERVAL_EVENT",
 		"ITEM_TREE", "ITEM_LIST", "ITEM_SINGLE", "ITEM_TABLE", "CLUSTER", "ELEMENT",
 	} {
-		if !swept[name] || isRoot[name] {
-			t.Errorf("non-root %s: swept = %v, root = %v; want swept and not a root", name, swept[name], isRoot[name])
+		if root := rmroots.IsArchetypeRoot(name); !swept[name] || root {
+			t.Errorf("non-root %s: swept = %v, root = %v; want swept and not a root", name, swept[name], root)
 		}
-	}
-	if len(swept) < len(roots) {
-		t.Fatalf("swept %d LOCATABLE concretes (%v), fewer than the %d roots", len(swept), slices.Sorted(maps.Keys(swept)), len(roots))
 	}
 }
 

@@ -1,12 +1,16 @@
 package instanceprobes_test
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -95,4 +99,89 @@ func TestREQ107_HollowBodyFloor(t *testing.T) {
 	if _, ok := got[reasonHollowBody+":/"]; ok {
 		t.Errorf("bodyReasons(with element) = %v, want no %s finding", got, reasonHollowBody)
 	}
+}
+
+// archetypeIDMissingOPT is a COMPOSITION template whose required content
+// attribute names no child, so Generate refuses the OBSERVATION it would
+// build there.
+const archetypeIDMissingOPT = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>archetype_id_missing</value></template_id><concept>archetype_id_missing</concept>
+<definition><rm_type_name>COMPOSITION</rm_type_name><node_id>at0000</node_id>
+<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>content</rm_attribute_name>
+<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality>
+</attributes>
+<archetype_id><value>openEHR-EHR-COMPOSITION.encounter.v1</value></archetype_id></definition>
+</template>`
+
+// TestREQ107_RatchetKeysArchetypeIDMissing pins the census key for the
+// generator's refusal of an archetype root the template names no archetype
+// for (REQ-107): the refusal category, then archetype_id_missing and a
+// locator. The locator is the OPT path the error names, whatever note
+// follows the path and whether or not the builder wraps the error; for a
+// required attribute the template leaves without children it is the path
+// of that attribute, so the refusal keys apart from one at the node that
+// holds the attribute, such as the template root.
+func TestREQ107_RatchetKeysArchetypeIDMissing(t *testing.T) {
+	const spaced = "/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben (A)']/items[at0001]"
+	missing := instance.ErrArchetypeIDMissing
+	key := func(locator string) string { return reasonRefusalOther + ":archetype_id_missing:" + locator }
+	cases := []struct {
+		name    string
+		err     error
+		locator string
+	}{
+		{"node without an archetype id", fmt.Errorf("%w: OBSERVATION at /content[at0000]", missing), "/content[at0000]"},
+		{"abstract node", fmt.Errorf("%w: CONTENT_ITEM (built as OBSERVATION) at /content[at0001]", missing), "/content[at0001]"},
+		{"name predicate with a space", fmt.Errorf("%w: OBSERVATION at %s", missing, spaced), spaced},
+		{
+			"required attribute of a nested node",
+			fmt.Errorf("%w: OBSERVATION for SECTION.items at %s (required, but the template names no child)", missing, spaced),
+			spaced + "/items",
+		},
+		{
+			"required attribute of the template root",
+			fmt.Errorf("%w: OBSERVATION for COMPOSITION.content at / (required, but the template names no child)", missing),
+			"/content",
+		},
+		{"template root", fmt.Errorf("%w: COMPOSITION at / (the template root)", missing), "/"},
+		{"wrapped by the builder", fmt.Errorf("composition.NewSkeleton: %w", fmt.Errorf("%w: OBSERVATION at /content[at0000]", missing)), "/content[at0000]"},
+	}
+	got := map[string]string{}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got[tc.name] = generateReason(t, tc.err)
+			if want := key(tc.locator); got[tc.name] != want {
+				t.Errorf("generateReason(%q) = %q, want %q", tc.err, got[tc.name], want)
+			}
+		})
+	}
+	// Distinct refusals at one node keep distinct keys.
+	for _, pair := range [][2]string{
+		{"template root", "required attribute of the template root"},
+		{"name predicate with a space", "required attribute of a nested node"},
+	} {
+		if got[pair[0]] == got[pair[1]] {
+			t.Errorf("%s and %s share the key %q, want distinct keys", pair[0], pair[1], got[pair[0]])
+		}
+	}
+
+	t.Run("refusal from Generate", func(t *testing.T) {
+		opt, err := template.ParseOPT(strings.NewReader(archetypeIDMissingOPT))
+		if err != nil {
+			t.Fatalf("ParseOPT: %v", err)
+		}
+		c, err := templatecompile.Compile(opt)
+		if err != nil {
+			t.Fatalf("Compile: %v", err)
+		}
+		_, err = instance.Generate(t.Context(), c, instance.Options{Territory: "NL", Composer: testComposer()})
+		if !errors.Is(err, missing) {
+			t.Fatalf("Generate error = %v, want one wrapping ErrArchetypeIDMissing", err)
+		}
+		if got, want := generateReason(t, err), key("/content"); got != want {
+			t.Errorf("generateReason(%q) = %q, want %q", err, got, want)
+		}
+	})
 }

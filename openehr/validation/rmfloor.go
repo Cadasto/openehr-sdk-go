@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
@@ -296,32 +297,13 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkTemporalValue(value, rmType, path)
 	case rmType == "ELEMENT":
 		w.checkElementNullFlavour(value, path)
-	case isArchetypeRootClass(rmType):
+	case rmroots.IsArchetypeRoot(rmType):
 		w.checkArchetypeRoot(value, rmType, path)
 	}
 }
 
-// isArchetypeRootClass reports whether rmType is a concrete RM class whose
-// objects are always archetype roots. It is a closed list of the classes whose
-// BMM definition declares the `Is_archetype_root` invariant (COMPOSITION,
-// EHR_ACCESS, EHR_STATUS) or inherits it from a declaring abstract class
-// (PARTY: PERSON, ORGANISATION, GROUP, AGENT, ROLE; ENTRY: ADMIN_ENTRY,
-// OBSERVATION, EVALUATION, INSTRUCTION, ACTION). rminfo does not expose
-// invariants, so the list is written out and a test pins it to the vendored
-// BMM: a BMM bump that adds a root class fails that test until the class is
-// added here.
-func isArchetypeRootClass(rmType string) bool {
-	switch rmType {
-	case "COMPOSITION", "EHR_ACCESS", "EHR_STATUS",
-		"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
-		"ADMIN_ENTRY", "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION":
-		return true
-	}
-	return false
-}
-
 // checkArchetypeRoot enforces the archetype-root rule on a node whose class
-// is always an archetype root (see [isArchetypeRootClass]). The class
+// is always an archetype root (see [rmroots.IsArchetypeRoot]). The class
 // invariant `Is_archetype_root` fixes is_archetype_root true, and
 // LOCATABLE's `Archetyped_valid` (is_archetype_root xor archetype_details =
 // Void) then makes archetype_details mandatory, although LOCATABLE declares
