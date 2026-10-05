@@ -108,6 +108,31 @@ func TestREQ107_VisitsSkipsNonStorableAttributes(t *testing.T) {
 	}
 }
 
+// visitProhibitedSingle is a C_SINGLE_ATTRIBUTE called name with existence
+// 0..0, over child: the OPT prohibits it.
+func visitProhibitedSingle(name, child string) string {
+	return `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
+		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
+		`<lower>0</lower><upper>0</upper></existence>` + child + `</attributes>`
+}
+
+// TestREQ107_VisitsSkipsProhibitedAttributes is the REQ-107 check that the
+// visit predicate never visits an attribute the OPT prohibits (existence
+// 0..0), under either policy, with or without a child under it.
+func TestREQ107_VisitsSkipsProhibitedAttributes(t *testing.T) {
+	visitTree := `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0001</node_id></children>`
+	for _, child := range []string{"", visitTree} {
+		node, attr := visitAttribute(t, visitRootOPT("OBSERVATION", visitProhibitedSingle("protocol", child)), "protocol")
+		for _, policy := range []Policy{Minimal, Example} {
+			g := &generator{opts: Options{Policy: policy}}
+			if g.visits(node, attr) {
+				t.Errorf("visits(OBSERVATION, protocol 0..0, %d children) under %v = true, want false", len(attr.Children()), policy)
+			}
+		}
+	}
+}
+
 // TestREQ107_VisitsFollowsThePolicy is the REQ-107 check that the visit
 // predicate applies the policy to a storable attribute: an optional
 // attribute the OPT names with no children is visited under Example and
