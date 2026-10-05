@@ -160,6 +160,76 @@ func TestREQ107_GeneratedNullFlavourIsFromTheOpenEHRGroup(t *testing.T) {
 	}
 }
 
+// A null flavour the OPT fills, on an ELEMENT with no value, carries its
+// code's pinned rubric as its text, so the rubric check above meets an
+// OPT-filled null flavour too: an OPT that allows only openehr::253 yields
+// "unknown". A code outside the group, or a group code in another
+// terminology, keeps the text the walk gave it: the generator invents no
+// rubric for it.
+func TestREQ034_REQ107_OPTFilledNullFlavourCarriesItsRubric(t *testing.T) {
+	cases := []struct {
+		name          string
+		terminologyID string
+		code          string
+		wantValue     string // empty when the code is outside the group
+	}{
+		{name: "unknown", terminologyID: terminology.ID, code: "253", wantValue: "unknown"},
+		{name: "masked", terminologyID: terminology.ID, code: "272", wantValue: "masked"},
+		{name: "openehr code outside the group", terminologyID: terminology.ID, code: "999"},
+		{name: "group code in another terminology", terminologyID: "local", code: "253"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, optTemplate("ELEMENT", optSingle("null_flavour", optCodedText(tc.terminologyID, tc.code))), true)
+			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
+						out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, ValueFill: fill, Now: defaultsNow})
+						if err != nil {
+							t.Fatalf("Generate: %v", err)
+						}
+						el, ok := out.(*rm.Element)
+						if !ok {
+							t.Fatalf("Generate returned %T, want *rm.Element", out)
+						}
+						nf := el.NullFlavour
+						if nf == nil {
+							t.Fatal("ELEMENT.null_flavour = nil, want the OPT-filled null flavour")
+						}
+						if nf.DefiningCode.TerminologyID.Value != tc.terminologyID || nf.DefiningCode.CodeString != tc.code {
+							t.Fatalf("null_flavour pinned to %s::%s generated code %s::%s",
+								tc.terminologyID, tc.code, nf.DefiningCode.TerminologyID.Value, nf.DefiningCode.CodeString)
+						}
+						if tc.wantValue == "" {
+							if code, found := terminology.NullFlavours.Code(nf.Value); found {
+								t.Errorf("null_flavour %s::%s value = %q, the rubric of %s; want the walk's text, not an invented rubric",
+									tc.terminologyID, tc.code, nf.Value, code)
+							}
+							return
+						}
+						if nf.Value != tc.wantValue {
+							t.Errorf("null_flavour %s::%s value = %q, want %q", tc.terminologyID, tc.code, nf.Value, tc.wantValue)
+						}
+						raw, err := json.Marshal(el)
+						if err != nil {
+							t.Fatalf("Marshal: %v", err)
+						}
+						var element map[string]any
+						if err := json.Unmarshal(raw, &element); err != nil {
+							t.Fatalf("Unmarshal: %v", err)
+						}
+						flavour, ok := element["null_flavour"].(map[string]any)
+						if !ok {
+							t.Fatalf("marshalled ELEMENT has no null_flavour object: %s", raw)
+						}
+						checkNullFlavour(t, element, flavour)
+					})
+				}
+			}
+		})
+	}
+}
+
 func checkNullFlavour(t *testing.T, element, nf map[string]any) {
 	t.Helper()
 	if _, has := element["value"]; has {

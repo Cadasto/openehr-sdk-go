@@ -1543,7 +1543,9 @@ func (g *generator) placeholderElement() *rm.Element {
 // and either null attribute, the null flavour and the null reason are both
 // dropped. An ELEMENT with no value, because the OPT constrains none or none
 // could be generated, keeps any null reason and gets the null flavour
-// "no information" when it has none.
+// "no information" when it has none. A null flavour the OPT filled keeps its
+// code, and takes the pinned rubric of that code when the code is in the
+// openEHR null flavours group.
 func settleElement(e *rm.Element) {
 	if e.Value != nil && !rm.IsTypedNil(e.Value) {
 		e.NullFlavour = nil
@@ -1552,7 +1554,9 @@ func settleElement(e *rm.Element) {
 	}
 	if e.NullFlavour == nil {
 		e.NullFlavour = noInformation()
+		return
 	}
+	useGroupRubric(e.NullFlavour, terminology.NullFlavours)
 }
 
 // useGroupRubric sets the text of a coded text to the pinned rubric of its
