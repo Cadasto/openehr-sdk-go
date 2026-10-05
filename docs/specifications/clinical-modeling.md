@@ -441,7 +441,7 @@ type Options struct {
     Territory   string                  // for COMPOSITION roots
     Composer    rm.PartyProxy           // required when root is COMPOSITION
     Now         time.Time               // clock for EVENT / context times
-    UIDSource   func() *rm.HierObjectID // optional determinism hook for LOCATABLE.uid (nil = crypto/rand)
+    UIDSource   func() *rm.HierObjectID // optional determinism hook for LOCATABLE.uid and PARTY_RELATIONSHIP party ids (nil = crypto/rand)
     ValueFill   ValueFill               // ExampleFill (default) or RandomFill
     ValueSource mrand.Source            // seeds RandomFill; nil = auto-seeded global
 }
@@ -452,7 +452,7 @@ func AsObservation(v any) (*rm.Observation, error)
 // … closed set matching validation ContentItem + standalone archetype roots
 ```
 
-When a `PARTY_RELATIONSHIP`'s source id or target id is empty, the generator **MUST** draw it from that same `UIDSource`.
+When a `PARTY_RELATIONSHIP`'s source or target carries no id, the generator **MUST** draw one from `Options.UIDSource`, or from its random fallback when `UIDSource` is nil.
 
 `Generate` **MUST** return a root RM value satisfying the OPT's structural rules and REQ-103 primitive constraints. Specifically, `Minimal` materialises only attributes with existence lower ≥ 1 (plus BMM-mandatory implicit attrs); `Example` additionally populates every primitive leaf via `PrimitiveConstraint.ExampleValue()`. A multi-valued attribute is sized to `max(existence.lower, 1)` subject to AOM `cardinality.upper` when bounded, except that an optional attribute the OPT leaves silent **MUST** get no child, so nothing archetype-rooted appears without its `archetype_details`; under `Minimal`, when optional archetype-root siblings share a `node_id`, the synthesiser emits only the first colliding sibling so validator node-id binding stays unambiguous (REQ-107). OPT-declared BMM generic RM types (e.g. `DV_INTERVAL<DV_QUANTITY>`) MUST resolve to the concrete Go typereg constructor before `rmwrite` attachment. `C_SINGLE_ATTRIBUTE` alternatives resolve first-child-wins (matching validation v2's first-alternative semantics). Every `ARCHETYPED` the generator writes **MUST** carry `rm.Release`, the RM release the SDK is generated from, as its `rm_version` ([bmm-conformance.md § Generator output conventions](bmm-conformance.md#generator-output-conventions)).
 
