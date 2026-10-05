@@ -211,6 +211,19 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
+			// The OPT pins the code_string to 238 and leaves the
+			// terminology open, so the walk writes 238 in a terminology
+			// other than openehr; the OPT admits openehr::238, so the
+			// default replaces it and Setting_valid holds.
+			name: "admit: EVENT_CONTEXT setting, code_string 238, terminology open",
+			opt: optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "",
+				optSingle("setting", optNode("DV_CODED_TEXT", "", optSingle("defining_code",
+					optNode("CODE_PHRASE", "", optStringAttr("code_string", "<list>238</list>")))))))),
+			check: func(t *testing.T, out any) {
+				checkOpenEHRCode(t, "EVENT_CONTEXT.setting", setting(out), terminology.Setting, "238")
+			},
+		},
+		{
 			// With its null flavour prohibited, the ELEMENT takes a value
 			// instead (TestREQ107_ProhibitedNullFlavourTakesAValue).
 			name: "ELEMENT null_flavour, prohibited",
