@@ -253,7 +253,7 @@ func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAt
 	if locatableUID(optNode, attr) {
 		return false
 	}
-	if attrProhibited(attr) && !(attr.Name() == "null_flavour" && nullFlavourNeeded(optNode)) {
+	if attrProhibited(attr) && !rmNeedsProhibited(optNode, attr) {
 		return false
 	}
 	// rminfo knows each class by its bare BMM name; the OPT may declare
@@ -301,6 +301,15 @@ func (g *generator) uidFor(v any) func() *rm.HierObjectID {
 		return g.nextUID
 	}
 	return nil
+}
+
+// rmNeedsProhibited reports whether an RM rule needs attr of optNode
+// where the OPT prohibits it, so the walk visits it as if the OPT allowed
+// it: an ELEMENT's null_flavour where the OPT prohibits value too
+// (nullFlavourNeeded). An attribute the BMM marks mandatory is never
+// prohibited (attrProhibited), so it needs no case here.
+func rmNeedsProhibited(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	return attr.Name() == "null_flavour" && nullFlavourNeeded(optNode)
 }
 
 // attrProhibited reports whether the OPT prohibits attr and no RM rule
@@ -797,16 +806,6 @@ func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 		}
 	}
 	return "example", true
-}
-
-// stringAttr reads a BMM String field the generator itself writes.
-// ok is false when parent has no such field under attr.
-func stringAttr(parent any, attr string) (string, bool) {
-	get, _, ok := stringField(parent, attr)
-	if !ok {
-		return "", false
-	}
-	return get(), true
 }
 
 // stringField returns a reader and a writer for the BMM String attribute
