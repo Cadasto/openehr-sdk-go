@@ -770,8 +770,9 @@ func (r *Resolver) validate(cat *ServiceCatalog) error {
 			}
 		}
 	}
-	// 3. The authorization-server members SMART App Launch 2.2.0 makes
-	//    conditional on what the document advertises.
+	// 3. Authorization-server members (REQ-072). SMART App Launch 2.2.0
+	//    requires token_endpoint; the anonymous-only relaxation is the
+	//    SDK's own choice.
 	if err := missingAuthMember(cat.Auth); err != nil {
 		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonAuthEndpointsMissing, Inner: err}
 	}
