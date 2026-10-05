@@ -225,12 +225,17 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 // `ifMatch` as the required `If-Match` header.
 //
 // Wire: PUT /ehr/{ehr_id}/composition/{voID} with If-Match. Errors:
-// 409 → [transport.ErrVersionConflict], 412 →
-// [transport.ErrPreconditionFailed], 422 (template / semantic validation
-// failure) → [transport.ErrUnprocessable]. (428 →
-// [transport.ErrPreconditionRequired] is a defensive mapping only; openEHR
-// signals a missing If-Match as 400, not 428.) Forgetting ifMatch returns
-// [transport.ErrInvalidConfig] without issuing a request.
+// 412 (the If-Match is not the latest version) →
+// [transport.ErrPreconditionFailed], with the server's latest version
+// uid in the metadata returned beside the error; 404 (unknown EHR or
+// Composition) → [transport.ErrNotFound]; 422 (template / semantic
+// validation failure) → [transport.ErrUnprocessable]. A 400 has no
+// sentinel and surfaces as a bare [transport.WireError]. (409 →
+// [transport.ErrVersionConflict] and 428 →
+// [transport.ErrPreconditionRequired] are defensive mappings only: the
+// openEHR contract signals a stale If-Match as 412 and a missing one as
+// 400.) Forgetting ifMatch returns [transport.ErrInvalidConfig] without
+// issuing a request.
 //
 // Response shape matches [Save]: bare `*rm.Composition` per the
 // ITS-REST OpenAPI `200_COMPOSITION_updated` response.
@@ -286,20 +291,22 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 }
 
 // Delete logically deletes the Composition version addressed by
-// versionUID, attaching the preceding version's identifier as
-// `If-Match`. The server typically responds 204 No Content.
+// versionUID, which must be the latest version (the preceding version of
+// the deletion). The server typically responds 204 No Content.
 //
-// Wire: DELETE /ehr/{ehr_id}/composition/{version_uid} with If-Match.
-// The If-Match requirement is enforced as in [Update].
-func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
+// Wire: DELETE /ehr/{ehr_id}/composition/{version_uid}. The openEHR
+// operation takes no If-Match header: the version uid in the path is the
+// precondition. Errors: 409 (the uid is no longer the latest version) →
+// [transport.ErrVersionConflict], with the server's latest version uid in
+// the metadata returned beside the error; 404 (unknown EHR or version) →
+// [transport.ErrNotFound]. A 400 (for example, already deleted) has no
+// sentinel and surfaces as a bare [transport.WireError].
+func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, fmt.Errorf("composition.Delete: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
 	if versionUID == "" {
 		return nil, fmt.Errorf("composition.Delete: %w: empty VersionUID", transport.ErrInvalidConfig)
-	}
-	if ifMatch == "" {
-		return nil, fmt.Errorf("composition.Delete: %w: empty If-Match (REQ-054)", transport.ErrInvalidConfig)
 	}
 	cfg := deleteConfig{}
 	for _, o := range opts {
@@ -315,7 +322,6 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		Method:             http.MethodDelete,
 		Path:               "/ehr/" + string(ehrID) + "/composition/" + string(versionUID),
 		Route:              "/ehr/{ehr_id}/composition/{version_uid}",
-		IfMatch:            ifMatch,
 		AuditDetailsHeader: auditHeader,
 	}
 	return openehrclient.DoDelete(ctx, c, req)
@@ -357,7 +363,7 @@ type Repository interface {
 	Get(ctx context.Context, ehrID openehrclient.EHRID, ref openehrclient.Ref) (*rm.Composition, *openehrclient.VersionMetadata, error)
 	Save(ctx context.Context, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
 	Update(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
-	Delete(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
+	Delete(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -377,6 +383,6 @@ func (r *repository) Update(ctx context.Context, ehrID openehrclient.EHRID, voID
 	return Update(ctx, r.c, ehrID, voID, ifMatch, comp, opts...)
 }
 
-func (r *repository) Delete(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
-	return Delete(ctx, r.c, ehrID, versionUID, ifMatch, opts...)
+func (r *repository) Delete(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
+	return Delete(ctx, r.c, ehrID, versionUID, opts...)
 }

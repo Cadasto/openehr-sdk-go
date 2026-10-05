@@ -4,9 +4,9 @@ kind: guide
 
 # Examples
 
-If you are new to the SDK, run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline: the REST ones use an in-process `httptest` backend, so nothing needs a clinical data repository (CDR).
+If you are new to the SDK, run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline. The REST ones talk to a fake server in the same process, so nothing needs a clinical data repository (CDR): either an `httptest` server on a loopback address, or a `sandbox` backend that opens no listener at all ([REST client](#rest-client) says which uses which).
 
-The 17 runnable programs under [`cmd/examples/`](../cmd/examples/) cover the major offline clinical-modeling and AQL workflows, plus selected REST and SMART flows. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
+The 21 runnable programs under [`cmd/examples/`](../cmd/examples/) cover the major offline clinical-modeling and AQL workflows. They also cover REST calls for EHRs, compositions, AQL queries, templates and contributions, and two ways to authenticate: a SMART launch for an app with a signed-in user, and client credentials for a service with no user. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
 
 Each entry says what the program shows, which packages it uses, how to run it, and what the output means. Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<name>` works from any working directory inside a clone. Build them all with `make build` (or `go build ./cmd/examples/...`).
 
@@ -38,7 +38,11 @@ The Packages column lists the SDK packages each program imports, by short name (
 | [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template`, `template/webtemplate`, `templatecompile`, `canjson`, `validation`, `rm` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + template-aware `WithTemplate` decode |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
 | [contribution-build](#contribution-build) | Optional mock (`-commit`) | `client/ehr/contribution`, `client/ehr`, `canjson`, `rm`, `discovery`, `transport` | Multi-version `Contribution_create` assembly, optionally committed |
+| [definition-lifecycle](#definition-lifecycle) | Mock (`sandbox`) | `client/definition`, `template`, `templatecompile`, `discovery`, `transport`, `sandbox` | Upload, list, download and compile a template; the server's copy vs the local compiled handle |
+| [composition-crud](#composition-crud) | Mock (`sandbox`) | `client/ehr/composition`, `client/ehr`, `rm`, `rmpath`, `canjson`, `discovery`, `transport`, `sandbox` | Save, read, update; a stale `If-Match` refused with 412 |
+| [query-execute](#query-execute) | Mock (`sandbox`) | `aql`, `client/query`, `rm`, `typereg`, `discovery`, `transport`, `sandbox` | Execute bound AQL, decode a RESULT_SET cell into a typed value, classify a refusal |
 | [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth`, `discovery` | Standalone PKCE launch; **state + verifier persistence** across the redirect |
+| [service-auth](#service-auth) | Mock (`sandbox`) | `auth/clientcreds`, `auth`, `client/system`, `discovery`, `transport`, `sandbox` | OAuth 2.0 client credentials for a backend service; the cached token reused |
 
 ---
 
@@ -307,8 +311,8 @@ go run ./cmd/examples/aql-build
 **Sample output:**
 
 ```text
-struct-builder : SELECT o FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] WHERE e/ehr_id/value = $ehr_id AND o/data[at0001]/events[at0006]/data/items[at0004]/value/magnitude > 37.5
-verb-functions : SELECT o FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] WHERE e/ehr_id/value = $ehr_id AND o/data[at0001]/events[at0006]/data/items[at0004]/value/magnitude > 37.5
+struct-builder : SELECT o FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] WHERE e/ehr_id/value = $ehr_id AND o/data[at0002]/events[at0003]/data[at0001]/items[at0004]/value/magnitude > 37.5
+verb-functions : SELECT o FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] WHERE e/ehr_id/value = $ehr_id AND o/data[at0002]/events[at0003]/data[at0001]/items[at0004]/value/magnitude > 37.5
 byte-identical : true
 
 containment algebra + in-text paging:
@@ -612,6 +616,8 @@ Every FLAT key is a path of Web Template ids, with an optional `|suffix` naming 
 
 ## REST client
 
+The REST and auth examples run against a fake server in the same process, built one of two ways. `ehr_create`, `contribution-build` (under `-commit`) and `smart-launch` start an `httptest` server on a loopback address. `definition-lifecycle`, `composition-crud`, `query-execute` and `service-auth` build their fake on the public [`sandbox`](../sandbox/doc.go) package instead: a `sandbox.Backend` is an `http.RoundTripper`, plugged into the `*http.Client` as its transport, so no listener is opened and the host in the base URL is never dialled. These four keep the fake in its own file (`fake_cdr.go` or `fake_server.go`), and only that file imports `sandbox`. Either way, the rest of the program wires the SDK as it would for a real server. To point it at one, inject your own `*http.Client` and put your deployment's base URL in the service catalog.
+
 ### ehr_create
 
 **Purpose:** Create an EHR through the SDK's REST client path. Three layers take part: a static service catalog says where the openEHR REST API lives, a transport client carries the injected `*http.Client`, and the typed `ehr.Create` call sends `POST /ehr` and decodes the answer. A throwaway `httptest` server plays the backend, so nothing needs a CDR. Every other REST call in the SDK is wired the same way.
@@ -680,6 +686,117 @@ Per-version overrides (`WithLifecycleState`, `WithVersionCommitter`, `WithVersio
 
 ---
 
+### definition-lifecycle
+
+**Purpose:** Take one template through the Definition REST client. The program uploads an ADL 1.4 OPT, finds its metadata in the server's template listing, downloads the stored OPT, compiles those bytes into a local template handle, and asks the server for an example composition. Two things are called "the template" here. The copy stored on the server is what the CDR checks every composition write against. The compiled handle is what this process's builder, validator and generator use. The SDK does not keep the two in step: when a template changes, upload it and compile it again. A fake CDR built on `sandbox` answers the four ADL 1.4 template routes.
+
+```bash
+go run ./cmd/examples/definition-lifecycle
+```
+
+**Packages:** `openehr/client/definition`, `openehr/template`, `openehr/templatecompile`, `smart/discovery`, `transport`, `sandbox` (plus `testkit/fixtures`, which locates the fixtures)
+
+**Fixtures:** `testkit/corpus/templates/body_weight.opt` (uploaded), `testkit/corpus/compositions/body_weight.json` (the fake's example composition)
+
+**Sample output:**
+
+```text
+uploaded template    : body_weight
+listed metadata      : id=body_weight concept=body_weight
+downloaded OPT       : 84804 bytes, identical to the upload: true
+compiled handle      : template=body_weight root=openEHR-EHR-COMPOSITION.encounter.v1
+example composition  : openEHR-EHR-COMPOSITION.encounter.v1 with 1 content item(s)
+OK: template uploaded, listed, downloaded and compiled; example received
+```
+
+`definition.UploadTemplate` sends no `Prefer` header, and the fake answers the way ITS-REST describes for that case: `201 Created`, a `Location` header naming the template, and an empty body. `UploadTemplate` then takes the template id from the last segment of `Location`; a server that sends a JSON body with a `template_id` works as well. The SDK has no call that returns the metadata of one template, so the program filters `definition.ListTemplates` by the id. The server matches that filter as a pattern and may list other templates too, so the program picks the entry whose `TemplateID` is exactly the id. This fake stores the OPT unchanged, so the download is identical to the upload. A real server may store a template in another form, so the program only reports the comparison; the check is that the download parses with `template.ParseOPTStrict` and compiles. For the example, the fake ignores the `type` and `detail_level` parameters and returns a composition recorded against the same template; a real server generates the example from the template.
+
+**What to copy into your app:**
+
+1. Bound the work with `context.WithTimeout`, give your `*http.Client` a `Timeout` of its own, and pass it to `transport.New` with `transport.WithHTTPClient`.
+2. `definition.UploadTemplate(ctx, client, definition.FormatADL14, body)`, then read the id from the returned metadata's `TemplateID`.
+3. `definition.ListTemplates(ctx, client, definition.FormatADL14, definition.WithTemplateID(id))` to read one template's metadata. ITS-REST makes the filter a wildcard pattern, matched by the server, so take the entry whose `TemplateID` equals the id, not the first entry.
+4. To compile exactly what the server holds, download it with `definition.GetTemplate`, then run `template.ParseOPTStrict` and `templatecompile.Compile`. The download may differ from the bytes you uploaded. Compile once per template and reuse the handle.
+5. `definition.ExampleComposition` gives a starting payload for a template. `WithExampleType` and `WithExampleDetailLevel` choose the kind of example; without them the server applies the ITS-REST defaults, `input` and `required`.
+
+---
+
+### composition-crud
+
+**Purpose:** Save, read and update a COMPOSITION through the REST client, then handle the refusal a stale update meets. The steps follow the openEHR optimistic-concurrency loop: save a first version, read the latest version together with its version uid, update with that uid in `If-Match`, and then send a second update that still carries the old uid. A fake CDR built on `sandbox` answers the three composition routes and keeps every version in memory.
+
+```bash
+go run ./cmd/examples/composition-crud
+```
+
+**Packages:** `openehr/client/ehr/composition`, `openehr/client/ehr`, `openehr/rm`, `openehr/rm/rmpath`, `openehr/serialize/canjson`, `smart/discovery`, `transport`, `sandbox` (plus `testkit/fixtures`, which locates the fixture)
+
+**Fixture:** `testkit/corpus/compositions/body_weight.json`
+
+**Sample output:**
+
+```text
+save: composition returned=false (Prefer: return=minimal)
+  VersionUID=8f14e45f-ceea-467a-9575-4e1a8b2c3d4e::sandbox.local::1
+  Location=https://sandbox.local/openehr/v1/ehr/5a8c6f2e-1b3d-4c7e-9f0a-2d4b6c8e0f1a/composition/8f14e45f-ceea-467a-9575-4e1a8b2c3d4e::sandbox.local::1
+  ETag=8f14e45f-ceea-467a-9575-4e1a8b2c3d4e::sandbox.local::1
+get: latest of 8f14e45f-ceea-467a-9575-4e1a8b2c3d4e is openEHR-EHR-COMPOSITION.encounter.v1
+  VersionUID=8f14e45f-ceea-467a-9575-4e1a8b2c3d4e::sandbox.local::1
+update: composition returned=true (Prefer: return=representation)
+  VersionUID=8f14e45f-ceea-467a-9575-4e1a8b2c3d4e::sandbox.local::2
+stale update: If-Match=8f14e45f-ceea-467a-9575-4e1a8b2c3d4e::sandbox.local::1 refused, status=412
+  server's latest VersionUID=8f14e45f-ceea-467a-9575-4e1a8b2c3d4e::sandbox.local::2
+OK: composition saved, read, updated, and a stale update refused, against an in-process fake CDR
+```
+
+A version uid has three parts, `<versioned object id>::<system id>::<version>`. `composition.Save` sends the default `Prefer: return=minimal`, so the server sends no body and the returned composition is nil; the version uid, `Location` and `ETag` come from the response metadata. `composition.Get` with `ehr.LatestOf` asks for the newest version of the family the versioned object id names. The program then corrects the weight value, found by its path with `rmpath.ItemAtPath`, and `composition.Update` sends the uid it read as `If-Match` with `Prefer: return=representation`, so version 2 comes back. The last update still carries the version 1 uid. The server refuses it with `412 Precondition Failed` and names its latest version in the `ETag`. `Update` maps that status to `transport.ErrPreconditionFailed` and returns the metadata beside the error.
+
+The fake answers as the pinned ITS-REST contract describes. A create answers `201 Created`, with the new version uid in `ETag` and its URL in `Location`. An update answers `200 OK` with a body when `Prefer` asks for one, and `204 No Content` otherwise. For a stale `If-Match`, the `composition_update` operation lists `412` and no `409`.
+
+**What to copy into your app:**
+
+1. Inject your own `*http.Client` with a `Timeout`, and pass a context with a deadline to every call.
+2. Take the version uid from the write's metadata (`meta.VersionUID`), not from the body. With the default `return=minimal` there is no body.
+3. Update with the version uid you last read as `If-Match`. On `errors.Is(err, transport.ErrPreconditionFailed)`, the metadata returned beside the error names the server's latest version: read it again, reapply your change, and update again.
+4. Use `errors.AsType[*transport.WireError](err)` only when you need the status code. Branch on the sentinel, not on the number.
+
+---
+
+### query-execute
+
+**Purpose:** Execute an AQL query and read its result, picking up where [aql-build](#aql-build) stops. The program builds the query with `aql.Builder` and binds the caller's data with `Bind`, so the values travel in `query_parameters` and the text carries only the `$ehr_id` and `$min_temp` placeholders. It sends the query with `query.Execute`, prints the RESULT_SET columns and rows, turns the RM-valued temperature cell into a typed `rm.DVQuantity`, and then classifies a query the server refuses. A fake CDR built on `sandbox` answers `POST /query/aql` with two fixed readings. It is stricter than a real CDR, so the binding is proven: it answers 400 unless the EHR id and the threshold arrive as parameters and the text holds only their placeholders.
+
+```bash
+go run ./cmd/examples/query-execute
+```
+
+**Packages:** `openehr/aql`, `openehr/client/query`, `openehr/rm`, `openehr/rm/typereg`, `smart/discovery`, `transport`, `sandbox`
+
+**Sample output:**
+
+```text
+query: SELECT o/data[at0002]/events[at0003]/time/value AS measured, o/data[at0002]/events[at0003]/data[at0001]/items[at0004]/value AS temperature FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] WHERE e/ehr_id/value = $ehr_id AND o/data[at0002]/events[at0003]/data[at0001]/items[at0004]/value/magnitude >= $min_temp
+bound parameters: ehr_id, min_temp
+fetch: 10
+columns:
+  measured     /data[at0002]/events[at0003]/time/value
+  temperature  /data[at0002]/events[at0003]/data[at0001]/items[at0004]/value
+rows: 2
+  2026-05-17T08:00:00Z  38.1 Cel
+  2026-05-17T20:00:00Z  37.6 Cel
+query without Bind calls:
+  refused by the CDR, AQL error code AQL_PARAMETER_MISSING
+  HTTP status 400
+```
+
+`fetch: 10` is the row count `Limit` sets in the request body; the text gets no `LIMIT`. Columns come in SELECT order, and so do the cells of each row. A cell decodes with `encoding/json` into `any`: text arrives as a string, a JSON number in a plain cell as `float64`, and an RM value as a `map[string]any` carrying its `_type`. `json.Marshal` followed by `typereg.DecodeAs[*rm.DVQuantity]` turns that map into the typed value, and refuses a cell of any other RM type.
+
+The second query is the same query without its `Bind` calls. Its text still names the placeholders, but no value travels with them, so the fake answers 400 with an openEHR error envelope. `errors.AsType[*query.AQLError]` exposes the server's code, here `AQL_PARAMETER_MISSING`, a code the fake makes up. `errors.AsType[*transport.WireError]` still reaches the HTTP status. By default the transport drops the server's message, which can quote patient data; `transport.WithRawErrorBodies(true)` keeps it. A `501` also matches `errors.Is(err, aql.ErrEngineCapability)`: valid AQL that the deployment does not implement.
+
+**What to copy into your app:** give each call a deadline with `context.WithTimeout`, and inject your own `*http.Client` with a `Timeout` through `transport.WithHTTPClient`. Put caller data in with `Bind`, never by pasting it into the text, and set the row count with `Limit`. To scope a query to one EHR, pass an `aql.Param` to `FromEHR`, as here. Read cells by column position, and decode an RM-valued cell with `typereg.DecodeAs` instead of walking the map. Branch on `*query.AQLError` and the `aql` error values (`aql.ErrPathResolution`, `aql.ErrEngineCapability`), and log a fixed text with the code, never the server's message or the body.
+
+---
+
 ### smart-launch
 
 **Purpose:** Walk through a standalone SMART-on-openEHR launch for a public client: the OAuth 2.0 authorization-code flow with PKCE, which is how a browser-based or native app that cannot keep a client secret obtains an access token. The program plays every party in turn (the app, the user's browser, and the authorization server) against an in-process stub, so it needs no account, no secret and no network. `go test ./cmd/examples/smart-launch` runs the same flow.
@@ -725,6 +842,38 @@ See [specifications/auth.md § PKCE flow](specifications/auth.md#req-061--pkce-f
 
 ---
 
+### service-auth
+
+**Purpose:** Authenticate a backend service to an openEHR server with the OAuth 2.0 client credentials grant: the flow for a batch job, a data loader or a gateway that runs with no user present. For an app that acts for a signed-in user, see [smart-launch](#smart-launch) instead. The program reads its client id and secret from the environment and describes the deployment in a static service catalog that names the token endpoint. From that catalog it builds a `clientcreds.Source` with a system scope, and hands the source to the REST transport. Two `system.Capabilities` calls (`OPTIONS /`) then show the bearer token reaching the server and the cached token being reused. A fake built on `sandbox` plays both the authorization server and the openEHR server, so nothing needs a network, an account or a real secret.
+
+```bash
+go run ./cmd/examples/service-auth
+OPENEHR_CLIENT_ID=... OPENEHR_CLIENT_SECRET=... go run ./cmd/examples/service-auth
+```
+
+**Packages:** `auth/clientcreds`, `auth` (scope syntax), `openehr/client/system`, `smart/discovery`, `transport`, `sandbox`
+
+**Sample output:**
+
+```text
+call 1: Example CDR 1.4.2, openEHR REST 1.1.0-development
+call 2: Example CDR 1.4.2, openEHR REST 1.1.0-development
+token requests: 1 for 2 calls
+OK: both calls carried a client credentials token
+```
+
+Without the variables the program falls back to two marked placeholders, `example-client` and `example-secret`. The fake accepts whatever credentials the program reads, so the output is the same either way. Nothing prints the secret, the token or the `Authorization` header. The requested scope is `system/composition-*.rs`: the client itself, not a user or a patient, may read and search every composition. The fake's token lives 300 seconds, so the second call reuses it and the token endpoint is called once. The fake token endpoint is scaffolding for the example: the SDK only ever acts as a client of an authorization server.
+
+**What to copy into your app:**
+
+1. Read the client id and secret from the environment, filled from your secret store. Never take them from command-line flags, which other users on the host can read in the process list, and never log them or the token.
+2. Build one `*http.Client` with its own `Timeout`, bound each run with `context.WithTimeout`, and pass the same client to the token source and to the transport.
+3. `clientcreds.NewFromCatalog(catalog, id, secret, clientcreds.WithHTTPClient(hc), clientcreds.WithScope(scope))`. It takes the token endpoint and the issuer from the catalog. At startup, it refuses a grant or a client authentication method that the catalog says the server does not accept. With only a token URL and no catalog, use `clientcreds.New(id, secret, tokenURL, ...)`. Build openEHR scopes with `auth.OpenEHRScope{...}.Token()`, which checks the syntax.
+4. `transport.New(catalog, transport.WithHTTPClient(hc), transport.WithTokenSource(src), transport.WithReauthOn401(src))`. The source keeps a token until it is within 30 seconds of expiry, and `clientcreds.WithRefreshThreshold` changes that window. `WithReauthOn401` fetches a fresh token once when the server answers 401 to a token it no longer accepts.
+5. Check the wiring with `system.Capabilities`, not `system.Health`: `Health` never sends a token.
+
+---
+
 ## Suggested learning order
 
 ```text
@@ -733,7 +882,12 @@ See [specifications/auth.md § PKCE flow](specifications/auth.md#req-061--pkce-f
 3. validate-from-json      ← wire bytes + validation (CI pattern)
 4. generate-example        ← generate data from templates
 5. ehr_create              ← REST wiring (mock first, then real CDR)
-6. smart-launch            ← SMART PKCE auth (standalone, public client)
+6. definition-lifecycle    ← get a template onto the server
+7. composition-crud        ← write data, with optimistic concurrency
+8. aql-build               ← build an AQL query in code
+9. query-execute           ← run it and read the data back
+10. smart-launch           ← SMART PKCE auth (standalone, public client)
+11. service-auth           ← client credentials for a backend service
 ```
 
 Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf constraints), `validate-composition` (in-memory RM construction), `contribution-build` (batched atomic writes).

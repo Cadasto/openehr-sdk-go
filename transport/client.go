@@ -454,6 +454,7 @@ func (c *Client) mapWireError(req *Request, target *url.URL, resp *Response) err
 	if detail, ok := decodeOpenEHRError(resp.Body); ok {
 		if !c.cfg.rawErrorBodies {
 			detail.Message = ""
+			detail.ValidationErrors = nil
 		}
 		we.OpenEHR = detail
 	}
@@ -499,7 +500,8 @@ func statusToSentinel(s int) error {
 
 // decodeOpenEHRError attempts to parse the openEHR error envelope
 // (REQ-093). Returns ok=false when the body is empty, non-JSON, or
-// missing both message and code (the envelope is best-effort).
+// missing message, code and validation errors (the envelope is
+// best-effort).
 func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 	if len(body) == 0 {
 		return nil, false
@@ -508,7 +510,7 @@ func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 	if err := json.Unmarshal(body, &d); err != nil {
 		return nil, false
 	}
-	if d.Message == "" && d.Code == "" {
+	if d.Message == "" && d.Code == "" && len(d.ValidationErrors) == 0 {
 		return nil, false
 	}
 	return &d, true

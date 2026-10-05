@@ -441,7 +441,7 @@ type Options struct {
     Territory   string                  // for COMPOSITION roots
     Composer    rm.PartyProxy           // required when root is COMPOSITION
     Now         time.Time               // clock for date-times the OPT leaves unset
-    UIDSource   func() *rm.HierObjectID // optional determinism hook for LOCATABLE.uid (nil = crypto/rand)
+    UIDSource   func() *rm.HierObjectID // optional determinism hook for LOCATABLE.uid and PARTY_RELATIONSHIP party ids (nil = crypto/rand)
     ValueFill   ValueFill               // ExampleFill (default) or RandomFill
     ValueSource mrand.Source            // seeds RandomFill; nil = auto-seeded global
 }
@@ -451,6 +451,8 @@ func AsComposition(v any) (*rm.Composition, error)
 func AsObservation(v any) (*rm.Observation, error)
 // … closed set matching validation ContentItem + standalone archetype roots
 ```
+
+When a `PARTY_RELATIONSHIP`'s source or target carries no id, the generator **MUST** draw one from `Options.UIDSource`, or from its random fallback when `UIDSource` is nil.
 
 `Generate` **MUST** return a root RM value satisfying the OPT's structural rules and REQ-103 primitive constraints. Under either policy, `Generate` **MUST NOT** visit `offset` on `POINT_EVENT` or `INTERVAL_EVENT`, or `is_integral` on `DV_QUANTITY` or `DV_PROPORTION`. Under `Minimal`, `Generate` **MUST** materialise any other attribute whose existence lower bound is bounded and ≥ 1, any other attribute the BMM marks mandatory, any other attribute whose cardinality lower bound is bounded and ≥ 1, or any other attribute that has OPT-pinned children, and **MUST NOT** materialise an attribute outside those cases unless an RM rule below requires it. Under `Example`, `Generate` **MUST** visit every other attribute and **MUST** populate every primitive leaf the way the `ValueFill` in force says ([§ Primitive-leaf value fill](#primitive-leaf-value-fill)). A multi-valued attribute is sized to `max(existence.lower, 1)` subject to AOM `cardinality.upper` when bounded, except that an optional attribute the OPT leaves silent **MUST** get no child, so nothing archetype-rooted appears without its `archetype_details`; under `Minimal`, when optional archetype-root siblings share a `node_id`, the synthesiser emits only the first colliding sibling so validator node-id binding stays unambiguous (REQ-107). OPT-declared BMM generic RM types (e.g. `DV_INTERVAL<DV_QUANTITY>`) MUST resolve to the concrete Go typereg constructor before `rmwrite` attachment. `C_SINGLE_ATTRIBUTE` alternatives resolve first-child-wins (matching validation v2's first-alternative semantics). Every `ARCHETYPED` the generator writes **MUST** carry `rm.Release`, the RM release the SDK is generated from, as its `rm_version` ([bmm-conformance.md § Generator output conventions](bmm-conformance.md#generator-output-conventions)).
 

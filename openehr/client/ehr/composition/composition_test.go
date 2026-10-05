@@ -512,10 +512,22 @@ func TestSaveRejectsNil(t *testing.T) {
 	}
 }
 
+// TestUpdateRequiresIfMatch pins REQ-054: an empty ifMatch is refused with
+// ErrInvalidConfig before any request is sent. The client is live and the
+// body is set, so only the If-Match guard can refuse the call.
 func TestUpdateRequiresIfMatch(t *testing.T) {
-	_, _, err := composition.Update(t.Context(), nil, ehrIDFixture, compositionVOID, "", &rm.Composition{})
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	_, _, err := composition.Update(t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, "", &rm.Composition{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig on empty If-Match, got %v", err)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("server saw %d request(s), want none", n)
 	}
 }
 
@@ -604,18 +616,28 @@ func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
 	}
 }
 
+// TestUpdateMapsPreconditionFailed pins REQ-054: a stale If-Match is a 412
+// that maps to ErrPreconditionFailed, and the latest version uid the
+// server names in its ETag stays reachable beside the error.
 func TestUpdateMapsPreconditionFailed(t *testing.T) {
+	const latest = "11111111-2222-4333-8444-555555555555::sandbox.local::3"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+latest+`"`)
 		w.WriteHeader(http.StatusPreconditionFailed)
 		_, _ = w.Write([]byte(`{"message":"stale","code":"PRECONDITION_FAILED"}`))
 	}))
 	defer srv.Close()
-	_, _, err := composition.Update(t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, "stale", &rm.Composition{})
+	_, meta, err := composition.Update(t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, "stale", &rm.Composition{})
 	if !errors.Is(err, transport.ErrPreconditionFailed) {
-		t.Errorf("expected ErrPreconditionFailed, got %v", err)
+		t.Fatalf("expected ErrPreconditionFailed, got %v", err)
+	}
+	if meta == nil || string(meta.VersionUID) != latest {
+		t.Errorf("latest version beside the error = %+v, want %q", meta, latest)
 	}
 }
 
+// TestDelete pins REQ-054: the Composition delete names the version in its
+// path and sends no If-Match.
 func TestDelete(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -623,7 +645,7 @@ func TestDelete(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	_, err := composition.Delete(t.Context(), newClient(t, srv), ehrIDFixture, compositionVUID, string(compositionVUID))
+	_, err := composition.Delete(t.Context(), newClient(t, srv), ehrIDFixture, compositionVUID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -633,13 +655,34 @@ func TestDelete(t *testing.T) {
 	if captured.URL.Path != "/openehr/v1/ehr/"+string(ehrIDFixture)+"/composition/"+string(compositionVUID) {
 		t.Errorf("path = %q", captured.URL.Path)
 	}
-	if got := captured.Header.Get("If-Match"); got != `"`+string(compositionVUID)+`"` {
-		t.Errorf("If-Match = %q", got)
+	// The openEHR delete operation takes no If-Match: the version uid in
+	// the path is the precondition.
+	if got := captured.Header.Get("If-Match"); got != "" {
+		t.Errorf("If-Match = %q, want none", got)
 	}
 }
 
-func TestDeleteRequiresIfMatch(t *testing.T) {
-	_, err := composition.Delete(t.Context(), nil, ehrIDFixture, compositionVUID, "")
+// TestDeleteNotLatest pins REQ-054: the 409 the openEHR delete answers when the
+// addressed version is no longer the latest: it maps to ErrVersionConflict
+// and the latest version uid stays reachable beside the error.
+func TestDeleteNotLatest(t *testing.T) {
+	const latest = "11111111-2222-4333-8444-555555555555::sandbox.local::2"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+latest+`"`)
+		w.WriteHeader(http.StatusConflict)
+	}))
+	defer srv.Close()
+	meta, err := composition.Delete(t.Context(), newClient(t, srv), ehrIDFixture, compositionVUID)
+	if !errors.Is(err, transport.ErrVersionConflict) {
+		t.Fatalf("expected ErrVersionConflict, got %v", err)
+	}
+	if meta == nil || string(meta.VersionUID) != latest {
+		t.Errorf("latest version beside the error = %+v, want %q", meta, latest)
+	}
+}
+
+func TestDeleteRejectsEmptyVersionUID(t *testing.T) {
+	_, err := composition.Delete(t.Context(), nil, ehrIDFixture, "")
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}

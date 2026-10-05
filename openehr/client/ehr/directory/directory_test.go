@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -468,10 +469,22 @@ func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
 	}
 }
 
+// TestUpdateDirectoryRequiresIfMatch pins REQ-054: an empty ifMatch is
+// refused with ErrInvalidConfig before any request is sent. The client is
+// live and the folder is set, so only the If-Match guard can refuse the call.
 func TestUpdateDirectoryRequiresIfMatch(t *testing.T) {
-	_, _, err := directory.Update(t.Context(), nil, ehrIDFixture, "", &rm.Folder{})
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	_, _, err := directory.Update(t.Context(), newClient(t, srv), ehrIDFixture, "", &rm.Folder{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("server saw %d request(s), want none", n)
 	}
 }
 

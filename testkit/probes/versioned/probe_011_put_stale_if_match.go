@@ -13,8 +13,10 @@ import (
 
 // Probe011PutStaleIfMatch implements PROBE-011: a PUT with a stale
 // If-Match (referencing an old version_uid) is rejected with 412
-// Precondition Failed or 409 Conflict per the deployment's
-// convention. The SDK maps either to a distinct typed sentinel.
+// Precondition Failed, which the SDK maps to
+// [transport.ErrPreconditionFailed]. The vendored ITS-REST pin answers a
+// stale If-Match on a PUT with 412 and lists no 409 for it, so a 409
+// fails the probe.
 //
 // Inputs:
 //   - ehrID is an existing EHR on the deployment / fixture under test.
@@ -24,8 +26,7 @@ import (
 //   - comp is any well-formed update payload.
 //
 // The probe issues [composition.Update] with the stale If-Match and
-// asserts the returned error is wireable as either
-// [transport.ErrPreconditionFailed] or [transport.ErrVersionConflict].
+// asserts the returned error matches [transport.ErrPreconditionFailed].
 func Probe011PutStaleIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, staleIfMatch string, comp *rm.Composition) (Result, error) { // PROBE-011 (REQ-054, REQ-093)
 	r := Result{Probe: "PROBE-011"}
 	if c == nil || ehrID == "" || voID == "" || staleIfMatch == "" || comp == nil {
@@ -42,11 +43,11 @@ func Probe011PutStaleIfMatch(ctx context.Context, c *transport.Client, ehrID ope
 		r.Status = "pass"
 		r.Detail = "mapped to ErrPreconditionFailed (412)"
 	case errors.Is(err, transport.ErrVersionConflict):
-		r.Status = "pass"
-		r.Detail = "mapped to ErrVersionConflict (409)"
+		r.Status = "fail"
+		r.Detail = "got ErrVersionConflict (409); the ITS-REST pin answers a stale If-Match on a PUT with 412"
 	default:
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("expected ErrPreconditionFailed (412) or ErrVersionConflict (409), got %v", err)
+		r.Detail = fmt.Sprintf("expected ErrPreconditionFailed (412), got %v", err)
 	}
 	return r, nil
 }

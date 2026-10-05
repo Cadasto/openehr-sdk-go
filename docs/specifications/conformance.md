@@ -337,18 +337,18 @@ client scenarios to SDK coverage:
 
 #### PROBE-010 — PUT Composition without If-Match
 
-- **Title:** A PUT against a versioned Composition without an `If-Match` header is rejected with `428 Precondition Required`.
+- **Title:** A PUT against a versioned resource without an `If-Match` is never sent: the SDK refuses it at the call site.
 - **Preconditions:** An existing Composition with a known `version_uid`.
-- **Wire assertion:** PUT `/ehr/{ehr_id}/composition/{versioned_object_id}` without `If-Match` returns `428`; the SDK maps this to `transport.ErrPreconditionRequired`. The Go SDK additionally short-circuits empty `ifMatch` at the call site with `transport.ErrInvalidConfig` per the typed-write-path guard.
+- **Wire assertion:** The Go SDK short-circuits an empty `ifMatch` at the call site with `transport.ErrInvalidConfig`, per the typed-write-path guard, so no request leaves the process. The probe sends nothing, so it does not observe how a backend answers a missing `If-Match`; that status mapping is [REQ-093](transport.md#req-093--openehr-error-envelope-mapping)'s.
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_010_put_without_if_match.go`](../../testkit/probes/versioned/probe_010_put_without_if_match.go).
 - **Satisfies:** REQ-054, REQ-093
 
 #### PROBE-011 — PUT Composition with stale If-Match
 
-- **Title:** A PUT with a stale `If-Match` (referencing an old version_uid) is rejected with `412 Precondition Failed` or `409 Conflict` depending on backend convention.
+- **Title:** A PUT with a stale `If-Match` (referencing an old version_uid) is rejected with `412 Precondition Failed`.
 - **Preconditions:** Composition has been updated since the SDK's cached `version_uid`.
-- **Wire assertion:** PUT returns `412` or `409`; SDK maps to `ErrPreconditionFailed` or `ErrVersionConflict` accordingly.
+- **Wire assertion:** PUT returns `412`, and the SDK maps it to `ErrPreconditionFailed`. The vendored ITS-REST pin answers a stale `If-Match` on a PUT with `412` and lists no `409` for it, so a `409` fails the probe.
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_011_put_stale_if_match.go`](../../testkit/probes/versioned/probe_011_put_stale_if_match.go).
 - **Satisfies:** REQ-054, REQ-093
