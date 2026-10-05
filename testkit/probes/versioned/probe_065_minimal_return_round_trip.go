@@ -18,9 +18,10 @@ import (
 // Composition.
 //
 // It checks two facts a deployment must satisfy on the minimal path: the
-// version id the write's ETag or Location names is recovered into the
-// VersionUID (a write that names nothing leaves the caller unable to read
-// what it just committed), and that committed version reads back in full.
+// version id the write returned, taken from a well-formed ETag and then
+// from Location, is recovered into the VersionUID (a write that names
+// nothing leaves the caller unable to read what it just committed), and
+// that committed version reads back in full.
 // That the SDK surfaces only metadata is the SDK's own contract (a minimal
 // write never decodes a body); asserting it here catches a regression that
 // started decoding one.
