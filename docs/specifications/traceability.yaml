@@ -960,6 +960,7 @@ requirements:
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
       - transport/client_test.go
       - transport/decode_error_test.go
+      - transport/error_envelope_test.go
       - transport/errors_test.go
       - transport/reauth_challenge_test.go
 
