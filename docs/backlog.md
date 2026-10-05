@@ -15,8 +15,14 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - auth/smart/source.go:95 · The TokenChange.Response doc says "Its Raw map is the hook's own copy", but maps.Clone copies only the top level: nested values such as fhirContext objects stay shared with LastTokenResponse; add the values inside Raw to the read-only list · by: go-reviewer · from: feat/smart-token-lifecycle
 - auth/smart/jwks.go:15 · the JWKS cache uses a fixed five-minute TTL; Cache-Control on the JWKS response and stale-if-error are not honoured · from: smart-client-conformance plan
 
+## cmd/examples/validate-composition
+- cmd/examples/validate-composition/main.go:122 · The claims that this composition "matches the default fixture of the validate-from-json example" and that the committed fixture is what gen_fixture.go writes have no test; the generator is `//go:build ignore`, so the copies can drift · evidence: generator output byte-identical today; overlay canjson comparison identical; no test refers to either · fix: move the builder into a normal file and add a comparison test, or drop the "matches" sentence · by: go-reviewer · from: docs/examples-validation-path
+
 ## cmd/probe-record
 - cmd/probe-record/scenarios_writes.go · the ehr-status scenario submits is_modifiable true, so its recording would also pass against a server that behaves differently; changing it needs a recapture · from: pr201
+
+## docs
+- docs/examples.md:205 · The failing-run outcomes documented here (-invalid: one `required` issue per pass at /category; -corpus at line 253: RM floor 0, template 12) are not checked by any test; the transcript test runs each program with no arguments and requires exit 0 · evidence: cmd/examples/transcripts_test.go:394-418; both variants match the prose by hand today · fix: add a transcript case with arguments that expects exit 1 and checks the issue lines, or drop the exact count · by: go-reviewer · from: docs/examples-validation-path
 
 ## docs/specifications
 - docs/specifications/traceability.yaml · test files may still cite a REQ they do not pin and so appear in its generated tests list; a sweep over all test files is still to do (the audit estimated 45 to 50 files, not re-counted) · from: audit-2026-09
@@ -92,6 +98,7 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - openehr/template/webtemplate · INTERVAL_EVENT `math_function` and `width` are not Web Template nodes, so FLAT neither emits nor decodes them (PROBE-105 alternative_events) · from: pr-crossformat
 - openehr/template/webtemplate · the Web Template builder keeps only the first value alternative of the corpus CLUSTER's labresult ELEMENT and projects one collapsed DV_TEXT leaf, so the reference's labresult/text_value key in ehrbase_conformance_cluster.json is refused on decode (PROBE-086 census) · from: audit-2026-09
 - openehr/template/webtemplate · the Web Template builder spells an archetyped ACTION transition as the nodes transition and transition2 where the reference emits one in-context ism_transition, so 10 of the action body's 14 excluded keys are still refused on decode (PROBE-086 census) · from: audit-2026-09
+- openehr/template/parse.go:411 · Strict parsing keeps an unrecognised leaf node type (CONSTRAINT_REF, for one) as a bare leaf and drops its constraint without error, so a strictly parsed template can still lose constraints; out of this range, a lead for the parser · evidence: Demonstration.v1.opt (8 CONSTRAINT_REF nodes) parses under ParseFileStrict with a nil error (go-reviewer overlay test) · fix: decide whether strict mode should reject or support CONSTRAINT_REF; backlog · by: go-reviewer · from: docs/examples-validation-path
 
 ## openehr/template/constraints
 - openehr/template/constraints/temporal.go · CTime, CDateTime and CDuration Validate refuse forms the REQ-123 parse and the RM floor accept (20251024T121033, 10:30:00+0100, -P1D, PT1,5S); align them or record the gap · from: pr199
