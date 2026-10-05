@@ -20,8 +20,7 @@ How AI assistants (Claude Code, Cursor, Copilot, Codex, …) work in this repo. 
 | modernizing, or loops/maps/strings | `go-idioms` |
 | goroutines, channels, or context lifetimes | `go-concurrency` |
 | a new package or exported API | `go-layout` |
-| a one-shot idiom/tool question, no editing | `/go-explain <topic>` |
-| golangci-lint v2 config/adoption | `go-linting`, `go-lint-setup`; not needed in this repo, because the config is already pinned (`make lint`) |
+| golangci-lint v2 config/adoption | `go-lint-setup`; not needed in this repo, because the config is already pinned (`make lint`) |
 | reviewing a Go diff | the plugin's `go-reviewer` agent, unless the workflow already supplies a single reviewer seat |
 
 **Orchestrators: brief every subagent.** Subagents don't inherit the parent session's skills:

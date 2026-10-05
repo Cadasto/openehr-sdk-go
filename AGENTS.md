@@ -25,7 +25,7 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 | 2 | [docs/architecture.md](docs/architecture.md) | Design narrative — package organization, dependencies, integration, mermaid diagrams |
 | 3 | [docs/ai-workflow.md](docs/ai-workflow.md) | **AI conventions** — the working loop, recommended plugins/skills, openEHR ground-truth lookups, hooks |
 | 4 | [docs/adr/](docs/adr/) | Closed architectural decisions |
-| 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) | Implementation plans, and the open-work roadmap |
+| 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) + [docs/backlog.md](docs/backlog.md) | Implementation plans, the open-work roadmap, and merged PRs' leftover suggestions (leads to verify, refreshed by `/sdd-triage --backlog` on `main`) |
 | 6 | [CHANGELOG.md](CHANGELOG.md) + [docs/releases.md](docs/releases.md) | Release log and version policy |
 | 7 | [CONTRIBUTING.md](CONTRIBUTING.md) + [SECURITY.md](SECURITY.md) | Contributor flow and vulnerability reporting |
 | 8 | [LICENSING.md](LICENSING.md) | MIT grant plus in-tree third-party inventory |
@@ -51,7 +51,7 @@ Full taxonomy and the package tree are in [module-layout.md](docs/specifications
 - No `cadasto/<X>` imports another `cadasto/<Y>` directly — share through openEHR-core types or interface contracts.
 - `auth/` is layered: generic `TokenSource` at the bottom; SMART (`auth/smart`) and other providers on top.
 - `internal/…` is consumer-invisible and excluded from semver promises.
-- **Building-block independence (REQ-013):** `openehr/{rm,serialize,validation,template,terminology}` and the AQL blocks `openehr/aql` + `aql/parse` + `aql/lint` + `aql/contain` MUST be usable standalone, with no `transport/` or `auth/` import. `openehr/aql` is no longer models-only — it imports `aql/contain` and the Go-internal `aql/internal/semcheck` for REQ-162 containment verification. `openehr/terminology` is stdlib-only and sits below `openehr/rm` (REQ-034).
+- **Building-block independence (REQ-013):** the offline blocks (`openehr/rm`, `bmm`, `serialize/…`, `validation` + `validation/rmread`, `instance`, `composition`, `template`, `templatecompile`, `template/webtemplate`, `terminology`) and the AQL blocks (`openehr/aql`, `aql/parse`, `aql/lint`, `aql/contain`, `aql/internal/semcheck`) MUST NOT import `transport/`, `auth/` or `openehr/client/*`, directly or through any package they import. The template-side blocks also keep `openehr/serialize/` out of their own files. The canonical list and its `Test*ForbiddenImports` guards are in [module-layout.md § REQ-013](docs/specifications/module-layout.md#req-013--building-block-independence); a block with a narrower rule (for example `openehr/terminology`, stdlib-only below `openehr/rm`, REQ-034) states it in its own section.
 
 ## Code style and conventions
 
@@ -97,6 +97,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
   Without Docker, run `fmt-check`, `vet`, `spec-check`, `flat-conformance-verify`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
 - After `git worktree remove`, run `golangci-lint cache clean`; otherwise lint reports phantom issues under the removed `.worktrees/` path.
 - **Public docs never name downstream consuming projects.** Describe what a consumer needs, not who the consumer is.
+- **Release cut** follows [releases.md § Tag checklist](docs/releases.md#tag-checklist) and commits straight to `main`, no branch or PR. The same commit moves the `go get …@vX.Y.Z` pin in `README.md`, `docs/quick-start.md`, `pages/install.md` and `pages/index.md`; `make docs-check` fails until all four match the newest `## [X.Y.Z]` heading in `CHANGELOG.md`.
 
 **Runtime dependencies** are deliberately minimal and reviewed — adding one is a decision, not a convenience. The current set, each confined to the package it serves:
 
@@ -109,7 +110,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 Rationale and the wider picture: [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
 
-**Agent tooling:** a review of a Go diff goes through the plugin's `go-reviewer` agent, or the reviewer loads the same focused skills itself when the workflow already provides a single reviewer seat (the SDD subagent-driven loop does). `/go-explain <topic>` is the one-shot idiom lookup for a Go question; `go-lint-setup` is never needed here — golangci-lint v2 is already pinned (`make lint`). Also: **gopls-lsp** (code intelligence) and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
+**Agent tooling:** a review of a Go diff goes through the plugin's `go-reviewer` agent, or the reviewer loads the same focused skills itself when the workflow already provides a single reviewer seat (the SDD subagent-driven loop does). `go-lint-setup` is never needed here: golangci-lint v2 is already pinned (`make lint`). Also: **gopls-lsp** (code intelligence) and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
 
 **Local agent config:** personal permission grants belong in the gitignored `.claude/settings.local.json` — never add a `permissions` block to the checked-in `.claude/settings.json` (shared hook/plugin config only).
 
