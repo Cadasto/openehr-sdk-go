@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -27,8 +28,9 @@ func TestREQ100_TArchetypeRootAlias(t *testing.T) {
 			t.Fatalf("ParseOPT(social.opt as vendored): %v", err)
 		}
 		// The vendored definition is an archetype root, and so are its
-		// seven C_ARCHETYPE_ROOT children. Without this floor the walk
-		// below could compare two trees that both lost their roots.
+		// seven C_ARCHETYPE_ROOT descendants. Without this floor the
+		// comparison below could pass on two trees that both lost their
+		// roots.
 		if got, wantRoots := countArchetypeRoots(want.Root()), 8; got != wantRoots {
 			t.Fatalf("ParseOPT(social.opt as vendored): %d archetype roots, want %d", got, wantRoots)
 		}
@@ -37,16 +39,16 @@ func TestREQ100_TArchetypeRootAlias(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ParseOPT(social.opt with T_ARCHETYPE_ROOT): %v", err)
 		}
-		if diffs := diffNodes("", want.Root(), lenient.Root(), nil); len(diffs) > 0 {
-			t.Errorf("ParseOPT(social.opt with T_ARCHETYPE_ROOT) differs from the vendored tree:\n%s", summariseDiffs(diffs))
+		if !reflect.DeepEqual(want, lenient) {
+			t.Errorf("ParseOPT(social.opt with T_ARCHETYPE_ROOT) differs from the vendored template:\n%s", explainDiff(want, lenient))
 		}
 
 		strict, err := template.ParseOPTStrict(bytes.NewReader(rewritten))
 		if err != nil {
 			t.Fatalf("ParseOPTStrict(social.opt with T_ARCHETYPE_ROOT) = %v, want nil error", err)
 		}
-		if diffs := diffNodes("", want.Root(), strict.Root(), nil); len(diffs) > 0 {
-			t.Errorf("ParseOPTStrict(social.opt with T_ARCHETYPE_ROOT) differs from the vendored tree:\n%s", summariseDiffs(diffs))
+		if !reflect.DeepEqual(want, strict) {
+			t.Errorf("ParseOPTStrict(social.opt with T_ARCHETYPE_ROOT) differs from the vendored template:\n%s", explainDiff(want, strict))
 		}
 	})
 
@@ -71,8 +73,18 @@ func TestREQ100_TArchetypeRootAlias(t *testing.T) {
 				t.Fatalf("ParseOPT(%s child) = %v, want nil error", tc.xsiType, err)
 			}
 			child := firstContentChild(t, lenient)
+			var ref *template.OperationalTemplate
 			if tc.wantRoot {
 				assertInlineArchetypeRoot(t, "ParseOPT", tc.xsiType, child)
+				// The C_ARCHETYPE_ROOT spelling is the reference: the
+				// whole parsed template must match it, field by field.
+				ref, err = template.ParseOPT(strings.NewReader(fmt.Sprintf(inlineArchetypeRootOPT, "C_ARCHETYPE_ROOT")))
+				if err != nil {
+					t.Fatalf("ParseOPT(C_ARCHETYPE_ROOT child): %v", err)
+				}
+				if !reflect.DeepEqual(ref, lenient) {
+					t.Errorf("ParseOPT(%s child) differs from the C_ARCHETYPE_ROOT parse:\n%s", tc.xsiType, explainDiff(ref, lenient))
+				}
 			} else {
 				co, ok := child.(*template.ComplexObject)
 				if !ok {
@@ -94,13 +106,17 @@ func TestREQ100_TArchetypeRootAlias(t *testing.T) {
 				t.Fatalf("ParseOPTStrict(%s child) = %v, want nil error", tc.xsiType, err)
 			}
 			assertInlineArchetypeRoot(t, "ParseOPTStrict", tc.xsiType, firstContentChild(t, strict))
+			if !reflect.DeepEqual(ref, strict) {
+				t.Errorf("ParseOPTStrict(%s child) differs from the C_ARCHETYPE_ROOT parse:\n%s", tc.xsiType, explainDiff(ref, strict))
+			}
 		})
 	}
 }
 
 // inlineArchetypeRootOPT is a COMPOSITION whose single content child has
 // the xsi:type given by the %s verb, an archetype id, one nested
-// attribute and one term definition.
+// attribute, one term definition and one term binding. The archetype-root
+// elements follow the C_ARCHETYPE_ROOT sequence of openEHR Template.xsd.
 const inlineArchetypeRootOPT = `<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <template_id><value>t</value></template_id>
@@ -124,14 +140,30 @@ const inlineArchetypeRootOPT = `<?xml version="1.0"?>
         <term_definitions code="at0000">
           <items id="text">Alias probe</items>
         </term_definitions>
+        <term_bindings terminology="SNOMED-CT">
+          <items code="at0000">
+            <value>
+              <terminology_id><value>SNOMED-CT</value></terminology_id>
+              <code_string>12345</code_string>
+            </value>
+          </items>
+        </term_bindings>
       </children>
     </attributes>
   </definition>
 </template>`
 
+// inlineTermBinding is the one term binding inlineArchetypeRootOPT
+// declares on its content child.
+var inlineTermBinding = template.TermBinding{
+	Terminology: "SNOMED-CT",
+	NodeOrPath:  "at0000",
+	Target:      template.CodedTermRef{TerminologyID: "SNOMED-CT", CodeString: "12345"},
+}
+
 // assertInlineArchetypeRoot checks the content child of
-// inlineArchetypeRootOPT kept its archetype id, its data attribute and
-// its term definition.
+// inlineArchetypeRootOPT kept its archetype id, its data attribute, its
+// term definition and its term binding.
 func assertInlineArchetypeRoot(t *testing.T, call, xsiType string, child template.Node) {
 	t.Helper()
 	ar, ok := child.(*template.ArchetypeRoot)
@@ -148,6 +180,9 @@ func assertInlineArchetypeRoot(t *testing.T, call, xsiType string, child templat
 	term, ok := ar.Term("at0000")
 	if !ok || term.Items["text"] != "Alias probe" {
 		t.Errorf("%s(%s child): Term(at0000) = %+v, %v, want text %q", call, xsiType, term, ok, "Alias probe")
+	}
+	if got, want := ar.TermBindings(), []template.TermBinding{inlineTermBinding}; !slices.Equal(got, want) {
+		t.Errorf("%s(%s child): TermBindings() = %+v, want %+v", call, xsiType, got, want)
 	}
 }
 
@@ -281,6 +316,16 @@ func diffNodes(path string, want, got template.Node, diffs []string) []string {
 		}
 	}
 	return diffs
+}
+
+// explainDiff says where two templates that are not deeply equal differ.
+// It walks the definition trees with diffNodes; when the walk finds
+// nothing, the difference lies in a field the walk does not read.
+func explainDiff(want, got *template.OperationalTemplate) string {
+	if diffs := diffNodes("", want.Root(), got.Root(), nil); len(diffs) > 0 {
+		return summariseDiffs(diffs)
+	}
+	return "the definition-tree walk finds no difference, so it lies in template metadata or a node field the walk does not compare"
 }
 
 func sameMultiplicity(a, b *template.Multiplicity) bool {

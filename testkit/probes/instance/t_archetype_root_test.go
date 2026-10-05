@@ -117,7 +117,9 @@ func summariseIssueList(issues []validation.Issue) string {
 		if i > 0 {
 			buf.WriteString(" | ")
 		}
-		buf.WriteString(iss.Code + "@" + iss.Path)
+		buf.WriteString(iss.Code)
+		buf.WriteByte('@')
+		buf.WriteString(iss.Path)
 	}
 	return buf.String()
 }
