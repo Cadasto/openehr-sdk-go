@@ -114,9 +114,10 @@ func TestREQ100_TArchetypeRootAlias(t *testing.T) {
 }
 
 // inlineArchetypeRootOPT is a COMPOSITION whose single content child has
-// the xsi:type given by the %s verb, an archetype id, one nested
-// attribute, one term definition and one term binding. The archetype-root
-// elements follow the C_ARCHETYPE_ROOT sequence of openEHR Template.xsd.
+// the xsi:type given by the %s verb, an archetype id, a template id of its
+// own, one nested attribute, one term definition and one term binding. The
+// archetype-root elements follow the C_ARCHETYPE_ROOT sequence of openEHR
+// Template.xsd.
 const inlineArchetypeRootOPT = `<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <template_id><value>t</value></template_id>
@@ -137,6 +138,7 @@ const inlineArchetypeRootOPT = `<?xml version="1.0"?>
           </children>
         </attributes>
         <archetype_id><value>openEHR-EHR-OBSERVATION.alias_probe.v1</value></archetype_id>
+        <template_id><value> alias_probe_template </value></template_id>
         <term_definitions code="at0000">
           <items id="text">Alias probe</items>
         </term_definitions>
@@ -162,8 +164,8 @@ var inlineTermBinding = template.TermBinding{
 }
 
 // assertInlineArchetypeRoot checks the content child of
-// inlineArchetypeRootOPT kept its archetype id, its data attribute, its
-// term definition and its term binding.
+// inlineArchetypeRootOPT kept its archetype id, its template id, trimmed,
+// its data attribute, its term definition and its term binding.
 func assertInlineArchetypeRoot(t *testing.T, call, xsiType string, child template.Node) {
 	t.Helper()
 	ar, ok := child.(*template.ArchetypeRoot)
@@ -172,6 +174,9 @@ func assertInlineArchetypeRoot(t *testing.T, call, xsiType string, child templat
 	}
 	if got, want := ar.ArchetypeID(), "openEHR-EHR-OBSERVATION.alias_probe.v1"; got != want {
 		t.Errorf("%s(%s child): ArchetypeID() = %q, want %q", call, xsiType, got, want)
+	}
+	if got, want := ar.TemplateID(), "alias_probe_template"; got != want {
+		t.Errorf("%s(%s child): TemplateID() = %q, want %q", call, xsiType, got, want)
 	}
 	attrs := ar.Attributes()
 	if len(attrs) != 1 || attrs[0].Name() != "data" || len(attrs[0].Children()) != 1 {
@@ -241,8 +246,8 @@ func countArchetypeRoots(n template.Node) int {
 
 // diffNodes walks want and got in step and appends one line per
 // difference: the node type, RM type, node id, node name, occurrences,
-// archetype id, term definitions and bindings, and per attribute its
-// name, cardinality, existence and children.
+// archetype id, template id, term definitions and bindings, and per
+// attribute its name, cardinality, existence and children.
 func diffNodes(path string, want, got template.Node, diffs []string) []string {
 	if path == "" {
 		path = "/"
@@ -267,6 +272,9 @@ func diffNodes(path string, want, got template.Node, diffs []string) []string {
 		g := got.(*template.ArchetypeRoot)
 		if w.ArchetypeID() != g.ArchetypeID() {
 			diffs = append(diffs, fmt.Sprintf("%s: ArchetypeID %q, want %q", path, g.ArchetypeID(), w.ArchetypeID()))
+		}
+		if w.TemplateID() != g.TemplateID() {
+			diffs = append(diffs, fmt.Sprintf("%s: TemplateID %q, want %q", path, g.TemplateID(), w.TemplateID()))
 		}
 		sameTerm := func(a, b template.ArchetypeTerm) bool { return a.Code == b.Code && maps.Equal(a.Items, b.Items) }
 		if !maps.EqualFunc(w.Terms(), g.Terms(), sameTerm) {

@@ -285,6 +285,7 @@ func (c *ComplexObject) isNode() {}
 // Template.xsd defines only C_ARCHETYPE_ROOT.
 type ArchetypeRoot struct {
 	archetypeID  string
+	templateID   string
 	terms        map[string]ArchetypeTerm
 	termBindings []TermBinding
 	ComplexObject
@@ -292,6 +293,13 @@ type ArchetypeRoot struct {
 
 // ArchetypeID returns the slot-fill archetype identifier.
 func (a *ArchetypeRoot) ArchetypeID() string { return a.archetypeID }
+
+// TemplateID returns the optional template id an archetype root may
+// carry, the <template_id>/<value> that openEHR Template.xsd allows after
+// its archetype id, or "" when the OPT gives none. It may differ from
+// [OperationalTemplate.TemplateID], the id of the template as a whole:
+// an exporter can record there the template the root was taken from.
+func (a *ArchetypeRoot) TemplateID() string { return a.templateID }
 
 // Terms returns the per-at-code term definitions captured from the
 // OPT's <term_definitions code="..."> blocks on this archetype root.

@@ -1069,6 +1069,7 @@ requirements:
       - internal/templatecompile/registerpath_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/rm/rminfo/lookup_test.go
+      - openehr/template/archetype_root_template_id_test.go
       - openehr/template/imports_test.go
       - openehr/template/node_name_test.go
       - openehr/template/parse_primitives_test.go
