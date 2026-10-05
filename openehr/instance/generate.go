@@ -2250,72 +2250,20 @@ func partyRefType(cs constraints.CString, chosen string) (string, error) {
 }
 
 // fillCurrentState gives an ISM_TRANSITION whose current state has no
-// code (noCode) the first code the OPT gives under current_state, or else
-// the code 524 (initial) of the openEHR instruction states group where the
-// OPT's constraint on current_state admits it (codeAdmitted). opt is the
-// OPT node of iv.
+// code (noCode) the code 524 (initial) of the openEHR instruction states
+// group, with its rubric, where the OPT's constraint on current_state
+// admits it (codedTextAdmitted). The alternative the walk builds is the OPT's value for
+// the attribute: a code a later alternative names is not, so it is never
+// read. opt is the OPT node of iv.
 func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
 	if !noCode(iv.CurrentState.DefiningCode.CodeString) {
 		return
 	}
-	ref, ok := firstCodedExample(opt, "current_state")
-	if !ok {
-		ref = constraints.CodedTermRef{Terminology: terminology.ID, CodeString: "524"}
-		if !codedTextAdmitted(opt, "current_state", openehrCoded(terminology.InstructionStates, ref.CodeString)) {
-			return
-		}
+	initial := openehrCoded(terminology.InstructionStates, "524")
+	if !codedTextAdmitted(opt, "current_state", initial) {
+		return
 	}
-	rubric := ref.CodeString
-	if text, found := terminology.InstructionStates.Rubric(ref.CodeString); found {
-		rubric = text
-	}
-	iv.CurrentState = rm.DVCodedText{
-		Value: rubric,
-		DefiningCode: rm.CodePhrase{
-			CodeString:    ref.CodeString,
-			TerminologyID: rm.TerminologyID{Value: ref.Terminology},
-		},
-	}
-}
-
-// firstCodedExample returns the first code, in OPT order, that a
-// C_CODE_PHRASE anywhere under attrName of opt gives as its example value,
-// skipping the placeholder at0000 (noCode). An alternative the OPT
-// prohibits, at any depth, supplies none. ok is false when there is none.
-func firstCodedExample(opt *tcimpl.CompiledNode, attrName string) (constraints.CodedTermRef, bool) {
-	if opt == nil {
-		return constraints.CodedTermRef{}, false
-	}
-	attr := opt.Attribute(attrName)
-	if attr == nil {
-		return constraints.CodedTermRef{}, false
-	}
-	var found constraints.CodedTermRef
-	var ok bool
-	var walk func(*tcimpl.CompiledNode)
-	walk = func(n *tcimpl.CompiledNode) {
-		if n == nil || ok {
-			return
-		}
-		if pc := n.PrimitiveConstraint(); pc != nil {
-			if phrase, is := pc.(constraints.CodePhrase); is {
-				if ref, isRef := phrase.ExampleValue().(constraints.CodedTermRef); isRef && !noCode(ref.CodeString) {
-					found = ref
-					ok = true
-					return
-				}
-			}
-		}
-		for _, a := range n.Attributes() {
-			for _, child := range allowedChildren(a) {
-				walk(child)
-			}
-		}
-	}
-	for _, child := range allowedChildren(attr) {
-		walk(child)
-	}
-	return found, ok
+	iv.CurrentState = initial
 }
 
 // applyStringLeaf writes a C_STRING leaf onto the String attribute attr

@@ -250,6 +250,14 @@ func TestREQ107_CurrentStateDefaultReadsTheWalkedAlternative(t *testing.T) {
 			currentState: optCodedText(terminology.ID, "526") + optNode("DV_CODED_TEXT", ""),
 			want:         "526",
 		},
+		{
+			// The OPT admits 524 too, so only the walk's code keeps the
+			// default out: ExampleFill takes the first code, and a
+			// RandomFill draw is kept whichever it is.
+			name:         "526 or 524",
+			currentState: optCodedText(terminology.ID, "526", "524"),
+			want:         "526",
+		},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
@@ -266,8 +274,12 @@ func TestREQ107_CurrentStateDefaultReadsTheWalkedAlternative(t *testing.T) {
 						checkOpenEHRCode(t, "ISM_TRANSITION.current_state", cs, terminology.InstructionStates, tc.want)
 						return
 					}
+					want := tc.want
+					if opts.ValueFill == instance.RandomFill && cs.DefiningCode.CodeString == "524" && strings.Contains(tc.currentState, "524") {
+						want = "524"
+					}
 					checkCode(t, "ISM_TRANSITION.current_state", cs.DefiningCode,
-						rm.CodePhrase{CodeString: tc.want, TerminologyID: rm.TerminologyID{Value: terminology.ID}})
+						rm.CodePhrase{CodeString: want, TerminologyID: rm.TerminologyID{Value: terminology.ID}})
 				})
 			}
 		}
