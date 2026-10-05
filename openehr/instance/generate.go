@@ -241,12 +241,12 @@ func compositionDefaultOwns(class, attrName string) bool {
 
 // visits decides whether the walk descends into attr of optNode. Under
 // either policy it never visits an attribute the OPT prohibits (an
-// existence of 0..0) that no RM rule needs (attrProhibited), whatever
-// children the OPT names under it, nor one the RM computes rather than
-// stores (offset on POINT_EVENT and INTERVAL_EVENT, is_integral on
-// DV_QUANTITY and DV_PROPORTION): the generator has nothing to write
-// there. Nor does it visit a locatable's uid, which setLocatableIdentity
-// stamps. A prohibited ELEMENT null_flavour the RM rule needs, because the
+// existence of 0..0, or OPT children it all prohibits) that no RM rule
+// needs (attrProhibited), whatever children the OPT names under it, nor
+// one the RM computes rather than stores (offset on POINT_EVENT and
+// INTERVAL_EVENT, is_integral on DV_QUANTITY and DV_PROPORTION): the
+// generator has nothing to write there. Nor does it visit a locatable's
+// uid, which setLocatableIdentity stamps. A prohibited ELEMENT null_flavour the RM rule needs, because the
 // OPT prohibits value too, is visited as if the OPT allowed it. Any other
 // attribute is visited when the policy says so (shouldVisit).
 func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
@@ -303,14 +303,20 @@ func (g *generator) uidFor(v any) func() *rm.HierObjectID {
 	return nil
 }
 
-// attrProhibited reports whether the OPT prohibits attr, with an
-// existence upper bound that is bounded and 0, and no RM rule needs it.
-// An attribute the BMM marks mandatory is never prohibited: the RM rule
-// wins over the prohibition, so it is visited and filled as an attribute
-// the OPT leaves silent is.
+// attrProhibited reports whether the OPT prohibits attr and no RM rule
+// needs it. The OPT prohibits an attribute in two ways: an existence upper
+// bound that is bounded and 0, or OPT children that it all prohibits (an
+// occurrences upper bound of 0). An attribute the BMM marks mandatory is
+// never prohibited: the RM rule wins over the prohibition, so it is
+// visited and filled as an attribute the OPT leaves silent is.
 func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
-	e := attr.Existence()
-	return e != nil && !e.UpperUnbounded() && e.Upper() == 0 && !attr.Required()
+	if attr.Required() {
+		return false
+	}
+	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
+		return true
+	}
+	return len(attr.Children()) > 0 && len(allowedChildren(attr)) == 0
 }
 
 // shouldVisit decides whether an attribute is in scope under the
@@ -347,7 +353,8 @@ func childProhibited(child *tcimpl.CompiledNode) bool {
 
 // allowedChildren returns the OPT children of attr the OPT does not
 // prohibit, in OPT order. An attribute whose children are all prohibited
-// is treated as one the OPT leaves silent.
+// is itself prohibited (attrProhibited), unless the BMM marks it
+// mandatory: then it is built as one the OPT leaves silent.
 func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
 	var allowed []*tcimpl.CompiledNode
 	for _, child := range attr.Children() {
@@ -1891,8 +1898,8 @@ func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
 	}
 }
 
-// prohibited reports whether the OPT prohibits attrName of opt with an
-// existence of 0..0 and no RM rule needs it (attrProhibited). opt is nil
+// prohibited reports whether the OPT prohibits attrName of opt and no RM
+// rule needs it (attrProhibited). opt is nil
 // for a value built from the BMM alone, which no OPT constrains.
 func prohibited(opt *tcimpl.CompiledNode, attrName string) bool {
 	if opt == nil {
@@ -1933,7 +1940,8 @@ func codedTextAdmits(node *tcimpl.CompiledNode, ct rm.DVCodedText) bool {
 // does not prohibit, the one the walk builds the attribute from. An
 // attribute the OPT prohibits admits nothing. opt is nil for a value built
 // from the BMM alone, and an attribute the OPT does not name, or names
-// with no allowed child, admits any default.
+// with no child, admits any default, as does a mandatory one whose
+// children the OPT all prohibits.
 func defaultAdmitted(opt *tcimpl.CompiledNode, attrName string, admits func(*tcimpl.CompiledNode) bool) bool {
 	if opt == nil {
 		return true
