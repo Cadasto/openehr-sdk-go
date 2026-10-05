@@ -110,6 +110,15 @@ func TestProbe007Proactive(t *testing.T) {
 	assertPass(t, r, err)
 }
 
+// TestProbe106 runs PROBE-106 and asserts Revoke sends the refresh token
+// to the advertised revocation_endpoint with token_type_hint
+// refresh_token and the public client_id, and leaves the source signed out
+// (REQ-167).
+func TestProbe106(t *testing.T) {
+	r, err := probes.Probe106TokenRevocation(t.Context())
+	assertPass(t, r, err)
+}
+
 // TestProbe008 runs PROBE-008 and asserts platform principal claims
 // surface verbatim, with absent claims surfacing as nil (REQ-067).
 func TestProbe008(t *testing.T) {

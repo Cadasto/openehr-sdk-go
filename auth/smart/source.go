@@ -1,11 +1,13 @@
 package smart
 
 import (
+	"cmp"
 	"context"
 	"crypto"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -28,6 +30,10 @@ const (
 	methodPrivateKeyJWT     = "private_key_jwt"
 	methodClientSecretBasic = "client_secret_basic"
 	methodClientSecretPost  = "client_secret_post"
+	// defaultAssertionAlg is the client-assertion algorithm used when
+	// WithClientAssertionKey names none: RS384, the HL7 SMART asymmetric
+	// baseline.
+	defaultAssertionAlg = "RS384"
 	// nonceLen is the number of random bytes in an OpenID Connect nonce,
 	// the same 256 bits as the state.
 	nonceLen = 32
@@ -71,6 +77,25 @@ type Config struct {
 	// client_secret_post (credentials in the form body). Resolved by
 	// configureClientAuth from the server's advertised methods (REQ-068).
 	secretAuthMethod string
+	// tokenChange is the hook set by WithTokenChange; nil means none.
+	tokenChange func(context.Context, TokenChange)
+}
+
+// TokenChange is what the source reports to the [WithTokenChange] hook when
+// its tokens change. [Source.Revoke] reports the zero TokenChange.
+type TokenChange struct {
+	// Access is the access token the source now holds.
+	Access auth.Token
+	// RefreshToken is the refresh token the source now holds: the
+	// response's; after a refresh whose response carried none, the one the
+	// source held before; after a code exchange whose response carried
+	// none, empty.
+	RefreshToken string
+	// Response is the token response as [Source.LastTokenResponse] returns
+	// it, so a refresh response's left-out launch context is filled in. Its
+	// Raw map is the hook's own copy. IDTokenClaims and NeedPatientBanner
+	// point at values the source keeps: treat them as read-only.
+	Response TokenResponse
 }
 
 // Option mutates Config during construction.
@@ -92,12 +117,17 @@ func WithClientSecret(secret string) Option {
 // WithClientAssertionKey enables confidential-client token exchange using
 // private_key_jwt (RFC 7523 / SMART client-confidential-asymmetric).
 // The signed client_assertion authenticates the client at the token endpoint
-// in place of an HTTP Basic header. alg is the JOSE algorithm (RS384 default
-// per SMART; RS256/ES256/ES384 also supported by jwtbearer.ClaimsSigner); kid,
-// when set, is emitted as the JWS "kid" header. Mutually exclusive with
-// WithClientSecret; configuring both is rejected at construction.
-// signer must be non-nil; a nil signer is rejected at construction with
-// [auth.ErrInvalidConfig].
+// in place of an HTTP Basic header. Each assertion is built by
+// [jwtbearer.NewClientAssertion], so it expires five minutes after issue.
+//
+// alg is the JOSE algorithm: RS384 when empty (the SMART baseline), or
+// ES384, RS256 or ES256. kid is required: the HL7 SMART asymmetric profile
+// has the assertion name its key in the JWS "kid" header. Construction fails
+// with [auth.ErrInvalidConfig] on an empty kid, a nil signer, a key that does
+// not fit alg, or an alg that the server's non-empty
+// token_endpoint_auth_signing_alg_values_supported does not list. Mutually
+// exclusive with WithClientSecret; configuring both is rejected at
+// construction the same way.
 func WithClientAssertionKey(signer crypto.Signer, alg, kid string) Option {
 	return func(cfg *Config) {
 		cfg.clientAssertion = &clientAssertionKey{signer: signer, alg: alg, kid: kid}
@@ -149,6 +179,51 @@ func WithRefreshThreshold(d time.Duration) Option {
 	return func(cfg *Config) { cfg.RefreshThreshold = d }
 }
 
+// WithTokenChange sets fn as the hook the source calls each time it holds
+// new tokens: after every successful code exchange
+// ([Source.ExchangeAuthorizationCode], and so
+// [Source.CompleteAuthorization]) and every successful refresh. The
+// [TokenChange] carries the new access token, the refresh token the source
+// now holds and the token response. When [Source.Revoke] clears the
+// tokens, fn sees the zero TokenChange once, in its place among the
+// changes: Revoke itself reports it only after its revocation request has
+// been sent or has failed, though another call reporting changes may report
+// it earlier. A Revoke that finds no token reports nothing. fn is not called for a
+// failed exchange or refresh, for a refresh whose result the source
+// discarded because a code exchange, [Source.SetTokens] or Revoke replaced
+// the session meanwhile, or by SetTokens, whose tokens the application
+// already has. A nil fn sets no hook.
+//
+// An application that keeps a session across restarts stores the refresh
+// token from here. RFC 6749 §6 has the client discard its old refresh token
+// when the server issues a new one, and RFC 9700 §4.14 makes rotating it
+// one of the two ways a public client's refresh token is protected.
+//
+// The source calls fn without holding its lock, so fn may call the
+// source's methods. ctx is the context of the call that changed the tokens,
+// which may have ended by the time fn runs; a hook that must finish a write
+// regardless can use [context.WithoutCancel].
+//
+// fn sees the changes one at a time, in the order the source installed
+// them. Callers waiting on the same refresh as the one that made it get the
+// new token without waiting for fn, and that refresh is reported once.
+// When the tokens change again while fn is running, from another goroutine
+// or from fn itself through the source, the change is reported after fn
+// returns, by the goroutine already running fn; the call that made the
+// change returns without waiting for that. So fn must not block for long:
+// later changes wait for it.
+//
+// If fn panics on the goroutine of a source call, which is the call that
+// made the change or a call reporting changes others made, the panic goes
+// up through that call. The changes still waiting are then reported from a
+// new goroutine the source starts, so none of them waits for a later change
+// of tokens. No caller could recover a panic on that goroutine, so there
+// the source recovers it, drops the change fn panicked on, and goes on with
+// the rest.
+func WithTokenChange(fn func(ctx context.Context, change TokenChange)) Option {
+	return func(cfg *Config) { cfg.tokenChange = fn }
+}
+
 // Source implements auth.TokenSource for SMART authorization-code + PKCE.
 type Source struct {
 	cfg Config
@@ -165,10 +240,94 @@ type Source struct {
 	// tokens replace it. Reauth sets it; setTokensLocked clears it.
 	forceRefresh bool
 	// session counts the times a code exchange or SetTokens installed
-	// tokens. A refresh records it when it starts and discards its result
-	// when it has changed by the time the refresh ends. A refresh does not
-	// advance it.
+	// tokens or Revoke cleared them. A refresh records it when it starts
+	// and discards its result when it has changed by the time the refresh
+	// ends. A refresh does not advance it.
 	session uint64
+	// changes holds the token changes installed but not yet reported to
+	// the token-change hook, oldest first; delivering reports that a
+	// goroutine is reporting them. See deliverChanges.
+	changes    []func()
+	delivering bool
+}
+
+// queueChangeLocked records change for the token-change hook, with the
+// context of the call that made it. The hook runs without s.mu, so it gets
+// its own copy of the response's Raw map. The caller holds s.mu, has
+// installed the change under it, and calls deliverChanges once it has
+// released s.mu.
+func (s *Source) queueChangeLocked(ctx context.Context, change TokenChange) {
+	hook := s.cfg.tokenChange
+	if hook == nil {
+		return
+	}
+	change.Response.Raw = maps.Clone(change.Response.Raw)
+	s.changes = append(s.changes, func() { hook(ctx, change) })
+}
+
+// deliverChanges reports the queued token changes to the hook, oldest
+// first, without holding s.mu. When another goroutine is already reporting
+// them, it returns at once and leaves its changes to that goroutine. So the
+// hook never runs in two goroutines at once and sees the changes in the
+// order they were installed, including a change the hook itself causes
+// through the source, which it sees after it returns.
+func (s *Source) deliverChanges() { s.reportChanges(false) }
+
+// reportChanges is deliverChanges. handedOn reports that it runs on a
+// goroutine the source started, not on the goroutine of a source call.
+//
+// On a caller's goroutine a panic of the hook goes on up to that caller, and
+// the changes still queued are handed on to a new goroutine. On a handed-on
+// goroutine no caller could recover a panic, and an unrecovered one would
+// end the program, so a change whose hook panics there is dropped and the
+// rest are reported.
+func (s *Source) reportChanges(handedOn bool) {
+	s.mu.Lock()
+	if s.delivering {
+		s.mu.Unlock()
+		return
+	}
+	s.delivering = true
+	locked := true
+	defer func() {
+		if locked {
+			s.delivering = false
+			s.mu.Unlock()
+			return
+		}
+		// Unlocked here only when the hook panicked on a caller's
+		// goroutine. The panic goes on up to that caller; the changes still
+		// queued are reported from a new goroutine, which ends once the
+		// queue is empty or finds another goroutine reporting.
+		s.mu.Lock()
+		s.delivering = false
+		rest := len(s.changes) > 0
+		s.mu.Unlock()
+		if rest {
+			go s.reportChanges(true)
+		}
+	}()
+	for len(s.changes) > 0 {
+		report := s.changes[0]
+		s.changes[0] = nil
+		s.changes = s.changes[1:]
+		s.mu.Unlock()
+		locked = false
+		if handedOn {
+			reportRecovering(report)
+		} else {
+			report()
+		}
+		s.mu.Lock()
+		locked = true
+	}
+}
+
+// reportRecovering runs report and drops a panic from it. It is for a
+// goroutine the source started, where nobody could recover the panic.
+func reportRecovering(report func()) {
+	defer func() { _ = recover() }()
+	report()
 }
 
 // setTokensLocked replaces the held tokens. New tokens are not the ones a
@@ -215,8 +374,8 @@ type tokenExchange struct {
 	err   error
 	// session is the session the refresh started in.
 	session uint64
-	// superseded reports that a code exchange or SetTokens replaced the
-	// session while the refresh ran, so its result was discarded and the
+	// superseded reports that a code exchange, SetTokens or Revoke replaced
+	// the session while the refresh ran, so its result was discarded and the
 	// callers waiting on it try again. It is written before done is closed.
 	superseded bool
 }
@@ -259,10 +418,12 @@ func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Sour
 //
 // FromConfig also fails with [auth.ErrInvalidConfig] on client credentials
 // that conflict or do not fit the server: both a client secret and a
-// client assertion key; a nil signing key, an unsupported algorithm, or a
-// key that does not suit the algorithm; or a client authentication method
-// that a non-empty TokenEndpointAuthMethodsSupported does not list. A
-// JWKSURI it cannot build a key-set fetcher from fails the same way.
+// client assertion key; a nil signing key, an empty key ID, an unsupported
+// algorithm, or a key that does not suit the algorithm; an assertion
+// algorithm that a non-empty TokenEndpointAuthSigningAlgValuesSupported does
+// not list; or a client authentication method that a non-empty
+// TokenEndpointAuthMethodsSupported does not list. A JWKSURI it cannot build
+// a key-set fetcher from fails the same way.
 func FromConfig(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
 		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
@@ -304,11 +465,12 @@ func FromConfig(cfg Config) (*Source, error) {
 
 // configureClientAuth resolves the confidential-client authentication method
 // for the token endpoint (REQ-068). It rejects ambiguous configuration (both an
-// assertion key and a client secret), builds the jwtbearer.ClaimsSigner for
-// private_key_jwt, and performs the G-3 discovery cross-check: when the
-// authorization server advertises token_endpoint_auth_methods_supported, the
-// method implied by the configured credential MUST be listed; an empty/absent
-// list is not constraining (skip).
+// assertion key and a client secret), builds the private_key_jwt assertion
+// with jwtbearer.NewClientAssertion after checking its algorithm against the
+// server's token_endpoint_auth_signing_alg_values_supported, and performs the
+// G-3 discovery cross-check: when the authorization server advertises
+// token_endpoint_auth_methods_supported, the method implied by the configured
+// credential MUST be listed. An empty or absent list is not constraining.
 func configureClientAuth(cfg *Config) error {
 	hasSecret := cfg.ClientSecret != ""
 	hasAssertion := cfg.clientAssertion != nil
@@ -320,16 +482,16 @@ func configureClientAuth(cfg *Config) error {
 	switch {
 	case hasAssertion:
 		method = methodPrivateKeyJWT
-		signer, err := jwtbearer.NewClaimsSigner(
-			jwtbearer.ClaimsTemplate{
-				Issuer:   cfg.ClientID,
-				Subject:  cfg.ClientID,
-				Audience: cfg.Auth.TokenEndpoint.String(),
-			},
-			cfg.clientAssertion.signer,
-			jwtbearer.WithAlgorithm(cfg.clientAssertion.alg),
-			jwtbearer.WithKeyID(cfg.clientAssertion.kid),
-		)
+		alg := cmp.Or(cfg.clientAssertion.alg, defaultAssertionAlg)
+		// The algorithm must be one the server accepts for client
+		// assertions, when it says which. An empty list says nothing.
+		if advertised := cfg.Auth.TokenEndpointAuthSigningAlgValuesSupported; len(advertised) > 0 &&
+			!slices.Contains(advertised, alg) {
+			return fmt.Errorf("%w: client assertion algorithm %q is not in the server's advertised token_endpoint_auth_signing_alg_values_supported %q",
+				auth.ErrInvalidConfig, alg, advertised)
+		}
+		signer, err := jwtbearer.NewClientAssertion(cfg.ClientID, cfg.Auth.TokenEndpoint.String(),
+			cfg.clientAssertion.signer, alg, cfg.clientAssertion.kid)
 		if err != nil {
 			return err
 		}
@@ -572,7 +734,9 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 	// A new authorization starts a new session: without an ID token there
 	// is nothing to bind a refresh to.
 	s.idBinding = bindingOf(tr.IDTokenClaims)
+	s.queueChangeLocked(ctx, TokenChange{Access: tok, RefreshToken: refresh, Response: tr})
 	s.mu.Unlock()
+	s.deliverChanges()
 	return tok, tr, nil
 }
 
@@ -593,6 +757,17 @@ func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDToken
 // A refresh response without an ID token keeps the session's identity: its
 // IDTokenClaims are the verified claims the session had before, so a
 // launch context rebuilt from it still names the same user.
+//
+// Likewise, a refresh response that leaves out a launch-context parameter
+// (patient, encounter, ehrId, episodeId, fhirContext, intent,
+// need_patient_banner, smart_style_url, tenant) or the scope keeps the value
+// the earlier response had, in the typed field and in Raw. Left out means
+// the member is absent from the response body: a member the refresh
+// response carries replaces the earlier value, even when it is an empty
+// string or null. Raw's other members are the refresh response's own.
+//
+// After [Source.Revoke] it is the zero value until a code exchange or a
+// refresh succeeds.
 func (s *Source) LastTokenResponse() TokenResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -607,6 +782,9 @@ func (s *Source) LastTokenResponse() TokenResponse {
 // ID token the source verified, and [Source.LastTokenResponse]. A later
 // refresh whose ID token names another user is then refused, so import
 // tokens for a different user into a new Source.
+//
+// SetTokens does not call the [WithTokenChange] hook: the application
+// already has the tokens it passes.
 func (s *Source) SetTokens(access auth.Token, refresh string) {
 	s.mu.Lock()
 	s.session++
@@ -617,17 +795,20 @@ func (s *Source) SetTokens(access auth.Token, refresh string) {
 // Token returns a valid access token, refreshing when near expiry.
 //
 // A refresh that started before [Source.ExchangeAuthorizationCode] or
-// [Source.SetTokens] replaced the held tokens has its result discarded,
-// success or failure, and Token returns the new tokens instead, refreshing
-// them in turn when they are stale.
+// [Source.SetTokens] replaced the held tokens, or before [Source.Revoke]
+// cleared them, has its result discarded, success or failure. Token then
+// answers from the tokens the source holds now: it returns them, refreshing
+// them in turn when they are stale, or, after Revoke, returns
+// [auth.ErrReauthRequired].
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	for {
 		tok, retry, err := s.tryToken(ctx)
 		if !retry {
 			return tok, err
 		}
-		// New tokens replaced the session the refresh belonged to; read
-		// them. A further retry needs yet another replacement meanwhile.
+		// A code exchange, SetTokens or Revoke replaced the session the
+		// refresh belonged to; read what the source holds now. A further
+		// retry needs yet another replacement meanwhile.
 	}
 }
 
@@ -690,10 +871,10 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 
 	s.mu.Lock()
 	if s.session != ex.session {
-		// A code exchange or SetTokens replaced the session while the refresh
-		// ran. Its result, success or failure, belongs to the old session:
-		// nothing of it is kept, and no terminal failure clears the new
-		// tokens. Every caller on this refresh tries again.
+		// A code exchange, SetTokens or Revoke replaced the session while the
+		// refresh ran. Its result, success or failure, belongs to the old
+		// session: nothing of it is kept, and no terminal failure clears the
+		// new tokens. Every caller on this refresh tries again.
 		if s.inflight == ex {
 			s.inflight = nil
 		}
@@ -703,18 +884,21 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 		return auth.Token{}, true, nil
 	}
 	if err == nil {
-		s.setTokensLocked(tok, refreshTok)
-		if refreshedTR.AccessToken != "" {
-			if refreshedTR.IDToken == "" {
-				// OpenID Connect Core 1.0 §12.2 lets a refresh leave the ID
-				// token out; the session keeps the identity it verified.
-				refreshedTR.IDTokenClaims = s.lastTR.IDTokenClaims
-			}
-			s.lastTR = refreshedTR
+		if refreshedTR.IDToken == "" {
+			// OpenID Connect Core 1.0 §12.2 lets a refresh leave the ID
+			// token out; the session keeps the identity it verified.
+			refreshedTR.IDTokenClaims = s.lastTR.IDTokenClaims
 		}
+		// Nor does the session lose the launch context or the scope a
+		// refresh response leaves out, and the new access token carries the
+		// scope the session keeps.
+		s.lastTR = keepSessionMembers(s.lastTR, refreshedTR)
+		tok.Scope = s.lastTR.Scope
+		s.setTokensLocked(tok, refreshTok)
 		if refreshedTR.IDTokenClaims != nil {
 			s.idBinding = bindingOf(refreshedTR.IDTokenClaims)
 		}
+		s.queueChangeLocked(ctx, TokenChange{Access: tok, RefreshToken: refreshTok, Response: s.lastTR})
 	} else {
 		// F-L: on a terminal failure clear the refresh token and the cached
 		// access token so that subsequent Token() calls deterministically
@@ -732,6 +916,9 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 	ex.token = tok
 	ex.err = err
 	close(ex.done)
+	// The waiters have their token; the change is reported after them, in
+	// the order it was installed whatever the hook does meanwhile.
+	s.deliverChanges()
 	return tok, false, err
 }
 
@@ -805,7 +992,6 @@ func (s *Source) exchangeCode(ctx context.Context, code, verifier string) (auth.
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
 		"redirect_uri":  {s.cfg.RedirectURI},
-		"client_id":     {s.cfg.ClientID},
 		"code_verifier": {verifier},
 	}
 	return s.postToken(ctx, form)
@@ -821,7 +1007,6 @@ func (s *Source) refreshGrant(ctx context.Context, refresh string, binding *idTo
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refresh},
-		"client_id":     {s.cfg.ClientID},
 	}
 	tok, tr, next, err := s.postToken(ctx, form)
 	if err != nil {
@@ -857,21 +1042,28 @@ func (s *Source) verifyRefreshedIDToken(ctx context.Context, raw string, prev *i
 	return claims, nil
 }
 
-func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
+// maxResponseBody is how much of a token- or revocation-endpoint response
+// the source reads.
+const maxResponseBody = 1 << 20
+
+// clientRequest builds the form POST to endpoint, a token or revocation
+// endpoint, and adds to it the client authentication both take, so the two
+// cannot differ. A failure to sign a client assertion is wrapped; the caller
+// gives every error its own sentinel.
+func (s *Source) clientRequest(ctx context.Context, endpoint string, form url.Values) (*http.Request, error) {
 	// Client authentication is selected deterministically (REQ-068):
 	//   - assertion signer configured → private_key_jwt (signed client_assertion)
 	//   - else client secret set      → client_secret_basic (HTTP Basic) or
 	//     client_secret_post (credentials in the form body), per the method
 	//     resolved by configureClientAuth from the server's advertised methods
 	//   - else                        → public client (no client auth)
+	// Only a public client and client_secret_post put client_id in the form:
+	// a confidential client is identified by its credential (REQ-068).
 	useBasic := false
 	if s.cfg.assertionSource != nil {
 		assertion, err := s.cfg.assertionSource.Assertion(ctx)
 		if err != nil {
-			return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{
-				Sentinel: auth.ErrTokenExchangeFailed,
-				Inner:    fmt.Errorf("client_assertion signing: %w", err),
-			}
+			return nil, fmt.Errorf("client_assertion signing: %w", err)
 		}
 		form.Set("client_assertion_type", clientAssertionType)
 		form.Set("client_assertion", assertion)
@@ -882,11 +1074,13 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 		} else {
 			useBasic = true
 		}
+	} else {
+		form.Set("client_id", s.cfg.ClientID)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.Auth.TokenEndpoint.String(), strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
-		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
@@ -895,12 +1089,20 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 		// (Appendix B) before use as the Basic username and password.
 		req.SetBasicAuth(url.QueryEscape(s.cfg.ClientID), url.QueryEscape(s.cfg.ClientSecret))
 	}
+	return req, nil
+}
+
+func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
+	req, err := s.clientRequest(ctx, s.cfg.Auth.TokenEndpoint.String(), form)
+	if err != nil {
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
+	}
 	resp, err := s.cfg.HTTPClient.Do(req)
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: err}
 	}

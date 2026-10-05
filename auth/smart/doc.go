@@ -14,6 +14,11 @@
 // [Source.LastTokenResponse] holds the latest token-endpoint SMART
 // fields, including after a [Source.Token] refresh; re-derive
 // smart.LaunchContext when launch context may have changed.
+// [WithTokenChange] reports each set of tokens the source installs, so an
+// application can store a rotated refresh token.
+// [Source.Revoke] signs the source out: it clears its tokens and asks the
+// authorization server to revoke the refresh token, or the access token
+// when it holds none.
 //
 // [ValidateIDToken] verifies an OpenID Connect ID token against the
 // deployment's key set ([JWKS]) and returns its claims as [IDTokenClaims].

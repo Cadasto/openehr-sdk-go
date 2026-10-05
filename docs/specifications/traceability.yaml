@@ -635,6 +635,7 @@ requirements:
     tests:
       - auth/smart/audience_test.go
       - auth/smart/authorize_request_test.go
+      - auth/smart/client_id_test.go
       - auth/smart/complete_test.go
       - auth/smart/exchange_idtoken_test.go
       - auth/smart/launch_test.go
@@ -676,8 +677,11 @@ requirements:
       - auth/errors_test.go
       - auth/jwtbearer/reauth_test.go
       - auth/smart/reauth_test.go
+      - auth/smart/refresh_carry_test.go
       - auth/smart/refresh_idtoken_test.go
+      - auth/smart/revoke_test.go
       - auth/smart/smart_test.go
+      - auth/smart/token_change_test.go
       - auth/tokensource_test.go
       - testkit/probes/auth/probe_007_proactive_refresh.go
       - testkit/probes/auth/probe_007_transport_refresh.go
@@ -697,8 +701,11 @@ requirements:
       - auth/smart/exchange_test.go
       - auth/smart/idtoken_test.go
       - auth/smart/reauth_test.go
+      - auth/smart/refresh_carry_test.go
       - auth/smart/refresh_idtoken_test.go
       - auth/smart/refresh_race_test.go
+      - auth/smart/revoke_test.go
+      - auth/smart/token_change_test.go
       - smart/idtoken_test.go
       - smart/launch_claims_test.go
       - smart/launch_seam_test.go
@@ -747,8 +754,12 @@ requirements:
     tests:
       - auth/clientcreds/catalog_test.go
       - auth/clientcreds/clientcreds_test.go
+      - auth/jwtbearer/client_assertion_test.go
       - auth/jwtbearer/jwtbearer_test.go
+      - auth/smart/client_assertion_test.go
+      - auth/smart/client_id_test.go
       - auth/smart/confidential_pkce_test.go
+      - auth/smart/revoke_test.go
       - auth/smart/smart_test.go
       - testkit/probes/auth/launch_modes.go
       - testkit/probes/auth/probes_test.go
@@ -1835,3 +1846,16 @@ requirements:
     tests:
       - transport/challenge_test.go
       - transport/reauth_challenge_test.go
+
+  - id: REQ-167
+    title: Token revocation
+    canonical: docs/specifications/auth.md#req-167--token-revocation
+    status: draft
+    implementation: landed
+    packages: [auth/smart, auth, testkit/probes/auth]
+    probes: [PROBE-106]
+    tests:
+      - auth/smart/revoke_test.go
+      - auth/smart/token_change_test.go
+      - testkit/probes/auth/probe_106_token_revocation.go
+      - testkit/probes/auth/probes_test.go

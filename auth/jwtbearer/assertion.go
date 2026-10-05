@@ -102,9 +102,23 @@ type ClaimsSigner struct {
 	jtiCounter atomic.Uint64
 }
 
-// NewClaimsSigner constructs a ClaimsSigner. Returns ErrInvalidConfig
-// when required fields are missing, the algorithm is unsupported, or the
-// signer's key type does not match the algorithm family.
+// NewClaimsSigner constructs a ClaimsSigner. Returns ErrInvalidConfig, and
+// never panics, when required fields are missing, the signer is nil or a
+// nil *rsa.PrivateKey or *ecdsa.PrivateKey, an *ecdsa.PrivateKey lacks its
+// private scalar or public point (or crypto/ecdsa cannot otherwise use it),
+// the algorithm is unsupported, the
+// signer's Public method panics or reports no usable public key (nil, or an
+// RSA or ECDSA public key without its modulus or curve, where a curve whose
+// parameters are missing or cannot be read counts as none), or the signer's
+// key type does not match the algorithm family. A Public method
+// panics for a nil key of most other types held in a non-nil crypto.Signer,
+// such as a nil ed25519.PrivateKey or a nil pointer to a signer type of the
+// caller's own whose Public reads its key, so such a signer is refused
+// instead of crashing the caller.
+//
+// A signer of the caller's own type whose Public reports a usable public key
+// of the right type is accepted as it is: the SDK cannot see inside it, so
+// whether it can sign is known only when it signs.
 //
 // Key requirements per algorithm:
 //   - RS256, RS384: *rsa.PrivateKey
@@ -119,6 +133,19 @@ func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...Sign
 	}
 	if s.Signer == nil {
 		return nil, fmt.Errorf("%w: signer is required", auth.ErrInvalidConfig)
+	}
+	// A nil key of a concrete type passes the check above, and its Public
+	// method would panic, so refuse it before calling any method on it.
+	if isNilKey(s.Signer) {
+		return nil, fmt.Errorf("%w: signer is a nil %T", auth.ErrInvalidConfig, s.Signer)
+	}
+	// An ECDSA private key without its scalar or its public point passes
+	// every check below and panics inside crypto/ecdsa on the first
+	// signature, on the goroutine of whoever asks for an assertion.
+	if k, ok := s.Signer.(*ecdsa.PrivateKey); ok {
+		if err := usableECDSAPrivateKey(k); err != nil {
+			return nil, err
+		}
 	}
 	if template.Issuer == "" {
 		return nil, fmt.Errorf("%w: ClaimsTemplate.Issuer is required", auth.ErrInvalidConfig)
@@ -136,6 +163,73 @@ func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...Sign
 		return nil, err
 	}
 	return s, nil
+}
+
+// clientAssertionLifetime is how long a client assertion stays valid. The HL7
+// SMART asymmetric client profile allows at most five minutes after issue.
+const clientAssertionLifetime = 5 * time.Minute
+
+// NewClientAssertion builds the client assertion of the HL7 SMART asymmetric
+// client profile: the signed JWT that a SMART Backend Services client, or a
+// confidential app holding a private key, sends as client_assertion to
+// authenticate at the token endpoint. Each assertion it signs has iss and
+// sub set to clientID, aud set to tokenURL, the JOSE headers typ JWT and
+// kid, a unique jti, and an exp five minutes after its iat.
+//
+// It fails with [auth.ErrInvalidConfig], and never panics, when clientID,
+// tokenURL, alg or kid is empty, signer is empty (nil, a nil RSA or ECDSA
+// private key, an ECDSA private key without its scalar or point, or a
+// signer whose Public method panics or reports no usable public key), alg
+// is not supported, or the key does not fit alg, as
+// [NewClaimsSigner] describes. A signer of the caller's own type whose
+// Public method reports a usable public key of the type alg needs is
+// accepted as it is.
+// [NewClaimsSigner] lists the key each algorithm needs.
+func NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, kid string) (*ClaimsSigner, error) {
+	if clientID == "" {
+		return nil, fmt.Errorf("%w: a SMART client assertion needs a clientID", auth.ErrInvalidConfig)
+	}
+	if tokenURL == "" {
+		return nil, fmt.Errorf("%w: a SMART client assertion needs a tokenURL", auth.ErrInvalidConfig)
+	}
+	if kid == "" {
+		return nil, fmt.Errorf("%w: a SMART client assertion needs a kid", auth.ErrInvalidConfig)
+	}
+	// NewClaimsSigner refuses a nil signer, an empty or unsupported alg, and
+	// a key that does not fit alg.
+	return NewClaimsSigner(ClaimsTemplate{
+		Issuer:   clientID,
+		Subject:  clientID,
+		Audience: tokenURL,
+		Lifetime: clientAssertionLifetime,
+	}, signer, WithAlgorithm(alg), WithKeyID(kid))
+}
+
+// isNilKey reports whether signer is a nil *rsa.PrivateKey or
+// *ecdsa.PrivateKey: a nil key held in a non-nil crypto.Signer. It names the
+// two key types the supported algorithms take; a nil value of any other
+// type is caught when its Public method panics (see publicKey).
+func isNilKey(signer crypto.Signer) bool {
+	switch k := signer.(type) {
+	case *rsa.PrivateKey:
+		return k == nil
+	case *ecdsa.PrivateKey:
+		return k == nil
+	}
+	return false
+}
+
+// publicKey returns signer.Public(). A Public method that panics, as it
+// does for a nil key of most types held in a non-nil crypto.Signer, is
+// refused with auth.ErrInvalidConfig instead of crashing the caller.
+func publicKey(signer crypto.Signer) (pub crypto.PublicKey, err error) {
+	defer func() {
+		if recover() != nil {
+			pub = nil
+			err = fmt.Errorf("%w: the signer's Public method panicked: a nil or unusable %T key", auth.ErrInvalidConfig, signer)
+		}
+	}()
+	return signer.Public(), nil
 }
 
 // SignerOption configures a ClaimsSigner.
@@ -238,40 +332,110 @@ func toJoseAlg(alg string) (gojose.SignatureAlgorithm, error) {
 	}
 }
 
-// validateKeyAlg checks that the signer's public key type and curve match
-// the requested algorithm family. For opaque crypto.Signer implementations
-// whose Public() does not return a concrete *rsa.PublicKey or *ecdsa.PublicKey
-// (e.g. KMS handles wrapped in an adapter), validation is skipped here.
-//
-// Opaque crypto.Signer implementations (e.g. KMS/HSM adapters) are supported:
-// at signing time a non-concrete signer is wrapped with
-// github.com/go-jose/go-jose/v4/cryptosigner, which handles both RSA and
-// ECDSA (including ES256/ES384). validateKeyAlg only inspects Public(); when
-// Public() returns a concrete *rsa.PublicKey / *ecdsa.PublicKey the key/alg
-// pairing is checked here, otherwise the pairing is enforced by go-jose at
-// sign time. (REQ-068)
+// validateKeyAlg checks that the signer's public key fits alg: RS256 and
+// RS384 need an *rsa.PublicKey, ES256 an *ecdsa.PublicKey on P-256, and
+// ES384 one on P-384. It inspects only Public(), so an opaque crypto.Signer
+// (e.g. a KMS or HSM adapter) passes when its Public() returns a usable key
+// of the type alg needs, and is refused when it returns any other type, no
+// key, or an RSA or ECDSA key without its modulus or curve. At signing time
+// a signer that is not a concrete *rsa.PrivateKey or *ecdsa.PrivateKey is
+// wrapped with github.com/go-jose/go-jose/v4/cryptosigner, which handles
+// both RSA and ECDSA (including ES256/ES384). An alg outside the four is not
+// checked here; toJoseAlg refuses it. (REQ-068)
 func validateKeyAlg(signer crypto.Signer, alg string) error {
-	pub := signer.Public()
+	pub, err := publicKey(signer)
+	if err != nil {
+		return err
+	}
+	if err := usablePublicKey(pub); err != nil {
+		return err
+	}
 	switch alg {
 	case "RS256", "RS384":
 		if _, ok := pub.(*rsa.PublicKey); !ok {
 			return fmt.Errorf("%w: %s requires an RSA signer, got %T", auth.ErrInvalidConfig, alg, pub)
 		}
 	case "ES256":
-		ecPub, ok := pub.(*ecdsa.PublicKey)
-		if !ok {
-			return fmt.Errorf("%w: ES256 requires an ECDSA signer, got %T", auth.ErrInvalidConfig, pub)
-		}
-		if ecPub.Curve != elliptic.P256() {
-			return fmt.Errorf("%w: ES256 requires a P-256 key, got %s", auth.ErrInvalidConfig, ecPub.Curve.Params().Name)
-		}
+		return checkCurve(pub, alg, elliptic.P256())
 	case "ES384":
-		ecPub, ok := pub.(*ecdsa.PublicKey)
-		if !ok {
-			return fmt.Errorf("%w: ES384 requires an ECDSA signer, got %T", auth.ErrInvalidConfig, pub)
+		return checkCurve(pub, alg, elliptic.P384())
+	}
+	return nil
+}
+
+// checkCurve checks that pub is an ECDSA public key on want. It reads the
+// curve's parameters once, through curveName, and builds every message from
+// what it has checked.
+func checkCurve(pub crypto.PublicKey, alg string, want elliptic.Curve) error {
+	ecPub, ok := pub.(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("%w: %s requires an ECDSA signer, got %T", auth.ErrInvalidConfig, alg, pub)
+	}
+	name, err := curveName(ecPub.Curve)
+	if err != nil {
+		return err
+	}
+	if ecPub.Curve != want {
+		return fmt.Errorf("%w: %s requires a %s key, got %s (%T)", auth.ErrInvalidConfig, alg, want.Params().Name, name, ecPub.Curve)
+	}
+	return nil
+}
+
+// usableECDSAPrivateKey refuses an ECDSA private key that crypto/ecdsa
+// cannot use: one without its private scalar or public point, with a zero
+// scalar, or on a curve it does not support. It asks crypto/ecdsa to encode
+// the key, which checks those, and treats a panic there, as a missing
+// scalar or point causes, as a refusal too. The encoded key is discarded.
+func usableECDSAPrivateKey(k *ecdsa.PrivateKey) (err error) {
+	refused := fmt.Errorf("%w: the ECDSA private key lacks its private scalar or public point, or crypto/ecdsa cannot use it", auth.ErrInvalidConfig)
+	defer func() {
+		if recover() != nil {
+			err = refused
 		}
-		if ecPub.Curve != elliptic.P384() {
-			return fmt.Errorf("%w: ES384 requires a P-384 key, got %s", auth.ErrInvalidConfig, ecPub.Curve.Params().Name)
+	}()
+	if _, err := k.Bytes(); err != nil {
+		return refused
+	}
+	return nil
+}
+
+// errNoCurve is the error for an ECDSA public key whose curve is missing or
+// cannot be read.
+func errNoCurve() error {
+	return fmt.Errorf("%w: the signer's Public method reports an ECDSA public key without its curve", auth.ErrInvalidConfig)
+}
+
+// curveName returns the name in curve's parameters. A curve that reports no
+// parameters, such as a nil *elliptic.CurveParams, or whose Params method
+// panics, such as a type of the caller's own that wraps no curve, counts as
+// no curve and is refused with auth.ErrInvalidConfig.
+func curveName(curve elliptic.Curve) (name string, err error) {
+	defer func() {
+		if recover() != nil {
+			name, err = "", errNoCurve()
+		}
+	}()
+	params := curve.Params()
+	if params == nil {
+		return "", errNoCurve()
+	}
+	return params.Name, nil
+}
+
+// usablePublicKey refuses a public key the algorithm checks cannot read: no
+// key at all, or an RSA or ECDSA key that is nil or lacks its modulus or
+// curve. Any other key passes here and is judged against the algorithm.
+func usablePublicKey(pub crypto.PublicKey) error {
+	switch k := pub.(type) {
+	case nil:
+		return fmt.Errorf("%w: the signer's Public method reports no public key", auth.ErrInvalidConfig)
+	case *rsa.PublicKey:
+		if k == nil || k.N == nil {
+			return fmt.Errorf("%w: the signer's Public method reports an RSA public key without its modulus", auth.ErrInvalidConfig)
+		}
+	case *ecdsa.PublicKey:
+		if k == nil || k.Curve == nil {
+			return errNoCurve()
 		}
 	}
 	return nil
