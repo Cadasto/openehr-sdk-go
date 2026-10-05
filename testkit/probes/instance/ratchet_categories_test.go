@@ -117,35 +117,54 @@ const archetypeIDMissingOPT = `<?xml version="1.0" encoding="utf-8"?>
 
 // TestREQ107_RatchetKeysArchetypeIDMissing pins the census key for the
 // generator's refusal of an archetype root the template names no archetype
-// for (REQ-107): the refusal category, then archetype_id_missing and the OPT
-// path the error names, whatever note follows the path and whether or not
-// the builder wraps the error.
+// for (REQ-107): the refusal category, then archetype_id_missing and a
+// locator. The locator is the OPT path the error names, whatever note
+// follows the path and whether or not the builder wraps the error; for a
+// required attribute the template leaves without children it is the path
+// of that attribute, so the refusal keys apart from one at the node that
+// holds the attribute, such as the template root.
 func TestREQ107_RatchetKeysArchetypeIDMissing(t *testing.T) {
 	const spaced = "/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben (A)']/items[at0001]"
 	missing := instance.ErrArchetypeIDMissing
+	key := func(locator string) string { return reasonRefusalOther + ":archetype_id_missing:" + locator }
 	cases := []struct {
-		name string
-		err  error
-		path string
+		name    string
+		err     error
+		locator string
 	}{
 		{"node without an archetype id", fmt.Errorf("%w: OBSERVATION at /content[at0000]", missing), "/content[at0000]"},
 		{"abstract node", fmt.Errorf("%w: CONTENT_ITEM (built as OBSERVATION) at /content[at0001]", missing), "/content[at0001]"},
 		{"name predicate with a space", fmt.Errorf("%w: OBSERVATION at %s", missing, spaced), spaced},
 		{
-			"required attribute without children",
+			"required attribute of a nested node",
 			fmt.Errorf("%w: OBSERVATION for SECTION.items at %s (required, but the template names no child)", missing, spaced),
-			spaced,
+			spaced + "/items",
+		},
+		{
+			"required attribute of the template root",
+			fmt.Errorf("%w: OBSERVATION for COMPOSITION.content at / (required, but the template names no child)", missing),
+			"/content",
 		},
 		{"template root", fmt.Errorf("%w: COMPOSITION at / (the template root)", missing), "/"},
 		{"wrapped by the builder", fmt.Errorf("composition.NewSkeleton: %w", fmt.Errorf("%w: OBSERVATION at /content[at0000]", missing)), "/content[at0000]"},
 	}
+	got := map[string]string{}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			want := reasonRefusalOther + ":archetype_id_missing:" + tc.path
-			if got := generateReason(t, tc.err); got != want {
-				t.Errorf("generateReason(%q) = %q, want %q", tc.err, got, want)
+			got[tc.name] = generateReason(t, tc.err)
+			if want := key(tc.locator); got[tc.name] != want {
+				t.Errorf("generateReason(%q) = %q, want %q", tc.err, got[tc.name], want)
 			}
 		})
+	}
+	// Distinct refusals at one node keep distinct keys.
+	for _, pair := range [][2]string{
+		{"template root", "required attribute of the template root"},
+		{"name predicate with a space", "required attribute of a nested node"},
+	} {
+		if got[pair[0]] == got[pair[1]] {
+			t.Errorf("%s and %s share the key %q, want distinct keys", pair[0], pair[1], got[pair[0]])
+		}
 	}
 
 	t.Run("refusal from Generate", func(t *testing.T) {
@@ -161,7 +180,7 @@ func TestREQ107_RatchetKeysArchetypeIDMissing(t *testing.T) {
 		if !errors.Is(err, missing) {
 			t.Fatalf("Generate error = %v, want one wrapping ErrArchetypeIDMissing", err)
 		}
-		if got, want := generateReason(t, err), reasonRefusalOther+":archetype_id_missing:/"; got != want {
+		if got, want := generateReason(t, err), key("/content"); got != want {
 			t.Errorf("generateReason(%q) = %q, want %q", err, got, want)
 		}
 	})

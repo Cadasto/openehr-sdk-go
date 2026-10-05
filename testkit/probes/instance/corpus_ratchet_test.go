@@ -286,11 +286,11 @@ func generateReason(t *testing.T, err error) string {
 		}
 		return reasonRefusalOther + ":slot_fill:" + path
 	case errors.Is(err, instance.ErrArchetypeIDMissing):
-		path, ok := archetypeIDMissingPath(err.Error())
+		locator, ok := archetypeIDMissingLocator(err.Error())
 		if !ok {
 			t.Fatalf("archetype id missing without a path: %v", err)
 		}
-		return reasonRefusalOther + ":archetype_id_missing:" + path
+		return reasonRefusalOther + ":archetype_id_missing:" + locator
 	case errors.Is(err, instance.ErrTypeMismatch):
 		return reasonRefusalOther + ":type_mismatch"
 	default:
@@ -472,13 +472,21 @@ func trailingPath(msg string) (string, bool) {
 	return p, true
 }
 
-// archetypeIDMissingPath returns the OPT path an ErrArchetypeIDMissing error
-// names: the text from the first " at /", without the parenthesised note
-// that may follow it. A path never ends in ")", and no note holds " (", so
-// the last " (" of a message ending in ")" starts the note even when a name
-// predicate in the path holds one. A tab means the text is not a path.
-func archetypeIDMissingPath(msg string) (string, bool) {
-	_, rest, ok := strings.Cut(msg, " at /")
+// archetypeIDMissingLocator returns the locator an ErrArchetypeIDMissing
+// error keys by. It reads the text after the sentinel's own: the OPT path
+// from the first " at /", without the parenthesised note that may follow
+// it. A path never ends in ")", and no note holds " (", so the last " (" of
+// a message ending in ")" starts the note even when a name predicate in the
+// path holds one. For a required attribute the template leaves without
+// children ("<type> for <CLASS>.<attribute> at <path> (...)") the locator is
+// the attribute's path, so that refusal keys apart from one at the node
+// itself. A tab means the text is not a path.
+func archetypeIDMissingLocator(msg string) (string, bool) {
+	_, detail, ok := strings.Cut(msg, instance.ErrArchetypeIDMissing.Error()+": ")
+	if !ok {
+		return "", false
+	}
+	head, rest, ok := strings.Cut(detail, " at /")
 	if !ok {
 		return "", false
 	}
@@ -490,6 +498,13 @@ func archetypeIDMissingPath(msg string) (string, bool) {
 	}
 	if strings.Contains(p, "\t") {
 		return "", false
+	}
+	if _, owner, isAttr := strings.Cut(head, " for "); isAttr {
+		i := strings.LastIndex(owner, ".")
+		if i < 0 || i == len(owner)-1 {
+			return "", false
+		}
+		p = strings.TrimSuffix(p, "/") + "/" + owner[i+1:]
 	}
 	return p, true
 }
