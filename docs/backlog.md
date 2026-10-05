@@ -13,7 +13,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - auth/jwtbearer/assertion.go:370 · Removing usablePublicKey's `case nil` arm keeps every test green because the algorithm check refuses a nil key anyway; give the "Public reports no key" row a wantInMsg so the arm is pinned · by: sdd-spec-conformance-reviewer · from: feat/smart-token-lifecycle
 
 ## auth/smart
-- auth/smart/revoke.go:64 · Token called after Revoke waits for an overtaken refresh to finish its network round trip before returning ErrReauthRequired, because Revoke leaves s.inflight set and a zero access token counts as stale; Revoke could set s.inflight = nil under the lock, which is safe because the old refresh checks `s.inflight == ex` before clearing it · by: go-reviewer · from: feat/smart-token-lifecycle
 - auth/smart/source.go:948 · The token and revocation POSTs follow a caller client's 307/308 redirects with the token still in the body; discovery guards its redirects, auth/smart does not (predates the range for the token endpoint) · by: go-reviewer · from: feat/smart-token-lifecycle
 - auth/smart/source.go:866 · A session restored with SetTokens on a new Source has no last token response, so a refresh response that leaves out scope gives an access token with an empty Scope although the imported token had one; consider falling back to the held token's Scope · by: go-reviewer · from: feat/smart-token-lifecycle
 - auth/smart/source.go:95 · The TokenChange.Response doc says "Its Raw map is the hook's own copy", but maps.Clone copies only the top level: nested values such as fhirContext objects stay shared with LastTokenResponse; add the values inside Raw to the read-only list · by: go-reviewer · from: feat/smart-token-lifecycle
@@ -144,11 +143,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 
 ## testkit/probe
 - testkit/probe/livestatus_test.go · the Live snapshots assert less than the cassette witnesses: createEHRProbe (live_test.go) passes on any non-empty EHR id without comparing it to the per-run id, and the PROBE-065 read-back checks only a non-empty archetype_node_id, not the saved node id or template id · from: pr201
-
-## testkit/probes/auth
-- testkit/probes/auth/launch_modes.go:271 · backendSigner builds by hand the SMART client assertion that jwtbearer.NewClientAssertion now provides; switching to it would keep the probe on the profile the SDK enforces · by: go-reviewer · from: feat/smart-token-lifecycle
-- testkit/probes/auth/probe_106_token_revocation.go:169 · The probe compares only client_id and the Authorization header, so a revocation request that adds client_secret or client_assertion fields the token request lacked still passes; compare the full set of client-authentication form fields at both endpoints · by: sdd-spec-conformance-reviewer · from: feat/smart-token-lifecycle
-- testkit/probes/auth/probe_106_token_revocation.go:112 · PROBE-106 logs four REQ-092 "plaintext URL in catalog" WARN lines per run; httptest.NewTLSServer and "https://" + req.Host pass with no warnings · by: go-reviewer · from: feat/smart-token-lifecycle
 
 ## testkit/probes/instance
 - testkit/probes/instance/corpus_ratchet_test.go · the census runs with Language en and one fixed Now, and its placeholder scan flags only the literal example, so a generator that wrote encoding utf8 or read time.Now() would leave it green · from: audit-2026-09
