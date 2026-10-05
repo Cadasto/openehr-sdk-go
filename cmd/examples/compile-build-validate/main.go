@@ -1,9 +1,16 @@
 // Example: the whole clinical pipeline through public SDK packages only. It
 // parses an operational template (OPT), compiles it, builds a composition that
 // follows it, serialises that composition to canonical JSON and back, and
-// validates the result against the same compiled template. Nothing here
-// imports an internal/ package, so a program in another Go module can do
-// exactly the same.
+// validates the result in two passes: the RM floor (validation.ValidateRM),
+// against the openEHR Reference Model alone, and the template constraints
+// (validation.ValidateComposition), against the same compiled template.
+// Nothing here imports an internal/ package, so a program in another Go
+// module can do exactly the same.
+//
+// The two passes compose but do not chain: today ValidateComposition checks
+// the template's constraints and does not run the RM floor's rules, so a
+// composition can satisfy its template and still break the Reference Model.
+// A program that wants both guarantees calls both.
 //
 // Runs offline. With no argument it uses the vendored vital_signs.opt fixture:
 //
@@ -48,8 +55,11 @@ func run() error {
 
 	// Step 1: parse the OPT. An operational template is the ADL 1.4 XML file
 	// a clinical modeller exports; it fixes which archetypes, nodes and value
-	// constraints a composition may contain.
-	opt, err := template.ParseFile(optPath)
+	// constraints a composition may contain. ParseFileStrict rejects a node
+	// type the parser does not support; the lenient ParseFile would keep it
+	// as a leaf and silently drop the constraints beneath it, which a program
+	// that builds and validates data must not do.
+	opt, err := template.ParseFileStrict(optPath)
 	if err != nil {
 		return fmt.Errorf("parse OPT %s: %w", optPath, err)
 	}
@@ -61,7 +71,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("compile template: %w", err)
 	}
-	fmt.Printf("template : %s (%s)\n", opt.TemplateID(), filepath.Base(optPath))
+	fmt.Printf("template             : %s (%s)\n", opt.TemplateID(), filepath.Base(optPath))
 
 	// Step 3: build a composition the template allows.
 	comp, err := buildComposition(context.Background(), compiled)
@@ -75,15 +85,19 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("composition: %d bytes canonical JSON, round-tripped\n", size)
+	fmt.Printf("composition          : %d bytes canonical JSON, round-tripped\n", size)
 
-	// Step 5: validate the decoded copy against the same compiled template.
-	if err := reportValidation(decoded, compiled); err != nil {
-		return err
+	// Step 5: validate the decoded copy, the one a server would receive, in
+	// both passes. The RM floor walks it with the Reference Model as its
+	// only guide; the template pass checks it against the same compiled
+	// template the builder used. Both always run, because neither result
+	// stands in for the other.
+	rmOK := reportPass("RM floor", validation.ValidateRM(decoded))
+	templateOK := reportPass("template constraints", validation.ValidateComposition(decoded, compiled))
+	if !rmOK || !templateOK {
+		return errors.New("round-tripped composition fails at least one validation pass")
 	}
-
-	// Step 6: the validator has typed entry points for other RM roots too.
-	return checkEHRStatusValidator(compiled)
+	return nil
 }
 
 // buildComposition sets one value in a composition shaped by the template.
@@ -134,34 +148,22 @@ func roundTrip(comp *rm.Composition) (*rm.Composition, int, error) {
 	return &decoded, len(encoded), nil
 }
 
-// reportValidation prints the validator's verdict. The result lists every
-// issue found in one pass rather than stopping at the first, so a caller can
-// show the whole list at once.
-func reportValidation(comp *rm.Composition, compiled *templatecompile.Compiled) error {
-	result := validation.ValidateComposition(comp, compiled)
-	if result.OK {
-		fmt.Println("validation : OK — round-tripped composition conforms to the OPT")
-		return nil
+// reportPass prints one validation pass under its name: the verdict, then one
+// line per issue. Each pass lists every issue it finds rather than stopping at
+// the first, so a caller can show the whole list at once. It returns
+// result.OK, which is false exactly when the pass found an error.
+func reportPass(name string, result validation.Result) bool {
+	verdict := "OK"
+	if !result.OK {
+		verdict = "failed"
 	}
-	fmt.Printf("validation : %d issue(s)\n", len(result.Issues))
+	if len(result.Issues) == 0 {
+		fmt.Printf("%-20s : %s, no issues\n", name, verdict)
+		return result.OK
+	}
+	fmt.Printf("%-20s : %s, %d issue(s)\n", name, verdict, len(result.Issues))
 	for _, issue := range result.Issues {
 		fmt.Printf("  %s [%s] %s\n", issue.Path, issue.Code, issue.Detail)
 	}
-	return errors.New("round-tripped composition does not conform to the OPT")
-}
-
-// checkEHRStatusValidator shows that the validator also has typed entry
-// points for other RM roots (ValidateEHRStatus here; ValidateFolder and
-// ValidateDemographic are its siblings). An EHR_STATUS can never satisfy a
-// template whose root is a COMPOSITION, so the validator must report a root
-// type mismatch. An OK here would mean that check has stopped working, and
-// the example fails rather than print a misleading line.
-func checkEHRStatusValidator(compiled *templatecompile.Compiled) error {
-	status := &rm.EHRStatus{Name: rm.DVText{Value: "EHR Status"}, Subject: rm.PartySelf{}}
-	result := validation.ValidateEHRStatus(status, compiled)
-	if result.OK {
-		return errors.New("ValidateEHRStatus unexpectedly OK against a COMPOSITION OPT")
-	}
-	fmt.Printf("ehr_status : ValidateEHRStatus callable — %d issue(s), root type mismatch as expected\n", len(result.Issues))
-	return nil
+	return result.OK
 }
