@@ -8,26 +8,27 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// Policy controls how much of the OPT tree is materialised. Under
-// either policy the generator skips an attribute the OPT prohibits (an
-// existence of 0..0), unless an RM rule needs it, such as an attribute
-// the BMM marks mandatory, and never visits one the RM computes rather
-// than stores (offset on POINT_EVENT and INTERVAL_EVENT, is_integral on
-// DV_QUANTITY and DV_PROPORTION). [ValueFill], not the policy, decides
-// how a primitive leaf is valued.
+// Policy controls which attributes the generator visits. Under either
+// policy it skips an attribute the OPT prohibits (an existence of 0..0),
+// unless an RM rule needs it, such as an attribute the BMM marks
+// mandatory, and never visits one the RM computes rather than stores
+// (offset on POINT_EVENT and INTERVAL_EVENT, is_integral on DV_QUANTITY
+// and DV_PROPORTION) or a locatable's uid, which the identity rule
+// decides. [ValueFill], not the policy, decides how a primitive leaf is
+// valued.
 type Policy int
 
 const (
-	// Minimal materialises an attribute only when its existence lower
-	// bound is bounded and at least 1, the BMM marks it mandatory, its
-	// cardinality lower bound is bounded and at least 1, or the OPT pins
-	// children under it. Another generator rule can need more, such as
-	// the RM rule that an ELEMENT carry a value or a null_flavour, or the
-	// uid of an entry. Smallest valid tree.
+	// Minimal visits the required attributes, and those with an allowed
+	// OPT child: an attribute the BMM marks mandatory, one whose
+	// existence or cardinality lower bound is at least 1, and one with
+	// an OPT child whose occurrences upper bound is not 0. An RM rule
+	// can need more, such as an ELEMENT's value or null_flavour.
+	// Smallest valid tree.
 	Minimal Policy = iota
-	// Example visits every attribute the visit rule allows, the
-	// optional ones the OPT names included, and values every primitive
-	// leaf the way the ValueFill in force says. Suited to fixtures.
+	// Example visits every attribute the visit rule allows: every
+	// attribute the compiled node carries, the optional ones the OPT
+	// names included. Suited to fixtures.
 	Example
 )
 
@@ -80,37 +81,35 @@ type Options struct {
 	// Policy is Minimal or Example. Zero value = Minimal.
 	Policy Policy
 
-	// Language is the ISO 639-1 code for DV_TEXT / Composition.language /
-	// Entry.language defaults. Empty falls back to the compiled
-	// template's Language(), then "en".
+	// Language is the ISO 639-1 code of the COMPOSITION's and every
+	// ENTRY's language default. Empty is read as the compiled template's
+	// Language(), then as "en".
 	Language string
 
-	// Territory is the ISO 3166-1 alpha-2 country code required on
-	// COMPOSITION roots. Non-COMPOSITION roots ignore it. Empty on a
-	// COMPOSITION root returns ErrTerritoryRequired.
+	// Territory is the ISO 3166-1 alpha-2 code of a COMPOSITION's
+	// territory default, required for a COMPOSITION root: empty there
+	// returns ErrTerritoryRequired. Any other root ignores it.
 	Territory string
 
-	// Composer is the party responsible for the composition content.
-	// Required when the root rm_type_name is COMPOSITION; nil returns
-	// ErrComposerRequired. Non-COMPOSITION roots ignore it.
+	// Composer is the COMPOSITION's composer, required for a COMPOSITION
+	// root: nil there returns ErrComposerRequired. Any other root ignores
+	// it.
 	Composer rm.PartyProxy
 
-	// Now is the clock for every date-time the OPT leaves unset and no
-	// primitive constraint values, such as HISTORY.origin, EVENT.time,
-	// ACTION.time and EventContext.start_time. Zero value falls back to
-	// time.Now() inside Generate so callers that don't pin the clock get
-	// a sensible default; tests pin it for determinism. Generate writes
-	// every date-time it takes from Now in UTC, whatever zone Now carries.
+	// Now is the clock for unconstrained date-times: every DV_DATE_TIME
+	// whose OPT node carries no primitive constraint and gets no OPT
+	// value, such as HISTORY.origin, EVENT.time, ACTION.time and
+	// EVENT_CONTEXT.start_time. Zero is read as the current time. Generate
+	// writes every date-time it takes from Now in UTC, whatever zone Now
+	// carries; tests pin it for determinism.
 	Now time.Time
 
-	// UIDSource is the optional generator for LOCATABLE.uid values.
-	// Each generated Composition, Observation, Evaluation, Instruction,
-	// Action, AdminEntry, GenericEntry, Person, Organisation, Group,
-	// Agent and Role calls UIDSource once during synthesis; no other
-	// LOCATABLE gets a uid. A PARTY_RELATIONSHIP also takes its uid, and
-	// an empty source or target id, from UIDSource. Nil falls back to a random RFC 9562 v4
-	// UUID (stdlib uuid.NewV4). Tests pin a counter or named-seed source
-	// for deterministic UIDs in golden fixtures.
+	// UIDSource supplies the uids the generator writes: the uid of every
+	// COMPOSITION, ENTRY, GENERIC_ENTRY, PARTY and PARTY_RELATIONSHIP, of
+	// any other locatable whose OPT requires its uid, and the id of a
+	// PARTY_RELATIONSHIP's source or target that carries none. Nil falls
+	// back to a random RFC 9562 v4 UUID (stdlib uuid.NewV4). Tests pin a
+	// counter or named-seed source for deterministic uids.
 	UIDSource func() *rm.HierObjectID
 
 	// ValueFill selects how primitive leaves are valued. Zero value =

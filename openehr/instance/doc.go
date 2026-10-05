@@ -22,19 +22,18 @@
 //
 // Under either policy the generator skips an attribute the template
 // prohibits (an existence of 0..0), unless an RM rule needs it, such as
-// an attribute the BMM marks mandatory, which it then writes as one the
-// template leaves silent; and it never visits one the RM computes
-// rather than stores (offset on an event, is_integral on DV_QUANTITY
-// and DV_PROPORTION).
+// an attribute the BMM marks mandatory, which it then writes as if the
+// template allowed it; and it never visits one the RM computes rather
+// than stores (offset on an event, is_integral on DV_QUANTITY and
+// DV_PROPORTION), nor a locatable's uid, which the identity rule
+// decides.
 //
-//   - Minimal: an attribute is materialised only when its existence
-//     lower bound is 1 or more, the BMM marks it mandatory, its
-//     cardinality lower bound is 1 or more, or the template pins
-//     children under it, unless another rule needs more, such as the
-//     RM rule that an ELEMENT carry a value or a null flavour. Smallest
-//     valid tree.
-//   - Example: every attribute the visit rule allows is visited.
-//     Useful for fixtures and demos.
+//   - Minimal: the required attributes, and those with an allowed
+//     template child (one whose occurrences upper bound is not 0). An
+//     RM rule can need more, such as an ELEMENT's value or null
+//     flavour. Smallest valid tree.
+//   - Example: every attribute the visit rule allows. Useful for
+//     fixtures and demos.
 //
 // Under both, every primitive leaf the walk reaches is valued as
 // [Options.ValueFill] says: the constraint's example value under
