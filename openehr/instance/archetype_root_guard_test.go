@@ -288,6 +288,43 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 	}
 }
 
+// TestREQ107_UnnamedNonRootTemplateRootHasNoArchetypeDetails is the REQ-107
+// check that a template root of a class that is not always an archetype
+// root, for which the OPT names no archetype id, gets no archetype_details:
+// an ARCHETYPED needs an archetype id, the generator invents none, and these
+// classes may leave the attribute out. The output passes the RM floor and
+// the template validator at either policy and either value fill.
+func TestREQ107_UnnamedNonRootTemplateRootHasNoArchetypeDetails(t *testing.T) {
+	for _, class := range []string{"CLUSTER", "SECTION", "GENERIC_ENTRY", "ELEMENT", "ITEM_TREE"} {
+		t.Run(class, func(t *testing.T) {
+			if rmroots.IsArchetypeRoot(class) {
+				t.Fatalf("%s is an archetype-root class; want one that may leave archetype_details out", class)
+			}
+			c := compileOPTText(t, guardRootOPT(class, ""), true)
+			for _, opts := range guardOptions() {
+				call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("%s: %v, want a root", call, err)
+				}
+				root, ok := out.(rm.Locatable)
+				if !ok {
+					t.Fatalf("%s returned %T, want a LOCATABLE", call, out)
+				}
+				if ad := root.GetArchetypeDetails(); ad != nil {
+					t.Errorf("%s: archetype_details = %+v, want none", call, *ad)
+				}
+				if r := validation.ValidateRM(out); !r.OK {
+					t.Errorf("%s: ValidateRM issues %+v, want none", call, r.Issues)
+				}
+				if r := validation.Validate(out, c); !r.OK {
+					t.Errorf("%s: Validate issues %+v, want none", call, r.Issues)
+				}
+			}
+		})
+	}
+}
+
 // checkSlotFallbackStamp fails t unless out is a COMPOSITION whose first
 // content item carries the RM-type-prefix archetype id the slot-fill rule
 // gives a slot without parsed includes, as its node id and in its
