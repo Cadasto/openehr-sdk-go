@@ -279,6 +279,10 @@ func (c *ComplexObject) isNode() {}
 // ComplexObject decorated with an archetype id. The archetype id is
 // the slot fill within the template (e.g.
 // "openEHR-EHR-OBSERVATION.blood_pressure.v1").
+//
+// The parser also reads xsi:type="T_ARCHETYPE_ROOT" as an ArchetypeRoot,
+// because some exporters write that spelling for the same node. openEHR
+// Template.xsd defines only C_ARCHETYPE_ROOT.
 type ArchetypeRoot struct {
 	archetypeID  string
 	terms        map[string]ArchetypeTerm
