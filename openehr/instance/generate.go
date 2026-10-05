@@ -539,11 +539,12 @@ func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth
 }
 
 // builtTypeArgument is the type argument the typereg constructor gives a
-// generic class the generator builds from its bare name: a HISTORY or an
-// event is built over ITEM_STRUCTURE. An abstract EVENT is built as a
-// POINT_EVENT (concreteFor).
+// generic class the generator builds from its bare name, for the classes
+// with a required attribute the BMM types by the class's formal parameter:
+// an event is built over ITEM_STRUCTURE, which types its data. An abstract
+// EVENT is built as a POINT_EVENT (concreteFor). A HISTORY needs no row:
+// the BMM types its events as EVENT, not by its parameter.
 var builtTypeArgument = map[string]string{
-	"HISTORY":        "ITEM_STRUCTURE",
 	"EVENT":          "ITEM_STRUCTURE",
 	"POINT_EVENT":    "ITEM_STRUCTURE",
 	"INTERVAL_EVENT": "ITEM_STRUCTURE",
