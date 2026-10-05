@@ -342,7 +342,7 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | `String` | `string` | |
 | `Octet` | `byte` | |
 | `Uri` | `string` | Validated at codec boundary; not `net/url.URL` to preserve round-trip exact representation |
-| `Any` | `any` | A non-mandatory property is `*any`, a mandatory one `any` (§ [Property → Go field](#property--go-field)). |
+| `Any` | `any` | Optional properties differ: § [Property → Go field](#property--go-field). |
 | `Iso8601_date` | `string` (validated) | See § ISO 8601 types below |
 | `Iso8601_time` | `string` (validated) | |
 | `Iso8601_date_time` | `string` (validated) | |
