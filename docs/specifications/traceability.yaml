@@ -1236,7 +1236,9 @@ requirements:
       - openehr/instance/clock_test.go
       - openehr/instance/code_phrase_terminology_internal_test.go
       - openehr/instance/code_phrase_terminology_test.go
+      - openehr/instance/coded_rubric_test.go
       - openehr/instance/constrained_datetime_test.go
+      - openehr/instance/contract_inputs_test.go
       - openehr/instance/element_rule_test.go
       - openehr/instance/element_slot_test.go
       - openehr/instance/entry_codes_test.go
