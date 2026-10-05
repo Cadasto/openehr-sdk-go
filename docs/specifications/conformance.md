@@ -109,7 +109,7 @@ For a backend-facing probe, a mode absent from its **Modes** line is an open gap
 
 **Known gaps.**
 
-- The auth probes (PROBE-001 to PROBE-009) and the discovery probes (PROBE-040, PROBE-041) start their own `httptest` server from a fixture instead of receiving an already-configured client, so their **Modes** lines claim Cassette and Live modes the runner cannot yet serve them in.
+- The auth probes (PROBE-001 to PROBE-009) and the discovery probes (PROBE-040, PROBE-041) start their own `httptest` server from a fixture instead of receiving an already-configured client, so their **Modes** lines claim Cassette and Live modes the runner cannot yet serve them in. PROBE-106 starts its own server the same way, and a Cassette or Live mode would need that probe rewritten to take a configured client.
 - `probe.ParseModes` refuses the spelling `Sandbox; Cassette, Live not yet scoped.` with `ErrInvalidEntry`, and four entries use it (PROBE-062, PROBE-078, PROBE-102, PROBE-103).
 - `TestREQ082ProbeClassMatchesModes` classifies only the probes that have a `ProbeNNN` function under `testkit/probes`. The **Modes** lines of in-repo probes implemented as unit tests elsewhere are checked by review alone.
 
@@ -302,8 +302,9 @@ named coverage functions alongside the auth probes in
   `client_secret` (HTTP Basic) and `auth/jwtbearer` (the RFC 7523 §2.1 JWT
   Bearer authorization grant, not a SMART flow).
 
-Together with the PKCE public flow (PROBE-004) and the confidential-code
-auth-method selection (covered by `auth/smart`'s `TestExchangeWithPrivateKeyJWT`
+Together with the PKCE public flow (PROBE-004), confidential-client PKCE
+(`auth/smart`'s `TestREQ068_ConfidentialClientUsesPKCE`), and the confidential-code
+auth-method selection (covered by `TestExchangeWithPrivateKeyJWT`
 / `TestG3CrossCheckRejectsUnsupportedMethod` / `TestExchangeWithClientSecretBasic`
 unit pins), this exercises every flow in REQ-068's table across all three launch modes.
 
@@ -316,7 +317,7 @@ client scenarios to SDK coverage:
 | Inferno client scenario | SDK coverage | Status |
 |---|---|---|
 | **Public client** (authorization-code + PKCE, no secret) | PROBE-004 (PKCE + G-7 parity), PROBE-005 (scope), standalone/embedded launch modes | Covered (Sandbox) |
-| **Confidential Symmetric** (`client_secret_basic`) | `auth/smart` `client_secret_basic` selection + backend symmetric arm of `LaunchModeBackend`; positive wire test `TestExchangeWithClientSecretBasic` (asserts `Authorization: Basic base64(clientID:secret)`, `grant_type=authorization_code`, no `client_assertion`) | Covered (Sandbox) |
+| **Confidential Symmetric** (`client_secret_basic`) | Authorization-code `client_secret_basic`: `auth/smart` selection, pinned by `TestExchangeWithClientSecretBasic` (asserts `Authorization: Basic base64(clientID:secret)`, `grant_type=authorization_code`, no `client_assertion`) | Covered (Sandbox) |
 | **Confidential Asymmetric** (`private_key_jwt`) | `auth/smart` `WithClientAssertionKey` (`TestExchangeWithPrivateKeyJWT`, G-3 cross-check) + private_key_jwt backend arm of `LaunchModeBackend` | Covered (Sandbox) |
 | **Backend Services Asymmetric** (`client_credentials` + `client_assertion`) | backend arm of `LaunchModeBackend` (`auth/clientcreds.WithClientAssertion`) | Covered (Sandbox) |
 
@@ -611,14 +612,14 @@ client scenarios to SDK coverage:
 - **Preconditions:** The sets under [`testkit/corpus/crossformat/`](../../testkit/corpus/crossformat/) ([§ Vendored fixtures](#vendored-fixtures-testkitcorpus)), each with the OPT of its template, from which the probe builds the Web Template (`templatecompile.Compile` + `webtemplate.Build`).
 - **Wire assertion:** In-repo, not backend-facing. Per set, every leg whose two formats the set carries:
   - (a) **JSON and XML:** the canonical JSON and the canonical XML each decode, and the two decoded compositions, re-encoded through `canjson`, are compared leaf by leaf: a comparison of decoded values, never of bytes ([§ REQ-080](#req-080--openehr-wire-conformance)).
-  - (b) **canonical to FLAT:** `simplified.MarshalFlat` over the decoded upstream canonical document is compared key by key with the upstream FLAT.
-  - (c) **FLAT to canonical:** `simplified.UnmarshalFlat` with `WithTemplate` over the upstream FLAT is compared leaf by leaf, in canonical JSON, with the decoded upstream canonical document.
+  - (b) **canonical to FLAT:** `simplified.MarshalFlat` over the decoded upstream canonical document is compared key by key with the upstream FLAT. That document is the set's canonical JSON when the set has one, and its canonical XML otherwise.
+  - (c) **FLAT to canonical:** `simplified.UnmarshalFlat` with `WithTemplate` over the upstream FLAT is compared leaf by leaf, in canonical JSON, with the decoded upstream canonical document. That document is the set's canonical JSON when the set has one, and its canonical XML otherwise.
   - (d) **FLAT to STRUCTURED:** `simplified.FlatToStructured` over the upstream FLAT, which needs no template, is compared leaf by leaf with the upstream STRUCTURED.
   - (e) **STRUCTURED to FLAT:** the upstream STRUCTURED, decoded and re-encoded as FLAT, is compared with the upstream FLAT decoded and re-encoded the same way.
 
   Every FLAT comparison **MUST** hold composition-level metadata out on both sides with the [PROBE-086](#probe-086--upstream-flat-serialisation-parity) hold-out, the same allow-list derived from the codec's alias accessors, so an allow-listed `ctx/` short form and its upstream real path are not reported as a difference. Every FLAT and STRUCTURED decode **MUST** use the PROBE-086 refusal-derived exclusion: a key family the codec refuses is removed, no wider than the refusal names, and the decode retried, so one refusal does not hide the rest of the document. Each leg's outcome is either a refusal (the codec's error) or the counts compared, missing, extra, altered and excluded, and it **MUST** equal the outcome recorded for that set and leg. Excluded counts the upstream FLAT keys the refusal-derived exclusion removed before the comparison, in the legs that decode the upstream FLAT, (c) and (e): in (e) both sides are decoded, so a removed key family can drop out of both, and only this count keeps that visible. A leg whose outcome changes **MUST** fail until its record changes in the same commit, so a gap opens or closes only deliberately. A recorded refusal, difference or non-zero excluded count **MUST** state why it exists. A leg whose recorded outcome is not a refusal **MUST** compare at least one key or leaf, since agreement over an empty set is vacuous. The recorded outcomes and their reasons **MUST** be published in a census beside the harness that the harness regenerates, not one kept by hand.
 - **Modes:** In-repo (parity property against vendored fixtures; no backend).
-- **Status:** Implemented (inline). The harness is [`testkit/conformance/crossformat/`](../../testkit/conformance/crossformat/): it runs the legs, holds the recorded outcomes and their reasons in `recorded.go`, and generates [`CENSUS.md`](../../testkit/conformance/crossformat/CENSUS.md) with `-update`, a test failing when the committed census is stale. The probe wrapper is [`probe_105_cross_format_parity.go`](../../testkit/probes/serialize/probe_105_cross_format_parity.go), run by `TestProbe105`, and fails any leg whose outcome differs from its record. At landing, ten sets run 24 legs: 4 agree in full, 3 end in a recorded refusal and 17 carry recorded differences or excluded keys, each with its cause in the census.
+- **Status:** Implemented (inline). The harness is [`testkit/conformance/crossformat/`](../../testkit/conformance/crossformat/): it runs the legs, holds the recorded outcomes and their reasons in `recorded.go`, and generates [`CENSUS.md`](../../testkit/conformance/crossformat/CENSUS.md) with `-update`, a test failing when the committed census is stale. The probe wrapper is [`probe_105_cross_format_parity.go`](../../testkit/probes/serialize/probe_105_cross_format_parity.go), run by `TestProbe105`, and fails any leg whose outcome differs from its record. The counts of sets, legs and outcomes live only in that census.
 - **Satisfies:** REQ-080 (advances); exercises REQ-052, REQ-053 and REQ-056.
 
 ### Canonical JSON and formats

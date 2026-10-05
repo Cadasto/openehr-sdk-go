@@ -6,7 +6,7 @@ kind: specification
 
 **Status:** Draft
 
-Normative contract for the `auth/` package family and the application-level `smart/` package. Covers REQ-060 through REQ-069 and REQ-165.
+Normative contract for the `auth/` package family and the application-level `smart/` package. Covers REQ-060 through REQ-069, REQ-165 and REQ-167.
 
 The SDK supports authenticated requests through a layered model:
 
@@ -175,13 +175,13 @@ The HL7 SMART [Backend Services](https://hl7.org/fhir/smart-app-launch/backend-s
 
 ##### Backend Services from a resolved catalog
 
-`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, clientSecret, opts...)` (the secret empty when a client assertion is configured) for SMART Backend Services against a resolved catalog. It **MUST** post to the token endpoint in `catalog.Auth.TokenEndpoint`, and **MUST** fail with `auth.ErrInvalidConfig` when the catalog is nil or names no token endpoint. It **MUST** record `catalog.Issuer` on the tokens it produces, unless the caller passes `WithIssuer`, whose issuer then wins. When the catalog advertises the corresponding list, construction **MUST** fail with `auth.ErrInvalidConfig` when:
+`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, clientSecret, opts...)` for SMART Backend Services against a resolved catalog. `NewFromCatalog` **MUST** follow the configuration table below, which rejects both a client secret and a client assertion with `auth.ErrInvalidConfig`. `NewFromCatalog` **MUST** post to the token endpoint in `catalog.Auth.TokenEndpoint`, and **MUST** fail with `auth.ErrInvalidConfig` when the catalog is nil or names no token endpoint. It **MUST** record `catalog.Issuer` on the tokens it produces, unless the caller passes `WithIssuer`, whose issuer then wins. When the catalog advertises the corresponding list, construction **MUST** fail with `auth.ErrInvalidConfig` when:
 
 - `grant_types_supported` does not contain `client_credentials`;
 - `token_endpoint_auth_methods_supported` does not contain the configured method (`private_key_jwt` with a client assertion, `client_secret_basic` or `client_secret_post` with a secret);
-- `token_endpoint_auth_signing_alg_values_supported` does not contain the algorithm of a client assertion produced by the SDK's own `jwtbearer.ClaimsSigner` (an assertion source the SDK cannot inspect is not checked).
+- `token_endpoint_auth_signing_alg_values_supported` does not contain the algorithm of a client assertion produced by the SDK's own `jwtbearer.ClaimsSigner`.
 
-An absent or empty list **MUST NOT** fail construction, as in § G-3. `NewFromCatalog` **MUST NOT** choose the client-assertion signing algorithm from `token_endpoint_auth_signing_alg_values_supported`: a `jwtbearer.ClaimsSigner` signs with the algorithm it was built with.
+An absent or empty list **MUST NOT** fail construction, as in § G-3. The list **MUST NOT** fail construction either for a client assertion from any other `jwtbearer.AssertionSource`, whose algorithm the SDK cannot inspect. `NewFromCatalog` **MUST NOT** choose the client-assertion signing algorithm from `token_endpoint_auth_signing_alg_values_supported`: a `jwtbearer.ClaimsSigner` signs with the algorithm it was built with.
 
 **Distinction from `auth/jwtbearer`:** `auth/jwtbearer` implements the separate RFC 7523 _JWT Bearer Token Grant_ (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`) — the JWT is the _authorization grant_ itself. `auth/clientcreds` with `WithClientAssertion` uses `grant_type=client_credentials` — the JWT is the _client authentication credential_. Both use `jwtbearer.AssertionSource` / `jwtbearer.ClaimsSigner` for signing.
 
@@ -202,7 +202,7 @@ Three launch modes the SDK **MUST** support — each is a way the SMART flow sta
 |---|---|
 | **Standalone** | The SDK initiates the launch by redirecting the user to the authorization endpoint. No EHR-side launch parameter. |
 | **Embedded** (iFrame) | The SDK is launched from inside an EHR or portal that has already authenticated the user; the EHR provides a `launch` parameter that the SDK forwards to the authorization endpoint to obtain launch context. |
-| **Backend service** | No user interaction. Uses SMART Backend Services (`auth/clientcreds` with a client assertion); the RFC 7523 §2.1 grant in `auth/jwtbearer` serves deployments outside SMART. No launch context. |
+| **Backend service** | No user interaction. Three confidential backend flows: `auth/clientcreds` with a client assertion (`client_credentials` + signed `client_assertion`, no Basic, no `client_secret` — SMART Backend Services), and, outside the SMART asymmetric profile, `auth/clientcreds` with a symmetric `client_secret` (HTTP Basic) and `auth/jwtbearer` (the RFC 7523 §2.1 JWT Bearer authorization grant, not a SMART flow). No launch context. |
 
 The launch mode is determined by configuration at construction time and **MAY** also be derived per call (e.g. an MCP server that accepts both standalone and embedded launches from different transports).
 
@@ -240,13 +240,13 @@ When `AuthorizeURL` is given a `launch` value, the request's `scope` **MUST** co
 `auth/smart` **MUST** provide `(*Source).CompleteAuthorization(ctx, callback url.Values, req AuthorizationRequest)`, taking the query the redirect URI received and the request the launch started with. A request without `State` or a PKCE verifier **MUST** fail with `auth.ErrInvalidConfig` before any check, so an empty state never matches an empty state. A callback that repeats `state`, `iss`, `code` or `error` **MUST** fail with `ErrAuthorizationRejected` (RFC 6749 §3.1 forbids a repeated response parameter). Otherwise it **MUST** apply these checks in this order and make no token-endpoint call until all of them pass:
 
 1. `state` **MUST** equal `req.State`; otherwise the call fails with `ErrLaunchInvalidState`.
-2. An empty `iss` value **MUST** be treated as absent. When the callback carries an `iss` (RFC 9207) or the authorization server advertises `authorization_response_iss_parameter_supported: true`, a request whose `Issuer` is empty **MUST** fail with `auth.ErrInvalidConfig`, not `ErrLaunchIssuerMismatch`, because there is nothing to compare with. Otherwise the callback's `iss` **MUST** equal `req.Issuer` exactly, and a callback without `iss` where the server advertises the parameter **MUST** be refused (RFC 9207 §2.4); either failure is `ErrLaunchIssuerMismatch`.
+2. An empty `iss` value **MUST** be treated as absent. The issuer check **MUST** run when the callback carries an `iss` (RFC 9207) or the authorization server advertises `authorization_response_iss_parameter_supported: true`. When it runs, a request whose `Issuer` is empty **MUST** fail with `auth.ErrInvalidConfig`, not `ErrLaunchIssuerMismatch`, because there is nothing to compare with. When `Issuer` is set, the callback's `iss` **MUST** equal `req.Issuer` exactly, and a callback without `iss` **MUST** be refused, because that callback is missing `iss` where the server advertises the parameter (RFC 9207 §2.4); either failure is `ErrLaunchIssuerMismatch`. When the callback carries no `iss` and the server does not advertise the parameter, the check **MUST NOT** run.
 3. When the callback carries `error` (RFC 6749 §4.1.2.1), the call **MUST** fail with an error that `errors.Is` matches to `ErrAuthorizationRejected` and from which `errors.As` extracts an `*auth.OAuth2Error` holding `error`, `error_description` and `error_uri`. A callback with neither `error` nor `code` **MUST** fail with `ErrAuthorizationRejected` as well.
 4. The code is then exchanged exactly as `ExchangeAuthorizationCode` exchanges it, including the ID-token rules of § REQ-064.
 
 #### Embedded launch
 
-`auth/smart` **MUST** provide `ParseEHRLaunch(query url.Values, allow func(iss string) bool) (EHRLaunch, error)`, which reads the `iss` and `launch` parameters a Launcher appends to the app's launch URL. It **MUST** fail with `ErrLaunchInvalidRequest` when `iss` is missing or not an absolute URL with a host, or `launch` is missing, without consulting `allow`. Otherwise it **MUST** fail with `ErrLaunchIssuerNotAllowed` when `allow` is nil or returns false for `iss`, so a client never resolves discovery for a Platform it has not chosen to trust. `EHRLaunch.Issuer` is the Platform base URL to resolve ([service-discovery.md § REQ-070](service-discovery.md#req-070)); `EHRLaunch.Launch` is passed unchanged to `AuthorizeURL`.
+`auth/smart` **MUST** provide `ParseEHRLaunch(query url.Values, allow func(iss string) bool) (EHRLaunch, error)`, which reads the `iss` and `launch` parameters a Launcher appends to the app's launch URL. It **MUST** fail with `ErrLaunchInvalidRequest` when `iss` is missing or not an absolute URL with a host, or `launch` is missing, without consulting `allow`. Otherwise it **MUST** fail with `ErrLaunchIssuerNotAllowed` when `allow` is nil or returns false for `iss`, so a client never resolves discovery for a Platform it has not chosen to trust. `EHRLaunch.Issuer` is the Platform base URL to resolve ([service-discovery.md § REQ-070](service-discovery.md#req-070)); `EHRLaunch.Launch` **MUST** be passed unchanged to `AuthorizeURL`.
 
 ### REQ-062 — JWKS rotation
 
@@ -254,7 +254,7 @@ When `AuthorizeURL` is given a `launch` value, the request's `scope` **MUST** co
 
 The SMART discovery resolver surfaces two algorithm-selection lists onto `AuthEndpoints` (REQ-070):
 
-- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). `auth/smart` checks the configured client-assertion algorithm against this list under § REQ-068, and `auth/clientcreds.NewFromCatalog` checks client assertions against it under [§ Backend Services from a resolved catalog](#backend-services-from-a-resolved-catalog).
+- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). When the list is non-empty, `auth/smart` **MUST** refuse a client assertion whose algorithm is not in it, and `auth/clientcreds.NewFromCatalog` **MUST** refuse a `jwtbearer.ClaimsSigner` whose algorithm is not in it. They **MUST NOT** choose an algorithm from the list (§ REQ-068). Which assertion sources `NewFromCatalog` checks is set in [Backend Services from a resolved catalog](#backend-services-from-a-resolved-catalog).
 - **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). ID-token verification (REQ-064) consumes this list as the verification allowlist when present (see _ID-token verification algorithm agility_ below).
 
 The SDK validates ID tokens against the deployment's published JWKS. JWKS rotation **MUST** be handled:
@@ -263,11 +263,11 @@ The SDK validates ID tokens against the deployment's published JWKS. JWKS rotati
 - The cache **MUST** honour a documented TTL (default: 5 minutes).
 - On a verification miss (`kid` not in cache), the SDK **MUST** refresh the JWKS once before reporting the verification as failed. This handles silent rotation by the authorization server.
 - The refresh path **MUST** coalesce concurrent attempts (REQ-026).
-- A key published without a `kid` **MUST** be kept. When an ID token's header carries no `kid`, the SDK **MUST** verify it with the set's only signing key when the set holds exactly one key whose `use`, if present, is `sig`, and **MUST** reject the token otherwise (OpenID Connect Core 1.0 §10.1 lets an issuer omit `kid` only when its set holds one key).
+- A key published without a `kid` **MUST** be kept. When an ID token's header carries no `kid`, the SDK **MUST** verify it with the set's only signing key when the set holds exactly one key whose `use`, if present, is `sig`, and **MUST** reject the token otherwise (OpenID Connect Core 1.0 §10.1 lets an issuer omit `kid` only when its set holds one signing key).
 
 #### ID-token verification algorithm agility (REQ-062, REQ-064) — landed in Phase 3e
 
-`auth/smart.ValidateIDToken` verifies the `id_token` signature against the deployment's JWKS and then applies the SDK's claim semantics. It lives beside the token exchange so the exchange and the refresh can verify the ID token they receive (§ REQ-064); `smart.ValidateIDToken` and `smart.IDTokenClaims` **MUST** remain as the same function and type for existing callers. Signature verification is delegated to **`github.com/coreos/go-oidc/v3`** (which uses `go-jose/v4`); the SDK does **not** hand-roll signature verification or JWK→key parsing.
+`auth/smart.ValidateIDToken` verifies the `id_token` signature against the deployment's JWKS and then applies the SDK's claim semantics. It lives beside the token exchange so the exchange and the refresh can verify the ID token they receive (§ REQ-064); `smart.ValidateIDToken` and `smart.IDTokenClaims` **MUST** remain as the same function and type for existing callers. Signature verification is delegated to **`github.com/coreos/go-oidc/v3`** (which uses `go-jose/v4`); the SDK **MUST NOT** hand-roll signature verification or JWK parsing.
 
 - **Supported algorithms:** the SDK **MUST** support `RS256`, `RS384`, `ES256` and `ES384`, and **MUST NOT** treat any other algorithm as supported. RS384/ES384 are the HL7 SMART asymmetric baseline; RS256/ES256 cover the widely deployed remainder. Both RSA and ECDSA keys published in the JWKS are honoured.
 - **Allowlist:** the caller passes the deployment's `id_token_signing_alg_values_supported` (via `smart.WithIDTokenSigningAlgs` / `ValidateConfig.AllowedIDTokenAlgs`). A non-empty allowlist **MUST** be intersected with the supported set: it can narrow the SDK's support and **MUST NOT** widen it. An empty intersection (the deployment advertises only algorithms the SDK does not support) **MUST** fail closed with `auth.ErrJWKSValidationFailed` before the JWKS is fetched, with no fallback to the full supported set. With no allowlist, the full supported set **MUST** apply.
@@ -365,7 +365,7 @@ Out of scope (v1 implementation status): MTLS, FAPI, JAR/PAR.
 
 `auth/smart` **MUST** provide `(*Source).Revoke(ctx)` for signing out (RFC 7009). When the source's catalog advertises `revocation_endpoint`, `Revoke` **MUST** POST the form-encoded `token` with its `token_type_hint` (RFC 7009 §2.1): the refresh token when the source holds one (`refresh_token`), otherwise the access token (`access_token`). It **MUST** authenticate exactly as the token endpoint does (§ REQ-068), so a public client sends `client_id`.
 
-Before it sends the request, and whatever the outcome, `Revoke` **MUST** clear the source's access and refresh tokens, drop its last token response and forget the identity of the last ID token it verified (§ REQ-064), so a failed call never leaves a signed-out session usable, no refresh starts with the token being revoked, and `LastTokenResponse` returns the zero value afterwards. It **MUST** report the outcome: nil on a 200 response (RFC 7009 §2.2 answers 200 for an unknown or already invalid token too), otherwise an `*auth.ExchangeError` matching `auth.ErrRevocationFailed`. A source that holds a token but has no revocation endpoint **MUST** clear it the same way and return an error matching `auth.ErrInvalidConfig`. A source that holds no token **MUST** drop its last token response, forget the verified identity and return nil, whether or not a revocation endpoint is advertised, without sending a request or calling the token-change hook.
+Before it sends the request, and whatever the outcome, `Revoke` **MUST** clear the source's access and refresh tokens, drop its last token response and forget the identity of the last ID token it verified (§ REQ-064), so a failed call never leaves a signed-out session usable, no refresh starts with the token being revoked, and `LastTokenResponse` returns the zero value afterwards. It **MUST** report the outcome: nil on a 200 response (RFC 7009 §2.2 answers 200 for an unknown or already invalid token too), otherwise an `*auth.ExchangeError` matching `auth.ErrRevocationFailed`. A source that holds a token but has no revocation endpoint **MUST** clear it the same way and return an error matching `auth.ErrInvalidConfig`. A source holds no token when it has no refresh token and no access-token value. `Revoke` **MUST** then clear that valueless access token, drop the last token response, forget the verified identity and return nil, whether or not a revocation endpoint is advertised, without sending a request or calling the token-change hook.
 
 ### REQ-064 — Launch context
 
@@ -382,7 +382,7 @@ type LaunchContext struct {
     // FHIR-compat launch-context claims (SMART App Launch §7.1).
     Patient     string         // SMART "patient" launch parameter — opaque to SDK
     Encounter   string         // SMART "encounter" launch parameter
-    User        string         // SMART "fhirUser" / openEHR equivalent
+    User        string         // verified ID token's fhirUser claim, else its sub
     Scopes      []string       // granted scopes (post-token-exchange)
     IDToken     *IDTokenClaims // parsed ID-token claims (sub, aud, iss, iat, exp, custom)
     Issuer      string         // deployment issuer URL
@@ -582,8 +582,8 @@ func ParseOpenEHRScope(token string) (OpenEHRScope, bool)
 ## Error mapping
 
 Auth errors **MUST** surface as typed sentinels. The shared classes live in
-package `auth` (`auth/errors.go`); the SMART-launch-specific state-mismatch
-sentinel lives in package `smart` (`auth/smart/errors.go`):
+package `auth` (`auth/errors.go`); the SMART-launch sentinels live in
+package `smart` (`auth/smart/errors.go`):
 
 ```go
 // package auth — shared across all providers
@@ -609,7 +609,7 @@ var (
 
 A PKCE `code_verifier` mismatch is **not** a separate client-side sentinel: the
 verifier is sent to the token endpoint, and a mismatch is rejected **server-side**,
-surfacing as `auth.ErrTokenExchangeFailed`. Token-exchange and refresh failures
+surfacing as `auth.ErrTokenExchangeFailed`. Token-exchange, refresh and revocation failures
 are wrapped in `*auth.ExchangeError`, which carries the HTTP `StatusCode`, the
 parsed RFC 6749 `OAuth2` envelope, and a `Terminal()` predicate (4xx
 `invalid_grant`/`invalid_client`/`invalid_token`) that drives refresh-token
@@ -635,10 +635,11 @@ Consumers detect classes via `errors.Is`. The underlying wire error is preserved
 | SMART PKCE flow | REQ-061 | `auth/smart/` |
 | JWKS rotation | REQ-062 | `auth/smart/`, optionally `auth/clientcreds/`, `auth/jwtbearer/` |
 | Token refresh | REQ-063 | `auth/smart/` (primary), `auth/<provider>/` (as applicable) |
-| Launch context | REQ-064 | `smart/` |
+| Launch context | REQ-064 | `auth/smart/`, `smart/` |
 | Per-client / tenant binding | REQ-065 | `auth/<provider>/`, `smart/discovery/` |
 | AI caller attribution | REQ-066 | `transport/`, `auth/context.go` |
 | Platform principal claims | REQ-067 | `auth/smart/`, `smart/` |
 | Flow + launch-mode coverage | REQ-068 | `auth/smart/`, `auth/clientcreds/`, `auth/jwtbearer/` |
 | HTTP Basic on openEHR REST | REQ-069 | `auth/basic/`, consumed by `transport/` |
 | openEHR scope syntax | REQ-165 | `auth/` |
+| Token revocation | REQ-167 | `auth/smart/` |

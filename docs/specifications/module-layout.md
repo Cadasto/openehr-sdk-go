@@ -25,7 +25,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | Package | Scope |
 |---|---|
 | `auth/` | Generic `TokenSource` abstraction and shared OAuth2 primitives (JWKS, discovery, scope builder). |
-| `auth/smart/` | SMART-on-openEHR provider — PKCE, authorization-code launch flow, token refresh, JWKS rotation. |
+| `auth/smart/` | SMART-on-openEHR provider — PKCE, authorization-code launch flow, token refresh, JWKS rotation, ID-token verification. |
 | `auth/clientcreds/` | OAuth2 Client Credentials grant provider. |
 | `auth/jwtbearer/` | OAuth2 JWT Bearer (RFC 7523) grant provider. |
 | `auth/basic/` | HTTP Basic (RFC 7617) credentials for openEHR REST (REQ-069). |
