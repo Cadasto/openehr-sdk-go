@@ -103,3 +103,51 @@ func TestREQ107_BareCodePhraseKeepsLocal(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_UnconstrainedTerminologyIDKeepsLocal is the REQ-107 check
+// that a code phrase whose terminology_id the OPT names as a TERMINOLOGY_ID
+// with no constraint on its value keeps the terminology local: the walk
+// cannot write that value, and the empty TERMINOLOGY_ID it builds must not
+// replace local. It holds for a code phrase at the root and under DV_COUNT
+// normal_status, under both policies, both value fills and both compile
+// modes.
+func TestREQ107_UnconstrainedTerminologyIDKeepsLocal(t *testing.T) {
+	termID := optSingle("terminology_id", optNode("TERMINOLOGY_ID", ""))
+	cases := []struct {
+		name string
+		opt  string
+		code func(out any) rm.CodePhrase
+	}{
+		{
+			name: "root CODE_PHRASE",
+			opt:  optTemplate("CODE_PHRASE", termID),
+			code: func(out any) rm.CodePhrase { return *out.(*rm.CodePhrase) },
+		},
+		{
+			name: "DV_COUNT normal_status",
+			opt: optTemplate("ELEMENT", optSingle("value",
+				optNode("DV_COUNT", "", optOptionalSingleOver("normal_status", optNode("CODE_PHRASE", "", termID))))),
+			code: func(out any) rm.CodePhrase {
+				ns := out.(*rm.Element).Value.(*rm.DVCount).NormalStatus
+				if ns == nil {
+					return rm.CodePhrase{}
+				}
+				return *ns
+			},
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					checkCode(t, tc.name, tc.code(out), localAt0000)
+				})
+			}
+		}
+	}
+}

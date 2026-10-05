@@ -105,19 +105,9 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	}
 
 	// Apply root-type-specific defaults once the structure is in place.
-	switch rootType {
-	case "COMPOSITION":
+	if rootType == "COMPOSITION" {
 		if err := g.applyCompositionDefaults(root.(*rm.Composition)); err != nil {
 			return nil, err
-		}
-	case "CODE_PHRASE":
-		// The implicit terminology_id attribute replaces the terminology
-		// the primitive default wrote with an empty TERMINOLOGY_ID, whose
-		// value the generator cannot write. A nested code phrase gets its
-		// terminology when rmwrite attaches it (local on a coded text,
-		// IANA_media-types on a media type); a root is not attached.
-		if cp := root.(*rm.CodePhrase); cp.TerminologyID.Value == "" {
-			cp.TerminologyID = rm.TerminologyID{Value: "local"}
 		}
 	}
 
@@ -326,10 +316,29 @@ func (g *generator) materialiseSingle(
 	if err := g.walkNode(child, rmChild); err != nil {
 		return err
 	}
+	if replacesTerminology(parentRM, attr.Name(), rmChild) {
+		return nil
+	}
 	if err := rmwrite.EnsureSingle(parentRM, optNode.RMTypeName(), attr.Name(), rmChild); err != nil {
 		return fmt.Errorf("attach %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
 	}
 	return nil
+}
+
+// replacesTerminology reports whether attaching child as attr of parent
+// would replace a code phrase's terminology with an empty TERMINOLOGY_ID.
+// The generator cannot write a TERMINOLOGY_ID's value except where the
+// OPT constrains it, so one built from the BMM, or from an OPT node that
+// does not constrain its value, is empty. The terminology the code phrase
+// already carries (local from its primitive default, or the one a
+// C_CODE_PHRASE named) is kept instead.
+func replacesTerminology(parent any, attr string, child any) bool {
+	cp, ok := parent.(*rm.CodePhrase)
+	if !ok || attr != "terminology_id" || cp.TerminologyID.Value == "" {
+		return false
+	}
+	tid, ok := child.(*rm.TerminologyID)
+	return ok && tid.Value == ""
 }
 
 // materialiseImplicitSingle creates a default value for a
@@ -397,6 +406,9 @@ func (g *generator) materialiseImplicitSingle(
 	// requires.
 	g.stampIfLocatable(rmChild, concreteFor(rmType))
 	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
+	if replacesTerminology(parentRM, attr.Name(), rmChild) {
+		return nil
+	}
 	// Best-effort attach; if the slot rejects the default (e.g. type
 	// mismatch on a polymorphic attr), let downstream defaults
 	// (applyCompositionDefaults) own the field.
@@ -455,9 +467,10 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 		// Best-effort attach: a default the slot rejects (a polymorphic
 		// attribute the BMM cannot narrow) is left to the validator, as in
 		// materialiseImplicitSingle.
-		if isContainer {
+		switch {
+		case isContainer:
 			_ = rmwrite.AppendMultiple(parent, parentRMType, attrName, rmChild)
-		} else {
+		case !replacesTerminology(parent, attrName, rmChild):
 			_ = rmwrite.EnsureSingle(parent, parentRMType, attrName, rmChild)
 		}
 	}
