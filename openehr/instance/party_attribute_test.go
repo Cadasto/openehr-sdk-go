@@ -150,27 +150,54 @@ func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 	}
 }
 
-// TestREQ107_KnownGapPinnedActorLanguages pins the REQ-107 known gap on
-// attributes the generator cannot write: a PERSON template that pins
-// languages makes Generate return an error wrapping
+// TestREQ107_KnownGapUnwritableAttributes pins the REQ-107 known gap on
+// attributes the generator cannot write: a template that puts an object
+// under one makes Generate return an error wrapping
 // rmwrite.ErrUnknownAttribute, and no root, at either policy and either
-// value fill, rather than members the template validator rejects. That
-// validator matches a multi-valued attribute's members by
-// archetype_node_id, which a DV_TEXT lacks. When it matches such members,
-// the generator can write languages and this test changes with the gap.
-func TestREQ107_KnownGapPinnedActorLanguages(t *testing.T) {
-	c := compileOPTText(t, guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
-		guardMultiple("languages", guardExistence11,
-			guardChild("C_COMPLEX_OBJECT", "DV_TEXT", "", guardOccurrences11, ""))), true)
-	for _, opts := range guardOptions() {
-		call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
-		out, err := instance.Generate(t.Context(), c, opts)
-		if !errors.Is(err, rmwrite.ErrUnknownAttribute) {
-			t.Errorf("%s error = %v, want one wrapping rmwrite.ErrUnknownAttribute", call, err)
-		}
-		if out != nil {
-			t.Errorf("%s returned %T, want no root", call, out)
-		}
+// value fill. The rows pin each attribute the gap names: a PERSON's
+// languages holding a DV_TEXT, a PERSON's roles holding a PARTY_REF, and a
+// ROLE performer's id holding a HIER_OBJECT_ID, which rmwrite cannot
+// attach to a PARTY_REF. The template validator matches a multi-valued
+// attribute's members by archetype_node_id, which a DV_TEXT or a PARTY_REF
+// lacks, so it would reject any language or role written; the languages
+// and roles rows change when it matches such members by RM type.
+func TestREQ107_KnownGapUnwritableAttributes(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  string
+	}{
+		{
+			name: "PERSON languages holding a DV_TEXT",
+			opt: guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
+				guardMultiple("languages", guardExistence11,
+					guardChild("C_COMPLEX_OBJECT", "DV_TEXT", "", guardOccurrences11, ""))),
+		},
+		{
+			name: "PERSON roles holding a PARTY_REF",
+			opt: guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
+				guardMultiple("roles", guardExistence11,
+					guardChild("C_COMPLEX_OBJECT", "PARTY_REF", "", guardOccurrences11, ""))),
+		},
+		{
+			name: "ROLE performer id holding a HIER_OBJECT_ID",
+			opt: rolePerformerOPT(guardSingle("id", guardExistence11,
+				guardChild("C_COMPLEX_OBJECT", "HIER_OBJECT_ID", "", guardOccurrences11, ""))),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, tc.opt, true)
+			for _, opts := range guardOptions() {
+				call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+				out, err := instance.Generate(t.Context(), c, opts)
+				if !errors.Is(err, rmwrite.ErrUnknownAttribute) {
+					t.Errorf("%s error = %v, want one wrapping rmwrite.ErrUnknownAttribute", call, err)
+				}
+				if out != nil {
+					t.Errorf("%s returned %T, want no root", call, out)
+				}
+			}
+		})
 	}
 }
 
