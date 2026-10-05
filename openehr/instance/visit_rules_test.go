@@ -155,3 +155,66 @@ func TestREQ107_OptionalSilentEventsGetNoMember(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_UnboundedLowerBoundIsNotRequired is the REQ-107 check that an
+// existence or cardinality lower bound the OPT marks unbounded does not
+// make an attribute required, whatever number the OPT puts beside it: the
+// visit rule counts a lower bound only when it is bounded and at least 1.
+// Minimal does not visit an optional OBSERVATION protocol whose existence
+// lower bound is unbounded with a lower of 1, and Example, which visits
+// it, writes it from its BMM type; neither policy gives a silent optional
+// ITEM_TREE items list whose cardinality lower bound is unbounded with a
+// lower of 2 any member. It holds under both value fills and both compile
+// modes.
+func TestREQ107_UnboundedLowerBoundIsNotRequired(t *testing.T) {
+	const openLower = `<lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>true</lower_unbounded>`
+	protocol := `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>protocol</rm_attribute_name>` +
+		`<existence>` + openLower + `<upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence></attributes>`
+	items := `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
+		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>0</lower><upper>1</upper></existence>` +
+		`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
+		`<lower_included>true</lower_included><lower_unbounded>true</lower_unbounded><upper_unbounded>true</upper_unbounded>` +
+		`<lower>2</lower></interval></cardinality></attributes>`
+	cases := []struct {
+		name  string
+		opt   string
+		check func(t *testing.T, policy instance.Policy, out any)
+	}{
+		{
+			name: "existence: OBSERVATION protocol",
+			opt:  optTemplate("OBSERVATION", protocol),
+			check: func(t *testing.T, policy instance.Policy, out any) {
+				p := out.(*rm.Observation).Protocol
+				present := p != nil && !rm.IsTypedNil(p)
+				if want := policy == instance.Example; present != want {
+					t.Errorf("OBSERVATION.protocol present = %t, want %t", present, want)
+				}
+			},
+		},
+		{
+			name: "cardinality: ITEM_TREE items",
+			opt:  optTemplate("ITEM_TREE", items),
+			check: func(t *testing.T, _ instance.Policy, out any) {
+				if n := len(out.(*rm.ItemTree).Items); n != 0 {
+					t.Errorf("ITEM_TREE.items has %d members, want none", n)
+				}
+			},
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					tc.check(t, opts.Policy, out)
+				})
+			}
+		}
+	}
+}
