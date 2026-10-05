@@ -120,6 +120,9 @@ func Get(ctx context.Context, c *Client, id string) (any, error) // forces type 
 
 Library code (non-test code outside `cmd/`) **MUST NOT** use reflection, except for ordinary field mapping over struct tags (it is what `encoding/json` does) and for uses that never choose a Go type from `_type`: a typed-nil or zero-value check, a value comparison (`reflect.DeepEqual`), a type name in an error message, and an addressable copy that reaches pointer-receiver methods. Each such use sits on the reviewed list of `TestREQ024ReflectOnlyForReviewedUses` ([`internal/reflect_guard_test.go`](../../internal/reflect_guard_test.go)). The type registry (REQ-040) is the **only** sanctioned mechanism for projecting the `_type` discriminator onto a concrete Go type.
 
+- A constraint interface **SHOULD** be a marker (`isComposition()`) plus the necessary method set — same rule as abstract categories.
+- Constraint interfaces **MUST NOT** appear in the *function* signature outside the type parameter list — `Get[T rm.CompositionLike](...) (T, error)` is correct; `func Get(...) (rm.CompositionLike, error)` is wrong because the runtime type is erased.
+
 If a generic API is harder to read than a `T`-specific one for the most common call site, the generic is wrong — drop it.
 
 ## Substitution slots and the `*Like` interfaces

@@ -21,7 +21,7 @@ Get from zero to a working import in a few minutes. This guide is for applicatio
 Add the module to your project:
 
 ```bash
-go get github.com/cadasto/openehr-sdk-go@latest   # pre-1.0: pin an exact tag (see releases.md)
+go get github.com/cadasto/openehr-sdk-go@v0.30.0   # pre-1.0: pin an exact tag (see releases.md)
 ```
 
 Clone this repository if you want to run the bundled examples or contribute:
@@ -90,7 +90,7 @@ go run ./cmd/examples/canonical_json
 
 Expected output includes the composition archetype id, language, and `OK: canonical-JSON Composition decoded`.
 
-### Validate against a template
+### Validate against the RM and a template
 
 A typical CI pipeline runs bytes → RM → compiled OPT → validation issues.
 
@@ -98,7 +98,7 @@ A typical CI pipeline runs bytes → RM → compiled OPT → validation issues.
 go run ./cmd/examples/validate-from-json
 ```
 
-This decodes `testdata/minimal_blood_pressure.json`, compiles `vital_signs.opt`, and prints either `result : OK — JSON validates against OPT` or a list of constraint violations. See [examples.md](examples.md#validate-from-json) for flags and custom file paths.
+This decodes `testdata/minimal_blood_pressure.json`, compiles `vital_signs.opt`, and runs two checks: the RM floor, which needs no template, and the template constraints. Each check prints its verdict and any issues it found, and the program exits 1 when either one fails. On the bundled fixture both report `OK, no issues`. See [examples.md](examples.md#validate-from-json) for flags and custom file paths.
 
 ---
 
@@ -151,8 +151,8 @@ Replace the static catalog URL with your deployment's openEHR REST base (usually
 import "github.com/cadasto/openehr-sdk-go/auth/clientcreds"
 
 ts, err := clientcreds.New(
-	os.Getenv("CLIENT_ID"),
-	os.Getenv("CLIENT_SECRET"),
+	os.Getenv("OPENEHR_CLIENT_ID"),
+	os.Getenv("OPENEHR_CLIENT_SECRET"),
 	"https://auth.example/oauth/token",
 	clientcreds.WithHTTPClient(hc),
 )
@@ -165,6 +165,8 @@ c, err := transport.New(cat,
 	transport.WithTokenSource(ts),
 )
 ```
+
+The [`service-auth`](examples.md#service-auth) example shows the full wiring, including `clientcreds.NewFromCatalog`, which takes the token endpoint from the service catalog.
 
 For SMART-on-openEHR launches, use `auth/smart` and the application-level helpers under `smart/`. Details: [specifications/auth.md](specifications/auth.md).
 

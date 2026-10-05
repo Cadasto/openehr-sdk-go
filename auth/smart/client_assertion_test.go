@@ -201,7 +201,9 @@ func TestClientAssertionAlgMustBeAdvertised(t *testing.T) { // REQ-068
 // TestClientAssertionSentLifetimeAndKeyID pins the client assertion
 // auth/smart sends on the code exchange: its exp is after its iat and at
 // most five minutes after it, and its header carries the configured kid and
-// algorithm (RS384 when alg is empty).
+// algorithm (RS384 when alg is empty), whichever algorithm the server's
+// advertised list names first: the list refuses an algorithm and never
+// picks one.
 func TestClientAssertionSentLifetimeAndKeyID(t *testing.T) { // REQ-068
 	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -212,13 +214,17 @@ func TestClientAssertionSentLifetimeAndKeyID(t *testing.T) { // REQ-068
 		t.Fatal(err)
 	}
 	tests := []struct {
-		name    string
-		key     crypto.Signer
-		alg     string
-		wantAlg string
+		name       string
+		key        crypto.Signer
+		alg        string
+		advertised []string
+		wantAlg    string
 	}{
 		{name: "ES384", key: ecKey, alg: "ES384", wantAlg: "ES384"},
 		{name: "default alg", key: rsaKey, alg: "", wantAlg: "RS384"},
+		{name: "advertised list starts with another RSA algorithm", key: rsaKey, alg: "RS384", advertised: []string{"RS256", "RS384"}, wantAlg: "RS384"},
+		{name: "default alg, advertised list starts with another RSA algorithm", key: rsaKey, alg: "", advertised: []string{"RS256", "RS384"}, wantAlg: "RS384"},
+		{name: "advertised list starts with another ECDSA algorithm", key: ecKey, alg: "ES384", advertised: []string{"ES256", "ES384"}, wantAlg: "ES384"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -245,6 +251,7 @@ func TestClientAssertionSentLifetimeAndKeyID(t *testing.T) { // REQ-068
 				discovery.AuthEndpoints{
 					AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
 					TokenEndpoint:         discovery.MustParseURL(srv.URL + "/token"),
+					TokenEndpointAuthSigningAlgValuesSupported: tc.advertised,
 				},
 				smart.WithHTTPClient(srv.Client()),
 				smart.WithRedirectURI("https://app.example/callback"),

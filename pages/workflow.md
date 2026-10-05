@@ -37,8 +37,8 @@ SDK starts from the file you export.
 ### 2. Work in process
 Parse the OPT and compile it, all without a network. Export Web Template JSON
 for FLAT paths. Build a Composition or synthesise one, then validate it
-against the compiled template. Encode canonical JSON, canonical XML, FLAT, or
-STRUCTURED. Build or parse AQL and lint it.
+against the Reference Model and the compiled template. Encode canonical JSON,
+canonical XML, FLAT, or STRUCTURED. Build or parse AQL and lint it.
 
 Packages: `template`, `templatecompile`, `validation`, and the codecs under
 `serialize/`. The full map is on [Packages](packages.md).
@@ -64,8 +64,9 @@ builder, the synthesiser, the validator, and AQL lint all accept.
 :material-check-decagram:
 
 ### Check before you send
-`validation.ValidateComposition` reports constraint issues against the
-compiled OPT. `ValidateRM` walks an RM root with no template at all.
+`validation.ValidateRM` checks the Reference Model's own rules with no
+template. `ValidateComposition` checks the compiled OPT's constraints. The two
+checks are separate, so a Composition you send should pass both.
 
 </div>
 
@@ -114,8 +115,10 @@ CDR.
 
 In tests you have two ways to avoid a real CDR. Inject `sandbox.Backend` as the
 client's `http.RoundTripper` and it answers requests in memory, with no
-server at all. The examples take the other route and start a loopback
-`httptest` server, which needs no credentials.
+server at all. Or start a loopback `httptest` server. The examples use both.
+The template, composition, query and client credentials examples run on
+`sandbox`. The examples that create an EHR, commit a contribution or run a
+SMART launch start an `httptest` server.
 
 Packages: `client/ehr` and the providers under `auth/`.
 

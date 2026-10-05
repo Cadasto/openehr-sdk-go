@@ -68,7 +68,10 @@ func TestProbe011PutStaleIfMatch_412(t *testing.T) {
 	}
 }
 
-func TestProbe011PutStaleIfMatch_409(t *testing.T) {
+// TestProbe011PutStaleIfMatch_409Fails pins PROBE-011 to the ITS-REST pin:
+// a stale If-Match on a PUT is a 412, so a server that answers 409 fails
+// the probe.
+func TestProbe011PutStaleIfMatch_409Fails(t *testing.T) {
 	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
 		_, _ = w.Write([]byte(`{"message":"stale","code":"VERSION_CONFLICT"}`))
@@ -77,8 +80,8 @@ func TestProbe011PutStaleIfMatch_409(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Status != "pass" {
-		t.Errorf("PROBE-011 (409) status = %q (detail: %s)", r.Status, r.Detail)
+	if r.Status != "fail" {
+		t.Errorf("PROBE-011 (409) status = %q (detail: %s), want fail", r.Status, r.Detail)
 	}
 }
 

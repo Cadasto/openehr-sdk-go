@@ -39,6 +39,11 @@ func run() error {
 	// Step 1: parse and compile. The compiled tree is what the composition
 	// builder and the validator work from; it is public so your own tooling
 	// can walk it too.
+	// This program parses with the lenient ParseFile on purpose: an
+	// inspection tool should still show the parts of a template it
+	// understands. The cost is that an unknown node type that has
+	// attributes under it shows as a leaf with nothing beneath it. Use
+	// ParseFileStrict when that has to be an error.
 	opt, err := template.ParseFile(optPath)
 	if err != nil {
 		return fmt.Errorf("parse OPT %s: %w", optPath, err)

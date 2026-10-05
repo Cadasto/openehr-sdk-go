@@ -34,7 +34,7 @@ type probe106Server struct {
 }
 
 func (p *probe106Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	base := "http://" + req.Host
+	base := "https://" + req.Host
 	if req.URL.Path == "/.well-known/smart-configuration" {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprintf(w, `{
@@ -102,14 +102,15 @@ func (p *probe106Server) requests() (token, revoke []probe106Request) {
 //  2. Revoke returns nil.
 //  3. The revocation endpoint received exactly one form-encoded POST
 //     carrying token=<the refresh token>, token_type_hint=refresh_token and
-//     the client_id the token endpoint received from the same public
-//     client, with no Authorization header at either endpoint.
+//     the same client-authentication form fields the token endpoint
+//     received (the public client's client_id, and no secret or assertion),
+//     with no Authorization header at either endpoint.
 //  4. The next Token call fails with auth.ErrReauthRequired, and the token
 //     endpoint receives no further request.
 func Probe106TokenRevocation(ctx context.Context) (Result, error) { // PROBE-106 (REQ-167)
 	r := Result{Probe: "PROBE-106"}
 	as := &probe106Server{}
-	srv := httptest.NewServer(as)
+	srv := httptest.NewTLSServer(as)
 	defer srv.Close()
 
 	cat, err := resolveFixture(ctx, srv)
@@ -173,6 +174,11 @@ func Probe106TokenRevocation(ctx context.Context) (Result, error) { // PROBE-106
 		r.Detail = fmt.Sprintf("client authentication differs: revocation client_id %q, token client_id %q, Authorization headers present %t/%t; want the public client's client_id at both and no header",
 			rev.form["client_id"], tokenReqs[0].form["client_id"], rev.authorization != "", tokenReqs[0].authorization != "")
 		return r, nil
+	case !clientAuthEqual(tokenReqs[0].form, rev.form):
+		r.Status = "fail"
+		r.Detail = fmt.Sprintf("client-authentication form fields differ: token %q, revocation %q; want the same keys and the same values",
+			clientAuthEncode(tokenReqs[0].form), clientAuthEncode(rev.form))
+		return r, nil
 	}
 
 	if tok, err := src.Token(ctx); !errors.Is(err, auth.ErrReauthRequired) {
@@ -187,6 +193,33 @@ func Probe106TokenRevocation(ctx context.Context) (Result, error) { // PROBE-106
 	}
 
 	r.Status = "pass"
-	r.Detail = "Revoke posted the refresh token with token_type_hint=refresh_token and the public client_id to the advertised revocation_endpoint; the source is signed out"
+	r.Detail = "Revoke posted the refresh token with token_type_hint=refresh_token and the same client authentication as the token request to the advertised revocation_endpoint; the source is signed out"
 	return r, nil
+}
+
+// clientAuthKeys are the form fields that authenticate the client. The
+// Authorization header is compared beside them.
+var clientAuthKeys = []string{"client_id", "client_secret", "client_assertion", "client_assertion_type"}
+
+// clientAuthEqual reports whether the two requests carry the same
+// client-authentication form fields: the same keys and the same values.
+func clientAuthEqual(a, b url.Values) bool {
+	for _, key := range clientAuthKeys {
+		if !slices.Equal(a[key], b[key]) {
+			return false
+		}
+	}
+	return true
+}
+
+// clientAuthEncode renders those fields for a failure message. Keys are
+// sorted, and a field neither request sent is left out.
+func clientAuthEncode(form url.Values) string {
+	got := make(url.Values)
+	for _, key := range clientAuthKeys {
+		if values, ok := form[key]; ok {
+			got[key] = values
+		}
+	}
+	return got.Encode()
 }

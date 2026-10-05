@@ -9,7 +9,7 @@ date: 2026-06-18
 # ADR 0009 — SMART-on-openEHR auth library scope and dependency model
 
 - **Status:** Accepted, 2026-06-18.
-- **Amended:** 2026-10-04 — PR 210 removed the RFC 7662 introspection client from current SDK scope; discovery continues to surface `introspection_endpoint`.
+- **Amended:** 2026-10-04 — PR 210 removed the RFC 7662 introspection client from current SDK scope; discovery continues to surface `introspection_endpoint`. 2026-10-05 — the capability table places ID-token verification in `auth/smart`, re-exported by `smart`.
 - **Supersedes:** —
 - **Superseded by:** —
 - **Tracks:** the SMART-on-openEHR auth conformance audit ([PR 45](https://github.com/Cadasto/openehr-sdk-go/pull/45)). Resolves: [STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library). Amends: REQ-061, REQ-062, REQ-063, REQ-064.
