@@ -333,12 +333,15 @@ func (g *generator) materialiseImplicitSingle(
 		// which the validator will flag.
 		return nil //nolint:nilerr // intentional: defer to validator
 	}
-	// A default built from the BMM alone has no archetype to name, so an
-	// archetype root is refused rather than built without
-	// archetype_details. No single attribute of the pinned RM reaches
-	// this today; it is kept in step with materialiseImplicitMultiple.
+	// A default built from the BMM alone has no archetype to name, so it
+	// must not be an archetype root: an optional attribute gets nothing,
+	// and a required one is refused, as in materialiseImplicitMultiple.
+	// No single attribute of the pinned RM reaches this today.
 	if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
-		return fmt.Errorf("%w: %s for %s.%s at %s (the template names no child)",
+		if !isRequired(attr) {
+			return nil
+		}
+		return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
 			ErrArchetypeIDMissing, built, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
 	}
 	// Stamp documented sentinel values on DV primitives so the
@@ -987,8 +990,13 @@ func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("makeChild %s: %w", child.RMTypeName(), err)
 	}
-	if !child.IsSlot() && child.ArchetypeID() == "" && rmroots.IsArchetypeRoot(rmTypeOf(rmChild)) {
-		return nil, fmt.Errorf("%w: %s at %s", ErrArchetypeIDMissing, child.RMTypeName(), child.AQLPath())
+	if built := rmTypeOf(rmChild); !child.IsSlot() && child.ArchetypeID() == "" && rmroots.IsArchetypeRoot(built) {
+		declared := child.RMTypeName()
+		if strings.TrimSpace(declared) != built {
+			// An abstract declared type is built as a concrete class.
+			declared += " (built as " + built + ")"
+		}
+		return nil, fmt.Errorf("%w: %s at %s", ErrArchetypeIDMissing, declared, child.AQLPath())
 	}
 	g.setLocatableIdentity(child, rmChild, false /* isTemplateRoot */)
 	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
