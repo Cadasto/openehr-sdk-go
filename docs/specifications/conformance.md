@@ -302,8 +302,9 @@ named coverage functions alongside the auth probes in
   `client_secret` (HTTP Basic) and `auth/jwtbearer` (the RFC 7523 §2.1 JWT
   Bearer authorization grant, not a SMART flow).
 
-Together with the PKCE public flow (PROBE-004) and the confidential-code
-auth-method selection (covered by `auth/smart`'s `TestExchangeWithPrivateKeyJWT`
+Together with the PKCE public flow (PROBE-004), confidential-client PKCE
+(`auth/smart`'s `TestREQ068_ConfidentialClientUsesPKCE`), and the confidential-code
+auth-method selection (covered by `TestExchangeWithPrivateKeyJWT`
 / `TestG3CrossCheckRejectsUnsupportedMethod` / `TestExchangeWithClientSecretBasic`
 unit pins), this exercises every flow in REQ-068's table across all three launch modes.
 
@@ -316,7 +317,7 @@ client scenarios to SDK coverage:
 | Inferno client scenario | SDK coverage | Status |
 |---|---|---|
 | **Public client** (authorization-code + PKCE, no secret) | PROBE-004 (PKCE + G-7 parity), PROBE-005 (scope), standalone/embedded launch modes | Covered (Sandbox) |
-| **Confidential Symmetric** (`client_secret_basic`) | `auth/smart` `client_secret_basic` selection + backend symmetric arm of `LaunchModeBackend`; positive wire test `TestExchangeWithClientSecretBasic` (asserts `Authorization: Basic base64(clientID:secret)`, `grant_type=authorization_code`, no `client_assertion`) | Covered (Sandbox) |
+| **Confidential Symmetric** (`client_secret_basic`) | Authorization-code `client_secret_basic`: `auth/smart` selection, pinned by `TestExchangeWithClientSecretBasic` (asserts `Authorization: Basic base64(clientID:secret)`, `grant_type=authorization_code`, no `client_assertion`) | Covered (Sandbox) |
 | **Confidential Asymmetric** (`private_key_jwt`) | `auth/smart` `WithClientAssertionKey` (`TestExchangeWithPrivateKeyJWT`, G-3 cross-check) + private_key_jwt backend arm of `LaunchModeBackend` | Covered (Sandbox) |
 | **Backend Services Asymmetric** (`client_credentials` + `client_assertion`) | backend arm of `LaunchModeBackend` (`auth/clientcreds.WithClientAssertion`) | Covered (Sandbox) |
 
