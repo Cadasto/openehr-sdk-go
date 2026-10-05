@@ -269,7 +269,8 @@ func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 // current policy. Under Example: every attribute. Under Minimal:
 // every attribute that is required (BMM-mandatory OR existence ≥ 1),
 // whose cardinality lower bound is 1 or more, OR that has OPT-pinned
-// children. The "has OPT children" arm captures the case where the
+// children the OPT does not prohibit. The "has OPT children" arm captures
+// the case where the
 // OPT explicitly constrains a structurally optional attribute (e.g.
 // COMPOSITION.content with archetype-root pins) — the act of pinning
 // is itself a signal that the resulting tree should carry those
@@ -286,7 +287,27 @@ func (g *generator) shouldVisit(attr *tcimpl.CompiledAttribute) bool {
 	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() && cm.Lower() > 0 {
 		return true
 	}
-	return len(attr.Children()) > 0
+	return len(allowedChildren(attr)) > 0
+}
+
+// childProhibited reports whether the OPT prohibits child: its
+// occurrences upper bound is bounded and 0.
+func childProhibited(child *tcimpl.CompiledNode) bool {
+	occ := child.Occurrences()
+	return occ != nil && !occ.UpperUnbounded() && occ.Upper() == 0
+}
+
+// allowedChildren returns the OPT children of attr the OPT does not
+// prohibit, in OPT order. An attribute whose children are all prohibited
+// is treated as one the OPT leaves silent.
+func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
+	var allowed []*tcimpl.CompiledNode
+	for _, child := range attr.Children() {
+		if !childProhibited(child) {
+			allowed = append(allowed, child)
+		}
+	}
+	return allowed
 }
 
 // materialiseSingle synthesises and attaches one child under a
@@ -302,7 +323,9 @@ func (g *generator) materialiseSingle(
 	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
-	children := attr.Children()
+	// An alternative the OPT prohibits is skipped: the next allowed one
+	// wins, and with none allowed the attribute is treated as silent.
+	children := allowedChildren(attr)
 	if len(children) == 0 {
 		// Implicit / OPT-silent attribute. When the attribute carries
 		// a BMM-resolved RM type, materialise a default child of that
@@ -929,7 +952,10 @@ func (g *generator) materialiseMultiple(
 	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
-	children := attr.Children()
+	// A child the OPT prohibits gets no member, neither from the
+	// per-child fill nor as the seed of the top-up; with every child
+	// prohibited the attribute is treated as silent.
+	children := allowedChildren(attr)
 	if len(children) == 0 {
 		// Implicit / OPT-silent multi-valued attribute. A required one
 		// (BMM-mandatory, or existence or cardinality lower of 1 or more)
@@ -1089,27 +1115,30 @@ func (g *generator) materialiseImplicitMultiple(
 	// built from the BMM alone has no archetype to name, so an
 	// archetype-rooted one (COMPOSITION.content) would break the RM
 	// floor's archetype_details rule; the RM rule needs no such child.
-	if remainingLowerNeeded(attr, 0) == 0 {
-		return nil
+	needed := remainingLowerNeeded(attr, 0)
+	if cm := attr.ChildMultiplicity(); cm != nil && !cm.UpperUnbounded() {
+		needed = min(needed, cm.Upper())
 	}
-	rmChild, err := newRMForOPTType(rmType)
-	if err != nil {
-		return nil //nolint:nilerr // intentional: defer to validator
+	for range needed {
+		rmChild, err := newRMForOPTType(rmType)
+		if err != nil {
+			return nil //nolint:nilerr // intentional: defer to validator
+		}
+		// A required attribute whose child would be an archetype root is
+		// refused instead, for the same reason: the generator does not
+		// invent an archetype id.
+		if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
+			return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
+				ErrArchetypeIDMissing, built, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
+		}
+		g.populatePrimitiveDefault(rmChild)
+		g.stampIfLocatable(rmChild, concreteFor(rmType))
+		if rel, ok := rmChild.(*rm.PartyRelationship); ok {
+			g.fillPartyRelationship(rel)
+		}
+		g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
+		_ = rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild)
 	}
-	// A required attribute whose child would be an archetype root is
-	// refused instead, for the same reason: the generator does not
-	// invent an archetype id.
-	if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
-		return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
-			ErrArchetypeIDMissing, built, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
-	}
-	g.populatePrimitiveDefault(rmChild)
-	g.stampIfLocatable(rmChild, concreteFor(rmType))
-	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-		g.fillPartyRelationship(rel)
-	}
-	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
-	_ = rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild)
 	return nil
 }
 
@@ -1834,37 +1863,15 @@ func stringAdmitted(attr *tcimpl.CompiledAttribute, s string) bool {
 	return !ok || len(cs.Validate(s)) == 0
 }
 
-// ensureItems puts one member in an RM-mandatory items list. When the
-// OPT names a child, that child is used so the template's RM type is
-// kept. A list the OPT does not describe gets one ELEMENT.
+// ensureItems puts the placeholder ELEMENT in an RM-mandatory items list
+// the walk left empty: a slot fill's, whose body the OPT does not
+// describe. A list the OPT itself sizes is filled by the walk, from its
+// OPT children or from its BMM type, and is never empty here, unless the
+// OPT prohibits items; the list then stays empty, though the RM requires
+// a member.
 func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
-	if len(*items) > 0 {
+	if len(*items) > 0 || prohibited(opt, "items") {
 		return
-	}
-	if opt != nil {
-		if attr := opt.Attribute("items"); attr != nil && len(attr.Children()) > 0 {
-			for _, child := range attr.Children() {
-				made, err := g.makeChild(child)
-				if err != nil {
-					continue
-				}
-				// A slot fill takes the walk's slot branch, like the fills
-				// materialiseSingle and materialiseMultiple make.
-				if child.IsSlot() && !g.stampSlotFill(made, child) {
-					continue
-				}
-				if err := g.walkNode(child, made); err != nil {
-					continue
-				}
-				item, ok := made.(rm.Item)
-				if !ok {
-					continue
-				}
-				*items = append(*items, item)
-				return
-			}
-			return
-		}
 	}
 	*items = append(*items, g.placeholderElement())
 }

@@ -40,8 +40,8 @@ func optRequiredCardinal(name string, lower, upper int) string {
 		optInterval(lower, upper) + `</interval></cardinality></attributes>`
 }
 
-// optOccurring is a C_COMPLEX_OBJECT of rmType, or an ARCHETYPE_SLOT when
-// slot is set, with occurrences lower..upper (upper -1 is unbounded).
+// optOccurring is a child of the given xsi:type and rmType with occurrences
+// lower..upper (upper -1 is unbounded).
 func optOccurring(xsiType, rmType, nodeID string, lower, upper int, attrs ...string) string {
 	return `<children xsi:type="` + xsiType + `"><rm_type_name>` + rmType + `</rm_type_name>` +
 		`<occurrences>` + optInterval(lower, upper) + `</occurrences>` +
@@ -70,11 +70,12 @@ func itemIDs(t *testing.T, out any) []string {
 
 // TestREQ107_ProhibitedChildGetsNoMember is the REQ-107 check that an OPT
 // child whose occurrences upper bound is 0 gets no member of a
-// multi-valued attribute: not from the per-child fill, not as the seed of
-// the top-up to the cardinality lower bound, whether that seed is an
-// object or a slot, and not as the member finishNode gives a CLUSTER's
-// items, which then falls back to the placeholder. It holds under both
-// policies, both value fills and both compile modes.
+// multi-valued attribute: not from the per-child fill, and not as the
+// seed of the top-up to the cardinality lower bound. A CLUSTER whose items
+// the OPT prohibits gets no member at all, not even from finishNode. It
+// holds under both policies, both value fills and both compile modes. A
+// slot is not covered: the template parser keeps no occurrences for an
+// ARCHETYPE_SLOT.
 func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 	cases := []struct {
 		name string
@@ -83,6 +84,9 @@ func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 		// valid says the template validator must find no error; the
 		// CLUSTER whose only child is prohibited contradicts the RM.
 		valid bool
+		// floorExempt marks a template that prohibits what the RM
+		// requires, whose output the RM floor rejects.
+		floorExempt bool
 	}{
 		{
 			name: "per-child fill",
@@ -100,18 +104,19 @@ func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 			valid: true,
 		},
 		{
-			name: "slot top-up seed",
-			opt: optTemplate("CLUSTER", optCardinal("items", 1, -1,
-				optOccurring("ARCHETYPE_SLOT", "ELEMENT", "at0001", 0, 0),
-				optOccurring("ARCHETYPE_SLOT", "CLUSTER", "at0002", 0, 1))),
-			want:  []string{"openEHR-EHR-CLUSTER.example.v1"},
-			valid: true,
-		},
-		{
 			name: "CLUSTER items with only a prohibited child",
 			opt: optTemplate("CLUSTER", optCardinal("items", 0, -1,
 				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 0))),
 			want: []string{"at0000"},
+		},
+		{
+			// The OPT prohibits items, which the RM requires: the
+			// generator yields, so the list stays empty and the RM floor
+			// reports it.
+			name:        "CLUSTER items prohibited, an ELEMENT child",
+			opt:         optTemplate("CLUSTER", optProhibitedMultiple("items", optNode("ELEMENT", "at0001"))),
+			want:        []string{},
+			floorExempt: true,
 		},
 	}
 	for _, tc := range cases {
@@ -126,7 +131,9 @@ func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 					if got := itemIDs(t, out); !slices.Equal(got, tc.want) {
 						t.Errorf("items = %v, want %v", got, tc.want)
 					}
-					noFloorErrors(t, out)
+					if !tc.floorExempt {
+						noFloorErrors(t, out)
+					}
 					if !tc.valid {
 						return
 					}
