@@ -1682,10 +1682,6 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		g.fillEntryCode(opt, rmValue, opt.RMTypeName(), "encoding")
 	}
 	switch v := rmValue.(type) {
-	case *rm.Action:
-		if v.Time.Value == "" && !prohibited(opt, "time") {
-			v.Time = rm.DVDateTime{Value: g.dateTimeDefault()}
-		}
 	case *rm.IsmTransition:
 		fillCurrentState(opt, v)
 	case *rm.IntervalEvent[rm.ItemStructure]:
@@ -1708,10 +1704,6 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.Activity:
 		if v.ActionArchetypeID == "" {
 			v.ActionArchetypeID = "openEHR-EHR-ACTION.example.v1"
-		}
-	case *rm.ItemSingle:
-		if v.Item.GetArchetypeNodeID() == "" && (v.Item.Value == nil || rm.IsTypedNil(v.Item.Value)) {
-			v.Item = *g.placeholderElement()
 		}
 	case *rm.DVEHRURI:
 		// Backstop for a DV_EHR_URI the primitive default did not reach;
