@@ -238,3 +238,57 @@ func rmTypeName(v any) string {
 	}
 	return fmt.Sprintf("%T", v)
 }
+
+// TestREQ107_MultipleSizedByOccurrencesAndCardinality is the REQ-107 check
+// that a multi-valued attribute gets max(occurrences.lower, 1) members of
+// each OPT child, in OPT order, and no more in all than its cardinality
+// upper bound, and is topped up to its cardinality lower bound with
+// members of its first child. It holds under both policies, both value
+// fills and both compile modes, and the template validator finds no error.
+func TestREQ107_MultipleSizedByOccurrencesAndCardinality(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  string
+		want []string
+	}{
+		{
+			name: "cardinality upper 1 across two children",
+			opt: optTemplate("CLUSTER", optCardinal("items", 1, 1,
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 1),
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0002", 0, 1))),
+			want: []string{"at0001"},
+		},
+		{
+			name: "occurrences lower 2",
+			opt: optTemplate("CLUSTER", optCardinal("items", 1, -1,
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 2, -1))),
+			want: []string{"at0001", "at0001"},
+		},
+		{
+			name: "top-up to cardinality lower 2 from one optional child",
+			opt: optTemplate("CLUSTER", optCardinal("items", 2, -1,
+				optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, -1))),
+			want: []string{"at0001", "at0001"},
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					if got := itemIDs(t, out); !slices.Equal(got, tc.want) {
+						t.Errorf("items = %v, want %v", got, tc.want)
+					}
+					noFloorErrors(t, out)
+					for _, iss := range templateErrors(out, c) {
+						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+				})
+			}
+		}
+	}
+}
