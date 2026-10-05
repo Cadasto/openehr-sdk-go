@@ -3,7 +3,7 @@ kind: plan
 ---
 # Backlog
 
-Leftovers of merged branches, by directory: suggestions, and findings the maintainer deferred here. Each line is a lead, not a finding: verify it before acting. A delivery whose `Files` touch a line's path folds it in and deletes the line. `sdd-pr flip --carry` appends; edit freely.
+Leftovers of merged branches, by directory: suggestions, and findings the maintainer deferred here. Each line is a lead, not a finding: verify it before acting. A delivery whose `Files` touch a line's path folds it in and deletes the line. `sdd-pr harvest` and `sdd-pr flip --carry` append; edit freely.
 
 ## auth
 - auth/scope.go:29 · BuildScope trims white space around each part (lines 43-45, now documented at 29-30), but REQ-165 calls BuildScope lexical and the padded-part tests treat trimming as a forbidden rewrite for Token, so the BuildScope bullet should say whether trimming is allowed · by: sdd-spec-conformance-reviewer · from: feat/openehr-scope-syntax
