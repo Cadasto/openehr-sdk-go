@@ -410,9 +410,9 @@ func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, type
 // RenderIntervalBoundFile renders <pkg>/interval_bound_gen.go for a target
 // that owns an interval-shaped class (a concrete one, or the abstract BASE
 // Interval struct, see [codecClassesIn]): the exported emptiness test the
-// canonical encoders apply to an open side's bound (REQ-052, REQ-056), with
-// one field-by-field zero predicate per concrete bound type, derived from the
-// BMM class's properties and using no reflection (REQ-024).
+// canonical encoders apply to an open side's bound, with one field-by-field
+// zero predicate per concrete bound type, derived from the BMM class's
+// properties and using no reflection.
 //
 // The bound types are read from each interval class's `lower` and `upper`
 // fields (see [intervalBounds]): the concrete classes a generic bound admits
@@ -424,6 +424,8 @@ func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, type
 //
 // Returns (nil, nil) when the target owns no interval-shaped class.
 func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
+	// The open-side emptiness rule is REQ-052 and REQ-056; the no-reflection
+	// rule is REQ-024.
 	shaped, boundClasses, err := intervalBounds(plan)
 	if err != nil {
 		return nil, err
