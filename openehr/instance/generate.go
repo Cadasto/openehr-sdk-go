@@ -922,8 +922,9 @@ func settleIntervalEndpoints(optNode *tcimpl.CompiledNode, rmValue any) {
 }
 
 // includedPerOPT returns the value the OPT gives an interval's
-// lower_included or upper_included: the example value of its C_BOOLEAN,
-// which is true whenever the constraint admits true. Without a constraint
+// lower_included or upper_included: the example value of its first
+// C_BOOLEAN the OPT does not prohibit, which is true whenever the
+// constraint admits true. Without a constraint
 // it returns true, the closed endpoint the template parser also assumes
 // when an OPT range omits the flag. It uses the example value under
 // RandomFill too, on purpose: a constraint that admits both values then
@@ -934,7 +935,7 @@ func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 	if attr == nil {
 		return true
 	}
-	for _, child := range attr.Children() {
+	for _, child := range allowedChildren(attr) {
 		if c, ok := child.PrimitiveConstraint().(constraints.CBoolean); ok {
 			included, _ := c.ExampleValue().(bool)
 			return included
