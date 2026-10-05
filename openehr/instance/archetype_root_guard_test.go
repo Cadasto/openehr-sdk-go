@@ -426,14 +426,39 @@ func TestREQ107_RequiredSlotFillPassesTheFloor(t *testing.T) {
 				}
 				fill := tc.fill(t, call, out)
 				checkSlotFallbackStamp(t, call, fill, tc.rmType)
-				if cl, ok := fill.(*rm.Cluster); ok && len(cl.Items) != 1 {
-					t.Errorf("%s: the CLUSTER fill has %d items, want 1", call, len(cl.Items))
+				if cl, ok := fill.(*rm.Cluster); ok {
+					checkClusterFillItem(t, call, cl)
 				}
 				if r := validation.ValidateRM(out); !r.OK {
 					t.Errorf("%s: ValidateRM issues %+v, want none", call, r.Issues)
 				}
 			}
 		})
+	}
+}
+
+// checkClusterFillItem fails t unless the CLUSTER slot fill cl holds exactly
+// one item, the placeholder ELEMENT (node id at0000, name "element") the
+// generator puts in an items list the OPT does not describe. A second item,
+// or an ELEMENT named after its RM type, would be the BMM fill's default
+// for CLUSTER.items, which the slot fill must not get as well.
+func checkClusterFillItem(t *testing.T, call string, cl *rm.Cluster) {
+	t.Helper()
+	if len(cl.Items) != 1 {
+		t.Errorf("%s: the CLUSTER fill has %d items, want 1", call, len(cl.Items))
+		return
+	}
+	el, ok := cl.Items[0].(*rm.Element)
+	if !ok {
+		t.Errorf("%s: the CLUSTER fill's item is %T, want *rm.Element", call, cl.Items[0])
+		return
+	}
+	name := ""
+	if el.Name != nil {
+		name = el.Name.GetValue()
+	}
+	if el.ArchetypeNodeID != "at0000" || name != "element" {
+		t.Errorf("%s: the CLUSTER fill's item is %s named %q, want the placeholder at0000 named \"element\"", call, el.ArchetypeNodeID, name)
 	}
 }
 

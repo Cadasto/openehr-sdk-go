@@ -136,21 +136,23 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	if optNode == nil || rmValue == nil {
 		return nil
 	}
-	// Slots are leaf fill-points: the synthesiser leaves slot bodies
-	// empty and the caller composes them via REQ-101 builder Set
-	// calls. The parsed REQ-104 grammar is used only to stamp a
-	// conforming archetype id when a lower-bound top-up forces a
-	// slot fill and a safe example can be derived (see stampSlotFill).
+	// Slots are leaf fill-points: the slot body is not in this OPT, and
+	// the caller composes it via REQ-101 builder Set calls. A slot the
+	// walk must fill has been stamped by stampSlotFill with an archetype
+	// id from the parsed REQ-104 grammar, or the RM-type-prefix example.
+	// The fill then gets the RM-mandatory attributes of its class, with
+	// the defaults an attribute the OPT leaves silent gets, so it passes
+	// the RM floor: an entry's language, encoding, subject and its own
+	// mandatory attributes. The fill holds only its identity here, which
+	// the BMM fill skips, so nothing is filled twice. A CLUSTER or ELEMENT
+	// fill takes finishNode's item defaults alone: one placeholder
+	// element in CLUSTER.items, its only mandatory attribute, and a null
+	// flavour on an ELEMENT, which has none.
 	if optNode.IsSlot() {
-		// The slot body is not in this OPT. A cluster slot is still an
-		// RM CLUSTER, and CLUSTER.items is mandatory, so it gets one element.
-		if c, ok := rmValue.(*rm.Cluster); ok && len(c.Items) == 0 {
-			c.Items = []rm.Item{g.placeholderElement()}
+		if _, isItem := rmValue.(rm.Item); !isItem {
+			g.populateBMMRequiredAttrs(rmValue, concreteFor(optNode.RMTypeName()), 0)
 		}
-		// An element slot has no value constraint to fill either.
-		if el, ok := rmValue.(*rm.Element); ok {
-			settleElement(el)
-		}
+		g.finishNode(optNode, rmValue)
 		return nil
 	}
 	// Primitive leaves: ExampleValue if policy allows, then return —
@@ -1548,19 +1550,12 @@ func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
 				if err != nil {
 					continue
 				}
-				if child.IsSlot() {
-					if !g.stampSlotFill(made, child) {
-						continue
-					}
-					// A slot is not walked: its body is not in this OPT.
-					// A cluster slot still needs one item for the RM floor.
-					if slot, ok := made.(*rm.Cluster); ok && len(slot.Items) == 0 {
-						slot.Items = []rm.Item{g.placeholderElement()}
-					}
-					if slot, ok := made.(*rm.Element); ok {
-						settleElement(slot)
-					}
-				} else if err := g.walkNode(child, made); err != nil {
+				// A slot fill takes the walk's slot branch, like the fills
+				// materialiseSingle and materialiseMultiple make.
+				if child.IsSlot() && !g.stampSlotFill(made, child) {
+					continue
+				}
+				if err := g.walkNode(child, made); err != nil {
 					continue
 				}
 				item, ok := made.(rm.Item)
