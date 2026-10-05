@@ -343,6 +343,11 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	case rm.Capability:
 		return readCapabilitySingle(&p, attrName)
 
+	case *rm.PartyRef:
+		return readPartyRefSingle(p, attrName)
+	case rm.PartyRef:
+		return readPartyRefSingle(&p, attrName)
+
 	// --- EHR-IM roots ---
 	case *rm.Folder:
 		return readFolderSingle(p, attrName)
@@ -447,6 +452,7 @@ func Handles(parent any) bool {
 		*rm.PartyIdentity, rm.PartyIdentity,
 		*rm.PartyRelationship, rm.PartyRelationship,
 		*rm.Capability, rm.Capability,
+		*rm.PartyRef, rm.PartyRef,
 		*rm.Folder, rm.Folder,
 		*rm.EHRStatus, rm.EHRStatus,
 		*rm.EHRAccess, rm.EHRAccess,
@@ -754,6 +760,14 @@ func objectRefPresent(r rm.ObjectRef) (any, bool) {
 		return r, false
 	}
 	return r, true
+}
+
+// partyRefPresent reads a PARTY_REF attribute as the PARTY_REF itself, so a
+// walker matches it against a PARTY_REF constraint, with the presence
+// objectRefPresent gives its reference.
+func partyRefPresent(r rm.PartyRef) (any, bool) {
+	_, ok := objectRefPresent(r.ObjectRef)
+	return r, ok
 }
 
 func readActionSingle(a *rm.Action, attr string) (any, bool) {
@@ -1385,7 +1399,7 @@ func readAgentMultiple(a *rm.Agent, attr string) ([]any, bool) {
 // absent.
 func readRoleSingle(r *rm.Role, attr string) (any, bool) {
 	if attr == "performer" {
-		return objectRefPresent(r.Performer.ObjectRef)
+		return partyRefPresent(r.Performer)
 	}
 	return readActorLikeSingle(r.ArchetypeNodeID, r.Name, r.Details, attr)
 }
@@ -1419,9 +1433,9 @@ func readPartyIdentitySingle(p *rm.PartyIdentity, attr string) (any, bool) {
 func readPartyRelationshipSingle(p *rm.PartyRelationship, attr string) (any, bool) {
 	switch attr {
 	case "source":
-		return objectRefPresent(p.Source.ObjectRef)
+		return partyRefPresent(p.Source)
 	case "target":
-		return objectRefPresent(p.Target.ObjectRef)
+		return partyRefPresent(p.Target)
 	default:
 		return readActorLikeSingle(p.ArchetypeNodeID, p.Name, p.Details, attr)
 	}
@@ -1456,6 +1470,21 @@ func readCapabilitySingle(c *rm.Capability, attr string) (any, bool) {
 		return dvTextPresent(c.Name)
 	case "credentials":
 		return ifacePresent(c.Credentials)
+	}
+	return nil, false
+}
+
+// PARTY_REF is the reference a ROLE's performer, a PARTY_RELATIONSHIP's
+// source and target and an ACTOR's roles hold. Its id, namespace and type
+// are RM-mandatory; each reads as absent while unset.
+func readPartyRefSingle(r *rm.PartyRef, attr string) (any, bool) {
+	switch attr {
+	case "id":
+		return ifacePresent(r.ID)
+	case "namespace":
+		return strPresent(r.Namespace)
+	case "type":
+		return strPresent(r.Type)
 	}
 	return nil, false
 }
