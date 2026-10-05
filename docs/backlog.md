@@ -18,10 +18,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 ## cmd/probe-record
 - cmd/probe-record/scenarios_writes.go · the ehr-status scenario submits is_modifiable true, so its recording would also pass against a server that behaves differently; changing it needs a recapture · from: pr201
 
-## docs
-
-## docs/adr
-
 ## docs/specifications
 - docs/specifications/traceability.yaml · test files may still cite a REQ they do not pin and so appear in its generated tests list; a sweep over all test files is still to do (the audit estimated 45 to 50 files, not re-counted) · from: audit-2026-09
 - docs/specifications/clinical-modeling.md · § REQ-107 has no spec text for what Options.Now sets (HISTORY.origin, ACTION.time and every DV_DATE_TIME default) or for the generator's placeholder values (the at0000 node id, the local::at0000 code, ehr://example) · from: audit-2026-09
