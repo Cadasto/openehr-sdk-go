@@ -38,9 +38,9 @@ func actorWrites() []partyWrite {
 // roleWrites adds the attributes ROLE declares beyond PARTY.
 func roleWrites() []partyWrite {
 	return append(partyCommonWrites(),
-		partyWrite{attr: "performer", child: &rm.PartyRef{ObjectRef: rm.ObjectRef{
+		partyWrite{attr: "performer", child: &rm.PartyRef{
 			ID: &rm.HierObjectID{Value: "00000000-0000-0000-0000-000000000001"}, Namespace: "local", Type: "PERSON",
-		}}, field: "Performer"},
+		}, field: "Performer"},
 		partyWrite{attr: "capabilities", multi: true, child: &rm.Capability{ArchetypeNodeID: "at0005"}, field: "Capabilities"},
 		partyWrite{attr: "time_validity", child: &rm.DVInterval[rm.DVDate]{}, field: "TimeValidity"})
 }
