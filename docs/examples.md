@@ -6,11 +6,13 @@ kind: guide
 
 If you are new to the SDK, run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline: the REST ones use an in-process `httptest` backend, so nothing needs a clinical data repository (CDR).
 
-The 17 runnable programs under [`cmd/examples/`](../cmd/examples/) demonstrate each major SDK surface. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
+The 17 runnable programs under [`cmd/examples/`](../cmd/examples/) cover the major offline clinical-modeling and AQL workflows, plus selected REST and SMART flows. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
 
 Each entry says what the program shows, which packages it uses, how to run it, and what the output means. Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<name>` works from any working directory inside a clone. Build them all with `make build` (or `go build ./cmd/examples/...`).
 
 A few openEHR terms recur throughout. A **COMPOSITION** is the top-level clinical document. An **OPT** (operational template) is the deployable form of a template: every archetype it uses, flattened into one XML file with the template's constraints applied; it fixes which archetypes, nodes and value constraints a composition may contain. **Canonical JSON** is the openEHR REST wire format for those documents. **AQL** (Archetype Query Language) is the openEHR query language. A **Web Template** is the JSON form of a compiled OPT that form renderers and the FLAT / STRUCTURED simplified formats work from.
+
+The examples that read an OPT file parse it with `template.ParseFileStrict`, so a program that validates, builds, generates, exports or lints stops on a template with an unknown node type that has attributes under it, instead of silently dropping that subtree. `template-explore` is the one exception: it parses leniently with `template.ParseFile` by choice, to show the parts of a template it understands. An unknown node type with no attributes under it is still kept as a leaf, without its constraint, in both modes. [opt-parse](#opt-parse) covers both modes and how they differ.
 
 ---
 
@@ -140,7 +142,7 @@ strict       : /content is ambiguous (multiple children) — add an [archetype-i
 
 The root is the COMPOSITION archetype the template is built on. `content` is the attribute that holds its clinical entries and has four child nodes here. `NodeAt(/content)` in the default (lenient) mode picks the first child; in strict mode the same lookup returns `ErrAmbiguousPath`, and the caller adds a predicate such as `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]` to say which child it means.
 
-**What to copy into your app:** `template.ParseFileStrict` in a validator that must fail loudly on a template shape the parser does not support; `ParseFile` when forward compatibility matters more, knowing that it drops the subtree under such a node. Call `opt.ParsePath` once per path, then `ValidatePath` for a precondition check or `NodeAt` for the node itself. Validators and code generators should pass `template.WithStrictPaths()` and handle `template.ErrAmbiguousPath` with `errors.Is`, so a path never silently resolves to the wrong child.
+**What to copy into your app:** `template.ParseFileStrict` in a validator that must fail loudly on an unknown node type that has attributes under it; `ParseFile` when forward compatibility matters more, knowing that it drops the subtree under such a node. Call `opt.ParsePath` once per path, then `ValidatePath` for a precondition check or `NodeAt` for the node itself. Validators and code generators should pass `template.WithStrictPaths()` and handle `template.ErrAmbiguousPath` with `errors.Is`, so a path never silently resolves to the wrong child.
 
 ---
 
@@ -177,7 +179,7 @@ Each violation carries a `Code`, the stable identifier a program branches on, an
 
 ### validate-composition
 
-**Purpose:** Build a composition in memory as plain Reference Model structs, compile an OPT, and validate the composition against it with `validation.ValidateComposition`. This is the smallest validation path: no JSON, no HTTP, just typed RM values, a compiled template, and the list of issues the validator returns.
+**Purpose:** Build a composition in memory as plain Reference Model structs, compile an OPT, and validate the composition in two passes: the RM floor (`validation.ValidateRM`) and the template constraints (`validation.ValidateComposition`). This is the smallest validation path: no JSON, no HTTP, just typed RM values, a compiled template, and the list of issues each pass returns. The two passes are the ones [validate-from-json](#validate-from-json) runs, and that section explains why one does not replace the other.
 
 ```bash
 go run ./cmd/examples/validate-composition
@@ -189,25 +191,26 @@ go run ./cmd/examples/validate-composition -invalid   # clear a required attribu
 
 It uses the same public `templatecompile.Compile` bridge as [compile-build-validate](#compile-build-validate), so the program can be copied into another module unchanged.
 
-**Default fixture:** `vital_signs.opt`, with a hand-built composition that matches it: an encounter holding one blood-pressure OBSERVATION with a systolic reading.
+**Default fixture:** `vital_signs.opt`, with a hand-built composition that passes both: an encounter holding one blood-pressure OBSERVATION with a systolic reading, the patient's position and the device used. Besides what the template asks for, it carries what the Reference Model requires: `archetype_details` on the COMPOSITION and the OBSERVATION, a value on every ELEMENT, and at least one item in the CLUSTER.
 
 **Sample output:**
 
 ```text
-template    : vital_signs (vital_signs.opt)
-compiled    : root COMPOSITION
-result      : OK — no issues
+template             : vital_signs (vital_signs.opt)
+compiled             : root COMPOSITION
+RM floor             : OK, no issues
+template constraints : OK, no issues
 ```
 
-With `-invalid` the program clears the composition's category before validating. The validator then reports one issue, `/category [required] required attribute "category" absent on COMPOSITION`, and the program exits 1.
+With `-invalid` the program clears the composition's category before validating. The Reference Model and the template both make `category` mandatory, so each pass reports one `required` issue at `/category`, and the program exits 1.
 
-**What to copy into your app:** compile once (`templatecompile.Compile(opt)`) and reuse the `*Compiled` for every composition. `validation.ValidateComposition(comp, compiled)` collects every issue in one pass; read `result.OK` for the verdict and `result.Issues` for the list, each with `Path` (where), `Code` (the stable identifier to branch on) and `Detail` (the explanation). Look coded labels up in `openehr/terminology` (`terminology.CompositionCategory.Rubric("433")`) instead of typing them next to the code, so the two cannot drift apart.
+**What to copy into your app:** compile once (`templatecompile.Compile(opt)`) and reuse the `*Compiled` for every composition. Run `validation.ValidateRM(comp)` and `validation.ValidateComposition(comp, compiled)`, and accept the composition only when both results are OK. Each pass collects every issue in one walk; read `result.OK` for the verdict and `result.Issues` for the list, each with `Path` (where), `Code` (the stable identifier to branch on) and `Detail` (the explanation). Look coded labels up in `openehr/terminology` (`terminology.CompositionCategory.Rubric("433")`) instead of typing them next to the code, so the two cannot drift apart.
 
 ---
 
 ### validate-from-json
 
-**Purpose:** Validate a COMPOSITION that arrives as canonical JSON against an OPT, the way a CI check or an inbound gateway would: read the bytes, decode them into RM structs, compile the OPT, and list every constraint the document breaks.
+**Purpose:** Validate a COMPOSITION that arrives as canonical JSON, the way a CI check or an inbound gateway would: read the bytes, decode them into RM structs, compile the OPT, and run two validation passes that each list every issue they find.
 
 ```bash
 go run ./cmd/examples/validate-from-json
@@ -215,31 +218,42 @@ go run ./cmd/examples/validate-from-json -corpus           # demo data with expe
 go run ./cmd/examples/validate-from-json comp.json tmpl.opt # your own files
 ```
 
+**The two passes:**
+
+| Pass | Call | What it checks |
+|---|---|---|
+| RM floor | `validation.ValidateRM(&composition)` | The openEHR Reference Model alone, with no template: the attributes the RM makes mandatory on every node, and the RM's own rules for each type, such as an ELEMENT carrying exactly one of a value or a null flavour, and every archetype root (the COMPOSITION, each ENTRY) carrying `archetype_details` |
+| Template constraints | `validation.ValidateComposition(&composition, compiled)` | What the OPT declares, node by node: existence, cardinality, RM type, archetype identity and value constraints |
+
+The two passes compose but do not chain. A composition can satisfy its template and still break the Reference Model: today `ValidateComposition` checks the template's constraints and does not run the RM floor's per-type rules. A program that wants both guarantees calls both, as this one does.
+
 **Flags:**
 
 | Flag | Effect |
 |---|---|
 | `-corpus` | Validate `testkit/corpus/compositions/vital_signs.json`, demo data that reports issues, instead of the clean local fixture |
-| `-cassette` | Deprecated spelling of `-corpus`, kept for scripts written before the rename |
+| `-cassette` | Deprecated spelling of `-corpus`, kept so older scripts keep working |
 
-The exit status is 1 when the composition does not validate (and on a usage error), so the command can gate a pipeline. Validation issues are a result the program prints; only a program error, such as a bad path or an unreadable OPT, is reported as a failure.
+The exit status lets the command gate a pipeline. It is 0 when both passes find no issue, and 1 when either pass reports an issue or the program cannot run: a missing or unreadable file, a composition or OPT that does not parse, or the wrong number of file arguments. A bad flag exits with status 2. Validation issues are a result the program prints; only a program error, such as a bad path or an unreadable OPT, is reported as a failure.
 
-**Default JSON fixture:** `cmd/examples/validate-from-json/testdata/minimal_blood_pressure.json`, a hand-made composition that validates cleanly against `vital_signs.opt`.
+**Default JSON fixture:** `cmd/examples/validate-from-json/testdata/minimal_blood_pressure.json`, a hand-made composition that passes both against `vital_signs.opt`. Its generator, `gen_fixture.go` in the same directory, refuses to write a fixture that fails either pass.
 
 **Packages:** `openehr/rm`, `openehr/serialize/canjson`, `openehr/template`, `openehr/templatecompile`, `openehr/validation`. **No `internal/` import.**
 
 **Sample output:**
 
 ```text
-json        : minimal_blood_pressure.json (2084 bytes)
-composition : archetype_node_id=openEHR-EHR-COMPOSITION.encounter.v1 content_items=1
-template    : vital_signs (vital_signs.opt)
-result      : OK — JSON validates against OPT
+json                 : minimal_blood_pressure.json (2928 bytes)
+composition          : archetype_node_id=openEHR-EHR-COMPOSITION.encounter.v1 content_items=1
+template             : vital_signs (vital_signs.opt)
+RM floor             : OK, no issues
+template constraints : OK, no issues
+result               : valid, both passes found no error
 ```
 
-With `-corpus` the result line reports the issue count, one `path [code] detail` line follows per issue, and a note says the issues are expected.
+With `-corpus` the RM floor reports no issues and the template constraints report 12, one `path [code] detail` line each: a magnitude out of range, units the template does not allow, and missing `items` lists the template requires (the issue lines call them empty). The result line says the composition is not valid, and a note says the issues are expected. The passes catch different things: the RM floor accepts those values and missing lists, and the template does not. The reverse holds too: a composition with no `archetype_details` on its archetype roots, or with an ELEMENT that has neither a value nor a null flavour, can pass the template constraints and fail the RM floor.
 
-**What to copy into your app:** the three steps in order: `canjson.Unmarshal` (a document that is not well-formed canonical JSON fails here, before any template is involved), `template.ParseFile` plus `templatecompile.Compile` once per template, then `validation.ValidateComposition`. Map `result.OK` to your exit status and print `result.Issues`. The same compiled template also feeds the composition builder, the instance generator and the AQL lint.
+**What to copy into your app:** the steps in order: `canjson.Unmarshal` (a document that is not well-formed canonical JSON fails here, before any validation runs), `template.ParseFileStrict` plus `templatecompile.Compile` once per template, then both `validation.ValidateRM` and `validation.ValidateComposition`. Accept the document only when both results are OK, map that to your exit status, and print each pass's `result.Issues` under the pass's name. Parse strictly in a validator: on an unknown node type that has attributes under it, `ParseFileStrict` refuses the template, while the lenient `ParseFile` keeps the node as a leaf and drops the constraints beneath it. The same compiled template also feeds the composition builder, the instance generator and the AQL lint.
 
 ---
 
@@ -267,14 +281,14 @@ go run ./cmd/examples/generate-example \
 
 **Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/instance`, `openehr/rm`, `openehr/serialize/canjson`. **No `internal/` import.**
 
-The output is one line of JSON. Each run gets fresh uids and a wall-clock context start time, so two runs are never byte-identical; that is why this entry shows no sample block. Pipe the output to a file or into `validate-from-json` to see that generated data passes the same template:
+The output is one line of JSON. Each run gets fresh uids and a wall-clock context start time, so two runs are never byte-identical; that is why this entry shows no sample block. Pipe the output to a file or into `validate-from-json` to see that generated data passes both of its checks, the RM floor and the template constraints:
 
 ```bash
 go run ./cmd/examples/generate-example --policy minimal > /tmp/generated.json
 go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/corpus/templates/vital_signs.opt
 ```
 
-**What to copy into your app:** `instance.Generate(ctx, compiled, instance.Options{Policy: ..., Territory: ..., Composer: ...})`. It returns the root as `any`, because a template can be rooted on any archetypeable type; `canjson.Marshal` encodes it as is, and `instance.AsComposition` (with siblings for the other root types) gives you the typed value. Optional RM strings are pointers, hence `new(name)` for the composer name. An unknown policy name is an error, so a typo on the command line does not silently pick a default.
+**What to copy into your app:** `template.ParseFileStrict` plus `templatecompile.Compile`, then `instance.Generate(ctx, compiled, instance.Options{Policy: ..., Territory: ..., Composer: ...})`. Parse strictly: on an unknown node type that has attributes under it, the lenient `ParseFile` keeps the node as a leaf and drops everything beneath it, so the generated instance would lack that subtree. `Generate` returns the root as `any`, because a template can be rooted on any archetypeable type; `canjson.Marshal` encodes it as is, and `instance.AsComposition` (with siblings for the other root types) gives you the typed value. Optional RM strings are pointers, hence `new(name)` for the composer name. An unknown policy name is an error, so a typo on the command line does not silently pick a default.
 
 ---
 
@@ -456,13 +470,13 @@ result   : OK — no errors, 3 advisories
 
 Four queries: a clean one; a broken one, where an archetype missing from the template and an unbound `$threshold` are errors while an unpredicated `events` step and a missing alias are advisories; a well-formed query that can never match, because under the RM an OBSERVATION never contains a COMPOSITION; and one that is OK yet not issue-free, because a FOLDER reaches a COMPOSITION only through a reference. `Result.OK` is false only when an error-severity issue is present, so an OK result can still carry warnings.
 
-**What to copy into your app:** for CI or pre-flight checks call `lint.LintString(q, nil)` (syntax, shape and RM checks, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or call `validation.ValidateAQL`) to add the archetype and path checks. Dispatch on `Issue.Code` and treat only `Error`-severity issues as hard failures. Still read `Result.Issues`, not only `Result.OK`: OK means *no errors*, not *no issues*. Most of the portability codes and all of the path-shape codes are advisory (the last block above).
+**What to copy into your app:** for CI or pre-flight checks call `lint.LintString(q, nil)` (syntax, shape and RM checks, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or call `validation.ValidateAQL`) to add the archetype and path checks. Parse that OPT with `template.ParseFileStrict`, as the program does, so a template with an unknown node type that has attributes under it is refused before the lint runs. After a lenient `ParseFile`, the subtree under that node is dropped, and the lint would report every archetype and path in it as not in the template. Dispatch on `Issue.Code` and treat only `Error`-severity issues as hard failures. Still read `Result.Issues`, not only `Result.OK`: OK means *no errors*, not *no issues*. Most of the portability codes and all of the path-shape codes are advisory (the last block above).
 
 ---
 
 ### compile-build-validate
 
-**Purpose:** Drive the whole clinical pipeline through public packages only, as a program in another Go module would. Parse an OPT, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the builder, serialise it to canonical JSON and decode it again, and validate the result against the same compiled template.
+**Purpose:** Drive the whole clinical pipeline through public packages only, as a program in another Go module would. Parse an OPT, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the builder, serialise it to canonical JSON and decode it again, and validate the result in two passes: the RM floor (`validation.ValidateRM`) and the constraints of the same compiled template (`validation.ValidateComposition`).
 
 ```bash
 go run ./cmd/examples/compile-build-validate
@@ -474,15 +488,15 @@ go run ./cmd/examples/compile-build-validate path/to/template.opt
 **Sample output:**
 
 ```text
-template : vital_signs (vital_signs.opt)
-composition: 3671 bytes canonical JSON, round-tripped
-validation : OK — round-tripped composition conforms to the OPT
-ehr_status : ValidateEHRStatus callable — 6 issue(s), root type mismatch as expected
+template             : vital_signs (vital_signs.opt)
+composition          : 3671 bytes canonical JSON, round-tripped
+RM floor             : OK, no issues
+template constraints : OK, no issues
 ```
 
-The builder starts from a skeleton generated from the compiled template, with the mandatory structure already in place, so the program sets only the one leaf it cares about (the systolic value, addressed by its template path). The last line shows that the validator also has typed entry points for other RM roots (`ValidateEHRStatus`, with `ValidateFolder` and `ValidateDemographic` as siblings). An EHR_STATUS can never satisfy a template whose root is a COMPOSITION, so the issues and the root type mismatch are the expected result.
+The builder starts from a skeleton generated from the compiled template, with the mandatory structure already in place, so the program sets only the one leaf it cares about (the systolic value, addressed by its template path). The builder also fills what the Reference Model requires beyond the template, such as `archetype_details` on every archetype root and a null flavour on an ELEMENT left without a value, so its output passes the RM floor as well as the template constraints. The program validates the decoded copy, the one a server would receive, and exits 1 if either pass reports an error. [validate-from-json](#validate-from-json) explains why both passes run.
 
-**What to copy into your app:** `templatecompile.Compile(opt)` once per template, then reuse the `*Compiled` across many `composition.NewBuilder` / `validation.Validate*` calls; the compiled template is the single artefact the builder and the validator share. Address leaves by template path with `SetQuantity`, `SetText`, `SetCodedText` or `Set`; the [template-explore](#template-explore) example prints every such path of a template.
+**What to copy into your app:** `templatecompile.Compile(opt)` once per template, then reuse the `*Compiled` across many `composition.NewBuilder` / `validation.ValidateComposition` calls; the compiled template is the single artefact the builder and the validator share. Run `validation.ValidateRM` beside the template pass, because neither replaces the other. For a root that binds to no template, the RM floor alone applies: `validation.ValidateRM`, or a typed wrapper such as `ValidateRMEHRStatus` or `ValidateRMFolder`. Address leaves by template path with `SetQuantity`, `SetText`, `SetCodedText` or `Set`; the [template-explore](#template-explore) example prints every such path of a template.
 
 ---
 
@@ -519,7 +533,7 @@ addressable primitive-leaf paths (6) — Builder.Set targets:
 
 In the structure view, `[1]` marks a single-valued attribute and `[*]` a multi-valued one; `required` means the Reference Model makes the attribute mandatory on that type. The bracketed identity is the archetype id where an archetype is plugged in, otherwise the at-code from the archetype's own definition; a data value such as DV_QUANTITY has neither. `(slot)` marks an opaque fill point another archetype plugs into, and `·primitive` marks a node with a value constraint, the editable leaf. The quoted text is the term the archetype defines for the node's at-code.
 
-**What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker. `node.RMTypeName()` plus `attr.Cardinality()` / `Required()` drive widget choice and required markers, and `node.Term(code, "")` gives the label. `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path.
+**What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker. `node.RMTypeName()` plus `attr.Cardinality()` / `Required()` drive widget choice and required markers, and `node.Term(code, "")` gives the label. `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path. The program parses with the lenient `template.ParseFile` on purpose, so it still shows the parts of a template it understands; the cost is that an unknown node type shows as a leaf with nothing beneath it. Use `template.ParseFileStrict` when an unknown node type that has attributes under it has to be an error.
 
 ---
 
@@ -556,13 +570,13 @@ encounter [COMPOSITION] 1..1
 
 Each line is one node as a form renderer reads it: the `id` is the segment a FLAT path is built from, then the RM type and the min..max occurrences (`*` for unbounded). After the dash come the inputs a data-entry client draws for a leaf, as `suffix:type` pairs; the suffix is the FLAT-path suffix the value is posted under (`|magnitude`, `|unit`, `|code`), and a coded input also reports how many codes its list offers. A hint to rerun with `-json` goes to stderr, so stdout stays the summary alone.
 
-**What to copy into your app:** `webtemplate.Marshal(compiled)` for the bytes (`application/openehr.wt+json`), or `webtemplate.Build(compiled)` when you post-process the typed tree first. Each `Node.ID` is the FLAT-path segment consumers bind to, and each leaf's `Inputs` (`suffix` / `type` / `list` / `validation`) drives the widget. Both fail loudly (`ErrEmptyTemplate` / `ErrNoDefaultLanguage` / `ErrIDCollision`) instead of emitting ambiguous output. The package's `deviations.md` lists the accepted reference deltas.
+**What to copy into your app:** parse the OPT with `template.ParseFileStrict` and compile it; after a lenient `ParseFile`, an unknown node type that has attributes under it loses everything beneath it, and the export would be an incomplete Web Template. Then `webtemplate.Marshal(compiled)` for the bytes (`application/openehr.wt+json`), or `webtemplate.Build(compiled)` when you post-process the typed tree first. Each `Node.ID` is the FLAT-path segment consumers bind to, and each leaf's `Inputs` (`suffix` / `type` / `list` / `validation`) drives the widget. Both fail loudly (`ErrEmptyTemplate` / `ErrNoDefaultLanguage` / `ErrIDCollision`) instead of emitting ambiguous output. The package's `deviations.md` lists the accepted reference deltas.
 
 ---
 
 ### flat-roundtrip
 
-**Purpose:** Convert a canonical COMPOSITION to the FLAT and STRUCTURED simplified formats and back. These formats address values by short Web Template ids instead of full RM paths, so converting between a COMPOSITION and FLAT or STRUCTURED needs the composition's Web Template. The program builds that from the OPT, encodes a vendored composition as FLAT, restructures it as STRUCTURED (no template needed for that step), decodes the FLAT back into a composition, and finally shows the template-aware decode (`WithTemplate`) whose result validates against the OPT. No transport or auth is involved.
+**Purpose:** Convert a canonical COMPOSITION to the FLAT and STRUCTURED simplified formats and back. These formats address values by short Web Template ids instead of full RM paths, so converting between a COMPOSITION and FLAT or STRUCTURED needs the composition's Web Template. The program builds that from the OPT, encodes a vendored composition as FLAT, restructures it as STRUCTURED (no template needed for that step), decodes the FLAT back into a composition, and finally shows the template-aware decode (`WithTemplate`) whose result passes both validation passes: the RM floor and the OPT's constraints. No transport or auth is involved.
 
 ```bash
 go run ./cmd/examples/flat-roundtrip
@@ -586,12 +600,13 @@ FLAT (application/openehr.wt.flat+json):
 STRUCTURED (application/openehr.wt.structured+json): 1325 bytes
 
 OK: FLAT -> COMPOSITION -> FLAT round-trips for Test_dv_quantity_open_constraint.v0
-OK: WithTemplate decode validates against the OPT
+OK: WithTemplate decode passes the RM floor
+OK: WithTemplate decode passes the template constraints
 ```
 
-Every FLAT key is a path of Web Template ids, with an optional `|suffix` naming the part of a value it carries (`|magnitude`, `|unit`, `|code`); composition-level metadata sits under `ctx/`. Without a compiled template the decode keeps exactly what the format carries, so encoding the result reproduces the first document key for key. The formats carry no node names and omit attributes the Reference Model requires (HISTORY.origin, EVENT.time, ...); `WithTemplate` restores the names from the compiled template and fills the other required attributes with synthesised defaults (from `ctx/` values and RM conventions, not recovered data), which is why only that decode validates against the OPT. It needs `ctx/time` in the input when the template has HISTORY or EVENT nodes; this fixture carries it.
+Every FLAT key is a path of Web Template ids, with an optional `|suffix` naming the part of a value it carries (`|magnitude`, `|unit`, `|code`); composition-level metadata sits under `ctx/`. Without a compiled template the decode keeps exactly what the format carries, so encoding the result reproduces the first document key for key. The formats carry no node names and omit attributes the Reference Model requires (HISTORY.origin, EVENT.time, ...); `WithTemplate` restores the names from the compiled template and fills the other required attributes with synthesised defaults (from `ctx/` values and RM conventions, not recovered data), which is why only that decode passes validation. It needs `ctx/time` in the input when the template has HISTORY or EVENT nodes; this fixture carries it. The program checks the result with both passes, the RM floor and the template constraints, because neither replaces the other.
 
-**What to copy into your app:** build the Web Template once (`templatecompile.Compile` plus `webtemplate.Build`), then `simplified.MarshalFlat(comp, wt)` / `UnmarshalFlat(data, wt)` (and the `…Structured` pair) for template-driven conversion, or `FlatToStructured` / `StructuredToFlat` for template-free interconversion. Pass `simplified.WithTemplate(compiled)` to `Unmarshal*` when you need an OPT-validatable composition (names restored from the template, other RM-mandatory attributes synthesised as defaults) rather than a format-idempotent one. Composition-level metadata rides `ctx/`; decorated or exotic datatypes ride `|raw`. The codec is strict on decode: unknown paths or suffixes, wrong-typed ctx values, index games, and malformed input return an error instead of dropping data. See the package's `deviations.md`.
+**What to copy into your app:** build the Web Template once (`templatecompile.Compile` plus `webtemplate.Build`), then `simplified.MarshalFlat(comp, wt)` / `UnmarshalFlat(data, wt)` (and the `…Structured` pair) for template-driven conversion, or `FlatToStructured` / `StructuredToFlat` for template-free interconversion. Pass `simplified.WithTemplate(compiled)` to `Unmarshal*` when you need a composition that passes validation (names restored from the template, other RM-mandatory attributes synthesised as defaults) rather than a format-idempotent one, and validate it with both `validation.ValidateRM` and `validation.ValidateComposition`. Composition-level metadata rides `ctx/`; decorated or exotic datatypes ride `|raw`. The codec is strict on decode: unknown paths or suffixes, wrong-typed ctx values, index games, and malformed input return an error instead of dropping data. See the package's `deviations.md`.
 
 ---
 
@@ -727,7 +742,7 @@ Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf co
 
 ## Fixtures and testkit
 
-Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and fixtures under `testkit/corpus/`. These are stable, checked-in artefacts, not generated at runtime. The exception is `validate-from-json/testdata/`, produced once via `gen_fixture.go`.
+Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and fixtures under `testkit/corpus/`. These are stable, checked-in artefacts, not generated at runtime. The exception is `validate-from-json/testdata/`, which is checked in but generated: `gen_fixture.go` in that directory writes it. Regenerate it whenever the generator changes, with `go run gen_fixture.go` from `cmd/examples/validate-from-json/`; the generator refuses to write a fixture that fails either validation pass.
 
 When writing your own tests, prefer importing fixtures from `testkit` rather than copying paths by hand.
 

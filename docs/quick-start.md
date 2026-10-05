@@ -90,7 +90,7 @@ go run ./cmd/examples/canonical_json
 
 Expected output includes the composition archetype id, language, and `OK: canonical-JSON Composition decoded`.
 
-### Validate against a template
+### Validate against the RM and a template
 
 A typical CI pipeline runs bytes → RM → compiled OPT → validation issues.
 
@@ -98,7 +98,7 @@ A typical CI pipeline runs bytes → RM → compiled OPT → validation issues.
 go run ./cmd/examples/validate-from-json
 ```
 
-This decodes `testdata/minimal_blood_pressure.json`, compiles `vital_signs.opt`, and prints either `result : OK — JSON validates against OPT` or a list of constraint violations. See [examples.md](examples.md#validate-from-json) for flags and custom file paths.
+This decodes `testdata/minimal_blood_pressure.json`, compiles `vital_signs.opt`, and runs two checks: the RM floor, which needs no template, and the template constraints. Each check prints its verdict and any issues it found, and the program exits 1 when either one fails. On the bundled fixture both report `OK, no issues`. See [examples.md](examples.md#validate-from-json) for flags and custom file paths.
 
 ---
 
