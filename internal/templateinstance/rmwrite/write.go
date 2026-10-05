@@ -1068,10 +1068,11 @@ func writeIsmTransitionSingle(i *rm.IsmTransition, attr string, child any) error
 }
 
 // partyFields points at the attributes PARTY gives every party class, so
-// one pair of writers serves all five. languages is the one ACTOR
-// attribute rmwrite builds a member for; it is nil for a ROLE, which is
-// no actor. ACTOR.roles is not addressed: its PARTY_REF members need an
-// OBJECT_ID, which is abstract, so rmwrite cannot build one.
+// one pair of writers serves all five. The ACTOR attributes languages and
+// roles stay unwritten: the template validator matches the members of a
+// multi-valued attribute by archetype_node_id, and a DV_TEXT language or a
+// PARTY_REF role carries none, so it would reject any member written. A
+// template that names either makes the write fail instead.
 type partyFields struct {
 	class         string // the Go type, for the error detail
 	name          *rm.DVTextLike
@@ -1079,27 +1080,26 @@ type partyFields struct {
 	identities    *[]rm.PartyIdentity
 	contacts      *[]rm.Contact
 	relationships *[]rm.PartyRelationship
-	languages     *[]rm.DVTextLike
 }
 
 func personFields(p *rm.Person) partyFields {
-	return partyFields{"*rm.Person", &p.Name, &p.Details, &p.Identities, &p.Contacts, &p.Relationships, &p.Languages}
+	return partyFields{"*rm.Person", &p.Name, &p.Details, &p.Identities, &p.Contacts, &p.Relationships}
 }
 
 func agentFields(a *rm.Agent) partyFields {
-	return partyFields{"*rm.Agent", &a.Name, &a.Details, &a.Identities, &a.Contacts, &a.Relationships, &a.Languages}
+	return partyFields{"*rm.Agent", &a.Name, &a.Details, &a.Identities, &a.Contacts, &a.Relationships}
 }
 
 func groupFields(g *rm.Group) partyFields {
-	return partyFields{"*rm.Group", &g.Name, &g.Details, &g.Identities, &g.Contacts, &g.Relationships, &g.Languages}
+	return partyFields{"*rm.Group", &g.Name, &g.Details, &g.Identities, &g.Contacts, &g.Relationships}
 }
 
 func organisationFields(o *rm.Organisation) partyFields {
-	return partyFields{"*rm.Organisation", &o.Name, &o.Details, &o.Identities, &o.Contacts, &o.Relationships, &o.Languages}
+	return partyFields{"*rm.Organisation", &o.Name, &o.Details, &o.Identities, &o.Contacts, &o.Relationships}
 }
 
 func roleFields(r *rm.Role) partyFields {
-	return partyFields{"*rm.Role", &r.Name, &r.Details, &r.Identities, &r.Contacts, &r.Relationships, nil}
+	return partyFields{"*rm.Role", &r.Name, &r.Details, &r.Identities, &r.Contacts, &r.Relationships}
 }
 
 func writePartySingle(f partyFields, attr string, child any) error {
@@ -1120,10 +1120,6 @@ func writePartyMultiple(f partyFields, attr string, child any) error {
 		return assignVia(child, func(v rm.Contact) { *f.contacts = append(*f.contacts, v) }, attr, "CONTACT")
 	case "relationships":
 		return assignVia(child, func(v rm.PartyRelationship) { *f.relationships = append(*f.relationships, v) }, attr, "PARTY_RELATIONSHIP")
-	case "languages":
-		if f.languages != nil {
-			return assignDVTextLike(child, func(v rm.DVTextLike) { *f.languages = append(*f.languages, v) }, attr)
-		}
 	}
 	return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, f.class, attr)
 }
