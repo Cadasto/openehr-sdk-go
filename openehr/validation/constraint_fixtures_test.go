@@ -83,88 +83,59 @@ func TestValidateComposition_ConstraintFixtures_NoPrimitiveViolations(t *testing
 	}
 }
 
-// REQ-110 — the DV_MULTIMEDIA media_type reader lets the OPT's CODE_PHRASE
-// constraint run. Test_dv_multimedia_open_constraint.v0 pins media_type to
-// a closed [application/pdf] list while its instance carries
-// application/dicom; the validator must catch the violation rather than
-// silently skip the (previously unreadable) media_type attribute.
+// REQ-103 and REQ-110: the DV_MULTIMEDIA media_type reader lets the OPT's
+// C_CODE_PHRASE constraint run instead of skipping the attribute.
+// Test_dv_multimedia_open_constraint.v0 pins media_type to the closed code
+// list [application/pdf] while its instance carries application/dicom. The
+// instance has three events, all at at0002, so the one path is reported
+// three times, and the report is exactly those three violations.
 func TestValidateComposition_ConstraintFixture_MultimediaViolation(t *testing.T) {
 	const id = "Test_dv_multimedia_open_constraint.v0"
-	c := mustCompile(t, id)
-	raw, err := os.ReadFile(fixtures.CompositionJSON(id))
-	if err != nil {
-		t.Fatal(err)
+	const mediaType = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0028]/value/media_type"
+	want := []string{
+		"primitive_not_in_list " + mediaType,
+		"primitive_not_in_list " + mediaType,
+		"primitive_not_in_list " + mediaType,
 	}
-	var comp rm.Composition
-	if err := canjson.Unmarshal(raw, &comp); err != nil {
-		t.Fatalf("decode composition: %v", err)
-	}
-	r := validation.ValidateComposition(&comp, c)
-	found := false
-	for _, issue := range r.Issues {
-		if strings.HasPrefix(issue.Code, "primitive_") && strings.HasSuffix(issue.Path, "/media_type") {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("expected a primitive media_type violation, got %+v", r.Issues)
-	}
+	assertFixtureIssues(t, id, want)
 }
 
-// REQ-110 — BOOLEAN AOM short-name on a DV wrapper scalar channel must
-// validate against the OPT's C_BOOLEAN constraint. Test_dv_boolean_true_false.v0
-// pins false_valid=false while the instance carries false.
+// REQ-103 and REQ-110: a BOOLEAN AOM short name on a DV wrapper's scalar
+// channel validates against the OPT's C_BOOLEAN constraint.
+// Test_dv_boolean_true_false.v0 pins false_valid=false while its instance
+// carries false. The instance has three events, all at at0002, so the one
+// path is reported three times, and the report is exactly those three
+// violations.
 func TestValidateComposition_ConstraintFixture_BooleanViolation(t *testing.T) {
 	const id = "Test_dv_boolean_true_false.v0"
-	c := mustCompile(t, id)
-	raw, err := os.ReadFile(fixtures.CompositionJSON(id))
-	if err != nil {
-		t.Fatal(err)
+	const value = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0029]/value/value"
+	want := []string{
+		"primitive_not_in_list " + value,
+		"primitive_not_in_list " + value,
+		"primitive_not_in_list " + value,
 	}
-	var comp rm.Composition
-	if err := canjson.Unmarshal(raw, &comp); err != nil {
-		t.Fatalf("decode composition: %v", err)
-	}
-	r := validation.ValidateComposition(&comp, c)
-	found := false
-	for _, issue := range r.Issues {
-		if strings.HasPrefix(issue.Code, "primitive_") && strings.Contains(issue.Detail, "false not allowed") {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("expected a primitive boolean violation, got %+v", r.Issues)
-	}
+	assertFixtureIssues(t, id, want)
 }
 
-// REQ-110 — INTEGER magnitude on a DV_COUNT scalar channel must validate
-// against the OPT range constraint. Test_dv_count_range_constraint.v0 pins
-// magnitude [10..20] while the instance carries 25.
+// REQ-103 and REQ-110: an INTEGER magnitude on DV_COUNT's scalar channel
+// validates against the OPT's C_INTEGER range.
+// Test_dv_count_range_constraint.v0 pins magnitude to [10..20] while its
+// instance carries 25. The instance has three events, all at at0002, so the
+// one path is reported three times, and the report is exactly those three
+// violations.
 func TestValidateComposition_ConstraintFixture_CountRangeViolation(t *testing.T) {
 	const id = "Test_dv_count_range_constraint.v0"
-	c := mustCompile(t, id)
-	raw, err := os.ReadFile(fixtures.CompositionJSON(id))
-	if err != nil {
-		t.Fatal(err)
+	const magnitude = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0042]/value/magnitude"
+	want := []string{
+		"primitive_out_of_range " + magnitude,
+		"primitive_out_of_range " + magnitude,
+		"primitive_out_of_range " + magnitude,
 	}
-	var comp rm.Composition
-	if err := canjson.Unmarshal(raw, &comp); err != nil {
-		t.Fatalf("decode composition: %v", err)
-	}
-	r := validation.ValidateComposition(&comp, c)
-	found := false
-	for _, issue := range r.Issues {
-		if strings.HasPrefix(issue.Code, "primitive_") && strings.Contains(issue.Detail, "outside [10..20]") {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("expected a primitive count range violation, got %+v", r.Issues)
-	}
+	assertFixtureIssues(t, id, want)
 }
 
-// Test_dv_parsable_open_constraint.v0 pins DV_PARSABLE.formalism to the
-// closed list [text/plain] (the C_STRING sets no list_open), while its
+// REQ-103: Test_dv_parsable_open_constraint.v0 pins DV_PARSABLE.formalism to
+// the closed list [text/plain] (the C_STRING sets no list_open), while its
 // instance carries abc. The instance has three events, all at at0002, and
 // each holds the same element, so the one path is reported three times.
 // The report is exactly those three violations.
@@ -179,8 +150,8 @@ func TestValidateComposition_ConstraintFixture_ParsableViolation(t *testing.T) {
 	assertFixtureIssues(t, id, want)
 }
 
-// clinical_content_validation's report is exactly these eight issues, each a
-// real defect of the instance against its OPT:
+// REQ-102 and REQ-103: clinical_content_validation's report is exactly these
+// eight issues, each a real defect of the instance against its OPT:
 //
 //   - four EVALUATION names outside the OPT's one-entry closed lists (the
 //     C_STRING sets no list_open, and the v1 entry is itself misspelled
