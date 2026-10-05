@@ -246,10 +246,14 @@ func compositionDefaultOwns(class, attrName string) bool {
 // stores (offset on POINT_EVENT and INTERVAL_EVENT, is_integral on
 // DV_QUANTITY and DV_PROPORTION): the generator has nothing to write
 // there. Nor does it visit a locatable's uid, which setLocatableIdentity
-// stamps. Any other attribute is visited when the policy says so
-// (shouldVisit).
+// stamps. A prohibited ELEMENT null_flavour the RM rule needs, because the
+// OPT prohibits value too, is visited as if the OPT allowed it. Any other
+// attribute is visited when the policy says so (shouldVisit).
 func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
-	if attrProhibited(attr) || locatableUID(optNode, attr) {
+	if locatableUID(optNode, attr) {
+		return false
+	}
+	if attrProhibited(attr) && !(attr.Name() == "null_flavour" && nullFlavourNeeded(optNode)) {
 		return false
 	}
 	// rminfo knows each class by its bare BMM name; the OPT may declare
@@ -1913,8 +1917,15 @@ func codeAdmitted(opt *tcimpl.CompiledNode, attrName string, phrase rm.CodePhras
 // text through a C_STRING the OPT puts on the coded text's value.
 func codedTextAdmitted(opt *tcimpl.CompiledNode, attrName string, ct rm.DVCodedText) bool {
 	return defaultAdmitted(opt, attrName, func(node *tcimpl.CompiledNode) bool {
-		return phraseAdmitted(node, ct.DefiningCode) && stringAdmitted(node.Attribute("value"), ct.Value)
+		return codedTextAdmits(node, ct)
 	})
+}
+
+// codedTextAdmits reports whether node, the OPT child a coded text is
+// built from, admits ct: its code through phraseAdmitted, its text
+// through a C_STRING on its value. A nil node admits anything.
+func codedTextAdmits(node *tcimpl.CompiledNode, ct rm.DVCodedText) bool {
+	return node == nil || (phraseAdmitted(node, ct.DefiningCode) && stringAdmitted(node.Attribute("value"), ct.Value))
 }
 
 // defaultAdmitted reports whether the OPT's own constraint on attrName of
@@ -2003,31 +2014,46 @@ func (g *generator) placeholderElement() *rm.Element {
 
 // settleElement makes an ELEMENT carry exactly one of value and null_flavour
 // (RM Inv_null_flavour_indicated), and a null_reason only while it is null
-// (RM Inv_null_reason_valid). A value wins: when the OPT constrains the value
-// and either null attribute, the null flavour and the null reason are both
-// dropped. An ELEMENT with no value, because the OPT constrains none or none
-// could be generated, keeps any null reason and gets the null flavour
+// (RM Inv_null_reason_valid). A value wins, and the null flavour and the
+// null reason are dropped, unless it gives way (valueGivesWay): the OPT
+// allows both value and null_flavour and requires null_flavour or
+// null_reason but not value; the value is then dropped. An ELEMENT with
+// no value keeps any null reason and gets the null flavour
 // "no information" when it has none, or one with no code (noCode), unless
-// the OPT's constraint on null_flavour rejects that code (codeAdmitted).
-// Where a code-phrase constraint rejects it, the walk's null flavour stays.
-// Where the OPT prohibits null_flavour, the RM rule wins: the ELEMENT
-// takes a value built as for an ELEMENT.value the OPT leaves silent, or,
-// where the OPT prohibits value as well, the null flavour "no information"
-// all the same. A null flavour with a code keeps it, and takes the
-// pinned rubric of that code when the code is in the openEHR null flavours
-// group. opt is the OPT node of e, or nil for an ELEMENT built from the
-// BMM alone.
+// the OPT's constraint on null_flavour rejects that code (codeAdmitted);
+// where a code-phrase constraint rejects it, the walk's null flavour
+// stays. Where the OPT prohibits null_flavour, the RM rule wins: the
+// ELEMENT takes a value built as for an ELEMENT.value the OPT leaves
+// silent, or, where the OPT prohibits value as well, the null flavour the
+// walk wrote as if the OPT allowed it (visits), with "no information"
+// where that leaves no code its own child admits. A null flavour with a
+// code keeps it, and takes the pinned rubric of that code when the code
+// is in the openEHR null flavours group. opt is the OPT node of e, or nil
+// for an ELEMENT built from the BMM alone.
 func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 	if e.Value != nil && !rm.IsTypedNil(e.Value) {
-		e.NullFlavour = nil
-		e.NullReason = nil
-		return
+		if !valueGivesWay(opt) {
+			e.NullFlavour = nil
+			e.NullReason = nil
+			return
+		}
+		e.Value = nil
 	}
 	if e.NullFlavour != nil && !noCode(e.NullFlavour.DefiningCode.CodeString) {
 		useGroupRubric(e.NullFlavour, terminology.NullFlavours)
 		return
 	}
-	if nf := noInformation(); codedTextAdmitted(opt, "null_flavour", *nf) {
+	nf := noInformation()
+	if nullFlavourNeeded(opt) {
+		// The OPT prohibits value and null_flavour, and the RM rule needs
+		// the null flavour: the walk wrote it as if the OPT allowed it, and
+		// the default goes where its own child admits it.
+		if codedTextAdmits(firstChild(opt, "null_flavour"), *nf) {
+			e.NullFlavour = nf
+		}
+		return
+	}
+	if codedTextAdmitted(opt, "null_flavour", *nf) {
 		e.NullFlavour = nf
 		return
 	}
@@ -2036,15 +2062,34 @@ func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 	}
 	// The OPT prohibits null_flavour, and the RM rule that an ELEMENT
 	// carry one of value and null_flavour wins: a value as for a silent
-	// ELEMENT.value, or, where the OPT prohibits value too, the null
-	// flavour after all.
-	if prohibited(opt, "value") {
-		e.NullFlavour = noInformation()
-		return
-	}
+	// ELEMENT.value.
 	if g.fillElementValue(e) {
 		e.NullReason = nil
 	}
+}
+
+// nullFlavourNeeded reports whether opt, an ELEMENT's OPT node, prohibits
+// both value and null_flavour, so the RM rule Inv_null_flavour_indicated
+// needs the null flavour, which is then written as if the OPT allowed it.
+func nullFlavourNeeded(opt *tcimpl.CompiledNode) bool {
+	return prohibited(opt, "null_flavour") && prohibited(opt, "value")
+}
+
+// valueGivesWay reports whether an ELEMENT's value gives way to its null
+// attributes: the OPT allows both value and null_flavour, and requires
+// null_flavour or null_reason but not value. Otherwise the value wins.
+func valueGivesWay(opt *tcimpl.CompiledNode) bool {
+	if opt == nil || prohibited(opt, "value") || prohibited(opt, "null_flavour") || requiresAttr(opt, "value") {
+		return false
+	}
+	return requiresAttr(opt, "null_flavour") || requiresAttr(opt, "null_reason")
+}
+
+// requiresAttr reports whether opt names attrName as required: the BMM
+// marks it mandatory or its existence lower bound is at least 1.
+func requiresAttr(opt *tcimpl.CompiledNode, attrName string) bool {
+	attr := opt.Attribute(attrName)
+	return attr != nil && isRequired(attr)
 }
 
 // fillElementValue gives e the value the generator builds for an
