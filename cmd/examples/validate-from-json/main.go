@@ -8,16 +8,15 @@
 //   - RM floor (validation.ValidateRM): the openEHR Reference Model alone, with
 //     no template. It checks the attributes the RM makes mandatory on every
 //     node, and the RM's own rules for each type, such as an ELEMENT carrying
-//     exactly one of a value or a null flavour, and an archetype root
-//     carrying archetype_details.
+//     exactly one of a value or a null flavour, and every COMPOSITION and
+//     ENTRY carrying archetype_details.
 //   - Template constraints (validation.ValidateComposition): what the OPT
 //     declares, node by node: existence, cardinality, RM type, archetype
 //     identity and value constraints.
 //
-// The two passes compose but do not chain. A composition that satisfies its
-// template can still break the Reference Model: today ValidateComposition
-// checks the template's constraints and does not run the RM floor's per-type
-// rules, so a program that wants both guarantees calls both.
+// Today ValidateComposition checks the template's constraints and does not
+// run the RM floor's per-type rules, so a composition can satisfy its template
+// and still break the Reference Model. This program runs both passes.
 //
 // By default it validates testdata/minimal_blood_pressure.json, a hand-made
 // composition that passes both against the vendored vital_signs.opt. With
@@ -29,8 +28,8 @@
 //	go run ./cmd/examples/validate-from-json -corpus
 //	go run ./cmd/examples/validate-from-json composition.json template.opt
 //
-// The exit status is 0 when both passes find no issue. It is 1 when either
-// pass reports an issue, or when the program cannot run: a missing or
+// The exit status is 0 when neither pass reports an error. It is 1 when either
+// pass does, or when the program cannot run: a missing or
 // unreadable file, a composition or OPT that does not parse, or the wrong
 // number of file arguments. A bad flag exits with status 2.
 package main

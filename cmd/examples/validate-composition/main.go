@@ -6,10 +6,9 @@
 // The two passes are the RM floor (validation.ValidateRM), which checks the
 // composition against the openEHR Reference Model alone, and the template
 // constraints (validation.ValidateComposition), which check it against the
-// OPT. They compose but do not chain: today ValidateComposition checks the
-// template's constraints and does not run the RM floor's per-type rules, so a
-// composition can satisfy its template and still break the Reference Model.
-// A program that wants both guarantees calls both.
+// OPT. Today ValidateComposition checks the template's constraints and does
+// not run the RM floor's per-type rules, so a composition can satisfy its
+// template and still break the Reference Model. This program runs both passes.
 //
 // Runs offline. With no argument it uses the vendored vital_signs.opt fixture
 // and a hand-built composition that passes both; -invalid clears a required

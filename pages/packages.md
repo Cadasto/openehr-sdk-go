@@ -34,7 +34,7 @@ None of these import `transport/` or `auth/`. That independence is REQ-013 in
 | [`openehr/template`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/template) | ADL 1.4 operational template parse and paths |
 | [`openehr/templatecompile`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/templatecompile) | Compile an OPT for the builder, validator, and AQL lint |
 | [`openehr/template/webtemplate`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate) | Web Template JSON export from a compiled OPT, EHRbase v2.3 ids |
-| [`openehr/validation`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/validation) | Composition against OPT; AQL lint entry |
+| [`openehr/validation`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/validation) | Reference Model rules with no template (`ValidateRM`), a Composition or other RM root against a compiled OPT, and the AQL lint entry |
 | [`openehr/instance`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/instance) | Synthesise an RM instance from a compiled template |
 | [`openehr/composition`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/composition) | OPT-driven Composition builder |
 | [`openehr/aql`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/aql) | AQL builders and request / result models |

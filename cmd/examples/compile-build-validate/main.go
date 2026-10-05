@@ -7,11 +7,9 @@
 // Nothing here imports an internal/ package, so a program in another Go
 // module can do exactly the same.
 //
-// The two passes compose but do not chain: today ValidateComposition checks
-// the template's constraints and does not run the RM floor's per-type rules,
-// so a composition can satisfy its template and still break the Reference
-// Model.
-// A program that wants both guarantees calls both.
+// Today ValidateComposition checks the template's constraints and does not
+// run the RM floor's per-type rules, so a composition can satisfy its template
+// and still break the Reference Model. This program runs both passes.
 //
 // Runs offline. With no argument it uses the vendored vital_signs.opt fixture:
 //

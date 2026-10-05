@@ -108,9 +108,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 ## openehr/validation/rmread
 - openehr/validation/rmread/read.go:1404 · Reading ROLE and CAPABILITY time_validity makes the floor walk those intervals (a bad DV_DATE at /time_validity/lower or /capabilities[0]/time_validity/upper gets rm_invariant Value_valid), but no ValidateRM test plants a fault there · by: sdd-spec-conformance-reviewer · from: #227
 
-## pages
-- pages/examples.md:51 · The heading still says "against a template", and the at-a-glance row at docs/examples.md:29 still says "vs OPT", while the rewritten sections say both the RM floor and the template constraints are required · by: sdd-doc-reviewer · from: #225
-
 ## resources/its-rest
 - resources/its-rest/ehr-validation.openapi.yaml:4386 · The vendored ETag_COMPOSITION example `W/"8849…::1` has no closing double quote; definition-validation.openapi.yaml:247 ends its description with stray text "formats.tags:"; upstream content, not to be hand-edited, so raise it with ITS-REST if it matters · by: sdd-implementer · from: docs/examples-rest-golden-paths
 

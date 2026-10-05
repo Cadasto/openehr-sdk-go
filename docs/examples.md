@@ -4,13 +4,13 @@ kind: guide
 
 # Examples
 
-If you are new to the SDK, run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline. The REST ones talk to a fake server in the same process, so nothing needs a clinical data repository (CDR): either an `httptest` server on a loopback address, or a `sandbox` backend that opens no listener at all ([REST client](#rest-client) says which uses which).
+If you are new to the SDK, run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline. The REST ones run against a fake backend in the same process, so none needs a clinical data repository (CDR). [REST client](#rest-client) says which use an `httptest` server on a loopback address and which use a `sandbox` backend that opens no listener at all.
 
 The 21 runnable programs under [`cmd/examples/`](../cmd/examples/) cover the major offline clinical-modeling and AQL workflows. They also cover REST calls for EHRs, compositions, AQL queries, templates and contributions, and two ways to authenticate: a SMART launch for an app with a signed-in user, and client credentials for a service with no user. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
 
 Each entry says what the program shows, which packages it uses, how to run it, and what the output means. Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<name>` works from any working directory inside a clone. Build them all with `make build` (or `go build ./cmd/examples/...`).
 
-A few openEHR terms recur throughout. A **COMPOSITION** is the top-level clinical document. An **OPT** (operational template) is the deployable form of a template: every archetype it uses, flattened into one XML file with the template's constraints applied; it fixes which archetypes, nodes and value constraints a composition may contain. **Canonical JSON** is the openEHR REST wire format for those documents. **AQL** (Archetype Query Language) is the openEHR query language. A **Web Template** is the JSON form of a compiled OPT that form renderers and the FLAT / STRUCTURED simplified formats work from.
+A few openEHR terms recur throughout. A **COMPOSITION** is the top-level clinical document. An **OPT** (operational template) is the deployable form of a template: every archetype it uses, flattened into one XML file with the template's constraints applied; it fixes which archetypes, nodes and value constraints a composition may contain. **Canonical JSON** is the openEHR REST wire format for those documents. **AQL** (Archetype Query Language) is the openEHR query language. A **Web Template** is the JSON form of a compiled OPT that form renderers and the FLAT / STRUCTURED simplified formats work from. The **RM floor** is the check against the Reference Model alone, with no template (`validation.ValidateRM`).
 
 The examples that read an OPT file parse it with `template.ParseFileStrict`, so a program that validates, builds, generates, exports or lints stops on a template with an unknown node type that has attributes under it, instead of silently dropping that subtree. `template-explore` is the one exception: it parses leniently with `template.ParseFile` by choice, to show the parts of a template it understands. An unknown node type with no attributes under it is still kept as a leaf, without its constraint, in both modes. [opt-parse](#opt-parse) covers both modes and how they differ.
 
@@ -26,7 +26,7 @@ The Packages column lists the SDK packages each program imports, by short name (
 | [canxml_roundtrip](#canxml_roundtrip) | No | `rm`, `canjson`, `canxml` | JSON ↔ XML cross-format round-trip |
 | [opt-parse](#opt-parse) | No | `template` | Parse an ADL 1.4 OPT, walk paths |
 | [primitive-validate](#primitive-validate) | No | `template`, `constraints` | Single values against one OPT leaf constraint |
-| [validate-composition](#validate-composition) | No | `template`, `templatecompile`, `validation`, `rm`, `terminology` | In-memory composition vs OPT |
+| [validate-composition](#validate-composition) | No | `template`, `templatecompile`, `validation`, `rm`, `terminology` | In-memory composition vs the RM and an OPT |
 | [validate-from-json](#validate-from-json) | No | `canjson`, `template`, `templatecompile`, `validation`, `rm` | Wire bytes → validate |
 | [generate-example](#generate-example) | No | `template`, `templatecompile`, `instance`, `canjson`, `rm` | OPT → generated RM instance → JSON |
 | [aql-build](#aql-build) | No | `aql`, `aql/contain` | Struct + verb builders → byte-identical AQL; nested CONTAINS + in-text paging; opt-in RM containment check |
@@ -36,13 +36,13 @@ The Packages column lists the SDK packages each program imports, by short name (
 | [template-explore](#template-explore) | No | `template`, `templatecompile` | Walk a compiled OPT: structure tree + leaf paths |
 | [webtemplate-export](#webtemplate-export) | No | `template`, `templatecompile`, `template/webtemplate` | Compiled OPT → Web Template JSON |
 | [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template`, `template/webtemplate`, `templatecompile`, `canjson`, `validation`, `rm` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + template-aware `WithTemplate` decode |
-| [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
-| [contribution-build](#contribution-build) | Optional mock (`-commit`) | `client/ehr/contribution`, `client/ehr`, `canjson`, `rm`, `discovery`, `transport` | Multi-version `Contribution_create` assembly, optionally committed |
-| [definition-lifecycle](#definition-lifecycle) | Mock (`sandbox`) | `client/definition`, `template`, `templatecompile`, `discovery`, `transport`, `sandbox` | Upload, list, download and compile a template; the server's copy vs the local compiled handle |
-| [composition-crud](#composition-crud) | Mock (`sandbox`) | `client/ehr/composition`, `client/ehr`, `rm`, `rmpath`, `canjson`, `discovery`, `transport`, `sandbox` | Save, read, update; a stale `If-Match` refused with 412 |
-| [query-execute](#query-execute) | Mock (`sandbox`) | `aql`, `client/query`, `rm`, `typereg`, `discovery`, `transport`, `sandbox` | Execute bound AQL, decode a RESULT_SET cell into a typed value, classify a refusal |
-| [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth`, `discovery` | Standalone PKCE launch; **state + verifier persistence** across the redirect |
-| [service-auth](#service-auth) | Mock (`sandbox`) | `auth/clientcreds`, `auth`, `client/system`, `discovery`, `transport`, `sandbox` | OAuth 2.0 client credentials for a backend service; the cached token reused |
+| [ehr_create](#ehr_create) | Fake (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
+| [contribution-build](#contribution-build) | Optional fake (`-commit`) | `client/ehr/contribution`, `client/ehr`, `canjson`, `rm`, `discovery`, `transport` | Multi-version `Contribution_create` assembly, optionally committed |
+| [definition-lifecycle](#definition-lifecycle) | Fake (`sandbox`) | `client/definition`, `template`, `templatecompile`, `discovery`, `transport`, `sandbox` | Upload, list, download and compile a template; the server's copy vs the local compiled handle |
+| [composition-crud](#composition-crud) | Fake (`sandbox`) | `client/ehr/composition`, `client/ehr`, `rm`, `rmpath`, `canjson`, `discovery`, `transport`, `sandbox` | Save, read, update; a stale `If-Match` refused with 412 |
+| [query-execute](#query-execute) | Fake (`sandbox`) | `aql`, `client/query`, `rm`, `typereg`, `discovery`, `transport`, `sandbox` | Execute bound AQL, decode a RESULT_SET cell into a typed value, classify a refusal |
+| [smart-launch](#smart-launch) | Fake (`httptest`) | `auth/smart`, `auth`, `discovery` | Standalone PKCE launch; **state + verifier persistence** across the redirect |
+| [service-auth](#service-auth) | Fake (`sandbox`) | `auth/clientcreds`, `auth`, `client/system`, `discovery`, `transport`, `sandbox` | OAuth 2.0 client credentials for a backend service; the cached token reused |
 
 ---
 
@@ -195,7 +195,7 @@ go run ./cmd/examples/validate-composition -invalid   # clear a required attribu
 
 It uses the same public `templatecompile.Compile` bridge as [compile-build-validate](#compile-build-validate), so the program can be copied into another module unchanged.
 
-**Default fixture:** `vital_signs.opt`, with a hand-built composition that passes both: an encounter holding one blood-pressure OBSERVATION with a systolic reading, the patient's position and the device used. Besides what the template asks for, it carries what the Reference Model requires: `archetype_details` on the COMPOSITION and the OBSERVATION, a value on every ELEMENT, and at least one item in the CLUSTER.
+**Default fixture:** `vital_signs.opt`, with a hand-built composition that passes both: an encounter holding one blood-pressure OBSERVATION with a systolic reading, the patient's position and the device used. Besides what the template asks for, it carries what the Reference Model requires: `archetype_details` on the COMPOSITION and the OBSERVATION, a value rather than a null flavour on every ELEMENT, and at least one item in the CLUSTER.
 
 **Sample output:**
 
@@ -226,10 +226,10 @@ go run ./cmd/examples/validate-from-json comp.json tmpl.opt # your own files
 
 | Pass | Call | What it checks |
 |---|---|---|
-| RM floor | `validation.ValidateRM(&composition)` | The openEHR Reference Model alone, with no template: the attributes the RM makes mandatory on every node, and the RM's own rules for each type, such as an ELEMENT carrying exactly one of a value or a null flavour, and every archetype root (the COMPOSITION, each ENTRY) carrying `archetype_details` |
+| RM floor | `validation.ValidateRM(&composition)` | The openEHR Reference Model alone, with no template: the attributes the RM makes mandatory on every node, and the RM's own rules for each type, such as an ELEMENT carrying exactly one of a value or a null flavour, and every COMPOSITION and ENTRY carrying `archetype_details` |
 | Template constraints | `validation.ValidateComposition(&composition, compiled)` | What the OPT declares, node by node: existence, cardinality, RM type, archetype identity and value constraints |
 
-The two passes compose but do not chain. A composition can satisfy its template and still break the Reference Model: today `ValidateComposition` checks the template's constraints and does not run the RM floor's per-type rules. A program that wants both guarantees calls both, as this one does.
+Today `ValidateComposition` checks the template's constraints and does not run the RM floor's per-type rules, so a composition can satisfy its template and still break the Reference Model. This program runs both passes.
 
 **Flags:**
 
@@ -238,7 +238,7 @@ The two passes compose but do not chain. A composition can satisfy its template 
 | `-corpus` | Validate `testkit/corpus/compositions/vital_signs.json`, demo data that reports issues, instead of the clean local fixture |
 | `-cassette` | Deprecated spelling of `-corpus`, kept so older scripts keep working |
 
-The exit status lets the command gate a pipeline. It is 0 when both passes find no issue, and 1 when either pass reports an issue or the program cannot run: a missing or unreadable file, a composition or OPT that does not parse, or the wrong number of file arguments. A bad flag exits with status 2. Validation issues are a result the program prints; only a program error, such as a bad path or an unreadable OPT, is reported as a failure.
+The exit status lets the command gate a pipeline. It is 0 when neither pass reports an error, and 1 when either pass does or the program cannot run: a missing or unreadable file, a composition or OPT that does not parse, or the wrong number of file arguments. A bad flag exits with status 2. Both failure cases exit 1, but they print differently: a program error is logged on stderr and stops the run, while validation issues print on stdout under each pass's name.
 
 **Default JSON fixture:** `cmd/examples/validate-from-json/testdata/minimal_blood_pressure.json`, a hand-made composition that passes both against `vital_signs.opt`. Its generator, `gen_fixture.go` in the same directory, refuses to write a fixture that fails either pass.
 
@@ -255,7 +255,7 @@ template constraints : OK, no issues
 result               : valid, both passes found no error
 ```
 
-With `-corpus` the RM floor reports no issues and the template constraints report 12, one `path [code] detail` line each: a magnitude out of range, units the template does not allow, and missing `items` lists the template requires (the issue lines call them empty). The result line says the composition is not valid, and a note says the issues are expected. The passes catch different things: the RM floor accepts those values and missing lists, and the template does not. The reverse holds too: a composition with no `archetype_details` on its archetype roots, or with an ELEMENT that has neither a value nor a null flavour, can pass the template constraints and fail the RM floor.
+With `-corpus` the RM floor reports no issues and the template constraints report 12, one `path [code] detail` line each: a magnitude out of range, units the template does not allow, and missing `items` lists the template requires (the issue lines call them empty). The result line says the composition is not valid, and a note says the issues are expected. The passes catch different things: the RM floor accepts those values and missing lists, and the template does not. The reverse holds too: a composition with no `archetype_details` on its COMPOSITION or an ENTRY, or with an ELEMENT that has neither a value nor a null flavour, can pass the template constraints and fail the RM floor.
 
 **What to copy into your app:** the steps in order: `canjson.Unmarshal` (a document that is not well-formed canonical JSON fails here, before any validation runs), `template.ParseFileStrict` plus `templatecompile.Compile` once per template, then both `validation.ValidateRM` and `validation.ValidateComposition`. Accept the document only when both results are OK, map that to your exit status, and print each pass's `result.Issues` under the pass's name. Parse strictly in a validator: on an unknown node type that has attributes under it, `ParseFileStrict` refuses the template, while the lenient `ParseFile` keeps the node as a leaf and drops the constraints beneath it. The same compiled template also feeds the composition builder, the instance generator and the AQL lint.
 
@@ -498,9 +498,9 @@ RM floor             : OK, no issues
 template constraints : OK, no issues
 ```
 
-The builder starts from a skeleton generated from the compiled template, with the mandatory structure already in place, so the program sets only the one leaf it cares about (the systolic value, addressed by its template path). The builder also fills what the Reference Model requires beyond the template, such as `archetype_details` on every archetype root and a null flavour on an ELEMENT left without a value, so its output passes the RM floor as well as the template constraints. The program validates the decoded copy, the one a server would receive, and exits 1 if either pass reports an error. [validate-from-json](#validate-from-json) explains why both passes run.
+The builder starts from a skeleton generated from the compiled template, with the mandatory structure already in place, so the program sets only the one leaf it cares about (the systolic value, addressed by its template path). The builder also fills what the Reference Model requires beyond the template, such as `archetype_details` on the COMPOSITION and each ENTRY and a null flavour on an ELEMENT left without a value, so its output passes the RM floor as well as the template constraints. The program validates the decoded copy, the one a server would receive, and exits 1 if either pass reports an error. [validate-from-json](#validate-from-json) explains why both passes run.
 
-**What to copy into your app:** `templatecompile.Compile(opt)` once per template, then reuse the `*Compiled` across many `composition.NewBuilder` / `validation.ValidateComposition` calls; the compiled template is the single artefact the builder and the validator share. Run `validation.ValidateRM` beside the template pass, because neither replaces the other. For a root that binds to no template, the RM floor alone applies: `validation.ValidateRM`, or a typed wrapper such as `ValidateRMEHRStatus` or `ValidateRMFolder`. Address leaves by template path with `SetQuantity`, `SetText`, `SetCodedText` or `Set`; the [template-explore](#template-explore) example prints every such path of a template.
+**What to copy into your app:** `templatecompile.Compile(opt)` once per template, then reuse the `*Compiled` across many `composition.NewBuilder` / `validation.ValidateComposition` calls; the compiled template is the single artefact the builder and the validator share. Run `validation.ValidateRM` beside the template pass. For a root that binds to no template, the RM floor alone applies: `validation.ValidateRM`, or a typed wrapper such as `ValidateRMEHRStatus` or `ValidateRMFolder`. Address leaves by template path with `SetQuantity`, `SetText`, `SetCodedText` or `Set`; the [template-explore](#template-explore) example prints every such path of a template.
 
 ---
 
@@ -608,7 +608,7 @@ OK: WithTemplate decode passes the RM floor
 OK: WithTemplate decode passes the template constraints
 ```
 
-Every FLAT key is a path of Web Template ids, with an optional `|suffix` naming the part of a value it carries (`|magnitude`, `|unit`, `|code`); composition-level metadata sits under `ctx/`. Without a compiled template the decode keeps exactly what the format carries, so encoding the result reproduces the first document key for key. The formats carry no node names and omit attributes the Reference Model requires (HISTORY.origin, EVENT.time, ...); `WithTemplate` restores the names from the compiled template and fills the other required attributes with synthesised defaults (from `ctx/` values and RM conventions, not recovered data), which is why only that decode passes validation. It needs `ctx/time` in the input when the template has HISTORY or EVENT nodes; this fixture carries it. The program checks the result with both passes, the RM floor and the template constraints, because neither replaces the other.
+Every FLAT key is a path of Web Template ids, with an optional `|suffix` naming the part of a value it carries (`|magnitude`, `|unit`, `|code`); composition-level metadata sits under `ctx/`. Without a compiled template the decode keeps exactly what the format carries, so encoding the result reproduces the first document key for key. The formats carry no node names and omit attributes the Reference Model requires (HISTORY.origin, EVENT.time, ...); `WithTemplate` restores the names from the compiled template and fills the other required attributes with synthesised defaults (from `ctx/` values and RM conventions, not recovered data), which is why only that decode passes validation. It needs `ctx/time` in the input when the template has HISTORY or EVENT nodes; this fixture carries it. The program checks the result with both passes, the RM floor and the template constraints ([validate-from-json](#validate-from-json) explains why).
 
 **What to copy into your app:** build the Web Template once (`templatecompile.Compile` plus `webtemplate.Build`), then `simplified.MarshalFlat(comp, wt)` / `UnmarshalFlat(data, wt)` (and the `…Structured` pair) for template-driven conversion, or `FlatToStructured` / `StructuredToFlat` for template-free interconversion. Pass `simplified.WithTemplate(compiled)` to `Unmarshal*` when you need a composition that passes validation (names restored from the template, other RM-mandatory attributes synthesised as defaults) rather than a format-idempotent one, and validate it with both `validation.ValidateRM` and `validation.ValidateComposition`. Composition-level metadata rides `ctx/`; decorated or exotic datatypes ride `|raw`. The codec is strict on decode: unknown paths or suffixes, wrong-typed ctx values, index games, and malformed input return an error instead of dropping data. See the package's `deviations.md`.
 
@@ -616,7 +616,7 @@ Every FLAT key is a path of Web Template ids, with an optional `|suffix` naming 
 
 ## REST client
 
-The REST and auth examples run against a fake server in the same process, built one of two ways. `ehr_create`, `contribution-build` (under `-commit`) and `smart-launch` start an `httptest` server on a loopback address. `definition-lifecycle`, `composition-crud`, `query-execute` and `service-auth` build their fake on the public [`sandbox`](../sandbox/doc.go) package instead: a `sandbox.Backend` is an `http.RoundTripper`, plugged into the `*http.Client` as its transport, so no listener is opened and the host in the base URL is never dialled. These four keep the fake in its own file (`fake_cdr.go` or `fake_server.go`), and only that file imports `sandbox`. Either way, the rest of the program wires the SDK as it would for a real server. To point it at one, inject your own `*http.Client` and put your deployment's base URL in the service catalog.
+The REST and auth examples run against a fake backend in the same process, built one of two ways. `ehr_create`, `contribution-build` (under `-commit`) and `smart-launch` start an `httptest` server on a loopback address. `definition-lifecycle`, `composition-crud`, `query-execute` and `service-auth` build their fake on the public [`sandbox`](../sandbox/doc.go) package instead: a `sandbox.Backend` is an `http.RoundTripper`, plugged into the `*http.Client` as its transport, so no listener is opened and the host in the base URL is never dialled. These four keep the fake in its own file (`fake_cdr.go` or `fake_server.go`), and only that file imports `sandbox`. Either way, the rest of the program wires the SDK as it would for a real server. To point it at one, inject your own `*http.Client` and put your deployment's base URL in the service catalog.
 
 ### ehr_create
 
@@ -764,7 +764,7 @@ The fake answers as the pinned ITS-REST contract describes. A create answers `20
 
 ### query-execute
 
-**Purpose:** Execute an AQL query and read its result, picking up where [aql-build](#aql-build) stops. The program builds the query with `aql.Builder` and binds the caller's data with `Bind`, so the values travel in `query_parameters` and the text carries only the `$ehr_id` and `$min_temp` placeholders. It sends the query with `query.Execute`, prints the RESULT_SET columns and rows, turns the RM-valued temperature cell into a typed `rm.DVQuantity`, and then classifies a query the server refuses. A fake CDR built on `sandbox` answers `POST /query/aql` with two fixed readings. It is stricter than a real CDR, so the binding is proven: it answers 400 unless the EHR id and the threshold arrive as parameters and the text holds only their placeholders.
+**Purpose:** Execute an AQL query and read its result, picking up where [aql-build](#aql-build) stops. The program builds the query with `aql.Builder` and binds the caller's data with `Bind`, so the values travel in `query_parameters` and the text carries only the `$ehr_id` and `$min_temp` placeholders. It sends the query with `query.Execute`, prints the RESULT_SET columns and rows, turns the RM-valued temperature cell into a typed `rm.DVQuantity`, and then classifies a query the server refuses. A fake CDR built on `sandbox` answers `POST /query/aql` with two fixed readings. It is stricter than a real CDR: it answers 400 unless the EHR id and the threshold arrive as parameters and the text holds only their placeholders.
 
 ```bash
 go run ./cmd/examples/query-execute
@@ -881,7 +881,7 @@ Without the variables the program falls back to two marked placeholders, `exampl
 2. opt-parse               ← understand templates and paths
 3. validate-from-json      ← wire bytes + validation (CI pattern)
 4. generate-example        ← generate data from templates
-5. ehr_create              ← REST wiring (mock first, then real CDR)
+5. ehr_create              ← REST wiring (fake first, then real CDR)
 6. definition-lifecycle    ← get a template onto the server
 7. composition-crud        ← write data, with optimistic concurrency
 8. aql-build               ← build an AQL query in code
