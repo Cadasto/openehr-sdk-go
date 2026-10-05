@@ -44,6 +44,31 @@ func optTerminologyIDValue(id string) string {
 	return optSingle("terminology_id", optNode("TERMINOLOGY_ID", "", optStringAttr("value", "<list>"+id+"</list>")))
 }
 
+// openehrAt0000 is what the walk writes for a code phrase the OPT
+// constrains to terminology openehr with an empty code list.
+var openehrAt0000 = rm.CodePhrase{CodeString: "at0000", TerminologyID: rm.TerminologyID{Value: terminology.ID}}
+
+// codedTextWithValue is a DV_CODED_TEXT whose text the OPT constrains with
+// a C_STRING listing texts, and whose defining_code it constrains to
+// terminology openehr with an empty code list, so the code has no value.
+func codedTextWithValue(texts ...string) string {
+	var list string
+	for _, text := range texts {
+		list += "<list>" + text + "</list>"
+	}
+	return optNode("DV_CODED_TEXT", "", optStringAttr("value", list),
+		optSingle("defining_code", optCodePhrase(terminology.ID)))
+}
+
+// checkCodedText fails t unless got carries the text and the code the walk
+// wrote.
+func checkCodedText(t *testing.T, what string, got rm.DVCodedText, text string, code rm.CodePhrase) {
+	t.Helper()
+	if got.Value != text || got.DefiningCode != code {
+		t.Errorf("%s = %q %+v, want the walk's %q %+v", what, got.Value, got.DefiningCode, text, code)
+	}
+}
+
 func checkCode(t *testing.T, what string, got, want rm.CodePhrase) {
 	t.Helper()
 	if got != want {
@@ -105,7 +130,11 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 		// it reports rm_type_mismatch on a code phrase's terminology_id
 		// whatever the value, because it reads that attribute as a string.
 		validatorBlind bool
-		check          func(t *testing.T, out any)
+		// requiredAt is the path of an RM-required attribute the OPT
+		// prohibits: the template validator reports it required there,
+		// and that is the only error the row allows.
+		requiredAt string
+		check      func(t *testing.T, out any)
 	}{
 		{
 			name: "ENTRY language, C_CODE_PHRASE local",
@@ -218,6 +247,76 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
+			name:       "EVENT_CONTEXT start_time, prohibited",
+			opt:        optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optProhibitedSingle("start_time")))),
+			requiredAt: "/context/start_time",
+			check: func(t *testing.T, out any) {
+				if got := generatedComposition(t, out).Context.StartTime.Value; got != "" {
+					t.Errorf("EVENT_CONTEXT.start_time = %q, want none", got)
+				}
+			},
+		},
+		{
+			name: "ACTION time, prohibited",
+			opt: optTemplate("ACTION", optSingle("language"), optSingle("encoding"), optSingle("subject"),
+				optSingle("ism_transition", optNode("ISM_TRANSITION", "")), optSingle("description", emptyTree),
+				optProhibitedSingle("time")),
+			requiredAt: "/time",
+			check: func(t *testing.T, out any) {
+				if got := out.(*rm.Action).Time.Value; got != "" {
+					t.Errorf("ACTION.time = %q, want none", got)
+				}
+			},
+		},
+		{
+			name: "COMPOSITION category, value C_STRING visit",
+			opt:  optTemplate("COMPOSITION", optSingle("category", codedTextWithValue("visit"))),
+			check: func(t *testing.T, out any) {
+				checkCodedText(t, "COMPOSITION.category", generatedComposition(t, out).Category, "visit", openehrAt0000)
+			},
+		},
+		{
+			name: "EVENT_CONTEXT setting, value C_STRING home",
+			opt:  optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optSingle("setting", codedTextWithValue("home"))))),
+			check: func(t *testing.T, out any) {
+				checkCodedText(t, "EVENT_CONTEXT.setting", setting(out), "home", openehrAt0000)
+			},
+		},
+		{
+			name: "admit: EVENT_CONTEXT setting, value C_STRING home or other care",
+			opt: optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "",
+				optSingle("setting", codedTextWithValue("home", "other care"))))),
+			check: func(t *testing.T, out any) {
+				checkOpenEHRCode(t, "EVENT_CONTEXT.setting", setting(out), terminology.Setting, "238")
+			},
+		},
+		{
+			name: "ISM_TRANSITION current_state, value C_STRING planned",
+			opt:  yieldAction("", "", codedTextWithValue("planned")),
+			check: func(t *testing.T, out any) {
+				checkCodedText(t, "ISM_TRANSITION.current_state", out.(*rm.Action).IsmTransition.CurrentState, "planned", openehrAt0000)
+			},
+		},
+		{
+			name: "INTERVAL_EVENT math_function, value C_STRING maximum",
+			opt: optTemplate("INTERVAL_EVENT", append([]string{optSingle("math_function", codedTextWithValue("maximum"))},
+				intervalEventAttrs...)...),
+			check: func(t *testing.T, out any) {
+				checkCodedText(t, "INTERVAL_EVENT.math_function", out.(*rm.IntervalEvent[rm.ItemStructure]).MathFunction, "maximum", openehrAt0000)
+			},
+		},
+		{
+			name: "ELEMENT null_flavour, value C_STRING unknown",
+			opt:  optTemplate("ELEMENT", optSingle("null_flavour", codedTextWithValue("unknown"))),
+			check: func(t *testing.T, out any) {
+				el := out.(*rm.Element)
+				if el.NullFlavour == nil {
+					t.Fatal("ELEMENT.null_flavour absent, want the walk's value")
+				}
+				checkCodedText(t, "ELEMENT.null_flavour", *el.NullFlavour, "unknown", openehrAt0000)
+			},
+		},
+		{
 			name: "DV_MULTIMEDIA media_type, C_CODE_PHRASE openEHR",
 			opt:  yieldMultimedia(optSingle("media_type", optCodePhrase("openEHR"))),
 			check: func(t *testing.T, out any) {
@@ -287,6 +386,9 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 						return
 					}
 					for _, iss := range templateErrors(out, c) {
+						if iss.Code == "required" && iss.Path == tc.requiredAt {
+							continue
+						}
 						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
 					}
 				})
