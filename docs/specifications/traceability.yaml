@@ -1115,6 +1115,7 @@ requirements:
     tests:
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/node_primitive_test.go
+      - openehr/instance/party_attribute_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/constraint_fixtures_test.go
