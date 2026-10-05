@@ -21,8 +21,10 @@ import (
 // Deliberate widening vs the previous 18-arm switch:
 // every LOCATABLE concrete the template compiler can yield (FOLDER,
 // EHR_STATUS, the demographic PARTY family, …) now gets its identity
-// stamped rather than silently skipped; the uid policy below is
-// unchanged.
+// stamped rather than silently skipped. The uid comes from uidSource; a
+// nil uidSource stamps none. The caller decides: the classes stampsUID
+// names get one unless their OPT prohibits it, and any other locatable
+// only where its OPT requires one (setLocatableIdentity, uidFor).
 func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *rm.Archetyped, uidSource func() *rm.HierObjectID) {
 	m, ok := rmValue.(rm.MutableLocatable)
 	if !ok || rm.IsTypedNil(rmValue) {
@@ -33,7 +35,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 	if archetypeDetails != nil {
 		m.SetArchetypeDetails(archetypeDetails)
 	}
-	if stampsUID(rmValue) {
+	if uidSource != nil {
 		// Set-only-if-unset: an explicitly provided UID (e.g. a fixture
 		// replay) wins over the generator's uidSource.
 		if l := rmValue.(rm.Locatable); l.GetUID() == nil {
@@ -42,17 +44,32 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 	}
 }
 
+// partyNeedsUID reports whether v is a PARTY, whose uid the RM needs
+// (PARTY Uid_mandatory), so the generator stamps it even where the OPT
+// prohibits uid.
+func partyNeedsUID(v any) bool {
+	switch v.(type) {
+	case *rm.Person, *rm.Organisation, *rm.Group, *rm.Agent, *rm.Role:
+		return true
+	}
+	return false
+}
+
 // stampsUID lists the classes whose generated instances carry a fresh
-// uid (REQ-107 emission policy): COMPOSITION and the ENTRY concretes —
-// the openEHR entry-level, independently addressable objects.
+// uid (REQ-107 emission policy): COMPOSITION, the ENTRY concretes and
+// GENERIC_ENTRY, the independently addressable clinical objects, and the
+// PARTY concretes, whose uid the RM requires (PARTY Uid_mandatory). A
+// PARTY_RELATIONSHIP takes its uid in fillPartyRelationship instead.
 // Structure nodes (SECTION, ITEM_*, CLUSTER, ELEMENT, HISTORY, events)
-// deliberately do not get generator-minted uids. This is policy
-// dispatch, not identity plumbing — it stays a hand-written closed set
-// (REQ-024, no reflection).
+// and the other demographic locatables (PARTY_IDENTITY, CONTACT,
+// ADDRESS, CAPABILITY) deliberately get no generator-minted uid. This is
+// policy dispatch, not identity plumbing — it stays a hand-written
+// closed set (REQ-024, no reflection).
 func stampsUID(v any) bool {
 	switch v.(type) {
 	case *rm.Composition, *rm.Observation, *rm.Evaluation,
-		*rm.Instruction, *rm.Action, *rm.AdminEntry, *rm.GenericEntry:
+		*rm.Instruction, *rm.Action, *rm.AdminEntry, *rm.GenericEntry,
+		*rm.Person, *rm.Organisation, *rm.Group, *rm.Agent, *rm.Role:
 		return true
 	}
 	return false

@@ -232,6 +232,9 @@ func TestREQ107_PinnedPerformerTypeIsAPartyClass(t *testing.T) {
 		{name: "list pin with two class names", pin: "<list>ROLE</list><list>ORGANISATION</list>", wantExample: "ROLE"},
 		{name: "list whose first member is no class name", pin: "<list>CLINICIAN</list><list>ORGANISATION</list>", want: "ORGANISATION"},
 		{name: "pattern that admits a later class name", pin: "<pattern>ORG.*</pattern>", want: "ORGANISATION"},
+		{name: "pattern that admits only GROUP", pin: "<pattern>GR.*</pattern>", want: "GROUP"},
+		{name: "pattern that admits only PARTY", pin: "<pattern>PARTY</pattern>", want: "PARTY"},
+		{name: "pattern that admits only ACTOR", pin: "<pattern>ACT.*</pattern>", want: "ACTOR"},
 		{name: "list that admits no class name", pin: "<list>CLINICIAN</list>", unsatisfiable: true},
 		{name: "pattern that admits no class name", pin: "<pattern>[a-z]+</pattern>", unsatisfiable: true},
 	}

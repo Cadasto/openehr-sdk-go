@@ -120,3 +120,32 @@ func TestPrimitiveConstraint_ExampleValueSeal(_ *testing.T) {
 	var _ constraints.PrimitiveConstraint = constraints.DvQuantity{}
 	var _ constraints.PrimitiveConstraint = constraints.CDvOrdinal{}
 }
+
+// TestREQ107_CodePhraseEmptyListPlaceholder is the REQ-107 check that a
+// C_CODE_PHRASE with an empty code list gives the code at0000, under the
+// terminology it names, or under local when it names none.
+func TestREQ107_CodePhraseEmptyListPlaceholder(t *testing.T) {
+	cases := []struct {
+		name string
+		c    constraints.CodePhrase
+		want constraints.CodedTermRef
+	}{
+		{
+			name: "terminology named",
+			c:    constraints.CodePhrase{Terminology: "SNOMED-CT"},
+			want: constraints.CodedTermRef{Terminology: "SNOMED-CT", CodeString: "at0000"},
+		},
+		{
+			name: "no terminology",
+			c:    constraints.CodePhrase{},
+			want: constraints.CodedTermRef{Terminology: "local", CodeString: "at0000"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.c.ExampleValue(); got != tc.want {
+				t.Errorf("%#v.ExampleValue() = %#v, want %#v", tc.c, got, tc.want)
+			}
+		})
+	}
+}

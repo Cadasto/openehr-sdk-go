@@ -1228,10 +1228,23 @@ requirements:
       - internal/templateinstance/rmwrite/write_text_like_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/instance/accessors_test.go
+      - openehr/instance/allowed_alternative_test.go
       - openehr/instance/archetype_root_guard_internal_test.go
       - openehr/instance/archetype_root_guard_test.go
+      - openehr/instance/built_type_argument_internal_test.go
+      - openehr/instance/clock_defaults_test.go
+      - openehr/instance/clock_test.go
+      - openehr/instance/code_phrase_terminology_internal_test.go
+      - openehr/instance/code_phrase_terminology_test.go
+      - openehr/instance/coded_rubric_test.go
+      - openehr/instance/composer_option_test.go
+      - openehr/instance/constrained_datetime_test.go
+      - openehr/instance/contract_inputs_test.go
       - openehr/instance/element_rule_test.go
       - openehr/instance/element_slot_test.go
+      - openehr/instance/entry_codes_test.go
+      - openehr/instance/event_multimedia_defaults_test.go
+      - openehr/instance/identity_stamp_test.go
       - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/interval_flags_test.go
@@ -1240,19 +1253,36 @@ requirements:
       - openehr/instance/interval_ordinal_pairs_internal_test.go
       - openehr/instance/interval_temporal_internal_test.go
       - openehr/instance/interval_zone_test.go
+      - openehr/instance/items_rule_test.go
+      - openehr/instance/multimedia_uri_internal_test.go
+      - openehr/instance/node_id_internal_test.go
+      - openehr/instance/node_id_test.go
+      - openehr/instance/nonstorable_visit_internal_test.go
+      - openehr/instance/nonstorable_visit_test.go
+      - openehr/instance/null_flavour_default_test.go
       - openehr/instance/party_attribute_test.go
       - openehr/instance/party_relationship_uid_test.go
       - openehr/instance/phase4_test.go
+      - openehr/instance/placeholder_exact_test.go
       - openehr/instance/placeholder_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
+      - openehr/instance/prohibited_attribute_test.go
       - openehr/instance/realworld_opt_synthesis_test.go
+      - openehr/instance/rm_defaults_named_test.go
       - openehr/instance/rm_defaults_test.go
+      - openehr/instance/rm_defaults_yield_test.go
       - openehr/instance/rm_release_test.go
       - openehr/instance/rmtype_test.go
       - openehr/instance/sample_test.go
+      - openehr/instance/single_slot_fill_test.go
+      - openehr/instance/sizing_rule_test.go
+      - openehr/instance/string_attr_party_name_test.go
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
+      - openehr/instance/uncarried_mandatory_test.go
+      - openehr/instance/valuefill_leaves_test.go
       - openehr/instance/valuefill_test.go
+      - openehr/instance/visit_rules_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/template/constraints/example_test.go
       - openehr/validation/constraint_fixtures_test.go

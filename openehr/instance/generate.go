@@ -26,8 +26,9 @@ import (
 // root type.
 //
 // The walk is template-driven: the compiled OPT drives traversal,
-// rmwrite materialises RM values, and primitive leaves call
-// PrimitiveConstraint.ExampleValue. The returned root is typed as
+// rmwrite materialises RM values, and primitive leaves are valued as
+// [Options.ValueFill] says: the constraint's example value, or an
+// in-constraint draw. The returned root is typed as
 // any; use [AsComposition], [AsObservation], etc. for the concrete
 // access path.
 //
@@ -89,6 +90,11 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	if err != nil {
 		return nil, fmt.Errorf("Generate: root %q: %w", rootType, err)
 	}
+	// A data-value or code-phrase root gets the primitive default a child
+	// of its type gets when it is built, so a root and a nested value of
+	// one type get the same placeholder. It does nothing for any other
+	// root.
+	g.populatePrimitiveDefault(root)
 
 	// The root carries the template_id; nested archetype roots only
 	// get archetype_details with the archetype_id.
@@ -99,8 +105,7 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	}
 
 	// Apply root-type-specific defaults once the structure is in place.
-	switch rootType {
-	case "COMPOSITION":
+	if rootType == "COMPOSITION" {
 		if err := g.applyCompositionDefaults(root.(*rm.Composition)); err != nil {
 			return nil, err
 		}
@@ -156,7 +161,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		g.finishNode(optNode, rmValue)
 		return nil
 	}
-	// Primitive leaves: ExampleValue if policy allows, then return —
+	// Primitive leaves: valued as the ValueFill says, then return —
 	// the primitive's RM-mandatory child attributes are implicitly
 	// captured by the value (e.g. DV_QUANTITY embeds magnitude and
 	// units). Validation v2 does not descend into primitive subtrees
@@ -182,12 +187,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	}
 
 	for _, attr := range optNode.Attributes() {
-		// rminfo knows each class by its bare BMM name; the OPT may declare
-		// a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
-		if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
-			continue
-		}
-		if !g.shouldVisit(attr) {
+		if !g.visits(optNode, attr) {
 			continue
 		}
 		switch attr.Cardinality() {
@@ -201,21 +201,143 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 			}
 		}
 	}
+	g.fillUncarriedRequired(optNode, rmValue)
 	orderIntervalBounds(optNode, rmValue)
 	settleIntervalEndpoints(optNode, rmValue)
 	g.finishNode(optNode, rmValue)
 	return nil
 }
 
+// fillUncarriedRequired fills each attribute the BMM marks mandatory on
+// rmValue's class that optNode does not carry, as under
+// templatecompile.WithoutImplicitAttributes, the way an attribute the OPT
+// leaves silent is filled. An attribute optNode carries is the walk's
+// business, a prohibited one included. A COMPOSITION's language,
+// territory, composer and category are left to applyCompositionDefaults,
+// as materialiseImplicitSingle leaves them.
+func (g *generator) fillUncarriedRequired(optNode *tcimpl.CompiledNode, rmValue any) {
+	class := bmmtype.Class(rmTypeOf(rmValue))
+	for _, attrName := range rminfo.Default.RequiredAttributes(class) {
+		if optNode.Attribute(attrName) != nil || compositionDefaultOwns(class, attrName) {
+			continue
+		}
+		g.fillBMMAttr(rmValue, class, attrName, 0)
+	}
+}
+
+// compositionDefaultOwns reports whether attrName of class is one
+// applyCompositionDefaults fills, from Options or its RM default, so no
+// generic default is built for it first.
+func compositionDefaultOwns(class, attrName string) bool {
+	if class != "COMPOSITION" {
+		return false
+	}
+	switch attrName {
+	case "language", "territory", "composer", "category", "context":
+		return true
+	}
+	return false
+}
+
+// visits decides whether the walk descends into attr of optNode. Under
+// either policy it never visits an attribute the OPT prohibits (an
+// existence of 0..0, or OPT children it all prohibits) that no RM rule
+// needs (attrProhibited), whatever children the OPT names under it, nor
+// one the RM computes rather than stores (offset on POINT_EVENT and
+// INTERVAL_EVENT, is_integral on DV_QUANTITY and DV_PROPORTION): the
+// generator has nothing to write there. Nor does it visit a locatable's
+// uid, which setLocatableIdentity stamps. A prohibited ELEMENT null_flavour the RM rule needs, because the
+// OPT prohibits value too, is visited as if the OPT allowed it. Any other
+// attribute is visited when the policy says so (shouldVisit).
+func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	if locatableUID(optNode, attr) {
+		return false
+	}
+	if attrProhibited(attr) && !rmNeedsProhibited(optNode, attr) {
+		return false
+	}
+	// rminfo knows each class by its bare BMM name; the OPT may declare
+	// a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
+	if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
+		return false
+	}
+	return g.shouldVisit(attr)
+}
+
+// locatableUID reports whether attr is the uid of a locatable, the one
+// LOCATABLE declares, which the identity rule rather than the walk
+// decides.
+func locatableUID(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	if attr.Name() != "uid" {
+		return false
+	}
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return false
+	}
+	site, ok := h.DeclaredOn(bmmtype.Class(concreteFor(optNode.RMTypeName())), "uid")
+	return ok && site == "LOCATABLE"
+}
+
+// requiresUID reports whether the OPT requires the uid of opt, with an
+// existence lower bound of at least 1.
+func requiresUID(opt *tcimpl.CompiledNode) bool {
+	if opt == nil {
+		return false
+	}
+	attr := opt.Attribute("uid")
+	if attr == nil {
+		return false
+	}
+	e := attr.Existence()
+	return e != nil && !e.LowerUnbounded() && e.Lower() >= 1
+}
+
+// uidFor returns the uid source for a value built without an OPT node
+// that names its uid: Options.UIDSource, or its fallback, for a class
+// stampsUID names, and nil, no uid, for any other.
+func (g *generator) uidFor(v any) func() *rm.HierObjectID {
+	if stampsUID(v) {
+		return g.nextUID
+	}
+	return nil
+}
+
+// rmNeedsProhibited reports whether an RM rule needs attr of optNode
+// where the OPT prohibits it, so the walk visits it as if the OPT allowed
+// it: an ELEMENT's null_flavour where the OPT prohibits value too
+// (nullFlavourNeeded). An attribute the BMM marks mandatory is never
+// prohibited (attrProhibited), so it needs no case here.
+func rmNeedsProhibited(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	return attr.Name() == "null_flavour" && nullFlavourNeeded(optNode)
+}
+
+// attrProhibited reports whether the OPT prohibits attr and no RM rule
+// needs it. The OPT prohibits an attribute in two ways: an existence upper
+// bound that is bounded and 0, or OPT children that it all prohibits (an
+// occurrences upper bound of 0). An attribute the BMM marks mandatory is
+// never prohibited: the RM rule wins over the prohibition, so it is
+// visited and filled as an attribute the OPT leaves silent is.
+func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
+	if attr.Required() {
+		return false
+	}
+	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
+		return true
+	}
+	return len(attr.Children()) > 0 && len(allowedChildren(attr)) == 0
+}
+
 // shouldVisit decides whether an attribute is in scope under the
 // current policy. Under Example: every attribute. Under Minimal:
-// every attribute that is required (BMM-mandatory OR existence ≥ 1)
-// OR has OPT-pinned children. The "has OPT children" arm captures
-// the case where the OPT explicitly constrains a structurally
-// optional attribute (e.g. COMPOSITION.content with archetype-root
-// pins) — the act of pinning is itself a signal that the resulting
-// tree should carry those children even under the smallest viable
-// build.
+// every attribute that is required (BMM-mandatory OR existence ≥ 1),
+// whose cardinality lower bound is 1 or more, OR that has OPT-pinned
+// children the OPT does not prohibit. The "has OPT children" arm captures
+// the case where the
+// OPT explicitly constrains a structurally optional attribute (e.g.
+// COMPOSITION.content with archetype-root pins) — the act of pinning
+// is itself a signal that the resulting tree should carry those
+// children even under the smallest viable build.
 func (g *generator) shouldVisit(attr *tcimpl.CompiledAttribute) bool {
 	if g.opts.Policy == Example {
 		return true
@@ -228,7 +350,28 @@ func (g *generator) shouldVisit(attr *tcimpl.CompiledAttribute) bool {
 	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() && cm.Lower() > 0 {
 		return true
 	}
-	return len(attr.Children()) > 0
+	return len(allowedChildren(attr)) > 0
+}
+
+// childProhibited reports whether the OPT prohibits child: its
+// occurrences upper bound is bounded and 0.
+func childProhibited(child *tcimpl.CompiledNode) bool {
+	occ := child.Occurrences()
+	return occ != nil && !occ.UpperUnbounded() && occ.Upper() == 0
+}
+
+// allowedChildren returns the OPT children of attr the OPT does not
+// prohibit, in OPT order. An attribute whose children are all prohibited
+// is itself prohibited (attrProhibited), unless the BMM marks it
+// mandatory: then it is built as one the OPT leaves silent.
+func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
+	var allowed []*tcimpl.CompiledNode
+	for _, child := range attr.Children() {
+		if !childProhibited(child) {
+			allowed = append(allowed, child)
+		}
+	}
+	return allowed
 }
 
 // materialiseSingle synthesises and attaches one child under a
@@ -244,7 +387,11 @@ func (g *generator) materialiseSingle(
 	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
-	children := attr.Children()
+	// An alternative the OPT prohibits is skipped: the next allowed one
+	// wins. With none allowed the attribute is prohibited and not visited
+	// (attrProhibited), unless the BMM marks it mandatory: then it gets
+	// here and is built as one the OPT leaves silent.
+	children := allowedChildren(attr)
 	if len(children) == 0 {
 		// Implicit / OPT-silent attribute. When the attribute carries
 		// a BMM-resolved RM type, materialise a default child of that
@@ -290,10 +437,29 @@ func (g *generator) materialiseSingle(
 	if err := g.walkNode(child, rmChild); err != nil {
 		return err
 	}
+	if replacesTerminology(parentRM, attr.Name(), rmChild) {
+		return nil
+	}
 	if err := rmwrite.EnsureSingle(parentRM, optNode.RMTypeName(), attr.Name(), rmChild); err != nil {
 		return fmt.Errorf("attach %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
 	}
 	return nil
+}
+
+// replacesTerminology reports whether attaching child as attr of parent
+// would replace a code phrase's terminology with an empty TERMINOLOGY_ID.
+// The generator cannot write a TERMINOLOGY_ID's value except where the
+// OPT constrains it, so one built from the BMM, or from an OPT node that
+// does not constrain its value, is empty. The terminology the code phrase
+// already carries (local from its primitive default, or the one a
+// C_CODE_PHRASE named) is kept instead.
+func replacesTerminology(parent any, attr string, child any) bool {
+	cp, ok := parent.(*rm.CodePhrase)
+	if !ok || attr != "terminology_id" || cp.TerminologyID.Value == "" {
+		return false
+	}
+	tid, ok := child.(*rm.TerminologyID)
+	return ok && tid.Value == ""
 }
 
 // materialiseImplicitSingle creates a default value for a
@@ -313,16 +479,13 @@ func (g *generator) materialiseImplicitSingle(
 	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
-	if optNode.RMTypeName() == "COMPOSITION" {
-		switch attr.Name() {
-		case "language", "territory", "composer", "category", "context":
-			return nil
-		}
-	}
-	if g.fillEntryCode(parentRM, optNode.RMTypeName(), attr.Name()) {
+	if compositionDefaultOwns(optNode.RMTypeName(), attr.Name()) {
 		return nil
 	}
-	rmType := attr.RMTypeName()
+	if g.fillEntryCode(optNode, parentRM, optNode.RMTypeName(), attr.Name()) {
+		return nil
+	}
+	rmType := attrType(optNode.RMTypeName(), attr.RMTypeName())
 	if rmType == "" {
 		return nil
 	}
@@ -361,6 +524,10 @@ func (g *generator) materialiseImplicitSingle(
 	// requires.
 	g.stampIfLocatable(rmChild, concreteFor(rmType))
 	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
+	settleBuilt(rmChild)
+	if replacesTerminology(parentRM, attr.Name(), rmChild) {
+		return nil
+	}
 	// Best-effort attach; if the slot rejects the default (e.g. type
 	// mismatch on a polymorphic attr), let downstream defaults
 	// (applyCompositionDefaults) own the field.
@@ -384,47 +551,113 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 		return
 	}
 	for _, attrName := range rminfo.Default.RequiredAttributes(parentRMType) {
-		// Skip identity / link metadata we already stamped or never
-		// validate as "required".
-		switch attrName {
-		case "archetype_node_id", "name", "uid", "archetype_details",
-			"links", "feeder_audit":
-			continue
-		}
-		rmType, ok := rminfo.Default.AttributeRMType(parentRMType, attrName)
-		if !ok || rmType == "" {
-			continue
-		}
-		if g.fillEntryCode(parent, parentRMType, attrName) {
-			continue
-		}
-		isContainer, _ := rminfo.Default.IsContainer(parentRMType, attrName)
-		if rmType == "String" {
-			g.writeBMMString(parent, parentRMType, attrName)
-			continue
-		}
-		concrete := concreteFor(rmType)
-		rmChild, err := rmwrite.NewRM(concrete)
-		if err != nil {
-			continue
-		}
-		g.populatePrimitiveDefault(rmChild)
-		g.stampIfLocatable(rmChild, concrete)
-		if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-			g.fillPartyRelationship(rel)
-		}
-		// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE
-		// inside DV_CODED_TEXT) get filled.
-		g.populateBMMRequiredAttrs(rmChild, concrete, depth+1)
-		// Best-effort attach: a default the slot rejects (a polymorphic
-		// attribute the BMM cannot narrow) is left to the validator, as in
-		// materialiseImplicitSingle.
-		if isContainer {
-			_ = rmwrite.AppendMultiple(parent, parentRMType, attrName, rmChild)
-		} else {
-			_ = rmwrite.EnsureSingle(parent, parentRMType, attrName, rmChild)
-		}
+		g.fillBMMAttr(parent, parentRMType, attrName, depth)
 	}
+}
+
+// fillBMMAttr builds a default for attrName of parent from its BMM type
+// alone, fills that default's own BMM-mandatory attributes, and attaches
+// it. A multi-valued attribute gets one member. Identity and link
+// metadata is skipped: the generator stamps it, or the RM does not
+// require it.
+func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth int) {
+	switch attrName {
+	case "archetype_node_id", "name", "uid", "archetype_details",
+		"links", "feeder_audit":
+		return
+	}
+	rmType, ok := rminfo.Default.AttributeRMType(parentRMType, attrName)
+	if !ok || rmType == "" {
+		return
+	}
+	rmType = attrType(parentRMType, rmType)
+	if g.fillEntryCode(nil, parent, parentRMType, attrName) {
+		return
+	}
+	isContainer, _ := rminfo.Default.IsContainer(parentRMType, attrName)
+	if rmType == "String" {
+		g.writeBMMString(parent, parentRMType, attrName)
+		return
+	}
+	concrete := concreteFor(rmType)
+	rmChild, err := rmwrite.NewRM(concrete)
+	if err != nil {
+		return
+	}
+	g.populatePrimitiveDefault(rmChild)
+	g.stampIfLocatable(rmChild, concrete)
+	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
+		g.fillPartyRelationship(nil, rel)
+	}
+	// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE inside
+	// DV_CODED_TEXT) get filled.
+	g.populateBMMRequiredAttrs(rmChild, concrete, depth+1)
+	settleBuilt(rmChild)
+	// Best-effort attach: a default the slot rejects (a polymorphic
+	// attribute the BMM cannot narrow) is left to the validator, as in
+	// materialiseImplicitSingle.
+	switch {
+	case isContainer:
+		_ = rmwrite.AppendMultiple(parent, parentRMType, attrName, rmChild)
+	case !replacesTerminology(parent, attrName, rmChild):
+		_ = rmwrite.EnsureSingle(parent, parentRMType, attrName, rmChild)
+	}
+}
+
+// builtTypeArgument is the type argument the typereg constructor gives a
+// generic class the generator builds from its bare name, for the classes
+// with a required attribute the BMM types by the class's formal parameter:
+// an event is built over ITEM_STRUCTURE, which types its data. An abstract
+// EVENT is built as a POINT_EVENT (concreteFor). A HISTORY needs no row:
+// the BMM types its events as EVENT, not by its parameter.
+var builtTypeArgument = map[string]string{
+	"EVENT":          "ITEM_STRUCTURE",
+	"POINT_EVENT":    "ITEM_STRUCTURE",
+	"INTERVAL_EVENT": "ITEM_STRUCTURE",
+}
+
+// attrType resolves declared, the BMM type of an attribute on a value of
+// parentType, where it is a formal generic parameter such as the T of
+// EVENT.data: to the actual type parentType names, or else to the type
+// argument the generator builds parentType's class with. Any other type
+// is returned unchanged.
+func attrType(parentType, declared string) string {
+	if actual := bmmtype.Substitute(parentType, declared); actual != declared {
+		return actual
+	}
+	class := bmmtype.Class(parentType)
+	if arg, ok := builtTypeArgument[class]; ok {
+		return bmmtype.Substitute(class+"<"+arg+">", declared)
+	}
+	return declared
+}
+
+// settleBuilt gives a value built from the BMM alone, which the walk
+// never reaches, the RM default finishNode gives a walked one where no
+// other pass does: an ISM_TRANSITION's current state, and a party's
+// name.
+func settleBuilt(v any) {
+	switch b := v.(type) {
+	case *rm.IsmTransition:
+		fillCurrentState(nil, b)
+	case *rm.PartyIdentified:
+		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
+	case *rm.PartyRelated:
+		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
+	}
+}
+
+// fillPartyName gives a PARTY_IDENTIFIED, or a PARTY_RELATED, with no
+// name, identifiers or external_ref the name "example", so RM
+// Basic_validity holds. The RM rule wins over the OPT, whether the OPT
+// prohibits name or Minimal would not visit it; a name the walk wrote,
+// one a C_STRING admits, stays.
+func fillPartyName(name **string, identifiers int, externalRef *rm.PartyRef) {
+	if *name != nil || identifiers > 0 || externalRef != nil {
+		return
+	}
+	example := "example"
+	*name = &example
 }
 
 // populatePrimitiveDefault stamps a minimal-valid sentinel on a
@@ -518,42 +751,69 @@ func (g *generator) temporalSentinel(v any) string {
 
 // writeBMMString stores a BMM String attribute. A field that already
 // holds a value is left alone: populatePrimitiveDefault may have set
-// a clock or a code before this pass. An empty value of a temporal
-// data value takes its temporal sentinel, so it stays a valid ISO 8601
-// value; every other empty string keeps the open-string example
-// sentinel.
+// a clock or a code before this pass. The value is bmmStringDefault's.
+// It is written through stringField's setter where that covers the
+// attribute, which reaches the String attributes the template-instance
+// writer has no field for (a text's formatting, a code phrase's
+// preferred_term, a quantity's magnitude_status, a party's name), and
+// through the writer otherwise.
 func (g *generator) writeBMMString(parent any, parentType, attr string) {
-	cur, known := stringAttr(parent, attr)
-	if known && cur != "" {
+	get, set, covered := stringField(parent, attr)
+	if covered && get() != "" {
 		return
 	}
-	val := "example"
-	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
-		val = s
+	val, ok := g.bmmStringDefault(parent, attr)
+	if !ok {
+		return
+	}
+	if covered {
+		set(val)
+		return
 	}
 	// Best-effort, on purpose: the write is refused for a String
-	// attribute rmwrite does not address (TERMINOLOGY_ID.value, a
-	// locatable's archetype_node_id), and those are filled by another
-	// default or reported by the validator. Returning the error would
-	// fail Generate on every OPT.
+	// attribute rmwrite does not address (a locatable's
+	// archetype_node_id), which another default fills or the validator
+	// reports. Returning the error would fail Generate on every OPT.
 	_ = rmwrite.EnsureSingle(parent, parentType, attr, val)
 }
 
-// stringAttr reads a BMM String field the generator itself writes.
-// ok is false when parent has no such field under attr.
-func stringAttr(parent any, attr string) (string, bool) {
-	get, _, ok := stringField(parent, attr)
-	if !ok {
-		return "", false
+// bmmStringDefault is the value writeBMMString gives an empty String
+// attribute attr of parent: a temporal value's sentinel, so it stays a
+// valid ISO 8601 value; "=" for a quantity's magnitude_status, the value
+// its RM invariant Magnitude_status_valid admits; a PARTY_REF's own
+// defaults (partyRef); and the open-string example otherwise. ok is false
+// for a TERMINOLOGY_ID's value, which stays empty: the code phrase it
+// belongs to keeps the terminology it already carries
+// (replacesTerminology).
+func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
+	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
+		return s, true
 	}
-	return get(), true
+	switch parent.(type) {
+	case *rm.DVQuantity:
+		if attr == "magnitude_status" {
+			return "=", true
+		}
+	case *rm.TerminologyID:
+		return "", false
+	case *rm.PartyRef:
+		def := partyRef(nil)
+		switch attr {
+		case "namespace":
+			return def.Namespace, true
+		case "type":
+			return def.Type, true
+		}
+	}
+	return "example", true
 }
 
 // stringField returns a reader and a writer for the BMM String attribute
 // attr of parent. It covers every String attribute of the data values the
-// generator builds, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value
-// and a PARTY_REF's namespace and type, so the walk writes a C_STRING the
-// OPT pins on any of them. A pin on a PARTY_REF holds where the reference
+// generator builds, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value,
+// a PARTY_REF's namespace and type, and a PARTY_IDENTIFIED's or
+// PARTY_RELATED's name, so the walk writes a C_STRING the OPT pins on any
+// of them. A pin on a PARTY_REF holds where the reference
 // can be attached and no later default replaces it: a ROLE's performer
 // keeps it, because fillPerformer fills only the empty parts. A template
 // that names a PARTY_RELATIONSHIP's source or target makes Generate fail
@@ -630,6 +890,14 @@ func stringField(parent any, attr string) (get func() string, set func(string), 
 		case "type":
 			return requiredString(&p.Type)
 		}
+	case *rm.PartyIdentified:
+		if attr == "name" {
+			return optionalString(&p.Name)
+		}
+	case *rm.PartyRelated:
+		if attr == "name" {
+			return optionalString(&p.Name)
+		}
 	}
 	return nil, nil, false
 }
@@ -669,15 +937,17 @@ func optionalString(f **string) (func() string, func(string), bool) {
 }
 
 // fillEntryCode sets ENTRY.language from Options.Language and
-// ENTRY.encoding to UTF-8 when that code is still empty. It reports
-// whether attr is one of those two fields, so the caller does not
-// also build a generic code phrase.
-func (g *generator) fillEntryCode(parent any, parentType, attr string) bool {
+// ENTRY.encoding to UTF-8 when that field has no code (noCode) and the
+// OPT's constraint on it admits the default (codeAdmitted); opt is the
+// OPT node of parent, or nil for an entry built from the BMM alone. It
+// reports whether attr is one of those two fields, so the caller does
+// not also build a generic code phrase.
+func (g *generator) fillEntryCode(opt *tcimpl.CompiledNode, parent any, parentType, attr string) bool {
 	phrase, ok := g.entryCodePhrase(parentType, attr)
 	if !ok {
 		return false
 	}
-	if !entryCodeEmpty(parent, attr) {
+	if !entryCodeEmpty(parent, attr) || !codeAdmitted(opt, attr, phrase) {
 		return true
 	}
 	// Best-effort: every ENTRY parent type is addressed by rmwrite, and an
@@ -715,12 +985,23 @@ func entryCodeEmpty(parent any, attr string) bool {
 	}
 	switch attr {
 	case "language":
-		return lang.CodeString == ""
+		return noCode(lang.CodeString)
 	case "encoding":
-		return enc.CodeString == ""
+		return noCode(enc.CodeString)
 	default:
 		return true
 	}
+}
+
+// noCode reports whether code is no real code: empty, or the placeholder
+// at0000 the walk writes where the OPT names a code phrase without a code
+// (the primitive default of an unconstrained CODE_PHRASE, and the example
+// value of a C_CODE_PHRASE with an empty code list). An RM default
+// replaces such a code. at0000 is an archetype node code, never an ISO
+// 639-1, ISO 3166-1, IANA character-set or openEHR code, so an OPT cannot
+// give it as a real value of an attribute an RM default fills.
+func noCode(code string) bool {
+	return code == "" || code == "at0000"
 }
 
 func entryCodes(parent any) (language, encoding rm.CodePhrase, ok bool) {
@@ -761,8 +1042,9 @@ func settleIntervalEndpoints(optNode *tcimpl.CompiledNode, rmValue any) {
 }
 
 // includedPerOPT returns the value the OPT gives an interval's
-// lower_included or upper_included: the example value of its C_BOOLEAN,
-// which is true whenever the constraint admits true. Without a constraint
+// lower_included or upper_included: the example value of its first
+// C_BOOLEAN the OPT does not prohibit, which is true whenever the
+// constraint admits true. Without a constraint
 // it returns true, the closed endpoint the template parser also assumes
 // when an OPT range omits the flag. It uses the example value under
 // RandomFill too, on purpose: a constraint that admits both values then
@@ -773,7 +1055,7 @@ func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 	if attr == nil {
 		return true
 	}
-	for _, child := range attr.Children() {
+	for _, child := range allowedChildren(attr) {
 		if c, ok := child.PrimitiveConstraint().(constraints.CBoolean); ok {
 			included, _ := c.ExampleValue().(bool)
 			return included
@@ -792,7 +1074,12 @@ func (g *generator) materialiseMultiple(
 	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
-	children := attr.Children()
+	// A child the OPT prohibits gets no member, neither from the
+	// per-child fill nor as the seed of the top-up. With every child
+	// prohibited the attribute is prohibited and not visited
+	// (attrProhibited), unless the BMM marks it mandatory: then it gets
+	// here and is built as one the OPT leaves silent.
+	children := allowedChildren(attr)
 	if len(children) == 0 {
 		// Implicit / OPT-silent multi-valued attribute. A required one
 		// (BMM-mandatory, or existence or cardinality lower of 1 or more)
@@ -916,7 +1203,7 @@ func (g *generator) stampSlotFill(rmValue any, slot *tcimpl.CompiledNode) bool {
 		ArchetypeID: rm.ArchetypeID{Value: archetypeID},
 		RMVersion:   rm.Release,
 	}
-	applyLocatableIdentity(rmValue, archetypeID, slot.RMTypeName(), ad, g.nextUID)
+	applyLocatableIdentity(rmValue, archetypeID, slot.RMTypeName(), ad, g.uidFor(rmValue))
 	return true
 }
 
@@ -952,27 +1239,30 @@ func (g *generator) materialiseImplicitMultiple(
 	// built from the BMM alone has no archetype to name, so an
 	// archetype-rooted one (COMPOSITION.content) would break the RM
 	// floor's archetype_details rule; the RM rule needs no such child.
-	if remainingLowerNeeded(attr, 0) == 0 {
-		return nil
+	needed := remainingLowerNeeded(attr, 0)
+	if cm := attr.ChildMultiplicity(); cm != nil && !cm.UpperUnbounded() {
+		needed = min(needed, cm.Upper())
 	}
-	rmChild, err := newRMForOPTType(rmType)
-	if err != nil {
-		return nil //nolint:nilerr // intentional: defer to validator
+	for range needed {
+		rmChild, err := newRMForOPTType(rmType)
+		if err != nil {
+			return nil //nolint:nilerr // intentional: defer to validator
+		}
+		// A required attribute whose child would be an archetype root is
+		// refused instead, for the same reason: the generator does not
+		// invent an archetype id.
+		if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
+			return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
+				ErrArchetypeIDMissing, built, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
+		}
+		g.populatePrimitiveDefault(rmChild)
+		g.stampIfLocatable(rmChild, concreteFor(rmType))
+		if rel, ok := rmChild.(*rm.PartyRelationship); ok {
+			g.fillPartyRelationship(nil, rel)
+		}
+		g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
+		_ = rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild)
 	}
-	// A required attribute whose child would be an archetype root is
-	// refused instead, for the same reason: the generator does not
-	// invent an archetype id.
-	if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
-		return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
-			ErrArchetypeIDMissing, built, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
-	}
-	g.populatePrimitiveDefault(rmChild)
-	g.stampIfLocatable(rmChild, concreteFor(rmType))
-	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-		g.fillPartyRelationship(rel)
-	}
-	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
-	_ = rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild)
 	return nil
 }
 
@@ -1023,7 +1313,7 @@ func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 	}
 	g.setLocatableIdentity(child, rmChild, false /* isTemplateRoot */)
 	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-		g.fillPartyRelationship(rel)
+		g.fillPartyRelationship(child, rel)
 	}
 	return rmChild, nil
 }
@@ -1083,11 +1373,12 @@ func concreteFor(rmType string) string {
 	return rmType
 }
 
-// setLocatableIdentity stamps archetype_node_id, name, uid (when
-// mandated by RM), and archetype_details on the freshly-built RM
-// value. The isTemplateRoot flag controls whether template_id is
-// stamped on archetype_details — only the very top-level root
-// carries it.
+// setLocatableIdentity stamps archetype_node_id, name, uid (on the
+// classes stampsUID names, unless opt prohibits uid on one that is not a
+// PARTY, and on any locatable whose uid opt requires), and
+// archetype_details on the freshly-built RM value. The
+// isTemplateRoot flag controls whether template_id is stamped on
+// archetype_details — only the very top-level root carries it.
 func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, isTemplateRoot bool) {
 	if opt == nil || rmValue == nil {
 		return
@@ -1137,7 +1428,14 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 		archetypeDetails = ad
 	}
 
-	applyLocatableIdentity(rmValue, id, name, archetypeDetails, g.nextUID)
+	uidSource := g.uidFor(rmValue)
+	switch {
+	case prohibited(opt, "uid") && !partyNeedsUID(rmValue):
+		uidSource = nil
+	case requiresUID(opt):
+		uidSource = g.nextUID
+	}
+	applyLocatableIdentity(rmValue, id, name, archetypeDetails, uidSource)
 }
 
 // applyPrimitiveExample materialises a primitive leaf's ExampleValue
@@ -1360,44 +1658,44 @@ func ordinalSymbolText(ref constraints.CodedTermRef) rm.DVCodedText {
 
 // applyCompositionDefaults sets the COMPOSITION-specific fields
 // per REQ-107: category 433|event|, language, territory, composer,
-// context.start_time. Called once after the OPT-driven walk so the
-// values land regardless of whether the OPT pinned them.
+// and an EVENT_CONTEXT with start_time and setting. Called once after
+// the OPT-driven walk so the values land regardless of whether the OPT
+// pinned them. Each coded default yields to the OPT: it is written only
+// where the OPT's own constraint on that attribute admits it
+// (codeAdmitted), and no EVENT_CONTEXT is created where the OPT
+// prohibits context. The composer is Options.Composer, as given, over any
+// party the walk built from the OPT. The OPT node of c is the template
+// root.
 func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
-	if c.Category.DefiningCode.CodeString == "" {
-		// The rubric comes from the pinned `composition category` group, never
-		// typed beside the code (REQ-034).
-		value, _ := terminology.CompositionCategory.Rubric("433")
-		c.Category = rm.DVCodedText{
-			Value: value,
-			DefiningCode: rm.CodePhrase{
-				CodeString:    "433",
-				TerminologyID: rm.TerminologyID{Value: terminology.ID},
-			},
+	root := g.compiled.Root()
+	if noCode(c.Category.DefiningCode.CodeString) {
+		// The rubric comes from the pinned `composition category` group,
+		// never typed beside the code (REQ-034).
+		if event := openehrCoded(terminology.CompositionCategory, "433"); codedTextAdmitted(root, "category", event) {
+			c.Category = event
 		}
 	} else {
 		// The OPT pinned the code, and the walk left the synthesiser's text
 		// beside it.
 		useGroupRubric(&c.Category, terminology.CompositionCategory)
 	}
-	if c.Language.CodeString == "" {
-		c.Language = rm.CodePhrase{
-			CodeString:    g.opts.Language,
-			TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
-		}
+	language := rm.CodePhrase{CodeString: g.opts.Language, TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
+	if noCode(c.Language.CodeString) && codeAdmitted(root, "language", language) {
+		c.Language = language
 	}
-	if c.Territory.CodeString == "" {
-		c.Territory = rm.CodePhrase{
-			CodeString:    g.opts.Territory,
-			TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"},
-		}
+	territory := rm.CodePhrase{CodeString: g.opts.Territory, TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"}}
+	if noCode(c.Territory.CodeString) && codeAdmitted(root, "territory", territory) {
+		c.Territory = territory
 	}
-	if c.Composer == nil {
-		c.Composer = g.opts.Composer
-	}
+	c.Composer = g.opts.Composer
 	if c.Context == nil {
+		if prohibited(root, "context") {
+			return nil
+		}
 		c.Context = &rm.EventContext{}
 	}
-	if c.Context.StartTime.Value == "" {
+	contextNode := firstChild(root, "context")
+	if c.Context.StartTime.Value == "" && !prohibited(contextNode, "start_time") {
 		c.Context.StartTime = rm.DVDateTime{Value: g.opts.Now.Format(time.RFC3339)}
 	}
 	// EventContext.Setting is BMM-mandatory and carries the RM invariant
@@ -1407,22 +1705,20 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	// unconstrained lets the generic example synthesiser invent an
 	// archetype-local code (`local`/`example`), which reads as populated and
 	// still violates the invariant. Nor is "openehr-coded" enough: a template
-	// can pin an `openehr` code that is not in the group. All three cases now
-	// take the documented default, because the pinned terminology tables
-	// (REQ-034) answer membership directly — so the generator cannot emit a
-	// composition that breaks Setting_valid (REQ-107). Checking the invariant on
-	// a composition the generator did not build stays a REQ-112 RM-floor job.
-	if c.Context.Setting.DefiningCode.CodeString == "" ||
+	// can pin an `openehr` code that is not in the group. All three cases
+	// take the documented default where the template's own constraint on
+	// setting admits it, because the pinned terminology tables (REQ-034)
+	// answer membership directly (REQ-107). Where that constraint rejects
+	// the default, such as a pin of one non-member code or of another
+	// terminology, the walk's value stays and Setting_valid can fail.
+	// Checking the invariant on a composition the generator did not build
+	// stays a REQ-112 RM-floor job.
+	otherCare := openehrCoded(terminology.Setting, "238")
+	if (c.Context.Setting.DefiningCode.CodeString == "" ||
 		c.Context.Setting.DefiningCode.TerminologyID.Value != terminology.ID ||
-		!terminology.Setting.Has(c.Context.Setting.DefiningCode.CodeString) {
-		rubric, _ := terminology.Setting.Rubric("238")
-		c.Context.Setting = rm.DVCodedText{
-			Value: rubric,
-			DefiningCode: rm.CodePhrase{
-				CodeString:    "238",
-				TerminologyID: rm.TerminologyID{Value: terminology.ID},
-			},
-		}
+		!terminology.Setting.Has(c.Context.Setting.DefiningCode.CodeString)) &&
+		codedTextAdmitted(contextNode, "setting", otherCare) {
+		c.Context.Setting = otherCare
 	}
 	return nil
 }
@@ -1444,8 +1740,10 @@ func isRequired(attr *tcimpl.CompiledAttribute) bool {
 }
 
 // newHierObjectID generates a HierObjectID with a random RFC 9562
-// version-4 UUID. Used for LOCATABLE.uid where openEHR mandates
-// uniqueness (Composition, Entry root types). Returns a pointer so
+// version-4 UUID. When Options.UIDSource is nil it gives the uid of each
+// locatable stampsUID names (a Composition, an Entry, a Party), and a
+// PARTY_RELATIONSHIP's uid and empty source or target id. Returns a
+// pointer so
 // canjson's polymorphic dispatch on the UIDBasedID interface emits
 // the `_type:"HIER_OBJECT_ID"` discriminator the decoder needs to
 // round-trip the field. uuid.NewV4 has no error path — it draws from
@@ -1508,35 +1806,37 @@ func firstCollidingOptionalSibling(child *tcimpl.CompiledNode, siblings []*tcimp
 // finishNode fills RM-mandatory fields the OPT walk left empty.
 // REQ-107: generated output has to pass the template-less floor.
 func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
+	// An OPT can name an ENTRY's language or encoding without a code; the
+	// walk then leaves the placeholder there for the RM default to replace,
+	// where the OPT's constraint on that attribute admits the default.
+	if _, _, ok := entryCodes(rmValue); ok {
+		g.fillEntryCode(opt, rmValue, opt.RMTypeName(), "language")
+		g.fillEntryCode(opt, rmValue, opt.RMTypeName(), "encoding")
+	}
 	switch v := rmValue.(type) {
-	case *rm.Action:
-		if v.Time.Value == "" {
-			v.Time = rm.DVDateTime{Value: g.dateTimeDefault()}
-		}
 	case *rm.IsmTransition:
 		fillCurrentState(opt, v)
+	case *rm.IntervalEvent[rm.ItemStructure]:
+		// typereg builds every INTERVAL_EVENT with this instantiation.
+		fillMathFunction(opt, &v.MathFunction)
+	case *rm.DVMultimedia:
+		settleMultimedia(opt, v)
 	case *rm.Cluster:
-		g.ensureItems(opt, &v.Items)
-	case *rm.ItemTree:
-		g.ensureItems(opt, &v.Items)
+		// CLUSTER.items is RM-mandatory. ITEM_TREE.items and ITEM_LIST.items
+		// are optional, so they get no member here: the walk gives them one
+		// when the OPT requires it, and none when the OPT leaves them
+		// optional.
+		g.ensureItems(&v.Items)
 	case *rm.PartyRelationship:
-		g.fillPartyRelationship(v)
+		g.fillPartyRelationship(opt, v)
 	case *rm.Role:
 		fillPerformer(&v.Performer)
+	case *rm.PartyIdentified:
+		fillPartyName(&v.Name, len(v.Identifiers), v.ExternalRef)
+	case *rm.PartyRelated:
+		fillPartyName(&v.Name, len(v.Identifiers), v.ExternalRef)
 	case *rm.Element:
-		settleElement(v)
-	case *rm.ItemList:
-		if len(v.Items) == 0 {
-			v.Items = append(v.Items, *g.placeholderElement())
-		}
-	case *rm.Activity:
-		if v.ActionArchetypeID == "" {
-			v.ActionArchetypeID = "openEHR-EHR-ACTION.example.v1"
-		}
-	case *rm.ItemSingle:
-		if v.Item.GetArchetypeNodeID() == "" && (v.Item.Value == nil || rm.IsTypedNil(v.Item.Value)) {
-			v.Item = *g.placeholderElement()
-		}
+		g.settleElement(opt, v)
 	case *rm.DVEHRURI:
 		// Backstop for a DV_EHR_URI the primitive default did not reach;
 		// every one the generator emits is walked.
@@ -1554,37 +1854,161 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	}
 }
 
-// ensureItems puts one member in an RM-mandatory items list. When the
-// OPT names a child, that child is used so the template's RM type is
-// kept. A list the OPT does not describe gets one ELEMENT.
-func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
-	if len(*items) > 0 {
+// fillMathFunction gives an INTERVAL_EVENT's math function the code 146
+// (mean) of the openEHR event math function group, with that code's
+// rubric, when the OPT gave it no code (noCode) and the OPT's constraint
+// on it admits that code (codeAdmitted), so RM Math_function_validity
+// holds. A code the OPT gave is kept. opt is the OPT node of the event.
+func fillMathFunction(opt *tcimpl.CompiledNode, mf *rm.DVCodedText) {
+	mean := openehrCoded(terminology.EventMathFunction, "146")
+	if !noCode(mf.DefiningCode.CodeString) || !codedTextAdmitted(opt, "math_function", mean) {
 		return
 	}
-	if opt != nil {
-		if attr := opt.Attribute("items"); attr != nil && len(attr.Children()) > 0 {
-			for _, child := range attr.Children() {
-				made, err := g.makeChild(child)
-				if err != nil {
-					continue
-				}
-				// A slot fill takes the walk's slot branch, like the fills
-				// materialiseSingle and materialiseMultiple make.
-				if child.IsSlot() && !g.stampSlotFill(made, child) {
-					continue
-				}
-				if err := g.walkNode(child, made); err != nil {
-					continue
-				}
-				item, ok := made.(rm.Item)
-				if !ok {
-					continue
-				}
-				*items = append(*items, item)
-				return
-			}
-			return
-		}
+	*mf = mean
+}
+
+// openehrCoded is the coded text of code in the openEHR terminology, with
+// the pinned rubric of that code in group as its text.
+func openehrCoded(group *terminology.Group, code string) rm.DVCodedText {
+	rubric, _ := group.Rubric(code)
+	return rm.DVCodedText{
+		Value: rubric,
+		DefiningCode: rm.CodePhrase{
+			CodeString:    code,
+			TerminologyID: rm.TerminologyID{Value: terminology.ID},
+		},
+	}
+}
+
+// settleMultimedia gives a DV_MULTIMEDIA the RM defaults the OPT left it
+// without, where the OPT's own constraint admits them. A media type with
+// no code (noCode) becomes text/plain in IANA_media-types, so RM
+// Media_type_valid holds, unless the OPT's constraint on media_type
+// rejects that, such as a C_CODE_PHRASE that names the terminology
+// openEHR (codeAdmitted); a code the OPT gave is kept. A value with
+// neither uri nor data gets the uri http://example.com, so RM Not_empty
+// holds, unless the OPT prohibits uri. opt is the OPT node of m.
+func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
+	textPlain := rm.CodePhrase{
+		CodeString:    "text/plain",
+		TerminologyID: rm.TerminologyID{Value: "IANA_media-types"},
+	}
+	if noCode(m.MediaType.CodeString) && codeAdmitted(opt, "media_type", textPlain) {
+		m.MediaType = textPlain
+	}
+	if (m.URI == nil || rm.IsTypedNil(m.URI)) && len(m.Data) == 0 && !prohibited(opt, "uri") {
+		m.URI = &rm.DVURI{Value: "http://example.com"}
+	}
+}
+
+// prohibited reports whether the OPT prohibits attrName of opt and no RM
+// rule needs it (attrProhibited). opt is nil
+// for a value built from the BMM alone, which no OPT constrains.
+func prohibited(opt *tcimpl.CompiledNode, attrName string) bool {
+	if opt == nil {
+		return false
+	}
+	attr := opt.Attribute(attrName)
+	return attr != nil && attrProhibited(attr)
+}
+
+// codeAdmitted reports whether the OPT's own constraint on attrName of opt
+// admits phrase as the attribute's code, so an RM default may be written
+// there. It reads the constraint through phraseAdmitted; see
+// defaultAdmitted for the cases that admit anything or nothing.
+func codeAdmitted(opt *tcimpl.CompiledNode, attrName string, phrase rm.CodePhrase) bool {
+	return defaultAdmitted(opt, attrName, func(node *tcimpl.CompiledNode) bool {
+		return phraseAdmitted(node, phrase)
+	})
+}
+
+// codedTextAdmitted reports whether the OPT's own constraint on the coded
+// text attrName of opt admits ct: its code through phraseAdmitted, and its
+// text through a C_STRING the OPT puts on the coded text's value.
+func codedTextAdmitted(opt *tcimpl.CompiledNode, attrName string, ct rm.DVCodedText) bool {
+	return defaultAdmitted(opt, attrName, func(node *tcimpl.CompiledNode) bool {
+		return codedTextAdmits(node, ct)
+	})
+}
+
+// codedTextAdmits reports whether node, the OPT child a coded text is
+// built from, admits ct: its code through phraseAdmitted, its text
+// through a C_STRING on its value. A nil node admits anything.
+func codedTextAdmits(node *tcimpl.CompiledNode, ct rm.DVCodedText) bool {
+	return node == nil || (phraseAdmitted(node, ct.DefiningCode) && stringAdmitted(node.Attribute("value"), ct.Value))
+}
+
+// defaultAdmitted reports whether the OPT's own constraint on attrName of
+// opt admits an RM default, as admits says of the first OPT child the OPT
+// does not prohibit, the one the walk builds the attribute from. An
+// attribute the OPT prohibits admits nothing. opt is nil for a value built
+// from the BMM alone, and an attribute the OPT does not name, or names
+// with no child, admits any default, as does a mandatory one whose
+// children the OPT all prohibits.
+func defaultAdmitted(opt *tcimpl.CompiledNode, attrName string, admits func(*tcimpl.CompiledNode) bool) bool {
+	if opt == nil {
+		return true
+	}
+	attr := opt.Attribute(attrName)
+	if attr == nil {
+		return true
+	}
+	if attrProhibited(attr) {
+		return false
+	}
+	if node := firstChild(opt, attrName); node != nil {
+		return admits(node)
+	}
+	return true
+}
+
+// phraseAdmitted reports whether the OPT node that constrains a code
+// phrase, or a coded text through its defining_code, admits phrase. It
+// reads the two shapes an OPT gives that constraint, as the template
+// validator does: a C_CODE_PHRASE, and a CODE_PHRASE node whose
+// code_string, or whose terminology_id's value, carries a C_STRING. Below
+// node it reads, like the walk, the first alternative the OPT does not
+// prohibit.
+func phraseAdmitted(node *tcimpl.CompiledNode, phrase rm.CodePhrase) bool {
+	if cp, ok := node.PrimitiveConstraint().(constraints.CodePhrase); ok {
+		ref := constraints.CodedTermRef{Terminology: phrase.TerminologyID.Value, CodeString: phrase.CodeString}
+		return len(cp.Validate(ref)) == 0
+	}
+	if dc := firstChild(node, "defining_code"); dc != nil {
+		return phraseAdmitted(dc, phrase)
+	}
+	if !stringAdmitted(node.Attribute("code_string"), phrase.CodeString) {
+		return false
+	}
+	if tid := firstChild(node, "terminology_id"); tid != nil {
+		return stringAdmitted(tid.Attribute("value"), phrase.TerminologyID.Value)
+	}
+	return true
+}
+
+// stringAdmitted reports whether the C_STRING the OPT puts on attr, its
+// first child the OPT does not prohibit, accepts s. An attribute the OPT
+// does not name, or constrains with no C_STRING, accepts any string.
+func stringAdmitted(attr *tcimpl.CompiledAttribute, s string) bool {
+	if attr == nil {
+		return true
+	}
+	children := allowedChildren(attr)
+	if len(children) == 0 {
+		return true
+	}
+	cs, ok := children[0].PrimitiveConstraint().(constraints.CString)
+	return !ok || len(cs.Validate(s)) == 0
+}
+
+// ensureItems puts the placeholder ELEMENT in an RM-mandatory items list
+// the walk left empty: a slot fill's, whose body the OPT does not
+// describe. A list the OPT itself sizes is filled by the walk, from its
+// OPT children or from its BMM type, and is never empty here, a
+// prohibited one included, since the RM requires a member.
+func (g *generator) ensureItems(items *[]rm.Item) {
+	if len(*items) > 0 {
+		return
 	}
 	*items = append(*items, g.placeholderElement())
 }
@@ -1594,31 +2018,106 @@ func (g *generator) ensureItems(opt *tcimpl.CompiledNode, items *[]rm.Item) {
 // fill, so it carries a null flavour (RM Inv_null_flavour_indicated).
 func (g *generator) placeholderElement() *rm.Element {
 	el := &rm.Element{}
-	applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
-	settleElement(el)
+	applyLocatableIdentity(el, "at0000", "element", nil, nil)
+	g.settleElement(nil, el)
 	return el
 }
 
 // settleElement makes an ELEMENT carry exactly one of value and null_flavour
 // (RM Inv_null_flavour_indicated), and a null_reason only while it is null
-// (RM Inv_null_reason_valid). A value wins: when the OPT constrains the value
-// and either null attribute, the null flavour and the null reason are both
-// dropped. An ELEMENT with no value, because the OPT constrains none or none
-// could be generated, keeps any null reason and gets the null flavour
-// "no information" when it has none. A null flavour the OPT filled keeps its
-// code, and takes the pinned rubric of that code when the code is in the
-// openEHR null flavours group.
-func settleElement(e *rm.Element) {
+// (RM Inv_null_reason_valid). A value wins, and the null flavour and the
+// null reason are dropped, unless it gives way (valueGivesWay): the OPT
+// allows both value and null_flavour and requires null_flavour or
+// null_reason but not value; the value is then dropped. An ELEMENT with
+// no value keeps any null reason and gets the null flavour
+// "no information" when it has none, or one with no code (noCode), unless
+// the OPT's constraint on null_flavour rejects that code (codeAdmitted);
+// where a code-phrase constraint rejects it, the walk's null flavour
+// stays. Where the OPT prohibits null_flavour, the RM rule wins: the
+// ELEMENT takes a value built as for an ELEMENT.value the OPT leaves
+// silent, or, where the OPT prohibits value as well, the null flavour the
+// walk wrote as if the OPT allowed it (visits), with "no information"
+// where that leaves no code its own child admits. A null flavour with a
+// code keeps it, and takes the pinned rubric of that code when the code
+// is in the openEHR null flavours group. opt is the OPT node of e, or nil
+// for an ELEMENT built from the BMM alone.
+func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 	if e.Value != nil && !rm.IsTypedNil(e.Value) {
-		e.NullFlavour = nil
+		if !valueGivesWay(opt) {
+			e.NullFlavour = nil
+			e.NullReason = nil
+			return
+		}
+		e.Value = nil
+	}
+	if e.NullFlavour != nil && !noCode(e.NullFlavour.DefiningCode.CodeString) {
+		useGroupRubric(e.NullFlavour, terminology.NullFlavours)
+		return
+	}
+	nf := noInformation()
+	if nullFlavourNeeded(opt) {
+		// The OPT prohibits value and null_flavour, and the RM rule needs
+		// the null flavour: the walk wrote it as if the OPT allowed it, and
+		// the default goes where its own child admits it.
+		if codedTextAdmits(firstChild(opt, "null_flavour"), *nf) {
+			e.NullFlavour = nf
+		}
+		return
+	}
+	if codedTextAdmitted(opt, "null_flavour", *nf) {
+		e.NullFlavour = nf
+		return
+	}
+	if e.NullFlavour != nil {
+		return
+	}
+	// The OPT prohibits null_flavour, and the RM rule that an ELEMENT
+	// carry one of value and null_flavour wins: a value as for a silent
+	// ELEMENT.value.
+	if g.fillElementValue(e) {
 		e.NullReason = nil
-		return
 	}
-	if e.NullFlavour == nil {
-		e.NullFlavour = noInformation()
-		return
+}
+
+// nullFlavourNeeded reports whether opt, an ELEMENT's OPT node, prohibits
+// both value and null_flavour, so the RM rule Inv_null_flavour_indicated
+// needs the null flavour, which is then written as if the OPT allowed it.
+func nullFlavourNeeded(opt *tcimpl.CompiledNode) bool {
+	return prohibited(opt, "null_flavour") && prohibited(opt, "value")
+}
+
+// valueGivesWay reports whether an ELEMENT's value gives way to its null
+// attributes: the OPT allows both value and null_flavour, and requires
+// null_flavour or null_reason but not value. Otherwise the value wins.
+func valueGivesWay(opt *tcimpl.CompiledNode) bool {
+	if opt == nil || prohibited(opt, "value") || prohibited(opt, "null_flavour") || requiresAttr(opt, "value") {
+		return false
 	}
-	useGroupRubric(e.NullFlavour, terminology.NullFlavours)
+	return requiresAttr(opt, "null_flavour") || requiresAttr(opt, "null_reason")
+}
+
+// requiresAttr reports whether opt names attrName as required: the BMM
+// marks it mandatory or its existence lower bound is at least 1.
+func requiresAttr(opt *tcimpl.CompiledNode, attrName string) bool {
+	attr := opt.Attribute(attrName)
+	return attr != nil && isRequired(attr)
+}
+
+// fillElementValue gives e the value the generator builds for an
+// ELEMENT.value the OPT leaves silent: a default of the attribute's BMM
+// type. It reports whether it wrote one.
+func (g *generator) fillElementValue(e *rm.Element) bool {
+	rmType, ok := rminfo.Default.AttributeRMType("ELEMENT", "value")
+	if !ok {
+		return false
+	}
+	value, err := newRMForOPTType(rmType)
+	if err != nil {
+		return false
+	}
+	g.populatePrimitiveDefault(value)
+	g.populateBMMRequiredAttrs(value, concreteFor(rmType), 0)
+	return rmwrite.EnsureSingle(e, "ELEMENT", "value", value) == nil
 }
 
 // useGroupRubric sets the text of a coded text to the pinned rubric of its
@@ -1638,15 +2137,8 @@ func useGroupRubric(v *rm.DVCodedText, group *terminology.Group) {
 // noInformation is the "no information" code (271) of the openEHR null
 // flavours group.
 func noInformation() *rm.DVCodedText {
-	const code = "271"
-	rubric, _ := terminology.NullFlavours.Rubric(code)
-	return &rm.DVCodedText{
-		Value: rubric,
-		DefiningCode: rm.CodePhrase{
-			CodeString:    code,
-			TerminologyID: rm.TerminologyID{Value: terminology.ID},
-		},
-	}
+	nf := openehrCoded(terminology.NullFlavours, "271")
+	return &nf
 }
 
 func symbolBlank(s rm.DVCodedText) bool {
@@ -1674,17 +2166,22 @@ func (g *generator) stampIfLocatable(rmValue any, rmType string) {
 	if name == "" {
 		name = "element"
 	}
-	applyLocatableIdentity(rmValue, "at0000", name, nil, g.nextUID)
+	applyLocatableIdentity(rmValue, "at0000", name, nil, g.uidFor(rmValue))
 	if el, ok := rmValue.(*rm.Element); ok {
-		settleElement(el)
+		g.settleElement(nil, el)
 	}
 }
 
-func (g *generator) fillPartyRelationship(rel *rm.PartyRelationship) {
+// fillPartyRelationship gives a PARTY_RELATIONSHIP what the RM requires
+// and the walk leaves empty: its node id, its uid unless the OPT
+// prohibits it, and a source and a target reference, each with an id
+// from Options.UIDSource. opt is the relationship's OPT node, or nil for
+// one built from the BMM alone.
+func (g *generator) fillPartyRelationship(opt *tcimpl.CompiledNode, rel *rm.PartyRelationship) {
 	if rel.GetArchetypeNodeID() == "" {
-		applyLocatableIdentity(rel, "at0000", "relationship", nil, g.nextUID)
+		applyLocatableIdentity(rel, "at0000", "relationship", nil, nil)
 	}
-	if rel.GetUID() == nil {
+	if rel.GetUID() == nil && !prohibited(opt, "uid") {
 		rel.SetUID(g.nextUID())
 	}
 	if rel.Source.Namespace == "" || rel.Source.Type == "" || rel.Source.ID == nil {
@@ -1755,61 +2252,21 @@ func partyRefType(cs constraints.CString, chosen string) (string, error) {
 	return "", errNoPartyRefType
 }
 
+// fillCurrentState gives an ISM_TRANSITION whose current state has no
+// code (noCode) the code 524 (initial) of the openEHR instruction states
+// group, with its rubric, where the OPT's constraint on current_state
+// admits it (codedTextAdmitted). The alternative the walk builds is the OPT's value for
+// the attribute: a code a later alternative names is not, so it is never
+// read. opt is the OPT node of iv.
 func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
-	if iv.CurrentState.DefiningCode.CodeString != "" {
+	if !noCode(iv.CurrentState.DefiningCode.CodeString) {
 		return
 	}
-	ref, ok := firstCodedExample(opt, "current_state")
-	if !ok {
-		ref = constraints.CodedTermRef{Terminology: terminology.ID, CodeString: "524"}
+	initial := openehrCoded(terminology.InstructionStates, "524")
+	if !codedTextAdmitted(opt, "current_state", initial) {
+		return
 	}
-	rubric := ref.CodeString
-	if text, found := terminology.InstructionStates.Rubric(ref.CodeString); found {
-		rubric = text
-	}
-	iv.CurrentState = rm.DVCodedText{
-		Value: rubric,
-		DefiningCode: rm.CodePhrase{
-			CodeString:    ref.CodeString,
-			TerminologyID: rm.TerminologyID{Value: ref.Terminology},
-		},
-	}
-}
-
-func firstCodedExample(opt *tcimpl.CompiledNode, attrName string) (constraints.CodedTermRef, bool) {
-	if opt == nil {
-		return constraints.CodedTermRef{}, false
-	}
-	attr := opt.Attribute(attrName)
-	if attr == nil {
-		return constraints.CodedTermRef{}, false
-	}
-	var found constraints.CodedTermRef
-	var ok bool
-	var walk func(*tcimpl.CompiledNode)
-	walk = func(n *tcimpl.CompiledNode) {
-		if n == nil || ok {
-			return
-		}
-		if pc := n.PrimitiveConstraint(); pc != nil {
-			if phrase, is := pc.(constraints.CodePhrase); is {
-				if ref, isRef := phrase.ExampleValue().(constraints.CodedTermRef); isRef && ref.CodeString != "" {
-					found = ref
-					ok = true
-					return
-				}
-			}
-		}
-		for _, a := range n.Attributes() {
-			for _, child := range a.Children() {
-				walk(child)
-			}
-		}
-	}
-	for _, child := range attr.Children() {
-		walk(child)
-	}
-	return found, ok
+	iv.CurrentState = initial
 }
 
 // applyStringLeaf writes a C_STRING leaf onto the String attribute attr

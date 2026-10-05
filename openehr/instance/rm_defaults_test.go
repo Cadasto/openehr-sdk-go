@@ -43,13 +43,7 @@ func optPrimitive(rmType, itemType, body string) string {
 // codes of terminologyID with a C_CODE_PHRASE. The OPT says nothing about
 // the text.
 func optCodedText(terminologyID string, codes ...string) string {
-	var list strings.Builder
-	for _, code := range codes {
-		list.WriteString(`<code_list>` + code + `</code_list>`)
-	}
-	phrase := `<children xsi:type="C_CODE_PHRASE"><rm_type_name>CODE_PHRASE</rm_type_name><node_id></node_id>` +
-		`<terminology_id><value>` + terminologyID + `</value></terminology_id>` + list.String() + `</children>`
-	return optNode("DV_CODED_TEXT", "", optSingle("defining_code", phrase))
+	return optNode("DV_CODED_TEXT", "", optSingle("defining_code", optCodePhrase(terminologyID, codes...)))
 }
 
 // walkText is the text the walk gives a DV_CODED_TEXT built by
@@ -128,8 +122,8 @@ var defaultsNow = time.Date(2021, 3, 4, 5, 6, 7, 0, time.UTC)
 // without children, so the generator's implicit fills supply them.
 var entryAttrs = []string{optSingle("language"), optSingle("encoding"), optSingle("subject")}
 
-// emptyTree is an ITEM_TREE the OPT names with no attributes, so its
-// items list is left to the generator.
+// emptyTree is an ITEM_TREE the OPT names with no attributes. Its items
+// list is optional in the RM, so the generator gives it no member.
 var emptyTree = optNode("ITEM_TREE", "at0001")
 
 // TestREQ107_RMDefaultsFillOPTSilentFields is the REQ-107 check that
@@ -169,14 +163,16 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 			},
 		},
 		{
-			name: "ITEM_TREE items",
+			// ITEM_TREE.items is optional in the RM and the OPT does not
+			// name it, so the tree gets no member.
+			name: "ITEM_TREE items stay empty",
 			opt: optTemplate("ACTION", append(entryAttrs,
 				optSingle("ism_transition", optNode("ISM_TRANSITION", "")),
 				optSingle("description", emptyTree))...),
 			check: func(t *testing.T, out any) {
 				tree, _ := out.(*rm.Action).Description.(*rm.ItemTree)
-				if tree == nil || len(tree.Items) != 1 || nodeID(tree.Items[0]) != "at0000" {
-					t.Errorf("ACTION.description = %+v, want an ITEM_TREE with one at0000 item", out.(*rm.Action).Description)
+				if tree == nil || len(tree.Items) != 0 {
+					t.Errorf("ACTION.description = %+v, want an ITEM_TREE with no items", out.(*rm.Action).Description)
 				}
 			},
 		},
@@ -191,21 +187,25 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 			},
 		},
 		{
-			name: "ITEM_LIST items",
+			// ITEM_LIST.items is optional in the RM and the OPT does not
+			// name it, so the list gets no member.
+			name: "ITEM_LIST items stay empty",
 			opt:  optTemplate("ITEM_LIST"),
 			check: func(t *testing.T, out any) {
-				l := out.(*rm.ItemList)
-				if len(l.Items) != 1 || l.Items[0].ArchetypeNodeID != "at0000" {
-					t.Errorf("ITEM_LIST.items = %+v, want one at0000 ELEMENT", l.Items)
+				if l := out.(*rm.ItemList); len(l.Items) != 0 {
+					t.Errorf("ITEM_LIST.items = %+v, want none", l.Items)
 				}
 			},
 		},
 		{
+			// The compiled ACTIVITY carries no action_archetype_id, a BMM
+			// String the generator fills as an attribute the OPT leaves
+			// silent, so RM Action_archetype_id_valid (not empty) holds.
 			name: "ACTIVITY action_archetype_id",
 			opt:  optTemplate("ACTIVITY", optSingle("description", emptyTree)),
 			check: func(t *testing.T, out any) {
-				if got := out.(*rm.Activity).ActionArchetypeID; got != "openEHR-EHR-ACTION.example.v1" {
-					t.Errorf("ACTIVITY.action_archetype_id = %q, want openEHR-EHR-ACTION.example.v1", got)
+				if got := out.(*rm.Activity).ActionArchetypeID; got == "" {
+					t.Errorf("ACTIVITY.action_archetype_id is empty, want a value")
 				}
 			},
 		},
@@ -384,7 +384,7 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 			},
 		},
 		{
-			name: "DV_PROPORTION precision and accuracy",
+			name: "DV_PROPORTION numerator, denominator, precision and accuracy",
 			opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_PROPORTION", "",
 				optSingle("numerator", optPrimitive("REAL", "C_REAL", "<list>3</list>")),
 				optSingle("denominator", optPrimitive("REAL", "C_REAL", "<list>4</list>")),
@@ -395,6 +395,9 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 				p, _ := out.(*rm.Element).Value.(*rm.DVProportion)
 				if p == nil {
 					t.Fatalf("ELEMENT.value = %T, want *rm.DVProportion", out.(*rm.Element).Value)
+				}
+				if p.Numerator != 3 || p.Denominator != 4 {
+					t.Errorf("DV_PROPORTION = %v/%v, want the pinned 3/4", p.Numerator, p.Denominator)
 				}
 				if p.Precision == nil || *p.Precision != 2 {
 					t.Errorf("DV_PROPORTION.precision = %v, want 2", p.Precision)
