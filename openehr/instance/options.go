@@ -151,7 +151,12 @@ var ErrConstraintUnsatisfiable = errors.New("instance.Generate: no value satisfi
 // PARTY, EHR_STATUS or EHR_ACCESS) but names no archetype for it. Such an
 // object could not carry valid archetype_details, so the RM floor would
 // reject it, and the generator does not invent an archetype id to avoid
-// that. The error names the RM type and the OPT path, and Generate returns
-// no root. It never wraps, and is never wrapped by,
-// [ErrSlotFillUnsupported] or [ErrConstraintUnsatisfiable].
+// that. A slot is not such an object: the slot-fill rule stamps it with an
+// archetype id, or refuses it with [ErrSlotFillUnsupported]. An archetype
+// id the template carries under an xsi:type the parser does not recognise
+// is dropped by lenient parsing, so this error covers that case too. The
+// error names the RM type and the OPT path, and Generate returns no root.
+// It wraps neither [ErrSlotFillUnsupported] nor
+// [ErrConstraintUnsatisfiable], and ErrConstraintUnsatisfiable never wraps
+// it.
 var ErrArchetypeIDMissing = errors.New("instance.Generate: the template names no archetype for an archetype root")

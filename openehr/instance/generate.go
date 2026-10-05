@@ -32,7 +32,10 @@ import (
 //
 // When the template asks for an object of a class that is always an
 // archetype root but names no archetype for it, Generate returns an
-// error wrapping [ErrArchetypeIDMissing] and no root.
+// error wrapping [ErrArchetypeIDMissing] and no root. A slot is not
+// such an object: the slot-fill rule gives a required slot an
+// archetype id from its includes, or the RM-type-prefix example id
+// when it has none, or refuses it with [ErrSlotFillUnsupported].
 func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -336,7 +339,9 @@ func (g *generator) materialiseImplicitSingle(
 	// A default built from the BMM alone has no archetype to name, so it
 	// must not be an archetype root: an optional attribute gets nothing,
 	// and a required one is refused, as in materialiseImplicitMultiple.
-	// No single attribute of the pinned RM reaches this today.
+	// No attribute the pinned RM declares single-valued has such a
+	// default; a template reaches this by writing a multi-valued one,
+	// such as COMPOSITION.content, as a single attribute.
 	if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
 		if !isRequired(attr) {
 			return nil
