@@ -598,9 +598,13 @@ func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string)
 // can name (LOCATABLE, ITEM, ITEM_STRUCTURE, DATA_VALUE, EVENT,
 // CONTENT_ITEM, ENTRY, CARE_ENTRY, PARTY_PROXY); concrete
 // subtypes admitted under each.
+//
+// A parameterised name such as "DV_INTERVAL<DV_COUNT>" is looked up by
+// its class, "DV_INTERVAL", because the generic parameter does not
+// change which abstract types the class conforms to.
 func rmTypeIsSubtypeOf(concrete, abstract string) bool {
 	subtypes := bmmSubtypes[abstract]
-	return slices.Contains(subtypes, concrete)
+	return slices.Contains(subtypes, bmmtype.Class(concrete))
 }
 
 // intervalRMTypeMatches reports whether a concrete interval RM type
@@ -701,19 +705,22 @@ func primitiveValueMatchesShortName(shortName string, val any) bool {
 // bmmSubtypes is the closed lookup of abstract → concrete RM type
 // admission rules used by checkRMType. Sourced from
 // openehr_rm_1.2.0.bmm: concrete classes that satisfy each
-// abstract slot. Entries are limited to the RM types the rest of
-// the validator routes — describeRMType, locatableArchetypeNodeID,
-// and the rmread table. Adding an abstract→concrete row here
-// without the corresponding routing rows would surface as a false
-// rm_type_mismatch (the walker would not recognise the concrete);
-// the inverse — concretes whose abstract slot is missing — would
-// surface as the same false positive on a polymorphic OPT slot.
-// Extend in lock-step.
+// abstract slot. Every row is written by hand.
 //
-// Out of scope for v2: DV_INTERVAL / DV_PARSABLE / DV_MULTIMEDIA /
-// DV_PROPORTION / DV_SCALE / DV_STATE / time-specifications (DataValue
-// subtypes outside the closed REQ-103 primitive set). Add when an OPT
-// surfaces a real consumer for them.
+// A concrete class missing from its abstract row is refused with a
+// false rm_type_mismatch wherever an OPT node declares that abstract
+// type. Adding a class to a row needs no naming table elsewhere:
+// describeRMType names every class the generated type registry holds
+// (rm.RMTypeName), and locatableArchetypeNodeID reads
+// archetype_node_id through rm.Locatable. What the walker reads below
+// a node still comes from rmread, so an OPT that constrains attributes
+// of a newly admitted class also needs rmread readers for them. Extend
+// the rows in lock-step with the BMM and with rmread.
+//
+// The DATA_VALUE row holds every concrete DATA_VALUE descendant of the
+// pinned BMM. TestDataValueSubtypesMatchBMM compares it with rminfo, so
+// a BMM bump that adds or drops a data value type fails that test until
+// the row follows it.
 //
 // REQ-110 added the demographic PARTY hierarchy (+ sub-components) and
 // the EHR-IM roots FOLDER / EHR_STATUS so non-COMPOSITION OPTs validate
@@ -762,10 +769,12 @@ var bmmSubtypes = map[string][]string{
 		"PARTY_SELF", "PARTY_IDENTIFIED", "PARTY_RELATED",
 	},
 	"DATA_VALUE": {
-		"DV_TEXT", "DV_CODED_TEXT", "DV_QUANTITY", "DV_COUNT",
-		"DV_BOOLEAN", "DV_ORDINAL", "DV_DATE", "DV_TIME",
-		"DV_DATE_TIME", "DV_DURATION",
-		"DV_IDENTIFIER", "DV_URI", "DV_EHR_URI",
+		"DV_BOOLEAN", "DV_CODED_TEXT", "DV_COUNT", "DV_DATE",
+		"DV_DATE_TIME", "DV_DURATION", "DV_EHR_URI",
+		"DV_GENERAL_TIME_SPECIFICATION", "DV_IDENTIFIER", "DV_INTERVAL",
+		"DV_MULTIMEDIA", "DV_ORDINAL", "DV_PARAGRAPH", "DV_PARSABLE",
+		"DV_PERIODIC_TIME_SPECIFICATION", "DV_PROPORTION", "DV_QUANTITY",
+		"DV_SCALE", "DV_STATE", "DV_TEXT", "DV_TIME", "DV_URI",
 	},
 	// AOM 1.4 primitive short names (used under C_PRIMITIVE_OBJECT)
 	// admit the canonical DV wrapper carrying the primitive value.

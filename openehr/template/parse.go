@@ -235,8 +235,8 @@ type xmlCObject struct {
 	// REQ-103 primitive constraint payload — only some are
 	// meaningful per xsi:type. The dispatch in buildPrimitive reads
 	// only the fields relevant to the parent xsi:type.
-	TrueValid        *bool                  `xml:"true_valid"`
-	FalseValid       *bool                  `xml:"false_valid"`
+	TrueValid        xmlBoolFlag            `xml:"true_valid"`
+	FalseValid       xmlBoolFlag            `xml:"false_valid"`
 	Range            *xmlNumericInterval    `xml:"range"`
 	PrimitivePattern string                 `xml:"pattern"`
 	PrimitiveList    []xmlPrimitiveListItem `xml:"list"`
